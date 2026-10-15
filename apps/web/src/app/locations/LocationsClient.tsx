@@ -221,7 +221,11 @@ export default function LocationsClient({
                               <div className="mb-3 h-36 w-full overflow-hidden rounded-lg bg-muted">
                                 <iframe
                                   src={embedSrc}
-                                  title={name ? `${name} — map` : 'Branch location map'}
+                                  title={
+                                    name
+                                      ? t(`${name} — map`, `خريطة ${name}`)
+                                      : t('Branch location map', 'خريطة الفرع')
+                                  }
                                   className="h-full w-full border-0"
                                   loading="lazy"
                                   referrerPolicy="no-referrer-when-downgrade"

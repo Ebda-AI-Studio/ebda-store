@@ -83,7 +83,7 @@ function MinimalProductCard({
   showCardPrice,
   showHover,
 }: ProductCardProps) {
-  const { isRtl: ctxIsRtl } = useLanguage();
+  const { isRtl: ctxIsRtl, t } = useLanguage();
   const { store, layout } = useStore();
   // Ruling NUMERALS-1: Western digits unless the store opted in (Arabic only).
   const numerals = storeNumerals(store?.theme);
@@ -236,7 +236,7 @@ function MinimalProductCard({
           {product.inStock !== false && isProductNew(product) && (
             <span
               className="absolute top-2 start-2 z-10 px-2 py-0.5 text-xs font-medium uppercase tracking-[0.18em] text-[hsl(var(--primary))] bg-background"
-              aria-label={isRtl ? 'منتج جديد' : 'New product'}
+              aria-label={t('New product', 'منتج جديد')}
             >
               {isRtl ? 'جديد' : 'NEW'}
             </span>

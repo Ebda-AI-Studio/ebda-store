@@ -19,7 +19,7 @@ export default function MinimalHeader({
   urlPrefix = '',
   headerBgColor,
 }: HeaderProps) {
-  const { isRtl: ctxIsRtl } = useLanguage();
+  const { isRtl: ctxIsRtl, t } = useLanguage();
   const isRtl = isRtlProp ?? ctxIsRtl;
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -107,7 +107,7 @@ export default function MinimalHeader({
               type="button"
               onClick={() => setIsSearchOpen(!isSearchOpen)}
               className="hidden lg:inline-flex h-11 w-11 items-center justify-center text-muted-foreground hover:text-foreground transition-colors duration-200 cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
-              aria-label={isRtl ? 'بحث' : 'Search'}
+              aria-label={t('Search', 'بحث')}
               aria-expanded={isSearchOpen}
             >
               <svg
@@ -137,7 +137,7 @@ export default function MinimalHeader({
             <Link
               href={isLoggedIn ? `${urlPrefix}/account` : `${urlPrefix}/auth/login`}
               className="hidden md:inline-flex h-11 w-11 items-center justify-center text-muted-foreground hover:text-foreground transition-colors duration-200 outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
-              aria-label={isRtl ? 'الحساب' : 'Account'}
+              aria-label={t('Account', 'الحساب')}
             >
               <svg
                 className="w-4 h-4"
@@ -159,7 +159,7 @@ export default function MinimalHeader({
             <Link
               href={`${urlPrefix}/cart`}
               className="relative hidden md:inline-flex h-11 w-11 items-center justify-center text-muted-foreground hover:text-foreground transition-colors duration-200 outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
-              aria-label={isRtl ? `سلة التسوق (${cartItemCount})` : `Cart (${cartItemCount} items)`}
+              aria-label={t(`Cart (${cartItemCount} items)`, `سلة التسوق (${cartItemCount})`)}
             >
               <CartIcon className="w-4 h-4" strokeWidth={1} aria-hidden="true" />
               {cartItemCount > 0 && (
@@ -177,7 +177,7 @@ export default function MinimalHeader({
               type="button"
               onClick={() => setIsMenuOpen(!isMenuOpen)}
               className="lg:hidden inline-flex h-11 w-11 items-center justify-center text-muted-foreground hover:text-foreground transition-colors duration-200 cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
-              aria-label={isRtl ? 'القائمة' : 'Menu'}
+              aria-label={t('Menu', 'القائمة')}
               aria-expanded={isMenuOpen}
             >
               <svg
@@ -221,10 +221,10 @@ export default function MinimalHeader({
               type="text"
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
-              placeholder={isRtl ? 'بحث' : 'Search'}
+              placeholder={t('Search', 'بحث')}
               className="w-full ps-10 pe-3 py-2.5 text-base sm:text-xs tracking-wide bg-transparent border border-border text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-foreground transition-colors duration-200 rounded"
               dir={isRtl ? 'rtl' : 'ltr'}
-              aria-label={isRtl ? 'بحث عن المنتجات' : 'Search products'}
+              aria-label={t('Search products', 'بحث عن المنتجات')}
             />
             <SearchAutocomplete
               query={searchQuery}
@@ -247,11 +247,11 @@ export default function MinimalHeader({
               type="text"
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
-              placeholder={isRtl ? 'بحث...' : 'Search...'}
+              placeholder={t('Search...', 'بحث...')}
               className="w-full text-center text-base sm:text-xs tracking-wide bg-transparent border-b border-border text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-foreground pb-2 transition-colors duration-200"
               dir={isRtl ? 'rtl' : 'ltr'}
               autoFocus={isSearchOpen}
-              aria-label={isRtl ? 'بحث عن المنتجات' : 'Search products'}
+              aria-label={t('Search products', 'بحث عن المنتجات')}
             />
             <SearchAutocomplete
               query={searchQuery}

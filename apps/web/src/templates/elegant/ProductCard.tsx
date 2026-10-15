@@ -78,7 +78,7 @@ function ElegantProductCard({
   showCardName,
   showCardPrice,
 }: ProductCardProps) {
-  const { isRtl: ctxIsRtl } = useLanguage();
+  const { isRtl: ctxIsRtl, t } = useLanguage();
   const { store, layout } = useStore();
   // Ruling NUMERALS-1: Western digits unless the store opted in (Arabic only).
   const numerals = storeNumerals(store?.theme);
@@ -218,7 +218,7 @@ function ElegantProductCard({
             'opacity-100 lg:opacity-0',
             (isHovered || isWishlisted) && 'lg:opacity-100'
           )}
-          aria-label={isRtl ? 'إضافة للمفضلة' : 'Add to wishlist'}
+          aria-label={t('Add to wishlist', 'إضافة للمفضلة')}
           aria-pressed={isWishlisted}
         >
           <svg

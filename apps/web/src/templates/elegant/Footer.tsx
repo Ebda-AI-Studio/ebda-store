@@ -30,7 +30,7 @@ export default function ElegantFooter({
   theme,
   locations,
 }: FooterProps) {
-  const { isRtl: ctxIsRtl, language } = useLanguage();
+  const { isRtl: ctxIsRtl, language, t } = useLanguage();
   const isRtl = isRtlProp ?? ctxIsRtl;
   const displayName = isRtl && branding.nameAr ? branding.nameAr : branding.name;
   const displayLogo = footerLogo || (isRtl && branding.logoAr ? branding.logoAr : branding.logo);
@@ -138,8 +138,8 @@ export default function ElegantFooter({
                       autoComplete="email"
                       value={email}
                       onChange={e => setEmail(e.target.value)}
-                      placeholder={isRtl ? 'البريد الإلكتروني' : 'Enter your email'}
-                      aria-label={isRtl ? 'البريد الإلكتروني' : 'Email address'}
+                      placeholder={t('Enter your email', 'البريد الإلكتروني')}
+                      aria-label={t('Email address', 'البريد الإلكتروني')}
                       className="h-12 min-w-0 flex-1 px-6 bg-background border border-border focus:border-foreground focus:outline-none text-sm tracking-wide placeholder:text-muted-foreground/50 transition-colors duration-500"
                       dir={isRtl ? 'rtl' : 'ltr'}
                       required

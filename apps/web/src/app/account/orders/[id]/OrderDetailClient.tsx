@@ -1165,7 +1165,8 @@ export default function OrderDetailClient() {
             onClick={() => {
               navigator.clipboard.writeText(order.trackingNumber!).catch(() => undefined);
             }}
-            title="Copy to clipboard"
+            title={t('Copy to clipboard', 'نسخ')}
+            aria-label={t('Copy tracking number', 'نسخ رقم التتبع')}
             className="flex-shrink-0 rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
           >
             <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">

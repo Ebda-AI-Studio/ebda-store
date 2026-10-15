@@ -20,7 +20,7 @@ export default function BoldHeader({
   urlPrefix = '',
   headerBgColor,
 }: HeaderProps) {
-  const { isRtl: ctxIsRtl } = useLanguage();
+  const { isRtl: ctxIsRtl, t } = useLanguage();
   const { store } = useStore();
   const isRtl = isRtlProp ?? ctxIsRtl;
   // Item 2 (2026-07-12) persona-completion: bold's bordered-header chrome
@@ -104,7 +104,7 @@ export default function BoldHeader({
               <button
                 onClick={() => setIsSearchOpen(!isSearchOpen)}
                 className="hidden md:inline-flex h-11 w-11 items-center justify-center rounded-lg text-white/70 hover:text-white hover:bg-white/10 transition-colors duration-200 cursor-pointer"
-                aria-label={isRtl ? 'بحث' : 'Search'}
+                aria-label={t('Search', 'بحث')}
               >
                 <svg
                   className="w-5 h-5"
@@ -132,7 +132,7 @@ export default function BoldHeader({
               <Link
                 href={isLoggedIn ? `${urlPrefix}/account` : `${urlPrefix}/auth/login`}
                 className="hidden md:inline-flex h-11 w-11 items-center justify-center rounded-lg text-white/70 hover:text-white hover:bg-white/10 transition-colors duration-200 cursor-pointer"
-                aria-label={isRtl ? 'الحساب' : 'Account'}
+                aria-label={t('Account', 'الحساب')}
               >
                 <svg
                   className="w-5 h-5"
@@ -154,7 +154,7 @@ export default function BoldHeader({
               <Link
                 href={`${urlPrefix}/cart`}
                 className="relative hidden md:inline-flex h-11 w-11 items-center justify-center rounded-lg text-white/70 hover:text-white hover:bg-white/10 transition-colors duration-200 cursor-pointer"
-                aria-label={isRtl ? `سلة (${cartItemCount})` : `Cart (${cartItemCount})`}
+                aria-label={t(`Cart (${cartItemCount})`, `سلة (${cartItemCount})`)}
               >
                 <CartIcon className="w-5 h-5" aria-hidden="true" />
                 {cartItemCount > 0 && (
@@ -170,7 +170,7 @@ export default function BoldHeader({
               <button
                 onClick={() => setIsMenuOpen(!isMenuOpen)}
                 className="md:hidden inline-flex h-11 w-11 items-center justify-center rounded-lg text-white/70 hover:text-white hover:bg-white/10 transition-colors duration-200 cursor-pointer"
-                aria-label={isRtl ? 'القائمة' : 'Menu'}
+                aria-label={t('Menu', 'القائمة')}
                 aria-expanded={isMenuOpen}
               >
                 <svg
@@ -213,10 +213,10 @@ export default function BoldHeader({
                 type="text"
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
-                placeholder={isRtl ? 'بحث' : 'Search'}
+                placeholder={t('Search', 'بحث')}
                 className="w-full ps-11 pe-4 py-3 bg-white/10 text-white placeholder:text-white/40 rounded-lg border border-white/20 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent text-base sm:text-sm font-medium transition-colors duration-200"
                 dir={isRtl ? 'rtl' : 'ltr'}
-                aria-label={isRtl ? 'بحث عن المنتجات' : 'Search products'}
+                aria-label={t('Search products', 'بحث عن المنتجات')}
               />
               <SearchAutocomplete
                 query={searchQuery}
@@ -237,11 +237,11 @@ export default function BoldHeader({
                 type="text"
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
-                placeholder={isRtl ? 'ابحث...' : 'Search products...'}
+                placeholder={t('Search products...', 'ابحث...')}
                 className="min-w-0 flex-1 px-4 py-2.5 bg-white/10 text-white placeholder:text-white/40 rounded-lg border border-white/20 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent text-base sm:text-sm font-medium transition-colors duration-200"
                 dir={isRtl ? 'rtl' : 'ltr'}
                 autoFocus={isSearchOpen}
-                aria-label={isRtl ? 'بحث عن المنتجات' : 'Search products'}
+                aria-label={t('Search products', 'بحث عن المنتجات')}
               />
               <button
                 type="submit"
@@ -276,7 +276,7 @@ export default function BoldHeader({
           Item 5 (2026-07-12): same enter/exit curve as the overlay above. */}
       <div
         className={`fixed top-0 end-0 z-50 h-full w-[85vw] max-w-xs bg-gray-950 border-s border-white/10 md:hidden transition-transform ease-out motion-reduce:duration-0 overscroll-contain ${isMenuOpen ? 'translate-x-0 duration-[220ms]' : isRtl ? '-translate-x-full duration-[160ms]' : 'translate-x-full duration-[160ms]'}`}
-        aria-label={isRtl ? 'قائمة التنقل' : 'Navigation menu'}
+        aria-label={t('Navigation menu', 'قائمة التنقل')}
       >
         <div className="flex items-center justify-between p-4 border-b border-white/10">
           <span className="font-black ui-caps-toggle tracking-wider text-white text-sm">
@@ -285,7 +285,7 @@ export default function BoldHeader({
           <button
             onClick={() => setIsMenuOpen(false)}
             className="inline-flex h-11 w-11 items-center justify-center rounded-lg text-white/70 hover:text-white hover:bg-white/10 transition-colors duration-200 cursor-pointer"
-            aria-label={isRtl ? 'إغلاق' : 'Close menu'}
+            aria-label={t('Close menu', 'إغلاق')}
           >
             <svg
               className="w-5 h-5"

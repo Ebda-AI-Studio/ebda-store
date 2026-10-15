@@ -32,7 +32,7 @@ export default function ModernFooter({
   theme,
   locations,
 }: FooterProps) {
-  const { isRtl: ctxIsRtl, language } = useLanguage();
+  const { isRtl: ctxIsRtl, language, t } = useLanguage();
   const isRtl = isRtlProp ?? ctxIsRtl;
   const [email, setEmail] = useState('');
   const [subscribed, setSubscribed] = useState(false);
@@ -347,8 +347,8 @@ export default function ModernFooter({
                     type="email"
                     value={email}
                     onChange={e => setEmail(e.target.value)}
-                    placeholder={isRtl ? 'البريد الإلكتروني' : 'Email address'}
-                    aria-label={isRtl ? 'البريد الإلكتروني' : 'Email address'}
+                    placeholder={t('Email address', 'البريد الإلكتروني')}
+                    aria-label={t('Email address', 'البريد الإلكتروني')}
                     className="w-full px-4 py-2.5 bg-foreground/10 rounded-lg border border-white/10 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 text-sm text-foreground placeholder:text-foreground/55 transition-colors duration-300 ease-out"
                     dir={isRtl ? 'rtl' : 'ltr'}
                     required

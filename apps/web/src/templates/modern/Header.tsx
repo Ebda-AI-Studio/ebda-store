@@ -19,7 +19,7 @@ export default function ModernHeader({
   urlPrefix = '',
   headerBgColor,
 }: HeaderProps) {
-  const { isRtl: ctxIsRtl } = useLanguage();
+  const { isRtl: ctxIsRtl, t } = useLanguage();
   const isRtl = isRtlProp ?? ctxIsRtl;
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -74,7 +74,7 @@ export default function ModernHeader({
               type="button"
               onClick={() => setIsMenuOpen(!isMenuOpen)}
               className="md:hidden inline-flex h-11 w-11 items-center justify-center rounded-lg hover:bg-muted transition-colors duration-300 ease-out cursor-pointer"
-              aria-label={isRtl ? 'القائمة' : 'Menu'}
+              aria-label={t('Menu', 'القائمة')}
               aria-expanded={isMenuOpen}
             >
               <svg
@@ -137,7 +137,7 @@ export default function ModernHeader({
                 type="button"
                 onClick={() => setIsSearchOpen(!isSearchOpen)}
                 className="hidden md:inline-flex h-11 w-11 items-center justify-center rounded-lg hover:bg-muted transition-colors duration-300 ease-out cursor-pointer"
-                aria-label={isRtl ? 'بحث' : 'Search'}
+                aria-label={t('Search', 'بحث')}
                 aria-expanded={isSearchOpen}
               >
                 {isSearchOpen ? (
@@ -183,7 +183,7 @@ export default function ModernHeader({
               <Link
                 href={isLoggedIn ? `${urlPrefix}/account` : `${urlPrefix}/auth/login`}
                 className="hidden md:inline-flex h-11 w-11 items-center justify-center rounded-lg hover:bg-muted transition-colors duration-300 ease-out"
-                aria-label={isRtl ? 'الحساب' : 'Account'}
+                aria-label={t('Account', 'الحساب')}
               >
                 <svg
                   className="w-5 h-5"
@@ -205,9 +205,7 @@ export default function ModernHeader({
               <Link
                 href={`${urlPrefix}/cart`}
                 className="relative hidden md:inline-flex h-11 w-11 items-center justify-center rounded-lg hover:bg-muted transition-colors duration-300 ease-out"
-                aria-label={
-                  isRtl ? `سلة التسوق (${cartItemCount})` : `Cart (${cartItemCount} items)`
-                }
+                aria-label={t(`Cart (${cartItemCount} items)`, `سلة التسوق (${cartItemCount})`)}
               >
                 <CartIcon className="w-5 h-5" aria-hidden="true" />
                 {cartItemCount > 0 && (
@@ -248,10 +246,10 @@ export default function ModernHeader({
                 type="text"
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
-                placeholder={isRtl ? 'ابحث...' : 'Search'}
+                placeholder={t('Search', 'ابحث...')}
                 className="w-full ps-11 pe-4 py-3 bg-muted rounded-full border border-border focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-base sm:text-sm transition-colors duration-300 ease-out"
                 dir={isRtl ? 'rtl' : 'ltr'}
-                aria-label={isRtl ? 'بحث عن المنتجات' : 'Search products'}
+                aria-label={t('Search products', 'بحث عن المنتجات')}
               />
               <SearchAutocomplete
                 query={searchQuery}
@@ -272,11 +270,11 @@ export default function ModernHeader({
                 type="text"
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
-                placeholder={isRtl ? 'ابحث عن المنتجات...' : 'Search products...'}
+                placeholder={t('Search products...', 'ابحث عن المنتجات...')}
                 className="min-w-0 flex-1 px-4 py-2.5 bg-muted rounded-lg border border-border focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-base sm:text-sm transition-colors duration-300 ease-out"
                 dir={isRtl ? 'rtl' : 'ltr'}
                 autoFocus={isSearchOpen}
-                aria-label={isRtl ? 'بحث عن المنتجات' : 'Search products'}
+                aria-label={t('Search products', 'بحث عن المنتجات')}
               />
               <button
                 type="submit"
@@ -311,7 +309,7 @@ export default function ModernHeader({
           Item 5 (2026-07-12): same enter/exit curve as the overlay above. */}
       <div
         className={`fixed top-0 end-0 z-50 h-full w-[85vw] max-w-xs bg-background shadow-2xl md:hidden transition-transform ease-out motion-reduce:duration-0 overscroll-contain ${isMenuOpen ? 'translate-x-0 duration-[220ms]' : isRtl ? '-translate-x-full duration-[160ms]' : 'translate-x-full duration-[160ms]'}`}
-        aria-label={isRtl ? 'قائمة التنقل' : 'Navigation menu'}
+        aria-label={t('Navigation menu', 'قائمة التنقل')}
       >
         <div className="flex items-center justify-between p-4 border-b border-border">
           <span className="font-semibold text-foreground">{isRtl ? 'القائمة' : 'Menu'}</span>
@@ -319,7 +317,7 @@ export default function ModernHeader({
             type="button"
             onClick={() => setIsMenuOpen(false)}
             className="inline-flex h-11 w-11 items-center justify-center rounded-lg hover:bg-muted transition-colors duration-300 ease-out cursor-pointer"
-            aria-label={isRtl ? 'إغلاق' : 'Close menu'}
+            aria-label={t('Close menu', 'إغلاق')}
           >
             <svg
               className="w-5 h-5"

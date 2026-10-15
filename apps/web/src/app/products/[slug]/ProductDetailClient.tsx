@@ -421,17 +421,28 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
     // must never wait on the network round-trip to reflect the toggle.
     const wasWishlisted = isWishlisted;
     setIsWishlisted(!wasWishlisted);
+    // Every shopper-facing string through t() (R-05): these toasts were English-only.
+    const name = language === 'ar' && product.nameAr ? product.nameAr : product.name;
     try {
       if (wasWishlisted) {
         await api.delete(`/wishlist/product/${product.id}`);
-        toastSuccess('Removed from wishlist', `${product.name} removed from your wishlist`);
+        toastSuccess(
+          t('Removed from wishlist', 'أُزيل من المفضلة'),
+          t(`${name} removed from your wishlist`, `أُزيل ${name} من المفضلة`)
+        );
       } else {
         await api.post('/wishlist', { productId: product.id });
-        toastSuccess('Added to wishlist', `${product.name} added to your wishlist`);
+        toastSuccess(
+          t('Added to wishlist', 'أُضيف إلى المفضلة'),
+          t(`${name} added to your wishlist`, `أُضيف ${name} إلى المفضلة`)
+        );
       }
     } catch {
       setIsWishlisted(wasWishlisted);
-      toastError('Error', 'Failed to update wishlist. Please try again.');
+      toastError(
+        t('Error', 'خطأ'),
+        t('Failed to update wishlist. Please try again.', 'تعذّر تحديث المفضلة. حاول مرة أخرى.')
+      );
     }
   };
 
@@ -1175,9 +1186,11 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
                     size="lg"
                     variant="outline"
                     onClick={handleToggleWishlist}
-                    aria-label={isWishlisted ? 'Remove from wishlist' : 'Add to wishlist'}
+                    aria-label={t('Save to wishlist', 'حفظ في المفضلة')}
+                    aria-pressed={isWishlisted}
                   >
                     <svg
+                      aria-hidden="true"
                       className="h-5 w-5"
                       fill={isWishlisted ? 'currentColor' : 'none'}
                       viewBox="0 0 24 24"

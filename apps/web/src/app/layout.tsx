@@ -16,6 +16,7 @@ import { buildStorefrontMetadata } from '../lib/storefront-metadata';
 import { MarketingPixelsProvider } from '../components/MarketingPixels';
 import { PostHogProvider } from '../components/PostHogProvider';
 import { ServiceWorkerRegistration } from '../components/ServiceWorkerRegistration';
+import { SkipLink } from '../components/SkipLink';
 import { ScrollToTop } from '../components/ScrollToTop';
 import { PushNotificationPrompt } from '../components/PushNotificationPrompt';
 import { OneSignalStorefrontInit } from '../components/OneSignalStorefrontInit';
@@ -562,18 +563,15 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             container (overflow-x-hidden), so Next's window-targeted scroll
             restoration alone leaves pages loading mid-page. */}
         <ScrollToTop />
-        <a
-          href="#main-content"
-          className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:start-4 focus:z-[9999] focus:rounded-lg focus:bg-background focus:px-4 focus:py-2 focus:text-sm focus:font-medium focus:text-foreground focus:shadow-lg focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
-        >
-          Skip to main content
-        </a>
         <StoreProvider
           initialStore={store}
           previewDraftToken={draftToken}
           initialIsPlatform={initialIsPlatform}
         >
           <LanguageProvider defaultLanguage={resolvedLanguage}>
+            {/* Skip link: still the first focusable element in <body>, now named in
+                the page's language (R-05). */}
+            <SkipLink />
             <ConsentProvider initialConsent={resolvedConsent}>
               {/* PostHog product analytics — mounted INSIDE ConsentProvider
                   so it can read the consent state. Init is gated on

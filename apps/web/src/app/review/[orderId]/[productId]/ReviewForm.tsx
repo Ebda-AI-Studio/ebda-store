@@ -127,7 +127,7 @@ export function ReviewForm({ orderId, productId, token, product, store }: Props)
   if (submitted) {
     return (
       <main className="max-w-lg mx-auto p-6 text-center" dir={dir}>
-        <div className="text-5xl mb-4" role="img" aria-label="success">
+        <div className="text-5xl mb-4" aria-hidden="true">
           ✅
         </div>
         <h1 className="text-2xl font-bold mb-2">

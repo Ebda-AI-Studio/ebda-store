@@ -37,7 +37,7 @@ interface BlogCarouselProps {
  * Trust strip / Brand story / footer rhythm above and below.
  */
 export function BlogCarousel({ posts, spacingSettings }: BlogCarouselProps) {
-  const { isRtl } = useLanguage();
+  const { isRtl, t } = useLanguage();
   const numerals = useStoreNumerals();
   const storeUrl = useStoreUrl();
   const { store } = useStore();
@@ -47,7 +47,7 @@ export function BlogCarousel({ posts, spacingSettings }: BlogCarouselProps) {
 
   return (
     <section
-      aria-label={isRtl ? 'المدونة' : 'Blog'}
+      aria-label={t('Blog', 'المدونة')}
       dir={isRtl ? 'rtl' : 'ltr'}
       className={`bg-[hsl(var(--bg-page))] ${wrapperClass}`}
     >

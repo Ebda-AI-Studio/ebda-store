@@ -20,7 +20,7 @@ export default function ElegantHeader({
   utilityBar,
   headerBgColor,
 }: HeaderProps) {
-  const { isRtl: ctxIsRtl } = useLanguage();
+  const { isRtl: ctxIsRtl, t } = useLanguage();
   const isRtl = isRtlProp ?? ctxIsRtl;
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -101,7 +101,7 @@ export default function ElegantHeader({
             type="button"
             onClick={() => setIsMenuOpen(!isMenuOpen)}
             className="md:hidden inline-flex h-11 w-11 items-center justify-center text-foreground/60 hover:text-foreground transition-colors duration-500 ease-out cursor-pointer"
-            aria-label={isRtl ? 'القائمة' : 'Menu'}
+            aria-label={t('Menu', 'القائمة')}
             aria-expanded={isMenuOpen}
           >
             <svg
@@ -147,7 +147,7 @@ export default function ElegantHeader({
               type="button"
               onClick={() => setIsSearchOpen(!isSearchOpen)}
               className="hidden md:inline-flex h-11 w-11 items-center justify-center text-foreground/50 hover:text-foreground transition-colors duration-500 ease-out cursor-pointer"
-              aria-label={isRtl ? 'بحث' : 'Search'}
+              aria-label={t('Search', 'بحث')}
             >
               <svg
                 className="w-5 h-5"
@@ -176,7 +176,7 @@ export default function ElegantHeader({
             <Link
               href={isLoggedIn ? `${urlPrefix}/account` : `${urlPrefix}/auth/login`}
               className="hidden md:inline-flex h-11 w-11 items-center justify-center text-foreground/50 hover:text-foreground transition-colors duration-500 ease-out cursor-pointer"
-              aria-label={isRtl ? 'الحساب' : 'Account'}
+              aria-label={t('Account', 'الحساب')}
             >
               <svg
                 className="w-5 h-5"
@@ -198,7 +198,7 @@ export default function ElegantHeader({
             <Link
               href={`${urlPrefix}/cart`}
               className="relative hidden md:inline-flex h-11 w-11 items-center justify-center text-foreground/50 hover:text-foreground transition-colors duration-500 ease-out cursor-pointer"
-              aria-label={isRtl ? `السلة (${cartItemCount})` : `Cart (${cartItemCount})`}
+              aria-label={t(`Cart (${cartItemCount})`, `السلة (${cartItemCount})`)}
             >
               <CartIcon className="w-5 h-5" strokeWidth={1} aria-hidden="true" />
               {cartItemCount > 0 && (
@@ -246,10 +246,10 @@ export default function ElegantHeader({
               type="text"
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
-              placeholder={isRtl ? 'بحث' : 'Search'}
+              placeholder={t('Search', 'بحث')}
               className="w-full ps-11 pe-4 py-3 bg-transparent border-b border-border focus:outline-none focus:border-foreground text-base sm:text-sm tracking-[0.08em] placeholder:text-muted-foreground/50 transition-colors duration-500"
               dir={isRtl ? 'rtl' : 'ltr'}
-              aria-label={isRtl ? 'بحث عن المنتجات' : 'Search products'}
+              aria-label={t('Search products', 'بحث عن المنتجات')}
             />
             <SearchAutocomplete
               query={searchQuery}
@@ -269,11 +269,11 @@ export default function ElegantHeader({
               type="text"
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
-              placeholder={isRtl ? 'ما الذي تبحث عنه؟' : 'What are you looking for?'}
+              placeholder={t('What are you looking for?', 'ما الذي تبحث عنه؟')}
               className="w-full px-0 py-3 bg-transparent border-0 border-b border-border focus:outline-none focus:border-foreground text-center text-base sm:text-sm tracking-[0.1em] placeholder:text-muted-foreground/50 transition-colors duration-500"
               dir={isRtl ? 'rtl' : 'ltr'}
               autoFocus={isSearchOpen}
-              aria-label={isRtl ? 'بحث عن المنتجات' : 'Search products'}
+              aria-label={t('Search products', 'بحث عن المنتجات')}
             />
             <SearchAutocomplete
               query={searchQuery}

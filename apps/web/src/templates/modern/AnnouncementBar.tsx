@@ -19,7 +19,7 @@ export default function ModernAnnouncementBar({
   onDismiss,
   urlPrefix,
 }: AnnouncementBarProps) {
-  const { isRtl: ctxIsRtl } = useLanguage();
+  const { isRtl: ctxIsRtl, t } = useLanguage();
   const isRtl = isRtlProp ?? ctxIsRtl;
   const [isDismissed, setIsDismissed] = useState(false);
   const [isVisible, setIsVisible] = useState(false);
@@ -95,7 +95,7 @@ export default function ModernAnnouncementBar({
         <button
           onClick={handleDismiss}
           className="absolute top-1/2 -translate-y-1/2 end-3 p-1 rounded-full hover:bg-white/20 transition-colors cursor-pointer"
-          aria-label={isRtl ? 'إغلاق' : 'Dismiss'}
+          aria-label={t('Dismiss', 'إغلاق')}
         >
           <svg
             className="w-3.5 h-3.5"

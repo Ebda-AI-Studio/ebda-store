@@ -78,7 +78,7 @@ function ModernProductCard({
   showCardName,
   showCardPrice,
 }: ProductCardProps) {
-  const { isRtl: ctxIsRtl } = useLanguage();
+  const { isRtl: ctxIsRtl, t } = useLanguage();
   const { store, layout } = useStore();
   // Ruling NUMERALS-1: Western digits unless the store opted in (Arabic only).
   const numerals = storeNumerals(store?.theme);
@@ -234,7 +234,7 @@ function ModernProductCard({
                 ? 'bg-destructive text-destructive-foreground scale-[1.05]'
                 : 'bg-white/95 text-foreground hover:bg-white hover:scale-[1.05]'
             )}
-            aria-label={isRtl ? 'إضافة للمفضلة' : 'Add to wishlist'}
+            aria-label={t('Add to wishlist', 'إضافة للمفضلة')}
             aria-pressed={isWishlisted}
           >
             <svg

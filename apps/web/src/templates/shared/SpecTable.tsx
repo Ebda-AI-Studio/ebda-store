@@ -31,13 +31,13 @@ interface SpecTableProps {
 }
 
 export function SpecTable({ specifications, className = '' }: SpecTableProps) {
-  const { isRtl } = useLanguage();
+  const { isRtl, t } = useLanguage();
   const rows = normalize(specifications);
   if (rows.length === 0) return null;
 
   return (
     <section
-      aria-label={isRtl ? 'المواصفات' : 'Specifications'}
+      aria-label={t('Specifications', 'المواصفات')}
       dir={isRtl ? 'rtl' : 'ltr'}
       className={`rounded-lg border border-foreground/10 ${className}`}
     >

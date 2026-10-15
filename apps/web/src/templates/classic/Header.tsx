@@ -20,7 +20,7 @@ export default function ClassicHeader({
   utilityBar,
   headerBgColor,
 }: HeaderProps) {
-  const { isRtl: ctxIsRtl } = useLanguage();
+  const { isRtl: ctxIsRtl, t } = useLanguage();
   const isRtl = isRtlProp ?? ctxIsRtl;
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -92,7 +92,7 @@ export default function ClassicHeader({
           <button
             onClick={() => setIsMenuOpen(!isMenuOpen)}
             className="md:hidden inline-flex h-11 w-11 items-center justify-center cursor-pointer text-foreground hover:text-primary transition-colors duration-500"
-            aria-label={isRtl ? 'القائمة' : 'Menu'}
+            aria-label={t('Menu', 'القائمة')}
             aria-expanded={isMenuOpen}
           >
             <svg
@@ -171,7 +171,7 @@ export default function ClassicHeader({
               <button
                 onClick={() => document.getElementById('classic-search-input')?.focus()}
                 className="cursor-pointer text-foreground/60 hover:text-foreground transition-colors duration-500"
-                aria-label={isRtl ? 'بحث' : 'Search'}
+                aria-label={t('Search', 'بحث')}
               >
                 <svg
                   className="w-5 h-5"
@@ -194,7 +194,7 @@ export default function ClassicHeader({
               <Link
                 href={isLoggedIn ? `${urlPrefix}/account` : `${urlPrefix}/auth/login`}
                 className="text-foreground/60 hover:text-foreground transition-colors duration-500"
-                aria-label={isRtl ? 'الحساب' : 'Account'}
+                aria-label={t('Account', 'الحساب')}
               >
                 <svg
                   className="w-5 h-5"
@@ -214,9 +214,7 @@ export default function ClassicHeader({
               <Link
                 href={`${urlPrefix}/cart`}
                 className="relative text-foreground/60 hover:text-foreground transition-colors duration-500 cursor-pointer"
-                aria-label={
-                  isRtl ? `سلة التسوق (${cartItemCount})` : `Cart (${cartItemCount} items)`
-                }
+                aria-label={t(`Cart (${cartItemCount} items)`, `سلة التسوق (${cartItemCount})`)}
               >
                 <CartIcon className="w-5 h-5" strokeWidth={1.5} aria-hidden="true" />
                 {cartItemCount > 0 && (
@@ -236,7 +234,7 @@ export default function ClassicHeader({
             <Link
               href={`${urlPrefix}/cart`}
               className="relative hidden md:inline-flex h-11 w-11 items-center justify-center text-foreground/60 hover:text-foreground transition-colors duration-500 cursor-pointer"
-              aria-label={isRtl ? 'السلة' : 'Cart'}
+              aria-label={t('Cart', 'السلة')}
             >
               <CartIcon className="w-5 h-5" strokeWidth={1.5} aria-hidden="true" />
               {cartItemCount > 0 && (
@@ -272,10 +270,10 @@ export default function ClassicHeader({
             type="text"
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
-            placeholder={isRtl ? 'بحث' : 'Search'}
+            placeholder={t('Search', 'بحث')}
             className="w-full ps-11 pe-4 py-2.5 border border-border bg-transparent font-serif text-base sm:text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-foreground transition-colors duration-500 rounded"
             dir={isRtl ? 'rtl' : 'ltr'}
-            aria-label={isRtl ? 'بحث عن المنتجات' : 'Search products'}
+            aria-label={t('Search products', 'بحث عن المنتجات')}
           />
           <SearchAutocomplete query={searchQuery} onSelect={() => setSearchQuery('')} />
         </form>
@@ -289,10 +287,10 @@ export default function ClassicHeader({
             type="text"
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
-            placeholder={isRtl ? 'ابحث في مجموعتنا...' : 'Search our collection...'}
+            placeholder={t('Search our collection...', 'ابحث في مجموعتنا...')}
             className="w-full py-1.5 px-0 border-b border-border bg-transparent font-serif text-base sm:text-sm text-center text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-foreground transition-colors duration-500"
             dir={isRtl ? 'rtl' : 'ltr'}
-            aria-label={isRtl ? 'بحث عن المنتجات' : 'Search products'}
+            aria-label={t('Search products', 'بحث عن المنتجات')}
           />
           <SearchAutocomplete query={searchQuery} onSelect={() => setSearchQuery('')} />
         </form>
@@ -334,10 +332,10 @@ export default function ClassicHeader({
                 type="text"
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
-                placeholder={isRtl ? 'بحث...' : 'Search...'}
+                placeholder={t('Search...', 'بحث...')}
                 className="w-full py-2 px-0 border-b border-border bg-transparent text-sm font-serif text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-foreground transition-colors duration-500"
                 dir={isRtl ? 'rtl' : 'ltr'}
-                aria-label={isRtl ? 'بحث عن المنتجات' : 'Search products'}
+                aria-label={t('Search products', 'بحث عن المنتجات')}
               />
               <SearchAutocomplete
                 query={searchQuery}

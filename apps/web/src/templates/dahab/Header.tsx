@@ -147,7 +147,7 @@ export default function DahabHeader({
             type="button"
             onClick={() => setLanguage(language === 'ar' ? 'en' : 'ar')}
             className={cx(ICON_BTN, 'hidden w-auto px-2 text-sm lg:flex')}
-            aria-label={language === 'ar' ? 'Switch to English' : 'التبديل إلى العربية'}
+            aria-label={t('التبديل إلى العربية', 'Switch to English')}
             lang={language === 'ar' ? 'en' : 'ar'}
           >
             {language === 'ar' ? 'EN' : 'عربي'}

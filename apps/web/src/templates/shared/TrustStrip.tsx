@@ -105,7 +105,7 @@ export function resolveTrustStripItems(
 }
 
 export function TrustStrip({ settings }: { settings?: TrustStripSettings } = {}) {
-  const { isRtl } = useLanguage();
+  const { isRtl, t } = useLanguage();
   const { store } = useStore();
   // Layout + size: page-builder layout.trustStrip wins; legacy theme.*
   // fallback covers stores saved before the page-builder section landed.
@@ -206,7 +206,7 @@ export function TrustStrip({ settings }: { settings?: TrustStripSettings } = {})
 
   return (
     <section
-      aria-label={isRtl ? 'لماذا تتسوق معنا' : 'Why shop with us'}
+      aria-label={t('Why shop with us', 'لماذا تتسوق معنا')}
       dir={isRtl ? 'rtl' : 'ltr'}
       className={`bg-[hsl(var(--bg-page))] ${wrapperClass}`}
       style={sectionBgStyle(settings?.bgColor, store.theme)}

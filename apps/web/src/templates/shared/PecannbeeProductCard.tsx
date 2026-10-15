@@ -99,7 +99,7 @@ function PecannbeeProductCardImpl({
   showCardName,
   showCardPrice,
 }: PecannbeeProductCardProps) {
-  const { isRtl: ctxIsRtl } = useLanguage();
+  const { isRtl: ctxIsRtl, t } = useLanguage();
   const { store, layout } = useStore();
   const { money, numerals } = useNumerals();
   const isRtl = isRtlProp ?? ctxIsRtl;
@@ -281,7 +281,7 @@ function PecannbeeProductCardImpl({
       <button
         type="button"
         onClick={handleWishlist}
-        aria-label={isRtl ? 'إضافة للمفضلة' : 'Add to wishlist'}
+        aria-label={t('Add to wishlist', 'إضافة للمفضلة')}
         aria-pressed={isWishlisted}
         // Touch hitbox: the visual circle stays 40px (h-10 w-10, unchanged),
         // but before:-inset-1.5 grows the actual tap target to ~52px so it
@@ -393,7 +393,7 @@ function PecannbeeProductCardImpl({
           {showNewBadge && (
             <span
               className="absolute top-3 start-3 z-10 rounded-full bg-[hsl(var(--primary))] px-2.5 py-1 text-xs font-bold uppercase tracking-wider text-[hsl(var(--primary-foreground))] shadow-[0_6px_14px_-6px_hsl(var(--primary)/0.5)]"
-              aria-label={isRtl ? 'منتج جديد' : 'New product'}
+              aria-label={t('New product', 'منتج جديد')}
             >
               {isRtl ? 'جديد' : 'NEW'}
             </span>

@@ -24,7 +24,7 @@ export default function ElegantCartTable({
   onRemove,
   typography,
 }: CartTableProps) {
-  const { isRtl: ctxIsRtl } = useLanguage();
+  const { isRtl: ctxIsRtl, t } = useLanguage();
   const { localize, money } = useNumerals();
   const isRtl = isRtlProp ?? ctxIsRtl;
   const format = (price: number) => `${money(price)} ${currency}`;
@@ -84,7 +84,7 @@ export default function ElegantCartTable({
                   type="button"
                   onClick={() => onRemove?.(item.id)}
                   className="inline-flex min-h-[44px] items-center text-sm uppercase tracking-[0.2em] text-muted-foreground hover:text-destructive-ink underline underline-offset-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 cursor-pointer"
-                  aria-label={isRtl ? 'إزالة' : 'Remove'}
+                  aria-label={t('Remove', 'إزالة')}
                   style={typography?.cta}
                 >
                   {isRtl ? 'إزالة' : 'Remove'}
@@ -97,7 +97,7 @@ export default function ElegantCartTable({
                     disabled={item.unavailable || item.quantity <= 1}
                     onClick={() => onUpdateQuantity?.(item.id, Math.max(1, item.quantity - 1))}
                     className="inline-flex h-11 w-11 items-center justify-center text-lg text-muted-foreground hover:text-foreground disabled:opacity-30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1 cursor-pointer"
-                    aria-label={isRtl ? 'تقليل' : 'Decrease'}
+                    aria-label={t('Decrease', 'تقليل')}
                   >
                     −
                   </button>
@@ -112,7 +112,7 @@ export default function ElegantCartTable({
                     disabled={item.unavailable}
                     onClick={() => onUpdateQuantity?.(item.id, item.quantity + 1)}
                     className="inline-flex h-11 w-11 items-center justify-center text-lg text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1 cursor-pointer disabled:opacity-40"
-                    aria-label={isRtl ? 'زيادة' : 'Increase'}
+                    aria-label={t('Increase', 'زيادة')}
                   >
                     +
                   </button>

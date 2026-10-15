@@ -59,7 +59,7 @@ interface BottomTabBarProps {
 }
 
 export function BottomTabBar({ bottomBar, theme, navigation = [] }: BottomTabBarProps = {}) {
-  const { isRtl } = useLanguage();
+  const { isRtl, t } = useLanguage();
   const { itemCount } = useCart();
   const storeUrl = useStoreUrl();
   const pathname = usePathname() ?? '/';
@@ -197,7 +197,7 @@ export function BottomTabBar({ bottomBar, theme, navigation = [] }: BottomTabBar
       />
     </svg>
   );
-  const menuLabel = isRtl ? 'القائمة' : 'Menu';
+  const menuLabel = t('Menu', 'القائمة');
   const menuColorStyle: React.CSSProperties | undefined =
     menuOpen && resolvedActive
       ? { color: resolvedActive }
@@ -207,7 +207,7 @@ export function BottomTabBar({ bottomBar, theme, navigation = [] }: BottomTabBar
 
   const bar = (
     <nav
-      aria-label={isRtl ? 'شريط التنقل' : 'Bottom navigation'}
+      aria-label={t('Bottom navigation', 'شريط التنقل')}
       dir={isRtl ? 'rtl' : 'ltr'}
       data-bottom-tab-bar
       className="fixed bottom-0 inset-x-0 z-40 md:hidden bg-[hsl(var(--bg-section-alt))] border-t border-foreground/10 pb-[env(safe-area-inset-bottom)]"
@@ -216,7 +216,7 @@ export function BottomTabBar({ bottomBar, theme, navigation = [] }: BottomTabBar
       <ul className="grid grid-cols-5 max-w-md mx-auto">
         {tabs.map(tab => {
           const active = isActive(tab.href);
-          const label = isRtl ? tab.labelAr : tab.labelEn;
+          const label = t(tab.labelEn, tab.labelAr);
           // Per-tab color: active uses resolvedActive, inactive uses resolvedInactive.
           // When neither applies, the className handles color as before (no regression).
           const tabColorStyle: React.CSSProperties | undefined =
@@ -307,7 +307,7 @@ export function BottomTabBar({ bottomBar, theme, navigation = [] }: BottomTabBar
       id="bottom-nav-menu-drawer"
       dir={isRtl ? 'rtl' : 'ltr'}
       title={menuLabel}
-      closeLabel={isRtl ? 'إغلاق القائمة' : 'Close menu'}
+      closeLabel={t('Close menu', 'إغلاق القائمة')}
       className="bg-[hsl(var(--bg-section-alt))] text-foreground md:hidden"
       style={resolvedBg ? { backgroundColor: resolvedBg } : undefined}
       titleClassName="text-xs font-semibold uppercase tracking-wider text-foreground/50"

@@ -104,6 +104,7 @@ function StarDisplay({ rating, size = 'sm' }: { rating: number; size?: 'sm' | 'l
 
 /** Clickable star selector used in the write-review form. */
 function StarSelector({ value, onChange }: { value: number; onChange: (rating: number) => void }) {
+  const { t } = useLanguage();
   const [hovered, setHovered] = useState(0);
   return (
     <div className="flex items-center gap-1">
@@ -114,7 +115,7 @@ function StarSelector({ value, onChange }: { value: number; onChange: (rating: n
           onClick={() => onChange(star)}
           onMouseEnter={() => setHovered(star)}
           onMouseLeave={() => setHovered(0)}
-          aria-label={`Rate ${star} out of 5`}
+          aria-label={t(`Rate ${star} out of 5`, `تقييم ${star} من 5`)}
           className="focus:outline-none"
         >
           <svg

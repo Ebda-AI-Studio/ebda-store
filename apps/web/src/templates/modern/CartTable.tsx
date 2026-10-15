@@ -24,7 +24,7 @@ export default function ModernCartTable({
   onRemove,
   typography,
 }: CartTableProps) {
-  const { isRtl: ctxIsRtl } = useLanguage();
+  const { isRtl: ctxIsRtl, t } = useLanguage();
   const { localize, money } = useNumerals();
   const isRtl = isRtlProp ?? ctxIsRtl;
 
@@ -104,7 +104,7 @@ export default function ModernCartTable({
                     onClick={() => onUpdateQuantity?.(item.id, Math.max(1, item.quantity - 1))}
                     className="flex h-11 w-11 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-40 focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1"
                     disabled={item.unavailable || item.quantity <= 1}
-                    aria-label={isRtl ? 'تقليل الكمية' : 'Decrease quantity'}
+                    aria-label={t('Decrease quantity', 'تقليل الكمية')}
                     style={typography?.cta}
                   >
                     <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -127,7 +127,7 @@ export default function ModernCartTable({
                     disabled={item.unavailable}
                     onClick={() => onUpdateQuantity?.(item.id, item.quantity + 1)}
                     className="flex h-11 w-11 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1 disabled:opacity-40"
-                    aria-label={isRtl ? 'زيادة الكمية' : 'Increase quantity'}
+                    aria-label={t('Increase quantity', 'زيادة الكمية')}
                     style={typography?.cta}
                   >
                     <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -152,7 +152,7 @@ export default function ModernCartTable({
                     type="button"
                     onClick={() => onRemove?.(item.id)}
                     className="flex h-11 w-11 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive-ink focus-visible:ring-2 focus-visible:ring-destructive focus-visible:ring-offset-1"
-                    aria-label={isRtl ? 'إزالة' : 'Remove'}
+                    aria-label={t('Remove', 'إزالة')}
                     style={typography?.cta}
                   >
                     <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
