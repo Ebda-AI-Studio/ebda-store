@@ -7,9 +7,13 @@ import { parseInput } from '../lib/parse-input';
 import {
   ackItemsSchema,
   ackNotices,
+  myAcceptances,
   pendingNoticesFor,
   policyOverview,
   requestNoticeSend,
+  resumeNoticeSend,
+  retryFailedDeliveries,
+  userLegalRecord,
 } from '../services/legal-notice.service';
 
 /**
@@ -64,9 +68,33 @@ meLegalNoticeRoutes.post(
 );
 
 /**
+ * GET /me/legal-acceptances: the signed-in user's own acceptance records (I6, account
+ * settings "Policies you accepted"). Read-only; never cached.
+ */
+export const meLegalAcceptanceRoutes = Router();
+
+meLegalAcceptanceRoutes.get(
+  '/',
+  authenticate,
+  authorize('store_admin', 'staff', 'super_admin'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const acceptances = await myAcceptances(req.user!.userId);
+      res.set('Cache-Control', 'no-store');
+      res.json({ success: true, data: { acceptances } });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+/**
  *  Super admin (mounted at /admin, BEFORE adminRoutes' catch-all MFA gate; carries its own chain):
  *    GET  /legal-policies                                   every document's current version + notice state
  *    POST /legal-policies/:docKey/:version/send-notice      announce a material version (202 | 409 | 422 | 502)
+ *    POST /legal-policies/:docKey/:version/resume           re-emit the email run of a send (202 | 404 | 502)
+ *    POST /legal-policies/:docKey/:version/retry-failed     failed -> queued, then resume (202 | 404 | 502)
+ *    GET  /users/:userId/legal-acceptances                  one account's acceptances + deliveries (I6)
  */
 export const adminLegalPolicyRoutes = Router();
 const superAdmin = [authenticate, requireMfaEnrolled, authorize('super_admin')];
@@ -110,6 +138,56 @@ adminLegalPolicyRoutes.post(
         userAgent: req.headers['user-agent'],
       });
       res.status(202).json({ success: true, data: { send } });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+/** Resume / Retry failed (I5): audited like Send, each its own action name. */
+function recoveryRoute(
+  path: 'resume' | 'retry-failed',
+  action: string,
+  run: (op: string, docKey: string, version: string) => Promise<Record<string, unknown>>
+) {
+  adminLegalPolicyRoutes.post(
+    `/legal-policies/:docKey/:version/${path}`,
+    ...superAdmin,
+    writeLimiter,
+    async (req: Request, res: Response, next: NextFunction) => {
+      try {
+        const { docKey, version } = parseInput(sendParams, req.params);
+        const data = await run(req.user!.userId, docKey, version);
+        await auditLog({
+          action,
+          userId: req.user!.userId,
+          resourceType: 'legal_policy',
+          resourceId: `${docKey}@${version}`,
+          details: data,
+          ip: req.ip,
+          userAgent: req.headers['user-agent'],
+        });
+        res.status(202).json({ success: true, data });
+      } catch (error) {
+        next(error);
+      }
+    }
+  );
+}
+recoveryRoute('resume', 'legal.notice_resumed', resumeNoticeSend);
+recoveryRoute('retry-failed', 'legal.notice_retry_failed', retryFailedDeliveries);
+
+const userParams = z.object({ userId: z.string().min(1).max(64) });
+
+adminLegalPolicyRoutes.get(
+  '/users/:userId/legal-acceptances',
+  ...superAdmin,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { userId } = parseInput(userParams, req.params);
+      const data = await userLegalRecord(req.user!.userId, userId);
+      res.set('Cache-Control', 'no-store');
+      res.json({ success: true, data });
     } catch (error) {
       next(error);
     }

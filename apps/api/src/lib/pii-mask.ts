@@ -46,6 +46,23 @@ export function scrubEmails(text: string): string {
 }
 
 /**
+ * `203.0.113.45` -> `203.0.113.*`; `2001:db8:1:2:3:4:5:6` -> `2001:db8:1:2:*`; an IPv4-mapped
+ * IPv6 (`::ffff:203.0.113.45`) is masked as its IPv4. Enough to recognise a network on a
+ * super-admin evidence screen, not to single out a device. Empty/nullish input returns null.
+ */
+export function maskIp(ip: string | null | undefined): string | null {
+  if (typeof ip !== 'string' || ip.trim() === '') return null;
+  const v = ip.trim().replace(/^::ffff:/i, '');
+  const v4 = /^(\d{1,3}\.\d{1,3}\.\d{1,3})\.\d{1,3}$/.exec(v);
+  if (v4) return `${v4[1]}.*`;
+  if (v.includes(':')) {
+    const groups = v.split(':').filter(Boolean).slice(0, 4);
+    return groups.length > 0 ? `${groups.join(':')}:*` : '*';
+  }
+  return '*';
+}
+
+/**
  * A recipient field that may be one address or a list (`EmailOptions.to`).
  * Each address is masked with `maskEmail`. Empty/nullish input returns null.
  */

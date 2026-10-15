@@ -60,8 +60,9 @@ export const merchantSignupSchema = z.object({
    */
   tracking: signupTrackingSchema.optional(),
   /**
-   * Click-wrap (Ruling LEGAL-4): the visitor ticked "I agree to the Terms, Privacy Policy,
-   * Merchant Agreement and Acceptable Use Policy". Required: a signup without it is refused.
+   * Click-wrap (Ruling LEGAL-4): the visitor ticked the box agreeing to all five documents
+   * (Terms of service, Privacy policy, Merchant agreement, Acceptable use policy, Legal notice);
+   * one acceptance row is recorded per document. Required: a signup without it is refused.
    */
   acceptedLegal: z.literal(true, {
     errorMap: () => ({ message: 'You must accept the terms and policies to create an account' }),

@@ -2,9 +2,13 @@
  * The legal-notice email (Rulings LEGAL-4, LEGAL-6): ONE bilingual mail, the full Arabic block
  * first then the full English block, Latin digits, links, no unsubscribe.
  */
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { BRAND } from '@ebda/shared';
+import { config } from '@api/config';
+import { ResendService } from '@api/services/resend.service';
+import { EmailService } from '@api/services/email.service';
 import {
+  legalNoticeMailerReady,
   sendLegalNoticeEmail,
   clearCapturedMail,
   latestCapturedMailTo,
@@ -20,6 +24,11 @@ const data = {
 };
 
 beforeEach(() => clearCapturedMail());
+const realEnv = config.nodeEnv;
+afterEach(() => {
+  (config as { nodeEnv: string }).nodeEnv = realEnv;
+  vi.restoreAllMocks();
+});
 
 describe('sendLegalNoticeEmail', () => {
   it('one mail carries both languages, Arabic block first', async () => {
@@ -70,5 +79,28 @@ describe('sendLegalNoticeEmail', () => {
     expect(mail.html).toContain('Mona &lt;b&gt;');
     expect(mail.html).not.toContain('Mona <b>');
     expect(mail.replyTo).toBe(BRAND.supportEmail);
+  });
+});
+
+describe('production delivery path', () => {
+  it('RESEND_NOT_CONFIGURED: production without a key throws and records nothing (I2)', async () => {
+    (config as { nodeEnv: string }).nodeEnv = 'production';
+    vi.spyOn(ResendService, 'isConfigured').mockReturnValue(false);
+    expect(legalNoticeMailerReady()).toBe(false);
+    await expect(sendLegalNoticeEmail(data)).rejects.toThrow('RESEND_NOT_CONFIGURED');
+    expect(latestCapturedMailTo('m@test.local')).toBeFalsy();
+  });
+
+  it('sends through Resend with NO List-Unsubscribe header: a transactional legal notice (M16)', async () => {
+    (config as { nodeEnv: string }).nodeEnv = 'production';
+    vi.spyOn(ResendService, 'isConfigured').mockReturnValue(true);
+    const raw = vi.spyOn(EmailService, 'sendPlatformRaw').mockResolvedValue(undefined);
+    expect(legalNoticeMailerReady()).toBe(true);
+    await sendLegalNoticeEmail(data);
+    expect(raw).toHaveBeenCalledTimes(1);
+    const sent = raw.mock.calls[0][0] as Record<string, unknown>;
+    expect(sent.to).toBe('m@test.local');
+    expect(sent).not.toHaveProperty('headers');
+    expect(JSON.stringify(sent)).not.toMatch(/List-Unsubscribe/i);
   });
 });

@@ -72,6 +72,7 @@ describe.skipIf(!hasDb)('legal notice email fan-out', () => {
   let owner: AppPrismaClient;
   const ids = { two: '', deletedOnly: '', noStore: '', en: '', demoOnly: '', op: '' };
   const emails: Record<string, string> = {};
+  let sendId = '';
   const storeIds: string[] = [];
   process.env.CAMPAIGN_PLATFORM_SEND_INTERVAL_MS = '0';
 
@@ -113,7 +114,7 @@ describe.skipIf(!hasDb)('legal notice email fan-out', () => {
   const runJob = () =>
     asApp(() =>
       runLegalNoticeSend({
-        event: { data: { docKey: 'terms', version: V, sentBy: ids.op } },
+        event: { data: { sendId, docKey: 'terms', version: V, sentBy: ids.op } },
         step: makeStep(new Map()),
       })
     );
@@ -141,7 +142,9 @@ describe.skipIf(!hasDb)('legal notice email fan-out', () => {
     await wipe();
     sendLegalNoticeEmail.mockReset();
     sendLegalNoticeEmail.mockImplementation(async () => undefined);
-    await owner.legalNoticeSend.create({ data: { docKey: 'terms', version: V, sentBy: ids.op } });
+    sendId = (
+      await owner.legalNoticeSend.create({ data: { docKey: 'terms', version: V, sentBy: ids.op } })
+    ).id;
   });
   afterAll(async () => {
     await wipe();
@@ -229,11 +232,97 @@ describe.skipIf(!hasDb)('legal notice email fan-out', () => {
     await expect(
       asApp(() =>
         runLegalNoticeSend({
-          event: { data: { docKey: 'terms', version: V, sentBy: ids.two } },
+          event: { data: { sendId, docKey: 'terms', version: V, sentBy: ids.two } },
           step: makeStep(new Map()),
         })
       )
     ).rejects.toThrow(/not an active super_admin/);
     expect(sendLegalNoticeEmail).not.toHaveBeenCalled();
+  });
+
+  it('Retry failed (I5): only the failed recipient is mailed again, once; sent rows are never re-mailed', async () => {
+    sendLegalNoticeEmail.mockImplementation(async d => {
+      if (d.email === emails[ids.en]) throw new Error('Resend send failed: boom');
+    });
+    await runJob();
+    expect(sendsTo(ids.en)).toBe(1);
+    expect(sendsTo(ids.two)).toBe(1);
+    sendLegalNoticeEmail.mockReset();
+    sendLegalNoticeEmail.mockImplementation(async () => undefined);
+    const { inngest } = await import('@api/lib/inngest/client');
+    const emitted = vi.spyOn(inngest, 'send').mockResolvedValue({ ids: ['evt'] } as never);
+    try {
+      const { retryFailedDeliveries } = await import('@api/services/legal-notice.service');
+      const r = await asApp(() => retryFailedDeliveries(ids.op, 'terms', V));
+      expect(r.requeued).toBeGreaterThanOrEqual(1);
+      expect(emitted).toHaveBeenCalledWith({
+        name: 'legal/notice.send-requested',
+        data: { sendId, docKey: 'terms', version: V, sentBy: ids.op },
+      });
+      // What the emitted event runs: the same handler, recipients NOT re-materialised.
+      const before = await owner.legalNoticeSend.findUnique({ where: { id: sendId } });
+      await runJob();
+      await runJob(); // a second Resume on top: still nothing new
+      expect(sendsTo(ids.en)).toBe(1);
+      expect(sendsTo(ids.two)).toBe(0);
+      const after = await owner.legalNoticeSend.findUnique({ where: { id: sendId } });
+      expect(after?.recipientCount).toBe(before?.recipientCount);
+      const row = await owner.legalNoticeDelivery.findUnique({
+        where: { userId_docKey_version: { userId: ids.en, docKey: 'terms', version: V } },
+      });
+      expect(row).toMatchObject({ status: 'sent', error: null });
+    } finally {
+      emitted.mockRestore();
+    }
+  }, 120_000);
+
+  it('Resume on a send whose recipients were never materialised mails everyone once (I5)', async () => {
+    const before = await owner.legalNoticeSend.findUnique({ where: { id: sendId } });
+    expect(before?.recipientCount).toBeNull();
+    await runJob();
+    expect(sendsTo(ids.two)).toBe(1);
+    await runJob();
+    expect(sendsTo(ids.two)).toBe(1);
+  }, 120_000);
+
+  it('an owner deleted after the recipients were listed is failed USER_GONE, not mailed (M3)', async () => {
+    const late = await mkUser('late', 'store_admin');
+    await mkStore(late, 6);
+    try {
+      await owner.legalNoticeDelivery.create({
+        data: { userId: late, docKey: 'terms', version: V },
+      });
+      await owner.legalNoticeSend.update({ where: { id: sendId }, data: { recipientCount: 1 } });
+      await owner.user.update({ where: { id: late }, data: { deletedAt: new Date() } });
+      await runJob();
+      expect(sendsTo(late)).toBe(0);
+      const row = await owner.legalNoticeDelivery.findUnique({
+        where: { userId_docKey_version: { userId: late, docKey: 'terms', version: V } },
+      });
+      expect(row).toMatchObject({ status: 'failed', error: 'USER_GONE' });
+    } finally {
+      await owner.legalNoticeDelivery.deleteMany({ where: { userId: late } });
+      await owner.store.deleteMany({ where: { ownerId: late } });
+      await owner.user.delete({ where: { id: late } });
+    }
+  }, 120_000);
+
+  it('a run pinned to a send row that no longer exists mails nobody (M1)', async () => {
+    const stale = sendId;
+    await wipe();
+    sendId = (
+      await owner.legalNoticeSend.create({ data: { docKey: 'terms', version: V, sentBy: ids.op } })
+    ).id;
+    const r = await asApp(() =>
+      runLegalNoticeSend({
+        event: { data: { sendId: stale, docKey: 'terms', version: V, sentBy: ids.op } },
+        step: makeStep(new Map()),
+      })
+    );
+    expect(r).toEqual({ skipped: 'SEND_ROW_MISSING' });
+    expect(sendLegalNoticeEmail).not.toHaveBeenCalled();
+    expect(await owner.legalNoticeDelivery.count({ where: { docKey: 'terms', version: V } })).toBe(
+      0
+    );
   });
 });

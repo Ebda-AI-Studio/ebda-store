@@ -10,6 +10,8 @@ import {
   LEGAL_DOC_SLUG,
   compareLegalVersions,
   computePendingNotices,
+  feeNoticeTooLate,
+  isNoticeable,
   currentLegalVersion,
   findLegalVersion,
   formatLegalDate,
@@ -37,6 +39,20 @@ describe('LEGAL_POLICIES (the shipped registry)', () => {
   it('passes every invariant', () => {
     expect(validateLegalPolicies(LEGAL_POLICIES)).toEqual([]);
   });
+  it('is frozen, and no two documents share a version or summary object (M4)', () => {
+    expect(Object.isFrozen(LEGAL_POLICIES)).toBe(true);
+    const entries = LEGAL_DOC_KEYS.map(k => LEGAL_POLICIES[k].history[0]);
+    for (const e of entries) {
+      expect(Object.isFrozen(e)).toBe(true);
+      expect(Object.isFrozen(e.summary)).toBe(true);
+    }
+    expect(new Set(entries).size).toBe(LEGAL_DOC_KEYS.length);
+    expect(new Set(entries.map(e => e.summary)).size).toBe(LEGAL_DOC_KEYS.length);
+    expect(() => {
+      (LEGAL_POLICIES.terms.history[0].summary as { en: string }).en = 'x';
+    }).toThrow(TypeError);
+  });
+
   it('has an entry for every document key and nothing else', () => {
     expect(Object.keys(LEGAL_POLICIES).sort()).toEqual([...LEGAL_DOC_KEYS].sort());
     for (const k of LEGAL_DOC_KEYS) expect(LEGAL_POLICIES[k].history.length).toBeGreaterThan(0);
@@ -173,5 +189,30 @@ describe('computePendingNotices', () => {
       computePendingNotices(LEGAL_POLICIES, [{ docKey: 'privacy', version: '1.0' }], [])
     ).toEqual([]);
     expect(computePendingNotices(p, [{ docKey: 'terms', version: '1.0' }], [])).toEqual([]);
+  });
+});
+
+describe('feeNoticeTooLate (I1: 30 days measured from the SEND, not from publishedAt)', () => {
+  const now = new Date('2026-10-15T12:00:00Z');
+  it('refuses a fee change whose effective date is less than 30 days after the send', () => {
+    expect(
+      feeNoticeTooLate(v({ feeChange: true, material: true, effectiveAt: '2026-11-13' }), now)
+    ).toBe(true);
+    expect(
+      feeNoticeTooLate(v({ feeChange: true, material: true, effectiveAt: '2026-11-15' }), now)
+    ).toBe(false);
+  });
+  it('never applies to a non-fee change, however close', () => {
+    expect(feeNoticeTooLate(v({ material: true, effectiveAt: '2026-10-15' }), now)).toBe(false);
+  });
+});
+
+describe('isNoticeable (the one eligibility rule for banner and ack)', () => {
+  it('needs material AND sent', () => {
+    const sent = [{ docKey: 'terms', version: '1.0' }];
+    expect(isNoticeable(v({ material: true }), 'terms', sent)).toBe(true);
+    expect(isNoticeable(v({ material: false }), 'terms', sent)).toBe(false);
+    expect(isNoticeable(v({ material: true }), 'terms', [])).toBe(false);
+    expect(isNoticeable(v({ material: true }), 'privacy', sent)).toBe(false);
   });
 });

@@ -18,17 +18,17 @@ export type LegalDocKey = (typeof LEGAL_DOC_KEYS)[number];
 
 export interface LegalVersion {
   /** Dotted numbers ("1.0", "1.1"), strictly newer than the previous entry. */
-  version: string;
+  readonly version: string;
   /** YYYY-MM-DD: shown as "Last updated" on the page. */
-  publishedAt: string;
+  readonly publishedAt: string;
   /** YYYY-MM-DD: when this version binds. A fee change needs >= publishedAt + 30 days. */
-  effectiveAt: string;
+  readonly effectiveAt: string;
   /** Material = announced: dashboard banner + email to every store owner. */
-  material: boolean;
+  readonly material: boolean;
   /** Affects fees: always material, and 30 days' notice (Terms, "Changes to these terms"). */
-  feeChange: boolean;
+  readonly feeChange: boolean;
   /** What changed, one or two sentences, shown in the banner and the email. */
-  summary: { ar: string; en: string };
+  readonly summary: { readonly ar: string; readonly en: string };
 }
 
 export type LegalPolicies = Readonly<
@@ -38,23 +38,29 @@ export type LegalPolicies = Readonly<
 /** Days of notice the Terms promise before a fee change takes effect. */
 export const LEGAL_FEE_NOTICE_DAYS = 30;
 
-const FIRST_VERSION: LegalVersion = {
-  version: '1.0',
-  publishedAt: '2026-10-07',
-  effectiveAt: '2026-10-07',
-  material: false,
-  feeChange: false,
-  summary: { ar: 'الإصدار الأول.', en: 'First version.' },
-};
+/** A fresh, frozen v1.0 entry per document: no two documents share (or can mutate) one object. */
+function firstVersion(): LegalVersion {
+  return Object.freeze({
+    version: '1.0',
+    publishedAt: '2026-10-07',
+    effectiveAt: '2026-10-07',
+    material: false,
+    feeChange: false,
+    summary: Object.freeze({ ar: 'الإصدار الأول.', en: 'First version.' }),
+  });
+}
 
-/** Oldest first; the LAST entry is the current version. */
-export const LEGAL_POLICIES: LegalPolicies = {
-  legal: { history: [{ ...FIRST_VERSION }] },
-  privacy: { history: [{ ...FIRST_VERSION }] },
-  terms: { history: [{ ...FIRST_VERSION }] },
-  acceptableUse: { history: [{ ...FIRST_VERSION }] },
-  merchant: { history: [{ ...FIRST_VERSION }] },
-};
+const doc = (...history: LegalVersion[]) =>
+  Object.freeze({ history: Object.freeze(history) as readonly LegalVersion[] });
+
+/** Oldest first; the LAST entry is the current version. Frozen: the registry is code, not state. */
+export const LEGAL_POLICIES: LegalPolicies = Object.freeze({
+  legal: doc(firstVersion()),
+  privacy: doc(firstVersion()),
+  terms: doc(firstVersion()),
+  acceptableUse: doc(firstVersion()),
+  merchant: doc(firstVersion()),
+});
 
 /** Document titles, identical to the marketing pages' titles (parity-tested in marketing-site.test.tsx). */
 export const LEGAL_DOC_TITLE: Readonly<Record<LegalDocKey, { ar: string; en: string }>> = {
@@ -152,6 +158,16 @@ export function validateLegalPolicies(
   return errors;
 }
 
+/**
+ * A fee change must reach merchants at least LEGAL_FEE_NOTICE_DAYS before it takes effect
+ * (Terms, "Changes to these terms"). The registry checks effectiveAt against publishedAt; this
+ * checks it against the moment the notice is actually SENT, so a late "Send notice" cannot
+ * shorten the promised window (Ruling LEGAL-5). Non-fee changes have no minimum.
+ */
+export function feeNoticeTooLate(entry: LegalVersion, now: Date = new Date()): boolean {
+  return entry.feeChange && utc(entry.effectiveAt) < now.getTime() + LEGAL_FEE_NOTICE_DAYS * DAY_MS;
+}
+
 /** The public page of a document on ebda.app (Arabic at the root, English under /en). */
 export function legalPolicyUrl(key: LegalDocKey, lang: 'ar' | 'en'): string {
   return `https://${BRAND.domains.marketing}${lang === 'en' ? '/en' : ''}/${LEGAL_DOC_SLUG[key]}/`;
@@ -182,22 +198,42 @@ export interface PendingLegalNotice {
 }
 
 /**
- * The notices a merchant still has to see: for each document, its CURRENT version when that
- * version is material, has been sent (a `legal_notice_sends` row) and is not yet accepted by
- * this user (a `legal_acceptances` row). Superseded versions are never pending.
+ * The ONE eligibility rule for a notice (banner AND "Got it"): a document's CURRENT version is
+ * noticeable when it is material and has been sent (a `legal_notice_sends` row). Superseded,
+ * non-material and unsent versions never are.
+ */
+export function isNoticeable(
+  cur: LegalVersion,
+  docKey: string,
+  sent: readonly LegalDocRef[]
+): boolean {
+  return cur.material && sent.some(s => s.docKey === docKey && s.version === cur.version);
+}
+
+/** Every document's noticeable current version (see isNoticeable). */
+export function noticeableVersions(
+  policies: LegalPolicies,
+  sent: readonly LegalDocRef[]
+): Array<{ docKey: LegalDocKey; version: string }> {
+  return LEGAL_DOC_KEYS.flatMap(docKey => {
+    const cur = currentLegalVersion(policies, docKey);
+    return isNoticeable(cur, docKey, sent) ? [{ docKey, version: cur.version }] : [];
+  });
+}
+
+/**
+ * The notices a merchant still has to see: each noticeable current version (isNoticeable) this
+ * user has not accepted yet (a `legal_acceptances` row).
  */
 export function computePendingNotices(
   policies: LegalPolicies,
   sent: readonly LegalDocRef[],
   accepted: readonly LegalDocRef[]
 ): PendingLegalNotice[] {
-  const has = (list: readonly LegalDocRef[], key: string, version: string) =>
-    list.some(r => r.docKey === key && r.version === version);
   const out: PendingLegalNotice[] = [];
-  for (const key of LEGAL_DOC_KEYS) {
+  for (const { docKey: key, version } of noticeableVersions(policies, sent)) {
+    if (accepted.some(r => r.docKey === key && r.version === version)) continue;
     const cur = currentLegalVersion(policies, key);
-    if (!cur.material) continue;
-    if (!has(sent, key, cur.version) || has(accepted, key, cur.version)) continue;
     out.push({
       docKey: key,
       version: cur.version,

@@ -246,6 +246,15 @@ export async function sendStaffInviteEmail(data: StaffInviteData, language?: Lan
 }
 
 /**
+ * False when a legal notice could not really be delivered (production without Resend). The
+ * fan-out checks it ONCE at the start of a run (Ruling LEGAL-5, I2), so an unconfigured mailer
+ * fails the run fast instead of burning a pacer slot per recipient.
+ */
+export function legalNoticeMailerReady(): boolean {
+  return !(config.nodeEnv === 'production' && !ResendService.isConfigured());
+}
+
+/**
  * Material policy-change notice to a store owner (Rulings LEGAL-4, LEGAL-6). ONE bilingual
  * email (Arabic block first, then English) whatever `users.language` says. Called once per
  * recipient by the `legal-notice-send` Inngest function, which owns idempotency
@@ -261,9 +270,8 @@ export async function sendStaffInviteEmail(data: StaffInviteData, language?: Lan
 export async function sendLegalNoticeEmail(
   data: LegalNoticeEmailData & { email: string }
 ): Promise<void> {
-  if (config.nodeEnv === 'production' && !ResendService.isConfigured()) {
-    throw new Error('RESEND_NOT_CONFIGURED');
-  }
+  // Belt and braces: the job checks legalNoticeMailerReady() ONCE before its first batch.
+  if (!legalNoticeMailerReady()) throw new Error('RESEND_NOT_CONFIGURED');
   const html = renderBrandedShell(legalNoticeTemplate.body(data), {
     name: BRAND.product.nameEn,
     nameAr: BRAND.product.nameAr,

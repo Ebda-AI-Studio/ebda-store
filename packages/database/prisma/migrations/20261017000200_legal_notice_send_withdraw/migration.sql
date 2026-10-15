@@ -8,7 +8,10 @@
 --   * the caller is an ACTIVE super_admin (acting-user GUC) AND is the row's sent_by (your own click);
 --   * recipient_count IS NULL (the fan-out never materialised recipients);
 --   * no legal_notice_deliveries row exists for that doc_key + version;
---   * the row is at most 10 minutes old.
+--   * the row is at most 10 minutes old. `sent_at` is `timestamp without time zone` holding UTC (Prisma
+--     writes UTC), so it is compared with `now() AT TIME ZONE 'UTC'`, never with bare now(): on a
+--     session whose TimeZone is not UTC the bare comparison shifts by the zone offset (a fresh row
+--     would read as hours old east of UTC and every withdrawal would be refused).
 -- The row is locked FOR UPDATE first, and materializeDeliveries takes the same lock before its first
 -- insert, so a fan-out that already started either holds the lock (this call waits, then sees its
 -- deliveries and deletes nothing) or finds the row gone and aborts without emailing anyone.
@@ -29,7 +32,7 @@ BEGIN
     FROM public.legal_notice_sends WHERE id = p_id FOR UPDATE;
   IF NOT FOUND THEN RETURN 0; END IF;
   IF s.sent_by <> cur OR s.recipient_count IS NOT NULL
-     OR s.sent_at < now() - interval '10 minutes' THEN
+     OR s.sent_at < (now() AT TIME ZONE 'UTC') - interval '10 minutes' THEN
     RETURN 0;
   END IF;
   -- A separate statement: after waiting on the lock this sees deliveries the fan-out committed.

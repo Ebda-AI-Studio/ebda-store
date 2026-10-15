@@ -10,7 +10,7 @@ import jwt from 'jsonwebtoken';
 import { createPrismaClient, runWithRequestDb, type AppPrismaClient } from '@ebda/database';
 import { LEGAL_POLICIES, type LegalPolicies } from '@ebda/shared';
 import { config } from '@api/config';
-import { meLegalNoticeRoutes } from '@api/routes/legal-policy.routes';
+import { meLegalAcceptanceRoutes, meLegalNoticeRoutes } from '@api/routes/legal-policy.routes';
 import { errorHandler } from '@api/middleware/error-handler';
 import { awaitDeferredWork } from '@api/lib/after-tenant-commit';
 import { __setLegalPoliciesForTests } from '@api/services/legal-notice.service';
@@ -48,7 +48,8 @@ const asApp = <T>(fn: () => Promise<T>) =>
   runWithRequestDb(() => createPrismaClient({ connectionString: appUrl(), max: 3 }), fn, {
     beforeDisconnect: () => awaitDeferredWork(5000),
   });
-const token = (userId: string, role: 'store_admin' | 'super_admin', impersonatedBy?: string) =>
+type Role = 'store_admin' | 'super_admin' | 'staff';
+const token = (userId: string, role: Role, impersonatedBy?: string) =>
   jwt.sign(
     { userId, email: `${userId}@example.test`, role, tv: 0, impersonatedBy },
     config.jwtSecret,
@@ -67,7 +68,7 @@ describe.skipIf(!hasDb)('pending legal notices', () => {
   let signedUp = '';
   const storeIds: string[] = [];
 
-  const mkUser = async (tag: string, role: 'store_admin' | 'super_admin') =>
+  const mkUser = async (tag: string, role: Role) =>
     (
       await owner.user.create({
         data: {
@@ -86,11 +87,7 @@ describe.skipIf(!hasDb)('pending legal notices', () => {
         .get('/api/v1/me/legal-notices')
         .set('Authorization', `Bearer ${token(userId, role)}`)
     );
-  const ack = (
-    userId: string,
-    items: unknown,
-    role: 'store_admin' | 'super_admin' = 'store_admin'
-  ) =>
+  const ack = (userId: string, items: unknown, role: Role = 'store_admin') =>
     asApp(async () =>
       request(app)
         .post('/api/v1/me/legal-notices/ack')
@@ -99,6 +96,8 @@ describe.skipIf(!hasDb)('pending legal notices', () => {
     );
   const wipe = async () => {
     await owner.legalNoticeSend.deleteMany({ where: { docKey: 'terms', version: V } });
+    // I3 fixture: an (impossible in production) announcement of the NON-material privacy@1.0.
+    await owner.legalNoticeSend.deleteMany({ where: { docKey: 'privacy', version: '1.0' } });
     await owner.legalAcceptance.deleteMany({ where: { docKey: 'terms', version: V } });
   };
   const withToken = (path: string, method: 'get' | 'post', tok: string) =>
@@ -116,6 +115,7 @@ describe.skipIf(!hasDb)('pending legal notices', () => {
     app.set('trust proxy', true);
     app.use(express.json());
     app.use('/api/v1/me/legal-notices', meLegalNoticeRoutes);
+    app.use('/api/v1/me/legal-acceptances', meLegalAcceptanceRoutes);
     app.use(errorHandler);
     merchant = await mkUser('m', 'store_admin');
     operator = await mkUser('op', 'super_admin');
@@ -273,5 +273,74 @@ describe.skipIf(!hasDb)('pending legal notices', () => {
         where: { userId: merchant, docKey: 'terms', version: V },
       })
     ).toBe(0);
+  });
+
+  it('I3: a version that WAS sent but is not material is still refused (422) and writes nothing', async () => {
+    // Guards the `material` half of the eligibility rule on its own: privacy@1.0 is current and
+    // has a send row, so only "not material" can refuse it.
+    await owner.legalNoticeSend.create({
+      data: { docKey: 'privacy', version: '1.0', sentBy: operator },
+    });
+    const res = await ack(merchant, [{ docKey: 'privacy', version: '1.0' }]);
+    expect(res.status).toBe(422);
+    expect(res.body.error.code).toBe('NOT_PENDING');
+    expect(await owner.legalAcceptance.count({ where: { userId: merchant } })).toBe(0);
+    // ...and it never shows as a banner either (the same shared rule).
+    expect((await get(merchant)).body.data.notices).toEqual([]);
+  });
+
+  it('M14: empty strings and 6+ items are 400; a duplicated item is acknowledged once; staff gets 403', async () => {
+    await owner.legalNoticeSend.create({ data: { docKey: 'terms', version: V, sentBy: operator } });
+    expect((await ack(merchant, [{ docKey: '', version: V }])).status).toBe(400);
+    expect((await ack(merchant, [{ docKey: 'terms', version: '' }])).status).toBe(400);
+    expect(
+      (
+        await ack(
+          merchant,
+          Array.from({ length: 6 }, () => ({ docKey: 'terms', version: V }))
+        )
+      ).status
+    ).toBe(400);
+    const dup = await ack(merchant, [
+      { docKey: 'terms', version: V },
+      { docKey: 'terms', version: V },
+    ]);
+    expect(dup.status).toBe(200);
+    expect(dup.body.data).toEqual({ acknowledged: 1 });
+    const staff = await mkUser('st', 'staff');
+    try {
+      const r = await ack(staff, [{ docKey: 'terms', version: V }], 'staff');
+      expect(r.status).toBe(403);
+      expect(await owner.legalAcceptance.count({ where: { userId: staff } })).toBe(0);
+    } finally {
+      await owner.user.delete({ where: { id: staff } });
+    }
+  });
+
+  it("I6: GET /me/legal-acceptances lists only the caller's own records, newest first, never cached", async () => {
+    await owner.legalNoticeSend.create({ data: { docKey: 'terms', version: V, sentBy: operator } });
+    expect((await ack(signedUp, [{ docKey: 'terms', version: V }])).status).toBe(200);
+    const res = await asApp(async () =>
+      request(app)
+        .get('/api/v1/me/legal-acceptances')
+        .set('Authorization', `Bearer ${token(signedUp, 'store_admin')}`)
+    );
+    expect(res.status).toBe(200);
+    expect(res.headers['cache-control']).toBe('no-store');
+    const list = res.body.data.acceptances as Array<{
+      docKey: string;
+      version: string;
+      source: string;
+    }>;
+    expect(list).toHaveLength(6);
+    expect(list[0]).toMatchObject({ docKey: 'terms', version: V, source: 'notice_ack' });
+    expect(list.filter(a => a.source === 'signup')).toHaveLength(5);
+    expect(JSON.stringify(res.body)).not.toMatch(/"ip"|userAgent|userId/);
+    const other = await asApp(async () =>
+      request(app)
+        .get('/api/v1/me/legal-acceptances')
+        .set('Authorization', `Bearer ${token(merchant, 'store_admin')}`)
+    );
+    expect(other.body.data.acceptances).toEqual([]);
   });
 });

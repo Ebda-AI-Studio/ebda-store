@@ -37,22 +37,27 @@ const APP_PASSWORD = process.env.EBDA_APP_PASSWORD || 'ci-only-app-pw';
 const hasDb = !!OWNER_URL && !OWNER_URL.includes('localhost:5432/test_db');
 const run = crypto.randomUUID().slice(0, 8);
 const V = '99.0';
-const FIXTURE: LegalPolicies = {
+const DAY = 86_400_000;
+const isoDay = (offsetDays: number) =>
+  new Date(Date.now() + offsetDays * DAY).toISOString().slice(0, 10);
+/** terms@99.0: a fee change published today, effective in 40 days (Send allowed). */
+const fixture = (effectiveInDays = 40, feeChange = true): LegalPolicies => ({
   ...LEGAL_POLICIES,
   terms: {
     history: [
       ...LEGAL_POLICIES.terms.history,
       {
         version: V,
-        publishedAt: '2026-10-20',
-        effectiveAt: '2026-11-20',
+        publishedAt: isoDay(0),
+        effectiveAt: isoDay(effectiveInDays),
         material: true,
-        feeChange: true,
+        feeChange,
         summary: { ar: 'تغيير تجريبي في الرسوم.', en: 'Test fee change.' },
       },
     ],
   },
-};
+});
+const FIXTURE = fixture();
 
 function appUrl(): string {
   const u = new URL(OWNER_URL);
@@ -171,13 +176,14 @@ describe.skipIf(!hasDb)('super-admin policy updates', () => {
     const first = await call('post', op, 'super_admin', sendUrl('terms', V));
     expect(first.status).toBe(202);
     expect(send).toHaveBeenCalledTimes(1);
+    const row = await owner.legalNoticeSend.findFirstOrThrow({
+      where: { docKey: 'terms', version: V, sentBy: op },
+    });
+    // M1: the event is pinned to THIS send row.
     expect(send).toHaveBeenCalledWith({
       name: 'legal/notice.send-requested',
-      data: { docKey: 'terms', version: V, sentBy: op },
+      data: { sendId: row.id, docKey: 'terms', version: V, sentBy: op },
     });
-    expect(
-      await owner.legalNoticeSend.count({ where: { docKey: 'terms', version: V, sentBy: op } })
-    ).toBe(1);
     const second = await call('post', op, 'super_admin', sendUrl('terms', V));
     expect(second.status).toBe(409);
     expect(second.body.error.code).toBe('ALREADY_SENT');
@@ -244,7 +250,9 @@ describe.skipIf(!hasDb)('super-admin policy updates', () => {
       await expect(
         asApp(() => withUser(merchant, () => withdrawLegalNoticeSend(id)))
       ).rejects.toThrow(/super_admin required/);
-      await expect(asApp(() => withdrawLegalNoticeSend(id))).rejects.toThrow();
+      await expect(asApp(() => withdrawLegalNoticeSend(id))).rejects.toThrow(
+        /super_admin required/
+      );
       expect(await left()).toBe(1);
     });
 
@@ -272,6 +280,19 @@ describe.skipIf(!hasDb)('super-admin policy updates', () => {
       const id = await mkSend(op);
       expect(await withdraw(op2, id)).toBe(0);
       expect(await left()).toBe(1);
+    });
+
+    it('M7: a fresh row is withdrawable on a session far east of UTC (sent_at is naive UTC)', async () => {
+      const id = await mkSend(op);
+      const [r] = await owner.$transaction(async tx => {
+        await tx.$executeRawUnsafe(`SET LOCAL TIME ZONE 'Pacific/Kiritimati'`);
+        await tx.$executeRaw`SELECT set_config('app.current_user_id', ${op}, true)`;
+        return tx.$queryRaw<
+          Array<{ n: number }>
+        >`SELECT public.ebda_withdraw_legal_notice_send(${id}) AS n`;
+      });
+      expect(Number(r.n)).toBe(1);
+      expect(await left()).toBe(0);
     });
 
     it('an old row cannot be withdrawn', async () => {
@@ -344,5 +365,223 @@ describe.skipIf(!hasDb)('super-admin policy updates', () => {
     } finally {
       await owner.legalNoticeDelivery.deleteMany({ where: { docKey: 'terms', version: V } });
     }
+  });
+
+  describe('I1: a fee change needs 30 days between the SEND and its effective date', () => {
+    afterAll(() => __setLegalPoliciesForTests(FIXTURE));
+
+    it('refuses a late fee-change Send with 422 NOTICE_TOO_LATE, no row, no event; the page row says so', async () => {
+      __setLegalPoliciesForTests(fixture(29));
+      const res = await call('post', op, 'super_admin', sendUrl('terms', V));
+      expect(res.status).toBe(422);
+      expect(res.body.error.code).toBe('NOTICE_TOO_LATE');
+      expect(send).not.toHaveBeenCalled();
+      expect(await owner.legalNoticeSend.count({ where: { docKey: 'terms', version: V } })).toBe(0);
+      const list = await call('get', op, 'super_admin', '/api/v1/admin/legal-policies');
+      const terms = list.body.data.policies.find((r: { docKey: string }) => r.docKey === 'terms');
+      expect(terms).toMatchObject({ canSend: false, sendBlocked: 'NOTICE_TOO_LATE' });
+    });
+
+    it('allows a fee change exactly 31 days out', async () => {
+      __setLegalPoliciesForTests(fixture(31));
+      expect((await call('post', op, 'super_admin', sendUrl('terms', V))).status).toBe(202);
+    });
+
+    it('a NON-fee material change has no minimum: effective today is fine', async () => {
+      __setLegalPoliciesForTests(fixture(0, false));
+      const list = await call('get', op, 'super_admin', '/api/v1/admin/legal-policies');
+      const terms = list.body.data.policies.find((r: { docKey: string }) => r.docKey === 'terms');
+      expect(terms).toMatchObject({ canSend: true, sendBlocked: null });
+      expect((await call('post', op, 'super_admin', sendUrl('terms', V))).status).toBe(202);
+    });
+  });
+
+  describe('I4: only aged rows read as stuck / no run', () => {
+    const terms = async () =>
+      (
+        await call('get', op, 'super_admin', '/api/v1/admin/legal-policies')
+      ).body.data.policies.find((r: { docKey: string }) => r.docKey === 'terms');
+
+    it('a fresh send with no recipients yet is neither noRun nor stalled; after 11 minutes it is both', async () => {
+      expect((await call('post', op, 'super_admin', sendUrl('terms', V))).status).toBe(202);
+      expect(await terms()).toMatchObject({ noRun: false, stalled: false, stuckSending: 0 });
+      await owner.$executeRaw`UPDATE legal_notice_sends SET sent_at = sent_at - interval '11 minutes' WHERE doc_key = 'terms' AND version = ${V}`;
+      expect(await terms()).toMatchObject({ noRun: true, stalled: true });
+    });
+
+    it('a sending row is stuck only after 15 minutes untouched; queued rows with no activity stall', async () => {
+      expect((await call('post', op, 'super_admin', sendUrl('terms', V))).status).toBe(202);
+      await owner.legalNoticeSend.update({
+        where: { docKey_version: { docKey: 'terms', version: V } },
+        data: { recipientCount: 2 },
+      });
+      const other = await mkUser('q', 'store_admin');
+      try {
+        await owner.legalNoticeDelivery.createMany({
+          data: [
+            { userId: merchant, docKey: 'terms', version: V, status: 'sending' },
+            { userId: other, docKey: 'terms', version: V, status: 'queued' },
+          ],
+        });
+        expect(await terms()).toMatchObject({
+          deliveries: { sending: 1, queued: 1 },
+          stuckSending: 0,
+          noRun: false,
+          stalled: false,
+        });
+        await owner.$executeRaw`UPDATE legal_notice_deliveries SET updated_at = updated_at - interval '16 minutes' WHERE doc_key = 'terms' AND version = ${V}`;
+        await owner.$executeRaw`UPDATE legal_notice_sends SET sent_at = sent_at - interval '16 minutes' WHERE doc_key = 'terms' AND version = ${V}`;
+        expect(await terms()).toMatchObject({ stuckSending: 1, stalled: true });
+      } finally {
+        await owner.legalNoticeDelivery.deleteMany({ where: { docKey: 'terms', version: V } });
+        await owner.user.delete({ where: { id: other } });
+      }
+    });
+  });
+
+  describe('I5: Resume and Retry failed', () => {
+    const url = (path: 'resume' | 'retry-failed') =>
+      `/api/v1/admin/legal-policies/terms/${V}/${path}`;
+
+    it('404 NOT_SENT before any send; a store_admin gets 403', async () => {
+      const r = await call('post', op, 'super_admin', url('resume'));
+      expect(r.status).toBe(404);
+      expect(r.body.error.code).toBe('NOT_SENT');
+      expect((await call('post', merchant, 'store_admin', url('retry-failed'))).status).toBe(403);
+      expect(send).not.toHaveBeenCalled();
+    });
+
+    it('Resume re-emits the event for the same send row as the acting operator, and is audited', async () => {
+      expect((await call('post', op, 'super_admin', sendUrl('terms', V))).status).toBe(202);
+      const row = await owner.legalNoticeSend.findFirstOrThrow({
+        where: { docKey: 'terms', version: V },
+      });
+      send.mockClear();
+      const r = await call('post', op2, 'super_admin', url('resume'));
+      expect(r.status).toBe(202);
+      expect(send).toHaveBeenCalledWith({
+        name: 'legal/notice.send-requested',
+        data: { sendId: row.id, docKey: 'terms', version: V, sentBy: op2 },
+      });
+      expect(
+        await owner.auditLog.count({
+          where: { userId: op2, action: 'legal.notice_resumed', resourceId: `terms@${V}` },
+        })
+      ).toBe(1);
+    });
+
+    it('Retry failed moves ONLY failed rows to queued (never sending/sent), then emits once', async () => {
+      expect((await call('post', op, 'super_admin', sendUrl('terms', V))).status).toBe(202);
+      const a = await mkUser('ra', 'store_admin');
+      const b = await mkUser('rb', 'store_admin');
+      try {
+        await owner.legalNoticeDelivery.createMany({
+          data: [
+            { userId: merchant, docKey: 'terms', version: V, status: 'failed', error: 'boom' },
+            { userId: a, docKey: 'terms', version: V, status: 'sent' },
+            { userId: b, docKey: 'terms', version: V, status: 'sending' },
+          ],
+        });
+        send.mockClear();
+        const r = await call('post', op, 'super_admin', url('retry-failed'));
+        expect(r.status).toBe(202);
+        expect(r.body.data.requeued).toBe(1);
+        expect(send).toHaveBeenCalledTimes(1);
+        const rows = await owner.legalNoticeDelivery.findMany({
+          where: { docKey: 'terms', version: V },
+          select: { userId: true, status: true, error: true },
+        });
+        const by = Object.fromEntries(rows.map(x => [x.userId, x]));
+        expect(by[merchant]).toMatchObject({ status: 'queued', error: null });
+        expect(by[a].status).toBe('sent');
+        expect(by[b].status).toBe('sending');
+        expect(
+          await owner.auditLog.count({
+            where: { userId: op, action: 'legal.notice_retry_failed', resourceId: `terms@${V}` },
+          })
+        ).toBe(1);
+        // Nothing failed any more: a second press requeues nothing and emits nothing.
+        send.mockClear();
+        const again = await call('post', op, 'super_admin', url('retry-failed'));
+        expect(again.body.data.requeued).toBe(0);
+        expect(send).not.toHaveBeenCalled();
+      } finally {
+        await owner.legalNoticeDelivery.deleteMany({ where: { docKey: 'terms', version: V } });
+        await owner.user.deleteMany({ where: { id: { in: [a, b] } } });
+      }
+    });
+
+    it('a Retry whose enqueue fails puts the rows back to failed: no orphan queued rows', async () => {
+      expect((await call('post', op, 'super_admin', sendUrl('terms', V))).status).toBe(202);
+      await owner.legalNoticeDelivery.create({
+        data: { userId: merchant, docKey: 'terms', version: V, status: 'failed', error: 'boom' },
+      });
+      try {
+        send.mockRejectedValueOnce(new Error('inngest down'));
+        const r = await call('post', op, 'super_admin', url('retry-failed'));
+        expect(r.status).toBe(502);
+        expect(r.body.error.code).toBe('ENQUEUE_FAILED');
+        const row = await owner.legalNoticeDelivery.findFirstOrThrow({
+          where: { docKey: 'terms', version: V, userId: merchant },
+        });
+        expect(row).toMatchObject({ status: 'failed', error: 'RETRY_ENQUEUE_FAILED' });
+      } finally {
+        await owner.legalNoticeDelivery.deleteMany({ where: { docKey: 'terms', version: V } });
+      }
+    });
+  });
+
+  describe("I6: one account's acceptance record (super admin)", () => {
+    it('lists acceptances with a masked IP and the delivery status; only a super admin may read it', async () => {
+      await owner.legalAcceptance.create({
+        data: {
+          userId: merchant,
+          docKey: 'privacy',
+          version: '1.0',
+          source: 'signup',
+          ip: '203.0.113.45',
+          userAgent: 'UA',
+        },
+      });
+      expect((await call('post', op, 'super_admin', sendUrl('terms', V))).status).toBe(202);
+      await owner.legalNoticeDelivery.create({
+        data: { userId: merchant, docKey: 'terms', version: V, status: 'sent' },
+      });
+      try {
+        const res = await call(
+          'get',
+          op,
+          'super_admin',
+          `/api/v1/admin/users/${merchant}/legal-acceptances`
+        );
+        expect(res.status).toBe(200);
+        expect(res.headers['cache-control']).toBe('no-store');
+        expect(res.body.data.acceptances).toEqual([
+          expect.objectContaining({
+            docKey: 'privacy',
+            version: '1.0',
+            source: 'signup',
+            maskedIp: '203.0.113.*',
+          }),
+        ]);
+        expect(JSON.stringify(res.body)).not.toContain('203.0.113.45');
+        expect(res.body.data.deliveries).toEqual([
+          expect.objectContaining({ docKey: 'terms', version: V, status: 'sent' }),
+        ]);
+        expect(
+          (
+            await call(
+              'get',
+              merchant,
+              'store_admin',
+              `/api/v1/admin/users/${merchant}/legal-acceptances`
+            )
+          ).status
+        ).toBe(403);
+      } finally {
+        await owner.legalAcceptance.deleteMany({ where: { userId: merchant } });
+        await owner.legalNoticeDelivery.deleteMany({ where: { docKey: 'terms', version: V } });
+      }
+    });
   });
 });
