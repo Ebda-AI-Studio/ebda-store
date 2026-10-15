@@ -18,6 +18,7 @@
  */
 import { prisma, Prisma, hasTenantContext } from '@ebda/database';
 import { AppError } from '../middleware/error-handler';
+import logger from '../lib/logger';
 import { featureService } from './feature.service';
 import { retryOnWriteConflict } from '../lib/db-retry';
 import { withSavepoint } from '../lib/savepoint';
@@ -43,7 +44,6 @@ export const VARIANT_REQUIRED_MESSAGE = {
  * here, server-side; the PDP's disabled button is only a convenience.
  * Returns the error code instead of throwing so the bulk sync can skip a line.
  */
-
 export function resolveLineNote(
   personalisation: unknown,
   raw: unknown
@@ -751,7 +751,8 @@ export class CartService {
     const variants = variantIds.length
       ? await prisma.productVariant.findMany({
           where: { id: { in: variantIds }, productId: { in: productIds }, isActive: true },
-          select: { id: true, inventory: true, allowBackorder: true },
+          // productId: the ownership check below (a variant must belong to ITS line's product).
+          select: { id: true, productId: true, inventory: true, allowBackorder: true },
         })
       : [];
     const variantById = new Map(variants.map(v => [v.id, v]));
@@ -772,6 +773,17 @@ export class CartService {
       // invalid variant is below (the VARIANT_REQUIRED gate in addItem, applied
       // with this path's skip-don't-fail policy — Ruling FU46-W1a-2).
       if (!item.variantId && product._count.variants > 0) return [];
+      // The variant must belong to THIS line's product. The lookup above only
+      // proves it belongs to SOME product in the payload, so `[{A, vB}, {B}]`
+      // wrote an (A, vB) line carrying B's size, stock and price (W1a review #1).
+      // Skipped, like an invalid variant; store id + code only in the log.
+      if (item.variantId && variantById.get(item.variantId)?.productId !== item.productId) {
+        logger.warn(
+          { storeId, code: 'VARIANT_PRODUCT_MISMATCH' },
+          '[cart.addItems] skipped a line whose variant is not its product'
+        );
+        return [];
+      }
       const r = resolveLineNote(product.personalisation, item.note);
       return 'error' in r ? [] : [{ ...item, note: r.note }];
     });

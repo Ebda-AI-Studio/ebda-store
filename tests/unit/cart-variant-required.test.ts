@@ -151,3 +151,30 @@ describe('CartService.addItems (guest→login sync) — variant parent without a
     });
   });
 });
+
+describe('CartService.addItems — a variant must belong to ITS line (W1a review #1)', () => {
+  it('[{A, vB}, {B}] writes no (A, vB) line; a variant on its own product still syncs', async () => {
+    m.product.findMany.mockResolvedValue([
+      { ...SIZED_PARENT, id: 'prod-A', inventory: 5, _count: { variants: 0 } },
+      { ...SIZED_PARENT, id: 'prod-B', _count: { variants: 2 } },
+    ]);
+    // The payload-wide lookup finds vB (it belongs to B, which is in the payload).
+    m.productVariant.findMany.mockResolvedValue([
+      { id: 'var-B', productId: 'prod-B', inventory: 9, allowBackorder: false },
+    ]);
+
+    await CartService.addItems('store-1', 'sess-1', [
+      { productId: 'prod-A', variantId: 'var-B', quantity: 1 },
+      { productId: 'prod-B', quantity: 1 },
+      { productId: 'prod-B', variantId: 'var-B', quantity: 2 },
+    ]);
+
+    const written = m.cartItem.create.mock.calls.map(c => c[0].data);
+    expect(written).toEqual([
+      expect.objectContaining({ productId: 'prod-B', variantId: 'var-B', quantity: 2 }),
+    ]);
+    expect(written.some(d => d.productId === 'prod-A')).toBe(false);
+    // the lookup must return productId for the compare to mean anything
+    expect(m.productVariant.findMany.mock.calls[0][0].select).toMatchObject({ productId: true });
+  });
+});

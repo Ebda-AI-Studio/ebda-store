@@ -2090,6 +2090,16 @@
       "find": "      if (!item.variantId && product._count.variants > 0) return [];",
       "replace": "",
       "test": "tests/unit/cart-variant-required.test.ts"
+    },
+    {
+      "id": "cart-sync-variant-belongs-to-line",
+      "domain": "data integrity",
+      "tier": "unit",
+      "why": "the guest-to-login cart sync (addItems) resolves variants against EVERY product in the payload, so [{A, vB}, {B}] writes an (A, vB) line: product A carrying product B's size, stock and price, and it also bypasses the VARIANT_REQUIRED skip (C-01 fix round, W1a review #1)",
+      "source": "apps/api/src/services/cart.service.ts",
+      "find": "      if (item.variantId && variantById.get(item.variantId)?.productId !== item.productId) {",
+      "replace": "      if (item.variantId && !variantById.has(item.variantId)) {",
+      "test": "tests/unit/cart-variant-required.test.ts"
     }
   ]
 }

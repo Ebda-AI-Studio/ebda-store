@@ -122,6 +122,23 @@ describe.skipIf(!hasDb)('cart refuses a variant product with no variant (VARIANT
     ]);
   });
 
+  it('POST /cart/sync never writes a line whose variant belongs to ANOTHER product (W1a review #1)', async () => {
+    const sessionId = cartSessionId('varreq-foreign');
+
+    await request(app)
+      .post(`/api/v1/stores/${store.storeId}/cart/sync`)
+      .set('x-session-id', sessionId)
+      .send({
+        items: [
+          { productId: plainId, variantId, quantity: 1 }, // plain product carrying the abaya's size
+          { productId: sizedId, quantity: 1 }, // puts the abaya in the payload, itself skipped
+        ],
+      })
+      .expect(200);
+
+    expect(await linesFor(sessionId)).toEqual([]);
+  });
+
   it('over HTTP as ebda_app, public cart route: refused without a variant, accepted with one', async () => {
     const headers = {
       'Content-Type': 'application/json',
