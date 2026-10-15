@@ -96,7 +96,7 @@ const APPS: AppSpec[] = [
       },
       {
         file: 'src/templates/elegant/Footer.tsx',
-        cls: 'mt-3 text-[10px] tracking-wide text-destructive',
+        cls: 'mt-3 text-xs tracking-wide text-destructive',
         why: 'merchant-coloured footer surface',
       },
     ],

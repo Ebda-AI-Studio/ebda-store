@@ -100,6 +100,8 @@ const PHASE_B_PENDING: Record<string, string> = {
     'PecannbeeProductCard rename (blocked on templates workstream)',
   'apps/web/src/templates/shared/card-overflow.test.tsx':
     'PecannbeeProductCard rename (blocked on templates workstream)',
+  'apps/web/src/templates/shared/sold-out-corner.test.tsx':
+    'PecannbeeProductCard rename (blocked on templates workstream)',
   'apps/web/src/templates/shared/footer-branches-render.test.tsx':
     'builder/templates/layout workstream (excluded)',
   'apps/web/src/templates/shared/HeroSlider.tsx': 'builder/templates/layout workstream (excluded)',
