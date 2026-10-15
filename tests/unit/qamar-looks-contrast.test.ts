@@ -1,0 +1,92 @@
+import { describe, it, expect } from 'vitest';
+import { LOOKS, contrastRatio, composeStoreTheme, deriveBrandRoles, hexToHsl } from '@ebda/shared';
+import {
+  FULL_BLEED_SCRIM,
+  FULL_BLEED_TEXT,
+} from '../../apps/web/src/builder/sections/ImageTextSection';
+
+const qamar = LOOKS.filter(l => l.template === 'qamar');
+// Every text pair a Qamar skin paints, beyond the generic set in looks-contrast.test.ts.
+const PAIRS: [string, (t: any) => [string, string]][] = [
+  ['ink on surface', t => [t.surface, t.ink]],
+  ['accent text on surface (prices, active)', t => [t.surface, t.accent]],
+  ['onPrimary on accent (accentForeground)', t => [t.accent, t.onPrimary]],
+  ['primary text on page (links, chips active)', t => [t.page, t.primary]],
+];
+
+const hex = (n: number[]) => '#' + n.map(c => Math.round(c).toString(16).padStart(2, '0')).join('');
+const rgb = (h: string) => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16));
+const over = (fg: string, a: number, bg: string) => {
+  const f = rgb(fg);
+  const b = rgb(bg);
+  return hex(f.map((c, i) => c * a + b[i] * (1 - a)));
+};
+
+describe('qamar looks: skin-painted text pairs >= 4.5', () => {
+  it('there are exactly three Qamar looks', () =>
+    expect(qamar.map(l => l.id).sort()).toEqual([
+      'qamar.atelier',
+      'qamar.lookbook',
+      'qamar.vitrine',
+    ]));
+  for (const l of qamar)
+    for (const [label, pick] of PAIRS)
+      it(`${l.id}: ${label}`, () => {
+        const [bg, fg] = pick(l.tokens);
+        expect(contrastRatio(bg, fg)).toBeGreaterThanOrEqual(4.5);
+      });
+});
+
+describe('full-bleed panel keeps white text legible over the worst photo pixel (C15)', () => {
+  it('panel constants are the ones the component paints', () => {
+    expect(FULL_BLEED_TEXT).toBe('#FFFFFF');
+    expect(FULL_BLEED_SCRIM.opacity).toBeLessThan(1);
+  });
+  for (const l of qamar)
+    for (const [name, photo] of [
+      ['white', '#FFFFFF'],
+      ['black', '#000000'],
+    ] as const)
+      it(`${l.id}: text on panel over a ${name} photo pixel`, () => {
+        // The panel is look-independent today; the loop makes a future per-look
+        // panel colour fail here instead of shipping unmeasured.
+        const panel = over(FULL_BLEED_SCRIM.color, FULL_BLEED_SCRIM.opacity, photo);
+        expect(contrastRatio(panel, FULL_BLEED_TEXT)).toBeGreaterThanOrEqual(4.5);
+      });
+});
+
+// C28 / Task 7: the Lookbook hero overlay is a dark scrim under light text. No hero
+// overlay constant exists yet, so pin the requirement against the look tokens: a scrim
+// of the look's dark page colour at >= 0.85 over a white photo pixel must carry the
+// look's light ink at >= 4.5. Task 7 must paint exactly this (or darker/more opaque).
+describe('lookbook hero overlay requirement (pinned for Task 7)', () => {
+  const t = qamar.find(l => l.id === 'qamar.lookbook')!.tokens;
+  it('ink is light and page is dark', () => {
+    expect(contrastRatio('#000000', t.page)).toBeLessThan(contrastRatio('#000000', t.ink));
+  });
+  it('page-coloured scrim at 0.85 over white carries ink >= 4.5', () => {
+    expect(contrastRatio(over(t.page, 0.85, '#FFFFFF'), t.ink)).toBeGreaterThanOrEqual(4.5);
+  });
+});
+
+// C9: a merchant who picks extreme primary/accent colours on a Qamar look still gets
+// readable button/badge text through the storefront's brand-role guard
+// (deriveBrandRoles, the same call themeToCssVars spreads last).
+describe('merchant-extreme colours on qamar looks', () => {
+  const EXTREMES = ['#FFFFFF', '#000000', '#FFFF00', '#FF00FF', '#00FFFF', '#808080', '#777777'];
+  const ratio = (surface: string, fgTriple: string) => contrastRatio(surface, `hsl(${fgTriple})`);
+  for (const l of qamar)
+    for (const c of EXTREMES)
+      it(`${l.id}: primary/accent ${c} keeps foreground legible`, () => {
+        const theme = composeStoreTheme({
+          template: 'qamar',
+          look: l.id,
+          theme: { primaryColor: hexToHsl(c), accentColor: hexToHsl(c) },
+        });
+        const roles = deriveBrandRoles(theme);
+        // The guard's floor is 2:1 for a kept stored foreground (deliberate brand picks);
+        // anything below is replaced with black/white (>= 4.58). Never invisible.
+        expect(ratio(c, roles['--primary-foreground'])).toBeGreaterThanOrEqual(2);
+        expect(ratio(c, roles['--accent-foreground'])).toBeGreaterThanOrEqual(2);
+      });
+});
