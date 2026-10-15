@@ -73,6 +73,29 @@ export function parseDeliveryOffDaysInput(
   return parsed.success ? { ok: true, value: parsed.data } : { ok: false };
 }
 
+/**
+ * What to send for the chip selection. The default is not pinned: when the selection equals the
+ * default AND the store has no saved value, nothing is sent (`undefined`), so a later change of
+ * `DEFAULT_DELIVERY_OFF_DAYS` still reaches that store. Any other selection, and any selection
+ * on a store that already saved one, is an explicit choice and is sent as is.
+ */
+export function offDaysForSave(
+  selected: number[],
+  hasSavedValue: boolean
+): { ok: true; value: number[] | undefined } | { ok: false } {
+  const parsed = parseDeliveryOffDaysInput(selected);
+  if (!parsed.ok) return parsed;
+  const isDefault =
+    parsed.value.length === DEFAULT_DELIVERY_OFF_DAYS.length &&
+    parsed.value.every((d, i) => d === DEFAULT_DELIVERY_OFF_DAYS[i]);
+  return { ok: true, value: isDefault && !hasSavedValue ? undefined : parsed.value };
+}
+
+/** True when the store has a valid saved `deliveryOffDays` (so the chips show a stored choice). */
+export function hasSavedOffDays(raw: unknown): boolean {
+  return deliveryOffDaysSchema.safeParse(raw).success && raw !== undefined && raw !== null;
+}
+
 export interface CheckoutDeliveryForm {
   /** The store's current `settings` JSON, spread through untouched. */
   existingSettings: Record<string, unknown>;

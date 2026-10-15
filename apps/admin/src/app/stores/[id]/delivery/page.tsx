@@ -9,8 +9,9 @@ import { apiGet, apiPut } from '../../../../lib/api';
 import {
   buildCheckoutDeliverySettings,
   parseDeliveryDaysInput,
-  parseDeliveryOffDaysInput,
+  offDaysForSave,
   offDaysFromSettings,
+  hasSavedOffDays,
 } from '../../../../lib/checkout-delivery-payload';
 import { DeliveryOffDaysField } from '../../../../components/DeliveryOffDaysField';
 import { useT } from '@/i18n/useT';
@@ -53,8 +54,10 @@ export default function CheckoutDeliveryPage() {
   // Both empty = none; saving sends an explicit null to clear a stored value.
   const [deliveryDaysMin, setDeliveryDaysMin] = useState('');
   const [deliveryDaysMax, setDeliveryDaysMax] = useState('');
-  // Weekdays with no delivery (chip selection). Unset in the store = Friday only.
+  // Weekdays with no delivery (chip selection). Unset in the store = the platform default (Friday).
   const [deliveryOffDays, setDeliveryOffDays] = useState<number[]>([5]);
+  // Whether the store already holds a saved choice: the untouched default is never written.
+  const [offDaysSaved, setOffDaysSaved] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
@@ -89,6 +92,7 @@ export default function CheckoutDeliveryPage() {
       setDeliveryDaysMin(typeof dd?.min === 'number' ? String(dd.min) : '');
       setDeliveryDaysMax(typeof dd?.max === 'number' ? String(dd.max) : '');
       setDeliveryOffDays(offDaysFromSettings(settings.deliveryOffDays));
+      setOffDaysSaved(hasSavedOffDays(settings.deliveryOffDays));
     } catch (err) {
       console.error('Failed to fetch checkout delivery settings:', err);
     } finally {
@@ -106,7 +110,7 @@ export default function CheckoutDeliveryPage() {
       setMessage({ type: 'error', text: t('deliveryDaysInvalid') });
       return;
     }
-    const off = parseDeliveryOffDaysInput(deliveryOffDays);
+    const off = offDaysForSave(deliveryOffDays, offDaysSaved);
     if (!off.ok) {
       setMessage({ type: 'error', text: t('deliveryOffDaysAllOff') });
       return;
@@ -125,6 +129,7 @@ export default function CheckoutDeliveryPage() {
         }),
       });
       if (!error) {
+        if (off.value !== undefined) setOffDaysSaved(true);
         setMessage({ type: 'success', text: t('successMessage') });
       } else {
         setMessage({ type: 'error', text: error.message || t('failedMessage') });
@@ -143,6 +148,7 @@ export default function CheckoutDeliveryPage() {
     deliveryDaysMin,
     deliveryDaysMax,
     deliveryOffDays,
+    offDaysSaved,
     t,
   ]);
 

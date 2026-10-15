@@ -17,6 +17,8 @@ import {
   majorInputToMinor,
   parseDeliveryDaysInput,
   parseDeliveryOffDaysInput,
+  offDaysForSave,
+  hasSavedOffDays,
   offDaysFromSettings,
   DELIVERY_WEEK_ORDER,
   type CheckoutDeliveryForm,
@@ -199,5 +201,26 @@ describe('store deliveryOffDays (days with no delivery)', () => {
 
   it('lists the chips Saturday-first', () => {
     expect([...DELIVERY_WEEK_ORDER]).toEqual([6, 0, 1, 2, 3, 4, 5]);
+  });
+});
+
+describe('offDaysForSave (the default is not pinned)', () => {
+  it('omits the untouched default for a store with no saved value', () => {
+    expect(offDaysForSave([5], false)).toEqual({ ok: true, value: undefined });
+  });
+  it('keeps explicit choices: a saved [5], any other selection, and []', () => {
+    expect(offDaysForSave([5], true)).toEqual({ ok: true, value: [5] });
+    expect(offDaysForSave([6, 5], false)).toEqual({ ok: true, value: [5, 6] });
+    expect(offDaysForSave([], false)).toEqual({ ok: true, value: [] });
+  });
+  it('still refuses all seven', () => {
+    expect(offDaysForSave([0, 1, 2, 3, 4, 5, 6], true)).toEqual({ ok: false });
+  });
+  it('hasSavedOffDays is true only for a valid stored array', () => {
+    expect(hasSavedOffDays(undefined)).toBe(false);
+    expect(hasSavedOffDays(null)).toBe(false);
+    expect(hasSavedOffDays('friday')).toBe(false);
+    expect(hasSavedOffDays([5])).toBe(true);
+    expect(hasSavedOffDays([])).toBe(true);
   });
 });

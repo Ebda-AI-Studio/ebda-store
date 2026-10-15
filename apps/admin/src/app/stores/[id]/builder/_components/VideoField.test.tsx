@@ -4,7 +4,7 @@
  * never uploaded; a valid file uploads and previews muted + looping; Remove
  * clears the value.
  */
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderToString } from 'react-dom/server';
 import { act } from 'react';
 import { hydrateRoot } from 'react-dom/client';
@@ -34,6 +34,11 @@ const file = (size: number, type: string) => {
   return f;
 };
 
+// jsdom does not implement media playback; one spy for the whole file.
+let pause: ReturnType<typeof vi.spyOn>;
+beforeEach(() => {
+  pause = vi.spyOn(HTMLMediaElement.prototype, 'pause').mockImplementation(() => undefined);
+});
 const realMatchMedia = window.matchMedia;
 afterEach(() => {
   cleanup();
@@ -112,6 +117,35 @@ describe('VideoField', () => {
       host.remove();
       errors.mockRestore();
     }
+  });
+
+  it('pauses a preview the browser already started when reduced motion is on', async () => {
+    mockMotion(true);
+    const server = renderToString(
+      <VideoField storeId="s1" tag="" value="https://media.test/x.mp4" onChange={vi.fn()} />
+    );
+    const host = document.createElement('div');
+    host.innerHTML = server;
+    document.body.appendChild(host);
+    let root: ReturnType<typeof hydrateRoot> | undefined;
+    try {
+      await act(async () => {
+        root = hydrateRoot(
+          host,
+          <VideoField storeId="s1" tag="" value="https://media.test/x.mp4" onChange={vi.fn()} />
+        );
+      });
+      expect(pause).toHaveBeenCalled();
+    } finally {
+      act(() => root?.unmount());
+      host.remove();
+    }
+  });
+
+  it('does not pause when motion is allowed', () => {
+    mockMotion(false);
+    render(<VideoField storeId="s1" tag="" value="https://media.test/x.mp4" onChange={vi.fn()} />);
+    expect(pause).not.toHaveBeenCalled();
   });
 
   it('under prefers-reduced-motion: no autoplay, controls shown', () => {

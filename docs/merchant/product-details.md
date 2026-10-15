@@ -29,12 +29,12 @@ Admin → **Products** → your product → **Edit** → **Personalisation**. Tu
 ## Delivery time — مدة التوصيل
 
 - **Made to order:** Admin → **Products** → your product → **Edit** → **Fulfilment** → lead time in days (0 to 60). The product page then says when the order is expected.
-- **Store-wide estimate:** Admin → **Delivery** → "Delivery time (business days)". Used when your delivery zones carry no day estimate (for example when you price per area). Counted in business days. Friday is off by default; under **Days with no delivery** pick the days your courier does not deliver (any of the seven, but at least one delivery day must stay).
+- **Store-wide estimate:** Admin → **Delivery** → "Delivery time (business days)". Used when your delivery zones carry no day estimate (for example when you price per area). Counted in business days. Friday is off by default and you can change it; under **Days with no delivery** pick the days your courier does not deliver (any of the seven, but at least one delivery day must stay).
 
 The date appears only when the store has an estimate (a delivery zone with days, or the store-wide one).
 
 - **حسب الطلب:** المنتجات → المنتج → تعديل → **التجهيز** → عدد أيام التجهيز (من 0 إلى 60).
-- **تقدير عام للمتجر:** **التوصيل** → "مدة التوصيل (أيام عمل)". يُستخدم لما مناطق الشحن ما فيها عدد أيام. تُحسب أيام العمل، والجمعة إجازة تلقائيًا. من **أيام بدون توصيل** اختار الأيام اللي المندوب مبيوصلش فيها (أي يوم من السبعة، بس لازم يفضل يوم توصيل واحد على الأقل).
+- **تقدير عام للمتجر:** **التوصيل** → "مدة التوصيل (أيام عمل)". يُستخدم لما مناطق الشحن ما فيها عدد أيام. تُحسب أيام العمل، والجمعة متختارة كيوم بدون توصيل افتراضيًا وتقدر تغيّرها. من **أيام بدون توصيل** اختار الأيام اللي المندوب مبيوصلش فيها (أي يوم من السبعة، بس لازم يفضل يوم توصيل واحد على الأقل).
 
 ## Size guides — دليل المقاسات
 

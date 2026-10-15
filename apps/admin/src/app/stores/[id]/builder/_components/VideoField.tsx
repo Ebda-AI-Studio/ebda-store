@@ -7,7 +7,7 @@
  * here first so a 40 MB file never leaves the browser; the API enforces the
  * same limits and sniffs the bytes.
  */
-import { useRef, useState, useSyncExternalStore } from 'react';
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { useT } from '@/i18n/useT';
 import { useImageUpload } from '@/hooks/useImageUpload';
 import { VIDEO_ACCEPT, checkVideoFile, formatMegabytes } from '@/lib/video-upload';
@@ -56,6 +56,12 @@ export function VideoField({
     readReducedMotion,
     serverReducedMotion
   );
+  // Removing `autoplay` does not stop a video the browser already started while parsing
+  // server markup, so pause it explicitly once reduced motion is known.
+  const videoRef = useRef<HTMLVideoElement>(null);
+  useEffect(() => {
+    if (reduceMotion) videoRef.current?.pause();
+  }, [reduceMotion, value]);
 
   const pick = async (file: File | undefined) => {
     if (!file) return;
@@ -79,6 +85,7 @@ export function VideoField({
       <div className="flex items-center gap-2">
         {value ? (
           <video
+            ref={videoRef}
             src={value}
             muted
             loop
