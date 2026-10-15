@@ -167,6 +167,7 @@ router.get(
         metaTitleAr: p.metaTitleAr ?? '',
         metaDescription: p.metaDescription ?? '',
         metaDescriptionAr: p.metaDescriptionAr ?? '',
+        searchTerms: p.searchTerms ?? '',
       }));
 
       await auditLog({
@@ -224,6 +225,7 @@ router.get(
           { header: 'Meta Title (AR)', key: 'metaTitleAr', width: 30 },
           { header: 'Meta Description', key: 'metaDescription', width: 40 },
           { header: 'Meta Description (AR)', key: 'metaDescriptionAr', width: 40 },
+          { header: 'Search Words', key: 'searchTerms', width: 40 },
         ],
         rows,
       });

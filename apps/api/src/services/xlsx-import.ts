@@ -133,6 +133,7 @@ type CanonicalKey =
   | 'metaTitleAr'
   | 'metaDescription'
   | 'metaDescriptionAr'
+  | 'searchTerms'
   // Variant columns (OSOSS-style). A row carrying a parentSku is a variant.
   | 'parentSku'
   | 'option1Name'
@@ -169,6 +170,8 @@ const HEADER_ALIASES: Record<string, CanonicalKey> = {
   'description (ar)': 'descriptionAr',
   'meta title (ar)': 'metaTitleAr',
   'meta description (ar)': 'metaDescriptionAr',
+  'search words': 'searchTerms',
+  'كلمات البحث': 'searchTerms',
   compareatprice: 'compareAtPrice',
   'compare at price': 'compareAtPrice',
   costprice: 'costPrice',
@@ -198,6 +201,8 @@ const HEADER_ALIASES: Record<string, CanonicalKey> = {
   metadescription: 'metaDescription',
   'meta description': 'metaDescription',
   metadescriptionar: 'metaDescriptionAr',
+  searchterms: 'searchTerms',
+  'search terms': 'searchTerms',
 
   // Variant columns (English + OSOSS export header)
   parentsku: 'parentSku',
@@ -382,6 +387,7 @@ const CSV_COLUMNS: CanonicalKey[] = [
   'metaTitleAr',
   'metaDescription',
   'metaDescriptionAr',
+  'searchTerms',
   'parentSku',
   'option1Name',
   'option1Value',

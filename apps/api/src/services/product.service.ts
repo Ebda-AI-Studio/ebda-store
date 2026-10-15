@@ -12,6 +12,7 @@ import { activeVariants, effectiveInventory } from '../lib/effective-inventory';
 import {
   slugify,
   slugifyWithFallback,
+  cleanSearchTerms,
   AI_AUTOFILL_FIELD_NAMES,
   type ProductFact,
   type PersonalisationConfig,
@@ -258,6 +259,12 @@ interface CreateProductData {
   facts?: ProductFact[];
   /** Made-to-order business days; `null` clears, `undefined` leaves alone. */
   leadTimeDays?: number | null;
+  /**
+   * Extra shopper words (dialect / Franco / English), searched never shown.
+   * `null` clears, `undefined` leaves alone. Re-cleaned + capped at 500 chars in
+   * create/update so every caller (routes, MCP, bulk, AI fill) hits the same cap.
+   */
+  searchTerms?: string | null;
   /** PDP personalisation field config; `null` clears, `undefined` leaves alone. */
   personalisation?: PersonalisationConfig | null;
   /** Own size chart (same store, checked); `null` = inherit the category's, `undefined` leaves alone. */
@@ -777,6 +784,7 @@ export class ProductService {
         isBestSeller: data.isBestSeller ?? false,
         badgeLabel: data.badgeLabel ?? null,
         badgeLabelAr: data.badgeLabelAr ?? null,
+        searchTerms: cleanSearchTerms(data.searchTerms),
         ...(data.facts !== undefined ? { facts: data.facts } : {}),
         ...(data.leadTimeDays !== undefined ? { leadTimeDays: data.leadTimeDays } : {}),
         ...personalisationWrite(data.personalisation),
@@ -976,6 +984,9 @@ export class ProductService {
           // convention as nameAr / description / excerpt above.
           ...(data.badgeLabel !== undefined ? { badgeLabel: data.badgeLabel } : {}),
           ...(data.badgeLabelAr !== undefined ? { badgeLabelAr: data.badgeLabelAr } : {}),
+          ...(data.searchTerms !== undefined
+            ? { searchTerms: cleanSearchTerms(data.searchTerms) }
+            : {}),
           ...(data.facts !== undefined ? { facts: data.facts } : {}),
           ...(data.leadTimeDays !== undefined ? { leadTimeDays: data.leadTimeDays } : {}),
           ...personalisationWrite(data.personalisation),

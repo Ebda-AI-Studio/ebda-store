@@ -20,6 +20,7 @@ const FIELDS = [
   'sku',
   'badgeLabel',
   'badgeLabelAr',
+  'searchTerms',
 ] as const;
 
 function form(overrides: Partial<ProductTextFieldsForm> = {}): ProductTextFieldsForm {
@@ -30,6 +31,7 @@ function form(overrides: Partial<ProductTextFieldsForm> = {}): ProductTextFields
     sku: '',
     badgeLabel: '',
     badgeLabelAr: '',
+    searchTerms: '',
     ...overrides,
   };
 }
@@ -52,6 +54,7 @@ describe('productTextFields — edit form (update)', () => {
       sku: null,
       badgeLabel: null,
       badgeLabelAr: null,
+      searchTerms: null,
     });
   });
 
@@ -64,6 +67,7 @@ describe('productTextFields — edit form (update)', () => {
         sku: 'PB-001',
         badgeLabel: 'Offer',
         badgeLabelAr: 'عرض',
+        searchTerms: 'كوتشي, 3abaya',
       }),
       'update'
     );
@@ -74,6 +78,7 @@ describe('productTextFields — edit form (update)', () => {
       sku: 'PB-001',
       badgeLabel: 'Offer',
       badgeLabelAr: 'عرض',
+      searchTerms: 'كوتشي, 3abaya',
     });
   });
 
@@ -89,7 +94,15 @@ describe('productTextFields — edit form (update)', () => {
 
   it('never emits `name` — it is required and must not become nullable', () => {
     expect(Object.keys(productTextFields(form(), 'update')).sort()).toEqual(
-      ['badgeLabel', 'badgeLabelAr', 'description', 'descriptionAr', 'nameAr', 'sku'].sort()
+      [
+        'badgeLabel',
+        'badgeLabelAr',
+        'description',
+        'descriptionAr',
+        'nameAr',
+        'searchTerms',
+        'sku',
+      ].sort()
     );
   });
 });

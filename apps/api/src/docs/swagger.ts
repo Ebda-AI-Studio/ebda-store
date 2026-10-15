@@ -157,6 +157,13 @@ All errors follow this format:
             // contract, not a hint.
             badgeLabel: { type: 'string', nullable: true, maxLength: 32 },
             badgeLabelAr: { type: 'string', nullable: true, maxLength: 32 },
+            searchTerms: {
+              type: 'string',
+              nullable: true,
+              maxLength: 500,
+              description:
+                'Extra words shoppers type (dialect / Franco / English); comma-separated, cleaned to "a, b, c". Searched, never displayed. null clears.',
+            },
             inventory: { type: 'integer' },
             status: { type: 'string', enum: ['active', 'draft', 'archived'] },
             images: { type: 'array', items: { $ref: '#/components/schemas/ProductImage' } },

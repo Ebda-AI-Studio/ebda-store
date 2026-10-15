@@ -699,7 +699,10 @@
         "badgeLabelPlaceholder": "e.g. Offer",
         "badgeLabelAr": "Card badge (Arabic)",
         "badgeLabelArPlaceholder": "مثلاً عرض",
-        "badgeLabelHint": "Free text shown as a chip on this product's card and page. Leave empty for no badge. Max 32 characters."
+        "badgeLabelHint": "Free text shown as a chip on this product's card and page. Leave empty for no badge. Max 32 characters.",
+        "searchTerms": "Search words",
+        "searchTermsPlaceholder": "e.g. sneakers, kotshi, 3abaya",
+        "searchTermsHint": "Other words shoppers type for this product, separated by commas: Egyptian spellings, Franco (3abaya), English. Not shown in the store."
       },
       "statusOptions": {
         "draft": "Draft",
@@ -935,6 +938,9 @@
         "badgeLabelAr": "Card badge (Arabic)",
         "badgeLabelArPlaceholder": "مثلاً عرض",
         "badgeLabelHint": "Free text shown as a chip on this product's card and page. Leave empty for no badge. Max 32 characters.",
+        "searchTerms": "Search words",
+        "searchTermsPlaceholder": "e.g. sneakers, kotshi, 3abaya",
+        "searchTermsHint": "Other words shoppers type for this product, separated by commas: Egyptian spellings, Franco (3abaya), English. Not shown in the store.",
         "mediaHint": "Drag and drop images here, or click to select",
         "mediaSizeHint": "Recommended 1000×1000 (square). Up to 10MB per file — we auto-compress for the storefront.",
         "price": "Price (EGP)",
