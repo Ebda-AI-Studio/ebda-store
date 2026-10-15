@@ -7073,6 +7073,7 @@
       "reconcileAction": "Reconcile to aggregate",
       "reconciling": "Reconciling…",
       "reconcileHint": "Per-warehouse counts are reconciled from your authoritative product stock.",
+      "searchTruncated": "These are the closest matches only. Add a word to narrow the search.",
       "reconcileDone": "Reconciled {reconciled} SKU(s), {failed} failed",
       "reconcileStarted": "Reconciliation started — per-warehouse counts will update shortly"
     }

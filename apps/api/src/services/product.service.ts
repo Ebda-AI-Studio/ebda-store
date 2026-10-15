@@ -34,6 +34,7 @@ import { assertWithinLimit } from './plan-limit.service';
 import {
   buildProductSearchWhere,
   productSearchFilter,
+  searchNameIds,
   searchProductIds,
 } from './product-search.service';
 
@@ -2104,14 +2105,11 @@ export class ProductService {
     };
 
     // Text search — Arabic-normalised word-AND (product-search.service), SKU included.
-    // `searchTruncated` as in list(): more than PRODUCT_SEARCH_ID_CAP matched.
-    let searchTruncated = false;
+    // No UI consumes this route, so the 1000-id cap is not surfaced here (Ruling SEARCH-T3-6).
     if (query && query.trim()) {
-      const filter = await productSearchFilter(storeId, query, 'admin');
-      searchTruncated = filter.truncated;
       where.AND = [
         ...(Array.isArray(where.AND) ? where.AND : where.AND ? [where.AND] : []),
-        ...filter.and,
+        ...(await buildProductSearchWhere(storeId, query, 'admin')),
       ];
     }
 
@@ -2261,7 +2259,6 @@ export class ProductService {
         limit,
         total,
         totalPages: Math.ceil(total / limit),
-        truncated: searchTruncated,
       },
       filters: {
         priceRange: {
@@ -2294,10 +2291,13 @@ export class ProductService {
     // product names, so matching on description would surface confusing results).
     // A multi-word / reordered query still matches (e.g. "بريتزوس مشكلة" →
     // "مخبوزات بريتزوس مشكلة").
+    // order 'featured': featured-first, then name, applied in SQL BEFORE the top
+    // `take`, so a featured match can never be cut by the id cap.
     const matchIds = await searchProductIds(storeId, trimmed, {
       scope: 'storefront',
       field: 'name',
-      limit: 200,
+      order: 'featured',
+      limit: take,
     });
     if (matchIds.length === 0) return { suggestions: [] as Array<unknown> };
     const products = await prisma.product.findMany({
@@ -2359,14 +2359,10 @@ export class ProductService {
       orderBy: { viewCount: 'desc' },
     });
 
+    // Same Arabic folding as the products above; soft-deleted categories never suggest.
+    const categoryIds = await searchNameIds('categories', storeId, query);
     const categories = await prisma.category.findMany({
-      where: {
-        storeId,
-        OR: [
-          { name: { contains: query, mode: 'insensitive' } },
-          { nameAr: { contains: query, mode: 'insensitive' } },
-        ],
-      },
+      where: { storeId, deletedAt: null, id: { in: categoryIds } },
       select: {
         id: true,
         name: true,

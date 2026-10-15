@@ -18,7 +18,7 @@ import { AppError } from '../middleware/error-handler';
 import logger from '../lib/logger';
 import { haversineKm } from '../lib/haversine';
 import { retryOnWriteConflict } from '../lib/db-retry';
-import { searchProductIds } from './product-search.service';
+import { searchProductIdSet, searchVariantIdsBySku } from './product-search.service';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -427,7 +427,7 @@ export class WarehouseService {
     storeId: string,
     warehouseId: string,
     options?: { page?: number; limit?: number; search?: string }
-  ): Promise<{ rows: WarehouseStockRow[]; total: number }> {
+  ): Promise<{ rows: WarehouseStockRow[]; total: number; truncated: boolean }> {
     // Verify warehouse belongs to store
     const warehouse = await prisma.warehouse.findFirst({
       where: { id: warehouseId, storeId },
@@ -443,16 +443,18 @@ export class WarehouseService {
       storeId,
     };
 
+    // `truncated`: more than PRODUCT_SEARCH_ID_CAP products (or variants) matched, so the
+    // rows cover only the closest 1,000; the stock page says "add a word".
+    let truncated = false;
     if (options?.search) {
-      // Product side: Arabic-normalised names/terms/descriptions + SKU (product-search.service).
-      const productIds = await searchProductIds(storeId, options.search, {
-        scope: 'admin',
-        includeDeleted: true,
-      });
-      where.OR = [
-        { productId: { in: productIds } },
-        { variant: { sku: { contains: options.search, mode: 'insensitive' } } },
-      ];
+      // Arabic-normalised: product names/terms/descriptions + product SKU, and variant SKU
+      // with the same folding ("mug-77" finds "MUG-٧٧") (product-search.service).
+      const [products, variants] = await Promise.all([
+        searchProductIdSet(storeId, options.search, { scope: 'admin', includeDeleted: true }),
+        searchVariantIdsBySku(storeId, options.search),
+      ]);
+      truncated = products.truncated || variants.truncated;
+      where.OR = [{ productId: { in: products.ids } }, { variantId: { in: variants.ids } }];
     }
 
     const [rows, total] = await Promise.all([
@@ -489,6 +491,7 @@ export class WarehouseService {
         variantSku: r.variant?.sku ?? null,
       })),
       total,
+      truncated,
     };
   }
 

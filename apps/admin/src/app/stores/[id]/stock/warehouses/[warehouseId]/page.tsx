@@ -56,6 +56,8 @@ export default function WarehouseStockPage() {
   const [warehouse, setWarehouse] = useState<Warehouse | null>(null);
   const [rows, setRows] = useState<StockRow[]>([]);
   const [total, setTotal] = useState(0);
+  // The search matched more than the API's 1,000-match cap: say so instead of a silent total.
+  const [truncated, setTruncated] = useState(false);
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
@@ -97,15 +99,18 @@ export default function WarehouseStockPage() {
       limit: String(LIMIT),
       ...(search && { search }),
     });
-    const { data, error: apiError } = await apiGet<{ rows: StockRow[]; total: number }>(
-      `/api/v1/stores/${storeId}/warehouses/${warehouseId}/stock?${qs}`
-    );
+    const { data, error: apiError } = await apiGet<{
+      rows: StockRow[];
+      total: number;
+      truncated?: boolean;
+    }>(`/api/v1/stores/${storeId}/warehouses/${warehouseId}/stock?${qs}`);
     if (!isLatest()) return;
     if (apiError) {
       setErr(apiError.message);
     } else {
       setRows(data?.rows ?? []);
       setTotal(data?.total ?? 0);
+      setTruncated(!!data?.truncated);
     }
     setLoading(false);
   }
@@ -245,6 +250,9 @@ export default function WarehouseStockPage() {
           }}
           placeholder={t('searchPlaceholder')}
         />
+        {search && truncated && (
+          <p className="mt-2 text-xs text-muted-foreground">{t('searchTruncated')}</p>
+        )}
       </div>
 
       {/* Reconcile helper note */}

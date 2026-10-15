@@ -1423,7 +1423,9 @@ router.get(
         fetch: async window => {
           const sid = currentStoreId();
           const scoped: Prisma.ProductWhereInput = { ...where, storeId: sid };
-          // Arabic-normalised names/terms/descriptions + SKU, per visited store.
+          // Arabic-normalised names/terms/descriptions + SKU, per visited store. Capped at the
+          // closest 1,000 matches PER STORE, not surfaced: no admin UI consumes this route
+          // (Ruling SEARCH-T3-6). pageAcrossStores calls fetch once per store (cross-store.ts).
           if (search) {
             scoped.id = {
               in: await searchProductIds(sid, search as string, {

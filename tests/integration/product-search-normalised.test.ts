@@ -6,6 +6,7 @@
  * Franco-Arabic only matches through merchant search terms here; Franco expansion is P1.
  * `%` and `_` in a query are LITERAL characters, never LIKE wildcards.
  */
+import crypto from 'crypto';
 import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
 import { prisma, runInTenantContext } from '@ebda/database';
 import { searchTokens } from '@ebda/shared';
@@ -19,6 +20,10 @@ const { searchProductIds, searchProductIdSet, searchNameIds, PRODUCT_SEARCH_ID_C
 const { ProductService } = await import('../../apps/api/src/services/product.service');
 const { BulkService } = await import('../../apps/api/src/services/bulk.service');
 const { PromotionService } = await import('../../apps/api/src/services/promotion.service');
+const { WarehouseService } = await import('../../apps/api/src/services/warehouse.service');
+const { bridgeProductSearchPage } = await import('../../apps/api/src/routes/wa-bridge.routes');
+/** Per-CALL unique tag: a retried test never meets its failed attempt's rows (CLAUDE.md). */
+const uniq = () => crypto.randomUUID().slice(0, 8);
 
 const run = `${Date.now()}${Math.random().toString(36).slice(2, 7)}`;
 let storeId: string;
@@ -219,29 +224,182 @@ describe.skipIf(!hasDb)('normalised product search', () => {
       expect(sku).toContain('Mug');
     });
     it('promotion and bundle name search fold Arabic spellings', async () => {
-      const promo = await prisma.promotion.create({
-        data: {
-          storeId,
-          name: `Eid ${run}`,
-          nameAr: 'تخفيضات العيد على الطرحة',
-          type: 'percentage',
-          value: 10,
-        },
-      });
-      const res = await inStore(() => PromotionService.list(storeId, { search: 'الطرحه' }));
-      expect(res.promotions.map(p => p.id)).toEqual([promo.id]);
-      const bundle = await prisma.bundle.create({
-        data: {
-          storeId,
-          name: `Set ${run}`,
-          nameAr: 'طقم إسدال',
-          slug: `set-${run}`,
-          pricingType: 'fixed_price',
-          pricingValue: 12000,
-        },
-      });
-      expect(await inStore(() => searchNameIds('bundles', storeId, 'اسدال'))).toEqual([bundle.id]);
-      expect(await inStore(() => searchNameIds('bundles', storeId, '%'))).toEqual([]);
+      const u = uniq();
+      let promoId: string | undefined;
+      let bundleId: string | undefined;
+      try {
+        const promo = await prisma.promotion.create({
+          data: {
+            storeId,
+            name: `Eid ${u}`,
+            nameAr: `تخفيضات العيد على الطرحة ${u}`,
+            type: 'percentage',
+            value: 10,
+          },
+        });
+        promoId = promo.id;
+        const res = await inStore(() => PromotionService.list(storeId, { search: `الطرحه ${u}` }));
+        expect(res.promotions.map(p => p.id)).toEqual([promo.id]);
+        const bundle = await prisma.bundle.create({
+          data: {
+            storeId,
+            name: `Set ${u}`,
+            nameAr: `طقم إسدال ${u}`,
+            slug: `set-${u}`,
+            pricingType: 'fixed_price',
+            pricingValue: 12000,
+          },
+        });
+        bundleId = bundle.id;
+        expect(await inStore(() => searchNameIds('bundles', storeId, `اسدال ${u}`))).toEqual([
+          bundle.id,
+        ]);
+        expect(await inStore(() => searchNameIds('bundles', storeId, '%'))).toEqual([]);
+      } finally {
+        if (promoId) await prisma.promotion.deleteMany({ where: { id: promoId } });
+        if (bundleId) await prisma.bundle.deleteMany({ where: { id: bundleId } });
+      }
+    });
+
+    it('search suggestions fold category names and skip deleted categories', async () => {
+      const u = uniq();
+      const made: string[] = [];
+      try {
+        const live = await prisma.category.create({
+          data: { storeId, name: `Shoes ${u}`, nameAr: `أحذية ${u}`, slug: `cat-${u}` },
+        });
+        made.push(live.id);
+        const gone = await prisma.category.create({
+          data: {
+            storeId,
+            name: `Old shoes ${u}`,
+            nameAr: `أحذية قديمة ${u}`,
+            slug: `cat-old-${u}`,
+            deletedAt: new Date(),
+          },
+        });
+        made.push(gone.id);
+        const res = await inStore(() => ProductService.getSearchSuggestions(storeId, `احذيه ${u}`));
+        const cats = (res.suggestions as { categories: Array<{ id: string }> }).categories;
+        expect(cats.map(c => c.id)).toEqual([live.id]);
+      } finally {
+        await prisma.category.deleteMany({ where: { id: { in: made } } });
+      }
+    });
+
+    it('warehouse stock search folds product names and VARIANT SKUs', async () => {
+      const u = uniq();
+      let warehouseId: string | undefined;
+      let productId: string | undefined;
+      try {
+        const wh = await prisma.warehouse.create({
+          data: { storeId, name: `WH ${u}`, code: `W${u}` },
+        });
+        warehouseId = wh.id;
+        const p = await prisma.product.create({
+          data: {
+            storeId,
+            slug: `cup-${u}`,
+            name: `Cup ${u}`,
+            price: 1000,
+            hasVariants: true,
+            variants: { create: [{ title: 'Large', sku: `MUG-٧٧-${u}`, price: 1000 }] },
+          },
+          include: { variants: true },
+        });
+        productId = p.id;
+        await prisma.warehouseStock.createMany({
+          data: [
+            {
+              storeId,
+              warehouseId: wh.id,
+              productId: p.id,
+              variantId: p.variants[0].id,
+              quantity: 3,
+            },
+            { storeId, warehouseId: wh.id, productId: ids.shoes, quantity: 4 },
+          ],
+        });
+        const bySku = await inStore(() =>
+          WarehouseService.listWarehouseStock(storeId, wh.id, { search: `mug-77-${u}` })
+        );
+        expect(bySku.rows.map(r => r.variantId)).toEqual([p.variants[0].id]);
+        expect(bySku.truncated).toBe(false);
+        const byName = await inStore(() =>
+          WarehouseService.listWarehouseStock(storeId, wh.id, { search: 'احذيه' })
+        );
+        expect(byName.rows.map(r => r.productId)).toEqual([ids.shoes]);
+      } finally {
+        if (warehouseId) {
+          await prisma.warehouseStock.deleteMany({ where: { warehouseId } });
+          await prisma.warehouse.deleteMany({ where: { id: warehouseId } });
+        }
+        if (productId) await prisma.product.deleteMany({ where: { id: productId } });
+      }
+    });
+
+    it('WhatsApp bridge pages one stable match set: no repeats, no gaps, no drafts', async () => {
+      const u = uniq();
+      const sid = await mkStore(`ps-wa-${u}`);
+      try {
+        await prisma.product.createMany({
+          data: Array.from({ length: 28 }, (_, i) => ({
+            storeId: sid,
+            slug: `wa-${i}-${u}`,
+            price: 1000,
+            // every 4th one is a draft: it must never take a page slot
+            status: i % 4 === 3 ? ('draft' as const) : ('active' as const),
+            name: `Scarf ${String(i).padStart(2, '0')}`,
+            nameAr: `وشاح ${i}`,
+          })),
+        });
+        const active = await prisma.product.findMany({
+          where: { storeId: sid, status: 'active' },
+          select: { id: true },
+        });
+        const seen: string[] = [];
+        let more = true;
+        for (let page = 1; more; page++) {
+          const res = await runInTenantContext(sid, () =>
+            bridgeProductSearchPage(sid, 'وشاح', page, 8)
+          );
+          seen.push(...res.products.map(p => p.id));
+          more = res.hasMore;
+          if (page > 5) throw new Error('hasMore never turned false');
+        }
+        expect(new Set(seen).size).toBe(seen.length); // no repeats
+        expect(seen.sort()).toEqual(active.map(a => a.id).sort()); // no gaps, no drafts
+      } finally {
+        await prisma.product.deleteMany({ where: { storeId: sid } });
+        await prisma.store.deleteMany({ where: { id: sid } });
+      }
+    });
+
+    it('typeahead puts a featured match first even when more matches than the limit exist', async () => {
+      const u = uniq();
+      const sid = await mkStore(`ps-ta-${u}`);
+      try {
+        await prisma.product.createMany({
+          data: Array.from({ length: 30 }, (_, i) => ({
+            storeId: sid,
+            slug: `ta-${i}-${u}`,
+            price: 1000,
+            status: 'active' as const,
+            // the featured one sorts LAST by name and matches worst
+            name: i === 29 ? 'Zzz long scarf featured pick' : `Scarf ${i}`,
+            featured: i === 29,
+          })),
+        });
+        const res = await runInTenantContext(sid, () =>
+          ProductService.getSuggestSuggestions(sid, 'scarf', 5)
+        );
+        const names = (res.suggestions as Array<{ name: string }>).map(s => s.name);
+        expect(names[0]).toBe('Zzz long scarf featured pick');
+        expect(names).toHaveLength(5);
+      } finally {
+        await prisma.product.deleteMany({ where: { storeId: sid } });
+        await prisma.store.deleteMany({ where: { id: sid } });
+      }
     });
   });
 });

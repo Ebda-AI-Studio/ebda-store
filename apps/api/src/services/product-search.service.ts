@@ -15,6 +15,13 @@ export interface ProductSearchOpts {
   limit?: number;
   /** Admin exports with "include deleted": drop the deleted_at filter. */
   includeDeleted?: boolean;
+  /** Also match the normalised SKU. Default: scope === 'admin'. */
+  withSku?: boolean;
+  /**
+   * 'similarity' (default) = best name match first; 'featured' = featured first, then name A-Z
+   * (typeahead: the merchant's curated picks win BEFORE the top N is taken).
+   */
+  order?: 'similarity' | 'featured';
 }
 
 export interface ProductSearchIdSet {
@@ -52,20 +59,24 @@ export function productSearchSql(
     opts.field === 'name'
       ? Prisma.sql`public.ebda_product_name_doc(p.name, p.name_ar, p.search_terms)`
       : Prisma.sql`public.ebda_product_search_doc(p.name, p.name_ar, p.search_terms, p.description, p.description_ar)`;
+  const withSku = opts.withSku ?? opts.scope === 'admin';
   const arms = tokens.map(t => {
     const pattern = `%${escapeLike(t)}%`;
-    return opts.scope === 'admin'
+    return withSku
       ? Prisma.sql`(${doc} LIKE ${pattern} OR public.ebda_ar_norm(coalesce(p.sku, '')) LIKE ${pattern})`
       : Prisma.sql`${doc} LIKE ${pattern}`;
   });
   const status = opts.scope === 'storefront' ? Prisma.sql`AND p.status = 'active'` : Prisma.empty;
   const deleted = opts.includeDeleted ? Prisma.empty : Prisma.sql`AND p.deleted_at IS NULL`;
-  const qNorm = normalizeArabicSearch(raw);
+  const orderBy =
+    opts.order === 'featured'
+      ? Prisma.sql`p.featured DESC, p.name ASC, p.id`
+      : Prisma.sql`similarity(public.ebda_product_name_doc(p.name, p.name_ar, p.search_terms), ${normalizeArabicSearch(raw)}) DESC, p.id`;
   // limit + 1: the extra row only says "there were more" (truncated).
   return Prisma.sql`SELECT p.id FROM products p
     WHERE p.store_id = ${storeId} ${deleted} ${status}
       AND ${Prisma.join(arms, ' AND ')}
-    ORDER BY similarity(public.ebda_product_name_doc(p.name, p.name_ar, p.search_terms), ${qNorm}) DESC, p.id
+    ORDER BY ${orderBy}
     LIMIT ${limit + 1}`;
 }
 
@@ -120,33 +131,69 @@ export async function buildProductSearchWhere(
   return (await productSearchFilter(storeId, search, scope)).and;
 }
 
+/** Word-AND normalised LIKE arms over one SQL expression (the token patterns are bound values). */
+function normalisedArms(expr: Prisma.Sql, tokens: string[]): Prisma.Sql {
+  return Prisma.join(
+    tokens.map(t => Prisma.sql`${expr} LIKE ${`%${escapeLike(t)}%`}`),
+    ' AND '
+  );
+}
+
 /**
- * Small per-store admin lists searched by name + Arabic name with the same folding (bundles,
- * promotions). These tables are tiny per store (store_id-indexed), so the normalised LIKE runs on
- * the store's rows without an expression index. Each table has its own literal statement (no
- * Prisma.raw table name).
+ * Small per-store lists searched by name + Arabic name with the same folding (bundles,
+ * promotions, categories). These tables are small per store (store_id-indexed), so the
+ * normalised LIKE runs on the store's rows without an expression index. Each table has its own
+ * literal statement (no Prisma.raw table name). Categories skip soft-deleted rows.
  */
 export async function searchNameIds(
-  table: 'bundles' | 'promotions',
+  table: 'bundles' | 'promotions' | 'categories',
   storeId: string,
-  raw: string
+  raw: string,
+  limit: number = PRODUCT_SEARCH_ID_CAP
 ): Promise<string[]> {
   const tokens = searchTokens(raw);
   if (tokens.length === 0) return [];
-  const match = Prisma.join(
-    tokens.map(
-      t =>
-        Prisma.sql`public.ebda_ar_norm(coalesce(t.name, '') || ' ' || coalesce(t.name_ar, '')) LIKE ${`%${escapeLike(t)}%`}`
-    ),
-    ' AND '
+  const match = normalisedArms(
+    Prisma.sql`public.ebda_ar_norm(coalesce(t.name, '') || ' ' || coalesce(t.name_ar, ''))`,
+    tokens
   );
-  const rows =
-    table === 'bundles'
-      ? await prisma.$queryRaw<Array<{ id: string }>>`
-          SELECT t.id FROM bundles t WHERE t.store_id = ${storeId} AND ${match}
-          LIMIT ${PRODUCT_SEARCH_ID_CAP}`
-      : await prisma.$queryRaw<Array<{ id: string }>>`
-          SELECT t.id FROM promotions t WHERE t.store_id = ${storeId} AND ${match}
-          LIMIT ${PRODUCT_SEARCH_ID_CAP}`;
+  const take = clampLimit(limit);
+  let rows: Array<{ id: string }>;
+  if (table === 'bundles') {
+    rows = await prisma.$queryRaw`
+      SELECT t.id FROM bundles t WHERE t.store_id = ${storeId} AND ${match}
+      ORDER BY t.id LIMIT ${take}`;
+  } else if (table === 'promotions') {
+    rows = await prisma.$queryRaw`
+      SELECT t.id FROM promotions t WHERE t.store_id = ${storeId} AND ${match}
+      ORDER BY t.id LIMIT ${take}`;
+  } else {
+    rows = await prisma.$queryRaw`
+      SELECT t.id FROM categories t
+      WHERE t.store_id = ${storeId} AND t.deleted_at IS NULL AND ${match}
+      ORDER BY t.id LIMIT ${take}`;
+  }
   return rows.map(r => r.id);
+}
+
+/**
+ * Variant ids whose SKU matches every token after the same folding (Arabic-Indic digits, case),
+ * for the warehouse stock search. product_variants has no store_id, so the join names the
+ * product's store_id explicitly (R-EBDA-004); RLS scopes variants through their product.
+ */
+export async function searchVariantIdsBySku(
+  storeId: string,
+  raw: string
+): Promise<ProductSearchIdSet> {
+  const tokens = searchTokens(raw);
+  if (tokens.length === 0) return { ids: [], truncated: false };
+  const match = normalisedArms(Prisma.sql`public.ebda_ar_norm(coalesce(v.sku, ''))`, tokens);
+  const rows = await prisma.$queryRaw<Array<{ id: string }>>`
+    SELECT v.id FROM product_variants v JOIN products p ON p.id = v.product_id
+    WHERE p.store_id = ${storeId} AND ${match}
+    ORDER BY v.id LIMIT ${PRODUCT_SEARCH_ID_CAP + 1}`;
+  return {
+    ids: rows.slice(0, PRODUCT_SEARCH_ID_CAP).map(r => r.id),
+    truncated: rows.length > PRODUCT_SEARCH_ID_CAP,
+  };
 }
