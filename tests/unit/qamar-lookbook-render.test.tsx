@@ -524,6 +524,17 @@ describe('homepage piece fetch is never capped below the referenced ids', async 
   });
 });
 
+describe('the category strip centres a short row (quality bar L-05)', async () => {
+  const { CategoryStrip } = await import('../../apps/web/src/templates/shared/CategoryStrip');
+  const { CATEGORIES } = await import('../fixtures/builder/homepage-data');
+  it('the scroll row is `justify-content: safe center` (start when it overflows)', () => {
+    const html = renderToStaticMarkup(
+      <CategoryStrip categories={CATEGORIES as any} isRtl urlPrefix="" pack="qamar" />
+    );
+    expect(html).toMatch(/<ul class="[^"]*\[justify-content:safe_center\]/);
+  });
+});
+
 describe('qamar display headings are not shrunk/grown by the Arabic font-size-adjust', () => {
   it('h1-h3 and .font-display reset it under the qamar pack; the collage motion has a reduced-motion end state', async () => {
     const { readFileSync } = await import('node:fs');

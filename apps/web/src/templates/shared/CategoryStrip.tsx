@@ -100,7 +100,10 @@ export function CategoryStrip({
           // touch-pan-x + overscroll-x-contain: iOS-stuck-scroll fix
           // (same pattern as ProductCarousel) — see 2026-05-16 commit
           // for the snap-x/iOS direction-detect explanation.
-          className={`-mx-4 flex snap-x snap-mandatory ${gridGapClass(cardGap)} overflow-x-auto overscroll-x-contain touch-pan-x px-4 pb-6`}
+          // `safe center` (quality bar L-05): a row that fits is centred instead of ending in an
+          // empty tail; a row that overflows falls back to start, so scrolling is unchanged and a
+          // row that already fills renders exactly as before.
+          className={`-mx-4 flex snap-x snap-mandatory ${gridGapClass(cardGap)} overflow-x-auto overscroll-x-contain touch-pan-x px-4 pb-6 [justify-content:safe_center]`}
           style={{ scrollbarWidth: 'thin' }}
         >
           {categories.map((cat, i) => {
