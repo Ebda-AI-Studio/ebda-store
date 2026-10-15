@@ -19,8 +19,7 @@ describe('normalizeArabicSearch', () => {
 
   it('every folded char has a vector (no untested rule)', () => {
     const covered = NORMALIZE_VECTORS.map(([i]) => i).join('');
-    for (const ch of new Set([...AR_FOLD_FROM].filter(c => !/[A-Z0-9]/.test(c)))) {
-      if (/[٠-٩۰-۹]/.test(ch)) continue; // digits covered by the ٤٢ / ۴۲ / ١٠٠ / ١٥ rows as a class
+    for (const ch of new Set([...AR_FOLD_FROM])) {
       expect(covered, `no vector exercises ${ch}`).toContain(ch);
     }
   });
@@ -29,6 +28,29 @@ describe('normalizeArabicSearch', () => {
     for (const [input] of NORMALIZE_VECTORS) {
       const once = normalizeArabicSearch(input);
       expect(normalizeArabicSearch(once)).toBe(once);
+    }
+  });
+
+  it('is idempotent over the whole folded range (generated sample)', () => {
+    const alphabet = [
+      ...AR_FOLD_FROM,
+      ...AR_FOLD_TO,
+      ' ',
+      '\t',
+      '\u00A0',
+      '\u0640',
+      '\u064B',
+      '\u0670',
+      '\u2009',
+    ];
+    let seed = 12345;
+    const rnd = () => (seed = (seed * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff;
+    for (let n = 0; n < 2000; n++) {
+      const len = 1 + Math.floor(rnd() * 12);
+      let input = '';
+      for (let k = 0; k < len; k++) input += alphabet[Math.floor(rnd() * alphabet.length)];
+      const once = normalizeArabicSearch(input);
+      expect(normalizeArabicSearch(once), JSON.stringify(input)).toBe(once);
     }
   });
 });

@@ -34,6 +34,9 @@ export const NORMALIZE_VECTORS: ReadonlyArray<readonly [string, string]> = [
   ['ـ', ''],
   ['', ''],
   ['ا\u0654حمر', 'احمر'], // decomposed alef + U+0654 combining hamza above is stripped
+  ['٠١٢٣٤٥٦٧٨٩', '0123456789'], // all Arabic-Indic digits
+  ['۰۱۲۳۴۵۶۷۸۹', '0123456789'], // all Persian digits
+  ['ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'], // full uppercase alphabet
   // Whitespace pin (A1): only [ \t\n\r ] collapse and only U+0020 is trimmed at the edges.
   // Other Unicode spaces are NOT touched, so SQL btrim(x, ' ') matches byte for byte.
   [' x ', ' x '], // thin space survives (String#trim would strip it)
