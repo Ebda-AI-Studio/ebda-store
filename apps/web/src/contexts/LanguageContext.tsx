@@ -303,8 +303,15 @@ export const translations = {
     'اكتب نقاط الثقة الخاصة بك (التوصيل، الدفع، الاسترجاع) وستظهر هنا.',
   'Customer reviews appear here once customers leave them.':
     'ستظهر آراء العملاء هنا بمجرد أن يكتبوها.',
+  'Add a look with a photo and its pieces and it will appear here.':
+    'أضف لوكاً بصورته وقطعه وسيظهر هنا.',
   'Only you see this in the editor. Visitors do not see an empty section.':
     'أنت وحدك ترى هذا في المحرر. لا يرى الزوار قسماً فارغاً.',
+
+  // Shop-the-look section (Phase B1 Lookbook). Neutral noun forms, never a gendered imperative.
+  'Shop the look': 'تسوّق اللوك',
+  'Items in this look': 'قطع اللوك',
+  'Look total': 'مجموع اللوك',
 
   // Route error fallback — Try Again while the refresh is in flight.
   'Retrying…': 'جارٍ إعادة المحاولة…',

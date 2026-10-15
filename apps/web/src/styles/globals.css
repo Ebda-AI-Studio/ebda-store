@@ -1156,6 +1156,39 @@ html[dir='rtl'] [data-pack='dahab'] .font-display {
   }
 }
 
+/* Collage hero (hero presentation 'collage', Ruling B1-7): the three photos settle once on first
+   paint, 280ms ease-out-quint, 60ms stagger. The first photo is the LCP element, so it only
+   slides (never starts invisible); the other two also fade in. Reduced motion: final state. */
+@keyframes collage-settle {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes collage-settle-lead {
+  from {
+    transform: translateY(12px);
+  }
+  to {
+    transform: none;
+  }
+}
+@media (prefers-reduced-motion: no-preference) {
+  [data-collage-settle] > :nth-child(1) {
+    animation: collage-settle-lead 280ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+  [data-collage-settle] > :nth-child(2) {
+    animation: collage-settle 280ms cubic-bezier(0.22, 1, 0.36, 1) 60ms both;
+  }
+  [data-collage-settle] > :nth-child(3) {
+    animation: collage-settle 280ms cubic-bezier(0.22, 1, 0.36, 1) 120ms both;
+  }
+}
+
 /* Dahab skin on the two Phase 2 document sections (no markup change, so
    every other store renders exactly as before): display-face headings, the
    arch frame on the image, and a quieter newsletter field. */
@@ -1283,7 +1316,10 @@ html[dir='rtl'] [data-pack='qamar'] .font-display {
   line-height: 1.4;
   letter-spacing: 0;
 }
-[data-pack='qamar'] .font-display {
+/* Every heading a look paints in its display face ([data-look] h1-h3) is reset too, not only
+   `.font-display`: a tall display face (Lookbook's Lalezar) under the Arabic 0.5 adjust rendered
+   the PDP title and the look names at ~2.5x their size (Task 7 shots). */
+[data-pack='qamar'] :is(h1, h2, h3, .font-display) {
   font-size-adjust: none;
 }
 /* Qamar's PDP title voice: the display face. ZERO specificity (:where), so the store-wide

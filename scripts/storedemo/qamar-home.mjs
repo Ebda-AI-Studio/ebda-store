@@ -2,14 +2,31 @@
 // registry presets plus CONTENT settings only. Design keys (presentation, layout, columns...) come
 // from the look's section mix at render (Ruling B1-8) or from `applyLook` on a merchant store.
 // One hero per look, tagged with `lookTag` (plan amendment C10), each with its own imagery; the
-// Atelier hero carries the hero clip. Shop-the-look (Task 7) and the occasion band tone (Task 8)
-// land with those tasks.
+// Atelier hero carries the hero clip. Shop-the-look (Task 7) is tagged for Lookbook; the occasion
+// band tone (Task 8) lands with that task.
 import { getSectionDefinition, sectionFromPreset } from '@ebda/shared';
-import { QAMAR_OCCASIONS, QAMAR_PAGE_IMAGES } from '../qamar-demo/catalogue.mjs';
+import { QAMAR_LOOKS_STORY, QAMAR_OCCASIONS, QAMAR_PAGE_IMAGES } from '../qamar-demo/catalogue.mjs';
+
+/** Alt text for the three look photos (read back from the assets), by look id. */
+const LOOK_ALT = {
+  'look-1': {
+    alt: 'A woman seen from behind on a Cairo rooftop in a rose linen abaya and a draped chiffon scarf',
+    altAr: 'ست من ضهرها على سطح في القاهرة لابسة عباية كتان وردي وطرحة شيفون',
+  },
+  'look-2': {
+    alt: 'A woman seen from behind at dusk in a teal satin dress with a silk shawl over her shoulders',
+    altAr: 'ست من ضهرها وقت المغرب لابسة فستان ساتان تركواز وشال حرير على كتافها',
+  },
+  'look-3': {
+    alt: 'A woman at sunset in an ivory kaftan with burgundy embroidery and a layered scarf',
+    altAr: 'ست وقت الغروب لابسة قفطان أوف وايت بتطريز نبيتي وطرحة طبقات',
+  },
+};
 
 /** Section types this document owns; legacy sections outside it are kept but hidden. */
 const USED = [
   'hero',
+  'shop-the-look',
   'category-grid',
   'featured-collection',
   'image-text',
@@ -25,7 +42,7 @@ const USED = [
  *   `productIdBySlug` feeds the shop-the-look blocks (Task 7).
  */
 export function buildQamarHome(base, ctx) {
-  const { img, video } = ctx;
+  const { img, video, productIdBySlug } = ctx;
   const node = (type, id, settings, blocks, lookTag) => {
     const n = sectionFromPreset(type, 0, id);
     n.settings = { ...n.settings, ...settings };
@@ -67,7 +84,8 @@ export function buildQamarHome(base, ctx) {
         headline: 'Dressed for the rooftop',
         headlineAr: 'لبس السطوح',
         ctaText: 'Shop the looks',
-        ctaTextAr: 'تسوقي اللوكات',
+        // Neutral noun form on a button (quality bar §2, ruling e).
+        ctaTextAr: 'تسوّق اللوكات',
         ctaHref: '/products',
       })
     ),
@@ -89,6 +107,29 @@ export function buildQamarHome(base, ctx) {
       }),
     ],
     'qamar.vitrine'
+  );
+  // Lookbook only (lookTag): three looks from the catalogue's story, pieces by product id.
+  const shopTheLook = node(
+    'shop-the-look',
+    'shop-the-look',
+    { heading: 'Shop the look', headingAr: 'تسوّق اللوك' },
+    QAMAR_LOOKS_STORY.map(l => {
+      const productIds = l.items.map(slug => productIdBySlug.get(slug));
+      if (productIds.some(id => !id))
+        throw new Error(`shop-the-look ${l.id}: a piece is not in the seeded catalogue`);
+      return {
+        id: l.id,
+        type: 'look',
+        settings: {
+          image: img(l.image),
+          ...LOOK_ALT[l.id],
+          title: l.title,
+          titleAr: l.titleAr,
+          productIds,
+        },
+      };
+    }),
+    'qamar.lookbook'
   );
   const categories = node('category-grid', 'categories', {
     title: 'Shop by category',
@@ -154,6 +195,7 @@ export function buildQamarHome(base, ctx) {
       heroAtelier,
       heroLookbook,
       heroVitrine,
+      shopTheLook,
       categories,
       newIn,
       atelierBreak,

@@ -117,7 +117,7 @@ export function SectionHeading({
   // Anchor B (PDP-4 / YML-1): GUARANTEE a readable heading color — invert at
   // render time, never via a CSS --section-fg cascade (audit 2026-06-05).
   //
-  // The background is the section bg when provided, else the page (#ffffff).
+  // The background is the section bg when provided, else the store's page colour (else #ffffff).
   // A saved/explicit color is honoured ONLY when it actually reads against that
   // bg (contrast >= 2:1, see floor note below). If it doesn't — e.g. a
   // stale white/light heading color on a white page (the wadyaljuz "قد يعجبك
@@ -125,7 +125,17 @@ export function SectionHeading({
   // heading is never invisible. This keeps a deliberate light-on-dark pick
   // (white on a brand-colored section reads fine) while self-correcting the
   // unreadable ones. The mechanical rule: the heading is ALWAYS legible.
-  const resolvedBg: string = resolveColor(sectionBgColor, store.theme) ?? '#ffffff';
+  // No section bg: the section paints the page colour (`--bg-page`, else `--background`), so
+  // measure against the store's own page colour when the theme carries one. A dark look
+  // (Qamar Lookbook, page #1E2340) otherwise got a BLACK heading on its dark page. Stores with
+  // no page colour on the theme keep the white assumption (unchanged output).
+  const pageRaw = store.theme?.bgPage || store.theme?.backgroundColor;
+  const pageBg =
+    pageRaw &&
+    (pageRaw.startsWith('#') || pageRaw.startsWith('hsl(') ? pageRaw : `hsl(${pageRaw})`);
+  const resolvedBg: string =
+    resolveColor(sectionBgColor, store.theme) ??
+    (pageBg && pickReadableForeground(pageBg) ? pageBg : '#ffffff');
   const ensureReadable = (zoneColor: string | undefined): string | undefined => {
     const auto = pickReadableForeground(resolvedBg) ?? '#000000';
     if (!zoneColor) return sectionBgColor ? auto : undefined; // no explicit pick → auto-contrast

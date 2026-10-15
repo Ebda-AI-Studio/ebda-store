@@ -602,7 +602,7 @@ export default function StoreLayoutPage() {
                 <div className="mb-2 text-xs font-medium text-muted-foreground">
                   {t('sections.hero.fitLabel')}
                 </div>
-                <div className="grid grid-cols-2 gap-2 mb-2">
+                <div className="grid grid-cols-3 gap-2 mb-2">
                   <ModeButton
                     active={(layout.hero.presentation ?? 'full-bleed') === 'full-bleed'}
                     onClick={() =>
@@ -615,11 +615,18 @@ export default function StoreLayoutPage() {
                     onClick={() => updateSection('hero', s => ({ ...s, presentation: 'framed' }))}
                     label={t('sections.hero.fitFit')}
                   />
+                  <ModeButton
+                    active={layout.hero.presentation === 'collage'}
+                    onClick={() => updateSection('hero', s => ({ ...s, presentation: 'collage' }))}
+                    label={t('sections.hero.fitCollage')}
+                  />
                 </div>
                 <p className="mb-4 text-xs text-muted-foreground">
-                  {(layout.hero.presentation ?? 'full-bleed') === 'full-bleed'
-                    ? t('sections.hero.fitFillHint')
-                    : t('sections.hero.fitFitHint')}
+                  {layout.hero.presentation === 'collage'
+                    ? t('sections.hero.fitCollageHint')
+                    : (layout.hero.presentation ?? 'full-bleed') === 'full-bleed'
+                      ? t('sections.hero.fitFillHint')
+                      : t('sections.hero.fitFitHint')}
                 </p>
                 {/* Autoplay only matters in slider mode — hide it entirely
                     when the merchant has picked the static single banner so

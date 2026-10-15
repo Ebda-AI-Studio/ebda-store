@@ -236,6 +236,8 @@ async function seedCatalogue(prisma, Prisma, storeId, base) {
           // Occasion categories feed Vitrine's bands, not the home category row.
           showOnHomeStrip: !occasion,
           sizeChartId: c.sizeChart ? chartIds[c.sizeChart] : null,
+          // A product photo already in the set: Lookbook's photo category row needs one (Task 7).
+          image: c.image ? url(c.image) : null,
         };
         const cat = await tx.category.upsert({
           where: { storeId_slug: { storeId, slug: c.slug } },

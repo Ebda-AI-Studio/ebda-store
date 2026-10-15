@@ -7,6 +7,7 @@ import {
   FULL_BLEED_TEXT,
 } from '../../apps/web/src/builder/sections/ImageTextSection';
 import { getPackStyles, QAMAR_HERO_SCRIM } from '../../apps/web/src/templates/shared/pack-styles';
+import { HERO_COLLAGE_TEXT_PANEL } from '../../apps/web/src/templates/shared/HeroCollage';
 
 const qamar = LOOKS.filter(l => l.template === 'qamar');
 // Every text pair a Qamar skin paints, beyond the generic set in looks-contrast.test.ts.
@@ -88,18 +89,35 @@ describe('qamar hero scrim keeps the white headline legible over a white photo',
   });
 });
 
-// C28 / Task 7: the Lookbook hero overlay is a dark scrim under light text. No hero
-// overlay constant exists yet, so pin the requirement against the look tokens: a scrim
-// of the look's dark page colour at >= 0.85 over a white photo pixel must carry the
-// look's light ink at >= 4.5. Task 7 must paint exactly this (or darker/more opaque).
-describe('lookbook hero overlay requirement (pinned for Task 7)', () => {
-  const t = qamar.find(l => l.id === 'qamar.lookbook')!.tokens;
-  it('ink is light and page is dark', () => {
+// C28 / Task 7: the Lookbook hero (collage) puts its headline + CTA on an OPAQUE panel of the
+// page colour, never over a photo: on Lookbook that is a dark solid surface under light ink.
+// Measured BY IMPORT at the worst text position — the panel edge next to the photos, over a
+// white or a black photo pixel — for every Qamar look, plus the CTA pair on the panel. When the
+// collage falls back to the banner (< 3 photos), the qamar hero scrim above applies.
+describe('collage hero text panel (C28): light text on a dark solid panel on Lookbook', () => {
+  it('the panel is the page colour at full opacity, as the component paints it', () => {
+    expect(HERO_COLLAGE_TEXT_PANEL).toEqual({ token: 'background', opacity: 1 });
+    const src = readFileSync(
+      path.resolve(__dirname, '../../apps/web/src/templates/shared/HeroCollage.tsx'),
+      'utf8'
+    );
+    expect(src).toMatch(/data-part="collage-text"\s+className="[^"]*\bbg-background\b(?!\/)/);
+  });
+  it('Lookbook: the panel is dark and the ink is light', () => {
+    const t = qamar.find(l => l.id === 'qamar.lookbook')!.tokens;
     expect(contrastRatio('#000000', t.page)).toBeLessThan(contrastRatio('#000000', t.ink));
   });
-  it('page-coloured scrim at 0.85 over white carries ink >= 4.5', () => {
-    expect(contrastRatio(over(t.page, 0.85, '#FFFFFF'), t.ink)).toBeGreaterThanOrEqual(4.5);
-  });
+  for (const l of qamar)
+    for (const [name, photo] of [
+      ['white', '#FFFFFF'],
+      ['black', '#000000'],
+    ] as const)
+      it(`${l.id}: headline ink and CTA on the panel over a ${name} photo pixel`, () => {
+        const panel = over(l.tokens.page, HERO_COLLAGE_TEXT_PANEL.opacity, photo);
+        expect(contrastRatio(panel, l.tokens.ink)).toBeGreaterThanOrEqual(4.5);
+        // the CTA is bg-primary / text-primary-foreground on that panel
+        expect(contrastRatio(l.tokens.primary, l.tokens.onPrimary)).toBeGreaterThanOrEqual(4.5);
+      });
 });
 
 // C9: a merchant who picks extreme primary/accent colours on a Qamar look still gets

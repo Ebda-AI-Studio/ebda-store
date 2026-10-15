@@ -18,10 +18,28 @@
  */
 
 export const QAMAR_CATEGORIES = [
-  { slug: 'abayas', name: 'Abayas', nameAr: 'عبايات', sizeChart: 'abaya' },
-  { slug: 'kaftans', name: 'Kaftans', nameAr: 'قفاطين', sizeChart: 'apparel' },
-  { slug: 'scarves', name: 'Scarves and shawls', nameAr: 'طرح وشيلان' },
-  { slug: 'dresses', name: 'Evening dresses', nameAr: 'فساتين سهرة', sizeChart: 'apparel' },
+  {
+    slug: 'abayas',
+    name: 'Abayas',
+    nameAr: 'عبايات',
+    sizeChart: 'abaya',
+    image: 'linen-abaya-1.webp',
+  },
+  {
+    slug: 'kaftans',
+    name: 'Kaftans',
+    nameAr: 'قفاطين',
+    sizeChart: 'apparel',
+    image: 'embroidered-kaftan-1.webp',
+  },
+  { slug: 'scarves', name: 'Scarves and shawls', nameAr: 'طرح وشيلان', image: 'silk-shawl-1.webp' },
+  {
+    slug: 'dresses',
+    name: 'Evening dresses',
+    nameAr: 'فساتين سهرة',
+    sizeChart: 'apparel',
+    image: 'evening-gown-rose-1.webp',
+  },
   // Occasion categories (Vitrine's bands); products are cross-listed into them.
   { slug: 'wedding', name: 'Wedding', nameAr: 'فرح' },
   { slug: 'engagement', name: 'Engagement', nameAr: 'خطوبة' },

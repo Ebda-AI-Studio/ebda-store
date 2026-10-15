@@ -38,6 +38,8 @@ import {
   type ProductSpotlightSettings,
 } from '../sections/ProductSpotlightSection';
 import { TrustBadgesSection, type TrustBadgesSettings } from '../sections/TrustBadgesSection';
+import { ShopTheLookSection, type ShopTheLookSettings } from '../sections/ShopTheLookSection';
+import { HeroCollage } from '../../templates/shared/HeroCollage';
 import { resolveSectionProducts } from '../sections/section-products';
 import { sectionBgStyle } from '../../templates/shared/section-bg';
 import { CategoryChips } from '../../templates/shared/CategoryChips';
@@ -142,6 +144,7 @@ export function PageRenderer({
       n.hidden !== true &&
       (n.type === 'featured-collection' ||
         n.type === 'product-spotlight' ||
+        n.type === 'shop-the-look' ||
         n.type === 'product-carousel')
   );
 
@@ -344,10 +347,24 @@ export function PageRenderer({
   // Hero rendering: prefer the new HeroSlider/HeroBanner shells when the
   // store has supplied slides via layout.hero. When no slides exist we fall
   // back to the legacy T.Hero (which uses the per-store hero text fields).
+  // Collage (Ruling B1-2): needs three slide photos (in the reader's language); with fewer, the
+  // hero renders as the banner / slider below in full-bleed.
+  const collageEligible =
+    layout.hero.enabled &&
+    layout.hero.presentation === 'collage' &&
+    heroSlidesWithImage(layout.hero.slides).length >= 3;
+  const bannerPresentation =
+    layout.hero.presentation === 'collage' ? 'full-bleed' : layout.hero.presentation;
   const sliderEligible =
-    layout.hero.mode === 'slider' && layout.hero.slides.length > 0 && !!T.HeroSlider;
+    !collageEligible &&
+    layout.hero.mode === 'slider' &&
+    layout.hero.slides.length > 0 &&
+    !!T.HeroSlider;
   const bannerEligible =
-    layout.hero.mode === 'single' && layout.hero.slides.length > 0 && !!T.HeroBanner;
+    !collageEligible &&
+    layout.hero.mode === 'single' &&
+    layout.hero.slides.length > 0 &&
+    !!T.HeroBanner;
   // The legacy T.Hero is only useful when the merchant has supplied at
   // least one piece of content for it (title, subtitle, or image). With
   // all three empty we'd render a hero with nothing in it, which is
@@ -414,6 +431,14 @@ export function PageRenderer({
             style={sectionBgStyle(layout.hero.bgColor, store.theme)}
             className={heroVisClass}
           >
+            {collageEligible && (
+              <HeroCollage
+                slides={heroSlidesWithImage(layout.hero.slides)}
+                isRtl={isRtl}
+                urlPrefix={storeUrl('')}
+                headingZone={heroHeadingZone}
+              />
+            )}
             {layout.hero.enabled && sliderEligible && T.HeroSlider && (
               <T.HeroSlider
                 // `image` is optional on HeroSlide only so a DRAFT can hold a
@@ -425,7 +450,7 @@ export function PageRenderer({
                 autoplayMs={layout.hero.autoplayMs}
                 isRtl={isRtl}
                 pack={templateId}
-                presentation={layout.hero.presentation}
+                presentation={bannerPresentation}
                 headingZone={heroHeadingZone}
                 urlPrefix={storeUrl('')}
               />
@@ -438,25 +463,29 @@ export function PageRenderer({
                   {...heroSlidesWithImage(layout.hero.slides)[0]}
                   isRtl={isRtl}
                   pack={templateId}
-                  presentation={layout.hero.presentation}
+                  presentation={bannerPresentation}
                   headingZone={heroHeadingZone}
                   urlPrefix={storeUrl('')}
                 />
               )}
-            {layout.hero.enabled && !sliderEligible && !bannerEligible && legacyHeroHasContent && (
-              <T.Hero
-                title={heroTitleEn}
-                titleAr={heroTitleArVal}
-                subtitle={heroSubtitleEn}
-                subtitleAr={heroSubtitleArVal}
-                image={heroImage}
-                ctaText={heroCtaEn}
-                ctaTextAr={heroCtaArVal}
-                ctaLink={heroCtaLink}
-                isRtl={isRtl}
-                urlPrefix={storeUrl('')}
-              />
-            )}
+            {layout.hero.enabled &&
+              !collageEligible &&
+              !sliderEligible &&
+              !bannerEligible &&
+              legacyHeroHasContent && (
+                <T.Hero
+                  title={heroTitleEn}
+                  titleAr={heroTitleArVal}
+                  subtitle={heroSubtitleEn}
+                  subtitleAr={heroSubtitleArVal}
+                  image={heroImage}
+                  ctaText={heroCtaEn}
+                  ctaTextAr={heroCtaArVal}
+                  ctaLink={heroCtaLink}
+                  isRtl={isRtl}
+                  urlPrefix={storeUrl('')}
+                />
+              )}
           </div>
         );
 
@@ -1120,6 +1149,21 @@ export function PageRenderer({
                     3
                   ).map(toTemplateProduct)}
                   editorMode={editorMode}
+                />
+              ) : def.type === 'shop-the-look' ? (
+                <ShopTheLookSection
+                  settings={settings as ShopTheLookSettings}
+                  blocks={section.blocks ?? []}
+                  // Store-scoped pools only: an unknown or foreign id is absent, never rendered (C11).
+                  products={[
+                    ...pools.newArrivals,
+                    ...pools.bestSellers,
+                    ...pools.featured,
+                    ...pools.extra,
+                  ]}
+                  editorMode={editorMode}
+                  showPrice={showCardPriceEff !== false}
+                  cardLayout={layout}
                 />
               ) : def.type === 'trust-badges' ? (
                 <TrustBadgesSection

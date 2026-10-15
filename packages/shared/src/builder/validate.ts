@@ -429,7 +429,15 @@ function scanPlaceholderCopy(
 /** Section types whose settings hold catalogue refs (`categorySlug` / `manualProductIds`). */
 const REF_SECTION_TYPES = new Set(['product-carousel', 'featured-collection', 'product-spotlight']);
 
-/** Collect catalogue refs held by product sections and collection tiles. */
+/** Block types whose settings hold product refs (`productIds`): shop-the-look looks (C11). */
+const REF_BLOCK_SECTION_TYPES = new Set(['shop-the-look']);
+
+/** The product ids a shop-the-look `look` block names, as stored. */
+function blockProductIds(settings: Record<string, unknown>): unknown[] {
+  return Array.isArray(settings.productIds) ? settings.productIds : [];
+}
+
+/** Collect catalogue refs held by product sections, collection tiles and shop-the-look looks. */
 export function collectRefs(def: PageDefinition): {
   categorySlugs: string[];
   productIds: string[];
@@ -441,6 +449,10 @@ export function collectRefs(def: PageDefinition): {
       for (const b of n.blocks ?? [])
         if (typeof b.settings.categorySlug === 'string' && b.settings.categorySlug)
           categorySlugs.add(b.settings.categorySlug);
+    if (REF_BLOCK_SECTION_TYPES.has(n.type))
+      for (const b of n.blocks ?? [])
+        for (const id of blockProductIds(b.settings))
+          if (typeof id === 'string') productIds.add(id);
     if (!REF_SECTION_TYPES.has(n.type)) continue;
     if (typeof n.settings.categorySlug === 'string' && n.settings.categorySlug)
       categorySlugs.add(n.settings.categorySlug);
@@ -473,6 +485,20 @@ export async function validateDefinition(
             )
           );
       });
+    if (REF_BLOCK_SECTION_TYPES.has(n.type))
+      (n.blocks ?? []).forEach((b, j) =>
+        blockProductIds(b.settings).forEach((id, k) => {
+          if (typeof id === 'string' && !found.productIds.has(id))
+            res.warnings.push(
+              issue(
+                'REF_NOT_FOUND',
+                `/sections/${i}/blocks/${j}/settings/productIds/${k}`,
+                `Product "${id}" is not in this store and will not show in the look.`,
+                `المنتج "${id}" غير موجود في هذا المتجر ولن يظهر في اللوك.`
+              )
+            );
+        })
+      );
     if (!REF_SECTION_TYPES.has(n.type)) return;
     const slug = n.settings.categorySlug;
     if (typeof slug === 'string' && slug && !found.categorySlugs.has(slug))

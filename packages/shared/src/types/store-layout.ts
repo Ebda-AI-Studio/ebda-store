@@ -217,10 +217,14 @@ export interface HeroSettings extends SectionBgOverride, SectionPaddingMaxWidthV
    *     + rounded corners + neutral bg; image renders with object-contain
    *     so the WHOLE image shows (may letterbox). Pick this when merchant
    *     uploaded an image they want to display in full without crop.
+   *   - `'collage'` (Phase B1, Ruling B1-2) — three slide photos overlap in a
+   *     collage with one headline + CTA below them on the page colour
+   *     (`HeroCollage`, every skin). Needs >= 3 slides with images; with fewer
+   *     the hero renders as the full-bleed banner/slider.
    * Merchants pick via Admin → Layout → Hero. Optional — undefined
    * preserves the existing full-bleed default for back-compat.
    */
-  presentation?: 'full-bleed' | 'framed';
+  presentation?: 'full-bleed' | 'framed' | 'collage';
   /** Per-section typography overrides — wins over global typography zones. */
   typography?: SectionTypographyOverride;
   /** Per-section divider overrides — see SectionDividers. Default undefined (off). */

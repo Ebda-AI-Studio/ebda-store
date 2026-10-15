@@ -355,6 +355,15 @@ interface OutOfStockRibbonProps {
  * a configurable badge pill instead of the diagonal ribbon. oosLabel===false
  * suppresses all OOS UI. Falls back to the original ribbon when unset.
  */
+/**
+ * The shared sold-out label text: the merchant's own OOS label (`productCardDefaults.oosLabelText*`)
+ * else the platform default. Used by the card badge below and by every row that lists a product
+ * (shop-the-look), so a sold-out piece reads the same everywhere.
+ */
+export function soldOutLabel(isRtl: boolean, textEn?: string, textAr?: string): string {
+  return (isRtl ? textAr : textEn) ?? (isRtl ? 'نفدت الكمية' : 'Sold Out');
+}
+
 export function OutOfStockRibbon({
   inStock = true,
   isRtl = false,
@@ -391,8 +400,7 @@ export function OutOfStockRibbon({
     // (matches the shorter copy already used on the elegant CTA label) —
     // narrower text keeps the compact pill from growing as wide as the
     // wishlist heart-collision guard below needs to reserve.
-    const labelText =
-      (isRtl ? oosLabelTextAr : oosLabelTextEn) ?? (isRtl ? 'نفدت الكمية' : 'Sold Out');
+    const labelText = soldOutLabel(isRtl, oosLabelTextEn, oosLabelTextAr);
 
     // Issue #548 — the guard below used to reserve the heart's footprint on
     // EVERY top placement via a symmetric max-width, which only actually

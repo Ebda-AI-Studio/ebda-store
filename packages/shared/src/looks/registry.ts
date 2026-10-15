@@ -73,12 +73,32 @@ export const LOOKS: readonly LookDefinition[] = [
     letter: 'B',
     skin: 'qamar',
     status: 'designed',
+    chrome: { header: { logoPlacement: 'start' } },
+    // Ruling B1-3 / B1-2: the collage hero and shop-the-look lead; categories scroll as a photo
+    // row. No hero `mode` (slideshow vs single is the merchant's content): a collage needs three
+    // slide photos and falls back to the banner/slider below that.
+    sections: [
+      { type: 'hero', design: { presentation: 'collage' } },
+      { type: 'shop-the-look', design: { bgColor: 'token:card' } },
+      {
+        type: 'category-grid',
+        design: { layout: 'horizontal', layoutMobile: 'horizontal', captionPosition: 'below' },
+      },
+      {
+        type: 'featured-collection',
+        // Surface bands alternate: page (hero), card (looks), page (categories), card (new in).
+        design: { columns: 4, mobileColumns: 2, bgColor: 'token:card' },
+        preset: { productSource: 'newest', limit: 8, heading: 'New in', headingAr: 'وصل حديثًا' },
+      },
+      { type: 'testimonials' },
+    ],
     name: { ar: 'لوك بوك', en: 'Lookbook' },
     forWhom: {
       ar: 'للستايلست والمحلات اللي بتبيع لوك كامل.',
       en: 'For stylists who sell whole outfits.',
     },
-    idea: { ar: 'اشتري اللوك كله بضغطة.', en: 'Shop the whole outfit in one tap.' },
+    // Each piece is a link to its PDP (Ruling B1-6): the copy promises no one-tap "add the look".
+    idea: { ar: 'كل لوك وقطعه في مكان واحد.', en: 'Each outfit and its pieces in one place.' },
     tokens: {
       page: '#1E2340',
       surface: '#2A3158',

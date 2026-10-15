@@ -1540,6 +1540,8 @@
           "fitFit": "Fit (show whole image)",
           "fitFillHint": "The image fills the banner edge-to-edge and is cropped to fit. Best for wide 1920×700 images.",
           "fitFitHint": "The whole image is shown inside the banner without cropping (it may have side bars). Best when your image is smaller or a different shape than recommended.",
+          "fitCollage": "Collage (3 photos)",
+          "fitCollageHint": "Three slide photos overlap with one headline and button beside them. Needs at least 3 slides with images; with fewer it shows as a full banner.",
           "autoplay": "Autoplay interval (ms)",
           "slides": {
             "title": "Slides",

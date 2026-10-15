@@ -182,7 +182,8 @@ const layoutSchemaInternal = z
       // 2026-05-18: framed vs full-bleed presentation. Without this listed
       // Zod silently strips the field on PUT — same trap as
       // the zod silent-strip trap (layout-schema-parity.test.ts). Keep in sync with HeroSettings.
-      presentation: z.enum(['full-bleed', 'framed']).optional(),
+      // 'collage' (Phase B1, Ruling B1-2): three overlapping photos + one headline, any skin.
+      presentation: z.enum(['full-bleed', 'framed', 'collage']).optional(),
       // 2026-05-18 Sprint 3: per-section bg color. Must be listed or Zod
       // silently strips it on every PUT — same trap class as imageMobile.
       bgColor: colorValue,

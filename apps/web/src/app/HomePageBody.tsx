@@ -82,7 +82,8 @@ function fetchHomeCategories(
     .catch(() => null);
 }
 
-/** Refs of the document-only product sections (category slug → fetch cap, product ids). */
+/** Refs of the document-only product sections (category slug → fetch cap, product ids),
+ *  including every shop-the-look `look` block's pieces (loaded into `extraProducts`). */
 function documentSectionRefs(def: PageDefinition | undefined): {
   categories: Array<[string, number]>;
   productIds: string[];
@@ -95,6 +96,14 @@ function documentSectionRefs(def: PageDefinition | undefined): {
   let bestSellers = 0;
   for (const n of def?.sections ?? []) {
     if (n.hidden === true) continue;
+    if (n.type === 'shop-the-look') {
+      for (const b of n.blocks ?? []) {
+        const ids = (b.settings as { productIds?: unknown }).productIds;
+        if (b.hidden !== true && Array.isArray(ids))
+          for (const id of ids) if (typeof id === 'string') productIds.push(id);
+      }
+      continue;
+    }
     if (n.type !== 'featured-collection' && n.type !== 'product-spotlight') continue;
     const s = n.settings as {
       productSource?: string;

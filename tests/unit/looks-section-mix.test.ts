@@ -36,9 +36,8 @@ const base = (): PageDefinition => {
 const defaultsOf = (type: string) => sectionFromPreset(type, 0, type).settings;
 const byType = (doc: PageDefinition, type: string) => doc.sections.find(s => s.type === type)!;
 
-// Lookbook's and Vitrine's real mixes land in Tasks 7–8; these stand-ins carry the exact
-// design keys the preflight found leaking between them (featured-collection bgColor on
-// Lookbook, testimonials layout on Vitrine).
+// Stand-ins for the C8 cases (and Vitrine until its real mix lands in Task 8). The C6 leak
+// cases below use Lookbook's REAL mix (Task 7).
 type Mix = Pick<LookDefinition, 'sections'>;
 const lookbookLike: Mix = {
   sections: [
@@ -131,18 +130,29 @@ describe('look section mix', () => {
     expect(b).toEqual(a);
   });
 
-  describe('look switch: no design leakage between looks (C6)', () => {
+  describe('look switch: no design leakage between looks (C6, real Lookbook mix)', () => {
+    const lookbook = getLook('qamar.lookbook')!;
     it('Lookbook → Atelier drops Lookbook-only design keys back to the section default', () => {
       for (const design of ['keep', 'reset'] as const) {
-        const onLookbook = applyTemplateFamily(base(), 'qamar', lookbookLike);
+        const onLookbook = applyTemplateFamily(base(), 'qamar', lookbook);
         expect(byType(onLookbook, 'featured-collection').settings.bgColor).toBe('token:card');
+        expect(byType(onLookbook, 'hero').settings.presentation).toBe('collage');
+        expect(byType(onLookbook, 'category-grid').settings.layout).toBe('horizontal');
         const doc = applyTemplateFamily(onLookbook, 'qamar', getLook('qamar.atelier'), {
-          from: lookbookLike,
+          from: lookbook,
           design,
         });
         const fc = byType(doc, 'featured-collection').settings;
         expect(fc.bgColor, design).toBe(defaultsOf('featured-collection').bgColor);
-        expect(fc.columns, design).toBe(4); // Atelier's own value replaces Lookbook's 3
+        expect(fc.columns, design).toBe(4);
+        // Atelier's own values replace Lookbook's
+        expect(byType(doc, 'hero').settings.presentation, design).toBe('full-bleed');
+        expect(byType(doc, 'category-grid').settings.layout, design).toBe('chips');
+        // Lookbook-only sections leave the draft
+        expect(
+          doc.sections.some(s => s.type === 'shop-the-look'),
+          design
+        ).toBe(false);
       }
     });
 
@@ -150,16 +160,21 @@ describe('look section mix', () => {
       for (const design of ['keep', 'reset'] as const) {
         const onVitrine = applyTemplateFamily(base(), 'qamar', vitrineLike);
         expect(byType(onVitrine, 'testimonials').settings.layout).toBe('single');
-        const doc = applyTemplateFamily(onVitrine, 'qamar', lookbookLike, {
+        const doc = applyTemplateFamily(onVitrine, 'qamar', lookbook, {
           from: vitrineLike,
           design,
         });
         expect(byType(doc, 'testimonials').settings.layout, design).toBe(
           defaultsOf('testimonials').layout
         );
-        expect(byType(doc, 'hero').settings.presentation, design).toBe(
-          defaultsOf('hero').presentation
+        // Lookbook sets its own hero presentation over Vitrine's framed one
+        expect(byType(doc, 'hero').settings.presentation, design).toBe('collage');
+        // the hero's content (mode, slides) is never touched by a look
+        expect(byType(doc, 'hero').settings.mode, design).toBe(
+          byType(onVitrine, 'hero').settings.mode
         );
+        expect(byType(doc, 'hero').blocks, design).toEqual(byType(onVitrine, 'hero').blocks);
+        expect(byType(doc, 'shop-the-look').settings.bgColor, design).toBe('token:card');
       }
     });
   });

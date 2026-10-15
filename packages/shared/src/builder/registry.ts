@@ -28,6 +28,8 @@ import {
   collectionBlockSchema,
   trustBadgesSchema,
   trustBadgeBlockSchema,
+  shopTheLookSchema,
+  shopTheLookBlockSchema,
   TRUST_BADGE_ICONS,
 } from './sections-document-only';
 import { PLACEHOLDER_STARTER_COPY } from './placeholder-copy';
@@ -246,6 +248,7 @@ export const SECTION_REGISTRY: readonly SectionDefinition[] = [
       s.select('presentation', 'Presentation', 'طريقة العرض', [
         opt('full-bleed', 'Full bleed', 'بعرض الشاشة'),
         opt('framed', 'Framed', 'داخل إطار'),
+        opt('collage', 'Collage (3 photos)', 'كولاج (3 صور)'),
       ]),
       ...styleSettings(),
     ],
@@ -746,6 +749,52 @@ export const SECTION_REGISTRY: readonly SectionDefinition[] = [
       ]),
       s.text('buttonText', 'Button text', 'نص الزر', { localized: true }),
       s.url('buttonLink', 'Button link', 'رابط الزر'),
+      s.color('bgColor', 'Background', 'الخلفية'),
+      ...spacingSettings(),
+    ],
+  }),
+  def({
+    type: 'shop-the-look',
+    labelEn: 'Shop the look',
+    // Neutral noun form (the verbal noun, "shopping the look"), never a gendered imperative.
+    labelAr: 'تسوّق اللوك',
+    legacyKey: null,
+    rendererKey: 'section.shopTheLook',
+    group: 'template',
+    propsSchema: shopTheLookSchema,
+    maxCount: 2,
+    blocks: [
+      {
+        type: 'look',
+        labelEn: 'Look',
+        labelAr: 'لوك',
+        maxCount: 6,
+        propsSchema: shopTheLookBlockSchema,
+        settings: [
+          s.image('image', 'Photo', 'الصورة', { localized: true }),
+          s.text('alt', 'Photo description', 'وصف الصورة', { localized: true }),
+          s.text('title', 'Look name', 'اسم اللوك', { localized: true }),
+          {
+            id: 'productIds',
+            type: 'product_list',
+            labelEn: 'Pieces',
+            labelAr: 'القطع',
+            group: 'content',
+            max: 4,
+          },
+        ],
+      },
+    ],
+    presets: [
+      {
+        nameEn: 'Shop the look',
+        nameAr: 'تسوّق اللوك',
+        settings: { heading: 'Shop the look', headingAr: 'تسوّق اللوك' },
+        blocks: [],
+      },
+    ],
+    settings: [
+      s.text('heading', 'Heading', 'العنوان', { localized: true }),
       s.color('bgColor', 'Background', 'الخلفية'),
       ...spacingSettings(),
     ],
