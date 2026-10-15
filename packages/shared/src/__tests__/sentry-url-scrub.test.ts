@@ -10,6 +10,13 @@ const PHONE = '01012345678';
 const PHONE_AR_ENC = encodeURIComponent('٠١٠١٢٣٤٥٦٧٨');
 
 describe('redactSensitiveQuery', () => {
+  it('scrubs a ?q= inside a quoted href of a posthog $elements_chain string', () => {
+    const chain = `a:attr__href="/search?q=${PHONE}"nth-child="1"nth-of-type="1"`;
+    expect(redactSensitiveQuery(chain)).toBe(
+      'a:attr__href="/search?q=[Filtered]"nth-child="1"nth-of-type="1"'
+    );
+  });
+
   it.each([
     [
       `/api/v1/public/products?search=${PHONE}&page=1`,

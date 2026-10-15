@@ -29,8 +29,10 @@ export const REDACTED_QUERY_VALUE = '[Filtered]';
 
 const SENSITIVE = new Set<string>(SENSITIVE_QUERY_PARAMS);
 // `?key=value` / `&key=value` anywhere in a string (absolute or relative URL, a log message);
-// also a bare query string `key=value&…` at the very start.
-const PARAM_RE = /(^|[?&])([^=&#?\s]+)=([^&#\s]*)/g;
+// also a bare query string `key=value&…` at the very start. A value stops at a quote so a
+// PostHog `$elements_chain` string (`a:attr__href="/search?q=abc"nth-child="1"`) is not swallowed
+// whole by its first `key="` pair, which would hide the inner `?q=`.
+const PARAM_RE = /(^|[?&])([^=&#?\s]+)=([^&#\s"']*)/g;
 
 function decodeKey(key: string): string {
   try {
