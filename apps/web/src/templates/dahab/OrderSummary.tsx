@@ -168,6 +168,3 @@ export default function DahabOrderSummary({
     </aside>
   );
 }
-
-/** This summary prints money with `useLocalePrice` (see `summaryMoneyFormatter`). */
-DahabOrderSummary.moneyFormat = 'locale' as const;

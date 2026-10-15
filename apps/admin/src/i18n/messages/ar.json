@@ -1573,7 +1573,11 @@
             "ctaHrefPlaceholder": "/products أو /products?category=shoes",
             "link": "رابط البانر (اختياري)",
             "linkPlaceholder": "https://… أو /products — اتركه فارغاً لبانر غير قابل للنقر",
-            "slideLabel": "شريحة {index}"
+            "slideLabel": "شريحة {index}",
+            "focus": "تركيز الصورة",
+            "focusCenter": "الوسط",
+            "focusTop": "أعلى (يحافظ على الرأس)",
+            "focusBottom": "أسفل"
           }
         },
         "categories": {

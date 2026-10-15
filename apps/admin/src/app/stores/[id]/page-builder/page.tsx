@@ -5767,6 +5767,23 @@ function SlidesEditor({ slides, storeId, storeTemplate, onChange }: SlidesEditor
                   value={slide.link ?? ''}
                   onChange={v => updateSlide(index, { link: v })}
                 />
+                {/* Image focus for the cropped hero (Ruling B1-32): keeps a head in frame. */}
+                <label className="flex flex-col gap-1 text-sm">
+                  <span className="text-muted-foreground">{t('focus')}</span>
+                  <select
+                    value={slide.focus ?? 'center'}
+                    onChange={e =>
+                      updateSlide(index, {
+                        focus: e.target.value as 'top' | 'center' | 'bottom',
+                      })
+                    }
+                    className="rounded-lg border border-border bg-card px-3 py-2 text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                  >
+                    <option value="center">{t('focusCenter')}</option>
+                    <option value="top">{t('focusTop')}</option>
+                    <option value="bottom">{t('focusBottom')}</option>
+                  </select>
+                </label>
               </div>
             </div>
           </li>

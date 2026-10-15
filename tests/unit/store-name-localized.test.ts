@@ -1,27 +1,28 @@
-/** Ruling B1-30: the store name a shopper reads is in their language (Arabic receipt chrome). */
+/** Ruling B1-30: the store name a shopper reads is in their language (Arabic receipt chrome).
+ *  One helper: the storefront's existing `pickLocalizedName` (also used by the receipt). */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
-import { localizedStoreName } from '@ebda/shared';
+import { pickLocalizedName } from '../../apps/web/src/templates/shared/display-helpers';
 
-describe('localizedStoreName', () => {
+describe('pickLocalizedName for the store name', () => {
   const s = { name: 'Qamar Atelier', nameAr: 'قمر أتيليه' };
   it('ar -> Arabic name, en -> canonical name', () => {
-    expect(localizedStoreName(s, 'ar')).toBe('قمر أتيليه');
-    expect(localizedStoreName(s, 'en')).toBe('Qamar Atelier');
+    expect(pickLocalizedName(s, true)).toBe('قمر أتيليه');
+    expect(pickLocalizedName(s, false)).toBe('Qamar Atelier');
   });
-  it('falls back across languages, never blank', () => {
-    expect(localizedStoreName({ name: 'X', nameAr: '  ' }, 'ar')).toBe('X');
-    expect(localizedStoreName({ name: '', nameAr: 'س' }, 'en')).toBe('س');
-    expect(localizedStoreName(null, 'ar')).toBe('');
+  it('falls back across languages', () => {
+    expect(pickLocalizedName({ name: 'X', nameAr: '  ' }, true)).toBe('X');
+    expect(pickLocalizedName({ name: '', nameAr: 'س' }, false)).toBe('س');
   });
 });
 
-describe('checkout / receipt chrome reads the localized name', () => {
+describe('the store-name renders use the one helper', () => {
   const web = path.resolve(__dirname, '../../apps/web/src');
+  const read = (f: string) => readFileSync(path.join(web, f), 'utf8');
   it('MinimalChrome (checkout + success header) never prints the raw English name', () => {
-    const src = readFileSync(path.join(web, 'components/MinimalChrome.tsx'), 'utf8');
-    expect(src).toMatch(/localizedStoreName\(store, language\)/);
+    const src = read('components/MinimalChrome.tsx');
+    expect(src).toMatch(/pickLocalizedName\(store, isRtl\)/);
     expect(src).not.toMatch(/\{store\.name\}/);
   });
   it('Arabic sentences that embed the store name use the Arabic name', () => {
@@ -29,9 +30,14 @@ describe('checkout / receipt chrome reads the localized name', () => {
       'app/faq/FAQClient.tsx',
       'app/affiliate/page.tsx',
       'app/how-to-guides/HowToGuidesClient.tsx',
-    ]) {
-      const src = readFileSync(path.join(web, f), 'utf8');
-      expect(src, f).toMatch(/localizedStoreName\(store, 'ar'\)/);
-    }
+    ])
+      expect(read(f), f).toMatch(/pickLocalizedName\(store, true\)/);
+  });
+  it('no second store-name helper exists in @ebda/shared', () => {
+    const shared = readFileSync(
+      path.resolve(__dirname, '../../packages/shared/src/region/index.ts'),
+      'utf8'
+    );
+    expect(shared).not.toMatch(/export function localizedStoreName/);
   });
 });

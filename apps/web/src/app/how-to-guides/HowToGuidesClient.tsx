@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useStore, useStoreUrl } from '../../contexts/StoreContext';
 import { ShopChrome } from '../../components';
-import { localizedStoreName } from '@ebda/shared';
+import { pickLocalizedName } from '../../templates/shared/display-helpers';
 
 interface StoreHowtoStep {
   name: string;
@@ -52,7 +52,7 @@ export default function HowToGuidesClient({ storeHowtos = [] }: HowToGuidesClien
           <p className="mt-2 text-muted-foreground">
             {t(
               `Step-by-step guides for ${store?.name || 'our store'} — ordering, returns, payments, and more.`,
-              `أدلة خطوة بخطوة لمتجر ${localizedStoreName(store, 'ar') || 'متجرنا'} — الطلب، الإرجاع، الدفع، والمزيد.`
+              `أدلة خطوة بخطوة لمتجر ${pickLocalizedName(store, true) || 'متجرنا'} — الطلب، الإرجاع، الدفع، والمزيد.`
             )}
           </p>
         </div>

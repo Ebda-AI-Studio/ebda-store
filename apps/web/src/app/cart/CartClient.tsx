@@ -16,7 +16,6 @@ import { api } from '@/lib/api';
 import { CartRecommendations } from '../../components/CartRecommendations';
 import { BundleLine } from '../../components/BundleLine';
 import { CartLineUnavailableNotice } from '../../templates/shared/CartLineUnavailable';
-import { summaryMoneyFormatter } from '../../templates/shared/useOrderSummaryBase';
 import { pageSurfaceStyle } from '@/lib/page-surface';
 import { couponQuoteBasis, couponQuoteCartItems } from '@/lib/coupon-quote-basis';
 import { productUnavailableCopy } from '@/lib/product-cart-errors';
@@ -29,7 +28,7 @@ import {
 import { useLastListing } from '../../hooks/useLastListing';
 import { useNumerals } from '../../hooks/useNumerals';
 import { formatTaxRowLabel } from '../../lib/tax-display';
-import { resolveColor, checkMinimumOrder, computeOrderAmounts, REGION } from '@ebda/shared';
+import { resolveColor, checkMinimumOrder, computeOrderAmounts } from '@ebda/shared';
 import { AcceptedPaymentBadges } from '../../components/AcceptedPaymentBadges';
 import { CartLineNote } from '../../components/commerce/CartLineNote';
 import { StickyCartTotal } from '../../components/commerce/StickyCartTotal';
@@ -115,7 +114,7 @@ export default function CartClient() {
   };
   const { language, t } = useLanguage();
   const lang = language === 'ar' ? 'ar' : 'en';
-  const { localize, money } = useNumerals();
+  const { localize } = useNumerals();
   const formatPrice = useLocalePrice();
   const continuShoppingHref = useLastListing();
 
@@ -1227,12 +1226,7 @@ export default function CartClient() {
           quotes the pre-discount subtotal. */}
       <StickyCartTotal
         totalLabel={t('Total', 'الإجمالي')}
-        total={summaryMoneyFormatter(
-          T?.OrderSummary,
-          money,
-          store.currency ?? REGION.currency,
-          formatPrice
-        )(total)}
+        total={formatPrice(total)}
         itemCount={cartCount}
         itemCountLabel={countText(lang, cartCount, ITEMS, localize(cartCount))}
         href={storeUrl('/checkout')}

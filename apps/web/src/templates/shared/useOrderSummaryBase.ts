@@ -33,22 +33,6 @@ export interface OrderSummaryBaseResult {
 }
 
 /**
- * The formatter every theme's OrderSummary prints money with: the storefront's ONE price format
- * (`useLocalePrice`: "2,980 ج.م" / "EGP 2,980", Ruling B1-28). It used to differ per theme
- * ("2,980 EGP" on the five legacy themes, locale on Dahab); a surface that repeats a summary figure
- * (the cart's phone sticky total) calls this so it stays byte-identical to the summary.
- * `Summary`, `money` and `currency` are kept for the call sites' signature and are ignored.
- */
-export function summaryMoneyFormatter(
-  _Summary: unknown,
-  _money: unknown,
-  _currency: string,
-  formatPrice: (piastres: number) => string
-): (piastres: number) => string {
-  return formatPrice;
-}
-
-/**
  * Derive the shared computed values needed by every OrderSummary theme.
  * Call this at the top of each theme's OrderSummary component and
  * destructure the result directly into your JSX.

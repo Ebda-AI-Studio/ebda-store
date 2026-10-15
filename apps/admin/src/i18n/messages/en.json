@@ -1573,7 +1573,11 @@
             "ctaHrefPlaceholder": "/products or /products?category=shoes",
             "link": "Banner link (optional)",
             "linkPlaceholder": "https://… or /products — leave empty for a non-clickable banner",
-            "slideLabel": "Slide {index}"
+            "slideLabel": "Slide {index}",
+            "focus": "Image focus",
+            "focusCenter": "Centre",
+            "focusTop": "Top (keeps heads in frame)",
+            "focusBottom": "Bottom"
           }
         },
         "categories": {

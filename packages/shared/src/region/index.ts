@@ -483,17 +483,3 @@ export function convertMinor(
   const rounded = Math.floor(exact + 0.5);
   return amountMinor < 0 ? -rounded : rounded;
 }
-
-/**
- * The store's name in the shopper's language (Ruling B1-30): Arabic name in `ar` when the
- * merchant set one, else the canonical name. Every user-visible store-name render goes through
- * this; machine identifiers (JSON-LD `name`, og alt) may keep the canonical name.
- */
-export function localizedStoreName(
-  store: { name?: string | null; nameAr?: string | null } | null | undefined,
-  language: string | null | undefined
-): string {
-  const en = store?.name?.trim() ?? '';
-  const ar = store?.nameAr?.trim() ?? '';
-  return language === 'ar' ? ar || en : en || ar;
-}
