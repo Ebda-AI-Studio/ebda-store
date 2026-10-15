@@ -19,6 +19,7 @@
 import { prisma, Prisma, hasTenantContext } from '@ebda/database';
 import { AppError } from '../middleware/error-handler';
 import logger from '../lib/logger';
+import { lineAllowsBackorder } from '../lib/effective-inventory';
 import { VARIANT_REQUIRED_MESSAGE } from '../lib/variant-required';
 import { featureService } from './feature.service';
 import { retryOnWriteConflict } from '../lib/db-retry';
@@ -433,7 +434,8 @@ export class CartService {
       const note = resolvedNote.note;
 
       // Resolve the chosen variant — it must belong to this product and
-      // be active. Variant stock + backorder override the product values,
+      // be active. Variant stock overrides the product column; backorder is the
+      // variant flag OR the product flag (lineAllowsBackorder),
       // and the line is keyed by (cartId, productId, variantId) so each
       // variant is its own row (order.service already reads variantId).
       let variant: { id: string; inventory: number; allowBackorder: boolean } | null = null;
@@ -448,8 +450,12 @@ export class CartService {
       }
 
       const availableInventory = variant ? variant.inventory : product.inventory;
-      const effectiveAllowBackorder =
-        backorderFeatureEnabled && (variant ? variant.allowBackorder : product.allowBackorder);
+      // Variant inherits the product flag — the shared rule (X-02 fix round).
+      const effectiveAllowBackorder = lineAllowsBackorder(
+        product,
+        variant,
+        backorderFeatureEnabled
+      );
 
       // Same product+variant+note line if it already exists (null variantId for
       // base-product lines merges only with other base-product lines; `note: null`
@@ -741,7 +747,8 @@ export class CartService {
     const productById = new Map(products.map(p => [p.id, p]));
 
     // Resolve any chosen variants up front (must belong to one of these products
-    // and be active). Variant stock/backorder override the product values.
+    // and be active). Variant stock overrides the product column; backorder
+    // inherits the product flag (lineAllowsBackorder).
     const variantIds = items.map(i => i.variantId).filter((v): v is string => !!v);
     const variants = variantIds.length
       ? await prisma.productVariant.findMany({
@@ -843,8 +850,11 @@ export class CartService {
         const targetQuantity = (existing?.quantity ?? 0) + item.quantity;
 
         const availableInventory = variant ? variant.inventory : product.inventory;
-        const effectiveAllowBackorder =
-          backorderFeatureEnabled && (variant ? variant.allowBackorder : product.allowBackorder);
+        const effectiveAllowBackorder = lineAllowsBackorder(
+          product,
+          variant,
+          backorderFeatureEnabled
+        );
 
         if (
           product.trackInventory &&
@@ -979,8 +989,12 @@ export class CartService {
       // variant-less line falls back to the product column. Mirrors
       // `addItem` (~:151) and `validate` (~:285), which have always done this.
       const stockHolder = item.variant ?? item.product;
-      const effectiveAllowBackorder =
-        backorderFeatureEnabled && (item.variant?.allowBackorder ?? item.product.allowBackorder);
+      // `??` never fell back (a variant's false is not nullish): one shared rule.
+      const effectiveAllowBackorder = lineAllowsBackorder(
+        item.product,
+        item.variant,
+        backorderFeatureEnabled
+      );
       if (
         item.product.trackInventory &&
         stockHolder.inventory < quantity &&

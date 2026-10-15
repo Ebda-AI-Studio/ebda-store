@@ -1409,6 +1409,7 @@ export class ProductService {
         select: {
           ...STOREFRONT_PRODUCT_SELECT,
           lowStockThreshold: true,
+          trackInventory: true,
           images: { orderBy: { position: 'asc' } as const, take: 2 }, // 2 images: primary + hover-reveal second on cards
           categories: { include: { category: true } },
           options: LISTING_SWATCH_OPTIONS_SELECT,
@@ -1513,6 +1514,7 @@ export class ProductService {
       select: {
         ...STOREFRONT_PRODUCT_SELECT,
         lowStockThreshold: true,
+        trackInventory: true,
         images: { orderBy: { position: 'asc' } as const, take: 2 }, // 2 images: primary + hover-reveal second on cards
         categories: { include: { category: true } },
         options: LISTING_SWATCH_OPTIONS_SELECT,
@@ -1593,6 +1595,7 @@ export class ProductService {
   private static readonly PUBLIC_PRODUCT_DETAIL_SELECT = {
     ...STOREFRONT_PRODUCT_SELECT,
     lowStockThreshold: true,
+    trackInventory: true,
     images: { orderBy: { position: 'asc' } },
     // Each category carries its size chart so the PDP can inherit it (`resolvePdpSizeChart`);
     // the nested chart is stripped from the payload again in `withSizeChart`.

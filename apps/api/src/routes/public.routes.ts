@@ -26,6 +26,7 @@ import { recordProductView } from '../services/view-ingest.service';
 import { getStoreIdFromRequest } from '../utils/store-helpers';
 import logger from '../lib/logger';
 import { featureService } from '../services/feature.service';
+import { gateBackorderPayload } from '../lib/effective-inventory';
 import { notificationDispatcher } from '../services/notification-dispatcher.service';
 import { getCached } from '../lib/public-cache';
 import { storeLookupForHost } from '../lib/store-host';
@@ -298,10 +299,13 @@ router.get('/products', async (req: Request, res: Response, next: NextFunction) 
     // x-store-id; per-locale because the storefront ?lang= query
     // surfaces in the URL, so it's already in the cache key without
     // needing Accept-Language Vary.
+    // The store's backorder feature is applied AFTER the cache read (an
+    // entitlement never rides the cached payload — the product_3d precedent).
+    const backorderOn = await featureService.isFeatureEnabled(storeId, 'inventory.backorder');
     setEdgeCache(res, { sMaxAge: 60, staleWhileRevalidate: 300 });
     res.json({
       success: true,
-      data: result,
+      data: gateBackorderPayload(result, backorderOn),
     });
   } catch (error) {
     next(error);
@@ -347,10 +351,12 @@ router.get('/products/:slugOrId', async (req: Request, res: Response, next: Next
           : { ...product, model3d: null }
         : product;
 
+    // Backorder feature after the cache read, like product_3d above (X-02 fix round).
+    const backorderOn = await featureService.isFeatureEnabled(storeId, 'inventory.backorder');
     setEdgeCache(res, { sMaxAge: 60, staleWhileRevalidate: 300 });
     res.json({
       success: true,
-      data: { product: payload },
+      data: { product: gateBackorderPayload(payload, backorderOn) },
     });
   } catch (error) {
     next(error);
@@ -464,7 +470,15 @@ router.get('/feed/products.json', async (req: Request, res: Response, next: Next
     });
     const now = new Date();
     const live = inputs.bundles.filter(b => withinSaleWindow(b, now));
-    const feed = buildProductFeed(store, inputs.products, baseUrl, live);
+    // Same backorder gate as the storefront (X-02 fix round): availability in the
+    // AI feed must agree with what the cart accepts.
+    const backorderOn = await featureService.isFeatureEnabled(storeId, 'inventory.backorder');
+    const feed = buildProductFeed(
+      store,
+      gateBackorderPayload(inputs.products, backorderOn),
+      baseUrl,
+      live
+    );
     // Never let the edge serve this body past the next window boundary: the
     // fresh window AND the stale-while-revalidate tail both end before it.
     const nextBoundarySec = nextSaleWindowBoundarySeconds(inputs.bundles, now);
@@ -1280,9 +1294,10 @@ router.get(
         product: wishlistCardProduct(item.product),
       }));
 
+      const backorderOn = await featureService.isFeatureEnabled(storeId, 'inventory.backorder');
       res.json({
         success: true,
-        data: { items, isPublic: wishlist.isPublic },
+        data: { items: gateBackorderPayload(items, backorderOn), isPublic: wishlist.isPublic },
       });
     } catch (error) {
       next(error);

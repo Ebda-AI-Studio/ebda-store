@@ -44,6 +44,7 @@ const productSelect = {
   inventory: true,
   allowBackorder: true,
   lowStockThreshold: true,
+  trackInventory: true,
   // Merchant-authored card badge. The FBT grid and the "You might also like"
   // strip render through PecannbeeProductCard / ProductCarousel — the same
   // canonical card components as the PLP — so a badge omitted here shows up

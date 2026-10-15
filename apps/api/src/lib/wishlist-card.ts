@@ -41,6 +41,7 @@ interface WishlistProductRow {
   inventory: number;
   allowBackorder: boolean;
   lowStockThreshold: number;
+  trackInventory?: boolean;
   images: Array<{ url: string }>;
   variants: Array<{
     id: string;
@@ -59,6 +60,7 @@ export function wishlistCardProduct(p: WishlistProductRow) {
     inventory: p.inventory,
     allowBackorder: p.allowBackorder,
     lowStockThreshold: p.lowStockThreshold,
+    trackInventory: p.trackInventory,
     variants: p.variants,
   });
   // A product the merchant unpublished is not buyable whatever its stock.

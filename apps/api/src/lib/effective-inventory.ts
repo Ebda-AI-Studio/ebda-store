@@ -93,6 +93,75 @@ export function isOrderable(
 }
 
 /**
+ * May THIS line (a product, or one of its variants) be sold past its stock?
+ * The ONE server rule, shared by cart add / sync / quantity change and the
+ * checkout decrement (X-02 fix round): the store's `inventory.backorder`
+ * feature AND (the variant's own flag OR the product's flag). A variant
+ * inherits its parent's `allowBackorder` (the merchant's bulk toggle sets only
+ * the product flag; `ProductVariant.allowBackorder` defaults to false) — the
+ * same inheritance `enrichStockFlags` shows the shopper, so the storefront and
+ * the server can never disagree about a pre-order.
+ */
+export function lineAllowsBackorder(
+  product: { allowBackorder?: boolean | null },
+  variant: { allowBackorder?: boolean | null } | null | undefined,
+  backorderFeatureEnabled: boolean
+): boolean {
+  return (
+    backorderFeatureEnabled && (variant?.allowBackorder === true || product.allowBackorder === true)
+  );
+}
+
+/**
+ * Apply the store's `inventory.backorder` feature to a public stock payload
+ * AFTER the cache read (the cached payload never decides an entitlement — the
+ * `product_3d` precedent in public.routes.ts). With the feature off no product
+ * or variant reads as backorderable, because the cart and checkout refuse it.
+ * CACHE CLASS: NEVER-stale entitlement, applied per request; FeatureService's
+ * own cache is busted on every override write.
+ */
+export function gateBackorder<
+  T extends {
+    acceptsBackorder?: boolean;
+    lowStock?: boolean;
+    availableQty?: number | null;
+    variants?: unknown;
+  },
+>(p: T, backorderFeatureEnabled: boolean): T {
+  if (backorderFeatureEnabled || !p || typeof p !== 'object') return p;
+  const off = <
+    V extends { acceptsBackorder?: boolean; lowStock?: boolean; availableQty?: number | null },
+  >(
+    x: V
+  ): V =>
+    x.acceptsBackorder
+      ? { ...x, acceptsBackorder: false, availableQty: x.lowStock ? x.availableQty : null }
+      : x;
+  const variants = Array.isArray(p.variants)
+    ? (p.variants as Array<Record<string, unknown>>).map(v => off(v as never))
+    : p.variants;
+  return { ...off(p), variants } as T;
+}
+
+/**
+ * `gateBackorder` over a whole response body (a listing page, a recommendation
+ * bundle, a wishlist): every object carrying a boolean `acceptsBackorder` is
+ * gated. Returns the SAME reference when the feature is on (no copy).
+ */
+export function gateBackorderPayload<T>(body: T, backorderFeatureEnabled: boolean): T {
+  if (backorderFeatureEnabled) return body;
+  const walk = (v: unknown, depth: number): unknown => {
+    if (depth > 8 || v === null || typeof v !== 'object') return v;
+    if (Array.isArray(v)) return v.map(x => walk(x, depth + 1));
+    const o = v as Record<string, unknown>;
+    const out: Record<string, unknown> = {};
+    for (const [k, x] of Object.entries(o)) out[k] = walk(x, depth + 1);
+    return typeof o.acceptsBackorder === 'boolean' ? gateBackorder(out as never, false) : out;
+  };
+  return walk(body, 0) as T;
+}
+
+/**
  * Availability fields computed by `enrichStockFlags`. Declared explicitly so
  * the function's return type is `P & StockFlags` rather than the input type
  * erased down to its constraint — consumers (e.g. the AI product feed's
@@ -117,6 +186,8 @@ export function enrichStockFlags<
     inventory: number;
     allowBackorder: boolean;
     lowStockThreshold: number;
+    /** false = the merchant does not track stock: always in stock (as `isOrderable`). */
+    trackInventory?: boolean;
     variants?: Array<{
       inventory: number;
       allowBackorder?: boolean;
@@ -143,21 +214,24 @@ export function enrichStockFlags<
   const productAllowsBackorder =
     product.allowBackorder || (hasVariants && sellable.some(v => v.allowBackorder === true));
 
-  const inStock = effectiveInventory > 0;
-  const lowStock = inStock && effectiveInventory <= product.lowStockThreshold;
-  const acceptsBackorder = effectiveInventory <= 0 && productAllowsBackorder;
+  // Untracked stock is always in stock — the same answer `isOrderable` and the
+  // cart give (X-02 fix round: the storefront read an untracked product with
+  // inventory 0 as sold out while the server sold it).
+  const untracked = product.trackInventory === false;
+  const inStock = untracked || effectiveInventory > 0;
+  const lowStock = !untracked && inStock && effectiveInventory <= product.lowStockThreshold;
+  const acceptsBackorder = !inStock && productAllowsBackorder;
   const availableQty = lowStock || acceptsBackorder ? effectiveInventory : null;
 
   // `isActive` is read here and stripped: it drives the flags, it is not part
   // of the storefront variant shape.
   const enrichedVariants = variants.map(({ isActive, ...v }) => {
     const sellableVariant = isActive !== false;
-    const vInStock = sellableVariant && v.inventory > 0;
-    const vLowStock = vInStock && v.inventory <= product.lowStockThreshold;
+    const vInStock = sellableVariant && (untracked || v.inventory > 0);
+    const vLowStock = !untracked && vInStock && v.inventory <= product.lowStockThreshold;
     const vAcceptsBackorder =
-      sellableVariant &&
-      v.inventory <= 0 &&
-      ((v.allowBackorder ?? false) || product.allowBackorder);
+      // The cart/checkout rule; the store feature is applied per request (gateBackorder).
+      sellableVariant && !vInStock && lineAllowsBackorder(product, v, true);
     const vAvailableQty = vLowStock || vAcceptsBackorder ? v.inventory : null;
     return {
       ...v,
@@ -175,7 +249,12 @@ export function enrichStockFlags<
   // P carries a `[key: string]: unknown` index signature, so TS can't prove
   // Omit actually narrows it — the runtime strip below is what matters.)
   // eslint-disable-next-line @typescript-eslint/no-unused-vars -- destructure-to-discard
-  const { lowStockThreshold: _lowStockThreshold, ...productWithoutThreshold } = product;
+  const {
+    lowStockThreshold: _lowStockThreshold,
+    // Read above, not shipped (merchant-internal, STOREFRONT_PRODUCT_SELECT excludes it).
+    trackInventory: _trackInventory,
+    ...productWithoutThreshold
+  } = product;
 
   return {
     ...productWithoutThreshold,

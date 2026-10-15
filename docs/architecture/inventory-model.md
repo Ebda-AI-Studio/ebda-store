@@ -101,6 +101,18 @@ those flags, and the storefront has exactly one copy of it:
 variant pills, the PDP buttons, every card path, the delivery line and JSON-LD
 availability (X-02; `tests/unit/can-buy-now.test.tsx` bans a second copy).
 
+**Backorder has one server rule too** (X-02 fix round): `lineAllowsBackorder(product,
+variant, featureOn)` in `apps/api/src/lib/effective-inventory.ts` = the store's
+`inventory.backorder` feature AND (the variant's flag OR the product's flag). A variant
+INHERITS the product flag (the merchant bulk toggle sets only the product flag; the
+variant column defaults to false). Cart add, guest→login sync, quantity change and the
+checkout decrement all call it; `enrichStockFlags` shows the shopper the same inheritance,
+and the public routes apply the feature AFTER the cache read with `gateBackorderPayload`
+(listing, PDP, recommendations, wishlists, AI feed). Untracked stock
+(`trackInventory: false`) reads `inStock: true` in the payload, as `isOrderable` and the
+cart already treated it. Proof over HTTP as `ebda_app`:
+`tests/integration/backorder-variant-inherits.test.ts`.
+
 ## Writing stock
 
 **One line writes the variant row XOR the product row — never both.** The

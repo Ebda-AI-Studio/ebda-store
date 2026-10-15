@@ -6,6 +6,8 @@ import { userContext } from '../middleware/tenant-context';
 
 import { LISTING_SWATCH_OPTIONS_SELECT } from '../lib/listing-swatch-select';
 import { WISHLIST_CARD_VARIANTS_SELECT, wishlistCardProduct } from '../lib/wishlist-card';
+import { gateBackorderPayload } from '../lib/effective-inventory';
+import { featureService } from '../services/feature.service';
 const router = Router();
 
 // Helper to get store ID from request header
@@ -122,9 +124,10 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
       product: wishlistCardProduct(item.product),
     }));
 
+    const backorderOn = await featureService.isFeatureEnabled(storeId, 'inventory.backorder');
     res.json({
       success: true,
-      data: { items, isPublic: wishlist.isPublic },
+      data: { items: gateBackorderPayload(items, backorderOn), isPublic: wishlist.isPublic },
     });
   } catch (error) {
     next(error);
@@ -227,7 +230,10 @@ router.post('/', async (req: Request, res: Response, next: NextFunction) => {
       data: {
         item: {
           id: item.id,
-          product: wishlistCardProduct(item.product),
+          product: gateBackorderPayload(
+            wishlistCardProduct(item.product),
+            await featureService.isFeatureEnabled(storeId, 'inventory.backorder')
+          ),
         },
       },
     });

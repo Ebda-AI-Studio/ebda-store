@@ -60,6 +60,7 @@ import { affiliateService } from './affiliate.service';
 import { auditLog } from '../middleware/security';
 import { hasCapturedPayment, shouldApplyRefundEffects } from './order-refund-gating';
 import logger from '../lib/logger';
+import { lineAllowsBackorder } from '../lib/effective-inventory';
 import { frozenTaxInvoiceFields, resolveActiveTaxRate } from '../lib/order-tax';
 import {
   invalidateStoreProductCachesAfterOrder,
@@ -1311,20 +1312,23 @@ export class OrderService {
             // dual-check as before: a disabled feature must never silently
             // backorder just because the per-product flag is on). Fetched fresh
             // to match the prior FOR UPDATE behavior, only on the rare miss path.
-            const perFlag = variantId
-              ? (
-                  await tx.productVariant.findUnique({
-                    where: { id: variantId },
-                    select: { allowBackorder: true },
-                  })
-                )?.allowBackorder
-              : (
-                  await tx.product.findUnique({
-                    where: { id: productId, storeId },
-                    select: { allowBackorder: true },
-                  })
-                )?.allowBackorder;
-            if (!backorderFeatureEnabled || !perFlag) {
+            // A variant inherits the product's flag: the shared rule
+            // (`lineAllowsBackorder`, X-02 fix round), the same one the cart and
+            // the storefront's pre-order label use.
+            const productFlags = await tx.product.findUnique({
+              where: { id: productId, storeId },
+              select: { allowBackorder: true },
+            });
+            const variantFlags = variantId
+              ? await tx.productVariant.findUnique({
+                  where: { id: variantId },
+                  select: { allowBackorder: true },
+                })
+              : null;
+            if (
+              !productFlags ||
+              !lineAllowsBackorder(productFlags, variantFlags, backorderFeatureEnabled)
+            ) {
               throw new AppError(
                 400,
                 'INSUFFICIENT_INVENTORY',
