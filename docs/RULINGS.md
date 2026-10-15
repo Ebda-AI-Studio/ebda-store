@@ -6129,3 +6129,5 @@ Ruling B0-47 — final-wave judgement calls, each a one-line revert: (a) `Delive
 Ruling B0-48 — delivery days off are a per-store setting (deliveryOffDays, default Friday; Ahmad 2026-10-15), superseding the Friday-only part of B0-1/1a. Cost if wrong: one more setting on the delivery page.
 
 Ruling B0-49 — phone fold = gallery + title + price + first selector; add-to-cart always reachable via the sticky bar shown from first paint whenever the main button is off-screen in either direction (Ahmad 2026-10-15). Evidence: 3-axis + required-note Linen Abaya puts the main button at y≈1090–1139 on an 844 viewport. Cost if wrong: the sticky bar covers ~64px of the gallery on long-option products.
+
+Ruling B0-50 — no lock_timeout in B0 migrations, per DB-INDEX-MIGRATIONS.md (a timeout leaves the migration FAILED and P3009 blocks every later deploy until a manual migrate resolve). Prod cart_items = 0 rows, order_items small, so locks are brief. Cost if wrong: a deploy waits behind a long-running transaction for a few seconds.

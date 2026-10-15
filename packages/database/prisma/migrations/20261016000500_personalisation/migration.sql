@@ -3,10 +3,9 @@
 -- products.personalisation  = PersonalisationConfig JSON (@ebda/shared), null = off.
 -- cart_items.note           = the customer's personalisation text for that line.
 -- order_items.personalisation = snapshot of the cart line's note.
--- Fail fast instead of queueing behind a long cart/order transaction: the index swap below
--- takes ACCESS EXCLUSIVE on cart_items, and every storefront request queues behind a waiting
--- lock. A timeout aborts the migration (the deploy retries); it never half-applies.
-SET lock_timeout = '5s';
+-- No lock_timeout (docs/DB-INDEX-MIGRATIONS.md): a timeout records the migration as FAILED and
+-- blocks later deploys until a manual migrate resolve. The locks (column adds, the cart_items
+-- index swap) are brief: production cart_items has 0 rows and order_items is small.
 
 ALTER TABLE "products" ADD COLUMN "personalisation" JSONB;
 ALTER TABLE "cart_items" ADD COLUMN "note" TEXT;
