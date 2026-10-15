@@ -5,12 +5,13 @@ import type { Category, PaginationMeta, ProductFacet } from '@/lib/api';
 import { useLanguage, translations } from '../../contexts/LanguageContext';
 import { useDebouncedValue } from '../../hooks/useDebouncedValue';
 import { useNumerals } from '../../hooks/useNumerals';
+import { useLocalePrice } from '../../hooks/useLocalePrice';
 import { useBodyScrollLock } from '../../hooks/useBodyScrollLock';
 import { buildSidebarVars, countActiveFilters } from './filter-sidebar-state';
 import { localizeOptionName, localizeOptionValue } from '@/lib/option-localization';
 import { Sheet } from '@/components/ui/Sheet';
 
-import { REGION, roundToMinor } from '@ebda/shared';
+import { roundToMinor } from '@ebda/shared';
 interface SortOption {
   value: string;
   label: string;
@@ -61,19 +62,18 @@ interface ProductsFilterSidebarProps {
   defaultOpen?: boolean;
   /**
    * Merchant-controlled background color for the WHOLE filter UI — desktop
-   * panel, mobile trigger, AND the mobile bottom-sheet + every inner accent
-   * (category chips, price slider, sort/search). Passed as an HSL TRIPLET
+   * panel, mobile trigger, AND the mobile bottom-sheet. Passed as an HSL TRIPLET
    * ("26 100% 50%", via `colorToHslTriplet(value, theme)`) and applied as a
-   * local `--primary` override on the <aside>, so it cascades to every
-   * descendant — including the fixed-position mobile sheet — and works with the
-   * existing `hsl(var(--primary)/alpha)` shades. Undefined → inherits the
-   * store's global `--primary` (existing look, no opt-in cost).
+   * local `--filter-bg` override on the <aside>, so it cascades to every
+   * descendant — including the fixed-position mobile sheet. Undefined → the
+   * quiet default from globals.css (`--filter-bg: var(--bg-page)`, Ruling B1-31);
+   * the store's primary marks only the active state.
    */
   bgTriplet?: string;
   /**
    * Merchant-controlled text/icon color for the whole filter UI, as an HSL
-   * triplet. Applied as a local `--primary-foreground` override on the
-   * <aside>. Undefined → inherits the global `--primary-foreground`.
+   * triplet. Applied as a local `--filter-fg` override on the <aside>.
+   * Undefined → `--filter-fg: var(--foreground)` (globals.css, B1-31).
    */
   fgTriplet?: string;
   /**
@@ -128,9 +128,7 @@ function FacetGroup({
   );
   return (
     <div>
-      <h3 className="mb-3 text-lg font-medium text-[hsl(var(--primary-foreground))]">
-        {facetLabel}
-      </h3>
+      <h3 className="mb-3 text-lg font-medium text-[hsl(var(--filter-fg))]">{facetLabel}</h3>
       <div className="space-y-2">
         {facet.values.map(v => {
           const isChecked = selectedValues.includes(v.value);
@@ -142,8 +140,8 @@ function FacetGroup({
               htmlFor={checkboxId}
               className={`flex cursor-pointer items-center gap-3 rounded-xl px-4 py-2.5 text-base transition-all ${
                 isChecked
-                  ? 'bg-[hsl(var(--primary-foreground)/0.2)] text-[hsl(var(--primary-foreground))] font-semibold'
-                  : 'bg-[hsl(var(--primary-foreground)/0.08)] text-[hsl(var(--primary-foreground)/0.75)] hover:bg-[hsl(var(--primary-foreground)/0.15)] hover:text-[hsl(var(--primary-foreground))]'
+                  ? 'bg-primary text-primary-foreground font-semibold'
+                  : 'bg-[hsl(var(--filter-fg)/0.08)] text-[hsl(var(--filter-fg)/0.75)] hover:bg-[hsl(var(--filter-fg)/0.15)] hover:text-[hsl(var(--filter-fg))]'
               }`}
             >
               <input
@@ -156,7 +154,7 @@ function FacetGroup({
                   // button is the explicit done action.
                   onOptionToggle?.(facet.name, v.value);
                 }}
-                className="h-4 w-4 shrink-0 accent-[hsl(var(--primary-foreground))] rounded"
+                className="h-4 w-4 shrink-0 accent-primary rounded"
                 aria-label={valueLabel}
               />
               <span>{valueLabel}</span>
@@ -201,7 +199,8 @@ export function ProductsFilterSidebar(props: ProductsFilterSidebarProps) {
     fgTriplet,
   } = props;
   const { t } = useLanguage();
-  const { localize, money } = useNumerals();
+  const { localize } = useNumerals();
+  const money = useLocalePrice();
 
   const sidebarVars = buildSidebarVars(bgTriplet, fgTriplet);
 
@@ -250,15 +249,15 @@ export function ProductsFilterSidebar(props: ProductsFilterSidebarProps) {
       {/* Results summary + per-page — shown at the top of the filter panel so
           it's visible the moment the shopper opens the filters. */}
       {(resultCount !== undefined || onPerPageChange) && (
-        <div className="space-y-3 border-b border-[hsl(var(--primary-foreground)/0.2)] pb-4">
+        <div className="space-y-3 border-b border-[hsl(var(--filter-fg)/0.2)] pb-4">
           {resultCount !== undefined && (
-            <p className="text-sm text-[hsl(var(--primary-foreground)/0.8)]">
+            <p className="text-sm text-[hsl(var(--filter-fg)/0.8)]">
               {isLoading ? (
                 t('Loading...', translations['Loading...'])
               ) : (
                 <>
                   {t('Showing', 'عرض')}{' '}
-                  <span className="font-medium text-[hsl(var(--primary-foreground))]">
+                  <span className="font-medium text-[hsl(var(--filter-fg))]">
                     {localize(resultCount)}
                   </span>{' '}
                   {meta ? t(`of ${meta.total}`, `من ${localize(meta.total)}`) : ''}{' '}
@@ -271,7 +270,7 @@ export function ProductsFilterSidebar(props: ProductsFilterSidebarProps) {
             <div>
               <label
                 htmlFor={`products-perpage-${mobile ? 'm' : 'd'}`}
-                className="mb-2 block text-base lg:text-lg font-medium text-[hsl(var(--primary-foreground))]"
+                className="mb-2 block text-base lg:text-lg font-medium text-[hsl(var(--filter-fg))]"
               >
                 {t('Show:', 'عرض:')}
               </label>
@@ -296,7 +295,7 @@ export function ProductsFilterSidebar(props: ProductsFilterSidebarProps) {
         <div>
           <label
             htmlFor={`products-sort-${mobile ? 'm' : 'd'}`}
-            className="mb-2 block text-base lg:text-lg font-medium text-[hsl(var(--primary-foreground))]"
+            className="mb-2 block text-base lg:text-lg font-medium text-[hsl(var(--filter-fg))]"
           >
             {t('Sort by', 'ترتيب')}
           </label>
@@ -316,13 +315,13 @@ export function ProductsFilterSidebar(props: ProductsFilterSidebarProps) {
       )}
 
       <div className="flex items-center justify-between">
-        <h3 className="text-sm lg:text-base font-semibold text-[hsl(var(--primary-foreground))]">
+        <h3 className="text-sm lg:text-base font-semibold text-[hsl(var(--filter-fg))]">
           {t('Filters', 'فلاتر')}
         </h3>
         <button
           type="button"
           onClick={onClearAll}
-          className="text-xs lg:text-sm font-medium text-[hsl(var(--primary-foreground))] underline opacity-80 hover:opacity-100"
+          className="text-xs lg:text-sm font-medium text-[hsl(var(--filter-fg))] underline opacity-80 hover:opacity-100"
         >
           {t('Remove filters', 'إزالة الفلاتر')}
         </button>
@@ -334,21 +333,15 @@ export function ProductsFilterSidebar(props: ProductsFilterSidebarProps) {
         priceMin !== undefined &&
         priceMax !== undefined && (
           <div>
-            <h3 className="mb-3 text-lg font-medium text-[hsl(var(--primary-foreground))]">
+            <h3 className="mb-3 text-lg font-medium text-[hsl(var(--filter-fg))]">
               {t('Price range', 'مجال السعر')}
             </h3>
             <div className="space-y-3">
-              <div className="flex items-center justify-between text-xs lg:text-sm text-[hsl(var(--primary-foreground)/0.8)]">
-                <span>
-                  {money(roundToMinor(priceMin))}{' '}
-                  {t(REGION.currencySymbol.en, REGION.currencySymbol.ar)}
-                </span>
-                <span>
-                  {money(roundToMinor(priceMax))}{' '}
-                  {t(REGION.currencySymbol.en, REGION.currencySymbol.ar)}
-                </span>
+              <div className="flex items-center justify-between text-xs lg:text-sm text-[hsl(var(--filter-fg)/0.8)]">
+                <span>{money(roundToMinor(priceMin))}</span>
+                <span>{money(roundToMinor(priceMax))}</span>
               </div>
-              <div className="relative h-1.5 rounded-full bg-[hsl(var(--primary-foreground)/0.25)]">
+              <div className="relative h-1.5 rounded-full bg-[hsl(var(--filter-fg)/0.25)]">
                 <div
                   className="absolute h-full rounded-full bg-primary"
                   style={{
@@ -410,13 +403,13 @@ export function ProductsFilterSidebar(props: ProductsFilterSidebarProps) {
       <form onSubmit={mobile ? closeAfter(onSearchSubmit) : onSearchSubmit}>
         <label
           htmlFor={`products-search-${mobile ? 'm' : 'd'}`}
-          className="mb-2 block text-base lg:text-lg font-medium text-[hsl(var(--primary-foreground))]"
+          className="mb-2 block text-base lg:text-lg font-medium text-[hsl(var(--filter-fg))]"
         >
           {t('Search', translations['Search'])}
         </label>
         <div className="search-box">
           <svg
-            className="h-5 w-5 text-[hsl(var(--primary-foreground)/0.6)]"
+            className="h-5 w-5 text-[hsl(var(--filter-fg)/0.6)]"
             fill="none"
             viewBox="0 0 24 24"
             stroke="currentColor"
@@ -441,7 +434,7 @@ export function ProductsFilterSidebar(props: ProductsFilterSidebarProps) {
       </form>
 
       <div>
-        <h3 className="mb-3 text-lg font-medium text-[hsl(var(--primary-foreground))]">
+        <h3 className="mb-3 text-lg font-medium text-[hsl(var(--filter-fg))]">
           {t('Categories', translations['Categories'])}
         </h3>
         <div className="space-y-2">
@@ -451,8 +444,8 @@ export function ProductsFilterSidebar(props: ProductsFilterSidebarProps) {
             aria-pressed={!categoryFilter}
             className={`flex w-full items-center justify-between rounded-xl px-4 py-2.5 text-base lg:text-lg transition-all ${
               !categoryFilter
-                ? 'bg-[hsl(var(--primary-foreground)/0.2)] text-[hsl(var(--primary-foreground))] font-semibold'
-                : 'bg-[hsl(var(--primary-foreground)/0.08)] text-[hsl(var(--primary-foreground)/0.75)] hover:bg-[hsl(var(--primary-foreground)/0.15)] hover:text-[hsl(var(--primary-foreground))]'
+                ? 'bg-primary text-primary-foreground font-semibold'
+                : 'bg-[hsl(var(--filter-fg)/0.08)] text-[hsl(var(--filter-fg)/0.75)] hover:bg-[hsl(var(--filter-fg)/0.15)] hover:text-[hsl(var(--filter-fg))]'
             }`}
           >
             <span>{t('All', 'الكل')}</span>
@@ -460,8 +453,8 @@ export function ProductsFilterSidebar(props: ProductsFilterSidebarProps) {
               <span
                 className={`rounded-full px-2 py-0.5 text-xs ${
                   !categoryFilter
-                    ? 'bg-[hsl(var(--primary-foreground)/0.2)]'
-                    : 'bg-[hsl(var(--primary-foreground)/0.12)]'
+                    ? 'bg-[hsl(var(--filter-fg)/0.2)]'
+                    : 'bg-[hsl(var(--filter-fg)/0.12)]'
                 }`}
               >
                 {meta.total}
@@ -480,8 +473,8 @@ export function ProductsFilterSidebar(props: ProductsFilterSidebarProps) {
                 aria-pressed={categoryFilter === cat.slug}
                 className={`flex w-full items-center justify-between rounded-xl px-4 py-2.5 text-base lg:text-lg transition-all ${
                   categoryFilter === cat.slug
-                    ? 'bg-[hsl(var(--primary-foreground)/0.2)] text-[hsl(var(--primary-foreground))] font-semibold'
-                    : 'bg-[hsl(var(--primary-foreground)/0.08)] text-[hsl(var(--primary-foreground)/0.75)] hover:bg-[hsl(var(--primary-foreground)/0.15)] hover:text-[hsl(var(--primary-foreground))]'
+                    ? 'bg-primary text-primary-foreground font-semibold'
+                    : 'bg-[hsl(var(--filter-fg)/0.08)] text-[hsl(var(--filter-fg)/0.75)] hover:bg-[hsl(var(--filter-fg)/0.15)] hover:text-[hsl(var(--filter-fg))]'
                 }`}
               >
                 <span>{language === 'ar' && cat.nameAr ? cat.nameAr : cat.name}</span>
@@ -489,8 +482,8 @@ export function ProductsFilterSidebar(props: ProductsFilterSidebarProps) {
                   <span
                     className={`rounded-full px-2 py-0.5 text-xs ${
                       categoryFilter === cat.slug
-                        ? 'bg-[hsl(var(--primary-foreground)/0.2)]'
-                        : 'bg-[hsl(var(--primary-foreground)/0.12)]'
+                        ? 'bg-[hsl(var(--filter-fg)/0.2)]'
+                        : 'bg-[hsl(var(--filter-fg)/0.12)]'
                     }`}
                   >
                     {cat.productCount}
@@ -507,7 +500,7 @@ export function ProductsFilterSidebar(props: ProductsFilterSidebarProps) {
         <button
           type="button"
           onClick={onClearAll}
-          className="w-full rounded-xl border border-[hsl(var(--primary-foreground)/0.3)] py-2.5 text-sm text-[hsl(var(--primary-foreground)/0.8)] transition-colors hover:bg-[hsl(var(--primary-foreground)/0.1)] hover:border-[hsl(var(--primary-foreground)/0.5)]"
+          className="w-full rounded-xl border border-[hsl(var(--filter-fg)/0.3)] py-2.5 text-sm text-[hsl(var(--filter-fg)/0.8)] transition-colors hover:bg-[hsl(var(--filter-fg)/0.1)] hover:border-[hsl(var(--filter-fg)/0.5)]"
         >
           {t('Clear All Filters', 'مسح جميع الفلاتر')}
         </button>
@@ -522,7 +515,7 @@ export function ProductsFilterSidebar(props: ProductsFilterSidebarProps) {
     // search input, price range labels, category chips, mobile sheet
     // trigger, the lot.
     <aside
-      className="w-full shrink-0 lg:w-64 lg:rounded-2xl lg:overflow-hidden lg:p-4 lg:bg-[hsl(var(--primary))] lg:text-[hsl(var(--primary-foreground))]"
+      className="w-full shrink-0 lg:w-64 lg:rounded-[var(--radius)] lg:overflow-hidden lg:p-4 lg:border lg:border-border lg:bg-[hsl(var(--filter-bg))] lg:text-[hsl(var(--filter-fg))]"
       style={sidebarVars}
       data-zone="filters"
     >
@@ -533,7 +526,7 @@ export function ProductsFilterSidebar(props: ProductsFilterSidebarProps) {
         aria-haspopup="dialog"
         aria-expanded={isOpen}
         aria-controls="products-filter-sheet"
-        className="lg:hidden mb-4 flex h-11 w-full items-center justify-between rounded-xl bg-[hsl(var(--primary))] px-4 text-sm font-semibold text-[hsl(var(--primary-foreground))] transition-colors hover:bg-[hsl(var(--primary)/0.9)]"
+        className="lg:hidden mb-4 flex h-11 w-full items-center justify-between rounded-[var(--radius)] border border-border bg-[hsl(var(--filter-bg))] px-4 text-sm font-semibold text-[hsl(var(--filter-fg))] transition-colors hover:bg-[hsl(var(--filter-fg)/0.05)]"
       >
         <span className="inline-flex items-center gap-2">
           <svg
@@ -552,7 +545,7 @@ export function ProductsFilterSidebar(props: ProductsFilterSidebarProps) {
           </svg>
           {t('Filters', 'الفلاتر')}
           {activeFilterCount > 0 && (
-            <span className="rounded-full bg-[hsl(var(--primary-foreground))] px-2 py-0.5 text-xs font-bold text-[hsl(var(--primary))]">
+            <span className="rounded-full bg-primary px-2 py-0.5 text-xs font-bold text-primary-foreground">
               {activeFilterCount}
             </span>
           )}
@@ -569,11 +562,11 @@ export function ProductsFilterSidebar(props: ProductsFilterSidebarProps) {
         focusClose
         title={t('Filters', 'فلاتر')}
         closeLabel={t('Close', 'إغلاق')}
-        className="bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] lg:hidden"
-        titleClassName="text-base font-semibold text-[hsl(var(--primary-foreground))]"
-        closeClassName="text-[hsl(var(--primary-foreground))] hover:bg-[hsl(var(--primary-foreground)/0.15)]"
+        className="bg-[hsl(var(--filter-bg))] text-[hsl(var(--filter-fg))] lg:hidden"
+        titleClassName="text-base font-semibold text-[hsl(var(--filter-fg))]"
+        closeClassName="text-[hsl(var(--filter-fg))] hover:bg-[hsl(var(--filter-fg)/0.15)]"
         bodyClassName="px-5 pb-4 space-y-6"
-        footerClassName="border-t border-[hsl(var(--primary-foreground)/0.2)] px-5 py-3"
+        footerClassName="border-t border-[hsl(var(--filter-fg)/0.2)] px-5 py-3"
         footer={
           <button
             type="button"
@@ -597,7 +590,7 @@ export function ProductsFilterSidebar(props: ProductsFilterSidebarProps) {
           onClick={() => setIsDesktopExpanded(v => !v)}
           aria-expanded={isDesktopExpanded}
           aria-controls="products-filter-panel-body"
-          className="mb-4 flex w-full items-center justify-between text-sm font-semibold text-[hsl(var(--primary-foreground))] hover:text-[hsl(var(--primary-foreground)/0.7)] transition-colors"
+          className="mb-4 flex w-full items-center justify-between text-sm font-semibold text-[hsl(var(--filter-fg))] hover:text-[hsl(var(--filter-fg)/0.7)] transition-colors"
         >
           <span className="inline-flex items-center gap-2">
             <svg

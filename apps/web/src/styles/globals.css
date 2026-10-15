@@ -1286,15 +1286,45 @@ html[dir='rtl'] [data-pack='qamar'] .font-display {
 [data-pack='qamar'] .font-display {
   font-size-adjust: none;
 }
-/* PDP title (STOP 1 critique): the shared h1 carries no size class, so it fell to the body size
-   (15px Arabic, 17px Latin), smaller than its own price. Qamar gives it the display voice at a
-   real title size. A merchant's productName zone size is an inline style and still wins. */
-[data-pack='qamar'] h1[data-zone='productName'] {
+/* Qamar's PDP title voice: the display face. ZERO specificity (:where), so the store-wide
+   productName zone ([data-zone="productName"], emit-zone-css) and the page-level zone (inline)
+   both still win (review I3). The title SIZE default is platform-wide (B1-29, below). */
+:where([data-pack='qamar']) :where(h1[data-zone='productName']) {
   font-family: var(--font-display, inherit);
-  font-size: clamp(1.5rem, 1.25rem + 1vw, 2.25rem);
   line-height: 1.3;
   font-weight: 600;
 }
+/* Ruling B1-27: on a merchant-coloured footer (ShopChrome sets data-footer-surface="custom" and
+   re-derives --foreground / --muted-foreground from the surface), the skins' translucent text
+   variants (text-foreground/60, text-muted-foreground/70, ...) collapse onto the muted tone that
+   is guaranteed >= 4.5:1, so no footer text is left to alpha-compositing luck on any brand colour. */
+[data-footer-surface='custom'] [class*='text-foreground/'],
+[data-footer-surface='custom'] [class*='text-muted-foreground'] {
+  color: hsl(var(--muted-foreground));
+}
+[data-footer-surface='custom'] [class*='hover:text-foreground']:hover {
+  color: hsl(var(--foreground));
+}
+
+/* Ruling B1-29: the shared PDP title (h1[data-zone='productName']) has no size class, so with no
+   zone size it fell to the body size, smaller than its own price (design.md: name >= price).
+   Platform default for EVERY skin at specificity (0,0,1): it must beat Tailwind preflight's
+   `h1 { font-size: inherit }` (also 0,0,1, earlier in the file), while any skin class (0,1,0), the
+   store-wide productName zone rule (0,1,0) and the page-level inline zone all override it. */
+h1:where([data-zone='productName']) {
+  font-size: clamp(1.5rem, 1.25rem + 1vw, 2rem);
+  line-height: 1.3;
+}
+
+/* Ruling B1-31: the PLP filter panel is a quiet surface on EVERY skin: the page colour with a
+   hairline border and ink text; the store's primary (accent) marks only the active state
+   (selected chip, count badge, price fill, "View results"). A merchant's own filter colours
+   (bgTriplet / fgTriplet) still override both through inline --filter-bg / --filter-fg. */
+[data-zone='filters'] {
+  --filter-bg: var(--bg-page);
+  --filter-fg: var(--foreground);
+}
+
 /* ==========================================================================
    Looks (Phase S). EVERY rule here is scoped under [data-look], which the
    root layout sets on <body> only for stores with a valid look. Legacy

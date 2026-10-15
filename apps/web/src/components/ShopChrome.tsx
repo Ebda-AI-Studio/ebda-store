@@ -11,7 +11,12 @@ import { FloatingWidget } from '../templates/shared/FloatingWidget';
 import { SectionDivider, resolveSlotDividerSettings } from '../templates/shared/SectionDivider';
 import { resolveFooterAutoContrastBg } from '../lib/footer-logo-bg';
 import type { FloatingWidgetConfig } from '@ebda/shared';
-import { resolveColor, footerLogoContrastFilter, sanitizeUrl } from '@ebda/shared';
+import {
+  resolveColor,
+  footerLogoContrastFilter,
+  readableTextVars,
+  sanitizeUrl,
+} from '@ebda/shared';
 import type { StoreLayoutSettings } from '@ebda/shared';
 import { sectionVisibilityClass } from '../templates/shared/section-spacing';
 import type {
@@ -56,6 +61,10 @@ export function ShopChrome({ children, layout: layoutProp }: ShopChromeProps) {
   const { components: T, isLoading: templateLoading } = useTemplateComponents();
 
   const isRtl = language === 'ar';
+  // Merchant-picked footer colour -> the readable text pair its footer paints with (B1-27).
+  const footerText = readableTextVars(
+    layout?.footer?.bgColor && store ? resolveColor(layout.footer.bgColor, store.theme) : undefined
+  );
 
   // Store owners can override the navigation menu via store.settings.navMenu
   // (an array of { label, labelAr?, href }). href may be relative ("/about")
@@ -420,7 +429,24 @@ export function ShopChrome({ children, layout: layoutProp }: ShopChromeProps) {
           prop instead so the theme can replace its default bg class with
           the merchant's inline color. Ahmad 2026-05-20: footer bg save was
           not landing because of this nested-bg paint-over. */}
-      <div data-zone="footer" className={sectionVisibilityClass(layout?.footer) ?? undefined}>
+      {/* A merchant-coloured footer re-derives the text pair the skin's footer paints with
+          (--foreground / --muted-foreground, black or white plus a muted tone that keeps
+          >= 4.5:1), and globals.css collapses the alpha text variants onto it on
+          [data-footer-surface='custom']: every skin's footer stays readable on any brand colour
+          (Ruling B1-27). An unset footer colour keeps the theme's own tokens. */}
+      <div
+        data-zone="footer"
+        className={sectionVisibilityClass(layout?.footer) ?? undefined}
+        {...(footerText
+          ? {
+              'data-footer-surface': 'custom',
+              style: {
+                '--foreground': footerText.foreground,
+                '--muted-foreground': footerText.muted,
+              } as React.CSSProperties,
+            }
+          : {})}
+      >
         <T.Footer
           branding={branding}
           contact={{

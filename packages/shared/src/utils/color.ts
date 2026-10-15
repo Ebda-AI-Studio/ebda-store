@@ -328,6 +328,44 @@ export function contrastRatio(bg: string, fg: string): number {
   return (brighter + 0.05) / (darker + 0.05);
 }
 
+// Readable text on a merchant-coloured surface (Ruling B1-27)
+
+/**
+ * The text pair for a surface whose colour the MERCHANT picked (footer bgColor): `foreground` is
+ * black or white (`pickReadableForeground`), `muted` is that colour blended toward the surface as
+ * far as it can go while staying >= 4.5:1, so secondary text keeps a quieter tone and still
+ * passes AA. Both are HSL triplets for `--foreground` / `--muted-foreground`. Undefined when the
+ * surface colour cannot be parsed (the caller keeps the theme's own tokens).
+ */
+export function readableTextVars(
+  bg: string | undefined
+): { foreground: string; muted: string; fg: string; mutedHex: string } | undefined {
+  const surface = parseColorToRgb(bg);
+  const fgHex = pickReadableForeground(bg);
+  if (!surface || !fgHex) return undefined;
+  const fg = parseColorToRgb(fgHex)!;
+  const hex = (c: Rgb) =>
+    '#' + [c.r, c.g, c.b].map(v => Math.round(v).toString(16).padStart(2, '0')).join('');
+  let muted = fg;
+  for (let t = 0.45; t > 0; t -= 0.05) {
+    const mix = {
+      r: fg.r + (surface.r - fg.r) * t,
+      g: fg.g + (surface.g - fg.g) * t,
+      b: fg.b + (surface.b - fg.b) * t,
+    };
+    if (contrastRatio(hex(surface), hex(mix)) >= 4.6) {
+      muted = mix;
+      break;
+    }
+  }
+  return {
+    foreground: rgbToHslTriplet(fg),
+    muted: rgbToHslTriplet(muted),
+    fg: fgHex,
+    mutedHex: hex(muted),
+  };
+}
+
 // Footer logo auto-contrast helper
 
 /**

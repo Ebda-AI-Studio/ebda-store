@@ -26,8 +26,8 @@ export function buildSidebarVars(
 ): React.CSSProperties | undefined {
   if (!bgTriplet && !fgTriplet) return undefined;
   return {
-    ...(bgTriplet ? { '--primary': bgTriplet } : {}),
-    ...(fgTriplet ? { '--primary-foreground': fgTriplet } : {}),
+    ...(bgTriplet ? { '--filter-bg': bgTriplet } : {}),
+    ...(fgTriplet ? { '--filter-fg': fgTriplet } : {}),
   } as React.CSSProperties;
 }
 

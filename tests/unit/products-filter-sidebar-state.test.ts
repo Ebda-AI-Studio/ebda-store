@@ -13,14 +13,14 @@ describe('buildSidebarVars', () => {
   });
 
   it('overrides only the token the merchant actually set', () => {
-    expect(buildSidebarVars('10 20 30', undefined)).toEqual({ '--primary': '10 20 30' });
-    expect(buildSidebarVars(undefined, '0 0 0')).toEqual({ '--primary-foreground': '0 0 0' });
+    expect(buildSidebarVars('10 20 30', undefined)).toEqual({ '--filter-bg': '10 20 30' });
+    expect(buildSidebarVars(undefined, '0 0 0')).toEqual({ '--filter-fg': '0 0 0' });
   });
 
   it('overrides both when both are set', () => {
     expect(buildSidebarVars('10 20 30', '0 0 0')).toEqual({
-      '--primary': '10 20 30',
-      '--primary-foreground': '0 0 0',
+      '--filter-bg': '10 20 30',
+      '--filter-fg': '0 0 0',
     });
   });
 });
@@ -50,5 +50,24 @@ describe('countActiveFilters', () => {
 
   it('defaults optionFilters so an omitted argument does not throw', () => {
     expect(countActiveFilters('shirt', '')).toBe(1);
+  });
+});
+
+describe('filter panel is a quiet surface on every skin (Ruling B1-31)', () => {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { readFileSync } = require('node:fs') as typeof import('node:fs');
+  const root = `${__dirname}/../..`;
+  const src = readFileSync(`${root}/apps/web/src/app/products/ProductsFilterSidebar.tsx`, 'utf8');
+  const css = readFileSync(`${root}/apps/web/src/styles/globals.css`, 'utf8');
+  it('the panel, sheet and trigger paint the page surface + hairline, never a primary slab', () => {
+    expect(src).not.toMatch(/bg-\[hsl\(var\(--primary\)\)\]/);
+    expect(src).not.toMatch(/--primary-foreground\)/);
+    expect(src).toMatch(/lg:border lg:border-border lg:bg-\[hsl\(var\(--filter-bg\)\)\]/);
+    expect(css).toMatch(
+      /\[data-zone='filters'\] \{\s*--filter-bg: var\(--bg-page\);\s*--filter-fg: var\(--foreground\);/
+    );
+  });
+  it('the accent (primary) marks only the active state', () => {
+    expect(src.match(/'bg-primary text-primary-foreground font-semibold'/g)).toHaveLength(3);
   });
 });

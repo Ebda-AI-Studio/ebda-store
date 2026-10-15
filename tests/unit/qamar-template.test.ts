@@ -72,13 +72,30 @@ describe('qamar skin id', () => {
   });
 });
 
-describe('qamar PDP title (STOP 1 critique)', () => {
-  const css = readFileSync(path.join(root, 'apps/web/src/styles/globals.css'), 'utf8');
-  it('sizes the PDP title only under the qamar pack, at >= 1.5rem', () => {
-    const m = css.match(/\[data-pack='qamar'\] h1\[data-zone='productName'\] \{([^}]*)\}/);
-    expect(m, 'qamar-scoped rule').not.toBeNull();
-    expect(m![1]).toMatch(/font-size: clamp\(1\.5rem,/);
-    // Every other skin keeps its PDP title untouched (byte-identical constraint).
-    expect(css).not.toMatch(/(^|\n)h1\[data-zone='productName'\]/);
+describe('PDP title CSS (B1-29, review I3/I4)', () => {
+  const css = readFileSync(path.join(root, 'apps/web/src/styles/globals.css'), 'utf8').replace(
+    /\/\*[\s\S]*?\*\//g,
+    ''
+  );
+  // Every rule whose selector names the PDP title, with its declarations.
+  const rules = [
+    ...css.matchAll(/([^{}]*h1(?::where\()?\[data-zone='productName'\][^{}]*)\{([^}]*)\}/g),
+  ].map(m => ({ sel: m[1].replace(/\/\*[\s\S]*?\*\//g, '').trim(), body: m[2] }));
+  it('a platform default size >= 1.5rem exists for every skin', () => {
+    const d = rules.find(r => r.sel === "h1:where([data-zone='productName'])");
+    expect(d, 'platform default').toBeDefined();
+    expect(d!.body).toMatch(/font-size: clamp\(1\.5rem,/);
+  });
+  it('every rule on the PDP title is at most (0,0,1), so the store-wide zone (0,1,0) wins', () => {
+    expect(rules.length).toBeGreaterThanOrEqual(2);
+    for (const r of rules) {
+      // outside :where(...) only a bare type selector may remain (h1 = 0,0,1)
+      const bare = r.sel.replace(/:where\((?:[^()]|\([^()]*\))*\)/g, '').replace(/\s+/g, '');
+      expect(bare === '' || bare === 'h1', r.sel).toBe(true);
+    }
+  });
+  it('the store-wide zone emitter rule (0,1,0) out-specifies the defaults', () => {
+    const emit = readFileSync(path.join(root, 'apps/web/src/lib/emit-zone-css.ts'), 'utf8');
+    expect(emit).toMatch(/\[data-zone="\$\{/);
   });
 });
