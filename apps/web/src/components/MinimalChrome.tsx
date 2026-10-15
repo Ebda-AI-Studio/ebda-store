@@ -5,6 +5,7 @@ import { ReactNode } from 'react';
 import { useStore, useStoreUrl } from '../contexts/StoreContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { StoreLogo } from '../templates/shared/StoreLogo';
+import { pickLocalizedName } from '../templates/shared/display-helpers';
 
 interface MinimalChromeProps {
   children: ReactNode;
@@ -34,6 +35,7 @@ export function MinimalChrome({
   const storeUrl = useStoreUrl();
   const { language } = useLanguage();
   const isRtl = language === 'ar';
+  const storeName = pickLocalizedName(store, isRtl) ?? '';
   const displayLabel = isRtl ? (labelAr ?? label) : (label ?? labelAr);
 
   return (
@@ -50,9 +52,9 @@ export function MinimalChrome({
                 // checkout / auth / share pages honor the store's `theme.logoSize`
                 // and aspect-fit exactly like the storefront header — not a
                 // separate hardcoded bounding box.
-                <StoreLogo src={store.logo} alt={store.name} priority />
+                <StoreLogo src={store.logo} alt={storeName} priority />
               ) : (
-                <span className="text-2xl font-bold text-primary sm:text-3xl">{store.name}</span>
+                <span className="text-2xl font-bold text-primary sm:text-3xl">{storeName}</span>
               )}
             </Link>
             {displayLabel && (
