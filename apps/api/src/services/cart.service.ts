@@ -19,6 +19,7 @@
 import { prisma, Prisma, hasTenantContext } from '@ebda/database';
 import { AppError } from '../middleware/error-handler';
 import logger from '../lib/logger';
+import { VARIANT_REQUIRED_MESSAGE } from '../lib/variant-required';
 import { featureService } from './feature.service';
 import { retryOnWriteConflict } from '../lib/db-retry';
 import { withSavepoint } from '../lib/savepoint';
@@ -27,15 +28,9 @@ import { STOREFRONT_PRODUCT_SELECT } from './product.service';
 import { resolveBundle, type ResolvedBundle } from './bundle.service';
 import { activePersonalisation, cleanNote, stripNote } from '@ebda/shared';
 
-/**
- * Bilingual copy for the VARIANT_REQUIRED refusal (a quick-add of a product
- * that has variants, with no variant chosen). Exported for the storefront
- * tests; the storefront itself sends the shopper to the PDP.
- */
-export const VARIANT_REQUIRED_MESSAGE = {
-  en: 'Choose the options for this product before adding it to the cart',
-  ar: 'اختر خيارات المنتج قبل إضافته إلى السلة',
-} as const;
+// Bilingual VARIANT_REQUIRED copy lives with the other line writers' guard;
+// re-exported for the cart's tests.
+export { VARIANT_REQUIRED_MESSAGE };
 
 /**
  * Resolve a customer's personalisation note against the product's config.

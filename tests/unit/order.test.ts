@@ -1162,6 +1162,22 @@ describe('OrderService', () => {
       });
     });
 
+    it('C-01: a product with variants and no variantId is refused (400 VARIANT_REQUIRED, ar + en), nothing written', async () => {
+      vi.mocked(prisma.product.findMany).mockResolvedValue([
+        { ...mockProductForAdmin, variants: [{ id: 'var-m', price: 5200, title: 'M' }] },
+      ] as any);
+      const err = await OrderService.createAdminOrder(
+        mockStoreId,
+        mockAdminUserId,
+        baseAdminOrderData
+      ).catch(e => e);
+      expect(err).toMatchObject({ statusCode: 400, code: 'VARIANT_REQUIRED' });
+      expect(err.details).toMatchObject({ productId: 'prod-123' });
+      expect(err.details.messageEn).toContain('Test Product');
+      expect(err.details.messageAr).toMatch(/[\u0600-\u06FF]/);
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+    });
+
     it('creates an admin order with no coupon (per-user check never runs)', async () => {
       const result = await OrderService.createAdminOrder(
         mockStoreId,

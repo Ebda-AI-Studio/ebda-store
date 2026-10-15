@@ -1282,7 +1282,9 @@
         "missingRequired": "الاسم الأول والهاتف مطلوبان",
         "createFailed": "تعذّر إنشاء الطلب",
         "unknownError": "خطأ غير معروف",
-        "overrideReasonRequired": "أدخل سببًا (3 أحرف على الأقل) لتجاوز شروط الكوبون"
+        "overrideReasonRequired": "أدخل سببًا (3 أحرف على الأقل) لتجاوز شروط الكوبون",
+        "variantsLoadFailed": "تعذّر تحميل مقاسات وخيارات المنتج. حاول مرة أخرى.",
+        "variantRequired": "اختر المقاس أو الخيار لكل منتج له خيارات."
       },
       "toast": {
         "created": "تم إنشاء الطلب {orderNumber}"
@@ -7965,7 +7967,10 @@
       "errOutOfStock": "المخزون غير كافٍ لـ {name}.",
       "errPaymentNotConfigured": "أعِد مزود دفع من إعدادات المتجر ← المدفوعات قبل إرسال روابط الدفع.",
       "errWbsKeyInvalid": "تعذرت قراءة مفتاح واتساب (WBS) المحفوظ. أعد ربط WBS.",
-      "errWbsSendFailed": "تعذر على واتساب إرسال رابط الدفع. حاول مرة أخرى بعد قليل."
+      "errWbsSendFailed": "تعذر على واتساب إرسال رابط الدفع. حاول مرة أخرى بعد قليل.",
+      "errVariantRequired": "اختر المقاس أو الخيار لـ {name}.",
+      "errVariantNotFound": "هذا المقاس أو الخيار من {name} لم يعد متاحًا.",
+      "variantLabel": "المقاس / الخيار"
     },
     "botAnalytics": {
       "notConnected": "WBS غير متصل بهذا المتجر. يرجى إعداد الربط في تبويب الاتصال أولاً.",

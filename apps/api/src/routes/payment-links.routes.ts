@@ -44,6 +44,7 @@ import { EFFECTIVE_STOCK_SELECT, isOrderable } from '../lib/effective-inventory'
 import { featureService } from '../services/feature.service';
 import { assertOrderAllowed } from '../services/plan-limit.service';
 import logger from '../lib/logger';
+import { variantRequiredError } from '../lib/variant-required';
 import type { Currency } from '../services/payment-providers/types';
 
 import { minorToDecimalString, REGION } from '@ebda/shared';
@@ -64,6 +65,9 @@ const bodySchema = z
       .array(
         z.object({
           productId: z.string().min(1),
+          // Required for a product with variants (C-01: sold as one of its
+          // variants, never the bare parent); validated below.
+          variantId: z.string().uuid().optional(),
           quantity: z.number().int().min(1).max(99),
         })
       )
@@ -201,6 +205,20 @@ router.post(
               // EFFECTIVE_STOCK_SELECT supplies inventory/trackInventory/
               // allowBackorder plus the variants the stock check needs.
               ...EFFECTIVE_STOCK_SELECT,
+              // Widened: the chosen variant's id, price and names are the line's.
+              variants: {
+                select: {
+                  id: true,
+                  price: true,
+                  sku: true,
+                  title: true,
+                  titleAr: true,
+                  costPrice: true,
+                  inventory: true,
+                  allowBackorder: true,
+                  isActive: true,
+                },
+              },
             },
           })
         : [];
@@ -226,11 +244,46 @@ router.post(
           });
           return;
         }
-        // Variant-aware: a payment-link line names a product, so its available
-        // stock is the variant sum when it has variants. Reading
-        // `p.inventory` rejected every variant product whose parent column had
-        // drifted negative (see lib/effective-inventory.ts).
-        if (!isOrderable(p, it.quantity, backorderFeatureEnabled)) {
+        // C-01 on the merchant path: a product with variants is sold as ONE of
+        // them. A bare parent here wrote a SIZELESS order line (W1a review).
+        if (!it.variantId && p.variants.length > 0) {
+          const err = variantRequiredError(p.id, p.name);
+          res.status(400).json({
+            success: false,
+            error: { code: err.code, message: err.message, details: err.details },
+          });
+          return;
+        }
+        const variant = it.variantId
+          ? p.variants.find(v => v.id === it.variantId && v.isActive)
+          : undefined;
+        if (it.variantId && !variant) {
+          res.status(400).json({
+            success: false,
+            error: {
+              code: 'VARIANT_NOT_FOUND',
+              message: `Variant ${it.variantId} is not an active option of ${p.name}.`,
+              details: { productId: it.productId, variantId: it.variantId },
+            },
+          });
+          return;
+        }
+        // Variant-aware: with a variant chosen the line's stock is THAT
+        // variant's; otherwise (a plain product) the product's own column.
+        // Reading `p.inventory` for a variant product rejected every one whose
+        // parent column had drifted negative (see lib/effective-inventory.ts).
+        const orderable = variant
+          ? isOrderable(
+              {
+                inventory: variant.inventory,
+                trackInventory: p.trackInventory,
+                allowBackorder: variant.allowBackorder || p.allowBackorder,
+              },
+              it.quantity,
+              backorderFeatureEnabled
+            )
+          : isOrderable(p, it.quantity, backorderFeatureEnabled);
+        if (!orderable) {
           res.status(400).json({
             success: false,
             error: {
@@ -242,10 +295,17 @@ router.post(
           return;
         }
       }
-      const itemsSubtotal = items.reduce((sum, it) => {
+      // A chosen variant's own price wins over the parent's (same rule as the cart).
+      const lineVariant = (it: (typeof items)[number]) =>
+        it.variantId
+          ? byId.get(it.productId)?.variants.find(v => v.id === it.variantId)
+          : undefined;
+      const unitPrice = (it: (typeof items)[number]) => {
         const p = byId.get(it.productId);
-        return sum + (p ? p.price * it.quantity : 0);
-      }, 0);
+        const v = lineVariant(it);
+        return typeof v?.price === 'number' ? v.price : (p?.price ?? 0);
+      };
+      const itemsSubtotal = items.reduce((sum, it) => sum + unitPrice(it) * it.quantity, 0);
       // VAT (rulings TAX-2, MONEYB-2): a payment-link order is a sale like any
       // other — a VAT-verified store charges VAT on the items AND on the extra
       // amount (a service fee / deposit is part of the supply). It used to be
@@ -333,15 +393,20 @@ router.post(
           items: {
             create: items.map(it => {
               const p = byId.get(it.productId)!;
+              const v = lineVariant(it);
+              const price = unitPrice(it);
               return {
                 productId: it.productId,
                 productName: p.name,
+                variantId: v?.id ?? null,
+                variantName: v?.title ?? null,
+                variantNameAr: v?.titleAr || null,
                 quantity: it.quantity,
-                price: p.price,
-                total: p.price * it.quantity,
-                sku: p.sku || null,
+                price,
+                total: price * it.quantity,
+                sku: v?.sku || p.sku || null,
                 // `??`, not `||`: a genuine 0 cost is a known cost.
-                costPrice: p.costPrice ?? null,
+                costPrice: v?.costPrice ?? p.costPrice ?? null,
               };
             }),
           },

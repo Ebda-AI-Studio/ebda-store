@@ -33,6 +33,7 @@ import { cartLineUnitPrice } from '../lib/cart-pricing';
 import { pairBackorderedLines } from '../lib/backorder-pairing';
 import { restoreCartShape } from '../lib/order-cart-restore';
 import { AppError } from '../middleware/error-handler';
+import { variantRequiredError } from '../lib/variant-required';
 import { CartService } from './cart.service';
 import { resolveBundle } from './bundle.service';
 import { STOREFRONT_PRODUCT_SELECT } from './product.service';
@@ -2760,6 +2761,12 @@ export class OrderService {
       let variantSku: string | undefined;
       let variantTitle: string | undefined;
       let variantTitleAr: string | null = null;
+      // C-01 on the merchant path: a product with variants is ordered as one
+      // of them. Without this a phone order wrote a SIZELESS line the
+      // warehouse cannot pick (W1a review, fix the class).
+      if (!it.variantId && product.variants.length > 0) {
+        throw variantRequiredError(product.id, product.name);
+      }
       if (it.variantId) {
         const variant = product.variants.find(v => v.id === it.variantId);
         if (!variant) {

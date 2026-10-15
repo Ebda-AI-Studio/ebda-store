@@ -229,20 +229,9 @@ export default function NewOrderPage() {
           const variants = data?.variants ?? [];
           setPendingVariantProduct({ ...p, variants });
         } catch {
-          // Fallback: add as parent product without variant if fetch fails.
-          const locName = displayName(p.name, p.nameAr);
-          setItems(prev => {
-            const existing = prev.find(it => it.productId === p.id && !it.variantId);
-            if (existing) {
-              return prev.map(it =>
-                it.productId === p.id && !it.variantId ? { ...it, quantity: it.quantity + 1 } : it
-              );
-            }
-            return [
-              ...prev,
-              { productId: p.id, productName: locName, unitPrice: p.price, quantity: 1 },
-            ];
-          });
+          // No bare-parent fallback: a product with variants is ordered as one
+          // of them (C-01) and the API refuses it without one (VARIANT_REQUIRED).
+          toastError(t('errors.variantsLoadFailed'));
         } finally {
           setLoadingVariants(false);
         }
@@ -390,7 +379,12 @@ export default function NewOrderPage() {
         order: { id: string; orderNumber: string };
       }>(`/api/v1/stores/${storeId}/orders/admin`, payload);
       if (apiError || !data) {
-        toastError(t('errors.createFailed'), apiError?.message ?? '');
+        toastError(
+          t('errors.createFailed'),
+          apiError?.code === 'VARIANT_REQUIRED'
+            ? t('errors.variantRequired')
+            : (apiError?.message ?? '')
+        );
         return;
       }
       toastSuccess(t('toast.created', { orderNumber: data.order.orderNumber }));

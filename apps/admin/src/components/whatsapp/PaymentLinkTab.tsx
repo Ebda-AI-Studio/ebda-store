@@ -11,6 +11,8 @@ import { apiGet, apiPost } from '../../lib/api';
 import { formatPrice } from '../../lib/format';
 import { useT } from '../../i18n/useT';
 import { paymentLinkErrorMessage } from './payment-link-errors';
+import { effectiveVariantPrice } from '../../lib/variant-price';
+import { useLocale } from 'next-intl';
 
 import { minorToDecimalString, roundToMinor, REGION } from '@ebda/shared';
 interface PaymentLinkResponse {
@@ -27,8 +29,20 @@ interface PaymentLinkResponse {
 interface ProductOption {
   id: string;
   name: string;
+  nameAr?: string | null;
   price: number;
   sku: string | null;
+  /** Server column: the product is sold as one of its variants (C-01). */
+  hasVariants?: boolean;
+}
+
+interface VariantOption {
+  id: string;
+  title: string;
+  titleAr?: string | null;
+  /** Override price; null = inherits the product price. */
+  price: number | null;
+  isActive: boolean;
 }
 
 const SendIcon = ({ className }: { className?: string }) => (
@@ -109,12 +123,17 @@ const TrashIcon = ({ className }: { className?: string }) => (
 
 interface CartLine {
   productId: string;
+  /** Required for a product with variants (the API answers VARIANT_REQUIRED). */
+  variantId?: string;
   quantity: number;
 }
 
 export function PaymentLinkTab({ storeId }: { storeId: string }) {
   const { success: toastSuccess, error: toastError } = useToast();
   const t = useT('whatsappIntegration.paymentLink');
+  const isRtl = useLocale() === 'ar';
+  // Variants per product, fetched when a sized product is picked (C-01).
+  const [variantsByProduct, setVariantsByProduct] = useState<Record<string, VariantOption[]>>({});
 
   const [customerPhone, setCustomerPhone] = useState(REGION.phone.callingCode);
   const [customerName, setCustomerName] = useState('');
@@ -157,7 +176,36 @@ export function PaymentLinkTab({ storeId }: { storeId: string }) {
   }, [loadProducts]);
 
   const phoneValid = /^\+[1-9]\d{6,14}$/.test(customerPhone.trim());
-  const validLines = cartLines.filter(l => l.productId && l.quantity > 0);
+  const productOf = (id: string) => products.find(p => p.id === id);
+  // A sized product's line is complete only once its size is picked.
+  const lineComplete = (l: CartLine) =>
+    !!l.productId && l.quantity > 0 && (!productOf(l.productId)?.hasVariants || !!l.variantId);
+  const validLines = cartLines.filter(lineComplete);
+  const missingVariant = cartLines.some(
+    l => l.productId && productOf(l.productId)?.hasVariants && !l.variantId
+  );
+  const linePrice = (l: CartLine) => {
+    const product = productOf(l.productId);
+    if (!product) return 0;
+    const v = l.variantId
+      ? variantsByProduct[l.productId]?.find(x => x.id === l.variantId)
+      : undefined;
+    return v ? effectiveVariantPrice(v.price, product.price) : product.price;
+  };
+  const loadVariants = async (productId: string) => {
+    if (variantsByProduct[productId]) return;
+    try {
+      const { data } = await apiGet<{ variants: VariantOption[] }>(
+        `/api/v1/stores/${storeId}/products/${productId}/variants`
+      );
+      setVariantsByProduct(prev => ({
+        ...prev,
+        [productId]: (data?.variants ?? []).filter(v => v.isActive !== false),
+      }));
+    } catch {
+      toastError(t('toastCouldNotSendTitle'), t('errVariantRequired', { name: '' }));
+    }
+  };
 
   // Parse extra amount (EGP with up to 2 decimals → piastres).
   const extraFils = (() => {
@@ -168,12 +216,13 @@ export function PaymentLinkTab({ storeId }: { storeId: string }) {
     return roundToMinor(n);
   })();
 
-  const canSend = phoneValid && (validLines.length > 0 || extraFils > 0) && !sending;
+  const canSend =
+    phoneValid && !missingVariant && (validLines.length > 0 || extraFils > 0) && !sending;
 
-  const itemsSubtotalFils = validLines.reduce((sum, line) => {
-    const product = products.find(p => p.id === line.productId);
-    return sum + (product ? product.price * line.quantity : 0);
-  }, 0);
+  const itemsSubtotalFils = validLines.reduce(
+    (sum, line) => sum + linePrice(line) * line.quantity,
+    0
+  );
   const totalFils = itemsSubtotalFils + extraFils;
 
   const addLine = () => setCartLines(prev => [...prev, { productId: '', quantity: 1 }]);
@@ -209,7 +258,11 @@ export function PaymentLinkTab({ storeId }: { storeId: string }) {
           customerPhone: customerPhone.trim(),
           customerName: customerName.trim() || undefined,
           items: validLines.length
-            ? validLines.map(l => ({ productId: l.productId, quantity: l.quantity }))
+            ? validLines.map(l => ({
+                productId: l.productId,
+                ...(l.variantId ? { variantId: l.variantId } : {}),
+                quantity: l.quantity,
+              }))
             : undefined,
           extraAmountFils: extraFils > 0 ? extraFils : undefined,
           extraAmountNote: extraFils > 0 ? extraAmountNote.trim() || undefined : undefined,
@@ -315,7 +368,7 @@ export function PaymentLinkTab({ storeId }: { storeId: string }) {
                         <button
                           type="button"
                           onClick={() => {
-                            updateLine(idx, { productId: '' });
+                            updateLine(idx, { productId: '', variantId: undefined });
                             setLineQueries(prev => ({ ...prev, [idx]: '' }));
                           }}
                           className="ms-2 text-xs text-orange-600 hover:text-orange-700 font-medium"
@@ -323,7 +376,34 @@ export function PaymentLinkTab({ storeId }: { storeId: string }) {
                           {t('change')}
                         </button>
                       </div>
-                    ) : (
+                    ) : null}
+                    {selected?.hasVariants && (
+                      <label className="mt-1 block text-xs text-muted-foreground">
+                        {t('variantLabel')}
+                        <select
+                          value={line.variantId ?? ''}
+                          onChange={e =>
+                            updateLine(idx, { variantId: e.target.value || undefined })
+                          }
+                          aria-invalid={!line.variantId}
+                          className={`mt-1 block w-full rounded-md border bg-background px-3 py-2 text-sm text-foreground ${
+                            line.variantId ? '' : 'border-destructive'
+                          }`}
+                        >
+                          <option value="">
+                            {t('errVariantRequired', { name: selected.name })}
+                          </option>
+                          {(variantsByProduct[selected.id] ?? []).map(v => (
+                            <option key={v.id} value={v.id}>
+                              {(isRtl ? v.titleAr || v.title : v.title) +
+                                ' — ' +
+                                formatPrice(effectiveVariantPrice(v.price, selected.price))}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                    )}
+                    {selected ? null : (
                       <input
                         type="text"
                         value={query}
@@ -346,8 +426,9 @@ export function PaymentLinkTab({ storeId }: { storeId: string }) {
                               key={p.id}
                               type="button"
                               onClick={() => {
-                                updateLine(idx, { productId: p.id });
+                                updateLine(idx, { productId: p.id, variantId: undefined });
                                 setLineQueries(prev => ({ ...prev, [idx]: '' }));
+                                if (p.hasVariants) void loadVariants(p.id);
                               }}
                               className="block w-full px-3 py-2 text-start text-sm hover:bg-orange-50 dark:hover:bg-orange-950/30"
                             >

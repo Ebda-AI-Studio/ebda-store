@@ -13,6 +13,8 @@ export const PAYMENT_LINK_ERROR_KEYS: Record<string, string> = {
   TEMPLATE_NOT_APPROVED: 'errTemplateNotApproved',
   PRODUCT_NOT_FOUND: 'errProductNotFound',
   OUT_OF_STOCK: 'errOutOfStock',
+  VARIANT_REQUIRED: 'errVariantRequired',
+  VARIANT_NOT_FOUND: 'errVariantNotFound',
   PAYMENT_NOT_CONFIGURED: 'errPaymentNotConfigured',
   WBS_KEY_INVALID: 'errWbsKeyInvalid',
   WBS_SEND_FAILED: 'errWbsSendFailed',
