@@ -1,0 +1,43 @@
+/**
+ * THE contract for Arabic search folding. `normalizeArabicSearch` (TS) and
+ * `public.ebda_ar_norm` (SQL, migration 20261018000100) are BOTH tested against
+ * every row (packages/shared/src/search/__tests__ + tests/integration/search-normalize-parity.test.ts).
+ * Change a rule => change it in both and add a row here.
+ * Rows are real Egyptian shopper spellings (hamza dropped, ta-marbuta as ha, ya without dots).
+ */
+export const NORMALIZE_VECTORS: ReadonlyArray<readonly [string, string]> = [
+  ['أحذية', 'احذيه'],
+  ['احذيه', 'احذيه'],
+  ['مكرونة', 'مكرونه'],
+  ['إسدال', 'اسدال'],
+  ['آيس كريم', 'ايس كريم'],
+  ['ٱلقاهرة', 'القاهره'],
+  ['مستشفى', 'مستشفي'],
+  ['شنطة جلد', 'شنطه جلد'],
+  ['جَزْمَة', 'جزمه'],
+  ['عبـــاية', 'عبايه'],
+  ['مقاس ٤٢', 'مقاس 42'],
+  ['مقاس ۴۲', 'مقاس 42'],
+  ['مسئول', 'مسيول'],
+  ['مسؤول', 'مسوول'],
+  ['کوتشی', 'كوتشي'],
+  ['أحمر', 'احمر'], // alef + combining hamza above
+  ['قُطْنٌ ١٠٠٪', 'قطن 100٪'],
+  ['3abaya', '3abaya'],
+  ['SHOES', 'shoes'],
+  ['Abaya   Black', 'abaya black'],
+  ['فستان سواريه', 'فستان سواريه'],
+  ['  طقم  حريمي  ', 'طقم حريمي'],
+  ['iPhone ١٥ Pro', 'iphone 15 pro'],
+  ['ى', 'ي'],
+  ['ة', 'ه'],
+  ['ـ', ''],
+  ['', ''],
+  ['ا\u0654حمر', 'احمر'], // decomposed alef + U+0654 combining hamza above is stripped
+  // Whitespace pin (A1): only [ \t\n\r ] collapse and only U+0020 is trimmed at the edges.
+  // Other Unicode spaces are NOT touched, so SQL btrim(x, ' ') matches byte for byte.
+  [' x ', ' x '], // thin space survives (String#trim would strip it)
+  ['　x　', '　x　'], // ideographic space survives
+  ['  x\t\ny\r', 'x y'], // NBSP/tab/LF/CR collapse; trailing collapsed space trimmed
+  ['﻿x', '﻿x'], // BOM is not whitespace here
+];
