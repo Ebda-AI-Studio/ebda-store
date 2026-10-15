@@ -326,6 +326,11 @@ async function getPlatformResend(): Promise<import('resend').Resend> {
   return _platformResend;
 }
 
+/** A header value on one line: a shopper-typed subject must not carry CR/LF into the email. */
+function oneLine(value: string): string {
+  return value.replace(/[\r\n]+/g, ' ').trim();
+}
+
 export class EmailService {
   // ---------------------------------------------------------------------------
   // Internal routing helpers
@@ -343,6 +348,7 @@ export class EmailService {
       content: string;
       text?: string;
       language?: 'en' | 'ar';
+      replyTo?: string;
     },
     // `queue: true` routes the rendered email through the durable Redis retry
     // queue (email-queue.service) instead of calling Resend inline — used by the
@@ -403,6 +409,7 @@ export class EmailService {
       subject: args.subject,
       html,
       text: args.text,
+      replyTo: args.replyTo,
     });
   }
 
@@ -1079,18 +1086,18 @@ export class EmailService {
   }
 
   /**
-   * Send Contact Form Email to Admin
+   * A storefront contact message with no store address to go to (Ruling FU46-1's last
+   * fallback), or one enqueued before FU46-1 shipped. Platform inbox, labelled with the store.
    */
-  static async sendContactForm(data: {
-    name: string;
-    email: string;
-    subject: string;
-    message: string;
-  }): Promise<void> {
+  static async sendContactForm(
+    data: { name: string; email: string; subject: string; message: string },
+    opts: { storeLabel?: string } = {}
+  ): Promise<void> {
     const content = this.contactFormTemplate(data);
+    const label = opts.storeLabel ? ` [${opts.storeLabel}]` : '';
     await this.sendPlatform({
       to: config.smtpFromEmail,
-      subject: `Contact Form: ${data.subject}`,
+      subject: `Contact Form${label}: ${oneLine(data.subject)}`,
       content,
       text: this.htmlToText(
         renderBrandedShell(content, {
@@ -1104,6 +1111,23 @@ export class EmailService {
           defaultLanguage: 'en',
         })
       ),
+      replyTo: data.email,
+    });
+  }
+
+  /**
+   * A shopper's storefront contact message, to the STORE (Ruling FU46-1): from the store's own
+   * sender, reply-to the shopper, in the store's branded shell.
+   */
+  static async sendStoreContactMessage(
+    storeId: string,
+    to: string,
+    data: { name: string; email: string; subject: string; message: string }
+  ): Promise<void> {
+    await this.sendForStore(storeId, {
+      to,
+      subject: `Contact Form: ${oneLine(data.subject)}`,
+      content: this.contactFormTemplate(data),
       replyTo: data.email,
     });
   }

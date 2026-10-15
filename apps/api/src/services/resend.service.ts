@@ -318,7 +318,7 @@ export class ResendService {
    */
   static async sendBrandedEmail(
     storeId: string,
-    opts: { to: string | string[]; subject: string; html: string; text?: string }
+    opts: { to: string | string[]; subject: string; html: string; text?: string; replyTo?: string }
   ): Promise<{ id: string }> {
     const store = await withStore(storeId, tx =>
       tx.store.findUnique({
@@ -345,7 +345,9 @@ export class ResendService {
       subject: opts.subject,
       html: opts.html,
     };
-    if (sender.replyTo) sdkPayload.replyTo = sender.replyTo;
+    // A per-message reply-to (a shopper's contact message, FU46-1) outranks the store's default.
+    const replyTo = opts.replyTo ?? sender.replyTo;
+    if (replyTo) sdkPayload.replyTo = replyTo;
     if (opts.text) sdkPayload.text = opts.text;
 
     const { data, error } = await client.emails.send(sdkPayload);

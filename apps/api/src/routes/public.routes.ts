@@ -32,7 +32,7 @@ import { storeLookupForHost } from '../lib/store-host';
 import { lookupStore, publicStorePage, type StoreStatusName } from '../lib/definer';
 import { redis } from '../services/redis.service';
 import { previewTokenKey } from '../lib/builder-preview-token';
-import { isReservedSlug, storefrontOrigin } from '@ebda/shared';
+import { isReservedSlug, storefrontOrigin, CONTACT_HONEYPOT_FIELD } from '@ebda/shared';
 import { parseOptionalBooleanQuery } from '../lib/query-params';
 import { setEdgeCache } from '../lib/edge-cache';
 import { buildProductFeed } from '../lib/product-feed';
@@ -2161,7 +2161,13 @@ router.post(
   }
 );
 
-// POST /contact - Submit contact form
+// POST /contact - a shopper's storefront contact-page message, for THIS store (Ruling FU46-1).
+//
+// Resolved from X-Store-ID / x-store-domain like every /public write; a request that names no
+// store is refused (400 STORE_NOT_RESOLVED) instead of landing in a platform inbox. A demo store
+// (the looks showroom) refuses like its checkout does. A filled honeypot is answered as success
+// and dropped. #645: the send is queued on Inngest and the ENQUEUE is awaited, so a visitor is
+// never told "sent" for a message nothing will act on.
 router.post('/contact', writeLimiter, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const contactSchema = z.object({
@@ -2169,22 +2175,34 @@ router.post('/contact', writeLimiter, async (req: Request, res: Response, next: 
       email: z.string().email('Invalid email address'),
       subject: z.string().min(1, 'Subject is required').max(200),
       message: z.string().min(1, 'Message is required').max(5000),
+      [CONTACT_HONEYPOT_FIELD]: z.string().max(500).optional(),
     });
 
     const data = contactSchema.parse(req.body);
+    const storeId = await getStoreIdFromRequest(req);
 
-    // #645: queued on Inngest instead of a fire-and-forget
-    // `EmailService.sendContactForm(...).catch(...)` — that pattern had ZERO
-    // durable record of the submission, so an SMTP failure lost it
-    // permanently and silently while the visitor still saw "sent". Inngest
-    // retries the send 3x and dead-letter-alerts (alerts-failure-watch) past
-    // the final retry. The enqueue itself IS awaited — an enqueue failure
-    // must fail this request, not report success for a message nothing will
-    // ever act on (matches the "mark failed on enqueue error" rule for every
-    // other >300ms/3rd-party path in this codebase).
+    if ((data[CONTACT_HONEYPOT_FIELD] ?? '').trim() !== '') {
+      logger.info({ storeId }, '[CONTACT] honeypot tripped; dropped');
+      res.json({ success: true, data: { message: 'Message sent successfully' } });
+      return;
+    }
+
+    const store = await prisma.store.findUnique({
+      where: { id: storeId },
+      select: { isDemo: true },
+    });
+    if (!store) throw new AppError(404, 'STORE_NOT_FOUND', 'Store not found');
+    if (store.isDemo) {
+      throw new AppError(403, 'DEMO_STORE', 'This is a demo store; messages are disabled', {
+        messageEn: 'This is a demo store: messages are disabled',
+        messageAr: 'ده متجر تجريبي — الرسائل مقفولة',
+      });
+    }
+
     await inngest.send({
       name: 'contact/form.submitted',
       data: {
+        storeId,
         name: data.name,
         email: data.email,
         subject: data.subject,
