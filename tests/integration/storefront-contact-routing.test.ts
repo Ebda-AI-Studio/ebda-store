@@ -173,8 +173,6 @@ describe.skipIf(!hasDb)('storefront contact routing (FU46-1)', () => {
   });
 
   it('per-store cap: the 21st message in the window is dropped silently; another store is unaffected', async () => {
-    await redis.delete(`ratelimit:contact:${capped.storeId}`);
-    await redis.delete(`ratelimit:contact:${other.storeId}`);
     for (let i = 0; i < 20; i++) expect((await post(capped.storeId, MESSAGE)).status).toBe(200);
     expect(send).toHaveBeenCalledTimes(20);
     const over = await post(capped.storeId, MESSAGE);
@@ -192,5 +190,30 @@ describe.skipIf(!hasDb)('storefront contact routing (FU46-1)', () => {
   it('recipient: a suspended owner is not mailed, and the platform sender address is never a target', async () => {
     expect((await asApp(() => storeContactTarget(suspended.storeId)))?.to).toBeNull();
     expect((await asApp(() => storeContactTarget(platformAddr.storeId)))?.to).toBeNull();
+  });
+
+  it('the cap window is FIXED: over-cap hits never extend the TTL, and the count resets after it', async () => {
+    const raw = (
+      redis as unknown as {
+        getConnectedClient(): {
+          ttl(k: string): Promise<number>;
+          expire(k: string, s: number): Promise<number>;
+          del(k: string): Promise<number>;
+        };
+      }
+    ).getConnectedClient();
+    const key = `ratelimit:contact:${capped.storeId}`;
+    await raw.del(key);
+    for (let i = 0; i < 20; i++) await post(capped.storeId, MESSAGE);
+    await raw.expire(key, 100); // simulate time passing: 100s left of the window
+    for (let i = 0; i < 3; i++) await post(capped.storeId, MESSAGE); // dropped hits
+    const ttl = await raw.ttl(key);
+    expect(ttl).toBeGreaterThan(0);
+    expect(ttl).toBeLessThanOrEqual(100); // not re-armed to 3600
+    expect(send).toHaveBeenCalledTimes(20);
+    await raw.del(key); // the window elapsed
+    await post(capped.storeId, MESSAGE);
+    expect(send).toHaveBeenCalledTimes(21);
+    expect(await raw.ttl(key)).toBeGreaterThan(3000); // a fresh window
   });
 });

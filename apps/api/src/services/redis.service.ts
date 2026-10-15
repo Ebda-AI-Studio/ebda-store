@@ -262,6 +262,23 @@ class RedisService {
     return (results?.[0]?.[1] as number) || 0;
   }
 
+  /**
+   * FIXED-window counter: the TTL is armed only when the key is created (count === 1) and is
+   * never extended by later hits, dropped or not. (`incrementRateLimit` re-arms it on every call,
+   * which lets a steady trickle hold a counter over its cap forever.) A key found without a TTL
+   * (crash between INCR and EXPIRE) is repaired. Returns 0 when Redis is unavailable (fail-open).
+   */
+  async incrementFixedWindow(key: string, windowSeconds: number): Promise<number> {
+    if (!this.isAvailable()) return 0;
+    const client = this.getConnectedClient();
+    const redisKey = `ratelimit:${key}`;
+    const count = await client.incr(redisKey);
+    if (count === 1 || (await client.ttl(redisKey)) === -1) {
+      await client.expire(redisKey, windowSeconds);
+    }
+    return count;
+  }
+
   async getRateLimitCount(key: string): Promise<number> {
     if (!this.isAvailable()) return 0;
     const count = await this.getConnectedClient().get(`ratelimit:${key}`);

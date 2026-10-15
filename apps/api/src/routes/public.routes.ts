@@ -2207,10 +2207,21 @@ router.post('/contact', writeLimiter, async (req: Request, res: Response, next: 
     // Per-STORE cap on top of the per-IP writeLimiter (FU46-1 review I1): a store UUID is public,
     // so distributed callers could otherwise flood one merchant from its own verified sender.
     // Over the cap: identical success to the shopper (no oracle), message dropped, store id logged.
-    // incrementRateLimit returns 0 when Redis is down (fail-open, like writeLimiter).
-    const sent = await redis.incrementRateLimit(`contact:${storeId}`, CONTACT_STORE_WINDOW_SECONDS);
+    // FIXED window: the TTL is set when the key is created and dropped hits never extend it (a
+    // sliding window would let a trickle lock the form forever). Returns 0 when Redis is down:
+    // fail-open like writeLimiter (Ruling FU46-1b).
+    const sent = await redis.incrementFixedWindow(
+      `contact:${storeId}`,
+      CONTACT_STORE_WINDOW_SECONDS
+    );
     if (sent > CONTACT_STORE_MAX_PER_WINDOW) {
-      logger.warn({ storeId }, '[CONTACT] per-store cap reached; message dropped');
+      // First over-cap hit of the window = the one merchant-visible signal: logged at error
+      // level (Sentry/pino alerting) once; the rest stay warn.
+      if (sent === CONTACT_STORE_MAX_PER_WINDOW + 1) {
+        logger.error({ storeId }, '[CONTACT] per-store cap hit; contact form is dropping messages');
+      } else {
+        logger.warn({ storeId }, '[CONTACT] per-store cap reached; message dropped');
+      }
       res.json({ success: true, data: { message: 'Message sent successfully' } });
       return;
     }
