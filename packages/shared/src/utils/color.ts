@@ -366,6 +366,45 @@ export function readableTextVars(
   };
 }
 
+/** The lightest foreground tone a skin footer paints for TEXT (`text-foreground/60`; the /55 tone
+ *  is on icons, non-text 3:1). A footer passes when the foreground (also at that alpha) and the
+ *  muted tone are >= 4.5:1 on the surface. */
+const FOOTER_FG_MIN_ALPHA = 0.6;
+
+/**
+ * Ruling B1-27 (fix round 2): the readable text pair for a merchant-coloured footer, ONLY when the
+ * skin's own pair fails on that surface. A footer whose theme foreground (at its lightest alpha)
+ * and muted tone already reach 4.5:1 returns undefined and keeps its exact shades and hover
+ * colours. `theme` carries the HSL triplets the storefront paints (`foregroundColor`,
+ * `mutedForeground`); missing ones fall back to the platform defaults the CSS uses.
+ */
+export function footerTextOverride(
+  bg: string | undefined,
+  theme: { foregroundColor?: string; mutedForeground?: string } | null | undefined
+): ReturnType<typeof readableTextVars> {
+  const surface = parseColorToRgb(bg);
+  if (!surface) return undefined;
+  const toRgb = (triplet: string | undefined, fallback: string) =>
+    parseColorToRgb(`hsl(${(triplet || fallback).replace(/^hsl\(|\)$/g, '')})`);
+  const fg = toRgb(theme?.foregroundColor, '224 71% 4%');
+  const muted = toRgb(theme?.mutedForeground, '220 9% 46%');
+  if (!fg || !muted) return readableTextVars(bg);
+  const hex = (c: Rgb) =>
+    '#' + [c.r, c.g, c.b].map(v => Math.round(v).toString(16).padStart(2, '0')).join('');
+  const over = (c: Rgb, a: number): Rgb => ({
+    r: c.r * a + surface.r * (1 - a),
+    g: c.g * a + surface.g * (1 - a),
+    b: c.b * a + surface.b * (1 - a),
+  });
+  const s = hex(surface);
+  const worst = Math.min(
+    contrastRatio(s, hex(fg)),
+    contrastRatio(s, hex(over(fg, FOOTER_FG_MIN_ALPHA))),
+    contrastRatio(s, hex(muted))
+  );
+  return worst >= 4.5 ? undefined : readableTextVars(bg);
+}
+
 // Footer logo auto-contrast helper
 
 /**

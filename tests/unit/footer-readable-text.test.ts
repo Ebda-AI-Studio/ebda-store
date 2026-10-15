@@ -11,6 +11,7 @@ import path from 'node:path';
 import {
   contrastRatio,
   readableTextVars,
+  footerTextOverride,
   resolveColor,
   getTemplateTheme,
   TEMPLATE_LAYOUT_BASELINES,
@@ -55,20 +56,53 @@ describe('a NON-Qamar skin with a dark brand colour on its default footer', () =
   });
 });
 
+describe('the override acts ONLY when the skin footer fails (review N1)', () => {
+  const theme = getTemplateTheme('modern');
+  it('a readable footer (white surface, theme ink) gets no override: byte-identical to main', () => {
+    expect(footerTextOverride('#FFFFFF', theme)).toBeUndefined();
+    expect(footerTextOverride('hsl(0 0% 100%)', theme)).toBeUndefined();
+  });
+  it('a light brand footer the theme ink already passes on keeps its shades', () => {
+    // pale sand footer: dark ink 4.5+ even at 55% alpha and the muted tone at 70%
+    expect(
+      footerTextOverride('#FFFFFF', { foregroundColor: '0 0% 0%', mutedForeground: '0 0% 30%' })
+    ).toBeUndefined();
+  });
+  it('a dark-brand footer on a legacy skin gets the readable pair', () => {
+    for (const t of ['minimal', 'elegant', 'modern', 'classic', 'bold'] as const) {
+      const th = { ...getTemplateTheme(t), primaryColor: hexToHsl('#141414') };
+      const bg = resolveColor('token:primary', th)!;
+      const v = footerTextOverride(bg, th);
+      expect(v, t).toBeDefined();
+      expect(contrastRatio(bg, v!.mutedHex), t).toBeGreaterThanOrEqual(4.5);
+    }
+  });
+});
+
 describe('wiring: every skin footer renders inside the readable wrapper', () => {
   const chrome = readFileSync(path.join(root, 'apps/web/src/components/ShopChrome.tsx'), 'utf8');
   const css = readFileSync(path.join(root, 'apps/web/src/styles/globals.css'), 'utf8');
   it('ShopChrome derives the vars from the resolved footer colour and marks the surface', () => {
-    expect(chrome).toMatch(/readableTextVars\(\s*layout\?\.footer\?\.bgColor/);
+    expect(chrome).toMatch(/footerTextOverride\(\s*layout\?\.footer\?\.bgColor/);
     expect(chrome).toMatch(/'data-footer-surface': 'custom'/);
     expect(chrome).toMatch(/'--muted-foreground': footerText\.muted/);
     // the wrapper is the one around <T.Footer>, i.e. every skin incl. Dahab and qamar
     const wrap = chrome.indexOf("'data-footer-surface'");
     expect(chrome.indexOf('<T.Footer', wrap)).toBeGreaterThan(wrap);
   });
-  it('globals.css collapses translucent text variants onto the guaranteed tone', () => {
+  it('globals.css collapses translucent TEXT variants, never form controls (N2)', () => {
     expect(css).toMatch(
-      /\[data-footer-surface='custom'\] \[class\*='text-foreground\/'\],\s*\[data-footer-surface='custom'\] \[class\*='text-muted-foreground'\] \{\s*color: hsl\(var\(--muted-foreground\)\);/
+      /\[data-footer-surface='custom'\]\s*:is\(\[class\*='text-foreground\/'\], \[class\*='text-muted-foreground'\]\):not\(input, textarea, select\) \{\s*color: hsl\(var\(--muted-foreground\)\);/
+    );
+    // a light-surfaced field (elegant newsletter) gets the theme ink back
+    expect(css).toMatch(/:is\(input, textarea, select\):is\(\s*\[class\*='bg-background'\]/);
+    expect(chrome).toMatch(/'--ctl-foreground': store\?\.theme\?\.foregroundColor/);
+    // a solid bg-foreground control's label is the opposite ink, never its own fill
+    expect(chrome).toMatch(
+      /'--footer-on-fg': footerText\.fg === '#ffffff' \? '0 0% 0%' : '0 0% 100%'/
+    );
+    expect(css).toMatch(
+      /\[data-footer-surface='custom'\] \[class~='bg-foreground'\] \{\s*color: hsl\(var\(--footer-on-fg\)\);/
     );
   });
 });

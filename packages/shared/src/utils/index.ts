@@ -18,6 +18,7 @@ export {
   resolveColor,
   pickReadableForeground,
   readableTextVars,
+  footerTextOverride,
   contrastRatio,
   parseColorToRgb,
   relativeLuminance,

@@ -140,7 +140,7 @@ function FacetGroup({
               htmlFor={checkboxId}
               className={`flex cursor-pointer items-center gap-3 rounded-xl px-4 py-2.5 text-base transition-all ${
                 isChecked
-                  ? 'bg-primary text-primary-foreground font-semibold'
+                  ? 'filter-active bg-primary text-primary-foreground font-semibold'
                   : 'bg-[hsl(var(--filter-fg)/0.08)] text-[hsl(var(--filter-fg)/0.75)] hover:bg-[hsl(var(--filter-fg)/0.15)] hover:text-[hsl(var(--filter-fg))]'
               }`}
             >
@@ -444,7 +444,7 @@ export function ProductsFilterSidebar(props: ProductsFilterSidebarProps) {
             aria-pressed={!categoryFilter}
             className={`flex w-full items-center justify-between rounded-xl px-4 py-2.5 text-base lg:text-lg transition-all ${
               !categoryFilter
-                ? 'bg-primary text-primary-foreground font-semibold'
+                ? 'filter-active bg-primary text-primary-foreground font-semibold'
                 : 'bg-[hsl(var(--filter-fg)/0.08)] text-[hsl(var(--filter-fg)/0.75)] hover:bg-[hsl(var(--filter-fg)/0.15)] hover:text-[hsl(var(--filter-fg))]'
             }`}
           >
@@ -473,7 +473,7 @@ export function ProductsFilterSidebar(props: ProductsFilterSidebarProps) {
                 aria-pressed={categoryFilter === cat.slug}
                 className={`flex w-full items-center justify-between rounded-xl px-4 py-2.5 text-base lg:text-lg transition-all ${
                   categoryFilter === cat.slug
-                    ? 'bg-primary text-primary-foreground font-semibold'
+                    ? 'filter-active bg-primary text-primary-foreground font-semibold'
                     : 'bg-[hsl(var(--filter-fg)/0.08)] text-[hsl(var(--filter-fg)/0.75)] hover:bg-[hsl(var(--filter-fg)/0.15)] hover:text-[hsl(var(--filter-fg))]'
                 }`}
               >
@@ -518,6 +518,9 @@ export function ProductsFilterSidebar(props: ProductsFilterSidebarProps) {
       className="w-full shrink-0 lg:w-64 lg:rounded-[var(--radius)] lg:overflow-hidden lg:p-4 lg:border lg:border-border lg:bg-[hsl(var(--filter-bg))] lg:text-[hsl(var(--filter-fg))]"
       style={sidebarVars}
       data-zone="filters"
+      // merchant filter colours: the active chip gets an ink ring so it never blends into a
+      // panel painted in the same colour as the store primary (review N3)
+      data-filter-custom={sidebarVars ? '' : undefined}
     >
       {/* Mobile trigger — opens the bottom-sheet. */}
       <button

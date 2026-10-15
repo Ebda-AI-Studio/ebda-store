@@ -1298,12 +1298,31 @@ html[dir='rtl'] [data-pack='qamar'] .font-display {
    re-derives --foreground / --muted-foreground from the surface), the skins' translucent text
    variants (text-foreground/60, text-muted-foreground/70, ...) collapse onto the muted tone that
    is guaranteed >= 4.5:1, so no footer text is left to alpha-compositing luck on any brand colour. */
-[data-footer-surface='custom'] [class*='text-foreground/'],
-[data-footer-surface='custom'] [class*='text-muted-foreground'] {
+[data-footer-surface='custom']
+  :is([class*='text-foreground/'], [class*='text-muted-foreground']):not(input, textarea, select) {
   color: hsl(var(--muted-foreground));
 }
-[data-footer-surface='custom'] [class*='hover:text-foreground']:hover {
+[data-footer-surface='custom'] [class*='hover:text-foreground']:not(input, textarea, select):hover {
   color: hsl(var(--foreground));
+}
+/* A solid `bg-foreground` control (elegant's subscribe button: bg-foreground text-background)
+   is filled with the DERIVED foreground; its label takes the opposite ink (--footer-on-fg). */
+[data-footer-surface='custom'] [class~='bg-foreground'] {
+  color: hsl(var(--footer-on-fg));
+}
+/* Form controls are never collapsed (above). A control that paints its OWN light surface
+   (elegant's newsletter field: bg-background) gets the theme's ink back, because the footer pair
+   is derived for the footer surface, not the field (review N2). A control tinted from the footer
+   ink (modern: bg-foreground/10) keeps the footer pair, which is the readable one there. */
+[data-footer-surface='custom']
+  :is(input, textarea, select):is(
+    [class*='bg-background'],
+    [class*='bg-card'],
+    [class*='bg-white']
+  ) {
+  --foreground: var(--ctl-foreground);
+  --muted-foreground: var(--ctl-muted-foreground);
+  color: hsl(var(--ctl-foreground));
 }
 
 /* Ruling B1-29: the shared PDP title (h1[data-zone='productName']) has no size class, so with no
@@ -1323,6 +1342,9 @@ h1:where([data-zone='productName']) {
 [data-zone='filters'] {
   --filter-bg: var(--bg-page);
   --filter-fg: var(--foreground);
+}
+[data-zone='filters'][data-filter-custom] .filter-active {
+  box-shadow: inset 0 0 0 2px hsl(var(--filter-fg));
 }
 
 /* ==========================================================================

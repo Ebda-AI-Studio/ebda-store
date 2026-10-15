@@ -68,6 +68,14 @@ describe('filter panel is a quiet surface on every skin (Ruling B1-31)', () => {
     );
   });
   it('the accent (primary) marks only the active state', () => {
-    expect(src.match(/'bg-primary text-primary-foreground font-semibold'/g)).toHaveLength(3);
+    expect(
+      src.match(/'filter-active bg-primary text-primary-foreground font-semibold'/g)
+    ).toHaveLength(3);
+  });
+  it('on a merchant-coloured panel the active chip keeps an ink ring (N3)', () => {
+    expect(src).toMatch(/data-filter-custom=\{sidebarVars \? '' : undefined\}/);
+    expect(css).toMatch(
+      /\[data-zone='filters'\]\[data-filter-custom\] \.filter-active \{\s*box-shadow: inset 0 0 0 2px hsl\(var\(--filter-fg\)\);/
+    );
   });
 });

@@ -14,7 +14,7 @@ import type { FloatingWidgetConfig } from '@ebda/shared';
 import {
   resolveColor,
   footerLogoContrastFilter,
-  readableTextVars,
+  footerTextOverride,
   sanitizeUrl,
 } from '@ebda/shared';
 import type { StoreLayoutSettings } from '@ebda/shared';
@@ -61,9 +61,11 @@ export function ShopChrome({ children, layout: layoutProp }: ShopChromeProps) {
   const { components: T, isLoading: templateLoading } = useTemplateComponents();
 
   const isRtl = language === 'ar';
-  // Merchant-picked footer colour -> the readable text pair its footer paints with (B1-27).
-  const footerText = readableTextVars(
-    layout?.footer?.bgColor && store ? resolveColor(layout.footer.bgColor, store.theme) : undefined
+  // Footer colour whose skin text pair fails AA -> the readable pair (B1-27). A footer that
+  // already reads keeps its exact shades and hover colours (no override, no data attribute).
+  const footerText = footerTextOverride(
+    layout?.footer?.bgColor && store ? resolveColor(layout.footer.bgColor, store.theme) : undefined,
+    store?.theme
   );
 
   // Store owners can override the navigation menu via store.settings.navMenu
@@ -429,11 +431,10 @@ export function ShopChrome({ children, layout: layoutProp }: ShopChromeProps) {
           prop instead so the theme can replace its default bg class with
           the merchant's inline color. Ahmad 2026-05-20: footer bg save was
           not landing because of this nested-bg paint-over. */}
-      {/* A merchant-coloured footer re-derives the text pair the skin's footer paints with
-          (--foreground / --muted-foreground, black or white plus a muted tone that keeps
-          >= 4.5:1), and globals.css collapses the alpha text variants onto it on
-          [data-footer-surface='custom']: every skin's footer stays readable on any brand colour
-          (Ruling B1-27). An unset footer colour keeps the theme's own tokens. */}
+      {/* Only when the skin's own footer text fails AA on the footer colour: re-derive the text
+          pair (--foreground / --muted-foreground, black or white plus a muted tone >= 4.5:1) and
+          let globals.css collapse the alpha text variants onto it on
+          [data-footer-surface='custom'] (Ruling B1-27). A readable footer is untouched. */}
       <div
         data-zone="footer"
         className={sectionVisibilityClass(layout?.footer) ?? undefined}
@@ -443,6 +444,12 @@ export function ShopChrome({ children, layout: layoutProp }: ShopChromeProps) {
               style: {
                 '--foreground': footerText.foreground,
                 '--muted-foreground': footerText.muted,
+                // the theme's own pair, restored on light form fields inside the footer (N2)
+                '--ctl-foreground': store?.theme?.foregroundColor || '224 71% 4%',
+                '--ctl-muted-foreground': store?.theme?.mutedForeground || '220 9% 46%',
+                // ink for a solid `bg-foreground` control (elegant's subscribe button): the
+                // opposite of the derived foreground, so its label never matches its fill
+                '--footer-on-fg': footerText.fg === '#ffffff' ? '0 0% 0%' : '0 0% 100%',
               } as React.CSSProperties,
             }
           : {})}
