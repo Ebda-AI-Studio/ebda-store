@@ -25,6 +25,12 @@ Yes. **Admin → Settings → Data Export** generates a JSON bundle of your prod
 
 نعم. تستطيع تصدير منتجاتك، فئاتك، طلباتك، عملاءك كملف JSON كامل من إعدادات الحساب.
 
+### How will I know if the terms or policies change? — هعرف إزاي لو الشروط أو السياسات اتغيرت؟
+
+Every policy page on ebda.app shows its version and the date it was last updated. When we make a material change (for example to fees), we email the store owner and show a notice in your dashboard with a summary, the date it takes effect and a link; press "Got it" to dismiss it. Fee changes always come with at least 30 days' notice.
+
+كل صفحة سياسة على ebda.app بتوضح رقم الإصدار وتاريخ آخر تحديث. لما نعمل تغيير جوهري (زي الرسوم) بنبعت إيميل لصاحب المتجر وبيظهر لك إشعار في لوحة التحكم فيه ملخص التغيير وتاريخ سريانه ورابط للسياسة؛ دوس «تمام، فهمت» علشان يختفي. أي تغيير في الرسوم بيكون بإشعار 30 يوم على الأقل.
+
 ---
 
 ## Products

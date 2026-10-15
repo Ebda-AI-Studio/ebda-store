@@ -106,6 +106,15 @@ Force AI WhatsApp is a **separate product** with its own 3-tier plan system on t
   record only", which writes `refund_reconciled` and stops the alerts
   (issue 2002).
 
+## How to publish a legal policy change
+
+Follow `docs/runbooks/legal-policy-change.md`: edit the text + bump `LEGAL_POLICIES` in one PR,
+deploy marketing AND the API, then for a material version press **Send notice** on
+**Policy updates** (`/policy-updates`). It emails every store owner once (bilingual, Arabic first)
+and shows a banner until they press "Got it". It cannot be sent twice. Watch the counts and the
+failed list; a row stuck in `sending` never finishes by itself and a `queued` row that stops
+draining means the run died (P1 alert): neither is re-sent automatically. Rulings LEGAL-4/5/6.
+
 ## Where the code lives
 
 | What                                 | Path                                                                         |

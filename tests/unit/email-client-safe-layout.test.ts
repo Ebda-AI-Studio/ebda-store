@@ -60,6 +60,7 @@ import { lowStockAlertTemplate } from '@api/services/email-templates/low-stock-a
 import { planLimitReachedTemplate } from '@api/services/email-templates/plan-limit-reached';
 import { subscriptionBillingTemplate } from '@api/services/email-templates/subscription-billing';
 import { staffInviteTemplate } from '@api/services/email-templates/staff-invite';
+import { legalNoticeTemplate } from '@api/services/email-templates/legal-notice';
 
 type Locale = 'en' | 'ar';
 
@@ -135,6 +136,14 @@ const any = {
   setPasswordUrl: 'https://admin.test/reset-password?token=abc',
 };
 
+const LEGAL_NOTICE_SAMPLE = {
+  name: 'Sara',
+  title: { ar: 'شروط الخدمة', en: 'Terms of service' },
+  summary: { ar: 'عدّلنا الرسوم.', en: 'We changed the fees.' },
+  effectiveOn: { ar: '20 نوفمبر 2026', en: '20 November 2026' },
+  url: { ar: 'https://ebda.app/terms/', en: 'https://ebda.app/en/terms/' },
+};
+
 type Tpl = Record<Locale, (...a: never[]) => string>;
 const TEMPLATES: Record<string, Tpl> = {
   welcome: welcomeTemplate,
@@ -155,6 +164,11 @@ const TEMPLATES: Record<string, Tpl> = {
   planLimitReached: planLimitReachedTemplate,
   subscriptionBilling: subscriptionBillingTemplate,
   staffInvite: staffInviteTemplate,
+  // One bilingual body for every recipient (Ruling LEGAL-6), so both locale keys render the same.
+  legalNotice: {
+    en: () => legalNoticeTemplate.body(LEGAL_NOTICE_SAMPLE),
+    ar: () => legalNoticeTemplate.body(LEGAL_NOTICE_SAMPLE),
+  },
 };
 
 function invoiceOrder(locale: Locale) {
