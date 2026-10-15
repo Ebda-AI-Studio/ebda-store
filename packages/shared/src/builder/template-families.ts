@@ -281,9 +281,14 @@ export function applyTemplateFamily(
   // stays on the draft (after the mix, in its order) when the merchant edited it; an untouched
   // section the outgoing look added leaves the draft (it stays in revision history).
   if (opts.design === 'keep' && opts.from) {
-    const kept = pool.filter(
-      n => getSectionDefinition(n.type)?.group === 'template' && editedSinceLook(n, opts)
-    );
+    // A kept section takes the incoming look's design: the keys only the outgoing look set
+    // return to the default (C6), and a design key the merchant changed stays (C8).
+    const kept = pool
+      .filter(n => getSectionDefinition(n.type)?.group === 'template' && editedSinceLook(n, opts))
+      .map(n => {
+        const outgoing = opts.from?.sections?.find(o => o.type === n.type)?.design ?? {};
+        return { ...n, settings: applySectionDesign(n.type, n.settings, {}, outgoing, opts) };
+      });
     if (kept.length) doc = { ...doc, sections: [...doc.sections, ...kept] };
   }
   return doc;

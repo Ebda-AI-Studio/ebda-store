@@ -232,6 +232,9 @@ describe('look section mix', () => {
     const kept = applyTemplateFamily(edited, 'qamar', lookbook, { from: vitrine, design: 'keep' });
     const list = kept.sections.find(n => n.type === 'collection-list')!;
     expect(list.blocks).toEqual(edited.sections.find(n => n.type === 'collection-list')!.blocks);
+    // N2: the kept list takes Lookbook's design: no Vitrine band styling is left
+    expect(list.settings.tileShape).toBe(defaultsOf('collection-list').tileShape);
+    expect(list.settings.tileShape).not.toBe('band');
     // after the incoming mix, never in the middle of it
     expect(kept.sections.map(n => n.type).slice(0, lookbook.sections!.length)).toEqual(
       lookbook.sections!.map(x => x.type)
@@ -264,6 +267,56 @@ describe('look section mix', () => {
     expect(kept2.sections.find(n => n.type === 'collection-list')?.settings.headingAr).toBe(
       'مناسباتنا'
     );
+  });
+
+  it('B1-45 keep: a merchant-changed design key on a kept section survives (C8)', () => {
+    const vitrine = getLook('qamar.vitrine')!;
+    const onVitrine = applyTemplateFamily(base(), 'qamar', vitrine);
+    const edited: PageDefinition = {
+      ...onVitrine,
+      sections: onVitrine.sections.map(n =>
+        n.type === 'collection-list'
+          ? { ...n, settings: { ...n.settings, tileShape: 'circle', headingAr: 'مناسباتنا' } }
+          : n
+      ),
+    };
+    const kept = applyTemplateFamily(edited, 'qamar', getLook('qamar.lookbook'), {
+      from: vitrine,
+      design: 'keep',
+    });
+    expect(kept.sections.find(n => n.type === 'collection-list')!.settings).toMatchObject({
+      tileShape: 'circle',
+      headingAr: 'مناسباتنا',
+    });
+  });
+
+  it('Vitrine → Atelier with keep: an edited quote follows Atelier unless the merchant changed the layout', () => {
+    const vitrine = getLook('qamar.vitrine')!;
+    const atelier = getLook('qamar.atelier')!;
+    const onVitrine = applyTemplateFamily(base(), 'qamar', vitrine);
+    const withTitle = (extra: Record<string, unknown>): PageDefinition => ({
+      ...onVitrine,
+      sections: onVitrine.sections.map(n =>
+        n.type === 'testimonials'
+          ? { ...n, settings: { ...n.settings, titleAr: 'قالوا عننا', ...extra } }
+          : n
+      ),
+    });
+    // edited content, layout untouched (still Vitrine's 'single'): kept, layout back to the row
+    const a = applyTemplateFamily(withTitle({}), 'qamar', atelier, {
+      from: vitrine,
+      design: 'keep',
+    });
+    const ta = a.sections.find(n => n.type === 'testimonials')!.settings;
+    expect(ta.titleAr).toBe('قالوا عننا');
+    expect(ta.layout).toBe(defaultsOf('testimonials').layout);
+    expect(ta.layout).not.toBe('single');
+    // the merchant set the layout to 'row' themselves: kept as they have it
+    const b = applyTemplateFamily(withTitle({ layout: 'row' }), 'qamar', atelier, {
+      from: vitrine,
+      design: 'keep',
+    });
+    expect(b.sections.find(n => n.type === 'testimonials')!.settings.layout).toBe('row');
   });
 
   it('Vitrine → Atelier resets the frame line (look-owned, B1-41)', () => {
