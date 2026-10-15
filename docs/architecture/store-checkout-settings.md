@@ -57,7 +57,7 @@ both available (today); 14:01 only B; 18:59 only B; 19:01 → tomorrow, both.
 
 ## `deliveryOffDays?: number[] | null`
 
-Weekdays with no delivery, `Date#getUTCDay` numbers (0=Sun ... 6=Sat). Unset/null = `[5]` (Friday). `[]` = delivers every day. Unique integers 0-6, at most 6 entries. The storefront "delivers by" estimate (`deliveryWindow({ offDays })`) skips these days for zone estimates and for the `deliveryDays` fallback. Edited on Admin → Delivery ("Days with no delivery"); null clears (shallow merge). Public (`lib/public-store-settings.ts`). Ruling B0-48.
+Weekdays with no delivery, `Date#getUTCDay` numbers (0=Sun ... 6=Sat). Unset/null = `[5]` (Friday). `[]` = delivers every day. Unique integers 0-6, at most 6 entries. The storefront "delivers by" estimate (`deliveryWindow({ offDays })`) skips these days for zone estimates and for the `deliveryDays` fallback. Edited on Admin → Delivery ("Days with no delivery"); null clears (shallow merge). The admin page does not pin the default: an untouched `[5]` on a store with no saved value is omitted from the payload (`offDaysForSave`), so changing `DEFAULT_DELIVERY_OFF_DAYS` later still reaches that store; any explicit choice is sent. Public (`lib/public-store-settings.ts`). Ruling B0-48.
 
 ## Editing / adding a setting
 
