@@ -8,7 +8,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { act, cleanup, render } from '@testing-library/react';
 import { SearchAutocomplete } from './SearchAutocomplete';
 
-const searchSuggest = vi.fn(async (_q: string) => ({
+const searchSuggest = vi.fn<(q: string) => Promise<unknown>>(async () => ({
   success: true,
   data: { suggestions: [{ id: 'p1', name: 'Shoes', slug: 'shoes', price: 100, image: null }] },
 }));
