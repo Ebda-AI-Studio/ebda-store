@@ -45,8 +45,12 @@ export const SCRUB_EMAILS_MAX = 2000;
 
 /** Every spelling of "@" a mail provider (or an HTML/URL rendering of its text) may use. */
 const AT_FORMS = /@|%40|&#0*64;|&#x0*40;|&commat;/i;
+const AT_ENCODED = /%40|&#0*64;|&#x0*40;|&commat;/gi;
 /** A quoted local part (`"john doe"@x.com`): it may hold spaces, so tokens alone miss it. */
 const QUOTED_LOCAL = /"[^"\r\n]{1,64}"(?=\s*(?:@|%40|&#0*64;|&#x0*40;|&commat;))/gi;
+/** The ONLY address shape we split: dot-atom local part, dotted domain, one "@". */
+const CLEAN_ADDRESS =
+  /^([\p{L}\p{M}\p{N}._+*-]+)@([\p{L}\p{M}\p{N}-]+(?:\.[\p{L}\p{M}\p{N}-]+)+)$/u;
 
 function caseInsensitiveReplaceAll(text: string, needle: string, by: string): string {
   if (!needle) return text;
@@ -61,30 +65,44 @@ function caseInsensitiveReplaceAll(text: string, needle: string, by: string): st
   return out + text.slice(from);
 }
 
-/** One whitespace-free token that carries an "@" form -> `j***@domain` (mailto: kept). */
+/**
+ * One whitespace-free token that carries an "@" form. FAIL CLOSED: the token is split into
+ * addresses only when every comma/semicolon-separated piece is either free of "@" or, once its
+ * wrapping punctuation (`<>()[]"'`, `mailto:`, a trailing `.`/`:`) is set aside, a CLEAN_ADDRESS.
+ * Anything a mail parser could read differently (two "@", a quoted or commented local part,
+ * `a(x)@b.com`, `x<a@b.com>`, an "@" with no dotted domain) is replaced WHOLE by `***`, so no
+ * local-part character beyond the first survives a split we are not sure of.
+ */
 function maskAddressToken(tok: string): string {
-  const at = AT_FORMS.exec(tok);
-  if (!at || at.index === 0) return tok;
-  const lead = /^(?:mailto:)?/i.exec(tok)![0];
-  const local = tok.slice(lead.length, at.index);
-  const domain = tok.slice(at.index + at[0].length);
-  if (!domain) return tok;
-  // `a@b@c.com`: the rest may carry another address; mask it too (bounded by SCRUB_EMAILS_MAX).
-  const rest = AT_FORMS.test(domain) ? maskAddressToken(domain) : domain;
-  return `${lead}${local.slice(0, 1) || '*'}***@${rest}`;
+  const norm = tok.replace(AT_ENCODED, '@');
+  const pieces = norm.split(/([,;])/);
+  const out: string[] = [];
+  for (const piece of pieces) {
+    if (piece === ',' || piece === ';' || !piece.includes('@')) {
+      out.push(piece);
+      continue;
+    }
+    const lead = /^[<(["']*(?:mailto:)?/i.exec(piece)![0];
+    const trail = /[>)\]"'.:!?]*$/.exec(piece.slice(lead.length))![0];
+    const core = piece.slice(lead.length, piece.length - trail.length);
+    const m = CLEAN_ADDRESS.exec(core);
+    if (!m) return '***';
+    out.push(`${lead}${Array.from(m[1])[0]}***@${m[2]}${trail}`);
+  }
+  return out.join('');
 }
 
 /**
  * Email addresses in free text (provider error text) replaced by their masked form, before it is
- * stored or shown. Hardened after a commit security scan (parser differential: a provider may
- * still read an address a narrow regex misses):
+ * stored or shown. Hardened after commit security scans (parser differential, local-part split):
  *  1. the input is cut to SCRUB_EMAILS_MAX BEFORE any matching, so cost is bounded;
  *  2. the `known` recipient addresses are replaced first, exact and case-insensitive;
  *  3. a quoted local part (`"john doe"@x.com`) is masked whole;
  *  4. every whitespace-delimited token holding any "@" form (`@`, `%40`, `&#64;`, `&#x40;`,
- *     `&commat;`, incl. `mailto:` and unicode/IDN) is masked. One linear pass over tokens:
- *     no nested quantifiers, no backtracking blow-up.
- * Broad on purpose: a false positive costs a masked word, a miss costs an address.
+ *     `&commat;`, incl. `mailto:` and unicode/IDN) goes through maskAddressToken, which keeps
+ *     only `x***@domain` for an unambiguous address and otherwise masks the WHOLE token.
+ * One linear pass over tokens: no nested quantifiers, no backtracking blow-up. Broad and
+ * fail-closed on purpose: a false positive costs a masked word, a miss costs an address.
  */
 export function scrubEmails(
   text: string,
@@ -95,12 +113,7 @@ export function scrubEmails(
     if (k && k.trim()) s = caseInsensitiveReplaceAll(s, k.trim(), maskEmail(k.trim()) ?? '***');
   }
   s = s.replace(QUOTED_LOCAL, '"***"');
-  // Tokens end at whitespace AND at list/markup punctuation, so `a@x.com,b@y.com` and
-  // `<a@x.com>` are two / one clean addresses (the Task 8 regex already split on these).
-  // An HTML entity (`&#64;`, `&commat;`) is part of a token even though it ends in `;`.
-  return s.replace(/(?:&#x?[0-9a-f]{1,6};|&commat;|[^\s,;<>()"'[\]])+/gi, tok =>
-    AT_FORMS.test(tok) ? maskAddressToken(tok) : tok
-  );
+  return s.replace(/\S+/g, tok => (AT_FORMS.test(tok) ? maskAddressToken(tok) : tok));
 }
 
 /**

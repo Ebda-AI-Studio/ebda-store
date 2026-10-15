@@ -103,8 +103,41 @@ describe('pre-existing masks are unchanged (characterization vs origin/main)', (
   it('scrubEmails never masks LESS than the Task 8 version: lists, markup, multiple @', () => {
     expect(scrubEmails('a@x.com,b@y.com')).toBe('a***@x.com,b***@y.com');
     expect(scrubEmails('a@x.com;b@y.com')).toBe('a***@x.com;b***@y.com');
-    expect(scrubEmails('x<jane@gmail.com>')).toBe('x<j***@gmail.com>');
     expect(scrubEmails('[jane@gmail.com]')).toBe('[j***@gmail.com]');
-    expect(scrubEmails('a@b@c.com')).toBe('a***@b***@c.com');
+    // ambiguous shapes now fail CLOSED (whole token), never a partial split
+    expect(scrubEmails('x<jane@gmail.com>')).toBe('***');
+    expect(scrubEmails('a@b@c.com')).toBe('***');
+  });
+});
+
+/**
+ * Fail closed (third security scan: parser differential / local-part split). For every shape a
+ * mail parser could split differently, no character of the local part survives beyond the one
+ * allowed first character.
+ */
+describe('scrubEmails fails closed on ambiguous address shapes', () => {
+  const survivors = (out: string, local: string) =>
+    Array.from(local.slice(1)).filter(c => /[\p{L}\p{N}]/u.test(c) && out.includes(c));
+
+  it.each([
+    ['quoted local part holding an @', '"alice@inner"@evil.com', 'alice@inner'],
+    ['quoted local part holding a space', 'x "alice smith"@evil.com y', 'alice smith'],
+    ['two @ in one token', 'alice@bobby@c.com', 'alice@bobby'],
+    ['comment in the local part', 'alice(note)@b.com', 'alice(note)'],
+    ['comment after the local part', 'alice@(c)b.com', 'alice'],
+    ['angle brackets glued to text', 'Name<alice@b.com>', 'Namealice'],
+    ['a dotless domain', 'alice@localhost', 'alice'],
+    ['encoded @ twice', 'alice%40bobby%40c.com', 'alicebobby'],
+    ['backslash-escaped local part', 'ali\\@ce@b.com', 'alice'],
+  ])('%s', (_label, input, local) => {
+    const out = scrubEmails(`fail: ${input} (550)`);
+    expect(survivors(out.replace('fail: ', '').replace(' (550)', ''), local)).toEqual([]);
+  });
+
+  it('keeps the clean, readable forms (display name, trailing dot, mailto)', () => {
+    expect(scrubEmails('Name <alice@b.com>')).toBe('Name <a***@b.com>');
+    expect(scrubEmails('to alice@b.com.')).toBe('to a***@b.com.');
+    expect(scrubEmails('mailto:alice@b.com')).toBe('mailto:a***@b.com');
+    expect(scrubEmails('"Alice" <alice@b.com>')).toBe('"Alice" <a***@b.com>');
   });
 });
