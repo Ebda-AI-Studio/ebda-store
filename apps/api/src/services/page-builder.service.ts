@@ -624,11 +624,30 @@ export async function applyFamilyForLook(
           HOME_PAGE_KEY
         )
       : state.definition;
-  // The store row still holds the OUTGOING look here: its mix's design keys are look-owned (C6/C8).
+  // The OUTGOING look is the one that composed this document (`appliedLook`), else the store
+  // row's (it still holds the old look here). After a discarded draft the published document is
+  // the right baseline, not the store row (C6/C8).
+  const outgoingId = state.definition.appliedLook ?? store.look;
+  const outgoing = getLook(outgoingId);
+  // The skin baseline the start document's layout-backed sections hold: a layout-derived page was
+  // just re-derived for the INCOMING skin + look above; a stored document was composed on the
+  // store's skin (when its look is the store's) or on the outgoing look's skin.
+  const toSkin = look ? { skin: look.skin, look: look.id } : undefined;
+  const fromSkin =
+    start !== state.definition && toSkin
+      ? toSkin
+      : {
+          skin:
+            outgoing && outgoingId !== store.look ? outgoing.skin : (store.template as TemplateId),
+          look: outgoing?.id ?? null,
+        };
   let definition = applyTemplateFamily(start, family, look, {
-    from: getLook(store.look),
+    from: outgoing,
     design,
+    fromSkin,
+    ...(toSkin ? { toSkin } : {}),
   });
+  if (look) definition = { ...definition, appliedLook: look.id };
   if (definition.theme && resetThemeKeys.length > 0) {
     const theme = { ...definition.theme } as Record<string, unknown>;
     for (const k of resetThemeKeys) delete theme[k];

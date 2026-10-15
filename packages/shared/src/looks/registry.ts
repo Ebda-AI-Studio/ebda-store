@@ -21,7 +21,7 @@ export const LOOKS: readonly LookDefinition[] = [
     // `layout: 'full-bleed'` with their schema values (plan amendment C1). The carousel
     // preset is `newest`, never a demo category slug (C7).
     sections: [
-      { type: 'hero', design: { presentation: 'full-bleed', mode: 'single' } },
+      { type: 'hero', design: { presentation: 'full-bleed' } },
       { type: 'category-grid' },
       {
         type: 'featured-collection',

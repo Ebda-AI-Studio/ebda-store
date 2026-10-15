@@ -7,6 +7,10 @@ import {
   getSectionDefinition,
   sectionFromPreset,
   PAGE_DEFINITION_SCHEMA_VERSION,
+  layoutToDefinition,
+  resolveLayoutSettings,
+  documentForLook,
+  validateDefinitionSync,
   type LookDefinition,
   type PageDefinition,
   type SectionNode,
@@ -38,7 +42,7 @@ const byType = (doc: PageDefinition, type: string) => doc.sections.find(s => s.t
 type Mix = Pick<LookDefinition, 'sections'>;
 const lookbookLike: Mix = {
   sections: [
-    { type: 'hero', design: { mode: 'single' } },
+    { type: 'hero' },
     { type: 'featured-collection', design: { bgColor: 'token:card', columns: 3 } },
     { type: 'testimonials' },
     { type: 'image-text' },
@@ -68,6 +72,11 @@ describe('look section mix', () => {
   });
 
   it('every mix entry names a template-group registry section and only design keys', () => {
+    for (const l of LOOKS) {
+      const types = (l.sections ?? []).map(s => s.type);
+      expect(new Set(types).size, `${l.id}: one spec per type`).toBe(types.length);
+    }
+    expect(LOOK_DESIGN_KEYS).not.toContain('mode'); // hero mode is content (slideshow vs single)
     for (const l of LOOKS)
       for (const s of l.sections ?? []) {
         expect(getSectionDefinition(s.type)?.group, `${l.id}:${s.type}`).toBe('template');
@@ -134,7 +143,6 @@ describe('look section mix', () => {
         const fc = byType(doc, 'featured-collection').settings;
         expect(fc.bgColor, design).toBe(defaultsOf('featured-collection').bgColor);
         expect(fc.columns, design).toBe(4); // Atelier's own value replaces Lookbook's 3
-        expect(byType(doc, 'hero').settings.mode, design).toBe('single'); // both set it
       }
     });
 
@@ -257,5 +265,149 @@ describe('look section mix', () => {
       if (story)
         expect(story.settings).toMatchObject({ headingAr: 'حكايتي', image: 'https://x/b.webp' });
     }
+  });
+  describe('layout-built pages: the skin baseline is the default (fix round 1)', () => {
+    const framedTwo: Mix = {
+      sections: [
+        { type: 'hero', design: { presentation: 'framed' } },
+        { type: 'category-grid', design: { desktopColumns: 2 } },
+      ],
+    };
+    const noDesign: Mix = { sections: [{ type: 'hero' }, { type: 'category-grid' }] };
+    const layoutPage = (skin: 'minimal' | 'qamar') =>
+      layoutToDefinition(resolveLayoutSettings({}, skin, null));
+
+    it('the probe: a layout-built page holds skin values that differ from preset 0', () => {
+      const page = layoutPage('minimal');
+      expect(byType(page, 'hero').settings.presentation).toBe('full-bleed');
+      expect(byType(page, 'category-grid').settings.desktopColumns).toBe(4);
+      expect(defaultsOf('category-grid').desktopColumns).not.toBe(4);
+    });
+
+    it("keep from a legacy store applies the incoming look's design (framed hero, 2 columns)", () => {
+      for (const skin of ['minimal', 'qamar'] as const) {
+        const doc = applyTemplateFamily(layoutPage(skin), 'qamar', framedTwo, {
+          from: null,
+          design: 'keep',
+          fromSkin: { skin },
+          toSkin: { skin: 'qamar' },
+        });
+        expect(byType(doc, 'hero').settings.presentation, skin).toBe('framed');
+        expect(byType(doc, 'category-grid').settings.desktopColumns, skin).toBe(2);
+      }
+    });
+
+    it('a key only the outgoing look set returns to the skin default, never to preset 0', () => {
+      for (const design of ['keep', 'reset'] as const) {
+        const onFramed = applyTemplateFamily(layoutPage('qamar'), 'qamar', framedTwo, {
+          fromSkin: { skin: 'qamar' },
+          toSkin: { skin: 'qamar' },
+        });
+        const doc = applyTemplateFamily(onFramed, 'qamar', noDesign, {
+          from: framedTwo,
+          design,
+          fromSkin: { skin: 'qamar' },
+          toSkin: { skin: 'qamar' },
+        });
+        const skinDefault = layoutPage('qamar');
+        expect(byType(doc, 'hero').settings.presentation, design).toBe(
+          byType(skinDefault, 'hero').settings.presentation
+        );
+        expect(byType(doc, 'category-grid').settings.desktopColumns, design).toBe(4);
+      }
+    });
+
+    it('keep: a merchant column choice that differs from the skin default is kept', () => {
+      const page = layoutPage('qamar');
+      const edited = {
+        ...page,
+        sections: page.sections.map(s =>
+          s.type === 'category-grid' ? { ...s, settings: { ...s.settings, desktopColumns: 5 } } : s
+        ),
+      };
+      const doc = applyTemplateFamily(edited, 'qamar', framedTwo, {
+        from: null,
+        design: 'keep',
+        fromSkin: { skin: 'qamar' },
+        toSkin: { skin: 'qamar' },
+      });
+      expect(byType(doc, 'category-grid').settings.desktopColumns).toBe(5);
+      expect(byType(doc, 'hero').settings.presentation).toBe('framed');
+    });
+  });
+
+  it("a merchant's multi-slide slideshow survives a keep switch to Atelier", () => {
+    const start = base();
+    const hero = byType(start, 'hero');
+    hero.settings = { ...hero.settings, mode: 'slider' };
+    hero.blocks = [
+      { id: 's1', type: 'slide', settings: { image: 'https://x/a.webp' } },
+      { id: 's2', type: 'slide', settings: { image: 'https://x/c.webp' } },
+      { id: 's3', type: 'slide', settings: { image: 'https://x/d.webp' } },
+    ];
+    for (const design of ['keep', 'reset'] as const) {
+      const doc = applyTemplateFamily(start, 'qamar', getLook('qamar.atelier'), {
+        from: null,
+        design,
+      });
+      expect(byType(doc, 'hero').settings.mode, design).toBe('slider');
+      expect(byType(doc, 'hero').blocks, design).toHaveLength(3);
+    }
+  });
+
+  describe('lookTag: one section per look on one page (C10)', () => {
+    const tagged = (): PageDefinition => {
+      const page = base();
+      const [hero, story] = page.sections;
+      const h = (id: string, tag: string, image: string) => ({
+        ...hero!,
+        id,
+        lookTag: tag,
+        blocks: [{ id: `${id}-s`, type: 'slide', settings: { image } }],
+      });
+      return {
+        ...page,
+        sections: [
+          h('hero-atelier', 'qamar.atelier', 'https://x/atelier.webp'),
+          h('hero-lookbook', 'qamar.lookbook', 'https://x/lookbook.webp'),
+          h('hero-vitrine', 'qamar.vitrine', 'https://x/vitrine.webp'),
+          story!,
+        ],
+      };
+    };
+
+    it("under a look with a mix, only that look's tagged section renders; untagged always do", () => {
+      const doc = documentForLook(tagged(), getLook('qamar.atelier'));
+      expect(doc.sections.map(s => s.id)).toEqual(['hero-atelier', 'story']);
+      const composed = applyTemplateFamily(tagged(), 'qamar', getLook('qamar.atelier'));
+      expect(composed.sections.filter(s => s.type === 'hero').map(s => s.id)).toEqual([
+        'hero-atelier',
+      ]);
+      expect(composed.sections.some(s => s.id === 'story')).toBe(true);
+    });
+
+    it('without a mix (or without a look) the document is unchanged', () => {
+      const page = tagged();
+      expect(documentForLook(page, getLook('souq.catalogue'))).toBe(page);
+      expect(documentForLook(page, null)).toBe(page);
+      const plain = base();
+      expect(documentForLook(plain, getLook('qamar.atelier'))).toBe(plain);
+    });
+
+    it('validation: one hero per look is fine; an unknown look or two heroes for one look is not', () => {
+      expect(validateDefinitionSync(tagged()).errors).toEqual([]);
+      const unknown = tagged();
+      unknown.sections[0] = { ...unknown.sections[0]!, lookTag: 'qamar.nope' };
+      expect(validateDefinitionSync(unknown).errors.map(e => e.path)).toContain(
+        '/sections/0/lookTag'
+      );
+      const twice = tagged();
+      twice.sections[1] = { ...twice.sections[1]!, lookTag: 'qamar.atelier' };
+      expect(validateDefinitionSync(twice).errors.map(e => e.code)).toContain('CARDINALITY');
+      const mixed = tagged();
+      mixed.sections.push({ ...mixed.sections[0]!, id: 'hero-plain', lookTag: undefined });
+      delete mixed.sections[mixed.sections.length - 1]!.lookTag;
+      expect(validateDefinitionSync(mixed).errors.map(e => e.code)).toContain('CARDINALITY');
+    });
   });
 });

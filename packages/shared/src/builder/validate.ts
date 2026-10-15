@@ -18,6 +18,7 @@ import { storeLayoutSchema } from './layout-schema';
 import { allSections, sectionToLegacy } from './adapter';
 import { isPlaceholderCopy } from './placeholder-copy';
 import { getSectionDefinition, VIEWPORTS } from './registry';
+import { getLook } from '../looks/registry';
 import {
   BUILDER_LIMITS,
   pageDefinitionSchema,
@@ -266,7 +267,8 @@ export function validateDefinitionSync(input: unknown): ValidationResult {
     );
 
   const ids = new Set<string>();
-  const counts = new Map<string, number>();
+  /** Per type: untagged count, and per look tag the count of sections tagged with it. */
+  const counts = new Map<string, { untagged: number; tagged: Map<string, number> }>();
   const visit = (nodes: SectionNode[], base: string, group: SectionGroup) => {
     nodes.forEach((n, i) => {
       const path = `${base}/${i}`;
@@ -280,15 +282,30 @@ export function validateDefinitionSync(input: unknown): ValidationResult {
           )
         );
       ids.add(n.id);
-      counts.set(n.type, (counts.get(n.type) ?? 0) + 1);
+      const c = counts.get(n.type) ?? { untagged: 0, tagged: new Map<string, number>() };
+      if (n.lookTag === undefined) c.untagged++;
+      else c.tagged.set(n.lookTag, (c.tagged.get(n.lookTag) ?? 0) + 1);
+      counts.set(n.type, c);
+      if (n.lookTag !== undefined && !getLook(n.lookTag))
+        errors.push(
+          issue(
+            'SCHEMA',
+            `${path}/lookTag`,
+            `Unknown look "${n.lookTag}".`,
+            `مظهر غير معروف "${n.lookTag}".`
+          )
+        );
       validateSection(n, path, group, errors);
     });
   };
   visit(def.sectionGroups.header, '/sectionGroups/header', 'header');
   visit(def.sections, '/sections', 'template');
   visit(def.sectionGroups.footer, '/sectionGroups/footer', 'footer');
-  for (const [type, n] of counts) {
+  // What renders under any one look is the untagged sections plus that look's tagged ones
+  // (`documentForLook`), so the cap applies to that sum, never to tagged sections of other looks.
+  for (const [type, c] of counts) {
     const d = getSectionDefinition(type);
+    const n = c.untagged + Math.max(0, ...c.tagged.values());
     if (d && n > d.maxCount)
       errors.push(
         issue(

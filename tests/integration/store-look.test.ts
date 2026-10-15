@@ -14,7 +14,7 @@ import express, { type Express, type Request, type Response, type NextFunction }
 import request from 'supertest';
 import jwt from 'jsonwebtoken';
 import { prisma, withRlsBypass, createPrismaClient, runWithRequestDb } from '@ebda/database';
-import { definitionToLayout, getLook, sectionFromPreset } from '@ebda/shared';
+import { definitionToLayout, getLook } from '@ebda/shared';
 import { awaitDeferredWork } from '@api/lib/after-tenant-commit';
 import storeRoutes from '@api/routes/store.routes';
 import { tenantContext } from '@api/middleware/tenant-context';
@@ -22,12 +22,33 @@ import { errorHandler } from '@api/middleware/error-handler';
 import { config } from '@api/config';
 import { hasDb } from '../helpers/bundle-fixtures';
 
-const { invalidated, r2Cleanup, failValidation, notReady } = vi.hoisted(() => ({
-  invalidated: [] as string[],
-  r2Cleanup: vi.fn(),
-  failValidation: { on: false },
-  notReady: { on: false },
-}));
+const { invalidated, r2Cleanup, failValidation, notReady, lookMix, failAfterBuilder } = vi.hoisted(
+  () => ({
+    invalidated: [] as string[],
+    r2Cleanup: vi.fn(),
+    failValidation: { on: false },
+    notReady: { on: false },
+    // A section mix injected into a registered look (Lookbook/Vitrine get their real mixes in
+    // Tasks 7-8; Atelier's own design values equal the skin defaults, so they prove nothing).
+    lookMix: {} as Record<string, unknown[]>,
+    // Makes applyLook's store-row update fail AFTER the builder step (Ruling LOOKS-10 retry path).
+    failAfterBuilder: { on: false },
+  })
+);
+vi.mock('@api/services/page-builder.service', async importOriginal => {
+  const real = await importOriginal<typeof import('@api/services/page-builder.service')>();
+  return {
+    ...real,
+    applyFamilyForLook: async (...a: Parameters<typeof real.applyFamilyForLook>) => {
+      const out = await real.applyFamilyForLook(...a);
+      if (failAfterBuilder.on) {
+        failAfterBuilder.on = false;
+        throw new Error('simulated store update failure after the builder step');
+      }
+      return out;
+    },
+  };
+});
 vi.mock('@api/services/r2-cleanup.service', async importOriginal => {
   const real = await importOriginal<typeof import('@api/services/r2-cleanup.service')>();
   return {
@@ -42,8 +63,13 @@ vi.mock('@api/services/r2-cleanup.service', async importOriginal => {
 // section fail publish readiness (as if the whole family still held starter copy).
 vi.mock('@ebda/shared', async importOriginal => {
   const real = await importOriginal<typeof import('@ebda/shared')>();
+  const getLook = (id: string | null | undefined) => {
+    const look = real.getLook(id);
+    return look && id && lookMix[id] ? { ...look, sections: lookMix[id] as never } : look;
+  };
   return {
     ...real,
+    getLook,
     validateDefinition: (...a: Parameters<typeof real.validateDefinition>) =>
       failValidation.on
         ? Promise.resolve({ ok: false, errors: [] })
@@ -299,56 +325,116 @@ describe.skipIf(!hasDb)('PUT /stores/:id/look (ebda_app + tenant guard)', () => 
     expect(invalidated).toContain(`public:store:${m.slug}`);
   });
 
-  it("a switch resets the outgoing look's design keys, and design:'keep' keeps the merchant's own (C6/C8)", async () => {
-    const draftDoc = async (storeId: string) =>
-      (await prisma.storePageRevision.findFirstOrThrow({
-        where: { storeId, pageKey: 'home', status: 'draft' },
-        select: { id: true, document: true },
-      })) as {
-        id: string;
-        document: { sections: { type: string; settings: Record<string, unknown> }[] };
-      };
-    const hero = (doc: { sections: { type: string; settings: Record<string, unknown> }[] }) =>
-      doc.sections.find(x => x.type === 'hero')!.settings;
-    const heroDefault = sectionFromPreset('hero', 0, 'hero').settings.presentation;
-
-    // Untouched: Atelier's full-bleed hero goes back to the default on Atelier -> Vitrine.
-    const a = await seedMerchant('mixa');
-    expect((await put(a.storeId, a.token, { lookId: LOOK_ID, design: 'keep' })).status).toBe(200);
-    expect(
-      (await put(a.storeId, a.token, { lookId: 'qamar.atelier', design: 'keep' })).status
-    ).toBe(200);
-    const onAtelier = await draftDoc(a.storeId);
-    expect(onAtelier.document.sections.map(x => x.type)).toEqual(
-      getLook('qamar.atelier')!.sections!.map(x => x.type)
-    );
-    expect(hero(onAtelier.document).presentation).toBe('full-bleed');
-    expect(
-      (await put(a.storeId, a.token, { lookId: 'qamar.vitrine', design: 'keep' })).status
-    ).toBe(200);
-    expect(hero((await draftDoc(a.storeId)).document).presentation).toBe(heroDefault);
-
-    // Merchant-edited: the hand-set hero presentation survives a keep switch.
-    const b = await seedMerchant('mixb');
-    expect((await put(b.storeId, b.token, { lookId: LOOK_ID, design: 'keep' })).status).toBe(200);
-    expect(
-      (await put(b.storeId, b.token, { lookId: 'qamar.atelier', design: 'keep' })).status
-    ).toBe(200);
-    const draft = await draftDoc(b.storeId);
-    const edited = {
-      ...draft.document,
-      sections: draft.document.sections.map(x =>
-        x.type === 'hero' ? { ...x, settings: { ...x.settings, presentation: 'framed' } } : x
-      ),
+  describe('look switch design keys (C6/C8, fix round 1)', () => {
+    type Doc = {
+      appliedLook?: string;
+      sections: { type: string; settings: Record<string, unknown>; blocks?: unknown }[];
     };
-    await withRlsBypass(tx =>
-      tx.storePageRevision.update({ where: { id: draft.id }, data: { document: edited as object } })
-    );
-    expect(
-      (await put(b.storeId, b.token, { lookId: 'qamar.vitrine', design: 'keep' })).status
-    ).toBe(200);
-    expect(hero((await draftDoc(b.storeId)).document).presentation).toBe('framed');
-    await awaitDeferredWork(5000);
+    const docOf = async (storeId: string, status: 'draft' | 'published') =>
+      (await prisma.storePageRevision.findFirstOrThrow({
+        where: { storeId, pageKey: 'home', status },
+        select: { id: true, document: true },
+      })) as { id: string; document: Doc };
+    const sec = (doc: Doc, type: string) => doc.sections.find(x => x.type === type)!.settings;
+    const ok = async (m: { storeId: string; token: string }, lookId: string) =>
+      expect((await put(m.storeId, m.token, { lookId, design: 'keep' })).status).toBe(200);
+    // Two columns + a framed hero on "Lookbook"; nothing on Atelier/Vitrine (C6 resets them).
+    const TWO = [
+      { type: 'hero', design: { presentation: 'framed' } },
+      { type: 'category-grid', design: { desktopColumns: 2 } },
+      { type: 'image-text' },
+    ];
+
+    beforeAll(() => {
+      lookMix['qamar.lookbook'] = TWO;
+    });
+    afterAll(() => {
+      delete lookMix['qamar.lookbook'];
+    });
+
+    it('keep from a layout-built page applies the look; a look-owned key returns to the skin default', async () => {
+      const a = await seedMerchant('mixa');
+      await ok(a, LOOK_ID);
+      await ok(a, 'qamar.lookbook');
+      const onLookbook = (await docOf(a.storeId, 'draft')).document;
+      expect(onLookbook.appliedLook).toBe('qamar.lookbook');
+      expect(sec(onLookbook, 'hero').presentation).toBe('framed');
+      expect(sec(onLookbook, 'category-grid').desktopColumns).toBe(2);
+      await ok(a, 'qamar.vitrine');
+      const onVitrine = (await docOf(a.storeId, 'draft')).document;
+      expect(onVitrine.appliedLook).toBe('qamar.vitrine');
+      // Back to the qamar skin's own defaults, not registry preset 0 (3 columns, unset hero).
+      expect(sec(onVitrine, 'category-grid').desktopColumns).toBe(4);
+      expect(sec(onVitrine, 'hero').presentation).toBe('full-bleed');
+      await awaitDeferredWork(5000);
+    });
+
+    it('keep: a hand-set hero presentation survives the switch', async () => {
+      const b = await seedMerchant('mixb');
+      await ok(b, LOOK_ID);
+      await ok(b, 'qamar.atelier');
+      const draft = await docOf(b.storeId, 'draft');
+      const edited = {
+        ...draft.document,
+        sections: draft.document.sections.map(x =>
+          x.type === 'hero' ? { ...x, settings: { ...x.settings, presentation: 'framed' } } : x
+        ),
+      };
+      await withRlsBypass(tx =>
+        tx.storePageRevision.update({
+          where: { id: draft.id },
+          data: { document: edited as object },
+        })
+      );
+      await ok(b, 'qamar.vitrine');
+      expect(sec((await docOf(b.storeId, 'draft')).document, 'hero').presentation).toBe('framed');
+      await awaitDeferredWork(5000);
+    });
+
+    it("A -> B with B's draft discarded, then B -> C: the published document's appliedLook is the baseline", async () => {
+      const c = await seedMerchant('mixc');
+      await ok(c, 'qamar.lookbook'); // fresh store: published, composed by Lookbook
+      const published = (await docOf(c.storeId, 'published')).document;
+      expect(published.appliedLook).toBe('qamar.lookbook');
+      expect(sec(published, 'category-grid').desktopColumns).toBe(2);
+      await ok(c, 'qamar.atelier'); // draft only; store row now says Atelier
+      const atelierDraft = await docOf(c.storeId, 'draft');
+      await withRlsBypass(tx => tx.storePageRevision.delete({ where: { id: atelierDraft.id } }));
+      await ok(c, 'qamar.vitrine');
+      const onVitrine = (await docOf(c.storeId, 'draft')).document;
+      // Lookbook's 2 columns are look-owned (untouched since Lookbook set them): reset, not kept
+      // as if the merchant had chosen them (the store row's Atelier never set the key).
+      expect(sec(onVitrine, 'category-grid').desktopColumns).toBe(4);
+      expect(onVitrine.appliedLook).toBe('qamar.vitrine');
+      await awaitDeferredWork(5000);
+    });
+
+    it('a retry after the store update failed converges on the same draft as one clean switch', async () => {
+      const once = await seedMerchant('retry1');
+      await ok(once, LOOK_ID);
+      await ok(once, 'qamar.lookbook');
+
+      const twice = await seedMerchant('retry2');
+      await ok(twice, LOOK_ID);
+      failAfterBuilder.on = true;
+      const failed = await put(twice.storeId, twice.token, {
+        lookId: 'qamar.lookbook',
+        design: 'keep',
+      });
+      expect(failed.status).toBe(500);
+      expect((await row(twice.storeId)).look).toBe(LOOK_ID); // the store row was not written
+      await ok(twice, 'qamar.lookbook');
+
+      const shape = (d: Doc) => ({
+        appliedLook: d.appliedLook,
+        sections: d.sections.map(x => ({ type: x.type, settings: x.settings, blocks: x.blocks })),
+      });
+      expect(shape((await docOf(twice.storeId, 'draft')).document)).toEqual(
+        shape((await docOf(once.storeId, 'draft')).document)
+      );
+      expect(await row(twice.storeId)).toMatchObject({ look: 'qamar.lookbook', template: 'qamar' });
+      await awaitDeferredWork(5000);
+    });
   });
 
   it('legacy store with customised layout_settings and no builder revision: DRAFT only, layout + R2 untouched', async () => {

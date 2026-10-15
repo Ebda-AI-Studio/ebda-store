@@ -16,6 +16,8 @@ import type { TemplateId, PageDefinition } from '@ebda/shared';
 import {
   sanitizeUrl,
   definitionToLayout,
+  documentForLook,
+  getLook,
   getSectionDefinition,
   renderableSections,
   sectionToLegacy,
@@ -109,7 +111,7 @@ function heroSlidesWithImage<T extends { image?: string }>(
 }
 
 export function PageRenderer({
-  definition,
+  definition: storedDefinition,
   editorMode = false,
   templateId,
   featuredProducts,
@@ -121,8 +123,10 @@ export function PageRenderer({
 }: PageRendererProps) {
   // The legacy-shaped view of the document: section props plus the
   // cross-section lookups the dividers and the featured fallback need.
-  const layout = definitionToLayout(definition);
   const { store } = useStore();
+  // Under a look with a section mix, sections tagged for another look are left out (C10).
+  const definition = documentForLook(storedDefinition, getLook(store.look));
+  const layout = definitionToLayout(definition);
   const { language } = useLanguage();
   const { addItem } = useCart();
   const storeUrl = useStoreUrl();

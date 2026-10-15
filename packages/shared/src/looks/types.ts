@@ -61,10 +61,13 @@ export interface LookChrome {
   header: { logoPlacement: 'start' | 'centre' };
 }
 
-/** Settings a look's `design` may set: layout/variant/background/spacing, never content. */
+/**
+ * Settings a look's `design` may set: layout/variant/background/spacing, never content.
+ * Hero `mode` (slideshow vs single) is CONTENT (registry group `content`): no look sets it, so a
+ * merchant's slideshow never collapses on a switch.
+ */
 export const LOOK_DESIGN_KEYS = [
   'presentation',
-  'mode',
   'layout',
   'layoutMobile',
   'captionPosition',
