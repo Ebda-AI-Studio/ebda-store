@@ -4,7 +4,13 @@
  * would still read, and the scan must stay bounded on huge input.
  */
 import { describe, it, expect } from 'vitest';
-import { SCRUB_EMAILS_MAX, scrubEmails } from '@api/lib/pii-mask';
+import {
+  SCRUB_EMAILS_MAX,
+  maskEmail,
+  maskEmailList,
+  maskPhone,
+  scrubEmails,
+} from '@api/lib/pii-mask';
 
 const leaks = (out: string, ...secrets: string[]) =>
   secrets.filter(s => out.toLowerCase().includes(s.toLowerCase()));
@@ -58,5 +64,47 @@ describe('scrubEmails', () => {
     expect(scrubEmails('Resend send failed: rate limited (429)')).toBe(
       'Resend send failed: rate limited (429)'
     );
+  });
+});
+
+/**
+ * Characterization: the pre-existing exports keep their origin/main outputs exactly (a security
+ * scan flagged pii-mask.ts as a possible regression; these pin the behaviour every existing
+ * caller across apps/api relies on). Values measured from origin/main's pii-mask.ts.
+ */
+describe('pre-existing masks are unchanged (characterization vs origin/main)', () => {
+  it.each([
+    ['jane.doe@gmail.com', 'j***@gmail.com'],
+    ['JANE.DOE@GMAIL.COM', 'J***@GMAIL.COM'],
+    ['jane+tag@gmail.com', 'j***@gmail.com'],
+    ['مُنى@مثال.مصر', 'م***@مثال.مصر'],
+    ['user@xn--mgbh0fb.xn--wgbh1c', 'u***@xn--mgbh0fb.xn--wgbh1c'],
+    ['no-at-sign', '***'],
+    ['a@b@c.com', 'a***@c.com'],
+    ['@leading.com', '***'],
+    ['trailing@', 't***@'],
+    ['', null],
+    [' ', null],
+    [null, null],
+    [undefined, null],
+  ])('maskEmail(%j) -> %j', (input, out) => {
+    expect(maskEmail(input as string | null | undefined)).toBe(out);
+  });
+
+  it('maskPhone and maskEmailList keep their outputs', () => {
+    expect(maskPhone('+201012345678')).toBe('+201 ****5678');
+    expect(maskPhone('0101 2345 678')).toBe('****5678');
+    expect(maskPhone('123')).toBe('****');
+    expect(maskPhone('')).toBeNull();
+    expect(maskEmailList(['a@b.com', 'C@D.COM'])).toEqual(['a***@b.com', 'C***@D.COM']);
+    expect(maskEmailList('x@y.z')).toBe('x***@y.z');
+  });
+
+  it('scrubEmails never masks LESS than the Task 8 version: lists, markup, multiple @', () => {
+    expect(scrubEmails('a@x.com,b@y.com')).toBe('a***@x.com,b***@y.com');
+    expect(scrubEmails('a@x.com;b@y.com')).toBe('a***@x.com;b***@y.com');
+    expect(scrubEmails('x<jane@gmail.com>')).toBe('x<j***@gmail.com>');
+    expect(scrubEmails('[jane@gmail.com]')).toBe('[j***@gmail.com]');
+    expect(scrubEmails('a@b@c.com')).toBe('a***@b***@c.com');
   });
 });

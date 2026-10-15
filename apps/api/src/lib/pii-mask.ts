@@ -65,11 +65,13 @@ function caseInsensitiveReplaceAll(text: string, needle: string, by: string): st
 function maskAddressToken(tok: string): string {
   const at = AT_FORMS.exec(tok);
   if (!at || at.index === 0) return tok;
-  const lead = /^["'<(\[]*(?:mailto:)?/i.exec(tok)![0];
+  const lead = /^(?:mailto:)?/i.exec(tok)![0];
   const local = tok.slice(lead.length, at.index);
   const domain = tok.slice(at.index + at[0].length);
   if (!domain) return tok;
-  return `${lead}${local.slice(0, 1) || '*'}***@${domain}`;
+  // `a@b@c.com`: the rest may carry another address; mask it too (bounded by SCRUB_EMAILS_MAX).
+  const rest = AT_FORMS.test(domain) ? maskAddressToken(domain) : domain;
+  return `${lead}${local.slice(0, 1) || '*'}***@${rest}`;
 }
 
 /**
@@ -93,7 +95,12 @@ export function scrubEmails(
     if (k && k.trim()) s = caseInsensitiveReplaceAll(s, k.trim(), maskEmail(k.trim()) ?? '***');
   }
   s = s.replace(QUOTED_LOCAL, '"***"');
-  return s.replace(/[^\s]+/g, tok => (AT_FORMS.test(tok) ? maskAddressToken(tok) : tok));
+  // Tokens end at whitespace AND at list/markup punctuation, so `a@x.com,b@y.com` and
+  // `<a@x.com>` are two / one clean addresses (the Task 8 regex already split on these).
+  // An HTML entity (`&#64;`, `&commat;`) is part of a token even though it ends in `;`.
+  return s.replace(/(?:&#x?[0-9a-f]{1,6};|&commat;|[^\s,;<>()"'[\]])+/gi, tok =>
+    AT_FORMS.test(tok) ? maskAddressToken(tok) : tok
+  );
 }
 
 /**
