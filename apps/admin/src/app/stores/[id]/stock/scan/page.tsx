@@ -19,6 +19,7 @@ import { useParams } from 'next/navigation';
 import { AdminLayout } from '@/components/AdminLayout';
 import { DataTable } from '@/components/mobile/DataTable';
 import { useT } from '@/i18n/useT';
+import { useFeatures } from '@/hooks/useFeatures';
 import { useLocale } from 'next-intl';
 import { VariantText } from '@ebda/ui';
 import { apiGet, apiPost } from '@/lib/api';
@@ -1079,6 +1080,11 @@ export default function BarcodeScanPage() {
   const storeId = params?.id as string;
   const t = useT('stock.scan');
   const [mode, setMode] = useState<Mode>('receive');
+  // Every inventory/* endpoint this page calls is requireFeature('inventory.barcode'): without it
+  // the scanner would draw fully and never work (count mode's lists and "start session" fail
+  // silently). Gate the whole page; scanErrorText stays as the backstop for a mid-session change.
+  const { isEnabled, isLoading: featuresLoading } = useFeatures();
+  const barcodeEnabled = isEnabled('inventory.barcode');
 
   const modes: { key: Mode; label: string }[] = [
     { key: 'receive', label: t('modeReceive') },
@@ -1088,47 +1094,63 @@ export default function BarcodeScanPage() {
 
   return (
     <AdminLayout title={t('title')} subtitle={t('description')}>
-      <div className="max-w-lg mx-auto space-y-5">
-        {/* Mode selector */}
-        <div className="flex rounded-xl border border-border bg-muted/20 p-1 gap-1">
-          {modes.map(m => (
-            <button
-              key={m.key}
-              type="button"
-              onClick={() => setMode(m.key)}
-              className={[
-                'flex-1 min-h-[44px] rounded-lg text-sm font-medium transition-colors',
-                mode === m.key
-                  ? 'bg-background shadow-sm text-foreground'
-                  : 'text-muted-foreground hover:text-foreground',
-              ].join(' ')}
-            >
-              {m.label}
-            </button>
-          ))}
+      {featuresLoading ? (
+        <div className="max-w-lg mx-auto space-y-3" data-testid="scan-features-skeleton">
+          <div className="h-12 animate-pulse rounded-xl bg-muted/40" />
+          <div className="h-32 animate-pulse rounded-xl bg-muted/30" />
         </div>
-
-        {/* What this page does — bilingual explainer of the 3 modes */}
-        <div className="rounded-xl border border-border bg-muted/20 p-3 text-xs leading-relaxed text-muted-foreground space-y-1.5">
-          <p className="font-semibold text-foreground">{t('helpTitle')}</p>
-          <p>
-            <span className="font-medium text-foreground">{t('modeReceive')}:</span>{' '}
-            {t('helpReceive')}
-          </p>
-          <p>
-            <span className="font-medium text-foreground">{t('modePick')}:</span> {t('helpPick')}
-          </p>
-          <p>
-            <span className="font-medium text-foreground">{t('modeCount')}:</span> {t('helpCount')}
-          </p>
-          <p className="pt-1 border-t border-border/60">{t('helpCamera')}</p>
+      ) : !barcodeEnabled ? (
+        <div
+          role="status"
+          data-testid="scan-feature-off"
+          className="max-w-lg mx-auto rounded-xl border border-border bg-muted/20 p-5 text-sm leading-relaxed text-foreground"
+        >
+          {t('featureNotOnPlan')}
         </div>
+      ) : (
+        <div className="max-w-lg mx-auto space-y-5">
+          {/* Mode selector */}
+          <div className="flex rounded-xl border border-border bg-muted/20 p-1 gap-1">
+            {modes.map(m => (
+              <button
+                key={m.key}
+                type="button"
+                onClick={() => setMode(m.key)}
+                className={[
+                  'flex-1 min-h-[44px] rounded-lg text-sm font-medium transition-colors',
+                  mode === m.key
+                    ? 'bg-background shadow-sm text-foreground'
+                    : 'text-muted-foreground hover:text-foreground',
+                ].join(' ')}
+              >
+                {m.label}
+              </button>
+            ))}
+          </div>
 
-        {/* Mode content */}
-        {mode === 'receive' && <ReceiveMode storeId={storeId} />}
-        {mode === 'pick' && <PickMode storeId={storeId} />}
-        {mode === 'count' && <CountMode storeId={storeId} />}
-      </div>
+          {/* What this page does — bilingual explainer of the 3 modes */}
+          <div className="rounded-xl border border-border bg-muted/20 p-3 text-xs leading-relaxed text-muted-foreground space-y-1.5">
+            <p className="font-semibold text-foreground">{t('helpTitle')}</p>
+            <p>
+              <span className="font-medium text-foreground">{t('modeReceive')}:</span>{' '}
+              {t('helpReceive')}
+            </p>
+            <p>
+              <span className="font-medium text-foreground">{t('modePick')}:</span> {t('helpPick')}
+            </p>
+            <p>
+              <span className="font-medium text-foreground">{t('modeCount')}:</span>{' '}
+              {t('helpCount')}
+            </p>
+            <p className="pt-1 border-t border-border/60">{t('helpCamera')}</p>
+          </div>
+
+          {/* Mode content */}
+          {mode === 'receive' && <ReceiveMode storeId={storeId} />}
+          {mode === 'pick' && <PickMode storeId={storeId} />}
+          {mode === 'count' && <CountMode storeId={storeId} />}
+        </div>
+      )}
     </AdminLayout>
   );
 }

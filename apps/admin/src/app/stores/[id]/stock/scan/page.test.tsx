@@ -13,11 +13,21 @@ vi.mock('@/lib/api', () => ({ apiGet, apiPost }));
 vi.mock('@/components/AdminLayout', () => ({
   AdminLayout: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
 }));
+const features = vi.hoisted(() => ({ enabled: true, loading: false }));
+vi.mock('@/hooks/useFeatures', () => ({
+  useFeatures: () => ({
+    isEnabled: (k: string) => (k === 'inventory.barcode' ? features.enabled : true),
+    isLoading: features.loading,
+    refresh: async () => {},
+  }),
+}));
 vi.mock('@/i18n/useT', () => ({ useT: () => (key: string) => key }));
 
 import BarcodeScanPage from './page';
 
 afterEach(() => {
+  features.enabled = true;
+  features.loading = false;
   cleanup();
   vi.clearAllMocks();
 });
@@ -54,5 +64,31 @@ describe('barcode scan page: pick mode errors', () => {
     });
     await loadOrderNumber('ORD-1');
     await waitFor(() => expect(screen.getByText('orderNotFound')).toBeTruthy());
+  });
+});
+
+describe('barcode scan page: plan gate (inventory.barcode)', () => {
+  it('feature off: one plan panel, no mode buttons, no API call', () => {
+    features.enabled = false;
+    render(<BarcodeScanPage />);
+    expect(screen.getByTestId('scan-feature-off').textContent).toBe('featureNotOnPlan');
+    for (const k of ['modeReceive', 'modePick', 'modeCount']) {
+      expect(screen.queryByText(k)).toBeNull();
+    }
+    expect(apiGet).not.toHaveBeenCalled();
+  });
+
+  it('while the flags load: a skeleton, neither the panel nor the scanner', () => {
+    features.loading = true;
+    render(<BarcodeScanPage />);
+    expect(screen.getByTestId('scan-features-skeleton')).toBeTruthy();
+    expect(screen.queryByTestId('scan-feature-off')).toBeNull();
+    expect(screen.queryByText('modeReceive')).toBeNull();
+  });
+
+  it('feature on: the three modes render and the panel does not', () => {
+    render(<BarcodeScanPage />);
+    expect(screen.getAllByText('modeReceive').length).toBeGreaterThan(0);
+    expect(screen.queryByTestId('scan-feature-off')).toBeNull();
   });
 });
