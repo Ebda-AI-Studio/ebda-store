@@ -1583,6 +1583,7 @@
           "mobileLabel": "الجوال",
           "layoutGrid": "شبكة",
           "layoutHorizontal": "تمرير أفقي",
+          "layoutChips": "أزرار نصية",
           "captionBelow": "اسم الفئة تحت الصورة",
           "captionOverlay": "اسم الفئة فوق الصورة",
           "desktopColumns": "أعمدة الشاشة الكبيرة",

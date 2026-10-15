@@ -1583,6 +1583,7 @@
           "mobileLabel": "Mobile",
           "layoutGrid": "Grid",
           "layoutHorizontal": "Horizontal scroll",
+          "layoutChips": "Text chips",
           "captionBelow": "Caption below image",
           "captionOverlay": "Caption over image",
           "desktopColumns": "Desktop columns",

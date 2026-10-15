@@ -86,7 +86,7 @@ describe('image-text full-bleed', () => {
     expect(imageTextSchema.safeParse({ layout: 'full-bleed' }).success).toBe(true);
   });
   it('exposes a solid scrim colour and opacity for the contrast test', () => {
-    expect(FULL_BLEED_SCRIM).toEqual({ color: '#000000', opacity: 0.6 });
+    expect(FULL_BLEED_SCRIM).toEqual({ color: '#141414', opacity: 0.88 });
   });
   for (const skin of ['minimal', 'dahab', 'qamar'] as const)
     it(`renders edge to edge with text over a scrim on ${skin}`, () => {
@@ -105,7 +105,12 @@ describe('image-text full-bleed', () => {
       expect(html).toContain('w-full');
       expect(html).not.toContain('md:grid-cols-2');
       expect(html).toContain('min-h-[60svh]');
-      expect(html).toContain('opacity:0.6');
+      expect(html).toContain('rgb(20 20 20 / 0.88)');
+      expect(html).toContain('data-part="full-bleed-panel"');
+      // the photo is never washed: no absolute inset-0 overlay besides the <img> itself
+      expect(html.match(/absolute inset-0/g)?.length).toBe(1);
+      expect(html).not.toContain('aria-hidden="true"');
+      expect(html).toContain('justify-start');
     });
   it('falls back to the split layout without an image', () => {
     ctx.store = { ...STORES.A, template: 'qamar', theme: getTemplateTheme('qamar') };

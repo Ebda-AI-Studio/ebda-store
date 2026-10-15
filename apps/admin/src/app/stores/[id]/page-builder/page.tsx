@@ -1,5 +1,7 @@
 'use client';
 
+import { ModeButton } from './ModeButton';
+import { CategoryLayoutButtons } from './CategoryLayoutButtons';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams } from 'next/navigation';
 import {
@@ -706,20 +708,11 @@ export default function StoreLayoutPage() {
                 <p className="mt-2 mb-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                   {t('sections.categories.desktopLabel')}
                 </p>
-                <div className="grid grid-cols-2 gap-2 mb-2">
-                  <ModeButton
-                    active={layout.categories.layout === 'grid'}
-                    onClick={() => updateSection('categories', s => ({ ...s, layout: 'grid' }))}
-                    label={t('sections.categories.layoutGrid')}
-                  />
-                  <ModeButton
-                    active={layout.categories.layout === 'horizontal'}
-                    onClick={() =>
-                      updateSection('categories', s => ({ ...s, layout: 'horizontal' }))
-                    }
-                    label={t('sections.categories.layoutHorizontal')}
-                  />
-                </div>
+                <CategoryLayoutButtons
+                  value={layout.categories.layout}
+                  onChange={v => updateSection('categories', s => ({ ...s, layout: v }))}
+                  t={t}
+                />
                 <div className="grid grid-cols-2 gap-2 mb-2">
                   <ModeButton
                     active={layout.categories.captionPosition === 'below'}
@@ -754,24 +747,11 @@ export default function StoreLayoutPage() {
                 <p className="mt-2 mb-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                   {t('sections.categories.mobileLabel')}
                 </p>
-                <div className="grid grid-cols-2 gap-2 mb-2">
-                  <ModeButton
-                    active={(layout.categories.layoutMobile ?? layout.categories.layout) === 'grid'}
-                    onClick={() =>
-                      updateSection('categories', s => ({ ...s, layoutMobile: 'grid' }))
-                    }
-                    label={t('sections.categories.layoutGrid')}
-                  />
-                  <ModeButton
-                    active={
-                      (layout.categories.layoutMobile ?? layout.categories.layout) === 'horizontal'
-                    }
-                    onClick={() =>
-                      updateSection('categories', s => ({ ...s, layoutMobile: 'horizontal' }))
-                    }
-                    label={t('sections.categories.layoutHorizontal')}
-                  />
-                </div>
+                <CategoryLayoutButtons
+                  value={layout.categories.layoutMobile ?? layout.categories.layout}
+                  onChange={v => updateSection('categories', s => ({ ...s, layoutMobile: v }))}
+                  t={t}
+                />
                 <div className="grid grid-cols-2 gap-2 mb-2">
                   <ModeButton
                     active={
@@ -3701,30 +3681,6 @@ function SectionTypographyBlock({
         ))}
       </div>
     </div>
-  );
-}
-
-function ModeButton({
-  active,
-  label,
-  onClick,
-}: {
-  active: boolean;
-  label: string;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`rounded-xl border px-3 py-2 text-sm font-medium transition-colors cursor-pointer ${
-        active
-          ? 'border-primary bg-primary/10 text-primary-ink'
-          : 'border-border bg-card text-foreground hover:bg-muted'
-      }`}
-    >
-      {label}
-    </button>
   );
 }
 
