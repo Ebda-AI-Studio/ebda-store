@@ -47,7 +47,7 @@ const upload = multer({
     if (allowedTypes.includes(file.mimetype)) {
       cb(null, true);
     } else {
-      cb(new Error(`Invalid file type: ${file.mimetype}`));
+      cb(new AppError(400, 'INVALID_FILE_TYPE', `Invalid file type: ${file.mimetype}`));
     }
   },
 });
@@ -717,7 +717,13 @@ const fontUpload = multer({
     if (allowedTypes.has(file.mimetype) || allowedExts.test(file.originalname)) {
       cb(null, true);
     } else {
-      cb(new Error(`Invalid font file: ${file.originalname} (${file.mimetype})`));
+      cb(
+        new AppError(
+          400,
+          'INVALID_FONT_TYPE',
+          `Invalid font file: ${file.originalname} (${file.mimetype})`
+        )
+      );
     }
   },
 });

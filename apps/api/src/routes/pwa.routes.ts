@@ -136,7 +136,7 @@ const iconUpload = multer({
     if (allowed.includes(file.mimetype)) {
       cb(null, true);
     } else {
-      cb(new Error(`Invalid icon file type: ${file.mimetype}`));
+      cb(new AppError(400, 'INVALID_FILE_TYPE', `Invalid icon file type: ${file.mimetype}`));
     }
   },
 });

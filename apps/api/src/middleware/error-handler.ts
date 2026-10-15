@@ -24,6 +24,23 @@ export class AppError extends Error {
 }
 
 /**
+ * multer's own errors (real multer on Node, the formData stub on workerd: two classes with the
+ * same `name` and multer's `code` strings, hence duck typing instead of `instanceof`). They
+ * reach `errorHandler` through `next(err)` from any bare `upload.single(...)` / `.array(...)`
+ * route, and are the CLIENT's fault: a file over the size cap is a 413, anything else
+ * (wrong field, too many files) a 400. Without this mapping every one of them was a 500.
+ */
+function multerClientError(err: unknown): { status: number; code: string; message: string } | null {
+  if (!(err instanceof Error) || err.name !== 'MulterError') return null;
+  const code = (err as Error & { code?: unknown }).code;
+  if (typeof code !== 'string') return null;
+  if (code === 'LIMIT_FILE_SIZE') {
+    return { status: 413, code: 'FILE_TOO_LARGE', message: 'The uploaded file is too large' };
+  }
+  return { status: 400, code, message: err.message };
+}
+
+/**
  * The status `errorHandler` below will answer with, for every error class it
  * maps to a CLIENT error (4xx) without that status living on the error object.
  * Returns undefined for anything that becomes a 500.
@@ -43,6 +60,8 @@ export function clientErrorStatus(err: unknown): number | undefined {
   if (err instanceof AppError) return err.statusCode < 500 ? err.statusCode : undefined;
   if (err instanceof SyntaxError && 'body' in err) return 400;
   if (err instanceof ZodError) return 400;
+  const multerErr = multerClientError(err);
+  if (multerErr) return multerErr.status;
   if (err instanceof Prisma.PrismaClientKnownRequestError) {
     if (err.code === 'P2002') return 409;
     if (err.code === 'P2025') return 404;
@@ -139,6 +158,16 @@ export function errorHandler(err: Error, req: Request, res: Response, next: Next
         message: err.message,
         details: err.details,
       },
+    });
+    return;
+  }
+
+  const multerErr = multerClientError(err);
+  if (multerErr) {
+    logger.debug({ err: { code: multerErr.code, message: err.message } }, 'Multer upload error');
+    res.status(multerErr.status).json({
+      success: false,
+      error: { code: multerErr.code, message: multerErr.message },
     });
     return;
   }
