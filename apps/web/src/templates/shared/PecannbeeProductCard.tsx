@@ -459,7 +459,7 @@ function PecannbeeProductCardImpl({
                 <p
                   id={`prod-${product.id}-name`}
                   data-zone="productName"
-                  className={`line-clamp-2 min-h-[2.5em] font-semibold ${textSizes.name} ${styles.productCardName}${nameCase === 'uppercase' ? ' uppercase' : ''}`}
+                  className={`[overflow-wrap:anywhere] line-clamp-2 min-h-[2.5em] font-semibold ${textSizes.name} ${styles.productCardName}${nameCase === 'uppercase' ? ' uppercase' : ''}`}
                   style={{
                     textWrap: 'balance',
                     fontFamily: productNameZone?.fontFamily,

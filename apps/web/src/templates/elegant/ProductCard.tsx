@@ -407,7 +407,7 @@ function ElegantProductCard({
               onAddToCart={handleAddToCart}
               variant="ghost"
               className={cn(
-                'w-full py-4 text-[10px] tracking-[0.25em] uppercase font-normal rounded-none cursor-pointer',
+                'w-full max-w-full overflow-hidden text-ellipsis px-2 py-4 text-[10px] tracking-[0.12em] sm:tracking-[0.25em] uppercase font-normal rounded-none cursor-pointer',
                 'hover:bg-foreground hover:text-background transition-colors duration-300'
               )}
               labels={{
@@ -438,7 +438,7 @@ function ElegantProductCard({
               <h3
                 id={`prod-${product.id}-name`}
                 data-zone="productName"
-                className={`${textSizes.name} tracking-[0.15em] ${nameCase === 'uppercase' ? 'uppercase' : ''} text-foreground/80 group-hover:text-foreground transition-colors duration-300 line-clamp-1 min-h-[1.5em]`}
+                className={`${textSizes.name} tracking-[0.15em] ${nameCase === 'uppercase' ? 'uppercase' : ''} text-foreground/80 group-hover:text-foreground transition-colors duration-300 [overflow-wrap:anywhere] line-clamp-1 min-h-[1.5em]`}
                 itemProp="name"
               >
                 {isRtl && product.nameAr ? product.nameAr : product.name}

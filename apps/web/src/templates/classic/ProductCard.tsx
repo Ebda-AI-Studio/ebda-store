@@ -374,7 +374,7 @@ function ClassicProductCard({
               <h3
                 id={`prod-${product.id}-name`}
                 data-zone="productName"
-                className={`font-serif ${textSizes.name} text-foreground mb-2 group-hover:text-primary transition-colors duration-500 leading-snug tracking-tight line-clamp-2 min-h-[2.5em]${nameCase === 'uppercase' ? ' uppercase' : ''}`}
+                className={`font-serif ${textSizes.name} text-foreground mb-2 group-hover:text-primary transition-colors duration-500 leading-snug tracking-tight [overflow-wrap:anywhere] line-clamp-2 min-h-[2.5em]${nameCase === 'uppercase' ? ' uppercase' : ''}`}
                 itemProp="name"
               >
                 {isRtl && product.nameAr ? product.nameAr : product.name}

@@ -338,7 +338,7 @@ function MinimalProductCard({
               language. */}
           <div
             className={cn(
-              'flex absolute bottom-0 inset-x-0 items-center justify-center pb-4 pt-12',
+              'flex absolute bottom-0 inset-x-0 items-center justify-center px-3 pb-4 pt-12',
               'bg-gradient-to-t from-background/95 via-background/70 to-transparent',
               // Mobile: the underlined add-link is always tappable (no hover to
               // reveal). Desktop: keep the on-hover reveal — "mobile stays pure"
@@ -358,7 +358,7 @@ function MinimalProductCard({
               onAddToCart={handleAddToCart}
               variant="ghost"
               className={cn(
-                'bg-transparent text-[10px] tracking-[0.28em] uppercase font-light text-foreground',
+                'max-w-full overflow-hidden text-ellipsis bg-transparent text-[10px] tracking-[0.14em] uppercase font-light text-foreground',
                 'underline underline-offset-4 decoration-foreground/30 hover:decoration-foreground',
                 'hover:bg-transparent hover:text-foreground transition-colors duration-300',
                 'py-1 h-auto cursor-pointer'
@@ -392,7 +392,7 @@ function MinimalProductCard({
               <h3
                 id={`prod-${product.id}-name`}
                 data-zone="productName"
-                className={`${textSizes.name} tracking-[0.18em] ${nameCase === 'uppercase' ? 'uppercase' : ''} font-light text-muted-foreground group-hover:text-foreground transition-colors duration-500 ease-out leading-snug line-clamp-2 min-h-[2.5em]`}
+                className={`${textSizes.name} tracking-[0.18em] ${nameCase === 'uppercase' ? 'uppercase' : ''} font-light text-muted-foreground group-hover:text-foreground transition-colors duration-500 ease-out leading-snug [overflow-wrap:anywhere] line-clamp-2 min-h-[2.5em]`}
                 itemProp="name"
               >
                 {isRtl && product.nameAr ? product.nameAr : product.name}

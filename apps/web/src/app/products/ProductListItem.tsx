@@ -218,7 +218,7 @@ export function ProductListItem({
             </p>
           )}
           <h3
-            className={`mt-1 text-lg font-semibold text-foreground${nameCase === 'uppercase' ? ' uppercase' : ''}`}
+            className={`mt-1 text-lg font-semibold text-foreground [overflow-wrap:anywhere]${nameCase === 'uppercase' ? ' uppercase' : ''}`}
             data-zone="productName"
           >
             {displayName}

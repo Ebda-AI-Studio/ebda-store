@@ -635,7 +635,7 @@ function SharedProductCarousel({
                             >
                               {nameVisible && (
                                 <p
-                                  className={`line-clamp-2 min-h-[2.5em] ${textSizes.name} ${styles.productCardName}${nameCase === 'uppercase' ? ' uppercase' : ''}`}
+                                  className={`[overflow-wrap:anywhere] line-clamp-2 min-h-[2.5em] ${textSizes.name} ${styles.productCardName}${nameCase === 'uppercase' ? ' uppercase' : ''}`}
                                   data-zone="productName"
                                   style={{
                                     fontFamily: productNameZone?.fontFamily,

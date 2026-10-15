@@ -381,7 +381,7 @@ function BoldProductCard({
               <h3
                 id={`prod-${product.id}-name`}
                 data-zone="productName"
-                className={`font-black ${textSizes.name} ${nameCase === 'uppercase' ? 'uppercase' : ''} tracking-tight line-clamp-1 min-h-[1.5em] group-hover:text-primary transition-colors duration-200`}
+                className={`font-black ${textSizes.name} ${nameCase === 'uppercase' ? 'uppercase' : ''} tracking-tight [overflow-wrap:anywhere] line-clamp-1 min-h-[1.5em] group-hover:text-primary transition-colors duration-200`}
                 itemProp="name"
               >
                 {isRtl && product.nameAr ? product.nameAr : product.name}

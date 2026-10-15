@@ -197,7 +197,7 @@ export default function DahabProductCard({
 
       <div className="mt-3 flex flex-1 flex-col gap-1.5">
         {nameVisible && (
-          <h3 className="line-clamp-2 text-[15px] leading-snug text-foreground">
+          <h3 className="line-clamp-2 text-[15px] leading-snug text-foreground [overflow-wrap:anywhere]">
             <Link
               href={href}
               prefetch={false}
