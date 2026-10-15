@@ -308,9 +308,9 @@ async function markDelivery(
 }
 
 /** Provider text, emails scrubbed, cut to ERROR_MAX. Pre-sliced so a huge message is cheap (M9). */
-function deliveryError(err: unknown): string {
+function deliveryError(err: unknown, recipient?: string): string {
   const msg = String((err as Error)?.message ?? err);
-  return scrubEmails(msg.slice(0, ERROR_MAX * 2)).slice(0, ERROR_MAX);
+  return scrubEmails(msg.slice(0, ERROR_MAX * 2), [recipient]).slice(0, ERROR_MAX);
 }
 
 /**
@@ -395,7 +395,7 @@ export async function sendNextBatch(
         ...content,
       });
     } catch (err) {
-      error = deliveryError(err);
+      error = deliveryError(err, user!.email);
       // No raw recipient address in logs (the drain is off-platform): the scrubbed reason only.
       logger.warn({ reason: error, userId, docKey, version }, '[LEGAL-NOTICE] send failed');
     }
@@ -544,7 +544,9 @@ export async function policyOverview(
           const emailOf = new Map(users.map(u => [u.id, u.email]));
           failedDeliveries = failed.map(f => ({
             maskedEmail: maskEmail(emailOf.get(f.userId)) ?? '***',
-            error: f.error ? scrubEmails(f.error).slice(0, ERROR_MAX) : null,
+            error: f.error
+              ? scrubEmails(f.error, [emailOf.get(f.userId)]).slice(0, ERROR_MAX)
+              : null,
             at: f.updatedAt.toISOString(),
           }));
         }
@@ -813,6 +815,10 @@ export async function userLegalRecord(
       orderBy: [{ acceptedAt: 'desc' }, { docKey: 'asc' }],
       select: { docKey: true, version: true, source: true, acceptedAt: true, ip: true },
     });
+    const account = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { email: true },
+    });
     const deliveries = await prisma.legalNoticeDelivery.findMany({
       where: { userId },
       orderBy: { updatedAt: 'desc' },
@@ -830,7 +836,7 @@ export async function userLegalRecord(
         docKey: d.docKey,
         version: d.version,
         status: d.status,
-        error: d.error ? scrubEmails(d.error).slice(0, ERROR_MAX) : null,
+        error: d.error ? scrubEmails(d.error, [account?.email]).slice(0, ERROR_MAX) : null,
         at: d.updatedAt.toISOString(),
       })),
     };

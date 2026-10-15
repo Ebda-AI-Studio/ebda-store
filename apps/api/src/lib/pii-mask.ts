@@ -40,9 +40,60 @@ export function maskEmail(email: string | null | undefined): string | null {
   return `${email.slice(0, 1)}***${email.slice(at)}`;
 }
 
-/** Every email-shaped substring in free text replaced by its masked form (provider error text). */
-export function scrubEmails(text: string): string {
-  return text.replace(/[^\s@<>"',;()]+@[^\s@<>"',;()]+/g, m => maskEmail(m) ?? '***');
+/** Longest free text `scrubEmails` looks at; the rest is dropped BEFORE matching (bounded cost). */
+export const SCRUB_EMAILS_MAX = 2000;
+
+/** Every spelling of "@" a mail provider (or an HTML/URL rendering of its text) may use. */
+const AT_FORMS = /@|%40|&#0*64;|&#x0*40;|&commat;/i;
+/** A quoted local part (`"john doe"@x.com`): it may hold spaces, so tokens alone miss it. */
+const QUOTED_LOCAL = /"[^"\r\n]{1,64}"(?=\s*(?:@|%40|&#0*64;|&#x0*40;|&commat;))/gi;
+
+function caseInsensitiveReplaceAll(text: string, needle: string, by: string): string {
+  if (!needle) return text;
+  const hay = text.toLowerCase();
+  const n = needle.toLowerCase();
+  let out = '';
+  let from = 0;
+  for (let i = hay.indexOf(n); i !== -1; i = hay.indexOf(n, from)) {
+    out += text.slice(from, i) + by;
+    from = i + n.length;
+  }
+  return out + text.slice(from);
+}
+
+/** One whitespace-free token that carries an "@" form -> `j***@domain` (mailto: kept). */
+function maskAddressToken(tok: string): string {
+  const at = AT_FORMS.exec(tok);
+  if (!at || at.index === 0) return tok;
+  const lead = /^["'<(\[]*(?:mailto:)?/i.exec(tok)![0];
+  const local = tok.slice(lead.length, at.index);
+  const domain = tok.slice(at.index + at[0].length);
+  if (!domain) return tok;
+  return `${lead}${local.slice(0, 1) || '*'}***@${domain}`;
+}
+
+/**
+ * Email addresses in free text (provider error text) replaced by their masked form, before it is
+ * stored or shown. Hardened after a commit security scan (parser differential: a provider may
+ * still read an address a narrow regex misses):
+ *  1. the input is cut to SCRUB_EMAILS_MAX BEFORE any matching, so cost is bounded;
+ *  2. the `known` recipient addresses are replaced first, exact and case-insensitive;
+ *  3. a quoted local part (`"john doe"@x.com`) is masked whole;
+ *  4. every whitespace-delimited token holding any "@" form (`@`, `%40`, `&#64;`, `&#x40;`,
+ *     `&commat;`, incl. `mailto:` and unicode/IDN) is masked. One linear pass over tokens:
+ *     no nested quantifiers, no backtracking blow-up.
+ * Broad on purpose: a false positive costs a masked word, a miss costs an address.
+ */
+export function scrubEmails(
+  text: string,
+  known: ReadonlyArray<string | null | undefined> = []
+): string {
+  let s = text.length > SCRUB_EMAILS_MAX ? text.slice(0, SCRUB_EMAILS_MAX) : text;
+  for (const k of known) {
+    if (k && k.trim()) s = caseInsensitiveReplaceAll(s, k.trim(), maskEmail(k.trim()) ?? '***');
+  }
+  s = s.replace(QUOTED_LOCAL, '"***"');
+  return s.replace(/[^\s]+/g, tok => (AT_FORMS.test(tok) ? maskAddressToken(tok) : tok));
 }
 
 /**
