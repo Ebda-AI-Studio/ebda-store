@@ -10,3 +10,5 @@ off-palette colour were regenerated (Ruling B1-9).
 
 Regenerate: `python3 scripts/qamar-demo/gen.py` (needs `npx wrangler login`; skips files already in
 `img-src/`), then `bash scripts/qamar-demo/encode.sh` and `bash scripts/qamar-demo/make-video.sh`.
+
+- `look-1.webp`: scrawled marks on the wall at the right edge (B1-9 lettering class) retouched out on 2026-10-15 by cloning the plain wall 48px below (PIL, feathered mask), re-encoded WebP q80, 33,900 bytes; viewed back.
