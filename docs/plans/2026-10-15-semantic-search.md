@@ -3206,7 +3206,7 @@ EOF
 )"
 ```
 
-**PR 4 boundary.** Merge + deploy with the flag still off → STOP-4 backfill confirmed complete (searches page shows "N of M") → Task 8 search-words autofill done → Task 13 eval re-run on the first REAL catalogue meets the bar with the msa/en floors (SEARCH-T13-4) → **STOP-3b** (Ahmad sets `SEARCH_SEMANTIC_ENABLED=true` as a Worker var) → live checks: `/health` commit, Arabic-locale search on one store, `wrangler tail` showing no `[search] vector leg failed` lines over 15 min, Workers AI usage in the CF dashboard.
+**PR 4 boundary.** Merge + deploy with the flag still off → `/health` commit = the merge commit → follow-up CONTRACT PR drops the 5-argument `ebda_product_embed_doc` (SEARCH-T13-8; never in the same deploy as the expand) → STOP-4 backfill confirmed complete (searches page shows "N of M") → Task 8 search-words autofill done → Task 13 eval re-run on the first REAL catalogue meets the bar with the msa/en floors (SEARCH-T13-4) → **STOP-3b** (Ahmad sets `SEARCH_SEMANTIC_ENABLED=true` as a Worker var) → live checks: `/health` commit, Arabic-locale search on one store, `wrangler tail` showing no `[search] vector leg failed` lines over 15 min, Workers AI usage in the CF dashboard.
 
 ---
 

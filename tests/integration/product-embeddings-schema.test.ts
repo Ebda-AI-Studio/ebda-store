@@ -154,15 +154,21 @@ describe.skipIf(!hasDb)('product_embeddings', () => {
     expect(c?.def).toMatch(/terms_embedding IS NULL.*=.*terms_hash IS NULL/);
   });
 
-  it('SEARCH-T13-5: the embed doc has no search-words part and the 5-argument version is gone', async () => {
+  it('SEARCH-T13-5/8: expand-then-contract — the 4-argument doc (no words) is added and the 5-argument one KEPT for the previous Worker', async () => {
     const sigs = await prisma.$queryRaw<Array<{ args: string }>>`
       SELECT pg_get_function_identity_arguments(p.oid) AS args FROM pg_proc p
       JOIN pg_namespace n ON n.oid = p.pronamespace
-      WHERE n.nspname = 'public' AND p.proname = 'ebda_product_embed_doc'`;
-    expect(sigs).toEqual([{ args: 'p_name text, p_name_ar text, p_desc text, p_desc_ar text' }]);
-    const [r] = await prisma.$queryRaw<Array<{ d: string }>>`
-      SELECT public.ebda_product_embed_doc('Mug', 'مج', 'سيراميك', NULL) AS d`;
+      WHERE n.nspname = 'public' AND p.proname = 'ebda_product_embed_doc' ORDER BY 1`;
+    expect(sigs).toEqual([
+      { args: 'p_name text, p_name_ar text, p_desc text, p_desc_ar text' },
+      { args: 'p_name text, p_name_ar text, p_terms text, p_desc text, p_desc_ar text' },
+    ]);
+    const [r] = await prisma.$queryRaw<Array<{ d: string; old: string }>>`
+      SELECT public.ebda_product_embed_doc('Mug', 'مج', 'سيراميك', NULL) AS d,
+             public.ebda_product_embed_doc('Mug', 'مج', 'kobaya', 'سيراميك', NULL) AS old`;
     expect(r.d).toBe('مج\nMug\nسيراميك');
+    // what the previous Worker (prod 03f7421c2) still computes during the migrate → deploy window
+    expect(r.old).toBe('مج\nMug\nkobaya\nسيراميك');
   });
 
   it('embed doc tolerates NULL fields and is IMMUTABLE invoker-rights sql', async () => {
@@ -172,7 +178,8 @@ describe.skipIf(!hasDb)('product_embeddings', () => {
     const [f] = await prisma.$queryRaw<Array<{ vol: string; secdef: boolean }>>`
       SELECT p.provolatile::text AS vol, p.prosecdef AS secdef FROM pg_proc p
       JOIN pg_namespace n ON n.oid = p.pronamespace
-      WHERE n.nspname = 'public' AND p.proname = 'ebda_product_embed_doc'`;
+      WHERE n.nspname = 'public' AND p.proname = 'ebda_product_embed_doc'
+        AND p.pronargs = 4`;
     expect(f).toEqual({ vol: 'i', secdef: false });
   });
 
