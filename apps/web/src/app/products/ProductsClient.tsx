@@ -34,6 +34,7 @@ import {
   pageDensityStyle,
 } from '../../templates/shared/section-typography';
 import { ProductListItem } from './ProductListItem';
+import { getSortOptions } from './products-sort';
 import { ProductsFilterSidebar } from './ProductsFilterSidebar';
 import { ProductsPagination } from './ProductsPagination';
 import { recordLastListing, consumeFocusProduct } from '@/lib/last-listing';
@@ -49,43 +50,6 @@ const PRICE_SLIDER_MAX = 5000;
 const PRICE_SLIDER_STEP = 10;
 
 const PER_PAGE_OPTIONS: readonly number[] = [12, 24, 48, 96];
-
-/** Sort option labels are translated at render time via the t() helper */
-function getSortOptions(t: (en: string, ar: string) => string) {
-  return [
-    // Default = the merchant's curated per-category order. Sends NO sort/featured
-    // param so the API uses the ProductCategory.position path (all products in the
-    // store's chosen order). MUST stay first + be the default \u2014 a category browse
-    // should show the whole category, not a filtered collection.
-    {
-      value: 'default',
-      label: t('Recommended', '\u0627\u0644\u0645\u064f\u0648\u0635\u0649 \u0628\u0647'),
-    },
-    { value: 'featured', label: t('Featured', '\u0645\u0645\u064a\u0632') },
-    { value: 'newest', label: t('Newest', '\u0627\u0644\u0623\u062d\u062f\u062b') },
-    {
-      value: 'best_seller',
-      label: t(
-        'Best sellers',
-        '\u0627\u0644\u0623\u0643\u062b\u0631 \u0645\u0628\u064a\u0639\u0627\u064b'
-      ),
-    },
-    {
-      value: 'price-asc',
-      label: t(
-        'Price: Low to High',
-        '\u0627\u0644\u0633\u0639\u0631: \u0645\u0646 \u0627\u0644\u0623\u0642\u0644 \u0644\u0644\u0623\u0639\u0644\u0649'
-      ),
-    },
-    {
-      value: 'price-desc',
-      label: t(
-        'Price: High to Low',
-        '\u0627\u0644\u0633\u0639\u0631: \u0645\u0646 \u0627\u0644\u0623\u0639\u0644\u0649 \u0644\u0644\u0623\u0642\u0644'
-      ),
-    },
-  ];
-}
 
 function ProductSkeleton() {
   return (
@@ -201,7 +165,8 @@ export default function ProductsClient({
   const { store } = useStore();
   const storeUrl = useStoreUrl();
   const { templateId } = useTemplateComponents();
-  const sortOptions = getSortOptions(t);
+  // A search the server ranked (hybrid relevance, Task 12) labels the default "Most relevant".
+  const sortOptions = getSortOptions(t, meta?.ranked === true);
 
   // Resolve productCardDefaults typography zones for PLP cards. The global
   // zones are not accessible from this client component (they're emitted as
