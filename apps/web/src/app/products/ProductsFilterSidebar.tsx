@@ -232,6 +232,11 @@ export function ProductsFilterSidebar(props: ProductsFilterSidebarProps) {
   useBodyScrollLock(isOpen);
 
   const activeFilterCount = countActiveFilters(search, categoryFilter, optionFilters);
+  // L-07: the one clear action shows only when something is filtered (a narrowed price too).
+  const priceNarrowed =
+    (priceMin !== undefined && priceFloor !== undefined && priceMin > priceFloor) ||
+    (priceMax !== undefined && priceCeil !== undefined && priceMax < priceCeil);
+  const activeCount = activeFilterCount + (priceNarrowed ? 1 : 0);
 
   // Close-and-act helpers — when the user picks an option inside the mobile
   // sheet, we close it so they see the filtered results immediately.
@@ -316,15 +321,17 @@ export function ProductsFilterSidebar(props: ProductsFilterSidebarProps) {
 
       <div className="flex items-center justify-between">
         <h3 className="text-sm lg:text-base font-semibold text-[hsl(var(--filter-fg))]">
-          {t('Filters', 'فلاتر')}
+          {t('Filters', 'الفلاتر')}
         </h3>
-        <button
-          type="button"
-          onClick={onClearAll}
-          className="text-xs lg:text-sm font-medium text-[hsl(var(--filter-fg))] underline opacity-80 hover:opacity-100"
-        >
-          {t('Remove filters', 'إزالة الفلاتر')}
-        </button>
+        {activeCount > 0 && (
+          <button
+            type="button"
+            onClick={onClearAll}
+            className="min-h-11 text-sm font-medium text-[hsl(var(--filter-fg))] underline underline-offset-4"
+          >
+            {t('Remove filters', 'إزالة الفلاتر')}
+          </button>
+        )}
       </div>
 
       {onPriceChange &&
@@ -493,18 +500,6 @@ export function ProductsFilterSidebar(props: ProductsFilterSidebarProps) {
             ))}
         </div>
       </div>
-
-      {/* Clear-filters button doubles as the bottom action on desktop;
-          mobile has its own primary "View results" CTA in the sheet footer. */}
-      {!mobile && (
-        <button
-          type="button"
-          onClick={onClearAll}
-          className="w-full rounded-xl border border-[hsl(var(--filter-fg)/0.3)] py-2.5 text-sm text-[hsl(var(--filter-fg)/0.8)] transition-colors hover:bg-[hsl(var(--filter-fg)/0.1)] hover:border-[hsl(var(--filter-fg)/0.5)]"
-        >
-          {t('Clear All Filters', 'مسح جميع الفلاتر')}
-        </button>
-      )}
     </>
   );
 
@@ -563,7 +558,7 @@ export function ProductsFilterSidebar(props: ProductsFilterSidebarProps) {
         side="bottom"
         id="products-filter-sheet"
         focusClose
-        title={t('Filters', 'فلاتر')}
+        title={t('Filters', 'الفلاتر')}
         closeLabel={t('Close', 'إغلاق')}
         className="bg-[hsl(var(--filter-bg))] text-[hsl(var(--filter-fg))] lg:hidden"
         titleClassName="text-base font-semibold text-[hsl(var(--filter-fg))]"

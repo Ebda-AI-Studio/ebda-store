@@ -471,7 +471,7 @@ function Totals({
 }
 
 /** Label at the start, value at the end, both in the body face (T-04: no tracked mono caps). */
-function MoneyRow({ label, ar, children }: { label: string; ar: boolean; children: ReactNode }) {
+function MoneyRow({ label, children }: { label: string; ar?: boolean; children: ReactNode }) {
   return (
     <div className="flex items-baseline justify-between gap-3 text-xs">
       <dt className={styles.inkSoft}>{label}</dt>

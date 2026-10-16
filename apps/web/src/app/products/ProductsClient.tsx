@@ -155,7 +155,7 @@ export default function ProductsClient({
   // allow-list (12 / 24 / 48 / 96); we persist their choice to localStorage
   // so it survives reloads but never trust it blindly — anything outside the
   // allow-list falls back to 96 (default: show all items).
-  const [perPage, setPerPage] = useState<number>(() => {
+  const [perPage] = useState<number>(() => {
     if (typeof window === 'undefined') return 96;
     const stored = Number(window.localStorage.getItem('plp-per-page'));
     return PER_PAGE_OPTIONS.includes(stored) ? stored : 96;
@@ -628,16 +628,7 @@ export default function ProductsClient({
                   onSortChange={setSortBy}
                   resultCount={products.length}
                   isLoading={isLoading}
-                  perPage={perPage}
-                  perPageOptions={PER_PAGE_OPTIONS}
-                  onPerPageChange={next => {
-                    if (PER_PAGE_OPTIONS.includes(next)) {
-                      setPerPage(next);
-                      if (typeof window !== 'undefined') {
-                        window.localStorage.setItem('plp-per-page', String(next));
-                      }
-                    }
-                  }}
+                  // L-07: a page size is not a filter; the PLP keeps its default page size.
                   priceMin={priceMin}
                   priceMax={priceMax}
                   priceFloor={0}

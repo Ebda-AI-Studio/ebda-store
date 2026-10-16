@@ -123,3 +123,18 @@ describe('Y-08 / R-09: cart coupon field and back arrows', () => {
     for (const a of arrows) expect(a[0]).toContain('rtl:-scale-x-100');
   });
 });
+
+describe('L-07: one filter panel, one clear action, no page-size control', () => {
+  const side = read('app/products/ProductsFilterSidebar.tsx');
+  const plp = read('app/products/ProductsClient.tsx');
+  it('the PLP does not hand the panel a per-page control (a page size is not a filter)', () => {
+    expect(plp).not.toMatch(/onPerPageChange=/);
+  });
+  it('one clear action: the header link only, shown only with an active filter', () => {
+    expect(side).not.toContain("'Clear All Filters'");
+    expect(side).toMatch(/activeCount > 0 && \(\s*<button[\s\S]{0,200}onClick=\{onClearAll\}/);
+  });
+  it('the panel is named with the article: "الفلاتر"', () => {
+    expect(side).not.toContain("t('Filters', 'فلاتر')");
+  });
+});
