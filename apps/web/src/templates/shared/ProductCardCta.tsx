@@ -33,6 +33,8 @@ import { avoidReservedCorner, soldOutCorner } from './badge-collision';
  * Task 3 (B1): ctaShape, ctaSize, ctaColor, ctaTextColor, ctaLabelTextEn,
  * ctaLabelTextAr, oosDimColor, theme — all optional, additive.
  */
+const useIsomorphicLayoutEffect = typeof window === 'undefined' ? useEffect : useLayoutEffect;
+
 /**
  * FU46 D7: a card narrow enough that the full "Add to cart" label would
  * ellipsize (the 3-col elegant PLP, the ~88px recommendation cards at 320-360)
@@ -40,9 +42,14 @@ import { avoidReservedCorner, soldOutCorner } from './badge-collision';
  * measurement, not breakpoint: the card width depends on the grid, not the
  * viewport. `needed` remembers the full label's width so the label comes back
  * when the box grows (rotation, resize) without flapping.
+ *
+ * Assumption behind the way back: the CTA FILLS its parent's content box (no
+ * sibling beside it), so "the parent's content width" is the width the label
+ * would get. Every card path today renders the CTA alone in its slot. A card
+ * that puts a sibling (a wishlist heart, a qty stepper) beside the CTA must
+ * subtract that sibling's width from `available`, or the label returns while
+ * it still does not fit and the two states flap.
  */
-const useIsomorphicLayoutEffect = typeof window === 'undefined' ? useEffect : useLayoutEffect;
-
 export function useCompactCta() {
   const ref = useRef<HTMLButtonElement | null>(null);
   const needed = useRef(0);
