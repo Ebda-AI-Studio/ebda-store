@@ -521,7 +521,10 @@ export async function balanceProductLanguages(
   balanced: boolean;
   changed: { name?: boolean; description?: boolean };
   sides: { name?: 'en' | 'ar'; description?: 'en' | 'ar' };
+  /** provider calls made (cache hits excluded): the sweep paces on it (review I4) */
+  calls: number;
 }> {
+  let calls = 0;
   const product = await prisma.product.findFirst({
     where: { id: productId, storeId, deletedAt: null },
     select: {
@@ -533,7 +536,7 @@ export async function balanceProductLanguages(
       aiBalanceBackup: true,
     },
   });
-  if (!product) return { balanced: false, changed: {}, sides: {} };
+  if (!product) return { balanced: false, changed: {}, sides: {}, calls };
 
   const sources = (product.aiFieldSources as AiFieldSources) ?? {};
   const existingBackup = (product.aiBalanceBackup ?? {}) as BalanceBackup;
@@ -608,13 +611,14 @@ export async function balanceProductLanguages(
         newEn = englishText ?? (enVal?.trim() || null);
       } else {
         // Either English is missing, OR force:true requests a fresh translation
-        const { translation } = await AIService.translate({
+        const { translation, cached } = await AIService.translate({
           storeId,
           text: arabicText,
           from: 'ar',
           to: 'en',
           kind,
         });
+        if (!cached) calls++;
         if (!translation?.trim()) return false;
         newEn = translation;
       }
@@ -626,13 +630,14 @@ export async function balanceProductLanguages(
     } else {
       // Only English exists
       newEn = englishText!;
-      const { translation } = await AIService.translate({
+      const { translation, cached } = await AIService.translate({
         storeId,
         text: englishText!,
         from: 'en',
         to: 'ar',
         kind,
       });
+      if (!cached) calls++;
       if (!translation?.trim()) return false;
       newAr = translation;
     }
@@ -681,7 +686,7 @@ export async function balanceProductLanguages(
   if (descChanged) changed.description = true;
 
   const anyChanged = Object.keys(writes).length > 0;
-  if (!anyChanged) return { balanced: false, changed, sides };
+  if (!anyChanged) return { balanced: false, changed, sides, calls };
 
   // Guarded write (review I1, same class as the fill): a field the merchant edited or stamped
   // 'human' while the translation was in flight is left alone. The guarded writer stamps 'ai'
@@ -698,7 +703,7 @@ export async function balanceProductLanguages(
     writes as Record<string, string | null>,
     { extraData: { aiBalanceBackup: backup as object } }
   );
-  if (written.length === 0) return { balanced: false, changed: {}, sides: {} };
+  if (written.length === 0) return { balanced: false, changed: {}, sides: {}, calls };
   const wrote = (a: string, b: string) => written.includes(a) || written.includes(b);
   const finalChanged = {
     ...(changed.name && wrote('name', 'nameAr') ? { name: true } : {}),
@@ -713,7 +718,7 @@ export async function balanceProductLanguages(
     { storeId, productId, changed: finalChanged, sides: finalSides },
     '[ai-balance] language balance applied'
   );
-  return { balanced: true, changed: finalChanged, sides: finalSides };
+  return { balanced: true, changed: finalChanged, sides: finalSides, calls };
 }
 
 /**
@@ -777,43 +782,105 @@ export async function revertProductBalance(
 }
 const SWEEP_THROTTLE_MS = parseInt(process.env.AI_BULK_THROTTLE_MS ?? '2500', 10);
 const sweepSleep = (ms: number) => new Promise<void>(r => setTimeout(r, ms));
+/**
+ * After a provider 429 the sweep waits one full per-minute rate window before the next product
+ * (review I4). The throttle alone should keep 429s away; this stops a burst from hammering.
+ */
+export const RATE_LIMIT_BACKOFF_MS = 60_000;
+
+export interface SweepStoreResult {
+  products: number;
+  filled: number;
+  calls: number;
+  rateLimited: number;
+  capped: boolean;
+}
+
+interface SweepDeps {
+  fill?: typeof fillProductFields;
+  balance?: (
+    storeId: string,
+    productId: string,
+    opts: { force?: boolean }
+  ) => Promise<{ balanced: boolean; calls?: number }>;
+  sleep?: (ms: number) => Promise<void>;
+  throttleMs?: number;
+}
 
 /**
  * Sweep one store: fill gaps on every active product, refresh ai text fields
  * whose product hasn't changed in STALE_TTL_DAYS, and (caller handles FBT
- * recompute first). Throttled like the bulk jobs. No-op if autopilot is off.
+ * recompute first). No-op if autopilot is off. Run it under the store's scope
+ * (`sweepAutofillStore`, review I3).
+ *
+ * Pacing (review I4, sleep-after-success): after each product, sleep
+ * AI_BULK_THROTTLE_MS × the provider calls it ACTUALLY made (cache hits and
+ * skipped products sleep nothing). A provider 429 is logged at warn with a
+ * running count and backs off RATE_LIMIT_BACKOFF_MS; a quota cap stops this
+ * store (terminal until the window resets). `deps` is for tests.
  */
-export async function sweepStore(storeId: string): Promise<{ products: number; filled: number }> {
-  if (!(await isAutopilotEnabled(storeId))) return { products: 0, filled: 0 };
+export async function sweepStore(storeId: string, deps: SweepDeps = {}): Promise<SweepStoreResult> {
+  const fill = deps.fill ?? fillProductFields;
+  const balance = deps.balance ?? balanceProductLanguages;
+  const sleep = deps.sleep ?? sweepSleep;
+  const throttleMs = deps.throttleMs ?? SWEEP_THROTTLE_MS;
+  const out: SweepStoreResult = { products: 0, filled: 0, calls: 0, rateLimited: 0, capped: false };
+  if (!(await isAutopilotEnabled(storeId))) return out;
 
   const products = await prisma.product.findMany({
     where: { storeId, status: 'active', deletedAt: null },
     select: { id: true, updatedAt: true },
   });
+  out.products = products.length;
 
-  let filled = 0;
+  const backOff = async (productId: string) => {
+    out.rateLimited++;
+    logger.warn(
+      { storeId, productId, rateLimited: out.rateLimited },
+      '[ai-autofill-sweep] provider rate limit (429): backing off one minute window'
+    );
+    await sleep(RATE_LIMIT_BACKOFF_MS);
+  };
+
   const staleBefore = new Date(Date.now() - STALE_TTL_DAYS * 24 * 60 * 60 * 1000);
   for (const p of products) {
     const refreshStale = p.updatedAt < staleBefore;
-    const res = await fillProductFields(storeId, p.id, { op: 'sweep', refreshStale });
-    filled += res.filled;
-    await sweepSleep(SWEEP_THROTTLE_MS);
+    const res = await fill(storeId, p.id, { op: 'sweep', refreshStale });
+    out.filled += res.filled;
+    out.calls += res.calls;
+    if (res.calls > 0) await sleep(throttleMs * res.calls);
+    if (res.capped) {
+      out.capped = true;
+      logger.info({ storeId, productId: p.id }, '[ai-autofill-sweep] quota cap: store stopped');
+      break;
+    }
+    if (res.rateLimited) {
+      await backOff(p.id);
+      continue;
+    }
 
-    // Autopilot: balance names + descriptions after filling so the 3-day sweep
+    // Autopilot: balance names + descriptions after filling so the daily sweep
     // keeps both languages in sync. force:false avoids churn on already-
     // balanced pairs. The revert backup ensures the merchant can undo.
     try {
-      const balResult = await balanceProductLanguages(storeId, p.id, { force: false });
-      if (balResult.balanced) {
-        filled += 1;
-        await sweepSleep(SWEEP_THROTTLE_MS);
-      }
+      const bal = await balance(storeId, p.id, { force: false });
+      const balCalls = bal.calls ?? 0;
+      out.calls += balCalls;
+      if (bal.balanced) out.filled += 1;
+      if (balCalls > 0) await sleep(throttleMs * balCalls);
     } catch (err) {
-      if (isAiQuotaCapError(err)) throw err;
+      if ((err as { code?: unknown } | null)?.code === 'AI_QUOTA_EXCEEDED') {
+        await backOff(p.id);
+        continue;
+      }
+      if (isAiQuotaCapError(err)) {
+        out.capped = true;
+        break;
+      }
       logger.warn({ err, storeId, productId: p.id }, '[ai-balance] sweep balance failed, skipping');
     }
   }
-  return { products: products.length, filled };
+  return out;
 }
 
 /**

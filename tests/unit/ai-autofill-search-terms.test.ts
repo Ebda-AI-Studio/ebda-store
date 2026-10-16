@@ -6,8 +6,9 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
+const warn = vi.fn();
 vi.mock('../../apps/api/src/lib/logger', () => ({
-  default: { warn: vi.fn(), debug: vi.fn(), error: vi.fn(), info: vi.fn() },
+  default: { warn: (...a: unknown[]) => warn(...a), debug: vi.fn(), error: vi.fn(), info: vi.fn() },
 }));
 
 let productRow: Record<string, unknown>;
@@ -289,6 +290,38 @@ describe('fillProductFields — searchTerms', () => {
       expect(src.name).toBe('ai');
       expect(src.metaTitleAr).toBe('human'); // the concurrent stamp is kept, not overwritten
       expect(src.searchTerms).toBeUndefined();
+    });
+  });
+
+  describe('I4: the fill reports real calls and does not swallow a 429', () => {
+    it('counts only non-cached provider calls', async () => {
+      productRow = {
+        ...baseProduct,
+        name: '',
+        description: '',
+        searchTerms: null,
+        aiFieldSources: { ...humanSources, name: undefined, description: undefined },
+      };
+      translate
+        .mockResolvedValueOnce({ translation: 'Leather sneakers', cached: true })
+        .mockResolvedValueOnce({ translation: 'White leather sneakers', cached: false });
+      const r = await fillProductFields('s1', 'p1', { op: 'create' });
+      expect(r.calls).toBe(2); // 1 uncached translate + 1 search-words call
+    });
+
+    it('a provider 429 is flagged rateLimited and logged at warn with a running count', async () => {
+      warn.mockClear();
+      generateProductSearchTerms.mockRejectedValue(
+        Object.assign(new Error('AI quota reached'), { code: 'AI_QUOTA_EXCEEDED', status: 429 })
+      );
+      productRow = { ...baseProduct, searchTerms: null, aiFieldSources: { ...humanSources } };
+      const r = await fillProductFields('s1', 'p1', { op: 'create' });
+      expect(r.rateLimited).toBe(true);
+      expect(r.capped).toBe(false);
+      expect(warn).toHaveBeenCalledWith(
+        expect.objectContaining({ rateLimitedTotal: expect.any(Number) }),
+        expect.stringMatching(/429/)
+      );
     });
   });
 });
