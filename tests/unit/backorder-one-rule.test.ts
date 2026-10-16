@@ -124,6 +124,28 @@ describe('gateBackorderPayload leaves non-plain values alone (fix round 2, re-re
     const plain = { products: [{ id: 'a', acceptsBackorder: false, createdAt }] };
     expect(gateBackorderPayload(plain, false)).toBe(plain);
   });
+
+  it('a null-prototype object is walked and gated like a plain one', () => {
+    const bare = Object.assign(Object.create(null), {
+      id: 'p2',
+      acceptsBackorder: true,
+      availableQty: 0,
+      createdAt,
+    }) as { id: string; acceptsBackorder: boolean; availableQty: number | null; createdAt: Date };
+    const out = gateBackorderPayload({ product: bare }, false);
+    expect(out.product.acceptsBackorder).toBe(false);
+    expect(out.product.availableQty).toBeNull();
+    expect(out.product.createdAt).toBe(createdAt);
+    expect(bare.acceptsBackorder).toBe(true); // input untouched
+  });
+
+  it('a bare array of Dates comes back as the same array of the same Dates', () => {
+    const dates = [createdAt, reviewedAt];
+    const out = gateBackorderPayload(dates, false);
+    expect(out).toBe(dates);
+    expect(out[0]).toBeInstanceOf(Date);
+    expect(out[1]).toBe(reviewedAt);
+  });
 });
 
 describe('every server backorder decision goes through lineAllowsBackorder / isOrderable', () => {
@@ -142,13 +164,5 @@ describe('every server backorder decision goes through lineAllowsBackorder / isO
   });
 });
 
-describe('admin reporting says "accepts backorder" only when the cart would (fix round 2)', () => {
-  it('analytics derives the flag through lineAllowsBackorder + the store feature', () => {
-    const src = readFileSync(
-      join(__dirname, '../..', 'apps/api/src/routes/analytics.routes.ts'),
-      'utf8'
-    );
-    expect(src).toMatch(/lineAllowsBackorder\(p, null, backorderOn\)/);
-    expect(src).not.toMatch(/productFlags\.map\(p => \[p\.id, p\.allowBackorder\]\)/);
-  });
-});
+// Admin reporting ("accepts backorder" only when the cart would) is proven by driving the real
+// route in `analytics-low-stock-backorder-flag.test.ts`, not by reading its source text.
