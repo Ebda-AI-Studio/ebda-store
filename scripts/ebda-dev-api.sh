@@ -21,7 +21,10 @@ if [ "$MODE" = node ]; then
     DIRECT_URL=postgresql://$OWNER@127.0.0.1:5432/$DB REDIS_URL=redis://127.0.0.1:$REDIS_PORT \
     node apps/api/dist/index.js >"$LOG" 2>&1
 else
+  # The config without the Workers AI binding (Ruling SEARCH-T10-4): the binding forces a remote
+  # proxy session that needs a Cloudflare login. No AI binding = no embeddings = lexical search.
+  node scripts/cf-api-local-config.mjs || exit 1
   cd apps/api && WRANGLER_HYPERDRIVE_LOCAL_CONNECTION_STRING_HYPERDRIVE=postgresql://ebda_app:$APP_PW@127.0.0.1:$PGB_PORT/$DB \
-    npx wrangler dev --port $PORT --inspector-port ${INSPECTOR_PORT:-4817} --local --persist-to "$(mktemp -d)" \
+    npx wrangler dev --port $PORT --inspector-port ${INSPECTOR_PORT:-4817} --local --config .wrangler.local.jsonc --persist-to "$(mktemp -d)" \
     $(for kv in "${VARS[@]}"; do echo --var "${kv/=/:}"; done) >"$LOG" 2>&1
 fi

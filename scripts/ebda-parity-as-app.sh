@@ -28,8 +28,11 @@ env "${COMMON[@]}" PORT=$BASE_PORT API_URL=http://127.0.0.1:$BASE_PORT WEB_URL=h
   DATABASE_URL=$BASE_APP DIRECT_URL=$O/$DB_BASE REDIS_URL=redis://127.0.0.1:$REDIS_PORT \
   node apps/api/dist/index.js >/tmp/ev-node-api.log 2>&1 & PIDS+=($!)
 PERSIST=$(mktemp -d)
+# Head boots the config without the Workers AI binding (Ruling SEARCH-T10-4): the binding forces a
+# remote proxy session that needs a Cloudflare login.
+node scripts/cf-api-local-config.mjs || exit 1
 (cd apps/api && WRANGLER_HYPERDRIVE_LOCAL_CONNECTION_STRING_HYPERDRIVE=postgresql://ebda_app:$APP_PW@127.0.0.1:$PGB_PORT/$DB_HEAD \
-  exec npx wrangler dev --port $HEAD_PORT --inspector-port ${INSPECTOR_PORT:-4814} --local --persist-to "$PERSIST" \
+  exec npx wrangler dev --port $HEAD_PORT --inspector-port ${INSPECTOR_PORT:-4814} --local --config .wrangler.local.jsonc --persist-to "$PERSIST" \
   $(for kv in "${COMMON[@]}" API_URL=http://127.0.0.1:$HEAD_PORT WEB_URL=http://localhost:3000 ADMIN_URL=http://localhost:3001; do echo --var "${kv/=/:}"; done) \
   >/tmp/ev-worker.log 2>&1) & PIDS+=($!)
 for i in $(seq 1 90); do
