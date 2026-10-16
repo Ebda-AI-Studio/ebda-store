@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { CartIcon } from '@ebda/ui';
 import { StoreLogo } from '../shared/StoreLogo';
 import type { HeaderProps } from '../types';
+import { useTabBarShown, HEADER_MENU_WITH_TAB_BAR_KEEP_SLOT } from '../shared/tab-bar-visibility';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { Sheet } from '../../components/ui/Sheet';
 import { LanguageSwitcher } from '../../components/LanguageSwitcher';
@@ -22,6 +23,7 @@ export default function ModernHeader({
   headerBgColor,
 }: HeaderProps) {
   const { isRtl: ctxIsRtl, t } = useLanguage();
+  const tabBarShown = useTabBarShown();
   const isRtl = isRtlProp ?? ctxIsRtl;
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -75,7 +77,7 @@ export default function ModernHeader({
             <button
               type="button"
               onClick={() => setIsMenuOpen(!isMenuOpen)}
-              className="md:hidden inline-flex h-11 w-11 items-center justify-center rounded-lg hover:bg-muted transition-colors duration-300 ease-out cursor-pointer"
+              className={`md:hidden inline-flex h-11 w-11 items-center justify-center rounded-lg hover:bg-muted transition-colors duration-300 ease-out cursor-pointer ${tabBarShown ? HEADER_MENU_WITH_TAB_BAR_KEEP_SLOT : ''}`}
               aria-label={t('Menu', 'القائمة')}
               aria-expanded={isMenuOpen}
             >

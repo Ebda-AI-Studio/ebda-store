@@ -12,6 +12,7 @@ import { resolveColor, DEFAULT_THEME } from '@ebda/shared';
 import { CartIcon } from '@ebda/ui';
 import type { NavItem } from '../types';
 import { Sheet } from '../../components/ui/Sheet';
+import { tabBarShownOn } from './tab-bar-visibility';
 
 /**
  * Sprint 3 (2026-05-17): Mobile sticky bottom tab bar with 4 destinations
@@ -85,8 +86,7 @@ export function BottomTabBar({ bottomBar, theme, navigation = [] }: BottomTabBar
   // desktop-only). The pathname includes the store slug prefix on path-based
   // multi-tenant URLs, so match the trailing segment(s).
   const lowered = pathname.toLowerCase();
-  const hideOn = ['/checkout', '/auth/', '/account/order'];
-  if (hideOn.some(p => lowered.includes(p))) return null;
+  if (!tabBarShownOn(pathname)) return null;
 
   const tabs: Array<{
     key: string;

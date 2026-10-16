@@ -9,6 +9,7 @@ import { WORDMARK_NAV_LINK_CLASS, wordmarkClass } from '../shared/wordmark';
 /** a11y P2-10 / rule (d): header text links measured 16-20px; every one is a 44px target. */
 const HEADER_TARGET = 'inline-flex min-h-11 items-center';
 import type { HeaderProps } from '../types';
+import { useTabBarShown, HEADER_MENU_WITH_TAB_BAR } from '../shared/tab-bar-visibility';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { LanguageSwitcher } from '../../components/LanguageSwitcher';
 import { SearchAutocomplete } from '../../components/SearchAutocomplete';
@@ -27,6 +28,7 @@ export default function MinimalHeader({
   wordmarkSize,
 }: HeaderProps) {
   const { isRtl: ctxIsRtl, t } = useLanguage();
+  const tabBarShown = useTabBarShown();
   const isRtl = isRtlProp ?? ctxIsRtl;
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -221,7 +223,7 @@ export default function MinimalHeader({
             <button
               type="button"
               onClick={() => setIsMenuOpen(!isMenuOpen)}
-              className="lg:hidden inline-flex h-11 w-11 items-center justify-center text-muted-foreground hover:text-foreground transition-colors duration-200 cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+              className={`lg:hidden inline-flex h-11 w-11 items-center justify-center text-muted-foreground hover:text-foreground transition-colors duration-200 cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 ${tabBarShown ? HEADER_MENU_WITH_TAB_BAR : ''}`}
               aria-label={t('Menu', 'القائمة')}
               aria-expanded={isMenuOpen}
             >
