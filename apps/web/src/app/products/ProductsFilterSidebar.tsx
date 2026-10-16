@@ -571,7 +571,7 @@ export function ProductsFilterSidebar(props: ProductsFilterSidebarProps) {
               id="products-sort-bar"
               value={sortBy ?? ''}
               onChange={e => onSortChange(e.target.value)}
-              className="h-11 max-w-[45%] rounded-[var(--radius)] border border-input bg-[hsl(var(--filter-bg))] px-3 text-sm text-[hsl(var(--filter-fg))] focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+              className="h-11 max-w-[45%] rounded-[var(--radius)] border border-input bg-[hsl(var(--filter-bg))] px-3 text-base sm:text-sm text-[hsl(var(--filter-fg))] focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
             >
               {sortOptions.map(opt => (
                 <option key={opt.value} value={opt.value}>
