@@ -6,7 +6,7 @@
 
 **Architecture:** P0 folds Arabic text in ONE immutable SQL function (`public.ebda_ar_norm`), mirrored byte-for-byte in TypeScript (`normalizeArabicSearch`) and pinned by one shared vector set. Every product search runs over trigram GIN _expression_ indexes on that function. P1 adds merchant-editable, AI-filled `search_terms`, bge-m3 embeddings in a pgvector child table under strict RLS, and reciprocal-rank fusion of lexical and vector results. P2 moves admin customer, order and phone search into SQL behind the same folding and adds a ⌘K palette. P3 adds catalogue import from photos and PDFs with Gemini vision, plus a review screen.
 
-**Tech Stack:** Postgres 16 on Neon (pg_trgm installed, pgvector new), Prisma 6.19 (`@prisma/adapter-pg`, raw SQL for expression and vector predicates), Express on Cloudflare Workers (`ebda-api`), Workers AI `@cf/baai/bge-m3`, Inngest, Gemini `gemini-flash-lite-latest`, Next.js 16 admin and storefront, vitest, k6.
+**Tech Stack:** Postgres 17 on Neon (17.11, measured 2026-10-16) (pg_trgm installed, pgvector new), Prisma 6.19 (`@prisma/adapter-pg`, raw SQL for expression and vector predicates), Express on Cloudflare Workers (`ebda-api`), Workers AI `@cf/baai/bge-m3`, Inngest, Gemini `gemini-flash-lite-latest`, Next.js 16 admin and storefront, vitest, k6.
 
 **Spec:** `.superpowers/shared/semantic-search-research.md` (the research brief, 2026-10-15) plus Ahmad's brief of 2026-10-15 ("do the whole thing we need this type of searching and optimizing"). The phase list in that brief is binding where it differs from the research sketch.
 
@@ -47,7 +47,7 @@ Ahmad 2026-10-15 additions:
   ```bash
   # docker, or Apple `container run` with identical flags
   docker run -d --name ebda-search-pg -e POSTGRES_USER=test -e POSTGRES_PASSWORD=test \
-    -e POSTGRES_DB=force_test -p 5432:5432 pgvector/pgvector:0.8.0-pg16
+    -e POSTGRES_DB=force_test -p 5432:5432 pgvector/pgvector:0.8.0-pg17
   export TEST_DB=postgresql://test:test@localhost:5432/force_test
   DATABASE_URL=$TEST_DB DIRECT_URL=$TEST_DB npx prisma migrate deploy --schema packages/database/prisma/schema.prisma
   ```
@@ -1661,7 +1661,7 @@ EOF
 
 **Files:**
 
-- Modify: `.github/workflows/ci.yml` (5× `image: postgres:16-alpine` → `image: pgvector/pgvector:0.8.0-pg16`), `.github/workflows/cf-api-deploy.yml:18`, `docker-compose.yml:7`
+- Modify: `.github/workflows/ci.yml` (5× `image: postgres:16-alpine` → `image: pgvector/pgvector:0.8.0-pg17`; Ruling SEARCH-T9-4), `.github/workflows/cf-api-deploy.yml:18`, `docker-compose.yml:7`
 - Create: `packages/database/prisma/migrations/20261019000100_product_embeddings/migration.sql`
 - Modify: `packages/database/prisma/schema.prisma` (model `ProductEmbedding`; back-relations on `Product` and `Store`)
 - Test: `tests/integration/product-embeddings-schema.test.ts`
@@ -1671,7 +1671,7 @@ EOF
 - Produces (SQL): extension `vector`; table `product_embeddings(product_id PK FK→products ON DELETE CASCADE, store_id FK→stores CASCADE, model text, content_hash text, embedding halfvec(1024), embedded_at timestamptz)`; index `(store_id)` and `(store_id, embedded_at)`; `public.ebda_product_embed_doc(name, name_ar, search_terms, description, description_ar) → text` (IMMUTABLE: raw (un-normalised) text, HTML tags stripped, each description capped at 1500 chars). Prisma: `ProductEmbedding { productId, storeId, model, contentHash, embedding Unsupported("halfvec(1024)"), embeddedAt }`.
 - Viewer: Task 12 adds "indexed N of M products" to the searches page header.
 
-- [ ] **Step 1: Swap the CI/compose images.** In `ci.yml`, run `sed -i '' 's#image: postgres:16-alpine#image: pgvector/pgvector:0.8.0-pg16#' .github/workflows/ci.yml .github/workflows/cf-api-deploy.yml docker-compose.yml`, then confirm with `grep -n "image: .*postgres\|pgvector" .github/workflows/*.yml docker-compose.yml`: 7 lines, all `pgvector/pgvector:0.8.0-pg16`. The image is Debian-based and includes contrib (pg_trgm, pg_stat_statements). Check that the tag exists: `docker manifest inspect pgvector/pgvector:0.8.0-pg16 >/dev/null && echo ok`, expected `ok`. If that tag is absent, use the newest `0.8.x-pg16` tag listed at hub.docker.com/r/pgvector/pgvector and record it in Ruling SEARCH-7.
+- [ ] **Step 1: Swap the CI/compose images.** In `ci.yml`, run `sed -i '' 's#image: postgres:16-alpine#image: pgvector/pgvector:0.8.0-pg17#' .github/workflows/ci.yml .github/workflows/cf-api-deploy.yml docker-compose.yml`, then confirm with `grep -n "image: .*postgres\|pgvector" .github/workflows/*.yml docker-compose.yml`: 7 lines, all `pgvector/pgvector:0.8.0-pg17`. The image is Debian-based and includes contrib (pg_trgm, pg_stat_statements). Check that the tag exists: `docker manifest inspect pgvector/pgvector:0.8.0-pg17 >/dev/null && echo ok`, expected `ok`. If that tag is absent, use the newest `0.8.x-pg17` tag listed at hub.docker.com/r/pgvector/pgvector and record it in Ruling SEARCH-7.
 
 - [ ] **Step 2: Write the failing test**
 
@@ -1709,7 +1709,7 @@ describe.skipIf(!hasDb)('product_embeddings', () => {
 
 - [ ] **Step 3: Run to verify it fails**
 
-Run: `docker rm -f ebda-search-pg; docker run -d --name ebda-search-pg -e POSTGRES_USER=test -e POSTGRES_PASSWORD=test -e POSTGRES_DB=force_test -p 5432:5432 pgvector/pgvector:0.8.0-pg16 && sleep 3 && DATABASE_URL=$TEST_DB DIRECT_URL=$TEST_DB npx prisma migrate deploy --schema packages/database/prisma/schema.prisma && DATABASE_URL=$TEST_DB npx vitest run tests/integration/product-embeddings-schema.test.ts`
+Run: `docker rm -f ebda-search-pg; docker run -d --name ebda-search-pg -e POSTGRES_USER=test -e POSTGRES_PASSWORD=test -e POSTGRES_DB=force_test -p 5432:5432 pgvector/pgvector:0.8.0-pg17 && sleep 3 && DATABASE_URL=$TEST_DB DIRECT_URL=$TEST_DB npx prisma migrate deploy --schema packages/database/prisma/schema.prisma && DATABASE_URL=$TEST_DB npx vitest run tests/integration/product-embeddings-schema.test.ts`
 Expected: FAIL. The first case fails with `type "halfvec" does not exist`.
 
 - [ ] **Step 4: Migration + model**
@@ -3785,7 +3785,7 @@ EOF
 - **Ruling SEARCH-4:** The search log stores a normalised term + counts per Cairo day, with no identity; phone/email/ID-shaped terms are dropped; retention is 90 days. Evidence: what merchants need is "what wasn't found", not who searched. Cost if wrong: no per-session funnel analysis (out of scope).
 - **Ruling SEARCH-5:** The searches page is not behind `requireAnalyticsTier`. Evidence: it is a core catalogue-fixing tool, and its viewer is every merchant (every-data-needs-UI). Cost if wrong: one analytics feature outside the paid tier.
 - **Ruling SEARCH-6:** Typeahead stays lexical-only and is not logged. Evidence: latency, and logging keystrokes would pollute the log with prefixes. Cost if wrong: a dialect-only term finds nothing in the dropdown until Enter (the full search page has the vector leg).
-- **Ruling SEARCH-7:** pgvector `halfvec(1024)` for bge-m3. The CI/compose image is `pgvector/pgvector:0.8.0-pg16` [tag existence: Task 9 Step 1], and the dims are measured in Task 10 Step 1. Cost if wrong: an image pull fails in CI, which is loud, not silent.
+- **Ruling SEARCH-7:** pgvector `halfvec(1024)` for bge-m3. The CI/compose image is `pgvector/pgvector:0.8.0-pg17` (production's major; SEARCH-T9-4), and the dims are measured in Task 10 Step 1. Cost if wrong: an image pull fails in CI, which is loud, not silent.
 - **Ruling SEARCH-8:** Exact KNN per store (btree `store_id` + ORDER BY distance), no HNSW. Evidence: per-store catalogues are hundreds to low thousands of rows [i], and filtered HNSW has a recall trap. Cost if wrong: a 20k+ product store pays a slower vector leg; revisit with `EXPLAIN ANALYZE` when any store passes 20k.
 - **Ruling SEARCH-9:** The embed doc covers names, search terms and descriptions only, not variant option values or category names. Evidence: it keeps staleness detectable in pure SQL (content hash), and the AI search terms already carry category vocabulary. Cost if wrong: "فستان احمر" relies on lexical match for a colour that exists only as a variant option.
 - **Ruling SEARCH-10:** Semantic search ships OFF and is turned on only when the eval bar holds: hybrid recall@10 ≥ 0.90, dialect and franco each ≥ 0.80, MRR ≥ 0.70, no msa/en regression > 0.02, and a dialect+franco lift ≥ 0.15 over lexical. Cost if wrong: a bar that is too strict leaves a working feature off; the eval output in PR 4 makes that visible.

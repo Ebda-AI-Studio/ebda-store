@@ -3,7 +3,7 @@
 --   vector                       NEW extension (pgvector). Production has 0.8.0 available (read-only
 --                                check 2026-10-15; STOP-2 cleared pre-launch); `halfvec` needs >= 0.7.
 --                                The neondb_owner migration role can create it on Neon. CI, compose and
---                                the buy-flow harness run pgvector/pgvector:0.8.0-pg16.
+--                                the buy-flow harness run pgvector/pgvector:0.8.0-pg17 (production is 17.11).
 --   ebda_product_embed_doc(...)  NEW IMMUTABLE sql helper: the text a product is embedded from. Raw
 --                                (un-normalised) names + search terms + descriptions with HTML tags
 --                                stripped and each description capped at 1500 chars; empty / NULL parts

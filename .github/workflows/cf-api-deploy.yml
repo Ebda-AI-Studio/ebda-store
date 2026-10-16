@@ -15,7 +15,7 @@ jobs:
     # Throwaway Postgres for the pre-deploy workerd smoke (Ruling DEPLOY-SAFETY-1); never production.
     services:
       postgres:
-        image: pgvector/pgvector:0.8.0-pg16
+        image: pgvector/pgvector:0.8.0-pg17
         env:
           POSTGRES_USER: test
           POSTGRES_PASSWORD: test

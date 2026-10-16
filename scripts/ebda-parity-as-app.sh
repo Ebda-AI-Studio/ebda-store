@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Buy-flow parity, Node (base) vs workerd (head), BOTH connecting as the strict-RLS role `ebda_app`.
-# Needs: Postgres 16 on :5432 with an owner role (OWNER_URL), the `ebda_app` LOGIN role (APP_PW),
+# Needs: Postgres 17 + pgvector on :5432 with an owner role (OWNER_URL), the `ebda_app` LOGIN role (APP_PW),
 # a pgbouncer (transaction mode) on PGB_PORT serving the head database, a Redis on REDIS_PORT,
 # apps/api built. Resources are parameters so concurrent runs on one host do not collide.
 #   bash scripts/ebda-parity-as-app.sh        (see docs/ebda/plans/sp4-sp5-evidence.md)

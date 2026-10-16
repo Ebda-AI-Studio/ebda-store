@@ -151,7 +151,7 @@ arm of an OR indexed, so dropping any one of them returns its whole search to a 
 and rollbacks never drop it.
 
 `vector` (pgvector) is created the same way by `20261022000100_product_embeddings` (production
-has 0.8.0 available; every CI/compose Postgres is `pgvector/pgvector:0.8.0-pg16`), and its rollback
+has 0.8.0 available; every CI/compose Postgres is `pgvector/pgvector:0.8.0-pg17`, production's major), and its rollback
 never drops it. `product_embeddings` has plain btree indexes only (`store_id`, `(store_id,
 embedded_at)`), declared in Prisma: the vector KNN is exact per store, with no HNSW/ivfflat index until
 a store passes ~20k products (Ruling SEARCH-8).

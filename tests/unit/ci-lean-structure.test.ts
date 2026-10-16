@@ -165,8 +165,6 @@ describe('ci.yml lanes', () => {
     expect(raw).toMatch(/DB role check: current_user=ebda_app rolbypassrls=false/);
     expect(raw).toMatch(/ALTER ROLE ebda_app WITH PASSWORD/);
     expect(raw).toMatch(/postgresql:\/\/ebda_app:ci-only-app-pw@/);
-    expect(raw).toMatch(/image: pgvector\/pgvector:0\.8\.0-pg16/);
-    expect(raw).not.toMatch(/image: postgres:/);
     expect(raw).toMatch(/image: redis:7-alpine/);
     for (const n of ['test-integration', 'test-rls-ebda-app']) expect(skipsOnPr(n)).toBe(true);
   });
@@ -265,4 +263,40 @@ describe('scripts/ci-affected.mjs', () => {
       expect(entry.hasWrangler, w).toBe(true);
     }
   });
+});
+
+/**
+ * Every Postgres that runs our migrations is the SAME image, and its major is production's (Neon
+ * 17.11, measured 2026-10-16; Ruling SEARCH-T9-4). The migrations need the `vector` extension, so a
+ * plain `postgres:` image fails `CREATE EXTENSION vector`, and a different major hides PG17-only
+ * behaviour (maintenance-op search_path, pg_stat_statements 1.11 columns) until the prod migrate.
+ */
+describe('postgres image parity', () => {
+  const PINNED = 'pgvector/pgvector:0.8.0-pg17';
+  const FILES = [
+    '.github/workflows/ci.yml',
+    '.github/workflows/cf-api-deploy.yml',
+    'docker-compose.yml',
+    'docker/docker-compose.yml',
+    'scripts/buy-flow-parity/run.mjs',
+  ];
+  // Any postgres / pgvector image reference: `image: x` / `image: 'x'` (tag optional, so a bare
+  // `postgres` is caught), or a quoted `name:tag` string (container run args). `postgresql://`
+  // URLs and a bare 'postgres' label are not images.
+  const IMG = String.raw`(?:docker\.io\/)?(?:library\/)?(?:postgres|pgvector\/pgvector)`;
+  const IMAGE_RE = new RegExp(
+    String.raw`image:\s*['"]?(${IMG}(?::[^\s'"]+)?)(?=['"\s]|$)|['"](${IMG}:[^\s'"]+)['"]`,
+    'gm'
+  );
+
+  for (const f of FILES) {
+    it(`${f} runs only ${PINNED}`, () => {
+      const text = readFileSync(path.join(ROOT, f), 'utf8');
+      const refs = [...text.matchAll(IMAGE_RE)].map(m =>
+        (m[1] ?? m[2]).replace(/^docker\.io\//, '')
+      );
+      expect(refs.length, `${f}: no postgres image found`).toBeGreaterThan(0);
+      expect(refs.filter(r => r !== PINNED)).toEqual([]);
+    });
+  }
 });
