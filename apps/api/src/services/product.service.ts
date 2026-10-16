@@ -1277,8 +1277,11 @@ export class ProductService {
       /** `relevance` = hybrid ranking for a search (Task 12); without a search it means no sort. */
       sort?: 'newest' | 'price_asc' | 'price_desc' | 'best_seller' | 'relevance';
       cursor?: string;
-      /** false = this searcher is over the embed rate limit: rank keyword-only (Ruling SEARCH-T12-3). */
-      semantic?: boolean;
+      /**
+       * Who is searching (`searcherFromIp`): the identity the query-embed limit charges. Without it
+       * a ranked search never embeds (default deny, Ruling SEARCH-T12-6).
+       */
+      searcher?: string;
     } = {}
   ) {
     const {
@@ -1350,7 +1353,7 @@ export class ProductService {
     if (search && ranked) {
       // The ranked id list replaces the keyword id filter (it already holds every keyword match up
       // to the cap, plus the vector-only hits). ANDed, so an `ids` filter on `where.id` still applies.
-      rankedIds = await rankedSearch(storeId, search, { semantic: options.semantic });
+      rankedIds = await rankedSearch(storeId, search, { searcher: options.searcher });
       where.AND = [
         ...(Array.isArray(where.AND) ? where.AND : where.AND ? [where.AND] : []),
         { id: { in: rankedIds } },

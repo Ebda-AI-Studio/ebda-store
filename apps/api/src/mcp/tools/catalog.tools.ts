@@ -79,7 +79,16 @@ function toSummary(p: any, currency: string) {
   };
 }
 
-export function registerCatalogTools(server: McpServer, store: McpStore): void {
+/**
+ * `searcher` (Task 12, Ruling SEARCH-T12-6): the calling client's identity (`searcherFromIp`).
+ * `search_products` passes it to the same gated hybrid search as the storefront list, so an agent
+ * is charged to the same per-searcher limit and daily budgets; without it the search never embeds.
+ */
+export function registerCatalogTools(
+  server: McpServer,
+  store: McpStore,
+  opts: { searcher?: string } = {}
+): void {
   server.registerTool(
     'get_store_info',
     {
@@ -104,6 +113,7 @@ export function registerCatalogTools(server: McpServer, store: McpStore): void {
         search: query,
         status: 'active',
         limit: limit ?? 20,
+        searcher: opts.searcher,
       });
       return ok({ products: products.map(p => toSummary(p, store.currency)) });
     }

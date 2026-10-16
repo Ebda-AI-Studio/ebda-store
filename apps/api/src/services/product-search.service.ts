@@ -276,7 +276,11 @@ export function shouldEmbedQuery(raw: string): boolean {
 }
 
 /** The query's vector (cached), raced against QUERY_EMBED_BUDGET_MS; the loser is aborted. */
-async function queryVector(storeId: string, raw: string): Promise<number[] | null> {
+async function queryVector(
+  storeId: string,
+  raw: string,
+  searcher: string | undefined
+): Promise<number[] | null> {
   const provider = getEmbeddingProvider();
   if (!provider) return null;
   const key = `${storeId}\u0000${provider.model}\u0000${normalizeArabicSearch(raw)}`;
@@ -285,8 +289,9 @@ async function queryVector(storeId: string, raw: string): Promise<number[] | nul
     if (hit.exp > Date.now()) return Array.from(hit.v);
     qCache.delete(key);
   }
-  // Unique queries defeat the cache: the daily budgets are what bound spend (fails closed).
-  if (!(await takeQueryEmbed(storeId))) return null;
+  // The ONE charge point (SEARCH-T12-6): once per real provider call, right before it, never on a
+  // cache hit. Budgets + per-searcher limit; no searcher = no call (default deny); fails closed.
+  if (!(await takeQueryEmbed(storeId, searcher))) return null;
   const ctl = new AbortController();
   let timer: ReturnType<typeof setTimeout> | undefined;
   const lost = new Promise<never>((_, reject) => {
@@ -314,7 +319,8 @@ async function queryVector(storeId: string, raw: string): Promise<number[] | nul
  * Vector leg: up to `limit` product ids of THIS store nearest to the query (exact KNN per store,
  * Ruling SEARCH-8), within SEARCH_VECTOR_MAX_DISTANCE, storefront-visible only (active, not
  * deleted, read live in the same SQL: Ruling SEARCH-11). `[]` when semantic search is off, the
- * query is not embeddable, the provider fails or loses the race, or the SQL fails (inside a
+ * query is not embeddable, no `searcher` is given or a budget refuses (`takeQueryEmbed`), the
+ * provider fails or loses the race, or the SQL fails (inside a
  * savepoint so the request transaction survives). Never throws. Runs in the caller's tenant scope
  * (RLS) AND names store_id on both tables (R-EBDA-004). Logs carry the store and the failure
  * kind, never the query text.
@@ -322,11 +328,12 @@ async function queryVector(storeId: string, raw: string): Promise<number[] | nul
 export async function semanticProductIds(
   storeId: string,
   raw: string,
-  limit = HYBRID_LEG
+  opts: { searcher?: string; limit?: number } = {}
 ): Promise<string[]> {
+  const limit = opts.limit ?? HYBRID_LEG;
   if (!semanticSearchEnabled() || !shouldEmbedQuery(raw)) return [];
   try {
-    const v = await queryVector(storeId, raw);
+    const v = await queryVector(storeId, raw, opts.searcher);
     if (!v) return [];
     const q = toHalfvecLiteral(v);
     const rows = await withSavepoint(
@@ -355,7 +362,7 @@ export async function semanticProductIds(
 /**
  * Storefront relevance order: the keyword leg (up to PRODUCT_SEARCH_ID_CAP, E10) with its first
  * HYBRID_LEG ids fused (RRF) with the vector leg, then the keyword tail in its own order. With the
- * vector leg off, failing, over budget, rate-limited (`semantic: false`) or skipped because the
+ * vector leg off, failing, over budget or the searcher's limit, without a `searcher`, or skipped because the
  * keyword leg is strong (>= KEYWORD_STRONG_AT), this is exactly the keyword (name-similarity)
  * order. The keyword leg runs first (it decides whether to embed). At most
  * PRODUCT_SEARCH_ID_CAP + HYBRID_LEG ids.
@@ -363,10 +370,10 @@ export async function semanticProductIds(
 export async function rankedSearch(
   storeId: string,
   raw: string,
-  opts: { semantic?: boolean } = {}
+  opts: { searcher?: string } = {}
 ): Promise<string[]> {
   const lexical = await searchProductIds(storeId, raw, { scope: 'storefront' });
-  if (opts.semantic === false || lexical.length >= KEYWORD_STRONG_AT) return lexical;
-  const vector = await semanticProductIds(storeId, raw);
+  if (lexical.length >= KEYWORD_STRONG_AT) return lexical;
+  const vector = await semanticProductIds(storeId, raw, { searcher: opts.searcher });
   return hybridOrder(lexical, vector, HYBRID_LEG);
 }

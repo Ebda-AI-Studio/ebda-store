@@ -10,6 +10,10 @@ const client = {
     return store.get(k)!;
   }),
   expire: vi.fn(async () => 1),
+  decr: vi.fn(async (k: string) => {
+    store.set(k, (store.get(k) ?? 0) - 1);
+    return store.get(k)!;
+  }),
   set: vi.fn(async (k: string) => (sets.has(k) ? null : (sets.add(k), 'OK'))),
 };
 vi.mock('../../apps/api/src/services/redis.service', () => ({
@@ -27,6 +31,8 @@ const {
   queryEmbedGlobalDailyCap,
   DEFAULT_QUERY_STORE_DAILY_CAP,
   DEFAULT_QUERY_GLOBAL_DAILY_CAP,
+  SEARCH_EMBED_PER_SEARCHER_PER_MIN,
+  searcherFromIp,
 } = await import('../../apps/api/src/lib/search/embed-budget');
 
 describe('takeEmbedCalls', () => {
@@ -83,34 +89,61 @@ describe('takeQueryEmbed', () => {
   it('per-store cap: 1000 attempts in one store are granted exactly the cap', async () => {
     process.env.SEARCH_QUERY_EMBED_STORE_DAILY_CAP = '25';
     let granted = 0;
-    for (let i = 0; i < 1000; i++) if (await takeQueryEmbed(A)) granted++;
+    for (let i = 0; i < 1000; i++) if (await takeQueryEmbed(A, `ip:${i}`)) granted++;
     expect(granted).toBe(25);
-    expect(await takeQueryEmbed(B)).toBe(true); // another store has its own budget
+    // The daily counters equal the calls actually granted (refusals are refunded).
+    const counts = [...store.entries()].filter(([k]) => k.startsWith('search:embed:query:'));
+    expect(counts.every(([, n]) => n === 25)).toBe(true);
+    expect(await takeQueryEmbed(B, 'ip:x')).toBe(true); // another store has its own budget
   });
 
   it('query-wide cap bounds the sum across stores (spreading over stores does not help)', async () => {
     process.env.SEARCH_QUERY_EMBED_GLOBAL_DAILY_CAP = '10';
     let granted = 0;
     for (let i = 0; i < 1000; i++)
-      if (await takeQueryEmbed(`${String(i).padStart(8, '0')}-1111-4111-8111-111111111111`))
+      if (
+        await takeQueryEmbed(`${String(i).padStart(8, '0')}-1111-4111-8111-111111111111`, `ip:${i}`)
+      )
         granted++;
     expect(granted).toBe(10);
   });
 
   it('query embeds also count against the account-wide indexer budget', async () => {
     process.env.SEARCH_EMBED_GLOBAL_DAILY_CAP = '3';
-    expect(await takeQueryEmbed(A)).toBe(true);
+    expect(await takeQueryEmbed(A, 'ip:a')).toBe(true);
     expect(await takeEmbedCalls(2)).toBe(true);
-    expect(await takeQueryEmbed(A)).toBe(false); // 4th call of the day
+    expect(await takeQueryEmbed(A, 'ip:b')).toBe(false); // 4th call of the day
     expect(await takeEmbedCalls(1)).toBe(false);
   });
 
   it('a cap of 0 refuses; no Redis refuses (fails closed: keyword-only search)', async () => {
     process.env.SEARCH_QUERY_EMBED_STORE_DAILY_CAP = '0';
-    expect(await takeQueryEmbed(A)).toBe(false);
+    expect(await takeQueryEmbed(A, 'ip:a')).toBe(false);
     delete process.env.SEARCH_QUERY_EMBED_STORE_DAILY_CAP;
     available = false;
-    expect(await takeQueryEmbed(A)).toBe(false);
+    expect(await takeQueryEmbed(A, 'ip:a')).toBe(false);
+  });
+
+  it('per searcher: 1000 attempts by one client in a minute are granted the per-minute cap', async () => {
+    let granted = 0;
+    for (let i = 0; i < 1000; i++) if (await takeQueryEmbed(A, 'ip:203.0.113.7')) granted++;
+    expect(granted).toBe(SEARCH_EMBED_PER_SEARCHER_PER_MIN);
+    // The 980 refused attempts never reached the store's or the platform's daily budget.
+    const storeCount = [...store.entries()].find(([k]) => k.startsWith(`search:embed:query:${A}:`));
+    expect(storeCount?.[1]).toBe(SEARCH_EMBED_PER_SEARCHER_PER_MIN);
+    expect(await takeQueryEmbed(A, 'ip:203.0.113.8')).toBe(true); // another client is not punished
+  });
+
+  it('no searcher → refused (default deny), and nothing is charged', async () => {
+    expect(await takeQueryEmbed(A, undefined)).toBe(false);
+    expect(await takeQueryEmbed(A, '')).toBe(false);
+    expect(store.size).toBe(0);
+  });
+
+  it('the searcher identity collapses IPv6 to its /64 (rotating the low bits is the same client)', () => {
+    expect(searcherFromIp('2001:db8:1:2:aaaa::1')).toBe(searcherFromIp('2001:db8:1:2:bbbb::9'));
+    expect(searcherFromIp('198.51.100.1')).not.toBe(searcherFromIp('198.51.100.2'));
+    expect(searcherFromIp(undefined)).toBe('ip:noip');
   });
 
   it('defaults, and a bad value falls back to the default', () => {

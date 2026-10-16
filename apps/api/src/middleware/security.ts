@@ -23,7 +23,6 @@ import {
 } from '../lib/rate-limit-telemetry';
 import { withSavepoint } from '../lib/savepoint';
 import { insertAuditLog } from '../lib/definer';
-import { semanticSearchEnabled } from '../lib/search/embedding-provider';
 
 // ==========================================
 // CSRF Protection with Redis + In-Memory Fallback
@@ -1666,44 +1665,6 @@ export const viewIngestLimiter = rateLimit({
   passOnStoreError: true,
   skip: skipForLoadTest,
   keyGenerator: req => ipKeyGenerator(req.ip ?? '') || 'noip',
-});
-
-/**
- * Storefront searches per minute per searcher (normalised IP) that MAY trigger a Workers AI query
- * embed (search program Task 12, Ruling SEARCH-T12-3). Over the limit the request is NOT refused:
- * it is served keyword-only (`res.locals.searchEmbedDenied`), so a shopper never sees a 429 from
- * this, and an attacker sending unique queries cannot buy more than this many embeds per IP per
- * minute. The daily budgets in `lib/search/embed-budget.ts` bound the total across IPs.
- */
-export const SEARCH_EMBED_PER_SEARCHER_PER_MIN = 20;
-
-/** A `/public/products` request that can reach the vector leg (semantic on, a search, no explicit sort). */
-export function isEmbedEligibleSearch(req: Request): boolean {
-  const { search, sort } = req.query;
-  return (
-    semanticSearchEnabled() &&
-    typeof search === 'string' &&
-    search.trim().length >= 2 &&
-    (sort === undefined || sort === '' || sort === 'relevance')
-  );
-}
-
-export const searchEmbedLimiter = rateLimit({
-  store: makeRateLimitStore(rateLimitRedisClient, 'search-embed'),
-  windowMs: 60 * 1000,
-  max: SEARCH_EMBED_PER_SEARCHER_PER_MIN,
-  // No RateLimit-* headers: an eligible search answers exactly like any other.
-  standardHeaders: false,
-  legacyHeaders: false,
-  // Redis down: let it through here; the daily budgets fail CLOSED without Redis, so no embed.
-  passOnStoreError: true,
-  skip: req => skipForLoadTest(req) || !isEmbedEligibleSearch(req),
-  keyGenerator: req => ipKeyGenerator(req.ip ?? '') || 'noip',
-  // Degrade, never refuse.
-  handler: (_req: Request, res: Response, next: NextFunction) => {
-    res.locals.searchEmbedDenied = true;
-    next();
-  },
 });
 
 // Per-TENANT aggregate limiter for the public surface (adversarial audit

@@ -23,7 +23,9 @@ const { publicStoreContext } = await import('../../apps/api/src/middleware/tenan
 const { errorHandler } = await import('../../apps/api/src/middleware/error-handler');
 const { redis } = await import('../../apps/api/src/services/redis.service');
 const { SEARCH_EMBED_PER_SEARCHER_PER_MIN } =
-  await import('../../apps/api/src/middleware/security');
+  await import('../../apps/api/src/lib/search/embed-budget');
+const { registerCatalogTools } = await import('../../apps/api/src/mcp/tools/catalog.tools');
+const { searcherFromIp } = await import('../../apps/api/src/lib/search/embed-budget');
 const { setEmbeddingProviderForTests, EMBED_MODEL } =
   await import('../../apps/api/src/lib/search/embedding-provider');
 const { indexStore } = await import('../../apps/api/src/services/product-index.service');
@@ -71,6 +73,8 @@ const app = buildApp();
 /** A unique letters-only word (digits or a UUID would make the query personal-data-shaped). */
 const word = () =>
   Array.from(crypto.randomBytes(8), b => String.fromCharCode(97 + (b % 26))).join('');
+/** The per-searcher limit is per fixed minute: a run crossing a minute boundary may use 2 windows. */
+const windowsSince = (t0: number) => Math.floor(Date.now() / 60_000) - Math.floor(t0 / 60_000) + 1;
 const ip = () =>
   `10.${crypto.randomInt(1, 250)}.${crypto.randomInt(1, 250)}.${crypto.randomInt(1, 250)}`;
 
@@ -152,6 +156,7 @@ describe.skipIf(!hasDb)('query-embed abuse bound (Ruling SEARCH-T12-3)', () => {
     { timeout: 180_000 },
     async () => {
       const attacker = ip();
+      const t0 = Date.now();
       const statuses = new Map<number, number>();
       let semanticHits = 0;
       for (let i = 0; i < 1000; i++) {
@@ -169,7 +174,9 @@ describe.skipIf(!hasDb)('query-embed abuse bound (Ruling SEARCH-T12-3)', () => {
       await awaitDeferredWork(5000);
       expect([...statuses.keys()].every(s => s === 200 || s === 429)).toBe(true);
       expect(statuses.get(200) ?? 0).toBeGreaterThanOrEqual(SEARCH_EMBED_PER_SEARCHER_PER_MIN);
-      expect(calls.length).toBeLessThanOrEqual(SEARCH_EMBED_PER_SEARCHER_PER_MIN);
+      expect(calls.length).toBeLessThanOrEqual(
+        SEARCH_EMBED_PER_SEARCHER_PER_MIN * windowsSince(t0)
+      );
       expect(calls.length).toBeGreaterThan(0); // the limiter degrades; it did not just break search
       expect(semanticHits).toBe(calls.length);
       // Embedded text is capped (the route cuts the term at 100 characters).
@@ -184,6 +191,86 @@ describe.skipIf(!hasDb)('query-embed abuse bound (Ruling SEARCH-T12-3)', () => {
       expect(other.status).toBe(200);
       expect(other.body.data.products.map((p: { id: string }) => p.id)).toEqual([target]);
       expect(calls.length).toBe(before + 1);
+    }
+  );
+
+  it(
+    'no URL shape escapes the limit: repeated, array, encoded, alternate-name and odd-sort params',
+    { timeout: 180_000 },
+    async () => {
+      const attacker = ip();
+      const t0 = Date.now();
+      const before = calls.length;
+      const shapes = [
+        (q: string) => `search=${encodeURIComponent(q)}&sort=foo`, // unknown sort = no sort = ranked
+        (q: string) => `search=${encodeURIComponent(q)}&sort=RELEVANCE`,
+        (q: string) => `search=${encodeURIComponent(q)}&sort[]=price_asc`,
+        (q: string) => `search=${encodeURIComponent(q)}&sort=relevance`,
+        (q: string) => `search=${encodeURIComponent(q)}&search=${encodeURIComponent(q)}`, // array
+        (q: string) => `q=${encodeURIComponent(q)}`, // not the search param
+        (q: string) => `search=${encodeURIComponent(q).replace(/%../g, m => m.toLowerCase())}`,
+        (q: string) => `search=${encodeURIComponent(` ${q.toUpperCase()}  `)}`,
+        (q: string) => `search=${encodeURIComponent(q)}&page=1&limit=5`,
+        (q: string) => `search=${encodeURIComponent(q)}&cursor=${crypto.randomUUID()}`,
+      ];
+      const statuses = new Set<number>();
+      for (let i = 0; i < 400; i++) {
+        const res = await request(app)
+          .get(`/api/v1/public/products?${shapes[i % shapes.length](`كوتشي ${word()}`)}`)
+          .set('x-store-id', storeId)
+          .set('x-forwarded-for', attacker);
+        statuses.add(res.status);
+      }
+      await awaitDeferredWork(5000);
+      expect([...statuses].every(st => st === 200 || st === 429)).toBe(true);
+      expect(calls.length - before).toBeLessThanOrEqual(
+        SEARCH_EMBED_PER_SEARCHER_PER_MIN * windowsSince(t0)
+      );
+      expect(calls.length - before).toBeGreaterThan(0);
+    }
+  );
+
+  it(
+    'MCP search_products goes through the same gate (1000 unique queries from one agent IP)',
+    { timeout: 180_000 },
+    async () => {
+      const tools = new Map<string, (a: { query: string; limit?: number }) => Promise<unknown>>();
+      const server = {
+        registerTool: (name: string, _d: unknown, h: (a: { query: string }) => Promise<unknown>) =>
+          void tools.set(name, h),
+      };
+      const agentIp = ip();
+      registerCatalogTools(
+        server as never,
+        { id: storeId, name: 'x', slug: 'x', currency: 'EGP', domain: null },
+        { searcher: searcherFromIp(agentIp) }
+      );
+      const search = tools.get('search_products')!;
+      const before = calls.length;
+      const t0 = Date.now();
+      let hits = 0;
+      for (let i = 0; i < 1000; i++) {
+        const out = (await asApp(() =>
+          runInStoreScope(storeId, () => search({ query: `كوتشي ${word()} ${word()}` }))
+        )) as { content: Array<{ text: string }> };
+        if (JSON.parse(out.content[0].text).products.some((p: { id: string }) => p.id === target))
+          hits++;
+      }
+      const made = calls.length - before;
+      expect(made).toBeLessThanOrEqual(SEARCH_EMBED_PER_SEARCHER_PER_MIN * windowsSince(t0));
+      expect(made).toBeGreaterThan(0);
+      expect(hits).toBe(made); // the semantic hit appears exactly when an embed was granted
+      // Built without a searcher (any future caller that forgets it): never embeds.
+      const bare = new Map<string, (a: { query: string }) => Promise<unknown>>();
+      registerCatalogTools(
+        { registerTool: (n: string, _d: unknown, h: never) => void bare.set(n, h) } as never,
+        { id: storeId, name: 'x', slug: 'x', currency: 'EGP', domain: null }
+      );
+      const b0 = calls.length;
+      await asApp(() =>
+        runInStoreScope(storeId, () => bare.get('search_products')!({ query: `كوتشي ${word()}` }))
+      );
+      expect(calls.length).toBe(b0);
     }
   );
 });

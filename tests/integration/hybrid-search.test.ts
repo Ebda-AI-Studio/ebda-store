@@ -39,6 +39,8 @@ const {
   KEYWORD_STRONG_AT,
   PRODUCT_SEARCH_ID_CAP,
 } = await import('../../apps/api/src/services/product-search.service');
+const { SEARCH_EMBED_PER_SEARCHER_PER_MIN } =
+  await import('../../apps/api/src/lib/search/embed-budget');
 const { ProductService } = await import('../../apps/api/src/services/product.service');
 
 const OWNER_URL = process.env.DIRECT_URL || process.env.DATABASE_URL || '';
@@ -119,8 +121,14 @@ async function mkProduct(storeId: string, data: Record<string, unknown>) {
   ).id;
 }
 
+/** A fresh searcher identity per call, so tests never share a per-minute embed bucket. */
+/** The per-searcher limit is per fixed minute: a run crossing a minute boundary may use 2 windows. */
+const windowsSince = (t0: number) => Math.floor(Date.now() / 60_000) - Math.floor(t0 / 60_000) + 1;
+const who = () => `test:${crypto.randomUUID()}`;
 const listPublic = (storeId: string, opts: Parameters<typeof ProductService.listPublic>[1]) =>
-  runInTenantContext(storeId, () => ProductService.listPublic(storeId, opts));
+  runInTenantContext(storeId, () =>
+    ProductService.listPublic(storeId, { searcher: who(), ...opts })
+  );
 const pageIds = (r: { products: Array<{ id: string }> }) => r.products.map(p => p.id);
 
 describe.skipIf(!hasDb)('hybrid storefront search (Task 12)', () => {
@@ -204,24 +212,30 @@ describe.skipIf(!hasDb)('hybrid storefront search (Task 12)', () => {
   it('zero keyword hits → the vector leg still returns the product', async () => {
     process.env.SEARCH_SEMANTIC_ENABLED = 'true';
     setEmbeddingProviderForTests(aliasProvider({ كوتشي: sneakerDoc }).provider);
-    const ids = await runInTenantContext(S, () => rankedSearch(S, 'كوتشي'));
+    const ids = await runInTenantContext(S, () => rankedSearch(S, 'كوتشي', { searcher: who() }));
     expect(ids).toEqual([p.sneaker]);
   });
 
   it("never returns another store's product: ebda_app (RLS + guard)", async () => {
     process.env.SEARCH_SEMANTIC_ENABLED = 'true';
     setEmbeddingProviderForTests(aliasProvider({ ring: foreignDoc }).provider);
-    const ids = await asApp(() => runInTenantContext(S, () => semanticProductIds(S, 'ring')));
+    const ids = await asApp(() =>
+      runInTenantContext(S, () => semanticProductIds(S, 'ring', { searcher: who() }))
+    );
     expect(ids).not.toContain(p.foreign);
     // Positive control: the same query in the foreign store finds it, so the vector did match.
-    const own = await asApp(() => runInTenantContext(F, () => semanticProductIds(F, 'ring')));
+    const own = await asApp(() =>
+      runInTenantContext(F, () => semanticProductIds(F, 'ring', { searcher: who() }))
+    );
     expect(own).toEqual([p.foreign]);
   });
 
   it("never returns another store's product: owner client (RLS bypassed, store_id filter alone)", async () => {
     process.env.SEARCH_SEMANTIC_ENABLED = 'true';
     setEmbeddingProviderForTests(aliasProvider({ ring: foreignDoc }).provider);
-    const ids = await runInTenantContext(S, () => semanticProductIds(S, 'ring'));
+    const ids = await runInTenantContext(S, () =>
+      semanticProductIds(S, 'ring', { searcher: who() })
+    );
     expect(ids).toEqual([]);
   });
 
@@ -235,14 +249,20 @@ describe.skipIf(!hasDb)('hybrid storefront search (Task 12)', () => {
     expect(Number(rows[0].n)).toBe(2);
     const f = aliasProvider({ draftq: draftDoc, deletedq: deletedDoc });
     setEmbeddingProviderForTests(f.provider);
-    expect(await runInTenantContext(S, () => semanticProductIds(S, 'draftq'))).toEqual([]);
-    expect(await runInTenantContext(S, () => semanticProductIds(S, 'deletedq'))).toEqual([]);
+    expect(
+      await runInTenantContext(S, () => semanticProductIds(S, 'draftq', { searcher: who() }))
+    ).toEqual([]);
+    expect(
+      await runInTenantContext(S, () => semanticProductIds(S, 'deletedq', { searcher: who() }))
+    ).toEqual([]);
     // Both queries were really embedded (not skipped as too short), so the SQL filter is what hid them.
     expect(f.calls).toHaveLength(2);
     // Positive control: republished, the same vector is found again.
     await prisma.product.update({ where: { id: p.draft }, data: { status: 'active' } });
     try {
-      expect(await runInTenantContext(S, () => semanticProductIds(S, 'draftq'))).toEqual([p.draft]);
+      expect(
+        await runInTenantContext(S, () => semanticProductIds(S, 'draftq', { searcher: who() }))
+      ).toEqual([p.draft]);
     } finally {
       await prisma.product.update({ where: { id: p.draft }, data: { status: 'draft' } });
     }
@@ -255,10 +275,14 @@ describe.skipIf(!hasDb)('hybrid storefront search (Task 12)', () => {
     const r = fakeVector('unrelated noise');
     const near = v.map((x, i) => 0.8 * x + 0.6 * r[i]);
     setEmbeddingProviderForTests(aliasProvider({ near }).provider);
-    expect(await runInTenantContext(S, () => semanticProductIds(S, 'near'))).toEqual([p.sneaker]);
+    expect(
+      await runInTenantContext(S, () => semanticProductIds(S, 'near', { searcher: who() }))
+    ).toEqual([p.sneaker]);
     clearQueryVectorCacheForTests();
     process.env.SEARCH_VECTOR_MAX_DISTANCE = '0.05';
-    expect(await runInTenantContext(S, () => semanticProductIds(S, 'near'))).toEqual([]);
+    expect(
+      await runInTenantContext(S, () => semanticProductIds(S, 'near', { searcher: who() }))
+    ).toEqual([]);
   });
 
   it('falls back to keyword results when the provider throws', async () => {
@@ -269,7 +293,7 @@ describe.skipIf(!hasDb)('hybrid storefront search (Task 12)', () => {
         throw new Error('5xx');
       },
     });
-    const ids = await runInTenantContext(S, () => rankedSearch(S, 'احذيه'));
+    const ids = await runInTenantContext(S, () => rankedSearch(S, 'احذيه', { searcher: who() }));
     expect(ids).toEqual([p.shoe1]);
   });
 
@@ -285,7 +309,7 @@ describe.skipIf(!hasDb)('hybrid storefront search (Task 12)', () => {
       },
     });
     const t0 = Date.now();
-    const ids = await runInTenantContext(S, () => rankedSearch(S, 'احذيه'));
+    const ids = await runInTenantContext(S, () => rankedSearch(S, 'احذيه', { searcher: who() }));
     const took = Date.now() - t0;
     expect(ids).toEqual([p.shoe1]);
     expect(QUERY_EMBED_BUDGET_MS).toBeLessThanOrEqual(500);
@@ -297,8 +321,12 @@ describe.skipIf(!hasDb)('hybrid storefront search (Task 12)', () => {
     process.env.SEARCH_SEMANTIC_ENABLED = 'false';
     const f = aliasProvider({ كوتشي: sneakerDoc });
     setEmbeddingProviderForTests(f.provider);
-    expect(await runInTenantContext(S, () => rankedSearch(S, 'احذيه'))).toEqual([p.shoe1]);
-    expect(await runInTenantContext(S, () => rankedSearch(S, 'كوتشي'))).toEqual([]);
+    expect(
+      await runInTenantContext(S, () => rankedSearch(S, 'احذيه', { searcher: who() }))
+    ).toEqual([p.shoe1]);
+    expect(
+      await runInTenantContext(S, () => rankedSearch(S, 'كوتشي', { searcher: who() }))
+    ).toEqual([]);
     expect(f.calls).toHaveLength(0);
   });
 
@@ -307,9 +335,9 @@ describe.skipIf(!hasDb)('hybrid storefront search (Task 12)', () => {
     const f = aliasProvider();
     setEmbeddingProviderForTests(f.provider);
     for (const q of ['ab', 'SKU-1234', 'ab12', '01012345678', '٠١٠١٢٣٤٥٦٧٨', 'me@x.com', '  '])
-      await runInTenantContext(S, () => rankedSearch(S, q));
+      await runInTenantContext(S, () => rankedSearch(S, q, { searcher: who() }));
     expect(f.calls).toHaveLength(0);
-    await runInTenantContext(S, () => rankedSearch(S, 'shoes'));
+    await runInTenantContext(S, () => rankedSearch(S, 'shoes', { searcher: who() }));
     expect(f.calls).toHaveLength(1);
   });
 
@@ -317,10 +345,10 @@ describe.skipIf(!hasDb)('hybrid storefront search (Task 12)', () => {
     process.env.SEARCH_SEMANTIC_ENABLED = 'true';
     const f = aliasProvider();
     setEmbeddingProviderForTests(f.provider);
-    await runInTenantContext(S, () => semanticProductIds(S, 'احذية رياضية'));
-    await runInTenantContext(S, () => semanticProductIds(S, 'احذيه رياضيه')); // same once folded
+    await runInTenantContext(S, () => semanticProductIds(S, 'احذية رياضية', { searcher: who() }));
+    await runInTenantContext(S, () => semanticProductIds(S, 'احذيه رياضيه', { searcher: who() })); // same once folded
     expect(f.calls).toHaveLength(1);
-    await runInTenantContext(F, () => semanticProductIds(F, 'احذية رياضية'));
+    await runInTenantContext(F, () => semanticProductIds(F, 'احذية رياضية', { searcher: who() }));
     expect(f.calls).toHaveLength(2);
     // A failure is not cached: the next request tries again.
     clearQueryVectorCacheForTests();
@@ -332,8 +360,8 @@ describe.skipIf(!hasDb)('hybrid storefront search (Task 12)', () => {
         throw new Error('5xx');
       },
     });
-    await runInTenantContext(S, () => semanticProductIds(S, 'shoes'));
-    await runInTenantContext(S, () => semanticProductIds(S, 'shoes'));
+    await runInTenantContext(S, () => semanticProductIds(S, 'shoes', { searcher: who() }));
+    await runInTenantContext(S, () => semanticProductIds(S, 'shoes', { searcher: who() }));
     expect(n).toBe(2);
   });
 
@@ -356,7 +384,7 @@ describe.skipIf(!hasDb)('hybrid storefront search (Task 12)', () => {
     process.env.SEARCH_SEMANTIC_ENABLED = 'true';
     const f = aliasProvider({ boot: await docOf(target), boots: await docOf(target) });
     setEmbeddingProviderForTests(f.provider);
-    const ids = await runInTenantContext(B, () => rankedSearch(B, 'boot'));
+    const ids = await runInTenantContext(B, () => rankedSearch(B, 'boot', { searcher: who() }));
     expect(ids).toHaveLength(60);
     expect(new Set(ids).size).toBe(60);
     expect(f.calls).toHaveLength(0); // 60 keyword matches: no Workers AI call
@@ -364,7 +392,9 @@ describe.skipIf(!hasDb)('hybrid storefront search (Task 12)', () => {
     expect(r.meta).toMatchObject({ total: 60, totalPages: 3, ranked: true });
     expect(pageIds(r)).toEqual(ids.slice(40, 60));
     // "boots" matches no "Boot N" by keyword: the vector leg alone answers (zero-result fallback).
-    expect(await runInTenantContext(B, () => rankedSearch(B, 'boots'))).toEqual([target]);
+    expect(
+      await runInTenantContext(B, () => rankedSearch(B, 'boots', { searcher: who() }))
+    ).toEqual([target]);
     expect(f.calls).toHaveLength(1);
   });
 
@@ -379,7 +409,9 @@ describe.skipIf(!hasDb)('hybrid storefront search (Task 12)', () => {
       setEmbeddingProviderForTests(f.provider);
       try {
         for (let i = 0; i < 1000; i++) {
-          const ids = await runInTenantContext(Q, () => rankedSearch(Q, `zz unique query ${i}`));
+          const ids = await runInTenantContext(Q, () =>
+            rankedSearch(Q, `zz unique query ${i}`, { searcher: who() })
+          );
           expect(ids).toEqual([]); // keyword-only once the budget is spent: an answer, never a throw
         }
         expect(f.calls).toHaveLength(25);
@@ -389,14 +421,60 @@ describe.skipIf(!hasDb)('hybrid storefront search (Task 12)', () => {
     }
   );
 
-  it('semantic: false (the per-searcher limiter said no) → keyword only, no provider call', async () => {
+  it('no searcher identity → never embeds (default deny for any caller that does not opt in)', async () => {
     process.env.SEARCH_SEMANTIC_ENABLED = 'true';
     const f = aliasProvider({ كوتشي: sneakerDoc });
     setEmbeddingProviderForTests(f.provider);
+    expect(await runInTenantContext(S, () => rankedSearch(S, 'كوتشي'))).toEqual([]);
+    expect(await runInTenantContext(S, () => semanticProductIds(S, 'كوتشي'))).toEqual([]);
     expect(
-      await runInTenantContext(S, () => rankedSearch(S, 'كوتشي', { semantic: false }))
+      pageIds(await runInTenantContext(S, () => ProductService.listPublic(S, { search: 'كوتشي' })))
     ).toEqual([]);
     expect(f.calls).toHaveLength(0);
+  });
+
+  it(
+    'one searcher, 1000 unique queries → at most SEARCH_EMBED_PER_SEARCHER_PER_MIN provider calls',
+    { timeout: 120_000 },
+    async () => {
+      process.env.SEARCH_SEMANTIC_ENABLED = 'true';
+      const f = aliasProvider();
+      setEmbeddingProviderForTests(f.provider);
+      const one = who();
+      const t0 = Date.now();
+      for (let i = 0; i < 1000; i++)
+        await runInTenantContext(S, () => rankedSearch(S, `abuse query ${i}`, { searcher: one }));
+      expect(f.calls.length).toBeLessThanOrEqual(
+        SEARCH_EMBED_PER_SEARCHER_PER_MIN * windowsSince(t0)
+      );
+      expect(f.calls.length).toBeGreaterThan(0);
+    }
+  );
+
+  it('a cache hit charges nothing; every miss charges once, before the call', async () => {
+    process.env.SEARCH_SEMANTIC_ENABLED = 'true';
+    process.env.SEARCH_QUERY_EMBED_STORE_DAILY_CAP = '1';
+    const C = await mkStore('charge');
+    const c1 = await mkProduct(C, { name: 'Sport trainer', nameAr: 'حذاء رياضي' });
+    setEmbeddingProviderForTests(aliasProvider().provider);
+    await runInStoreScope(C, () => indexStore(C));
+    const f = aliasProvider({ كوتشي: await docOf(c1), جزمه: await docOf(c1) });
+    setEmbeddingProviderForTests(f.provider);
+    try {
+      const run = (q: string) =>
+        runInTenantContext(C, () => semanticProductIds(C, q, { searcher: who() }));
+      expect(await run('كوتشي')).toEqual([c1]); // miss: charged (1 of 1), called
+      expect(await run('كوتشي')).toEqual([c1]); // hit: free, still answered
+      expect(await run('كوتشي')).toEqual([c1]);
+      expect(await run('جزمه')).toEqual([]); // miss: budget spent by the ONE real call
+      expect(f.calls).toHaveLength(1);
+      const { redis } = await import('../../apps/api/src/services/redis.service');
+      const { queryEmbedStoreKey } = await import('../../apps/api/src/lib/search/embed-budget');
+      // Exactly the ONE provider call: the cache hits charged nothing, the refusal was refunded.
+      expect(Number(await redis.getClient()?.get(queryEmbedStoreKey(C, new Date())))).toBe(1);
+    } finally {
+      delete process.env.SEARCH_QUERY_EMBED_STORE_DAILY_CAP;
+    }
   });
 
   // ---- storefront list (listPublic) -----------------------------------------------------------
