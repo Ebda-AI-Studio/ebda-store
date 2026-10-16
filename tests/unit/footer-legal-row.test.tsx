@@ -131,3 +131,33 @@ describe.each(Object.entries(FOOTERS))('S-01: %s footer legal row', (_name, Foot
     expect(container.querySelectorAll('a[href="/privacy"]').length).toBe(1);
   });
 });
+
+describe('FU46 I-1: the © year is the per-request render clock, not the local one', () => {
+  it('prints the same year on a UTC server and a Cairo browser across the new-year boundary', async () => {
+    const { RenderClockProvider } = await import('../../apps/web/src/contexts/RenderClockContext');
+    const now = Date.UTC(2026, 11, 31, 22, 30); // 31 Dec 22:30 UTC = 1 Jan 00:30 in Cairo
+    const years: string[] = [];
+    const prevTz = process.env.TZ;
+    try {
+      for (const tz of ['UTC', 'Africa/Cairo']) {
+        process.env.TZ = tz;
+        vi.useFakeTimers();
+        vi.setSystemTime(now);
+        const { container, unmount } = render(
+          <RenderClockProvider now={now}>
+            <Minimal {...base} />
+          </RenderClockProvider>
+        );
+        years.push(container.querySelector('[data-footer-legal] p')!.textContent!);
+        unmount();
+        vi.useRealTimers();
+      }
+    } finally {
+      if (prevTz === undefined) delete process.env.TZ;
+      else process.env.TZ = prevTz;
+      vi.useRealTimers();
+    }
+    expect(years[0]).toContain('© 2026');
+    expect(years[1]).toBe(years[0]);
+  });
+});

@@ -58,7 +58,15 @@ function fnName(fn: ts.Node): string | undefined {
   return undefined;
 }
 
-function isRenderPath(node: ts.Node): boolean {
+/**
+ * Plain `.ts` modules under `templates/` are helpers the skins' components call during render
+ * (resolveBottomBar read the clock this way, FU46 final review I-1), so a clock read ANYWHERE in
+ * one is render path: the scanner cannot follow the call, the file location stands for it.
+ */
+const isTemplateHelper = (file: string) => /[\\/]templates[\\/]/.test(file) && /\.ts$/.test(file);
+
+function isRenderPath(node: ts.Node, helperFile = false): boolean {
+  if (helperFile) return true;
   let cur: ts.Node | undefined = node.parent;
   while (cur) {
     if (
@@ -103,6 +111,7 @@ export function scanSource(file: string, text: string): string[] {
     /^\s*(['"])use client\1/m.test(text.slice(0, 400)) ||
     /[\\/](components|templates|hooks|contexts)[\\/]/.test(file);
   if (!clientFile) return [];
+  const helperFile = isTemplateHelper(file);
   const hits: string[] = [];
   const at = (n: ts.Node, what: string) => {
     const { line } = sf.getLineAndCharacterOfPosition(n.getStart());
@@ -110,7 +119,11 @@ export function scanSource(file: string, text: string): string[] {
   };
   const visit = (n: ts.Node) => {
     // location.href / window.location.origin ... : a property read ON the location object.
-    if (ts.isPropertyAccessExpression(n) && isLocationRoot(n.expression) && isRenderPath(n)) {
+    if (
+      ts.isPropertyAccessExpression(n) &&
+      isLocationRoot(n.expression) &&
+      isRenderPath(n, helperFile)
+    ) {
       at(n, `render-time ${n.getText(sf)}`);
     }
     if (
@@ -118,7 +131,7 @@ export function scanSource(file: string, text: string): string[] {
       ts.isIdentifier(n.expression) &&
       n.expression.text === 'Date' &&
       (n.arguments?.length ?? 0) === 0 &&
-      isRenderPath(n)
+      isRenderPath(n, helperFile)
     ) {
       at(n, 'render-time new Date()');
     }
@@ -128,7 +141,7 @@ export function scanSource(file: string, text: string): string[] {
       ts.isIdentifier(n.expression.expression) &&
       n.expression.expression.text === 'Date' &&
       n.expression.name.text === 'now' &&
-      isRenderPath(n)
+      isRenderPath(n, helperFile)
     ) {
       at(n, 'render-time Date.now()');
     }
@@ -279,6 +292,17 @@ describe('no render-time window.location / Date in any Next app (B0-46)', () => 
       ['dated with an argument', `const d = new Date(post.createdAt).getFullYear();`],
     ])('leaves alone: %s', (_n, body) => {
       expect(scanSource('x/Thing.tsx', wrap(body))).toEqual([]);
+    });
+    it('catches a clock read inside a helper module under templates/ (FU46 I-1)', () => {
+      const src = `export function resolveBottomBar() { const y = new Date().getFullYear(); return y; }`;
+      expect(scanSource('apps/web/src/templates/shared/display-helpers.ts', src)).toHaveLength(1);
+      expect(
+        scanSource('apps/web/src/templates/shared/h.ts', `export const n = () => Date.now();`)
+      ).toHaveLength(1);
+      // a dated argument, or a helper outside templates/, stays alone
+      expect(
+        scanSource('apps/web/src/templates/shared/h.ts', `export const n = (a) => new Date(a);`)
+      ).toEqual([]);
     });
     it('skips server-only files (no use client, not under components/templates/hooks/contexts)', () => {
       expect(

@@ -200,14 +200,16 @@ export function resolveBottomBar(
   bottomBar: FooterBottomBarConfig | undefined,
   storeName: string,
   isRtl: boolean,
-  disabledCmsSlugs?: string[]
+  disabledCmsSlugs: string[] | undefined,
+  /** The © year. Passed in (the per-request render clock), never read here: a clock read in a
+   *  helper is a hydration mismatch when server and browser straddle New Year (FU46 I-1). */
+  year: number
 ): ResolvedBottomBar {
   const enabled = bottomBar?.enabled !== false;
   const overrideRaw = isRtl
     ? (bottomBar?.copyrightOverrideAr ?? bottomBar?.copyrightOverride)
     : bottomBar?.copyrightOverride;
   const override = typeof overrideRaw === 'string' ? overrideRaw.trim() : '';
-  const year = new Date().getFullYear();
   const fallback = isRtl
     ? `© ${year} ${storeName}. جميع الحقوق محفوظة.`
     : `© ${year} ${storeName}. All rights reserved.`;

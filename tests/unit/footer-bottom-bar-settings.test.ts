@@ -146,7 +146,7 @@ describe("the Returns link follows the store's returns feature (review M7)", () 
   it('feature off → the returns link is off', () => {
     const slugs = footerDisabledSlugs(['privacy'], ['coupons']);
     expect(slugs).toEqual(['privacy', 'returns']);
-    expect(resolveBottomBar(undefined, 'Shop', false, slugs).returnsEnabled).toBe(false);
+    expect(resolveBottomBar(undefined, 'Shop', false, slugs, 2026).returnsEnabled).toBe(false);
   });
   it('feature on, or features unknown → unchanged', () => {
     expect(footerDisabledSlugs(['privacy'], ['returns'])).toEqual(['privacy']);

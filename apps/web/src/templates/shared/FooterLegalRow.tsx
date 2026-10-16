@@ -15,6 +15,7 @@
  * as `className` (inheriting the body ink vanished on a dark merchant footer).
  */
 import { useLanguage } from '../../contexts/LanguageContext';
+import { useRenderNow } from '../../contexts/RenderClockContext';
 import type { FooterLinksConfig } from '../types';
 import { resolveBottomBar, resolveFooterSections } from './display-helpers';
 
@@ -50,7 +51,10 @@ export function FooterLegalRow({
   className,
 }: FooterLegalRowProps) {
   const { t } = useLanguage();
-  const bar = resolveBottomBar(footerLinks?.bottomBar, storeName, isRtl, disabledCmsSlugs);
+  // UTC year of the per-request clock: getFullYear() is the local zone's, which differs between
+  // the Worker (UTC) and a Cairo browser for 2 h a year and mismatched the hydrating render.
+  const year = new Date(useRenderNow()).getUTCFullYear();
+  const bar = resolveBottomBar(footerLinks?.bottomBar, storeName, isRtl, disabledCmsSlugs, year);
   if (!bar.enabled) return null;
 
   const inColumns = new Set(
