@@ -38,6 +38,10 @@ export interface RateLimitBindingLike {
   limit(opts: { key: string }): Promise<{ success: boolean }>;
 }
 
+export interface AiBindingLike {
+  run(model: string, input: Record<string, unknown>): Promise<unknown>;
+}
+
 export interface CfBindings {
   HYPERDRIVE: { connectionString: string };
   /** Public caches (store/product payloads). Eventual consistency is fine for these. */
@@ -53,6 +57,8 @@ export interface CfBindings {
   CF_VERSION_METADATA?: { id?: string; tag?: string };
   /** Service Binding to the storefront Worker (ebda-web): cache purge without a public host. */
   STOREFRONT?: ServiceBindingLike;
+  /** Workers AI (search embeddings, bge-m3). Always remote, also in `wrangler dev`. */
+  AI?: AiBindingLike;
   [name: string]: unknown;
 }
 

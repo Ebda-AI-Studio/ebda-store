@@ -21,11 +21,16 @@ import { awaitDeferredWork } from './lib/after-tenant-commit';
 import logger from './lib/logger';
 import { listenAfterDatabaseRoleGuard, type DatabaseRoleRow } from './lib/database-role-guard';
 import { retryTransientRead } from './lib/db-retry';
+import { assertEmbeddingConfig } from './lib/search/embedding-provider';
 
 // The Node server shell (Railway, Docker, `npm run dev`). The Express app itself
 // lives in app.ts and is shared with the Cloudflare Worker shell (worker.ts);
 // everything here is process-lifetime state a Worker does not have: the listening
 // socket, socket.io, in-process loops, signal handlers.
+
+// Fail loud before serving: semantic search switched on with no embedding provider, or half a
+// REST credential pair (lib/search/embedding-provider.ts). Node has no `AI` binding.
+assertEmbeddingConfig(logger);
 
 const httpServer = createServer(app);
 
