@@ -127,6 +127,27 @@ export function classifyCall(args: string): 'text' | 'dynamic' | 'none' {
   return kind;
 }
 
+/** Raw SQL that inserts products or SETs an index column of products (embed doc, status, deleted_at). */
+export function rawProductWrites(src: string): string[] {
+  const out: string[] = [];
+  // Case-insensitive; the table may be quoted and carry an alias (`products p`, `products AS p`).
+  const table = String.raw`"?products"?(?:\s+(?:AS\s+)?(?!SET\b)[A-Za-z_]\w*)?`;
+  if (new RegExp(String.raw`INSERT\s+INTO\s+${table}\s*\(`, 'i').test(src)) out.push('INSERT');
+  const update = new RegExp(
+    String.raw`UPDATE\s+${table}\s+SET([\s\S]*?)(WHERE|RETURNING|\x60|$)`,
+    'gi'
+  );
+  for (const m of src.matchAll(update)) {
+    if (
+      /(^|[\s,.])"?(name|name_ar|search_terms|description|description_ar|status|deleted_at)"?\s*=/i.test(
+        m[1]
+      )
+    )
+      out.push(`UPDATE ... SET ${m[1].trim().slice(0, 40)}`);
+  }
+  return out;
+}
+
 function scan(): Map<string, Array<{ line: number; kind: 'text' | 'dynamic' }>> {
   const CALL = /\.product\.(create|createMany|update|updateMany|upsert)\(/g;
   const hits = new Map<string, Array<{ line: number; kind: 'text' | 'dynamic' }>>();
@@ -186,17 +207,21 @@ describe('product text writers keep the search index current (Task 11)', () => {
     expect(fn).toMatch(/event: REINDEX_EVENT/);
   });
 
-  it('no raw SQL inserts products or SETs an embed-doc column (it would bypass every check above)', () => {
-    const bad: string[] = [];
-    for (const f of listTs(SRC)) {
-      const s = readFileSync(f, 'utf8');
-      if (/INSERT\s+INTO\s+"?products"?\s*\(/.test(s)) bad.push(`${relative(ROOT, f)}: INSERT`);
-      // Today: warehouse.service (inventory) and product.service (ai_field_sources) only.
-      for (const m of s.matchAll(/UPDATE\s+"?products"?\s+SET([\s\S]*?)(WHERE|RETURNING|`)/g)) {
-        if (/\b"?(name|name_ar|search_terms|description|description_ar)"?\s*=/.test(m[1]))
-          bad.push(`${relative(ROOT, f)}: UPDATE ... SET ${m[1].trim().slice(0, 40)}`);
-      }
-    }
+  it('the raw-SQL detector catches lower case and table aliases (review M1)', () => {
+    expect(rawProductWrites('update products set name = $1 where id = $2')).toHaveLength(1);
+    expect(rawProductWrites('UPDATE products p SET name = $1 WHERE p.id = $2')).toHaveLength(1);
+    expect(rawProductWrites('UPDATE "products" AS p SET "search_terms" = $1')).toHaveLength(1);
+    expect(rawProductWrites('insert into products (id, name) values ($1, $2)')).toHaveLength(1);
+    expect(rawProductWrites('insert into "products" p (id) values ($1)')).toHaveLength(1);
+    expect(rawProductWrites('UPDATE "products" SET inventory = 1 WHERE "id" = $1')).toEqual([]);
+    expect(rawProductWrites('update product_variants set name = $1')).toEqual([]);
+  });
+
+  it('no raw SQL inserts products or SETs an index column (it would bypass every check above)', () => {
+    const bad = listTs(SRC).flatMap(f =>
+      rawProductWrites(readFileSync(f, 'utf8')).map(w => `${relative(ROOT, f)}: ${w}`)
+    );
+    // Today: warehouse.service (inventory) and product.service (ai_field_sources) only.
     expect(bad).toEqual([]);
   });
 });
