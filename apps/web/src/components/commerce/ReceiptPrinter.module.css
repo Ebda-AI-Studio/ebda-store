@@ -138,6 +138,21 @@
   }
 }
 
+/* K-07 `receiptStyle: framed` (a look token): the printer is a quiet frame in the page's own
+   colours, not a near-black device slab; the paper and its ink are unchanged. */
+.framed .housing {
+  background: transparent;
+  border: 1px solid hsl(var(--input));
+}
+.framed .screen {
+  background: transparent;
+  color: hsl(var(--foreground));
+}
+.framed .slit {
+  background: hsl(var(--input));
+  box-shadow: none;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .feeding,
   .statusIn {

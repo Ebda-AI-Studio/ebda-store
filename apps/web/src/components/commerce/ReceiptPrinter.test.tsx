@@ -158,7 +158,7 @@ describe('ReceiptPrinter', () => {
     expect(screen.getByRole('status').textContent).toContain('تم الدفع وتأكيد طلبك');
   });
 
-  it('renders every line, bundle as one row, and the order number under the barcode', () => {
+  it('renders every line, bundle as one row, and the order number at the foot', () => {
     render(<ReceiptPrinter order={orderWithBundle} paymentState="paid" store={store} />);
     expect(screen.getAllByTestId('receipt-line')).toHaveLength(
       groupOrderLinesForDisplay(orderWithBundle.items).length
@@ -167,10 +167,9 @@ describe('ReceiptPrinter', () => {
     expect(screen.getByText(/علبة هدية/)).toBeTruthy();
     // bundle = one row priced at the box total (100 + 80), never its components
     expect(screen.getAllByTestId('receipt-line')[2].textContent).toMatch(/180/);
-    expect(screen.getByTestId('receipt-barcode-caption').textContent).toContain(
+    expect(screen.getByTestId('receipt-order-number').textContent).toContain(
       orderWithBundle.orderNumber
     );
-    expect(screen.getByTestId('receipt-barcode').getAttribute('aria-hidden')).toBe('true');
   });
 
   it('shows the variant and personalisation under its line', () => {
@@ -352,7 +351,7 @@ describe('ReceiptPrinter', () => {
     const total = screen.getByTestId('receipt-total').textContent ?? '';
     expect(total).toMatch(/٩٥٠/);
     expect(total).not.toMatch(/[0-9]/);
-    expect(screen.getByTestId('receipt-barcode-caption').textContent).toBe('#1043');
+    expect(screen.getByTestId('receipt-order-number').textContent).toBe('#1043');
   });
 
   it('english: canonical variant title, and the date reads day month year', () => {
@@ -364,11 +363,12 @@ describe('ReceiptPrinter', () => {
     expect(document.body.textContent).not.toContain('10/15/2026');
   });
 
-  it('prints the order number once on the paper (barcode caption), no duplicate row', () => {
+  it('prints the order number once on the paper (the foot), no duplicate meta row', () => {
     render(<ReceiptPrinter order={order} paymentState="cod" store={store} />);
-    expect(screen.queryByTestId('receipt-order-number')).toBeNull();
-    expect(screen.queryByText('رقم الطلب')).toBeNull();
-    expect(screen.getByTestId('receipt-barcode-caption').textContent).toBe('#1043');
+    const paper = screen.getByTestId('receipt-paper');
+    expect(within(paper).getAllByText('#1043')).toHaveLength(1);
+    expect(within(paper).getAllByText('رقم الطلب')).toHaveLength(1);
+    expect(screen.getByTestId('receipt-order-number').textContent).toBe('#1043');
   });
 
   it('a bubbling animationend from inside the leaving status line does not end the crossfade', () => {
@@ -382,5 +382,48 @@ describe('ReceiptPrinter', () => {
     fireEvent(leaving, new Event('animationend', { bubbles: true }));
     fireEvent(leaving, new Event('webkitAnimationEnd', { bubbles: true }));
     expect(screen.queryByTestId('receipt-status-leaving')).toBeNull();
+  });
+});
+
+// W3 receipt polish (decision (d) supersedes B0-3; T-04, M-05, K-07).
+describe('receipt W3', () => {
+  it('S-04: no decorative barcode; one large human-readable order number', () => {
+    render(<ReceiptPrinter order={order} paymentState="cod" store={store} />);
+    expect(screen.queryByTestId('receipt-barcode')).toBeNull();
+    const n = screen.getByTestId('receipt-order-number');
+    expect(n.textContent).toBe('#1043');
+    expect(n.className).toContain('text-2xl');
+    expect(n.className).not.toMatch(/tracking-\[/);
+  });
+  it('T-04: money is the body face with tabular figures; mono is only the order number', () => {
+    render(<ReceiptPrinter order={order} paymentState="paid" store={store} />);
+    for (const el of document.querySelectorAll(`.${styles.mono}`))
+      expect(el.textContent).toMatch(/^#?1043$/);
+    expect(document.querySelector('[class*="uppercase"]')).toBeNull();
+  });
+  it('M-05: a tap on the paper ends the feed at once', () => {
+    render(
+      <ReceiptPrinter order={{ ...order, id: 'order-tap' }} paymentState="cod" store={store} />
+    );
+    expect(screen.getByTestId('receipt-paper').getAttribute('data-feeding')).toBe('true');
+    fireEvent.click(screen.getByTestId('receipt-paper'));
+    expect(screen.getByTestId('receipt-paper').getAttribute('data-feeding')).toBeNull();
+  });
+  it('K-07: receiptStyle framed drops the device slab (no shadow, framed housing)', () => {
+    const { container } = render(
+      <ReceiptPrinter
+        order={order}
+        paymentState="cod"
+        store={{ ...store, theme: { receiptStyle: 'framed' } } as never}
+      />
+    );
+    const section = container.querySelector('section')!;
+    expect(section.getAttribute('data-receipt')).toBe('framed');
+    expect(container.innerHTML).not.toContain('shadow-lg');
+  });
+  it('K-07: without the token the device housing is unchanged', () => {
+    const { container } = render(<ReceiptPrinter order={order} paymentState="cod" store={store} />);
+    expect(container.querySelector('section')!.hasAttribute('data-receipt')).toBe(false);
+    expect(container.innerHTML).toContain('shadow-lg');
   });
 });

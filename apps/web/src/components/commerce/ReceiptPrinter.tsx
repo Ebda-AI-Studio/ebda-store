@@ -5,7 +5,7 @@
  *
  * A printer card (store tokens: foreground body, background ink) shows the
  * order and a status line; under its slot a white thermal receipt feeds DOWN,
- * torn edge and barcode first, clipped at the slot. When the feed ends the
+ * torn edge first, clipped at the slot. When the feed ends the
  * spinner becomes the order's REAL payment state. The status copy and the
  * total label come only from `paymentState`: a COD / awaiting / pending order
  * never reads "paid" (review focus #7).
@@ -22,6 +22,7 @@ import { groupOrderLinesForDisplay, orderTaxPlacement, orderLineVariantTitle } f
 import type { Order } from '@/lib/api';
 import { MINUS, signedText } from '@/lib/bidi';
 import type { StoreData } from '@/contexts/StoreContext';
+import type { StoreTheme } from '@ebda/shared';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useLocalePrice } from '@/hooks/useLocalePrice';
 import { useNumerals } from '@/hooks/useNumerals';
@@ -29,7 +30,6 @@ import { formatDate } from '@/lib/format-date';
 import { paymentMethodLabel, paymentProviderLabel } from '@/lib/order-labels';
 import { pickLocalizedName } from '@/templates/shared/display-helpers';
 import { CartLineNote } from './CartLineNote';
-import { Barcode } from './Barcode';
 import styles from './ReceiptPrinter.module.css';
 import { countText, ITEMS } from '@/lib/plural';
 
@@ -43,7 +43,10 @@ export type PaymentState =
   | 'awaiting'
   | 'unknown';
 
-type ReceiptStore = Pick<StoreData, 'name' | 'nameAr' | 'logo' | 'logoAr' | 'timezone'>;
+type ReceiptStore = Pick<StoreData, 'name' | 'nameAr' | 'logo' | 'logoAr' | 'timezone'> & {
+  /** K-07: a look's `receiptStyle` (`framed` = paper in the page ink, no device slab). */
+  theme?: Pick<StoreTheme, 'receiptStyle'> | null;
+};
 
 export interface ReceiptPrinterProps {
   order: Order | null;
@@ -81,7 +84,8 @@ function Num({ children }: { children: string }) {
     <span className="tabular-nums">
       {children.split(LATIN_NUMBER).map((part, i) =>
         i % 2 === 1 ? (
-          <span key={i} className={styles.mono}>
+          // T-04: digit runs stay in the body face (tabular figures above); mono is the code only.
+          <span key={i} dir="ltr">
             {part}
           </span>
         ) : (
@@ -173,14 +177,16 @@ export function ReceiptPrinter({
   );
   const paid = paymentState === 'paid';
   const payment = order ? paymentLabel(order, paymentState, language) : null;
+  const framed = store.theme?.receiptStyle === 'framed';
 
   return (
     <section
-      className="mx-auto mt-8 w-full max-w-[24rem] text-start"
+      className={`mx-auto mt-8 w-full max-w-[24rem] text-start ${framed ? styles.framed : ''}`}
       aria-label={t('Order receipt', 'فاتورة الطلب')}
+      data-receipt={framed ? 'framed' : undefined}
     >
       {/* Printer */}
-      <div className={`${styles.housing} relative z-10 p-1.5 shadow-lg`}>
+      <div className={`${styles.housing} relative z-10 p-1.5 ${framed ? '' : 'shadow-lg'}`}>
         <div className={`${styles.screen} px-4 pb-3.5 pt-4`}>
           <div className="flex items-start justify-between gap-4">
             <div className="min-w-0">
@@ -256,6 +262,10 @@ export function ReceiptPrinter({
             data-testid="receipt-paper"
             onAnimationEnd={e => {
               if (e.target === e.currentTarget) setFedId(order.id);
+            }}
+            // M-05: a tap skips the 1.6s feed (the receipt is already real text under it).
+            onClick={() => {
+              if (feed && !feedDone) setFedId(order.id);
             }}
           >
             <article className={`${styles.paper} px-5 pt-6 text-sm leading-snug`}>
@@ -364,12 +374,14 @@ export function ReceiptPrinter({
                 </p>
               )}
 
-              <div className="mt-6 flex flex-col items-center gap-1.5 pb-4">
-                <Barcode value={order.orderNumber} className={`h-11 w-[78%] ${styles.ink}`} />
+              {/* Decision (d), supersedes B0-3: no decorative barcode (it never scanned); the
+                  order number is the one thing a shopper reads out, so it is large. */}
+              <div className="mt-6 flex flex-col items-center gap-1 pb-4">
+                <p className={`text-xs ${styles.inkSoft}`}>{t('Order number', 'رقم الطلب')}</p>
                 <p
-                  data-testid="receipt-barcode-caption"
+                  data-testid="receipt-order-number"
                   dir="ltr"
-                  className={`${styles.mono} text-xs tracking-[0.3em] ${styles.inkSoft}`}
+                  className={`${styles.mono} text-2xl font-semibold ${styles.ink}`}
                 >
                   #{order.orderNumber}
                 </p>
@@ -428,9 +440,7 @@ function Totals({
         </MoneyRow>
       )}
       <div className="flex items-baseline justify-between gap-3 pt-2">
-        <dt
-          className={`font-bold ${ar ? 'text-sm' : `${styles.mono} text-xs uppercase tracking-[0.08em]`}`}
-        >
+        <dt className="font-bold text-sm">
           {paid ? t('Total paid', 'المدفوع') : t('Total', 'الإجمالي')}
         </dt>
         <dd className="text-lg font-bold" data-testid="receipt-total">
@@ -460,19 +470,11 @@ function Totals({
   );
 }
 
-/** Label at the start, value at the end. English labels are Latin mono small
- *  caps (the receipt voice); Arabic labels and every value stay in the body
- *  font, with only Western digit runs in mono via `Num`. */
+/** Label at the start, value at the end, both in the body face (T-04: no tracked mono caps). */
 function MoneyRow({ label, ar, children }: { label: string; ar: boolean; children: ReactNode }) {
   return (
     <div className="flex items-baseline justify-between gap-3 text-xs">
-      <dt
-        className={
-          ar ? styles.inkSoft : `${styles.mono} uppercase tracking-[0.08em] ${styles.inkSoft}`
-        }
-      >
-        {label}
-      </dt>
+      <dt className={styles.inkSoft}>{label}</dt>
       <dd>{children}</dd>
     </div>
   );
