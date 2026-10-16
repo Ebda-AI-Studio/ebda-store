@@ -23,7 +23,9 @@ export interface AreaRateRow {
 
 interface ComboboxOption {
   value: string; // EN canonical
-  label: string; // display label (locale-aware)
+  label: string; // display label, in the page language only (a11y re-audit P2-N13)
+  /** Both languages, matched by the search box (an English query on the Arabic page still finds). */
+  search?: string;
 }
 
 interface ComboboxProps {
@@ -65,7 +67,7 @@ function Combobox({
   const displayValue = open ? query : (selectedOption?.label ?? '');
 
   const filteredOptions = query
-    ? options.filter(o => o.label.toLowerCase().includes(query.toLowerCase()))
+    ? options.filter(o => (o.search ?? o.label).toLowerCase().includes(query.toLowerCase()))
     : options;
 
   // Click outside → close
@@ -297,7 +299,8 @@ export function GovernorateAreaSelect({
     if (seen.size <= 1) return []; // single-country: no dropdown needed
     return Array.from(seen.entries()).map(([en, ar]) => ({
       value: en,
-      label: locale === 'ar' ? `${ar} / ${en}` : `${en} / ${ar}`,
+      label: locale === 'ar' ? ar : en,
+      search: `${en} ${ar}`,
     }));
   }, [areaRates, locale]);
 
@@ -351,7 +354,8 @@ export function GovernorateAreaSelect({
       return true;
     }).map(gov => ({
       value: gov.en,
-      label: locale === 'ar' ? `${gov.ar} / ${gov.en}` : `${gov.en} / ${gov.ar}`,
+      label: locale === 'ar' ? gov.ar : gov.en,
+      search: `${gov.en} ${gov.ar}`,
     }));
 
     // (b) Custom govs: in areaRates but NOT in the static list.
@@ -366,10 +370,8 @@ export function GovernorateAreaSelect({
         seenCustom.add(r.governorate);
         customOptions.push({
           value: r.governorate,
-          label:
-            locale === 'ar'
-              ? `${r.governorateAr} / ${r.governorate}`
-              : `${r.governorate} / ${r.governorateAr}`,
+          label: locale === 'ar' ? r.governorateAr : r.governorate,
+          search: `${r.governorate} ${r.governorateAr}`,
         });
       }
     }
@@ -396,7 +398,8 @@ export function GovernorateAreaSelect({
       })
       .map(a => ({
         value: a.en,
-        label: locale === 'ar' ? `${a.ar} / ${a.en}` : `${a.en} / ${a.ar}`,
+        label: locale === 'ar' ? a.ar : a.en,
+        search: `${a.en} ${a.ar}`,
       }));
 
     // (b) Custom areas: rate rows for this gov whose area is NOT in the static list.
@@ -407,7 +410,8 @@ export function GovernorateAreaSelect({
         if (staticAreaNames.has(r.area)) continue;
         customAreaOptions.push({
           value: r.area,
-          label: locale === 'ar' ? `${r.areaAr} / ${r.area}` : `${r.area} / ${r.areaAr}`,
+          label: locale === 'ar' ? r.areaAr : r.area,
+          search: `${r.area} ${r.areaAr}`,
         });
       }
     }
