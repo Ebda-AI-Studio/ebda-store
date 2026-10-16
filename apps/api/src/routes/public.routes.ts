@@ -225,8 +225,14 @@ router.get('/products', async (req: Request, res: Response, next: NextFunction) 
     }
     const effectiveSearch = rawSearch.length >= 2 ? rawSearch.slice(0, 100) : undefined;
 
+    // `relevance` (Task 12) = the hybrid order of a search; the service treats it as no sort
+    // whenever semantic search is off or there is no search term.
     const sortValue =
-      sort === 'newest' || sort === 'price_asc' || sort === 'price_desc' || sort === 'best_seller'
+      sort === 'newest' ||
+      sort === 'price_asc' ||
+      sort === 'price_desc' ||
+      sort === 'best_seller' ||
+      sort === 'relevance'
         ? sort
         : undefined;
 

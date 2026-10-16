@@ -5,7 +5,7 @@
  * with the code-level tenant guard on (both layers), the way the Worker runs them.
  */
 import { describe, it, expect, beforeAll, afterAll, afterEach, vi } from 'vitest';
-import crypto, { createHash } from 'node:crypto';
+import crypto from 'node:crypto';
 import {
   prisma,
   createPrismaClient,
@@ -14,6 +14,7 @@ import {
   runInTenantContext,
 } from '@ebda/database';
 import { hasDb } from '../helpers/bundle-fixtures';
+import { fakeProvider } from '../helpers/fake-embeddings';
 
 vi.hoisted(() => {
   process.env.SEARCH_EMBED_THROTTLE_MS = '0';
@@ -36,31 +37,13 @@ vi.mock('../../apps/api/src/services/alerts.service', () => ({
   }),
 }));
 
-const { setEmbeddingProviderForTests, EMBED_DIMS, EMBED_MODEL, EmbeddingError } =
+const { setEmbeddingProviderForTests, EMBED_MODEL, EmbeddingError } =
   await import('../../apps/api/src/lib/search/embedding-provider');
 const { indexStore, findStaleProducts, storeIndexStatus, hasStaleProducts } =
   await import('../../apps/api/src/services/product-index.service');
 const { requestStoreReindex } = await import('../../apps/api/src/lib/search/reindex');
 const { handleSearchProductIndex, handleSearchIndexBackstop, INDEX_RETRIES, ISOLATE_CHUNK } =
   await import('../../apps/api/src/lib/inngest/functions/search-product-index');
-
-/** Deterministic fake: same text → same vector; counts calls. */
-function fakeProvider() {
-  const calls: string[][] = [];
-  return {
-    calls,
-    provider: {
-      model: EMBED_MODEL,
-      async embed(texts: string[]) {
-        calls.push(texts);
-        return texts.map(t => {
-          const h = createHash('sha256').update(t).digest();
-          return Array.from({ length: EMBED_DIMS }, (_, i) => (h[i % 32] - 128) / 128);
-        });
-      },
-    },
-  };
-}
 
 const OWNER_URL = process.env.DIRECT_URL || process.env.DATABASE_URL || '';
 function appUrl(): string {

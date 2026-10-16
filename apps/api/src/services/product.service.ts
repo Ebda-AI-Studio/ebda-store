@@ -36,9 +36,11 @@ import { assertWithinLimit } from './plan-limit.service';
 import {
   buildProductSearchWhere,
   productSearchFilter,
+  rankedSearch,
   searchNameIds,
   searchProductIds,
 } from './product-search.service';
+import { semanticSearchEnabled } from '../lib/search/embedding-provider';
 
 /**
  * Compute availability flags for a product (and its variants) based on
@@ -390,6 +392,41 @@ export const STOREFRONT_PRODUCT_SELECT = {
   personalisation: true,
   updatedAt: true,
   createdAt: true,
+} as const satisfies Prisma.ProductSelect;
+
+/**
+ * The storefront LISTING row (cards): storefront-safe scalars plus what the cards need. One shape
+ * for every `listPublic` path (newest/price, merchant category order, hybrid relevance) so they
+ * serialize identically. `lowStockThreshold` and the variants' stock fields are read by
+ * `enrichStockFlags` and stripped before the row is returned (T-H1, #1103).
+ */
+const PUBLIC_LISTING_SELECT = {
+  ...STOREFRONT_PRODUCT_SELECT,
+  lowStockThreshold: true,
+  trackInventory: true,
+  images: { orderBy: { position: 'asc' } as const, take: 2 }, // 2 images: primary + hover-reveal second on cards
+  categories: { include: { category: true } },
+  options: LISTING_SWATCH_OPTIONS_SELECT,
+  store: { select: { id: true, name: true, slug: true } },
+  // Variants are needed by the storefront card components to (a)
+  // pick between the inline "Add to cart" and "View" CTAs, and
+  // (b) compute the "From <min>" pricing for multi-variant
+  // products. Without this include, every product looks variant-
+  // less to the storefront and the View CTA never appears
+  // regardless of how many variants the merchant created.
+  // Light select (price + compareAtPrice + stock fields) so the join
+  // stays cheap while supplying what enrichStockFlags needs.
+  variants: {
+    select: {
+      id: true,
+      price: true,
+      compareAtPrice: true,
+      inventory: true,
+      allowBackorder: true,
+      // Stock only — enrichStockFlags reads and strips it (#1103).
+      isActive: true,
+    },
+  },
 } as const satisfies Prisma.ProductSelect;
 
 /** Json column write: `null` must become SQL NULL (Prisma.DbNull), `undefined` leaves it alone. */
@@ -1237,7 +1274,8 @@ export class ProductService {
   static async listPublic(
     storeId: string,
     options: ListProductsOptions & {
-      sort?: 'newest' | 'price_asc' | 'price_desc' | 'best_seller';
+      /** `relevance` = hybrid ranking for a search (Task 12); without a search it means no sort. */
+      sort?: 'newest' | 'price_asc' | 'price_desc' | 'best_seller' | 'relevance';
       cursor?: string;
     } = {}
   ) {
@@ -1248,11 +1286,16 @@ export class ProductService {
       featured,
       minPrice,
       maxPrice,
-      sort,
       cursor,
       ids,
       optionFilters,
     } = options;
+    // `relevance` is the default order of a search, so it is the same request as no sort. With
+    // SEARCH_SEMANTIC_ENABLED off (or no search) everything below is exactly the pre-Task-12 path.
+    const sort = options.sort === 'relevance' ? undefined : options.sort;
+    // Hybrid relevance (Task 12): a search with no explicit sort, semantic search on. Ranks
+    // keyword + vector hits (RRF) and pages through that order; every other filter still applies.
+    const ranked = Boolean(search) && !sort && semanticSearchEnabled();
     const page = Math.max(1, options.page || 1);
     const limit = Math.min(100, Math.max(1, options.limit || 20));
 
@@ -1301,7 +1344,16 @@ export class ProductService {
       }
     }
 
-    if (search) {
+    let rankedIds: string[] | null = null;
+    if (search && ranked) {
+      // The ranked id list replaces the keyword id filter (it already holds every keyword match up
+      // to the cap, plus the vector-only hits). ANDed, so an `ids` filter on `where.id` still applies.
+      rankedIds = await rankedSearch(storeId, search);
+      where.AND = [
+        ...(Array.isArray(where.AND) ? where.AND : where.AND ? [where.AND] : []),
+        { id: { in: rankedIds } },
+      ];
+    } else if (search) {
       // Arabic-normalised word-AND over names, search terms and descriptions
       // (product-search.service): any subset / reordering of words matches.
       where.AND = [
@@ -1359,6 +1411,59 @@ export class ProductService {
           ...optionClauses,
         ];
       }
+    }
+
+    if (rankedIds) {
+      // Hybrid relevance path: keep the ranked order, drop ids any other filter (category, price,
+      // featured, ids, option facets, status) excludes, then page through it in memory like the
+      // merchant-ordered category path. The order is deterministic (RRF ties break by id; each leg
+      // has an id tie-break), so page N and a cursor walk see the same list. The cursor is the id of
+      // the last row the client has; an id no longer in the list yields an empty page.
+      const allowed = new Set(
+        (await prisma.product.findMany({ where, select: { id: true } })).map(r => r.id)
+      );
+      const ordered = rankedIds.filter(id => allowed.has(id));
+      let pageIdList: string[];
+      let nextCursor: string | undefined;
+      if (cursor) {
+        const at = ordered.indexOf(cursor);
+        const after = at === -1 ? [] : ordered.slice(at + 1);
+        pageIdList = after.slice(0, limit);
+        nextCursor = after.length > limit ? pageIdList[limit - 1] : undefined;
+      } else {
+        pageIdList = ordered.slice(skip, skip + limit);
+      }
+      const [rows, facets] = await Promise.all([
+        prisma.product.findMany({
+          where: {
+            storeId,
+            status: status as ProductStatus,
+            deletedAt: null,
+            id: { in: pageIdList },
+          },
+          select: PUBLIC_LISTING_SELECT,
+        }),
+        computeFacets(storeId, whereForFacets),
+      ]);
+      const byId = new Map(rows.map(r => [r.id, r]));
+      const pageRows = pageIdList.flatMap(id => {
+        const row = byId.get(id);
+        return row ? [row] : [];
+      });
+      return {
+        products: pageRows.map(p => enrichStockFlags(p)),
+        facets,
+        meta: {
+          page: cursor ? undefined : page,
+          limit,
+          total: ordered.length,
+          totalPages: cursor ? undefined : Math.ceil(ordered.length / limit),
+          nextCursor,
+          skipCapped: skipCapped || undefined,
+          /** The order is the hybrid relevance order (the storefront labels it "Most relevant"). */
+          ranked: true as const,
+        },
+      };
     }
 
     // `sort=best_seller` is curator-driven: filter to manually-flagged items
@@ -1420,26 +1525,7 @@ export class ProductService {
         // Explicit select (not include) — storefront-safe scalars only, plus
         // lowStockThreshold which enrichStockFlags needs for its lowStock
         // computation but strips before the row is returned. See T-H1.
-        select: {
-          ...STOREFRONT_PRODUCT_SELECT,
-          lowStockThreshold: true,
-          trackInventory: true,
-          images: { orderBy: { position: 'asc' } as const, take: 2 }, // 2 images: primary + hover-reveal second on cards
-          categories: { include: { category: true } },
-          options: LISTING_SWATCH_OPTIONS_SELECT,
-          store: { select: { id: true, name: true, slug: true } },
-          variants: {
-            select: {
-              id: true,
-              price: true,
-              compareAtPrice: true,
-              inventory: true,
-              allowBackorder: true,
-              // Stock only — enrichStockFlags reads and strips it (#1103).
-              isActive: true,
-            },
-          },
-        },
+        select: PUBLIC_LISTING_SELECT,
         orderBy: { createdAt: 'desc' as const },
       };
 
@@ -1525,34 +1611,7 @@ export class ProductService {
       // Explicit select (not include) — storefront-safe scalars only, plus
       // lowStockThreshold which enrichStockFlags needs for its lowStock
       // computation but strips before the row is returned. See T-H1.
-      select: {
-        ...STOREFRONT_PRODUCT_SELECT,
-        lowStockThreshold: true,
-        trackInventory: true,
-        images: { orderBy: { position: 'asc' } as const, take: 2 }, // 2 images: primary + hover-reveal second on cards
-        categories: { include: { category: true } },
-        options: LISTING_SWATCH_OPTIONS_SELECT,
-        store: { select: { id: true, name: true, slug: true } },
-        // Variants are needed by the storefront card components to (a)
-        // pick between the inline "Add to cart" and "View" CTAs, and
-        // (b) compute the "From <min>" pricing for multi-variant
-        // products. Without this include, every product looks variant-
-        // less to the storefront and the View CTA never appears
-        // regardless of how many variants the merchant created.
-        // Light select (price + compareAtPrice + stock fields) so the join
-        // stays cheap while supplying what enrichStockFlags needs.
-        variants: {
-          select: {
-            id: true,
-            price: true,
-            compareAtPrice: true,
-            inventory: true,
-            allowBackorder: true,
-            // Stock only — enrichStockFlags reads and strips it (#1103).
-            isActive: true,
-          },
-        },
-      },
+      select: PUBLIC_LISTING_SELECT,
       orderBy,
     };
 
