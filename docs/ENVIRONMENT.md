@@ -6,7 +6,7 @@ Moved verbatim from `CLAUDE.md` (2026-07-11) so the instruction file stays rules
 
 The API is the Cloudflare Worker `ebda-api` (`api.ebda.app`), deployed only by `.github/workflows/cf-api-deploy.yml` (`workflow_dispatch`); admin/web/orders/marketing deploy from their own `cf-*-deploy.yml` on push to `main`. There is no Railway deploy for this repo (the Railway section that used to sit here was inherited from Force Website Builder).
 
-- `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID` (repo **secrets**) — used by every `cf-*-deploy.yml`.
+- `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID` (repo **secrets**) — used by every `cf-*-deploy.yml`. Required scope for `cf-api-deploy.yml` with the Workers AI binding (search P1): the token's existing **Workers Scripts Edit** ("Editor" on the Worker) is enough — Cloudflare: "To deploy a Worker that has bindings … you need Editor access to the Worker. You do not need separate permissions on the bound resources" (developers.cloudflare.com/workers/authorization, read 2026-10-16); no Workers AI permission is needed to DEPLOY the binding, and the Worker's AI calls are authorised by the binding itself, not the token. Not yet exercised with the `ai` line: if a deploy is refused, `wrangler deploy` fails AFTER the expand-only migrations and the previous version keeps serving; check the first `cf-api-deploy` run after PR 3.
 - `EBDA_HYPERDRIVE_ID`, `EBDA_KV_CACHE_ID` (repo **variables**) — substituted into `.wrangler.deploy.jsonc` by `scripts/ebda-cf-api-config.mjs`; `apps/api/wrangler.jsonc` keeps placeholder zeros for local dev.
 - Runtime secrets of the API Worker are set with `wrangler secret put <NAME> --name ebda-api` (list with `wrangler secret list --name ebda-api`); the variables below marked "API" live there.
 
