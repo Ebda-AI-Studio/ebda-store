@@ -62,3 +62,12 @@ describe('Y-07 / T-07: PDP range and stepper glyphs', () => {
     expect(pdp).toContain('<span aria-hidden="true">−</span>');
   });
 });
+
+describe('M-3 (B1-57 parked): shared builder sections never use the accent as TEXT on hover', () => {
+  it('no builder/sections file has hover:text-accent (rose on Vitrine measured ~2.6:1)', () => {
+    const hits = files(path.join(WEB, 'builder/sections')).filter(f =>
+      /hover:text-accent(?!-)/.test(readFileSync(f, 'utf8'))
+    );
+    expect(hits.map(f => path.relative(WEB, f))).toEqual([]);
+  });
+});
