@@ -6280,8 +6280,7 @@ Ruling FU46-18 (final review I-1) — the footer © year is the UTC year of the 
 
 Ruling FU46-19 (final review M-6) — checkout refuses a cart line with no variant on a product that has variants: 400 `VARIANT_REQUIRED`, bilingual message naming the product, `details.productIds` / `products` for the cart; the storefront shows it with the cart link. Cart writes already refused it; this closes lines written before C-01. Evidence: `tests/integration/cart-variant-required.test.ts` (old sizeless line, 0 orders), `checkoutErrors.test.ts`. Cost if wrong: a shopper with an old sizeless line must pick the size once on the product page.
 
-Ruling FU46-20 (final review M-7, M-9) — a stored `footerLinks.bottomBar` with `copyrightOverride(Ar): null` or a value over 200 characters never blocks an unrelated settings save (`normalizeStoredBottomBar` runs before `footerBottomBarSchema` at the settings edge; the storefront clamps to 200 on read). Production check 2026-10-16: 0 of 1 stores carry `footerLinks.bottomBar`, so no backfill. The default © line with no store name reads "© 2026 · All rights reserved." (Arabic equivalent), with no stray dot. Cost if wrong: an over-long legacy value is shown cut at 200 characters.
----
+## Ruling FU46-20 (final review M-7, M-9) — a stored `footerLinks.bottomBar` with `copyrightOverride(Ar): null` or a value over 200 characters never blocks an unrelated settings save (`normalizeStoredBottomBar` runs before `footerBottomBarSchema` at the settings edge; the storefront clamps to 200 on read). Production check 2026-10-16: 0 of 1 stores carry `footerLinks.bottomBar`, so no backfill. The default © line with no store name reads "© 2026 · All rights reserved." (Arabic equivalent), with no stray dot. Cost if wrong: an over-long legacy value is shown cut at 200 characters.
 
 ## 2026-10-16 — Search program, PR 1 (P0): SEARCH-\*
 
