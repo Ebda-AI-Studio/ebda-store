@@ -18,7 +18,7 @@
  * No-op when NEXT_PUBLIC_SENTRY_DSN_ADMIN is missing.
  */
 import * as Sentry from '@sentry/nextjs';
-import { isHostInjectedScriptEvent } from '@ebda/shared';
+import { isHostInjectedScriptEvent, scrubSentryBreadcrumb, scrubSentryEvent } from '@ebda/shared';
 
 const dsn = process.env.NEXT_PUBLIC_SENTRY_DSN_ADMIN;
 
@@ -39,8 +39,12 @@ if (dsn) {
     // not by our bundle — see @ebda/shared sentry-host-injected-filter.
     beforeSend(event) {
       const ua = typeof navigator === 'undefined' ? '' : navigator.userAgent;
-      return isHostInjectedScriptEvent(event, ua) ? null : event;
+      return isHostInjectedScriptEvent(event, ua) ? null : scrubSentryEvent(event);
     },
+    // Free-text query values (?search=, ?q=, ?email=, ?phone=) never leave in an event,
+    // a transaction or a breadcrumb (@ebda/shared sentry-url-scrub).
+    beforeSendTransaction: event => scrubSentryEvent(event),
+    beforeBreadcrumb: breadcrumb => scrubSentryBreadcrumb(breadcrumb),
   });
 }
 

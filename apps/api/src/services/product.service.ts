@@ -12,6 +12,7 @@ import { activeVariants, effectiveInventory } from '../lib/effective-inventory';
 import {
   slugify,
   slugifyWithFallback,
+  cleanSearchTerms,
   AI_AUTOFILL_FIELD_NAMES,
   type ProductFact,
   type PersonalisationConfig,
@@ -31,46 +32,12 @@ import { inngest } from '../lib/inngest/client';
 import { stampHumanEdits, enqueueRecommendationsSweepForNewProduct } from './ai-autofill.service';
 import { recordSlugRedirect } from './slug-redirect.service';
 import { assertWithinLimit } from './plan-limit.service';
-
-/**
- * Build a Prisma `AND` clause for a free-text product search.
- *
- * Splits the query on whitespace and requires EVERY word to appear (case-
- * insensitive `contains`) in at least one searchable field. This makes the
- * search order-independent and middle-word friendly: searching "بريتزوس مشكلة"
- * matches "مخبوزات بريتزوس مشكلة" because both words are present, and even a
- * reordered "مشكلة بريتزوس" matches. A single-word query behaves exactly as the
- * previous single `contains`. Returns an array suitable for spreading into
- * `where.AND` (empty when the query is blank).
- *
- * TOKEN CAP (adversarial audit P1-3): at most 8 tokens are used. Each token
- * expands into a 4-5 way OR of leading-wildcard ILIKEs, so an unbounded
- * whitespace-separated query string would multiply into hundreds of ILIKE
- * clauses from one crafted request. No legitimate product search needs more
- * than 8 words; extras are ignored.
- *
- * Exported for tests (the cap is otherwise unobservable from the route).
- *
- * @param search   raw query string
- * @param withSku  include the (English-only) SKU column — admin paths only
- */
-export function buildProductSearchAnd(
-  search: string | undefined | null,
-  withSku: boolean
-): Prisma.ProductWhereInput[] {
-  const tokens = (search ?? '').trim().split(/\s+/).filter(Boolean).slice(0, 8);
-  if (tokens.length === 0) return [];
-  return tokens.map(token => {
-    const or: Prisma.ProductWhereInput[] = [
-      { name: { contains: token, mode: 'insensitive' } },
-      { nameAr: { contains: token, mode: 'insensitive' } },
-      { description: { contains: token, mode: 'insensitive' } },
-      { descriptionAr: { contains: token, mode: 'insensitive' } },
-    ];
-    if (withSku) or.push({ sku: { contains: token, mode: 'insensitive' } });
-    return { OR: or };
-  });
-}
+import {
+  buildProductSearchWhere,
+  productSearchFilter,
+  searchNameIds,
+  searchProductIds,
+} from './product-search.service';
 
 /**
  * Compute availability flags for a product (and its variants) based on
@@ -292,6 +259,12 @@ interface CreateProductData {
   facts?: ProductFact[];
   /** Made-to-order business days; `null` clears, `undefined` leaves alone. */
   leadTimeDays?: number | null;
+  /**
+   * Extra shopper words (dialect / Franco / English), searched never shown.
+   * `null` clears, `undefined` leaves alone. Re-cleaned + capped at 500 chars in
+   * create/update so every caller (routes, MCP, bulk, AI fill) hits the same cap.
+   */
+  searchTerms?: string | null;
   /** PDP personalisation field config; `null` clears, `undefined` leaves alone. */
   personalisation?: PersonalisationConfig | null;
   /** Own size chart (same store, checked); `null` = inherit the category's, `undefined` leaves alone. */
@@ -546,15 +519,16 @@ export class ProductService {
       if (safeIds.length > 0) where.id = { in: safeIds };
     }
 
+    // Arabic-normalised word-AND over names, search terms, descriptions and SKU
+    // (product-search.service). `searchTruncated`: more than PRODUCT_SEARCH_ID_CAP
+    // products matched, so total + paging cover only the best-ranked of them.
+    let searchTruncated = false;
     if (search) {
-      // Match against both English and Arabic name/description so admins
-      // searching in Arabic find their localized products. SKU stays
-      // English-only because SKUs are merchant codes, not localized text.
-      // Word-AND so any subset / reordering of words still matches (e.g.
-      // "بريتزوس مشكلة" finds "مخبوزات بريتزوس مشكلة").
+      const filter = await productSearchFilter(storeId, search, 'admin');
+      searchTruncated = filter.truncated;
       where.AND = [
         ...(Array.isArray(where.AND) ? where.AND : where.AND ? [where.AND] : []),
-        ...buildProductSearchAnd(search, true),
+        ...filter.and,
       ];
     }
 
@@ -635,6 +609,7 @@ export class ProductService {
         limit,
         total,
         totalPages: Math.ceil(total / limit),
+        truncated: searchTruncated,
       },
     };
   }
@@ -809,6 +784,7 @@ export class ProductService {
         isBestSeller: data.isBestSeller ?? false,
         badgeLabel: data.badgeLabel ?? null,
         badgeLabelAr: data.badgeLabelAr ?? null,
+        searchTerms: cleanSearchTerms(data.searchTerms),
         ...(data.facts !== undefined ? { facts: data.facts } : {}),
         ...(data.leadTimeDays !== undefined ? { leadTimeDays: data.leadTimeDays } : {}),
         ...personalisationWrite(data.personalisation),
@@ -1008,6 +984,9 @@ export class ProductService {
           // convention as nameAr / description / excerpt above.
           ...(data.badgeLabel !== undefined ? { badgeLabel: data.badgeLabel } : {}),
           ...(data.badgeLabelAr !== undefined ? { badgeLabelAr: data.badgeLabelAr } : {}),
+          ...(data.searchTerms !== undefined
+            ? { searchTerms: cleanSearchTerms(data.searchTerms) }
+            : {}),
           ...(data.facts !== undefined ? { facts: data.facts } : {}),
           ...(data.leadTimeDays !== undefined ? { leadTimeDays: data.leadTimeDays } : {}),
           ...personalisationWrite(data.personalisation),
@@ -1378,12 +1357,11 @@ export class ProductService {
     }
 
     if (search) {
-      // Mirror admin list(): match both English + Arabic so storefront
-      // shoppers searching in either language find the right products.
-      // Word-AND so any subset / reordering of words still matches.
+      // Arabic-normalised word-AND over names, search terms and descriptions
+      // (product-search.service): any subset / reordering of words matches.
       where.AND = [
         ...(Array.isArray(where.AND) ? where.AND : where.AND ? [where.AND] : []),
-        ...buildProductSearchAnd(search, false),
+        ...(await buildProductSearchWhere(storeId, search, 'storefront')),
       ];
     }
 
@@ -2137,11 +2115,12 @@ export class ProductService {
       deletedAt: null,
     };
 
-    // Text search — word-AND so any subset / reordering of words still matches.
+    // Text search — Arabic-normalised word-AND (product-search.service), SKU included.
+    // No UI consumes this route, so the 1000-id cap is not surfaced here (Ruling SEARCH-T3-6).
     if (query && query.trim()) {
       where.AND = [
         ...(Array.isArray(where.AND) ? where.AND : where.AND ? [where.AND] : []),
-        ...buildProductSearchAnd(query, true),
+        ...(await buildProductSearchWhere(storeId, query, 'admin')),
       ];
     }
 
@@ -2319,34 +2298,28 @@ export class ProductService {
     // service limit param so an attacker can't request more.
     const take = Math.min(25, Math.max(1, limit));
 
-    // Word-AND across name + nameAr only (typeahead shows product names, so
-    // matching on description would surface confusing results). Each query word
-    // must appear in name or nameAr, so a multi-word / reordered query still
-    // matches (e.g. "بريتزوس مشكلة" → "مخبوزات بريتزوس مشكلة").
-    const suggestTokens = trimmed.split(/\s+/).filter(Boolean);
+    // Arabic-normalised word-AND over names + search terms only (typeahead shows
+    // product names, so matching on description would surface confusing results).
+    // A multi-word / reordered query still matches (e.g. "بريتزوس مشكلة" →
+    // "مخبوزات بريتزوس مشكلة").
+    // order 'featured': featured-first, then name, applied in SQL BEFORE the top
+    // `take`, so a featured match can never be cut by the id cap.
+    const matchIds = await searchProductIds(storeId, trimmed, {
+      scope: 'storefront',
+      field: 'name',
+      order: 'featured',
+      limit: take,
+    });
+    if (matchIds.length === 0) return { suggestions: [] as Array<unknown> };
     const products = await prisma.product.findMany({
-      where: {
-        storeId,
-        status: 'active',
-        deletedAt: null,
-        AND: suggestTokens.map(token => ({
-          OR: [
-            { name: { contains: token, mode: 'insensitive' as const } },
-            { nameAr: { contains: token, mode: 'insensitive' as const } },
-          ],
-        })),
-      },
+      where: { storeId, status: 'active', deletedAt: null, id: { in: matchIds } },
       select: {
         id: true,
         slug: true,
         name: true,
         nameAr: true,
         price: true,
-        images: {
-          select: { url: true },
-          orderBy: { position: 'asc' },
-          take: 1,
-        },
+        images: { select: { url: true }, orderBy: { position: 'asc' }, take: 1 },
       },
       orderBy: [{ featured: 'desc' }, { name: 'asc' }],
       take,
@@ -2376,10 +2349,14 @@ export class ProductService {
       where: {
         storeId,
         status: 'active',
-        OR: [
-          { name: { contains: query, mode: 'insensitive' } },
-          { nameAr: { contains: query, mode: 'insensitive' } },
-        ],
+        deletedAt: null,
+        id: {
+          in: await searchProductIds(storeId, query, {
+            scope: 'storefront',
+            field: 'name',
+            limit: 50,
+          }),
+        },
       },
       select: {
         id: true,
@@ -2393,14 +2370,10 @@ export class ProductService {
       orderBy: { viewCount: 'desc' },
     });
 
+    // Same Arabic folding as the products above; soft-deleted categories never suggest.
+    const categoryIds = await searchNameIds('categories', storeId, query);
     const categories = await prisma.category.findMany({
-      where: {
-        storeId,
-        OR: [
-          { name: { contains: query, mode: 'insensitive' } },
-          { nameAr: { contains: query, mode: 'insensitive' } },
-        ],
-      },
+      where: { storeId, deletedAt: null, id: { in: categoryIds } },
       select: {
         id: true,
         name: true,

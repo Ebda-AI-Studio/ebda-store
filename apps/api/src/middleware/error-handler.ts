@@ -3,6 +3,7 @@ import { ZodError } from 'zod';
 import { Prisma } from '@ebda/database';
 import { uniqueViolationTarget } from '../lib/prisma-errors';
 import logger from '../lib/logger';
+import { redactSensitiveQuery } from '@ebda/shared';
 
 export class AppError extends Error {
   constructor(
@@ -122,7 +123,10 @@ export function errorHandler(err: Error, req: Request, res: Response, next: Next
   // built-in final handler, the same way Express's own docs say a custom
   // error handler must when headersSent is true.
   if (res.headersSent) {
-    logger.error({ err, path: req.originalUrl }, 'Error after headers were already sent');
+    logger.error(
+      { err, path: redactSensitiveQuery(req.originalUrl) },
+      'Error after headers were already sent'
+    );
     next(err);
     return;
   }

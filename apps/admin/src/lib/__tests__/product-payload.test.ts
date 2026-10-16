@@ -11,6 +11,8 @@
  * must keep sending `undefined` (there is nothing to clear on a create).
  */
 import { describe, it, expect } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { productTextFields, type ProductTextFieldsForm } from '../product-payload';
 
 const FIELDS = [
@@ -20,6 +22,7 @@ const FIELDS = [
   'sku',
   'badgeLabel',
   'badgeLabelAr',
+  'searchTerms',
 ] as const;
 
 function form(overrides: Partial<ProductTextFieldsForm> = {}): ProductTextFieldsForm {
@@ -30,6 +33,7 @@ function form(overrides: Partial<ProductTextFieldsForm> = {}): ProductTextFields
     sku: '',
     badgeLabel: '',
     badgeLabelAr: '',
+    searchTerms: '',
     ...overrides,
   };
 }
@@ -52,6 +56,7 @@ describe('productTextFields — edit form (update)', () => {
       sku: null,
       badgeLabel: null,
       badgeLabelAr: null,
+      searchTerms: null,
     });
   });
 
@@ -64,6 +69,7 @@ describe('productTextFields — edit form (update)', () => {
         sku: 'PB-001',
         badgeLabel: 'Offer',
         badgeLabelAr: 'عرض',
+        searchTerms: 'كوتشي, 3abaya',
       }),
       'update'
     );
@@ -74,6 +80,7 @@ describe('productTextFields — edit form (update)', () => {
       sku: 'PB-001',
       badgeLabel: 'Offer',
       badgeLabelAr: 'عرض',
+      searchTerms: 'كوتشي, 3abaya',
     });
   });
 
@@ -89,7 +96,15 @@ describe('productTextFields — edit form (update)', () => {
 
   it('never emits `name` — it is required and must not become nullable', () => {
     expect(Object.keys(productTextFields(form(), 'update')).sort()).toEqual(
-      ['badgeLabel', 'badgeLabelAr', 'description', 'descriptionAr', 'nameAr', 'sku'].sort()
+      [
+        'badgeLabel',
+        'badgeLabelAr',
+        'description',
+        'descriptionAr',
+        'nameAr',
+        'searchTerms',
+        'sku',
+      ].sort()
     );
   });
 });
@@ -155,5 +170,23 @@ describe('productTextFields — the card badge', () => {
   it('sends a badge typed on the create form', () => {
     const payload = productTextFields(form({ badgeLabel: ' Offer ' }), 'create');
     expect(payload.badgeLabel).toBe('Offer');
+  });
+});
+
+describe('searchTerms on the edit page', () => {
+  it('emptied or whitespace-only field serialises as an explicit null (clears the column)', () => {
+    for (const searchTerms of ['', '   ']) {
+      const body = JSON.parse(JSON.stringify(productTextFields(form({ searchTerms }), 'update')));
+      expect(body).toHaveProperty('searchTerms', null);
+    }
+  });
+
+  it('the edit page builds its PUT body through productTextFields(formData, "update")', () => {
+    const src = readFileSync(
+      resolve(__dirname, '../../app/stores/[id]/products/[productId]/edit/page.tsx'),
+      'utf8'
+    );
+    expect(src).toContain("...productTextFields(formData, 'update')");
+    expect(src).toMatch(/searchTerms: p\.searchTerms \|\| ''/);
   });
 });

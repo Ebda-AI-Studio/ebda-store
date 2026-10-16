@@ -1,8 +1,15 @@
 import { prisma, Prisma, ProductStatus, SlugEntityType, withMoneyTx } from '@ebda/database';
-import { csvField, minorToDecimalString, slugifyWithFallback } from '@ebda/shared';
+import {
+  SEARCH_TERMS_MAX_LENGTH,
+  cleanSearchTerms,
+  csvField,
+  minorToDecimalString,
+  slugifyWithFallback,
+} from '@ebda/shared';
 import { AppError } from '../middleware/error-handler';
 import { recordSlugRedirect } from './slug-redirect.service';
 import { assertWithinLimit } from './plan-limit.service';
+import { PRODUCT_SEARCH_MAX_LIMIT, searchProductIds } from './product-search.service';
 import {
   bundleFkViolationKind,
   planBundlePinnedVariantSkips,
@@ -34,6 +41,8 @@ interface ProductImportRow {
   metaTitleAr?: string;
   metaDescription?: string;
   metaDescriptionAr?: string;
+  // Extra shopper words, comma-separated (cleaned + capped via cleanSearchTerms).
+  searchTerms?: string;
   // Variant columns (OSOSS-style). A row with a non-empty parentSku is a
   // variant of the product whose `sku` equals parentSku — see classifyRow.
   parentSku?: string;
@@ -320,11 +329,14 @@ export class BulkService {
     }
 
     if (options?.search) {
-      where.OR = [
-        { name: { contains: options.search, mode: 'insensitive' } },
-        { nameAr: { contains: options.search, mode: 'insensitive' } },
-        { sku: { contains: options.search, mode: 'insensitive' } },
-      ];
+      // Arabic-normalised names/terms/descriptions + SKU (product-search.service).
+      where.id = {
+        in: await searchProductIds(storeId, options.search, {
+          scope: 'admin',
+          includeDeleted: !!options.includeDeleted,
+          limit: PRODUCT_SEARCH_MAX_LIMIT,
+        }),
+      };
     }
 
     // Hard ceiling to prevent OOM on very large stores.
@@ -371,6 +383,7 @@ export class BulkService {
       'metaTitleAr',
       'metaDescription',
       'metaDescriptionAr',
+      'searchTerms',
       'parentSku',
       'option1Name',
       'option1Value',
@@ -420,6 +433,7 @@ export class BulkService {
         csvField(product.metaTitleAr || ''),
         csvField(product.metaDescription || ''),
         csvField(product.metaDescriptionAr || ''),
+        csvField(product.searchTerms || ''),
         ...blanks(7), // parentSku + option{1,2,3}Name/Value — empty on base rows
       ].join(',');
 
@@ -454,7 +468,7 @@ export class BulkService {
           '', // categories (inherited)
           '', // tags
           csvField(variant.imageUrl || ''),
-          ...blanks(4), // meta fields (inherited)
+          ...blanks(5), // meta fields + searchTerms (inherited)
           csvField(product.sku || ''), // parentSku
           ...optionCols, // option1Name/Value, option2..., option3...
         ].join(',');
@@ -495,6 +509,7 @@ export class BulkService {
       'metaTitleAr',
       'metaDescription',
       'metaDescriptionAr',
+      'searchTerms',
       'parentSku',
       'option1Name',
       'option1Value',
@@ -530,6 +545,7 @@ export class BulkService {
       'عنوان SEO',
       'SEO Description',
       'وصف SEO',
+      '"جزمة, كوتشي, 3abaya"', // searchTerms — extra words shoppers type
       '', // parentSku — empty on a base product row
       '', // option1Name
       '', // option1Value
@@ -567,6 +583,7 @@ export class BulkService {
       '',
       '',
       '',
+      '', // searchTerms (inherited)
       'SKU-001', // parentSku → links to the base product above
       'Size', // option1Name
       '1 Kg', // option1Value
@@ -788,6 +805,18 @@ export class BulkService {
           continue;
         }
 
+        // Search words: over-long raw input is a row error (same 400-not-500
+        // contract as the product routes); the stored value is always the
+        // cleaned + capped form so the DB CHECK can never fire.
+        if (row.searchTerms && String(row.searchTerms).length > SEARCH_TERMS_MAX_LENGTH) {
+          result.failed++;
+          result.errors.push({
+            row: rowIndex,
+            error: `Search words must be at most ${SEARCH_TERMS_MAX_LENGTH} characters`,
+          });
+          continue;
+        }
+
         // Generate slug if not provided
         const baseSlug = row.slug || this.generateSlug(row.name);
 
@@ -992,6 +1021,8 @@ export class BulkService {
         await withMoneyTx(prisma, async (tx: Prisma.TransactionClient) => {
           for (const { rowIndex, row, slug, existing } of batch) {
             try {
+              // Blank = leave alone (bulk cannot clear; documented in the import help).
+              const cleanedSearchTerms = cleanSearchTerms(row.searchTerms);
               const productFields = {
                 name: row.name,
                 nameAr: row.nameAr || null,
@@ -1017,6 +1048,9 @@ export class BulkService {
                 metaTitleAr: row.metaTitleAr || null,
                 metaDescription: row.metaDescription || null,
                 metaDescriptionAr: row.metaDescriptionAr || null,
+                // A blank/absent column leaves curated search words alone on
+                // update (older exports have no such column) and is null on create.
+                ...(cleanedSearchTerms ? { searchTerms: cleanedSearchTerms } : {}),
               };
 
               let productId: string;

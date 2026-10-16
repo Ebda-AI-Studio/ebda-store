@@ -170,6 +170,7 @@ export function AdminLayout({
     insightsFunnel: t('hubTabs.insightsFunnel'),
     insightsSegments: t('hubTabs.insightsSegments'),
     insightsProducts: t('hubTabs.insightsProducts'),
+    insightsSearches: t('hubTabs.insightsSearches'),
     // Marketing tabs
     aiTools: t('hubTabs.aiTools'),
     aiUsage: t('hubTabs.aiUsage'),

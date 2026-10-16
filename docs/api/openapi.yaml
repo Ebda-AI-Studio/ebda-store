@@ -272,6 +272,12 @@ paths:
             type: string
         - name: search
           in: query
+          description: >-
+            Every word must appear (any order) in the product's names, search words or
+            descriptions. Arabic spelling variants fold (أ/إ/آ → ا, ة → ه, ى → ي, tashkeel and
+            tatweel dropped) and Arabic-Indic digits match 0-9; `%` and `_` match literally.
+            At most 8 words are used and the term is cut to 100 characters; a 1-character
+            search returns an empty page.
           schema:
             type: string
       responses:

@@ -19,6 +19,8 @@ export interface Pagination {
   limit: number;
   total: number;
   totalPages: number;
+  /** The search matched more products than the API returns (its closest 1,000): narrow it. */
+  truncated?: boolean;
 }
 
 export type StatusFilter = 'all' | 'active' | 'draft' | 'archived';

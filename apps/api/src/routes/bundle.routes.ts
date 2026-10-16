@@ -24,6 +24,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import { prisma } from '@ebda/database';
+import { searchNameIds } from '../services/product-search.service';
 import logger from '../lib/logger';
 import {
   computeBundlePrice,
@@ -382,10 +383,8 @@ router.get(
       const where: Record<string, unknown> = { storeId };
       if (isActive !== undefined) where.isActive = isActive;
       if (search) {
-        where.OR = [
-          { name: { contains: search, mode: 'insensitive' } },
-          { nameAr: { contains: search, mode: 'insensitive' } },
-        ];
+        // Arabic-normalised name + nameAr word-AND (product-search.service searchNameIds).
+        where.id = { in: await searchNameIds('bundles', storeId, search) };
       }
 
       const [rows, total] = await Promise.all([

@@ -35,6 +35,7 @@ export function ProductsPagination({
       <div className="flex items-center gap-3">
         <p className="text-sm text-muted-foreground">
           {t('showing', { from, to, total: pagination.total })}
+          {pagination.truncated && <span> · {t('truncated')}</span>}
         </p>
         {onLimitChange && (
           <label className="flex items-center gap-2 text-sm text-muted-foreground">

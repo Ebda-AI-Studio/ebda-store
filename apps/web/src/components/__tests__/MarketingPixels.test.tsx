@@ -31,7 +31,7 @@ vi.mock('../../contexts/ConsentContext', () => ({
   useConsent: () => ({ consent: { marketing: true } }),
 }));
 
-import { MarketingPixelsProvider, trackPurchase } from '../MarketingPixels';
+import { MarketingPixelsProvider, trackPurchase, trackSearch } from '../MarketingPixels';
 
 const ADS = { enabled: true, conversionId: 'AW-123456789', conversionLabel: 'AbC123def' };
 const GA4 = { enabled: true, measurementId: 'G-ABCDEF1234' };
@@ -162,5 +162,67 @@ describe('trackPurchase — reports whether any pixel received the event', () =>
   it('true when only ttq is present', () => {
     (window as { ttq?: unknown }).ttq = { track: vi.fn() };
     expect(trackPurchase(purchase)).toBe(true);
+  });
+});
+
+describe('trackSearch — the term reaches an ad network only when it is not personal data (Ruling SEARCH-T5-9)', () => {
+  type W = Record<string, unknown>;
+  const KEYS = ['fbq', 'ttq', 'snaptr', 'gtag', 'twq', 'pintrk'] as const;
+  let calls: Record<string, unknown[][]>;
+
+  beforeEach(() => {
+    calls = { fbq: [], ttq: [], snaptr: [], gtag: [], twq: [], pintrk: [] };
+    const w = window as unknown as W;
+    for (const k of ['fbq', 'snaptr', 'gtag', 'twq', 'pintrk']) {
+      w[k] = (...args: unknown[]) => calls[k].push(args);
+    }
+    w.ttq = { track: (...args: unknown[]) => calls.ttq.push(args) };
+  });
+  afterEach(() => {
+    for (const k of KEYS) delete (window as unknown as W)[k];
+  });
+
+  // [adapter, the call it must make for a product term, for a personal-data term]
+  const ADAPTERS: Array<[string, (t: string) => unknown[], unknown[]]> = [
+    ['Meta fbq', t => ['track', 'Search', { search_string: t }], ['track', 'Search', {}]],
+    ['TikTok ttq', t => ['Search', { query: t }], ['Search', {}]],
+    ['Snap snaptr', t => ['track', 'SEARCH', { search_string: t }], ['track', 'SEARCH', {}]],
+    ['Google gtag', t => ['event', 'search', { search_term: t }], ['event', 'search', {}]],
+    ['Pinterest pintrk', t => ['track', 'search', { search_query: t }], ['track', 'search', {}]],
+  ];
+  const keyOf = (name: string) => name.split(' ')[1];
+
+  it.each(ADAPTERS)('%s: a product term is sent', (name, withTerm) => {
+    trackSearch({ searchString: "كوتشي 3'ada2" });
+    expect(calls[keyOf(name)]).toEqual([withTerm("كوتشي 3'ada2")]);
+  });
+
+  const PERSONAL = [
+    '01012345678',
+    '٠١٠١٢٣٤٥٦٧٨',
+    "O'Brien 010 1234 5678",
+    'ahmed@mail.com',
+    'ORD-LX3K9A2-7F',
+    'https://x.com/a',
+  ];
+  it.each(ADAPTERS)(
+    '%s: a personal-data term fires the event WITHOUT the term',
+    (name, _w, without) => {
+      for (const term of PERSONAL) {
+        calls[keyOf(name)] = [];
+        trackSearch({ searchString: term });
+        expect(calls[keyOf(name)]).toEqual([without]);
+        expect(JSON.stringify(calls)).not.toContain(term);
+      }
+    }
+  );
+
+  it('X twq never carried a term', () => {
+    trackSearch({ searchString: 'dress' });
+    trackSearch({ searchString: '01012345678' });
+    expect(calls.twq).toEqual([
+      ['track', 'Search'],
+      ['track', 'Search'],
+    ]);
   });
 });

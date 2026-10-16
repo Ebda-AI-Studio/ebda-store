@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import logger from '../lib/logger';
 import { BoundedMap } from '../lib/bounded-map';
+import { redactSensitiveQuery } from '@ebda/shared';
 
 /**
  * Endpoint deprecation signalling.
@@ -97,7 +98,7 @@ export function deprecate(opts: DeprecationOptions) {
       lastWarnedAt.set(routeKey, now);
       logger.warn(
         {
-          path: req.originalUrl,
+          path: redactSensitiveQuery(req.originalUrl),
           method: req.method,
           sunset: opts.sunset.toISOString(),
           reason: opts.reason,
