@@ -125,6 +125,20 @@ describe('generateProductSearchTerms', () => {
     expect(await generateProductSearchTerms(input, 'k', 'm')).toBe('شبشب, shibshib, shebsheb');
   });
 
+  it('drops a single word that mixes Latin and Arabic letters, keeps mixed-script phrases', async () => {
+    // Live check 2026-10-16 produced "fنجان قهوة"; real shoppers do type "طرحة beige".
+    generateContent.mockResolvedValue(
+      reply('{"terms":["fنجان قهوة","طرحة beige","tar7a chiffon","طرحه شيفون","kobaيه"]}')
+    );
+    expect(await generateProductSearchTerms(input, 'k', 'm')).toBe(
+      'طرحة beige, tar7a chiffon, طرحه شيفون'
+    );
+  });
+
+  it('prompt forbids attributes the product data does not state', () => {
+    expect(buildSearchTermsPrompt(input)).toMatch(/gender, season or use/);
+  });
+
   it('returns null when every term is dropped', async () => {
     generateContent.mockResolvedValue(reply('{"terms":["01012345678","  ", "a@b.co"]}'));
     expect(await generateProductSearchTerms(input, 'k', 'm')).toBeNull();

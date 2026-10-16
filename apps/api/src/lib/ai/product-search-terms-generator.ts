@@ -45,10 +45,20 @@ Description: ${desc || '(none)'}
 
 Return 8 to 20 short terms a shopper would TYPE to find this exact product: Egyptian dialect words,
 Franco-Arabic spellings, common misspellings, and plain English words. Synonyms of the product type
-are good. Do not invent brand names, sizes, colours or materials that are not in the product data.
-Do not repeat the product name verbatim. Never include phone numbers, emails, links or prices.
+are good. Do not invent brand names, sizes, colours or materials that are not in the product data,
+and do not add a gender, season or use the product data does not state. Write each word in ONE
+script (all Arabic letters or all Latin letters/digits). Do not repeat the product name verbatim.
+Never include phone numbers, emails, links or prices.
 
 Return ONLY valid JSON: { "terms": ["...", "..."] }`;
+}
+
+/**
+ * A single WORD mixing Latin and Arabic letters ("fنجان") is a model glitch no shopper types.
+ * Mixed-script PHRASES ("طرحة beige") are real Egyptian queries and are kept.
+ */
+function hasMixedScriptWord(term: string): boolean {
+  return term.split(/\s+/).some(w => /[A-Za-z]/.test(w) && /[\u0600-\u06FF]/.test(w));
 }
 
 export async function generateProductSearchTerms(
@@ -85,6 +95,6 @@ export async function generateProductSearchTerms(
   // every piece that can end up stored, not a "words, 0101…" string it might pass whole.
   const terms = parsed.terms
     .flatMap(t => (typeof t === 'string' ? t.split(/[,،\n]/) : []))
-    .filter(t => t.trim() && !isPersonalDataTerm(t));
+    .filter(t => t.trim() && !isPersonalDataTerm(t) && !hasMixedScriptWord(t));
   return cleanSearchTerms(terms.join(','));
 }
