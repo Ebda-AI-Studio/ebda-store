@@ -535,15 +535,19 @@ export function OosImageDim({
  */
 const NEW_PRODUCT_WINDOW_DAYS = 14;
 
-export function isProductNew(product: {
-  isNew?: boolean;
-  createdAt?: string | Date | null;
-}): boolean {
+export function isProductNew(
+  product: {
+    isNew?: boolean;
+    createdAt?: string | Date | null;
+  },
+  /** The render clock (`useRenderNow()`), never a fresh read of the time (hydration-safe). */
+  now: number
+): boolean {
   if (product.isNew === true) return true;
   if (!product.createdAt) return false;
   const created =
     product.createdAt instanceof Date ? product.createdAt : new Date(product.createdAt);
   if (Number.isNaN(created.getTime())) return false;
-  const ageMs = Date.now() - created.getTime();
+  const ageMs = now - created.getTime();
   return ageMs < NEW_PRODUCT_WINDOW_DAYS * 24 * 60 * 60 * 1000;
 }

@@ -46,6 +46,7 @@ import {
 } from '../shared/custom-badge';
 import { SwatchDots } from '../../components/commerce/SwatchDots';
 import { FactChips } from '../../components/commerce/FactChips';
+import { useRenderNow } from '../../contexts/RenderClockContext';
 
 /**
  * Classic Template - Product Card
@@ -86,6 +87,7 @@ function ClassicProductCard({
 }: ProductCardProps) {
   const { isRtl: ctxIsRtl } = useLanguage();
   const { store, layout } = useStore();
+  const renderNow = useRenderNow();
   // Ruling NUMERALS-1: Western digits unless the store opted in (Arabic only).
   const numerals = storeNumerals(store?.theme);
   const isRtl = isRtlProp ?? ctxIsRtl;
@@ -179,7 +181,7 @@ function ClassicProductCard({
     // of the sale badge (`!hasSale`), at logical top-start; mirror that
     // exact condition so a badge avoiding a reserved heart corner doesn't
     // land on top of it.
-    newOrBrandBadgeReserved: Boolean(!hasSale && isProductNew(product) && orderable),
+    newOrBrandBadgeReserved: Boolean(!hasSale && isProductNew(product, renderNow) && orderable),
     // The mobile quick-add CTA band below is an unconditional full-width
     // overlay (hidden only via a `lg:` desktop hover state, never removed
     // from the DOM), so it reserves the whole bottom edge.
@@ -318,7 +320,7 @@ function ClassicProductCard({
             </span>
           ) : (
             !hasSale &&
-            isProductNew(product) &&
+            isProductNew(product, renderNow) &&
             orderable && (
               <ProductBadge
                 variant="new"

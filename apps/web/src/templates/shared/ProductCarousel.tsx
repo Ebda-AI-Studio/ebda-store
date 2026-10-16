@@ -38,6 +38,7 @@ import { getDiscountBadgeColor } from './discount-badge';
 import { getCustomBadgeColor, getCustomBadgeTextColor, resolveCardBadges } from './custom-badge';
 import { SwatchDots } from '../../components/commerce/SwatchDots';
 import { FactChips } from '../../components/commerce/FactChips';
+import { useRenderNow } from '../../contexts/RenderClockContext';
 
 /**
  * Horizontal-scroll product strip. Card chrome + CTA pill style vary per pack:
@@ -102,6 +103,7 @@ function SharedProductCarousel({
   // When `store.theme.showQuickAdd === true`, in-stock non-variant
   // products get the overlay button; otherwise it's hidden.
   const { store, layout } = useStore();
+  const renderNow = useRenderNow();
   const { money, numerals } = useNumerals();
   const showQuickAdd = store.theme?.showQuickAdd === true;
   // Item 4 (2026-07-12): when the merchant already has the outer showCardFrame
@@ -358,7 +360,7 @@ function SharedProductCarousel({
               const inStock = product.inStock !== false;
               // Task 13: backorder-aware orderable signal.
               const orderable = canBuyNow(product);
-              const showNewBadge = inStock && isProductNew(product);
+              const showNewBadge = inStock && isProductNew(product, renderNow);
               // Issue #1609 — mirror the EXACT expression the quick-add
               // button below renders on, so a badge only lifts for a
               // product that will actually get a quick-add circle overlaid

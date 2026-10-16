@@ -37,6 +37,7 @@ import { getCustomBadgeText } from '../shared/custom-badge';
 import { cx, BagIcon } from './ui';
 import { SwatchDots } from '../../components/commerce/SwatchDots';
 import { FactChips } from '../../components/commerce/FactChips';
+import { useRenderNow } from '../../contexts/RenderClockContext';
 
 export interface DahabProductCardProps extends ProductCardProps {
   /** `sizes` hint for the image (grid density decides it). */
@@ -55,6 +56,7 @@ export default function DahabProductCard({
 }: DahabProductCardProps) {
   const { isRtl: ctxIsRtl, t } = useLanguage();
   const { store } = useStore();
+  const renderNow = useRenderNow();
   const { numerals } = useNumerals();
   const formatPrice = useLocalePrice();
   const isRtl = isRtlProp ?? ctxIsRtl;
@@ -81,7 +83,7 @@ export default function DahabProductCard({
       ? getDiscountBadgeText(product, isRtl, undefined, undefined, numerals)
       : null;
   const custom = orderable ? getCustomBadgeText(product, isRtl) : null;
-  const isNew = inStock && isProductNew(product);
+  const isNew = inStock && isProductNew(product, renderNow);
   const badge = !orderable
     ? t('Sold out', 'نفدت الكمية')
     : (custom ?? discount ?? (isNew ? t('New', 'جديد') : null));

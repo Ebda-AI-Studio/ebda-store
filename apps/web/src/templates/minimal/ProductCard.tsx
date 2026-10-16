@@ -46,6 +46,7 @@ import {
 import { cn } from '@ebda/ui';
 import { SwatchDots } from '../../components/commerce/SwatchDots';
 import { FactChips } from '../../components/commerce/FactChips';
+import { useRenderNow } from '../../contexts/RenderClockContext';
 
 /**
  * Minimal Template - Product Card
@@ -86,6 +87,7 @@ function MinimalProductCard({
 }: ProductCardProps) {
   const { isRtl: ctxIsRtl, t } = useLanguage();
   const { store, layout } = useStore();
+  const renderNow = useRenderNow();
   // Ruling NUMERALS-1: Western digits unless the store opted in (Arabic only).
   const numerals = storeNumerals(store?.theme);
   const isRtl = isRtlProp ?? ctxIsRtl;
@@ -182,7 +184,7 @@ function MinimalProductCard({
     topEndReserved: Boolean(onRemoveFromWishlist),
     // Issue #2092 (#1997 sweep) — minimal's own NEW chip sits at logical
     // top-start; the SAME expression it renders on below.
-    newOrBrandBadgeReserved: Boolean(product.inStock !== false && isProductNew(product)),
+    newOrBrandBadgeReserved: Boolean(product.inStock !== false && isProductNew(product, renderNow)),
     bottomOverlay: 'both',
   });
 
@@ -238,7 +240,7 @@ function MinimalProductCard({
               so it doesn't violate the chrome-free identity but still
               flags fresh inventory. Hides under OOS via isProductNew
               implicit gating in caller order. */}
-          {product.inStock !== false && isProductNew(product) && (
+          {product.inStock !== false && isProductNew(product, renderNow) && (
             <span
               className="absolute top-2 start-2 z-10 px-2 py-0.5 text-xs font-medium uppercase tracking-[0.18em] text-[hsl(var(--primary))] bg-background"
               aria-label={t('New product', 'منتج جديد')}

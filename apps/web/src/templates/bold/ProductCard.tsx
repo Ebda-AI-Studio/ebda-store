@@ -46,6 +46,7 @@ import {
 } from '../shared/ProductCardCta';
 import { SwatchDots } from '../../components/commerce/SwatchDots';
 import { FactChips } from '../../components/commerce/FactChips';
+import { useRenderNow } from '../../contexts/RenderClockContext';
 
 /**
  * Bold Template - Product Card
@@ -85,6 +86,7 @@ function BoldProductCard({
 }: ProductCardProps) {
   const { isRtl: ctxIsRtl } = useLanguage();
   const { store, layout } = useStore();
+  const renderNow = useRenderNow();
   // Ruling NUMERALS-1: Western digits unless the store opted in (Arabic only).
   const numerals = storeNumerals(store?.theme);
   const isRtl = isRtlProp ?? ctxIsRtl;
@@ -176,7 +178,7 @@ function BoldProductCard({
     // Issue #1997 — the NEW badge below renders at logical top-start under
     // this exact condition; a discount/custom badge avoiding a reserved
     // heart corner must not land on top of it.
-    newOrBrandBadgeReserved: Boolean(orderable && isProductNew(product)),
+    newOrBrandBadgeReserved: Boolean(orderable && isProductNew(product, renderNow)),
     // The mobile quick-add CTA band below is an unconditional full-width
     // overlay (hidden only via a `lg:` desktop hover state, never removed
     // from the DOM), so it reserves the whole bottom edge.
@@ -296,7 +298,7 @@ function BoldProductCard({
 
           {/* NEW badge — BUG 2 fix: no inStock gate removed from the group;
               NEW stays top corner, only shown when orderable (unchanged). */}
-          {orderable && isProductNew(product) && (
+          {orderable && isProductNew(product, renderNow) && (
             <ProductBadgeGroup absolute position={isRtl ? 'top-right' : 'top-left'} isRtl={isRtl}>
               <ProductBadge
                 variant="new"

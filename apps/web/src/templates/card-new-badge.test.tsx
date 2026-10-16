@@ -65,6 +65,8 @@ vi.mock('next/link', () => ({
 }));
 
 const adapters = await import('./adapters');
+const { isProductNew } = await import('./shared/ProductCardCta');
+const { RenderClockProvider } = await import('../contexts/RenderClockContext');
 const { PecannbeeProductCard } = await import('./shared/PecannbeeProductCard');
 const { default: ModernProductCard } = await import('./modern/ProductCard');
 const { default: ElegantProductCard } = await import('./elegant/ProductCard');
@@ -214,8 +216,48 @@ describe('one New rule on every card path', () => {
     for (const f of files) {
       const s = readFileSync(resolve(__dirname, f), 'utf8');
       expect(s, f).not.toMatch(/product\.isNew\b/);
-      expect(s, f).toMatch(/isProductNew\(/);
+      expect(s, f).toMatch(/isProductNew\(product, renderNow\)/);
+      expect(s, f).toMatch(/const renderNow = useRenderNow\(\);/);
     }
+  });
+
+  // Review M9: the 14-day rule is decided on the render's clock, never a fresh
+  // Date.now() during render, so the server HTML and hydration agree.
+  it('isProductNew reads the clock it is given, not Date.now()', () => {
+    const cta = readFileSync(resolve(__dirname, 'shared/ProductCardCta.tsx'), 'utf8');
+    const fn = cta.slice(cta.indexOf('export function isProductNew'));
+    expect(fn.slice(0, fn.indexOf('\n}'))).not.toMatch(/Date\.now\(\)/);
+    const created = '2026-10-01T00:00:00Z';
+    const t = Date.parse(created);
+    expect(isProductNew({ createdAt: created }, t + 13 * DAY)).toBe(true);
+    expect(isProductNew({ createdAt: created }, t + 15 * DAY)).toBe(false);
+  });
+
+  it('the root layout hands one server clock to the client', () => {
+    const layout = readFileSync(resolve(__dirname, '../app/layout.tsx'), 'utf8');
+    expect(layout).toMatch(/const renderNow = Date\.now\(\);/);
+    expect(layout).toMatch(/<RenderClockProvider now=\{renderNow\}>/);
+  });
+
+  it('a card decides on the provided clock (a fresh product reads "old" at a later render clock)', () => {
+    const p = adapters.toTemplateProduct({
+      ...base(fresh),
+      status: 'active',
+      images: img,
+      variants: [],
+    } as never);
+    const later = Date.now() + 30 * DAY;
+    const { container } = render(
+      React.createElement(
+        RenderClockProvider,
+        { now: later },
+        React.createElement(
+          MinimalProductCard as never,
+          { product: p, isRtl: true, currency: 'EGP' } as never
+        )
+      )
+    );
+    expect(container.textContent).not.toMatch(/جديد/);
   });
   it('the recommendation payload selects createdAt and the wishlist projection ships it', () => {
     const rec = readFileSync(

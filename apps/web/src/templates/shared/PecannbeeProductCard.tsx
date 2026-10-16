@@ -41,6 +41,7 @@ import { fromMinor } from '@ebda/shared';
 import { REGION } from '@ebda/shared';
 import { SwatchDots } from '../../components/commerce/SwatchDots';
 import { FactChips } from '../../components/commerce/FactChips';
+import { useRenderNow } from '../../contexts/RenderClockContext';
 interface PecannbeeProductCardProps extends ProductCardProps {
   pack?: TemplateId;
   /**
@@ -102,6 +103,7 @@ function PecannbeeProductCardImpl({
 }: PecannbeeProductCardProps) {
   const { isRtl: ctxIsRtl, t } = useLanguage();
   const { store, layout } = useStore();
+  const renderNow = useRenderNow();
   const { money, numerals } = useNumerals();
   const isRtl = isRtlProp ?? ctxIsRtl;
   const styles = getPackStyles(pack);
@@ -171,7 +173,7 @@ function PecannbeeProductCardImpl({
     }
   };
 
-  const showNewBadge = inStock && isProductNew(product);
+  const showNewBadge = inStock && isProductNew(product, renderNow);
 
   // Task 3 B: read CTA + OOS defaults from productCardDefaults.
   const defaults = layout?.productCardDefaults;
