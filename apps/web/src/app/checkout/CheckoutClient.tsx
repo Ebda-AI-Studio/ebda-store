@@ -2051,7 +2051,7 @@ export default function CheckoutClient() {
                               type="checkbox"
                               checked={smsOptIn}
                               onChange={e => setSmsOptIn(e.target.checked)}
-                              className="mt-0.5 h-4 w-4 shrink-0 rounded border-input text-primary accent-primary focus:ring-2 focus:ring-primary/20"
+                              className="mt-0.5 h-4 w-4 shrink-0 rounded border-input text-primary accent-primary focus:ring-2 focus:ring-primary"
                             />
                             <span className="flex flex-col gap-0.5">
                               <span className="text-sm text-foreground">
@@ -2241,7 +2241,7 @@ export default function CheckoutClient() {
                           // auto-zooming when this textarea receives focus
                           // (any field <16px triggers it, won't auto-unzoom).
                           // sm:text-sm restores the denser desktop appearance.
-                          className="min-h-24 w-full rounded-lg border border-input bg-background px-4 py-2 text-base sm:text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                          className="min-h-24 w-full rounded-lg border border-input bg-background px-4 py-2 text-base sm:text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary"
                           placeholder={t(
                             'Any special delivery instructions...',
                             '\u0623\u064a \u062a\u0639\u0644\u064a\u0645\u0627\u062a \u062e\u0627\u0635\u0629 \u0644\u0644\u062a\u0648\u0635\u064a\u0644...'
@@ -2258,7 +2258,7 @@ export default function CheckoutClient() {
                           type="checkbox"
                           checked={saveInfo}
                           onChange={e => setSaveInfo(e.target.checked)}
-                          className="mt-0.5 h-4 w-4 shrink-0 rounded border-input text-primary accent-primary focus:ring-2 focus:ring-primary/20"
+                          className="mt-0.5 h-4 w-4 shrink-0 rounded border-input text-primary accent-primary focus:ring-2 focus:ring-primary"
                         />
                         <span className="flex flex-col gap-0.5">
                           <span className="text-sm font-medium text-foreground group-hover:text-primary transition-colors">

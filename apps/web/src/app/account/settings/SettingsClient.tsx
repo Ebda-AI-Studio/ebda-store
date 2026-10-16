@@ -531,7 +531,7 @@ export default function SettingsClient() {
                   checked={false}
                   disabled={isSavingSms}
                   onChange={e => e.target.checked && handleSmsConsentChange(true)}
-                  className="mt-0.5 h-4 w-4 shrink-0 rounded border-input text-primary accent-primary focus:ring-2 focus:ring-primary/20"
+                  className="mt-0.5 h-4 w-4 shrink-0 rounded border-input text-primary accent-primary focus:ring-2 focus:ring-primary"
                 />
                 <span className="flex flex-col gap-0.5">
                   <span className="text-sm font-medium text-foreground">
