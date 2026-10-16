@@ -28,16 +28,82 @@ import {
 
 const ROOT = join(__dirname, '../..');
 
+/**
+ * Hue-based (review I5): every colour literal in code is parsed — hex (#rgb/#rgba/#rrggbb/
+ * #rrggbbaa), rgb()/rgba(), hsl()/hsla(), bare HSL triplets ("26 100% 50%", the StoreTheme and
+ * CSS-variable form) and oklch() — and refused when it falls in the saturated orange band:
+ * hue 15–34°, saturation ≥ 85%, lightness 30–97% (the pale peach tints of the old chrome too). Six exact codes let `#fc6b02` (19 admin lines)
+ * through. Status ambers (hue ≥ 36: warning 38°, amber-500 37.7°) and reds stay allowed.
+ */
+export const ORANGE_BAND = { hueMin: 15, hueMax: 34, satMin: 85, lightMin: 30, lightMax: 97 };
+
+function rgbToHsl(r: number, g: number, b: number): [number, number, number] {
+  r /= 255;
+  g /= 255;
+  b /= 255;
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  const l = (max + min) / 2;
+  const d = max - min;
+  if (d === 0) return [0, 0, l * 100];
+  const sat = d / (1 - Math.abs(2 * l - 1));
+  let h = max === r ? ((g - b) / d) % 6 : max === g ? (b - r) / d + 2 : (r - g) / d + 4;
+  h *= 60;
+  if (h < 0) h += 360;
+  return [h, sat * 100, l * 100];
+}
+
+function oklchToRgb(L: number, C: number, H: number): [number, number, number] {
+  const hr = (H * Math.PI) / 180;
+  const a = C * Math.cos(hr);
+  const b = C * Math.sin(hr);
+  const l_ = (L + 0.3963377774 * a + 0.2158037573 * b) ** 3;
+  const m_ = (L - 0.1055613458 * a - 0.0638541728 * b) ** 3;
+  const s_ = (L - 0.0894841775 * a - 1.291485548 * b) ** 3;
+  const lin = [
+    4.0767416621 * l_ - 3.3077115913 * m_ + 0.2309699292 * s_,
+    -1.2684380046 * l_ + 2.6097574011 * m_ - 0.3413193965 * s_,
+    -0.0041960863 * l_ - 0.7034186147 * m_ + 1.707614701 * s_,
+  ];
+  const enc = (x: number) =>
+    Math.round(
+      255 * Math.min(1, Math.max(0, x <= 0.0031308 ? 12.92 * x : 1.055 * x ** (1 / 2.4) - 0.055))
+    );
+  return [enc(lin[0]), enc(lin[1]), enc(lin[2])];
+}
+
+/** Every colour literal on a line, as [source text, h, s, l]. */
+export function colourLiterals(line: string): Array<[string, number, number, number]> {
+  const out: Array<[string, number, number, number]> = [];
+  for (const m of line.matchAll(/#([0-9a-fA-F]{3,8})(?![0-9a-zA-Z_-])/g)) {
+    const hex = m[1];
+    if (![3, 4, 6, 8].includes(hex.length)) continue;
+    if (/^\d+$/.test(hex) && hex.length <= 4) continue; // an issue number like #1609, not a colour
+    const full = hex.length <= 4 ? [...hex.slice(0, 3)].map(c => c + c).join('') : hex.slice(0, 6);
+    const n = parseInt(full, 16);
+    out.push([m[0], ...rgbToHsl((n >> 16) & 255, (n >> 8) & 255, n & 255)]);
+  }
+  for (const m of line.matchAll(/rgba?\(\s*(\d{1,3})[\s,]+(\d{1,3})[\s,]+(\d{1,3})/g))
+    out.push([m[0], ...rgbToHsl(+m[1], +m[2], +m[3])]);
+  for (const m of line.matchAll(/hsla?\(\s*([\d.]+)(?:deg)?[\s,]+([\d.]+)%[\s,]+([\d.]+)%/g))
+    out.push([m[0], +m[1], +m[2], +m[3]]);
+  for (const m of line.matchAll(/(?<![\d.\w(,])([\d.]+) ([\d.]+)% ([\d.]+)%/g))
+    out.push([m[0], +m[1], +m[2], +m[3]]);
+  for (const m of line.matchAll(/oklch\(\s*([\d.]+)(%?)\s+([\d.]+)\s+([\d.]+)/g)) {
+    const L = m[2] ? +m[1] / 100 : +m[1];
+    out.push([m[0], ...rgbToHsl(...oklchToRgb(L, +m[3], +m[4]))]);
+  }
+  return out;
+}
+
+export function isOrange([, h, s, l]: [string, number, number, number]): boolean {
+  const B = ORANGE_BAND;
+  return h >= B.hueMin && h <= B.hueMax && s >= B.satMin && l >= B.lightMin && l <= B.lightMax;
+}
+
 export const ORANGE: Array<[string, RegExp]> = [
-  ['Force orange hex', /#(?:ff6f00|ff6e0[01]|f97316|fb923c|ea580c|ff7700)\b/i],
-  [
-    'orange HSL triplet (hue 20-35, saturation ≥ 90%)',
-    /(?<![\d.])(?:2\d|3[0-5])(?:\.\d+)? (?:9\d|100)(?:\.\d+)?% \d/,
-  ],
-  ['Force orange rgb()', /rgba?\(\s*255\s*,\s*1[01]\d\s*,\s*[0-9]\s*[,)]/],
   ['filled tailwind orange', /\b(?:bg|from|via|to|ring|accent|fill|stroke)-orange-[3-6]00\b/],
   ['tailwind orange icon/text ink', /\btext-orange-[56]00\b/],
-  ['orange hsl() with commas', /hsl\(\s*(?:2\d|3[0-5])(?:\.\d+)?\s*,\s*(?:9\d|100)%/],
   ['GL orange tint', /vec3\(\s*1\.0\s*,\s*0\.4\d*\s*,\s*0\.0\d*\s*\)/],
 ];
 
@@ -53,6 +119,10 @@ const SKIP = [
 ];
 /** Each entry: why this file may name an orange. Must still contain one (shrink-only). */
 const ALLOW: Record<string, string> = {
+  'apps/web/src/templates/shared/icons.tsx':
+    "Instagram's official logo gradient (#FB8A2E stop): a third-party brand mark, not Ebda chrome",
+  'apps/admin/src/app/stores/[id]/branding/_components/types.ts':
+    "COLOR_PRESETS: the merchant's own swatch choices (an orange option a merchant may pick), not a default",
   'apps/api/src/lib/ai/eval/fixtures/golden/store-content.ts':
     "an AI eval case: a MERCHANT's orange logo and the palette the model must extract from it",
 };
@@ -68,6 +138,11 @@ export function orangeHits(path: string, text: string): string[] {
   text.split('\n').forEach((line, i) => {
     for (const [name, re] of ORANGE)
       if (re.test(line)) out.push(`${path}:${i + 1} ${name}: ${line.trim().slice(0, 120)}`);
+    for (const c of colourLiterals(line))
+      if (isOrange(c))
+        out.push(
+          `${path}:${i + 1} orange ${c[0]} (h${c[1].toFixed(0)} s${c[2].toFixed(0)} l${c[3].toFixed(0)}): ${line.trim().slice(0, 100)}`
+        );
   });
   return out;
 }
@@ -104,6 +179,12 @@ describe('no Force orange anywhere that runs (Ruling D1016-ORANGE-1)', () => {
       'from-amber-500 to-orange-500',
       "if (!hslComponents) return 'hsl(26, 100%, 50%)';",
       'vec3 tint = vec3(1.0, 0.45, 0.06);',
+      "className='bg-[#fc6b02] text-white'",
+      'accent-[#FC6B02]',
+      'color: rgb(252, 107, 2)',
+      'background: oklch(0.7 0.19 45)',
+      'fill="#f60"',
+      '#ff6e01cc',
     ])
       expect(hit(s), s).toBe(true);
     for (const s of [
@@ -115,8 +196,30 @@ describe('no Force orange anywhere that runs (Ruling D1016-ORANGE-1)', () => {
       'dark:bg-orange-900/30',
       "'Vodafone Cash, Orange Cash, e& money'",
       '#B08D57',
+      '#F79E1B', // Mastercard's own amber, hue 36
+      '#EB001B',
+      '#f59e0b', // amber-500 (status), hue 38
+      'see issue #1609 and #2092',
+      'oklch(0.7 0.15 250)',
     ])
       expect(hit(s), s).toBe(false);
+  });
+});
+
+describe('a gold primary fill takes the dark primary ink (admin)', () => {
+  it('no admin class string pairs bg-primary with text-white (white on gold is 3.07:1)', () => {
+    const admin = trackedFiles().filter(f => f.startsWith('apps/admin/src/') && /\.tsx?$/.test(f));
+    const bad: string[] = [];
+    for (const f of admin) {
+      const src = readFileSync(join(ROOT, f), 'utf8');
+      for (const m of src.matchAll(/["'`][^"'`\n]*["'`]/g))
+        if (
+          /(?<![\w:/-])bg-primary(?![\w/-])/.test(m[0]) &&
+          /(?<![\w:/-])text-white(?![\w/-])/.test(m[0])
+        )
+          bad.push(`${f}: ${m[0].slice(0, 80)}`);
+    }
+    expect(bad).toEqual([]);
   });
 });
 

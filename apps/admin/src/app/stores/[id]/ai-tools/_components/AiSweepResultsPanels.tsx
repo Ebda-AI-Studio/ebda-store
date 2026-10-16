@@ -449,7 +449,7 @@ function FaqPanel({ data, storeId }: { data: FaqResult; storeId: string }) {
                 <p className="font-medium">{f.question}</p>
                 <div className="flex shrink-0 items-center gap-1.5">
                   {f.aiDrafted && !f.manuallyEdited && (
-                    <span className="rounded-full bg-[#fc6b02]/10 px-2 py-0.5 text-[10px] font-medium text-[#fc6b02]">
+                    <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary-ink">
                       {t('aiBadge')}
                     </span>
                   )}
@@ -518,7 +518,7 @@ function HowtoPanel({ data, storeId }: { data: HowtoResult; storeId: string }) {
                     {t('stepCount', { count: h.stepCount })}
                   </span>
                   {h.aiDrafted && !h.manuallyEdited && (
-                    <span className="rounded-full bg-[#fc6b02]/10 px-2 py-0.5 text-[10px] font-medium text-[#fc6b02]">
+                    <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary-ink">
                       {t('aiBadge')}
                     </span>
                   )}
@@ -784,7 +784,7 @@ function CollapsiblePanel({
         <div className="flex items-center gap-3 min-w-0">
           <span className="font-medium text-sm text-foreground">{title}</span>
           {badge && (
-            <span className="rounded-full bg-[#fc6b02]/10 px-2 py-0.5 text-[10px] font-semibold text-[#fc6b02]">
+            <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold text-primary-ink">
               {badge}
             </span>
           )}
@@ -822,7 +822,7 @@ function FillRateCard({
       <div className="mt-1 text-[11px] font-medium text-foreground">{label}</div>
       {/* Thin fill-rate bar */}
       <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-border">
-        <div className="h-full bg-[#fc6b02] transition-all" style={{ width: `${percentage}%` }} />
+        <div className="h-full bg-primary transition-all" style={{ width: `${percentage}%` }} />
       </div>
     </div>
   );
