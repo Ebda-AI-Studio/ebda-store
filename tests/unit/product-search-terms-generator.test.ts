@@ -272,6 +272,51 @@ describe('generateProductSearchTerms', () => {
       expect(await generateProductSearchTerms(boot, 'k', 'm')).toBe('هاف بوت, half boot');
     });
 
+    it('N3: Egyptian نسواني states the female group (keeps شنطة حريمي / women bag)', async () => {
+      const bag = {
+        ...input,
+        product: {
+          name: 'Leather bag',
+          nameAr: 'شنطة نسواني',
+          description: null,
+          descriptionAr: null,
+        },
+        categoryNames: [],
+      };
+      generateContent.mockResolvedValue(
+        reply(
+          '{"terms":["شنطة حريمي","women bag","شنطة نسوانى","neswany bag","shanta","mens bag"]}'
+        )
+      );
+      expect(await generateProductSearchTerms(bag, 'k', 'm')).toBe(
+        'شنطة حريمي, women bag, شنطة نسوانى, neswany bag, shanta'
+      );
+    });
+
+    it('N3: unstated نسواني / اولادي / صبياني / Franco / teen / unisex / spring are dropped', async () => {
+      generateContent.mockResolvedValue(
+        reply(
+          JSON.stringify({
+            terms: [
+              'هاف بوت',
+              'بوت نسواني',
+              'بوت اولادي',
+              'بوت صبياني',
+              'boot neswany',
+              'boot wlady',
+              'teen boots',
+              'unisex boot',
+              'بوت ربيعي',
+              'spring boot',
+              'بوت خريفي',
+              'half boot',
+            ],
+          })
+        )
+      );
+      expect(await generateProductSearchTerms(boot, 'k', 'm')).toBe('هاف بوت, half boot');
+    });
+
     it('a category name justifies the group (ملابس حريمي → women / نسائي)', async () => {
       generateContent.mockResolvedValue(
         reply('{"terms":["عبايه","women abaya","عباية نسائي","girls abaya"]}')
