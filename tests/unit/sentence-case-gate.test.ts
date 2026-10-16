@@ -65,3 +65,21 @@ describe('related row keeps the page gutter (VT-c)', () => {
     expect(src).toMatch(/<div className="mt-16 -mx-4 sm:-mx-6 lg:-mx-8">\s*\{\/\*/);
   });
 });
+
+// Taste re-audit P2-7: "Our Story" (the story block's default heading), "Secure Checkout" (the
+// checkout chip's default) and "Promo code" in the cart vs "Coupon code" at checkout.
+describe('defaults are sentence case and one thing has one name (P2-7)', () => {
+  it('story heading and checkout chip defaults', () => {
+    expect(readFileSync(join(WEB, 'templates/shared/BrandStoryBlock.tsx'), 'utf8')).toContain(
+      "headingEn = 'Our story'"
+    );
+    expect(readFileSync(join(WEB, 'app/checkout/CheckoutClient.tsx'), 'utf8')).toContain(
+      "?? 'Secure checkout'"
+    );
+  });
+  it('the cart and checkout both say Coupon code', () => {
+    const cart = readFileSync(join(WEB, 'app/cart/CartClient.tsx'), 'utf8');
+    expect(cart).not.toMatch(/'Promo code'/);
+    expect(cart).toMatch(/'Coupon code'/);
+  });
+});

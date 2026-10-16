@@ -165,7 +165,7 @@ export default function CheckoutClient() {
   // owners can rename or clear the "Secure Checkout" text via
   // store.settings.checkoutLabel / .checkoutLabelAr without code changes.
   const checkoutLabelEn =
-    (store?.settings?.checkoutLabel as string | undefined) ?? 'Secure Checkout';
+    (store?.settings?.checkoutLabel as string | undefined) ?? 'Secure checkout';
   const checkoutLabelAr = (store?.settings?.checkoutLabelAr as string | undefined) ?? 'دفع آمن';
   const storeUrl = useStoreUrl();
   const continueShoppingHref = useLastListing();

@@ -843,7 +843,7 @@ export default function CartClient() {
                               htmlFor="cart-promo-code-t"
                               className="text-sm font-medium text-foreground"
                             >
-                              {t('Promo code', 'كود الخصم')}
+                              {t('Coupon code', 'كود الخصم')}
                             </label>
                             <div className="mt-2 flex gap-2">
                               <input
@@ -933,7 +933,7 @@ export default function CartClient() {
                                 className="text-sm font-medium text-foreground"
                               >
                                 {t(
-                                  'Promo code',
+                                  'Coupon code',
                                   '\u0643\u0648\u062f \u0627\u0644\u062e\u0635\u0645'
                                 )}
                               </label>
