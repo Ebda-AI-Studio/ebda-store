@@ -71,3 +71,31 @@ async function alertGlobalCapOnce(cap: number): Promise<void> {
     context: { cap },
   }).catch(() => undefined);
 }
+
+/** One outage alert per window, platform-wide (PR3 final review minor 7, Ruling SEARCH-T11-21). */
+export const OUTAGE_ALERT_KEY = 'search:embed:outage-alerted';
+const OUTAGE_WINDOW_SECONDS = 6 * 60 * 60; // the backstop's period: one alert per backstop tick at most
+
+/**
+ * Raise ONE platform P1 per 6 h window for a Workers AI outage seen by any store's indexer run
+ * (every product failed retryably, twice). Without Redis it alerts anyway (an outage must not be
+ * silent; deduplication is the part that degrades).
+ */
+export async function alertOutageOnce(context: { storeId: string; kind: string }): Promise<void> {
+  const client = redis.getClient();
+  if (client && redis.isAvailable()) {
+    const first = await client
+      .set(OUTAGE_ALERT_KEY, '1', 'EX', OUTAGE_WINDOW_SECONDS, 'NX')
+      .catch(() => 'OK');
+    if (first !== 'OK') return;
+  }
+  logger.error(context, '[search-index] Workers AI outage: every product failed twice');
+  await sendAlert({
+    level: 'p1',
+    scope: 'platform',
+    source: 'search-index.outage',
+    title: 'Search: Workers AI embedding outage',
+    body: `Every product in an indexer batch failed twice with a retryable error (${context.kind}; first seen for store ${context.storeId}). Indexing is paused for affected stores until the next event or backstop tick; nothing was quarantined. One alert per 6 h window.`,
+    context,
+  }).catch(() => undefined);
+}

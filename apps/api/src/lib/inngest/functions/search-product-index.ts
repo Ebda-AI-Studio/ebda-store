@@ -41,7 +41,7 @@ import {
   type StaleDoc,
 } from '../../../services/product-index.service';
 import { EmbeddingError, getEmbeddingProvider } from '../../search/embedding-provider';
-import { takeEmbedCalls } from '../../search/embed-budget';
+import { alertOutageOnce, takeEmbedCalls } from '../../search/embed-budget';
 import logger from '../../logger';
 
 export const REINDEX_EVENT = 'search/store.reindex-requested';
@@ -162,6 +162,7 @@ async function indexRounds(
     } else {
       const isolated = await isolate(storeId, step, round, plan.items, batch.failed ?? 'provider');
       if (isolated === 'global-capped') return { embedded, capped: 'global' };
+      if (isolated === 'outage') return { embedded, outage: true };
       settled = isolated;
     }
 
@@ -195,8 +196,8 @@ async function indexRounds(
  * on its own (memoized); the ones that failed retryably wait a durable backoff (`step.sleep`, no
  * compute) and get ONE more single try in their own step. `settleSingles` then decides: a
  * non-retryable failure is permanent, a second retryable failure is a 24 h quarantine, and if
- * nothing succeeded and nothing was rejected outright it is an outage — the run fails (P1 via
- * alerts-failure-watch) and nothing is quarantined.
+ * nothing succeeded and nothing was rejected outright it is an outage — nothing is quarantined, the
+ * run ends `outage` (not failed) and ONE platform P1 is raised per 6 h window (PR3 minor 7).
  */
 async function isolate(
   storeId: string,
@@ -204,7 +205,7 @@ async function isolate(
   round: number,
   items: StaleDoc[],
   batchKind: string
-): Promise<Settled | 'global-capped'> {
+): Promise<Settled | 'global-capped' | 'outage'> {
   // Review N-M3: memoized steps of ISOLATE_CHUNK products, so no step holds 25 sequential calls.
   const singles = async (label: string, list: StaleDoc[]): Promise<SingleResult[] | null> => {
     const out: SingleResult[] = [];
@@ -234,8 +235,11 @@ async function isolate(
   }
   const settled = settleSingles(first, retried);
   if (settled.outage) {
-    logger.error({ storeId, round, batchKind }, '[search-index] every product failed: outage');
-    throw new NonRetriableError(`search-index: every product failed twice (${batchKind})`);
+    // PR3 minor 7: not a failed run per store (alerts-failure-watch would raise one P1 per store per
+    // backstop tick) but ONE platform alert per window; the store is retried by the next event or
+    // backstop tick. Nothing is quarantined.
+    await step.run(`outage-${round}`, () => alertOutageOnce({ storeId, kind: batchKind }));
+    return 'outage';
   }
   return { ok: settled.ok, failures: settled.failures };
 }

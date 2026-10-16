@@ -651,25 +651,33 @@ describe.skipIf(!hasDb)('product embedding indexer (Task 11)', () => {
       expect(after.map(r => r.id)).toContain(bad);
     });
 
-    it('an outage (every product fails) quarantines nothing and fails the run', async () => {
-      const { s, good1, bad } = await poisonStore('i2c');
+    it('PR3 minor 7: an outage quarantines nothing and raises ONE platform alert per window, not one per store', async () => {
+      const { redis } = await import('../../apps/api/src/services/redis.service');
+      const { OUTAGE_ALERT_KEY } = await import('../../apps/api/src/lib/search/embed-budget');
+      await redis.getClient()!.del(OUTAGE_ALERT_KEY);
+      const one = await poisonStore('i2c');
+      const two = await poisonStore('i2c2');
       setEmbeddingProviderForTests({
         model: EMBED_MODEL,
         async embed() {
           throw new EmbeddingError('timeout', 'down');
         },
       });
-      await expect(
-        asApp(() =>
+      alerts.length = 0;
+      for (const st of [one, two]) {
+        const r = await asApp(() =>
           handleSearchProductIndex({
-            event: { data: { storeId: s } },
+            event: { data: { storeId: st.s } },
             step: fakeStep(),
             attempt: INDEX_RETRIES,
           })
-        )
-      ).rejects.toThrow();
-      expect(await failureRow(bad)).toBeUndefined();
-      expect(await failureRow(good1)).toBeUndefined();
+        );
+        expect(r).toMatchObject({ outage: true });
+        expect(await failureRow(st.bad)).toBeUndefined();
+        expect(await failureRow(st.good1)).toBeUndefined();
+      }
+      expect(alerts.filter(a => a.source === 'search-index.outage')).toHaveLength(1);
+      await redis.getClient()!.del(OUTAGE_ALERT_KEY);
     });
   });
 
