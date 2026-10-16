@@ -28,18 +28,26 @@ function leadTimeText(n: number, lang: 'ar' | 'en', localize: (v: number) => str
 }
 
 /**
- * "Arrives Sun 19 Oct – Tue 21 Oct" under the add-to-cart button, plus one muted line when
- * the product is made to order. Business days (the store's `deliveryOffDays` skipped, Friday by default) from the
- * store's active shipping zones, else the store-wide `settings.deliveryDays`. Hides itself when neither
- * has numbers (never "0 days"). Ink/muted tokens only: the accent belongs to the CTA.
+ * The store's delivery window, formatted for the render ("Sun 19 Oct" … in the
+ * shopper's language and digits): business days (the store's `deliveryOffDays`
+ * skipped, Friday by default) from the store's active shipping zones, else the
+ * store-wide `settings.deliveryDays`, plus a made-to-order lead time. `from` is
+ * the day the clock starts (now on the PDP, the order's date on the receipt);
+ * null until mounted (a server-rendered date would mismatch on hydration).
+ * Returns null when the store has no numbers (never "0 days").
  */
-export function DeliveryChip({ leadTimeDays }: { leadTimeDays?: number | null }) {
-  const { language, t } = useLanguage();
+export function useDeliveryWindow({
+  leadTimeDays,
+  from: start,
+}: {
+  leadTimeDays?: number | null;
+  /** When the window starts; omitted = now (read after mount). null = not yet known. */
+  from?: Date | null;
+} = {}): { from: string; to: string } | null {
+  const { language } = useLanguage();
   const { store } = useStore();
   const numerals = useStoreNumerals();
-  const { localize } = useNumerals();
   const [zones, setZones] = useState<Zones | null>(null);
-  // `now` is read after mount: a server-rendered date would mismatch on hydration.
   const [now, setNow] = useState<Date | null>(null);
 
   useEffect(() => {
@@ -53,14 +61,15 @@ export function DeliveryChip({ leadTimeDays }: { leadTimeDays?: number | null })
     };
   }, [store.id]);
 
-  if (!zones || !now) return null;
+  const clock = start === undefined ? now : start;
+  if (!zones || !now || !clock || Number.isNaN(clock.getTime())) return null;
 
   const sets = store.settings as { deliveryDays?: unknown; deliveryOffDays?: unknown } | undefined;
   const parsed = deliveryDaysSchema.safeParse(sets?.deliveryDays);
   const offParsed = deliveryOffDaysSchema.safeParse(sets?.deliveryOffDays);
   const lead = typeof leadTimeDays === 'number' && leadTimeDays > 0 ? leadTimeDays : null;
   const w = deliveryWindow({
-    now,
+    now: clock,
     leadTimeDays: lead,
     zones: zones.map(z => ({
       isActive: true, // the public endpoint only returns active zones
@@ -81,8 +90,21 @@ export function DeliveryChip({ leadTimeDays }: { leadTimeDays?: number | null })
       numerals,
       style: 'day',
     });
-  const from = fmt(w.from);
-  const to = fmt(w.to);
+  return { from: fmt(w.from), to: fmt(w.to) };
+}
+
+/**
+ * "Arrives Sun 19 Oct – Tue 21 Oct" under the add-to-cart button, plus one muted line when
+ * the product is made to order (`useDeliveryWindow`). Hides itself when the store has no
+ * numbers. Ink/muted tokens only: the accent belongs to the CTA.
+ */
+export function DeliveryChip({ leadTimeDays }: { leadTimeDays?: number | null }) {
+  const { language, t } = useLanguage();
+  const { localize } = useNumerals();
+  const win = useDeliveryWindow({ leadTimeDays });
+  if (!win) return null;
+  const lead = typeof leadTimeDays === 'number' && leadTimeDays > 0 ? leadTimeDays : null;
+  const { from, to } = win;
   const text =
     from === to
       ? t(`Arrives ${from}`, `يوصلك ${from}`)

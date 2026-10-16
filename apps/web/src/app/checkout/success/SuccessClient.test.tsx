@@ -20,7 +20,11 @@ vi.mock('@ebda/ui', () => ({
 vi.mock('../../../components', () => ({
   MinimalChrome: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }));
-vi.mock('../../../templates/shared/WaMeButtons', () => ({ WaMeCodConfirmButton: () => null }));
+vi.mock('../../../templates/shared/WaMeButtons', () => ({
+  WaMeCodConfirmButton: () => null,
+  useOrderQuestionHref: () => null,
+}));
+vi.mock('../../../components/commerce/DeliveryChip', () => ({ useDeliveryWindow: () => null }));
 vi.mock('./InstapayCard', () => ({ InstapayCard: () => null }));
 vi.mock('./FawryReferenceCard', () => ({ FawryReferenceCard: () => null }));
 vi.mock('../../../contexts/StoreContext', () => ({

@@ -50,6 +50,7 @@ import { DahabProductDetail } from '../../../templates/dahab/ProductDetail';
 import { REGION } from '@ebda/shared';
 import { FactsTable } from '../../../components/commerce/FactsTable';
 import { DeliveryChip } from '../../../components/commerce/DeliveryChip';
+import { TrustLine } from '../../../components/commerce/TrustLine';
 import { Breadcrumbs } from '../../../components/Breadcrumbs';
 import { canBuyNow, inStockNow } from '../../../lib/can-buy-now';
 import { SizeChartDialog } from '../../../components/commerce/SizeChartDialog';
@@ -1195,6 +1196,8 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
                 </div>
                 {/* X-03: a delivery date only for something that can be bought now. */}
                 {buyableNow && <DeliveryChip leadTimeDays={product.leadTimeDays} />}
+                {/* S-02: COD · return window, from the store's own settings. */}
+                <TrustLine />
               </div>
 
               {/* Below the buy block: the category chip and the description (fold rule above). */}

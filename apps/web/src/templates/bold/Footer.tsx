@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { PoweredByForce } from '../shared/PoweredByForce';
 import { FooterLegalRow } from '../shared/FooterLegalRow';
+import { FooterWhatsApp } from '../shared/FooterWhatsApp';
 import type { FooterProps } from '../types';
 import { useLanguage } from '../../contexts/LanguageContext';
 import {
@@ -54,7 +55,7 @@ export default function BoldFooter({
 
   // Hide the contact column entirely when the store has no contact details
   // configured — empty heading + empty list reads as half-built.
-  const hasContact = !!(contact.email || displayPhone || displayAddress);
+  const hasContact = !!(contact.email || displayPhone || displayAddress || contact.whatsapp);
   // Opt-in "Branches" column — see resolveFooterBranches for the gating
   // rules. Off (+0) reduces this formula to exactly today's totalCells.
   const branches = resolveFooterBranches(locations, theme, isRtl);
@@ -227,6 +228,14 @@ export default function BoldFooter({
                     >
                       {displayPhone}
                     </a>
+                  </li>
+                )}
+                {contact.whatsapp && (
+                  <li>
+                    <FooterWhatsApp
+                      whatsapp={contact.whatsapp}
+                      className={`text-sm ${fgMuted} hover:text-primary transition-colors duration-200 font-medium cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2`}
+                    />
                   </li>
                 )}
                 {displayAddress && (

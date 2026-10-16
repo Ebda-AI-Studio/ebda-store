@@ -2,6 +2,7 @@
 
 import { PoweredByForce } from '../shared/PoweredByForce';
 import { FooterLegalRow } from '../shared/FooterLegalRow';
+import { FooterWhatsApp } from '../shared/FooterWhatsApp';
 import type { FooterProps } from '../types';
 import { useLanguage } from '../../contexts/LanguageContext';
 import {
@@ -120,6 +121,14 @@ export default function MinimalFooter({
                 </a>
               ))}
             </nav>
+          )}
+
+          {/* S-02: the store's WhatsApp, named (the social row only has an icon). */}
+          {contact.whatsapp && (
+            <FooterWhatsApp
+              whatsapp={contact.whatsapp}
+              className="text-sm tracking-wide text-muted-foreground hover:text-foreground transition-colors duration-200"
+            />
           )}
 
           {/* Social — only render the row when at least one social link is

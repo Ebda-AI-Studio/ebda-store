@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { PoweredByForce } from '../shared/PoweredByForce';
 import { FooterLegalRow } from '../shared/FooterLegalRow';
+import { FooterWhatsApp } from '../shared/FooterWhatsApp';
 import { useState } from 'react';
 import type { FooterProps } from '../types';
 import { useLanguage } from '../../contexts/LanguageContext';
@@ -262,7 +263,7 @@ export default function ElegantFooter({
 
           {/* Contact — hidden entirely if the store has no contact details
               configured. Empty heading + empty list looks unfinished. */}
-          {(contact.email || displayPhone || displayAddress) && (
+          {(contact.email || displayPhone || displayAddress || contact.whatsapp) && (
             <div>
               <h4 className="text-xs tracking-[0.25em] ui-caps-toggle font-semibold text-foreground mb-6 font-serif">
                 {isRtl ? 'تواصل' : 'Contact'}
@@ -287,6 +288,14 @@ export default function ElegantFooter({
                     >
                       {displayPhone}
                     </a>
+                  </li>
+                )}
+                {contact.whatsapp && (
+                  <li>
+                    <FooterWhatsApp
+                      whatsapp={contact.whatsapp}
+                      className="text-foreground/70 hover:text-foreground transition-colors duration-700 ease-out tracking-wide cursor-pointer"
+                    />
                   </li>
                 )}
                 {displayAddress && (

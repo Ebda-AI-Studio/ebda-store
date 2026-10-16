@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { PoweredByForce } from '../shared/PoweredByForce';
 import { FooterLegalRow } from '../shared/FooterLegalRow';
+import { FooterWhatsApp } from '../shared/FooterWhatsApp';
 import type { FooterProps } from '../types';
 import { useLanguage } from '../../contexts/LanguageContext';
 import {
@@ -122,7 +123,7 @@ export default function ClassicFooter({
             {/* Contact details — only render the list if at least one
                 detail is present. Classic mixes contact into the brand
                 column so an empty <ul> would create dead space. */}
-            {(contact.email || displayPhone || displayAddress) && (
+            {(contact.email || displayPhone || displayAddress || contact.whatsapp) && (
               <ul className="space-y-2 text-sm text-muted-foreground">
                 {contact.email && (
                   <li>
@@ -143,6 +144,14 @@ export default function ClassicFooter({
                     >
                       {displayPhone}
                     </a>
+                  </li>
+                )}
+                {contact.whatsapp && (
+                  <li>
+                    <FooterWhatsApp
+                      whatsapp={contact.whatsapp}
+                      className="hover:text-foreground transition-colors duration-200"
+                    />
                   </li>
                 )}
                 {displayAddress && (

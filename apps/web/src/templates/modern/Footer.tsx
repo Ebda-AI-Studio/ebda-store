@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { PoweredByForce } from '../shared/PoweredByForce';
 import { FooterLegalRow } from '../shared/FooterLegalRow';
+import { FooterWhatsApp } from '../shared/FooterWhatsApp';
 import { useState } from 'react';
 import type { FooterProps } from '../types';
 import { useLanguage } from '../../contexts/LanguageContext';
@@ -95,7 +96,7 @@ export default function ModernFooter({
   // WhatsApp is excluded from the trigger because it appears in the social
   // icon row above — repeating it under "Contact" is the duplication this
   // pass cleans up.
-  const hasContact = !!(contact.email || displayPhone || displayAddress);
+  const hasContact = !!(contact.email || displayPhone || displayAddress || contact.whatsapp);
   // Opt-in "Branches" column — see resolveFooterBranches for the gating
   // rules. Adding its +1 to the SAME formula that already counts contact +
   // newsletter means the off-case (showBranches=false, i.e. +0) reduces to
@@ -278,6 +279,14 @@ export default function ModernFooter({
                       </svg>
                       {displayPhone}
                     </a>
+                  </li>
+                )}
+                {contact.whatsapp && (
+                  <li>
+                    <FooterWhatsApp
+                      whatsapp={contact.whatsapp}
+                      className="text-sm text-foreground/70 hover:text-foreground transition-colors duration-300 ease-out"
+                    />
                   </li>
                 )}
                 {/* WhatsApp lives in the social row at the brand block; we

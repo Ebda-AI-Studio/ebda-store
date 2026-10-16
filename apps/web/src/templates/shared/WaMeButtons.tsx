@@ -193,6 +193,17 @@ export function WaMeCodConfirmButton({
   );
 }
 
+/**
+ * The "ask about this order" wa.me link, or null when the store has no valid
+ * number, the merchant turned the order-question toggle off, or there is no
+ * order yet. Shared by the order page button and the receipt (S-02).
+ */
+export function useOrderQuestionHref(orderNumber: string | null | undefined): string | null {
+  const { store, locale, visibility, storeName } = useWaMe();
+  if (!orderNumber || !visibility.orderQuestion) return null;
+  return waMeLink(store.whatsapp, buildOrderQuestionMessage({ locale, orderNumber, storeName }));
+}
+
 /** Order page: ask the merchant about this order. */
 export function WaMeOrderQuestionButton({
   orderNumber,
@@ -201,12 +212,8 @@ export function WaMeOrderQuestionButton({
   orderNumber: string;
   className?: string;
 }) {
-  const { store, locale, t, visibility, storeName } = useWaMe();
-  if (!visibility.orderQuestion) return null;
-  const href = waMeLink(
-    store.whatsapp,
-    buildOrderQuestionMessage({ locale, orderNumber, storeName })
-  );
+  const { t } = useWaMe();
+  const href = useOrderQuestionHref(orderNumber);
   if (!href) return null;
   return (
     <WaLink

@@ -29,6 +29,7 @@ import { FactsTable } from '../../components/commerce/FactsTable';
 import { useAnchorOffscreen } from '../../components/commerce/useAnchorOffscreen';
 import { useStickyBarHeight } from '../../components/commerce/useStickyBarHeight';
 import { DeliveryChip } from '../../components/commerce/DeliveryChip';
+import { TrustLine } from '../../components/commerce/TrustLine';
 import { PersonalisationField } from '../../components/commerce/PersonalisationField';
 import { SizeChartDialog } from '../../components/commerce/SizeChartDialog';
 import type { PublicSizeChart } from '@ebda/shared';
@@ -471,6 +472,8 @@ export function DahabProductDetail(p: DahabProductDetailProps) {
             </div>
             {/* X-03: a delivery date only for something that can be bought now. */}
             {!p.addDisabled && <DeliveryChip leadTimeDays={p.leadTimeDays} />}
+            {/* S-02: COD · return window, from the store's own settings. */}
+            <TrustLine />
             {p.stockText && <p className="mt-3 text-[13px] text-muted-foreground">{p.stockText}</p>}
 
             <div className="mt-8 border-t border-border">

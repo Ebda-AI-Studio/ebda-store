@@ -51,6 +51,13 @@ export interface ReceiptPrinterProps {
   store: ReceiptStore;
   /** The order is still being fetched: printer + spinner + empty slot. */
   loading?: boolean;
+  /**
+   * S-02: the store's delivery window from the order's date (`useDeliveryWindow`),
+   * already formatted; null/absent = the store has no delivery numbers → no row.
+   */
+  deliveryWindow?: { from: string; to: string } | null;
+  /** S-02: the store's "ask about this order" wa.me link; null/absent = no line. */
+  whatsappHref?: string | null;
 }
 
 const REDUCED = '(prefers-reduced-motion: reduce)';
@@ -107,6 +114,8 @@ export function ReceiptPrinter({
   paymentState,
   store,
   loading = false,
+  deliveryWindow = null,
+  whatsappHref = null,
 }: ReceiptPrinterProps) {
   const { t, language, isRtl } = useLanguage();
   const formatPrice = useLocalePrice();
@@ -325,7 +334,35 @@ export function ReceiptPrinter({
                     })}
                   </Num>
                 </MetaRow>
+                {/* S-02: when it arrives, from the store's own zones/settings. A
+                    failed payment is not on its way, so it gets no window. */}
+                {deliveryWindow && paymentState !== 'failed' && (
+                  <MetaRow label={t('Arrives', 'يوصلك')} ar={ar}>
+                    <span data-testid="receipt-delivery-window">
+                      {deliveryWindow.from === deliveryWindow.to
+                        ? deliveryWindow.from
+                        : `${deliveryWindow.from} – ${deliveryWindow.to}`}
+                    </span>
+                  </MetaRow>
+                )}
               </dl>
+
+              {whatsappHref && (
+                <p className="mt-4 text-center text-xs">
+                  <a
+                    data-testid="receipt-whatsapp"
+                    href={whatsappHref}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className={`${styles.ink} underline underline-offset-4`}
+                  >
+                    {t(
+                      'Questions? Message the store on WhatsApp',
+                      'عندك سؤال؟ كلّم المتجر على واتساب'
+                    )}
+                  </a>
+                </p>
+              )}
 
               <div className="mt-6 flex flex-col items-center gap-1.5 pb-4">
                 <Barcode value={order.orderNumber} className={`h-11 w-[78%] ${styles.ink}`} />

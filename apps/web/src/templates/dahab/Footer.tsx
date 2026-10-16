@@ -14,6 +14,7 @@ import type { FooterProps } from '../types';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { PoweredByForce } from '../shared/PoweredByForce';
 import { FooterLegalRow } from '../shared/FooterLegalRow';
+import { FooterWhatsApp } from '../shared/FooterWhatsApp';
 import {
   footerBranchesHeading,
   resolveAddressHref,
@@ -144,7 +145,7 @@ export default function DahabFooter({
             </div>
           )}
 
-          {(contact.email || phone || address) && (
+          {(contact.email || phone || address || contact.whatsapp) && (
             <div>
               <h2 className={HEAD}>{t('Visit and contact', 'زورونا وتواصلوا')}</h2>
               <ul className="space-y-1 text-sm">
@@ -153,6 +154,11 @@ export default function DahabFooter({
                     <a href={`tel:${contact.phone}`} dir="ltr" className={LINK}>
                       {phone}
                     </a>
+                  </li>
+                )}
+                {contact.whatsapp && (
+                  <li>
+                    <FooterWhatsApp whatsapp={contact.whatsapp} className={LINK} />
                   </li>
                 )}
                 {contact.email && (
