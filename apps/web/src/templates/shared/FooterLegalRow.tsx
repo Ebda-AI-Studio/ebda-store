@@ -89,7 +89,7 @@ export function FooterLegalRow({
             {links.map((l, i) => (
               <li key={l.path} className="flex items-center gap-x-2">
                 {i > 0 && (
-                  <span aria-hidden="true" className="opacity-60">
+                  <span aria-hidden="true" className="text-muted-foreground">
                     ·
                   </span>
                 )}

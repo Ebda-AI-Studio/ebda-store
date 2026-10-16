@@ -247,3 +247,19 @@ describe('IA-09: one footer gutter', () => {
     expect(src).toContain('mx-auto max-w-7xl px-4 sm:px-6 lg:px-8');
   });
 });
+
+// a11y re-audit P2-N14 (K-03 floor): the decorative "·" between policy links was opacity-60 and
+// measured 2.7-3.6:1. It reads a colour token at full opacity.
+describe('P2-N14: the policy separator is a token, not an alpha', () => {
+  it('no opacity below the 70% floor on the separator', async () => {
+    const { readFileSync } = await import('node:fs');
+    const { join } = await import('node:path');
+    const src = readFileSync(
+      join(__dirname, '../../apps/web/src/templates/shared/FooterLegalRow.tsx'),
+      'utf8'
+    );
+    const sep = /<span aria-hidden="true" className="([^"]*)">\s*·/.exec(src)!;
+    expect(sep[1]).not.toMatch(/\bopacity-[1-6]\d\b/);
+    expect(sep[1]).toMatch(/\btext-muted-foreground\b/);
+  });
+});
