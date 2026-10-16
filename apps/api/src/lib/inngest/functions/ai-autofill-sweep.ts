@@ -24,13 +24,28 @@
  */
 
 import type { InngestFunction } from 'inngest';
-import { storeDirectory } from '@ebda/database';
+import { runInStoreScope, storeDirectory } from '@ebda/database';
 import { withLeaderLock } from '../../leader-election';
 import { sweepStore } from '../../../services/ai-autofill.service';
 import { recommendationService } from '../../../services/recommendation.service';
 import logger from '../../logger';
 import { inngest } from '../client';
 import { BULK_AI_BATCH_SIZE, chunk } from '../batch-utils';
+
+/**
+ * One store's daily work, under that store's scope (review I3). The cron used to call
+ * `recalculateFBT` / `sweepStore` with NO ambient scope: the tenant guard refused the first query
+ * (`TenantScopeViolation`, and under `ebda_app` RLS it would have read nothing), so every store
+ * logged "store failed" and neither the FBT recompute nor the autofill backfill ever ran.
+ * `runInStoreScope`, not one transaction: the sweep interleaves AI calls and throttle sleeps,
+ * so each query is its own short transaction (CLAUDE.md, long jobs). Exported for tests.
+ */
+export function sweepAutofillStore(storeId: string) {
+  return runInStoreScope(storeId, async () => {
+    await recommendationService.recalculateFBT(storeId);
+    return sweepStore(storeId);
+  });
+}
 
 // NOTE: inferred WITHOUT the `InngestFunction.Any` contextual type on this
 // `const` — annotating that directly here breaks TS's inference of
@@ -79,8 +94,7 @@ const aiAutofillSweepFn = inngest.createFunction(
         await step.run(`batch-${i}`, async () => {
           for (const storeId of batchIds) {
             try {
-              await recommendationService.recalculateFBT(storeId);
-              const res = await sweepStore(storeId);
+              const res = await sweepAutofillStore(storeId);
               logger.info({ storeId, ...res }, '[ai-autofill-sweep] store swept');
             } catch (err) {
               logger.error({ err, storeId }, '[ai-autofill-sweep] store failed');
