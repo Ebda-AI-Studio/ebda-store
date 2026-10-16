@@ -665,7 +665,7 @@ export default function ProductsClient({
                     aria-pressed={viewMode === 'grid'}
                     onClick={() => setViewMode('grid')}
                     aria-label={t('Grid view', '\u0639\u0631\u0636 \u0634\u0628\u0643\u064a')}
-                    className={`rounded-md p-1.5 transition-colors ${viewMode === 'grid' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'}`}
+                    className={`rounded-md inline-flex h-11 w-11 items-center justify-center transition-colors ${viewMode === 'grid' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'}`}
                   >
                     <svg
                       className="h-4 w-4"
@@ -690,7 +690,7 @@ export default function ProductsClient({
                     aria-pressed={viewMode === 'list'}
                     onClick={() => setViewMode('list')}
                     aria-label={t('List view', '\u0639\u0631\u0636 \u0642\u0627\u0626\u0645\u0629')}
-                    className={`rounded-md p-1.5 transition-colors ${viewMode === 'list' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'}`}
+                    className={`rounded-md inline-flex h-11 w-11 items-center justify-center transition-colors ${viewMode === 'list' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'}`}
                   >
                     <svg
                       className="h-4 w-4"

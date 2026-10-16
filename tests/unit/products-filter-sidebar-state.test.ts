@@ -123,3 +123,27 @@ describe('price sliders are 44px targets (a11y P2-10)', () => {
     for (const r of ranges) expect(r).toMatch(/className="[^"]*\bh-11\b/);
   });
 });
+
+// a11y re-audit P2-N9 / P2-N10 (rule (d)): at 1280 the Filters toggle measured 222x20, the
+// search field 156x20, the grid/list toggles 28x28, the Lookbook sort select 38px; in the 390
+// sheet the search field 284x20 inside its pill and the sort select 40px.
+describe('filter panel controls are 44px (P2-N9/N10)', () => {
+  it('selects, the panel toggle, the search field and the view toggles', async () => {
+    const { readFileSync } = await import('node:fs');
+    const read = (f: string) =>
+      readFileSync(new URL(`../../apps/web/src/${f}`, import.meta.url), 'utf8');
+    const side = read('app/products/ProductsFilterSidebar.tsx');
+    const selects = [...side.matchAll(/<select[\s\S]*?className="([^"]*)"/g)].map(m => m[1]);
+    expect(selects.length).toBeGreaterThanOrEqual(3);
+    for (const c of selects) expect(c).toMatch(/\b(min-h-11|h-11)\b/);
+    expect(side).toMatch(/className="mb-4 flex min-h-11 w-full items-center justify-between/);
+    const css = read('styles/globals.css');
+    expect(css).toMatch(/\.search-input \{\s*@apply [^;]*\bmin-h-11\b[^;]*\btext-base\b/);
+    const list = read('app/products/ProductsClient.tsx');
+    const toggles = [
+      ...list.matchAll(/className=\{`rounded-md ([^`]*?) transition-colors \$\{viewMode/g),
+    ];
+    expect(toggles.length).toBe(2);
+    for (const t of toggles) expect(t[1]).toMatch(/\bh-11 w-11\b/);
+  });
+});

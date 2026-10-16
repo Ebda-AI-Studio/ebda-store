@@ -284,7 +284,7 @@ export function ProductsFilterSidebar(props: ProductsFilterSidebarProps) {
                 id={`products-perpage-${mobile ? 'm' : 'd'}`}
                 value={String(perPage)}
                 onChange={e => onPerPageChange(Number(e.target.value))}
-                className="w-full rounded-xl border border-input bg-card px-3 py-2.5 text-base text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary sm:text-sm"
+                className="min-h-11 w-full rounded-xl border border-input bg-card px-3 py-2.5 text-base text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary sm:text-sm"
               >
                 {perPageOptions.map(n => (
                   <option key={n} value={String(n)}>
@@ -309,7 +309,7 @@ export function ProductsFilterSidebar(props: ProductsFilterSidebarProps) {
             id={`products-sort-${mobile ? 'm' : 'd'}`}
             value={sortBy ?? ''}
             onChange={e => onSortChange(e.target.value)}
-            className="w-full rounded-xl border border-input bg-card px-3 py-2.5 text-base text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary sm:text-sm"
+            className="min-h-11 w-full rounded-xl border border-input bg-card px-3 py-2.5 text-base text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary sm:text-sm"
           >
             {sortOptions.map(opt => (
               <option key={opt.value} value={opt.value}>
@@ -621,7 +621,7 @@ export function ProductsFilterSidebar(props: ProductsFilterSidebarProps) {
           onClick={() => setIsDesktopExpanded(v => !v)}
           aria-expanded={isDesktopExpanded}
           aria-controls="products-filter-panel-body"
-          className="mb-4 flex w-full items-center justify-between text-sm font-semibold text-[hsl(var(--filter-fg))] hover:text-[hsl(var(--filter-fg)/0.7)] transition-colors"
+          className="mb-4 flex min-h-11 w-full items-center justify-between text-sm font-semibold text-[hsl(var(--filter-fg))] hover:text-[hsl(var(--filter-fg)/0.7)] transition-colors"
         >
           <span className="inline-flex items-center gap-2">
             <svg

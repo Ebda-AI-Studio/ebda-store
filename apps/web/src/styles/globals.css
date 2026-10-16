@@ -439,7 +439,7 @@
   }
 
   .search-input {
-    @apply flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground;
+    @apply min-h-11 flex-1 self-stretch bg-transparent text-base outline-none placeholder:text-muted-foreground sm:text-sm;
   }
 
   /* Cart Item */
