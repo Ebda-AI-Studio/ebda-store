@@ -320,9 +320,9 @@ router.get('/products', async (req: Request, res: Response, next: NextFunction) 
           // The query-embed limit is charged inside the service at the provider call (SEARCH-T12-6).
           searcher: searcherFromIp(req.ip),
         }),
-      { cacheIf: r => (r.meta as { degraded?: boolean }).degraded !== true }
+      { cacheIf: r => (r as { meta?: { degraded?: boolean } }).meta?.degraded !== true }
     );
-    const ranked = (result.meta as { ranked?: boolean }).ranked === true;
+    const ranked = (result as { meta?: { ranked?: boolean } }).meta?.ranked === true;
 
     // First-party search log (search program P0, Task 5): page 1 of a real query only, so
     // paging does not double count; typeahead (/search/suggest) is not logged (keystrokes,
