@@ -24,7 +24,10 @@ import {
   resolveColor,
   storeLayoutSchema,
 } from '@ebda/shared';
-import { sectionBgStyle } from '../../apps/web/src/templates/shared/section-bg';
+import {
+  darkLookListingBand,
+  sectionBgStyle,
+} from '../../apps/web/src/templates/shared/section-bg';
 import { getPackStyles } from '../../apps/web/src/templates/shared/pack-styles';
 
 const ctx = vi.hoisted(() => ({ template: 'qamar' }));
@@ -167,5 +170,32 @@ describe('LB-06 strip gutter', () => {
     expect(look.sections!.find(s => s.type === 'category-grid')!.design).toMatchObject({
       paddingBottom: 'tight',
     });
+  });
+});
+
+// W2a fix round 1 (review I-3): quality bar § 9 rule 1 reaches the listing pages too.
+describe('LB-01 on listings: a dark look lists products on the inverse band', () => {
+  const theme = (look: string | null, template = 'qamar') =>
+    composeStoreTheme({ template: template as never, look, theme: {} });
+  it('Lookbook (dark page): the band, painted as the section band is', () => {
+    const t = theme('qamar.lookbook');
+    expect(darkLookListingBand(t, 'qamar.lookbook', false)).toEqual(
+      sectionBgStyle(INVERSE_SURFACE, t)
+    );
+  });
+  it('a light look, a store with no look, or a merchant page colour: unchanged', () => {
+    expect(darkLookListingBand(theme('qamar.atelier'), 'qamar.atelier', false)).toBeUndefined();
+    expect(darkLookListingBand(theme('qamar.vitrine'), 'qamar.vitrine', false)).toBeUndefined();
+    const darkLegacy = { ...theme(null, 'modern'), backgroundColor: '230 36% 18%' };
+    expect(darkLookListingBand(darkLegacy, null, false)).toBeUndefined();
+    expect(darkLookListingBand(theme('qamar.lookbook'), 'qamar.lookbook', true)).toBeUndefined();
+  });
+  it('the PLP and search results use it (merchant page colour first on the PLP)', () => {
+    const plp = readFileSync(path.join(web, 'app/products/ProductsClient.tsx'), 'utf8');
+    expect(plp).toContain(
+      'darkLookListingBand(store.theme, store.look, !!productsPage?.bgColor) ??'
+    );
+    const search = readFileSync(path.join(web, 'app/search/SearchClient.tsx'), 'utf8');
+    expect(search).toContain('darkLookListingBand(store?.theme, store?.look, false)');
   });
 });

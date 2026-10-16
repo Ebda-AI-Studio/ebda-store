@@ -192,9 +192,15 @@ describe('occasion bands', () => {
     const rings = bands().match(/<span[^>]*data-part="band-focus"[^>]*>/g) ?? [];
     expect(rings).toHaveLength(3);
     for (const r of rings)
-      expect(r).toContain(
-        'absolute inset-1 z-10 border-2 border-current opacity-0 group-focus-visible/band:opacity-100'
+      expect(r).toMatch(
+        /absolute inset-1 z-10 border-2 border-current opacity-0 ring-2 ring-inset ring-(primary|accent|border) group-focus-visible\/band:opacity-100/
       );
+    // two-tone: the inner ring is the band's own fill, so text colour + fill (>= 3:1) are adjacent
+    expect(rings.map(r => /ring-(primary|accent|border)/.exec(r)![1])).toEqual([
+      'primary',
+      'accent',
+      'border',
+    ]);
   });
 
   it('a block with no tone cycles primary, accent, line', () => {

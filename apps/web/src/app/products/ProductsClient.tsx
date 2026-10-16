@@ -40,6 +40,7 @@ import { recordLastListing, consumeFocusProduct } from '@/lib/last-listing';
 
 import { roundToMinor } from '@ebda/shared';
 import { Breadcrumbs } from '../../components/Breadcrumbs';
+import { darkLookListingBand } from '../../templates/shared/section-bg';
 /**
  * How many products the user can choose to load per PLP page. Capped at 96
  * because larger pages start to hurt mobile data + LCP without much UX win.
@@ -554,7 +555,11 @@ export default function ProductsClient({
     <ShopChrome>
       <div
         className="flex-1"
-        style={pageSurfaceStyle(productsPage?.bgColor, store.theme, productsPage?.colorScheme)}
+        style={
+          // A dark look lists its (white-ground) product photos on the inverse band (I-3).
+          darkLookListingBand(store.theme, store.look, !!productsPage?.bgColor) ??
+          pageSurfaceStyle(productsPage?.bgColor, store.theme, productsPage?.colorScheme)
+        }
       >
         {/* data-zone="products" wraps the entire listing — header h1 +
           breadcrumb + filter sidebar (sort, price range, search,

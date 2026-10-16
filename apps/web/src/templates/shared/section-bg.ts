@@ -1,5 +1,11 @@
 import type { CSSProperties } from 'react';
-import { INVERSE_SURFACE, colorToHslTriplet, resolveColor } from '@ebda/shared';
+import {
+  INVERSE_SURFACE,
+  colorToHslTriplet,
+  getLook,
+  pickReadableForeground,
+  resolveColor,
+} from '@ebda/shared';
 import type { StoreTheme } from '@ebda/shared';
 
 /**
@@ -46,4 +52,22 @@ function inverseBandStyle(theme: StoreTheme): CSSProperties | undefined {
     '--input': page,
     '--bg-page': ink,
   } as CSSProperties;
+}
+
+/**
+ * Quality bar § 9 rule 1 (W2a fix round 1, I-3): a LOOK whose page is dark (Lookbook) shows
+ * merchant product photos (white grounds) on the inverse band, on listing pages too, not only in
+ * its home mix. Undefined (no change) for a store with no look, a light look, or when the
+ * merchant set their own page colour (`hasMerchantBg`: merchant > look).
+ */
+export function darkLookListingBand(
+  theme: StoreTheme | undefined,
+  lookId: string | null | undefined,
+  hasMerchantBg: boolean
+): CSSProperties | undefined {
+  if (hasMerchantBg || !theme || !getLook(lookId) || !theme.backgroundColor) return undefined;
+  const page = theme.backgroundColor.trim();
+  const css = /^\d/.test(page) ? `hsl(${page})` : page;
+  if (pickReadableForeground(css) !== '#ffffff') return undefined;
+  return inverseBandStyle(theme);
 }

@@ -14,6 +14,7 @@ import { toTemplateProduct } from '../../templates/adapters';
 import { trackSearch } from '../../components/MarketingPixels';
 import { SearchAutocomplete } from '../../components/SearchAutocomplete';
 import { countText, RESULTS } from '../../lib/plural';
+import { darkLookListingBand } from '../../templates/shared/section-bg';
 
 const sortValues = ['newest', 'price-asc', 'price-desc', 'name-asc'] as const;
 
@@ -208,74 +209,97 @@ function SearchContent() {
 
   return (
     <ShopChrome>
-      {/* Search results are still product listings — same typography
+      {/* A dark look lists product photos on the inverse band, as /products does (I-3). */}
+      <div className="flex-1" style={darkLookListingBand(store?.theme, store?.look, false)}>
+        {/* Search results are still product listings — same typography
           zone as /products. */}
-      <div
-        className="mx-auto w-full max-w-7xl flex-1 px-4 py-8 sm:px-6 lg:px-8"
-        data-zone="products"
-      >
-        <h1 className="text-3xl font-bold mb-6">
-          {t(
-            'Search Products',
-            '\u0627\u0644\u0628\u062d\u062b \u0639\u0646 \u0627\u0644\u0645\u0646\u062a\u062c\u0627\u062a'
-          )}
-        </h1>
+        <div
+          className="mx-auto w-full max-w-7xl flex-1 px-4 py-8 sm:px-6 lg:px-8"
+          data-zone="products"
+        >
+          <h1 className="text-3xl font-bold mb-6">
+            {t(
+              'Search Products',
+              '\u0627\u0644\u0628\u062d\u062b \u0639\u0646 \u0627\u0644\u0645\u0646\u062a\u062c\u0627\u062a'
+            )}
+          </h1>
 
-        {/* Search form */}
-        <form onSubmit={handleSearch} role="search" className="mb-6">
-          <div className="relative max-w-2xl mx-auto">
-            <div className="flex gap-3">
-              <input
-                type="text"
-                value={searchTerm}
-                onChange={e => setSearchTerm(e.target.value)}
-                placeholder={t(
-                  'Search for products...',
-                  '\u0627\u0644\u0628\u062d\u062b \u0639\u0646 \u0627\u0644\u0645\u0646\u062a\u062c\u0627\u062a...'
-                )}
-                className="min-w-0 flex-1 px-4 py-3 border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-primary bg-background text-foreground"
-              />
-              <button
-                type="submit"
-                className="px-6 py-3 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors font-medium"
-              >
-                {t('Search', translations['Search'])}
-              </button>
-            </div>
-            {/* Live autocomplete suggestions \u2014 same component as theme headers.
+          {/* Search form */}
+          <form onSubmit={handleSearch} role="search" className="mb-6">
+            <div className="relative max-w-2xl mx-auto">
+              <div className="flex gap-3">
+                <input
+                  type="text"
+                  value={searchTerm}
+                  onChange={e => setSearchTerm(e.target.value)}
+                  placeholder={t(
+                    'Search for products...',
+                    '\u0627\u0644\u0628\u062d\u062b \u0639\u0646 \u0627\u0644\u0645\u0646\u062a\u062c\u0627\u062a...'
+                  )}
+                  className="min-w-0 flex-1 px-4 py-3 border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-primary bg-background text-foreground"
+                />
+                <button
+                  type="submit"
+                  className="px-6 py-3 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors font-medium"
+                >
+                  {t('Search', translations['Search'])}
+                </button>
+              </div>
+              {/* Live autocomplete suggestions \u2014 same component as theme headers.
                 Absolutely positioned relative to this wrapper so it overlays
                 the page content below the input. Selecting a suggestion
                 navigates to the product page (handled inside the component);
                 the on-page results list continues to be driven by searchTerm. */}
-            <SearchAutocomplete
-              query={searchTerm}
-              committedQuery={committedQuery}
-              onSelect={() => {}}
-            />
-          </div>
-        </form>
+              <SearchAutocomplete
+                query={searchTerm}
+                committedQuery={committedQuery}
+                onSelect={() => {}}
+              />
+            </div>
+          </form>
 
-        {/* Filter & Sort bar \u2014 uses the same stacked-with-inline-labels
+          {/* Filter & Sort bar \u2014 uses the same stacked-with-inline-labels
             pattern as the /products toolbar (commit 33abdf6) so Arabic
             labels like "\u0627\u0644\u0633\u0639\u0631: \u0645\u0646 \u0627\u0644\u0623\u0639\u0644\u0649 \u0644\u0644\u0623\u0642\u0644" can't truncate. Each filter
             occupies its own row at every breakpoint; min-w on each Select
             guards the Arabic label width. 2026-05-16 ahmad standing rule:
             'apply mobile's fix to desktop' \u2014 toolbar UX is identical
             regardless of viewport. */}
-        {/* Filters toggle — only appears once a search has been run (results
+          {/* Filters toggle — only appears once a search has been run (results
             are up). Tapping it reveals the category + sort controls. */}
-        {committedQuery && (
-          <div className="mb-4 max-w-2xl mx-auto">
-            <button
-              type="button"
-              onClick={() => setShowFilters(v => !v)}
-              aria-expanded={showFilters}
-              aria-controls="search-filters"
-              className="flex h-11 w-full items-center justify-between rounded-xl border border-input bg-card px-4 text-sm font-medium text-foreground transition-colors hover:bg-muted"
-            >
-              <span className="inline-flex items-center gap-2">
+          {committedQuery && (
+            <div className="mb-4 max-w-2xl mx-auto">
+              <button
+                type="button"
+                onClick={() => setShowFilters(v => !v)}
+                aria-expanded={showFilters}
+                aria-controls="search-filters"
+                className="flex h-11 w-full items-center justify-between rounded-xl border border-input bg-card px-4 text-sm font-medium text-foreground transition-colors hover:bg-muted"
+              >
+                <span className="inline-flex items-center gap-2">
+                  <svg
+                    className="h-4 w-4"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    aria-hidden="true"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"
+                    />
+                  </svg>
+                  {t('Filters', 'الفلاتر')}
+                  {categoryFilter && (
+                    <span className="rounded-full bg-primary px-2 py-0.5 text-xs text-primary-foreground">
+                      1
+                    </span>
+                  )}
+                </span>
                 <svg
-                  className="h-4 w-4"
+                  className={`h-4 w-4 transition-transform duration-200 ${showFilters ? 'rotate-180' : ''}`}
                   fill="none"
                   viewBox="0 0 24 24"
                   stroke="currentColor"
@@ -285,104 +309,205 @@ function SearchContent() {
                     strokeLinecap="round"
                     strokeLinejoin="round"
                     strokeWidth={2}
-                    d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"
+                    d="M19 9l-7 7-7-7"
                   />
                 </svg>
-                {t('Filters', 'الفلاتر')}
-                {categoryFilter && (
-                  <span className="rounded-full bg-primary px-2 py-0.5 text-xs text-primary-foreground">
-                    1
-                  </span>
-                )}
-              </span>
-              <svg
-                className={`h-4 w-4 transition-transform duration-200 ${showFilters ? 'rotate-180' : ''}`}
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                aria-hidden="true"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M19 9l-7 7-7-7"
-                />
-              </svg>
-            </button>
-          </div>
-        )}
+              </button>
+            </div>
+          )}
 
-        {committedQuery && showFilters && (
-          <div
-            id="search-filters"
-            className="mb-6 max-w-2xl mx-auto rounded-xl bg-muted/30 p-4 flex flex-col gap-3"
-          >
-            {categories.length > 0 && (
+          {committedQuery && showFilters && (
+            <div
+              id="search-filters"
+              className="mb-6 max-w-2xl mx-auto rounded-xl bg-muted/30 p-4 flex flex-col gap-3"
+            >
+              {categories.length > 0 && (
+                <div className="flex items-center gap-2">
+                  <span className="shrink-0 text-sm font-medium text-foreground">
+                    {t('Category:', '\u0627\u0644\u0641\u0626\u0629:')}
+                  </span>
+                  <Select
+                    id="search-category"
+                    value={categoryFilter}
+                    onChange={e => handleCategoryChange(e.target.value)}
+                    options={[
+                      {
+                        value: '',
+                        label: t(
+                          'All Categories',
+                          '\u0643\u0644 \u0627\u0644\u0641\u0626\u0627\u062a'
+                        ),
+                      },
+                      ...categories.map(cat => ({ value: cat.id, label: cat.name })),
+                    ]}
+                    className="flex-1 min-w-[14rem] h-11 rounded-lg border border-input bg-background px-3 text-base focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 lg:h-10 lg:text-sm"
+                  />
+                </div>
+              )}
+
               <div className="flex items-center gap-2">
                 <span className="shrink-0 text-sm font-medium text-foreground">
-                  {t('Category:', '\u0627\u0644\u0641\u0626\u0629:')}
+                  {t('Sort by:', '\u062a\u0631\u062a\u064a\u0628 \u062d\u0633\u0628:')}
                 </span>
                 <Select
-                  id="search-category"
-                  value={categoryFilter}
-                  onChange={e => handleCategoryChange(e.target.value)}
-                  options={[
-                    {
-                      value: '',
-                      label: t(
-                        'All Categories',
-                        '\u0643\u0644 \u0627\u0644\u0641\u0626\u0627\u062a'
-                      ),
-                    },
-                    ...categories.map(cat => ({ value: cat.id, label: cat.name })),
-                  ]}
-                  className="flex-1 min-w-[14rem] h-11 rounded-lg border border-input bg-background px-3 text-base focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 lg:h-10 lg:text-sm"
+                  id="search-sort"
+                  value={sortBy}
+                  onChange={e => handleSortChange(e.target.value as SortValue)}
+                  options={getSortOptions(t).map(opt => ({ value: opt.value, label: opt.label }))}
+                  className="flex-1 min-w-[12rem] h-11 rounded-lg border border-input bg-background px-3 text-base focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 lg:h-10 lg:text-sm"
                 />
               </div>
-            )}
 
-            <div className="flex items-center gap-2">
-              <span className="shrink-0 text-sm font-medium text-foreground">
-                {t('Sort by:', '\u062a\u0631\u062a\u064a\u0628 \u062d\u0633\u0628:')}
-              </span>
-              <Select
-                id="search-sort"
-                value={sortBy}
-                onChange={e => handleSortChange(e.target.value as SortValue)}
-                options={getSortOptions(t).map(opt => ({ value: opt.value, label: opt.label }))}
-                className="flex-1 min-w-[12rem] h-11 rounded-lg border border-input bg-background px-3 text-base focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 lg:h-10 lg:text-sm"
-              />
+              {categoryFilter && (
+                <button
+                  onClick={() => handleCategoryChange('')}
+                  className="self-start flex items-center gap-1 rounded-full bg-primary/10 px-3 py-1 text-xs font-medium text-primary hover:bg-primary/20 transition-colors"
+                >
+                  {categories.find(c => c.id === categoryFilter)?.name ?? categoryFilter}
+                  <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M6 18L18 6M6 6l12 12"
+                    />
+                  </svg>
+                </button>
+              )}
             </div>
+          )}
 
-            {categoryFilter && (
-              <button
-                onClick={() => handleCategoryChange('')}
-                className="self-start flex items-center gap-1 rounded-full bg-primary/10 px-3 py-1 text-xs font-medium text-primary hover:bg-primary/20 transition-colors"
-              >
-                {categories.find(c => c.id === categoryFilter)?.name ?? categoryFilter}
-                <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          {/* Error */}
+          {error && (
+            <div
+              role="alert"
+              className="mb-6 p-4 bg-destructive/10 border border-destructive/30 rounded-lg"
+            >
+              <div className="flex items-center gap-3">
+                <svg
+                  className="h-5 w-5 text-destructive-ink flex-shrink-0"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
                   <path
                     strokeLinecap="round"
                     strokeLinejoin="round"
                     strokeWidth={2}
-                    d="M6 18L18 6M6 6l12 12"
+                    d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
                   />
                 </svg>
-              </button>
-            )}
-          </div>
-        )}
+                <p className="text-destructive-ink flex-1">{error}</p>
+                <button
+                  onClick={() => performSearch(committedQuery, categoryFilter)}
+                  className="px-3 py-1 text-sm bg-destructive/20 text-destructive-ink rounded hover:bg-destructive/30 transition-colors"
+                >
+                  {t(
+                    'Retry',
+                    '\u0625\u0639\u0627\u062f\u0629 \u0627\u0644\u0645\u062d\u0627\u0648\u0644\u0629'
+                  )}
+                </button>
+              </div>
+            </div>
+          )}
 
-        {/* Error */}
-        {error && (
-          <div
-            role="alert"
-            className="mb-6 p-4 bg-destructive/10 border border-destructive/30 rounded-lg"
-          >
-            <div className="flex items-center gap-3">
+          {/* Loading skeletons */}
+          {isLoading && (
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+              {[...Array(8)].map((_, i) => (
+                <div key={i} className="bg-muted animate-pulse rounded-lg h-64" />
+              ))}
+            </div>
+          )}
+
+          {/* Results grid */}
+          {!isLoading && !error && products.length > 0 && (
+            <>
+              <p className="text-muted-foreground mb-6 text-sm">
+                {t(
+                  countText('en', products.length, RESULTS),
+                  countText('ar', products.length, RESULTS)
+                )}{' '}
+                {t('for', '\u0644\u0640')} &quot;
+                {displayQuery}&quot;
+                {categoryFilter && (
+                  <>
+                    {' '}
+                    {t('in', '\u0641\u064a')}{' '}
+                    <span className="font-medium text-foreground">
+                      {categories.find(c => c.id === categoryFilter)?.name ?? categoryFilter}
+                    </span>
+                  </>
+                )}
+              </p>
+              {T && !templateLoading ? (
+                <T.ProductGrid
+                  products={products.map(toTemplateProduct)}
+                  isRtl={isRtl}
+                  currency={store.currency}
+                  columns={4}
+                  cartQuantities={cartQuantities}
+                  onAddToCart={handleAddToCart}
+                  urlPrefix={urlPrefix}
+                />
+              ) : (
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+                  {products.map(p => (
+                    <div key={p.id} className="animate-pulse rounded-xl border bg-card">
+                      <div className="aspect-square bg-muted rounded-t-xl" />
+                      <div className="p-4 space-y-2">
+                        <div className="h-4 w-3/4 bg-muted rounded" />
+                        <div className="h-5 w-1/2 bg-muted rounded" />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </>
+          )}
+
+          {/* No results */}
+          {!isLoading && !error && committedQuery && products.length === 0 && (
+            <div className="text-center py-12">
+              <p className="text-muted-foreground mb-3">
+                {t(
+                  'No products found for',
+                  '\u0644\u0645 \u064a\u062a\u0645 \u0627\u0644\u0639\u062b\u0648\u0631 \u0639\u0644\u0649 \u0645\u0646\u062a\u062c\u0627\u062a \u0644\u0640'
+                )}{' '}
+                &quot;{committedQuery}
+                &quot;
+                {categoryFilter
+                  ? t(
+                      ' in the selected category',
+                      ' \u0641\u064a \u0627\u0644\u0641\u0626\u0629 \u0627\u0644\u0645\u062d\u062f\u062f\u0629'
+                    )
+                  : ''}
+              </p>
+              {categoryFilter && (
+                <button
+                  onClick={() => handleCategoryChange('')}
+                  className="block mx-auto mb-3 text-sm text-primary hover:underline"
+                >
+                  {t(
+                    'Clear category filter',
+                    '\u0645\u0633\u062d \u0641\u0644\u062a\u0631 \u0627\u0644\u0641\u0626\u0629'
+                  )}
+                </button>
+              )}
+              <Link href={storeUrl('/products')} className="text-primary hover:underline text-sm">
+                {t(
+                  'Browse all products',
+                  '\u062a\u0635\u0641\u062d \u0643\u0644 \u0627\u0644\u0645\u0646\u062a\u062c\u0627\u062a'
+                )}
+              </Link>
+            </div>
+          )}
+
+          {/* Empty state when no query entered yet */}
+          {!isLoading && !error && !committedQuery && (
+            <div className="text-center py-12">
               <svg
-                className="h-5 w-5 text-destructive-ink flex-shrink-0"
+                className="mx-auto h-12 w-12 text-muted-foreground mb-4"
                 fill="none"
                 viewBox="0 0 24 24"
                 stroke="currentColor"
@@ -390,155 +515,34 @@ function SearchContent() {
                 <path
                   strokeLinecap="round"
                   strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+                  strokeWidth={1.5}
+                  d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
                 />
               </svg>
-              <p className="text-destructive-ink flex-1">{error}</p>
-              <button
-                onClick={() => performSearch(committedQuery, categoryFilter)}
-                className="px-3 py-1 text-sm bg-destructive/20 text-destructive-ink rounded hover:bg-destructive/30 transition-colors"
+              <p className="text-lg font-medium text-foreground mb-1">
+                {t(
+                  'Search our products',
+                  '\u0627\u0628\u062d\u062b \u0641\u064a \u0645\u0646\u062a\u062c\u0627\u062a\u0646\u0627'
+                )}
+              </p>
+              <p className="text-muted-foreground">
+                {t(
+                  'Enter a search term above to find products by name, description, or category.',
+                  '\u0623\u062f\u062e\u0644 \u0643\u0644\u0645\u0629 \u0628\u062d\u062b \u0623\u0639\u0644\u0627\u0647 \u0644\u0644\u0639\u062b\u0648\u0631 \u0639\u0644\u0649 \u0627\u0644\u0645\u0646\u062a\u062c\u0627\u062a \u062d\u0633\u0628 \u0627\u0644\u0627\u0633\u0645 \u0623\u0648 \u0627\u0644\u0648\u0635\u0641 \u0623\u0648 \u0627\u0644\u0641\u0626\u0629.'
+                )}
+              </p>
+              <Link
+                href={storeUrl('/products')}
+                className="mt-4 inline-block text-primary hover:underline text-sm font-medium"
               >
                 {t(
-                  'Retry',
-                  '\u0625\u0639\u0627\u062f\u0629 \u0627\u0644\u0645\u062d\u0627\u0648\u0644\u0629'
+                  'Or browse all products',
+                  '\u0623\u0648 \u062a\u0635\u0641\u062d \u062c\u0645\u064a\u0639 \u0627\u0644\u0645\u0646\u062a\u062c\u0627\u062a'
                 )}
-              </button>
+              </Link>
             </div>
-          </div>
-        )}
-
-        {/* Loading skeletons */}
-        {isLoading && (
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-            {[...Array(8)].map((_, i) => (
-              <div key={i} className="bg-muted animate-pulse rounded-lg h-64" />
-            ))}
-          </div>
-        )}
-
-        {/* Results grid */}
-        {!isLoading && !error && products.length > 0 && (
-          <>
-            <p className="text-muted-foreground mb-6 text-sm">
-              {t(
-                countText('en', products.length, RESULTS),
-                countText('ar', products.length, RESULTS)
-              )}{' '}
-              {t('for', '\u0644\u0640')} &quot;
-              {displayQuery}&quot;
-              {categoryFilter && (
-                <>
-                  {' '}
-                  {t('in', '\u0641\u064a')}{' '}
-                  <span className="font-medium text-foreground">
-                    {categories.find(c => c.id === categoryFilter)?.name ?? categoryFilter}
-                  </span>
-                </>
-              )}
-            </p>
-            {T && !templateLoading ? (
-              <T.ProductGrid
-                products={products.map(toTemplateProduct)}
-                isRtl={isRtl}
-                currency={store.currency}
-                columns={4}
-                cartQuantities={cartQuantities}
-                onAddToCart={handleAddToCart}
-                urlPrefix={urlPrefix}
-              />
-            ) : (
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-                {products.map(p => (
-                  <div key={p.id} className="animate-pulse rounded-xl border bg-card">
-                    <div className="aspect-square bg-muted rounded-t-xl" />
-                    <div className="p-4 space-y-2">
-                      <div className="h-4 w-3/4 bg-muted rounded" />
-                      <div className="h-5 w-1/2 bg-muted rounded" />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </>
-        )}
-
-        {/* No results */}
-        {!isLoading && !error && committedQuery && products.length === 0 && (
-          <div className="text-center py-12">
-            <p className="text-muted-foreground mb-3">
-              {t(
-                'No products found for',
-                '\u0644\u0645 \u064a\u062a\u0645 \u0627\u0644\u0639\u062b\u0648\u0631 \u0639\u0644\u0649 \u0645\u0646\u062a\u062c\u0627\u062a \u0644\u0640'
-              )}{' '}
-              &quot;{committedQuery}
-              &quot;
-              {categoryFilter
-                ? t(
-                    ' in the selected category',
-                    ' \u0641\u064a \u0627\u0644\u0641\u0626\u0629 \u0627\u0644\u0645\u062d\u062f\u062f\u0629'
-                  )
-                : ''}
-            </p>
-            {categoryFilter && (
-              <button
-                onClick={() => handleCategoryChange('')}
-                className="block mx-auto mb-3 text-sm text-primary hover:underline"
-              >
-                {t(
-                  'Clear category filter',
-                  '\u0645\u0633\u062d \u0641\u0644\u062a\u0631 \u0627\u0644\u0641\u0626\u0629'
-                )}
-              </button>
-            )}
-            <Link href={storeUrl('/products')} className="text-primary hover:underline text-sm">
-              {t(
-                'Browse all products',
-                '\u062a\u0635\u0641\u062d \u0643\u0644 \u0627\u0644\u0645\u0646\u062a\u062c\u0627\u062a'
-              )}
-            </Link>
-          </div>
-        )}
-
-        {/* Empty state when no query entered yet */}
-        {!isLoading && !error && !committedQuery && (
-          <div className="text-center py-12">
-            <svg
-              className="mx-auto h-12 w-12 text-muted-foreground mb-4"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={1.5}
-                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-              />
-            </svg>
-            <p className="text-lg font-medium text-foreground mb-1">
-              {t(
-                'Search our products',
-                '\u0627\u0628\u062d\u062b \u0641\u064a \u0645\u0646\u062a\u062c\u0627\u062a\u0646\u0627'
-              )}
-            </p>
-            <p className="text-muted-foreground">
-              {t(
-                'Enter a search term above to find products by name, description, or category.',
-                '\u0623\u062f\u062e\u0644 \u0643\u0644\u0645\u0629 \u0628\u062d\u062b \u0623\u0639\u0644\u0627\u0647 \u0644\u0644\u0639\u062b\u0648\u0631 \u0639\u0644\u0649 \u0627\u0644\u0645\u0646\u062a\u062c\u0627\u062a \u062d\u0633\u0628 \u0627\u0644\u0627\u0633\u0645 \u0623\u0648 \u0627\u0644\u0648\u0635\u0641 \u0623\u0648 \u0627\u0644\u0641\u0626\u0629.'
-              )}
-            </p>
-            <Link
-              href={storeUrl('/products')}
-              className="mt-4 inline-block text-primary hover:underline text-sm font-medium"
-            >
-              {t(
-                'Or browse all products',
-                '\u0623\u0648 \u062a\u0635\u0641\u062d \u062c\u0645\u064a\u0639 \u0627\u0644\u0645\u0646\u062a\u062c\u0627\u062a'
-              )}
-            </Link>
-          </div>
-        )}
+          )}
+        </div>
       </div>
     </ShopChrome>
   );

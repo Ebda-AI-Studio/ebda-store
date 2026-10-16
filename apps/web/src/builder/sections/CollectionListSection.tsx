@@ -49,6 +49,18 @@ export const BAND_TONES = {
 } as const;
 const TONE_CYCLE = ['primary', 'accent', 'line'] as const;
 
+/**
+ * The band focus ring is TWO-TONE (W2a fix round 1, review M-4): 2px in the band's text colour
+ * outside, 2px in the band's fill inside. The two are the band's own pair (>= 3:1 by
+ * band-tones-legacy-contrast.test.ts), so over the photo half the ring always shows one tone
+ * against the other, whatever the photo.
+ */
+export const BAND_FOCUS_INNER = {
+  primary: 'ring-primary',
+  accent: 'ring-accent',
+  line: 'ring-border',
+} as const;
+
 /** The theme keys each tone paints: [fill, text]. */
 const TONE_KEYS = {
   primary: ['primaryColor', 'primaryForeground'],
@@ -193,7 +205,7 @@ export function CollectionListSection({
                 <span
                   aria-hidden="true"
                   data-part="band-focus"
-                  className="pointer-events-none absolute inset-1 z-10 border-2 border-current opacity-0 group-focus-visible/band:opacity-100"
+                  className={`pointer-events-none absolute inset-1 z-10 border-2 border-current opacity-0 ring-2 ring-inset ${BAND_FOCUS_INNER[tones[i]]} group-focus-visible/band:opacity-100`}
                 />
                 <span className="flex items-center gap-2 px-4 py-5 sm:px-6 md:order-2 md:px-5 md:py-4">
                   <span className="font-display text-3xl [text-wrap:balance] sm:text-4xl md:text-3xl">
