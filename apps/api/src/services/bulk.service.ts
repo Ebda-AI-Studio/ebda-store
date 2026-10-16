@@ -12,6 +12,7 @@ import { recordSlugRedirect } from './slug-redirect.service';
 import { stampHumanEdits } from './ai-autofill.service';
 import { assertWithinLimit } from './plan-limit.service';
 import { PRODUCT_SEARCH_MAX_LIMIT, searchProductIds } from './product-search.service';
+import { requestStoreReindex } from '../lib/search/reindex';
 import {
   bundleFkViolationKind,
   planBundlePinnedVariantSkips,
@@ -1319,6 +1320,10 @@ export class BulkService {
         });
       }
     }
+
+    // Imported rows changed product text: ask the search indexer to look at this store once
+    // (Task 11). Each batch above already committed; inside a request this waits for its COMMIT.
+    if (result.created + result.updated > 0) await requestStoreReindex(storeId, 'bulk-import');
 
     return result;
   }

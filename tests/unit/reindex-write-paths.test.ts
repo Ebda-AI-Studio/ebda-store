@@ -1,0 +1,192 @@
+/**
+ * Search program Task 11: every product-TEXT writer keeps the embedding index current.
+ *
+ * Scans every `*.product.(create|createMany|update|updateMany|upsert)(...)` call in apps/api/src and
+ * reads the TOP-LEVEL keys of its `data` object. A call is
+ *   - text     — `data` names a column of the embed doc (name, nameAr, searchTerms, description,
+ *                descriptionAr);
+ *   - dynamic  — `data` is an identifier, or has a spread / computed key at top level (may be text);
+ *   - none     — anything else (stock, price, flags, positions...).
+ * Every file with a text or dynamic call is listed in REVIEWED with the exact count and how it
+ * keeps the index current. A new text/dynamic call anywhere fails here until someone decides:
+ * add `requestStoreReindex(...)` after the write commits, or record why it is not text.
+ * Raw SQL that writes `products` is refused outright (none exists today).
+ */
+import { readFileSync, readdirSync, statSync } from 'node:fs';
+import { join, relative } from 'node:path';
+import { describe, it, expect } from 'vitest';
+
+const ROOT = join(__dirname, '..', '..');
+const SRC = join(ROOT, 'apps/api/src');
+const DOC_FIELDS = new Set(['name', 'nameAr', 'searchTerms', 'description', 'descriptionAr']);
+
+type Via =
+  | { via: 'requestStoreReindex' }
+  | { via: 'product.upserted' }
+  | { via: 'not-text'; why: string };
+
+const REVIEWED: Record<string, { sites: number } & Via & { note?: string }> = {
+  // create (:758) + update (:967) emit product.upserted (consumed by search-product-index);
+  // bulkUpdate's `scalarData` is status/featured/isNew/isBestSeller only.
+  'apps/api/src/services/product.service.ts': { sites: 3, via: 'product.upserted' },
+  // writeAiFieldsGuarded (fill + balance) and revertProductBalance.
+  'apps/api/src/services/ai-autofill.service.ts': { sites: 2, via: 'requestStoreReindex' },
+  // AI hand-back clears one field by computed key before regenerating it.
+  'apps/api/src/routes/ai.routes.ts': { sites: 1, via: 'requestStoreReindex' },
+  // CSV/XLSX import create + update (`...productFields`).
+  'apps/api/src/services/bulk.service.ts': { sites: 2, via: 'requestStoreReindex' },
+  // Catalogue translation sweep (`data: updates` = name/nameAr/description/descriptionAr).
+  'apps/api/src/lib/inngest/functions/bulk-ai-translate.ts': {
+    sites: 1,
+    via: 'requestStoreReindex',
+  },
+};
+
+function listTs(dir: string, out: string[] = []): string[] {
+  for (const f of readdirSync(dir)) {
+    const p = join(dir, f);
+    if (statSync(p).isDirectory()) {
+      if (f !== '__tests__' && f !== 'node_modules') listTs(p, out);
+    } else if (p.endsWith('.ts') && !p.endsWith('.test.ts')) out.push(p);
+  }
+  return out;
+}
+
+/** Index of the bracket closing the one at `open` (skips strings and template literals). */
+function closeOf(s: string, open: number): number {
+  const pairs: Record<string, string> = { '(': ')', '{': '}', '[': ']' };
+  const stack: string[] = [];
+  for (let i = open; i < s.length; i++) {
+    const c = s[i];
+    if (c === '"' || c === "'" || c === '`') {
+      for (i++; i < s.length && s[i] !== c; i++) if (s[i] === '\\') i++;
+      continue;
+    }
+    if (pairs[c]) stack.push(pairs[c]);
+    else if (c === ')' || c === '}' || c === ']') {
+      stack.pop();
+      if (stack.length === 0) return i;
+    }
+  }
+  return -1;
+}
+
+/** Top-level comma-separated members of an object literal body. */
+function topLevelMembers(body: string): string[] {
+  const out: string[] = [];
+  let depth = 0;
+  let start = 0;
+  for (let i = 0; i < body.length; i++) {
+    const c = body[i];
+    if (c === '"' || c === "'" || c === '`') {
+      for (i++; i < body.length && body[i] !== c; i++) if (body[i] === '\\') i++;
+      continue;
+    }
+    if (c === '(' || c === '{' || c === '[') depth++;
+    else if (c === ')' || c === '}' || c === ']') depth--;
+    else if (c === ',' && depth === 0) {
+      out.push(body.slice(start, i));
+      start = i + 1;
+    }
+  }
+  out.push(body.slice(start));
+  return out.map(m => m.replace(/\/\/[^\n]*|\/\*[\s\S]*?\*\//g, '').trim()).filter(Boolean);
+}
+
+export function classifyCall(args: string): 'text' | 'dynamic' | 'none' {
+  const outer = topLevelMembers(
+    args
+      .slice(1, -1)
+      .trim()
+      .replace(/^\{|\}$/g, '')
+  );
+  const dataMember = outer.find(m => /^data\s*:/.test(m));
+  if (!dataMember) return /^\s*\{/.test(args.slice(1)) ? 'none' : 'dynamic';
+  const value = dataMember.replace(/^data\s*:\s*/, '');
+  // `data: [...]` (createMany) → classify each element.
+  const objects = value.startsWith('[') ? topLevelMembers(value.slice(1, -1)) : [value];
+  let kind: 'text' | 'dynamic' | 'none' = 'none';
+  for (const obj of objects) {
+    if (!obj.startsWith('{')) return 'dynamic';
+    for (const m of topLevelMembers(obj.slice(1, -1))) {
+      if (m.startsWith('...') || m.startsWith('[')) kind = 'dynamic';
+      const key = /^([A-Za-z_$][\w$]*)\s*(:|$)/.exec(m)?.[1];
+      if (key && DOC_FIELDS.has(key)) return 'text';
+    }
+  }
+  return kind;
+}
+
+function scan(): Map<string, Array<{ line: number; kind: 'text' | 'dynamic' }>> {
+  const CALL = /\.product\.(create|createMany|update|updateMany|upsert)\(/g;
+  const hits = new Map<string, Array<{ line: number; kind: 'text' | 'dynamic' }>>();
+  for (const file of listTs(SRC)) {
+    const s = readFileSync(file, 'utf8');
+    for (const m of s.matchAll(CALL)) {
+      const open = (m.index ?? 0) + m[0].length - 1;
+      const close = closeOf(s, open);
+      const kind = classifyCall(s.slice(open, close + 1));
+      if (kind === 'none') continue;
+      const rel = relative(ROOT, file);
+      const line = s.slice(0, m.index).split('\n').length;
+      hits.set(rel, [...(hits.get(rel) ?? []), { line, kind }]);
+    }
+  }
+  return hits;
+}
+
+describe('product text writers keep the search index current (Task 11)', () => {
+  const hits = scan();
+
+  it('the classifier reads top-level data keys, not selects or nested objects', () => {
+    expect(
+      classifyCall('({ where: { id }, data: { inventory: 1 }, select: { name: true } })')
+    ).toBe('none');
+    expect(classifyCall('({ where: { id }, data: { excerpt: x, src: { ...s } } })')).toBe('none');
+    expect(classifyCall('({ where: { id }, data: { nameAr: x } })')).toBe('text');
+    expect(classifyCall('({ where: { id }, data: { [field]: null } })')).toBe('dynamic');
+    expect(classifyCall('({ where: { id }, data: { ...fields, a: 1 } })')).toBe('dynamic');
+    expect(classifyCall('({ where: { id }, data: updates })')).toBe('dynamic');
+    expect(classifyCall('(args)')).toBe('dynamic');
+  });
+
+  it('every text/dynamic product writer is reviewed (a new one fails until decided)', () => {
+    const found = Object.fromEntries([...hits.entries()].map(([f, sites]) => [f, sites.length]));
+    const expected = Object.fromEntries(Object.entries(REVIEWED).map(([f, r]) => [f, r.sites]));
+    expect(found).toEqual(expected);
+  });
+
+  it.each(Object.entries(REVIEWED).filter(([, r]) => r.via === 'requestStoreReindex'))(
+    '%s requests a reindex',
+    f => {
+      expect(readFileSync(join(ROOT, f), 'utf8')).toMatch(/requestStoreReindex\(/);
+    }
+  );
+
+  it.each(Object.entries(REVIEWED).filter(([, r]) => r.via === 'product.upserted'))(
+    '%s emits product.upserted (the indexer consumes it)',
+    f => {
+      expect(readFileSync(join(ROOT, f), 'utf8')).toMatch(/name: 'product\.upserted'/);
+    }
+  );
+
+  it('the indexer consumes product.upserted and the reindex event', () => {
+    const fn = readFileSync(join(SRC, 'lib/inngest/functions/search-product-index.ts'), 'utf8');
+    expect(fn).toMatch(/event: 'product\.upserted'/);
+    expect(fn).toMatch(/event: REINDEX_EVENT/);
+  });
+
+  it('no raw SQL inserts products or SETs an embed-doc column (it would bypass every check above)', () => {
+    const bad: string[] = [];
+    for (const f of listTs(SRC)) {
+      const s = readFileSync(f, 'utf8');
+      if (/INSERT\s+INTO\s+"?products"?\s*\(/.test(s)) bad.push(`${relative(ROOT, f)}: INSERT`);
+      // Today: warehouse.service (inventory) and product.service (ai_field_sources) only.
+      for (const m of s.matchAll(/UPDATE\s+"?products"?\s+SET([\s\S]*?)(WHERE|RETURNING|`)/g)) {
+        if (/\b"?(name|name_ar|search_terms|description|description_ar)"?\s*=/.test(m[1]))
+          bad.push(`${relative(ROOT, f)}: UPDATE ... SET ${m[1].trim().slice(0, 40)}`);
+      }
+    }
+    expect(bad).toEqual([]);
+  });
+});
