@@ -11,6 +11,7 @@ import { useToast, Skeleton, SkeletonProductCard } from '@ebda/ui';
 import { PecannbeeProductCard } from '../templates/shared/PecannbeeProductCard';
 import { gridGapClass } from '../templates/shared/card-size';
 import { SectionRetryNotice } from './SectionRetryNotice';
+import { countText, ITEMS_ADDED, ITEMS_NEED_OPTIONS } from '../lib/plural';
 
 /** Loading placeholder matching the grid this section renders once data
  *  resolves — avoids the pop-in layout shift the previous `return null`
@@ -125,7 +126,7 @@ export function FrequentlyBoughtTogether({ storeId, productId }: FrequentlyBough
     if (simple.length > 0) {
       toastSuccess(
         t('Added to cart', 'تمت الإضافة إلى السلة'),
-        `${simple.length} ${t('items added to your cart', 'منتجات أضيفت إلى سلتك')}`
+        t(countText('en', simple.length, ITEMS_ADDED), countText('ar', simple.length, ITEMS_ADDED))
       );
     }
 
@@ -135,8 +136,8 @@ export function FrequentlyBoughtTogether({ storeId, productId }: FrequentlyBough
         .join(isRtl ? '، ' : ', ');
       toastInfo(
         t(
-          `${needVariant.length} item${needVariant.length > 1 ? 's' : ''} need${needVariant.length > 1 ? '' : 's'} a variant`,
-          `${needVariant.length} ${needVariant.length > 1 ? 'منتجات تحتاج' : 'منتج يحتاج'} إلى اختيار نوع`
+          countText('en', needVariant.length, ITEMS_NEED_OPTIONS),
+          countText('ar', needVariant.length, ITEMS_NEED_OPTIONS)
         ),
         t(
           `${names} — open each to pick a variant before adding.`,

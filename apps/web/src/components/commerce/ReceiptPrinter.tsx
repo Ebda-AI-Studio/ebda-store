@@ -31,6 +31,7 @@ import { pickLocalizedName } from '@/templates/shared/display-helpers';
 import { CartLineNote } from './CartLineNote';
 import { Barcode } from './Barcode';
 import styles from './ReceiptPrinter.module.css';
+import { countText, ITEMS } from '@/lib/plural';
 
 /** The success page's verified payment outcome (SuccessClient owns it). */
 export type PaymentState =
@@ -189,8 +190,8 @@ export function ReceiptPrinter({
               <p className="mt-0.5 truncate text-xs opacity-60">
                 {order
                   ? t(
-                      `${itemCount} ${itemCount === 1 ? 'item' : 'items'}`,
-                      arabicPieces(itemCount, localize)
+                      countText('en', itemCount, ITEMS),
+                      countText('ar', itemCount, ITEMS, localize(itemCount))
                     )
                   : storeName}
               </p>
@@ -453,13 +454,6 @@ function paymentLabel(order: Order, state: PaymentState, lang: 'ar' | 'en'): str
       : paymentProviderLabel(p.provider, lang);
   }
   return state === 'cod' ? paymentProviderLabel('cod', lang) : null;
-}
-
-/** "قطعة واحدة" / "قطعتين" / "٣ قطع" / "١١ قطعة". */
-function arabicPieces(n: number, localize: (v: number) => string): string {
-  if (n === 1) return 'قطعة واحدة';
-  if (n === 2) return 'قطعتين';
-  return `${localize(n)} ${n <= 10 ? 'قطع' : 'قطعة'}`;
 }
 
 function statusCopy(kind: StatusKind, t: (en: string, ar: string) => string): string {

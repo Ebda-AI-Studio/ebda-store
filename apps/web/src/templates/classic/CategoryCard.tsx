@@ -7,7 +7,7 @@ import { useLanguage } from '../../contexts/LanguageContext';
 import { useStore } from '../../contexts/StoreContext';
 import { categorySizeClass, cardShapeClasses } from '../shared/card-size';
 import { responsiveFontSize } from '../shared/section-typography';
-import { getCategoryCountUnit } from '../../lib/category-count-unit';
+import { categoryCountText } from '../../lib/category-count-unit';
 
 export default function ClassicCategoryCard({
   category,
@@ -22,7 +22,6 @@ export default function ClassicCategoryCard({
   const isRtl = isRtlProp ?? ctxIsRtl;
   const { store } = useStore();
   const displayName = isRtl && category.nameAr ? category.nameAr : category.name;
-  const countUnit = getCategoryCountUnit(store.theme, isRtl);
   const isOverlay = captionPosition === 'overlay';
   // Named shape overrides classic's default aspect-square sm:aspect-[3/4]
   // + rounded-sm (added 2026-05-16). Falls back to classic defaults.
@@ -107,7 +106,7 @@ export default function ClassicCategoryCard({
           {/* Product count */}
           {category.productCount !== undefined && (
             <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
-              {category.productCount} {countUnit}
+              {categoryCountText(store.theme, isRtl, category.productCount)}
             </p>
           )}
 

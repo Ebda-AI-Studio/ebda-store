@@ -6,6 +6,7 @@ import { useStore } from '@/contexts/StoreContext';
 import { useStoreNumerals, useNumerals } from '@/hooks/useNumerals';
 import { formatDate } from '@/lib/format-date';
 import { fetchPublicShippingZones } from '@/lib/shipping-public';
+import { countText, DAYS } from '@/lib/plural';
 
 type Zones = Awaited<ReturnType<typeof fetchPublicShippingZones>>;
 
@@ -20,12 +21,10 @@ function zonesFor(storeId: string): Promise<Zones> {
   return p;
 }
 
-/** "in N days" tail of the made-to-order line, with Arabic noun agreement: يوم / يومين / N أيام / N يوم. */
+/** "in N days" tail of the made-to-order line, through the one plural helper (Y-01). */
 function leadTimeText(n: number, lang: 'ar' | 'en', localize: (v: number) => string): string {
-  if (lang === 'en') return `Made for you in ${n} ${n === 1 ? 'day' : 'days'}`;
-  const days =
-    n === 1 ? 'يوم' : n === 2 ? 'يومين' : n <= 10 ? `${localize(n)} أيام` : `${localize(n)} يوم`;
-  return `بيتجهز خصيصًا لك في ${days}`;
+  if (lang === 'en') return `Made for you in ${countText('en', n, DAYS)}`;
+  return `بيتجهز خصيصًا لك في ${countText('ar', n, DAYS, localize(n))}`;
 }
 
 /**

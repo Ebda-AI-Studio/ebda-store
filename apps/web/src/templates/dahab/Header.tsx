@@ -20,6 +20,7 @@ import { StoreLogo } from '../shared/StoreLogo';
 import { DahabDrawer } from './Drawer';
 import { DahabCartDrawer } from './CartDrawer';
 import { BagIcon, DAHAB_CONTAINER, MenuIcon, SearchIcon, UserIcon, ChevronIcon, cx } from './ui';
+import { countText, ITEMS } from '../../lib/plural';
 
 const ICON_BTN =
   'relative flex h-11 w-11 items-center justify-center text-foreground/85 transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm';
@@ -158,7 +159,10 @@ export default function DahabHeader({
             onClick={() => setBagOpen(true)}
             aria-label={
               cartItemCount > 0
-                ? t(`Bag, ${cartItemCount} items`, `السلة، ${localize(cartItemCount)} قطع`)
+                ? t(
+                    `Bag, ${countText('en', cartItemCount, ITEMS)}`,
+                    `السلة، ${countText('ar', cartItemCount, ITEMS, localize(cartItemCount))}`
+                  )
                 : t('Bag', 'السلة')
             }
           >

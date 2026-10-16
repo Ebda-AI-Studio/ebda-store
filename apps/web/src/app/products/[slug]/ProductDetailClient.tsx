@@ -59,6 +59,7 @@ import {
   personalisationMissing,
 } from '../../../components/commerce/PersonalisationField';
 import { activePersonalisation, cleanNote } from '@ebda/shared';
+import { countText, ITEMS } from '../../../lib/plural';
 // Lazy-load heavy below-the-fold components to reduce initial bundle size
 const ReviewSection = dynamic(() => import('../../../components/ReviewSection'), { ssr: false });
 const FrequentlyBoughtTogether = dynamic(() =>
@@ -636,7 +637,10 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
   // skins, so the bar carries its own cart link (W1a fix round, minor 3).
   const cartLinkLabel =
     cartCount > 0
-      ? t(`Cart, ${cartCount} items`, `السلة، ${localize(cartCount)} قطع`)
+      ? t(
+          `Cart, ${countText('en', cartCount, ITEMS)}`,
+          `السلة، ${countText('ar', cartCount, ITEMS, localize(cartCount))}`
+        )
       : t('Cart', 'السلة');
   const priceText =
     pricing.mode === 'range' && minVariantPrice !== null && maxVariantPrice !== null

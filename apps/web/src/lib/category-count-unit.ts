@@ -1,36 +1,36 @@
 /**
- * Category product-count unit label helper.
+ * Category product-count line helper.
  *
- * Returns the merchant-configured unit word for the product count shown on
- * category cards (e.g. "4 pieces" / "4 قطعة"). Falls back to the canonical
- * defaults so stores that haven't configured a value continue to look exactly
- * as before.
- *
- * Default: EN "pieces" / AR "قطعة" — canonical across all templates (bold
+ * The count shown on category cards ("4 pieces" / "٤ قطع"). A store that never
+ * set a unit word gets the one plural helper (Y-01, `lib/plural.ts`), which
+ * declines the noun for every Arabic category ("قطعة واحدة / قطعتين / ٣ قطع /
+ * ١١ قطعة"). The default noun is "pieces" / "قطعة" across all templates (bold
  * previously used "items"/"منتج" but is unified here to keep the store-wide
  * setting coherent).
  */
 
 import type { StoreTheme } from '@ebda/shared';
-
-const DEFAULT_UNIT_EN = 'pieces';
-const DEFAULT_UNIT_AR = 'قطعة';
+import { countText, PIECES } from './plural';
 
 /**
- * Return the configured (or default) category count unit word for the given
- * language direction.
+ * The category card's count line. A merchant-configured unit
+ * (`theme.categoryCountUnit`) is the merchant's own single word: it cannot be
+ * declined, so it is printed after the number as typed (the one sanctioned
+ * number + word join, allowlisted in tests/unit/plural-counted-nouns.test.ts).
  *
- * @param theme   The store's `StoreTheme` (from `useStore().store.theme`).
- *                Pass `null` or `undefined` to get the plain default.
- * @param isRtl   Whether the current locale is RTL (Arabic).
+ * @param theme  The store's `StoreTheme` (or null for the plain default).
+ * @param isRtl  Whether the current locale is RTL (Arabic).
+ * @param count  The product count (picks the plural form).
+ * @param shown  The count as displayed (the render's digits); defaults to `count`.
  */
-export function getCategoryCountUnit(
+export function categoryCountText(
   theme: Pick<StoreTheme, 'categoryCountUnit'> | null | undefined,
-  isRtl: boolean
+  isRtl: boolean,
+  count: number,
+  shown: string = String(count)
 ): string {
   const unit = theme?.categoryCountUnit;
-  if (isRtl) {
-    return unit?.ar?.trim() || DEFAULT_UNIT_AR;
-  }
-  return unit?.en?.trim() || DEFAULT_UNIT_EN;
+  const custom = (isRtl ? unit?.ar : unit?.en)?.trim();
+  if (custom) return `${shown} ${custom}`;
+  return countText(isRtl ? 'ar' : 'en', count, PIECES, shown);
 }

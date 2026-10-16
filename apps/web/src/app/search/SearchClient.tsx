@@ -13,6 +13,7 @@ import { useTemplateComponents } from '../../hooks/useTemplateComponents';
 import { toTemplateProduct } from '../../templates/adapters';
 import { trackSearch } from '../../components/MarketingPixels';
 import { SearchAutocomplete } from '../../components/SearchAutocomplete';
+import { countText, RESULTS } from '../../lib/plural';
 
 const sortValues = ['newest', 'price-asc', 'price-desc', 'name-asc'] as const;
 
@@ -416,8 +417,11 @@ function SearchContent() {
         {!isLoading && !error && products.length > 0 && (
           <>
             <p className="text-muted-foreground mb-6 text-sm">
-              {products.length} {t('result', '\u0646\u062a\u064a\u062c\u0629')}
-              {products.length !== 1 ? t('s', '') : ''} {t('for', '\u0644\u0640')} &quot;
+              {t(
+                countText('en', products.length, RESULTS),
+                countText('ar', products.length, RESULTS)
+              )}{' '}
+              {t('for', '\u0644\u0640')} &quot;
               {displayQuery}&quot;
               {categoryFilter && (
                 <>

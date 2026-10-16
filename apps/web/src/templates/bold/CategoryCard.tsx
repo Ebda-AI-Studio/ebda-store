@@ -7,7 +7,7 @@ import { useLanguage } from '../../contexts/LanguageContext';
 import { useStore } from '../../contexts/StoreContext';
 import { categorySizeClass, cardShapeClasses } from '../shared/card-size';
 import { responsiveFontSize } from '../shared/section-typography';
-import { getCategoryCountUnit } from '../../lib/category-count-unit';
+import { categoryCountText } from '../../lib/category-count-unit';
 
 export default function BoldCategoryCard({
   category,
@@ -22,7 +22,6 @@ export default function BoldCategoryCard({
   const isRtl = isRtlProp ?? ctxIsRtl;
   const { store } = useStore();
   const displayName = isRtl && category.nameAr ? category.nameAr : category.name;
-  const countUnit = getCategoryCountUnit(store.theme, isRtl);
   const isOverlay = captionPosition === 'overlay';
   // Named shape overrides bold's brutalist default aspect-square sm:aspect-[3/4]
   // + rounded-3xl. Falls back to bold defaults.
@@ -82,7 +81,7 @@ export default function BoldCategoryCard({
               </h3>
               {category.productCount !== undefined && (
                 <p className="text-white/75 font-bold uppercase tracking-[0.05em] text-sm">
-                  {category.productCount} {countUnit}
+                  {categoryCountText(store.theme, isRtl, category.productCount)}
                 </p>
               )}
             </div>

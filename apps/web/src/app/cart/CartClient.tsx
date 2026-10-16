@@ -33,6 +33,7 @@ import { resolveColor, checkMinimumOrder, computeOrderAmounts, REGION } from '@e
 import { AcceptedPaymentBadges } from '../../components/AcceptedPaymentBadges';
 import { CartLineNote } from '../../components/commerce/CartLineNote';
 import { StickyCartTotal } from '../../components/commerce/StickyCartTotal';
+import { countText, ITEMS } from '../../lib/plural';
 import { Breadcrumbs } from '../../components/Breadcrumbs';
 
 export default function CartClient() {
@@ -111,6 +112,7 @@ export default function CartClient() {
     cta: cartZoneStyle(cartCtaZone),
   };
   const { language, t } = useLanguage();
+  const lang = language === 'ar' ? 'ar' : 'en';
   const { localize, money } = useNumerals();
   const formatPrice = useLocalePrice();
   const continuShoppingHref = useLastListing();
@@ -449,7 +451,7 @@ export default function CartClient() {
           </h1>
           {(cartItems.length > 0 || cartBundles.length > 0) && (
             <p className="mt-2 text-muted-foreground" style={cartZoneStyle(cartLabelZone)}>
-              {cartCount} {t('items', '\u0645\u0646\u062a\u062c\u0627\u062a')}{' '}
+              {countText(lang, cartCount, ITEMS, localize(cartCount))}{' '}
               {t('in your cart', '\u0641\u064a \u0633\u0644\u062a\u0643')}
             </p>
           )}
@@ -1005,7 +1007,7 @@ export default function CartClient() {
                                   'Subtotal',
                                   '\u0627\u0644\u0645\u062c\u0645\u0648\u0639 \u0627\u0644\u0641\u0631\u0639\u064a'
                                 )}{' '}
-                                ({cartCount} {t('items', '\u0645\u0646\u062a\u062c\u0627\u062a')})
+                                ({countText(lang, cartCount, ITEMS, localize(cartCount))})
                               </span>
                               <span
                                 className="font-bold text-foreground"
@@ -1248,10 +1250,7 @@ export default function CartClient() {
           formatPrice
         )(total)}
         itemCount={cartCount}
-        itemCountLabel={t(
-          `${localize(cartCount)} ${cartCount === 1 ? 'item' : 'items'}`,
-          `${localize(cartCount)} منتج`
-        )}
+        itemCountLabel={countText(lang, cartCount, ITEMS, localize(cartCount))}
         href={storeUrl('/checkout')}
         label={t('Checkout', 'إتمام الطلب')}
         disabled={checkoutBlocked}

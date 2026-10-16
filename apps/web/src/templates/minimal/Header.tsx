@@ -8,6 +8,7 @@ import type { HeaderProps } from '../types';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { LanguageSwitcher } from '../../components/LanguageSwitcher';
 import { SearchAutocomplete } from '../../components/SearchAutocomplete';
+import { countText, ITEMS } from '../../lib/plural';
 
 export default function MinimalHeader({
   branding,
@@ -159,7 +160,10 @@ export default function MinimalHeader({
             <Link
               href={`${urlPrefix}/cart`}
               className="relative hidden md:inline-flex h-11 w-11 items-center justify-center text-muted-foreground hover:text-foreground transition-colors duration-200 outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
-              aria-label={t(`Cart (${cartItemCount} items)`, `سلة التسوق (${cartItemCount})`)}
+              aria-label={t(
+                `Cart (${countText('en', cartItemCount, ITEMS)})`,
+                `سلة التسوق (${cartItemCount})`
+              )}
             >
               <CartIcon className="w-4 h-4" strokeWidth={1} aria-hidden="true" />
               {cartItemCount > 0 && (

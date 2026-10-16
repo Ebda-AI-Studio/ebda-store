@@ -8,6 +8,7 @@ import type { HeaderProps, ResolvedUtilityBar } from '../types';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { LanguageSwitcher } from '../../components/LanguageSwitcher';
 import { SearchAutocomplete } from '../../components/SearchAutocomplete';
+import { countText, ITEMS } from '../../lib/plural';
 
 export default function ClassicHeader({
   branding,
@@ -214,7 +215,10 @@ export default function ClassicHeader({
               <Link
                 href={`${urlPrefix}/cart`}
                 className="relative text-foreground/70 hover:text-foreground transition-colors duration-500 cursor-pointer"
-                aria-label={t(`Cart (${cartItemCount} items)`, `سلة التسوق (${cartItemCount})`)}
+                aria-label={t(
+                  `Cart (${countText('en', cartItemCount, ITEMS)})`,
+                  `سلة التسوق (${cartItemCount})`
+                )}
               >
                 <CartIcon className="w-5 h-5" strokeWidth={1.5} aria-hidden="true" />
                 {cartItemCount > 0 && (

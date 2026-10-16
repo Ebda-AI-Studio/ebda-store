@@ -7,7 +7,7 @@ import { useLanguage } from '../../contexts/LanguageContext';
 import { useStore } from '../../contexts/StoreContext';
 import { categorySizeClass, cardShapeClasses } from '../shared/card-size';
 import { responsiveFontSize } from '../shared/section-typography';
-import { getCategoryCountUnit } from '../../lib/category-count-unit';
+import { categoryCountText } from '../../lib/category-count-unit';
 
 export default function ElegantCategoryCard({
   category,
@@ -22,7 +22,6 @@ export default function ElegantCategoryCard({
   const isRtl = isRtlProp ?? ctxIsRtl;
   const { store } = useStore();
   const displayName = isRtl && category.nameAr ? category.nameAr : category.name;
-  const countUnit = getCategoryCountUnit(store.theme, isRtl);
   const isOverlay = captionPosition === 'overlay';
   // Named shape overrides elegant's default aspect-square sm:aspect-[2/3]
   // + rounded-md (added 2026-05-16). Falls back to elegant defaults.
@@ -114,7 +113,7 @@ export default function ElegantCategoryCard({
           </h3>
           {category.productCount !== undefined && (
             <p className="text-xs text-muted-foreground/80 mt-2 tracking-[0.22em] uppercase">
-              {category.productCount} {countUnit}
+              {categoryCountText(store.theme, isRtl, category.productCount)}
             </p>
           )}
         </div>

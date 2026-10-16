@@ -4,6 +4,7 @@
  * `0` means returns are not accepted, and null/undefined means the merchant
  * declared nothing (so no number is printed).
  */
+import { countText, DAYS } from './plural';
 export type PolicyLang = 'ar' | 'en';
 
 export type ReturnPolicyKind = 'window' | 'none' | 'undeclared';
@@ -13,13 +14,9 @@ export function returnPolicyKind(days: number | null | undefined): ReturnPolicyK
   return days <= 0 ? 'none' : 'window';
 }
 
-/** "30 days" / "٣٠ يوماً"-style phrase with Arabic number agreement (Western digits). */
+/** "30 days" / "٣٠ يومًا"-style phrase through the one plural helper (Western digits). */
 export function daysPhrase(n: number, lang: PolicyLang): string {
-  if (lang === 'en') return `${n} ${n === 1 ? 'day' : 'days'}`;
-  if (n === 1) return 'يوم واحد';
-  if (n === 2) return 'يومين';
-  if (n >= 3 && n <= 10) return `${n} أيام`;
-  return `${n} يوماً`;
+  return countText(lang, n, DAYS);
 }
 
 export interface ReturnPolicyCopy {

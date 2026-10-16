@@ -9,6 +9,7 @@ import { useLanguage } from '../../contexts/LanguageContext';
 import { Sheet } from '../../components/ui/Sheet';
 import { LanguageSwitcher } from '../../components/LanguageSwitcher';
 import { SearchAutocomplete } from '../../components/SearchAutocomplete';
+import { countText, ITEMS } from '../../lib/plural';
 
 export default function ModernHeader({
   branding,
@@ -206,7 +207,10 @@ export default function ModernHeader({
               <Link
                 href={`${urlPrefix}/cart`}
                 className="relative hidden md:inline-flex h-11 w-11 items-center justify-center rounded-lg hover:bg-muted transition-colors duration-300 ease-out"
-                aria-label={t(`Cart (${cartItemCount} items)`, `سلة التسوق (${cartItemCount})`)}
+                aria-label={t(
+                  `Cart (${countText('en', cartItemCount, ITEMS)})`,
+                  `سلة التسوق (${cartItemCount})`
+                )}
               >
                 <CartIcon className="w-5 h-5" aria-hidden="true" />
                 {cartItemCount > 0 && (
