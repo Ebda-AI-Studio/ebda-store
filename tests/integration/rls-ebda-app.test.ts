@@ -1023,7 +1023,9 @@ describe('SECURITY DEFINER functions: they return only what they should', () => 
       })
     );
     await owner.$executeRawUnsafe(
-      `UPDATE webhook_events SET received_at = now() - interval '2 hours' WHERE id = '${id4}'`
+      // received_at is `timestamp without time zone` holding UTC (Prisma writes UTC); a bare
+      // now() is the SESSION time zone, so on a non-UTC Postgres the row looked 1h in the future.
+      `UPDATE webhook_events SET received_at = (now() AT TIME ZONE 'UTC') - interval '2 hours' WHERE id = '${id4}'`
     );
     const stuck = await asApp(() => webhookInbox.stuck(new Date(Date.now() - 3600_000), 50));
     expect(stuck.some(r => r.id === id4 && r.storeId === null)).toBe(true);

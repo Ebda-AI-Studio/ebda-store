@@ -358,6 +358,22 @@ export const DEFAULT_TEST_SHIPPING_ADDRESS = {
   email: 'bundle-buyer@example.com',
 };
 
+let shippingIdentitySeq = 0;
+/**
+ * DEFAULT_TEST_SHIPPING_ADDRESS with a phone + email unique to this CALL. The open-hold cap
+ * (lib/stock-hold-cap.ts, #65/#75: 5 unpaid gateway orders per phone or email per store) counts
+ * every order a file places with the shared fixture identity, so the 6th order in a file was a
+ * 429 that had nothing to do with the test. Tests that exercise the cap keep the shared one.
+ */
+export function testShippingAddress(): typeof DEFAULT_TEST_SHIPPING_ADDRESS {
+  const n = ++shippingIdentitySeq;
+  return {
+    ...DEFAULT_TEST_SHIPPING_ADDRESS,
+    phone: `9655${String(process.pid % 1000).padStart(3, '0')}${String(n).padStart(4, '0')}`,
+    email: `bundle-buyer-${process.pid}-${n}-${Date.now().toString(36)}@example.com`,
+  };
+}
+
 /** Adds `productId` (at `quantity`) as an ordinary loose line to `sessionId`'s cart — a thin wrapper over `CartService.addItem` so tests exercising a MIX of loose items and bundles don't need their own import of `CartService`. */
 export async function addItemToCart(
   storeId: string,
@@ -414,7 +430,7 @@ export async function checkoutBundleFor(
     await addItemToCart(storeId, sessionId, extra.productId, extra.quantity ?? 1);
   }
   return OrderService.create(storeId, opts.customerId, sessionId, {
-    shippingAddress: DEFAULT_TEST_SHIPPING_ADDRESS,
+    shippingAddress: testShippingAddress(),
     paymentMethod: opts.paymentMethod ?? 'paymob',
   });
 }

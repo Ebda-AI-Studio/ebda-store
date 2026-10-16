@@ -346,7 +346,7 @@ describe('optimistic concurrency under real parallel transactions', { retry: 0 }
     );
   });
 
-  it('a legacy layout PUT publishes a revision; a draft based on the old head then gets 409', async () => {
+  it('a legacy layout PUT publishes a revision and rebases the pending draft above it; a stale-base save gets 409', async () => {
     const storeId = await freshStore('legacy');
     await inStore(storeId, () =>
       saveDraft({ storeId, pageKey: HOME, baseRev: 0, definition: docFor({}), userId: null })
@@ -367,14 +367,19 @@ describe('optimistic concurrency under real parallel transactions', { retry: 0 }
       orderBy: { rev: 'asc' },
     });
     expect(rows.map(r => [r.rev, r.status])).toEqual([
-      [1, 'draft'],
       [2, 'published'],
+      [3, 'draft'],
     ]);
     expect(
       await inStore(storeId, () =>
         saveDraft({ storeId, pageKey: HOME, baseRev: 1, definition: docFor({}), userId: null })
       )
     ).toMatchObject({ ok: false, status: 409 });
+    expect(
+      await inStore(storeId, () =>
+        saveDraft({ storeId, pageKey: HOME, baseRev: 3, definition: docFor({}), userId: null })
+      )
+    ).toMatchObject({ ok: true });
   });
 });
 
