@@ -438,7 +438,7 @@ export default function CartClient() {
               { label: t('Home', translations['Home']), href: storeUrl('/') },
               {
                 label: t(
-                  'Shopping Cart',
+                  'Shopping cart',
                   '\u0633\u0644\u0629 \u0627\u0644\u062a\u0633\u0648\u0642'
                 ),
               },
@@ -449,7 +449,7 @@ export default function CartClient() {
             className="text-3xl font-bold tracking-tight text-foreground"
             style={cartZoneStyle(cartHeadingZone)}
           >
-            {t('Shopping Cart', '\u0633\u0644\u0629 \u0627\u0644\u062a\u0633\u0648\u0642')}
+            {t('Shopping cart', '\u0633\u0644\u0629 \u0627\u0644\u062a\u0633\u0648\u0642')}
           </h1>
           {(cartItems.length > 0 || cartBundles.length > 0) && (
             <p className="mt-2 text-muted-foreground" style={cartZoneStyle(cartLabelZone)}>
@@ -506,7 +506,7 @@ export default function CartClient() {
                   <Button className="mt-8 gap-2 rounded-[var(--radius)]" size="lg">
                     <CartIcon className="h-5 w-5" />
                     {t(
-                      'Start Shopping',
+                      'Start shopping',
                       '\u0627\u0628\u062f\u0623 \u0627\u0644\u062a\u0633\u0648\u0642'
                     )}
                   </Button>
@@ -791,7 +791,7 @@ export default function CartClient() {
                         />
                       </svg>
                       {t(
-                        'Continue Shopping',
+                        'Continue shopping',
                         '\u0645\u062a\u0627\u0628\u0639\u0629 \u0627\u0644\u062a\u0633\u0648\u0642'
                       )}
                     </Link>
@@ -842,7 +842,7 @@ export default function CartClient() {
                               htmlFor="cart-promo-code-t"
                               className="text-sm font-medium text-foreground"
                             >
-                              {t('Promo Code', 'كود الخصم')}
+                              {t('Promo code', 'كود الخصم')}
                             </label>
                             <div className="mt-2 flex gap-2">
                               <input
@@ -919,7 +919,7 @@ export default function CartClient() {
                             }}
                           >
                             {t(
-                              'Order Summary',
+                              'Order summary',
                               '\u0645\u0644\u062e\u0635 \u0627\u0644\u0637\u0644\u0628'
                             )}
                           </h2>
@@ -932,7 +932,7 @@ export default function CartClient() {
                                 className="text-sm font-medium text-foreground"
                               >
                                 {t(
-                                  'Promo Code',
+                                  'Promo code',
                                   '\u0643\u0648\u062f \u0627\u0644\u062e\u0635\u0645'
                                 )}
                               </label>

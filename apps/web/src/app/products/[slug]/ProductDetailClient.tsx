@@ -559,7 +559,7 @@ export default function ProductDetailClient({
             )}
           </p>
           <Link href={storeUrl('/products')}>
-            <Button className="mt-6">{t('Browse Products', 'تصفح المنتجات')}</Button>
+            <Button className="mt-6">{t('Browse products', 'تصفح المنتجات')}</Button>
           </Link>
         </div>
       </ShopChrome>
@@ -655,8 +655,8 @@ export default function ProductDetailClient({
   const addLabel = canBackorder
     ? t('Pre-order', 'اطلب مسبقاً')
     : outOfStock
-      ? t('Out of Stock', 'غير متوفر')
-      : t('Add to Cart', translations['Add to Cart']);
+      ? t('Out of stock', 'غير متوفر')
+      : t('Add to cart', translations['Add to Cart']);
   // The task bar replaces the tab bar (C-04), the only phone cart entry on most
   // skins, so the bar carries its own cart link (W1a fix round, minor 3).
   const cartLinkLabel =
@@ -1236,10 +1236,10 @@ export default function ProductDetailClient({
                       {/* From the same stock answer as the button (X-02): a variant
                           product's own inventory is 0, and a pre-order is not "out". */}
                       {!outOfStock
-                        ? t('In Stock', 'متوفر')
+                        ? t('In stock', 'متوفر')
                         : canBackorder
                           ? t('Available to pre-order', 'متاح للطلب المسبق')
-                          : t('Out of Stock', 'غير متوفر')}
+                          : t('Out of stock', 'غير متوفر')}
                     </span>
                   )}
                 </div>

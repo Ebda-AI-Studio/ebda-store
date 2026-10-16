@@ -101,7 +101,7 @@ export default function PaymentStep({
       {(!isDemo || paymentConfigError) && (
         <div className="rounded-[var(--radius)] border bg-card p-6 shadow-sm">
           <h2 className="text-lg font-semibold text-foreground">
-            {t('Payment Method', translations['Payment Method'])}
+            {t('Payment method', translations['Payment Method'])}
           </h2>
           <p className="mt-1 text-sm text-muted-foreground">
             {t('Select your preferred payment method', 'اختر طريقة الدفع المفضلة')}

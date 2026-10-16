@@ -75,7 +75,7 @@ export function CheckoutErrorAlert({
         </svg>
         <div className="flex-1">
           <h3 className="text-sm font-medium text-destructive-ink">
-            {t('Checkout Error', 'خطأ في الدفع')}
+            {t('Checkout error', 'خطأ في الدفع')}
           </h3>
           <p className="mt-1 text-sm text-destructive-ink" dir="auto">
             {message}

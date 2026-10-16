@@ -1867,7 +1867,7 @@ export default function CheckoutClient() {
           </p>
           <Link href={continueShoppingHref}>
             <Button className="mt-6">
-              {t('Continue Shopping', translations['Continue Shopping'])}
+              {t('Continue shopping', translations['Continue Shopping'])}
             </Button>
           </Link>
         </div>
@@ -1995,7 +1995,7 @@ export default function CheckoutClient() {
                       style={zoneStyle(checkoutHeadingZone, checkoutScale)}
                     >
                       {t(
-                        'Shipping Information',
+                        'Shipping information',
                         '\u0645\u0639\u0644\u0648\u0645\u0627\u062a \u0627\u0644\u0634\u062d\u0646'
                       )}
                     </h2>
@@ -2228,7 +2228,7 @@ export default function CheckoutClient() {
                           className="block text-sm font-medium text-foreground mb-1"
                         >
                           {t(
-                            'Order Notes (optional)',
+                            'Order notes (optional)',
                             '\u0645\u0644\u0627\u062d\u0638\u0627\u062a \u0627\u0644\u0637\u0644\u0628 (\u0627\u062e\u062a\u064a\u0627\u0631\u064a)'
                           )}
                         </label>
@@ -2334,7 +2334,7 @@ export default function CheckoutClient() {
                         disabled={shippingUnavailable || belowMinimumOrder || !shippingSettled}
                       >
                         {t(
-                          'Continue to Payment',
+                          'Continue to payment',
                           '\u0627\u0644\u0645\u062a\u0627\u0628\u0639\u0629 \u0644\u0644\u062f\u0641\u0639'
                         )}
                       </Button>
@@ -2473,7 +2473,7 @@ export default function CheckoutClient() {
                   size="lg"
                   disabled={shippingUnavailable || belowMinimumOrder || !shippingSettled}
                 >
-                  {t('Continue to Payment', 'المتابعة للدفع')}
+                  {t('Continue to payment', 'المتابعة للدفع')}
                 </Button>
               </div>
             )}

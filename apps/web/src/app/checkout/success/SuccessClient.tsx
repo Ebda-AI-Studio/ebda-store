@@ -266,7 +266,7 @@ function SuccessContent() {
             >
               <p className="text-sm font-medium text-warning-ink">
                 {t(
-                  'Cash on Delivery — Pay when your order arrives',
+                  'Cash on delivery — pay when your order arrives',
                   '\u0627\u0644\u062f\u0641\u0639 \u0639\u0646\u062f \u0627\u0644\u0627\u0633\u062a\u0644\u0627\u0645 — \u0627\u062f\u0641\u0639 \u0639\u0646\u062f \u0648\u0635\u0648\u0644 \u0637\u0644\u0628\u0643'
                 )}
               </p>
@@ -323,7 +323,7 @@ function SuccessContent() {
               <Link href={continueShoppingHref} className="w-full sm:w-64">
                 <Button size="lg" className="w-full">
                   {t(
-                    'Continue Shopping',
+                    'Continue shopping',
                     '\u0645\u062a\u0627\u0628\u0639\u0629 \u0627\u0644\u062a\u0633\u0648\u0642'
                   )}
                 </Button>
@@ -332,7 +332,7 @@ function SuccessContent() {
             <Link href={storeUrl('/account/orders')} className="w-full sm:w-64">
               <Button size="lg" variant="outline" className="w-full">
                 {t(
-                  'View Order Status',
+                  'View order status',
                   '\u0639\u0631\u0636 \u062d\u0627\u0644\u0629 \u0627\u0644\u0637\u0644\u0628'
                 )}
               </Button>
@@ -346,7 +346,7 @@ function SuccessContent() {
             )}{' '}
             <Link href={storeUrl('/contact')} className="text-primary underline underline-offset-4">
               {t(
-                'Contact Support',
+                'Contact support',
                 '\u062a\u0648\u0627\u0635\u0644 \u0645\u0639 \u0627\u0644\u062f\u0639\u0645'
               )}
             </Link>
