@@ -1,5 +1,6 @@
 import { prisma, Prisma, ProductStatus, SlugEntityType, withMoneyTx } from '@ebda/database';
 import {
+  AI_AUTOFILL_FIELD_NAMES,
   SEARCH_TERMS_MAX_LENGTH,
   cleanSearchTerms,
   csvField,
@@ -8,6 +9,7 @@ import {
 } from '@ebda/shared';
 import { AppError } from '../middleware/error-handler';
 import { recordSlugRedirect } from './slug-redirect.service';
+import { stampHumanEdits } from './ai-autofill.service';
 import { assertWithinLimit } from './plan-limit.service';
 import { PRODUCT_SEARCH_MAX_LIMIT, searchProductIds } from './product-search.service';
 import {
@@ -15,6 +17,26 @@ import {
   planBundlePinnedVariantSkips,
   throwIfBundleFkViolation,
 } from '../lib/bundle-fk-errors';
+
+/** The AI-writable product fields + their provenance map, read before an import update. */
+const AI_PROVENANCE_SELECT = Object.fromEntries(
+  [...AI_AUTOFILL_FIELD_NAMES, 'aiFieldSources'].map(f => [f, true])
+) as Prisma.ProductSelect;
+
+/**
+ * The AI-writable fields an import row actually SETS (non-empty). An imported value is a
+ * merchant edit, so `stampHumanEdits` makes a changed one 'human' and the autopilot never
+ * replaces it (search program P1: it now writes search words too). Blank cells are left out
+ * on purpose: an import blank keeps its documented meaning (search words: leave alone; other
+ * fields: clear) without also locking the field against the autopilot.
+ */
+function importedAiValues(fields: Record<string, unknown>): Record<string, unknown> {
+  return Object.fromEntries(
+    AI_AUTOFILL_FIELD_NAMES.filter(
+      f => typeof fields[f] === 'string' && (fields[f] as string).trim()
+    ).map(f => [f, fields[f]])
+  );
+}
 
 interface ProductImportRow {
   name: string;
@@ -1055,11 +1077,24 @@ export class BulkService {
 
               let productId: string;
 
+              const imported = importedAiValues(productFields as Record<string, unknown>);
+
               if (existing) {
                 // Update existing product
+                const current = (await tx.product.findUnique({
+                  where: { id: existing.id, storeId },
+                  select: AI_PROVENANCE_SELECT,
+                })) as Record<string, unknown> | null;
                 await tx.product.update({
                   where: { id: existing.id, storeId },
-                  data: productFields,
+                  data: {
+                    ...productFields,
+                    aiFieldSources: stampHumanEdits(
+                      (current?.aiFieldSources as Record<string, 'ai' | 'human'>) ?? {},
+                      current ?? {},
+                      imported
+                    ),
+                  },
                 });
                 productId = existing.id;
                 result.updated++;
@@ -1084,6 +1119,7 @@ export class BulkService {
                   data: {
                     store: { connect: { id: storeId } },
                     ...productFields,
+                    aiFieldSources: stampHumanEdits({}, {}, imported),
                   },
                 });
                 productId = created.id;

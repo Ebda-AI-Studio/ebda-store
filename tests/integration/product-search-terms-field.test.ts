@@ -192,6 +192,75 @@ describe.skipIf(!hasDb)('search terms: stored, searchable, every writer capped',
       expect(exported.split('\n')[0]).toContain('searchTerms');
       expect(exported).toContain('كوتشي');
     });
+
+    // Search program P1 (Task 8): the autopilot now writes search words, so an import is a
+    // merchant edit and must stamp 'human' or the next AI refresh would replace it.
+    const rowAr = (name: string, nameAr: string, slug: string, sku: string, terms: string) =>
+      `${name},${nameAr},${slug},,,1000,,,${sku},,5,,true,,active,false,false,,,,,,,,"${terms}"`;
+    const sourcesOf = async (slug: string) =>
+      ((await prisma.product.findFirst({ where: { storeId, slug } }))!.aiFieldSources ??
+        {}) as Record<string, string>;
+
+    it("create: imported words and names are the merchant's (human), empty fields stay fillable", async () => {
+      const slug = `bulk-own-${run}`;
+      const csv = [header, rowAr('Bulk Own', 'كوتشي', slug, `BO-${run}`, 'kotshy, كوتشي')].join(
+        '\n'
+      );
+      await inStore(() => BulkService.importProducts(storeId, csv, { updateExisting: true }));
+      const s = await sourcesOf(slug);
+      expect(s.searchTerms).toBe('human');
+      expect(s.name).toBe('human');
+      expect(s.nameAr).toBe('human');
+      expect(s.descriptionAr).toBeUndefined(); // empty → the autopilot may still fill it
+    });
+
+    it('update: changed words over AI-owned words become human; identical words stay ai', async () => {
+      const slug = `bulk-ai-${run}`;
+      const sku = `BAI-${run}`;
+      const created = await inStore(() =>
+        BulkService.importProducts(
+          storeId,
+          [header, rowAr('Bulk AI', 'جزمة', slug, sku, '')].join('\n'),
+          { updateExisting: true }
+        )
+      );
+      expect(created.created).toBe(1);
+      // What the autopilot would have written.
+      await prisma.product.updateMany({
+        where: { storeId, slug },
+        data: {
+          searchTerms: 'gazma, جزمه',
+          aiFieldSources: { searchTerms: 'ai', nameAr: 'ai', name: 'human' },
+        },
+      });
+
+      // Re-export round trip: same words, same name → ownership unchanged.
+      await inStore(() =>
+        BulkService.importProducts(
+          storeId,
+          [header, rowAr('Bulk AI', 'جزمة', slug, sku, 'gazma, جزمه')].join('\n'),
+          { updateExisting: true }
+        )
+      );
+      expect((await sourcesOf(slug)).searchTerms).toBe('ai');
+      expect((await sourcesOf(slug)).nameAr).toBe('ai');
+
+      // A blank Arabic name is the documented import clear: it keeps the ai stamp (fillable).
+      await inStore(() =>
+        BulkService.importProducts(
+          storeId,
+          [header, rowAr('Bulk AI', '', slug, sku, 'gazma, gezma, جزمه')].join('\n'),
+          { updateExisting: true }
+        )
+      );
+      const s = await sourcesOf(slug);
+      expect(s.searchTerms).toBe('human');
+      expect(s.nameAr).toBe('ai');
+      expect(
+        (await termsOf((await prisma.product.findFirst({ where: { storeId, slug } }))!.id))!
+          .searchTerms
+      ).toBe('gazma, gezma, جزمه');
+    });
   });
 
   describe('HTTP: ZodError on searchTerms is a 400, never the DB CHECK 500', () => {
