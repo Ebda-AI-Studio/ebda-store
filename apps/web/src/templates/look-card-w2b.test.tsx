@@ -387,7 +387,10 @@ describe('PecannbeeProductCard NEW chip never shares the heart corner', () => {
       );
       const cls = chipOf(container).className;
       expect(cls, `sale=${sale}`).not.toMatch(/\btop-3 start-3\b|\bstart-3 top-3\b/);
-      expect(cls, `sale=${sale}`).toContain(sale ? 'bottom-3' : 'end-3');
+      // IA-08 (W4): one fixed corner, top-end; with a sale chip it stacks under it, never jumps.
+      expect(cls, `sale=${sale}`).toContain('end-3');
+      expect(cls, `sale=${sale}`).toContain(sale ? 'top-12' : 'top-3');
+      expect(cls, `sale=${sale}`).not.toContain('bottom-3');
       cleanup();
     }
   });
