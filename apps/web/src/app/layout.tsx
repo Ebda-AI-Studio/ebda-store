@@ -672,7 +672,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                         className="border-t border-border/30 bg-background [body:has([data-loading])_&]:hidden"
                       >
                         <div className="container mx-auto px-4 py-3 text-center">
-                          <CookiePreferencesLink className="inline-flex min-h-11 min-w-11 items-center text-xs text-muted-foreground hover:text-foreground transition-colors duration-200 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2" />
+                          <CookiePreferencesLink className="inline-flex min-h-11 min-w-11 items-center justify-center text-xs text-muted-foreground hover:text-foreground transition-colors duration-200 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2" />
                         </div>
                       </div>
                     </>

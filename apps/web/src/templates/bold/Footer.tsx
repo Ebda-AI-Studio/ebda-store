@@ -152,7 +152,7 @@ export default function BoldFooter({
                     href={s.url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className={`inline-flex min-h-11 min-w-11 items-center ${fgFull} hover:text-primary transition-colors duration-200 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2`}
+                    className={`inline-flex min-h-11 min-w-11 items-center justify-center ${fgFull} hover:text-primary transition-colors duration-200 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2`}
                     aria-label={s.key}
                   >
                     <SocialGlyph
@@ -179,7 +179,7 @@ export default function BoldFooter({
                     <li key={link.href}>
                       <Link
                         href={link.href}
-                        className={`inline-flex min-h-11 min-w-11 items-center text-sm ${fgMuted} hover:text-primary transition-colors duration-200 font-medium items-center gap-2 group cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2`}
+                        className={`inline-flex min-h-11 min-w-11 items-center justify-center text-sm ${fgMuted} hover:text-primary transition-colors duration-200 font-medium items-center gap-2 group cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2`}
                       >
                         <span className="w-0 group-hover:w-3 h-0.5 bg-primary transition-[width] duration-200 shrink-0" />
                         {link.label}
@@ -199,7 +199,7 @@ export default function BoldFooter({
                   <li key={item.href}>
                     <Link
                       href={item.href}
-                      className={`inline-flex min-h-11 min-w-11 items-center text-sm ${fgMuted} hover:text-primary transition-colors duration-200 font-medium items-center gap-2 group cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2`}
+                      className={`inline-flex min-h-11 min-w-11 items-center justify-center text-sm ${fgMuted} hover:text-primary transition-colors duration-200 font-medium items-center gap-2 group cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2`}
                     >
                       <span className="w-0 group-hover:w-3 h-0.5 bg-primary transition-[width] duration-200 shrink-0" />
                       {isRtl && item.labelAr ? item.labelAr : item.label}
@@ -222,7 +222,7 @@ export default function BoldFooter({
                   <li>
                     <a
                       href={`mailto:${contact.email}`}
-                      className={`inline-flex min-h-11 min-w-11 items-center text-sm ${fgMuted} hover:text-primary transition-colors duration-200 font-medium cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2`}
+                      className={`inline-flex min-h-11 min-w-11 items-center justify-center text-sm ${fgMuted} hover:text-primary transition-colors duration-200 font-medium cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2`}
                     >
                       {contact.email}
                     </a>
@@ -232,7 +232,7 @@ export default function BoldFooter({
                   <li>
                     <a
                       href={`tel:${contact.phone}`}
-                      className={`inline-flex min-h-11 min-w-11 items-center text-sm ${fgMuted} hover:text-primary transition-colors duration-200 font-medium cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2`}
+                      className={`inline-flex min-h-11 min-w-11 items-center justify-center text-sm ${fgMuted} hover:text-primary transition-colors duration-200 font-medium cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2`}
                       dir="ltr"
                     >
                       {displayPhone}
@@ -254,7 +254,7 @@ export default function BoldFooter({
                         href={addressMapHref}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="inline-flex min-h-11 min-w-11 items-center hover:text-primary transition-colors duration-200"
+                        className="inline-flex min-h-11 min-w-11 items-center justify-center hover:text-primary transition-colors duration-200"
                       >
                         {displayAddress}
                       </a>
@@ -283,7 +283,7 @@ export default function BoldFooter({
                         href={loc.mapsHref}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="inline-flex min-h-11 min-w-11 items-center hover:text-primary transition-colors duration-200"
+                        className="inline-flex min-h-11 min-w-11 items-center justify-center hover:text-primary transition-colors duration-200"
                       >
                         {loc.address}
                       </a>
@@ -294,7 +294,7 @@ export default function BoldFooter({
                       <a
                         href={`tel:${loc.phone}`}
                         dir="ltr"
-                        className="inline-flex min-h-11 min-w-11 items-center hover:text-primary transition-colors duration-200"
+                        className="inline-flex min-h-11 min-w-11 items-center justify-center hover:text-primary transition-colors duration-200"
                       >
                         {loc.phone}
                       </a>

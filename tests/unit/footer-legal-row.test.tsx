@@ -179,6 +179,11 @@ describe.each(Object.entries(FOOTERS))(
       );
       // a11y P2-10: short footer words measured 33-41px wide, so width is enforced too.
       expect(smallTargets(container, 44, { requireWidth: true })).toEqual([]);
+      // A word narrower than 44px sits centred in its box, so the row's gaps stay even
+      // (stop3 1280: "About   Contact" and "Terms   · Returns" were lopsided).
+      for (const a of Array.from(container.querySelectorAll('.min-w-11'))) {
+        expect(a.className, a.textContent ?? '').toMatch(/\bjustify-center\b/);
+      }
       // A full-width flex button keeps its label centred (the 44px pass once dropped it).
       for (const b of Array.from(container.querySelectorAll('button.inline-flex.w-full'))) {
         expect(b.className).toMatch(/\bjustify-center\b/);

@@ -264,7 +264,7 @@ export default function ElegantFooter({
                   <li key={item.href}>
                     <Link
                       href={item.href}
-                      className="inline-flex min-h-11 min-w-11 items-center text-sm text-foreground/70 hover:text-foreground transition-colors duration-700 ease-out tracking-wide cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+                      className="inline-flex min-h-11 min-w-11 items-center justify-center text-sm text-foreground/70 hover:text-foreground transition-colors duration-700 ease-out tracking-wide cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
                     >
                       {isRtl && item.labelAr ? item.labelAr : item.label}
                     </Link>
@@ -286,7 +286,7 @@ export default function ElegantFooter({
                   <li>
                     <a
                       href={`mailto:${contact.email}`}
-                      className="inline-flex min-h-11 min-w-11 items-center text-foreground/70 hover:text-foreground transition-colors duration-700 ease-out tracking-wide cursor-pointer"
+                      className="inline-flex min-h-11 min-w-11 items-center justify-center text-foreground/70 hover:text-foreground transition-colors duration-700 ease-out tracking-wide cursor-pointer"
                     >
                       {contact.email}
                     </a>
@@ -296,7 +296,7 @@ export default function ElegantFooter({
                   <li>
                     <a
                       href={`tel:${contact.phone}`}
-                      className="inline-flex min-h-11 min-w-11 items-center text-foreground/70 hover:text-foreground transition-colors duration-700 ease-out tracking-wide cursor-pointer"
+                      className="inline-flex min-h-11 min-w-11 items-center justify-center text-foreground/70 hover:text-foreground transition-colors duration-700 ease-out tracking-wide cursor-pointer"
                       dir="ltr"
                     >
                       {displayPhone}
@@ -318,7 +318,7 @@ export default function ElegantFooter({
                         href={addressMapHref}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="inline-flex min-h-11 min-w-11 items-center text-foreground/70 hover:text-foreground transition-colors duration-700 ease-out tracking-wide cursor-pointer"
+                        className="inline-flex min-h-11 min-w-11 items-center justify-center text-foreground/70 hover:text-foreground transition-colors duration-700 ease-out tracking-wide cursor-pointer"
                       >
                         {displayAddress}
                       </a>
@@ -346,7 +346,7 @@ export default function ElegantFooter({
                     href={s.url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex min-h-11 min-w-11 items-center text-foreground/70 hover:text-foreground transition-colors duration-300 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+                    className="inline-flex min-h-11 min-w-11 items-center justify-center text-foreground/70 hover:text-foreground transition-colors duration-300 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
                     aria-label={s.key}
                   >
                     <SocialGlyph
@@ -376,7 +376,7 @@ export default function ElegantFooter({
                         href={loc.mapsHref}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="inline-flex min-h-11 min-w-11 items-center text-foreground/70 hover:text-foreground transition-colors duration-700 ease-out tracking-wide cursor-pointer"
+                        className="inline-flex min-h-11 min-w-11 items-center justify-center text-foreground/70 hover:text-foreground transition-colors duration-700 ease-out tracking-wide cursor-pointer"
                       >
                         {loc.address}
                       </a>
@@ -387,7 +387,7 @@ export default function ElegantFooter({
                       <a
                         href={`tel:${loc.phone}`}
                         dir="ltr"
-                        className="inline-flex min-h-11 min-w-11 items-center text-foreground/70 hover:text-foreground transition-colors duration-700 ease-out tracking-wide cursor-pointer"
+                        className="inline-flex min-h-11 min-w-11 items-center justify-center text-foreground/70 hover:text-foreground transition-colors duration-700 ease-out tracking-wide cursor-pointer"
                       >
                         {loc.phone}
                       </a>

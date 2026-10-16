@@ -138,7 +138,7 @@ export default function ClassicFooter({
                   <li>
                     <a
                       href={`mailto:${contact.email}`}
-                      className="inline-flex min-h-11 min-w-11 items-center hover:text-foreground transition-colors duration-200"
+                      className="inline-flex min-h-11 min-w-11 items-center justify-center hover:text-foreground transition-colors duration-200"
                     >
                       {contact.email}
                     </a>
@@ -148,7 +148,7 @@ export default function ClassicFooter({
                   <li>
                     <a
                       href={`tel:${contact.phone}`}
-                      className="inline-flex min-h-11 min-w-11 items-center hover:text-foreground transition-colors duration-200"
+                      className="inline-flex min-h-11 min-w-11 items-center justify-center hover:text-foreground transition-colors duration-200"
                       dir="ltr"
                     >
                       {displayPhone}
@@ -170,7 +170,7 @@ export default function ClassicFooter({
                         href={addressMapHref}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="inline-flex min-h-11 min-w-11 items-center hover:text-foreground transition-colors duration-200"
+                        className="inline-flex min-h-11 min-w-11 items-center justify-center hover:text-foreground transition-colors duration-200"
                       >
                         {displayAddress}
                       </a>
@@ -191,7 +191,7 @@ export default function ClassicFooter({
                     href={s.url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex min-h-11 min-w-11 items-center text-muted-foreground hover:text-foreground overflow-hidden rounded-md transition-colors duration-200 cursor-pointer"
+                    className="inline-flex min-h-11 min-w-11 items-center justify-center text-muted-foreground hover:text-foreground overflow-hidden rounded-md transition-colors duration-200 cursor-pointer"
                     aria-label={s.key}
                   >
                     <SocialGlyph
@@ -218,7 +218,7 @@ export default function ClassicFooter({
                       <li key={link.href}>
                         <Link
                           href={link.href}
-                          className="inline-flex min-h-11 min-w-11 items-center text-sm text-muted-foreground hover:text-foreground transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+                          className="inline-flex min-h-11 min-w-11 items-center justify-center text-sm text-muted-foreground hover:text-foreground transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
                         >
                           {link.label}
                         </Link>
@@ -251,7 +251,7 @@ export default function ClassicFooter({
                       <li key={item.href}>
                         <Link
                           href={item.href}
-                          className="inline-flex min-h-11 min-w-11 items-center text-sm text-muted-foreground hover:text-foreground transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+                          className="inline-flex min-h-11 min-w-11 items-center justify-center text-sm text-muted-foreground hover:text-foreground transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
                         >
                           {isRtl && item.labelAr ? item.labelAr : item.label}
                         </Link>
@@ -277,7 +277,7 @@ export default function ClassicFooter({
                         href={loc.mapsHref}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="inline-flex min-h-11 min-w-11 items-center hover:text-foreground transition-colors duration-200"
+                        className="inline-flex min-h-11 min-w-11 items-center justify-center hover:text-foreground transition-colors duration-200"
                       >
                         {loc.address}
                       </a>
@@ -288,7 +288,7 @@ export default function ClassicFooter({
                       <a
                         href={`tel:${loc.phone}`}
                         dir="ltr"
-                        className="inline-flex min-h-11 min-w-11 items-center hover:text-foreground transition-colors duration-200"
+                        className="inline-flex min-h-11 min-w-11 items-center justify-center hover:text-foreground transition-colors duration-200"
                       >
                         {loc.phone}
                       </a>

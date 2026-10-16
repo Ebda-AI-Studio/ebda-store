@@ -57,7 +57,10 @@ async function pickOptions(page) {
 async function fillShipping(page) {
   await page.locator('input[autocomplete="given-name"]').fill('Mona');
   await page.locator('input[autocomplete="family-name"]').fill('Adel');
-  await page.locator('input[autocomplete="tel"]').fill('01012345678');
+  // A fresh number per run: the API caps orders awaiting payment per phone, so a re-shoot
+  // with one fixed number is refused ("too many orders awaiting payment").
+  const phone = `010${String(Math.floor(Math.random() * 1e8)).padStart(8, '0')}`;
+  await page.locator('input[autocomplete="tel"]').fill(phone);
   const combos = page.locator('input[role="combobox"]');
   for (let i = 0; i < (await combos.count()); i++) {
     await combos.nth(i).click();
@@ -108,7 +111,7 @@ export const ACTIONS = {
   async 'increase-quantity'(page, url) {
     await page.goto(url, { waitUntil: 'networkidle', timeout: 180000 });
     await page
-      .getByRole('button', { name: /Increase quantity|زيادة الكمية/ })
+      .getByRole('button', { name: /Increase quantity|زيادة الكمية|زيادة كمية/ })
       .first()
       .click();
     await page.waitForTimeout(1200);
@@ -116,7 +119,7 @@ export const ACTIONS = {
   async 'remove-line-with-undo'(page, url) {
     await page.goto(url, { waitUntil: 'networkidle', timeout: 180000 });
     await page
-      .getByRole('button', { name: /Remove item|إزالة المنتج/ })
+      .getByRole('button', { name: /^(Remove|إزالة) / })
       .last()
       .click();
     await page.waitForTimeout(700);
@@ -143,7 +146,7 @@ export const ACTIONS = {
       .getByRole('button', { name: /Place order|تأكيد الطلب/ })
       .first()
       .click();
-    await page.waitForURL(/\/checkout\/success/, { timeout: 60000 });
+    await page.waitForURL(/\/checkout\/success/, { timeout: 60000, waitUntil: 'commit' }); // client-side push: no load event
     await page.waitForTimeout(3500); // the receipt's print-in feed
   },
   async 'scroll-to-footer'(page, url) {
@@ -208,6 +211,8 @@ async function main() {
           title: await page.title(),
         });
       } catch (e) {
+        // Keep what the page showed when the step failed, so the failure can be read.
+        await page.screenshot({ path: join(out, `${tag}-FAILED.png`) }).catch(() => {});
         run.push({ screen: s.id, viewport: vid, ok: false, error: String(e).slice(0, 300) });
       }
     }

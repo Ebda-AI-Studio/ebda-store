@@ -27,7 +27,7 @@ export function FooterWhatsApp({
       href={href}
       target="_blank"
       rel="noopener noreferrer"
-      className={['inline-flex min-h-11 min-w-11 items-center gap-2', className]
+      className={['inline-flex min-h-11 min-w-11 items-center justify-center gap-2', className]
         .filter(Boolean)
         .join(' ')}
     >
