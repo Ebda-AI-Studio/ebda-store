@@ -66,7 +66,7 @@
     "test:load": "bash loadtests/run.sh lens-n-medium-traffic",
     "ai:eval": "tsx tests/ai-eval/live.eval.ts",
     "search:eval": "tsx tests/search-eval/run.ts",
-    "typecheck": "tsc --noEmit -p packages/shared/tsconfig.json && tsc --noEmit -p packages/database/tsconfig.json && tsc --noEmit -p packages/ui/tsconfig.json && tsc --noEmit -p apps/api/tsconfig.json && tsc --noEmit -p apps/admin/tsconfig.json && tsc --noEmit -p apps/web/tsconfig.json && tsc --noEmit -p apps/orders/tsconfig.json && tsc --noEmit -p apps/marketing/tsconfig.json && tsc --noEmit -p apps/status/tsconfig.json",
+    "typecheck": "tsc --noEmit -p packages/shared/tsconfig.json && tsc --noEmit -p packages/database/tsconfig.json && tsc --noEmit -p packages/ui/tsconfig.json && tsc --noEmit -p apps/api/tsconfig.json && tsc --noEmit -p apps/admin/tsconfig.json && tsc --noEmit -p apps/web/tsconfig.json && tsc --noEmit -p apps/orders/tsconfig.json && tsc --noEmit -p apps/marketing/tsconfig.json && tsc --noEmit -p apps/status/tsconfig.json && tsc --noEmit -p tests/search-eval/tsconfig.json",
     "clean": "npm run clean --workspaces --if-present && rm -rf node_modules",
     "db:generate": "npm run generate -w packages/database",
     "db:migrate": "npm run migrate -w packages/database",
