@@ -97,6 +97,8 @@ const NOT_R2_REFERENCES: Record<string, string> = {
   'SizeChart.rows': 'size-chart cells (text, max 24 chars each), no media',
   'Product.aiBalanceBackup': 'backup of name/description text + aiFieldSources, no media',
   'ProductEmbedding.contentHash': 'md5 hex of the embedded product text (search P1), never a URL',
+  'ProductEmbedFailure.contentHash':
+    'md5 hex of a product text the embedding model rejected (search P1 quarantine), never a URL',
   'Order.shippingAddress': 'postal address',
   'Order.billingAddress': 'postal address',
   'OrderEvent.metadata': 'status-transition audit metadata',
