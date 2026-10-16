@@ -5,7 +5,7 @@
  *   1. honeypot  - a hidden field no person fills; a filled one is a bot. The
  *                  answer is the SAME generic success (nothing is created), so
  *                  the bot learns nothing.
- *   2. form token - a server-signed timestamp issued when the form loads
+ *   2. form token - a server-signed timestamp + random nonce issued when the form loads
  *                  (`GET /auth/merchant/signup-token`). A submit faster than
  *                  `SIGNUP_MIN_FILL_MS`, with a missing / forged / expired /
  *                  already-used token is refused. The client cannot forge the
@@ -54,32 +54,46 @@ export const SIGNUP_HONEYPOT_FIELD = 'company_site';
 
 const TOKEN_KEY_PREFIX = 'signup:form-token:';
 
-function sign(ts: string): string {
+function sign(payload: string): string {
   return crypto
     .createHmac('sha256', `${config.jwtSecret}:merchant-signup-form`)
-    .update(ts)
+    .update(payload)
     .digest('base64url');
 }
 
-/** Issue a form token: `<issuedAtMs>.<hmac>`. Stateless; single use is enforced at submit. */
+/**
+ * Issue a form token: `<issuedAtMs>.<nonce>.<hmac(issuedAtMs.nonce)>`. Stateless; single use is
+ * enforced at submit by claiming the signature. The nonce makes two tokens issued in the same
+ * millisecond distinct: without it they were byte-identical and the second visitor's submit was
+ * refused as already used (Ruling FU46-8). 9 random bytes from Web Crypto (Workers-safe) = 12
+ * base64url characters.
+ */
 export function issueSignupFormToken(now: number = Date.now()): string {
   const ts = String(now);
-  return `${ts}.${sign(ts)}`;
+  const nonce = Buffer.from(globalThis.crypto.getRandomValues(new Uint8Array(9))).toString(
+    'base64url'
+  );
+  return `${ts}.${nonce}.${sign(`${ts}.${nonce}`)}`;
 }
 
 export type FormTokenVerdict = 'ok' | 'invalid' | 'too_fast' | 'expired';
+
+const NONCE_RE = /^[A-Za-z0-9_-]{12}$/;
 
 export function verifySignupFormToken(
   token: unknown,
   now: number = Date.now()
 ): { verdict: FormTokenVerdict; sig?: string } {
   if (typeof token !== 'string') return { verdict: 'invalid' };
-  const dot = token.indexOf('.');
-  if (dot < 1) return { verdict: 'invalid' };
-  const ts = token.slice(0, dot);
-  const sig = token.slice(dot + 1);
+  const parts = token.split('.');
+  // 3 parts since FU46-8; 2 parts = a token issued before it, accepted until it ages out.
+  if (parts.length !== 2 && parts.length !== 3) return { verdict: 'invalid' };
+  const ts = parts[0];
+  const nonce = parts.length === 3 ? parts[1] : null;
+  const sig = parts[parts.length - 1];
   if (!/^\d{10,15}$/.test(ts)) return { verdict: 'invalid' };
-  const expected = sign(ts);
+  if (nonce !== null && !NONCE_RE.test(nonce)) return { verdict: 'invalid' };
+  const expected = sign(nonce === null ? ts : `${ts}.${nonce}`);
   const a = Buffer.from(sig);
   const b = Buffer.from(expected);
   if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) return { verdict: 'invalid' };

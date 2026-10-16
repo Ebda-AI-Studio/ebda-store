@@ -127,6 +127,71 @@ describe('signup gate (route)', () => {
     expect(signupMock).not.toHaveBeenCalled();
   });
 
+  it('two tokens issued in the same millisecond are distinct and each verifies (FU46-8)', () => {
+    const at = Date.now() - 10_000;
+    const a = issueSignupFormToken(at);
+    const b = issueSignupFormToken(at);
+    expect(a).not.toBe(b);
+    expect(verifySignupFormToken(a).verdict).toBe('ok');
+    expect(verifySignupFormToken(b).verdict).toBe('ok');
+    expect(verifySignupFormToken(a).sig).not.toBe(verifySignupFormToken(b).sig);
+  });
+
+  it('a tampered nonce, or a token from before FU46-8, is handled', () => {
+    const [ts, nonce, sig] = issueSignupFormToken(Date.now() - 10_000).split('.');
+    expect(verifySignupFormToken(`${ts}.${nonce.slice(1)}x.${sig}`).verdict).toBe('invalid');
+    expect(verifySignupFormToken(`${ts}.${sig}`).verdict).toBe('invalid');
+  });
+
+  it('two forms opened in the same millisecond each submit once (FU46-8, frozen clock)', async () => {
+    const t0 = Date.now();
+    vi.useFakeTimers({ toFake: ['Date'] });
+    try {
+      vi.setSystemTime(t0);
+      const [ga, gb] = await Promise.all([
+        request(app()).get('/auth/merchant/signup-token'),
+        request(app()).get('/auth/merchant/signup-token'),
+      ]);
+      const ta = ga.body.data.token as string;
+      const tb = gb.body.data.token as string;
+      expect(ta.split('.')[0]).toBe(String(t0));
+      expect(tb.split('.')[0]).toBe(String(t0));
+      expect(ta).not.toBe(tb);
+
+      vi.setSystemTime(t0 + 10_000);
+      const ra = await request(app())
+        .post('/auth/merchant/signup')
+        .send(body(`a@${freshDomain()}`, { formToken: ta }));
+      const rb = await request(app())
+        .post('/auth/merchant/signup')
+        .send(body(`b@${freshDomain()}`, { formToken: tb }));
+      expect([ra.status, rb.status]).toEqual([200, 200]);
+      expect(signupMock).toHaveBeenCalledTimes(2);
+
+      // Each is still single use.
+      const replay = await request(app())
+        .post('/auth/merchant/signup')
+        .send(body(`c@${freshDomain()}`, { formToken: tb }));
+      expect(replay.status).toBe(400);
+      expect(replay.body.error.code).toBe('SIGNUP_FORM_INVALID');
+      expect(signupMock).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('a genuine pre-FU46-8 token (<ms>.<hmac(ms)>) still verifies until it ages out', () => {
+    const ts = String(Date.now() - 10_000);
+    const legacySig = crypto
+      .createHmac('sha256', `${process.env.JWT_SECRET}:merchant-signup-form`)
+      .update(ts)
+      .digest('base64url');
+    expect(verifySignupFormToken(`${ts}.${legacySig}`).verdict).toBe('ok');
+    expect(verifySignupFormToken(`${ts}.${legacySig}`, Date.now() + 48 * 3600_000).verdict).toBe(
+      'expired'
+    );
+  });
+
   it('the fill-time floor is configurable', async () => {
     process.env.SIGNUP_MIN_FILL_MS = '0';
     const res = await request(app())
