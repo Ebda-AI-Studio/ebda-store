@@ -814,10 +814,7 @@ export default function ProductDetailClient({
                   disabled={noteMissing}
                   onBlocked={() => setNoteNudge(n => n + 1)}
                 />
-                <ShareProductRow
-                  productName={displayName}
-                  url={typeof window !== 'undefined' ? window.location.href : ''}
-                />
+                <ShareProductRow productName={displayName} />
               </>
             }
             selectedImage={selectedImage}
@@ -1246,7 +1243,6 @@ export default function ProductDetailClient({
               />
               <ShareProductRow
                 productName={language === 'ar' && product.nameAr ? product.nameAr : product.name}
-                url={typeof window !== 'undefined' ? window.location.href : ''}
                 className="mt-6 border-t border-border pt-6"
               />
               <SpecTable

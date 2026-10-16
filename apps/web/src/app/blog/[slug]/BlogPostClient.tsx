@@ -105,7 +105,6 @@ export function BlogPostClient({ post }: { post: BlogDetail | null }) {
 
               <ShareProductRow
                 productName={isRtl && post.titleAr ? post.titleAr : post.title}
-                url={typeof window !== 'undefined' ? window.location.href : ''}
                 className="mt-10 border-t border-foreground/10 pt-6"
               />
             </>

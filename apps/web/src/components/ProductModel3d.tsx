@@ -13,6 +13,7 @@ import dynamic from 'next/dynamic';
 import { useMemo, useRef } from 'react';
 import { resolveModel3dLook, type PublicModel3d } from '@ebda/shared';
 import { captureEvent } from './PostHogProvider';
+import { useCurrentUrl } from '../hooks/useCurrentUrl';
 
 const ProductModelViewer = dynamic(() => import('@ebda/ui/model3d'), {
   ssr: false,
@@ -84,6 +85,7 @@ export function ProductModel3dPanel({
   );
   const base = { storeId, productId };
   const firstLook = useRef(true);
+  const currentUrl = useCurrentUrl();
   const alt =
     (isRtl ? model.altTextAr || model.altText : model.altText || model.altTextAr) ||
     `${productName} — ${t('3D model', 'موديل ثلاثي الأبعاد')}`;
@@ -107,7 +109,7 @@ export function ProductModel3dPanel({
         enabled: model.arEnabled,
         usdzUrl: model.usdzUrl,
         title: productName,
-        fallbackUrl: typeof window !== 'undefined' ? window.location.href : '',
+        fallbackUrl: currentUrl,
       }}
       onLoad={info => captureEvent('product_3d_loaded', { ...base, ...info })}
       onError={reason => captureEvent('product_3d_load_failed', { ...base, reason })}

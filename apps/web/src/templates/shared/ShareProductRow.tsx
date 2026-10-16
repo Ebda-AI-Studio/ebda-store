@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useLanguage } from '../../contexts/LanguageContext';
+import { useCurrentUrl } from '../../hooks/useCurrentUrl';
 
 /**
  * Sprint 4 (2026-05-17): PDP share row — X / Facebook / Telegram /
@@ -15,15 +16,18 @@ import { useLanguage } from '../../contexts/LanguageContext';
 
 interface ShareProductRowProps {
   productName: string;
-  url: string;
+  /** Defaults to the current page (read after hydration). */
+  url?: string;
   className?: string;
 }
 
 export function ShareProductRow({ productName, url, className = '' }: ShareProductRowProps) {
   const { isRtl, t } = useLanguage();
+  const currentUrl = useCurrentUrl();
+  const shareUrl = url ?? currentUrl;
   const [copied, setCopied] = useState(false);
 
-  const encodedUrl = encodeURIComponent(url);
+  const encodedUrl = encodeURIComponent(shareUrl);
   const encodedText = encodeURIComponent(productName);
 
   const shareLinks = [
@@ -59,7 +63,7 @@ export function ShareProductRow({ productName, url, className = '' }: ShareProdu
 
   async function handleCopy() {
     try {
-      await navigator.clipboard.writeText(url);
+      await navigator.clipboard.writeText(shareUrl);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch {
