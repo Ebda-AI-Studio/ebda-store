@@ -16,7 +16,7 @@ describe('qamar skin id', () => {
     expect(schema).toMatch(/enum StoreTemplate \{[^}]*\bqamar\b[^}]*\}/s);
     const mig = path.join(
       root,
-      'packages/database/prisma/migrations/20261018000100_store_template_qamar/migration.sql'
+      'packages/database/prisma/migrations/20261023000100_store_template_qamar/migration.sql'
     );
     expect(existsSync(mig)).toBe(true);
     const sql = readFileSync(mig, 'utf8');
