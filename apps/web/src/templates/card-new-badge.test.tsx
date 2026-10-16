@@ -248,17 +248,18 @@ describe('one New rule on every card path', () => {
     } as never);
     const later = Date.now() + 30 * DAY;
     const { container } = render(
-      React.createElement(RenderClockProvider, {
-        now: later,
-        children: React.createElement(
+      React.createElement(
+        RenderClockProvider,
+        { now: later } as never,
+        React.createElement(
           MinimalProductCard as never,
           {
             product: p,
             isRtl: true,
             currency: 'EGP',
           } as never
-        ),
-      })
+        )
+      )
     );
     expect(container.textContent).not.toMatch(/جديد/);
   });
