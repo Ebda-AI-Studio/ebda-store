@@ -1,10 +1,19 @@
 'use client';
 
 import { useCallback, useState } from 'react';
-import { getApiUrl } from '../lib/api';
+import { getApiUrl, localizedApiMessage } from '../lib/api';
 import { useT } from '@/i18n/useT';
 
 type Translator = ReturnType<typeof useT>;
+
+/**
+ * The API's error text for a failed upload in the admin's language (a byte-sniff refusal
+ * carries `details.messageEn` / `details.messageAr`), else its message, else `fallback`.
+ */
+export function uploadErrorText(data: UploadResponse | undefined, fallback: string): string {
+  const err = data?.error;
+  return localizedApiMessage(err?.code, err?.message || fallback, err?.details);
+}
 
 /**
  * Shared upload helpers for the ImageUpload widgets. Extracted so the
@@ -61,7 +70,7 @@ export function useImageUpload() {
           onProgress: setProgress,
           parse: data => {
             if (data.success && data.data?.url) return data.data.url as string;
-            throw new Error(data.error?.message || t('errors.uploadFailed'));
+            throw new Error(uploadErrorText(data, t('errors.uploadFailed')));
           },
         });
       } catch (err) {
@@ -106,7 +115,7 @@ export function useImageUpload() {
             if (data.success && data.data?.files) {
               return (data.data.files as Array<{ url: string }>).map(f => f.url);
             }
-            throw new Error(data.error?.message || t('errors.uploadFailed'));
+            throw new Error(uploadErrorText(data, t('errors.uploadFailed')));
           },
         });
         return urls;
@@ -138,7 +147,7 @@ interface UploadResponse {
     url?: string;
     files?: Array<{ url: string }>;
   };
-  error?: { message?: string };
+  error?: { code?: string; message?: string; details?: Record<string, unknown> };
 }
 
 interface RunXhrOptions<T> {
@@ -172,7 +181,7 @@ function runXhr<T>({ t, url, formData, onProgress, parse }: RunXhrOptions<T>): P
         try {
           const data: UploadResponse = JSON.parse(xhr.responseText);
           reject(
-            new Error(data.error?.message || t('errors.uploadFailedWithCode', { code: xhr.status }))
+            new Error(uploadErrorText(data, t('errors.uploadFailedWithCode', { code: xhr.status })))
           );
         } catch {
           reject(new Error(t('errors.uploadFailedWithCode', { code: xhr.status })));

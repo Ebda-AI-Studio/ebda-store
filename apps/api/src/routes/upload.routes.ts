@@ -10,6 +10,14 @@ import { uploadLimiter, dailyUploadLimiter, auditLog } from '../middleware/secur
 import { runInTenantContext } from '@ebda/database';
 import { AppError } from '../middleware/error-handler';
 import { sniffVideo, VIDEO_MAX_BYTES } from '../lib/video-sniff';
+import {
+  sniffImage,
+  IMAGE_EXT,
+  sniffFont,
+  FONT_EXT,
+  renameByKind,
+  uploadContentError,
+} from '../lib/upload-sniff';
 
 /**
  * Run a function under the tenant RLS context if a storeId is known,
@@ -225,6 +233,11 @@ router.post(
         });
         return;
       }
+      const sniffed = sniffImage(req.file.buffer);
+      if (!sniffed) {
+        res.status(400).json({ success: false, error: uploadContentError('image') });
+        return;
+      }
 
       const resolved = await resolveFolderAndStore(req);
       if (!resolved.ok) {
@@ -251,10 +264,17 @@ router.post(
         // customers for three months.
         const resizedBuffer = await enforceMaxDimensions(aspectResized);
 
-        const uploaded = await StorageService.upload(resizedBuffer, req.file!.originalname, {
-          folder: resolved.folder,
-          storeId: resolved.storeId,
-        });
+        // Named by the bytes we STORE (a resize can re-encode a GIF to JPEG), never the
+        // client's name: storage derives the Content-Type from this extension.
+        const storedKind = sniffImage(resizedBuffer) ?? sniffed;
+        const uploaded = await StorageService.upload(
+          resizedBuffer,
+          renameByKind(req.file!.originalname, IMAGE_EXT[storedKind], 'image'),
+          {
+            folder: resolved.folder,
+            storeId: resolved.storeId,
+          }
+        );
 
         await auditLog({
           action: 'file.uploaded',
@@ -452,6 +472,12 @@ router.post(
         });
         return;
       }
+      // One non-image refuses the whole batch: nothing in it is stored.
+      const sniffedAll = files.map(f => sniffImage(f.buffer));
+      if (sniffedAll.some(kind => kind === null)) {
+        res.status(400).json({ success: false, error: uploadContentError('image') });
+        return;
+      }
 
       const resolved = await resolveFolderAndStore(req);
       if (!resolved.ok) {
@@ -466,10 +492,11 @@ router.post(
         // (see enforceMaxDimensions' doc comment for the incident this
         // guards against).
         const capped = await Promise.all(
-          files.map(async f => ({
-            buffer: await enforceMaxDimensions(f.buffer),
-            filename: f.originalname,
-          }))
+          files.map(async (f, i) => {
+            const buffer = await enforceMaxDimensions(f.buffer);
+            const kind = sniffImage(buffer) ?? sniffedAll[i]!;
+            return { buffer, filename: renameByKind(f.originalname, IMAGE_EXT[kind], 'image') };
+          })
         );
         const uploaded = await StorageService.uploadMultiple(capped, {
           folder: resolved.folder,
@@ -752,6 +779,12 @@ router.post(
         });
         return;
       }
+      // The bytes decide the format (the filter above admits octet-stream and any name).
+      const fontKind = sniffFont(req.file.buffer);
+      if (!fontKind) {
+        res.status(400).json({ success: false, error: uploadContentError('font') });
+        return;
+      }
 
       // Force the folder to `fonts` regardless of what the client sent
       // — keeps every per-store font under a predictable prefix that
@@ -773,23 +806,18 @@ router.post(
         return;
       }
 
-      const ext = (
-        req.file.originalname.match(/\.(woff2|woff|ttf|otf)$/i)?.[1] ?? 'woff2'
-      ).toLowerCase();
+      const ext = FONT_EXT[fontKind].slice(1);
       const result = await withOptionalTenantContext(storeId, async () => {
-        const uploaded = await StorageService.upload(req.file!.buffer, req.file!.originalname, {
-          folder: 'fonts',
-          storeId,
-          contentType:
-            ext === 'woff2'
-              ? 'font/woff2'
-              : ext === 'woff'
-                ? 'font/woff'
-                : ext === 'ttf'
-                  ? 'font/ttf'
-                  : 'font/otf',
-          allowedTypes: ['font/woff2', 'font/woff', 'font/ttf', 'font/otf'],
-        });
+        const uploaded = await StorageService.upload(
+          req.file!.buffer,
+          renameByKind(req.file!.originalname, FONT_EXT[fontKind], 'font'),
+          {
+            folder: 'fonts',
+            storeId,
+            contentType: fontKind,
+            allowedTypes: ['font/woff2', 'font/woff', 'font/ttf', 'font/otf'],
+          }
+        );
 
         await auditLog({
           action: 'font.uploaded',

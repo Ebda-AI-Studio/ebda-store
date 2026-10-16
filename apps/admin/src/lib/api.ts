@@ -930,7 +930,7 @@ export async function apiPatch<T = unknown>(endpoint: string, body?: unknown) {
  * shows `error.message` as-is, so pick the Arabic text here, once, when the UI
  * is RTL — platform-level, no per-page handling.
  */
-function localizedApiMessage(
+export function localizedApiMessage(
   _code: string | undefined,
   message: string,
   details: Record<string, unknown> | undefined

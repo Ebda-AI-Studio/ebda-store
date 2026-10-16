@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { AdminLayout } from '@/components/AdminLayout';
 import { useT } from '@/i18n/useT';
-import { apiGet, apiPost, getApiUrl } from '@/lib/api';
+import { apiGet, apiPost, getApiUrl, localizedApiMessage } from '@/lib/api';
 import { minorToMajor } from '@/lib/format';
 import { resolveUploadErrorMessage } from '@/lib/expense-upload-error';
 import {
@@ -190,8 +190,14 @@ export default function NewExpensePage() {
       if (!uploadRes.ok) {
         const body = await uploadRes.json().catch(() => ({}));
         setOcrStatus('error');
+        // A byte-sniff refusal carries both languages in error.details (B0-46).
         setOcrMessage(
-          resolveUploadErrorMessage(body) ?? t('uploadFailedGeneric', { status: uploadRes.status })
+          localizedApiMessage(
+            undefined,
+            resolveUploadErrorMessage(body) ??
+              t('uploadFailedGeneric', { status: uploadRes.status }),
+            (body as { error?: { details?: Record<string, unknown> } })?.error?.details
+          )
         );
         setOcrUploading(false);
         return;

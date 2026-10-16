@@ -2110,6 +2110,26 @@
       "find": "        if (variant.isActive === false) {",
       "replace": "        if (false) {",
       "test": "tests/unit/order.test.ts"
+    },
+    {
+      "id": "upload-image-content-sniffed",
+      "domain": "injection",
+      "tier": "unit",
+      "why": "POST /uploads/image stores whatever bytes arrive under the client's own filename and mime, so an HTML/JS file called .png is served from the public bucket",
+      "source": "apps/api/src/routes/upload.routes.ts",
+      "find": "      const sniffed = sniffImage(req.file.buffer);\n      if (!sniffed) {",
+      "replace": "      const sniffed = sniffImage(req.file.buffer) ?? 'image/png';\n      if (!sniffed) {",
+      "test": "tests/unit/upload-routes.test.ts"
+    },
+    {
+      "id": "upload-images-batch-content-sniffed",
+      "domain": "injection",
+      "tier": "unit",
+      "why": "POST /uploads/images lets one non-image file ride inside a batch of real ones",
+      "source": "apps/api/src/routes/upload.routes.ts",
+      "find": "      if (sniffedAll.some(kind => kind === null)) {",
+      "replace": "      if (false) {",
+      "test": "tests/unit/upload-routes.test.ts"
     }
   ]
 }
