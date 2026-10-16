@@ -207,7 +207,7 @@ Square corners (`rounded-none`) and serif uppercase — a crisp tag.
 - Main header: `bg-background shadow-sm` with `py-5` for tall stature.
 - Logo centered: `mx-auto md:mx-0`, image height `h-14 max-h-14`, fallback wordmark `text-2xl font-serif font-bold tracking-wider`.
 - Desktop nav split left/right around the centered logo, each item: `text-sm font-serif tracking-widest uppercase text-foreground/70 hover:text-foreground` with a `after:w-0 after:h-px after:bg-foreground hover:after:w-full transition-all duration-300` underline.
-- Action icons (search/account/cart): `text-foreground/60 hover:text-foreground` with thin-stroke (`strokeWidth={1.5}`) outline icons.
+- Action icons (search/account/cart): `text-foreground/70 hover:text-foreground` with thin-stroke (`strokeWidth={1.5}`) outline icons.
 - Cart count: `bg-foreground text-background text-[10px] font-serif w-4 h-4 rounded-full` — small circular counter, not the brand color.
 - Below-header search row: `border-t border-border/40 py-3` with the underlined input centered in a `max-w-md`.
 
@@ -343,7 +343,7 @@ When generating new components for the Classic template, treat `Header.tsx`, `He
 
 - "Create a Classic press-quote block: centered, `font-serif font-normal text-2xl md:text-3xl text-foreground leading-snug` quote text, `w-12 h-px bg-border mx-auto my-6` divider, attribution in `text-xs uppercase tracking-widest text-muted-foreground`."
 - "Build a feature row: 3 columns at `lg:`, each with a thin-stroke icon (`strokeWidth={1}`), serif heading `font-serif text-lg`, body in `text-sm text-muted-foreground leading-relaxed`. Container has `border-y border-border py-12`."
-- "Make an editorial breadcrumb: `text-xs uppercase tracking-widest text-muted-foreground` separated by `·` middle-dots in `text-foreground/40`. Current item is `text-foreground` (no underline)."
+- "Make an editorial breadcrumb: `text-xs uppercase tracking-widest text-muted-foreground` separated by `·` middle-dots in `text-foreground/70`. Current item is `text-foreground` (no underline)."
 - "Design a testimonial card: NO border-radius. `border border-border bg-background p-8`. Quote in `font-serif italic text-foreground leading-relaxed`. Five-star rating in `text-warning` at thin stroke. Attribution in `text-xs uppercase tracking-widest text-muted-foreground` with `mt-6` and a `w-8 h-px bg-border mb-3` rule above."
 
 ### Component Patterns to Inherit

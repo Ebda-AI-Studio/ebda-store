@@ -104,6 +104,37 @@ describe('K-04: foreground text never drops under 70% alpha', () => {
     expect(MUTED_ALPHA.test('"text-muted-foreground"')).toBe(false);
   });
 
+  // The skin and look design docs are what a builder copies from: a doc that
+  // still prescribes `text-muted-foreground/60` or `text-foreground/50` puts the
+  // banned ink straight back (W1c review). Same two matchers, over the docs.
+  it('no template design doc prescribes a banned ink', () => {
+    const docs = [
+      ...readdirSync(join(WEB, 'templates'))
+        .map(d => join(WEB, 'templates', d, 'DESIGN.md'))
+        .filter(p => {
+          try {
+            return statSync(p).isFile();
+          } catch {
+            return false;
+          }
+        }),
+      ...readdirSync(join(ROOT, 'docs/ebda/templates'))
+        .filter(n => n.endsWith('.md'))
+        .map(n => join(ROOT, 'docs/ebda/templates', n)),
+    ];
+    expect(docs.length).toBeGreaterThanOrEqual(5);
+    const hits = docs.flatMap(f =>
+      readFileSync(f, 'utf8')
+        .split('\n')
+        .flatMap((l, i) =>
+          LOW.test(l) || (MUTED_ALPHA.test(l) && !/cursor-not-allowed/.test(l))
+            ? [`${relative(ROOT, f)}:${i + 1}: ${l.trim().slice(0, 120)}`]
+            : []
+        )
+    );
+    expect(hits).toEqual([]);
+  });
+
   it('the matcher catches the old shapes (self-test)', () => {
     expect(LOW.test('"text-xs uppercase text-foreground/50"')).toBe(true);
     expect(LOW.test("'w-4 text-foreground/55'")).toBe(true);

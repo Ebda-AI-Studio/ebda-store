@@ -281,7 +281,7 @@ Cart count: `bg-primary text-primary-foreground text-[10px] font-black rounded-f
 - Hero: full-bleed `<Image fill />` with `bg-gray-950/65` overlay — the image is nearly absorbed into the dark.
 - Cart thumb: `h-28 w-28 sm:h-32 sm:w-32` — bigger than other templates.
 - Hover behavior: `hover:scale-110` on category card image; `scale-110` on product card image when `isHovered` (state-driven via `useState`, not just CSS hover).
-- Image fallback: `flex items-center justify-center text-muted-foreground/40` with `strokeWidth={1.5}` placeholder icon — heavier strokes than Elegant/Minimal.
+- Image fallback: `flex items-center justify-center text-muted-foreground` with `strokeWidth={1.5}` placeholder icon — heavier strokes than Elegant/Minimal.
 
 ### Announcement Bar
 

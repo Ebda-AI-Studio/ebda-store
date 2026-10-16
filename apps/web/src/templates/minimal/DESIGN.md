@@ -261,7 +261,7 @@ The only "pill" is the cart counter, which isn't actually a pill: `text-[9px] fo
 - Cart image: `aspect-[3/4] w-20` on `bg-muted/30` — small, portrait.
 - Hover behavior on product card: `group-hover:opacity-80 transition-opacity duration-300 ease-out` — opacity-only, no scale.
 - Hover on category card: `group-hover:scale-102 transition-transform duration-500` — gentle 1.02× scale on the image only.
-- Image fallback (product): `flex items-center justify-center text-muted-foreground/20` with `strokeWidth={0.5}` icon at `w-10 h-10` — even thinner stroke than Elegant.
+- Image fallback (product): `flex items-center justify-center text-muted-foreground` with `strokeWidth={0.5}` icon at `w-10 h-10` — even thinner stroke than Elegant.
 
 ### Announcement Bar
 
