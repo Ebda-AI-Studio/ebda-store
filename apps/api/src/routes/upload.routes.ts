@@ -1,5 +1,4 @@
 import { Router, Request, Response, NextFunction } from 'express';
-import { z } from 'zod';
 import multer from 'multer';
 import { authenticate } from '../middleware/auth';
 import { checkStoreAccess } from '../middleware/store-access';
@@ -524,109 +523,6 @@ router.post(
       res.json({
         success: true,
         data: { files: results },
-      });
-    } catch (error) {
-      next(error);
-    }
-  }
-);
-
-/**
- * POST /uploads/presigned
- * Get a presigned URL for direct upload
- */
-router.post(
-  '/presigned',
-  authenticate,
-  requirePermission('products:write'),
-  async (req: Request, res: Response, next: NextFunction) => {
-    try {
-      const parsed = z
-        .object({
-          filename: z.string().min(1),
-          contentType: z.string().min(1),
-          folder: z.string().optional(),
-          // Read below as a store-id candidate; was cast from `req.body`
-          // unvalidated, so a non-string reached checkStoreAccess. `nullish`
-          // keeps a client that sends `storeId: null` working.
-          storeId: z.string().nullish(),
-        })
-        .safeParse(req.body);
-      if (!parsed.success) {
-        res.status(400).json({
-          success: false,
-          error: { code: 'MISSING_PARAMS', message: 'filename and contentType are required' },
-        });
-        return;
-      }
-      const { filename, contentType, folder, storeId: parsedBodyStoreId } = parsed.data;
-
-      // Validate content type against allowed types
-      const allowedContentTypes = [
-        'image/jpeg',
-        'image/png',
-        'image/gif',
-        'image/webp',
-        'image/x-icon',
-        'image/vnd.microsoft.icon',
-      ];
-      if (!allowedContentTypes.includes(contentType)) {
-        res.status(400).json({
-          success: false,
-          error: {
-            code: 'INVALID_TYPE',
-            message: `Invalid content type: ${contentType}. Allowed: ${allowedContentTypes.join(', ')}`,
-          },
-        });
-        return;
-      }
-
-      const sanitizedFolder = (folder || 'misc').replace(/[^a-zA-Z0-9_-]/g, '');
-      if (!ALLOWED_FOLDERS.has(sanitizedFolder)) {
-        res.status(400).json({
-          success: false,
-          error: {
-            code: 'INVALID_FOLDER',
-            message: `Folder '${sanitizedFolder}' is not allowed. Allowed: ${Array.from(ALLOWED_FOLDERS).join(', ')}`,
-          },
-        });
-        return;
-      }
-      const queryStoreId = (req.query.storeId as string | undefined) || undefined;
-      const bodyStoreId = parsedBodyStoreId || undefined;
-      const headerStoreId = (req.headers['x-store-id'] as string | undefined) || undefined;
-      const presignedStoreId =
-        queryStoreId || bodyStoreId || headerStoreId || req.user?.storeId || null;
-      // Same ownership guard as POST /uploads/image — the storeId
-      // becomes the R2 key prefix verbatim, so we can't trust whatever
-      // the caller passes. super_admin bypasses (no storeId, legacy
-      // platform path); store_admin must own the resolved storeId.
-      if (presignedStoreId) {
-        const access = await checkStoreAccess(presignedStoreId, req.user!);
-        if (!access.ok) {
-          res
-            .status(access.status)
-            .json({ success: false, error: { code: access.code, message: access.message } });
-          return;
-        }
-      } else if (req.user?.role !== 'super_admin') {
-        res.status(403).json({
-          success: false,
-          error: { code: 'FORBIDDEN', message: 'storeId is required for non-super-admin uploads' },
-        });
-        return;
-      }
-      const result = await StorageService.getUploadUrl(
-        filename,
-        contentType,
-        sanitizedFolder,
-        3600,
-        presignedStoreId
-      );
-
-      res.json({
-        success: true,
-        data: result,
       });
     } catch (error) {
       next(error);
