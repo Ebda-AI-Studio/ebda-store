@@ -230,3 +230,13 @@ describe('PDP gallery is a named region with prev/next buttons', () => {
     expect(container.querySelector('button[data-gallery-next]')).toBeNull();
   });
 });
+
+// Taste re-audit P2-1 (quality bar § 8, Y-05): "متوفر" / "In stock" rendered on every
+// in-stock PDP, a status true for almost every item. The stock line shows only when it says
+// something: pre-order or out of stock.
+describe('PDP stock line only when it is news (P2-1)', () => {
+  it('an in-stock product shows no stock line', async () => {
+    const { container } = await renderPdp({});
+    expect(container.textContent).not.toMatch(/In stock|متوفر(?! )/);
+  });
+});

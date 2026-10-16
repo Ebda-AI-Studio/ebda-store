@@ -1232,17 +1232,19 @@ export default function ProductDetailClient({
                       +
                     </button>
                   </div>
-                  {effectiveInventory !== undefined && effectiveInventory !== null && (
-                    <span className="text-sm text-muted-foreground">
-                      {/* From the same stock answer as the button (X-02): a variant
-                          product's own inventory is 0, and a pre-order is not "out". */}
-                      {!outOfStock
-                        ? t('In stock', 'متوفر')
-                        : canBackorder
+                  {effectiveInventory !== undefined &&
+                    effectiveInventory !== null &&
+                    outOfStock && (
+                      <span className="text-sm text-muted-foreground">
+                        {/* From the same stock answer as the button (X-02): a variant
+                          product's own inventory is 0, and a pre-order is not "out".
+                          Taste re-audit P2-1: "in stock" is true for almost every item, so
+                          only pre-order and out of stock are said (quality bar § 8). */}
+                        {canBackorder
                           ? t('Available to pre-order', 'متاح للطلب المسبق')
                           : t('Out of stock', 'غير متوفر')}
-                    </span>
-                  )}
+                      </span>
+                    )}
                 </div>
                 {/* BUG 2 fix: discount badge stacked directly below the OOS
                     indicator row when product is out of stock (and not
