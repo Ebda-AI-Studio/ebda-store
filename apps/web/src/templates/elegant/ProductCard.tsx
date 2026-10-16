@@ -32,7 +32,12 @@ import { PlaceholderImageIcon } from '../shared/icons';
 import { TaxInclusiveLabel } from '../shared/tax-inclusive-label';
 import { productCardPropsEqual } from '../shared/product-card-memo';
 import { getProductPricing, getDiscountBadgeText } from '../../lib/product-pricing';
-import { OosImageDim, ProductCardCta, OutOfStockRibbon } from '../shared/ProductCardCta';
+import {
+  OosImageDim,
+  ProductCardCta,
+  OutOfStockRibbon,
+  isProductNew,
+} from '../shared/ProductCardCta';
 import { getDiscountBadgeColor } from '../shared/discount-badge';
 import {
   getCustomBadgeColor,
@@ -187,7 +192,7 @@ function ElegantProductCard({
     // Issue #1997 — the NEW badge below renders at logical top-start under
     // this exact condition; a discount/custom badge avoiding a reserved
     // heart corner must not land on top of it.
-    newOrBrandBadgeReserved: Boolean(orderable && product.isNew),
+    newOrBrandBadgeReserved: Boolean(orderable && isProductNew(product)),
     // The mobile quick-add CTA band below is an unconditional full-width
     // overlay (hidden only via a `lg:` desktop hover state, never removed
     // from the DOM), so it reserves the whole bottom edge.
@@ -347,7 +352,7 @@ function ElegantProductCard({
 
           {/* NEW badge — BUG 2 fix: no inStock gate removed from the group;
               NEW stays top corner, only shown when orderable (unchanged). */}
-          {orderable && product.isNew && (
+          {orderable && isProductNew(product) && (
             <ProductBadgeGroup absolute position={isRtl ? 'top-right' : 'top-left'} isRtl={isRtl}>
               <ProductBadge
                 variant="new"

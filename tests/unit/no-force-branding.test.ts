@@ -98,6 +98,8 @@ const PHASE_B_PENDING: Record<string, string> = {
     'builder/templates/layout workstream (excluded)',
   'apps/web/src/templates/card-mappers-cta.test.tsx':
     'PecannbeeProductCard rename (blocked on templates workstream)',
+  'apps/web/src/templates/card-new-badge.test.tsx':
+    'PecannbeeProductCard rename (blocked on templates workstream)',
   'apps/web/src/templates/shared/card-overflow.test.tsx':
     'PecannbeeProductCard rename (blocked on templates workstream)',
   'apps/web/src/templates/shared/sold-out-corner.test.tsx':

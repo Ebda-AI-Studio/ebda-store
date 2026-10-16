@@ -53,6 +53,9 @@ const productSelect = {
   badgeLabelAr: true,
   // Card fact chips. BOUNDED-stale within the 5-minute recommendation cache.
   facts: true,
+  // Card "New" badge: every card path reads isProductNew (createdAt inside the
+  // window). Without it the badge never rendered on these strips.
+  createdAt: true,
   images: {
     take: 2, // primary + hover-reveal second image on recommendation cards
     orderBy: { position: 'asc' as const },

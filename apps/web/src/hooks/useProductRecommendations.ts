@@ -43,6 +43,8 @@ export interface RecommendedProduct {
   options?: TemplateProduct['options'];
   /** Fact chips on the card. */
   facts?: TemplateProduct['facts'];
+  /** Feeds the card "New" badge. */
+  createdAt?: string | null;
 }
 
 /** `loading` and `empty` are deliberately distinct from `error`: "nothing to

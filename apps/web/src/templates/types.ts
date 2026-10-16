@@ -42,6 +42,12 @@ export interface TemplateProduct {
   rating?: number;
   reviewCount?: number;
   isNew?: boolean;
+  /**
+   * When the product was created. Every card path decides the "New" badge with
+   * `isProductNew` (an explicit `isNew` or a createdAt inside the window); the
+   * adapters must carry it or the badge never renders (W1c carry).
+   */
+  createdAt?: string | null;
   isFeatured?: boolean;
   /**
    * Merchant-authored free-text card badge (EN / AR). Absent or empty means

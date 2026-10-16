@@ -38,7 +38,12 @@ import { PlaceholderImageIcon } from '../shared/icons';
 import { CompareButton, RemoveFromWishlistButton } from '../shared/card-actions';
 import { TaxInclusiveLabel } from '../shared/tax-inclusive-label';
 import { productCardPropsEqual } from '../shared/product-card-memo';
-import { OosImageDim, ProductCardCta, OutOfStockRibbon } from '../shared/ProductCardCta';
+import {
+  OosImageDim,
+  ProductCardCta,
+  OutOfStockRibbon,
+  isProductNew,
+} from '../shared/ProductCardCta';
 import { SwatchDots } from '../../components/commerce/SwatchDots';
 import { FactChips } from '../../components/commerce/FactChips';
 
@@ -190,7 +195,7 @@ function ModernProductCard({
     // Issue #1997 — the NEW badge below renders at logical top-start under
     // this exact condition; a discount/custom badge avoiding a reserved
     // heart corner must not land on top of it.
-    newOrBrandBadgeReserved: Boolean(orderable && product.isNew),
+    newOrBrandBadgeReserved: Boolean(orderable && isProductNew(product)),
     // The mobile quick-add CTA band below is an unconditional full-width
     // overlay (hidden only via a `lg:` desktop hover state, never removed
     // from the DOM), so it reserves the whole bottom edge.
@@ -304,7 +309,7 @@ function ModernProductCard({
               ribbon (OutOfStockRibbon below) to match the pecannbee/
               alkahraman target across every theme. NEW stays top corner,
               only shown when orderable (unchanged). */}
-          {orderable && product.isNew && (
+          {orderable && isProductNew(product) && (
             <ProductBadgeGroup absolute position={isRtl ? 'top-right' : 'top-left'} isRtl={isRtl}>
               <ProductBadge variant="new" isRtl={isRtl} size="sm" />
             </ProductBadgeGroup>

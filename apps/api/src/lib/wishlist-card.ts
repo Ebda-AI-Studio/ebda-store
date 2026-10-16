@@ -53,6 +53,8 @@ interface WishlistProductRow {
   }>;
   options?: unknown;
   facts?: unknown;
+  /** Feeds the card "New" badge (isProductNew); the wishlist reads include every scalar. */
+  createdAt?: Date | string | null;
 }
 
 export function wishlistCardProduct(p: WishlistProductRow) {
@@ -88,5 +90,6 @@ export function wishlistCardProduct(p: WishlistProductRow) {
     })),
     options: p.options,
     facts: p.facts,
+    createdAt: p.createdAt ?? undefined,
   };
 }
