@@ -118,7 +118,7 @@ export function CategoryStrip({
             // row that already fills renders exactly as before.
             // scroll-ps-4 (LB-06, W2a, look stores): snapping the first tile keeps the 16px
             // inline-start gutter, so the row starts aligned with the heading and only the end peeks.
-            className={`-mx-4 flex snap-x snap-mandatory ${onLook ? 'scroll-ps-4 ' : ''}${gridGapClass(cardGap)} overflow-x-auto overscroll-x-contain touch-pan-x px-4 pb-6 [justify-content:safe_center]`}
+            className={`-mx-4 flex snap-x snap-mandatory ${onLook ? 'scroll-ps-4 ' : ''}${gridGapClass(cardGap)} overflow-x-auto overscroll-x-contain touch-pan-x px-4 pb-6 ${onLook ? 'justify-start' : '[justify-content:safe_center]'}`}
             style={{ scrollbarWidth: 'thin' }}
           >
             {categories.map((cat, i) => {

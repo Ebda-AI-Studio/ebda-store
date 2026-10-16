@@ -557,14 +557,27 @@ describe('homepage piece fetch is never capped below the referenced ids', async 
   });
 });
 
-describe('the category strip centres a short row (quality bar L-05)', async () => {
+describe('the category strip: a short row (quality bar L-05, taste re-audit P2-9)', async () => {
   const { CategoryStrip } = await import('../../apps/web/src/templates/shared/CategoryStrip');
   const { CATEGORIES } = await import('../fixtures/builder/homepage-data');
-  it('the scroll row is `justify-content: safe center` (start when it overflows)', () => {
-    const html = renderToStaticMarkup(
-      <CategoryStrip categories={CATEGORIES as any} isRtl urlPrefix="" pack="qamar" />
-    );
-    expect(html).toMatch(/<ul class="[^"]*\[justify-content:safe_center\]/);
+  const strip = (look: string | null) => {
+    const prev = ctx.store;
+    ctx.store = { ...ctx.store, look };
+    try {
+      return renderToStaticMarkup(
+        <CategoryStrip categories={CATEGORIES as any} isRtl urlPrefix="" pack="qamar" />
+      );
+    } finally {
+      ctx.store = prev;
+    }
+  };
+  it('no look: `justify-content: safe center` (start when it overflows), as L-05 set it', () => {
+    expect(strip(null)).toMatch(/<ul class="[^"]*\[justify-content:safe_center\]/);
+  });
+  it('a look store: start-aligned on the grid, like its start-aligned heading (P2-9)', () => {
+    const html = strip('qamar.lookbook');
+    expect(html).not.toMatch(/\[justify-content:safe_center\]/);
+    expect(html).toMatch(/<ul class="[^"]*\bjustify-start\b/);
   });
 });
 
