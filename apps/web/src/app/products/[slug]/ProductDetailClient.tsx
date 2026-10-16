@@ -1224,9 +1224,16 @@ export default function ProductDetailClient({
               </div>
 
               {/* Below the buy block: the category chip and the description (fold rule above). */}
-              {categoryName && (
-                <div className="mt-6">
-                  <Badge variant="secondary">{categoryName}</Badge>
+              {/* L-08: on phones (no breadcrumb below md) the category is a link back to its PLP;
+                  from md the breadcrumb carries it, so no second, unlinked label. */}
+              {categoryName && cat0?.category?.slug && (
+                <div className="mt-6 md:hidden">
+                  <Link
+                    href={storeUrl(`/products?category=${cat0.category.slug}`)}
+                    className="inline-flex min-h-11 items-center gap-1 text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
+                  >
+                    {categoryName}
+                  </Link>
                 </div>
               )}
               {displayDescription && (

@@ -153,3 +153,13 @@ describe('L-08: the desktop PDP gallery stays in view while the buy column scrol
     expect(src).toMatch(/className="space-y-4 md:col-span-5 md:sticky md:top-24 md:self-start"/);
   });
 });
+
+describe('L-08: the PDP category chip is the phone way back to the category, never a stray label', () => {
+  it('a link to the category PLP, phones only (the breadcrumb carries it from md)', () => {
+    const src = read('app/products/[slug]/ProductDetailClient.tsx');
+    expect(src).not.toMatch(/<Badge variant="secondary">\{categoryName\}<\/Badge>/);
+    expect(src).toMatch(
+      /className="mt-6 md:hidden"[\s\S]{0,200}href=\{storeUrl\(`\/products\?category=\$\{cat0\.category\.slug\}`\)\}/
+    );
+  });
+});
