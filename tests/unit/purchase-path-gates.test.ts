@@ -248,3 +248,24 @@ describe('error surfaces: 44px actions, no palette orange', () => {
     expect(s).toMatch(/minHeight: 44/);
   });
 });
+
+describe('no Tailwind orange in the storefront (Ahmad 2026-10-16)', () => {
+  it('no *-orange-N utility in any storefront file', async () => {
+    const { readdirSync, statSync } = await import('node:fs');
+    const walk = (d: string): string[] =>
+      readdirSync(d).flatMap(f => {
+        const p = path.join(d, f);
+        return statSync(p).isDirectory()
+          ? walk(p)
+          : /\.tsx?$/.test(f) && !/\.test\./.test(f)
+            ? [p]
+            : [];
+      });
+    const hits = walk(WEB).filter(f =>
+      /\b(?:bg|text|border|ring|from|to|via|fill|stroke|outline|shadow)-orange-\d/.test(
+        readFileSync(f, 'utf8')
+      )
+    );
+    expect(hits.map(f => path.relative(WEB, f))).toEqual([]);
+  });
+});
