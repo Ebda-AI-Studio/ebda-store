@@ -14,6 +14,7 @@ import en from '../messages/en.json';
 import ar from '../messages/ar.json';
 import { intlFormats } from '../formats';
 import { formatPrice } from '@/lib/format';
+import { NON_LATIN_NUMERAL as ARABIC_INDIC } from '../numerals';
 
 type Tree = { [k: string]: string | Tree };
 
@@ -22,8 +23,6 @@ function leaves(tree: Tree, prefix = ''): [string, string][] {
     typeof v === 'string' ? [[prefix + k, v] as [string, string]] : leaves(v, `${prefix}${k}.`)
   );
 }
-
-const ARABIC_INDIC = /[٠-٩۰-۹]/;
 
 describe('admin ICU numbers render Latin digits (issue 1971)', () => {
   for (const [name, catalogue] of [

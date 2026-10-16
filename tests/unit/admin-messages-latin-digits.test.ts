@@ -1,11 +1,13 @@
 /**
- * Ruling NUMERALS-1: the admin uses Western digits (0-9) in both languages. Arabic-Indic
- * (٠-٩) or extended (۰-۹) digits in an admin message file are a regression, except where the
- * copy SHOWS the storefront's Arabic-Indic option itself.
+ * Ruling NUMERALS-1: the admin uses Western digits (0-9) and the Western percent sign in both
+ * languages. Arabic-Indic (٠-٩) or extended (۰-۹) digits, or the Arabic percent sign (٪), in an
+ * admin message file are a regression, except where the copy SHOWS the storefront's
+ * Arabic-Indic option itself. The character class lives in ONE place, `i18n/numerals.ts`.
  */
 import { describe, it, expect } from 'vitest';
 import ar from '../../apps/admin/src/i18n/messages/ar.json';
 import en from '../../apps/admin/src/i18n/messages/en.json';
+import { NON_LATIN_NUMERAL as NON_LATIN_DIGIT } from '../../apps/admin/src/i18n/numerals';
 
 type Messages = { [key: string]: string | Messages };
 function flatten(obj: Messages, prefix = '', out: Record<string, string> = {}) {
@@ -23,7 +25,6 @@ const SHOWS_THE_OPTION = new Set([
   'branding.theme.arabicNumerals.hint',
   'branding.theme.arabicNumerals.arabic',
 ]);
-const NON_LATIN_DIGIT = /[٠-٩۰-۹]/;
 
 describe('admin message files use Western digits (NUMERALS-1)', () => {
   it.each([
@@ -34,6 +35,11 @@ describe('admin message files use Western digits (NUMERALS-1)', () => {
       .filter(([k, v]) => !SHOWS_THE_OPTION.has(k) && NON_LATIN_DIGIT.test(v))
       .map(([k]) => k);
     expect(offenders).toEqual([]);
+  });
+
+  it('the shared class covers both digit blocks and the Arabic percent sign', () => {
+    for (const c of ['٠', '٩', '۰', '۹', '٪']) expect(NON_LATIN_DIGIT.test(c), c).toBe(true);
+    for (const c of ['0', '9', '%', '٫']) expect(NON_LATIN_DIGIT.test(c), c).toBe(false);
   });
 
   it('the allowlist is still needed (a stale entry fails)', () => {
