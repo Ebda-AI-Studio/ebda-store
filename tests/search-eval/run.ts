@@ -3,29 +3,30 @@
  * Search quality eval (search program P1, Task 13; Ruling SEARCH-10). MANUAL / on demand, never
  * per-push: it needs a real embedding model (and, for --generate-ai-terms, Gemini).
  *
- * Seeds the SYNTHETIC store of catalogue.ts into a throwaway store on DATABASE_URL (a LOCAL scratch
- * database: any host other than localhost / 127.0.0.1 / ::1 is refused), embeds it with the
- * production indexer, runs every query through the production code (`searchProductIds`,
+ * Seeds the SYNTHETIC store of catalogue.ts into a throwaway store on DATABASE_URL, embeds it with
+ * the production indexer, runs every query through the production code (`searchProductIds`,
  * `semanticProductIds`, `rankedSearchWithMode`: budgets, race, cache, SQL), and scores keyword-only
  * against hybrid per query class, for keyword-strong thresholds 20 / 50 / none and vector
- * distances 0.45 / 0.55 / 0.65 / none. Exit 0 = the shipped configuration meets the bar, 1 = below
- * the bar (a finding, not a test to edit), 2 = harness error, 3 = fake embeddings (NOT
- * REPRESENTATIVE: no verdict).
+ * distances 0.45 / 0.55 / 0.65 / none. DATABASE_URL and REDIS_URL must both be loopback (guards.ts:
+ * the eval writes a store and INCRs the shared embed-budget counters). Exit 0 = the shipped
+ * configuration meets the bar, 1 = below the bar (a finding, not a test to edit), 2 = harness
+ * error, 3 = fake embeddings (NOT REPRESENTATIVE: no verdict).
  *
  * Embedding provider, first that applies:
- *   SEARCH_EVAL_EMBED_URL   the local proxy Worker (embed-proxy/, `wrangler dev`, real bge-m3 via
- *                           the AI binding on the logged-in account; no token copied anywhere)
+ *   --real                the local proxy Worker (embed-proxy/), started and stopped by this run:
+ *                         real bge-m3 via the AI binding on the `wrangler login` account (Whisky),
+ *                         127.0.0.1 only, a per-run secret header (proxy.ts); no token copied
  *   CF_AI_ACCOUNT_ID + CF_AI_API_TOKEN   the production REST provider
- *   neither                 a hash fake (plumbing only)
+ *   neither               a hash fake (plumbing only)
  * Query vectors are fetched once, up front, outside the 400 ms race (a laptop's round trip to
  * Workers AI is not the Worker's), then served to the production path from memory: the eval
  * measures quality; latency is Task 14's job.
  *
- *   npx wrangler dev -c tests/search-eval/embed-proxy/wrangler.jsonc --ip 127.0.0.1 --port 8799 &
  *   DATABASE_URL=$TEST_DB DIRECT_URL=$TEST_DB REDIS_URL=$TEST_REDIS \
- *     SEARCH_EVAL_EMBED_URL=http://127.0.0.1:8799 npm run search:eval -- --ai-terms --out f.json
+ *     npm run search:eval -- --real --ai-terms --out f.json
  * ($TEST_DB = the migrated local pg17 + pgvector of the plan's Global Constraints.)
  *
+ * --real                real bge-m3 (above)
  * --ai-terms            fill products.search_terms from ai-terms.json (Task 8 generator output)
  * --generate-ai-terms   regenerate ai-terms.json with the Task 8 generator first (GEMINI_API_KEY;
  *                       one Gemini call per product), then run with them
@@ -34,6 +35,7 @@
  */
 import { readFileSync, writeFileSync } from 'node:fs';
 import { assertLocalTargets } from './guards';
+import { startEmbedProxy } from './proxy';
 import { createHash } from 'node:crypto';
 import { catalogueRows, evalQueries, EVAL_ABSENT, EVAL_FORMS, type EvalQuery } from './catalogue';
 import {
@@ -99,23 +101,13 @@ async function main(): Promise<number> {
   const { fakeVector } = await import('../helpers/fake-embeddings');
 
   // ---- embedding provider -------------------------------------------------------------------
-  const proxyUrl = process.env.SEARCH_EVAL_EMBED_URL;
   const remote = ep.getEmbeddingProvider(); // REST when CF_AI_* are set
-  const mode: 'proxy' | 'rest' | 'fake' = proxyUrl ? 'proxy' : remote ? 'rest' : 'fake';
+  const proxy = arg('--real') ? await startEmbedProxy(ep.EMBED_MAX_BATCH) : null;
+  const mode: 'proxy' | 'rest' | 'fake' = proxy ? 'proxy' : remote ? 'rest' : 'fake';
   const backend = async (texts: string[]): Promise<number[][]> => {
-    if (mode === 'fake') return texts.map(fakeVector);
+    if (proxy) return proxy.embed(texts);
     if (mode === 'rest') return remote!.embed(texts);
-    const out: number[][] = [];
-    for (let i = 0; i < texts.length; i += ep.EMBED_MAX_BATCH) {
-      const res = await fetch(proxyUrl!, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ text: texts.slice(i, i + ep.EMBED_MAX_BATCH) }),
-      });
-      if (!res.ok) throw new Error(`embed proxy HTTP ${res.status}`);
-      out.push(...((await res.json()) as { data: number[][] }).data);
-    }
-    return out;
+    return texts.map(fakeVector);
   };
   const prefetched = new Map<string, number[]>();
   let providerCalls = 0;
@@ -491,6 +483,7 @@ async function main(): Promise<number> {
     }
     await owner.$disconnect();
     await redis.disconnect();
+    proxy?.stop();
   }
 }
 
