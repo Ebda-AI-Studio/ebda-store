@@ -258,7 +258,7 @@ export function RouteErrorFallback({ error, reset }: RouteErrorFallbackProps) {
         {(!isTemporarilyUnavailable || !isPlatform) && (
           <Link
             href={storeUrl('/')}
-            className="rounded-lg border border-border px-5 py-2 text-sm font-medium text-foreground transition-colors hover:bg-muted"
+            className="rounded-lg border border-input px-5 py-2 text-sm font-medium text-foreground transition-colors hover:bg-muted"
           >
             {t('Go Home', 'العودة للرئيسية')}
           </Link>

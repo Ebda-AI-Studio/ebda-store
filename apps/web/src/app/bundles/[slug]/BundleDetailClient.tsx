@@ -283,7 +283,7 @@ export default function BundleDetailClient({ initialBundle }: BundleDetailClient
                   <span className="text-sm font-medium text-foreground">
                     {t('Quantity', 'الكمية')}:
                   </span>
-                  <div className="flex items-center rounded-lg border border-border">
+                  <div className="flex items-center rounded-lg border border-input">
                     <button
                       type="button"
                       onClick={() => setQuantity(Math.max(1, quantity - 1))}

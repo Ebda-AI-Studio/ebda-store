@@ -21,7 +21,7 @@ export function CategoryChips({
           <li key={c.id} className="shrink-0 snap-start">
             <Link
               href={`${urlPrefix}/products?category=${encodeURIComponent(c.slug)}`}
-              className="inline-flex min-h-[44px] items-center rounded-[var(--radius)] border border-border px-4 text-sm text-foreground hover:border-foreground"
+              className="inline-flex min-h-[44px] items-center rounded-[var(--radius)] border border-input px-4 text-sm text-foreground hover:border-foreground"
             >
               {isRtl ? c.nameAr || c.name : c.name || c.nameAr}
             </Link>

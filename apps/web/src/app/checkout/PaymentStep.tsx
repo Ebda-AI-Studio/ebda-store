@@ -171,7 +171,7 @@ export default function PaymentStep({
                   className={`flex items-center gap-4 rounded-lg border p-4 cursor-pointer transition ${
                     selectedProvider === provider.id
                       ? 'border-primary bg-primary/5'
-                      : 'border-border hover:border-border/80'
+                      : 'border-input hover:border-input/80'
                   }`}
                 >
                   <input

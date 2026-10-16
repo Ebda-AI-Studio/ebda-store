@@ -162,7 +162,7 @@ export function PushNotificationPrompt() {
           type="button"
           onClick={handleDismiss}
           aria-label={t('Dismiss notification prompt', 'تجاهل إشعار التنبيه')}
-          className="rounded-lg border border-border px-3 py-1.5 text-xs text-muted-foreground hover:bg-muted"
+          className="rounded-lg border border-input px-3 py-1.5 text-xs text-muted-foreground hover:bg-muted"
         >
           {t('Dismiss', 'ليس الآن')}
         </button>

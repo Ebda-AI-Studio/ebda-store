@@ -205,7 +205,7 @@ export default function VerifyEmailClient() {
                   </button>
                   <Link
                     href={storeUrl('/')}
-                    className="inline-flex w-full items-center justify-center rounded-lg border border-border px-6 py-3 font-medium text-foreground hover:bg-muted transition"
+                    className="inline-flex w-full items-center justify-center rounded-lg border border-input px-6 py-3 font-medium text-foreground hover:bg-muted transition"
                   >
                     {t(
                       'Back to Home',
@@ -252,7 +252,7 @@ export default function VerifyEmailClient() {
                   </Link>
                   <Link
                     href={storeUrl('/')}
-                    className="inline-flex w-full items-center justify-center rounded-lg border border-border px-6 py-3 font-medium text-foreground hover:bg-muted transition"
+                    className="inline-flex w-full items-center justify-center rounded-lg border border-input px-6 py-3 font-medium text-foreground hover:bg-muted transition"
                   >
                     {t(
                       'Back to Home',

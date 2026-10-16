@@ -227,7 +227,7 @@ export default function DahabHeader({
             <button
               type="button"
               onClick={() => setLanguage(language === 'ar' ? 'en' : 'ar')}
-              className="min-h-[44px] rounded-sm border border-border px-4 text-sm text-foreground/85 hover:border-primary hover:text-primary"
+              className="min-h-[44px] rounded-sm border border-input px-4 text-sm text-foreground/85 hover:border-primary hover:text-primary"
               lang={language === 'ar' ? 'en' : 'ar'}
             >
               {language === 'ar' ? 'English' : 'العربية'}

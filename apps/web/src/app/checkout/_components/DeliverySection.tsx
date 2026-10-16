@@ -79,8 +79,8 @@ export function DeliverySection({
                       selected
                         ? 'border-primary bg-primary/5 text-foreground'
                         : w.available
-                          ? 'border-border text-foreground hover:border-border/80'
-                          : 'cursor-not-allowed border-border/50 text-muted-foreground opacity-50'
+                          ? 'border-input text-foreground hover:border-input/80'
+                          : 'cursor-not-allowed border-input/50 text-muted-foreground opacity-50'
                     }`}
                   >
                     <span className="font-medium">{language === 'ar' ? w.labelAr : w.label}</span>

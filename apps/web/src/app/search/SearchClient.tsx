@@ -271,7 +271,7 @@ function SearchContent() {
               onClick={() => setShowFilters(v => !v)}
               aria-expanded={showFilters}
               aria-controls="search-filters"
-              className="flex h-11 w-full items-center justify-between rounded-xl border border-border bg-card px-4 text-sm font-medium text-foreground transition-colors hover:bg-muted"
+              className="flex h-11 w-full items-center justify-between rounded-xl border border-input bg-card px-4 text-sm font-medium text-foreground transition-colors hover:bg-muted"
             >
               <span className="inline-flex items-center gap-2">
                 <svg
@@ -337,7 +337,7 @@ function SearchContent() {
                     },
                     ...categories.map(cat => ({ value: cat.id, label: cat.name })),
                   ]}
-                  className="flex-1 min-w-[14rem] h-11 rounded-lg border border-border bg-background px-3 text-base focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 lg:h-10 lg:text-sm"
+                  className="flex-1 min-w-[14rem] h-11 rounded-lg border border-input bg-background px-3 text-base focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 lg:h-10 lg:text-sm"
                 />
               </div>
             )}
@@ -351,7 +351,7 @@ function SearchContent() {
                 value={sortBy}
                 onChange={e => handleSortChange(e.target.value as SortValue)}
                 options={getSortOptions(t).map(opt => ({ value: opt.value, label: opt.label }))}
-                className="flex-1 min-w-[12rem] h-11 rounded-lg border border-border bg-background px-3 text-base focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 lg:h-10 lg:text-sm"
+                className="flex-1 min-w-[12rem] h-11 rounded-lg border border-input bg-background px-3 text-base focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 lg:h-10 lg:text-sm"
               />
             </div>
 

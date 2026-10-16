@@ -22,7 +22,7 @@ export function ProductsPagination({ meta, page, onPageChange }: ProductsPaginat
       <button
         onClick={() => onPageChange(Math.max(1, page - 1))}
         disabled={page === 1}
-        className="min-h-11 rounded-lg border border-border px-4 py-2 text-sm font-medium transition-colors hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed"
+        className="min-h-11 rounded-lg border border-input px-4 py-2 text-sm font-medium transition-colors hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed"
       >
         {t('Previous', 'السابق')}
       </button>
@@ -38,7 +38,7 @@ export function ProductsPagination({ meta, page, onPageChange }: ProductsPaginat
                 className={`flex h-11 w-11 items-center justify-center rounded-lg text-sm font-medium transition-colors ${
                   page === p
                     ? 'bg-primary text-primary-foreground'
-                    : 'border border-border hover:bg-muted'
+                    : 'border border-input hover:bg-muted'
                 }`}
               >
                 {localize(p)}
@@ -49,7 +49,7 @@ export function ProductsPagination({ meta, page, onPageChange }: ProductsPaginat
       <button
         onClick={() => onPageChange(Math.min(meta.totalPages, page + 1))}
         disabled={page === meta.totalPages}
-        className="min-h-11 rounded-lg border border-border px-4 py-2 text-sm font-medium transition-colors hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed"
+        className="min-h-11 rounded-lg border border-input px-4 py-2 text-sm font-medium transition-colors hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed"
       >
         {t('Next', 'التالي')}
       </button>

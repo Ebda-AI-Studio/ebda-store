@@ -429,7 +429,7 @@ export function DahabProductDetail(p: DahabProductDetailProps) {
             )}
 
             <div ref={buyRef} className="mt-8 flex items-stretch gap-3">
-              <div className="flex items-center rounded-[var(--radius)] border border-border">
+              <div className="flex items-center rounded-[var(--radius)] border border-input">
                 <button
                   type="button"
                   onClick={() => p.setQuantity(Math.max(1, p.quantity - 1))}
@@ -468,7 +468,7 @@ export function DahabProductDetail(p: DahabProductDetailProps) {
                     ? t('Remove from wishlist', 'إزالة من المفضلة')
                     : t('Add to wishlist', 'إضافة للمفضلة')
                 }
-                className="flex w-12 items-center justify-center rounded-[var(--radius)] border border-border text-foreground/80 hover:border-primary hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                className="flex w-12 items-center justify-center rounded-[var(--radius)] border border-input text-foreground/80 hover:border-primary hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
                 <HeartIcon className="h-5 w-5" filled={p.isWishlisted} />
               </button>

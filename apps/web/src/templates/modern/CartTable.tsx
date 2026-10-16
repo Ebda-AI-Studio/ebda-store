@@ -98,7 +98,7 @@ export default function ModernCartTable({
               </div>
 
               <div className="flex items-center justify-between gap-3">
-                <div className="flex items-center gap-2 rounded-lg border border-border/60 p-1">
+                <div className="flex items-center gap-2 rounded-lg border border-input/60 p-1">
                   <button
                     type="button"
                     onClick={() => onUpdateQuantity?.(item.id, Math.max(1, item.quantity - 1))}

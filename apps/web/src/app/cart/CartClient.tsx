@@ -692,7 +692,7 @@ export default function CartClient() {
 
                             <div className="mt-auto flex items-center justify-between pt-2">
                               {/* Quantity Selector */}
-                              <div className="inline-flex items-center overflow-hidden rounded-md border border-border">
+                              <div className="inline-flex items-center overflow-hidden rounded-md border border-input">
                                 <button
                                   onClick={() => handleUpdateQuantity(item.id, item.quantity - 1)}
                                   disabled={item.unavailable || item.quantity <= 1}

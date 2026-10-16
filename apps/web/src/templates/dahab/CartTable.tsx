@@ -81,7 +81,7 @@ export default function DahabCartTable({
                 </p>
               </div>
               <div className="mt-auto flex items-center justify-between">
-                <div className="flex items-center rounded-[var(--radius)] border border-border">
+                <div className="flex items-center rounded-[var(--radius)] border border-input">
                   <button
                     type="button"
                     disabled={item.unavailable || item.quantity <= 1}

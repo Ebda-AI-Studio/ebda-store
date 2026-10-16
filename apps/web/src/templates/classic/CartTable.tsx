@@ -40,7 +40,7 @@ export default function ClassicCartTable({
           <div key={item.id} className="flex gap-5 p-5">
             <Link
               href={`${urlPrefix}/products/${item.slug}`}
-              className="h-28 w-28 flex-shrink-0 overflow-hidden bg-muted border border-border/60"
+              className="h-28 w-28 flex-shrink-0 overflow-hidden bg-muted border border-input/60"
             >
               {item.image ? (
                 <Image
@@ -98,7 +98,7 @@ export default function ClassicCartTable({
                 </button>
               </div>
               <div className="mt-4 flex items-center justify-between">
-                <div className="flex items-center border border-border">
+                <div className="flex items-center border border-input">
                   <button
                     type="button"
                     disabled={item.unavailable || item.quantity <= 1}
