@@ -127,3 +127,24 @@ describe('step 2 controls are 44px targets (P1-N4)', () => {
     );
   });
 });
+
+// a11y re-audit P2-N3: axe heading-order on step 2, an h3 "Shipping to" straight after the h1.
+describe('step 2 heading order (P2-N3)', () => {
+  it('the first heading in the step is an h2', () => {
+    const { container } = render(
+      <PaymentStep
+        formData={formData as never}
+        shippingNames={names}
+        onEditShipping={() => {}}
+        paymentProviders={[]}
+        selectedProvider="cod"
+        onSelectProvider={() => {}}
+        isProcessing={false}
+        total={10000}
+        formatPrice={n => String(n)}
+      />
+    );
+    const first = container.querySelector('h1, h2, h3, h4, h5, h6')!;
+    expect(first.tagName).toBe('H2');
+  });
+});

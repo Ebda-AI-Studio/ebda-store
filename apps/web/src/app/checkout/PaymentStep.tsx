@@ -76,7 +76,7 @@ export default function PaymentStep({
       {/* Shipping Summary */}
       <div className="rounded-[var(--radius)] border bg-card p-6 shadow-sm">
         <div className="flex items-center justify-between">
-          <h3 className="font-medium text-foreground">{t('Shipping to', 'الشحن إلى')}</h3>
+          <h2 className="font-medium text-foreground">{t('Shipping to', 'الشحن إلى')}</h2>
           <button
             type="button"
             onClick={onEditShipping}
