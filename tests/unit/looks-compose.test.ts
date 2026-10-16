@@ -29,9 +29,13 @@ describe('composeStoreTheme', () => {
     const t = composeStoreTheme({ template: 'minimal', look: 'qamar.deleted', theme: {} });
     expect(t.primaryColor).toBe(getTemplateTheme('minimal').primaryColor);
   });
-  it('null look = legacy store, unchanged behaviour', () => {
+  it('null look = legacy store, unchanged except the input floor (Ruling B1-90)', async () => {
+    const { boundaryColorFloor } = await import('@ebda/shared');
+    const skin = getTemplateTheme('modern');
     expect(composeStoreTheme({ template: 'modern', look: null, theme: { x: 1 } as any })).toEqual({
-      ...getTemplateTheme('modern'),
+      ...skin,
+      // taste re-audit no-look regression: --input reads >= 3:1 against the page
+      inputColor: boundaryColorFloor(skin.inputColor, skin.backgroundColor),
       x: 1,
     });
   });
@@ -83,12 +87,18 @@ describe('look UI tokens (W2a token plumbing): merchant > look > skin', () => {
     expect(t.overPhotoChrome).toBeUndefined();
     expect(t.receiptStyle).toBeUndefined();
   });
-  it('no look: the composed theme is the skin theme byte-for-byte (no UI token appears)', async () => {
-    const { LOOK_UI_TOKEN_KEYS } = await import('@ebda/shared');
+  it('no look: the composed theme is the skin theme byte-for-byte but the input floor (no UI token appears)', async () => {
+    const { LOOK_UI_TOKEN_KEYS, boundaryColorFloor } = await import('@ebda/shared');
     const skins = ['modern', 'classic', 'minimal', 'bold', 'elegant', 'dahab', 'qamar'] as const;
     for (const template of skins) {
       const t = composeStoreTheme({ template, look: null, theme: {} });
-      expect(JSON.stringify(t), template).toBe(JSON.stringify(getTemplateTheme(template)));
+      const skin = getTemplateTheme(template);
+      // Ruling B1-90: --input is held to >= 3:1 against the page; every other key is the skin's.
+      const want = {
+        ...skin,
+        inputColor: boundaryColorFloor(skin.inputColor, skin.backgroundColor),
+      };
+      expect(JSON.stringify(t), template).toBe(JSON.stringify(want));
       for (const k of LOOK_UI_TOKEN_KEYS) expect(k in t, `${template}.${k}`).toBe(false);
     }
   });

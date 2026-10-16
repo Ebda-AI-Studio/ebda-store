@@ -11,6 +11,7 @@ import path from 'node:path';
 import {
   LOOKS,
   contrastRatio,
+  boundaryColorFloor,
   composeStoreTheme,
   getTemplateTheme,
   deriveCoreBrandTokens,
@@ -50,10 +51,12 @@ describe('stores with saved colours keep their field colour (N1)', () => {
     }
   });
 
-  it('no look + a saved custom border colour: fields draw in that border (as before the sweep)', () => {
+  it('no look + a saved custom border colour: fields draw in that border, floored to 3:1 (B1-90)', () => {
     for (const id of Object.keys(TEMPLATE_THEMES) as TemplateId[]) {
       const t = composeStoreTheme({ template: id, theme: { borderColor: '12 40% 30%' } });
-      expect(t.inputColor, id).toBe('12 40% 30%');
+      // the saved border's hue and saturation; lightness only moves if it reads under 3:1
+      expect(t.inputColor, id).toBe(boundaryColorFloor('12 40% 30%', t.backgroundColor));
+      expect(t.inputColor.startsWith('12 40% '), id).toBe(true);
       expect(t.borderColor, id).toBe('12 40% 30%');
     }
     // an unregistered look id renders as legacy too
@@ -63,7 +66,7 @@ describe('stores with saved colours keep their field colour (N1)', () => {
         look: 'qamar.removed',
         theme: { borderColor: '1 2% 3%' },
       }).inputColor
-    ).toBe('1 2% 3%');
+    ).toBe(boundaryColorFloor('1 2% 3%', '0 0% 100%'));
   });
 
   it('an explicitly saved input colour wins; a look store keeps its muted input', () => {

@@ -29,7 +29,13 @@ export {
   hslToHex,
 } from './color';
 export type { ColorValue, ColorToken, Rgb } from './color';
-export { lightenColor, darkenColor, generateSectionPalette, deriveCoreBrandTokens } from './color';
+export {
+  lightenColor,
+  darkenColor,
+  generateSectionPalette,
+  deriveCoreBrandTokens,
+  boundaryColorFloor,
+} from './color';
 export type {
   PaletteSeeds,
   SectionPaletteEntry,
