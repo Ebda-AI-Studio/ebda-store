@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useT } from '@/i18n/useT';
 import { IMAGE_UPLOAD_ACCEPT } from '@ebda/shared';
 import { useImageUpload } from '../hooks/useImageUpload';
@@ -292,6 +292,12 @@ export function MultiImageUpload({
   const resolvedLabel = label ?? t('multiLabel');
   const { uploading, progress, error, setError, uploadMulti } = useImageUpload();
   const [localError, setLocalError] = useState<string | null>(null);
+  // The attach after an upload must see the values as they are THEN: the merchant can remove,
+  // reorder or add images while a batch is in flight, and the closure's copy would undo that.
+  const valuesRef = useRef(values);
+  useEffect(() => {
+    valuesRef.current = values;
+  }, [values]);
 
   const handleFiles = useCallback(
     async (fileList: FileList) => {
@@ -315,7 +321,7 @@ export function MultiImageUpload({
       // Attach every image that WAS stored, even when a later batch failed (I-1b); the hook
       // names the files it could not store in `error`.
       const { urls } = await uploadMulti(files, folder, storeId);
-      if (urls.length > 0) onChange([...values, ...urls]);
+      if (urls.length > 0) onChange([...valuesRef.current, ...urls]);
     },
     [folder, max, onChange, setError, storeId, t, uploadMulti, values]
   );
