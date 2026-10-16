@@ -52,6 +52,54 @@ describe('purchase-path manifest', () => {
   });
 });
 
+/**
+ * Rule (a) (W4): the taste gate scores a look only on the WHOLE purchase path, shot at
+ * 390 Arabic and 1280 English. The audit that scored Atelier 24 found its worst defects on
+ * screens the self-review never shot (payment step, cart remove, receipt).
+ */
+describe('(a) the screen manifest covers the whole purchase path', () => {
+  const REQUIRED = [
+    'home',
+    'category',
+    'pdp',
+    'pdp-add-missing-option',
+    'pdp-added',
+    'cart',
+    'cart-edit',
+    'cart-remove',
+    'checkout-shipping',
+    'checkout-shipping-errors',
+    'checkout-payment',
+    'receipt',
+    'footer',
+  ];
+  it('viewports are exactly 390 Arabic and 1280 English', () => {
+    expect(manifest.viewports).toEqual(['390-ar', '1280-en']);
+  });
+  it('lists every step from browse to receipt, in path order', () => {
+    const ids = (manifest.screens as Array<{ id: string }>).map(s => s.id);
+    expect(ids).toEqual(REQUIRED);
+  });
+  it('the shooting script implements every action the manifest names', async () => {
+    const { ACTIONS, viewportOf } = await import('../../scripts/taste/shoot-purchase-path.mjs');
+    for (const s of manifest.screens as Array<{ id: string; action?: string }>)
+      expect(Object.keys(ACTIONS), s.id).toContain(s.action ?? 'none');
+    expect(viewportOf('390-ar')).toMatchObject({ w: 390, lang: 'ar', mobile: true });
+    expect(viewportOf('1280-en')).toMatchObject({ w: 1280, lang: 'en', mobile: false });
+    expect(typeof manifest.secondProductPath).toBe('string');
+  });
+  // Set PURCHASE_PATH_SHOTS=<dir>:<prefix>[,<prefix>...] after a shoot to prove every
+  // screen x viewport exists for each look (the re-shoot evidence the taste gate reads).
+  const shots = process.env.PURCHASE_PATH_SHOTS;
+  it.skipIf(!shots)('every screen x viewport was shot for each prefix', () => {
+    const [dir, prefixes] = shots!.split(':');
+    for (const p of prefixes.split(','))
+      for (const s of REQUIRED)
+        for (const v of manifest.viewports as string[])
+          expect(existsSync(path.join(dir, `${p}-${s}-${v}.png`)), `${p}-${s}-${v}`).toBe(true);
+  });
+});
+
 describe('(b) no unthemed browser form controls on the purchase path', () => {
   it.each(manifest.files)('%s', f => {
     const s = src(f);

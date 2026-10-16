@@ -1,6 +1,7 @@
 {
   "$comment": "Quality bar § 10 (W4, Ruling B1-71): the purchase path every template and look is judged on. `files` feeds the token gates (no unthemed form controls, no colours outside the token set, 44px targets). `screens` is the taste gate's screen manifest: every screen at every viewport is shot before a look is scored. Gate: tests/unit/purchase-path-gates.test.ts.",
   "viewports": ["390-ar", "1280-en"],
+  "secondProductPath": "/products/silk-shawl",
   "screens": [
     { "id": "home", "path": "/" },
     { "id": "category", "path": "/products?category=abayas" },
