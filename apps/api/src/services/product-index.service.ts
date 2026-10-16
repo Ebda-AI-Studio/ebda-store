@@ -23,6 +23,7 @@ import {
 } from '../lib/search/embedding-provider';
 import logger from '../lib/logger';
 import { sendAlert } from './alerts.service';
+import { takeEmbedCalls } from '../lib/search/embed-budget';
 
 /** Must stay byte-identical across every query below: the hash is md5 of exactly this. */
 // A value-less Prisma.sql fragment (constant SQL, no Prisma.raw escape hatch).
@@ -376,6 +377,8 @@ export async function indexStore(
     if (plan.items.length === 0) return finish({ embedded, remaining: false, capped: false });
     let ok: Array<{ id: string; hash: string; lit: string }>;
     let failures: EmbedFailure[] = [];
+    // Account-wide ceiling on provider calls (SEARCH-T11-19): one call per batch, one per single.
+    if (!(await takeEmbedCalls(1))) return finish({ embedded, remaining: true, capped: true });
     try {
       const literals = await embedDocs(
         provider,
@@ -386,11 +389,15 @@ export async function indexStore(
     } catch (err) {
       // In-process there is no Inngest retry: go straight to the single pass + one retry.
       if (!(err instanceof EmbeddingError)) throw err;
+      if (!(await takeEmbedCalls(plan.items.length)))
+        return finish({ embedded, remaining: true, capped: true });
       const first = await embedSingles(provider, plan.items, embedThrottleMs());
       const again = retryableFailures(plan.items, first);
       let retried: SingleResult[] = [];
       if (again.length > 0) {
         await sleep(opts.retryBackoffMs ?? SINGLE_RETRY_BACKOFF_MS);
+        if (!(await takeEmbedCalls(again.length)))
+          return finish({ embedded, remaining: true, capped: true });
         retried = await embedSingles(provider, again, embedThrottleMs());
       }
       const settled = settleSingles(first, retried);

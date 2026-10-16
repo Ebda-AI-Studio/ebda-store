@@ -29,6 +29,10 @@ vi.mock('@ebda/database', async importOriginal => {
     },
   };
 });
+// The account-wide Redis budget (SEARCH-T11-19) is not what this file tests: always grant it.
+vi.mock('../../apps/api/src/lib/search/embed-budget', () => ({
+  takeEmbedCalls: vi.fn(async () => true),
+}));
 vi.mock('../../apps/api/src/lib/inngest/client', () => ({
   inngest: { send: vi.fn(), createFunction: vi.fn(() => ({})) },
 }));

@@ -41,6 +41,7 @@ import {
   type StaleDoc,
 } from '../../../services/product-index.service';
 import { EmbeddingError, getEmbeddingProvider } from '../../search/embedding-provider';
+import { takeEmbedCalls } from '../../search/embed-budget';
 import logger from '../../logger';
 
 export const REINDEX_EVENT = 'search/store.reindex-requested';
@@ -129,6 +130,8 @@ async function indexRounds(
     const batch = (await step.run(`embed-${round}`, async () => {
       const provider = getEmbeddingProvider();
       if (!provider) throw new NonRetriableError('search-index: embedding provider went away');
+      // Account-wide ceiling on provider calls (SEARCH-T11-19).
+      if (!(await takeEmbedCalls(1))) return { globalCapped: true };
       try {
         const literals = await embedDocs(
           provider,
@@ -143,7 +146,11 @@ async function indexRounds(
         if (err.retryable && attempt < INDEX_RETRIES) throw err;
         return { failed: err.kind };
       }
-    })) as { literals?: string[]; failed?: string };
+    })) as { literals?: string[]; failed?: string; globalCapped?: boolean };
+    if (batch.globalCapped) {
+      logger.warn({ storeId, embedded }, '[search-index] global daily embedding budget reached');
+      return { embedded, capped: 'global' };
+    }
 
     let settled: Settled;
     if (batch.literals) {
@@ -153,7 +160,9 @@ async function indexRounds(
         failures: [],
       };
     } else {
-      settled = await isolate(storeId, step, round, plan.items, batch.failed ?? 'provider');
+      const isolated = await isolate(storeId, step, round, plan.items, batch.failed ?? 'provider');
+      if (isolated === 'global-capped') return { embedded, capped: 'global' };
+      settled = isolated;
     }
 
     const res = (await step.run(`write-${round}`, () =>
@@ -195,29 +204,33 @@ async function isolate(
   round: number,
   items: StaleDoc[],
   batchKind: string
-): Promise<Settled> {
+): Promise<Settled | 'global-capped'> {
   // Review N-M3: memoized steps of ISOLATE_CHUNK products, so no step holds 25 sequential calls.
-  const singles = async (label: string, list: StaleDoc[]) => {
+  const singles = async (label: string, list: StaleDoc[]): Promise<SingleResult[] | null> => {
     const out: SingleResult[] = [];
     for (let c = 0; c * ISOLATE_CHUNK < list.length; c++) {
       const chunk = list.slice(c * ISOLATE_CHUNK, (c + 1) * ISOLATE_CHUNK);
-      out.push(
-        ...((await step.run(`${label}-${c}`, async () => {
-          const provider = getEmbeddingProvider();
-          if (!provider) throw new NonRetriableError('search-index: embedding provider went away');
-          return embedSingles(provider, chunk, embedThrottleMs());
-        })) as SingleResult[])
-      );
+      const res = (await step.run(`${label}-${c}`, async () => {
+        const provider = getEmbeddingProvider();
+        if (!provider) throw new NonRetriableError('search-index: embedding provider went away');
+        if (!(await takeEmbedCalls(chunk.length))) return null; // SEARCH-T11-19
+        return embedSingles(provider, chunk, embedThrottleMs());
+      })) as SingleResult[] | null;
+      if (res === null) return null;
+      out.push(...res);
     }
     return out;
   };
 
   const first = await singles(`single-${round}`, items);
+  if (first === null) return 'global-capped';
   const again = retryableFailures(items, first);
   let retried: SingleResult[] = [];
   if (again.length > 0) {
     await step.sleep(`backoff-${round}`, SINGLE_RETRY_BACKOFF);
-    retried = await singles(`retry-${round}`, again);
+    const r = await singles(`retry-${round}`, again);
+    if (r === null) return 'global-capped';
+    retried = r;
   }
   const settled = settleSingles(first, retried);
   if (settled.outage) {

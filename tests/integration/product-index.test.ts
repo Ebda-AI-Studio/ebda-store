@@ -153,6 +153,11 @@ describe.skipIf(!hasDb)('product embedding indexer (Task 11)', () => {
   let pid: string;
 
   beforeAll(async () => {
+    // The account-wide call budget lives in Redis and fails closed without it (SEARCH-T11-19).
+    const { redis } = await import('../../apps/api/src/services/redis.service');
+    await redis.connect();
+    const { embedCallBudgetKey } = await import('../../apps/api/src/lib/search/embed-budget');
+    await redis.getClient()?.del(embedCallBudgetKey(new Date()));
     const owner = await mkUser('main');
     ownerIds.push(owner.id);
     storeId = (await mkStore(owner.id, 'main')).id;
@@ -162,6 +167,7 @@ describe.skipIf(!hasDb)('product embedding indexer (Task 11)', () => {
   afterEach(() => {
     setEmbeddingProviderForTests(undefined);
     delete process.env.SEARCH_EMBED_STORE_DAILY_CAP;
+    delete process.env.SEARCH_EMBED_GLOBAL_DAILY_CAP;
     sent.length = 0;
   });
   afterAll(async () => {
@@ -712,6 +718,42 @@ describe.skipIf(!hasDb)('product embedding indexer (Task 11)', () => {
       )
     ).rejects.toThrow('rollback');
     expect(sent).toHaveLength(0);
+  });
+
+  it('PR3 minor 2: SEARCH_EMBED_GLOBAL_DAILY_CAP counts provider calls across stores in Redis', async () => {
+    const { embedCallBudgetKey } = await import('../../apps/api/src/lib/search/embed-budget');
+    const { redis } = await import('../../apps/api/src/services/redis.service');
+    await redis.connect();
+    const client = redis.getClient();
+    expect(client && redis.isAvailable()).toBeTruthy();
+    await client!.del(embedCallBudgetKey(new Date()));
+    const owner = await mkUser('gcap');
+    ownerIds.push(owner.id);
+    const a = (await mkStore(owner.id, 'gcap-a')).id;
+    const b = (await mkStore(owner.id, 'gcap-b')).id;
+    storeIds.push(a, b);
+    await mkProduct(a, { name: 'A one' });
+    await mkProduct(a, { name: 'A two' });
+    await mkProduct(b, { name: 'B one' });
+    const f = fakeProvider();
+    setEmbeddingProviderForTests(f.provider);
+    process.env.SEARCH_EMBED_GLOBAL_DAILY_CAP = '2';
+    try {
+      // Store a: one call per product (batchSize 1) → both calls fit the global budget of 2.
+      expect(await runInStoreScope(a, () => indexStore(a, { batchSize: 1 }))).toMatchObject({
+        embedded: 2,
+      });
+      // Store b: the account-wide budget is spent → capped, no provider call (handler path).
+      const r = await asApp(() =>
+        handleSearchProductIndex({ event: { data: { storeId: b } }, step: fakeStep() })
+      );
+      expect(r).toMatchObject({ embedded: 0, capped: 'global' });
+      expect(f.calls).toHaveLength(2);
+      expect(Number(await client!.get(embedCallBudgetKey(new Date())))).toBeGreaterThanOrEqual(3);
+    } finally {
+      delete process.env.SEARCH_EMBED_GLOBAL_DAILY_CAP;
+      await client!.del(embedCallBudgetKey(new Date()));
+    }
   });
 
   it('as ebda_app: the vector rows are invisible from another store scope', async () => {
