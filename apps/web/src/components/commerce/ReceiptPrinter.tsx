@@ -374,10 +374,17 @@ export function ReceiptPrinter({
                 <p
                   data-testid="receipt-order-number"
                   dir="ltr"
-                  aria-label={order.orderNumber}
                   className={`${styles.mono} text-xl font-semibold ${styles.ink}`}
                 >
-                  #{groupOrderNumber(order.orderNumber)}
+                  {groupOrderNumber(order.orderNumber) === order.orderNumber ? (
+                    `#${order.orderNumber}`
+                  ) : (
+                    // a11y re-audit P2-N7: no aria-label on a <p>; read the full value instead.
+                    <>
+                      <span aria-hidden="true">#{groupOrderNumber(order.orderNumber)}</span>
+                      <span className="sr-only">{order.orderNumber}</span>
+                    </>
+                  )}
                 </p>
               </div>
             </article>

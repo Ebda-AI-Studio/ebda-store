@@ -444,8 +444,11 @@ describe('receipt IA-14', () => {
       />
     );
     const n = screen.getByTestId('receipt-order-number');
-    expect(n.textContent).toBe('#TMZRB9 · IR5JY');
-    expect(n.getAttribute('aria-label')).toBe('ORD-TMZRB9-IR5JY');
+    // a11y re-audit P2-N7: aria-label is prohibited on a <p>; the grouped form is shown
+    // (aria-hidden) and the full value is read from an sr-only span.
+    expect(n.hasAttribute('aria-label')).toBe(false);
+    expect(n.querySelector('[aria-hidden="true"]')!.textContent).toBe('#TMZRB9 · IR5JY');
+    expect(n.querySelector('.sr-only')!.textContent).toBe('ORD-TMZRB9-IR5JY');
   });
 
   it('the order number and the total appear once on the page', () => {
