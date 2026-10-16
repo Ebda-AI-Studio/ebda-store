@@ -31,6 +31,12 @@ vi.mock('@api/services/feature.service', () => ({
   featureService: { isFeatureEnabled: vi.fn().mockResolvedValue(true) },
 }));
 vi.mock('@api/lib/revalidate-storefront', () => ({ revalidateStorefront: vi.fn() }));
+const { incrementFixedWindow, sendAlert } = vi.hoisted(() => ({
+  incrementFixedWindow: vi.fn(async () => 1),
+  sendAlert: vi.fn(async () => 'sent'),
+}));
+vi.mock('@api/services/redis.service', () => ({ redis: { incrementFixedWindow } }));
+vi.mock('@api/services/alerts.service', () => ({ sendAlert }));
 
 const { setCfBindings, clearCfBindings } = await import('@api/cf/bindings');
 const { generatePwaIconSet } = await import('@api/services/pwa.service');
@@ -81,6 +87,9 @@ const uploaded = (key: string) =>
 beforeEach(() => {
   uploadMock.mockClear();
   warn.mockClear();
+  incrementFixedWindow.mockClear();
+  incrementFixedWindow.mockResolvedValue(1);
+  sendAlert.mockClear();
 });
 afterEach(() => clearCfBindings());
 
@@ -136,6 +145,37 @@ describe('PWA icons through Cloudflare Images (D1016-ICONS-1)', () => {
     for (const key of Object.keys(SIZES)) expect(uploaded(key).equals(source), key).toBe(true);
     expect(warn).toHaveBeenCalledTimes(1);
     expect(String(warn.mock.calls[0][0].err)).toMatch(/deadline/i);
+  });
+
+  it('a fallback logs a stable code, counts it per day, and alerts once a day (review N3)', async () => {
+    const { binding } = fakeImages('throw');
+    setCfBindings({ HYPERDRIVE: { connectionString: '' }, IMAGES: binding });
+    await generatePwaIconSet(STORE_ID, fakePng(600, 600), { background: '#ffffff' });
+    expect(warn.mock.calls[0][0]).toMatchObject({
+      code: 'PWA_ICON_RESIZE_FALLBACK',
+      storeId: STORE_ID,
+    });
+    expect(incrementFixedWindow).toHaveBeenCalledWith(
+      expect.stringMatching(/^metric:pwa-icon-resize-fallback:\d{4}-\d{2}-\d{2}$/),
+      2 * 24 * 60 * 60
+    );
+    expect(sendAlert).toHaveBeenCalledTimes(1);
+    expect(sendAlert.mock.calls[0][0]).toMatchObject({
+      level: 'p1',
+      scope: 'platform',
+      source: 'pwa.icon-resize-fallback',
+    });
+    // the second fallback of the day is counted, not re-alerted
+    incrementFixedWindow.mockResolvedValue(2);
+    await generatePwaIconSet(STORE_ID, fakePng(600, 600), { background: '#ffffff' });
+    expect(incrementFixedWindow).toHaveBeenCalledTimes(2);
+    expect(sendAlert).toHaveBeenCalledTimes(1);
+  });
+
+  it('no binding at all is not a fallback event (nothing counted, nothing alerted)', async () => {
+    await generatePwaIconSet(STORE_ID, fakePng(600, 600));
+    expect(incrementFixedWindow).not.toHaveBeenCalled();
+    expect(sendAlert).not.toHaveBeenCalled();
   });
 
   it('no binding: today’s behaviour, the source under every key', async () => {

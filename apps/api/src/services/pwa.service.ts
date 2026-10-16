@@ -8,6 +8,8 @@ import { revalidateStorefront } from '../lib/revalidate-storefront';
 import logger from '../lib/logger';
 import { BRAND } from '@ebda/shared';
 import { imagesBinding, renderIcon } from '../lib/images/icon-resizer';
+import { redis } from './redis.service';
+import { sendAlert } from './alerts.service';
 
 // PWA Settings structure
 export interface PWASettings {
@@ -95,6 +97,36 @@ const ICON_TARGETS: ReadonlyArray<{
  * Every target resized through Cloudflare Images, or null (no binding, or ANY target failed:
  * a mixed set of resized and pass-through icons is never stored). One warning on failure.
  */
+/** Stable code for log drains and alert matching (review N3). */
+export const PWA_ICON_RESIZE_FALLBACK = 'PWA_ICON_RESIZE_FALLBACK';
+
+/**
+ * A fallback is silent to the merchant (the icons still work), so it is made loud to us: a
+ * structured warn with a stable `code`, a per-day counter (`metric:pwa-icon-resize-fallback:<day>`,
+ * fixed 2-day window, readable with `redis.getRateLimitCount`), and ONE platform P1 per day — the
+ * first fallback of the day — through `sendAlert` (its own 5-minute throttle is the second guard).
+ * Never throws: reporting must not break the upload.
+ */
+async function reportResizeFallback(storeId: string, reason: string): Promise<void> {
+  logger.warn(
+    { code: PWA_ICON_RESIZE_FALLBACK, storeId, err: reason },
+    'pwa: Cloudflare Images resize failed; storing the source under every size (FU46-8 fallback)'
+  );
+  const day = new Date().toISOString().slice(0, 10);
+  const count = await redis
+    .incrementFixedWindow(`metric:pwa-icon-resize-fallback:${day}`, 2 * 24 * 60 * 60)
+    .catch(() => 0);
+  if (count === 1)
+    await sendAlert({
+      level: 'p1',
+      scope: 'platform',
+      source: 'pwa.icon-resize-fallback',
+      title: 'PWA icons: Cloudflare Images resize falling back',
+      body: `An icon upload fell back to storing the source under every size (${reason}). Check that Images is enabled on the account and the binding answers (Ruling D1016-ICONS-2). One alert per day; the day's count is in metric:pwa-icon-resize-fallback:${day}.`,
+      context: { storeId, code: PWA_ICON_RESIZE_FALLBACK },
+    }).catch(() => undefined);
+}
+
 /** How long the whole Images resize may take before the set falls back (review M1). */
 export const IMAGES_DEADLINE_MS = 10_000;
 
@@ -119,10 +151,7 @@ async function resizedTargets(
     });
     return await Promise.race([all, deadline]);
   } catch (err) {
-    logger.warn(
-      { storeId, err: err instanceof Error ? err.message : String(err) },
-      'pwa: Cloudflare Images resize failed; storing the source under every size (FU46-8 fallback)'
-    );
+    await reportResizeFallback(storeId, err instanceof Error ? err.message : String(err));
     return null;
   } finally {
     if (timer) clearTimeout(timer);
