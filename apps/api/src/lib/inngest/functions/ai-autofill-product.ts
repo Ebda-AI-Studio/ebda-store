@@ -29,7 +29,7 @@ import { inngest } from '../client';
  * Residual, reported not fixed: `changedFields` has the same debounce-
  * coalescing gap (an earlier event's changed fields are lost if a later
  * event in the same 10s window supersedes it), so a debounced-away field
- * rename can leave a dependent AI-owned sibling field stale until the 3-day
+ * rename can leave a dependent AI-owned sibling field stale until the daily
  * stale-refresh sweep (`refreshStale`) catches it up. Forcing every debounced
  * run to `changedFields: []` would not fix this — it would regress the
  * common, NOT-coalesced single-edit case (the vast majority of saves), which

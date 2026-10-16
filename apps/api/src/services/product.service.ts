@@ -65,7 +65,7 @@ import {
  * Variants also inherit the parent's allowBackorder flag when their own is false.
  */
 /**
- * Fields not in `AI_AUTOFILL_FIELDS` are excluded from that engine's 3-day
+ * Fields not in `AI_AUTOFILL_FIELDS` are excluded from that engine's daily
  * sweep + `/ai/reset-field` endpoint by design (same "excluded from v1"
  * treatment documented on the AEO fields) but are still AI-writable via a
  * standalone bulk sweep — currently `excerpt`/`excerptAr` (bulk-ai-excerpt).

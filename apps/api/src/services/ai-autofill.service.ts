@@ -60,7 +60,7 @@ export function computeFillSet(
   // update fills gaps + refreshes ai fields whose source changed.
   const base = fieldsNeedingRefresh(sources, changedFields);
   if (!refreshStale) return base;
-  // Stale-refresh (3-day sweep on a long-untouched product): also regenerate
+  // Stale-refresh (daily sweep on a long-untouched product): also regenerate
   // every ai-owned field so improved prompts / fresh context propagate.
   // human-owned fields are still never touched.
   const aiOwned = AI_AUTOFILL_FIELD_NAMES.filter(f => sources[f] === 'ai');
