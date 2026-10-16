@@ -15,6 +15,7 @@ const ctx = vi.hoisted(() => ({
   store: null as unknown as Record<string, unknown>,
   ioCallback: (() => {}) as (e: unknown[]) => void,
   all: [] as Array<(e: unknown[]) => void>,
+  lang: undefined as string | undefined,
 }));
 
 vi.mock('../../apps/web/src/contexts/StoreContext', () => ({
@@ -29,11 +30,11 @@ vi.mock('../../apps/web/src/contexts/LanguageContext', async importOriginal => {
   return {
     ...real,
     useLanguage: () => ({
-      language: 'en',
-      direction: 'ltr',
-      isRtl: false,
+      language: ctx.lang ?? 'en',
+      direction: ctx.lang === 'ar' ? 'rtl' : 'ltr',
+      isRtl: ctx.lang === 'ar',
       setLanguage: () => {},
-      t: (en: string) => en,
+      t: (en: string, ar?: string) => (ctx.lang === 'ar' ? (ar ?? en) : en),
     }),
   };
 });
@@ -238,5 +239,29 @@ describe('PDP stock line only when it is news (P2-1)', () => {
   it('an in-stock product shows no stock line', async () => {
     const { container } = await renderPdp({});
     expect(container.textContent).not.toMatch(/In stock|متوفر(?! )/);
+  });
+});
+
+// a11y re-audit P2-N5: in Arabic the strip was dir=ltr, so photo 2 came in from the right while
+// Next sat on the left (inline end) and ArrowLeft meant next. The strip follows the page
+// direction: in Arabic photo 2 lies to the left, where Next and ArrowLeft point.
+describe('the gallery reads in the page direction (P2-N5)', () => {
+  const two = [
+    { id: 'i1', url: '/a.webp', alt: 'a' },
+    { id: 'i2', url: '/b.webp', alt: 'b' },
+  ];
+  it.each([
+    ['ar', 'rtl'],
+    ['en', 'ltr'],
+  ])('%s strip is %s, Next at the inline end', async (l, dir) => {
+    ctx.lang = l;
+    try {
+      const { container } = await renderPdp({}, undefined, two);
+      const track = container.querySelector('[aria-roledescription="carousel"]') as HTMLElement;
+      expect(track.getAttribute('dir')).toBe(dir);
+      expect(container.querySelector('button[data-gallery-next]')!.className).toContain('end-2');
+    } finally {
+      ctx.lang = undefined;
+    }
   });
 });

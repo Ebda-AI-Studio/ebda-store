@@ -250,7 +250,10 @@ export default function ProductDetailClient({
   useEffect(() => {
     const el = galleryRef.current;
     if (!el) return;
-    const target = el.clientWidth * selectedImage;
+    // P2-N5: the strip follows the page direction; in RTL scrollLeft runs 0 -> -max (the
+    // standard every current engine ships), so the target is negative there.
+    const sign = el.getAttribute('dir') === 'rtl' ? -1 : 1;
+    const target = sign * el.clientWidth * selectedImage;
     if (Math.abs(el.scrollLeft - target) > 8) {
       smoothScrollLeftTo(el, target);
     }
@@ -258,7 +261,7 @@ export default function ProductDetailClient({
   const handleGalleryScroll = () => {
     const el = galleryRef.current;
     if (!el || el.clientWidth === 0) return;
-    const idx = Math.round(el.scrollLeft / el.clientWidth);
+    const idx = Math.round(Math.abs(el.scrollLeft) / el.clientWidth);
     setSelectedImage(prev => (prev === idx ? prev : idx));
   };
   const { success: toastSuccess, error: toastError } = useToast();
@@ -944,13 +947,11 @@ export default function ProductDetailClient({
                   <div
                     ref={galleryRef}
                     onScroll={handleGalleryScroll}
-                    // dir="ltr" even on the Arabic (RTL) storefront: the gallery
-                    // is a sequence of images (not text), so left-to-right order is
-                    // correct, AND it keeps scrollLeft positive (0→max) in every
-                    // browser. Without it, RTL makes scrollLeft go negative in
-                    // Chrome/Firefox, so the index math + scroll-to break and the
-                    // gallery desyncs / scrolls into empty space for AR shoppers.
-                    dir="ltr"
+                    // a11y re-audit P2-N5: the strip reads in the page direction, so in Arabic
+                    // photo 2 lies to the LEFT, where Next (inline end) and ArrowLeft point. It was
+                    // dir=ltr to keep scrollLeft positive; the scroll math now takes |scrollLeft|
+                    // and a signed target instead (RTL scrollLeft is 0 -> -max in every engine).
+                    dir={language === 'ar' ? 'rtl' : 'ltr'}
                     // P1-7 (W4): a named, focusable region; arrow keys page it like the buttons.
                     role="region"
                     aria-roledescription="carousel"
