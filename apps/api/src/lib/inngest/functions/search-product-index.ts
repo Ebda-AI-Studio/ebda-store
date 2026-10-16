@@ -53,15 +53,18 @@ export const REINDEX_EVENT = 'search/store.reindex-requested';
  */
 export const INDEX_BATCH = 25;
 /**
- * Rounds per run before handing off to a continuation run (~200 products). Step state measured at
- * ~9.8 KB/product of vectors + ≤ ~7 KB/product of docs: ≤ ~3.4 MiB per run, inside Inngest's 4 MiB
- * per step / 32 MiB per run (inngest.com/docs/usage-limits/inngest).
+ * Rounds per run before handing off to a continuation run (~200 products). Step state per product,
+ * with the words vector (SEARCH-T13-7): up to 2 vectors × ~9.8 KB (measured for one) + ≤ ~7 KB of
+ * doc + ≤ ~1 KB of words (search_terms is capped at 500 characters) ≈ 27.6 KB, so ≤ ~5.4 MiB per
+ * run (200 products) and ≤ ~490 KB per embed step (25 products × 19.6 KB of vectors), inside
+ * Inngest's 4 MiB per step / 32 MiB per run (inngest.com/docs/usage-limits/inngest).
  */
 export const MAX_ROUNDS = 8;
 /**
  * Products per memoized step in the single pass (review N-M3). Worst case per step: 5 × (the 15 s
- * per-call timeout, EMBED_TIMEOUT_MS, + the 200 ms throttle) ≈ 76 s and ≤ ~50 KB of output. Inngest
- * allows a step "up to 2 hours, subject to the function host's shorter timeout" and 4 MiB of output
+ * per-call timeout, EMBED_TIMEOUT_MS, + the 200 ms throttle) ≈ 76 s and ≤ ~100 KB of output (5 ×
+ * 2 vectors × ~9.8 KB, SEARCH-T13-7). Inngest allows a step "up to 2 hours, subject to the
+ * function host's shorter timeout" and 4 MiB of output
  * (inngest.com/docs/usage-limits/inngest); the host, a Worker HTTP request, has no wall-clock limit
  * while Inngest stays connected but only a 20-minute grace when the runtime is updated
  * (developers.cloudflare.com/workers/platform/limits). 76 s sits far inside both.
