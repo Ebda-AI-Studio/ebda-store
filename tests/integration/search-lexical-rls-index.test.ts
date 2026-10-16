@@ -15,48 +15,23 @@
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import crypto from 'node:crypto';
-import { prisma, createPrismaClient, runWithRequestDb, runInTenantContext } from '@ebda/database';
+import { prisma, runInTenantContext } from '@ebda/database';
+import { createAppPlanner } from '../helpers/app-role-planner';
 import { hasDb } from '../helpers/bundle-fixtures';
 
 const { searchProductIds } = await import('../../apps/api/src/services/product-search.service');
 
-const OWNER_URL = process.env.DIRECT_URL || process.env.DATABASE_URL || '';
-function appUrl(): string {
-  const u = new URL(OWNER_URL);
-  u.username = 'ebda_app';
-  u.password = process.env.EBDA_APP_PASSWORD || 'ci-only-app-pw';
-  return u.toString();
-}
-// ONE connection: the stats flush below must happen in the session that ran the searches.
-const app = hasDb ? createPrismaClient({ connectionString: appUrl(), max: 1 }) : null;
-const asApp = <T>(fn: () => Promise<T>) => runWithRequestDb(() => app!, fn);
+const planner = hasDb ? createAppPlanner() : null;
+const app = planner?.app ?? null;
+const asApp = <T>(fn: () => Promise<T>) => planner!.asApp(fn);
+const idxScans = (name: string) => planner!.idxScans(name);
+const expectScansAbove = (name: string, before: number) => planner!.expectScansAbove(name, before);
 
 const ROWS = 20_000;
 const tag = `lx${Date.now()}${crypto.randomBytes(2).toString('hex')}`;
 let storeId = '';
 let ownerId = '';
 const md5 = (s: string) => crypto.createHash('md5').update(s).digest('hex');
-
-async function idxScans(name: string): Promise<number> {
-  await prisma.$queryRaw`SELECT pg_stat_clear_snapshot()`;
-  const r = await prisma.$queryRaw<Array<{ n: bigint }>>`
-    SELECT idx_scan AS n FROM pg_stat_user_indexes WHERE indexrelname = ${name}`;
-  return Number(r[0].n);
-}
-/** The counter is flushed asynchronously (and later under load): poll up to 5 s instead of one sleep. */
-async function expectScansAbove(name: string, before: number) {
-  let now = before;
-  for (let i = 0; i < 50 && now <= before; i++) {
-    await flushAppStats();
-    now = await idxScans(name);
-    if (now <= before) await new Promise(r => setTimeout(r, 100));
-  }
-  expect(now).toBeGreaterThan(before);
-}
-async function flushAppStats() {
-  await asApp(() => app!.$queryRaw`SELECT pg_stat_force_next_flush()`);
-  await new Promise(r => setTimeout(r, 50));
-}
 
 describe.skipIf(!hasDb)(
   'lexical product search uses its trigram indexes under RLS (Task 14)',
@@ -78,7 +53,8 @@ describe.skipIf(!hasDb)(
       await prisma.$executeRaw`
       INSERT INTO public.products
         (id, store_id, name, name_ar, sku, description, slug, price, status, updated_at)
-      SELECT ${tag} || '-' || g, ${storeId}, md5('n' || g), md5('a' || g), md5('s' || g),
+      SELECT ${tag} || '-' || g, ${storeId},
+             CASE g % 500 WHEN 0 THEN 'qz' || g || ' ' WHEN 250 THEN 'xqz' || g || ' ' ELSE '' END || md5('n' || g), md5('a' || g), md5('s' || g),
              repeat('quality cotton item ', 17), ${tag} || '-' || g, 1000, 'active', now()
       FROM generate_series(1, ${ROWS}::int) g`;
       await prisma.$executeRaw`ANALYZE public.products`;
@@ -87,7 +63,7 @@ describe.skipIf(!hasDb)(
     afterAll(async () => {
       if (storeId) await prisma.store.delete({ where: { id: storeId } }).catch(() => undefined);
       if (ownerId) await prisma.user.delete({ where: { id: ownerId } }).catch(() => undefined);
-      await app?.$disconnect();
+      await planner?.close();
     }, 120_000);
 
     const run = (term: string, opts: Parameters<typeof searchProductIds>[2]) =>
@@ -96,7 +72,6 @@ describe.skipIf(!hasDb)(
     it('storefront search finds the product through products_search_doc_trgm_idx', async () => {
       const before = await idxScans('products_search_doc_trgm_idx');
       const ids = await run(md5('n7').slice(0, 10), { scope: 'storefront' });
-      await flushAppStats();
       expect(ids).toEqual([`${tag}-7`]);
       await expectScansAbove('products_search_doc_trgm_idx', before);
     }, 60_000);
@@ -104,7 +79,6 @@ describe.skipIf(!hasDb)(
     it('typeahead (field: name) uses products_name_doc_trgm_idx', async () => {
       const before = await idxScans('products_name_doc_trgm_idx');
       const ids = await run(md5('a9').slice(0, 10), { scope: 'storefront', field: 'name' });
-      await flushAppStats();
       expect(ids).toEqual([`${tag}-9`]);
       await expectScansAbove('products_name_doc_trgm_idx', before);
     }, 60_000);
@@ -113,7 +87,6 @@ describe.skipIf(!hasDb)(
       const doc = await idxScans('products_search_doc_trgm_idx');
       const sku = await idxScans('products_sku_norm_trgm_idx');
       const ids = await run(md5('s11').slice(0, 10), { scope: 'admin' });
-      await flushAppStats();
       expect(ids).toEqual([`${tag}-11`]);
       await expectScansAbove('products_search_doc_trgm_idx', doc);
       await expectScansAbove('products_sku_norm_trgm_idx', sku);
@@ -177,15 +150,16 @@ describe.skipIf(!hasDb)(
     };
 
     it('a 2-character query matches word starts, index-backed and fast at 20,000 products', async () => {
-      const want = await startsWord('search', 'ab');
+      const want = await startsWord('search', 'qz');
       expect(want.length).toBeGreaterThan(5);
+      // 'qz' starts a word in 40 products and sits MID-word ("xqz...") in 40 others.
       const substring = await prisma.$queryRaw<Array<{ n: bigint }>>`
       SELECT count(*) AS n FROM public.products WHERE store_id = ${storeId}
-        AND public.ebda_product_search_doc(name, name_ar, search_terms, description, description_ar) LIKE '%ab%'`;
+        AND public.ebda_product_search_doc(name, name_ar, search_terms, description, description_ar) LIKE '%qz%'`;
       expect(want.length).toBeLessThan(Number(substring[0].n)); // mid-word hits are NOT matches any more
       const before = await idxScans('products_search_doc_trgm_idx');
       const runs = [];
-      for (let i = 0; i < 3; i++) runs.push(await timed(() => run('ab', { scope: 'storefront' })));
+      for (let i = 0; i < 3; i++) runs.push(await timed(() => run('qz', { scope: 'storefront' })));
       expect([...runs[0].out].sort()).toEqual(want);
       await expectScansAbove('products_search_doc_trgm_idx', before);
       // measured before the change: ~700 ms for a short word at 20k (a store scan)

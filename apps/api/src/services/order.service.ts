@@ -281,24 +281,24 @@ export async function orderSearchWhere(
   ];
   if (search.length < 3) return relationFallback;
 
-  // The matching customers are read THROUGH this store's orders (keyed by `storeId`, which is
-  // what the tenant guard requires), not from `users` directly. That is also the exact
-  // relation-join semantics: a customer with users.store_id NULL, or registered on another
-  // store, matches when they ordered here. Filtering `users.store_id = storeId` would drop them.
-  const [customerRows, guestOrderIds] = await Promise.all([
-    prisma.order.groupBy({
-      by: ['customerId'],
-      where: { storeId, customerId: { not: null }, customer: { is: { OR: customerMatch } } },
-      orderBy: { customerId: 'asc' },
-      take: ORDER_SEARCH_CUSTOMER_ID_CAP + 1,
-    }),
+  // The three lookups run in the store-scoped SECURITY DEFINER `ebda_order_search_ids` (Ruling
+  // SEARCH-T14-5): as `ebda_app` the RLS barrier forbids every ILIKE trigram index, so the same
+  // predicates written inline scanned the whole store. Customers are still read THROUGH this
+  // store's orders (the function requires an order here), which is the exact relation-join
+  // semantics: a customer with users.store_id NULL, or registered on another store, matches when
+  // they ordered here.
+  const [numberIds, customerIds, guestOrderIds] = await Promise.all([
+    orderSearchIds(storeId, 'order_number', search),
+    orderSearchIds(storeId, 'customers', search),
     guestOrderIdsMatching(storeId, search),
   ]);
-  const customers = customerRows.map(r => ({ id: r.customerId as string }));
+  const customers = customerIds.map(id => ({ id }));
   // Each half degrades on its OWN: a broad guest term (every Egyptian guest phone starts `+20`)
   // must not cost the registered half its indexed `customer_id IN (...)` arm, nor the reverse
   // (issue 2444). Both over the cap is exactly `relationFallback`.
-  const arms: Prisma.OrderWhereInput[] = [{ orderNumber: contains }];
+  const arms: Prisma.OrderWhereInput[] = [];
+  if (numberIds.length > ORDER_SEARCH_CUSTOMER_ID_CAP) arms.push({ orderNumber: contains });
+  else if (numberIds.length > 0) arms.push({ id: { in: numberIds } });
   if (customers.length > ORDER_SEARCH_CUSTOMER_ID_CAP) {
     arms.push({ customer: { is: { OR: customerMatch } } });
   } else if (customers.length > 0) {
@@ -309,6 +309,8 @@ export async function orderSearchWhere(
   } else if (guestOrderIds.length > 0) {
     arms.push({ id: { in: guestOrderIds } });
   }
+  // Nothing matched anywhere: an explicit match-nothing arm (an empty OR is easy to misread).
+  if (arms.length === 0) arms.push({ id: { in: [] } });
   return arms;
 }
 
@@ -318,45 +320,42 @@ function likeContains(term: string): string {
 }
 
 /**
- * Ids of this store's live GUEST orders whose shipping contact (first name,
- * last name, email or phone) contains `search`, capped at
- * `ORDER_SEARCH_CUSTOMER_ID_CAP + 1` so the caller can tell "too many".
- *
- * The WHERE is shaped to match the partial expression GIN indexes of
- * migration 20261003100000_order_search_guest_contact_trgm_idx exactly:
- * `customer_id IS NULL` is the index predicate and each ILIKE reads the same
- * `shipping_address ->> '<key>'` expression the index was built on, so
- * Postgres answers the four-way OR with a BitmapOr of the four trigram
- * indexes (then `store_id` filters the few hits) instead of walking every
- * order. Do not rewrite these to `#>>`, `jsonb_extract_path_text` or
- * `LOWER(...) LIKE` — a different expression cannot use the index.
- *
- * Registered customers' orders are excluded on purpose (`customer_id IS NULL`):
- * they keep matching through the customer's own account fields, exactly as
- * before, so a registered customer's results do not change. The search term is
- * PII (a phone or an email): it is only ever a bound parameter, never logged.
+ * Ids (capped at `ORDER_SEARCH_CUSTOMER_ID_CAP + 1` so a caller can tell "too many") from the
+ * store-scoped SECURITY DEFINER `public.ebda_order_search_ids` (migration
+ * 20261024000500_order_customer_search_ids, Ruling SEARCH-T14-5):
+ *   'order_number'  live orders whose number contains the term
+ *   'guest'         live GUEST orders (`customer_id IS NULL`) whose shipping contact (first name,
+ *                   last name, email or phone) contains it, served by the partial expression
+ *                   trigram indexes of migration 20261003100000
+ *   'customers'     users with an order in this store whose name / email / phone contains it
+ * The function refuses any store but the one in `app.current_store_id`; the term is only ever a
+ * bound parameter, never logged (it is PII: a phone or an email).
  */
-export async function guestOrderIdsMatching(storeId: string, search: string): Promise<string[]> {
-  const rows = await prisma.$queryRaw<Array<{ id: string }>>(guestOrderIdsSql(storeId, search));
+export async function orderSearchIds(
+  storeId: string,
+  kind: 'order_number' | 'guest' | 'customers',
+  search: string,
+  limit: number = ORDER_SEARCH_CUSTOMER_ID_CAP + 1
+): Promise<string[]> {
+  const rows = await prisma.$queryRaw<Array<{ id: string }>>(
+    orderSearchIdsSql(storeId, kind, search, limit)
+  );
   return rows.map(r => r.id);
 }
 
-/** The statement behind `guestOrderIdsMatching`; exported so the plan test EXPLAINs the real SQL. */
-export function guestOrderIdsSql(storeId: string, search: string): Prisma.Sql {
-  const like = likeContains(search);
-  return Prisma.sql`
-    SELECT id FROM public.orders
-    WHERE store_id = ${storeId}
-      AND customer_id IS NULL
-      AND deleted_at IS NULL
-      AND (
-            shipping_address ->> 'firstName' ILIKE ${like}
-         OR shipping_address ->> 'lastName'  ILIKE ${like}
-         OR shipping_address ->> 'email'     ILIKE ${like}
-         OR shipping_address ->> 'phone'     ILIKE ${like}
-      )
-    LIMIT ${ORDER_SEARCH_CUSTOMER_ID_CAP + 1}
-  `;
+/** The statement behind `orderSearchIds`; exported so the tests run the real SQL. */
+export function orderSearchIdsSql(
+  storeId: string,
+  kind: 'order_number' | 'guest' | 'customers',
+  search: string,
+  limit: number
+): Prisma.Sql {
+  return Prisma.sql`SELECT public.ebda_order_search_ids(${storeId}, ${kind}, ${likeContains(search)}, ${limit}) AS id`;
+}
+
+/** Ids of this store's live GUEST orders whose shipping contact contains `search`. */
+export async function guestOrderIdsMatching(storeId: string, search: string): Promise<string[]> {
+  return orderSearchIds(storeId, 'guest', search);
 }
 
 export class OrderService {

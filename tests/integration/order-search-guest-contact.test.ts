@@ -20,9 +20,7 @@
  *   - a registered customer's order is never matched through its shipping JSON;
  *   - store scope, soft-deleted orders, LIKE metacharacters, the short-term and
  *     over-cap fallbacks;
- *   - the real statement is index-eligible: with seq scans disabled its plan
- *     uses the guest trigram indexes. A rewrite to a different JSON expression,
- *     or one that drops `customer_id IS NULL`, cannot use them and reddens this.
+ *   - (index use as `ebda_app` is proven in order-customer-search-rls-index.test.ts).
  */
 import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
 import { prisma, Prisma } from '@ebda/database';
@@ -32,7 +30,7 @@ vi.mock('../../apps/api/src/lib/inngest/client', () => ({
   inngest: { send: vi.fn(async () => ({ ids: [] })), createFunction: vi.fn(() => ({})) },
 }));
 
-const { OrderService, ORDER_SEARCH_CUSTOMER_ID_CAP, guestOrderIdsSql } =
+const { OrderService, ORDER_SEARCH_CUSTOMER_ID_CAP } =
   await import('../../apps/api/src/services/order.service');
 
 const suffix = `${Date.now()}-${process.pid}-${Math.random().toString(36).slice(2, 8)}`;
@@ -313,58 +311,8 @@ describe.skipIf(!hasDb)('order search: guest contact', () => {
     }
   });
 
-  it('the real statement is index-eligible: with every other index on orders removed, its plan is a BitmapOr of the guest trigram indexes', async () => {
-    // Which plan a planner CHOOSES depends on table size and statistics, so a
-    // cost-based assertion is flaky (it flipped between runs of this file and
-    // of the whole suite). Eligibility is not cost: remove the competing
-    // indexes (rolled back below), forbid a seq scan, and the statement either
-    // can use the guest indexes or it has nothing to scan with. A rewrite to a
-    // different JSON expression, or one without `customer_id IS NULL`, cannot
-    // prove the partial predicate and falls to a Seq Scan, which reddens this.
-    const ROLLBACK = new Error('rollback');
-    let plan = '';
-    await prisma
-      .$transaction(async tx => {
-        const others = await tx.$queryRaw<Array<{ relname: string }>>`
-          SELECT c.relname FROM pg_index i JOIN pg_class c ON c.oid = i.indexrelid
-          WHERE i.indrelid = 'public.orders'::regclass AND NOT i.indisprimary
-            AND NOT EXISTS (SELECT 1 FROM pg_constraint k WHERE k.conindid = i.indexrelid)
-            AND c.relname NOT LIKE 'orders\\_guest\\_%'`;
-        for (const { relname } of others) {
-          await tx.$executeRawUnsafe(`DROP INDEX public."${relname}"`);
-        }
-        // The planner's other candidate is a no-qual scan of one whole partial
-        // trigram index (it satisfies `customer_id IS NULL` alone and filters
-        // the rest). On a handful of rows that scan is CHEAPER than four
-        // probes, so which one wins flipped with index bloat and statistics
-        // (red on main 2026-10-03 on a reused DB). Make the whole-index scan
-        // lose by volume, not by luck: fill the transaction with guest rows
-        // (rolled back with the rest) so the full scan costs thousands while
-        // the four selective probes stay flat, then ANALYZE so the estimate
-        // is current rather than whatever autovacuum last saw.
-        await tx.$executeRaw`
-          INSERT INTO public.orders
-            (id, store_id, order_number, subtotal, total, shipping_address, billing_address, updated_at)
-          SELECT 'plan-fill-' || ${tag} || '-' || g, ${storeId}, 'PF-' || ${tag} || '-' || g, 1, 1,
-                 jsonb_build_object('firstName', md5('f' || g), 'lastName', md5('l' || g),
-                                    'email', md5('e' || g) || '@fill.test', 'phone', md5('p' || g)),
-                 '{}'::jsonb, now()
-          FROM generate_series(1, 20000) g`;
-        await tx.$executeRaw`ANALYZE public.orders`;
-        await tx.$executeRaw`SET LOCAL enable_seqscan = off`;
-        const rows = await tx.$queryRaw<Array<{ 'QUERY PLAN': string }>>(
-          Prisma.sql`EXPLAIN (COSTS OFF) ${guestOrderIdsSql(storeId, `zq${tag.slice(-6)}`)}`
-        );
-        plan = rows.map(r => r['QUERY PLAN']).join('\n');
-        throw ROLLBACK;
-      })
-      .catch(e => {
-        if (e !== ROLLBACK) throw e;
-      });
-    for (const idx of ['first_name', 'last_name', 'email', 'phone']) {
-      expect(plan).toContain(`orders_guest_${idx}_trgm_idx`);
-    }
-    expect(plan).toContain('BitmapOr');
-    expect(plan).not.toContain('Seq Scan');
-  });
+  // The former planner case here EXPLAINed the inline guest statement as the OWNER. Under the
+  // strict-RLS role the inline statement cannot use these indexes at all (Ruling SEARCH-T14-5); the
+  // lookup is now the SECURITY DEFINER ebda_order_search_ids, and
+  // order-customer-search-rls-index.test.ts proves each index is scanned as `ebda_app`.
 });
