@@ -26,6 +26,9 @@ import { acrossStores, runInStoreScope } from '@ebda/database';
 import { inngest } from '../client';
 import {
   embedDocs,
+  embedEachIsolating,
+  quarantineEmbedFailures,
+  type EmbedFailure,
   embedThrottleMs,
   hasStaleProducts,
   planEmbedBatch,
@@ -40,6 +43,8 @@ export const REINDEX_EVENT = 'search/store.reindex-requested';
 export const INDEX_BATCH = 25;
 /** Rounds per run before handing off to a continuation run (~200 products, ~1.6 MB step state). */
 export const MAX_ROUNDS = 8;
+/** Inngest retries per step; attempt numbers run 0..INDEX_RETRIES. */
+export const INDEX_RETRIES = 3;
 const FAN_OUT_CHUNK = 1000;
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -55,9 +60,12 @@ const sleep = (ms: number) => new Promise<void>(r => setTimeout(r, ms));
 export async function handleSearchProductIndex({
   event,
   step,
+  attempt = 0,
 }: {
   event: { data?: Record<string, unknown> };
   step: IndexStep;
+  /** Inngest's zero-indexed attempt of the step being executed; `INDEX_RETRIES` is the last one. */
+  attempt?: number;
 }): Promise<Record<string, unknown>> {
   const storeId = event.data?.storeId;
   if (typeof storeId !== 'string' || !UUID_RE.test(storeId)) return { skipped: 'missing-store' };
@@ -74,34 +82,52 @@ export async function handleSearchProductIndex({
     }
     if (plan.items.length === 0) return { embedded, done: true };
 
-    const literals = (await step.run(`embed-${round}`, async () => {
+    const out = (await step.run(`embed-${round}`, async () => {
       const provider = getEmbeddingProvider();
       if (!provider) throw new NonRetriableError('search-index: embedding provider went away');
       try {
-        const out = await embedDocs(
+        const literals = await embedDocs(
           provider,
           plan.items.map(i => i.doc)
         );
         await sleep(embedThrottleMs()); // sleep-after-success, per real call
-        return out;
+        return { literals, failed: [] as EmbedFailure[] };
       } catch (err) {
-        if (err instanceof EmbeddingError && !err.retryable)
-          throw new NonRetriableError(`search-index: ${err.kind}: ${err.message}`, { cause: err });
-        throw err;
+        if (!(err instanceof EmbeddingError)) throw err;
+        // Review I2: a retryable failure is retried by Inngest first. On the LAST attempt, or at
+        // once for a non-retryable one, embed one product at a time so a poison product cannot
+        // stall the store: it is quarantined and the rest are written. An outage (every product
+        // fails retryably) still throws and nothing is quarantined.
+        if (err.retryable && attempt < INDEX_RETRIES) throw err;
+        try {
+          return await embedEachIsolating(provider, plan.items, embedThrottleMs());
+        } catch (outage) {
+          throw new NonRetriableError(`search-index: every product failed (${err.kind})`, {
+            cause: outage,
+          });
+        }
       }
-    })) as string[];
+    })) as { literals: Array<string | null>; failed: EmbedFailure[] };
 
-    const written = (await step.run(`write-${round}`, () =>
-      runInStoreScope(storeId, () =>
-        writeEmbeddings(
+    const res = (await step.run(`write-${round}`, () =>
+      runInStoreScope(storeId, async () => {
+        const ok = plan.items.flatMap((it, i) => {
+          const lit = out.literals[i];
+          return lit ? [{ id: it.id, hash: it.hash, lit }] : [];
+        });
+        const written = await writeEmbeddings(
           storeId,
-          plan.items.map(({ id, hash }) => ({ id, hash })),
-          literals
-        )
-      )
-    )) as number;
+          ok.map(({ id, hash }) => ({ id, hash })),
+          ok.map(o => o.lit)
+        );
+        await quarantineEmbedFailures(storeId, out.failed);
+        // Quarantined products count as progress: they leave the stale set.
+        return { written, quarantined: out.failed.length };
+      })
+    )) as { written: number; quarantined: number };
+    const written = res.written;
     embedded += written;
-    if (written === 0) {
+    if (written === 0 && res.quarantined === 0) {
       // Every product in the batch changed between read and write: stop rather than spin; the
       // write paths that changed them already asked for a new run.
       logger.warn({ storeId, round }, '[search-index] batch wrote nothing; stopping this run');
@@ -118,15 +144,16 @@ export const searchProductIndex: InngestFunction.Any = inngest.createFunction(
     name: 'Search: embed stale products for a store',
     concurrency: [{ key: 'event.data.storeId', limit: 1 }, { limit: 4 }],
     debounce: { key: 'event.data.storeId', period: '20s', timeout: '2m' },
-    retries: 3,
+    retries: INDEX_RETRIES,
     // `product.upserted` is not in the typed AppEvent registry (same cast as ai-autofill-product).
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     triggers: [{ event: 'product.upserted' as any }, { event: REINDEX_EVENT }],
   },
-  async ({ event, step }) =>
+  async ({ event, step, attempt }) =>
     handleSearchProductIndex({
       event: event as { data?: Record<string, unknown> },
       step: step as unknown as IndexStep,
+      attempt,
     })
 );
 
