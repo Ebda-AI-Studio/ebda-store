@@ -30,6 +30,7 @@ DEV_STATS=1
 # SEARCH_SEMANTIC_ENABLED=true fails the boot check if no provider resolves.
 # SEARCH_SEMANTIC_ENABLED=false
 # SEARCH_EMBED_STORE_DAILY_CAP=3000
+# SEARCH_EMBED_THROTTLE_MS=200
 # SEARCH_VECTOR_MAX_DISTANCE=0.55
 # REST fallback for Node dev only, never on the Worker; set both or neither:
 # CF_AI_ACCOUNT_ID=
