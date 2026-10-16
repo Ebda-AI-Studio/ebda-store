@@ -70,25 +70,33 @@ const utilityLinkSchema = z
  * 2026-05-21 removal are tolerated (ignored by the storefront).
  */
 export const COPYRIGHT_OVERRIDE_MAX = 200;
-/**
- * Tolerant on purpose (FU46 M-7): a row saved before the 2026-05-21 removal can hold
- * `copyrightOverride: null` or an over-long string, and every settings PUT re-validates the whole
- * blob, so a strict field made unrelated saves answer 400. null reads as unset and a long value
- * is clamped (the admin input is capped at 200, the storefront clamps on read too).
- */
-const copyrightField = z.preprocess(
-  v => (v === null ? undefined : typeof v === 'string' ? v.slice(0, COPYRIGHT_OVERRIDE_MAX) : v),
-  z.string().max(COPYRIGHT_OVERRIDE_MAX).optional()
-);
 export const footerBottomBarSchema = z.object({
   enabled: z.boolean().optional(),
-  copyrightOverride: copyrightField,
-  copyrightOverrideAr: copyrightField,
+  copyrightOverride: z.string().max(COPYRIGHT_OVERRIDE_MAX).optional(),
+  copyrightOverrideAr: z.string().max(COPYRIGHT_OVERRIDE_MAX).optional(),
   privacyEnabled: z.boolean().optional(),
   termsEnabled: z.boolean().optional(),
   shippingEnabled: z.boolean().optional(),
   returnsEnabled: z.boolean().optional(),
 });
+/**
+ * Tolerant read of a STORED bottomBar before it is validated (FU46 M-7). A row saved before the
+ * 2026-05-21 removal can hold `copyrightOverride: null` or an over-long string, and every
+ * settings PUT re-validates the whole blob, so the strict schema answered 400 on a field the
+ * merchant never touched. null reads as unset and a long value is clamped (the admin input is
+ * capped at 200 and the storefront clamps on read too). Any other shape is returned untouched
+ * for the schema to judge.
+ */
+export function normalizeStoredBottomBar(raw: unknown): unknown {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return raw;
+  const out: Record<string, unknown> = { ...(raw as Record<string, unknown>) };
+  for (const key of ['copyrightOverride', 'copyrightOverrideAr']) {
+    const v = out[key];
+    if (v === null) delete out[key];
+    else if (typeof v === 'string') out[key] = v.slice(0, COPYRIGHT_OVERRIDE_MAX);
+  }
+  return out;
+}
 export type FooterBottomBarSettings = z.infer<typeof footerBottomBarSchema>;
 
 export const draftChromeSchema = z

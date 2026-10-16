@@ -32,6 +32,7 @@ import {
   deliveryDaysSchema,
   deliveryOffDaysSchema,
   footerBottomBarSchema,
+  normalizeStoredBottomBar,
 } from '@ebda/shared';
 import {
   maskMarketingPixelSecrets,
@@ -134,7 +135,7 @@ function addSettingsIssues(settings: Record<string, unknown> | undefined, ctx: z
   const footerLinks = settings?.footerLinks;
   if (footerLinks && typeof footerLinks === 'object' && 'bottomBar' in footerLinks) {
     const parsed = footerBottomBarSchema.safeParse(
-      (footerLinks as Record<string, unknown>).bottomBar
+      normalizeStoredBottomBar((footerLinks as Record<string, unknown>).bottomBar)
     );
     if (!parsed.success) {
       for (const issue of parsed.error.issues) {
