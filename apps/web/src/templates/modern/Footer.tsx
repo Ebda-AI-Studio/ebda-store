@@ -181,7 +181,7 @@ export default function ModernFooter({
                     href={s.url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex min-h-11 items-center text-foreground/75 hover:text-foreground transition-colors duration-300 ease-out cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+                    className="inline-flex min-h-11 min-w-11 items-center text-foreground/75 hover:text-foreground transition-colors duration-300 ease-out cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
                     aria-label={s.key}
                   >
                     <SocialGlyph
@@ -208,7 +208,7 @@ export default function ModernFooter({
                     <li key={link.href}>
                       <Link
                         href={link.href}
-                        className="inline-flex min-h-11 items-center text-sm text-foreground/70 hover:text-foreground transition-colors duration-300 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+                        className="inline-flex min-h-11 min-w-11 items-center text-sm text-foreground/70 hover:text-foreground transition-colors duration-300 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
                       >
                         {link.label}
                       </Link>
@@ -227,7 +227,7 @@ export default function ModernFooter({
                   <li key={item.href}>
                     <Link
                       href={item.href}
-                      className="inline-flex min-h-11 items-center text-sm text-foreground/70 hover:text-foreground transition-colors duration-300 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+                      className="inline-flex min-h-11 min-w-11 items-center text-sm text-foreground/70 hover:text-foreground transition-colors duration-300 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
                     >
                       {isRtl && item.labelAr ? item.labelAr : item.label}
                     </Link>
@@ -249,7 +249,7 @@ export default function ModernFooter({
                   <li>
                     <a
                       href={`mailto:${contact.email}`}
-                      className="inline-flex min-h-11 items-center gap-3 text-sm text-foreground/70 hover:text-foreground transition-colors duration-300 ease-out"
+                      className="inline-flex min-h-11 min-w-11 items-center gap-3 text-sm text-foreground/70 hover:text-foreground transition-colors duration-300 ease-out"
                     >
                       <svg
                         className="w-4 h-4 shrink-0 text-foreground/70"
@@ -273,7 +273,7 @@ export default function ModernFooter({
                   <li>
                     <a
                       href={`tel:${contact.phone}`}
-                      className="inline-flex min-h-11 items-center gap-3 text-sm text-foreground/70 hover:text-foreground transition-colors duration-300 ease-out"
+                      className="inline-flex min-h-11 min-w-11 items-center gap-3 text-sm text-foreground/70 hover:text-foreground transition-colors duration-300 ease-out"
                       dir="ltr"
                     >
                       <svg
@@ -334,7 +334,7 @@ export default function ModernFooter({
                           href={addressMapHref}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="inline-flex min-h-11 items-center items-start gap-3 text-sm text-foreground/70 hover:text-foreground transition-colors duration-300 ease-out"
+                          className="inline-flex min-h-11 min-w-11 items-center items-start gap-3 text-sm text-foreground/70 hover:text-foreground transition-colors duration-300 ease-out"
                         >
                           {mapIcon}
                           {displayAddress}
@@ -382,7 +382,7 @@ export default function ModernFooter({
                   <button
                     type="submit"
                     disabled={submitting}
-                    className="inline-flex min-h-11 items-center w-full px-4 py-2.5 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors duration-300 ease-out font-semibold text-sm cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
+                    className="inline-flex min-h-11 w-full items-center justify-center px-4 py-2.5 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors duration-300 ease-out font-semibold text-sm cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
                   >
                     {submitting
                       ? isRtl
@@ -418,7 +418,7 @@ export default function ModernFooter({
                         href={loc.mapsHref}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="inline-flex min-h-11 items-center hover:text-foreground transition-colors duration-300 ease-out"
+                        className="inline-flex min-h-11 min-w-11 items-center hover:text-foreground transition-colors duration-300 ease-out"
                       >
                         {loc.address}
                       </a>
@@ -429,7 +429,7 @@ export default function ModernFooter({
                       <a
                         href={`tel:${loc.phone}`}
                         dir="ltr"
-                        className="inline-flex min-h-11 items-center hover:text-foreground transition-colors duration-300 ease-out"
+                        className="inline-flex min-h-11 min-w-11 items-center hover:text-foreground transition-colors duration-300 ease-out"
                       >
                         {loc.phone}
                       </a>

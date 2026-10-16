@@ -4,6 +4,7 @@
  * scale: 1 = 4px), the way the browser will size it:
  *   height = h-* | size-* | min-h-*  (else py-* x2 + the text size's line height)
  *   width  = w-* | size-* | min-w-*  (else unknown: text-labelled controls are as wide as their words)
+ *   width lower bounds: w-full/flex-1/grow fill the row, px-N spans 2N, a text input defaults to ~150px
  *   a `before:` hit-area inset (before:-inset-N, before:-inset-y-N, before:-inset-x-N) adds to both.
  * Unknown dimensions are reported as null and only height is enforced for text controls.
  */
@@ -24,35 +25,54 @@ export function hitBox(el: Element): { h: number | null; w: number | null } {
   let minH = 0;
   let minW = 0;
   let py = 0;
+  let px = 0;
+  let fluid = false;
   let text = 20;
   let insetX = 0;
   let insetY = 0;
   for (const c of cls) {
     let m: RegExpExecArray | null;
-    if ((m = /^h-(.+)$/.exec(c))) h = SCALE(m[1]) ?? h;
+    if (/^(w-full|flex-1|grow|flex-grow)$/.test(c)) fluid = true;
+    else if ((m = /^h-(.+)$/.exec(c))) h = SCALE(m[1]) ?? h;
     else if ((m = /^w-(.+)$/.exec(c))) w = SCALE(m[1]) ?? w;
     else if ((m = /^size-(.+)$/.exec(c))) h = w = SCALE(m[1]) ?? h;
     else if ((m = /^min-h-(.+)$/.exec(c))) minH = SCALE(m[1]) ?? minH;
     else if ((m = /^min-w-(.+)$/.exec(c))) minW = SCALE(m[1]) ?? minW;
     else if ((m = /^py-(.+)$/.exec(c))) py = SCALE(m[1]) ?? py;
+    else if ((m = /^px-(.+)$/.exec(c))) px = SCALE(m[1]) ?? px;
     else if ((m = /^text-(xs|sm|base|lg|xl)$/.exec(c))) text = LINE[m[1]];
-    else if ((m = /^before:-inset-(.+)$/.exec(c))) insetX = insetY = SCALE(m[1]) ?? 0;
+    // axis-specific insets first: the general pattern would swallow "y-3" and read 0
     else if ((m = /^before:-inset-y-(.+)$/.exec(c))) insetY = SCALE(m[1]) ?? 0;
     else if ((m = /^before:-inset-x-(.+)$/.exec(c))) insetX = SCALE(m[1]) ?? 0;
+    else if ((m = /^before:-inset-(.+)$/.exec(c))) insetX = insetY = SCALE(m[1]) ?? 0;
   }
   const height = Math.max(h ?? py * 2 + text, minH) + insetY * 2;
-  const width = w !== null || minW ? Math.max(w ?? 0, minW) + insetX * 2 : null;
+  // Width lower bounds: a fluid control fills its row; padding alone already spans 2*px;
+  // a text field with no width class gets the browser default (size=20, ~150px).
+  const isTextField =
+    el.tagName === 'INPUT' && !/^(checkbox|radio|range)$/.test(el.getAttribute('type') ?? '');
+  const lower = fluid ? Infinity : Math.max(px * 2, isTextField && w === null ? 150 : 0);
+  const known = w !== null || minW > 0 || lower > 0;
+  const width = known ? Math.max(w ?? 0, minW, lower) + insetX * 2 : null;
   return { h: height, w: width };
 }
 
-/** Every interactive element under `root` whose computed hit box is under `min` px. */
-export function smallTargets(root: ParentNode, min = 44): string[] {
+/**
+ * Every interactive element under `root` whose computed hit box is under `min` px.
+ * `requireWidth`: a control whose width is unknown (a text link with no min-w) fails
+ * too, for rows of short words ("FAQ", "عنّا") that measured 33-41px wide (a11y P2-10).
+ */
+export function smallTargets(
+  root: ParentNode,
+  min = 44,
+  { requireWidth = false }: { requireWidth?: boolean } = {}
+): string[] {
   return Array.from(
     root.querySelectorAll('a[href], button, [role="button"], select, input:not([type="hidden"])')
   )
     .filter(el => !(el as HTMLElement).hidden && el.getAttribute('aria-hidden') !== 'true')
     .map(el => ({ el, box: hitBox(el) }))
-    .filter(({ box }) => (box.h ?? 0) < min || (box.w !== null && box.w < min))
+    .filter(({ box }) => (box.h ?? 0) < min || (box.w === null ? requireWidth : box.w < min))
     .map(
       ({ el, box }) =>
         `${el.tagName.toLowerCase()} "${(el.textContent ?? el.getAttribute('aria-label') ?? '').trim().slice(0, 30)}" ${box.w ?? '?'}x${box.h}`
