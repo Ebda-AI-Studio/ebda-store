@@ -14,6 +14,8 @@ export interface Toast {
   title: string;
   message?: string;
   duration?: number;
+  /** One inline action (e.g. "Undo" after removing a cart line). Runs, then closes the toast. */
+  action?: { label: string; onClick: () => void };
 }
 
 interface ToastContextValue {
@@ -179,26 +181,28 @@ function ToastItem({ toast, onClose }: { toast: Toast; onClose: () => void }) {
     ),
   };
 
+  // IA-03 (W4): the theme's tokens, never palette hues (a mint toast is in none of the looks).
+  // Success and info speak in the store's ink; error and warning keep their semantic inks.
   const styles: Record<ToastType, { container: string; icon: string; progress: string }> = {
     success: {
-      container: 'bg-background border-green-200 dark:border-green-800',
-      icon: 'text-green-500 bg-green-50 dark:bg-green-900/30',
-      progress: 'bg-green-500',
+      container: 'bg-background border-border',
+      icon: 'text-foreground bg-foreground/5',
+      progress: 'bg-foreground/40',
     },
     error: {
-      container: 'bg-background border-red-200 dark:border-red-800',
-      icon: 'text-red-500 bg-red-50 dark:bg-red-900/30',
-      progress: 'bg-red-500',
+      container: 'bg-background border-destructive/40',
+      icon: 'text-destructive-ink bg-destructive/10',
+      progress: 'bg-destructive',
     },
     warning: {
-      container: 'bg-background border-yellow-200 dark:border-yellow-800',
-      icon: 'text-yellow-500 bg-yellow-50 dark:bg-yellow-900/30',
-      progress: 'bg-yellow-500',
+      container: 'bg-background border-warning/40',
+      icon: 'text-warning-ink bg-warning/10',
+      progress: 'bg-warning',
     },
     info: {
-      container: 'bg-background border-blue-200 dark:border-blue-800',
-      icon: 'text-blue-500 bg-blue-50 dark:bg-blue-900/30',
-      progress: 'bg-blue-500',
+      container: 'bg-background border-border',
+      icon: 'text-foreground bg-foreground/5',
+      progress: 'bg-foreground/40',
     },
   };
 
@@ -209,7 +213,7 @@ function ToastItem({ toast, onClose }: { toast: Toast; onClose: () => void }) {
       className={`
         pointer-events-auto relative overflow-hidden
         ${s.container}
-        border rounded-xl shadow-lg
+        border rounded-[var(--radius,0.75rem)] shadow-lg
         flex items-start gap-2.5 p-3 sm:gap-3 sm:p-4
         animate-toast-in
       `}
@@ -225,6 +229,19 @@ function ToastItem({ toast, onClose }: { toast: Toast; onClose: () => void }) {
           <p className="text-sm text-muted-foreground mt-0.5 leading-relaxed">{toast.message}</p>
         )}
       </div>
+
+      {toast.action && (
+        <button
+          type="button"
+          onClick={() => {
+            toast.action?.onClick();
+            onClose();
+          }}
+          className="flex-shrink-0 min-h-11 px-2 text-sm font-semibold text-foreground underline underline-offset-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          {toast.action.label}
+        </button>
+      )}
 
       {/* Close button */}
       <button
