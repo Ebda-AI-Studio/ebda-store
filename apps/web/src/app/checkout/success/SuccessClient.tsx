@@ -344,7 +344,10 @@ function SuccessContent() {
               'Questions about your order?',
               '\u0647\u0644 \u0644\u062f\u064a\u0643 \u0623\u0633\u0626\u0644\u0629 \u062d\u0648\u0644 \u0637\u0644\u0628\u0643\u061f'
             )}{' '}
-            <Link href={storeUrl('/contact')} className="text-primary underline underline-offset-4">
+            <Link
+              href={storeUrl('/contact')}
+              className="relative text-primary underline underline-offset-4 before:absolute before:-inset-y-3 before:inset-x-0 before:content-['']"
+            >
               {t(
                 'Contact support',
                 '\u062a\u0648\u0627\u0635\u0644 \u0645\u0639 \u0627\u0644\u062f\u0639\u0645'

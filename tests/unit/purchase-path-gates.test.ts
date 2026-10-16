@@ -165,3 +165,20 @@ describe('1.4.1: purchase-path text links are underlined at rest', () => {
     expect(hits).toEqual([]);
   });
 });
+
+/**
+ * a11y re-audit P2-N12 (rule (d) as briefed): inline links in running copy, "Returns within 14
+ * days" (PDP) and "Contact support" (receipt), measured 21px high. They keep their line and get a
+ * 44px hit inset (before:-inset-y-3 on a 20px line).
+ */
+describe('(d) inline purchase-path links carry a 44px hit inset', () => {
+  it.each([
+    ['components/commerce/TrustLine.tsx', "storeUrl('/returns')"],
+    ['app/checkout/success/SuccessClient.tsx', "storeUrl('/contact')"],
+  ])('%s', (f, href) => {
+    const s = src(f);
+    const i = s.indexOf(href);
+    const tag = s.slice(i, s.indexOf('>', i));
+    expect(tag).toMatch(/className="[^"]*\brelative\b[^"]*\bbefore:-inset-y-3\b/);
+  });
+});
