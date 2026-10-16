@@ -202,3 +202,14 @@ describe('VariantSelector value thumbnails', () => {
     expect(screen.getByRole('button', { name: '50g' }).querySelector('img')).toBeNull();
   });
 });
+
+// a11y P1-4 / P2-10 / rule (d) (W4): size and length chips measured 44x38, swatches 41x45.
+describe('every option control is at least 44x44 (computed hit box)', () => {
+  it('chips and swatches', async () => {
+    const { smallTargets } = await import('../../../../tests/helpers/target-size');
+    const { container } = render(
+      <VariantSelector options={options} variants={variants} onVariantSelect={() => {}} />
+    );
+    expect(smallTargets(container)).toEqual([]);
+  });
+});

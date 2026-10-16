@@ -266,7 +266,7 @@ export function VariantSelector({
                       }
                       title={!available ? t('Out of Stock', 'غير متوفر') : pillLabel}
                       className={[
-                        'relative inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full before:absolute before:-inset-1.5 before:content-[""] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                        'relative inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full before:absolute before:-inset-1.5 before:content-[""] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
                         isSelected
                           ? 'ring-2 ring-foreground ring-offset-2 ring-offset-background'
                           : 'ring-1 ring-foreground/35',
@@ -324,7 +324,7 @@ export function VariantSelector({
                                 : 'cursor-not-allowed border-input text-muted-foreground line-through opacity-50',
                           ].join(' ')
                         : [
-                            'relative min-w-[2.75rem] rounded-lg border px-3 py-2 text-sm font-medium transition',
+                            'relative min-h-11 min-w-11 rounded-lg border px-3 py-2 text-sm font-medium transition',
                             thumbnail || dotColor ? 'inline-flex items-center gap-2' : '',
                             isSelected
                               ? 'border-primary bg-primary text-primary-foreground'
