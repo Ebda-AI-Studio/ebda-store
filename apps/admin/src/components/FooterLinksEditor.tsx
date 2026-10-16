@@ -85,14 +85,17 @@ export const DEFAULT_UTILITY_LINKS: UtilityBarLink[] = [
   { label: 'Wishlist', labelAr: 'المفضلة', href: '/wishlist', enabled: true },
 ];
 
-/** Snapshot of current footer-links + utility-bar state for the preview bundle. */
+/** Snapshot of current footer-links + utility-bar state for the preview bundle.
+ *  `footerLinks` is the same merge a save writes (`mergeFooterLinksForSave` over
+ *  what is stored), so the preview keeps stored keys the editor does not edit. */
 export interface FooterLinksEditorState {
   footerLinks: {
     shop: FooterLink[];
     support: FooterLink[];
     company: FooterLink[];
     newsletterEnabled: boolean;
-    bottomBar: FooterBottomBarSettings;
+    bottomBar: FooterBottomBarSettings & Record<string, unknown>;
+    [key: string]: unknown;
   };
   utilityBar: {
     enabled: boolean;
@@ -360,6 +363,8 @@ export function FooterLinksEditor({
   const [newsletterEnabled, setNewsletterEnabled] = useState(true);
   // The footer legal row (S-01). Unset keys keep the storefront default (on).
   const [bottomBar, setBottomBar] = useState<FooterBottomBarSettings>({});
+  // What is stored, as loaded: the preview bundle lays the edits over it, as a save does.
+  const [storedFooterLinks, setStoredFooterLinks] = useState<StoreSettings['footerLinks']>();
   const [utilityBarEnabled, setUtilityBarEnabled] = useState(true);
   const [utilityLinks, setUtilityLinks] = useState<UtilityBarLink[]>(DEFAULT_UTILITY_LINKS);
 
@@ -374,6 +379,7 @@ export function FooterLinksEditor({
         if (data?.store) {
           const settings = (data.store.settings || {}) as StoreSettings;
           if (settings.footerLinks) {
+            setStoredFooterLinks(settings.footerLinks);
             if (settings.footerLinks.shop?.length) setShopLinks(settings.footerLinks.shop);
             if (settings.footerLinks.support?.length) setSupportLinks(settings.footerLinks.support);
             if (settings.footerLinks.company?.length) setCompanyLinks(settings.footerLinks.company);
@@ -434,14 +440,16 @@ export function FooterLinksEditor({
   // the current (unsaved) values for the preview-draft bundle.
   useEffect(() => {
     if (stateRef) {
+      const edited = {
+        shop: shopLinks,
+        support: supportLinks,
+        company: companyLinks,
+        newsletterEnabled,
+        bottomBar,
+      };
+      const merged = mergeFooterLinksForSave(storedFooterLinks, edited);
       stateRef.current = {
-        footerLinks: {
-          shop: shopLinks,
-          support: supportLinks,
-          company: companyLinks,
-          newsletterEnabled,
-          bottomBar,
-        },
+        footerLinks: { ...merged, ...edited, bottomBar: merged.bottomBar ?? {} },
         utilityBar: {
           enabled: utilityBarEnabled,
           links: utilityLinks,
@@ -454,6 +462,7 @@ export function FooterLinksEditor({
     companyLinks,
     newsletterEnabled,
     bottomBar,
+    storedFooterLinks,
     utilityBarEnabled,
     utilityLinks,
     stateRef,
