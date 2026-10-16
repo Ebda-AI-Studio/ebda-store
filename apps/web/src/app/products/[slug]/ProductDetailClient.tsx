@@ -769,7 +769,7 @@ export default function ProductDetailClient({
               outOfStock && !canBackorder
                 ? t('Out of stock', 'غير متوفر حالياً')
                 : canBackorder
-                  ? t('Made to order — ships when ready', 'يُصنع حسب الطلب — يُشحن فور تجهيزه')
+                  ? t('Made to order — ships when ready', 'بيتعمل مخصوص — يتشحن أول ما يجهز')
                   : null
             }
             onAddToCart={handleAddToCart}

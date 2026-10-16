@@ -230,7 +230,7 @@ export async function assertOrderAllowed(storeId: string): Promise<void> {
   if (row.isDemo) {
     throw new AppError(403, 'DEMO_STORE', 'This is a demo store; orders are disabled', {
       messageEn: 'This is a demo store: ordering is disabled',
-      messageAr: 'هذا متجر تجريبي — الطلبات مغلقة',
+      messageAr: 'ده متجر تجريبي — الطلب مقفول',
     });
   }
   const e = await getEntitlements(storeId);

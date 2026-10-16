@@ -98,10 +98,10 @@ export function ProductModel3dPanel({
       look={look}
       labels={{
         loading: t('Loading 3D…', 'جاري تحميل الـ 3D…'),
-        error: t('3D view unavailable right now.', 'عرض الـ 3D غير متاح حالياً.'),
+        error: t('3D view unavailable right now.', 'عرض الـ 3D مش متاح دلوقتي.'),
         hint: t(
           'Drag to rotate · pinch or +/− to zoom · arrow keys',
-          'اسحب للتدوير · قرّب بإصبعين أو +/− · الأسهم'
+          'اسحب للف · قرّب بإصبعين أو +/− · الأسهم'
         ),
         ar: t('View in your space', 'اعرضه في مكانك'),
       }}

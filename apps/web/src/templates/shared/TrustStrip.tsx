@@ -43,7 +43,7 @@ const DEFAULT_TRUST_ITEMS: TrustItem[] = [
     titleEn: 'Fast Delivery',
     titleAr: 'شحن سريع',
     subEn: 'Delivered to your door across Egypt',
-    subAr: 'يصلك إلى باب البيت في جميع أنحاء مصر',
+    subAr: 'بيوصلك لحد باب البيت في كل مصر',
   },
   {
     // Shield-check — quality guarantee

@@ -51,7 +51,7 @@ export default function ContactClient() {
       if (result.success) {
         success(
           t('Message sent!', 'تم إرسال رسالتك'),
-          t("We'll get back to you as soon as possible.", 'سنرد عليك في أقرب وقت.')
+          t("We'll get back to you as soon as possible.", 'هنرد عليك في أقرب وقت.')
         );
         setFormData({
           name: '',
@@ -62,14 +62,14 @@ export default function ContactClient() {
         });
       } else {
         showError(
-          t('Failed to send message', 'لم تُرسَل الرسالة'),
-          result.error?.message || t('Please try again later.', 'حاول مرة أخرى بعد قليل.')
+          t('Failed to send message', 'الرسالة ما اتبعتتش'),
+          result.error?.message || t('Please try again later.', 'جرّب تاني بعد شوية.')
         );
       }
     } catch {
       showError(
-        t('Failed to send message', 'لم تُرسَل الرسالة'),
-        t('Please try again later.', 'حاول مرة أخرى بعد قليل.')
+        t('Failed to send message', 'الرسالة ما اتبعتتش'),
+        t('Please try again later.', 'جرّب تاني بعد شوية.')
       );
     } finally {
       setIsSubmitting(false);

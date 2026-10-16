@@ -1206,7 +1206,7 @@ export default function CheckoutClient() {
     // Enter-key implicit submit of the payment form from reaching createOrder.
     if (store.isDemo) {
       setCheckoutError(
-        t('This is a demo store — ordering is closed', 'هذا متجر تجريبي — الطلبات مغلقة')
+        t('This is a demo store — ordering is closed', 'ده متجر تجريبي — الطلب مقفول')
       );
       return;
     }

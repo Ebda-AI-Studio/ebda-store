@@ -31,7 +31,7 @@ const props = {
 describe('PaymentStep on a demo store', () => {
   it('shows the notice and no submit button', () => {
     const { container, getByText } = render(<PaymentStep {...props} isDemo />);
-    expect(getByText('هذا متجر تجريبي — الطلبات مغلقة')).toBeTruthy();
+    expect(getByText('ده متجر تجريبي — الطلب مقفول')).toBeTruthy();
     expect(container.querySelector('button[type="submit"]')).toBeNull();
   });
   it('a normal store keeps the pay button and no notice', () => {

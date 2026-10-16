@@ -15,8 +15,8 @@ export function returnPolicyKind(days: number | null | undefined): ReturnPolicyK
 }
 
 /**
- * "14 days" / "١٤ يومًا" after a preposition (every caller says "خلال …" /
- * "لمدة …"), through the one plural helper in the oblique case ("خلال يومين").
+ * "14 days" / "١٤ يوم" after a preposition (every caller says "خلال …"), through
+ * the one plural helper (Egyptian forms: "خلال يومين", Ruling FU46-Y02a).
  * `localize` puts the number in the store's digits (review M8: the PDP trust
  * line and /returns must agree); default Western.
  */
@@ -25,7 +25,7 @@ export function daysPhrase(
   lang: PolicyLang,
   localize: (v: number) => string = String
 ): string {
-  return countText(lang, n, DAYS, localize(n), 'oblique');
+  return countText(lang, n, DAYS, localize(n));
 }
 
 export interface ReturnPolicyCopy {
@@ -44,7 +44,7 @@ export function returnPolicyCopy(
     return lang === 'ar'
       ? {
           title: `سياسة الإرجاع خلال ${daysPhrase(n, 'ar', localize)}`,
-          body: `نتمنى أن تكون راضياً تماماً عن مشترياتك. إذا لم يناسبك الطلب، يمكنك إرجاعه خلال ${daysPhrase(n, 'ar', localize)} من تاريخ التوصيل.`,
+          body: `نتمنى تكون راضي تمامًا عن مشترياتك. لو الطلب مش مناسبك، تقدر ترجعه خلال ${daysPhrase(n, 'ar', localize)} من تاريخ التوصيل.`,
         }
       : {
           title: `${n}-Day Return Policy`,
@@ -55,7 +55,7 @@ export function returnPolicyCopy(
     return lang === 'ar'
       ? {
           title: 'الإرجاع غير متاح',
-          body: 'هذا المتجر لا يقبل طلبات الإرجاع. إذا وصلك منتج تالف أو غير مطابق، تواصل مع المتجر وسنساعدك.',
+          body: 'المتجر ده مش بيقبل الإرجاع. لو وصلك منتج تالف أو مش زي الوصف، كلّم المتجر وهيساعدك.',
         }
       : {
           title: 'Returns Not Accepted',
@@ -65,7 +65,7 @@ export function returnPolicyCopy(
   return lang === 'ar'
     ? {
         title: 'سياسة الإرجاع',
-        body: 'تواصل مع المتجر لمعرفة مدة الإرجاع المتاحة لطلبك قبل تقديم الطلب.',
+        body: 'كلّم المتجر عشان تعرف مدة الإرجاع المتاحة لطلبك قبل ما تطلب.',
       }
     : {
         title: 'Return Policy',
@@ -83,16 +83,16 @@ export function termsReturnSentence(
   if (kind === 'window') {
     const n = days as number;
     return lang === 'ar'
-      ? `تسمح سياسة الإرجاع لدينا بالإرجاع خلال ${daysPhrase(n, 'ar', localize)} من التوصيل. يرجى الرجوع إلى صفحة المرتجعات لمعرفة التفاصيل الكاملة حول الأهلية والإجراءات.`
+      ? `سياسة الإرجاع عندنا بتسمح بالإرجاع خلال ${daysPhrase(n, 'ar', localize)} من التوصيل. شوف صفحة المرتجعات عشان تعرف كل التفاصيل عن الشروط والخطوات.`
       : `Our return policy allows returns within ${daysPhrase(n, 'en')} of delivery. Please refer to our Returns page for complete details on eligibility and process.`;
   }
   if (kind === 'none') {
     return lang === 'ar'
-      ? 'لا يقبل هذا المتجر طلبات الإرجاع. يرجى الرجوع إلى صفحة المرتجعات لمعرفة التفاصيل.'
+      ? 'المتجر ده مش بيقبل الإرجاع. شوف صفحة المرتجعات عشان تعرف التفاصيل.'
       : 'This store does not accept returns. Please refer to our Returns page for details.';
   }
   return lang === 'ar'
-    ? 'تختلف مدة الإرجاع حسب المتجر. يرجى الرجوع إلى صفحة المرتجعات أو التواصل معنا لمعرفة التفاصيل الكاملة حول الأهلية والإجراءات.'
+    ? 'مدة الإرجاع بيحددها المتجر. شوف صفحة المرتجعات أو كلّمنا عشان تعرف كل التفاصيل عن الشروط والخطوات.'
     : 'The return period is set by the store. Please refer to our Returns page or contact us for complete details on eligibility and process.';
 }
 
@@ -106,15 +106,15 @@ export function faqReturnAnswer(
   if (kind === 'window') {
     const n = days as number;
     return lang === 'ar'
-      ? `نقدم سياسة إرجاع لمدة ${daysPhrase(n, 'ar', localize)} للعناصر غير المستخدمة في عبوتها الأصلية. يرجى زيارة صفحة المرتجعات لمزيد من التفاصيل.`
+      ? `بنقبل الإرجاع خلال ${daysPhrase(n, 'ar', localize)} للمنتجات اللي ما اتستعملتش وفي علبتها الأصلية. شوف صفحة المرتجعات لتفاصيل أكتر.`
       : `We offer a ${n}-day return policy for unused items in original packaging. Please visit our Returns page for more details.`;
   }
   if (kind === 'none') {
     return lang === 'ar'
-      ? 'هذا المتجر لا يقبل طلبات الإرجاع. يرجى زيارة صفحة المرتجعات لمزيد من التفاصيل.'
+      ? 'المتجر ده مش بيقبل الإرجاع. شوف صفحة المرتجعات لتفاصيل أكتر.'
       : 'This store does not accept returns. Please visit our Returns page for more details.';
   }
   return lang === 'ar'
-    ? 'تختلف مدة الإرجاع حسب المتجر. يرجى زيارة صفحة المرتجعات أو التواصل معنا لمزيد من التفاصيل.'
+    ? 'مدة الإرجاع بيحددها المتجر. شوف صفحة المرتجعات أو كلّمنا لتفاصيل أكتر.'
     : 'The return period is set by the store. Please visit our Returns page or contact us for more details.';
 }

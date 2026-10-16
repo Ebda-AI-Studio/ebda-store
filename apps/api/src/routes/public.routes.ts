@@ -2243,7 +2243,7 @@ router.post('/contact', writeLimiter, async (req: Request, res: Response, next: 
     if (store.isDemo) {
       throw new AppError(403, 'DEMO_STORE', 'This is a demo store; messages are disabled', {
         messageEn: 'This is a demo store: messages are disabled',
-        messageAr: 'هذا متجر تجريبي — الرسائل مغلقة',
+        messageAr: 'ده متجر تجريبي — الرسائل مقفولة',
       });
     }
 

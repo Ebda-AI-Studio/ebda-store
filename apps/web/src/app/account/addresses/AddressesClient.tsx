@@ -394,7 +394,7 @@ export default function AddressesClient() {
               label={t('Landmark (optional)', 'علامة مميزة (اختياري)')}
               value={formData.address2}
               onChange={e => setFormData({ ...formData, address2: e.target.value })}
-              placeholder={t('Next to the pharmacy…', 'بجوار الصيدلية…')}
+              placeholder={t('Next to the pharmacy…', 'جنب الصيدلية…')}
             />
 
             <label className="flex items-center gap-2">

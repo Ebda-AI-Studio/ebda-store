@@ -11,7 +11,7 @@ export function subscriptionRequiredCopy(code: string, t: (en: string, ar: strin
   if (code !== 'SUBSCRIPTION_REQUIRED') return null;
   return t(
     'This store is not taking orders right now. Please try again later.',
-    'المتجر لا يستقبل طلبات حالياً. حاول مرة أخرى لاحقاً.'
+    'المتجر مش بيستقبل طلبات دلوقتي. جرّب تاني بعدين.'
   );
 }
 
@@ -52,7 +52,7 @@ export function personalisationRequiredCopy(
   if (parts.length === 0) {
     return t(
       'An item in your cart needs your personalisation. Add it on the product page.',
-      'يوجد منتج في سلتك يحتاج إلى تخصيص. اكتبه من صفحة المنتج.'
+      'في منتج في سلتك محتاج تخصيص. اكتبه من صفحة المنتج.'
     );
   }
   return parts
@@ -92,6 +92,6 @@ export function variantRequiredCopy(
   const list = names.join(ar ? '، ' : ', ');
   return t(
     `Please choose a size for ${list} on its product page.`,
-    `يرجى اختيار المقاس لـ ${list} من صفحة المنتج.`
+    `اختار المقاس لـ ${list} من صفحة المنتج.`
   );
 }

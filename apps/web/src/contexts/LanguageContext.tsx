@@ -292,19 +292,19 @@ export const translations = {
 
   // Editor canvas hints for sections with nothing to show yet (EmptySectionHint).
   // Never shown on the public storefront, which hides these sections instead.
-  'Add categories and they will appear here.': 'أضف أقساماً وستظهر هنا.',
-  'Add products and your newest ones will appear here.': 'أضف منتجات وستظهر أحدث منتجاتك هنا.',
+  'Add categories and they will appear here.': 'ضيف أقسام وهتظهر هنا.',
+  'Add products and your newest ones will appear here.': 'ضيف منتجات وأحدث منتجاتك هتظهر هنا.',
   'Best sellers appear here once your products start selling.':
-    'ستظهر المنتجات الأكثر مبيعاً هنا بمجرد أن تبدأ منتجاتك في البيع.',
+    'الأكثر مبيعاً هيظهر هنا أول ما منتجاتك تبدأ تتباع.',
   'Add a store description or image in store settings to show your story here.':
-    'أضف وصفاً أو صورة للمتجر من إعدادات المتجر وستظهر قصتك هنا.',
-  'Publish a blog post to show it here.': 'انشر مقالاً في المدونة وسيظهر هنا.',
+    'ضيف وصف أو صورة للمتجر من إعدادات المتجر وحكايتك هتظهر هنا.',
+  'Publish a blog post to show it here.': 'انشر مقال في المدونة وهيظهر هنا.',
   'Write your own trust items (delivery, payment, returns) and they will show here.':
-    'اكتب نقاط الثقة الخاصة بك (التوصيل، الدفع، الاسترجاع) وستظهر هنا.',
+    'اكتب نقاط الثقة بتاعتك (التوصيل، الدفع، الاسترجاع) وهتظهر هنا.',
   'Customer reviews appear here once customers leave them.':
-    'ستظهر آراء العملاء هنا بمجرد أن يكتبوها.',
+    'آراء العملاء هتظهر هنا أول ما العملاء يكتبوها.',
   'Only you see this in the editor. Visitors do not see an empty section.':
-    'أنت وحدك ترى هذا في المحرر. لا يرى الزوار قسماً فارغاً.',
+    'إنت بس اللي بتشوف ده في المحرر. الزوار مش بيشوفوا قسم فاضي.',
 
   // Route error fallback — Try Again while the refresh is in flight.
   'Retrying…': 'جارٍ إعادة المحاولة…',
