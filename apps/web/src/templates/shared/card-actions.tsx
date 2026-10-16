@@ -52,6 +52,20 @@ export function cardActionLabel(kind: CardActionKind, isRtl: boolean, name?: str
   }
 }
 
+/**
+ * a11y P2-14: a card link's accessible name leads with the product; badge words
+ * follow it ("Linen abaya, New, -20%"), never precede it.
+ */
+export function cardLinkLabel(
+  name: string,
+  badges: Array<string | false | null | undefined>
+): string {
+  return [
+    name,
+    ...badges.filter((b): b is string => typeof b === 'string' && b.trim() !== ''),
+  ].join(', ');
+}
+
 interface CompareButtonProps {
   productId: string;
   isInCompare?: boolean;

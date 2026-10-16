@@ -159,7 +159,14 @@ function stripBadgeChip(html: string): { stripped: string; chips: string[] } {
     'g'
   );
   const chips = html.match(chipRe) ?? [];
-  return { stripped: html.replace(chipRe, ''), chips };
+  // a11y P2-14: the chip is aria-hidden and its words follow the product name in
+  // the link's name (aria-label suffix or an sr-only span). That announcement is
+  // part of adding a label, so it is stripped along with the chip.
+  const stripped = html
+    .replace(chipRe, '')
+    .replace(/(aria-label="[^"]*), Offer"/g, '$1"')
+    .replace(/<span class="sr-only">, Offer<\/span>/g, '');
+  return { stripped, chips };
 }
 
 // ── 1. The additive contract ────────────────────────────────────────────────

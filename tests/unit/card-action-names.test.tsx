@@ -56,3 +56,27 @@ describe('per-card actions are named with the product', () => {
     }
   });
 });
+
+/**
+ * a11y P2-14: the card link's name started with the badge ("NEW Open-front
+ * abaya ..."). The name comes first and badges follow it; the chips themselves
+ * are hidden from the accessibility tree (an aria-label on a span is ignored).
+ */
+describe('card link names lead with the product (P2-14)', async () => {
+  const { cardLinkLabel } = await import('../../apps/web/src/templates/shared/card-actions');
+  it('joins the name then the badges, skipping empty ones', () => {
+    expect(cardLinkLabel('Linen abaya', ['New', false, undefined, '-20%'])).toBe(
+      'Linen abaya, New, -20%'
+    );
+    expect(cardLinkLabel('عباية', [])).toBe('عباية');
+  });
+
+  it.each(['shared/PecannbeeProductCard.tsx', 'minimal/ProductCard.tsx'])(
+    '%s hides its chips and names the link name-first',
+    f => {
+      const src = readFileSync(join(T, f), 'utf8');
+      expect(src).not.toMatch(/aria-label=\{t\('New product'/);
+      expect(src).toMatch(/cardLinkLabel\(/);
+    }
+  );
+});

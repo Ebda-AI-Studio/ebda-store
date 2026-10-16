@@ -37,7 +37,7 @@ import { AdaptiveAddButton, OosImageDim, OutOfStockRibbon, isProductNew } from '
 import { BrandPill } from './BrandPill';
 import { getDiscountBadgeColor } from './discount-badge';
 import { newBadgeCornerCls } from './badge-collision';
-import { cardActionLabel } from './card-actions';
+import { cardActionLabel, cardLinkLabel } from './card-actions';
 import { getCustomBadgeColor, getCustomBadgeTextColor, resolveCardBadges } from './custom-badge';
 import {
   lookCardCta,
@@ -356,6 +356,14 @@ function PecannbeeProductCardImpl({
       <Link
         href={href}
         prefetch={false}
+        aria-label={cardLinkLabel(name, [
+          showNewBadge && t('New', 'جديد'),
+          onSale && discountBadgeAllowed && discountBadgeText,
+          customBadgeText,
+          !orderable &&
+            ((isRtl ? resolvedOosLabelTextAr : resolvedOosLabelTextEn) ||
+              t('Out of stock', 'نفد المخزون')),
+        ])}
         className="group/img block focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
       >
         {/* Image: item 8 — aspect+radius driven by per-store cardImageAspect/cardImageRadius;
@@ -446,7 +454,8 @@ function PecannbeeProductCardImpl({
                   : `absolute ${newCorner} z-10 rounded-full bg-[hsl(var(--primary))] px-2.5 py-1 text-xs font-bold uppercase tracking-wider text-[hsl(var(--primary-foreground))] shadow-[0_6px_14px_-6px_hsl(var(--primary)/0.5)]`
               }
               style={chip ? LOOK_CHIP_STYLE : undefined}
-              aria-label={t('New product', 'منتج جديد')}
+              aria-hidden="true"
+              data-badge="new"
             >
               {isRtl ? 'جديد' : 'NEW'}
             </span>

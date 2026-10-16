@@ -34,7 +34,7 @@ import {
   storeNumerals,
   getLook,
 } from '@ebda/shared';
-import { CompareButton, RemoveFromWishlistButton } from '../shared/card-actions';
+import { CompareButton, RemoveFromWishlistButton, cardLinkLabel } from '../shared/card-actions';
 import { Price } from '@ebda/ui';
 import { TaxInclusiveLabel } from '../shared/tax-inclusive-label';
 import { productCardPropsEqual } from '../shared/product-card-memo';
@@ -262,7 +262,8 @@ function MinimalProductCard({
                   : 'absolute top-2 start-2 z-10 px-2 py-0.5 text-xs font-medium uppercase tracking-[0.18em] text-[hsl(var(--primary))] bg-background'
               }
               style={chip ? LOOK_CHIP_STYLE : undefined}
-              aria-label={t('New product', 'منتج جديد')}
+              aria-hidden="true"
+              data-badge="new"
             >
               {isRtl ? 'جديد' : 'NEW'}
             </span>
@@ -289,6 +290,7 @@ function MinimalProductCard({
                   ? LOOK_CHIP_STYLE
                   : { backgroundColor: customBadgeColor, color: customBadgeTextColor }
               }
+              aria-hidden="true"
             >
               {customBadgeText}
             </span>
@@ -435,6 +437,14 @@ function MinimalProductCard({
                 {isRtl && product.nameAr ? product.nameAr : product.name}
               </h3>
             )}
+            {/* P2-14: the chips are aria-hidden; their words follow the name. */}
+            {(() => {
+              const after = cardLinkLabel('', [
+                product.inStock !== false && isProductNew(product, renderNow) && t('New', 'جديد'),
+                customBadgeText,
+              ]);
+              return after ? <span className="sr-only">{after}</span> : null;
+            })()}
             {/* schema meta always rendered for SEO */}
             <span itemProp="offers" itemScope itemType="https://schema.org/Offer">
               <meta itemProp="priceCurrency" content={currency} />

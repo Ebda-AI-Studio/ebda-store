@@ -370,8 +370,7 @@ describe('contrast on every look', () => {
 describe('PecannbeeProductCard NEW chip never shares the heart corner', () => {
   const newOne = (sale: boolean) =>
     ({ ...product(sale ? 'sale' : 'plain'), isNew: true }) as ReturnType<typeof product>;
-  const chipOf = (c: HTMLElement) =>
-    c.querySelector('[aria-label="منتج جديد"], [aria-label="New product"]') as HTMLElement;
+  const chipOf = (c: HTMLElement) => c.querySelector('[data-badge="new"]') as HTMLElement;
   it.each([null, 'qamar.atelier', 'qamar.lookbook'])('%s', look => {
     selectLook(look);
     for (const sale of [false, true]) {
@@ -406,7 +405,7 @@ describe('minimal/ProductCard chips (the Qamar search grid) follow cardBadge', (
           isRtl: true,
         } as never
       )
-    ).container.querySelector('[aria-label="منتج جديد"]') as HTMLElement;
+    ).container.querySelector('[data-badge="new"]') as HTMLElement;
   it('no look: the quiet tracked primary text chip, unchanged', () => {
     selectLook(null);
     expect(card().className).toContain('tracking-[0.18em]');
