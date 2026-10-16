@@ -37,6 +37,19 @@ vi.mock('@api/middleware/store-access', () => ({
     next();
   },
 }));
+// M8: a switch that makes the index-status read fail, to prove it degrades only the index line.
+const indexStatusFails = { on: false };
+vi.mock('../../apps/api/src/services/product-index.service', async importOriginal => {
+  const real =
+    await importOriginal<typeof import('../../apps/api/src/services/product-index.service')>();
+  return {
+    ...real,
+    storeIndexStatus: async (storeId: string) => {
+      if (indexStatusFails.on) throw new Error('index status read failed');
+      return real.storeIndexStatus(storeId);
+    },
+  };
+});
 vi.mock('../../apps/api/src/lib/inngest/client', () => ({
   inngest: { send: vi.fn(async () => ({ ids: [] })), createFunction: vi.fn(() => ({})) },
 }));
@@ -136,6 +149,19 @@ describe.skipIf(!hasDb)('GET /stores/:storeId/search-insights', () => {
   });
 
   // Task 12: the viewer of product_embeddings (every-data-needs-UI) — "N of M ready / N failed".
+  it('an index-status failure drops only the index line; the search insights still answer', async () => {
+    const storeId = await seedStore('index-fail');
+    indexStatusFails.on = true;
+    try {
+      const res = await get(storeId, '?days=7');
+      expect(res.status).toBe(200);
+      expect(res.body.data.totals).toMatchObject({ searches: 0 });
+      expect(res.body.data.index).toBeUndefined();
+    } finally {
+      indexStatusFails.on = false;
+    }
+  });
+
   it('reports the smart-search index status of THIS store, and whether semantic search is on', async () => {
     const storeId = await seedStore('index');
     const other = await seedStore('index-other');

@@ -25,6 +25,8 @@ import { withStore } from '@ebda/database';
 import { getSearchInsights } from '../services/search-log.service';
 import { storeIndexStatus } from '../services/product-index.service';
 import { semanticSearchEnabled } from '../lib/search/embedding-provider';
+import { withSavepoint } from '../lib/savepoint';
+import logger from '../lib/logger';
 
 const router = Router({ mergeParams: true });
 
@@ -48,12 +50,22 @@ router.get(
         days: Number(parsed.data.days) as 7 | 30 | 90,
         filter: parsed.data.filter,
       });
-      // Task 12: the smart-search index line ("N of M ready / N failed"). Counts only; no shopper data.
-      const status = await withStore(storeId, () => storeIndexStatus(storeId));
-      const data: SearchInsightsResponse = {
-        ...insights,
-        index: { ...status, semanticEnabled: semanticSearchEnabled() },
-      };
+      // Task 12: the smart-search index line ("N of M ready / N failed"). Counts only; no shopper
+      // data. Its failure drops only that line (`index` is optional), never the page (review M8);
+      // the savepoint keeps a failed statement from aborting the request transaction.
+      let index: SearchInsightsResponse['index'];
+      try {
+        const status = await withSavepoint(() =>
+          withStore(storeId, () => storeIndexStatus(storeId))
+        );
+        index = { ...status, semanticEnabled: semanticSearchEnabled() };
+      } catch (err) {
+        logger.warn(
+          { storeId, err: err instanceof Error ? err.message : 'unknown' },
+          '[search-insights] index status unavailable; omitted'
+        );
+      }
+      const data: SearchInsightsResponse = { ...insights, ...(index ? { index } : {}) };
       res.json({ success: true, data });
     } catch (err) {
       next(err);
