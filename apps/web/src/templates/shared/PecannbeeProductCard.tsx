@@ -36,6 +36,7 @@ import { TaxInclusiveLabel } from './tax-inclusive-label';
 import { AdaptiveAddButton, OosImageDim, OutOfStockRibbon, isProductNew } from './ProductCardCta';
 import { BrandPill } from './BrandPill';
 import { getDiscountBadgeColor } from './discount-badge';
+import { newBadgeCornerCls } from './badge-collision';
 import { getCustomBadgeColor, getCustomBadgeTextColor, resolveCardBadges } from './custom-badge';
 import {
   lookCardCta,
@@ -266,6 +267,11 @@ function PecannbeeProductCardImpl({
       ? LOOK_CHIP_STYLE
       : { backgroundColor: discountBadgeColor };
   const heartMaterial = overPhotoMaterial(store.theme, store.look);
+  // The heart holds top-start on this card; the sale chip may hold top-end (X-01 class).
+  const newCorner = newBadgeCornerCls({
+    topStartReserved: true,
+    topEndReserved: onSale && discountBadgeAllowed && discountTopCorner === 'end',
+  });
 
   return (
     <article
@@ -431,8 +437,8 @@ function PecannbeeProductCardImpl({
             <span
               className={
                 chip
-                  ? cn(LOOK_CHIP_CLS, 'top-3 start-3')
-                  : 'absolute top-3 start-3 z-10 rounded-full bg-[hsl(var(--primary))] px-2.5 py-1 text-xs font-bold uppercase tracking-wider text-[hsl(var(--primary-foreground))] shadow-[0_6px_14px_-6px_hsl(var(--primary)/0.5)]'
+                  ? cn(LOOK_CHIP_CLS, newCorner)
+                  : `absolute ${newCorner} z-10 rounded-full bg-[hsl(var(--primary))] px-2.5 py-1 text-xs font-bold uppercase tracking-wider text-[hsl(var(--primary-foreground))] shadow-[0_6px_14px_-6px_hsl(var(--primary)/0.5)]`
               }
               style={chip ? LOOK_CHIP_STYLE : undefined}
               aria-label={t('New product', 'منتج جديد')}

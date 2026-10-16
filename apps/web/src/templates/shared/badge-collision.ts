@@ -79,3 +79,17 @@ export function soldOutCorner({
     otherHReserved: topEndReserved,
   });
 }
+
+/**
+ * The NEW chip's corner (W2b, X-01 class): its home is top-START like the sold-out marker (the
+ * two never show together: NEW is in-stock only), and it moves off whatever top corner a button
+ * or the sale chip holds. On the Pecannbee card the heart owns top-start, so NEW sits top-end,
+ * or bottom-start when the sale chip is at top-end.
+ */
+export function newBadgeCornerCls(reserved: {
+  topStartReserved?: boolean;
+  topEndReserved?: boolean;
+}): string {
+  const c = soldOutCorner(reserved);
+  return `${c.v === 'top' ? 'top-3' : 'bottom-3'} ${c.h === 'start' ? 'start-3' : 'end-3'}`;
+}

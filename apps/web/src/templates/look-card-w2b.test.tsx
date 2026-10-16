@@ -353,3 +353,33 @@ describe('contrast on every look', () => {
     }
   );
 });
+
+// X-01 class (W2b, live 390 shots): the NEW chip had its own hard-coded top-start corner, the
+// same corner as this card's wishlist heart, on every store. It now takes its corner from the
+// card's allocator: top-start is the heart's, so top-end, or bottom-start when the sale chip
+// holds top-end.
+describe('PecannbeeProductCard NEW chip never shares the heart corner', () => {
+  const newOne = (sale: boolean) =>
+    ({ ...product(sale ? 'sale' : 'plain'), isNew: true }) as ReturnType<typeof product>;
+  const chipOf = (c: HTMLElement) =>
+    c.querySelector('[aria-label="منتج جديد"], [aria-label="New product"]') as HTMLElement;
+  it.each([null, 'qamar.atelier', 'qamar.lookbook'])('%s', look => {
+    selectLook(look);
+    for (const sale of [false, true]) {
+      const { container } = render(
+        React.createElement(
+          PecannbeeProductCard as never,
+          {
+            product: newOne(sale),
+            isRtl: true,
+            pack: state.template,
+          } as never
+        )
+      );
+      const cls = chipOf(container).className;
+      expect(cls, `sale=${sale}`).not.toMatch(/\btop-3 start-3\b|\bstart-3 top-3\b/);
+      expect(cls, `sale=${sale}`).toContain(sale ? 'bottom-3' : 'end-3');
+      cleanup();
+    }
+  });
+});
