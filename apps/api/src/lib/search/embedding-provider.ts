@@ -218,7 +218,9 @@ export function semanticSearchEnabled(): boolean {
   return process.env.SEARCH_SEMANTIC_ENABLED === 'true' && getEmbeddingProvider() !== null;
 }
 
+/** `[x,y,...]` for a `::halfvec` parameter; refuses a wrong length or NaN/Infinity before SQL. */
 export function toHalfvecLiteral(v: number[]): string {
+  check([v], 1);
   return `[${v.join(',')}]`;
 }
 

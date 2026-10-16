@@ -205,7 +205,22 @@ describe('embedding provider', () => {
     setEmbeddingProviderForTests(fake);
     expect(getEmbeddingProvider()).toBe(fake);
   });
-  it('halfvec literal', () => expect(toHalfvecLiteral([0.5, -1])).toBe('[0.5,-1]'));
+  it('halfvec literal', () => {
+    const v = vec();
+    v[0] = 0.5;
+    v[1] = -1;
+    expect(toHalfvecLiteral(v)).toBe(`[${v.join(',')}]`);
+    expect(toHalfvecLiteral(v).startsWith('[0.5,-1,')).toBe(true);
+  });
+  it('halfvec literal refuses a wrong length or a non-finite value (review M3)', () => {
+    expect(() => toHalfvecLiteral([0.5, -1])).toThrow(/expected 1024/);
+    const nan = vec();
+    nan[3] = Number.NaN;
+    expect(() => toHalfvecLiteral(nan)).toThrow(/finite/);
+    const inf = vec();
+    inf[3] = Number.POSITIVE_INFINITY;
+    expect(() => toHalfvecLiteral(inf)).toThrow(/finite/);
+  });
   it('EMBED_DIMS matches the halfvec column in the migration and the Prisma schema', () => {
     const mig = readFileSync(
       'packages/database/prisma/migrations/20261022000100_product_embeddings/migration.sql',
