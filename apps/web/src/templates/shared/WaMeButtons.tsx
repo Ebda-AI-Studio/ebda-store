@@ -186,7 +186,7 @@ export function WaMeCodConfirmButton({
       <p className="mt-2 text-xs text-muted-foreground">
         {t(
           'Send us the prefilled message so we can confirm your order faster.',
-          'ابعت لنا الرسالة الجاهزة عشان نأكد طلبك أسرع.'
+          'أرسل لنا الرسالة الجاهزة لنؤكد طلبك أسرع.'
         )}
       </p>
     </div>

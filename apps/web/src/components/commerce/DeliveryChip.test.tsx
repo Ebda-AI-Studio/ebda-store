@@ -73,7 +73,7 @@ describe('DeliveryChip', () => {
     zones = [zone()];
     render(<DeliveryChip leadTimeDays={5} />);
     const chip = await screen.findByTestId('delivery-chip');
-    expect(chip.textContent).toContain('يوصلك بين');
+    expect(chip.textContent).toContain('يصلك بين');
     expect(chip.textContent).toContain('يُجهَّز خصيصًا لك خلال 5 أيام');
     // The "و" attaches to the second date.
     expect(chip.textContent).toMatch(/بين \S+ \d+ \S+ و\S+ \d+ \S+/);
@@ -105,11 +105,11 @@ describe('DeliveryChip', () => {
     expect(chip.textContent).toContain('Arrives Thu 15 Oct');
   });
 
-  it('single day reads "يوصلك X" and omits the lead line when ready to ship', async () => {
+  it('single day reads "يصلك X" and omits the lead line when ready to ship', async () => {
     zones = [zone({ estimatedDaysMin: 1, estimatedDaysMax: 1 })];
     render(<DeliveryChip leadTimeDays={null} />);
     const chip = await screen.findByTestId('delivery-chip');
-    expect(chip.textContent).toContain('يوصلك');
+    expect(chip.textContent).toContain('يصلك');
     expect(chip.textContent).not.toContain('بين');
     expect(chip.textContent).not.toContain('يُجهَّز');
   });

@@ -45,15 +45,15 @@ describe('PersonalisationField', () => {
     expect(input.maxLength).toBe(12);
     expect(input.required).toBe(true);
     // first paint: counter only, no "fill it in first" yet
-    expect(screen.queryByText('اكتب الاسم للتطريز الأول')).toBeNull();
+    expect(screen.queryByText('اكتب الاسم للتطريز أولاً')).toBeNull();
     expect(screen.getByText('0/12')).toBeTruthy();
     fireEvent.blur(input);
-    expect(screen.getByText('اكتب الاسم للتطريز الأول')).toBeTruthy();
+    expect(screen.getByText('اكتب الاسم للتطريز أولاً')).toBeTruthy();
     expect(input.getAttribute('aria-invalid')).toBe('true');
     fireEvent.change(input, { target: { value: 'سارة' } });
     expect(onChange).toHaveBeenCalledWith('سارة');
     rerender(<PersonalisationField config={cfg} value="سارة" onChange={onChange} />);
-    expect(screen.queryByText('اكتب الاسم للتطريز الأول')).toBeNull();
+    expect(screen.queryByText('اكتب الاسم للتطريز أولاً')).toBeNull();
     expect(screen.getByText('4/12')).toBeTruthy();
   });
 
@@ -68,7 +68,7 @@ describe('PersonalisationField', () => {
     rerender(<PersonalisationField config={cfg} value="" onChange={() => {}} nudge={1} />);
     expect(document.activeElement).toBe(input);
     expect(scroll).toHaveBeenCalledTimes(1);
-    expect(screen.getByText('اكتب الاسم للتطريز الأول')).toBeTruthy();
+    expect(screen.getByText('اكتب الاسم للتطريز أولاً')).toBeTruthy();
   });
 
   it('english on an Arabic-only label: the platform default, never the Arabic label (F4)', () => {

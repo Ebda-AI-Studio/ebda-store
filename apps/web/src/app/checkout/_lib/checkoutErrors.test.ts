@@ -16,7 +16,7 @@ describe('subscriptionRequiredCopy', () => {
       'This store is not taking orders right now. Please try again later.'
     );
     expect(subscriptionRequiredCopy('SUBSCRIPTION_REQUIRED', ar)).toBe(
-      'المتجر مش بيستقبل طلبات دلوقتي. جرّب تاني بعدين.'
+      'المتجر لا يستقبل طلبات حالياً. حاول مرة أخرى لاحقاً.'
     );
   });
   it('ignores other codes', () => {
@@ -59,7 +59,7 @@ describe('personalisationRequiredCopy', () => {
 
   it('still explains itself without details', () => {
     expect(personalisationRequiredCopy('PERSONALISATION_REQUIRED', undefined, tAr, 'ar')).toBe(
-      'في منتج في سلتك محتاج تخصيص. اكتبه من صفحة المنتج.'
+      'يوجد منتج في سلتك يحتاج إلى تخصيص. اكتبه من صفحة المنتج.'
     );
   });
 });

@@ -500,7 +500,7 @@ export function DahabProductDetail(p: DahabProductDetailProps) {
                 <p>
                   {t(
                     'Delivery times and fees for your area are shown at checkout.',
-                    'مواعيد ومصاريف التوصيل لمنطقتك بتظهر في خطوة إتمام الطلب.'
+                    'مواعيد التوصيل ورسومه لمنطقتك تظهر في خطوة إتمام الطلب.'
                   )}{' '}
                   <Link
                     href={p.shippingHref}
@@ -514,7 +514,7 @@ export function DahabProductDetail(p: DahabProductDetailProps) {
                 <p>
                   {t(
                     'Read how returns and exchanges work for this store.',
-                    'اعرف إزاي الاسترجاع والاستبدال في المتجر ده.'
+                    'اعرف طريقة الاسترجاع والاستبدال في هذا المتجر.'
                   )}{' '}
                   <Link
                     href={p.returnsHref}

@@ -55,14 +55,14 @@ export function DahabCartDrawer({
             <p className="text-xs text-muted-foreground">
               {t(
                 'Delivery and payment options (cash on delivery, InstaPay, cards) at checkout.',
-                'التوصيل وطرق الدفع (عند الاستلام، إنستاباي، الكروت) في الخطوة الجاية.'
+                'التوصيل وطرق الدفع (عند الاستلام، إنستاباي، البطاقات) في الخطوة التالية.'
               )}
             </p>
             {blocked && (
               <p className="text-xs text-destructive-ink">
                 {t(
                   'Remove the items that are no longer available to check out.',
-                  'احذف القطع اللي مبقتش متاحة عشان تكمل الطلب.'
+                  'احذف القطع التي لم تعد متاحة لإتمام الطلب.'
                 )}
               </p>
             )}
@@ -94,12 +94,12 @@ export function DahabCartDrawer({
       {empty ? (
         <div className="flex h-full flex-col items-center justify-center gap-5 px-8 text-center">
           <p className="font-display text-2xl text-foreground">
-            {t('Your bag is empty', 'سلتك فاضية')}
+            {t('Your bag is empty', 'سلتك فارغة')}
           </p>
           <p className="text-sm text-muted-foreground">
             {t(
               'Rings, chains, bracelets and earrings are waiting.',
-              'الخواتم والسلاسل والأساور والحلقان في انتظارك.'
+              'الخواتم والسلاسل والأساور والأقراط في انتظارك.'
             )}
           </p>
           <Link href={`${urlPrefix}/products`} className={DAHAB_BTN_SECONDARY} onClick={onClose}>

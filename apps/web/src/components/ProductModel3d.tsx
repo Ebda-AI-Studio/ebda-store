@@ -52,7 +52,7 @@ export function Model3dToggle({
           d="M12 3l8 4.5v9L12 21l-8-4.5v-9L12 3zm0 0v9m8-4.5L12 12 4 7.5"
         />
       </svg>
-      {active ? t('Photos', 'الصور') : t('View in 3D', 'شوفه 3D')}
+      {active ? t('Photos', 'الصور') : t('View in 3D', 'اعرضه 3D')}
     </button>
   );
 }
@@ -98,12 +98,12 @@ export function ProductModel3dPanel({
       look={look}
       labels={{
         loading: t('Loading 3D…', 'جاري تحميل الـ 3D…'),
-        error: t('3D view unavailable right now.', 'عرض الـ 3D مش متاح دلوقتي.'),
+        error: t('3D view unavailable right now.', 'عرض الـ 3D غير متاح حالياً.'),
         hint: t(
           'Drag to rotate · pinch or +/− to zoom · arrow keys',
-          'اسحب للف · قرّب بإصبعين أو +/− · الأسهم'
+          'اسحب للتدوير · قرّب بإصبعين أو +/− · الأسهم'
         ),
-        ar: t('View in your space', 'شوفه في مكانك'),
+        ar: t('View in your space', 'اعرضه في مكانك'),
       }}
       ar={{
         enabled: model.arEnabled,

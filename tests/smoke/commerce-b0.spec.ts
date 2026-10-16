@@ -320,7 +320,7 @@ test.describe('commerce b0 flow @local-stack', () => {
     await expect(facts).toContainText('العناية');
     await expect(facts).toContainText('المنشأ');
 
-    await expect(page.getByTestId('delivery-chip')).toContainText('يوصلك');
+    await expect(page.getByTestId('delivery-chip')).toContainText('يصلك');
 
     await page.getByRole('button', { name: 'دليل المقاسات' }).click();
     const dialog = page.getByRole('dialog');
@@ -338,11 +338,11 @@ test.describe('commerce b0 flow @local-stack', () => {
     const field = page.locator('input[maxlength="12"]');
     const mainAdd = page.getByTestId('pdp-add');
     await expect(field).toBeVisible();
-    await expect(page.getByText('اكتب الاسم للتطريز الأول')).toBeHidden();
+    await expect(page.getByText('اكتب الاسم للتطريز أولاً')).toBeHidden();
     await expect(mainAdd).toBeEnabled();
     await mainAdd.click();
     await expect(field).toBeFocused();
-    await expect(page.getByText('اكتب الاسم للتطريز الأول')).toBeVisible();
+    await expect(page.getByText('اكتب الاسم للتطريز أولاً')).toBeVisible();
 
     // 4. Type Sara and add; then the sticky bar adds Omar.
     await field.fill('Sara');

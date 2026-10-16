@@ -106,7 +106,7 @@ export function InstapayReceiptUploader({
         case 'DUPLICATE_REFERENCE':
           return t(
             'This transfer reference was already used for another payment. Check the reference, or contact the store.',
-            'مرجع التحويل ده اتستخدم قبل كده في دفعة تانية. راجع المرجع أو كلّم المتجر.'
+            'مرجع التحويل هذا استُخدم من قبل في دفعة أخرى. راجع المرجع أو تواصل مع المتجر.'
           );
         case 'INVALID_FILE_TYPE':
           return t(
@@ -114,20 +114,20 @@ export function InstapayReceiptUploader({
             'ارفع صورة بصيغة JPG أو PNG أو WebP.'
           );
         case 'FILE_TOO_LARGE':
-          return t('The image is larger than 8 MB.', 'حجم الصورة أكبر من 8 ميجا.');
+          return t('The image is larger than 8 MB.', 'حجم الصورة أكبر من 8 ميجابايت.');
         case 'TOO_MANY_RECEIPTS':
         case 'RATE_LIMITED':
           return t(
             'Too many attempts. Please wait a few minutes and try again.',
-            'محاولات كتير. استنى كام دقيقة وجرّب تاني.'
+            'محاولات كثيرة. انتظر بضع دقائق ثم حاول مرة أخرى.'
           );
         case 'PRIVATE_STORAGE_NOT_CONFIGURED':
           return t(
             'Receipt upload is not available for this store right now. Please contact the store.',
-            'رفع الإيصال مش متاح للمتجر ده دلوقتي. كلّم المتجر.'
+            'رفع الإيصال غير متاح لهذا المتجر حالياً. تواصل مع المتجر.'
           );
         default:
-          return t('Something went wrong. Please try again.', 'حصل خطأ. جرّب تاني.');
+          return t('Something went wrong. Please try again.', 'حدث خطأ. حاول مرة أخرى.');
       }
     },
     [t]
@@ -202,7 +202,7 @@ export function InstapayReceiptUploader({
       setError(
         t(
           'Check the amount and the transfer reference (8 to 20 digits).',
-          'راجع المبلغ ومرجع التحويل (من 8 لـ 20 رقم).'
+          'راجع المبلغ ومرجع التحويل (من 8 إلى 20 رقماً).'
         )
       );
       return;
@@ -211,7 +211,7 @@ export function InstapayReceiptUploader({
       setError(
         t(
           'Fill in the date, time and the sender name as shown on the receipt.',
-          'املا التاريخ والوقت واسم المُحوِّل زي ما هو مكتوب في الإيصال.'
+          'املأ التاريخ والوقت واسم المُحوِّل كما هو مكتوب في الإيصال.'
         )
       );
       return;
@@ -252,10 +252,10 @@ export function InstapayReceiptUploader({
     return (
       <div className="mt-4 rounded-lg border bg-muted/40 p-3" data-testid="instapay-review-notice">
         <p className="text-sm font-medium text-foreground">
-          {t('Your receipt was sent.', 'الإيصال اتبعت.')}
+          {t('Your receipt was sent.', 'تم إرسال الإيصال.')}
         </p>
         <p className="mt-1 text-sm text-muted-foreground">
-          {t('The store owner will review your transfer.', 'صاحب المتجر هيراجع التحويل')}
+          {t('The store owner will review your transfer.', 'سيراجع صاحب المتجر التحويل')}
         </p>
       </div>
     );
@@ -289,7 +289,7 @@ export function InstapayReceiptUploader({
           data-testid="instapay-proof-rejected"
         >
           <p className="text-sm font-medium text-destructive-ink">
-            {t('The store did not accept this transfer.', 'المتجر مقبلش التحويل ده.')}
+            {t('The store did not accept this transfer.', 'لم يقبل المتجر هذا التحويل.')}
           </p>
           {proof.reviewNote && (
             <p className="mt-1 text-sm text-foreground">
@@ -297,7 +297,7 @@ export function InstapayReceiptUploader({
             </p>
           )}
           <p className="mt-1 text-xs text-muted-foreground">
-            {t('You can upload the right receipt below.', 'تقدر ترفع الإيصال الصح تحت.')}
+            {t('You can upload the right receipt below.', 'يمكنك رفع الإيصال الصحيح أدناه.')}
           </p>
         </div>
       )}
@@ -318,7 +318,7 @@ export function InstapayReceiptUploader({
           <p className="mt-1 text-xs text-muted-foreground">
             {t(
               'JPG, PNG or WebP, up to 8 MB. The store owner reviews it.',
-              'JPG أو PNG أو WebP، لحد 8 ميجا. صاحب المتجر هو اللي بيراجعه.'
+              'JPG أو PNG أو WebP، حتى 8 ميجابايت. يراجعه صاحب المتجر.'
             )}
           </p>
           {uploading && (
@@ -329,7 +329,7 @@ export function InstapayReceiptUploader({
 
       {reading && (
         <p className="text-sm text-muted-foreground" data-testid="instapay-reading">
-          {t('Reading your receipt…', 'بنقرا الإيصال…')}
+          {t('Reading your receipt…', 'جارٍ قراءة الإيصال…')}
         </p>
       )}
 
@@ -339,11 +339,11 @@ export function InstapayReceiptUploader({
             {readFailed
               ? t(
                   'We could not read it automatically — please fill in the details.',
-                  'معرفناش نقرا الإيصال تلقائي — من فضلك املا البيانات.'
+                  'تعذّرت قراءة الإيصال تلقائياً — يرجى إدخال البيانات.'
                 )
               : t(
                   'Check the details below against your receipt and correct anything that is wrong.',
-                  'راجع البيانات دي على الإيصال وصحّح أي حاجة غلط.'
+                  'راجع هذه البيانات على الإيصال وصحّح أي خطأ.'
                 )}
           </p>
           {field('amount', t('Amount (EGP)', 'المبلغ (ج.م)'), { dir: 'ltr' })}
@@ -352,7 +352,7 @@ export function InstapayReceiptUploader({
             {field('transferDate', t('Date', 'التاريخ'), { type: 'date', dir: 'ltr' })}
             {field('transferTime', t('Time', 'الوقت'), { type: 'time', dir: 'ltr' })}
           </div>
-          {field('payerName', t('Sender name (as shown)', 'اسم المُحوِّل (زي ما هو مكتوب)'))}
+          {field('payerName', t('Sender name (as shown)', 'اسم المُحوِّل (كما هو مكتوب)'))}
           {field('payerAddress', t('Sender InstaPay address', 'عنوان إنستاباي للمُحوِّل'), {
             dir: 'ltr',
           })}
@@ -365,7 +365,7 @@ export function InstapayReceiptUploader({
           {field('receiverMobile', t('Receiver mobile', 'موبايل المستلم'), { dir: 'ltr' })}
           {field('note', t('Note', 'ملاحظة'))}
           <Button type="button" onClick={() => void submit()} disabled={submitting}>
-            {t('Send receipt', 'ابعت الإيصال')}
+            {t('Send receipt', 'أرسل الإيصال')}
           </Button>
         </div>
       )}

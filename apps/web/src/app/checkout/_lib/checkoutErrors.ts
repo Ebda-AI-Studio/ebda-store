@@ -11,7 +11,7 @@ export function subscriptionRequiredCopy(code: string, t: (en: string, ar: strin
   if (code !== 'SUBSCRIPTION_REQUIRED') return null;
   return t(
     'This store is not taking orders right now. Please try again later.',
-    'المتجر مش بيستقبل طلبات دلوقتي. جرّب تاني بعدين.'
+    'المتجر لا يستقبل طلبات حالياً. حاول مرة أخرى لاحقاً.'
   );
 }
 
@@ -52,7 +52,7 @@ export function personalisationRequiredCopy(
   if (parts.length === 0) {
     return t(
       'An item in your cart needs your personalisation. Add it on the product page.',
-      'في منتج في سلتك محتاج تخصيص. اكتبه من صفحة المنتج.'
+      'يوجد منتج في سلتك يحتاج إلى تخصيص. اكتبه من صفحة المنتج.'
     );
   }
   return parts

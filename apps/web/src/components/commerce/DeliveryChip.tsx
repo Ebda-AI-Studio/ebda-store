@@ -135,8 +135,8 @@ export function DeliveryChip({ leadTimeDays }: { leadTimeDays?: number | null })
   const { from, to } = win;
   const text =
     from === to
-      ? t(`Arrives ${from}`, `يوصلك ${from}`)
-      : t(`Arrives ${from} – ${to}`, `يوصلك بين ${from} و${to}`);
+      ? t(`Arrives ${from}`, `يصلك ${from}`)
+      : t(`Arrives ${from} – ${to}`, `يصلك بين ${from} و${to}`);
 
   return (
     <div data-testid="delivery-chip" className="mt-3 flex items-start gap-2 text-foreground">
