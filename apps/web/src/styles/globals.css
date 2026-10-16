@@ -1424,11 +1424,13 @@ html[lang] [data-look] [data-transactional] :is(h2, h3, h4) {
 /* Section rhythm: only sections whose spacing is UNSET (sectionSpacingClasses adds
    sp-top-default / sp-bottom-default, and only for a store with a look) scale by
    --space-unit. An explicit merchant preset, even "normal", carries no marker. */
+/* AT-1: on a phone the rhythm caps at 80px between sections (2rem x 2 x airy 1.25);
+   48px per side at airy measured 120-150px gaps and read unfinished, not airy. */
 [data-look] .sp-top-default {
-  padding-top: calc(3rem * var(--space-unit, 1));
+  padding-top: calc(2rem * var(--space-unit, 1));
 }
 [data-look] .sp-bottom-default {
-  padding-bottom: calc(3rem * var(--space-unit, 1));
+  padding-bottom: calc(2rem * var(--space-unit, 1));
 }
 @media (min-width: 640px) {
   [data-look] .sp-top-default {
