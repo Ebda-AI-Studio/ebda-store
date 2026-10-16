@@ -19,6 +19,7 @@ vi.mock('@ebda/database', () => ({
       findFirst: vi.fn(async () => productRow),
       update: (...a: unknown[]) => updateSpy(...(a as [])),
     },
+    $queryRaw: vi.fn(async () => []),
     category: { findMany: (...a: unknown[]) => categoryFindMany(...a) },
     productCategory: { createMany: vi.fn() },
   },
@@ -243,5 +244,51 @@ describe('fillProductFields — searchTerms', () => {
     });
     await fillProductFields('s1', 'p1', { op: 'create' });
     expect(generateProductSearchTerms.mock.calls[0][0].categoryNames).toEqual(['أحذية', 'Shoes']);
+  });
+
+  describe('I1: a merchant save while generation is in flight survives', () => {
+    it("the merchant's words and human stamp survive; the stale AI words are not written", async () => {
+      productRow = { ...baseProduct, searchTerms: null, aiFieldSources: { ...humanSources } };
+      generateProductSearchTerms.mockImplementation(async () => {
+        // The merchant saves their own words while Gemini is answering.
+        productRow = {
+          ...productRow,
+          searchTerms: 'كوتشي, kotshy',
+          aiFieldSources: { ...humanSources, searchTerms: 'human' },
+        };
+        return 'جزمه, gazma, shoes';
+      });
+      await fillProductFields('s1', 'p1', { op: 'create' });
+      expect(updateSpy).not.toHaveBeenCalled();
+    });
+
+    it('a field whose value changed since the read is skipped even without a human stamp; others still write, on the FRESH provenance map', async () => {
+      productRow = {
+        ...baseProduct,
+        name: '',
+        searchTerms: null,
+        aiFieldSources: { ...humanSources, name: undefined, metaTitle: 'human' },
+      };
+      translate.mockResolvedValue({ translation: 'Leather sneakers', cached: false });
+      generateProductSearchTerms.mockImplementation(async () => {
+        // Another writer (bulk import of an older export) set the words, no stamp change;
+        // and the merchant stamped a different field meanwhile.
+        productRow = {
+          ...productRow,
+          searchTerms: 'kotshy',
+          aiFieldSources: { ...(productRow.aiFieldSources as object), metaTitleAr: 'human' },
+        };
+        return 'جزمه, gazma';
+      });
+      await fillProductFields('s1', 'p1', { op: 'create' });
+      const data = (updateSpy.mock.calls[0] as unknown as [{ data: Record<string, unknown> }])[0]
+        .data;
+      expect(data).not.toHaveProperty('searchTerms');
+      expect(data.name).toBe('Leather sneakers');
+      const src = data.aiFieldSources as Record<string, string>;
+      expect(src.name).toBe('ai');
+      expect(src.metaTitleAr).toBe('human'); // the concurrent stamp is kept, not overwritten
+      expect(src.searchTerms).toBeUndefined();
+    });
   });
 });

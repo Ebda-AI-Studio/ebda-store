@@ -38,7 +38,10 @@ vi.mock('@ebda/database', () => ({
       findFirst: (...args: unknown[]) => mockFindFirst(...args),
       update: (...args: unknown[]) => mockUpdate(...args),
     },
+    // The guarded writer's row lock (review I1).
+    $queryRaw: vi.fn(async () => []),
   },
+  hasTenantContext: () => false,
   runInTenantContext: vi.fn((_, fn: () => unknown) => fn()),
 }));
 
@@ -66,6 +69,7 @@ function makeProduct(overrides: Record<string, unknown> = {}) {
     descriptionAr: null as string | null,
     aiFieldSources: {} as Record<string, string>,
     aiBalanceBackup: {} as Record<string, unknown>,
+    categories: [] as Array<{ categoryId: string }>,
     ...overrides,
   };
 }

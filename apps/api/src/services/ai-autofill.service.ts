@@ -1,5 +1,5 @@
 import { AI_AUTOFILL_FIELD_NAMES, fieldsNeedingRefresh, type AiFieldSources } from '@ebda/shared';
-import { prisma, withStore } from '@ebda/database';
+import { prisma, withStore, hasTenantContext, runInTenantContext } from '@ebda/database';
 import { AIService } from './ai.service';
 import { isAiQuotaCapError } from '../lib/ai-quota';
 import { containsArabic } from '../lib/ai/description-richness';
@@ -76,22 +76,64 @@ interface FillOpts {
 }
 
 /**
- * The single fill core shared by the event handler and the sweep. Loads the
- * product, computes the fill set, calls the existing AIService methods (which
- * enforce quota + cache + usage recording), writes the results, and stamps
- * the filled fields 'ai'. NEVER overwrites a 'human' field (computeFillSet
- * excludes them).
+ * What the fill read, as plain JSON (it is an Inngest step output, review I2). `values` is the
+ * baseline every write is checked against at write time (review I1).
  */
-export async function fillProductFields(
+export interface FillPlan {
+  storeId: string;
+  productId: string;
+  fillSet: string[];
+  values: Record<string, string | null>;
+  sources: AiFieldSources;
+  /** names of the product's own categories (ar, en); empty when it has none */
+  categoryNames: string[];
+  hasCategories: boolean;
+  /** the store's categories, read only when the product has none (categorize input) */
+  storeCategories: Array<{ id: string; name: string; nameAr: string | null }>;
+  storeName: string;
+  storeNameAr: string | null;
+}
+
+/** What the AI produced, as plain JSON (an Inngest step output: a retry never pays twice). */
+export interface FillGeneration {
+  writes: Record<string, string>;
+  pickedCategoryIds: string[];
+  /** provider calls actually made (cache hits excluded): the sweep paces on it (review I4) */
+  calls: number;
+  /** a provider 429 stopped this run: the sweep backs off (review I4) */
+  rateLimited: boolean;
+  /** a platform / store / budget cap stopped this run: terminal until the window resets */
+  capped: boolean;
+}
+
+export interface FillResult {
+  filled: number;
+  skipped: boolean;
+  calls: number;
+  rateLimited: boolean;
+  capped: boolean;
+}
+
+/** Provider 429s seen by this isolate; logged with every one so a burst is visible (I4). */
+let rateLimitedTotal = 0;
+
+const nameOf = (c: { name: string | null; nameAr: string | null }) =>
+  [c.nameAr, c.name].filter((v): v is string => !!v);
+
+/**
+ * Phase 1 — READ (short; the Inngest function runs it in one tenant transaction). Returns null
+ * when the product is gone or there is nothing to do.
+ */
+export async function readFillPlan(
   storeId: string,
   productId: string,
   opts: FillOpts
-): Promise<{ filled: number; skipped: boolean }> {
+): Promise<FillPlan | null> {
   const product = await prisma.product.findFirst({
     where: { id: productId, storeId, deletedAt: null },
     include: { categories: { select: { categoryId: true } } },
   });
-  if (!product) return { filled: 0, skipped: true };
+  if (!product) return null;
 
   const sources = (product.aiFieldSources as AiFieldSources) ?? {};
   let fillSet = new Set(
@@ -100,9 +142,8 @@ export async function fillProductFields(
   if (opts.onlyFields) {
     fillSet = new Set([...fillSet].filter(f => opts.onlyFields!.includes(f)));
   }
-  if (fillSet.size === 0 && product.categories.length > 0) {
-    return { filled: 0, skipped: true };
-  }
+  const hasCategories = product.categories.length > 0;
+  if (fillSet.size === 0 && hasCategories) return null;
 
   const store = await withStore(storeId, tx =>
     tx.store.findUnique({
@@ -110,9 +151,58 @@ export async function fillProductFields(
       select: { name: true, nameAr: true },
     })
   );
+  const categoryNames = hasCategories
+    ? (
+        await prisma.category.findMany({
+          where: { storeId, id: { in: product.categories.map(c => c.categoryId) } },
+          select: { name: true, nameAr: true },
+        })
+      ).flatMap(nameOf)
+    : [];
+  const storeCategories = hasCategories
+    ? []
+    : await prisma.category.findMany({
+        where: { storeId },
+        select: { id: true, name: true, nameAr: true },
+      });
 
+  const row = product as unknown as Record<string, unknown>;
+  return {
+    storeId,
+    productId,
+    fillSet: [...fillSet],
+    values: Object.fromEntries(
+      AI_AUTOFILL_FIELD_NAMES.map(f => [f, (row[f] as string | null | undefined) ?? null])
+    ),
+    sources,
+    categoryNames,
+    hasCategories,
+    storeCategories,
+    storeName: store?.name ?? '',
+    storeNameAr: store?.nameAr ?? null,
+  };
+}
+
+/**
+ * Phase 2 — GENERATE. AI calls only; holds NO transaction (review I2: run it under
+ * `runInStoreScope`, where the quota checks, cache reads and usage rows are each their own
+ * short statement). Usage is recorded at spend time by the AI layer, so a write that later
+ * fails or is skipped never hides real spend (Ruling SEARCH-T8-6).
+ */
+export async function generateFill(plan: FillPlan): Promise<FillGeneration> {
+  const { storeId, productId, values: product, sources } = plan;
+  const fillSet = new Set(plan.fillSet);
   const writes: Record<string, string> = {};
-  const stampedSources: AiFieldSources = { ...sources };
+  const out: FillGeneration = {
+    writes,
+    pickedCategoryIds: [],
+    calls: 0,
+    rateLimited: false,
+    capped: false,
+  };
+  const spent = (cached: boolean) => {
+    if (!cached) out.calls++;
+  };
 
   // A field is a safe write target only if it's in the fill set AND either
   // currently empty OR explicitly ai-owned (a refresh). This is the crucial
@@ -120,7 +210,7 @@ export async function fillProductFields(
   // a product can have real human-written content with no provenance entry, so
   // computeFillSet treats it as "empty" — without this value check the engine
   // would OVERWRITE that human content. Never write over existing content that
-  // isn't ours.
+  // isn't ours. (applyFill re-checks every field against the row at write time.)
   const canWrite = (field: string, currentVal: string | null | undefined): boolean =>
     fillSet.has(field) && (!currentVal?.trim() || sources[field] === 'ai');
 
@@ -129,62 +219,24 @@ export async function fillProductFields(
     // `&& <source>?.trim()` guard means we only translate when the source
     // language actually has content, so the mutual sourcing never loops and a
     // both-empty pair is simply skipped.
-
-    // name: AR → EN (Arabic-first merchant wrote nameAr, English empty)
-    if (canWrite('name', product.name) && product.nameAr?.trim()) {
-      const { translation } = await AIService.translate({
-        storeId,
-        text: product.nameAr,
-        from: 'ar',
-        to: 'en',
-        kind: 'product-name',
-      });
-      if (translation) {
-        writes.name = translation;
-        stampedSources.name = 'ai';
-      }
-    }
-    // name: EN → AR
-    if (canWrite('nameAr', product.nameAr) && product.name?.trim()) {
-      const { translation } = await AIService.translate({
-        storeId,
-        text: product.name,
-        from: 'en',
-        to: 'ar',
-        kind: 'product-name',
-      });
-      if (translation) {
-        writes.nameAr = translation;
-        stampedSources.nameAr = 'ai';
-      }
-    }
-
-    // description: AR → EN
-    if (canWrite('description', product.description) && product.descriptionAr?.trim()) {
-      const { translation } = await AIService.translate({
-        storeId,
-        text: product.descriptionAr,
-        from: 'ar',
-        to: 'en',
-        kind: 'product-description',
-      });
-      if (translation) {
-        writes.description = translation;
-        stampedSources.description = 'ai';
-      }
-    }
-    // description: EN → AR
-    if (canWrite('descriptionAr', product.descriptionAr) && product.description?.trim()) {
-      const { translation } = await AIService.translate({
-        storeId,
-        text: product.description,
-        from: 'en',
-        to: 'ar',
-        kind: 'product-description',
-      });
-      if (translation) {
-        writes.descriptionAr = translation;
-        stampedSources.descriptionAr = 'ai';
+    const pairs: Array<[string, string, 'ar' | 'en', 'product-name' | 'product-description']> = [
+      ['name', 'nameAr', 'ar', 'product-name'], // AR → EN (Arabic-first merchant)
+      ['nameAr', 'name', 'en', 'product-name'], // EN → AR
+      ['description', 'descriptionAr', 'ar', 'product-description'],
+      ['descriptionAr', 'description', 'en', 'product-description'],
+    ];
+    for (const [target, source, from, kind] of pairs) {
+      const text = product[source];
+      if (canWrite(target, product[target]) && text?.trim()) {
+        const { translation, cached } = await AIService.translate({
+          storeId,
+          text,
+          from,
+          to: from === 'ar' ? 'en' : 'ar',
+          kind,
+        });
+        spent(cached);
+        if (translation) writes[target] = translation;
       }
     }
 
@@ -200,37 +252,28 @@ export async function fillProductFields(
     );
     // Run when there's product content in EITHER language.
     if (seoWanted && (effName?.trim() || effNameAr?.trim())) {
-      const { suggestion } = await AIService.suggestSeo({
+      const { suggestion, cached } = await AIService.suggestSeo({
         storeId,
         kind: 'product',
-        storeName: store?.name ?? '',
-        storeNameAr: store?.nameAr,
+        storeName: plan.storeName,
+        storeNameAr: plan.storeNameAr,
         entityName: effName || effNameAr || '',
         entityNameAr: effNameAr,
         entityDescription: effDescription,
         entityDescriptionAr: effDescriptionAr,
       });
+      spent(cached);
       // Guard each write against an empty/whitespace value — Gemini can return
       // "" for a sparse product, and writing it would stamp the field 'ai' and
       // lock the empty value in (never re-filled until a source changes).
-      if (canWrite('metaTitle', product.metaTitle) && suggestion.title?.trim()) {
-        writes.metaTitle = suggestion.title;
-        stampedSources.metaTitle = 'ai';
-      }
-      if (canWrite('metaTitleAr', product.metaTitleAr) && suggestion.titleAr?.trim()) {
-        writes.metaTitleAr = suggestion.titleAr;
-        stampedSources.metaTitleAr = 'ai';
-      }
-      if (canWrite('metaDescription', product.metaDescription) && suggestion.description?.trim()) {
-        writes.metaDescription = suggestion.description;
-        stampedSources.metaDescription = 'ai';
-      }
-      if (
-        canWrite('metaDescriptionAr', product.metaDescriptionAr) &&
-        suggestion.descriptionAr?.trim()
-      ) {
-        writes.metaDescriptionAr = suggestion.descriptionAr;
-        stampedSources.metaDescriptionAr = 'ai';
+      const seo: Array<[string, string | undefined]> = [
+        ['metaTitle', suggestion.title],
+        ['metaTitleAr', suggestion.titleAr],
+        ['metaDescription', suggestion.description],
+        ['metaDescriptionAr', suggestion.descriptionAr],
+      ];
+      for (const [f, v] of seo) {
+        if (canWrite(f, product[f]) && v?.trim()) writes[f] = v;
       }
     }
 
@@ -239,33 +282,21 @@ export async function fillProductFields(
     let pickedCategoryNames: string[] = [];
     // Categorize ONLY when the product has zero categories. Use whichever
     // language has content (Arabic-first stores may have only the Arabic).
-    if (product.categories.length === 0 && (effName?.trim() || effNameAr?.trim())) {
-      const cats = await prisma.category.findMany({
-        where: { storeId },
-        select: { id: true, name: true, nameAr: true },
+    if (
+      !plan.hasCategories &&
+      plan.storeCategories.length > 0 &&
+      (effName?.trim() || effNameAr?.trim())
+    ) {
+      const { suggestions, cached } = await AIService.suggestCategories({
+        storeId,
+        productName: effName || effNameAr || '',
+        productDescription: effDescription || effDescriptionAr,
+        existingCategories: plan.storeCategories,
       });
-      if (cats.length > 0) {
-        const { suggestions } = await AIService.suggestCategories({
-          storeId,
-          productName: effName || effNameAr || '',
-          productDescription: effDescription || effDescriptionAr,
-          existingCategories: cats,
-        });
-        const picked = suggestions.filter(s => s.confidence !== 'low').map(s => s.id);
-        pickedCategoryNames = cats
-          .filter(c => picked.includes(c.id))
-          .flatMap(c => [c.nameAr, c.name].filter((v): v is string => !!v));
-        if (picked.length > 0) {
-          // Savepointed: the catch below swallows, and this can run inside a
-          // request's / Inngest `runInTenantContext` transaction (issue 2215).
-          await withSavepoint(() =>
-            prisma.productCategory.createMany({
-              data: picked.map(categoryId => ({ productId, categoryId })),
-              skipDuplicates: true,
-            })
-          );
-        }
-      }
+      spent(cached);
+      const picked = suggestions.filter(s => s.confidence !== 'low').map(s => s.id);
+      out.pickedCategoryIds = picked;
+      pickedCategoryNames = plan.storeCategories.filter(c => picked.includes(c.id)).flatMap(nameOf);
     }
 
     // Search words (dialect / Franco / EN) for products.search_terms — search program P1.
@@ -277,50 +308,146 @@ export async function fillProductFields(
       config.googleAiKey &&
       (effName?.trim() || effNameAr?.trim())
     ) {
-      const catNames = product.categories.length
-        ? (
-            await prisma.category.findMany({
-              where: { storeId, id: { in: product.categories.map(c => c.categoryId) } },
-              select: { name: true, nameAr: true },
-            })
-          ).flatMap(c => [c.nameAr, c.name].filter((v): v is string => !!v))
-        : pickedCategoryNames;
       const terms = await generateProductSearchTerms(
         {
           storeId,
-          storeName: store?.nameAr || store?.name || '',
+          storeName: plan.storeNameAr || plan.storeName || '',
           product: {
             name: effName ?? '',
             nameAr: effNameAr,
             description: effDescription,
             descriptionAr: effDescriptionAr,
           },
-          categoryNames: catNames,
+          categoryNames: plan.hasCategories ? plan.categoryNames : pickedCategoryNames,
         },
         config.googleAiKey,
         process.env.GEMINI_MODEL || 'gemini-flash-lite-latest'
       );
-      if (terms) {
-        writes.searchTerms = terms;
-        stampedSources.searchTerms = 'ai';
-      }
+      spent(false); // the generator never caches: every return is a paid call
+      if (terms) writes.searchTerms = terms;
     }
   } catch (err) {
-    if (isAiQuotaCapError(err)) {
+    const code = (err as { code?: unknown } | null)?.code;
+    if (code === 'AI_QUOTA_EXCEEDED') {
+      // A provider 429 (rethrowAsAppError). Not swallowed: warn with a running count, and
+      // tell the caller to back off (the sweep sleeps a full minute window, review I4).
+      out.rateLimited = true;
+      rateLimitedTotal++;
+      logger.warn(
+        { storeId, productId, rateLimitedTotal },
+        '[ai-autofill] provider rate limit (429), backing off'
+      );
+    } else if (isAiQuotaCapError(err)) {
+      out.capped = true;
       logger.info({ storeId, productId }, '[ai-autofill] quota cap reached, deferring');
     } else {
       logger.warn({ err, storeId, productId }, '[ai-autofill] fill failed');
     }
   }
+  return out;
+}
 
-  if (Object.keys(writes).length > 0) {
-    await prisma.product.update({
-      where: { id: productId, storeId },
-      data: { ...writes, aiFieldSources: stampedSources },
+/**
+ * The one guarded writer for AI content (review I1, every AI field). In ONE short transaction:
+ * lock the product row, re-read it, and write a field only when its stored value still equals
+ * the value the generation read AND its owner has not become 'human' since. The provenance map
+ * is rebuilt from the FRESH map (a concurrent 'human' stamp on any other field is kept).
+ * `extra` runs inside the same transaction, after the write, with the fresh row.
+ */
+export async function writeAiFieldsGuarded(
+  storeId: string,
+  productId: string,
+  baseline: Record<string, string | null | undefined>,
+  writes: Record<string, string | null>,
+  opts: {
+    extraData?: Record<string, unknown>;
+    extra?: (fresh: { categoryCount: number }) => Promise<void>;
+  } = {}
+): Promise<{ written: string[]; stale: string[] }> {
+  const run = <T>(fn: () => Promise<T>): Promise<T> =>
+    // Inside a caller's transaction, join it (its atomicity); otherwise open a short one.
+    hasTenantContext() ? fn() : runInTenantContext(storeId, fn);
+  return run(async () => {
+    // Row lock: a merchant save that starts after this waits for our COMMIT, and one that
+    // committed before it is in the re-read below. store_id keeps the raw query tenant-keyed.
+    await prisma.$queryRaw`SELECT id FROM products WHERE id = ${productId} AND store_id = ${storeId} FOR UPDATE`;
+    const fresh = await prisma.product.findFirst({
+      where: { id: productId, storeId, deletedAt: null },
+      include: { categories: { select: { categoryId: true } } },
     });
-  }
+    if (!fresh) return { written: [], stale: Object.keys(writes) };
+    const row = fresh as unknown as Record<string, unknown>;
+    const freshSources = (fresh.aiFieldSources as AiFieldSources) ?? {};
+    const nextSources: AiFieldSources = { ...freshSources };
+    const data: Record<string, string | null> = {};
+    const stale: string[] = [];
+    for (const [field, value] of Object.entries(writes)) {
+      const changed = ((row[field] as string | null) ?? '') !== (baseline[field] ?? '');
+      if (freshSources[field] === 'human' || changed) {
+        stale.push(field);
+        continue;
+      }
+      data[field] = value;
+      nextSources[field] = 'ai';
+    }
+    if (stale.length > 0) {
+      logger.info(
+        { storeId, productId, fields: stale },
+        '[ai-autofill] fields changed since the read; not overwritten'
+      );
+    }
+    const written = Object.keys(data);
+    if (written.length > 0) {
+      await prisma.product.update({
+        where: { id: productId, storeId },
+        data: { ...data, ...(opts.extraData ?? {}), aiFieldSources: nextSources },
+      });
+    }
+    if (opts.extra) await opts.extra({ categoryCount: fresh.categories.length });
+    return { written, stale };
+  });
+}
 
-  return { filled: Object.keys(writes).length, skipped: false };
+/** Phase 3 — WRITE (short transaction, guarded per field). Idempotent: a retry re-checks. */
+export async function applyFill(plan: FillPlan, gen: FillGeneration): Promise<{ filled: number }> {
+  const { storeId, productId } = plan;
+  const { written } = await writeAiFieldsGuarded(storeId, productId, plan.values, gen.writes, {
+    extra: async ({ categoryCount }) => {
+      // Only a product that STILL has no category gets the AI's picks.
+      if (gen.pickedCategoryIds.length === 0 || categoryCount > 0) return;
+      await withSavepoint(() =>
+        prisma.productCategory.createMany({
+          data: gen.pickedCategoryIds.map(categoryId => ({ productId, categoryId })),
+          skipDuplicates: true,
+        })
+      );
+    },
+  });
+  return { filled: written.length };
+}
+
+/**
+ * The single fill core shared by the event handler, the sweep and the hand-back route:
+ * read → generate → guarded write. Call it OUTSIDE a transaction (a store scope or none), so no
+ * transaction is held across the AI calls (review I2). NEVER overwrites a 'human' field, nor a
+ * field that changed while the AI was generating (review I1).
+ */
+export async function fillProductFields(
+  storeId: string,
+  productId: string,
+  opts: FillOpts
+): Promise<FillResult> {
+  const plan = await readFillPlan(storeId, productId, opts);
+  if (!plan) return { filled: 0, skipped: true, calls: 0, rateLimited: false, capped: false };
+  const gen = await generateFill(plan);
+  const { filled } = await applyFill(plan, gen);
+  return {
+    filled,
+    skipped: false,
+    calls: gen.calls,
+    rateLimited: gen.rateLimited,
+    capped: gen.capped,
+  };
 }
 
 /** Read the per-store aiAutopilot toggle (default ON when unset). */
@@ -432,7 +559,6 @@ export async function balanceProductLanguages(
       };
 
   const writes: Partial<Record<string, string | null>> = {};
-  const newSources: AiFieldSources = { ...sources };
   const sides: { name?: 'en' | 'ar'; description?: 'en' | 'ar' } = {};
   const changed: { name?: boolean; description?: boolean } = {};
 
@@ -523,13 +649,11 @@ export async function balanceProductLanguages(
     // into `newEn`/`newAr`.
     if ((!enUnchanged || opts.force) && !humanEn) {
       writes[enField] = newEn ?? null;
-      newSources[enField] = 'ai';
       // Mark the translation direction hint
       if (arabicText) sides[enField === 'name' ? 'name' : 'description'] = 'ar';
     }
     if ((!arUnchanged || opts.force) && !humanAr) {
       writes[arField] = newAr ?? null;
-      newSources[arField] = 'ai';
       if (!arabicText) sides[enField === 'name' ? 'name' : 'description'] = 'en';
     }
 
@@ -559,17 +683,37 @@ export async function balanceProductLanguages(
   const anyChanged = Object.keys(writes).length > 0;
   if (!anyChanged) return { balanced: false, changed, sides };
 
-  await prisma.product.update({
-    where: { id: productId, storeId },
-    data: {
-      ...(writes as Record<string, string | null>),
-      aiFieldSources: newSources,
-      aiBalanceBackup: backup as object,
+  // Guarded write (review I1, same class as the fill): a field the merchant edited or stamped
+  // 'human' while the translation was in flight is left alone. The guarded writer stamps 'ai'
+  // on exactly the fields it writes, on the FRESH provenance map.
+  const { written } = await writeAiFieldsGuarded(
+    storeId,
+    productId,
+    {
+      name: product.name,
+      nameAr: product.nameAr,
+      description: product.description,
+      descriptionAr: product.descriptionAr,
     },
-  });
+    writes as Record<string, string | null>,
+    { extraData: { aiBalanceBackup: backup as object } }
+  );
+  if (written.length === 0) return { balanced: false, changed: {}, sides: {} };
+  const wrote = (a: string, b: string) => written.includes(a) || written.includes(b);
+  const finalChanged = {
+    ...(changed.name && wrote('name', 'nameAr') ? { name: true } : {}),
+    ...(changed.description && wrote('description', 'descriptionAr') ? { description: true } : {}),
+  };
+  const finalSides = {
+    ...(finalChanged.name && sides.name ? { name: sides.name } : {}),
+    ...(finalChanged.description && sides.description ? { description: sides.description } : {}),
+  };
 
-  logger.info({ storeId, productId, changed, sides }, '[ai-balance] language balance applied');
-  return { balanced: true, changed, sides };
+  logger.info(
+    { storeId, productId, changed: finalChanged, sides: finalSides },
+    '[ai-balance] language balance applied'
+  );
+  return { balanced: true, changed: finalChanged, sides: finalSides };
 }
 
 /**
