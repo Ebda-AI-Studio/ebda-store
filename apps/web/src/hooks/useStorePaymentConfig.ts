@@ -20,6 +20,27 @@ const paymentConfig = z.object({
 });
 
 /**
+ * Mounts committed together for the same store share ONE request (the Dahab
+ * footer marks and the cart's "we accept" card mount in the same commit; their
+ * effects run back to back). The shared promise is forgotten at the end of that
+ * tick, so any later mount (and the retry) asks fresh: dedupe, not a cache
+ * (W1c review M6).
+ */
+const sameTick = new Map<string, Promise<unknown>>();
+function getConfigOnce(storeId: string): Promise<unknown> {
+  let p = sameTick.get(storeId);
+  if (!p) {
+    const created = api.get<PaymentConfigResponse>('/payments/config');
+    sameTick.set(storeId, created);
+    queueMicrotask(() => {
+      if (sameTick.get(storeId) === created) sameTick.delete(storeId);
+    });
+    p = created;
+  }
+  return p;
+}
+
+/**
  * What this store accepts, from its ACTUAL `/payments/config` (the checkout's own
  * source): fresh per mount and per store, one retry after 1.5s. Unknown (loading,
  * failed, demo store, another tenant's stale answer) is `null`, and a caller must
@@ -40,7 +61,9 @@ export function useStorePaymentConfig(): PaymentConfigResponse | null {
     setLoaded(null);
     async function attempt(canRetry: boolean) {
       try {
-        const result = await api.get<PaymentConfigResponse>('/payments/config');
+        const result = (await getConfigOnce(storeId)) as Awaited<
+          ReturnType<typeof api.get<PaymentConfigResponse>>
+        >;
         if (cancelled) return;
         const parsed = result.success ? paymentConfig.safeParse(result.data) : null;
         if (parsed?.success) {

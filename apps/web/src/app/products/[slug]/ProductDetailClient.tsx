@@ -51,6 +51,7 @@ import { REGION } from '@ebda/shared';
 import { FactsTable } from '../../../components/commerce/FactsTable';
 import { DeliveryChip } from '../../../components/commerce/DeliveryChip';
 import { TrustLine } from '../../../components/commerce/TrustLine';
+import type { CodOffer } from '../../../lib/cod-offer';
 import { Breadcrumbs } from '../../../components/Breadcrumbs';
 import { canBuyNow, inStockNow } from '../../../lib/can-buy-now';
 import { SizeChartDialog } from '../../../components/commerce/SizeChartDialog';
@@ -162,9 +163,15 @@ function ProductSkeleton() {
 interface ProductDetailClientProps {
   initialProduct?: Product | null;
   layout?: StoreLayoutSettings;
+  /** Server-read COD offer for the trust line (S-02); null/absent = no COD claim. */
+  codOffer?: CodOffer | null;
 }
 
-export default function ProductDetailClient({ initialProduct, layout }: ProductDetailClientProps) {
+export default function ProductDetailClient({
+  initialProduct,
+  layout,
+  codOffer = null,
+}: ProductDetailClientProps) {
   const params = useParams();
   const slug = params?.slug as string;
 
@@ -738,6 +745,7 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
             productsHref={storeUrl('/products')}
             shippingHref={storeUrl('/shipping')}
             returnsHref={storeUrl('/returns')}
+            codOffer={codOffer}
             excerpt={displayExcerpt}
             description={displayDescription}
             priceText={priceText}
@@ -1197,7 +1205,7 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
                 {/* X-03: a delivery date only for something that can be bought now. */}
                 {buyableNow && <DeliveryChip leadTimeDays={product.leadTimeDays} />}
                 {/* S-02: COD · return window, from the store's own settings. */}
-                <TrustLine />
+                <TrustLine cod={codOffer} />
               </div>
 
               {/* Below the buy block: the category chip and the description (fold rule above). */}

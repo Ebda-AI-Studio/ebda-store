@@ -48,6 +48,7 @@ const numeralsMock = vi.hoisted(() => () => ({
   }),
 }));
 const apiMock = vi.hoisted(() => () => ({
+  API_URL: 'http://api.test/api/v1',
   api: {
     get: (path: string) =>
       path === '/payments/config' ? ctx.payment() : Promise.resolve({ success: false }),
@@ -63,6 +64,9 @@ vi.mock('@/lib/api', apiMock);
 vi.mock('../../apps/web/src/lib/api', apiMock);
 
 import { TrustLine } from '../../apps/web/src/components/commerce/TrustLine';
+import { fetchCodOffer } from '../../apps/web/src/lib/cod-offer';
+import { useStorePaymentConfig } from '../../apps/web/src/hooks/useStorePaymentConfig';
+import { renderToString } from 'react-dom/server';
 import { ReceiptPrinter } from '../../apps/web/src/components/commerce/ReceiptPrinter';
 import Minimal from '../../apps/web/src/templates/minimal/Footer';
 import Classic from '../../apps/web/src/templates/classic/Footer';
@@ -87,65 +91,122 @@ beforeEach(() => {
 });
 afterEach(cleanup);
 
+const CODS = { name: 'Cash on Delivery', nameAr: 'الدفع عند الاستلام' };
+
 describe('S-02: PDP trust line', () => {
-  it('COD on and a 14-day window: "الدفع عند الاستلام · إرجاع خلال 14 يومًا"', async () => {
-    ctx.payment.mockResolvedValue(cod);
-    render(<TrustLine />);
-    const line = await screen.findByTestId('pdp-trust-line');
-    await waitFor(() => expect(line.querySelector('[data-trust="cod"]')).not.toBeNull());
+  it('COD on and a 14-day window: "الدفع عند الاستلام · إرجاع خلال 14 يومًا", on the FIRST render', () => {
+    render(<TrustLine cod={CODS} />);
+    const line = screen.getByTestId('pdp-trust-line');
     expect(line.textContent).toBe('الدفع عند الاستلام · إرجاع خلال 14 يومًا');
     expect(line.querySelector('a[data-trust="returns"]')!.getAttribute('href')).toBe('/returns');
   });
 
-  it('reads the merchant COD name in English', async () => {
+  it('is in the server HTML, so nothing is inserted under the CTA after load (review I5)', () => {
+    const html = renderToString(<TrustLine cod={CODS} />);
+    expect(html).toContain('الدفع عند الاستلام');
+    expect(html).toContain('data-trust="cod"');
+  });
+
+  it('reads the merchant COD name in English', () => {
     ctx.language = 'en';
-    ctx.payment.mockResolvedValue(cod);
-    render(<TrustLine />);
-    await waitFor(() =>
-      expect(screen.getByTestId('pdp-trust-line').textContent).toBe(
-        'Cash on Delivery · Returns within 14 days'
-      )
+    render(<TrustLine cod={CODS} />);
+    expect(screen.getByTestId('pdp-trust-line').textContent).toBe(
+      'Cash on Delivery · Returns within 14 days'
     );
   });
 
-  it('COD off: only the return window', async () => {
-    ctx.payment.mockResolvedValue(noCod);
-    render(<TrustLine />);
-    await waitFor(() => expect(ctx.payment).toHaveBeenCalled());
+  it('COD off: only the return window', () => {
+    render(<TrustLine cod={null} />);
     expect(screen.getByTestId('pdp-trust-line').textContent).toBe('إرجاع خلال 14 يومًا');
   });
 
-  it('no window declared, or returns not accepted: no returns part', async () => {
-    ctx.payment.mockResolvedValue(cod);
+  it('no window declared, or returns not accepted: no returns part', () => {
     for (const days of [null, 0]) {
       ctx.store = { ...ctx.store, returnWindowDays: days };
-      const { unmount } = render(<TrustLine />);
-      const line = await screen.findByTestId('pdp-trust-line');
-      expect(line.querySelector('[data-trust="returns"]')).toBeNull();
+      const { unmount } = render(<TrustLine cod={CODS} />);
+      expect(
+        screen.getByTestId('pdp-trust-line').querySelector('[data-trust="returns"]')
+      ).toBeNull();
       unmount();
     }
   });
 
-  it('no data at all (COD off or unknown, no window): renders nothing', async () => {
+  it('no data at all (COD off or unknown, no window): renders nothing', () => {
     ctx.store = { ...ctx.store, returnWindowDays: null };
-    ctx.payment.mockResolvedValue({ success: false });
-    const { container } = render(<TrustLine />);
-    await waitFor(() => expect(ctx.payment).toHaveBeenCalled());
+    const { container } = render(<TrustLine cod={null} />);
     expect(container.innerHTML).toBe('');
   });
 
+  it('never fetches on the client; the PDP reads COD on the server', () => {
+    const tl = readFileSync(
+      join(__dirname, '../../apps/web/src/components/commerce/TrustLine.tsx'),
+      'utf8'
+    );
+    expect(tl).not.toMatch(/useStorePaymentConfig|api\.get|fetch\(/);
+    const body = readFileSync(
+      join(__dirname, '../../apps/web/src/app/products/[slug]/ProductDetailBody.tsx'),
+      'utf8'
+    );
+    expect(body).toMatch(/fetchCodOffer\(store\)/);
+    expect(body).toMatch(/codOffer=\{codOffer\}/);
+  });
+
+  it('fetchCodOffer reads the store config and never throws', async () => {
+    const realFetch = globalThis.fetch;
+    try {
+      globalThis.fetch = vi.fn(
+        async () =>
+          new Response(
+            JSON.stringify({
+              success: true,
+              data: { cod: { displayName: 'COD', displayNameAr: null } },
+            })
+          )
+      ) as never;
+      expect(await fetchCodOffer({ id: 'store-a' })).toEqual({ name: 'COD', nameAr: null });
+      globalThis.fetch = vi.fn(
+        async () => new Response(JSON.stringify({ success: true, data: { cod: null } }))
+      ) as never;
+      expect(await fetchCodOffer({ id: 'store-a' })).toBeNull();
+      globalThis.fetch = vi.fn(async () => {
+        throw new Error('down');
+      }) as never;
+      expect(await fetchCodOffer({ id: 'store-a' })).toBeNull();
+    } finally {
+      globalThis.fetch = realFetch;
+    }
+  });
+
   it('sits under the buy button on the default PDP and the Dahab PDP', () => {
-    for (const f of [
-      'apps/web/src/app/products/[slug]/ProductDetailClient.tsx',
-      'apps/web/src/templates/dahab/ProductDetail.tsx',
+    for (const [f, tag] of [
+      ['apps/web/src/app/products/[slug]/ProductDetailClient.tsx', '<TrustLine cod={codOffer} />'],
+      ['apps/web/src/templates/dahab/ProductDetail.tsx', '<TrustLine cod={p.codOffer ?? null} />'],
     ]) {
       const src = readFileSync(join(__dirname, '../..', f), 'utf8');
       const chip = src.indexOf('<DeliveryChip');
       expect(chip, f).toBeGreaterThan(0);
-      const trust = src.indexOf('<TrustLine />');
+      const trust = src.indexOf(tag);
       expect(trust, f).toBeGreaterThan(chip);
       expect(trust - chip, f).toBeLessThan(400);
     }
+  });
+});
+
+describe('concurrent /payments/config readers share one request (review M6)', () => {
+  it('two mounts at once → one fetch; a later mount asks again', async () => {
+    ctx.payment.mockResolvedValue({ success: true, data: { methods: {}, cod: CODS } });
+    function Two() {
+      useStorePaymentConfig();
+      useStorePaymentConfig();
+      return null;
+    }
+    const { unmount } = render(<Two />);
+    await waitFor(() => expect(ctx.payment).toHaveBeenCalledTimes(1));
+    await new Promise(r => setTimeout(r, 20));
+    expect(ctx.payment).toHaveBeenCalledTimes(1);
+    unmount();
+    render(<Two />);
+    await waitFor(() => expect(ctx.payment).toHaveBeenCalledTimes(2));
   });
 });
 

@@ -19,6 +19,7 @@ import {
 } from '../../../lib/structured-data';
 import { JsonLd } from '../../../components/JsonLd';
 import ProductDetailClient from './ProductDetailClient';
+import { fetchCodOffer } from '../../../lib/cod-offer';
 
 /**
  * Product detail (PDP) page body — extracted 2026-07-12 (tenant-cacheable
@@ -177,12 +178,14 @@ export async function ProductDetailBody({
    *  doc comment for why Track-A never carries a draft token. */
   draftToken?: string;
 }) {
-  const [initialProduct, layout, shippingZones] = await Promise.all([
+  const [initialProduct, layout, shippingZones, codOffer] = await Promise.all([
     fetchInitialProduct(slug, store),
     fetchProductDetailLayoutSettings(store.id, draftToken),
     // Feeds `offers.shippingDetails` in the Product JSON-LD below. Resolves to
     // [] on any failure, so it can never turn a product page into an error.
     fetchPublicShippingZones(store.id),
+    // S-02: the COD half of the trust line, in the server HTML (no post-load shift).
+    fetchCodOffer(store),
   ]);
 
   // Genuine miss on a real store: try to resolve a renamed-slug 308 before
@@ -270,7 +273,7 @@ export async function ProductDetailBody({
       {jsonLdScripts.map((jsonLd, i) => (
         <JsonLd key={i} data={jsonLd} />
       ))}
-      <ProductDetailClient initialProduct={initialProduct} layout={layout} />
+      <ProductDetailClient initialProduct={initialProduct} layout={layout} codOffer={codOffer} />
     </>
   );
 }

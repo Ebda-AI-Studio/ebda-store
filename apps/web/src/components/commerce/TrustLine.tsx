@@ -6,8 +6,10 @@
  * the return window, and neither was near the CTA.
  *
  * Both halves come from the store, nothing is hard-coded:
- *  - COD: the store's own `/payments/config` says COD is on (its display name
- *    is the merchant's; unknown or off = no COD part);
+ *  - COD: the store's own `/payments/config`, read on the server while the PDP
+ *    renders (`fetchCodOffer`) and passed in, so the line is in the first paint
+ *    and never inserted after load (review I5: zero layout shift). The display
+ *    name is the merchant's; unknown or off = no COD part;
  *  - returns: `store.returnWindowDays` > 0 (0 = not accepted and undeclared are
  *    not advertised here; the /returns page explains them). It links there.
  * With neither, nothing renders (no empty state).
@@ -15,22 +17,27 @@
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useStore, useStoreUrl } from '@/contexts/StoreContext';
 import { useNumerals } from '@/hooks/useNumerals';
-import { useStorePaymentConfig } from '@/hooks/useStorePaymentConfig';
+import type { CodOffer } from '@/lib/cod-offer';
 import { countText, DAYS } from '@/lib/plural';
 import { returnPolicyKind } from '@/lib/return-policy-text';
 
-export function TrustLine({ className = 'mt-3' }: { className?: string }) {
+export function TrustLine({
+  cod: codOffer,
+  className = 'mt-3',
+}: {
+  cod: CodOffer | null | undefined;
+  className?: string;
+}) {
   const { language, t } = useLanguage();
   const { store } = useStore();
   const storeUrl = useStoreUrl();
   const { localize } = useNumerals();
-  const payment = useStorePaymentConfig();
 
   const ar = language === 'ar';
-  const cod = payment?.cod
+  const cod = codOffer
     ? ar
-      ? payment.cod.displayNameAr?.trim() || 'الدفع عند الاستلام'
-      : payment.cod.displayName?.trim() || 'Cash on delivery'
+      ? codOffer.nameAr || 'الدفع عند الاستلام'
+      : codOffer.name || 'Cash on delivery'
     : null;
   const days = store.returnWindowDays;
   const returns =

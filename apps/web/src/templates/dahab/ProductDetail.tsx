@@ -30,6 +30,7 @@ import { useAnchorOffscreen } from '../../components/commerce/useAnchorOffscreen
 import { useStickyBarHeight } from '../../components/commerce/useStickyBarHeight';
 import { DeliveryChip } from '../../components/commerce/DeliveryChip';
 import { TrustLine } from '../../components/commerce/TrustLine';
+import type { CodOffer } from '../../lib/cod-offer';
 import { PersonalisationField } from '../../components/commerce/PersonalisationField';
 import { SizeChartDialog } from '../../components/commerce/SizeChartDialog';
 import type { PublicSizeChart } from '@ebda/shared';
@@ -77,6 +78,8 @@ export interface DahabProductDetailProps {
   facts?: ProductFact[];
   /** Made-to-order business days; feeds the delivers-by chip under the buy button. */
   leadTimeDays?: number | null;
+  /** Server-read COD offer for the trust line under the buy button (S-02). */
+  codOffer?: CodOffer | null;
   /** Raw PersonalisationConfig; the field renders above the buy row only when enabled. */
   personalisation?: unknown;
   /** Resolved size chart (product's, else category's); the size-guide button hides without one. */
@@ -473,7 +476,7 @@ export function DahabProductDetail(p: DahabProductDetailProps) {
             {/* X-03: a delivery date only for something that can be bought now. */}
             {!p.addDisabled && <DeliveryChip leadTimeDays={p.leadTimeDays} />}
             {/* S-02: COD · return window, from the store's own settings. */}
-            <TrustLine />
+            <TrustLine cod={p.codOffer ?? null} />
             {p.stockText && <p className="mt-3 text-[13px] text-muted-foreground">{p.stockText}</p>}
 
             <div className="mt-8 border-t border-border">
