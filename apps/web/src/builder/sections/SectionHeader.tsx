@@ -37,27 +37,19 @@ export function SectionHeader({
   if (!title && !subtitle && !linkLabel) return null;
   return (
     <div className={center ? 'mb-8 text-center sm:mb-10' : 'mb-8 sm:mb-10'}>
+      {/* IA-16: the title and See all share one row on the text baseline; the subtitle follows. */}
       <div
-        className={`flex flex-wrap items-end gap-x-6 gap-y-2 ${center ? 'justify-center' : 'justify-between'}`}
+        data-heading-row
+        className={`flex flex-wrap items-baseline gap-x-6 gap-y-2 ${center ? 'justify-center' : 'justify-between'}`}
       >
-        <div className="min-w-0">
-          {title && (
-            <h2
-              className="font-display text-balance text-[clamp(1.5rem,1.1rem+1.4vw,2.35rem)] leading-tight text-foreground rtl:leading-[1.45]"
-              {...editTitle}
-            >
-              {title}
-            </h2>
-          )}
-          {subtitle && (
-            <p
-              className="mt-2 max-w-[56ch] text-pretty text-[15px] leading-relaxed text-muted-foreground"
-              {...editSubtitle}
-            >
-              {subtitle}
-            </p>
-          )}
-        </div>
+        {title && (
+          <h2
+            className="min-w-0 font-display text-balance text-[clamp(1.5rem,1.1rem+1.4vw,2.35rem)] leading-tight text-foreground rtl:leading-[1.45]"
+            {...editTitle}
+          >
+            {title}
+          </h2>
+        )}
         {linkLabel && linkHref && !center && (
           <Link
             href={linkHref}
@@ -84,6 +76,14 @@ export function SectionHeader({
           </Link>
         )}
       </div>
+      {subtitle && (
+        <p
+          className={`mt-2 max-w-[56ch] text-pretty text-[15px] leading-relaxed text-muted-foreground ${center ? 'mx-auto' : ''}`}
+          {...editSubtitle}
+        >
+          {subtitle}
+        </p>
+      )}
       <div
         aria-hidden="true"
         className={

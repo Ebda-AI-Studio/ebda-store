@@ -244,6 +244,44 @@ export function SectionHeading({
   const kickerShowLines = kickerLinesEnabled;
   const titleShowLines = titleLinesEnabled;
   const subtitleShowLines = subtitleLinesEnabled;
+  // IA-16: a start-aligned title shares one baseline row with See all; a centred or
+  // hairline-flanked title has no end edge to share, so the link keeps its own row below.
+  const seeAllInline = Boolean(seeAllHref && text) && titleAlign === 'start' && !titleShowLines;
+  const seeAllLink = (inline: boolean) => (
+    <Link
+      href={seeAllHref ?? ''}
+      // Item 2 (2026-07-12) persona-completion: elegant's whisper CTA
+      // idiom (top hairline, matching productCardCta's `border-t
+      // border-foreground/15`) extended to the see-all link when
+      // personaChromeV2 is on. Existing theme token only, no new color.
+      className={
+        inline
+          ? `inline-flex min-h-11 shrink-0 items-center ${styles.sectionSeeAll}`
+          : `mt-2 block w-full text-end ${
+              elegantPersonaChrome ? 'border-t border-foreground/15 pt-2' : ''
+            } ${styles.sectionSeeAll}`
+      }
+      data-zone="sectionSeeAll"
+      // The data-cta="link" hover effect is a from-center underline (a
+      // background-gradient line, NOT text-decoration). A merchant who set
+      // the See-all zone's text decoration to "none" means "no underline" —
+      // honour that by dropping data-cta so the hover line doesn't fire.
+      data-cta={seeAllZone?.textDecoration === 'none' ? undefined : 'link'}
+      style={{
+        fontFamily: seeAllZone?.fontFamily,
+        fontSize: responsiveFontSize(seeAllZone?.fontSize),
+        fontWeight: seeAllZone?.fontWeight,
+        color: seeAllZone?.color,
+        letterSpacing: seeAllZone?.letterSpacing,
+        lineHeight: seeAllZone?.lineHeight,
+        textTransform: seeAllZone?.textTransform as React.CSSProperties['textTransform'],
+        textDecoration: seeAllZone?.textDecoration,
+        textAlign: seeAllZone?.textAlign as React.CSSProperties['textAlign'],
+      }}
+    >
+      {isRtl ? 'عرض الكل' : 'See all'}
+    </Link>
+  );
   return (
     <div className="mb-8 flex flex-col gap-2 sm:mb-12 sm:gap-3">
       {/* relative row: title-block is full-width-centered, seeAll absolute-anchored
@@ -355,6 +393,35 @@ export function SectionHeading({
                   style={titleLineStyle}
                 />
               </div>
+            ) : seeAllInline ? (
+              <div data-heading-row className="flex items-baseline justify-between gap-x-6">
+                <h2
+                  className={`min-w-0 ${styles.sectionHeading} ${
+                    titleAlign === 'start'
+                      ? 'text-start'
+                      : titleAlign === 'end'
+                        ? 'text-end'
+                        : 'text-center'
+                  }`}
+                  data-zone="sectionTitle"
+                  style={{
+                    fontFamily: headingZone?.fontFamily,
+                    fontSize: responsiveFontSize(headingZone?.fontSize),
+                    fontWeight: headingZone?.fontWeight,
+                    // resolvedHeadingColor: explicit merchant pick wins; falls back
+                    // to auto-invert against sectionBgColor when no explicit color.
+                    color: resolvedHeadingColor,
+                    letterSpacing: headingZone?.letterSpacing,
+                    lineHeight: headingZone?.lineHeight,
+                    textTransform:
+                      headingZone?.textTransform as React.CSSProperties['textTransform'],
+                    textDecoration: headingZone?.textDecoration,
+                  }}
+                >
+                  {text}
+                </h2>
+                {seeAllLink(true)}
+              </div>
             ) : (
               <h2
                 className={`${styles.sectionHeading} ${
@@ -448,37 +515,7 @@ export function SectionHeading({
             </div>
           )}
         </div>
-        {seeAllHref && (
-          <Link
-            href={seeAllHref}
-            // Item 2 (2026-07-12) persona-completion: elegant's whisper CTA
-            // idiom (top hairline, matching productCardCta's `border-t
-            // border-foreground/15`) extended to the see-all link when
-            // personaChromeV2 is on. Existing theme token only, no new color.
-            className={`mt-2 block w-full text-end ${
-              elegantPersonaChrome ? 'border-t border-foreground/15 pt-2' : ''
-            } ${styles.sectionSeeAll}`}
-            data-zone="sectionSeeAll"
-            // The data-cta="link" hover effect is a from-center underline (a
-            // background-gradient line, NOT text-decoration). A merchant who set
-            // the See-all zone's text decoration to "none" means "no underline" —
-            // honour that by dropping data-cta so the hover line doesn't fire.
-            data-cta={seeAllZone?.textDecoration === 'none' ? undefined : 'link'}
-            style={{
-              fontFamily: seeAllZone?.fontFamily,
-              fontSize: responsiveFontSize(seeAllZone?.fontSize),
-              fontWeight: seeAllZone?.fontWeight,
-              color: seeAllZone?.color,
-              letterSpacing: seeAllZone?.letterSpacing,
-              lineHeight: seeAllZone?.lineHeight,
-              textTransform: seeAllZone?.textTransform as React.CSSProperties['textTransform'],
-              textDecoration: seeAllZone?.textDecoration,
-              textAlign: seeAllZone?.textAlign as React.CSSProperties['textAlign'],
-            }}
-          >
-            {isRtl ? 'عرض الكل' : 'See all'}
-          </Link>
-        )}
+        {seeAllHref && !seeAllInline && seeAllLink(false)}
       </div>
       {/* belowHeading divider — between this heading block and the section
           content (products / categories grid). Full DividerSettings shape;
