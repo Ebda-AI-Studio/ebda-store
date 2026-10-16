@@ -200,6 +200,8 @@ export const translations = {
   'Low to High': 'من الأقل للأعلى',
   'High to Low': 'من الأعلى للأقل',
   Search: 'بحث',
+  // Search results sort: the hybrid relevance order (shown only when the server ranked the list).
+  'Most relevant': 'الأكثر صلة',
   'No results found': 'لم يتم العثور على نتائج',
   'Loading...': 'جاري التحميل...',
   Error: 'خطأ',

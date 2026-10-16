@@ -320,6 +320,8 @@ interface PaginationMeta {
   limit: number;
   total: number;
   totalPages: number;
+  /** The list is in hybrid relevance order (search with semantic search on, Task 12). */
+  ranked?: boolean;
 }
 
 /**
