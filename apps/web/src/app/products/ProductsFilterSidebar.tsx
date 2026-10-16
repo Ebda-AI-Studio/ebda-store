@@ -373,7 +373,7 @@ export function ProductsFilterSidebar(props: ProductsFilterSidebarProps) {
                     const v = Math.min(Number(e.target.value), priceMax);
                     onPriceChange(v, priceMax);
                   }}
-                  className="w-full accent-primary"
+                  className="h-11 w-full accent-primary"
                   aria-label={t('Minimum price', 'الحد الأدنى للسعر')}
                 />
                 <input
@@ -386,7 +386,7 @@ export function ProductsFilterSidebar(props: ProductsFilterSidebarProps) {
                     const v = Math.max(Number(e.target.value), priceMin);
                     onPriceChange(priceMin, v);
                   }}
-                  className="w-full accent-primary"
+                  className="h-11 w-full accent-primary"
                   aria-label={t('Maximum price', 'الحد الأقصى للسعر')}
                 />
               </div>

@@ -110,3 +110,16 @@ describe('mobile filter row shows the item count and a sort (IA-11)', () => {
     expect(src).toMatch(/id="products-sort-bar"/);
   });
 });
+
+describe('price sliders are 44px targets (a11y P2-10)', () => {
+  it('both range inputs carry a 44px box', async () => {
+    const { readFileSync } = await import('node:fs');
+    const src = readFileSync(
+      new URL('../../apps/web/src/app/products/ProductsFilterSidebar.tsx', import.meta.url),
+      'utf8'
+    );
+    const ranges = [...src.matchAll(/<input\s+type="range"[\s\S]*?\/>/g)].map(m => m[0]);
+    expect(ranges).toHaveLength(2);
+    for (const r of ranges) expect(r).toMatch(/className="[^"]*\bh-11\b/);
+  });
+});
