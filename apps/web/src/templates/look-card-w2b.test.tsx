@@ -481,3 +481,20 @@ describe('PecannbeeProductCard fills its column on a look store (IA-05)', () => 
     expect(c).toContain('mx-auto');
   });
 });
+
+describe('minimal/ProductCard fills its column on a look store too (IA-05, search grid)', () => {
+  const root = () =>
+    render(
+      React.createElement(
+        MinimalProductCard as never,
+        { product: product('plain'), isRtl: true } as never
+      )
+    ).container.firstElementChild as HTMLElement;
+  it('look store: no cap, no auto margins; no look: unchanged', () => {
+    selectLook('qamar.vitrine');
+    expect(root().className).not.toMatch(/max-w-\[|mx-auto/);
+    cleanup();
+    selectLook(null);
+    expect(root().className).toContain('mx-auto');
+  });
+});

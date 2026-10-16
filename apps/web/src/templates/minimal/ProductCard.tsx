@@ -32,6 +32,7 @@ import {
   fromMinor,
   REGION,
   storeNumerals,
+  getLook,
 } from '@ebda/shared';
 import { CompareButton, RemoveFromWishlistButton } from '../shared/card-actions';
 import { Price } from '@ebda/ui';
@@ -203,7 +204,10 @@ function MinimalProductCard({
       itemScope
       itemType="https://schema.org/Product"
       aria-labelledby={`prod-${product.id}-name`}
-      className={`w-full mx-auto ${productSizeClass(cardSize)} ${frameCls}`.trim()}
+      // IA-05 (W4): a look store's card fills its grid column; no look keeps the centred cap.
+      className={`w-full ${getLook(store.look) ? '' : `mx-auto ${productSizeClass(cardSize)}`} ${frameCls}`
+        .replace(/\s+/g, ' ')
+        .trim()}
       style={
         showCardFrame && cardFrameColor && store.theme
           ? { borderColor: resolveColor(cardFrameColor, store.theme) }
