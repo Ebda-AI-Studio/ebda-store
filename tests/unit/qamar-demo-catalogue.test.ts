@@ -153,3 +153,22 @@ describe('qamar demo assets (Ruling B1-9 as amended by C18)', () => {
     expect(onDisk).not.toContain('hero.webm');
   });
 });
+
+// W2b (S-02 per look): the shared PDP trust line (`components/commerce/TrustLine.tsx`, main's S-02)
+// renders only from store data, so the demo and the three look stores must declare COD and a
+// return window or the looks are judged without their trust line.
+describe('demo seed feeds the shared trust line (W2b)', () => {
+  const src = require('node:fs').readFileSync(
+    path.join(__dirname, '../../scripts/storedemo/seed.mjs'),
+    'utf8'
+  ) as string;
+  it('the store gets a 14-day return window', () => {
+    expect(src).toMatch(/returnWindowDays:\s*14\b/);
+  });
+  it('the store gets an enabled COD payment config, found by provider then updated or created', () => {
+    expect(src).toMatch(/provider:\s*'cod'/);
+    expect(src).toMatch(/paymentConfig\.(findFirst|upsert)/);
+    expect(src).toMatch(/isEnabled:\s*true/);
+    expect(src).toMatch(/displayNameAr:\s*'الدفع عند الاستلام'/);
+  });
+});

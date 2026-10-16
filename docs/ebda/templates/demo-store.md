@@ -18,7 +18,7 @@
 
 ## Seeding
 
-`DATABASE_URL=<owner url> [QAMAR_DEMO_ASSET_BASE=<url or /path>] npx tsx scripts/storedemo/seed.mjs [--yes-production] [--local-look-stores]` prints the plan first. It refuses a non-loopback database unless `--yes-production` (Ahmad's STOP 3, never an agent), and with `--yes-production` it refuses any asset base other than `https://media.ebda.app/demo/qamar` (Ruling B1-16). Idempotent: owner, store, categories and products upserted; size charts and the shipping zone found by name then updated or created; variants found by SKU (built from the FULL option-value slugs, e.g. `LINEN-ABAYA-ROSE-M-56`) and never deleted, because cart lines may point at them.
+`DATABASE_URL=<owner url> [QAMAR_DEMO_ASSET_BASE=<url or /path>] npx tsx scripts/storedemo/seed.mjs [--yes-production] [--local-look-stores]` prints the plan first. It refuses a non-loopback database unless `--yes-production` (Ahmad's STOP 3, never an agent), and with `--yes-production` it refuses any asset base other than `https://media.ebda.app/demo/qamar` (Ruling B1-16). Idempotent: owner, store, categories and products upserted; the store declares cash on delivery (one `payment_configs` row, found by provider then updated or created) and a 14-day return window, so the shared PDP trust line renders on every look (W2b, Ruling B1-64); size charts and the shipping zone found by name then updated or created; variants found by SKU (built from the FULL option-value slugs, e.g. `LINEN-ABAYA-ROSE-M-56`) and never deleted, because cart lines may point at them.
 
 What it writes (Phase B1 Task 6):
 

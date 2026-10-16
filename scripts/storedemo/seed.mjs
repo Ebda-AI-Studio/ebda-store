@@ -392,6 +392,21 @@ async function seedCatalogue(prisma, Prisma, storeId, base) {
       if (z) await tx.shippingZone.update({ where: { id: z.id, storeId }, data: zone });
       else await tx.shippingZone.create({ data: { storeId, ...zone } });
 
+      // Cash on delivery + a 14-day return window: the shared PDP trust line (S-02) reads both
+      // from the store, so every look is judged with the trust line it ships with (W2b).
+      const cod = {
+        provider: 'cod',
+        isEnabled: true,
+        displayName: 'Cash on delivery',
+        displayNameAr: 'الدفع عند الاستلام',
+      };
+      const codRow = await tx.paymentConfig.findFirst({
+        where: { storeId, provider: 'cod' },
+        select: { id: true },
+      });
+      if (codRow) await tx.paymentConfig.update({ where: { id: codRow.id, storeId }, data: cod });
+      else await tx.paymentConfig.create({ data: { storeId, ...cod } });
+
       // Store settings: read, spread, write (the store row is this seed's own).
       const store = await tx.store.findUnique({
         where: { id: storeId },
@@ -404,6 +419,7 @@ async function seedCatalogue(prisma, Prisma, storeId, base) {
             'An illustrative Egyptian boutique: abayas, kaftans, scarves and evening dresses, cut in Heliopolis.',
           descriptionAr:
             'بوتيك مصري توضيحي: عبايات وقفاطين وطرح وفساتين سهرة، متفصلة في مصر الجديدة.',
+          returnWindowDays: 14,
           // "Demo store" is said once, by the demo bar above it (DemoLookBar); this line only
           // labels the photos (Task 9 review).
           announcementBar: {
