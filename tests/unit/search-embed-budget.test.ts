@@ -32,6 +32,7 @@ const {
   DEFAULT_QUERY_STORE_DAILY_CAP,
   DEFAULT_QUERY_GLOBAL_DAILY_CAP,
   SEARCH_EMBED_PER_SEARCHER_PER_MIN,
+  searcherPerMinuteCap,
   searcherFromIp,
   queryBudgetSpent,
   queryBudgetSpentUntil,
@@ -196,5 +197,24 @@ describe('takeQueryEmbed', () => {
     for (let i = 0; i < SEARCH_EMBED_PER_SEARCHER_PER_MIN + 5; i++)
       await takeQueryEmbed(A, 'ip:same');
     expect(queryBudgetSpent(A)).toBe(false); // per-client and transient: never the store's state
+  });
+
+  // Review M5: behind Egyptian mobile CGNAT many shoppers share one IPv4, so the per-IP limit is a
+  // knob with a CGNAT-sized default; the daily budgets are what bound spend.
+  it('per-searcher limit: default 60/min, configurable, a bad value falls back, 0 means none', async () => {
+    expect(SEARCH_EMBED_PER_SEARCHER_PER_MIN).toBe(60);
+    expect(searcherPerMinuteCap()).toBe(60);
+    process.env.SEARCH_EMBED_PER_SEARCHER_PER_MIN = '5';
+    try {
+      let granted = 0;
+      for (let i = 0; i < 50; i++) if (await takeQueryEmbed(A, 'ip:198.51.100.9')) granted++;
+      expect(granted).toBe(5);
+      process.env.SEARCH_EMBED_PER_SEARCHER_PER_MIN = 'lots';
+      expect(searcherPerMinuteCap()).toBe(60);
+      process.env.SEARCH_EMBED_PER_SEARCHER_PER_MIN = '0';
+      expect(await takeQueryEmbed(A, 'ip:198.51.100.10')).toBe(false);
+    } finally {
+      delete process.env.SEARCH_EMBED_PER_SEARCHER_PER_MIN;
+    }
   });
 });

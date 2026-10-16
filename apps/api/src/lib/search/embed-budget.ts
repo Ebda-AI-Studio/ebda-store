@@ -70,8 +70,17 @@ export async function takeEmbedCalls(n: number): Promise<boolean> {
 // queries defeat the cache, so these counters, not the cache, are what bound the spend.
 export const DEFAULT_QUERY_GLOBAL_DAILY_CAP = 10_000;
 export const DEFAULT_QUERY_STORE_DAILY_CAP = 1_000;
-/** Query embeds per searcher (normalised IP) per minute. */
-export const SEARCH_EMBED_PER_SEARCHER_PER_MIN = 20;
+/**
+ * Default query embeds per searcher (normalised IP) per fixed minute. Sized for carrier-grade NAT:
+ * Egyptian mobile networks put many shoppers behind one public IPv4, so a tight per-IP limit would
+ * turn legitimate shoppers keyword-only at scale (review M5). This limit only slows ONE client
+ * draining the shared budgets; the daily budgets are what bound spend. Ruling SEARCH-T12-11.
+ */
+export const SEARCH_EMBED_PER_SEARCHER_PER_MIN = 60;
+
+/** `SEARCH_EMBED_PER_SEARCHER_PER_MIN` (docs/ENVIRONMENT.md); a bad value falls back; 0 = none. */
+export const searcherPerMinuteCap = () =>
+  capFromEnv('SEARCH_EMBED_PER_SEARCHER_PER_MIN', SEARCH_EMBED_PER_SEARCHER_PER_MIN);
 /** The per-minute searcher key lives two windows (Redis/KV TTL floor 120 s). */
 const SEARCHER_KEY_TTL_SECONDS = 120;
 
@@ -189,7 +198,7 @@ export async function takeQueryEmbedResult(
     const sKey = searcherEmbedKey(searcher, now);
     const sUsed = await client.incr(sKey);
     if (sUsed === 1) await client.expire(sKey, SEARCHER_KEY_TTL_SECONDS);
-    if (sUsed > SEARCH_EMBED_PER_SEARCHER_PER_MIN) return { ok: false, reason: 'searcher-limit' };
+    if (sUsed > searcherPerMinuteCap()) return { ok: false, reason: 'searcher-limit' };
     // 2. The daily budgets (INCR, then compare). A refusal by ANY of them refunds all three, so each
     //    daily counter equals the provider calls actually made (a crash between the two steps
     //    over-counts by one; it can never under-count).
