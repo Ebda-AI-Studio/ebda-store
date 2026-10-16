@@ -11,6 +11,7 @@ const READERS = [
   'apps/admin/src/app/stores/[id]/page-builder/page.tsx',
   'apps/admin/src/app/stores/[id]/finance/expenses/new/page.tsx',
   'apps/admin/src/app/stores/[id]/products/[productId]/_components/Product3dModelCard.tsx',
+  'apps/admin/src/app/stores/[id]/pwa/_components/PwaIconUploader.tsx',
 ];
 
 describe('upload error language has one source of truth', () => {

@@ -1,7 +1,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import multer from 'multer';
-import sharp from 'sharp';
+import { pngDimensions } from '../lib/upload-sniff';
 import { authenticate, authorize } from '../middleware/auth';
 import { requireStoreAccess } from '../middleware/store-access';
 import { requireFeature } from '../middleware/feature-gate';
@@ -124,24 +124,47 @@ router.put(
   }
 );
 
-// Icon-set upload (B5, 2026-05-04 plan task 3). Memory storage + a generous
-// type allowlist — sharp/libvips rasterizes PNG/JPEG/WebP/SVG alike. Same
-// 10MB ceiling as the generic /uploads/image endpoint (upload.routes.ts);
-// a source icon has no business being larger than that.
+// Icon-set upload (B5; Workers-safe since Ruling FU46-8). No image library runs on workerd, so
+// the source is stored as sent under every size's key: it must therefore already be a square
+// PNG of at least 512×512 (checked from its bytes below), and at most 1 MB because the same bytes
+// are served for the 16/32px favicons too.
+export const PWA_ICON_MAX_BYTES = 1024 * 1024;
 const iconUpload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 10 * 1024 * 1024, files: 1 },
+  limits: { fileSize: PWA_ICON_MAX_BYTES, files: 1 },
   fileFilter: (_req, file, cb) => {
-    const allowed = ['image/png', 'image/jpeg', 'image/webp', 'image/svg+xml'];
+    const allowed = ['image/png'];
     if (allowed.includes(file.mimetype)) {
       cb(null, true);
     } else {
-      cb(new AppError(400, 'INVALID_FILE_TYPE', `Invalid icon file type: ${file.mimetype}`));
+      cb(
+        new AppError(400, 'INVALID_FILE_TYPE', 'The icon must be a PNG image.', {
+          messageEn: 'The icon must be a PNG image.',
+          messageAr: 'يجب أن تكون الأيقونة صورة PNG.',
+        })
+      );
     }
   },
 });
 
 const MIN_ICON_DIMENSION = 512;
+
+/** A bilingual 400 for a PWA icon source the route refuses by its bytes. */
+function iconError(
+  code: 'ICON_NOT_PNG' | 'ICON_NOT_SQUARE' | 'ICON_TOO_SMALL',
+  dims?: { width: number; height: number }
+): AppError {
+  const got = dims ? ` (${dims.width}×${dims.height})` : '';
+  const text = {
+    ICON_NOT_PNG: ['The icon must be a PNG image.', 'يجب أن تكون الأيقونة صورة PNG.'],
+    ICON_NOT_SQUARE: [`The icon must be square${got}.`, `يجب أن تكون الأيقونة مربعة${got}.`],
+    ICON_TOO_SMALL: [
+      `The icon must be at least ${MIN_ICON_DIMENSION}×${MIN_ICON_DIMENSION}px${got}.`,
+      `يجب ألا تقل الأيقونة عن ${MIN_ICON_DIMENSION}×${MIN_ICON_DIMENSION} بكسل${got}.`,
+    ],
+  }[code];
+  return new AppError(400, code, text[0], { messageEn: text[0], messageAr: text[1] });
+}
 
 // POST /stores/:storeId/pwa/icons - Upload one source icon, generate the
 // full size set server-side, persist the resulting URLs onto pwaSettings.
@@ -159,28 +182,17 @@ router.post(
       const { storeId } = req.params;
       const file = req.file;
       if (!file) {
-        throw new AppError(
-          400,
-          'NO_FILE',
-          'Upload a square icon (PNG, JPEG, WebP or SVG, 512×512+)'
-        );
+        throw new AppError(400, 'NO_FILE', 'Upload a square PNG icon, 512×512px or larger', {
+          messageEn: 'Upload a square PNG icon, 512×512px or larger',
+          messageAr: 'ارفع أيقونة PNG مربعة بحجم 512×512 بكسل أو أكبر',
+        });
       }
 
-      const meta = await sharp(file.buffer).metadata();
-      if (!meta.width || !meta.height) {
-        throw new AppError(
-          400,
-          'ICON_UNREADABLE',
-          'Could not read the uploaded image dimensions. Use a valid PNG, JPEG, WebP or SVG file.'
-        );
-      }
-      if (meta.width < MIN_ICON_DIMENSION || meta.height < MIN_ICON_DIMENSION) {
-        throw new AppError(
-          400,
-          'ICON_TOO_SMALL',
-          `Icon must be at least ${MIN_ICON_DIMENSION}×${MIN_ICON_DIMENSION}px (got ${meta.width}×${meta.height})`
-        );
-      }
+      // The bytes decide (Ruling FU46-8): a PNG by its magic, its size from IHDR.
+      const dims = pngDimensions(file.buffer);
+      if (!dims) throw iconError('ICON_NOT_PNG');
+      if (dims.width !== dims.height) throw iconError('ICON_NOT_SQUARE', dims);
+      if (dims.width < MIN_ICON_DIMENSION) throw iconError('ICON_TOO_SMALL', dims);
 
       const previous = await prisma.store.findUnique({
         where: { id: storeId },
@@ -207,7 +219,7 @@ router.post(
         details: {
           filename: file.originalname,
           size: file.size,
-          sourceDims: `${meta.width}x${meta.height}`,
+          sourceDims: `${dims.width}x${dims.height}`,
         },
         ip: req.ip,
         userAgent: req.headers['user-agent'],

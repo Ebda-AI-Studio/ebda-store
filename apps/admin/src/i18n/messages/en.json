@@ -3682,9 +3682,9 @@
     },
     "icons": {
       "title": "App Icons",
-      "uploaderHelp": "Upload one square logo and we'll generate every size your customers need — Android home screen, iOS Add to Home Screen, and the browser tab.",
+      "uploaderHelp": "Upload one square PNG logo and it is used for every size your customers see — Android home screen, iOS Add to Home Screen, and the browser tab.",
       "uploaderLabel": "Upload your store icon",
-      "uploaderSizeHint": "Square PNG, JPEG, WebP or SVG, at least 512×512px",
+      "uploaderSizeHint": "Square PNG, 512×512px or larger, up to 1 MB. Keep the artwork inside the central 80% so the adaptive icon does not clip it.",
       "generatedPreview": "Generated sizes",
       "iconAppleTouchAlt": "iOS home screen icon",
       "favicon32Alt": "Browser tab icon",
@@ -3698,7 +3698,8 @@
       "icon512Help": "High-res icon for splash screen",
       "maskable": "Maskable Icon",
       "maskableAlt": "Maskable",
-      "maskableHelp": "Adaptive icon with safe zone"
+      "maskableHelp": "Adaptive icon with safe zone",
+      "tooLarge": "The icon must be 1 MB or smaller"
     },
     "features": {
       "title": "Features",

@@ -48,6 +48,18 @@ export function sniffFont(buf: Buffer): FontKind | null {
   return null;
 }
 
+/**
+ * Width/height of a PNG from its IHDR chunk (always the first chunk, bytes 8-24), or null when
+ * the buffer is not a PNG with a well-formed IHDR. No decoder needed, so it runs on workerd.
+ */
+export function pngDimensions(buf: Buffer): { width: number; height: number } | null {
+  if (sniffImage(buf) !== 'image/png' || buf.length < 24) return null;
+  if (buf.subarray(12, 16).toString('latin1') !== 'IHDR') return null;
+  const width = buf.readUInt32BE(16);
+  const height = buf.readUInt32BE(20);
+  return width > 0 && height > 0 ? { width, height } : null;
+}
+
 /** `photo.png` + `image/jpeg` → `photo.jpg`; an empty base becomes `fallback`. */
 export function renameByKind(originalName: string, ext: string, fallback: string): string {
   return `${originalName.replace(/\.[^.]*$/, '') || fallback}${ext}`;

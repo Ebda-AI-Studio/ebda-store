@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Image from 'next/image';
 import { useT } from '@/i18n/useT';
-import { getApiUrl } from '../../../../../lib/api';
+import { getApiUrl, localizedApiMessage } from '../../../../../lib/api';
 import { UploadDropzone } from '../../../../../components/image-upload/UploadDropzone';
 import { UploadProgress } from '../../../../../components/image-upload/UploadProgress';
 import type { PWASettings } from './types';
@@ -15,13 +15,15 @@ interface PwaIconUploaderProps {
   onChange: (settings: PWASettings) => void;
 }
 
-const MAX_ICON_SIZE = 10 * 1024 * 1024;
-const ACCEPTED_TYPES = ['image/png', 'image/jpeg', 'image/webp', 'image/svg+xml'];
+// The API stores the source as sent under every icon size (Ruling FU46-8, no image library on
+// Workers), so it takes a square PNG of 512×512+ and at most 1 MB (pwa.routes.ts).
+const MAX_ICON_SIZE = 1024 * 1024;
+const ACCEPTED_TYPES = ['image/png'];
 
 interface IconUploadResponse {
   success?: boolean;
   data?: { settings?: PWASettings };
-  error?: { message?: string };
+  error?: { code?: string; message?: string; details?: Record<string, unknown> };
 }
 
 /**
@@ -84,7 +86,7 @@ export function PwaIconUploader({ storeId, settings, pwaEnabled, onChange }: Pwa
         return;
       }
       if (file.size > MAX_ICON_SIZE) {
-        setError(tUpload('errors.tooLarge'));
+        setError(t('tooLarge'));
         return;
       }
 
@@ -116,8 +118,12 @@ export function PwaIconUploader({ storeId, settings, pwaEnabled, onChange }: Pwa
             } else {
               reject(
                 new Error(
-                  data?.error?.message ||
-                    tUpload('errors.uploadFailedWithCode', { code: xhr.status })
+                  localizedApiMessage(
+                    data?.error?.code,
+                    data?.error?.message ||
+                      tUpload('errors.uploadFailedWithCode', { code: xhr.status }),
+                    data?.error?.details
+                  )
                 )
               );
             }
@@ -144,7 +150,7 @@ export function PwaIconUploader({ storeId, settings, pwaEnabled, onChange }: Pwa
         setProgress(0);
       }
     },
-    [onChange, storeId, tUpload]
+    [onChange, storeId, t, tUpload]
   );
 
   return (

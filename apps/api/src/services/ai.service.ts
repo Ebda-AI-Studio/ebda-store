@@ -19,7 +19,6 @@
 import { GeminiFailoverClient } from '../lib/ai/gemini-keys';
 import { z } from 'zod';
 import { createHash } from 'crypto';
-import sharp from 'sharp';
 import { prisma } from '@ebda/database';
 import { config } from '../config';
 import { redis } from './redis.service';
@@ -30,31 +29,8 @@ import { computeCostMicros } from '../lib/ai-pricing';
 import { safeFetchImage } from '../lib/safe-fetch';
 import { sanitizeJsonControlChars } from '../lib/ai/parse-ai-json';
 import { rethrowAsAppError } from '../lib/ai/gemini-errors';
+import { geminiInlineImage, GeminiImageUnsupported } from '../lib/ai/gemini-image';
 import { withSavepoint } from '../lib/savepoint';
-
-// Gemini Vision accepts only these mime types for inline_data. Anything else
-// (image/svg+xml, image/gif, image/tiff, image/x-icon) gets a 400. We
-// rasterize via sharp to PNG before sending. Keep this in sync with
-// https://ai.google.dev/gemini-api/docs/prompting_with_media#supported_file_formats
-const GEMINI_SUPPORTED_IMAGE_MIME_TYPES = new Set([
-  'image/png',
-  'image/jpeg',
-  'image/webp',
-  'image/heic',
-  'image/heif',
-]);
-
-async function rasterizeForGemini(
-  buf: Buffer,
-  mimeType: string
-): Promise<{ data: string; mimeType: string }> {
-  if (GEMINI_SUPPORTED_IMAGE_MIME_TYPES.has(mimeType)) {
-    return { data: buf.toString('base64'), mimeType };
-  }
-  // sharp handles SVG, GIF (first frame), TIFF, ICO, BMP, AVIF natively.
-  const png = await sharp(buf).png().toBuffer();
-  return { data: png.toString('base64'), mimeType: 'image/png' };
-}
 
 type Feature =
   | 'translate'
@@ -693,10 +669,18 @@ export class AIService {
     let base64: string;
     let mimeType: string;
     try {
-      const rasterized = await rasterizeForGemini(Buffer.from(arrayBuf), rawMime);
-      base64 = rasterized.data;
-      mimeType = rasterized.mimeType;
+      const inline = geminiInlineImage(Buffer.from(arrayBuf), rawMime);
+      base64 = inline.data;
+      mimeType = inline.mimeType;
     } catch (err) {
+      if (err instanceof GeminiImageUnsupported) {
+        // No rasterizing on workerd (Ruling FU46-8): an SVG/GIF logo cannot be read by the AI.
+        const messageEn =
+          'The AI can read a PNG, JPEG or WebP logo. Upload the logo in one of those.';
+        const messageAr =
+          'يقرأ الذكاء الاصطناعي الشعار بصيغة PNG أو JPEG أو WebP فقط. ارفع الشعار بإحداها.';
+        throw new AppError(400, 'AI_LOGO_UNSUPPORTED_FORMAT', messageEn, { messageEn, messageAr });
+      }
       logger.error({ err, rawMime, logoUrl }, 'Logo rasterization failed before Gemini call');
       throw new AppError(
         502,
