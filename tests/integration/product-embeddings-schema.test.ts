@@ -236,6 +236,55 @@ describe.skipIf(!hasDb)('product_embeddings', () => {
     expect(Number(children.n)).toBe(0);
   });
 
+  it('Task 14: both vectors are stored inline (toast_tuple_target 8160), not in TOAST', async () => {
+    const [rel] = await prisma.$queryRaw<Array<{ opts: string[] | null }>>`
+      SELECT reloptions AS opts FROM pg_class WHERE oid = 'public.product_embeddings'::regclass`;
+    expect(rel.opts).toContain('toast_tuple_target=8160');
+    // Behaviour, not just the option: 150 rows of two incompressible 1024-dim vectors (~4 KB each
+    // row) grow the heap and leave the TOAST relation untouched. (Measured at 20 000 products
+    // with the default EXTENDED: the exact KNN scan read the vectors back through the TOAST index
+    // (~5 buffer hits per value, 120 k hits per query) and took 74 ms alone and ~1.2 s mean
+    // under 30 searches/s, against 30 ms and 26 ms inline.)
+    const ROLLBACK = Symbol('rollback');
+    let grew = { heap: 0n, toast: 0n };
+    const storeId = await seedStore('inline');
+    await prisma
+      .$transaction(
+        async tx => {
+          const size = async () => {
+            const [r] = await tx.$queryRaw<Array<{ heap: bigint; toast: bigint }>>`
+              SELECT pg_relation_size('public.product_embeddings'::regclass) AS heap,
+                     pg_relation_size((SELECT reltoastrelid FROM pg_class
+                                       WHERE oid = 'public.product_embeddings'::regclass)) AS toast`;
+            return r;
+          };
+          const before = await size();
+          await tx.$executeRaw`
+            INSERT INTO public.products (id, store_id, name, slug, price, status, updated_at)
+            SELECT 'inl-' || ${uid()} || '-' || g, ${storeId}, 'n' || g, 'inl-' || ${uid()} || '-' || g,
+                   1000, 'active', now()
+            FROM generate_series(1, 150) g`;
+          await tx.$executeRaw`
+            INSERT INTO public.product_embeddings
+              (product_id, store_id, model, content_hash, embedding, terms_embedding, terms_hash)
+            SELECT p.id, p.store_id, '@cf/baai/bge-m3', md5(p.id),
+                   (SELECT array_agg(random()::real) FROM generate_series(1, 1024))::real[]::halfvec(1024),
+                   (SELECT array_agg(random()::real) FROM generate_series(1, 1024))::real[]::halfvec(1024),
+                   'h'
+            FROM public.products p WHERE p.store_id = ${storeId}`;
+          const after = await size();
+          grew = { heap: after.heap - before.heap, toast: after.toast - before.toast };
+          throw ROLLBACK;
+        },
+        { timeout: 60_000 }
+      )
+      .catch(e => {
+        if (e !== ROLLBACK) throw e;
+      });
+    expect(grew.heap).toBeGreaterThan(0n);
+    expect(grew.toast).toBe(0n);
+  }, 90_000);
+
   it('has the store_id and (store_id, embedded_at) btree indexes', async () => {
     const idx = await prisma.$queryRaw<Array<{ indexname: string }>>`
       SELECT indexname::text FROM pg_indexes WHERE tablename = 'product_embeddings' ORDER BY 1`;
