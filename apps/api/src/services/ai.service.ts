@@ -66,6 +66,8 @@ type Feature =
   | 'geo'
   | 'recommendations'
   | 'tags'
+  // Search words (dialect / Franco / EN) for products.search_terms — search program P1.
+  | 'search-terms'
   | 'image-alt'
   | 'excerpt'
   | 'answer_engine_gemini'
