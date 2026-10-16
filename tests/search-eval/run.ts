@@ -33,6 +33,7 @@
  * --keep                keep the seeded store (default: deleted at the end)
  */
 import { readFileSync, writeFileSync } from 'node:fs';
+import { assertLocalTargets } from './guards';
 import { createHash } from 'node:crypto';
 import { catalogueRows, evalQueries, EVAL_ABSENT, EVAL_FORMS, type EvalQuery } from './catalogue';
 import {
@@ -72,16 +73,8 @@ const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
 const fmt = (n: number) => n.toFixed(2);
 const label = (t: number | null, d: number | null) => `t=${t ?? 'none'} d=${d ?? 'none'}`;
 
-function assertLocalDb(url: string | undefined): string {
-  if (!url) throw new Error('DATABASE_URL is required (a LOCAL scratch database)');
-  const host = new URL(url).hostname;
-  if (!['localhost', '127.0.0.1', '::1', '[::1]'].includes(host))
-    throw new Error(`refusing a non-local DATABASE_URL host (${host}): the eval writes a store`);
-  return url;
-}
-
 async function main(): Promise<number> {
-  const dbUrl = assertLocalDb(process.env.DATABASE_URL);
+  const { databaseUrl: dbUrl } = assertLocalTargets(process.env);
   // A local scratch process: lift the spend guards that exist for anonymous traffic (the eval's own
   // spend is bounded by its size: ~250 product embeds + ~270 query embeds per run).
   for (const [k, v] of Object.entries({
