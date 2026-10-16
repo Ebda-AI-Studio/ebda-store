@@ -221,6 +221,8 @@ export interface FooterBottomBarConfig {
   privacyEnabled?: boolean;
   termsEnabled?: boolean;
   shippingEnabled?: boolean;
+  /** The returns-policy link in the footer legal row (S-01). Unset = on. */
+  returnsEnabled?: boolean;
 }
 
 /**

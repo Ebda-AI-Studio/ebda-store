@@ -90,14 +90,14 @@ Every template (Qamar, Souq, Jasmine, Lamma, Dahab) and every look inside it mus
 
 ## 8. Copy and trust
 
-| Rule                                                                                                                                                                                           | Check           |
-| ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------- |
-| Only exceptions speak. A status that is true for almost every item ("in stock", "0/12") is not rendered. One fact, one place per screen. [Y-05]                                                | critique + shot |
-| Every option label names the current selection. Every field says required or optional and carries an example in the shopper's language. [Y-03, Y-04]                                           | test            |
-| No generated filler copy ("Browse X"). Empty means absent. [Y-06]                                                                                                                              | critique        |
-| COD and the exchange policy sit within one scroll of the PDP CTA and in the footer. The receipt repeats the delivery window and offers WhatsApp. Nothing renders without merchant data. [S-02] | test + shot     |
-| Every footer renders privacy, terms and returns from `resolveBottomBar`. [S-01]                                                                                                                | test            |
-| Nothing imitates function: a barcode, handle or control that looks usable must work, or it is removed. [S-04, ruling pending (d)]                                                              | critique        |
+| Rule                                                                                                                                                                                                                         | Check                                                                      |
+| ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- |
+| Only exceptions speak. A status that is true for almost every item ("in stock", "0/12") is not rendered. One fact, one place per screen. [Y-05]                                                                              | critique + shot                                                            |
+| Every option label names the current selection. Every field says required or optional and carries an example in the shopper's language. [Y-03, Y-04]                                                                         | test                                                                       |
+| No generated filler copy ("Browse X"). Empty means absent. [Y-06]                                                                                                                                                            | critique                                                                   |
+| COD and the exchange policy sit within one scroll of the PDP CTA and in the footer. The receipt repeats the delivery window and offers WhatsApp. Nothing renders without merchant data. [S-02]                               | test + shot                                                                |
+| Every footer renders the shared `FooterLegalRow` (privacy · terms · returns · ©) from `resolveBottomBar`: a link drops when its toggle or CMS page is off, and is never repeated when a footer column already has it. [S-01] | test: `tests/unit/footer-legal-row.test.tsx` (each of the 5 skins + Dahab) |
+| Nothing imitates function: a barcode, handle or control that looks usable must work, or it is removed. [S-04, ruling pending (d)]                                                                                            | critique                                                                   |
 
 ## How to run the taste gate
 

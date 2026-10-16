@@ -1,6 +1,7 @@
 'use client';
 
 import { PoweredByForce } from '../shared/PoweredByForce';
+import { FooterLegalRow } from '../shared/FooterLegalRow';
 import type { FooterProps } from '../types';
 import { useLanguage } from '../../contexts/LanguageContext';
 import {
@@ -17,6 +18,8 @@ export default function MinimalFooter({
   socials,
   navigation = [],
   footerLinks,
+  disabledCmsSlugs,
+  urlPrefix,
   isRtl: isRtlProp,
   bgColor,
   footerLogo,
@@ -180,10 +183,16 @@ export default function MinimalFooter({
             </div>
           )}
         </div>
-
-        {/* Bottom bar removed 2026-05-21 — redundant with Company Links. */}
       </div>
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        {/* Legal row (S-01): privacy · terms · returns · ©, from resolveBottomBar. */}
+        <FooterLegalRow
+          footerLinks={footerLinks}
+          disabledCmsSlugs={disabledCmsSlugs}
+          storeName={displayName ?? ''}
+          isRtl={isRtl}
+          urlPrefix={urlPrefix}
+        />
         <PoweredByForce hidden={hidePoweredBy} />
       </div>
     </footer>

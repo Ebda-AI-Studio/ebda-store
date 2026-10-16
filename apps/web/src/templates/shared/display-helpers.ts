@@ -178,6 +178,8 @@ export interface ResolvedBottomBar {
   privacyEnabled: boolean;
   termsEnabled: boolean;
   shippingEnabled: boolean;
+  /** The returns-policy link (S-01): on unless the merchant turned it off. */
+  returnsEnabled: boolean;
 }
 
 /**
@@ -218,6 +220,7 @@ export function resolveBottomBar(
     privacyEnabled: bottomBar?.privacyEnabled !== false && !disabled.has('privacy'),
     termsEnabled: bottomBar?.termsEnabled !== false && !disabled.has('terms'),
     shippingEnabled: bottomBar?.shippingEnabled !== false && !disabled.has('shipping'),
+    returnsEnabled: bottomBar?.returnsEnabled !== false && !disabled.has('returns'),
   };
 }
 

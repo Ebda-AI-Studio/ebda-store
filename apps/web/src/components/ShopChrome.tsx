@@ -234,6 +234,8 @@ export function ShopChrome({ children, layout: layoutProp }: ShopChromeProps) {
               termsEnabled: typeof bb.termsEnabled === 'boolean' ? bb.termsEnabled : undefined,
               shippingEnabled:
                 typeof bb.shippingEnabled === 'boolean' ? bb.shippingEnabled : undefined,
+              returnsEnabled:
+                typeof bb.returnsEnabled === 'boolean' ? bb.returnsEnabled : undefined,
             };
           }
           return {

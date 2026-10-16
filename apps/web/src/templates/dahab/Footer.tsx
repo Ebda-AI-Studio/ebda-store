@@ -13,6 +13,7 @@ import { AcceptedPaymentBadges } from '../../components/AcceptedPaymentBadges';
 import type { FooterProps } from '../types';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { PoweredByForce } from '../shared/PoweredByForce';
+import { FooterLegalRow } from '../shared/FooterLegalRow';
 import {
   footerBranchesHeading,
   resolveAddressHref,
@@ -37,6 +38,8 @@ export default function DahabFooter({
   socials,
   navigation = [],
   footerLinks,
+  disabledCmsSlugs,
+  urlPrefix,
   isRtl: isRtlProp,
   bgColor,
   footerLogo,
@@ -56,7 +59,6 @@ export default function DahabFooter({
   const sections = resolveFooterSections(footerLinks, isRtl);
   const socialLinks = getSocialLinks(socials, contact, theme?.socialOrder);
   const branches = resolveFooterBranches(locations, theme, isRtl);
-  const year = new Date().getFullYear();
 
   return (
     <footer
@@ -215,9 +217,17 @@ export default function DahabFooter({
           )}
         >
           <DahabPaymentMarks />
-          <p className="text-xs text-foreground/70">
-            © {year} {name}
-          </p>
+          {/* Legal row (S-01): privacy · terms · returns · ©, from resolveBottomBar.
+              Dahab's bar already has its hairline above. */}
+          <FooterLegalRow
+            footerLinks={footerLinks}
+            disabledCmsSlugs={disabledCmsSlugs}
+            storeName={name}
+            isRtl={isRtl}
+            urlPrefix={urlPrefix}
+            hairline={false}
+            className="text-xs text-foreground/70"
+          />
         </div>
         <div className={DAHAB_CONTAINER}>
           <PoweredByForce hidden={hidePoweredBy} />
