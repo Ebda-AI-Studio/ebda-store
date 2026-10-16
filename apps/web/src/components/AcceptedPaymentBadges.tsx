@@ -36,9 +36,11 @@ export function AcceptedPaymentBadges({
           className={
             variant === 'dahab'
               ? 'flex h-7 items-center rounded-[3px] border border-foreground/20 px-2.5 text-xs font-medium text-foreground/70'
-              : 'flex h-7 items-center rounded-[var(--radius)] border border-input px-2.5 text-xs font-medium text-muted-foreground'
+              : // P2-6: plain text; a bordered chip read as a button that did nothing (S-04).
+                'flex items-center gap-2 text-xs text-muted-foreground'
           }
         >
+          {variant !== 'dahab' && i > 0 && <span aria-hidden="true">·</span>}
           {t(badge.label, badge.labelAr)}
         </li>
       ))}
