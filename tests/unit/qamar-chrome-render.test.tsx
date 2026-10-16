@@ -217,3 +217,22 @@ describe('qamar type rules in globals.css (decision (a), T-02)', () => {
     );
   });
 });
+
+// a11y P2-10: the header wordmark link measured 34px (ar) and the desktop nav
+// links 20px. Every header control on every Qamar look clears 44px.
+describe('rule (d): Qamar header targets are 44px', () => {
+  for (const look of ['qamar.atelier', 'qamar.lookbook', 'qamar.vitrine'] as const) {
+    for (const lang of ['ar', 'en'] as const) {
+      it(`${look} ${lang}`, async () => {
+        const { JSDOM } = await import('jsdom');
+        const { smallTargets } = await import('../helpers/target-size');
+        setLook(look, lang);
+        const html = renderToStaticMarkup(
+          <QamarHeader branding={branding} navigation={nav} cartItemCount={2} />
+        );
+        const doc = new JSDOM(`<body>${html}</body>`).window.document;
+        expect(smallTargets(doc.body)).toEqual([]);
+      });
+    }
+  }
+});

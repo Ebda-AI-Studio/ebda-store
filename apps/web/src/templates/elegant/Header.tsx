@@ -220,7 +220,7 @@ export default function ElegantHeader({
             <Link
               key={item.href}
               href={item.href}
-              className="text-lg tracking-[0.18em] ui-caps-toggle text-muted-foreground hover:text-foreground transition-colors duration-500 ease-out cursor-pointer"
+              className="inline-flex min-h-11 items-center text-lg tracking-[0.18em] ui-caps-toggle text-muted-foreground hover:text-foreground transition-colors duration-500 ease-out cursor-pointer"
             >
               {isRtl && item.labelAr ? item.labelAr : item.label}
             </Link>

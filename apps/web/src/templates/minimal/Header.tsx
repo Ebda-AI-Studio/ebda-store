@@ -5,6 +5,9 @@ import Link from 'next/link';
 import { CartIcon } from '@ebda/ui';
 import { StoreLogo } from '../shared/StoreLogo';
 import { WORDMARK_NAV_LINK_CLASS, wordmarkClass } from '../shared/wordmark';
+
+/** a11y P2-10 / rule (d): header text links measured 16-20px; every one is a 44px target. */
+const HEADER_TARGET = 'inline-flex min-h-11 items-center';
 import type { HeaderProps } from '../types';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { LanguageSwitcher } from '../../components/LanguageSwitcher';
@@ -61,8 +64,9 @@ export default function MinimalHeader({
   const isCentre = logoPlacement === 'centre';
   // Only the qamar skin passes wordmarkSize (W2a T-01); undefined keeps the markup byte-identical.
   const navLinkClass = wordmarkSize
-    ? WORDMARK_NAV_LINK_CLASS
-    : 'text-xs tracking-[0.18em] ui-caps-toggle font-normal text-muted-foreground hover:text-foreground transition-colors duration-200';
+    ? `${HEADER_TARGET} ${WORDMARK_NAV_LINK_CLASS}`
+    : HEADER_TARGET +
+      ' text-xs tracking-[0.18em] ui-caps-toggle font-normal text-muted-foreground hover:text-foreground transition-colors duration-200';
   const displayName = isRtl && branding.nameAr ? branding.nameAr : branding.name;
   const displayLogo = isRtl && branding.logoAr ? branding.logoAr : branding.logo;
 
@@ -89,7 +93,7 @@ export default function MinimalHeader({
               every theme's logo MUST center on mobile. */}
           <Link
             href={urlPrefix || '/'}
-            className={`absolute left-1/2 -translate-x-1/2 md:relative md:left-auto md:translate-x-0 flex items-center justify-center flex-shrink-0 ${
+            className={`absolute left-1/2 -translate-x-1/2 md:relative md:left-auto md:translate-x-0 flex min-h-11 items-center justify-center flex-shrink-0 ${
               isCentre
                 ? 'min-w-0 max-w-[calc(100%-13rem)] md:max-w-[40vw] md:col-start-2'
                 : 'max-w-[65%] md:max-w-none'
@@ -289,7 +293,7 @@ export default function MinimalHeader({
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
               placeholder={t('Search...', 'بحث...')}
-              className="w-full text-center text-base sm:text-xs tracking-wide bg-transparent border-b border-input text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-foreground pb-2 transition-colors duration-200"
+              className="w-full text-center text-base sm:text-xs tracking-wide bg-transparent border-b border-input text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-foreground min-h-11 pb-2 transition-colors duration-200"
               dir={isRtl ? 'rtl' : 'ltr'}
               autoFocus={isSearchOpen}
               aria-label={t('Search products', 'بحث عن المنتجات')}
@@ -320,7 +324,7 @@ export default function MinimalHeader({
             : {})}
         >
           <nav aria-label={t('Menu', 'القائمة')} className="min-h-0 overflow-hidden">
-            <ul className="space-y-5 pb-6 text-center">
+            <ul className="space-y-1 pb-6 text-center">
               {navigation.map(item => (
                 <li key={item.href}>
                   <Link

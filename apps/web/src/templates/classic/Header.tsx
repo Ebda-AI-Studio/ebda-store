@@ -130,7 +130,7 @@ export default function ClassicHeader({
               <Link
                 key={item.href}
                 href={item.href}
-                className="relative whitespace-nowrap text-lg font-serif tracking-widest ui-caps-toggle text-foreground/70 hover:text-foreground transition-colors duration-500 after:absolute after:bottom-0 after:start-0 after:w-0 after:h-px after:bg-foreground after:transition-[width] after:duration-300 hover:after:w-full"
+                className="relative inline-flex min-h-11 items-center whitespace-nowrap text-lg font-serif tracking-widest ui-caps-toggle text-foreground/70 hover:text-foreground transition-colors duration-500 after:absolute after:bottom-0 after:start-0 after:w-0 after:h-px after:bg-foreground after:transition-[width] after:duration-300 hover:after:w-full"
               >
                 {isRtl && item.labelAr ? item.labelAr : item.label}
               </Link>
@@ -168,7 +168,7 @@ export default function ClassicHeader({
               <Link
                 key={item.href}
                 href={item.href}
-                className="relative whitespace-nowrap text-lg font-serif tracking-widest ui-caps-toggle text-foreground/70 hover:text-foreground transition-colors duration-500 after:absolute after:bottom-0 after:start-0 after:w-0 after:h-px after:bg-foreground after:transition-[width] after:duration-300 hover:after:w-full"
+                className="relative inline-flex min-h-11 items-center whitespace-nowrap text-lg font-serif tracking-widest ui-caps-toggle text-foreground/70 hover:text-foreground transition-colors duration-500 after:absolute after:bottom-0 after:start-0 after:w-0 after:h-px after:bg-foreground after:transition-[width] after:duration-300 hover:after:w-full"
               >
                 {isRtl && item.labelAr ? item.labelAr : item.label}
               </Link>

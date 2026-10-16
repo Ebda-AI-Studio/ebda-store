@@ -91,7 +91,7 @@ export default function BoldHeader({
                 <Link
                   key={item.href}
                   href={item.href}
-                  className="relative whitespace-nowrap px-2 py-2 text-base font-bold ui-caps-toggle tracking-wider text-white/70 lg:px-4 lg:text-lg hover:text-white transition-colors duration-200 group cursor-pointer"
+                  className="relative inline-flex min-h-11 items-center whitespace-nowrap px-2 py-2 text-base font-bold ui-caps-toggle tracking-wider text-white/70 lg:px-4 lg:text-lg hover:text-white transition-colors duration-200 group cursor-pointer"
                 >
                   {isRtl && item.labelAr ? item.labelAr : item.label}
                   <span className="absolute bottom-0 inset-x-2 lg:inset-x-4 h-0.5 bg-primary scale-x-0 group-hover:scale-x-100 transition-transform duration-200 origin-left" />
