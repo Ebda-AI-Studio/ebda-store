@@ -23,7 +23,7 @@ import {
 } from '@ebda/shared';
 import { useLocale } from 'next-intl';
 import { useT } from '@/i18n/useT';
-import { apiDelete, apiGet, apiPut, getApiUrl } from '../../../../../../lib/api';
+import { adminUiLocale, apiDelete, apiGet, apiPut, getApiUrl } from '../../../../../../lib/api';
 import { useFeatures } from '../../../../../../hooks/useFeatures';
 import { uploadErrorText } from '../../../../../../hooks/useImageUpload';
 import { ImageUpload } from '../../../../../../components/ImageUpload';
@@ -242,7 +242,7 @@ export function Product3dModelCard({ storeId, productId }: { storeId: string; pr
     setNotice(null);
     const check = validateGlb(new Uint8Array(await file.arrayBuffer()));
     if (!check.ok) {
-      toastError(t('uploadFailed'), model3dErrorMessage(check.code, locale));
+      toastError(t('uploadFailed'), model3dErrorMessage(check.code, adminUiLocale()));
       return;
     }
     setBusy(true);
@@ -273,7 +273,7 @@ export function Product3dModelCard({ storeId, productId }: { storeId: string; pr
     if (!file) return;
     const check = validateUsdz(new Uint8Array(await file.arrayBuffer()));
     if (!check.ok) {
-      toastError(t('uploadFailed'), model3dErrorMessage(check.code, locale));
+      toastError(t('uploadFailed'), model3dErrorMessage(check.code, adminUiLocale()));
       return;
     }
     setBusy(true);

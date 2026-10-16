@@ -21,3 +21,15 @@ describe('upload error language has one source of truth', () => {
     expect(src).not.toMatch(/locale\s*===\s*'ar'\s*\?\s*\w+\??\.messageAr/);
   });
 });
+
+describe('Product3dModelCard error text uses the same language source (review M-5)', () => {
+  it('its client-side validation errors pick the language via adminUiLocale(), not useLocale()', () => {
+    const src = readFileSync(
+      'apps/admin/src/app/stores/[id]/products/[productId]/_components/Product3dModelCard.tsx',
+      'utf8'
+    );
+    const calls = src.match(/model3dErrorMessage\([^)]*\)/g) ?? [];
+    expect(calls.length).toBeGreaterThan(0);
+    for (const call of calls) expect(call).toMatch(/adminUiLocale\(\)/);
+  });
+});

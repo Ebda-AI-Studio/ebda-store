@@ -37,3 +37,16 @@ describe('upload error text follows the admin language', () => {
     expect(uploadErrorText(undefined, 'fallback')).toBe('fallback');
   });
 });
+
+describe('adminUiLocale: the one language source for admin error text', () => {
+  it('is ar under rtl and en otherwise, the rule localizedApiMessage uses', async () => {
+    const { adminUiLocale, localizedApiMessage } = await import('../../apps/admin/src/lib/api');
+    const details = { messageEn: 'E', messageAr: 'ع' };
+    document.documentElement.dir = 'rtl';
+    expect(adminUiLocale()).toBe('ar');
+    expect(localizedApiMessage(undefined, 'm', details)).toBe('ع');
+    document.documentElement.dir = 'ltr';
+    expect(adminUiLocale()).toBe('en');
+    expect(localizedApiMessage(undefined, 'm', details)).toBe('E');
+  });
+});
