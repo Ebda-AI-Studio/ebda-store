@@ -65,7 +65,7 @@ function sign(payload: string): string {
  * Issue a form token: `<issuedAtMs>.<nonce>.<hmac(issuedAtMs.nonce)>`. Stateless; single use is
  * enforced at submit by claiming the signature. The nonce makes two tokens issued in the same
  * millisecond distinct: without it they were byte-identical and the second visitor's submit was
- * refused as already used (Ruling FU46-8). 9 random bytes from node `randomBytes` (nodejs_compat on Workers) = 12
+ * refused as already used (Ruling FU46-11). 9 random bytes from node `randomBytes` (nodejs_compat on Workers) = 12
  * base64url characters.
  */
 export function issueSignupFormToken(now: number = Date.now()): string {
@@ -84,8 +84,8 @@ export function verifySignupFormToken(
 ): { verdict: FormTokenVerdict; sig?: string } {
   if (typeof token !== 'string') return { verdict: 'invalid' };
   const parts = token.split('.');
-  // 3 parts since FU46-8; 2 parts = a token issued before it, accepted until it ages out.
-  // TODO(remove after 2026-10-23): drop the legacy 2-part branch once every pre-FU46-8 token has expired.
+  // 3 parts since FU46-11; 2 parts = a token issued before it, accepted until it ages out.
+  // TODO(remove after 2026-10-23): drop the legacy 2-part branch once every pre-FU46-11 token has expired.
   if (parts.length !== 2 && parts.length !== 3) return { verdict: 'invalid' };
   const ts = parts[0];
   const nonce = parts.length === 3 ? parts[1] : null;

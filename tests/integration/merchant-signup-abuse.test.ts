@@ -127,7 +127,7 @@ describe('signup gate (route)', () => {
     expect(signupMock).not.toHaveBeenCalled();
   });
 
-  it('two tokens issued in the same millisecond are distinct and each verifies (FU46-8)', () => {
+  it('two tokens issued in the same millisecond are distinct and each verifies (FU46-11)', () => {
     const at = Date.now() - 10_000;
     const a = issueSignupFormToken(at);
     const b = issueSignupFormToken(at);
@@ -137,13 +137,13 @@ describe('signup gate (route)', () => {
     expect(verifySignupFormToken(a).sig).not.toBe(verifySignupFormToken(b).sig);
   });
 
-  it('a tampered nonce, or a token from before FU46-8, is handled', () => {
+  it('a tampered nonce, or a token from before FU46-11, is handled', () => {
     const [ts, nonce, sig] = issueSignupFormToken(Date.now() - 10_000).split('.');
     expect(verifySignupFormToken(`${ts}.${nonce.slice(1)}x.${sig}`).verdict).toBe('invalid');
     expect(verifySignupFormToken(`${ts}.${sig}`).verdict).toBe('invalid');
   });
 
-  it('two forms opened in the same millisecond each submit once (FU46-8, frozen clock)', async () => {
+  it('two forms opened in the same millisecond each submit once (FU46-11, frozen clock)', async () => {
     const t0 = Date.now();
     vi.useFakeTimers({ toFake: ['Date'] });
     try {
@@ -180,7 +180,7 @@ describe('signup gate (route)', () => {
     }
   });
 
-  it('a genuine pre-FU46-8 token (<ms>.<hmac(ms)>) still verifies until it ages out', () => {
+  it('a genuine pre-FU46-11 token (<ms>.<hmac(ms)>) still verifies until it ages out', () => {
     const ts = String(Date.now() - 10_000);
     const legacySig = crypto
       .createHmac('sha256', `${process.env.JWT_SECRET}:merchant-signup-form`)
