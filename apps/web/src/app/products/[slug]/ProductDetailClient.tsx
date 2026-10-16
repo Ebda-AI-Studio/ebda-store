@@ -165,12 +165,15 @@ interface ProductDetailClientProps {
   layout?: StoreLayoutSettings;
   /** Server-read COD offer for the trust line (S-02); null/absent = no COD claim. */
   codOffer?: CodOffer | null;
+  /** Canonical page URL from the server, for the share row. Absent -> read after hydration. */
+  shareUrl?: string;
 }
 
 export default function ProductDetailClient({
   initialProduct,
   layout,
   codOffer = null,
+  shareUrl,
 }: ProductDetailClientProps) {
   const params = useParams();
   const slug = params?.slug as string;
@@ -814,7 +817,7 @@ export default function ProductDetailClient({
                   disabled={noteMissing}
                   onBlocked={() => setNoteNudge(n => n + 1)}
                 />
-                <ShareProductRow productName={displayName} />
+                <ShareProductRow productName={displayName} url={shareUrl} />
               </>
             }
             selectedImage={selectedImage}
@@ -1243,6 +1246,7 @@ export default function ProductDetailClient({
               />
               <ShareProductRow
                 productName={language === 'ar' && product.nameAr ? product.nameAr : product.name}
+                url={shareUrl}
                 className="mt-6 border-t border-border pt-6"
               />
               <SpecTable

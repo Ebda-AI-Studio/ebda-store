@@ -131,7 +131,10 @@ export async function BlogPostBody({ store, slug }: { store: ResolvedStore; slug
           dangerouslySetInnerHTML={{ __html: jsonLdScriptContent(jsonLd) }}
         />
       )}
-      <BlogPostClient post={post} />
+      <BlogPostClient
+        post={post}
+        shareUrl={post ? storeAbsoluteUrl(store, `/blog/${slug}`) : undefined}
+      />
     </>
   );
 }

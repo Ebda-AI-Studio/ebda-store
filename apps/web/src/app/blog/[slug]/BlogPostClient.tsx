@@ -33,7 +33,14 @@ export interface BlogDetail {
  * supply plain text only, so the XSS surface stays at zero (unchanged from the
  * original client-only implementation).
  */
-export function BlogPostClient({ post }: { post: BlogDetail | null }) {
+export function BlogPostClient({
+  post,
+  shareUrl,
+}: {
+  post: BlogDetail | null;
+  /** Canonical post URL from the server, for the share row. */
+  shareUrl?: string;
+}) {
   const { isRtl } = useLanguage();
   const numerals = useStoreNumerals();
   const storeUrl = useStoreUrl();
@@ -105,6 +112,7 @@ export function BlogPostClient({ post }: { post: BlogDetail | null }) {
 
               <ShareProductRow
                 productName={isRtl && post.titleAr ? post.titleAr : post.title}
+                url={shareUrl}
                 className="mt-10 border-t border-foreground/10 pt-6"
               />
             </>

@@ -273,7 +273,15 @@ export async function ProductDetailBody({
       {jsonLdScripts.map((jsonLd, i) => (
         <JsonLd key={i} data={jsonLd} />
       ))}
-      <ProductDetailClient initialProduct={initialProduct} layout={layout} codOffer={codOffer} />
+      <ProductDetailClient
+        initialProduct={initialProduct}
+        layout={layout}
+        codOffer={codOffer}
+        // Canonical, store-aware URL for the share row: real in the server HTML and before hydration.
+        shareUrl={
+          initialProduct ? storeAbsoluteUrl(store, `/products/${initialProduct.slug}`) : undefined
+        }
+      />
     </>
   );
 }
