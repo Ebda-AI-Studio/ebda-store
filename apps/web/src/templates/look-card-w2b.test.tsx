@@ -432,3 +432,22 @@ describe('PecannbeeProductCard keyboard stops (R-12)', () => {
     if (view) expect(view.getAttribute('aria-label')).toBe('عرض منتج sized');
   });
 });
+
+// T-03 + decision (a) (W3): a look's display face (Cormorant, Playfair, Archivo) is set at >= 24px;
+// the related-products strip heading was 20px on every store. A store with no look keeps 20px.
+describe('relatedHeadingSize', () => {
+  it('24px on a look store, 20px without a look; both related strips use it', async () => {
+    const { relatedHeadingSize } = await import('./shared/look-card');
+    expect(relatedHeadingSize('qamar.atelier')).toBe('24px');
+    expect(relatedHeadingSize(null)).toBe('20px');
+    const fs = await import('node:fs');
+    const p = await import('node:path');
+    for (const f of [
+      '../components/YouMightAlsoLike.tsx',
+      '../app/products/[slug]/ProductDetailClient.tsx',
+    ])
+      expect(fs.readFileSync(p.resolve(__dirname, f), 'utf8'), f).toContain(
+        'relatedHeadingSize(store.look)'
+      );
+  });
+});

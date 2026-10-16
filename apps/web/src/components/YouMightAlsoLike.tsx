@@ -1,5 +1,6 @@
 'use client';
 
+import { relatedHeadingSize } from '../templates/shared/look-card';
 import {
   useProductRecommendations,
   selectMergedRecommendations,
@@ -98,7 +99,7 @@ export function YouMightAlsoLike({ storeId, productId }: YouMightAlsoLikeProps) 
         products={products.map(recommendedToTemplateProduct)}
         title="You Might Also Like"
         titleAr="قد يعجبك أيضاً"
-        headingZone={{ fontSize: '20px' }}
+        headingZone={{ fontSize: relatedHeadingSize(store.look) }}
         isRtl={isRtl}
         currency={store.currency}
         pack={templateId}

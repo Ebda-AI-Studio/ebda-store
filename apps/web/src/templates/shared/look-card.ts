@@ -87,3 +87,11 @@ export function overPhotoHeartCls(material: 'soft' | 'bare', wishlisted: boolean
     ? `absolute top-1 start-1 z-20 inline-flex h-11 w-11 items-center justify-center [filter:drop-shadow(0_0_1px_rgb(255_255_255/0.95))] transition-colors duration-[var(--duration-base)] cursor-pointer ${ink}`
     : `before:absolute before:-inset-1.5 before:content-[''] absolute top-3 start-3 z-20 inline-flex h-10 w-10 items-center justify-center rounded-full bg-white/95 shadow-[0_8px_20px_-8px_rgb(20_20_20/0.30)] transition-[background-color,color] duration-[var(--duration-base)] hover:bg-white cursor-pointer ${ink}`;
 }
+
+/**
+ * The related-products strip heading (T-03, decision (a)): a look's display face is never set under
+ * 24px; a store with no look keeps the compact 20px strip heading.
+ */
+export function relatedHeadingSize(look: string | null | undefined): '24px' | '20px' {
+  return getLook(look) ? '24px' : '20px';
+}

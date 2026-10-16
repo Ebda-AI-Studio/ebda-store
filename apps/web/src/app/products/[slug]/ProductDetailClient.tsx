@@ -51,6 +51,7 @@ import { REGION } from '@ebda/shared';
 import { FactsTable } from '../../../components/commerce/FactsTable';
 import { DeliveryChip } from '../../../components/commerce/DeliveryChip';
 import { TrustLine } from '../../../components/commerce/TrustLine';
+import { relatedHeadingSize } from '../../../templates/shared/look-card';
 import type { CodOffer } from '../../../lib/cod-offer';
 import { Breadcrumbs } from '../../../components/Breadcrumbs';
 import { canBuyNow, inStockNow } from '../../../lib/can-buy-now';
@@ -317,7 +318,7 @@ export default function ProductDetailClient({
   // scale: cap it at ~20px (text-xl) unless the merchant set a PDP heading zone.
   const relatedHeadingZone = pdpHeadingZone?.fontSize
     ? pdpHeadingZone
-    : { ...(pdpHeadingZone || {}), fontSize: '20px' };
+    : { ...(pdpHeadingZone || {}), fontSize: relatedHeadingSize(store.look) };
   const pdpScale = pageTextScale(pdp?.textScale);
   const pdpDensity = pageDensityStyle(pdp?.density);
   // Decision (b), L-03 (W2a): an image-led look (`density: 'airy'`, design.md § "Image-led looks")
