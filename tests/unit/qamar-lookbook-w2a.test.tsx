@@ -81,6 +81,17 @@ describe('LB-01 inverse band', () => {
     expect(style['--background']).toBe(theme.foregroundColor);
   });
 
+  // W2b (live, Lookbook /search 390): text that INHERITS (an h1 with no colour class) kept the
+  // page's light ink, and `text-primary` prices / chips were saffron on the light band (1.9:1).
+  it('the band sets its own text colour and remaps primary to the ink pair (fills stay readable)', () => {
+    expect(style.color).toBe(hsl(theme.backgroundColor));
+    expect(style['--primary']).toBe(theme.backgroundColor);
+    expect(style['--primary-foreground']).toBe(theme.foregroundColor);
+    expect(style['--ring']).toBe(theme.backgroundColor);
+    // the accent (sale / new chips) keeps saffron on indigo ink, 7.11:1
+    expect(style['--accent']).toBeUndefined();
+  });
+
   it('every text pair on the band is >= 4.5:1 (ink, prices, the 70% link), the button keeps its pair', () => {
     const band = look.tokens.ink; // #F4F1FA
     const text = look.tokens.page; // #1E2340

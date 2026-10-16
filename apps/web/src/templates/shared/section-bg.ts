@@ -38,6 +38,8 @@ function inverseBandStyle(theme: StoreTheme): CSSProperties | undefined {
   const hairline = triplet(theme.mutedForeground) || page;
   return {
     backgroundColor: `hsl(${ink})`,
+    // Inherited text (an h1 with no colour class) reads the band, not the page (W2b).
+    color: `hsl(${page})`,
     '--background': ink,
     '--foreground': page,
     '--card': ink,
@@ -50,6 +52,12 @@ function inverseBandStyle(theme: StoreTheme): CSSProperties | undefined {
     '--secondary-foreground': page,
     '--border': hairline,
     '--input': page,
+    // A light look primary (Lookbook saffron) is unreadable as TEXT on the band (1.9:1): primary
+    // takes the band's ink pair, so `text-primary` prices and `bg-primary` fills both read. The
+    // accent (chips) keeps its own pair.
+    '--primary': page,
+    '--primary-foreground': ink,
+    '--ring': page,
     '--bg-page': ink,
   } as CSSProperties;
 }

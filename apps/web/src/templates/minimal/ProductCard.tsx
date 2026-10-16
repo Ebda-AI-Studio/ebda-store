@@ -3,7 +3,13 @@
 import { memo } from 'react';
 import { canBuyNow } from '@/lib/can-buy-now';
 import { resolveProductCardCtaOosDefaults } from '../shared/product-card-defaults';
-import { lookCardCta, lookCtaVisible } from '../shared/look-card';
+import {
+  lookCardCta,
+  lookCtaVisible,
+  lookChip,
+  LOOK_CHIP_CLS,
+  LOOK_CHIP_STYLE,
+} from '../shared/look-card';
 import Link from 'next/link';
 import Image from 'next/image';
 import type { ProductCardProps } from '../types';
@@ -150,6 +156,7 @@ function MinimalProductCard({
   } = resolveProductCardCtaOosDefaults(layout);
   // Look card action (W2b, L-01): undefined on a store with no look.
   const lookCta = lookCardCta(store.theme, layout);
+  const chip = lookChip(store.theme);
   // Discount/sale badge — minimal's badge is inline text below the price
   // (no corner overlay by design, "minimal pack stays chrome-free"), so
   // only the merchant-configurable COLOR applies here; the position field
@@ -245,7 +252,12 @@ function MinimalProductCard({
               implicit gating in caller order. */}
           {product.inStock !== false && isProductNew(product, renderNow) && (
             <span
-              className="absolute top-2 start-2 z-10 px-2 py-0.5 text-xs font-medium uppercase tracking-[0.18em] text-[hsl(var(--primary))] bg-background"
+              className={
+                chip
+                  ? cn(LOOK_CHIP_CLS, 'top-2 start-2')
+                  : 'absolute top-2 start-2 z-10 px-2 py-0.5 text-xs font-medium uppercase tracking-[0.18em] text-[hsl(var(--primary))] bg-background'
+              }
+              style={chip ? LOOK_CHIP_STYLE : undefined}
               aria-label={t('New product', 'منتج جديد')}
             >
               {isRtl ? 'جديد' : 'NEW'}
@@ -263,10 +275,16 @@ function MinimalProductCard({
           {customBadgeText && (
             <span
               className={cn(
-                'pointer-events-none absolute z-10 px-2 py-0.5 text-xs font-medium uppercase tracking-[0.18em] text-white',
+                chip
+                  ? LOOK_CHIP_CLS
+                  : 'pointer-events-none absolute z-10 px-2 py-0.5 text-xs font-medium uppercase tracking-[0.18em] text-white',
                 customBadgePositionCls
               )}
-              style={{ backgroundColor: customBadgeColor, color: customBadgeTextColor }}
+              style={
+                chip && !defaults?.customBadge?.color
+                  ? LOOK_CHIP_STYLE
+                  : { backgroundColor: customBadgeColor, color: customBadgeTextColor }
+              }
             >
               {customBadgeText}
             </span>

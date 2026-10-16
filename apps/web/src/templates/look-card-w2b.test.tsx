@@ -383,3 +383,26 @@ describe('PecannbeeProductCard NEW chip never shares the heart corner', () => {
     }
   });
 });
+
+describe('minimal/ProductCard chips (the Qamar search grid) follow cardBadge', () => {
+  const card = () =>
+    render(
+      React.createElement(
+        MinimalProductCard as never,
+        {
+          product: { ...product('plain'), isNew: true },
+          isRtl: true,
+        } as never
+      )
+    ).container.querySelector('[aria-label="منتج جديد"]') as HTMLElement;
+  it('no look: the quiet tracked primary text chip, unchanged', () => {
+    selectLook(null);
+    expect(card().className).toContain('tracking-[0.18em]');
+  });
+  it('a look with cardBadge accent: the accent chip on the radius', () => {
+    selectLook('qamar.lookbook');
+    const c = card();
+    expect(c.className).toContain('rounded-[var(--radius)]');
+    expect(c.getAttribute('style')).toContain('hsl(var(--accent))');
+  });
+});
