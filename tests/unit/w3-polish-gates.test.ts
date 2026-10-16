@@ -46,3 +46,19 @@ describe('M-04: no transition-all in the storefront (it animates layout and ever
     expect(hits).toEqual([]);
   });
 });
+
+describe('Y-07 / T-07: PDP range and stepper glyphs', () => {
+  const pdp = read('app/products/[slug]/ProductDetailClient.tsx');
+  it('Y-07: an English price range reads "to", never an en dash', () => {
+    expect(pdp).not.toMatch(
+      /\$\{formatPrice\(minVariantPrice\)\} – \$\{formatPrice\(maxVariantPrice\)\}`\s*:/
+    );
+    expect(pdp).toMatch(
+      /t\(\s*`\$\{formatPrice\(minVariantPrice\)\} to \$\{formatPrice\(maxVariantPrice\)\}`/
+    );
+  });
+  it('T-07: the decrease button shows a real minus (U+2212), aria-hidden, not an ASCII hyphen', () => {
+    expect(pdp).not.toMatch(/>\s*-\s*<\/button>/);
+    expect(pdp).toContain('<span aria-hidden="true">−</span>');
+  });
+});

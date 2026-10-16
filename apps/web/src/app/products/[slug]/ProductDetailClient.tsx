@@ -667,7 +667,11 @@ export default function ProductDetailClient({
       : t('Cart', 'السلة');
   const priceText =
     pricing.mode === 'range' && minVariantPrice !== null && maxVariantPrice !== null
-      ? `${formatPrice(minVariantPrice)} – ${formatPrice(maxVariantPrice)}`
+      ? // Y-07: English reads a range in words; Arabic keeps the dash between the two prices.
+        t(
+          `${formatPrice(minVariantPrice)} to ${formatPrice(maxVariantPrice)}`,
+          `${formatPrice(minVariantPrice)} – ${formatPrice(maxVariantPrice)}`
+        )
       : formatPrice(displayPrice);
   // The WhatsApp order/ask button carries the typed note and follows the SAME
   // required-personalisation gate as add-to-cart.
@@ -1135,7 +1139,7 @@ export default function ProductDetailClient({
                       aria-label={t('Decrease quantity', 'تقليل الكمية')}
                       className="flex h-11 min-w-11 items-center justify-center px-4 text-muted-foreground hover:bg-muted cursor-pointer"
                     >
-                      -
+                      <span aria-hidden="true">−</span>
                     </button>
                     <span aria-live="polite" className="w-12 text-center font-medium">
                       {localize(quantity)}
