@@ -44,8 +44,10 @@ describe('PersonalisationField', () => {
     const input = screen.getByLabelText(/الاسم للتطريز/) as HTMLInputElement;
     expect(input.maxLength).toBe(12);
     expect(input.required).toBe(true);
-    // first paint: counter only, no "fill it in first" yet
+    // first paint: no "fill it in first" yet, and (Y-04) no counter before the shopper types
     expect(screen.queryByText('اكتب الاسم للتطريز أولاً')).toBeNull();
+    expect(screen.queryByText('0/12')).toBeNull();
+    fireEvent.focus(input);
     expect(screen.getByText('0/12')).toBeTruthy();
     fireEvent.blur(input);
     expect(screen.getByText('اكتب الاسم للتطريز أولاً')).toBeTruthy();
@@ -104,5 +106,24 @@ describe('personalisationMissing (feeds the single add-to-cart disabled rule)', 
     expect(personalisationMissing({ ...cfg, required: false }, '')).toBe(false);
     expect(personalisationMissing({ ...cfg, enabled: false }, '')).toBe(false);
     expect(personalisationMissing(null, '')).toBe(false);
+  });
+});
+
+// Y-04 (W3): an optional field says so, and the input shows an example.
+describe('PersonalisationField optional marker and example', () => {
+  it('optional: "(اختياري)" after the label; required: the asterisk only', () => {
+    render(
+      <PersonalisationField config={{ ...cfg, required: false }} value="" onChange={() => {}} />
+    );
+    expect(screen.getByText('(اختياري)')).toBeTruthy();
+    cleanup();
+    render(<PersonalisationField config={cfg} value="" onChange={() => {}} />);
+    expect(screen.queryByText('(اختياري)')).toBeNull();
+  });
+  it('the input carries an example placeholder in the page language', () => {
+    render(<PersonalisationField config={cfg} value="" onChange={() => {}} />);
+    expect((screen.getByLabelText(/الاسم للتطريز/) as HTMLInputElement).placeholder).toBe(
+      'مثال: منى'
+    );
   });
 });

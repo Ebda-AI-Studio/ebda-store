@@ -48,6 +48,8 @@ export function PersonalisationField({
   const id = useId();
   const input = useRef<HTMLInputElement>(null);
   const [touched, setTouched] = useState(false);
+  // Y-04: the counter waits for the shopper (focus or a typed character).
+  const [focused, setFocused] = useState(false);
 
   useEffect(() => {
     if (nudge <= 0) return;
@@ -75,9 +77,13 @@ export function PersonalisationField({
     <div className={className ?? 'mt-6'}>
       <label htmlFor={id} className="block text-sm font-medium text-foreground">
         <bdi>{label}</bdi>
-        {cfg.required && (
+        {cfg.required ? (
           <span aria-hidden="true" className="ms-0.5 text-muted-foreground">
             *
+          </span>
+        ) : (
+          <span className="ms-1 font-normal text-muted-foreground">
+            {t('(optional)', '(اختياري)')}
           </span>
         )}
       </label>
@@ -95,7 +101,12 @@ export function PersonalisationField({
         autoComplete="off"
         enterKeyHint="done"
         onChange={e => onChange(e.target.value)}
-        onBlur={() => setTouched(true)}
+        onFocus={() => setFocused(true)}
+        onBlur={() => {
+          setTouched(true);
+          setFocused(false);
+        }}
+        placeholder={t('e.g. Mona', 'مثال: منى')}
         className="mt-2 block h-11 w-full rounded-[var(--radius)] border border-input bg-background px-3 text-base text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:max-w-sm"
       />
       <p
@@ -105,9 +116,11 @@ export function PersonalisationField({
         <span data-testid="personalisation-hint">
           {missing && touched ? t(`Fill in “${label}” first`, `اكتب ${label} أولاً`) : ''}
         </span>
-        <span className="tabular-nums" aria-label={t('Characters used', 'عدد الحروف')}>
-          {localize(value.length)}/{localize(cfg.maxLength)}
-        </span>
+        {(focused || value.length > 0) && (
+          <span className="tabular-nums" aria-label={t('Characters used', 'عدد الحروف')}>
+            {localize(value.length)}/{localize(cfg.maxLength)}
+          </span>
+        )}
       </p>
     </div>
   );
