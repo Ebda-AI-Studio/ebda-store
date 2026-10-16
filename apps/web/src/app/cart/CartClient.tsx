@@ -287,6 +287,8 @@ export default function CartClient() {
   // The server is still the source of truth for the discount amount; if the
   // stored code is no longer valid we silently drop it.
   const autoAppliedRef = useRef(false);
+  // Taste re-audit P2-3: the sticky total waits until the summary checkout button leaves view.
+  const summaryRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (autoAppliedRef.current) return;
     if (!cartIsReady || !store.id || cartTotal === 0) return;
@@ -803,7 +805,7 @@ export default function CartClient() {
 
                 {/* Order Summary */}
                 <div className="mt-8 lg:col-span-4 lg:mt-0">
-                  <div className="sticky top-24 space-y-6">
+                  <div ref={summaryRef} className="sticky top-24 space-y-6">
                     {T?.OrderSummary ? (
                       <T.OrderSummary
                         subtotal={subtotal}
@@ -1144,7 +1146,11 @@ export default function CartClient() {
                               {t(CART_CHECKOUT_CTA.en, CART_CHECKOUT_CTA.ar)}
                             </Button>
                           ) : (
-                            <Link href={storeUrl('/checkout')} className="mt-6 block">
+                            <Link
+                              href={storeUrl('/checkout')}
+                              data-cta="button"
+                              className="mt-6 block"
+                            >
                               <Button className="w-full gap-2 rounded-[var(--radius)]" size="lg">
                                 {t(CART_CHECKOUT_CTA.en, CART_CHECKOUT_CTA.ar)}
                                 <ArrowIcon className="h-5 w-5" isRtl={language === 'ar'} />
@@ -1225,6 +1231,7 @@ export default function CartClient() {
         label={t(CART_CHECKOUT_CTA.en, CART_CHECKOUT_CTA.ar)}
         disabled={checkoutBlocked}
         blockedMessage={checkoutBlockedMessage}
+        anchorRef={summaryRef}
       />
     </ShopChrome>
   );
