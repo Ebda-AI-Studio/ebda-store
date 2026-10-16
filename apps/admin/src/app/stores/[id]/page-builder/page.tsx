@@ -668,6 +668,11 @@ export default function StoreLayoutPage() {
                         label={t('sections.hero.textAnchorBottomStart')}
                       />
                     </div>
+                    {layout.hero.textAnchor === 'bottom-start' && (
+                      <p className="-mt-2 mb-4 text-xs text-muted-foreground">
+                        {t('sections.hero.textAnchorHint')}
+                      </p>
+                    )}
                   </>
                 )}
                 {/* Autoplay only matters in slider mode — hide it entirely

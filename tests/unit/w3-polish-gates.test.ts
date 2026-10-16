@@ -71,3 +71,31 @@ describe('M-3 (B1-57 parked): shared builder sections never use the accent as TE
     expect(hits.map(f => path.relative(WEB, f))).toEqual([]);
   });
 });
+
+describe('M-6 (B1-57 parked): the editor says why the headline colour is not used under the photo', async () => {
+  const { getSectionDefinition } = await import('@ebda/shared');
+  it('the hero textAnchor setting carries a bilingual hint (document editor)', () => {
+    const d = getSectionDefinition('hero')!.settings.find(s => s.id === 'textAnchor')!;
+    expect(d.hintEn).toMatch(/phones and tablets/i);
+    expect(d.hintAr).toBeTruthy();
+    const panel = readFileSync(
+      path.resolve(WEB, '../../admin/src/app/stores/[id]/builder/_components/SettingsPanel.tsx'),
+      'utf8'
+    );
+    expect(panel).toContain('def.hintEn');
+  });
+  it('the classic editor shows the same hint when Bottom corner is picked', () => {
+    const page = readFileSync(
+      path.resolve(WEB, '../../admin/src/app/stores/[id]/page-builder/page.tsx'),
+      'utf8'
+    );
+    expect(page).toContain("t('sections.hero.textAnchorHint')");
+    for (const l of ['en', 'ar']) {
+      const msgs = readFileSync(
+        path.resolve(WEB, `../../admin/src/i18n/messages/${l}.json`),
+        'utf8'
+      );
+      expect(msgs, l).toContain('"textAnchorHint"');
+    }
+  });
+});

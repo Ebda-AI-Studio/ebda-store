@@ -56,6 +56,9 @@ export interface SettingDefinition {
   localized?: boolean;
   /** Viewports this setting may be overridden on (`responsive.<viewport>.settings`). */
   responsive?: readonly Viewport[];
+  /** A one-line explanation under the control (bilingual), for a choice with a side effect. */
+  hintEn?: string;
+  hintAr?: string;
 }
 
 const opt = (value: string | number, labelEn: string, labelAr: string): SettingOption => ({

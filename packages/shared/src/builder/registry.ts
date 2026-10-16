@@ -254,10 +254,22 @@ export const SECTION_REGISTRY: readonly SectionDefinition[] = [
         opt('none', 'None', 'بدون'),
         opt('line', 'Hairline', 'خط رفيع'),
       ]),
-      s.select('textAnchor', 'Text position', 'موضع النص', [
-        opt('center', 'Centre', 'في المنتصف'),
-        opt('bottom-start', 'Bottom corner', 'في الركن السفلي'),
-      ]),
+      s.select(
+        'textAnchor',
+        'Text position',
+        'موضع النص',
+        [
+          opt('center', 'Centre', 'في المنتصف'),
+          opt('bottom-start', 'Bottom corner', 'في الركن السفلي'),
+        ],
+        {
+          // M-6 (B1-48): below xl the anchored copy leaves the photo, so its colour is the page's.
+          hintEn:
+            'On phones and tablets the text sits under the photo in the page colours, so the headline colour applies only on large screens.',
+          hintAr:
+            'على الجوال والتابلت يظهر النص أسفل الصورة بألوان الصفحة، لذا يُطبَّق لون العنوان على الشاشات الكبيرة فقط.',
+        }
+      ),
       ...styleSettings(),
     ],
   }),
