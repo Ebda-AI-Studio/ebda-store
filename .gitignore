@@ -179,6 +179,10 @@ dist-cf/
 
 # Generated deployment binding IDs; committed fallback stays local-only.
 apps/api/.wrangler.deploy.jsonc
+# workerd smoke copy of the API config without the AI binding (scripts/ci/workerd-smoke.mjs)
+apps/api/.wrangler.smoke.jsonc
+# local dev copy of the API config without the AI binding (scripts/cf-api-local-config.mjs)
+apps/api/.wrangler.local.jsonc
 
 # Isolated preview stack configs (scripts/preview/preview-config.mjs)
 apps/*/.wrangler.preview.jsonc

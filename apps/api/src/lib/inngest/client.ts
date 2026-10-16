@@ -337,6 +337,14 @@ type LegalNoticeSendRequestedEvent = EventPayload & {
   data: { sendId: string; docKey: string; version: string; sentBy: string };
 };
 
+// Search program Task 11: ask the product embedding indexer to look at one store (debounced per
+// store). Sent by every product-text writer outside ProductService.create/update, the backstop cron
+// and the indexer's own continuation.
+type SearchStoreReindexRequestedEvent = EventPayload & {
+  name: 'search/store.reindex-requested';
+  data: { storeId: string; reason: string };
+};
+
 export type AppEvent =
   | OrderCreatedEvent
   | BulkImportStartedEvent
@@ -371,7 +379,8 @@ export type AppEvent =
   | ContactFormSubmittedEvent
   | CampaignSendRequestedEvent
   | EbdaAdsConversionRequestedEvent
-  | LegalNoticeSendRequestedEvent;
+  | LegalNoticeSendRequestedEvent
+  | SearchStoreReindexRequestedEvent;
 
 // Inngest re-registers the function manifest only when it detects a
 // deploy-version change. Without an explicit deploy id, Railway boots

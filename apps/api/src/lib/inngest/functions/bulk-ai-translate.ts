@@ -7,6 +7,7 @@ import { callWithRetry } from '../ai-retry';
 import { inngest } from '../client';
 import { BULK_AI_BATCH_SIZE, chunk } from '../batch-utils';
 import { invalidateStoreProductCaches } from '../../public-cache';
+import { requestStoreReindex } from '../../search/reindex';
 
 /**
  * Catalogue-wide translation sweep. Walks every product + category
@@ -165,6 +166,7 @@ const bulkAiTranslateFn = inngest.createFunction(
           let bSkipped = 0;
           let bFailed = 0;
           let bQuotaReached = false;
+          let bProductsWritten = 0;
           const bErrors: BulkError[] = [];
 
           async function recordError(err: BulkError) {
@@ -265,6 +267,7 @@ const bulkAiTranslateFn = inngest.createFunction(
               if (Object.keys(updates).length > 0) {
                 try {
                   await prisma.product.update({ where: { id: p.id, storeId }, data: updates });
+                  bProductsWritten++;
                 } catch (err) {
                   await recordError({
                     entityKind: 'product',
@@ -466,6 +469,10 @@ const bulkAiTranslateFn = inngest.createFunction(
               }
             }
           }
+
+          // Translated names/descriptions feed the search embedding (Task 11). This function runs
+          // under runInStoreScope (no request), so the event is sent inline, after the writes above.
+          if (bProductsWritten > 0) await requestStoreReindex(storeId, 'bulk-ai-translate');
 
           return {
             processed: bProcessed,

@@ -534,7 +534,7 @@ export class WarehouseService {
             initialQty: input.quantity,
           });
 
-          await WarehouseService.syncAggregateInventory(input.productId, variantId, tx);
+          await WarehouseService.syncAggregateInventory(storeId, input.productId, variantId, tx);
         }),
       WAREHOUSE_WRITE_RETRY
     );
@@ -593,7 +593,7 @@ export class WarehouseService {
             initialQty: Math.max(0, input.delta),
           });
 
-          await WarehouseService.syncAggregateInventory(input.productId, variantId, tx);
+          await WarehouseService.syncAggregateInventory(storeId, input.productId, variantId, tx);
 
           // Record in InventoryHistory for audit trail
           const changeType = input.delta >= 0 ? 'manual_add' : 'manual_remove';
@@ -715,27 +715,36 @@ export class WarehouseService {
    * cross-variant-rollup cases) — RED before this lock, GREEN after.
    */
   static async syncAggregateInventory(
+    storeId: string,
     productId: string,
     variantId: string | null,
     tx: Prisma.TransactionClient
   ): Promise<void> {
+    // Every statement carries the store (review M9, Ruling WAREHOUSE-STORE-SCOPE-1): RLS already
+    // limits ebda_app to the ambient store, but a raw statement naming a tenant table must not rely
+    // on that alone. product_variants has no store_id, so it is scoped through its product.
     if (variantId) {
       // Lock the variant row first — separate statement so the following
       // SUM-update runs against a fresh snapshot once the lock is granted.
-      await tx.$queryRaw`SELECT "id" FROM "product_variants" WHERE "id" = ${variantId} FOR UPDATE`;
+      await tx.$queryRaw`
+        SELECT v."id" FROM "product_variants" v
+         WHERE v."id" = ${variantId} AND v."product_id" = ${productId}
+           AND EXISTS (SELECT 1 FROM "products" p WHERE p."id" = ${productId} AND p."store_id" = ${storeId})
+        FOR UPDATE OF v`;
 
       await tx.$executeRaw`
         UPDATE "product_variants"
         SET inventory = (
           SELECT COALESCE(SUM("quantity"), 0) FROM "warehouse_stock"
-          WHERE "product_id" = ${productId} AND "variant_id" = ${variantId}
+          WHERE "store_id" = ${storeId} AND "product_id" = ${productId} AND "variant_id" = ${variantId}
         )
-        WHERE "id" = ${variantId}
+        WHERE "id" = ${variantId} AND "product_id" = ${productId}
+          AND EXISTS (SELECT 1 FROM "products" p WHERE p."id" = ${productId} AND p."store_id" = ${storeId})
       `;
 
       // Also re-aggregate the parent product from all its variants — same
       // lock-then-recompute pattern, one level up.
-      await tx.$queryRaw`SELECT "id" FROM "products" WHERE "id" = ${productId} FOR UPDATE`;
+      await tx.$queryRaw`SELECT "id" FROM "products" WHERE "id" = ${productId} AND "store_id" = ${storeId} FOR UPDATE`;
 
       await tx.$executeRaw`
         UPDATE "products"
@@ -743,19 +752,19 @@ export class WarehouseService {
           SELECT COALESCE(SUM("inventory"), 0) FROM "product_variants"
           WHERE "product_id" = ${productId}
         )
-        WHERE "id" = ${productId}
+        WHERE "id" = ${productId} AND "store_id" = ${storeId}
       `;
     } else {
       // Base-product stock (no variant)
-      await tx.$queryRaw`SELECT "id" FROM "products" WHERE "id" = ${productId} FOR UPDATE`;
+      await tx.$queryRaw`SELECT "id" FROM "products" WHERE "id" = ${productId} AND "store_id" = ${storeId} FOR UPDATE`;
 
       await tx.$executeRaw`
         UPDATE "products"
         SET inventory = (
           SELECT COALESCE(SUM("quantity"), 0) FROM "warehouse_stock"
-          WHERE "product_id" = ${productId} AND "variant_id" IS NULL
+          WHERE "store_id" = ${storeId} AND "product_id" = ${productId} AND "variant_id" IS NULL
         )
-        WHERE "id" = ${productId}
+        WHERE "id" = ${productId} AND "store_id" = ${storeId}
       `;
     }
   }

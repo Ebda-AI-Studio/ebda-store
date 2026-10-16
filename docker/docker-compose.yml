@@ -1,7 +1,10 @@
 services:
   # PostgreSQL Database
   postgres:
-    image: postgres:16-alpine
+    # Postgres 17 (production's major, Neon 17.11) + pgvector: migrations CREATE EXTENSION vector
+    # (search program P1). A data volume created by the old postgres:16-alpine image WILL NOT START
+    # on 17: pg_dump it first and restore into a fresh volume, or drop the volume and re-migrate.
+    image: pgvector/pgvector:0.8.0-pg17
     container_name: force_postgres
     restart: unless-stopped
     environment:

@@ -32,6 +32,7 @@ import { runScheduled } from './cf/cron';
 import { createDatabaseRoleGuard } from './cf/database-role-guard';
 import { isPlatformOrigin } from './lib/cors-cache';
 import { config } from './config';
+import { assertEmbeddingConfig } from './lib/search/embedding-provider';
 import * as Sentry from '@sentry/cloudflare';
 import { scrubSentryBreadcrumb, scrubSentryEvent } from '@ebda/shared';
 
@@ -103,8 +104,16 @@ function withTrustedClientIp(request: Request): Request {
   return new Request(request, { headers });
 }
 
+let embeddingConfigChecked = false;
+
 function prepare(env: CfBindings): void {
   setCfBindings(env);
+  // Fail loud on a semantic-search config with no provider (cached on success only, like the
+  // role guard: a throwing isolate 500s every request until the config is fixed or rolled back).
+  if (!embeddingConfigChecked) {
+    assertEmbeddingConfig(logger);
+    embeddingConfigChecked = true;
+  }
   // No sockets to open: this only flips redis.service to "available" over AuthState + KV.
   redisReady ??= redis.connect();
   const deployment = env.CF_VERSION_METADATA?.id;

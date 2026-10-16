@@ -5,3 +5,7 @@
 -- back to sequential scans.
 DROP INDEX CONCURRENTLY IF EXISTS "products_search_doc_trgm_idx";
 DROP INDEX CONCURRENTLY IF EXISTS "products_name_doc_trgm_idx";
+
+-- After running this, delete the migration's row too, or a later `prisma migrate deploy` treats it
+-- as applied and never recreates what was rolled back:
+--   DELETE FROM _prisma_migrations WHERE migration_name = '20261019000100_search_normalisation';

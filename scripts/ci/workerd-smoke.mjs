@@ -21,6 +21,18 @@ import { tmpdir } from 'node:os';
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const API = path.join(ROOT, 'apps/api');
 
+/**
+ * The config the smoke boots: the given one minus its Workers AI line. An `AI` binding always runs
+ * REMOTELY (also under `wrangler dev --local`), which needs a Cloudflare login CI does not have and
+ * would bill the account; the Worker boots without it (no provider -> lexical search). Throws when
+ * the line is missing, so a reshaped block cannot silently reach the smoke. Exported for the test.
+ */
+export function stripAiBinding(source) {
+  const re = /^[ \t]*"ai":[ \t]*\{[ \t]*"binding":[ \t]*"AI"[ \t]*\},?[ \t]*\r?\n/m;
+  if (!re.test(source)) throw new Error('wrangler config has no "ai" binding line to strip');
+  return source.replace(re, '');
+}
+
 /** Pure verdict on a set of observed responses; exported for the unit test. */
 export function smokeProblems(observed) {
   const problems = [];
@@ -75,6 +87,8 @@ async function main() {
   if (!owner || !app)
     throw new Error('SMOKE_OWNER_DATABASE_URL and SMOKE_APP_DATABASE_URL are required');
   const config = arg('config') ?? 'wrangler.jsonc';
+  // Before anything is written: a config with no AI line fails here, leaving no files behind.
+  const smokeSource = stripAiBinding(readFileSync(path.join(API, config), 'utf8'));
   const port = Number(arg('port') ?? 8799);
   const base = `http://127.0.0.1:${port}`;
 
@@ -102,14 +116,21 @@ async function main() {
       'TAP_SECRET_KEY=s',
       'TAP_WEBHOOK_SECRET=smoke-only-tap-webhook-secret',
       'INNGEST_EVENT_KEY=smoke',
+      // No AI binding in the smoke (stripAiBinding): say so explicitly, so a `true` set in the
+      // config's vars cannot fail the boot check here for a reason production does not have.
+      'SEARCH_SEMANTIC_ENABLED=false',
     ].join('\n') + '\n'
   );
+
+  // Written next to the source config: `main`, `alias` and the other paths in it are relative.
+  const smokeConfig = path.join(API, '.wrangler.smoke.jsonc');
+  writeFileSync(smokeConfig, smokeSource);
 
   const logPath = path.join(tmpdir(), `workerd-smoke-${process.pid}.log`);
   const log = createWriteStream(logPath);
   const child = spawn(
     'npx',
-    ['wrangler', 'dev', '--local', '--port', String(port), '--config', config],
+    ['wrangler', 'dev', '--local', '--port', String(port), '--config', '.wrangler.smoke.jsonc'],
     {
       cwd: API,
       detached: true,
@@ -129,6 +150,7 @@ async function main() {
       process.kill(-child.pid, 'SIGKILL');
     } catch {}
     rmSync(devVars, { force: true });
+    rmSync(smokeConfig, { force: true });
   };
 
   let failure = null;

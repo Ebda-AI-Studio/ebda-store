@@ -44,6 +44,7 @@ import { productMetaSyncFn, productMetaSyncDeleteFn } from './product-meta-sync'
 import { aiAutofillProduct } from './ai-autofill-product';
 import { aiAutofillCleanup } from './ai-autofill-cleanup';
 import { aiAutofillSweep } from './ai-autofill-sweep';
+import { searchProductIndex, searchIndexBackstop } from './search-product-index';
 import { orderCapiConversion } from './order-capi-conversion';
 import { ebdaAdsConversion } from './ebda-ads-conversion';
 import { orderAutoCancelUnpaid } from './order-auto-cancel-unpaid';
@@ -143,6 +144,9 @@ const allInngestFunctions: InngestFunction.Any[] = [
   aiAutofillCleanup,
   // AI-first autofill: daily leader-locked catalogue sweep with order-driven recos
   aiAutofillSweep,
+  // Search (Task 11): embed stale products per store + 6-hourly stale-store backstop/backfill
+  searchProductIndex,
+  searchIndexBackstop,
   // Server-side conversion API: Meta CAPI + TikTok Events API on purchase
   orderCapiConversion,
   // Ebda's OWN acquisition funnel: Meta CAPI for registration / store created / first paid sub.

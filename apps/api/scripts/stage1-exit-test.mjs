@@ -7,7 +7,7 @@
  *
  *   bash apps/api/scripts/cf-pooler.sh start
  *   su postgres -c "psql -d ebda_s1 -f apps/api/scripts/cf-seed.sql"
- *   (cd apps/api && npx wrangler dev --port 8799)
+ *   (node scripts/cf-api-local-config.mjs && cd apps/api && npx wrangler dev --port 8799 --config .wrangler.local.jsonc)
  *   node apps/api/scripts/stage1-exit-test.mjs [--n 200] [--rounds 3] [--base http://127.0.0.1:8799]
  *
  * The mix (default 200): catalogue reads of store A and B selected by the HOST header

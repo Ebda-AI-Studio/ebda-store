@@ -41,6 +41,9 @@ const { handleAiAutofillProduct } =
   await import('../../apps/api/src/lib/inngest/functions/ai-autofill-product');
 const { sweepAutofillStore } =
   await import('../../apps/api/src/lib/inngest/functions/ai-autofill-sweep');
+const { inngest } = await import('../../apps/api/src/lib/inngest/client');
+const { setEmbeddingProviderForTests, EMBED_MODEL } =
+  await import('../../apps/api/src/lib/search/embedding-provider');
 
 const OWNER_URL = process.env.DIRECT_URL || process.env.DATABASE_URL || '';
 function appUrl(): string {
@@ -139,6 +142,9 @@ describe.skipIf(!hasDb)('autofill under ebda_app + tenant guard (Task 8 review I
 
   it('I2: the stepwise product.upserted autofill fills search words as ebda_app', async () => {
     const productId = await mkProduct('i2');
+    // Task 11: a fill that writes search words asks the search indexer to look at the store.
+    setEmbeddingProviderForTests({ model: EMBED_MODEL, embed: async () => [] });
+    vi.mocked(inngest.send).mockClear();
     await asApp(() =>
       handleAiAutofillProduct({
         event: { data: { storeId, productId, op: 'create' } },
@@ -151,6 +157,11 @@ describe.skipIf(!hasDb)('autofill under ebda_app + tenant guard (Task 8 review I
     expect(
       await prisma.aiUsage.count({ where: { storeId, feature: 'search-terms' } })
     ).toBeGreaterThan(0);
+    expect(vi.mocked(inngest.send)).toHaveBeenCalledWith({
+      name: 'search/store.reindex-requested',
+      data: { storeId, reason: 'ai-autofill' },
+    });
+    setEmbeddingProviderForTests(undefined);
   });
 
   it('I3: the daily sweep per-store unit fills search words as ebda_app (was refused unscoped)', async () => {

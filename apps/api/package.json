@@ -12,7 +12,8 @@
     "test": "vitest",
     "test:coverage": "vitest --coverage",
     "clean": "rm -rf dist node_modules",
-    "cf:dev": "wrangler dev",
+    "cf:dev": "node ../../scripts/cf-api-local-config.mjs && wrangler dev --config .wrangler.local.jsonc",
+    "cf:dev:ai": "wrangler dev",
     "cf:dry-run": "wrangler deploy --dry-run --outdir dist-cf",
     "cf:test": "npm run cf:dry-run && vitest run --config vitest.workers.config.mts",
     "cf:exit-test": "node scripts/stage1-exit-test.mjs"

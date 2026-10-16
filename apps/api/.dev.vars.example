@@ -23,3 +23,16 @@ INNGEST_EVENT_KEY=local-dev-event-key
 # Dev-only diagnostics routes GET /__dev/stats and /__dev/probe (src/cf/dev-stats.ts): isolate pool counters for the
 # Stage 2 burst / soak runs and the workerd db-scope tests. Never set in wrangler.jsonc or a deployed Worker.
 DEV_STATS=1
+# Semantic search (docs/ENVIRONMENT.md "Semantic search"). `npm run cf:dev` boots a copy of the config
+# WITHOUT the AI binding (no login needed; search stays lexical). `npm run cf:dev:ai` keeps it: the
+# binding runs remotely and needs `wrangler login` on the Whisky account (billed per token).
+# SEARCH_SEMANTIC_ENABLED is a wrangler.jsonc var ("false"); override it here for local dev only.
+# SEARCH_SEMANTIC_ENABLED=true fails the boot check if no provider resolves.
+# SEARCH_SEMANTIC_ENABLED=false
+# SEARCH_EMBED_STORE_DAILY_CAP=3000
+# SEARCH_EMBED_GLOBAL_DAILY_CAP=20000
+# SEARCH_EMBED_THROTTLE_MS=200
+# SEARCH_VECTOR_MAX_DISTANCE=0.55
+# REST fallback for Node dev only, never on the Worker; set both or neither:
+# CF_AI_ACCOUNT_ID=
+# CF_AI_API_TOKEN=
