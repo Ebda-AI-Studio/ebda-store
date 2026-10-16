@@ -122,14 +122,17 @@ describe.each(Object.entries({ ...themes, dahab: (await import('../dahab/CartTab
   '%s CartTable — every control is a 44px target',
   (_name, Table) => {
     it('remove, steppers and the name link', async () => {
-      const { JSDOM } = await import('jsdom');
+      // @ts-expect-error jsdom ships no types in this workspace
+      const { JSDOM } = (await import('jsdom')) as {
+        JSDOM: new (html: string) => { window: { document: Document } };
+      };
       const { smallTargets } = await import('../../../../../tests/helpers/target-size');
       lang.current = 'ar';
       const html = render(Table, [line({ quantity: 2 })]);
       const doc = new JSDOM(`<body>${html}</body>`).window.document;
       // A photo link is sized by its image, which a class read cannot see; the browser probe
       // (scripts/taste/purchase-path-probe.mjs) measures it. Everything else is checked here.
-      for (const a of Array.from(doc.querySelectorAll('a')))
+      for (const a of Array.from(doc.querySelectorAll<HTMLAnchorElement>('a')))
         if (a.querySelector('img') || /\baspect-/.test(a.className)) a.remove();
       expect(smallTargets(doc.body, 44, { requireWidth: true })).toEqual([]);
     });
