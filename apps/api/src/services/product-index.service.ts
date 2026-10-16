@@ -155,7 +155,7 @@ export async function planEmbedBatch(
 /**
  * Step 2 (EXTERNAL, no transaction): embed the docs and return `halfvec` literals. Components are
  * rounded to 5 significant digits — halfvec stores ~3.3, so nothing the column keeps is lost — which
- * keeps the memoized Inngest step output small (~8 KB per product instead of ~20 KB).
+ * keeps the memoized Inngest step output small (measured ~9.8 KB per product instead of ~20 KB).
  */
 export async function embedDocs(
   provider: EmbeddingProvider,

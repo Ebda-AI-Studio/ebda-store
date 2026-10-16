@@ -41,7 +41,11 @@ import logger from '../../logger';
 export const REINDEX_EVENT = 'search/store.reindex-requested';
 /** Products per provider call (bge-m3 takes up to 100; 25 keeps one call well under the timeout). */
 export const INDEX_BATCH = 25;
-/** Rounds per run before handing off to a continuation run (~200 products, ~1.6 MB step state). */
+/**
+ * Rounds per run before handing off to a continuation run (~200 products). Step state measured at
+ * ~9.8 KB/product of vectors + ≤ ~7 KB/product of docs: ≤ ~3.4 MiB per run, inside Inngest's 4 MiB
+ * per step / 32 MiB per run (inngest.com/docs/usage-limits/inngest).
+ */
 export const MAX_ROUNDS = 8;
 /** Inngest retries per step; attempt numbers run 0..INDEX_RETRIES. */
 export const INDEX_RETRIES = 3;
