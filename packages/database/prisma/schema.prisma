@@ -1316,13 +1316,17 @@ model ProductEmbedding {
 /// Embedding quarantine (Task 11 review I2): a product whose CURRENT text (md5 = contentHash) could
 /// not be embedded. Skipped by the indexer until the text changes; deleted on a successful embed.
 model ProductEmbedFailure {
-  productId   String   @id @map("product_id")
-  storeId     String   @map("store_id")
-  contentHash String   @map("content_hash")
-  errorKind   String   @map("error_kind")
+  productId   String    @id @map("product_id")
+  storeId     String    @map("store_id")
+  contentHash String    @map("content_hash")
+  errorKind   String    @map("error_kind")
   /// The embedding model that rejected it; a different current model re-admits the product.
   model       String
-  failedAt    DateTime @default(now()) @map("failed_at") @db.Timestamptz(6)
+  /// true = failed retryably twice (temporary, see expiresAt); false = rejected non-retryably.
+  retryable   Boolean   @default(false)
+  /// NULL = until the text or model changes; otherwise re-admitted after this time (24 h).
+  expiresAt   DateTime? @map("expires_at") @db.Timestamptz(6)
+  failedAt    DateTime  @default(now()) @map("failed_at") @db.Timestamptz(6)
 
   product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
   store   Store   @relation(fields: [storeId], references: [id], onDelete: Cascade)

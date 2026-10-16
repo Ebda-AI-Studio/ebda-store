@@ -77,9 +77,15 @@ const asApp = <T>(fn: () => Promise<T>) =>
 function fakeStep() {
   const memo = new Map<string, unknown>();
   const events: Array<{ name: string; data: Record<string, unknown> }> = [];
+  const sleeps: string[] = [];
   return {
     events,
     memo,
+    sleeps,
+    /** Inngest's durable sleep; a no-op here that records its id. */
+    sleep: async (id: string, _duration: string) => {
+      sleeps.push(id);
+    },
     run: async (name: string, fn: () => Promise<unknown>) => {
       if (!memo.has(name)) memo.set(name, JSON.parse(JSON.stringify((await fn()) ?? null)));
       return memo.get(name);
@@ -401,9 +407,17 @@ describe.skipIf(!hasDb)('product embedding indexer (Task 11)', () => {
     const failureRow = async (productId: string) =>
       (
         await prisma.$queryRaw<
-          Array<{ content_hash: string; error_kind: string }>
-        >`SELECT content_hash, error_kind FROM product_embed_failures WHERE product_id = ${productId}`
+          Array<{
+            content_hash: string;
+            error_kind: string;
+            retryable: boolean;
+            ttl_h: number | null;
+          }>
+        >`SELECT content_hash, error_kind, retryable,
+                 round(extract(epoch FROM (expires_at - now())) / 3600)::int AS ttl_h
+            FROM product_embed_failures WHERE product_id = ${productId}`
       )[0];
+    const quarantineAlerts = () => alerts.filter(a => a.source === 'search-index.quarantine');
     async function poisonStore(tag: string) {
       const owner = await mkUser(tag);
       ownerIds.push(owner.id);
@@ -428,8 +442,14 @@ describe.skipIf(!hasDb)('product embedding indexer (Task 11)', () => {
       expect(await embeddingRow(good1)).toBeDefined();
       expect(await embeddingRow(good2)).toBeDefined();
       expect(await embeddingRow(bad)).toBeUndefined();
-      expect(await failureRow(bad)).toMatchObject({ error_kind: 'provider' });
-      expect(alerts.filter(a => a.context?.productId === bad)).toHaveLength(1);
+      // (a) non-retryable: permanent at once (no expiry), and ONE summary P1 for the run.
+      expect(await failureRow(bad)).toMatchObject({
+        error_kind: 'provider',
+        retryable: false,
+        ttl_h: null,
+      });
+      expect(quarantineAlerts()).toHaveLength(1);
+      expect(quarantineAlerts()[0].context).toMatchObject({ permanent: 1, temporary: 0 });
       expect(await runInStoreScope(s, () => storeIndexStatus(s))).toEqual({
         products: 3,
         indexed: 2,
@@ -442,7 +462,7 @@ describe.skipIf(!hasDb)('product embedding indexer (Task 11)', () => {
         handleSearchProductIndex({ event: { data: { storeId: s } }, step: fakeStep(), attempt: 0 })
       );
       expect(pp.calls.length).toBe(before);
-      expect(alerts.filter(a => a.context?.productId === bad)).toHaveLength(1);
+      expect(quarantineAlerts()).toHaveLength(1);
       expect(await runInStoreScope(s, () => hasStaleProducts(s))).toBe(false);
       // Editing the text (a new hash) re-admits it; now it embeds and the quarantine row goes.
       await prisma.product.update({ where: { id: bad }, data: { name: 'Fixed item' } });
@@ -454,7 +474,7 @@ describe.skipIf(!hasDb)('product embedding indexer (Task 11)', () => {
       expect(await failureRow(bad)).toBeUndefined();
     });
 
-    it('retryable failure: earlier attempts throw for Inngest to retry; the final attempt isolates', async () => {
+    it('retryable failure: Inngest retries first; on the last attempt a product failing twice is quarantined for 24 h', async () => {
       const { s, good1, bad } = await poisonStore('i2b');
       setEmbeddingProviderForTests(
         poisonProvider(() => new EmbeddingError('provider', 'capacity', { retryable: true }))
@@ -471,6 +491,38 @@ describe.skipIf(!hasDb)('product embedding indexer (Task 11)', () => {
         )
       ).rejects.toThrow();
       expect(await failureRow(bad)).toBeUndefined();
+      const step = fakeStep();
+      await asApp(() =>
+        handleSearchProductIndex({
+          event: { data: { storeId: s } },
+          step,
+          attempt: INDEX_RETRIES,
+        })
+      );
+      expect(await embeddingRow(good1)).toBeDefined();
+      // (b) one more single retry after a durable backoff, in its own step; failing again = 24 h.
+      expect(step.sleeps).toEqual(['backoff-0']);
+      expect([...step.memo.keys()].some(k => k.startsWith('retry-0'))).toBe(true);
+      expect(await failureRow(bad)).toMatchObject({ retryable: true, ttl_h: 24 });
+      expect(quarantineAlerts()).toHaveLength(1);
+      expect(quarantineAlerts()[0].context).toMatchObject({ permanent: 0, temporary: 1 });
+    });
+
+    it('a 429 burst on single calls quarantines nothing when the retry succeeds', async () => {
+      const { s, good1, bad, good2 } = await poisonStore('nI1-burst');
+      await prisma.product.update({ where: { id: bad }, data: { name: 'Flaky item' } });
+      const f = fakeProvider();
+      let flakyFailures = 0;
+      setEmbeddingProviderForTests({
+        model: EMBED_MODEL,
+        async embed(texts: string[]) {
+          // The batch call is rate limited, and so is the FIRST single call for the flaky product.
+          if (texts.length > 1 || (texts[0].includes('Flaky') && flakyFailures++ === 0))
+            throw new EmbeddingError('http', '429', { status: 429 });
+          return f.provider.embed(texts);
+        },
+      });
+      alerts.length = 0;
       await asApp(() =>
         handleSearchProductIndex({
           event: { data: { storeId: s } },
@@ -478,8 +530,54 @@ describe.skipIf(!hasDb)('product embedding indexer (Task 11)', () => {
           attempt: INDEX_RETRIES,
         })
       );
+      for (const id of [good1, bad, good2]) expect(await embeddingRow(id)).toBeDefined();
+      expect(await failureRow(bad)).toBeUndefined();
+      expect(quarantineAlerts()).toHaveLength(0);
+    });
+
+    it('a temporary quarantine expires and the product is re-admitted', async () => {
+      const { s, bad } = await poisonStore('nI1-exp');
+      setEmbeddingProviderForTests(
+        poisonProvider(() => new EmbeddingError('provider', 'capacity', { retryable: true }))
+          .provider
+      );
+      await asApp(() =>
+        handleSearchProductIndex({
+          event: { data: { storeId: s } },
+          step: fakeStep(),
+          attempt: INDEX_RETRIES,
+        })
+      );
+      expect(await failureRow(bad)).toMatchObject({ retryable: true });
+      expect(await runInStoreScope(s, () => hasStaleProducts(s))).toBe(false);
+      await prisma.$executeRaw`UPDATE product_embed_failures SET expires_at = now() - interval '1 minute' WHERE product_id = ${bad}`;
+      expect(await runInStoreScope(s, () => hasStaleProducts(s))).toBe(true);
+      // Same text, provider recovered: it embeds and the quarantine row goes (re-admitted by expiry, not by an edit).
+      setEmbeddingProviderForTests(fakeProvider().provider);
+      await asApp(() =>
+        handleSearchProductIndex({ event: { data: { storeId: s } }, step: fakeStep() })
+      );
+      expect(await embeddingRow(bad)).toBeDefined();
+      expect(await failureRow(bad)).toBeUndefined();
+    });
+
+    it('(c) several poisons in one run raise ONE summary P1 with the count', async () => {
+      const { s, good1 } = await poisonStore('nI1-sum');
+      await mkProduct(s, { name: 'POISON two' });
+      setEmbeddingProviderForTests(
+        poisonProvider(() => new EmbeddingError('input', 'rejected', { retryable: false })).provider
+      );
+      alerts.length = 0;
+      await asApp(() =>
+        handleSearchProductIndex({ event: { data: { storeId: s } }, step: fakeStep() })
+      );
       expect(await embeddingRow(good1)).toBeDefined();
-      expect(await failureRow(bad)).toMatchObject({ error_kind: 'provider' });
+      expect(quarantineAlerts()).toHaveLength(1);
+      expect(quarantineAlerts()[0].context).toMatchObject({
+        storeId: s,
+        permanent: 2,
+        temporary: 0,
+      });
     });
 
     /** Quarantine `productId` against its CURRENT text, as model `model`, by hand. */

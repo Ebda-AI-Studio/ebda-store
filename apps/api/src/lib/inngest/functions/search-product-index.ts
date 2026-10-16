@@ -25,10 +25,15 @@ import { NonRetriableError, type InngestFunction } from 'inngest';
 import { acrossStores, runInStoreScope } from '@ebda/database';
 import { inngest } from '../client';
 import {
+  alertQuarantined,
   embedDocs,
-  embedEachIsolating,
+  embedSingles,
   quarantineEmbedFailures,
+  retryableFailures,
+  settleSingles,
+  SINGLE_RETRY_BACKOFF,
   type EmbedFailure,
+  type SingleResult,
   embedThrottleMs,
   hasStaleProducts,
   planEmbedBatch,
@@ -56,6 +61,8 @@ type Ev = { name: string; data: Record<string, unknown> };
 interface IndexStep {
   run<T>(name: string, fn: () => Promise<T>): Promise<unknown>;
   sendEvent(id: string, payload: Ev | Ev[]): Promise<unknown>;
+  /** Durable sleep (no compute while waiting). */
+  sleep(id: string, duration: string): Promise<unknown>;
 }
 
 const sleep = (ms: number) => new Promise<void>(r => setTimeout(r, ms));
@@ -80,6 +87,25 @@ export async function handleSearchProductIndex({
   // NOT trust `event.data.changedFields` to skip earlier: the 20 s per-store debounce delivers only
   // the LAST event, so a text edit followed by a price edit would arrive as `changedFields: ['price']`
   // and be lost. The hash is the source of truth.
+  const counts = { permanent: 0, temporary: 0 };
+  const result = await indexRounds(storeId, step, attempt, counts);
+  // Review N-I1 (c): ONE P1 per run that quarantined anything, with the counts — never per product.
+  if (counts.permanent + counts.temporary > 0)
+    await step.run('alert-quarantine', () => alertQuarantined(storeId, counts));
+  return { ...result, quarantined: counts };
+}
+
+type Settled = {
+  ok: Array<{ id: string; hash: string; lit: string }>;
+  failures: EmbedFailure[];
+};
+
+async function indexRounds(
+  storeId: string,
+  step: IndexStep,
+  attempt: number,
+  counts: { permanent: number; temporary: number }
+): Promise<Record<string, unknown>> {
   let embedded = 0;
   for (let round = 0; round < MAX_ROUNDS; round++) {
     const plan = (await step.run(`plan-${round}`, () =>
@@ -91,7 +117,7 @@ export async function handleSearchProductIndex({
     }
     if (plan.items.length === 0) return { embedded, done: true };
 
-    const out = (await step.run(`embed-${round}`, async () => {
+    const batch = (await step.run(`embed-${round}`, async () => {
       const provider = getEmbeddingProvider();
       if (!provider) throw new NonRetriableError('search-index: embedding provider went away');
       try {
@@ -100,43 +126,42 @@ export async function handleSearchProductIndex({
           plan.items.map(i => i.doc)
         );
         await sleep(embedThrottleMs()); // sleep-after-success, per real call
-        return { literals, failed: [] as EmbedFailure[] };
+        return { literals };
       } catch (err) {
         if (!(err instanceof EmbeddingError)) throw err;
-        // Review I2: a retryable failure is retried by Inngest first. On the LAST attempt, or at
-        // once for a non-retryable one, embed one product at a time so a poison product cannot
-        // stall the store: it is quarantined and the rest are written. An outage (every product
-        // fails retryably) still throws and nothing is quarantined.
+        // A retryable batch failure is retried by Inngest first. On the LAST attempt, or at once for
+        // a non-retryable one, fall through to the single pass below (reviews I2, N-I1).
         if (err.retryable && attempt < INDEX_RETRIES) throw err;
-        try {
-          return await embedEachIsolating(provider, plan.items, embedThrottleMs());
-        } catch (outage) {
-          throw new NonRetriableError(`search-index: every product failed (${err.kind})`, {
-            cause: outage,
-          });
-        }
+        return { failed: err.kind };
       }
-    })) as { literals: Array<string | null>; failed: EmbedFailure[] };
+    })) as { literals?: string[]; failed?: string };
+
+    let settled: Settled;
+    if (batch.literals) {
+      const literals = batch.literals;
+      settled = {
+        ok: plan.items.map((it, i) => ({ id: it.id, hash: it.hash, lit: literals[i] })),
+        failures: [],
+      };
+    } else {
+      settled = await isolate(storeId, step, round, plan.items, batch.failed ?? 'provider');
+    }
 
     const res = (await step.run(`write-${round}`, () =>
       runInStoreScope(storeId, async () => {
-        const ok = plan.items.flatMap((it, i) => {
-          const lit = out.literals[i];
-          return lit ? [{ id: it.id, hash: it.hash, lit }] : [];
-        });
         const written = await writeEmbeddings(
           storeId,
-          ok.map(({ id, hash }) => ({ id, hash })),
-          ok.map(o => o.lit)
+          settled.ok.map(({ id, hash }) => ({ id, hash })),
+          settled.ok.map(o => o.lit)
         );
-        await quarantineEmbedFailures(storeId, out.failed);
-        // Quarantined products count as progress: they leave the stale set.
-        return { written, quarantined: out.failed.length };
+        const q = await quarantineEmbedFailures(storeId, settled.failures);
+        return { written, ...q };
       })
-    )) as { written: number; quarantined: number };
-    const written = res.written;
-    embedded += written;
-    if (written === 0 && res.quarantined === 0) {
+    )) as { written: number; permanent: number; temporary: number };
+    counts.permanent += res.permanent;
+    counts.temporary += res.temporary;
+    embedded += res.written;
+    if (res.written === 0 && settled.failures.length === 0) {
       // Every product in the batch changed between read and write: stop rather than spin; the
       // write paths that changed them already asked for a new run.
       logger.warn({ storeId, round }, '[search-index] batch wrote nothing; stopping this run');
@@ -145,6 +170,43 @@ export async function handleSearchProductIndex({
   }
   await step.sendEvent('continue', { name: REINDEX_EVENT, data: { storeId, reason: 'continue' } });
   return { embedded, continued: true };
+}
+
+/**
+ * The batch failed for good: find the poison from EVIDENCE (review N-I1). Each product is embedded
+ * on its own (memoized); the ones that failed retryably wait a durable backoff (`step.sleep`, no
+ * compute) and get ONE more single try in their own step. `settleSingles` then decides: a
+ * non-retryable failure is permanent, a second retryable failure is a 24 h quarantine, and if
+ * nothing succeeded and nothing was rejected outright it is an outage — the run fails (P1 via
+ * alerts-failure-watch) and nothing is quarantined.
+ */
+async function isolate(
+  storeId: string,
+  step: IndexStep,
+  round: number,
+  items: StaleDoc[],
+  batchKind: string
+): Promise<Settled> {
+  const singles = async (label: string, list: StaleDoc[]) =>
+    (await step.run(label, async () => {
+      const provider = getEmbeddingProvider();
+      if (!provider) throw new NonRetriableError('search-index: embedding provider went away');
+      return embedSingles(provider, list, embedThrottleMs());
+    })) as SingleResult[];
+
+  const first = await singles(`single-${round}`, items);
+  const again = retryableFailures(items, first);
+  let retried: SingleResult[] = [];
+  if (again.length > 0) {
+    await step.sleep(`backoff-${round}`, SINGLE_RETRY_BACKOFF);
+    retried = await singles(`retry-${round}`, again);
+  }
+  const settled = settleSingles(first, retried);
+  if (settled.outage) {
+    logger.error({ storeId, round, batchKind }, '[search-index] every product failed: outage');
+    throw new NonRetriableError(`search-index: every product failed twice (${batchKind})`);
+  }
+  return { ok: settled.ok, failures: settled.failures };
 }
 
 export const searchProductIndex: InngestFunction.Any = inngest.createFunction(

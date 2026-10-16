@@ -6,7 +6,11 @@
 --                           holding the md5 of the doc that failed and the model that rejected it:
 --                           the indexer skips a product only while md5(current doc) = content_hash
 --                           AND model = the current embedding model, so editing the text or changing
---                           the model re-admits it (review N-M2).
+--                           the model re-admits it (review N-M2). Only evidence quarantines (review
+--                           N-I1): a non-retryable rejection is permanent (expires_at NULL); a
+--                           product that failed retryably, then again on a single retry after a
+--                           backoff, is quarantined with retryable = true for 24 h (expires_at), and
+--                           is re-admitted when that passes.
 --                           A later successful embed deletes the row. Without it, one poison product
 --                           repeats in the same newest-first batch forever and stalls its store.
 --                           Child of products and stores (ON DELETE CASCADE); nothing references it.
@@ -23,6 +27,8 @@ CREATE TABLE "product_embed_failures" (
     "content_hash" TEXT NOT NULL,
     "error_kind" TEXT NOT NULL,
     "model" TEXT NOT NULL,
+    "retryable" BOOLEAN NOT NULL DEFAULT false,
+    "expires_at" TIMESTAMPTZ(6),
     "failed_at" TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "product_embed_failures_pkey" PRIMARY KEY ("product_id")
