@@ -255,7 +255,7 @@ export function BottomTabBar({ bottomBar, theme, navigation = [] }: BottomTabBar
                     </span>
                   )}
                 </span>
-                <span className="text-xs font-medium leading-none">{label}</span>
+                <span className="text-xs font-medium leading-snug">{label}</span>
               </Link>
             </li>
           );
@@ -289,7 +289,7 @@ export function BottomTabBar({ bottomBar, theme, navigation = [] }: BottomTabBar
             >
               {menuIcon}
             </span>
-            <span className="text-xs font-medium leading-none">{menuLabel}</span>
+            <span className="text-xs font-medium leading-snug">{menuLabel}</span>
           </button>
         </li>
       </ul>
