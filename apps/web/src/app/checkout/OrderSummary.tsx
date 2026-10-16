@@ -264,6 +264,8 @@ export function OrderSummary({
           ) : (
             <div className="flex gap-2">
               <Input
+                // P2-7 (W4): a placeholder is not a label.
+                aria-label={t('Coupon code', 'كود الخصم')}
                 placeholder={t('Coupon code', '\u0643\u0648\u062f \u0627\u0644\u062e\u0635\u0645')}
                 value={couponCode}
                 onChange={e => onCouponCodeChange(e.target.value.toUpperCase())}

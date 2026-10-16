@@ -209,9 +209,23 @@ export default function PaymentStep({
         <button
           type="button"
           onClick={onEditShipping}
-          className="text-sm text-primary underline underline-offset-4"
+          className="inline-flex min-h-11 items-center gap-1.5 text-sm text-primary underline underline-offset-4"
         >
-          {language === 'ar' ? 'العودة إلى الشحن →' : '← Return to shipping'}
+          <svg
+            className="h-4 w-4 shrink-0 rtl:-scale-x-100"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            aria-hidden="true"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M10 19l-7-7m0 0l7-7m-7 7h18"
+            />
+          </svg>
+          {t('Return to shipping', 'العودة إلى الشحن')}
         </button>
         {isDemo ? (
           <DemoCheckoutNotice />
@@ -225,7 +239,8 @@ export default function PaymentStep({
             {isProcessing
               ? t('Processing...', 'جاري المعالجة...')
               : selectedProvider === 'cod'
-                ? t('Place Order', translations['Place Order'])
+                ? // IA-13 (W4): the confirm button carries the total, like the sticky cart bar.
+                  `${t('Place order', 'تأكيد الطلب')} · ${formatPrice(total)}`
                 : `${t('Pay', 'ادفع')} ${formatPrice(total)}`}
           </Button>
         )}

@@ -166,6 +166,9 @@ function Combobox({
           }
           aria-autocomplete="list"
           aria-required
+          // P2-8 (W4): the error text is announced with the field, and the field says it is invalid.
+          aria-invalid={hasError ? true : undefined}
+          aria-describedby={hasError ? `${id}-error` : undefined}
           type="text"
           disabled={disabled}
           placeholder={placeholder}
@@ -442,10 +445,10 @@ export function GovernorateAreaSelect({
     onChange(governorate, '');
   };
 
-  const countryLabel = locale === 'ar' ? 'الدولة *' : 'Country *';
+  const countryLabel = locale === 'ar' ? 'الدولة' : 'Country';
   const countryPlaceholder = locale === 'ar' ? 'الدولة' : 'Country';
-  const govLabel = locale === 'ar' ? 'المحافظة *' : 'Governorate *';
-  const areaLabel = locale === 'ar' ? 'المنطقة *' : 'Area *';
+  const govLabel = locale === 'ar' ? 'المحافظة' : 'Governorate';
+  const areaLabel = locale === 'ar' ? 'المنطقة' : 'Area';
   const govPlaceholder = locale === 'ar' ? 'المحافظة' : 'Governorate';
   const areaPlaceholder = locale === 'ar' ? 'المنطقة' : 'Area';
 
@@ -481,7 +484,7 @@ export function GovernorateAreaSelect({
             clearLabel={clearLabel}
           />
           {governorateError && (
-            <p role="alert" className="mt-1 text-sm text-destructive-ink">
+            <p id={`${govId}-error`} role="alert" className="mt-1 text-sm text-destructive-ink">
               {governorateError}
             </p>
           )}
@@ -501,7 +504,7 @@ export function GovernorateAreaSelect({
             clearLabel={clearLabel}
           />
           {areaError && (
-            <p role="alert" className="mt-1 text-sm text-destructive-ink">
+            <p id={`${areaId}-error`} role="alert" className="mt-1 text-sm text-destructive-ink">
               {areaError}
             </p>
           )}

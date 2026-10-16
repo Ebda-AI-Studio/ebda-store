@@ -112,6 +112,9 @@ interface AreaRate {
   freeShippingThreshold: number | null;
 }
 
+/** P2-6 (W4): checkout fields stay 44px on desktop too (the shared Input drops to 40 at sm). */
+const CHECKOUT_FIELD = 'sm:h-11';
+
 export default function CheckoutClient() {
   const router = useRouter();
   const { store, layout } = useStore();
@@ -1888,6 +1891,10 @@ export default function CheckoutClient() {
     <MinimalChrome label={checkoutLabelEn} labelAr={checkoutLabelAr}>
       <div className="flex-1" style={checkoutBgStyle} data-transactional>
         <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8" style={checkoutDensity}>
+          {/* P2-2 (W4): the page names itself (the chrome label above is not a heading). */}
+          <h1 data-checkout-title className="sr-only">
+            {t('Checkout', 'إتمام الطلب')}
+          </h1>
           {/* Progress Steps */}
           <div className="mb-8">
             <div className="flex items-center justify-center">
@@ -2004,18 +2011,9 @@ export default function CheckoutClient() {
                             autoComplete="given-name"
                             value={formData.firstName}
                             onChange={e => updateField('firstName', e.target.value)}
-                            aria-invalid={formErrors.firstName ? true : undefined}
-                            className={
-                              formErrors.firstName
-                                ? 'border-destructive focus:border-destructive focus:ring-destructive'
-                                : ''
-                            }
+                            error={formErrors.firstName}
+                            className={CHECKOUT_FIELD}
                           />
-                          {formErrors.firstName && (
-                            <p role="alert" className="mt-1 text-sm text-destructive-ink">
-                              {formErrors.firstName}
-                            </p>
-                          )}
                         </div>
                         <div data-error={!!formErrors.lastName}>
                           <Input
@@ -2026,18 +2024,9 @@ export default function CheckoutClient() {
                             autoComplete="family-name"
                             value={formData.lastName}
                             onChange={e => updateField('lastName', e.target.value)}
-                            aria-invalid={formErrors.lastName ? true : undefined}
-                            className={
-                              formErrors.lastName
-                                ? 'border-destructive focus:border-destructive focus:ring-destructive'
-                                : ''
-                            }
+                            error={formErrors.lastName}
+                            className={CHECKOUT_FIELD}
                           />
-                          {formErrors.lastName && (
-                            <p role="alert" className="mt-1 text-sm text-destructive-ink">
-                              {formErrors.lastName}
-                            </p>
-                          )}
                         </div>
                       </div>
 
@@ -2047,21 +2036,12 @@ export default function CheckoutClient() {
                           type="tel"
                           autoComplete="tel"
                           inputMode="tel"
-                          placeholder={REGION.phone.placeholderIntl}
+                          placeholder={REGION.phone.placeholder}
                           value={formData.phone}
                           onChange={e => updateField('phone', e.target.value)}
-                          aria-invalid={formErrors.phone ? true : undefined}
-                          className={
-                            formErrors.phone
-                              ? 'border-destructive focus:border-destructive focus:ring-destructive'
-                              : ''
-                          }
+                          error={formErrors.phone}
+                          className={CHECKOUT_FIELD}
                         />
-                        {formErrors.phone && (
-                          <p role="alert" className="mt-1 text-sm text-destructive-ink">
-                            {formErrors.phone}
-                          </p>
-                        )}
                         {showSmsOptIn && (
                           <label
                             data-sms-marketing-optin
@@ -2101,18 +2081,9 @@ export default function CheckoutClient() {
                           inputMode="email"
                           value={formData.email}
                           onChange={e => updateField('email', e.target.value)}
-                          aria-invalid={formErrors.email ? true : undefined}
-                          className={
-                            formErrors.email
-                              ? 'border-destructive focus:border-destructive focus:ring-destructive'
-                              : ''
-                          }
+                          error={formErrors.email}
+                          className={CHECKOUT_FIELD}
                         />
-                        {formErrors.email && (
-                          <p role="alert" className="mt-1 text-sm text-destructive-ink">
-                            {formErrors.email}
-                          </p>
-                        )}
                       </div>
 
                       {/* Country row \u2014 fixed display for single-country stores.
@@ -2213,42 +2184,24 @@ export default function CheckoutClient() {
                       {/* Structured Egyptian address fields */}
                       <div data-error={!!formErrors.street}>
                         <Input
-                          label={t('Street *', 'اسم الشارع *')}
+                          label={t('Street', 'اسم الشارع')}
                           autoComplete="address-line1"
                           value={formData.street}
                           onChange={e => updateField('street', e.target.value)}
-                          aria-invalid={formErrors.street ? true : undefined}
-                          className={
-                            formErrors.street
-                              ? 'border-destructive focus:border-destructive focus:ring-destructive'
-                              : ''
-                          }
+                          error={formErrors.street}
+                          className={CHECKOUT_FIELD}
                         />
-                        {formErrors.street && (
-                          <p role="alert" className="mt-1 text-sm text-destructive-ink">
-                            {formErrors.street}
-                          </p>
-                        )}
                       </div>
 
                       <div className="grid grid-cols-3 gap-4">
                         <div data-error={!!formErrors.building}>
                           <Input
-                            label={t('Building no. *', 'رقم المبنى *')}
+                            label={t('Building no.', 'رقم المبنى')}
                             value={formData.building}
                             onChange={e => updateField('building', e.target.value)}
-                            aria-invalid={formErrors.building ? true : undefined}
-                            className={
-                              formErrors.building
-                                ? 'border-destructive focus:border-destructive focus:ring-destructive'
-                                : ''
-                            }
+                            error={formErrors.building}
+                            className={CHECKOUT_FIELD}
                           />
-                          {formErrors.building && (
-                            <p role="alert" className="mt-1 text-sm text-destructive-ink">
-                              {formErrors.building}
-                            </p>
-                          )}
                         </div>
                         <Input
                           label={t('Floor (optional)', 'الدور (اختياري)')}
@@ -2355,9 +2308,24 @@ export default function CheckoutClient() {
                         href={storeUrl('/cart')}
                         className="inline-flex min-h-11 items-center text-sm text-primary underline underline-offset-4"
                       >
-                        {language === 'ar'
-                          ? '\u0627\u0644\u0639\u0648\u062f\u0629 \u0625\u0644\u0649 \u0627\u0644\u0633\u0644\u0629 \u2192'
-                          : '\u2190 Return to cart'}
+                        {/* P2-9 (W4): the one mirrored back icon, at the inline start. */}
+                        <span className="inline-flex items-center gap-1.5">
+                          <svg
+                            className="h-4 w-4 shrink-0 rtl:-scale-x-100"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                            aria-hidden="true"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M10 19l-7-7m0 0l7-7m-7 7h18"
+                            />
+                          </svg>
+                          {t('Return to cart', 'العودة إلى السلة')}
+                        </span>
                       </Link>
                       <Button
                         type="submit"
@@ -2480,7 +2448,23 @@ export default function CheckoutClient() {
                   href={storeUrl('/cart')}
                   className="inline-flex min-h-11 items-center text-sm text-primary underline underline-offset-4"
                 >
-                  {language === 'ar' ? 'العودة إلى السلة →' : '← Return to cart'}
+                  <span className="inline-flex items-center gap-1.5">
+                    <svg
+                      className="h-4 w-4 shrink-0 rtl:-scale-x-100"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                      aria-hidden="true"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M10 19l-7-7m0 0l7-7m-7 7h18"
+                      />
+                    </svg>
+                    {t('Return to cart', 'العودة إلى السلة')}
+                  </span>
                 </Link>
                 <Button
                   type="submit"
