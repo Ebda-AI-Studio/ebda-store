@@ -18,7 +18,7 @@ Product cards have no borders and no shadows; they're an `aspect-[3/4]` image on
 - Type weights stay 300–400 — `font-light` and `font-normal` (and the unstyled default for prices)
 - Hero headline reaches `text-8xl` at `xl:` — bigger than Modern's hero, but at `font-light` instead of Bold's `font-black`
 - Hero image is `aspect-[21/9]` full-bleed cinematic — the only chrome the template offers
-- CTAs are TEXT LINKS with hover-shift (`hover:text-primary` or `hover:border-primary`) — no button shapes
+- CTAs are TEXT LINKS with hover-shift (`hover:text-primary` or `hover:border-primary`) — no button shapes, except the cart's checkout action (a filled button, C-03)
 - `transition-colors duration-200` to `duration-300` — quick but unhurried
 - Cart counter is a numeric superscript (`text-[9px]` next to the cart icon) — no colored badge
 - All corners default to `rounded-none` — the few exceptions (cart-counter implied position, image rounding) are also unrounded
@@ -111,7 +111,7 @@ Minimal uses the smallest slice of the token palette of any template. Most surfa
 
 ### Buttons / Links
 
-Minimal does NOT have buttons in the conventional sense. It has TEXT LINKS that hover to primary or shift their bottom-border to primary. The only "button-like" affordance is the bottom-border underline.
+Minimal does NOT have buttons in the conventional sense. It has TEXT LINKS that hover to primary or shift their bottom-border to primary. The one exception is the cart's checkout action (C-03, 2026-10-16): the money step must be the heaviest element on the cart, so the OrderSummary CTA is a filled button.
 
 **Hero CTA**
 
@@ -123,7 +123,17 @@ transition-colors duration-200
 
 Followed by an inline chevron icon (`w-4 h-4 strokeWidth={1}`) that translates `0.5px` on hover.
 
-**OrderSummary CTA / EmptyState CTA (bottom-border underline)**
+**OrderSummary CTA (filled, C-03)**
+
+```
+flex h-12 w-full items-center justify-center gap-2 rounded-[var(--radius)] bg-primary px-4
+text-sm font-medium text-primary-foreground hover:bg-primary/90
+focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-foreground
+```
+
+Label from `lib/checkout-cta.ts` ("Checkout / إتمام الطلب", the sticky bar's key), followed by the mirrored `ArrowIcon`.
+
+**EmptyState CTA (bottom-border underline)**
 
 ```
 border-b border-foreground pb-1 text-sm text-foreground
@@ -251,7 +261,7 @@ The only "pill" is the cart counter, which isn't actually a pill: `text-[9px] fo
 - Cart image: `aspect-[3/4] w-20` on `bg-muted/30` — small, portrait.
 - Hover behavior on product card: `group-hover:opacity-80 transition-opacity duration-300 ease-out` — opacity-only, no scale.
 - Hover on category card: `group-hover:scale-102 transition-transform duration-500` — gentle 1.02× scale on the image only.
-- Image fallback (product): `flex items-center justify-center text-muted-foreground/20` with `strokeWidth={0.5}` icon at `w-10 h-10` — even thinner stroke than Elegant.
+- Image fallback (product): `flex items-center justify-center text-muted-foreground` with `strokeWidth={0.5}` icon at `w-10 h-10` — even thinner stroke than Elegant.
 
 ### Announcement Bar
 

@@ -6,7 +6,8 @@ import Link from 'next/link';
 import { Button } from '@ebda/ui';
 import { api, type Order } from '@/lib/api';
 import { MinimalChrome } from '../../../components';
-import { WaMeCodConfirmButton } from '../../../templates/shared/WaMeButtons';
+import { WaMeCodConfirmButton, useOrderQuestionHref } from '../../../templates/shared/WaMeButtons';
+import { useDeliveryWindow } from '../../../components/commerce/DeliveryChip';
 import { InstapayCard } from './InstapayCard';
 import { FawryReferenceCard } from './FawryReferenceCard';
 import { useStore, useStoreUrl } from '../../../contexts/StoreContext';
@@ -49,6 +50,19 @@ function SuccessContent() {
 
   const [order, setOrder] = useState<Order | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  // S-02: the receipt repeats the delivery window of the order's own shipping
+  // zone (clock starts at the order's date; the longest made-to-order lead time
+  // on the order; no window when the address matches no zone) and offers WhatsApp.
+  const orderLead = order
+    ? Math.max(0, ...order.items.map(i => i.product?.leadTimeDays ?? 0))
+    : null;
+  const deliveryWindow = useDeliveryWindow({
+    from: order ? new Date(order.createdAt) : null,
+    leadTimeDays: orderLead,
+    // The ORDER's zone, never the fastest one (W1c review I4).
+    address: order ? (order.shippingAddress ?? {}) : null,
+  });
+  const whatsappHref = useOrderQuestionHref(order?.orderNumber);
   const [paymentState, setPaymentState] = useState<PaymentState>(
     isCod ? 'cod' : isInstapay || fawryRef ? 'awaiting' : 'verifying'
   );
@@ -280,6 +294,8 @@ function SuccessContent() {
               paymentState={paymentState}
               store={store}
               loading={isLoading}
+              deliveryWindow={deliveryWindow}
+              whatsappHref={whatsappHref}
             />
           ) : (
             <p className="mt-8 text-sm text-muted-foreground">

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { MINUS, SignedAmount } from '@/lib/bidi';
 import { useLocalePrice } from '../../hooks/useLocalePrice';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -32,6 +33,10 @@ import { resolveColor, checkMinimumOrder, computeOrderAmounts, REGION } from '@e
 import { AcceptedPaymentBadges } from '../../components/AcceptedPaymentBadges';
 import { CartLineNote } from '../../components/commerce/CartLineNote';
 import { StickyCartTotal } from '../../components/commerce/StickyCartTotal';
+import { countText, ITEMS } from '../../lib/plural';
+import { CART_CHECKOUT_CTA } from '../../lib/checkout-cta';
+import { ArrowIcon } from '../../templates/shared/icons';
+import { Breadcrumbs } from '../../components/Breadcrumbs';
 
 export default function CartClient() {
   const {
@@ -109,6 +114,7 @@ export default function CartClient() {
     cta: cartZoneStyle(cartCtaZone),
   };
   const { language, t } = useLanguage();
+  const lang = language === 'ar' ? 'ar' : 'en';
   const { localize, money } = useNumerals();
   const formatPrice = useLocalePrice();
   const continuShoppingHref = useLastListing();
@@ -427,22 +433,17 @@ export default function CartClient() {
       <div className="flex-1" style={cartBgStyle}>
         <div className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 lg:px-8" style={cartDensity}>
           {/* Breadcrumb */}
-          <nav className="mb-6 flex items-center gap-2 text-sm text-muted-foreground">
-            <Link href={storeUrl('/')} className="transition-colors hover:text-primary">
-              {t('Home', translations['Home'])}
-            </Link>
-            <svg
-              className={`h-4 w-4 ${language === 'ar' ? 'rotate-180' : ''}`}
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-            </svg>
-            <span className="text-foreground">
-              {t('Shopping Cart', '\u0633\u0644\u0629 \u0627\u0644\u062a\u0633\u0648\u0642')}
-            </span>
-          </nav>
+          <Breadcrumbs
+            items={[
+              { label: t('Home', translations['Home']), href: storeUrl('/') },
+              {
+                label: t(
+                  'Shopping Cart',
+                  '\u0633\u0644\u0629 \u0627\u0644\u062a\u0633\u0648\u0642'
+                ),
+              },
+            ]}
+          />
 
           <h1
             className="text-3xl font-bold tracking-tight text-foreground"
@@ -452,7 +453,7 @@ export default function CartClient() {
           </h1>
           {(cartItems.length > 0 || cartBundles.length > 0) && (
             <p className="mt-2 text-muted-foreground" style={cartZoneStyle(cartLabelZone)}>
-              {cartCount} {t('items', '\u0645\u0646\u062a\u062c\u0627\u062a')}{' '}
+              {countText(lang, cartCount, ITEMS, localize(cartCount))}{' '}
               {t('in your cart', '\u0641\u064a \u0633\u0644\u062a\u0643')}
             </p>
           )}
@@ -502,7 +503,7 @@ export default function CartClient() {
                   )}
                 </p>
                 <Link href={storeUrl('/products')}>
-                  <Button className="mt-8 gap-2 rounded-xl shadow-lg shadow-primary/25" size="lg">
+                  <Button className="mt-8 gap-2 rounded-xl" size="lg">
                     <CartIcon className="h-5 w-5" />
                     {t(
                       'Start Shopping',
@@ -638,7 +639,7 @@ export default function CartClient() {
                                   </span>
                                 )}
                                 <h3
-                                  className="mt-0.5 text-lg font-bold text-foreground sm:text-xl"
+                                  className="mt-0.5 text-lg font-bold text-foreground [overflow-wrap:anywhere] sm:text-xl"
                                   data-zone="productName"
                                   style={cartZoneStyle(cartNameZone)}
                                 >
@@ -818,8 +819,8 @@ export default function CartClient() {
                         total={total}
                         currency={store.currency}
                         isRtl={language === 'ar'}
-                        ctaLabel="Proceed to Checkout"
-                        ctaLabelAr="المتابعة للدفع"
+                        ctaLabel={CART_CHECKOUT_CTA.en}
+                        ctaLabelAr={CART_CHECKOUT_CTA.ar}
                         ctaHref={storeUrl('/checkout')}
                         ctaDisabled={checkoutBlocked}
                         ctaBlockedMessage={checkoutBlockedMessage}
@@ -1008,7 +1009,7 @@ export default function CartClient() {
                                   'Subtotal',
                                   '\u0627\u0644\u0645\u062c\u0645\u0648\u0639 \u0627\u0644\u0641\u0631\u0639\u064a'
                                 )}{' '}
-                                ({cartCount} {t('items', '\u0645\u0646\u062a\u062c\u0627\u062a')})
+                                ({countText(lang, cartCount, ITEMS, localize(cartCount))})
                               </span>
                               <span
                                 className="font-bold text-foreground"
@@ -1024,7 +1025,7 @@ export default function CartClient() {
                                   {promoType === 'percentage' ? `${promoValue}%` : promoName})
                                 </span>
                                 <span className="font-medium text-success-ink">
-                                  -{formatPrice(discount)}
+                                  <SignedAmount sign={MINUS} value={formatPrice(discount)} />
                                 </span>
                               </div>
                             )}
@@ -1121,37 +1122,16 @@ export default function CartClient() {
                             <Button
                               type="button"
                               disabled
-                              className="mt-6 w-full gap-2 rounded-xl shadow-lg shadow-primary/25"
+                              className="mt-6 w-full gap-2 rounded-xl"
                               size="lg"
                             >
-                              {t(
-                                'Proceed to Checkout',
-                                '\u0627\u0644\u0645\u062a\u0627\u0628\u0639\u0629 \u0644\u0644\u062f\u0641\u0639'
-                              )}
+                              {t(CART_CHECKOUT_CTA.en, CART_CHECKOUT_CTA.ar)}
                             </Button>
                           ) : (
                             <Link href={storeUrl('/checkout')} className="mt-6 block">
-                              <Button
-                                className="w-full gap-2 rounded-xl shadow-lg shadow-primary/25"
-                                size="lg"
-                              >
-                                {t(
-                                  'Proceed to Checkout',
-                                  '\u0627\u0644\u0645\u062a\u0627\u0628\u0639\u0629 \u0644\u0644\u062f\u0641\u0639'
-                                )}
-                                <svg
-                                  className="h-5 w-5"
-                                  fill="none"
-                                  viewBox="0 0 24 24"
-                                  stroke="currentColor"
-                                >
-                                  <path
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    strokeWidth={2}
-                                    d="M14 5l7 7m0 0l-7 7m7-7H3"
-                                  />
-                                </svg>
+                              <Button className="w-full gap-2 rounded-xl" size="lg">
+                                {t(CART_CHECKOUT_CTA.en, CART_CHECKOUT_CTA.ar)}
+                                <ArrowIcon className="h-5 w-5" isRtl={language === 'ar'} />
                               </Button>
                             </Link>
                           )}
@@ -1228,7 +1208,12 @@ export default function CartClient() {
                 store.id &&
                 store.id !== 'demo' && (
                   <div className="mt-8">
-                    <CartRecommendations storeId={store.id} productIds={cartItems.map(i => i.id)} />
+                    <CartRecommendations
+                      storeId={store.id}
+                      // Product ids, not cart-line ids (the API looks up
+                      // relations by product; line ids matched nothing).
+                      productIds={[...new Set(cartItems.map(i => i.productId))]}
+                    />
                   </div>
                 )}
             </>
@@ -1249,12 +1234,9 @@ export default function CartClient() {
           formatPrice
         )(total)}
         itemCount={cartCount}
-        itemCountLabel={t(
-          `${localize(cartCount)} ${cartCount === 1 ? 'item' : 'items'}`,
-          `${localize(cartCount)} منتج`
-        )}
+        itemCountLabel={countText(lang, cartCount, ITEMS, localize(cartCount))}
         href={storeUrl('/checkout')}
-        label={t('Checkout', 'إتمام الطلب')}
+        label={t(CART_CHECKOUT_CTA.en, CART_CHECKOUT_CTA.ar)}
         disabled={checkoutBlocked}
         blockedMessage={checkoutBlockedMessage}
       />

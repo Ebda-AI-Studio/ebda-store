@@ -33,7 +33,14 @@ export interface BlogDetail {
  * supply plain text only, so the XSS surface stays at zero (unchanged from the
  * original client-only implementation).
  */
-export function BlogPostClient({ post }: { post: BlogDetail | null }) {
+export function BlogPostClient({
+  post,
+  shareUrl,
+}: {
+  post: BlogDetail | null;
+  /** Canonical post URL from the server, for the share row. */
+  shareUrl?: string;
+}) {
   const { isRtl } = useLanguage();
   const numerals = useStoreNumerals();
   const storeUrl = useStoreUrl();
@@ -53,7 +60,7 @@ export function BlogPostClient({ post }: { post: BlogDetail | null }) {
         <div className="mx-auto max-w-3xl px-4 sm:px-6 lg:px-8">
           {!post ? (
             <div className="text-center py-16">
-              <p className="text-foreground/60">
+              <p className="text-foreground/70">
                 {isRtl ? 'المقال غير موجود.' : 'Post not found.'}
               </p>
               <Link
@@ -69,11 +76,11 @@ export function BlogPostClient({ post }: { post: BlogDetail | null }) {
                 <Link
                   href={storeUrl('/blog')}
                   prefetch={false}
-                  className="text-sm font-semibold text-foreground/60 hover:text-foreground"
+                  className="text-sm font-semibold text-foreground/70 hover:text-foreground"
                 >
                   {isRtl ? '← المدونة' : '← Blog'}
                 </Link>
-                <p className="mt-6 text-xs text-foreground/55">
+                <p className="mt-6 text-xs text-muted-foreground">
                   {new Date(post.publishedAt ?? post.createdAt).toLocaleDateString(
                     intlLocale(isRtl ? 'ar' : 'en', numerals),
                     { year: 'numeric', month: 'long', day: 'numeric' }
@@ -105,7 +112,7 @@ export function BlogPostClient({ post }: { post: BlogDetail | null }) {
 
               <ShareProductRow
                 productName={isRtl && post.titleAr ? post.titleAr : post.title}
-                url={typeof window !== 'undefined' ? window.location.href : ''}
+                url={shareUrl}
                 className="mt-10 border-t border-foreground/10 pt-6"
               />
             </>

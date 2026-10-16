@@ -1,13 +1,15 @@
 'use client';
 
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useT } from '@/i18n/useT';
+import { IMAGE_UPLOAD_ACCEPT } from '@ebda/shared';
 import { useImageUpload } from '../hooks/useImageUpload';
 import { apiDelete } from '../lib/api';
 import { UploadDropzone } from './image-upload/UploadDropzone';
 import { UploadPreview } from './image-upload/UploadPreview';
 import { UploadProgress } from './image-upload/UploadProgress';
 import { MultiImageGrid } from './image-upload/MultiImageGrid';
+import { partitionImageFiles, type RefusedFile } from './image-upload/accept-files';
 
 /**
  * Extract the R2 object key from a stored URL. Both the public CDN URL
@@ -120,7 +122,25 @@ interface MultiImageUploadProps {
   recommendedSizeHint?: string;
 }
 
-const MAX_FILE_SIZE = 10 * 1024 * 1024;
+type ImageUploadT = ReturnType<typeof useT>;
+
+/** Name every file refused before upload, one clause per reason (type / size). */
+function describeRefused(t: ImageUploadT, refused: readonly RefusedFile[]): string | null {
+  if (refused.length === 0) return null;
+  const names = (reason: RefusedFile['reason']) =>
+    refused
+      .filter(r => r.reason === reason)
+      .map(r => r.name)
+      .join('، ');
+  const parts: string[] = [];
+  if (refused.some(r => r.reason === 'type')) {
+    parts.push(t('errors.refusedType', { files: names('type') }));
+  }
+  if (refused.some(r => r.reason === 'size')) {
+    parts.push(t('errors.refusedSize', { files: names('size') }));
+  }
+  return parts.join(' · ');
+}
 
 export function ImageUpload({
   value,
@@ -129,7 +149,7 @@ export function ImageUpload({
   folder = 'products',
   storeId,
   label,
-  accept = 'image/jpeg,image/png,image/webp,image/gif',
+  accept = IMAGE_UPLOAD_ACCEPT,
   className = '',
   aspectRatio = 'free',
   recommendedSizeHint,
@@ -162,12 +182,13 @@ export function ImageUpload({
       const typeOk = acceptTypes.some(
         tp => file.type === tp || (tp.endsWith('/*') && file.type.startsWith(tp.replace('/*', '/')))
       );
-      if (!typeOk) {
-        setLocalError(t('errors.typeNotAccepted', { type: file.type }));
-        return;
+      // The caller's `accept` may only narrow the server's list, never widen it.
+      const { refused } = partitionImageFiles([file]);
+      if (!typeOk && refused.length === 0) {
+        refused.push({ name: file.name, reason: 'type' });
       }
-      if (file.size > MAX_FILE_SIZE) {
-        setLocalError(t('errors.tooLarge'));
+      if (refused.length > 0) {
+        setLocalError(describeRefused(t, refused));
         return;
       }
 
@@ -271,6 +292,12 @@ export function MultiImageUpload({
   const resolvedLabel = label ?? t('multiLabel');
   const { uploading, progress, error, setError, uploadMulti } = useImageUpload();
   const [localError, setLocalError] = useState<string | null>(null);
+  // The attach after an upload must see the values as they are THEN: the merchant can remove,
+  // reorder or add images while a batch is in flight, and the closure's copy would undo that.
+  const valuesRef = useRef(values);
+  useEffect(() => {
+    valuesRef.current = values;
+  }, [values]);
 
   const handleFiles = useCallback(
     async (fileList: FileList) => {
@@ -280,18 +307,21 @@ export function MultiImageUpload({
         return;
       }
 
-      const files = Array.from(fileList)
-        .filter(f => f.type.startsWith('image/') && f.size <= MAX_FILE_SIZE)
-        .slice(0, remaining);
+      // Refuse (and name) what the server would refuse before anything is sent (FU46 I-1a).
+      const { accepted, refused } = partitionImageFiles(Array.from(fileList));
+      const files = accepted.slice(0, remaining);
+      const refusedText = describeRefused(t, refused);
       if (files.length === 0) {
-        setLocalError(t('errors.noValidFiles'));
+        setLocalError(refusedText ?? t('errors.noValidFiles'));
         return;
       }
 
-      setLocalError(null);
+      setLocalError(refusedText);
       setError(null);
-      const newUrls = await uploadMulti(files, folder, storeId);
-      if (newUrls) onChange([...values, ...newUrls]);
+      // Attach every image that WAS stored, even when a later batch failed (I-1b); the hook
+      // names the files it could not store in `error`.
+      const { urls } = await uploadMulti(files, folder, storeId);
+      if (urls.length > 0) onChange([...valuesRef.current, ...urls]);
     },
     [folder, max, onChange, setError, storeId, t, uploadMulti, values]
   );
@@ -317,7 +347,8 @@ export function MultiImageUpload({
     [onChange, values]
   );
 
-  const displayError = localError ?? error;
+  // Both can be true at once: files refused before upload AND files a batch could not store.
+  const displayError = [localError, error].filter(Boolean).join(' · ') || null;
 
   return (
     <div className={className}>
@@ -325,7 +356,7 @@ export function MultiImageUpload({
 
       {values.length < max && (
         <UploadDropzone
-          accept="image/jpeg,image/png,image/webp,image/gif"
+          accept={IMAGE_UPLOAD_ACCEPT}
           multiple
           onFiles={handleFiles}
           paddingClass="p-8"

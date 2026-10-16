@@ -1,5 +1,5 @@
 import { randomUUID } from 'crypto';
-import sharp from 'sharp';
+import { sniffImage } from '../lib/upload-sniff';
 import { prisma, Prisma, withStore } from '@ebda/database';
 import { AppError } from '../middleware/error-handler';
 import { featureService } from './feature.service';
@@ -69,16 +69,16 @@ export interface GeneratedPwaIcons {
 }
 
 /**
- * Icon sizes generated from a single merchant-uploaded source image.
- *
- * `padded: true` (maskable only) shrinks the source to ~80% inside a
- * transparent square so Android/iOS adaptive-icon safe zones don't clip the
- * artwork — the standard maskable-icon safe-zone convention.
+ * The size keys of the icon set. Since Ruling FU46-8 (no `sharp` on workerd) every key holds
+ * the merchant's source PNG unchanged; `size` is what the manifest declares for it and the
+ * browser scales the image to that size when it renders. `padded` documents that the
+ * maskable icon is NOT padded any more: the merchant keeps the artwork inside the central 80%
+ * (the admin hint says so).
  */
 const ICON_TARGETS: ReadonlyArray<{
   key: Exclude<keyof GeneratedPwaIcons, 'iconSource'>;
   size: number;
-  padded: boolean;
+  padded: false;
 }> = [
   { key: 'icon192', size: 192, padded: false },
   { key: 'icon384', size: 384, padded: false },
@@ -86,113 +86,48 @@ const ICON_TARGETS: ReadonlyArray<{
   { key: 'iconAppleTouch', size: 180, padded: false },
   { key: 'favicon32', size: 32, padded: false },
   { key: 'favicon16', size: 16, padded: false },
-  { key: 'maskableIcon', size: 512, padded: true },
+  { key: 'maskableIcon', size: 512, padded: false },
 ];
 
 /**
- * Generate the full PWA icon size set from one merchant-uploaded source
- * image and upload every size to R2 under `stores/<storeId>/pwa/`.
+ * Store the PWA icon set from one merchant-uploaded square PNG under `stores/<storeId>/pwa/`.
  *
- * Deviation from the 2026-05-04 plan: the plan's sketch called a
- * `uploadToR2` helper that doesn't exist in this codebase. This reuses the
- * repo's actual upload primitive, `StorageService.upload` (same one every
- * other admin upload surface — logos, hero, fonts — goes through).
+ * Workers-safe (Ruling FU46-8): nothing is decoded or resized — `sharp` cannot load on workerd,
+ * and before this change every production call threw there. The route has already checked the
+ * source is a square PNG of at least 512×512 and at most 1 MB from its bytes; this function
+ * re-checks it is a PNG (defence in depth: it is exported) and then stores the SAME bytes as the
+ * source and under every target key, `Content-Type: image/png`.
  *
- * Every icon key carries a per-generation VERSION suffix (`icon192-<ver>`),
- * unlike the fixed `filename: target.key` this replaced. `StorageService`
- * sets `CacheControl: public, max-age=31536000` (one year) on every upload,
- * so a fixed key meant re-uploading a new source kept the SAME R2 key and
- * URL — the browser/edge/PWA cache kept serving the OLD icon bytes for up to
- * a year, because nothing about the URL ever changed. Versioning the key
- * makes a new generation a NEW URL, which busts every cache layer for free.
+ * Every key carries a per-generation VERSION suffix (`icon192-<ver>`): `StorageService` sets a
+ * one-year `Cache-Control`, so a fixed key kept serving the old icon after a re-upload (#1912),
+ * and a fresh key per run means a mid-run failure never overwrites an icon that is live and
+ * referenced by `Store.pwaSettings` (#1913). The route deletes the previous generation once the
+ * new URLs are persisted (`cleanupRemovedJsonUrls`, issue 2201); a failed run leaves orphaned
+ * new-version objects that the R2 orphan sweep reports.
  *
- * It also closes the partial-failure defect this loop otherwise has: because
- * every target now gets a key nothing has ever pointed at, a mid-loop throw
- * (network blip, R2 hiccup) can no longer overwrite an EARLIER target that
- * was already live and referenced by `Store.pwaSettings` — the previous
- * generation's icons stay exactly as they were, still serving, still
- * consistent with the DB, until this call fully succeeds and its caller
- * persists the new URLs. On success the route deletes the PREVIOUS
- * generation's objects once the write commits (`cleanupRemovedJsonUrls` in
- * pwa.routes.ts, issue 2201), so a regeneration does not accumulate ~9
- * objects per upload. A failed run leaves orphaned new-version objects in
- * R2, never a half-updated live set. Those orphans are cheap and are REPORTED
- * by the weekly `r2-orphan-sweep` and `scripts/r2-orphan-audit.ts` (deleted
- * only when an operator opts in: `R2_ORPHAN_SWEEP_APPLY=true` / `--apply`).
- * Both read `Store.pwaSettings` through the shared `R2_REFERENCE_COLUMNS`
- * registry (lib/r2-references.ts), so the LIVE generation's icons count as
- * referenced and are never swept; `tests/unit/r2-reference-registry.test.ts`
- * pins that.
- *
- * Two separate failure domains, handled in two phases (issues #1913/#1916):
- *
- *  1. Run the ENTIRE sharp pipeline first and hold every output buffer in
- *     memory before any upload starts. A corrupt/garbage source, an
- *     unsupported format, or a decode/OOM failure therefore never touches
- *     R2 at all — it 400s as `ICON_GENERATION_FAILED` with every existing
- *     icon object (the previous generation) untouched.
- *  2. Only once every buffer exists do uploads start, concurrently (see
- *     below). This phase can still fail (R2 outage, a dropped `pwa` folder
- *     allowlist entry, a network blip) — because every key carries this
- *     run's version suffix (see above), a failure partway through leaves at
- *     worst a PARTIAL set of new-version objects (orphaned, cheap, swept by
- *     the orphan-audit script) while the previous generation's icons stay
- *     exactly as they were, still fully live and referenced by
- *     `Store.pwaSettings`. A genuine StorageService `AppError` (503
- *     `STORAGE_NOT_CONFIGURED`, 400 `INVALID_FOLDER`/`MISSING_TENANT`, …)
- *     is re-thrown UNCHANGED instead of being masked as "your image is
- *     invalid", so an infra failure surfaces with its real status code
- *     (error-handler.ts escalates >=500 to Sentry) instead of a silent,
- *     unalerted 400. An unrecognized upload error becomes 502
- *     `ICON_UPLOAD_FAILED` — also not "your image is invalid".
+ * Errors: a non-PNG source is a 400 `ICON_GENERATION_FAILED` before any upload. A
+ * StorageService `AppError` (503 `STORAGE_NOT_CONFIGURED`, 400 `INVALID_FOLDER`, ...) is re-thrown
+ * unchanged (#1916); any other upload failure is a 502 `ICON_UPLOAD_FAILED`, never "your image is
+ * invalid". The target uploads run concurrently: the caller holds a request transaction open
+ * across them (#1914).
  */
 export async function generatePwaIconSet(
   storeId: string,
-  sourceBuffer: Buffer,
-  background: { r: number; g: number; b: number; alpha: number } = { r: 0, g: 0, b: 0, alpha: 0 }
+  sourceBuffer: Buffer
 ): Promise<GeneratedPwaIcons> {
-  // One version per generation run, shared by every uploaded key so the
-  // whole set is internally consistent (and so a caller can tell which
-  // generation a URL belongs to just by reading it). A timestamp alone can
-  // collide when two generations land in the same millisecond (a merchant
-  // double-clicking "save", or a fast test) — randomUUID guarantees a fresh
-  // key every time regardless of timing.
+  // One version per run, shared by every key (randomUUID: two runs in one millisecond differ).
   const version = randomUUID().slice(0, 8);
 
-  let sourcePng: Buffer;
-  const prepared: Array<{ target: (typeof ICON_TARGETS)[number]; buffer: Buffer }> = [];
-  try {
-    // Normalize the source as-is to PNG so the pipeline can be re-run later
-    // against the original artwork without re-asking the merchant to
-    // upload again.
-    sourcePng = await sharp(sourceBuffer).png({ compressionLevel: 9 }).toBuffer();
-
-    for (const target of ICON_TARGETS) {
-      const innerSize = target.padded ? Math.floor(target.size * 0.8) : target.size;
-      const pad = target.size - innerSize;
-
-      const buf = await sharp(sourceBuffer, { density: Math.max(384, target.size * 2) })
-        .resize(innerSize, innerSize, { fit: 'contain', background })
-        .extend({
-          top: Math.floor(pad / 2),
-          bottom: Math.ceil(pad / 2),
-          left: Math.floor(pad / 2),
-          right: Math.ceil(pad / 2),
-          background,
-        })
-        .png({ compressionLevel: 9 })
-        .toBuffer();
-
-      prepared.push({ target, buffer: buf });
-    }
-  } catch (err) {
-    logger.error({ err, storeId }, 'pwa: icon set generation failed (image processing)');
-    throw new AppError(
-      400,
-      'ICON_GENERATION_FAILED',
-      'Could not process the uploaded icon. Use a valid square PNG, JPEG, WebP or SVG image.'
-    );
+  if (sniffImage(sourceBuffer) !== 'image/png') {
+    logger.warn({ storeId }, 'pwa: icon source is not a PNG');
+    const messageEn = 'The icon must be a square PNG image.';
+    throw new AppError(400, 'ICON_GENERATION_FAILED', messageEn, {
+      messageEn,
+      messageAr: 'يجب أن تكون الأيقونة صورة PNG مربعة.',
+    });
   }
+  const sourcePng = sourceBuffer;
+  const prepared = ICON_TARGETS.map(target => ({ target, buffer: sourceBuffer }));
 
   const results: Partial<GeneratedPwaIcons> = {};
   try {

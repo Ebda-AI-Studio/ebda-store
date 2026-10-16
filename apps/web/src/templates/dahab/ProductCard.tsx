@@ -22,6 +22,7 @@
  * master toggle are honoured.
  */
 import { useEffect, useState } from 'react';
+import { canBuyNow } from '@/lib/can-buy-now';
 import Image from 'next/image';
 import Link from 'next/link';
 import type { ProductCardProps } from '../types';
@@ -36,6 +37,7 @@ import { getCustomBadgeText } from '../shared/custom-badge';
 import { cx, BagIcon } from './ui';
 import { SwatchDots } from '../../components/commerce/SwatchDots';
 import { FactChips } from '../../components/commerce/FactChips';
+import { useRenderNow } from '../../contexts/RenderClockContext';
 
 export interface DahabProductCardProps extends ProductCardProps {
   /** `sizes` hint for the image (grid density decides it). */
@@ -54,6 +56,7 @@ export default function DahabProductCard({
 }: DahabProductCardProps) {
   const { isRtl: ctxIsRtl, t } = useLanguage();
   const { store } = useStore();
+  const renderNow = useRenderNow();
   const { numerals } = useNumerals();
   const formatPrice = useLocalePrice();
   const isRtl = isRtlProp ?? ctxIsRtl;
@@ -70,7 +73,7 @@ export default function DahabProductCard({
   const secondary = product.images?.[1];
   const pricing = getProductPricing(product, undefined, 'card');
   const inStock = product.inStock !== false;
-  const orderable = inStock || product.acceptsBackorder === true;
+  const orderable = canBuyNow(product);
   const hasVariants = (product.variants?.length ?? 0) > 0;
   const priceVisible = showCardPrice !== false && store.theme?.showPriceOnCards !== false;
   const nameVisible = showCardName !== false;
@@ -80,7 +83,7 @@ export default function DahabProductCard({
       ? getDiscountBadgeText(product, isRtl, undefined, undefined, numerals)
       : null;
   const custom = orderable ? getCustomBadgeText(product, isRtl) : null;
-  const isNew = inStock && isProductNew(product);
+  const isNew = inStock && isProductNew(product, renderNow);
   const badge = !orderable
     ? t('Sold out', 'نفدت الكمية')
     : (custom ?? discount ?? (isNew ? t('New', 'جديد') : null));
@@ -101,7 +104,7 @@ export default function DahabProductCard({
     ? t('Choose options', 'اختيار المقاس')
     : !orderable
       ? t('Sold out', 'نفدت الكمية')
-      : product.acceptsBackorder && !inStock
+      : orderable && !inStock
         ? t('Pre-order', 'طلب مسبق')
         : t('Add to bag', 'إضافة للسلة');
 
@@ -155,7 +158,7 @@ export default function DahabProductCard({
           {badge && (
             <span
               className={cx(
-                'absolute start-3 top-3 rounded-[2px] px-2 py-1 text-[11px] font-medium leading-none',
+                'absolute start-3 top-3 rounded-[2px] px-2 py-1 text-xs font-medium leading-none',
                 orderable
                   ? 'bg-background/85 text-primary backdrop-blur-sm'
                   : 'bg-background/85 text-muted-foreground'
@@ -197,7 +200,7 @@ export default function DahabProductCard({
 
       <div className="mt-3 flex flex-1 flex-col gap-1.5">
         {nameVisible && (
-          <h3 className="line-clamp-2 text-[15px] leading-snug text-foreground">
+          <h3 className="line-clamp-2 text-[15px] leading-snug text-foreground [overflow-wrap:anywhere]">
             <Link
               href={href}
               prefetch={false}

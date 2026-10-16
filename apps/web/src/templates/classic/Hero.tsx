@@ -44,24 +44,16 @@ export default function ClassicHero({
           {/* Text column */}
           <div
             className={`flex flex-col justify-center py-16 sm:py-20 lg:py-28 ${
-              image
-                ? isRtl
-                  ? 'lg:order-2 lg:pe-12'
-                  : 'lg:order-1 lg:pe-12'
-                : 'mx-auto w-full max-w-2xl items-center text-center'
+              image ? 'lg:order-1 lg:pe-12' : 'mx-auto w-full max-w-2xl items-center text-center'
             }`}
           >
             {/* Accent rule */}
-            <div
-              className={`w-12 h-px bg-foreground mb-8 ${
-                image ? (isRtl ? 'ms-auto' : 'ms-0') : 'mx-auto'
-              }`}
-            />
+            <div className={`w-12 h-px bg-foreground mb-8 ${image ? 'ms-0' : 'mx-auto'}`} />
 
             {/* Serif heading */}
             <h1
               className={`text-4xl md:text-5xl lg:text-6xl font-serif font-normal text-foreground leading-[1.1] tracking-tight mb-6 ${
-                image ? (isRtl ? 'text-right' : 'text-left') : 'text-center'
+                image ? 'text-start' : 'text-center'
               }`}
             >
               {displayTitle}
@@ -70,14 +62,14 @@ export default function ClassicHero({
             {/* Subtitle */}
             <p
               className={`text-base md:text-lg text-muted-foreground font-light leading-relaxed mb-10 max-w-sm ${
-                image ? (isRtl ? 'text-right ms-auto' : 'text-left') : 'text-center mx-auto'
+                image ? 'text-start' : 'text-center mx-auto'
               }`}
             >
               {displaySubtitle}
             </p>
 
             {/* CTA — outlined button with classic serif treatment */}
-            <div className={image ? (isRtl ? 'text-right' : 'text-left') : 'text-center'}>
+            <div className={image ? 'text-start' : 'text-center'}>
               <Link
                 href={resolvedCtaLink}
                 data-cta="button"
@@ -111,7 +103,7 @@ export default function ClassicHero({
 
           {/* Image column — only render when an image is configured. */}
           {image && (
-            <div className={`relative self-stretch ${isRtl ? 'lg:order-1' : 'lg:order-2'}`}>
+            <div className={`relative self-stretch lg:order-2`}>
               <div className="absolute inset-0 m-6">
                 <Image
                   src={image}

@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useLanguage } from '../../contexts/LanguageContext';
+import { useCurrentUrl } from '../../hooks/useCurrentUrl';
 
 /**
  * Sprint 4 (2026-05-17): PDP share row — X / Facebook / Telegram /
@@ -15,15 +16,18 @@ import { useLanguage } from '../../contexts/LanguageContext';
 
 interface ShareProductRowProps {
   productName: string;
-  url: string;
+  /** Defaults to the current page (read after hydration). */
+  url?: string;
   className?: string;
 }
 
 export function ShareProductRow({ productName, url, className = '' }: ShareProductRowProps) {
-  const { isRtl } = useLanguage();
+  const { isRtl, t } = useLanguage();
+  const currentUrl = useCurrentUrl();
+  const shareUrl = url ?? currentUrl;
   const [copied, setCopied] = useState(false);
 
-  const encodedUrl = encodeURIComponent(url);
+  const encodedUrl = encodeURIComponent(shareUrl);
   const encodedText = encodeURIComponent(productName);
 
   const shareLinks = [
@@ -59,7 +63,7 @@ export function ShareProductRow({ productName, url, className = '' }: ShareProdu
 
   async function handleCopy() {
     try {
-      await navigator.clipboard.writeText(url);
+      await navigator.clipboard.writeText(shareUrl);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch {
@@ -92,10 +96,10 @@ export function ShareProductRow({ productName, url, className = '' }: ShareProdu
         <button
           type="button"
           onClick={handleCopy}
-          aria-label={isRtl ? 'نسخ الرابط' : 'Copy link'}
+          aria-label={t('Copy link', 'نسخ الرابط')}
           // Touch hitbox: visual height stays 36px; before:-inset-y-2 grows
           // the vertical tap target to ~44px without changing rendered size.
-          className="relative before:absolute before:-inset-y-2 before:inset-x-0 before:content-[''] inline-flex h-9 items-center justify-center gap-1.5 rounded-full bg-foreground/5 hover:bg-foreground/10 text-foreground/80 hover:text-foreground transition-colors px-3 text-[11px] font-medium"
+          className="relative before:absolute before:-inset-y-2 before:inset-x-0 before:content-[''] inline-flex h-9 items-center justify-center gap-1.5 rounded-full bg-foreground/5 hover:bg-foreground/10 text-foreground/80 hover:text-foreground transition-colors px-3 text-xs font-medium"
         >
           {copied ? (
             <>

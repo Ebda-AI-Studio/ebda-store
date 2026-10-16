@@ -6,6 +6,7 @@ import { ShopChrome } from '../../components';
 import { useStore, useStoreUrl } from '../../contexts/StoreContext';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { faqReturnAnswer } from '../../lib/return-policy-text';
+import { useNumerals } from '../../hooks/useNumerals';
 
 // Generic fallback FAQs — shown only when the store hasn't authored any
 // store-specific FAQs via the admin FAQ manager.
@@ -109,6 +110,8 @@ export default function FAQClient({ storeFaqs = [], storeHowtos = [] }: FAQClien
   const { store } = useStore();
   const storeUrl = useStoreUrl();
   const { t, language } = useLanguage();
+  // Days in the store's digits, the same as the PDP trust line (review M8).
+  const { localize } = useNumerals();
   const [openFaqIndex, setOpenFaqIndex] = useState<number | null>(0);
   const [openHowtoIndex, setOpenHowtoIndex] = useState<number | null>(null);
 
@@ -126,7 +129,7 @@ export default function FAQClient({ storeFaqs = [], storeHowtos = [] }: FAQClien
           // The return answer follows the store's published window instead of a hard-coded 30 days.
           answer:
             f.question === 'What is your return policy?'
-              ? faqReturnAnswer(store.returnWindowDays, language)
+              ? faqReturnAnswer(store.returnWindowDays, language, localize)
               : t(f.answer, f.answerAr),
         }));
 

@@ -234,6 +234,8 @@ export function ShopChrome({ children, layout: layoutProp }: ShopChromeProps) {
               termsEnabled: typeof bb.termsEnabled === 'boolean' ? bb.termsEnabled : undefined,
               shippingEnabled:
                 typeof bb.shippingEnabled === 'boolean' ? bb.shippingEnabled : undefined,
+              returnsEnabled:
+                typeof bb.returnsEnabled === 'boolean' ? bb.returnsEnabled : undefined,
             };
           }
           return {
@@ -438,7 +440,9 @@ export function ShopChrome({ children, layout: layoutProp }: ShopChromeProps) {
           // Pages the merchant explicitly disabled in /content/<slug>.
           // The footer hides matching legal links so a disabled Privacy
           // page doesn't leave a dead "Privacy" link in the bottom bar.
-          disabledCmsSlugs={store.disabledCmsSlugs}
+          // The returns feature switched off counts as the returns page off: the
+          // legal row's Returns link drops with it (S-01). Unknown features keep it.
+          disabledCmsSlugs={footerDisabledSlugs(store.disabledCmsSlugs, store.enabledFeatures)}
           isRtl={isRtl}
           urlPrefix={urlPrefix}
           bgColor={
@@ -505,4 +509,18 @@ export function ShopChrome({ children, layout: layoutProp }: ShopChromeProps) {
       )}
     </div>
   );
+}
+
+/**
+ * The slugs whose footer legal link is off: the CMS pages the merchant turned
+ * off, plus `returns` when the store's returns feature is switched off (its
+ * request form needs the feature). Unknown features (`undefined`) keep it.
+ */
+export function footerDisabledSlugs(
+  disabledCmsSlugs: string[] | undefined,
+  enabledFeatures: string[] | undefined
+): string[] | undefined {
+  if (!Array.isArray(enabledFeatures) || enabledFeatures.includes('returns'))
+    return disabledCmsSlugs;
+  return [...(disabledCmsSlugs ?? []), 'returns'];
 }

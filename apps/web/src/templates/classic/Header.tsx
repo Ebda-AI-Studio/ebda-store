@@ -8,6 +8,7 @@ import type { HeaderProps, ResolvedUtilityBar } from '../types';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { LanguageSwitcher } from '../../components/LanguageSwitcher';
 import { SearchAutocomplete } from '../../components/SearchAutocomplete';
+import { countText, ITEMS } from '../../lib/plural';
 
 export default function ClassicHeader({
   branding,
@@ -20,7 +21,7 @@ export default function ClassicHeader({
   utilityBar,
   headerBgColor,
 }: HeaderProps) {
-  const { isRtl: ctxIsRtl } = useLanguage();
+  const { isRtl: ctxIsRtl, t } = useLanguage();
   const isRtl = isRtlProp ?? ctxIsRtl;
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -67,7 +68,7 @@ export default function ClassicHeader({
       {showUtilityBar && (
         <div className="hidden md:block bg-foreground text-background py-2">
           <div className="container mx-auto px-4 flex items-center justify-end text-xs tracking-wide">
-            <div className={`flex items-center gap-6 ${isRtl ? 'flex-row-reverse' : ''}`}>
+            <div className="flex items-center gap-6">
               {utilityBarLinks.map(link => (
                 <Link
                   key={`${link.label}-${link.href}`}
@@ -92,7 +93,7 @@ export default function ClassicHeader({
           <button
             onClick={() => setIsMenuOpen(!isMenuOpen)}
             className="md:hidden inline-flex h-11 w-11 items-center justify-center cursor-pointer text-foreground hover:text-primary transition-colors duration-500"
-            aria-label={isRtl ? 'القائمة' : 'Menu'}
+            aria-label={t('Menu', 'القائمة')}
             aria-expanded={isMenuOpen}
           >
             <svg
@@ -121,14 +122,12 @@ export default function ClassicHeader({
           </button>
 
           {/* Desktop: left nav */}
-          <nav
-            className={`hidden md:flex items-center gap-8 flex-1 ${isRtl ? 'justify-end flex-row-reverse' : 'justify-start'}`}
-          >
+          <nav className="hidden md:flex items-center gap-8 flex-1 justify-start">
             {leftNav.map(item => (
               <Link
                 key={item.href}
                 href={item.href}
-                className="relative text-lg font-serif tracking-widest ui-caps-toggle text-foreground/70 hover:text-foreground transition-colors duration-500 after:absolute after:bottom-0 after:left-0 after:w-0 after:h-px after:bg-foreground after:transition-[width] after:duration-300 hover:after:w-full"
+                className="relative whitespace-nowrap text-lg font-serif tracking-widest ui-caps-toggle text-foreground/70 hover:text-foreground transition-colors duration-500 after:absolute after:bottom-0 after:start-0 after:w-0 after:h-px after:bg-foreground after:transition-[width] after:duration-300 hover:after:w-full"
               >
                 {isRtl && item.labelAr ? item.labelAr : item.label}
               </Link>
@@ -157,25 +156,23 @@ export default function ClassicHeader({
           </Link>
 
           {/* Desktop: right nav */}
-          <nav
-            className={`hidden md:flex items-center gap-8 flex-1 ${isRtl ? 'justify-start flex-row-reverse' : 'justify-end'}`}
-          >
+          <nav className="hidden md:flex items-center gap-8 flex-1 justify-end">
             {rightNav.map(item => (
               <Link
                 key={item.href}
                 href={item.href}
-                className="relative text-lg font-serif tracking-widest ui-caps-toggle text-foreground/70 hover:text-foreground transition-colors duration-500 after:absolute after:bottom-0 after:left-0 after:w-0 after:h-px after:bg-foreground after:transition-[width] after:duration-300 hover:after:w-full"
+                className="relative whitespace-nowrap text-lg font-serif tracking-widest ui-caps-toggle text-foreground/70 hover:text-foreground transition-colors duration-500 after:absolute after:bottom-0 after:start-0 after:w-0 after:h-px after:bg-foreground after:transition-[width] after:duration-300 hover:after:w-full"
               >
                 {isRtl && item.labelAr ? item.labelAr : item.label}
               </Link>
             ))}
 
             {/* Action icons */}
-            <div className={`flex items-center gap-4 ${isRtl ? 'flex-row-reverse' : ''}`}>
+            <div className="flex items-center gap-4">
               <button
                 onClick={() => document.getElementById('classic-search-input')?.focus()}
-                className="cursor-pointer text-foreground/60 hover:text-foreground transition-colors duration-500"
-                aria-label={isRtl ? 'بحث' : 'Search'}
+                className="cursor-pointer text-foreground/70 hover:text-foreground transition-colors duration-500"
+                aria-label={t('Search', 'بحث')}
               >
                 <svg
                   className="w-5 h-5"
@@ -197,8 +194,8 @@ export default function ClassicHeader({
 
               <Link
                 href={isLoggedIn ? `${urlPrefix}/account` : `${urlPrefix}/auth/login`}
-                className="text-foreground/60 hover:text-foreground transition-colors duration-500"
-                aria-label={isRtl ? 'الحساب' : 'Account'}
+                className="text-foreground/70 hover:text-foreground transition-colors duration-500"
+                aria-label={t('Account', 'الحساب')}
               >
                 <svg
                   className="w-5 h-5"
@@ -217,16 +214,15 @@ export default function ClassicHeader({
               </Link>
               <Link
                 href={`${urlPrefix}/cart`}
-                className="relative text-foreground/60 hover:text-foreground transition-colors duration-500 cursor-pointer"
-                aria-label={
-                  isRtl ? `سلة التسوق (${cartItemCount})` : `Cart (${cartItemCount} items)`
-                }
+                className="relative text-foreground/70 hover:text-foreground transition-colors duration-500 cursor-pointer"
+                aria-label={t(
+                  `Cart (${countText('en', cartItemCount, ITEMS)})`,
+                  `سلة التسوق (${cartItemCount})`
+                )}
               >
                 <CartIcon className="w-5 h-5" strokeWidth={1.5} aria-hidden="true" />
                 {cartItemCount > 0 && (
-                  <span
-                    className={`absolute -top-2 ${isRtl ? '-left-2' : '-right-2'} bg-foreground text-background text-[10px] font-serif w-4 h-4 rounded-full flex items-center justify-center`}
-                  >
+                  <span className="absolute -top-2 -end-2 bg-foreground text-background text-xs font-serif h-[18px] min-w-[18px] px-1 rounded-full tabular-nums flex items-center justify-center">
                     {cartItemCount > 9 ? '9+' : cartItemCount}
                   </span>
                 )}
@@ -238,17 +234,15 @@ export default function ClassicHeader({
               to free row width for the centered logo. Only Cart visible
               here. Platform rule: Account hidden on mobile across all
               themes. */}
-          <div className={`flex md:hidden items-center gap-1 ${isRtl ? 'flex-row-reverse' : ''}`}>
+          <div className="flex md:hidden items-center gap-1">
             <Link
               href={`${urlPrefix}/cart`}
-              className="relative hidden md:inline-flex h-11 w-11 items-center justify-center text-foreground/60 hover:text-foreground transition-colors duration-500 cursor-pointer"
-              aria-label={isRtl ? 'السلة' : 'Cart'}
+              className="relative hidden md:inline-flex h-11 w-11 items-center justify-center text-foreground/70 hover:text-foreground transition-colors duration-500 cursor-pointer"
+              aria-label={t('Cart', 'السلة')}
             >
               <CartIcon className="w-5 h-5" strokeWidth={1.5} aria-hidden="true" />
               {cartItemCount > 0 && (
-                <span
-                  className={`absolute -top-2 ${isRtl ? '-left-2' : '-right-2'} bg-foreground text-background text-[10px] font-serif w-4 h-4 rounded-full flex items-center justify-center`}
-                >
+                <span className="absolute -top-2 -end-2 bg-foreground text-background text-xs font-serif h-[18px] min-w-[18px] px-1 rounded-full tabular-nums flex items-center justify-center">
                   {cartItemCount}
                 </span>
               )}
@@ -263,7 +257,7 @@ export default function ClassicHeader({
       <div className="hidden border-t border-border/40 py-3" data-zone="mobile-search">
         <form onSubmit={handleSearch} className="relative container mx-auto px-4">
           <svg
-            className={`absolute top-1/2 -translate-y-1/2 ${isRtl ? 'right-7' : 'left-7'} w-5 h-5 text-muted-foreground pointer-events-none`}
+            className="absolute top-1/2 -translate-y-1/2 start-7 w-5 h-5 text-muted-foreground pointer-events-none"
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
@@ -280,10 +274,10 @@ export default function ClassicHeader({
             type="text"
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
-            placeholder={isRtl ? 'بحث' : 'Search'}
-            className={`w-full ${isRtl ? 'pr-11 pl-4' : 'pl-11 pr-4'} py-2.5 border border-border bg-transparent font-serif text-base sm:text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-foreground transition-colors duration-500 rounded`}
+            placeholder={t('Search', 'بحث')}
+            className="w-full ps-11 pe-4 py-2.5 border border-border bg-transparent font-serif text-base sm:text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-foreground transition-colors duration-500 rounded"
             dir={isRtl ? 'rtl' : 'ltr'}
-            aria-label={isRtl ? 'بحث عن المنتجات' : 'Search products'}
+            aria-label={t('Search products', 'بحث عن المنتجات')}
           />
           <SearchAutocomplete query={searchQuery} onSelect={() => setSearchQuery('')} />
         </form>
@@ -297,10 +291,10 @@ export default function ClassicHeader({
             type="text"
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
-            placeholder={isRtl ? 'ابحث في مجموعتنا...' : 'Search our collection...'}
+            placeholder={t('Search our collection...', 'ابحث في مجموعتنا...')}
             className="w-full py-1.5 px-0 border-b border-border bg-transparent font-serif text-base sm:text-sm text-center text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-foreground transition-colors duration-500"
             dir={isRtl ? 'rtl' : 'ltr'}
-            aria-label={isRtl ? 'بحث عن المنتجات' : 'Search products'}
+            aria-label={t('Search products', 'بحث عن المنتجات')}
           />
           <SearchAutocomplete query={searchQuery} onSelect={() => setSearchQuery('')} />
         </form>
@@ -342,10 +336,10 @@ export default function ClassicHeader({
                 type="text"
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
-                placeholder={isRtl ? 'بحث...' : 'Search...'}
+                placeholder={t('Search...', 'بحث...')}
                 className="w-full py-2 px-0 border-b border-border bg-transparent text-sm font-serif text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-foreground transition-colors duration-500"
                 dir={isRtl ? 'rtl' : 'ltr'}
-                aria-label={isRtl ? 'بحث عن المنتجات' : 'Search products'}
+                aria-label={t('Search products', 'بحث عن المنتجات')}
               />
               <SearchAutocomplete
                 query={searchQuery}

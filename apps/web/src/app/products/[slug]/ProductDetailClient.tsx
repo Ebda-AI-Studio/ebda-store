@@ -27,7 +27,7 @@ import { useLanguage, translations } from '../../../contexts/LanguageContext';
 import { trackViewContent, trackAddToCart } from '../../../components/MarketingPixels';
 import { recordFocusProduct, getLastListing } from '@/lib/last-listing';
 import { VariantSelector } from '../../../components/VariantSelector';
-import { autoSelectVariant } from '@/lib/single-variant';
+import { autoSelectVariant, variantWithoutPicker } from '@/lib/single-variant';
 import { useTemplateComponents } from '../../../hooks/useTemplateComponents';
 import { useNumerals } from '../../../hooks/useNumerals';
 import { toTemplateProduct } from '../../../templates/adapters';
@@ -50,6 +50,10 @@ import { DahabProductDetail } from '../../../templates/dahab/ProductDetail';
 import { REGION } from '@ebda/shared';
 import { FactsTable } from '../../../components/commerce/FactsTable';
 import { DeliveryChip } from '../../../components/commerce/DeliveryChip';
+import { TrustLine } from '../../../components/commerce/TrustLine';
+import type { CodOffer } from '../../../lib/cod-offer';
+import { Breadcrumbs } from '../../../components/Breadcrumbs';
+import { canBuyNow, inStockNow } from '../../../lib/can-buy-now';
 import { SizeChartDialog } from '../../../components/commerce/SizeChartDialog';
 import { StickyAddToCart } from '../../../components/commerce/StickyAddToCart';
 import {
@@ -57,6 +61,7 @@ import {
   personalisationMissing,
 } from '../../../components/commerce/PersonalisationField';
 import { activePersonalisation, cleanNote } from '@ebda/shared';
+import { countText, ITEMS } from '../../../lib/plural';
 // Lazy-load heavy below-the-fold components to reduce initial bundle size
 const ReviewSection = dynamic(() => import('../../../components/ReviewSection'), { ssr: false });
 const FrequentlyBoughtTogether = dynamic(() =>
@@ -158,9 +163,18 @@ function ProductSkeleton() {
 interface ProductDetailClientProps {
   initialProduct?: Product | null;
   layout?: StoreLayoutSettings;
+  /** Server-read COD offer for the trust line (S-02); null/absent = no COD claim. */
+  codOffer?: CodOffer | null;
+  /** Canonical page URL from the server, for the share row. Absent -> read after hydration. */
+  shareUrl?: string;
 }
 
-export default function ProductDetailClient({ initialProduct, layout }: ProductDetailClientProps) {
+export default function ProductDetailClient({
+  initialProduct,
+  layout,
+  codOffer = null,
+  shareUrl,
+}: ProductDetailClientProps) {
   const params = useParams();
   const slug = params?.slug as string;
 
@@ -174,6 +188,8 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
   // Bumped when a tap on add-to-cart is blocked ONLY by the empty required note:
   // PersonalisationField then scrolls to, focuses and explains itself (no add).
   const [noteNudge, setNoteNudge] = useState(0);
+  // Bumped when add-to-cart is tapped with an option still unset (C-02).
+  const [optionNudge, setOptionNudge] = useState(0);
   const [selectedImage, setSelectedImage] = useState(0);
   const [isAdding, setIsAdding] = useState(false);
   const [isWishlisted, setIsWishlisted] = useState(false);
@@ -181,12 +197,26 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
   // A product with exactly one tappable variant starts with it selected — the
   // same rule VariantSelector uses for its initial pick — so the server render
   // already has Add to Cart enabled instead of flipping on after hydration.
-  const [selectedVariant, setSelectedVariant] = useState<ProductVariant | null>(() =>
-    autoSelectVariant(
-      initialProduct?.variants,
-      (initialProduct?.options ?? []).map(o => o.name)
-    )
-  );
+  const [selectedVariant, setSelectedVariant] = useState<ProductVariant | null>(() => {
+    const names = (initialProduct?.options ?? []).map(o => o.name);
+    return (
+      autoSelectVariant(initialProduct?.variants, names) ??
+      variantWithoutPicker(initialProduct?.variants, names)
+    );
+  });
+  // Variants but no option groups: no picker will ever set a variant, so the
+  // page holds one (also when the product loads client-side). Without this the
+  // buy button nudged a selector that is not on the page: a dead tap.
+  useEffect(() => {
+    if (selectedVariant || !product) return;
+    const v = variantWithoutPicker(
+      product.variants,
+      (product.options ?? []).map(o => o.name)
+    );
+    if (v) setSelectedVariant(v);
+    // Keyed on the product only; selectedVariant is read to skip, not to react.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [product]);
 
   // True once the shopper has tapped an option pill. An auto-selected single
   // variant (above) must not swap the gallery to its own image: the owner's
@@ -231,7 +261,7 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
     setSelectedImage(prev => (prev === idx ? prev : idx));
   };
   const { success: toastSuccess, error: toastError } = useToast();
-  const { addItem } = useCart();
+  const { addItem, itemCount: cartCount } = useCart();
   // Issue 1 fix (2026-05-28): destructure ctxLayout so we can merge it
   // with the server-side prop layout and forward to ShopChrome — the footer
   // bgColor (and other chrome overrides) were not applied on the PDP because
@@ -405,27 +435,42 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
     // must never wait on the network round-trip to reflect the toggle.
     const wasWishlisted = isWishlisted;
     setIsWishlisted(!wasWishlisted);
+    // Every shopper-facing string through t() (R-05): these toasts were English-only.
+    const name = language === 'ar' && product.nameAr ? product.nameAr : product.name;
     try {
       if (wasWishlisted) {
         await api.delete(`/wishlist/product/${product.id}`);
-        toastSuccess('Removed from wishlist', `${product.name} removed from your wishlist`);
+        toastSuccess(
+          t('Removed from wishlist', 'أُزيل من المفضلة'),
+          t(`${name} removed from your wishlist`, `أُزيل ${name} من المفضلة`)
+        );
       } else {
         await api.post('/wishlist', { productId: product.id });
-        toastSuccess('Added to wishlist', `${product.name} added to your wishlist`);
+        toastSuccess(
+          t('Added to wishlist', 'أُضيف إلى المفضلة'),
+          t(`${name} added to your wishlist`, `أُضيف ${name} إلى المفضلة`)
+        );
       }
     } catch {
       setIsWishlisted(wasWishlisted);
-      toastError('Error', 'Failed to update wishlist. Please try again.');
+      toastError(
+        t('Error', 'خطأ'),
+        t('Failed to update wishlist. Please try again.', 'تعذّر تحديث المفضلة. حاول مرة أخرى.')
+      );
     }
   };
 
   const handleAddToCart = async () => {
     if (!product) return;
 
-    // If this product has variants and no variant is selected yet, prompt the user
+    // An option is still unset (or the picked combination does not exist): the
+    // button is NOT disabled for that (C-02) — the tap takes the shopper to the
+    // first missing choice (VariantSelector `nudge`: scroll, focus, ring, live
+    // text). Same path for the main button, the Dahab pinned bar and the
+    // phone sticky bar, which all call this handler.
     const productVariants = product.variants ?? [];
     if (productVariants.length > 0 && !selectedVariant) {
-      toastSuccess('Select options', 'Please select all options before adding to cart');
+      setOptionNudge(n => n + 1);
       return;
     }
 
@@ -560,7 +605,6 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
   const effectiveInventory = selectedVariant ? selectedVariant.inventory : product.inventory;
 
   // Derived add-to-cart state
-  const variantRequired = hasVariants && !selectedVariant;
   // OOS decision: with a variant selected use that variant's stock; with NO
   // variant selected use the server's aggregate `inStock` flag, NOT
   // product.inventory directly — variant products carry 0/null product-level
@@ -568,16 +612,19 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
   // variant product's PDP either falsely show OOS or (when null) never show the
   // OOS label. The API's inStock already aggregates variant stock and respects
   // untracked inventory. (Fixed 2026-06-27.)
-  const outOfStock = selectedVariant ? selectedVariant.inventory === 0 : product.inStock === false;
+  //
+  // ONE rule for every buy surface on this page — the selector, both buttons, the
+  // sticky bars, the OOS ribbon and the delivery line (X-02/X-03): `canBuyNow`
+  // (stock OR backorder). `outOfStock` is only the on-hand half, for the wording.
+  const outOfStock = !inStockNow(product, selectedVariant);
+  const buyableNow = canBuyNow(product, selectedVariant);
   // Backorder: when the product (or selected variant) accepts backorders, an
   // out-of-stock item stays orderable — the cart + order API already honor
   // allowBackorder (product.service.ts enrichStockFlags → acceptsBackorder).
   // The storefront previously hard-disabled Add-to-Cart at 0 inventory,
   // silently blocking the backorder feature merchants paid for (Ebda audit
   // 2026-06-14).
-  const canBackorder =
-    outOfStock &&
-    (selectedVariant ? selectedVariant.acceptsBackorder : product.acceptsBackorder) === true;
+  const canBackorder = outOfStock && buyableNow;
   // THE add-to-cart disabled rule. Every buy button on this page (default button,
   // Dahab main + pinned bar, any sticky bar) reads this one value. A missing
   // required note is NOT a disabled reason: it is the separate `noteMissing`
@@ -585,16 +632,27 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
   // the field instead of adding (F6, the sticky bar's dead button). So a required
   // personalisation still can never be skipped by a second button.
   const noteMissing = personalisationMissing(product.personalisation, note);
-  const addDisabled = (outOfStock && !canBackorder) || variantRequired;
+  // `disabled` means the item cannot be bought (C-02). An option still to
+  // choose is recoverable, so it never disables or relabels the button; the
+  // tap nudges the selector instead (handleAddToCart).
+  const addDisabled = !buyableNow;
   // ONE source for the buy label and the price text: the main button, the Dahab
-  // pinned bar and the default sticky bar all read these.
-  const addLabel = variantRequired
-    ? t('Select Options', 'اختر الخيارات')
-    : canBackorder
-      ? t('Pre-order', 'اطلب مسبقاً')
-      : outOfStock
-        ? t('Out of Stock', 'غير متوفر')
-        : t('Add to Cart', translations['Add to Cart']);
+  // pinned bar and the default sticky bar all read these. The real verb at
+  // every step: no "Select options" placeholder label.
+  const addLabel = canBackorder
+    ? t('Pre-order', 'اطلب مسبقاً')
+    : outOfStock
+      ? t('Out of Stock', 'غير متوفر')
+      : t('Add to Cart', translations['Add to Cart']);
+  // The task bar replaces the tab bar (C-04), the only phone cart entry on most
+  // skins, so the bar carries its own cart link (W1a fix round, minor 3).
+  const cartLinkLabel =
+    cartCount > 0
+      ? t(
+          `Cart, ${countText('en', cartCount, ITEMS)}`,
+          `السلة، ${countText('ar', cartCount, ITEMS, localize(cartCount))}`
+        )
+      : t('Cart', 'السلة');
   const priceText =
     pricing.mode === 'range' && minVariantPrice !== null && maxVariantPrice !== null
       ? `${formatPrice(minVariantPrice)} – ${formatPrice(maxVariantPrice)}`
@@ -627,7 +685,7 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
   const { customBadgeText: pdpCustomBadgeText } = resolveCardBadges({
     product,
     isRtl: language === 'ar',
-    orderable: !outOfStock || canBackorder,
+    orderable: buyableNow,
     customPosition: resolvedLayout?.productCardDefaults?.customBadge?.position,
     discountPosition: resolvedLayout?.productCardDefaults?.discountBadge?.position,
     discountOccupiesCorner: false,
@@ -690,6 +748,7 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
             productsHref={storeUrl('/products')}
             shippingHref={storeUrl('/shipping')}
             returnsHref={storeUrl('/returns')}
+            codOffer={codOffer}
             excerpt={displayExcerpt}
             description={displayDescription}
             priceText={priceText}
@@ -710,7 +769,7 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
               outOfStock && !canBackorder
                 ? t('Out of stock', 'غير متوفر حالياً')
                 : canBackorder
-                  ? t('Made to order — ships when ready', 'بيتعمل مخصوص — يتشحن أول ما يجهز')
+                  ? t('Made to order — ships when ready', 'يُصنع حسب الطلب — يُشحن فور تجهيزه')
                   : null
             }
             onAddToCart={handleAddToCart}
@@ -720,15 +779,17 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
             note={note}
             onNoteChange={setNote}
             noteNudge={noteNudge}
+            optionNudge={optionNudge}
             addLabel={
-              variantRequired
-                ? t('Choose options', 'اختيار المقاس')
-                : canBackorder
-                  ? t('Pre-order', 'طلب مسبق')
-                  : outOfStock
-                    ? t('Out of stock', 'غير متوفر')
-                    : t('Add to bag', 'إضافة للسلة')
+              canBackorder
+                ? t('Pre-order', 'طلب مسبق')
+                : outOfStock
+                  ? t('Out of stock', 'غير متوفر')
+                  : t('Add to bag', 'إضافة للسلة')
             }
+            cartHref={storeUrl('/cart')}
+            cartCount={cartCount}
+            cartLabel={cartLinkLabel}
             isWishlisted={isWishlisted}
             onToggleWishlist={handleToggleWishlist}
             sku={product.sku}
@@ -756,10 +817,7 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
                   disabled={noteMissing}
                   onBlocked={() => setNoteNudge(n => n + 1)}
                 />
-                <ShareProductRow
-                  productName={displayName}
-                  url={typeof window !== 'undefined' ? window.location.href : ''}
-                />
+                <ShareProductRow productName={displayName} url={shareUrl} />
               </>
             }
             selectedImage={selectedImage}
@@ -810,49 +868,25 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
           style={pdpDensity}
           data-zone="products"
         >
-          {/* Breadcrumb */}
-          <nav className="mb-8 flex items-center gap-2 text-sm text-muted-foreground">
-            <Link href={storeUrl('/')} className="hover:text-primary">
-              {t('Home', translations['Home'])}
-            </Link>
-            <span>/</span>
-            <Link
-              href={storeUrl('/products')}
-              className="hover:text-primary flex items-center gap-1"
-            >
-              <svg
-                className={`h-3.5 w-3.5 ${language === 'ar' ? 'rotate-180' : ''}`}
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M15 19l-7-7 7-7"
-                />
-              </svg>
-              {t('Products', translations['Products'])}
-            </Link>
-            <span>/</span>
-            {/* Category segment — links back to the PLP filtered to this
-                product's primary category (home / products / <category> /
-                <product>). Locale-aware label; only renders when the product
-                has a category. */}
-            {categoryName && cat0?.category?.slug && (
-              <>
-                <Link
-                  href={storeUrl(`/products?category=${cat0.category.slug}`)}
-                  className="hover:text-primary"
-                >
-                  {categoryName}
-                </Link>
-                <span>/</span>
-              </>
-            )}
-            <span className="text-foreground">{displayName}</span>
-          </nav>
+          {/* Breadcrumb. Hidden below md (C-04): on a phone the fold is gallery, title,
+              price, the first selector and the buy button; the trail pushes them down. */}
+          <Breadcrumbs
+            className="mb-8 hidden text-sm md:block"
+            items={[
+              { label: t('Home', translations['Home']), href: storeUrl('/') },
+              { label: t('Products', translations['Products']), href: storeUrl('/products') },
+              // Category segment: back to the PLP filtered to the primary category.
+              ...(categoryName && cat0?.category?.slug
+                ? [
+                    {
+                      label: categoryName,
+                      href: storeUrl(`/products?category=${cat0.category.slug}`),
+                    },
+                  ]
+                : []),
+              { label: displayName },
+            ]}
+          />
 
           {/* Product Details */}
           <div className="grid gap-8 md:grid-cols-12">
@@ -948,13 +982,13 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
                     Sits OVER the swipe track so it stays put while images scroll. */}
                 {!show3d && (
                   <OosImageDim
-                    orderable={!outOfStock || canBackorder}
+                    orderable={buyableNow}
                     oosDimColor={productCardDefaults?.oosDimColor}
                     theme={store?.theme}
                   />
                 )}
                 <OutOfStockRibbon
-                  inStock={!outOfStock || canBackorder}
+                  inStock={buyableNow}
                   isRtl={language === 'ar'}
                   oosLabel={productCardDefaults?.oosLabel}
                   oosLabelTextEn={productCardDefaults?.oosLabelTextEn}
@@ -1022,7 +1056,7 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
                   Hardcoded text-3xl / text-2xl removed — size is purely zone-driven.
                   See design.md § "PDP name ≥ price invariant". */}
               <h1
-                className="font-bold text-foreground"
+                className="font-bold text-foreground [overflow-wrap:anywhere]"
                 data-zone="productName"
                 style={zoneStyle(pdpNameZone, pdpScale)}
               >
@@ -1060,6 +1094,7 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
                   onVariantSelect={setSelectedVariant}
                   onShopperSelect={() => setShopperPickedVariant(true)}
                   onSelectionChange={setPickedOptions}
+                  nudge={optionNudge}
                   swatchColor={model3d ? swatchColor : undefined}
                   sizeGuide={
                     product.sizeChart ? <SizeChartDialog chart={product.sizeChart} /> : undefined
@@ -1112,9 +1147,13 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
                   </div>
                   {effectiveInventory !== undefined && effectiveInventory !== null && (
                     <span className="text-sm text-muted-foreground">
-                      {effectiveInventory > 0
+                      {/* From the same stock answer as the button (X-02): a variant
+                          product's own inventory is 0, and a pre-order is not "out". */}
+                      {!outOfStock
                         ? t('In Stock', 'متوفر')
-                        : t('Out of Stock', 'غير متوفر')}
+                        : canBackorder
+                          ? t('Available to pre-order', 'متاح للطلب المسبق')
+                          : t('Out of Stock', 'غير متوفر')}
                     </span>
                   )}
                 </div>
@@ -1144,9 +1183,11 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
                     size="lg"
                     variant="outline"
                     onClick={handleToggleWishlist}
-                    aria-label={isWishlisted ? 'Remove from wishlist' : 'Add to wishlist'}
+                    aria-label={t('Save to wishlist', 'حفظ في المفضلة')}
+                    aria-pressed={isWishlisted}
                   >
                     <svg
+                      aria-hidden="true"
                       className="h-5 w-5"
                       fill={isWishlisted ? 'currentColor' : 'none'}
                       viewBox="0 0 24 24"
@@ -1161,7 +1202,10 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
                     </svg>
                   </Button>
                 </div>
-                <DeliveryChip leadTimeDays={product.leadTimeDays} />
+                {/* X-03: a delivery date only for something that can be bought now. */}
+                {buyableNow && <DeliveryChip leadTimeDays={product.leadTimeDays} />}
+                {/* S-02: COD · return window, from the store's own settings. */}
+                <TrustLine cod={codOffer} />
               </div>
 
               {/* Below the buy block: the category chip and the description (fold rule above). */}
@@ -1202,7 +1246,7 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
               />
               <ShareProductRow
                 productName={language === 'ar' && product.nameAr ? product.nameAr : product.name}
-                url={typeof window !== 'undefined' ? window.location.href : ''}
+                url={shareUrl}
                 className="mt-6 border-t border-border pt-6"
               />
               <SpecTable
@@ -1310,6 +1354,10 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
         label={addLabel}
         disabled={addDisabled || isAdding}
         onAdd={handleAddToCart}
+        cartHref={storeUrl('/cart')}
+        cartCount={cartCount}
+        cartCountText={localize(cartCount)}
+        cartLabel={cartLinkLabel}
       />
     </ShopChrome>
   );

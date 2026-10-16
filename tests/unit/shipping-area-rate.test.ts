@@ -86,4 +86,39 @@ describe('resolveShippingFee priority', () => {
     expect(r.freeShipping).toBe(true);
     expect(r.shippingCost).toBe(0);
   });
+
+  // Carry 5 (B0-46 T15): the legacy zone match is the receipt's rule (`zoneForAddress`):
+  // whole names, normalised, area then governorate. A substring hit charged the wrong zone.
+  it('a zone area that is only a substring of the shopper area does not match', () => {
+    const zones = [{ areas: ['Tor'], deliveryFee: 4000, freeShippingThreshold: null }];
+    const r = resolveShippingFee([], zones as any, {
+      governorate: 'Alexandria',
+      area: 'Victoria',
+      orderTotal: 5000,
+    });
+    expect(r.matched).toBe(false);
+    expect(r.shippingCost).toBe(0);
+  });
+  it('an area no zone lists falls to the zone that names its governorate', () => {
+    const zones = [
+      { areas: ['Nasr City'], deliveryFee: 3000, freeShippingThreshold: null },
+      { areas: ['Aswan', 'Luxor'], deliveryFee: 9000, freeShippingThreshold: null },
+    ];
+    const r = resolveShippingFee([], zones as any, {
+      governorate: 'Aswan',
+      area: 'Edfu',
+      orderTotal: 5000,
+    });
+    expect(r.source).toBe('zone');
+    expect(r.shippingCost).toBe(9000);
+  });
+  it('the zone match ignores case and spacing', () => {
+    const zones = [{ areas: ['Nasr City'], deliveryFee: 3000, freeShippingThreshold: null }];
+    const r = resolveShippingFee([], zones as any, {
+      governorate: '',
+      area: ' nasr  city',
+      orderTotal: 5000,
+    });
+    expect(r.shippingCost).toBe(3000);
+  });
 });

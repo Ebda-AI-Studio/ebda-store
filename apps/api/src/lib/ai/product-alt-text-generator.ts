@@ -1,12 +1,9 @@
 /**
  * Shared product-image alt-text generation core (Gemini Vision).
  *
- * Fetches the image bytes, rasterizes to a Gemini-supported mime type
- * (mirrors the private `rasterizeForGemini` helper in `ai.service.ts` —
- * duplicated here rather than exported so this bulk-AI module stays
- * self-contained with the plain `config.googleAiKey` + `callWithRetry`
- * plumbing used by every other `bulk-ai-*` generator), then asks Gemini
- * for a concise, descriptive, SEO+a11y-friendly alt string.
+ * Fetches the image bytes, checks Gemini accepts the type (`geminiInlineImage`, shared with
+ * `ai.service.ts`; no rasterizing since sharp cannot run on workerd), then asks Gemini for a
+ * concise, descriptive, SEO+a11y-friendly alt string.
  *
  * Used by the `bulk-ai-image-alt` Inngest sweep. No per-image button exists
  * yet, but keeping this as a standalone module (rather than inline in the
@@ -14,33 +11,12 @@
  * leaves room for one later.
  */
 import { GeminiFailoverClient } from './gemini-keys';
-import sharp from 'sharp';
+import { geminiInlineImage } from './gemini-image';
 import { safeFetchImage } from '../safe-fetch';
 import { rethrowAsAppError } from './gemini-errors';
 import { recordUsage } from '../../services/ai.service';
 
 export const ALT_TEXT_MAX_LENGTH = 160;
-
-// Gemini Vision accepts only these mime types for inline_data — see
-// https://ai.google.dev/gemini-api/docs/prompting_with_media#supported_file_formats
-const GEMINI_SUPPORTED_IMAGE_MIME_TYPES = new Set([
-  'image/png',
-  'image/jpeg',
-  'image/webp',
-  'image/heic',
-  'image/heif',
-]);
-
-async function rasterizeForGemini(
-  buf: Buffer,
-  mimeType: string
-): Promise<{ data: string; mimeType: string }> {
-  if (GEMINI_SUPPORTED_IMAGE_MIME_TYPES.has(mimeType)) {
-    return { data: buf.toString('base64'), mimeType };
-  }
-  const png = await sharp(buf).png().toBuffer();
-  return { data: png.toString('base64'), mimeType: 'image/png' };
-}
 
 export interface GenerateProductAltTextInput {
   /** storeId for AI quota-usage attribution (AiUsage row). */
@@ -53,9 +29,9 @@ export interface GenerateProductAltTextInput {
 }
 
 /**
- * Fetch + rasterize the image, then generate a concise alt string
- * (<=160 chars) via Gemini Vision. Throws on fetch failure, rasterize
- * failure, or a missing/empty model response — the caller (bulk sweep)
+ * Fetch the image, then generate a concise alt string (<=160 chars) via Gemini Vision.
+ * Throws on fetch failure, an image type Gemini cannot read (GIF/SVG), or a missing/empty
+ * model response — the caller (bulk sweep)
  * maps these to a per-image failure entry.
  */
 export async function generateProductAltText(
@@ -83,7 +59,8 @@ export async function generateProductAltText(
     .trim()
     .toLowerCase();
 
-  const { data: base64, mimeType } = await rasterizeForGemini(Buffer.from(arrayBuf), rawMime);
+  // Throws GeminiImageUnsupported for GIF/SVG: the sweep records it as this image's failure.
+  const { data: base64, mimeType } = geminiInlineImage(Buffer.from(arrayBuf), rawMime);
 
   const prompt = `Write ONE concise, descriptive alt-text string for this e-commerce product image.
 

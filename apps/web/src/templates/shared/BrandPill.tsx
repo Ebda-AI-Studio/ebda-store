@@ -30,7 +30,7 @@ export function BrandPill({ hidden = false, className = '' }: BrandPillProps) {
   if (!label) return null;
   return (
     <span
-      className={`absolute top-3 start-3 z-10 inline-flex items-center rounded px-2 py-0.5 text-[10px] font-semibold tracking-wide bg-[hsl(var(--accent))]/95 text-[hsl(var(--accent-foreground))] shadow-[0_4px_10px_-4px_hsl(var(--foreground)/0.25)] backdrop-blur-sm pointer-events-none ${className}`}
+      className={`absolute top-3 start-3 z-10 inline-flex items-center rounded px-2 py-0.5 text-xs font-semibold tracking-wide bg-[hsl(var(--accent))]/95 text-[hsl(var(--accent-foreground))] shadow-[0_4px_10px_-4px_hsl(var(--foreground)/0.25)] backdrop-blur-sm pointer-events-none ${className}`}
       aria-hidden
     >
       {label}

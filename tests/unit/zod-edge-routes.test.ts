@@ -17,7 +17,6 @@ const m = vi.hoisted(() => ({
   addRelation: vi.fn(async () => ({ id: 'rel-1' })),
   wishlistFind: vi.fn(async () => ({ id: 'w1', isPublic: false })),
   wishlistUpdate: vi.fn(async (a: any) => ({ id: 'w1', isPublic: a.data.isPublic })),
-  getUploadUrl: vi.fn(async () => ({ url: 'https://r2.example/u' })),
   checkStoreAccess: vi.fn(async () => ({ ok: true })),
   revalidateTag: vi.fn(),
 }));
@@ -56,7 +55,7 @@ vi.mock('@api/middleware/security', () => ({
   auditLog: vi.fn(),
 }));
 vi.mock('@api/services/storage.service', () => ({
-  StorageService: { getUploadUrl: m.getUploadUrl },
+  StorageService: {},
 }));
 vi.mock('@api/services/image-resize.service', () => ({
   resizeToAspect: vi.fn(),
@@ -195,27 +194,15 @@ describe('wishlist PUT /visibility', () => {
   });
 });
 
-describe('uploads POST /presigned — body storeId', () => {
+describe('uploads POST /presigned is gone (Ruling FU46-5b)', () => {
   const a = app('/uploads', uploadRoutes);
-  const base = { filename: 'a.png', contentType: 'image/png', folder: 'products' };
 
-  it('rejects a non-string storeId before it reaches checkStoreAccess', async () => {
+  it('answers 404: a direct-to-R2 PUT is never byte-checked, so the route no longer exists', async () => {
     const res = await request(a)
       .post('/uploads/presigned')
-      .send({ ...base, storeId: { id: 1 } });
-    expect(res.status).toBe(400);
+      .send({ filename: 'a.png', contentType: 'image/png', folder: 'products', storeId: 's1' });
+    expect(res.status).toBe(404);
     expect(m.checkStoreAccess).not.toHaveBeenCalled();
-  });
-  it('accepts a string storeId and a null storeId', async () => {
-    const ok = await request(a)
-      .post('/uploads/presigned')
-      .send({ ...base, storeId: 's1' });
-    expect(ok.status).toBe(200);
-    expect(m.checkStoreAccess).toHaveBeenCalledWith('s1', expect.anything());
-    const nul = await request(a)
-      .post('/uploads/presigned')
-      .send({ ...base, storeId: null });
-    expect(nul.status).toBe(200);
   });
 });
 

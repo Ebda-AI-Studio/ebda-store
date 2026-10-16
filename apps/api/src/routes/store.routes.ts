@@ -31,6 +31,8 @@ import {
   LOOK_MOTIONS,
   deliveryDaysSchema,
   deliveryOffDaysSchema,
+  footerBottomBarSchema,
+  normalizeStoredBottomBar,
 } from '@ebda/shared';
 import {
   maskMarketingPixelSecrets,
@@ -108,7 +110,8 @@ function addDeliveryOffDaysIssues(
  * - `contact.addressUrl` renders into `<a href>`: a `javascript:`/`data:` value is stored XSS;
  * - `deliveryDays` and `deliveryOffDays` (above);
  * - `floatingWidget` button links render as `<a href>`; the dedicated route validates them, so
- *   this generic path must too (S2).
+ *   this generic path must too (S2);
+ * - `footerLinks.bottomBar` (the footer legal row's toggles + © override, S-01).
  * All other keys pass through unvalidated (existing behaviour).
  */
 function addSettingsIssues(settings: Record<string, unknown> | undefined, ctx: z.RefinementCtx) {
@@ -128,6 +131,22 @@ function addSettingsIssues(settings: Record<string, unknown> | undefined, ctx: z
   }
   addDeliveryDaysIssues(settings, ctx);
   addDeliveryOffDaysIssues(settings, ctx);
+  // The footer legal row's toggles + © override (S-01): typed, length-capped.
+  const footerLinks = settings?.footerLinks;
+  if (footerLinks && typeof footerLinks === 'object' && 'bottomBar' in footerLinks) {
+    const parsed = footerBottomBarSchema.safeParse(
+      normalizeStoredBottomBar((footerLinks as Record<string, unknown>).bottomBar)
+    );
+    if (!parsed.success) {
+      for (const issue of parsed.error.issues) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['footerLinks', 'bottomBar', ...issue.path],
+          message: issue.message,
+        });
+      }
+    }
+  }
   for (const issue of floatingWidgetLinkIssues(settings)) {
     ctx.addIssue({ code: z.ZodIssueCode.custom, path: issue.path, message: issue.message });
   }

@@ -56,7 +56,7 @@ export default function ElegantHero({
               At lg+ where the image area takes ~60vw, object-cover
               fills the larger surface without losing meaningful pixels. */}
           <div
-            className={`relative w-full lg:w-[60%] aspect-[4/3] sm:aspect-[16/10] lg:aspect-auto lg:min-h-full bg-muted ${isRtl ? 'lg:order-2' : 'lg:order-1'} overflow-hidden`}
+            className={`relative w-full lg:w-[60%] aspect-[4/3] sm:aspect-[16/10] lg:aspect-auto lg:min-h-full bg-muted lg:order-1 overflow-hidden`}
           >
             <Image
               src={image}
@@ -70,11 +70,9 @@ export default function ElegantHero({
           </div>
 
           {/* Text side — 40% */}
-          <div
-            className={`w-full lg:w-[40%] bg-background flex items-center ${isRtl ? 'lg:order-1' : 'lg:order-2'}`}
-          >
+          <div className={`w-full lg:w-[40%] bg-background flex items-center lg:order-2`}>
             <div
-              className={`px-6 sm:px-8 md:px-12 lg:px-16 py-10 sm:py-12 md:py-16 max-w-lg ${isRtl ? 'text-right mr-auto' : 'text-left'}`}
+              className={`px-6 sm:px-8 md:px-12 lg:px-16 py-10 sm:py-12 md:py-16 max-w-lg me-auto text-start`}
             >
               {/* Eyebrow ("New Collection") removed — was hardcoded
                   template demo copy. */}
@@ -88,7 +86,7 @@ export default function ElegantHero({
                   </span>
                 )}
               </h1>
-              <div className={`w-12 h-px bg-foreground/20 mb-8 ${isRtl ? 'mr-0 ml-auto' : ''}`} />
+              <div className="w-12 h-px bg-foreground/20 mb-8 me-auto" />
               <p className="text-sm text-muted-foreground font-light tracking-wide leading-loose mb-12 max-w-xs">
                 {displaySubtitle}
               </p>

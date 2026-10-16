@@ -96,6 +96,14 @@ const PHASE_B_PENDING: Record<string, string> = {
   'apps/web/src/templates/shared/custom-badge.ts': 'builder/templates/layout workstream (excluded)',
   'apps/web/src/templates/shared/FloatingWidget.tsx':
     'builder/templates/layout workstream (excluded)',
+  'apps/web/src/templates/card-mappers-cta.test.tsx':
+    'PecannbeeProductCard rename (blocked on templates workstream)',
+  'apps/web/src/templates/card-new-badge.test.tsx':
+    'PecannbeeProductCard rename (blocked on templates workstream)',
+  'apps/web/src/templates/shared/card-overflow.test.tsx':
+    'PecannbeeProductCard rename (blocked on templates workstream)',
+  'apps/web/src/templates/shared/sold-out-corner.test.tsx':
+    'PecannbeeProductCard rename (blocked on templates workstream)',
   'apps/web/src/templates/shared/footer-branches-render.test.tsx':
     'builder/templates/layout workstream (excluded)',
   'apps/web/src/templates/shared/HeroSlider.tsx': 'builder/templates/layout workstream (excluded)',

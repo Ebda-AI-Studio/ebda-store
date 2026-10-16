@@ -1,6 +1,7 @@
 'use client';
 
 import { memo } from 'react';
+import { canBuyNow } from '@/lib/can-buy-now';
 import { resolveProductCardCtaOosDefaults } from '../shared/product-card-defaults';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -45,6 +46,7 @@ import {
 import { cn } from '@ebda/ui';
 import { SwatchDots } from '../../components/commerce/SwatchDots';
 import { FactChips } from '../../components/commerce/FactChips';
+import { useRenderNow } from '../../contexts/RenderClockContext';
 
 /**
  * Minimal Template - Product Card
@@ -83,8 +85,9 @@ function MinimalProductCard({
   showCardPrice,
   showHover,
 }: ProductCardProps) {
-  const { isRtl: ctxIsRtl } = useLanguage();
+  const { isRtl: ctxIsRtl, t } = useLanguage();
   const { store, layout } = useStore();
+  const renderNow = useRenderNow();
   // Ruling NUMERALS-1: Western digits unless the store opted in (Arabic only).
   const numerals = storeNumerals(store?.theme);
   const isRtl = isRtlProp ?? ctxIsRtl;
@@ -117,7 +120,7 @@ function MinimalProductCard({
   // BUG 1 fix: use helper for correct EGP/pct text.
   const discountBadgeText = getDiscountBadgeText(product, isRtl, undefined, undefined, numerals);
   // Task 13: backorder-aware orderable signal. OOS + backorder allowed → orderable.
-  const orderable = product.inStock !== false || product.acceptsBackorder === true;
+  const orderable = canBuyNow(product);
   const handleAddToCart = async (productId: string) => {
     await onAddToCart?.(productId);
   };
@@ -147,9 +150,13 @@ function MinimalProductCard({
   // Discount/sale badge — minimal's badge is inline text below the price
   // (no corner overlay by design, "minimal pack stays chrome-free"), so
   // only the merchant-configurable COLOR applies here; the position field
-  // is a no-op for this theme. Unset color falls back to the platform
-  // destructive/red default (matches the previous hardcoded text-red-600).
-  const discountBadgeColor = getDiscountBadgeColor(defaults?.discountBadge?.color, store.theme);
+  // is a no-op for this theme. The label is TEXT here, so an unset color
+  // falls back to the store's destructive ink (>= 4.5:1 on its page, K-01).
+  const discountBadgeColor = getDiscountBadgeColor(
+    defaults?.discountBadge?.color,
+    store.theme,
+    'text'
+  );
   // Custom (merchant-authored) badge. Unlike the other four themes, minimal's
   // DISCOUNT indicator is inline text under the price with no corner at all,
   // so the two can never collide: `discountOccupiesCorner: false` keeps the
@@ -177,7 +184,7 @@ function MinimalProductCard({
     topEndReserved: Boolean(onRemoveFromWishlist),
     // Issue #2092 (#1997 sweep) — minimal's own NEW chip sits at logical
     // top-start; the SAME expression it renders on below.
-    newOrBrandBadgeReserved: Boolean(product.inStock !== false && isProductNew(product)),
+    newOrBrandBadgeReserved: Boolean(product.inStock !== false && isProductNew(product, renderNow)),
     bottomOverlay: 'both',
   });
 
@@ -233,10 +240,10 @@ function MinimalProductCard({
               so it doesn't violate the chrome-free identity but still
               flags fresh inventory. Hides under OOS via isProductNew
               implicit gating in caller order. */}
-          {product.inStock !== false && isProductNew(product) && (
+          {product.inStock !== false && isProductNew(product, renderNow) && (
             <span
-              className="absolute top-2 start-2 z-10 px-2 py-0.5 text-[10px] font-medium uppercase tracking-[0.18em] text-[hsl(var(--primary))] bg-background"
-              aria-label={isRtl ? 'منتج جديد' : 'New product'}
+              className="absolute top-2 start-2 z-10 px-2 py-0.5 text-xs font-medium uppercase tracking-[0.18em] text-[hsl(var(--primary))] bg-background"
+              aria-label={t('New product', 'منتج جديد')}
             >
               {isRtl ? 'جديد' : 'NEW'}
             </span>
@@ -253,7 +260,7 @@ function MinimalProductCard({
           {customBadgeText && (
             <span
               className={cn(
-                'pointer-events-none absolute z-10 px-2 py-0.5 text-[10px] font-medium uppercase tracking-[0.18em] text-white',
+                'pointer-events-none absolute z-10 px-2 py-0.5 text-xs font-medium uppercase tracking-[0.18em] text-white',
                 customBadgePositionCls
               )}
               style={{ backgroundColor: customBadgeColor, color: customBadgeTextColor }}
@@ -310,7 +317,7 @@ function MinimalProductCard({
               )}
             </>
           ) : (
-            <div className="w-full h-full flex items-center justify-center text-muted-foreground/20">
+            <div className="w-full h-full flex items-center justify-center text-muted-foreground">
               <svg
                 className="w-10 h-10"
                 fill="none"
@@ -338,7 +345,7 @@ function MinimalProductCard({
               language. */}
           <div
             className={cn(
-              'flex absolute bottom-0 inset-x-0 items-center justify-center pb-4 pt-12',
+              'flex absolute bottom-0 inset-x-0 items-center justify-center px-3 pb-4 pt-12',
               'bg-gradient-to-t from-background/95 via-background/70 to-transparent',
               // Mobile: the underlined add-link is always tappable (no hover to
               // reveal). Desktop: keep the on-hover reveal — "mobile stays pure"
@@ -358,7 +365,7 @@ function MinimalProductCard({
               onAddToCart={handleAddToCart}
               variant="ghost"
               className={cn(
-                'bg-transparent text-[10px] tracking-[0.28em] uppercase font-light text-foreground',
+                'max-w-full overflow-hidden text-ellipsis bg-transparent text-xs tracking-[0.14em] uppercase font-normal text-foreground',
                 'underline underline-offset-4 decoration-foreground/30 hover:decoration-foreground',
                 'hover:bg-transparent hover:text-foreground transition-colors duration-300',
                 'py-1 h-auto cursor-pointer'
@@ -385,14 +392,12 @@ function MinimalProductCard({
 
         {/* Text — PC-1: name/price sizes from textSizes; PC-2: pad from textSizes.pad. */}
         {showLabel !== false && (nameVisible || priceVisible) && (
-          <div
-            className={`flex flex-col gap-2 ${textSizes.pad} ${isRtl ? 'text-right' : 'text-left'}`}
-          >
+          <div className={`flex flex-col gap-2 ${textSizes.pad} text-start`}>
             {nameVisible && (
               <h3
                 id={`prod-${product.id}-name`}
                 data-zone="productName"
-                className={`${textSizes.name} tracking-[0.18em] ${nameCase === 'uppercase' ? 'uppercase' : ''} font-light text-muted-foreground group-hover:text-foreground transition-colors duration-500 ease-out leading-snug line-clamp-2 min-h-[2.5em]`}
+                className={`${textSizes.name} tracking-normal sm:tracking-[0.18em] ${nameCase === 'uppercase' ? 'uppercase' : ''} font-light text-muted-foreground group-hover:text-foreground transition-colors duration-500 ease-out leading-snug [overflow-wrap:anywhere] line-clamp-2 min-h-[2.5em]`}
                 itemProp="name"
               >
                 {isRtl && product.nameAr ? product.nameAr : product.name}
@@ -424,14 +429,14 @@ function MinimalProductCard({
               merchant-configurable via productCardDefaults.discountBadge.color. */}
             {priceVisible && hasSale && discountBadgeText && (
               <p
-                className="text-[10px] tracking-[0.25em] uppercase font-semibold"
+                className="text-xs tracking-[0.25em] uppercase font-semibold"
                 style={{ color: discountBadgeColor }}
               >
                 {discountBadgeText}
               </p>
             )}
             {priceVisible && (
-              <TaxInclusiveLabel className="block text-[10px] tracking-wide font-light text-muted-foreground/70" />
+              <TaxInclusiveLabel className="block text-xs tracking-wide font-normal text-muted-foreground" />
             )}
             <SwatchDots product={product} max={5} />
             <FactChips product={product} className="mt-1" />

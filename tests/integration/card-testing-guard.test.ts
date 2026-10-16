@@ -58,6 +58,9 @@ vi.mock('@api/middleware/rbac', () => ({
 }));
 vi.mock('@api/middleware/security', () => ({
   paymentLimiter: (_req: any, _res: any, next: any) => next(),
+  // payment.routes mounts the InstaPay receipt upload behind both (#51).
+  uploadLimiter: (_req: any, _res: any, next: any) => next(),
+  dailyUploadLimiter: (_req: any, _res: any, next: any) => next(),
   auditLog: vi.fn().mockResolvedValue(undefined),
 }));
 vi.mock('@api/utils/store-helpers', () => ({ getAuthUser: (req: any) => req.user }));
@@ -330,6 +333,9 @@ describe('POST /payments/create wiring', () => {
       customer: null,
       shippingAddress: { email: 'g@example.com' },
       store: { domain: null, slug: 'demo' },
+      // Created through OrderService.create, which admits a manual (COD/InstaPay) hold;
+      // without the marker the #65 guard answers 409 MANUAL_HOLD_NOT_ADMITTED (FU46-9 class).
+      manualHoldAdmitted: true,
     });
     h.paymentFindFirst.mockResolvedValue(null);
     h.paymentCreate.mockResolvedValue({ id: 'pay-1' });

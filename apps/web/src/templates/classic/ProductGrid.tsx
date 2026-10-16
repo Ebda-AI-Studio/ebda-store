@@ -75,7 +75,7 @@ export default function ClassicProductGrid({
         {products.length === 0 && (
           <div className="text-center py-16">
             <div className="w-16 h-16 mx-auto mb-6 border border-border/50 flex items-center justify-center">
-              <NoProductsIcon className="w-8 h-8 text-muted-foreground/50" />
+              <NoProductsIcon className="w-8 h-8 text-muted-foreground" />
             </div>
             <p className="text-muted-foreground">
               {isRtl ? 'لا توجد منتجات متاحة' : 'No products available'}

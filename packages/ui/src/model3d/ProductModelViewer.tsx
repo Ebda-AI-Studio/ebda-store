@@ -460,7 +460,7 @@ export const ProductModelViewer = forwardRef<ProductModelViewerHandle, ProductMo
           </div>
         )}
         {state === 'ready' && (
-          <p className="pointer-events-none absolute inset-x-0 top-2 text-center text-[11px] text-muted-foreground">
+          <p className="pointer-events-none absolute inset-x-0 top-2 text-center text-xs text-muted-foreground">
             {labels.hint}
           </p>
         )}

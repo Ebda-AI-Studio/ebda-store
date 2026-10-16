@@ -8,7 +8,7 @@ interface PaymentIconProps {
 function BadgeIcon({ label, className }: { label: string; className: string }) {
   return (
     <div className={`flex h-8 w-12 items-center justify-center rounded text-white ${className}`}>
-      <span className="text-[10px] font-bold leading-none">{label}</span>
+      <span className="text-xs font-bold leading-none">{label}</span>
     </div>
   );
 }

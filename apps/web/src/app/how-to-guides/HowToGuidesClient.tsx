@@ -103,7 +103,7 @@ export default function HowToGuidesClient({ storeHowtos = [] }: HowToGuidesClien
                       {h.steps.map((step, sIdx) => (
                         <li key={sIdx} className="flex gap-3">
                           <span
-                            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary text-sm font-semibold text-white"
+                            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary text-sm font-semibold text-primary-foreground"
                             aria-hidden="true"
                           >
                             {sIdx + 1}

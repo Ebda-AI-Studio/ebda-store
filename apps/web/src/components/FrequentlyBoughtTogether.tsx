@@ -1,11 +1,9 @@
 'use client';
 
 import { pickLocalizedName } from '../templates/shared/display-helpers';
-import {
-  useProductRecommendations,
-  selectCrossSell,
-  type RecommendedProduct,
-} from '../hooks/useProductRecommendations';
+import { canBuyNow } from '@/lib/can-buy-now';
+import { useProductRecommendations, selectCrossSell } from '../hooks/useProductRecommendations';
+import { recommendedToTemplateProduct, needsOptions } from '../templates/adapters';
 import { useCart } from '../contexts/CartContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useStore, useStoreUrl, useStoreTemplate } from '../contexts/StoreContext';
@@ -13,6 +11,7 @@ import { useToast, Skeleton, SkeletonProductCard } from '@ebda/ui';
 import { PecannbeeProductCard } from '../templates/shared/PecannbeeProductCard';
 import { gridGapClass } from '../templates/shared/card-size';
 import { SectionRetryNotice } from './SectionRetryNotice';
+import { countText, ITEMS_ADDED, ITEMS_NEED_OPTIONS } from '../lib/plural';
 
 /** Loading placeholder matching the grid this section renders once data
  *  resolves — avoids the pop-in layout shift the previous `return null`
@@ -53,9 +52,9 @@ export function FrequentlyBoughtTogether({ storeId, productId }: FrequentlyBough
   const productCardDefaults = layout?.productCardDefaults;
 
   // Variant-parent products can't be added to cart silently from a
-  // recommendation card. Helper shared by single-add and add-all.
-  const hasVariants = (p: RecommendedProduct): boolean =>
-    Array.isArray(p.variants) && p.variants.length > 0;
+  // recommendation card (the cart API refuses it: VARIANT_REQUIRED). The
+  // shared rule, so the button and the card agree.
+  const hasVariants = needsOptions;
 
   const { products, status, refetch } = useProductRecommendations(
     storeId,
@@ -106,8 +105,11 @@ export function FrequentlyBoughtTogether({ storeId, productId }: FrequentlyBough
   };
 
   const handleAddAllToCart = async () => {
-    const simple = products.filter(p => !hasVariants(p));
-    const needVariant = products.filter(p => hasVariants(p));
+    // Sold-out pieces (no backorder) are left out: the card shows them sold
+    // out, so "add all" must not try them and toast a refusal.
+    const orderable = products.filter(p => canBuyNow(p));
+    const simple = orderable.filter(p => !hasVariants(p));
+    const needVariant = orderable.filter(p => hasVariants(p));
 
     // Sequential awaits so each addItem sees the post-previous-add cart state.
     for (const p of simple) {
@@ -124,7 +126,7 @@ export function FrequentlyBoughtTogether({ storeId, productId }: FrequentlyBough
     if (simple.length > 0) {
       toastSuccess(
         t('Added to cart', 'تمت الإضافة إلى السلة'),
-        `${simple.length} ${t('items added to your cart', 'منتجات أضيفت إلى سلتك')}`
+        t(countText('en', simple.length, ITEMS_ADDED), countText('ar', simple.length, ITEMS_ADDED))
       );
     }
 
@@ -134,8 +136,8 @@ export function FrequentlyBoughtTogether({ storeId, productId }: FrequentlyBough
         .join(isRtl ? '، ' : ', ');
       toastInfo(
         t(
-          `${needVariant.length} item${needVariant.length > 1 ? 's' : ''} need${needVariant.length > 1 ? '' : 's'} a variant`,
-          `${needVariant.length} ${needVariant.length > 1 ? 'منتجات تحتاج' : 'منتج يحتاج'} إلى اختيار نوع`
+          countText('en', needVariant.length, ITEMS_NEED_OPTIONS),
+          countText('ar', needVariant.length, ITEMS_NEED_OPTIONS)
         ),
         t(
           `${names} — open each to pick a variant before adding.`,
@@ -182,23 +184,7 @@ export function FrequentlyBoughtTogether({ storeId, productId }: FrequentlyBough
         {products.map(p => (
           <PecannbeeProductCard
             key={p.id}
-            product={{
-              id: p.id,
-              name: p.name,
-              nameAr: p.nameAr,
-              slug: p.slug,
-              price: p.price,
-              compareAtPrice: p.compareAtPrice,
-              discountType: p.discountType ?? undefined,
-              discountValue: p.discountValue ?? undefined,
-              badgeLabel: p.badgeLabel ?? undefined,
-              badgeLabelAr: p.badgeLabelAr ?? undefined,
-              images: p.images,
-              inStock: true,
-              variants: p.variants,
-              options: p.options,
-              facts: p.facts,
-            }}
+            product={recommendedToTemplateProduct(p)}
             isRtl={isRtl}
             currency={store.currency}
             pack={templateId}

@@ -4,6 +4,7 @@ import { withLeaderLock } from '../lib/leader-election';
 import logger from '../lib/logger';
 import { readInStoreContext } from '../lib/store-scoped-read';
 import { LISTING_SWATCH_OPTIONS_SELECT } from '../lib/listing-swatch-select';
+import { enrichStockFlags, gateBackorder } from '../lib/effective-inventory';
 
 // ==========================================
 // Recommendation Service
@@ -15,6 +16,9 @@ const CACHE_TTL_SECONDS = 300; // 5 minutes
 const FBT_WINDOW_DAYS = 90;
 const FBT_MIN_THRESHOLD = 2;
 const FBT_LOCK_TTL_SECONDS = 300;
+// Cart cross-sell: slots shown, and how many scored candidates are read to fill them.
+const CART_RECS_SHOWN = 4;
+const CART_RECS_CANDIDATES = 12;
 
 // Minimal product shape returned in recommendation lists
 const productSelect = {
@@ -24,6 +28,23 @@ const productSelect = {
   slug: true,
   price: true,
   compareAtPrice: true,
+  // The web mapper already forwards these to the discount badge; without them
+  // a fixed-amount sale read as a percentage on the recommendation cards only.
+  discountType: true,
+  discountValue: true,
+  // Stock (C-01, 2026-10-15). The cards decide quick-add vs "choose options"
+  // vs sold-out from `inStock` / `acceptsBackorder` / `variants`, which
+  // `enrichStockFlags` derives from these exactly as the listing does; the
+  // storefront used to hard-code `inStock: true` because nothing here said
+  // otherwise. `lowStockThreshold` is read and stripped by enrichStockFlags.
+  // CACHE CLASS: BOUNDED-stale (the 5-minute CACHE_TTL_SECONDS below). The
+  // card is a hint; the cart API re-reads stock uncached and refuses an
+  // oversell, so the residual is a sold-out card that still offers the add
+  // for at most 5 minutes and then gets a refusal toast.
+  inventory: true,
+  allowBackorder: true,
+  lowStockThreshold: true,
+  trackInventory: true,
   // Merchant-authored card badge. The FBT grid and the "You might also like"
   // strip render through PecannbeeProductCard / ProductCarousel — the same
   // canonical card components as the PLP — so a badge omitted here shows up
@@ -32,6 +53,9 @@ const productSelect = {
   badgeLabelAr: true,
   // Card fact chips. BOUNDED-stale within the 5-minute recommendation cache.
   facts: true,
+  // Card "New" badge: every card path reads isProductNew (createdAt inside the
+  // window). Without it the badge never rendered on these strips.
+  createdAt: true,
   images: {
     take: 2, // primary + hover-reveal second image on recommendation cards
     orderBy: { position: 'asc' as const },
@@ -42,7 +66,19 @@ const productSelect = {
   // without this, the FBT "Add all" button silently adds the parent SKU
   // (no variant chosen) which either errors out or creates ambiguous
   // cart lines. Same gap fixed earlier on listPublic in commit `8c55a73`.
-  variants: { select: { id: true, price: true } },
+  // `isActive` is read (a disabled variant is not stock) and stripped by
+  // enrichStockFlags. Every variant row comes back, disabled ones included: a
+  // product whose variants are all disabled is still a variant product.
+  variants: {
+    select: {
+      id: true,
+      price: true,
+      compareAtPrice: true,
+      inventory: true,
+      allowBackorder: true,
+      isActive: true,
+    },
+  },
   // Colour dots on the recommendation cards (same payload as the listing).
   // CACHE CLASS: BOUNDED-stale; these lists sit behind the 5-minute
   // CACHE_TTL_SECONDS cache, so a swatch edit shows within that window.
@@ -91,7 +127,7 @@ class RecommendationService {
       crossSell = manualCrossSell.map(r => ({
         relationId: r.id,
         position: r.position,
-        ...r.targetProduct,
+        ...enrichStockFlags(r.targetProduct),
       }));
     } else {
       // AI recommendations — second priority after manual cross-sells.
@@ -120,7 +156,7 @@ class RecommendationService {
         crossSell = aiRecRows.map(r => ({
           aiScore: r.score,
           aiReason: r.reason,
-          ...r.targetProduct,
+          ...enrichStockFlags(r.targetProduct),
         }));
       } else {
         // FBT fallback — used when no AI recs exist for this product yet.
@@ -144,7 +180,7 @@ class RecommendationService {
           const isSource = row.productId1 === productId;
           return {
             coOccurrenceCount: row.coOccurrenceCount,
-            ...(isSource ? row.product2 : row.product1),
+            ...enrichStockFlags(isSource ? row.product2 : row.product1),
           };
         });
       }
@@ -164,7 +200,7 @@ class RecommendationService {
     const upsell = upsellRows.map(r => ({
       relationId: r.id,
       position: r.position,
-      ...r.targetProduct,
+      ...enrichStockFlags(r.targetProduct),
     }));
 
     // 4. Also Like: products from same categories
@@ -195,7 +231,7 @@ class RecommendationService {
         take: 6,
         select: productSelect,
       });
-      alsoLike = alsoLikeRows;
+      alsoLike = alsoLikeRows.map(p => enrichStockFlags(p));
     }
 
     const result = { crossSell, upsell, alsoLike };
@@ -209,7 +245,17 @@ class RecommendationService {
   // ----------------------------------------
   // getCartRecommendations (not cached)
   // ----------------------------------------
-  async getCartRecommendations(storeId: string, productIds: string[]) {
+  /**
+   * `backorderFeatureEnabled` (default true = the old behaviour): with the store's
+   * `inventory.backorder` feature OFF a sold-out backorderable product is not
+   * buyable, so it is gated BEFORE the "keep only buyable picks" filter — a
+   * feature-off store never fills a recommendation slot with a sold-out card.
+   */
+  async getCartRecommendations(
+    storeId: string,
+    productIds: string[],
+    backorderFeatureEnabled = true
+  ) {
     if (!productIds.length) return [];
 
     const scoreMap = new Map<string, number>();
@@ -272,10 +318,12 @@ class RecommendationService {
       }
     }
 
-    // Sort by reference count, take top 4
+    // Sort by reference count. Read up to 12 candidates and keep the first 4
+    // a shopper can actually buy: a sold-out pick (no backorder) used to take
+    // one of the 4 slots as a dead card (W1a review, item 4).
     const sortedIds = Array.from(scoreMap.entries())
       .sort((a, b) => b[1] - a[1])
-      .slice(0, 4)
+      .slice(0, CART_RECS_CANDIDATES)
       .map(([id]) => id);
 
     if (!sortedIds.length) return [];
@@ -291,7 +339,12 @@ class RecommendationService {
     });
 
     // Preserve score order
-    return sortedIds.map(id => products.find((p: any) => p.id === id)).filter(Boolean);
+    return sortedIds
+      .map(id => products.find((p: any) => p.id === id))
+      .filter(Boolean)
+      .map(p => gateBackorder(enrichStockFlags(p!), backorderFeatureEnabled))
+      .filter(p => p.inStock || p.acceptsBackorder)
+      .slice(0, CART_RECS_SHOWN);
   }
 
   // ----------------------------------------

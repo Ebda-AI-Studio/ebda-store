@@ -10,7 +10,7 @@ import { useNumerals } from '../hooks/useNumerals';
  *  imageless, rather than a second hand-drawn icon. */
 export function BundlePlaceholderIcon() {
   return (
-    <div className="flex h-full w-full items-center justify-center text-muted-foreground/70">
+    <div className="flex h-full w-full items-center justify-center text-muted-foreground">
       <svg className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path
           strokeLinecap="round"

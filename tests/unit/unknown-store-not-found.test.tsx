@@ -27,8 +27,8 @@ const render = (lang: 'en' | 'ar', links = unknownHostLinks({})) => {
 describe('UnknownHostNotFound', () => {
   it('renders Arabic copy and the ebda.app CTA', () => {
     const html = render('ar');
-    expect(html).toContain('المتجر ده مش موجود أو لسه ما فتحش');
-    expect(html).toContain('اعمل متجرك على إبدأ');
+    expect(html).toContain('هذا المتجر غير موجود أو لم يُفتح بعد');
+    expect(html).toContain('أنشئ متجرك على إبدأ');
     expect(html).toContain('href="https://ebda.app"');
   });
 
@@ -52,7 +52,7 @@ describe('UnknownHostNotFound', () => {
   it('omits WhatsApp when no number is available, never an empty wa.me link', () => {
     const html = render('ar', { ...unknownHostLinks({}), whatsappHref: null });
     expect(html).not.toContain('wa.me');
-    expect(html).not.toContain('كلمنا على واتساب');
+    expect(html).not.toContain('تواصل معنا عبر واتساب');
   });
 
   it('hides the demo store link by default and shows it only for SHOW_DEMO_STORE_LINK=true', () => {

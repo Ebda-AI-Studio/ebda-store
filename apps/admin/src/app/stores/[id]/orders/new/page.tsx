@@ -8,6 +8,7 @@ import { useLocale } from 'next-intl';
 import { EGYPT_GOVERNORATES, areasForGovernorate, roundToMinor, REGION } from '@ebda/shared';
 import { AdminLayout } from '../../../../../components/AdminLayout';
 import { apiGet, apiPost } from '../../../../../lib/api';
+import { isVariantProduct } from '../../../../../lib/variant-product';
 import { useAuth } from '../../../../../lib/auth';
 import { formatPrice } from '@/lib/format';
 import { useT } from '@/i18n/useT';
@@ -30,7 +31,9 @@ interface ProductSearchResult {
   nameAr?: string;
   price: number;
   sku?: string;
+  /** Column; can drift from the rows. `variantCount` (every row) wins when present. */
   hasVariants?: boolean;
+  variantCount?: number;
   variants?: ProductVariant[];
 }
 
@@ -211,7 +214,8 @@ export default function NewOrderPage() {
     setProductResults([]);
 
     // If the product has variants, fetch them and show the variant picker.
-    const hasVariants = p.hasVariants || (p.variants && p.variants.length > 0);
+    // The API's rule (any variant row), not the column (W1a re-review minor 4).
+    const hasVariants = isVariantProduct(p) || (p.variants?.length ?? 0) > 0;
     if (hasVariants) {
       if (p.variants && p.variants.length > 0) {
         // Already have variants in the search result — go straight to picker.
@@ -229,20 +233,9 @@ export default function NewOrderPage() {
           const variants = data?.variants ?? [];
           setPendingVariantProduct({ ...p, variants });
         } catch {
-          // Fallback: add as parent product without variant if fetch fails.
-          const locName = displayName(p.name, p.nameAr);
-          setItems(prev => {
-            const existing = prev.find(it => it.productId === p.id && !it.variantId);
-            if (existing) {
-              return prev.map(it =>
-                it.productId === p.id && !it.variantId ? { ...it, quantity: it.quantity + 1 } : it
-              );
-            }
-            return [
-              ...prev,
-              { productId: p.id, productName: locName, unitPrice: p.price, quantity: 1 },
-            ];
-          });
+          // No bare-parent fallback: a product with variants is ordered as one
+          // of them (C-01) and the API refuses it without one (VARIANT_REQUIRED).
+          toastError(t('errors.variantsLoadFailed'));
         } finally {
           setLoadingVariants(false);
         }
@@ -390,7 +383,14 @@ export default function NewOrderPage() {
         order: { id: string; orderNumber: string };
       }>(`/api/v1/stores/${storeId}/orders/admin`, payload);
       if (apiError || !data) {
-        toastError(t('errors.createFailed'), apiError?.message ?? '');
+        toastError(
+          t('errors.createFailed'),
+          apiError?.code === 'VARIANT_REQUIRED'
+            ? t('errors.variantRequired')
+            : apiError?.code === 'VARIANT_INACTIVE'
+              ? t('errors.variantInactive')
+              : (apiError?.message ?? '')
+        );
         return;
       }
       toastSuccess(t('toast.created', { orderNumber: data.order.orderNumber }));

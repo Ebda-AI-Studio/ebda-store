@@ -38,7 +38,7 @@ export function StoreNotFound({ store }: { store: ResolvedStore }) {
           الصفحة غير متوفرة
         </h1>
         <p className="text-base font-medium text-foreground/70">This page isn’t available</p>
-        <p className="mx-auto max-w-md text-sm text-foreground/60" dir="rtl">
+        <p className="mx-auto max-w-md text-sm text-foreground/70" dir="rtl">
           عذرًا، الصفحة التي تبحث عنها غير موجودة أو تم نقلها.
         </p>
       </div>

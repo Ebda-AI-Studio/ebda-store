@@ -930,15 +930,24 @@ export async function apiPatch<T = unknown>(endpoint: string, body?: unknown) {
  * shows `error.message` as-is, so pick the Arabic text here, once, when the UI
  * is RTL — platform-level, no per-page handling.
  */
-function localizedApiMessage(
+/**
+ * The admin UI language for error text, read where the UI itself declares it (`<html dir>`).
+ * The one source every error reader uses (`localizedApiMessage`, the upload readers, the 3D
+ * card's own validation messages) so a toast can never be in a different language from its
+ * neighbour. Call it in handlers, not during render (render-time document reads are banned).
+ */
+export function adminUiLocale(): 'ar' | 'en' {
+  return typeof document !== 'undefined' && document.documentElement.dir === 'rtl' ? 'ar' : 'en';
+}
+
+export function localizedApiMessage(
   _code: string | undefined,
   message: string,
   details: Record<string, unknown> | undefined
 ): string {
   // Any code whose details carry both-language text is localized (plan limits,
   // subscription gates, go-live gates, ...).
-  const isArabic = typeof document !== 'undefined' && document.documentElement.dir === 'rtl';
-  const text = isArabic ? details?.messageAr : details?.messageEn;
+  const text = adminUiLocale() === 'ar' ? details?.messageAr : details?.messageEn;
   return typeof text === 'string' && text ? text : message;
 }
 

@@ -24,7 +24,7 @@ export default function ClassicCartTable({
   onRemove,
   typography,
 }: CartTableProps) {
-  const { isRtl: ctxIsRtl } = useLanguage();
+  const { isRtl: ctxIsRtl, t } = useLanguage();
   const { localize, money } = useNumerals();
   const isRtl = isRtlProp ?? ctxIsRtl;
   const format = (price: number) => `${money(price)} ${currency}`;
@@ -91,7 +91,7 @@ export default function ClassicCartTable({
                   type="button"
                   onClick={() => onRemove?.(item.id)}
                   className="inline-flex min-h-[44px] items-center text-base uppercase tracking-widest text-muted-foreground hover:text-destructive-ink transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-destructive cursor-pointer"
-                  aria-label={isRtl ? 'إزالة' : 'Remove'}
+                  aria-label={t('Remove', 'إزالة')}
                   style={typography?.cta}
                 >
                   {isRtl ? 'إزالة' : 'Remove'}
@@ -104,7 +104,7 @@ export default function ClassicCartTable({
                     disabled={item.unavailable || item.quantity <= 1}
                     onClick={() => onUpdateQuantity?.(item.id, Math.max(1, item.quantity - 1))}
                     className="h-11 w-11 text-muted-foreground hover:bg-muted disabled:opacity-40 transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground cursor-pointer"
-                    aria-label={isRtl ? 'تقليل' : 'Decrease'}
+                    aria-label={t('Decrease', 'تقليل')}
                     style={typography?.cta}
                   >
                     −
@@ -117,7 +117,7 @@ export default function ClassicCartTable({
                     disabled={item.unavailable}
                     onClick={() => onUpdateQuantity?.(item.id, item.quantity + 1)}
                     className="h-11 w-11 text-muted-foreground hover:bg-muted transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground cursor-pointer disabled:opacity-40"
-                    aria-label={isRtl ? 'زيادة' : 'Increase'}
+                    aria-label={t('Increase', 'زيادة')}
                     style={typography?.cta}
                   >
                     +

@@ -1,6 +1,7 @@
 'use client';
 
 import { memo, useState } from 'react';
+import { canBuyNow } from '@/lib/can-buy-now';
 import { resolveProductCardCtaOosDefaults } from '../shared/product-card-defaults';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -37,9 +38,15 @@ import { PlaceholderImageIcon } from '../shared/icons';
 import { CompareButton, RemoveFromWishlistButton } from '../shared/card-actions';
 import { TaxInclusiveLabel } from '../shared/tax-inclusive-label';
 import { productCardPropsEqual } from '../shared/product-card-memo';
-import { OosImageDim, ProductCardCta, OutOfStockRibbon } from '../shared/ProductCardCta';
+import {
+  OosImageDim,
+  ProductCardCta,
+  OutOfStockRibbon,
+  isProductNew,
+} from '../shared/ProductCardCta';
 import { SwatchDots } from '../../components/commerce/SwatchDots';
 import { FactChips } from '../../components/commerce/FactChips';
+import { useRenderNow } from '../../contexts/RenderClockContext';
 
 /**
  * Modern Template - Product Card
@@ -78,8 +85,9 @@ function ModernProductCard({
   showCardName,
   showCardPrice,
 }: ProductCardProps) {
-  const { isRtl: ctxIsRtl } = useLanguage();
+  const { isRtl: ctxIsRtl, t } = useLanguage();
   const { store, layout } = useStore();
+  const renderNow = useRenderNow();
   // Ruling NUMERALS-1: Western digits unless the store opted in (Arabic only).
   const numerals = storeNumerals(store?.theme);
   const isRtl = isRtlProp ?? ctxIsRtl;
@@ -115,7 +123,7 @@ function ModernProductCard({
   // the merchant hasn't supplied an Arabic translation.
   const displayName = isRtl && product.nameAr ? product.nameAr : product.name;
   // Task 13: backorder-aware orderable signal. OOS + backorder allowed → orderable.
-  const orderable = product.inStock !== false || product.acceptsBackorder === true;
+  const orderable = canBuyNow(product);
 
   if (process.env.NODE_ENV !== 'production' && !product.images?.[0]?.url) {
     console.warn(`[ProductCard] Missing image for product "${product.name}" (id: ${product.id})`);
@@ -170,6 +178,7 @@ function ModernProductCard({
     discountBadgeAllowed,
     customBadgePositionCls,
     discountBadgePositionCls,
+    discountTopCorner,
   } = resolveCardBadges({
     discountVisible: Boolean(discountBadgeText),
     product,
@@ -188,7 +197,7 @@ function ModernProductCard({
     // Issue #1997 — the NEW badge below renders at logical top-start under
     // this exact condition; a discount/custom badge avoiding a reserved
     // heart corner must not land on top of it.
-    newOrBrandBadgeReserved: Boolean(orderable && product.isNew),
+    newOrBrandBadgeReserved: Boolean(orderable && isProductNew(product, renderNow)),
     // The mobile quick-add CTA band below is an unconditional full-width
     // overlay (hidden only via a `lg:` desktop hover state, never removed
     // from the DOM), so it reserves the whole bottom edge.
@@ -220,7 +229,7 @@ function ModernProductCard({
         <div
           className={cn(
             'absolute top-3 z-20 flex flex-col gap-2 transition-[opacity,transform] duration-300',
-            isRtl ? 'left-3' : 'right-3',
+            'end-3',
             'opacity-100 translate-x-0',
             'lg:opacity-0 lg:translate-x-3',
             isHovered && 'lg:opacity-100 lg:translate-x-0'
@@ -234,7 +243,7 @@ function ModernProductCard({
                 ? 'bg-destructive text-destructive-foreground scale-[1.05]'
                 : 'bg-white/95 text-foreground hover:bg-white hover:scale-[1.05]'
             )}
-            aria-label={isRtl ? 'إضافة للمفضلة' : 'Add to wishlist'}
+            aria-label={t('Add to wishlist', 'إضافة للمفضلة')}
             aria-pressed={isWishlisted}
           >
             <svg
@@ -302,7 +311,7 @@ function ModernProductCard({
               ribbon (OutOfStockRibbon below) to match the pecannbee/
               alkahraman target across every theme. NEW stays top corner,
               only shown when orderable (unchanged). */}
-          {orderable && product.isNew && (
+          {orderable && isProductNew(product, renderNow) && (
             <ProductBadgeGroup absolute position={isRtl ? 'top-right' : 'top-left'} isRtl={isRtl}>
               <ProductBadge variant="new" isRtl={isRtl} size="sm" />
             </ProductBadgeGroup>
@@ -352,8 +361,11 @@ function ModernProductCard({
             oosLabelColor={resolvedOosLabelColor}
             oosLabelTextColor={resolvedOosLabelTextColor}
             theme={store.theme}
-            topStartReserved={Boolean(onToggleCompare)}
-            topEndReserved={Boolean(onRemoveFromWishlist || onAddToWishlist !== undefined)}
+            topStartReserved={Boolean(onToggleCompare) || discountTopCorner === 'start'}
+            topEndReserved={
+              Boolean(onRemoveFromWishlist || onAddToWishlist !== undefined) ||
+              discountTopCorner === 'end'
+            }
           />
 
           {/* Image overlay tint when out-of-stock. z-[5] sits under the OOS
@@ -439,7 +451,7 @@ function ModernProductCard({
                 <h3
                   id={`prod-${product.id}-name`}
                   data-zone="productName"
-                  className={`font-semibold ${textSizes.name} text-foreground group-hover:text-primary transition-colors duration-300 ease-out line-clamp-2 min-h-[2.5em] leading-snug tracking-tight ${isRtl ? 'text-right' : ''}${nameCase === 'uppercase' ? ' uppercase' : ''}`}
+                  className={`font-semibold ${textSizes.name} text-foreground group-hover:text-primary transition-colors duration-300 ease-out [overflow-wrap:anywhere] line-clamp-2 min-h-[2.5em] leading-snug tracking-tight${nameCase === 'uppercase' ? ' uppercase' : ''}`}
                   itemProp="name"
                 >
                   {isRtl && product.nameAr ? product.nameAr : product.name}

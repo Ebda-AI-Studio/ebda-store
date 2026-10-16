@@ -54,11 +54,17 @@ vi.mock('@ebda/database', () => ({
       // miss to `true`. Returning the cart's product means these tests now
       // exercise the state production is actually in; individual tests still
       // override it where they need something else.
-      findMany: vi
-        .fn()
-        .mockResolvedValue([
-          { id: 'prod-123', trackInventory: true, costPrice: 500, categories: [] },
-        ]),
+      findMany: vi.fn().mockResolvedValue([
+        {
+          id: 'prod-123',
+          name: 'Test Product',
+          nameAr: null,
+          trackInventory: true,
+          costPrice: 500,
+          _count: { variants: 0 },
+          categories: [],
+        },
+      ]),
       update: vi.fn(),
     },
     productVariant: {
@@ -143,7 +149,6 @@ vi.mock('@ebda/database', () => ({
 vi.mock('@api/services/email.service', () => ({
   EmailService: {
     sendOrderConfirmation: vi.fn().mockResolvedValue(undefined),
-    sendAdminNewOrder: vi.fn().mockResolvedValue(undefined),
     sendOrderShipped: vi.fn().mockResolvedValue(undefined),
     sendPaymentSuccess: vi.fn().mockResolvedValue(undefined),
     sendAdminRefund: vi.fn().mockResolvedValue(undefined),
@@ -1160,6 +1165,52 @@ describe('OrderService', () => {
         }
         return fn;
       });
+    });
+
+    it('C-01: a product with variants and no variantId is refused (400 VARIANT_REQUIRED, ar + en), nothing written', async () => {
+      vi.mocked(prisma.product.findMany).mockResolvedValue([
+        { ...mockProductForAdmin, variants: [{ id: 'var-m', price: 5200, title: 'M' }] },
+      ] as any);
+      const err = await OrderService.createAdminOrder(
+        mockStoreId,
+        mockAdminUserId,
+        baseAdminOrderData
+      ).catch(e => e);
+      expect(err).toMatchObject({ statusCode: 400, code: 'VARIANT_REQUIRED' });
+      expect(err.details).toMatchObject({ productId: 'prod-123' });
+      expect(err.details.messageEn).toContain('Test Product');
+      expect(err.details.messageAr).toMatch(/[\u0600-\u06FF]/);
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+    });
+
+    it('W1b carry: a DISABLED variant is refused (409 VARIANT_INACTIVE), nothing written', async () => {
+      vi.mocked(prisma.product.findMany).mockResolvedValue([
+        {
+          ...mockProductForAdmin,
+          variants: [{ id: 'var-m', price: 5200, title: 'M', isActive: false }],
+        },
+      ] as any);
+      const err = await OrderService.createAdminOrder(mockStoreId, mockAdminUserId, {
+        ...baseAdminOrderData,
+        items: [{ productId: 'prod-123', variantId: 'var-m', quantity: 1 }],
+      } as any).catch(e => e);
+      expect(err).toMatchObject({ statusCode: 409, code: 'VARIANT_INACTIVE' });
+      expect(err.details).toMatchObject({ productId: 'prod-123', variantId: 'var-m' });
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+    });
+
+    it('an ACTIVE variant of the product is accepted', async () => {
+      vi.mocked(prisma.product.findMany).mockResolvedValue([
+        {
+          ...mockProductForAdmin,
+          variants: [{ id: 'var-m', price: 5200, title: 'M', isActive: true }],
+        },
+      ] as any);
+      const result = await OrderService.createAdminOrder(mockStoreId, mockAdminUserId, {
+        ...baseAdminOrderData,
+        items: [{ productId: 'prod-123', variantId: 'var-m', quantity: 1 }],
+      } as any);
+      expect(result.orderNumber).toBeDefined();
     });
 
     it('creates an admin order with no coupon (per-user check never runs)', async () => {

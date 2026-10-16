@@ -84,7 +84,7 @@ Elegant relies on a near-monochromatic palette dominated by `--foreground` and i
 | ----------------------------- | ------------------------------------------------------------------------------ | ------ | ------------------------------------------------------- |
 | Hero headline (image variant) | `text-4xl md:text-5xl lg:text-6xl font-light leading-[1.1] tracking-[-0.02em]` | 300    | First word italic `font-normal`, rest `font-extralight` |
 | Hero headline (no-image)      | `text-5xl md:text-6xl lg:text-7xl font-light leading-[1.1] tracking-[-0.02em]` | 300    | First word `italic font-normal text-primary`            |
-| Hero eyebrow                  | `text-[10px] tracking-[0.5em] uppercase text-muted-foreground/60`              | 400    | "New Collection"                                        |
+| Hero eyebrow                  | `text-[10px] tracking-[0.5em] uppercase text-muted-foreground`                 | 400    | "New Collection"                                        |
 | Hero subtitle                 | `text-sm font-light tracking-wide leading-loose`                               | 300    |                                                         |
 | Hero CTA label                | `text-xs tracking-[0.25em] uppercase font-medium`                              | 500    |                                                         |
 | Section heading (grid)        | `text-3xl md:text-4xl font-light tracking-wide`                                | 300    |                                                         |
@@ -100,8 +100,8 @@ Elegant relies on a near-monochromatic palette dominated by `--foreground` and i
 | Cart item price               | `text-xs uppercase tracking-[0.2em] text-muted-foreground`                     | 400    |                                                         |
 | Nav link                      | `text-[11px] tracking-[0.2em] uppercase text-muted-foreground`                 | 400    |                                                         |
 | Top utility bar               | `text-[11px] tracking-[0.15em] uppercase text-muted-foreground`                | 400    | "Complimentary shipping…"                               |
-| Footer column heading         | `text-[10px] tracking-[0.3em] uppercase font-serif text-muted-foreground/60`   | 400    |                                                         |
-| Footer link                   | `text-xs text-foreground/60 tracking-wide`                                     | 400    |                                                         |
+| Footer column heading         | `text-[10px] tracking-[0.3em] uppercase font-serif text-muted-foreground`      | 400    |                                                         |
+| Footer link                   | `text-xs text-foreground/70 tracking-wide`                                     | 400    |                                                         |
 | Announcement bar              | `text-xs tracking-[0.25em] uppercase font-light`                               | 300    |                                                         |
 
 ### Principles
@@ -231,7 +231,7 @@ NO border or container — pure typographic empty state.
 ```
 w-full px-0 py-3 bg-transparent border-0 border-b border-border
 focus:outline-none focus:border-foreground
-text-center text-sm tracking-[0.1em] placeholder:text-muted-foreground/50
+text-center text-sm tracking-[0.1em] placeholder:text-muted-foreground
 transition-colors duration-500
 ```
 
@@ -240,7 +240,7 @@ transition-colors duration-500
 ```
 flex-1 px-6 py-4 bg-background border border-border
 focus:border-foreground focus:outline-none
-text-xs tracking-[0.1em] placeholder:text-muted-foreground/40
+text-xs tracking-[0.1em] placeholder:text-muted-foreground
 transition-colors duration-500
 ```
 
@@ -261,7 +261,7 @@ Square, ALL CAPS, near-black-on-near-white. "New" and "Sale" labels use this exa
 - Top utility bar: hidden on mobile, `text-[11px] tracking-[0.15em] uppercase text-muted-foreground` with "Complimentary shipping on orders over 25 KD" on left, "Contact" / "Wishlist" links on right.
 - Main row: logo centered with `flex-1` spacers on both sides.
 - Logo height: `h-20 max-h-20 w-auto` (largest of the 5 templates) — luxury wordmark stature. Fallback wordmark: `text-3xl font-light tracking-[0.25em]`.
-- Action icons (`strokeWidth={1}`): search / account / cart at `text-foreground/50 hover:text-foreground` — the most subdued action set across the templates.
+- Action icons (`strokeWidth={1}`): search / account / cart at `text-foreground/70 hover:text-foreground` — the most subdued action set across the templates.
 - Desktop nav row sits BELOW the logo row: `hidden md:flex items-center justify-center gap-10 pb-5`, links at `text-[11px] tracking-[0.2em] uppercase`.
 - Cart count badge: `bg-foreground text-background text-[9px] font-medium w-4 h-4 rounded-full` — tiny solid dark dot.
 
@@ -336,7 +336,7 @@ The announcement bar is the ONE place chromatic primary appears proudly.
 - Center hero text and section eyebrows — Elegant is symmetric and editorial.
 - Pair small eyebrow text with large light headline: `text-[10px] tracking-[0.5em] uppercase` over `text-6xl font-light`.
 - Use `aspect-[3/4]` for product images and `aspect-[2/3]` for category images — portrait ratios match fashion photography.
-- Use `font-serif` for footer column titles ONLY (`font-serif text-[10px] tracking-[0.3em] uppercase text-muted-foreground/60`).
+- Use `font-serif` for footer column titles ONLY (`font-serif text-[10px] tracking-[0.3em] uppercase text-muted-foreground`).
 - Use `text-success uppercase tracking-[0.2em] text-xs` for "Free" / "Complimentary" labels — keep success color WITH the elegant tracking treatment.
 
 ### Don't
@@ -383,8 +383,8 @@ The announcement bar is the ONE place chromatic primary appears proudly.
 
 - Hero `<Image>` uses `priority`, `sizes="(min-width: 1024px) 60vw, 100vw"`, fills its 60% column.
 - Product cards: dual-image crossfade on hover via two `<Image fill />` components stacked, both with `loading="lazy"` and `sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"`.
-- Image fallback: `flex items-center justify-center text-muted-foreground/20` with a thin `strokeWidth={0.5}` placeholder icon at `w-16 h-16`.
+- Image fallback: `flex items-center justify-center text-muted-foreground` with a thin `strokeWidth={0.5}` placeholder icon at `w-16 h-16`.
 
 ## 9. Agent Prompt Guide
 
-When generating new components for the Elegant template, treat `Hero.tsx`, `ProductCard.tsx`, and `Footer.tsx` as canon. Default typography weight to `font-light` (300) for display, `font-normal` (400) for labels, `font-medium` (500) at maximum on CTAs — NEVER reach `font-bold` or higher. Default labels to ALL CAPS with `tracking-[0.2em]` to `tracking-[0.3em]`; reserve `tracking-[0.4em]` and `tracking-[0.5em]` for the smallest eyebrows (10–11px). Default corners to `rounded-none` — sharp corners are signature. Default to NO borders, NO shadows, NO card backgrounds; let images sit directly on `bg-background` (or `bg-gray-50` for product image bg) with text below. CTAs use the outlined-invert pattern: `border border-foreground text-foreground hover:bg-foreground hover:text-background transition-all duration-500`. All transitions take `duration-300` or `duration-500` — never `duration-150` or `duration-200`. The brand `--primary` color is reserved for the announcement bar (`bg-primary`), focus rings, hero italic-accent (no-image variant), and select hover transitions on text links — it does NOT fill resting CTAs. Hero headlines use the italic-split pattern: `<span className="italic font-normal">{firstWord}</span><span className="block font-extralight">{rest}</span>`. Footer column eyebrows use `font-serif` Playfair Display at `text-[10px] tracking-[0.3em] uppercase text-muted-foreground/60`. Image aspect ratios are portrait by default — `aspect-[3/4]` (products), `aspect-[2/3]` (categories). RTL is supported via `dir`, mirrored chevrons (`rotate-180`), and Arabic strings (`isRtl && nameAr ? nameAr : name`). When in doubt, add more whitespace, lighten the type weight, and lengthen the transition.
+When generating new components for the Elegant template, treat `Hero.tsx`, `ProductCard.tsx`, and `Footer.tsx` as canon. Default typography weight to `font-light` (300) for display, `font-normal` (400) for labels, `font-medium` (500) at maximum on CTAs — NEVER reach `font-bold` or higher. Default labels to ALL CAPS with `tracking-[0.2em]` to `tracking-[0.3em]`; reserve `tracking-[0.4em]` and `tracking-[0.5em]` for the smallest eyebrows (10–11px). Default corners to `rounded-none` — sharp corners are signature. Default to NO borders, NO shadows, NO card backgrounds; let images sit directly on `bg-background` (or `bg-gray-50` for product image bg) with text below. CTAs use the outlined-invert pattern: `border border-foreground text-foreground hover:bg-foreground hover:text-background transition-all duration-500`. All transitions take `duration-300` or `duration-500` — never `duration-150` or `duration-200`. The brand `--primary` color is reserved for the announcement bar (`bg-primary`), focus rings, hero italic-accent (no-image variant), and select hover transitions on text links — it does NOT fill resting CTAs. Hero headlines use the italic-split pattern: `<span className="italic font-normal">{firstWord}</span><span className="block font-extralight">{rest}</span>`. Footer column eyebrows use `font-serif` Playfair Display at `text-[10px] tracking-[0.3em] uppercase text-muted-foreground`. Image aspect ratios are portrait by default — `aspect-[3/4]` (products), `aspect-[2/3]` (categories). RTL is supported via `dir`, mirrored chevrons (`rotate-180`), and Arabic strings (`isRtl && nameAr ? nameAr : name`). When in doubt, add more whitespace, lighten the type weight, and lengthen the transition.

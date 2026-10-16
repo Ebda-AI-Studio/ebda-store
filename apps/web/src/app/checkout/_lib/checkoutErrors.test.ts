@@ -5,6 +5,7 @@ import {
   orderLocale,
   personalisationRequiredCopy,
   subscriptionRequiredCopy,
+  variantRequiredCopy,
 } from './checkoutErrors';
 
 const en = (e: string) => e;
@@ -16,7 +17,7 @@ describe('subscriptionRequiredCopy', () => {
       'This store is not taking orders right now. Please try again later.'
     );
     expect(subscriptionRequiredCopy('SUBSCRIPTION_REQUIRED', ar)).toBe(
-      'المتجر مش بيستقبل طلبات دلوقتي. جرّب تاني بعدين.'
+      'المتجر لا يستقبل طلبات حالياً. حاول مرة أخرى لاحقاً.'
     );
   });
   it('ignores other codes', () => {
@@ -59,8 +60,26 @@ describe('personalisationRequiredCopy', () => {
 
   it('still explains itself without details', () => {
     expect(personalisationRequiredCopy('PERSONALISATION_REQUIRED', undefined, tAr, 'ar')).toBe(
-      'في منتج في سلتك محتاج تخصيص. اكتبه من صفحة المنتج.'
+      'يوجد منتج في سلتك يحتاج إلى تخصيص. اكتبه من صفحة المنتج.'
     );
+  });
+});
+
+describe('variantRequiredCopy (FU46 M-6)', () => {
+  const tEn = (en: string) => en;
+  const tAr = (_en: string, ar: string) => ar;
+  const details = { products: [{ name: 'Linen Abaya', nameAr: 'عباية كتان' }, { name: 'Scarf' }] };
+  it('names the items, in the shopper language, falling back across languages', () => {
+    expect(variantRequiredCopy('VARIANT_REQUIRED', details, tEn, 'en')).toBe(
+      'Please choose a size for Linen Abaya, Scarf on its product page.'
+    );
+    expect(variantRequiredCopy('VARIANT_REQUIRED', details, tAr, 'ar')).toBe(
+      'يرجى اختيار المقاس لـ عباية كتان، Scarf من صفحة المنتج.'
+    );
+  });
+  it('still explains itself without details, and ignores other codes', () => {
+    expect(variantRequiredCopy('VARIANT_REQUIRED', undefined, tAr, 'ar')).toContain('المقاس');
+    expect(variantRequiredCopy('EMPTY_CART', details, tEn, 'en')).toBeNull();
   });
 });
 

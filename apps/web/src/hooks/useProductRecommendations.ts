@@ -30,12 +30,21 @@ export interface RecommendedProduct {
   badgeLabel?: string | null;
   badgeLabelAr?: string | null;
   images: Array<{ id: string; url: string; alt?: string }>;
-  /** Variants of this product — empty/missing means a simple SKU. */
-  variants?: Array<{ id: string; price: number }>;
+  /** Variants of this product — empty/missing means a simple SKU. Every row,
+   *  disabled ones included (a product with only disabled variants is still a
+   *  variant product). Prices may be null (= the parent price). */
+  variants?: Array<{ id: string; price: number | null; compareAtPrice?: number | null }>;
+  /** Server-computed by enrichStockFlags (recommendation.service.ts). */
+  inStock?: boolean;
+  acceptsBackorder?: boolean;
+  /** Variant-aware aggregate stock (sum of active variants). */
+  inventory?: number;
   /** Swatch-bearing option values only (colour dots on the card). */
   options?: TemplateProduct['options'];
   /** Fact chips on the card. */
   facts?: TemplateProduct['facts'];
+  /** Feeds the card "New" badge. */
+  createdAt?: string | null;
 }
 
 /** `loading` and `empty` are deliberately distinct from `error`: "nothing to

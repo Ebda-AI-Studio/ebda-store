@@ -32,6 +32,7 @@ import {
   sniffReceiptMime,
   type FlagInput,
 } from '@api/services/payment-providers/instapay-receipt.service';
+import { sniffImage } from '@api/lib/upload-sniff';
 import { manualPeriodFor } from '@api/services/billing/account.service';
 import { ordersOpenFor } from '@api/services/plan-limit.service';
 
@@ -146,6 +147,30 @@ describe('references, receivers, images, time', () => {
     expect(sniffReceiptMime(Buffer.from('RIFF0000WEBPVP8 '))).toBe('image/webp');
     expect(sniffReceiptMime(Buffer.from('%PDF-1.7'))).toBeNull();
     expect(sniffReceiptMime(Buffer.from('<svg'))).toBeNull();
+  });
+  it('one sniffer: receipts reuse sniffImage, minus GIF (FU46 M-8)', () => {
+    const samples = [
+      png('receipt-sent'),
+      Buffer.from([0xff, 0xd8, 0xff, 0xe0]),
+      Buffer.from('RIFF0000WEBPVP8 '),
+      Buffer.from('GIF89a......'),
+      Buffer.from('GIF87a......'),
+      Buffer.from('%PDF-1.7'),
+      Buffer.alloc(0),
+    ];
+    for (const b of samples) {
+      const kind = sniffImage(b);
+      expect(sniffReceiptMime(b)).toBe(kind === 'image/gif' ? null : kind);
+    }
+    // no second copy of the magic bytes in the receipt service
+    const src = readFileSync(
+      path.resolve(
+        __dirname,
+        '../../apps/api/src/services/payment-providers/instapay-receipt.service.ts'
+      ),
+      'utf8'
+    );
+    expect(src).not.toMatch(/0xff|0x89|'RIFF'|'WEBP'/);
   });
   it("converts the receipt's Cairo wall-clock time to UTC (DST-aware)", () => {
     // 5 Oct 2026: Egypt summer time (UTC+3).

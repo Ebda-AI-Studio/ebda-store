@@ -44,7 +44,7 @@ export function TestimonialRow({
         <div className="grid gap-7 sm:grid-cols-2 lg:grid-cols-3 lg:gap-9">
           {testimonials.slice(0, 6).map(t => (
             <article key={t.id} className={styles.testimonialCard}>
-              <Stars rating={t.rating} />
+              <Stars rating={t.rating} isRtl={isRtl} />
               {t.title && (
                 <h3 className="mt-5 text-lg font-semibold text-foreground line-clamp-1 tracking-tight">
                   {t.title}
@@ -67,10 +67,15 @@ export function TestimonialRow({
   );
 }
 
-function Stars({ rating }: { rating: number }) {
+function Stars({ rating, isRtl }: { rating: number; isRtl?: boolean }) {
   const full = Math.max(0, Math.min(5, Math.round(rating)));
+  // R-05: named in the page's language; role=img so the name is announced at all.
   return (
-    <div className="flex items-center gap-1" aria-label={`${full} of 5 stars`}>
+    <div
+      className="flex items-center gap-1"
+      role="img"
+      aria-label={isRtl ? `${full} من 5 نجوم` : `${full} of 5 stars`}
+    >
       {Array.from({ length: 5 }).map((_, i) => (
         <svg
           key={i}

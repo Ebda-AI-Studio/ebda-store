@@ -23,8 +23,9 @@ import {
 } from '@ebda/shared';
 import { useLocale } from 'next-intl';
 import { useT } from '@/i18n/useT';
-import { apiDelete, apiGet, apiPut, getApiUrl } from '../../../../../../lib/api';
+import { adminUiLocale, apiDelete, apiGet, apiPut, getApiUrl } from '../../../../../../lib/api';
 import { useFeatures } from '../../../../../../hooks/useFeatures';
+import { uploadErrorText } from '../../../../../../hooks/useImageUpload';
 import { ImageUpload } from '../../../../../../components/ImageUpload';
 import { ColorField } from '../../../../../../components/ColorField';
 
@@ -241,7 +242,7 @@ export function Product3dModelCard({ storeId, productId }: { storeId: string; pr
     setNotice(null);
     const check = validateGlb(new Uint8Array(await file.arrayBuffer()));
     if (!check.ok) {
-      toastError(t('uploadFailed'), model3dErrorMessage(check.code, locale));
+      toastError(t('uploadFailed'), model3dErrorMessage(check.code, adminUiLocale()));
       return;
     }
     setBusy(true);
@@ -250,13 +251,8 @@ export function Product3dModelCard({ storeId, productId }: { storeId: string; pr
     setBusy(false);
     setProgress(null);
     if (!res.ok) {
-      const d = res.body?.error?.details;
-      toastError(
-        t('uploadFailed'),
-        (locale === 'ar' ? d?.messageAr : d?.messageEn) ??
-          res.body?.error?.message ??
-          String(res.status)
-      );
+      // Bilingual details picked by the same rule as every admin upload reader (review M-5).
+      toastError(t('uploadFailed'), uploadErrorText(res.body, String(res.status)));
       return;
     }
     if (localUrl) URL.revokeObjectURL(localUrl);
@@ -277,7 +273,7 @@ export function Product3dModelCard({ storeId, productId }: { storeId: string; pr
     if (!file) return;
     const check = validateUsdz(new Uint8Array(await file.arrayBuffer()));
     if (!check.ok) {
-      toastError(t('uploadFailed'), model3dErrorMessage(check.code, locale));
+      toastError(t('uploadFailed'), model3dErrorMessage(check.code, adminUiLocale()));
       return;
     }
     setBusy(true);
@@ -286,7 +282,7 @@ export function Product3dModelCard({ storeId, productId }: { storeId: string; pr
     setBusy(false);
     setProgress(null);
     if (!res.ok) {
-      toastError(t('uploadFailed'), res.body?.error?.message ?? String(res.status));
+      toastError(t('uploadFailed'), uploadErrorText(res.body, String(res.status)));
       return;
     }
     const usdzUrl = res.body?.data?.usdzUrl ?? null;
@@ -321,7 +317,8 @@ export function Product3dModelCard({ storeId, productId }: { storeId: string; pr
     setBusy(false);
     const url = res.body?.data?.url;
     if (!res.ok || !url) {
-      toastError(t('uploadFailed'), res.body?.error?.message ?? String(res.status));
+      // A byte-sniff refusal carries both languages (B0-46), like the GLB validator's.
+      toastError(t('uploadFailed'), uploadErrorText(res.body, String(res.status)));
       return;
     }
     if (await put({ posterUrl: url })) toastSuccess(t('posterSaved'), '');

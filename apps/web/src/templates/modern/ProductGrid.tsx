@@ -32,7 +32,7 @@ export default function ModernProductGrid({
 
   onRemoveFromWishlist,
 }: ProductGridProps) {
-  const { isRtl: ctxIsRtl } = useLanguage();
+  const { isRtl: ctxIsRtl, t } = useLanguage();
   const isRtl = isRtlProp ?? ctxIsRtl;
 
   const gridCols: Record<2 | 3 | 4, string> = {
@@ -46,9 +46,9 @@ export default function ModernProductGrid({
       <div
         className="py-20 text-center"
         role="status"
-        aria-label={isRtl ? 'لا توجد منتجات' : 'No products found'}
+        aria-label={t('No products found', 'لا توجد منتجات')}
       >
-        <div className="w-20 h-20 mx-auto mb-5 rounded-full bg-muted flex items-center justify-center text-muted-foreground/50">
+        <div className="w-20 h-20 mx-auto mb-5 rounded-full bg-muted flex items-center justify-center text-muted-foreground">
           <NoProductsIcon className="w-9 h-9" />
         </div>
         <h3 className="text-base font-semibold text-foreground mb-1.5">
@@ -65,7 +65,7 @@ export default function ModernProductGrid({
     <div
       className={cn('grid gap-3 md:gap-4', gridCols[columns])}
       role="list"
-      aria-label={isRtl ? 'قائمة المنتجات' : 'Product list'}
+      aria-label={t('Product list', 'قائمة المنتجات')}
       dir={isRtl ? 'rtl' : 'ltr'}
       data-zone="products"
     >

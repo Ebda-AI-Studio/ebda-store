@@ -30,19 +30,19 @@ describe('toast lift above the sticky bars', () => {
     ["body[data-sticky-cart='1'] [data-toast-region]", '61px'],
     ["body[data-sticky-cart='blocked'] [data-toast-region]", '85px'],
   ])(
-    '%s lifts by tab bar + the measured bar height (fallback %s), same as the widget',
+    '%s lifts by the measured bar height (fallback %s), same as the widget — no tab-bar term (C-04: the tab bar is hidden under a task bar)',
     (selector, px) => {
       const flat = blockFor(selector).replace(/\s+/g, ' ');
-      expect(flat).toContain(
-        `calc( var(--bottom-tab-h) + var(--sticky-bar-h, ${px}) + 10px + env(safe-area-inset-bottom) )`
-      );
+      expect(flat).toContain(`calc(var(--sticky-bar-h, ${px}) + 10px)`);
+      expect(flat).not.toContain('--bottom-tab-h');
       const widget = selector.replace('[data-toast-region]', "[data-floating-widget='bottom']");
       expect(blockFor(widget)).toBe(blockFor(selector));
     }
   );
 
   it('the Dahab bar (73px) never overlaps the toast: the lift tracks the published height', () => {
-    // 69 tab + 73 bar + 10 gap = 152 > the old fixed 140, which overlapped by ~2px (Minor 1).
+    // The lift is the bar's own measured height (73 for Dahab, safe-area padding included)
+    // + 10px, never a fixed guess (the old fixed 140 overlapped by ~2px, Minor 1).
     const dahabBar = 12 * 2 + 48 + 1;
     expect(dahabBar).toBe(73);
     const hook = readFileSync(

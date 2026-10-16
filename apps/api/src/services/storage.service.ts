@@ -421,43 +421,6 @@ export class StorageService {
   }
 
   /**
-   * Generate a signed URL for direct upload
-   */
-  static async getUploadUrl(
-    filename: string,
-    contentType: string,
-    folder = 'uploads',
-    expiresIn = 3600,
-    storeId: string | null = null
-  ): Promise<{ uploadUrl: string; key: string; publicUrl: string }> {
-    const ext = path.extname(filename).toLowerCase();
-    const key = this.composeKey({
-      folder,
-      storeId,
-      filename: undefined,
-      originalFilename: filename,
-      ext,
-    });
-
-    const client = await this.getClient();
-
-    const command = new (await loadS3()).PutObjectCommand({
-      Bucket: config.storageBucket,
-      Key: key,
-      ContentType: contentType,
-    });
-
-    const { getSignedUrl } = await loadS3Presigner();
-    const uploadUrl = await getSignedUrl(client, command, { expiresIn });
-
-    return {
-      uploadUrl,
-      key,
-      publicUrl: this.getPublicUrl(key),
-    };
-  }
-
-  /**
    * One page of a store's uploaded images, newest first within the page
    * (visual builder media picker). `prefix` MUST be a tenant prefix
    * (`stores/<storeId>/...`): the caller derives it from a store id that

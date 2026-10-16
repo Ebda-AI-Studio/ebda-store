@@ -8,6 +8,7 @@ import { requireFeature } from '../middleware/feature-gate';
 import { uploadLimiter, dailyUploadLimiter } from '../middleware/security';
 import { StorageService } from '../services/storage.service';
 import { enforceMaxDimensions } from '../services/image-resize.service';
+import { sniffImage, IMAGE_EXT, renameByKind, uploadContentError } from '../lib/upload-sniff';
 import { runInTenantContext } from '@ebda/database';
 import { inngest } from '../lib/inngest/client';
 import { ALLOWED_CURRENCIES, REGION } from '@ebda/shared';
@@ -305,16 +306,32 @@ router.post(
       // downsamples internally anyway) extracted identical totals and 22/22
       // line totals from a 3024x4032 receipt photo and its 2000px version,
       // blurred and skewed, 3 runs each. Stored bytes drop ~95%.
+      // The bytes decide (B0-46): the declared mime the filter above checked is the client's.
+      const receiptKind = sniffImage(req.file!.buffer);
+      if (
+        receiptKind !== 'image/jpeg' &&
+        receiptKind !== 'image/png' &&
+        receiptKind !== 'image/webp'
+      ) {
+        const e = uploadContentError('receipt');
+        throw new AppError(400, e.code, e.message, e.details);
+      }
       const receiptBuffer = await enforceMaxDimensions(req.file!.buffer);
+      // Named and typed by the bytes actually stored, never the client's filename or mime.
+      const storedKind = sniffImage(receiptBuffer) ?? receiptKind;
 
       // Upload to R2 under stores/<storeId>/receipts/
       const uploaded = await runInTenantContext(req.params.storeId, () =>
-        StorageService.upload(receiptBuffer, req.file!.originalname, {
-          folder: 'misc', // misc is on the ALLOWED_FOLDERS list in storage.service.ts
-          storeId: req.params.storeId,
-          contentType: req.file!.mimetype,
-          allowedTypes: ['image/jpeg', 'image/png', 'image/webp'],
-        })
+        StorageService.upload(
+          receiptBuffer,
+          renameByKind(req.file!.originalname, IMAGE_EXT[storedKind], 'receipt'),
+          {
+            folder: 'misc', // misc is on the ALLOWED_FOLDERS list in storage.service.ts
+            storeId: req.params.storeId,
+            contentType: storedKind,
+            allowedTypes: ['image/jpeg', 'image/png', 'image/webp'],
+          }
+        )
       );
 
       // Fire async OCR job — non-blocking

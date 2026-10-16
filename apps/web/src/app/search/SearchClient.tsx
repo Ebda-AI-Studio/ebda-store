@@ -13,6 +13,7 @@ import { useTemplateComponents } from '../../hooks/useTemplateComponents';
 import { toTemplateProduct } from '../../templates/adapters';
 import { trackSearch } from '../../components/MarketingPixels';
 import { SearchAutocomplete } from '../../components/SearchAutocomplete';
+import { countText, RESULTS } from '../../lib/plural';
 
 const sortValues = ['newest', 'price-asc', 'price-desc', 'name-asc'] as const;
 
@@ -236,7 +237,7 @@ function SearchContent() {
               />
               <button
                 type="submit"
-                className="px-6 py-3 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors font-medium"
+                className="px-6 py-3 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors font-medium"
               >
                 {t('Search', translations['Search'])}
               </button>
@@ -289,7 +290,9 @@ function SearchContent() {
                 </svg>
                 {t('Filters', 'الفلاتر')}
                 {categoryFilter && (
-                  <span className="rounded-full bg-primary px-2 py-0.5 text-xs text-white">1</span>
+                  <span className="rounded-full bg-primary px-2 py-0.5 text-xs text-primary-foreground">
+                    1
+                  </span>
                 )}
               </span>
               <svg
@@ -418,8 +421,11 @@ function SearchContent() {
         {!isLoading && !error && products.length > 0 && (
           <>
             <p className="text-muted-foreground mb-6 text-sm">
-              {products.length} {t('result', '\u0646\u062a\u064a\u062c\u0629')}
-              {products.length !== 1 ? t('s', '') : ''} {t('for', '\u0644\u0640')} &quot;
+              {t(
+                countText('en', products.length, RESULTS),
+                countText('ar', products.length, RESULTS)
+              )}{' '}
+              {t('for', '\u0644\u0640')} &quot;
               {displayQuery}&quot;
               {categoryFilter && (
                 <>
@@ -498,7 +504,7 @@ function SearchContent() {
         {!isLoading && !error && !committedQuery && (
           <div className="text-center py-12">
             <svg
-              className="mx-auto h-12 w-12 text-muted-foreground/50 mb-4"
+              className="mx-auto h-12 w-12 text-muted-foreground mb-4"
               fill="none"
               viewBox="0 0 24 24"
               stroke="currentColor"

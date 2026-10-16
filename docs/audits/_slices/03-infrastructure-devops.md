@@ -72,7 +72,7 @@ Six deploy surfaces: Vercel force-admin, Vercel force-web, Railway API, Neon, Cl
 
 **⚠️ P3 — `remotePatterns` includes stale `*.supabase.co`** (`apps/web/next.config.js:41-44`). Neon replaced Supabase but pattern remains. No security risk (whitelist), but misleading.
 
-**⚠️ P3 — Vercel Hobby 4.5 MB body cap risk.** API is on Railway (no Vercel cap), but storefront's Next.js Route Handlers for any future webhook or upload path would hit the limit. Not currently triggered (uploads go to R2 presigned URLs through API).
+**⚠️ P3 — Vercel Hobby 4.5 MB body cap risk.** API is on Railway (no Vercel cap), but storefront's Next.js Route Handlers for any future webhook or upload path would hit the limit. Not currently triggered (uploads go through the API's multipart routes; the presigned-URL route was deleted 2026-10-16, Ruling FU46-5b).
 
 #### 3.3 Railway API
 

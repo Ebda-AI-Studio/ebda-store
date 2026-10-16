@@ -211,9 +211,8 @@ export function ProductsTable({
         // Variant products carry their stock on the variants, so the API returns
         // a variant-aware `totalInventory`. Resolve + colour against that value so
         // a variant product with stock isn't shown as a red zero.
-        const resolvedInventory = product.hasVariants
-          ? (product.totalInventory ?? 0)
-          : product.inventory;
+        // The server resolves it from the variant ROWS (not the drifting column).
+        const resolvedInventory = product.totalInventory ?? product.inventory;
         return (
           <span
             className={`text-sm font-medium ${

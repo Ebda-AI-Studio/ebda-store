@@ -1,3 +1,5 @@
+import { deriveBrandRoles } from '@ebda/shared';
+
 export interface StoreTheme {
   // Core brand colors (HSL triplets e.g. '26 100% 50%')
   primaryColor: string;
@@ -191,9 +193,11 @@ export interface StoreBranding {
 
 export type BrandingTabId = 'branding' | 'theme' | 'contact' | 'social' | 'locations';
 
-export const DEFAULT_THEME: StoreTheme = {
+const BASE_THEME: StoreTheme = {
   primaryColor: '26 100% 50%',
-  primaryForeground: '0 0% 100%',
+  // Derived below: the storefront picks the ink from the primary (deriveBrandRoles); a literal
+  // white here was 2.79:1 on this orange (FU46 M-3).
+  primaryForeground: '',
   secondaryColor: '220 14% 96%',
   secondaryForeground: '220 9% 46%',
   accentColor: '26 100% 95%',
@@ -213,6 +217,11 @@ export const DEFAULT_THEME: StoreTheme = {
   showBrandStory: true,
   showTrustStrip: true,
   trustStripLayout: 'horizontal',
+};
+
+export const DEFAULT_THEME: StoreTheme = {
+  ...BASE_THEME,
+  primaryForeground: deriveBrandRoles(BASE_THEME as never)['--primary-foreground'],
 };
 
 /**

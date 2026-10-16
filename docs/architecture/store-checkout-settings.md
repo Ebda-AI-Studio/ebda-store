@@ -10,9 +10,17 @@ slug). Merchant-editable at **Store → Settings → Delivery**
 
 When set to a valid email, every order placed in the store auto-emails the rendered PDF
 invoice to that address (e.g. the store owner). Fires from the `order/created` fanout
-(`apps/api/src/lib/inngest/functions/order-created.ts`, `send-owner-invoice` step →
+(`apps/api/src/lib/inngest/functions/order-created.ts`, `send-owner-invoice` step ->
 reuses the existing `order/invoice.email-requested` pipeline). Resolver:
-`resolveOrderInvoiceRecipient` (same file). Empty/unset = no owner invoice sent.
+`resolveOrderInvoiceRecipient` in `apps/api/src/lib/order-notification-address.ts`
+(shared by every sender below). Empty/unset = no owner invoice sent.
+
+This address is also the ONLY place per-order alert mail goes (Ruling FU46-1a): the invoice
+it receives for every order IS the new-order notice (there is no separate alert step), and the
+refund-processed alert goes to the same address. With no address set, nothing is sent: order
+and refund alerts never go to Ebda's own inbox, and no mail goes to owners by default.
+Storefront contact-form messages follow the same rule (Ruling FU46-1c): the store's contact
+email, else its active owner, else nothing.
 
 ## `minimumOrderFils?: number`
 

@@ -1,5 +1,6 @@
 'use client';
 import { swatchOf } from '@ebda/shared';
+import { SignedAmount } from '@/lib/bidi';
 
 type V = {
   id?: string;
@@ -49,7 +50,11 @@ export function SwatchDots({
           </span>
         );
       })}
-      {total > max && <span className="text-xs text-muted-foreground">+{total - max}</span>}
+      {total > max && (
+        <span className="text-xs text-muted-foreground">
+          <SignedAmount sign="+" value={total - max} />
+        </span>
+      )}
     </div>
   );
 }

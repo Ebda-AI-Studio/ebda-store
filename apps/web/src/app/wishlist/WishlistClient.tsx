@@ -9,25 +9,13 @@ import { useStore, useStoreUrl } from '../../contexts/StoreContext';
 import { useLanguage, translations } from '../../contexts/LanguageContext';
 import { useCart } from '../../contexts/CartContext';
 import { useTemplateComponents } from '../../hooks/useTemplateComponents';
+import { useCurrentUrl } from '../../hooks/useCurrentUrl';
 import type { TemplateProduct } from '../../templates/types';
+import { wishlistToTemplateProduct, type WishlistCardProduct } from '../../templates/adapters';
 
 interface WishlistItem {
   id: string;
-  product: {
-    id: string;
-    name: string;
-    slug: string;
-    price: number;
-    compareAtPrice?: number;
-    discountType?: 'percentage' | 'fixed' | null;
-    discountValue?: number | null;
-    badgeLabel?: string | null;
-    badgeLabelAr?: string | null;
-    images: string[];
-    status: string;
-    options?: TemplateProduct['options'];
-    facts?: TemplateProduct['facts'];
-  };
+  product: WishlistCardProduct;
 }
 
 export default function WishlistClient() {
@@ -49,9 +37,12 @@ export default function WishlistClient() {
 
   // Derive the share URL from the current user's auth state
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  // The page URL is '' until after hydration (useCurrentUrl), so the origin never differs
+  // between the server render and the hydrating one.
+  const currentUrl = useCurrentUrl();
   const shareUrl =
-    currentUserId && typeof window !== 'undefined'
-      ? `${window.location.origin}${storeUrl(`/wishlist/shared/${currentUserId}`)}`
+    currentUserId && currentUrl
+      ? `${new URL(currentUrl).origin}${storeUrl(`/wishlist/shared/${currentUserId}`)}`
       : null;
 
   const loadWishlist = useCallback(async () => {
@@ -173,8 +164,11 @@ export default function WishlistClient() {
       const response = await api.addToCart(productId, 1);
       if (response.success) {
         router.push(storeUrl('/cart'));
-      } else if (response.error?.code === 'PERSONALISATION_REQUIRED') {
-        // The merchant requires a personalisation note, typed on the PDP only.
+      } else if (
+        response.error?.code === 'PERSONALISATION_REQUIRED' ||
+        response.error?.code === 'VARIANT_REQUIRED'
+      ) {
+        // A personalisation note or a size/colour: both are chosen on the PDP only.
         const slug = items.find(i => i.product.id === productId)?.product.slug;
         if (slug) router.push(storeUrl(`/products/${slug}`));
       } else {
@@ -244,7 +238,7 @@ export default function WishlistClient() {
             </p>
             <Link
               href={storeUrl('/auth/login?redirect=/wishlist')}
-              className="inline-flex items-center px-6 py-3 bg-primary text-white rounded-lg hover:bg-primary/90"
+              className="inline-flex items-center px-6 py-3 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90"
             >
               {t('Sign In', translations['Sign In'])}
             </Link>
@@ -254,21 +248,9 @@ export default function WishlistClient() {
     );
   }
 
-  const wishlistTemplateProducts: TemplateProduct[] = items.map(item => ({
-    id: item.product.id,
-    name: item.product.name,
-    slug: item.product.slug,
-    price: item.product.price,
-    compareAtPrice: item.product.compareAtPrice,
-    discountType: item.product.discountType ?? undefined,
-    discountValue: item.product.discountValue ?? undefined,
-    badgeLabel: item.product.badgeLabel ?? undefined,
-    badgeLabelAr: item.product.badgeLabelAr ?? undefined,
-    images: item.product.images.map((url, i) => ({ id: `${item.id}-${i}`, url })),
-    inStock: item.product.status === 'active',
-    options: item.product.options,
-    facts: item.product.facts,
-  }));
+  const wishlistTemplateProducts: TemplateProduct[] = items.map(item =>
+    wishlistToTemplateProduct(item.id, item.product)
+  );
 
   const handleAddFromWishlist = async (productId: string) => {
     await addToCart(productId);
@@ -296,7 +278,7 @@ export default function WishlistClient() {
             disabled={isTogglingVisibility}
             className={`flex items-center gap-2 px-4 py-2 rounded-lg border text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
               isPublic
-                ? 'bg-primary text-white border-primary hover:bg-primary/90'
+                ? 'bg-primary text-primary-foreground border-primary hover:bg-primary/90'
                 : 'bg-background text-foreground border-border hover:bg-muted'
             }`}
           >
@@ -469,7 +451,7 @@ export default function WishlistClient() {
         {!error && items.length === 0 ? (
           <div className="text-center py-12 bg-background rounded-lg">
             <svg
-              className="w-16 h-16 text-muted-foreground/70 mx-auto mb-4"
+              className="w-16 h-16 text-muted-foreground mx-auto mb-4"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -495,7 +477,7 @@ export default function WishlistClient() {
             </p>
             <Link
               href={storeUrl('/products')}
-              className="inline-flex items-center px-6 py-3 bg-primary text-white rounded-lg hover:bg-primary/90"
+              className="inline-flex items-center px-6 py-3 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90"
             >
               {t(
                 'Browse Products',

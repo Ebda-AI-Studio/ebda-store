@@ -1,6 +1,7 @@
 'use client';
 
 import { memo, useState } from 'react';
+import { canBuyNow } from '@/lib/can-buy-now';
 import { resolveProductCardCtaOosDefaults } from '../shared/product-card-defaults';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -31,7 +32,12 @@ import { PlaceholderImageIcon } from '../shared/icons';
 import { TaxInclusiveLabel } from '../shared/tax-inclusive-label';
 import { productCardPropsEqual } from '../shared/product-card-memo';
 import { getProductPricing, getDiscountBadgeText } from '../../lib/product-pricing';
-import { OosImageDim, ProductCardCta, OutOfStockRibbon } from '../shared/ProductCardCta';
+import {
+  OosImageDim,
+  ProductCardCta,
+  OutOfStockRibbon,
+  isProductNew,
+} from '../shared/ProductCardCta';
 import { getDiscountBadgeColor } from '../shared/discount-badge';
 import {
   getCustomBadgeColor,
@@ -40,6 +46,7 @@ import {
 } from '../shared/custom-badge';
 import { SwatchDots } from '../../components/commerce/SwatchDots';
 import { FactChips } from '../../components/commerce/FactChips';
+import { useRenderNow } from '../../contexts/RenderClockContext';
 
 /**
  * Elegant Template - Product Card
@@ -78,8 +85,9 @@ function ElegantProductCard({
   showCardName,
   showCardPrice,
 }: ProductCardProps) {
-  const { isRtl: ctxIsRtl } = useLanguage();
+  const { isRtl: ctxIsRtl, t } = useLanguage();
   const { store, layout } = useStore();
+  const renderNow = useRenderNow();
   // Ruling NUMERALS-1: Western digits unless the store opted in (Arabic only).
   const numerals = storeNumerals(store?.theme);
   const isRtl = isRtlProp ?? ctxIsRtl;
@@ -127,7 +135,7 @@ function ElegantProductCard({
   // BUG 1 fix: helper text for correct EGP/pct badge.
   const discountBadgeText = getDiscountBadgeText(product, isRtl, undefined, undefined, numerals);
   // Task 13: backorder-aware orderable signal. OOS + backorder allowed → orderable.
-  const orderable = product.inStock !== false || product.acceptsBackorder === true;
+  const orderable = canBuyNow(product);
 
   const frameCls =
     `${cardFrameClass(showCardFrame, cardFrameStyle)} ${showCardFrame ? cardFrameWidthClass(cardFrameWidth) : ''} ${showCardFrame ? cardFrameSizeClass(cardFrameSize) : ''}`.trim();
@@ -167,6 +175,7 @@ function ElegantProductCard({
     discountBadgeAllowed,
     customBadgePositionCls,
     discountBadgePositionCls,
+    discountTopCorner,
   } = resolveCardBadges({
     discountVisible: Boolean(hasSale && discountBadgeText),
     product,
@@ -185,7 +194,7 @@ function ElegantProductCard({
     // Issue #1997 — the NEW badge below renders at logical top-start under
     // this exact condition; a discount/custom badge avoiding a reserved
     // heart corner must not land on top of it.
-    newOrBrandBadgeReserved: Boolean(orderable && product.isNew),
+    newOrBrandBadgeReserved: Boolean(orderable && isProductNew(product, renderNow)),
     // The mobile quick-add CTA band below is an unconditional full-width
     // overlay (hidden only via a `lg:` desktop hover state, never removed
     // from the DOM), so it reserves the whole bottom edge.
@@ -214,11 +223,11 @@ function ElegantProductCard({
           onClick={handleWishlist}
           className={cn(
             'absolute top-4 z-20 p-2 min-h-[44px] min-w-[44px] flex items-center justify-center transition-opacity duration-300 cursor-pointer',
-            isRtl ? 'left-4' : 'right-4',
+            'end-4',
             'opacity-100 lg:opacity-0',
             (isHovered || isWishlisted) && 'lg:opacity-100'
           )}
-          aria-label={isRtl ? 'إضافة للمفضلة' : 'Add to wishlist'}
+          aria-label={t('Add to wishlist', 'إضافة للمفضلة')}
           aria-pressed={isWishlisted}
         >
           <svg
@@ -273,7 +282,7 @@ function ElegantProductCard({
             oosLabelColor={resolvedOosLabelColor}
             oosLabelTextColor={resolvedOosLabelTextColor}
             theme={store.theme}
-            topStartReserved={Boolean(onToggleCompare)}
+            topStartReserved={Boolean(onToggleCompare) || discountTopCorner === 'start'}
             topEndReserved
           />
           {onToggleCompare && (
@@ -338,20 +347,20 @@ function ElegantProductCard({
               )}
             </>
           ) : (
-            <div className="w-full h-full flex items-center justify-center text-muted-foreground/20">
+            <div className="w-full h-full flex items-center justify-center text-muted-foreground">
               <PlaceholderImageIcon className="w-16 h-16" strokeWidth={0.5} />
             </div>
           )}
 
           {/* NEW badge — BUG 2 fix: no inStock gate removed from the group;
               NEW stays top corner, only shown when orderable (unchanged). */}
-          {orderable && product.isNew && (
+          {orderable && isProductNew(product, renderNow) && (
             <ProductBadgeGroup absolute position={isRtl ? 'top-right' : 'top-left'} isRtl={isRtl}>
               <ProductBadge
                 variant="new"
                 isRtl={isRtl}
                 size="sm"
-                className="text-[9px] tracking-[0.2em] uppercase rounded-none bg-foreground text-background font-normal"
+                className="text-xs tracking-[0.2em] uppercase rounded-none bg-foreground text-background font-normal"
                 label={isRtl ? 'جديد' : 'New'}
               />
             </ProductBadgeGroup>
@@ -363,7 +372,7 @@ function ElegantProductCard({
           {hasSale && discountBadgeAllowed && discountBadgeText && (
             <span
               className={cn(
-                'pointer-events-none absolute z-10 rounded-full px-2.5 py-1 text-[9px] font-normal tracking-[0.2em] uppercase text-white shadow-[0_8px_20px_-8px_rgba(220,38,38,0.45)]',
+                'pointer-events-none absolute z-10 rounded-full px-2.5 py-1 text-xs font-normal tracking-[0.2em] uppercase text-white shadow-[0_8px_20px_-8px_rgba(220,38,38,0.45)]',
                 discountBadgePositionCls
               )}
               style={{ backgroundColor: discountBadgeColor }}
@@ -377,7 +386,7 @@ function ElegantProductCard({
           {customBadgeText && (
             <span
               className={cn(
-                'pointer-events-none absolute z-10 rounded-full px-2.5 py-1 text-[9px] font-normal tracking-[0.2em] uppercase text-white shadow-[0_8px_20px_-8px_rgba(0,0,0,0.35)]',
+                'pointer-events-none absolute z-10 rounded-full px-2.5 py-1 text-xs font-normal tracking-[0.2em] uppercase text-white shadow-[0_8px_20px_-8px_rgba(0,0,0,0.35)]',
                 customBadgePositionCls
               )}
               style={{ backgroundColor: customBadgeColor, color: customBadgeTextColor }}
@@ -407,7 +416,7 @@ function ElegantProductCard({
               onAddToCart={handleAddToCart}
               variant="ghost"
               className={cn(
-                'w-full py-4 text-[10px] tracking-[0.25em] uppercase font-normal rounded-none cursor-pointer',
+                'w-full max-w-full overflow-hidden text-ellipsis px-2 py-4 text-xs tracking-[0.12em] sm:tracking-[0.25em] uppercase font-normal rounded-none cursor-pointer',
                 'hover:bg-foreground hover:text-background transition-colors duration-300'
               )}
               labels={{
@@ -438,7 +447,7 @@ function ElegantProductCard({
               <h3
                 id={`prod-${product.id}-name`}
                 data-zone="productName"
-                className={`${textSizes.name} tracking-[0.15em] ${nameCase === 'uppercase' ? 'uppercase' : ''} text-foreground/80 group-hover:text-foreground transition-colors duration-300 line-clamp-1 min-h-[1.5em]`}
+                className={`${textSizes.name} tracking-normal sm:tracking-[0.15em] ${nameCase === 'uppercase' ? 'uppercase' : ''} text-foreground/80 group-hover:text-foreground transition-colors duration-300 [overflow-wrap:anywhere] line-clamp-1 min-h-[1.5em]`}
                 itemProp="name"
               >
                 {isRtl && product.nameAr ? product.nameAr : product.name}
@@ -463,7 +472,7 @@ function ElegantProductCard({
               />
             )}
             {priceVisible && (
-              <TaxInclusiveLabel className="block text-[10px] tracking-[0.2em] uppercase text-muted-foreground/60" />
+              <TaxInclusiveLabel className="block text-xs tracking-[0.2em] uppercase text-muted-foreground" />
             )}
             <SwatchDots product={product} max={5} className="justify-center" />
             <FactChips product={product} className="mt-1 justify-center" />

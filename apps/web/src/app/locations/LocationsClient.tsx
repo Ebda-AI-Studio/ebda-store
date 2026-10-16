@@ -141,7 +141,7 @@ export default function LocationsClient({
         <section dir={isRtl ? 'rtl' : 'ltr'} className="py-12 sm:py-16 lg:py-20" style={density}>
           <div className="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8">
             <header className="mb-8">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-foreground/50">
+              <p className="text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">
                 {t('Branches', 'الفروع')}
               </p>
               <h1
@@ -162,15 +162,15 @@ export default function LocationsClient({
             </header>
 
             {isLoading ? (
-              <p className="py-16 text-center text-sm text-foreground/60">
+              <p className="py-16 text-center text-sm text-foreground/70">
                 {isRtl ? 'جارٍ التحميل…' : 'Loading…'}
               </p>
             ) : disabled ? (
-              <p className="py-16 text-center text-sm text-foreground/60">
+              <p className="py-16 text-center text-sm text-foreground/70">
                 {isRtl ? 'الفروع غير متاحة حالياً.' : 'Locations are not available right now.'}
               </p>
             ) : locations.length === 0 ? (
-              <p className="py-16 text-center text-sm text-foreground/60">
+              <p className="py-16 text-center text-sm text-foreground/70">
                 {isRtl ? 'لا توجد فروع بعد.' : 'No locations yet.'}
               </p>
             ) : (
@@ -179,7 +179,7 @@ export default function LocationsClient({
                   <div key={group.country}>
                     {/* Country chip + hairline */}
                     <div className="mb-4 flex items-center gap-3">
-                      <span className="text-[10px] font-semibold uppercase tracking-[0.1em] text-foreground/50">
+                      <span className="text-xs font-semibold uppercase tracking-[0.1em] text-muted-foreground">
                         {group.country}
                       </span>
                       <div className="h-px flex-1 bg-border" />
@@ -221,7 +221,11 @@ export default function LocationsClient({
                               <div className="mb-3 h-36 w-full overflow-hidden rounded-lg bg-muted">
                                 <iframe
                                   src={embedSrc}
-                                  title={name ? `${name} — map` : 'Branch location map'}
+                                  title={
+                                    name
+                                      ? t(`${name} — map`, `خريطة ${name}`)
+                                      : t('Branch location map', 'خريطة الفرع')
+                                  }
                                   className="h-full w-full border-0"
                                   loading="lazy"
                                   referrerPolicy="no-referrer-when-downgrade"

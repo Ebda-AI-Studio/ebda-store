@@ -20,7 +20,7 @@ export default function ElegantHeader({
   utilityBar,
   headerBgColor,
 }: HeaderProps) {
-  const { isRtl: ctxIsRtl } = useLanguage();
+  const { isRtl: ctxIsRtl, t } = useLanguage();
   const isRtl = isRtlProp ?? ctxIsRtl;
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -100,8 +100,8 @@ export default function ElegantHeader({
           <button
             type="button"
             onClick={() => setIsMenuOpen(!isMenuOpen)}
-            className="md:hidden inline-flex h-11 w-11 items-center justify-center text-foreground/60 hover:text-foreground transition-colors duration-500 ease-out cursor-pointer"
-            aria-label={isRtl ? 'القائمة' : 'Menu'}
+            className="md:hidden inline-flex h-11 w-11 items-center justify-center text-foreground/70 hover:text-foreground transition-colors duration-500 ease-out cursor-pointer"
+            aria-label={t('Menu', 'القائمة')}
             aria-expanded={isMenuOpen}
           >
             <svg
@@ -146,8 +146,8 @@ export default function ElegantHeader({
             <button
               type="button"
               onClick={() => setIsSearchOpen(!isSearchOpen)}
-              className="hidden md:inline-flex h-11 w-11 items-center justify-center text-foreground/50 hover:text-foreground transition-colors duration-500 ease-out cursor-pointer"
-              aria-label={isRtl ? 'بحث' : 'Search'}
+              className="hidden md:inline-flex h-11 w-11 items-center justify-center text-foreground/70 hover:text-foreground transition-colors duration-500 ease-out cursor-pointer"
+              aria-label={t('Search', 'بحث')}
             >
               <svg
                 className="w-5 h-5"
@@ -169,14 +169,14 @@ export default function ElegantHeader({
                 can switch even when the rest of the actions row collapses. */}
             <LanguageSwitcher
               variant="compact"
-              className="text-foreground/60 hover:text-foreground"
+              className="text-foreground/70 hover:text-foreground"
             />
 
             {/* Account */}
             <Link
               href={isLoggedIn ? `${urlPrefix}/account` : `${urlPrefix}/auth/login`}
-              className="hidden md:inline-flex h-11 w-11 items-center justify-center text-foreground/50 hover:text-foreground transition-colors duration-500 ease-out cursor-pointer"
-              aria-label={isRtl ? 'الحساب' : 'Account'}
+              className="hidden md:inline-flex h-11 w-11 items-center justify-center text-foreground/70 hover:text-foreground transition-colors duration-500 ease-out cursor-pointer"
+              aria-label={t('Account', 'الحساب')}
             >
               <svg
                 className="w-5 h-5"
@@ -197,14 +197,12 @@ export default function ElegantHeader({
             {/* Cart */}
             <Link
               href={`${urlPrefix}/cart`}
-              className="relative hidden md:inline-flex h-11 w-11 items-center justify-center text-foreground/50 hover:text-foreground transition-colors duration-500 ease-out cursor-pointer"
-              aria-label={isRtl ? `السلة (${cartItemCount})` : `Cart (${cartItemCount})`}
+              className="relative hidden md:inline-flex h-11 w-11 items-center justify-center text-foreground/70 hover:text-foreground transition-colors duration-500 ease-out cursor-pointer"
+              aria-label={t(`Cart (${cartItemCount})`, `السلة (${cartItemCount})`)}
             >
               <CartIcon className="w-5 h-5" strokeWidth={1} aria-hidden="true" />
               {cartItemCount > 0 && (
-                <span
-                  className={`absolute -top-2 ${isRtl ? '-left-2' : '-right-2'} bg-foreground text-background text-[9px] font-medium w-4 h-4 rounded-full flex items-center justify-center`}
-                >
+                <span className="absolute -top-2 -end-2 bg-foreground text-background text-xs font-medium h-[18px] min-w-[18px] px-1 rounded-full tabular-nums flex items-center justify-center">
                   {cartItemCount > 9 ? '9+' : cartItemCount}
                 </span>
               )}
@@ -231,7 +229,7 @@ export default function ElegantHeader({
         <div className="hidden pb-4 -mt-2" data-zone="mobile-search">
           <form onSubmit={handleSearch} className="relative">
             <svg
-              className={`absolute top-1/2 -translate-y-1/2 ${isRtl ? 'right-3' : 'left-3'} w-5 h-5 text-foreground/40 pointer-events-none`}
+              className="absolute top-1/2 -translate-y-1/2 start-3 w-5 h-5 text-foreground/70 pointer-events-none"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -248,10 +246,10 @@ export default function ElegantHeader({
               type="text"
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
-              placeholder={isRtl ? 'بحث' : 'Search'}
-              className={`w-full ${isRtl ? 'pr-11 pl-4' : 'pl-11 pr-4'} py-3 bg-transparent border-b border-border focus:outline-none focus:border-foreground text-base sm:text-sm tracking-[0.08em] placeholder:text-muted-foreground/50 transition-colors duration-500`}
+              placeholder={t('Search', 'بحث')}
+              className="w-full ps-11 pe-4 py-3 bg-transparent border-b border-border focus:outline-none focus:border-foreground text-base sm:text-sm tracking-[0.08em] placeholder:text-muted-foreground transition-colors duration-500"
               dir={isRtl ? 'rtl' : 'ltr'}
-              aria-label={isRtl ? 'بحث عن المنتجات' : 'Search products'}
+              aria-label={t('Search products', 'بحث عن المنتجات')}
             />
             <SearchAutocomplete
               query={searchQuery}
@@ -271,11 +269,11 @@ export default function ElegantHeader({
               type="text"
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
-              placeholder={isRtl ? 'ما الذي تبحث عنه؟' : 'What are you looking for?'}
-              className="w-full px-0 py-3 bg-transparent border-0 border-b border-border focus:outline-none focus:border-foreground text-center text-base sm:text-sm tracking-[0.1em] placeholder:text-muted-foreground/50 transition-colors duration-500"
+              placeholder={t('What are you looking for?', 'ما الذي تبحث عنه؟')}
+              className="w-full px-0 py-3 bg-transparent border-0 border-b border-border focus:outline-none focus:border-foreground text-center text-base sm:text-sm tracking-[0.1em] placeholder:text-muted-foreground transition-colors duration-500"
               dir={isRtl ? 'rtl' : 'ltr'}
               autoFocus={isSearchOpen}
-              aria-label={isRtl ? 'بحث عن المنتجات' : 'Search products'}
+              aria-label={t('Search products', 'بحث عن المنتجات')}
             />
             <SearchAutocomplete
               query={searchQuery}

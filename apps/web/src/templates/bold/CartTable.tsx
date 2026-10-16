@@ -24,7 +24,7 @@ export default function BoldCartTable({
   onRemove,
   typography,
 }: CartTableProps) {
-  const { isRtl: ctxIsRtl } = useLanguage();
+  const { isRtl: ctxIsRtl, t } = useLanguage();
   const { localize, money } = useNumerals();
   const isRtl = isRtlProp ?? ctxIsRtl;
   const format = (price: number) => `${money(price)} ${currency}`;
@@ -84,7 +84,7 @@ export default function BoldCartTable({
                   type="button"
                   onClick={() => onRemove?.(item.id)}
                   className="h-11 w-11 flex-shrink-0 border-2 border-foreground bg-background text-2xl font-black text-foreground hover:bg-destructive hover:text-destructive-foreground hover:border-destructive transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 cursor-pointer"
-                  aria-label={isRtl ? 'إزالة' : 'Remove'}
+                  aria-label={t('Remove', 'إزالة')}
                   style={typography?.cta}
                 >
                   ×
@@ -97,7 +97,7 @@ export default function BoldCartTable({
                     disabled={item.unavailable || item.quantity <= 1}
                     onClick={() => onUpdateQuantity?.(item.id, Math.max(1, item.quantity - 1))}
                     className="h-11 w-11 font-black text-foreground hover:bg-foreground hover:text-background disabled:opacity-30 transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-1 cursor-pointer"
-                    aria-label={isRtl ? 'تقليل' : 'Decrease'}
+                    aria-label={t('Decrease', 'تقليل')}
                     style={typography?.cta}
                   >
                     −
@@ -113,7 +113,7 @@ export default function BoldCartTable({
                     disabled={item.unavailable}
                     onClick={() => onUpdateQuantity?.(item.id, item.quantity + 1)}
                     className="h-11 w-11 font-black text-foreground hover:bg-foreground hover:text-background transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-1 cursor-pointer disabled:opacity-40"
-                    aria-label={isRtl ? 'زيادة' : 'Increase'}
+                    aria-label={t('Increase', 'زيادة')}
                     style={typography?.cta}
                   >
                     +

@@ -1,8 +1,10 @@
 'use client';
 
 import Link from 'next/link';
+import { MINUS, SignedAmount } from '@/lib/bidi';
 import type { OrderSummaryProps } from '../types';
 import { useOrderSummaryBase } from '../shared/useOrderSummaryBase';
+import { ArrowIcon } from '../shared/icons';
 
 import { REGION } from '@ebda/shared';
 export default function ElegantOrderSummary({
@@ -71,7 +73,7 @@ export default function ElegantOrderSummary({
               {discountLabel ?? (isRtl ? 'الخصم' : 'Discount')}
             </dt>
             <dd className="tracking-wide tabular-nums" style={typography?.price}>
-              −{fmt(discount)}
+              <SignedAmount sign={MINUS} value={fmt(discount)} />
             </dd>
           </div>
         )}
@@ -137,10 +139,11 @@ export default function ElegantOrderSummary({
           <Link
             href={ctaHref}
             data-cta="button"
-            className="mt-8 flex h-12 w-full items-center justify-center border border-foreground bg-foreground px-4 text-xs font-medium uppercase tracking-[0.3em] text-background hover:bg-foreground/85 transition-colors duration-700 ease-out focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2"
+            className="mt-8 flex h-12 w-full items-center justify-center gap-2 border border-foreground bg-foreground px-4 text-xs font-medium uppercase tracking-[0.3em] text-background hover:bg-foreground/85 transition-colors duration-700 ease-out focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2"
             style={typography?.cta}
           >
             {ctaText}
+            <ArrowIcon className="h-4 w-4 shrink-0" isRtl={isRtl} />
           </Link>
         ) : (
           <button
@@ -148,10 +151,17 @@ export default function ElegantOrderSummary({
             onClick={onCtaClick}
             disabled={ctaDisabled || ctaLoading}
             data-cta="button"
-            className="mt-8 flex h-12 w-full items-center justify-center border border-foreground bg-foreground px-4 text-xs font-medium uppercase tracking-[0.3em] text-background hover:bg-foreground/85 disabled:opacity-40 transition-colors duration-700 ease-out focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2"
+            className="mt-8 flex h-12 w-full items-center justify-center gap-2 border border-foreground bg-foreground px-4 text-xs font-medium uppercase tracking-[0.3em] text-background hover:bg-foreground/85 disabled:opacity-40 transition-colors duration-700 ease-out focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2"
             style={typography?.cta}
           >
-            {ctaLoading ? '···' : ctaText}
+            {ctaLoading ? (
+              '···'
+            ) : (
+              <>
+                {ctaText}
+                <ArrowIcon className="h-4 w-4 shrink-0" isRtl={isRtl} />
+              </>
+            )}
           </button>
         ))}
     </aside>

@@ -74,7 +74,7 @@ describe.each(['en', 'ar'] as const)('3D toggle (%s)', locale => {
     const { getByRole, rerender } = render(
       <Model3dToggle active={false} onToggle={onToggle} t={t} />
     );
-    expect(getByRole('button').textContent).toBe(locale === 'ar' ? 'شوفه 3D' : 'View in 3D');
+    expect(getByRole('button').textContent).toBe(locale === 'ar' ? 'اعرضه 3D' : 'View in 3D');
     fireEvent.click(getByRole('button'));
     expect(onToggle).toHaveBeenCalledTimes(1);
     rerender(<Model3dToggle active onToggle={onToggle} t={t} />);

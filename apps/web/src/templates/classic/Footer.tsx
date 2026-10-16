@@ -2,8 +2,11 @@
 
 import Link from 'next/link';
 import { PoweredByForce } from '../shared/PoweredByForce';
+import { FooterLegalRow } from '../shared/FooterLegalRow';
+import { FooterWhatsApp } from '../shared/FooterWhatsApp';
 import type { FooterProps } from '../types';
 import { useLanguage } from '../../contexts/LanguageContext';
+import { footerRootPaint } from '../shared/footer-ink';
 import {
   footerBranchesHeading,
   getDisplayBranding,
@@ -21,6 +24,8 @@ export default function ClassicFooter({
   socials,
   navigation = [],
   footerLinks,
+  disabledCmsSlugs,
+  urlPrefix,
   isRtl: isRtlProp,
   bgColor,
   footerLogo,
@@ -70,7 +75,7 @@ export default function ClassicFooter({
   return (
     <footer
       data-zone="footer"
-      style={bgColor ? { backgroundColor: bgColor } : undefined}
+      {...footerRootPaint(bgColor)}
       className={`${bgColor ? '' : 'bg-[hsl(var(--bg-section-alt))]'} border-t border-border mt-auto`}
       dir={isRtl ? 'rtl' : 'ltr'}
     >
@@ -92,6 +97,14 @@ export default function ClassicFooter({
                     : undefined
                 }
               />
+            )}
+            {!displayLogo && !hideFooterLogoMobile && (
+              <p
+                data-footer-brand="mobile"
+                className="md:hidden mb-5 text-center text-xl font-serif font-bold text-foreground"
+              >
+                {displayName}
+              </p>
             )}
             {displayLogo ? (
               <img
@@ -119,7 +132,7 @@ export default function ClassicFooter({
             {/* Contact details — only render the list if at least one
                 detail is present. Classic mixes contact into the brand
                 column so an empty <ul> would create dead space. */}
-            {(contact.email || displayPhone || displayAddress) && (
+            {(contact.email || displayPhone || displayAddress || contact.whatsapp) && (
               <ul className="space-y-2 text-sm text-muted-foreground">
                 {contact.email && (
                   <li>
@@ -140,6 +153,14 @@ export default function ClassicFooter({
                     >
                       {displayPhone}
                     </a>
+                  </li>
+                )}
+                {contact.whatsapp && (
+                  <li>
+                    <FooterWhatsApp
+                      whatsapp={contact.whatsapp}
+                      className="hover:text-foreground transition-colors duration-200"
+                    />
                   </li>
                 )}
                 {displayAddress && (
@@ -278,10 +299,17 @@ export default function ClassicFooter({
             </div>
           )}
         </div>
-
-        {/* Bottom bar removed 2026-05-21 — redundant with Company Links. */}
       </div>
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        {/* Legal row (S-01): privacy · terms · returns · ©, from resolveBottomBar. */}
+        <FooterLegalRow
+          footerLinks={footerLinks}
+          disabledCmsSlugs={disabledCmsSlugs}
+          storeName={displayName ?? ''}
+          isRtl={isRtl}
+          urlPrefix={urlPrefix}
+          className="text-muted-foreground"
+        />
         <PoweredByForce hidden={hidePoweredBy} />
       </div>
     </footer>

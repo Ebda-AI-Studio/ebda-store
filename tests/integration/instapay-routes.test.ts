@@ -110,6 +110,8 @@ describe.skipIf(!hasDb)('InstaPay over HTTP', () => {
   }
 
   // `codFee`: a COD order is created with its fee frozen and inside total (MONEYB-3).
+  // `manualHoldAdmitted: true`: these are orders OrderService.create admitted as COD/InstaPay holds;
+  // /payments/create refuses to convert any other order into one (MANUAL_HOLD_NOT_ADMITTED, #65).
   async function mkOrder(s: { id: string; productId: string }, codFee = 0) {
     orderSeq += 1;
     return owner.order.create({
@@ -120,6 +122,7 @@ describe.skipIf(!hasDb)('InstaPay over HTTP', () => {
         paymentStatus: 'unpaid',
         subtotal: TOTAL,
         codFee,
+        manualHoldAdmitted: true,
         total: TOTAL + codFee,
         shippingAddress: { firstName: 'Mona', lastName: 'Adel', email: 'mona@example.com' },
         billingAddress: {},

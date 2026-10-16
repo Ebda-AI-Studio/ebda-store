@@ -20,6 +20,7 @@ import { StoreLogo } from '../shared/StoreLogo';
 import { DahabDrawer } from './Drawer';
 import { DahabCartDrawer } from './CartDrawer';
 import { BagIcon, DAHAB_CONTAINER, MenuIcon, SearchIcon, UserIcon, ChevronIcon, cx } from './ui';
+import { countText, ITEMS } from '../../lib/plural';
 
 const ICON_BTN =
   'relative flex h-11 w-11 items-center justify-center text-foreground/85 transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm';
@@ -147,7 +148,7 @@ export default function DahabHeader({
             type="button"
             onClick={() => setLanguage(language === 'ar' ? 'en' : 'ar')}
             className={cx(ICON_BTN, 'hidden w-auto px-2 text-sm lg:flex')}
-            aria-label={language === 'ar' ? 'Switch to English' : 'التبديل إلى العربية'}
+            aria-label={t('التبديل إلى العربية', 'Switch to English')}
             lang={language === 'ar' ? 'en' : 'ar'}
           >
             {language === 'ar' ? 'EN' : 'عربي'}
@@ -158,13 +159,16 @@ export default function DahabHeader({
             onClick={() => setBagOpen(true)}
             aria-label={
               cartItemCount > 0
-                ? t(`Bag, ${cartItemCount} items`, `السلة، ${localize(cartItemCount)} قطع`)
+                ? t(
+                    `Bag, ${countText('en', cartItemCount, ITEMS)}`,
+                    `السلة، ${countText('ar', cartItemCount, ITEMS, localize(cartItemCount))}`
+                  )
                 : t('Bag', 'السلة')
             }
           >
             <BagIcon className="h-[22px] w-[22px]" />
             {cartItemCount > 0 && (
-              <span className="absolute end-1 top-1.5 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-primary px-1 text-[10px] font-semibold leading-none text-primary-foreground tabular-nums">
+              <span className="absolute end-1 top-1.5 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-primary px-1 text-xs font-semibold leading-none text-primary-foreground tabular-nums">
                 {localize(cartItemCount)}
               </span>
             )}
@@ -190,7 +194,7 @@ export default function DahabHeader({
               value={query}
               onChange={e => setQuery(e.target.value)}
               autoFocus={searchOpen}
-              placeholder={t('Rings, chains, 21K gold…', 'خواتم، سلاسل، دهب عيار 21…')}
+              placeholder={t('Rings, chains, 21K gold…', 'خواتم، سلاسل، ذهب عيار 21…')}
               className="h-12 w-full border-0 border-b border-border bg-transparent ps-8 text-base text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none"
             />
             <SearchAutocomplete

@@ -18,9 +18,35 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import express from 'express';
-import type { AddressInfo } from 'node:net';
+import { IncomingMessage, ServerResponse } from 'node:http';
+import { Socket } from 'node:net';
 import type { Request } from 'express';
 import { skipGlobalRateLimit } from '@api/middleware/global-rate-limit-skip';
+
+/**
+ * Runs `app` on an in-memory request/response pair: no listening port, no network, nothing to
+ * tear down (a real socket here once answered 404 in a full run). Resolves with the status code
+ * once the app ends the response.
+ */
+function dispatch(
+  app: express.Express,
+  method: string,
+  url: string,
+  headers: Record<string, string> = {}
+): Promise<number> {
+  const rq = new IncomingMessage(new Socket());
+  rq.method = method;
+  rq.url = url;
+  rq.headers = Object.fromEntries(Object.entries(headers).map(([k, v]) => [k.toLowerCase(), v]));
+  const rs = new ServerResponse(rq);
+  return new Promise<number>((resolve, reject) => {
+    rs.end = ((..._args: unknown[]) => {
+      resolve(rs.statusCode);
+      return rs;
+    }) as typeof rs.end;
+    app(rq, rs, err => reject(err ?? new Error(`unhandled ${method} ${url}`)));
+  });
+}
 
 const req = (over: Partial<Request> = {}): Request =>
   ({
@@ -243,7 +269,7 @@ describe('req.path at app-level really is the full mounted path', () => {
     // The bypass matches a literal string, so it is only correct if Express
     // hands an app-level middleware the FULL path. That is a framework fact,
     // not something a hand-made req object can establish — so this drives a
-    // real express app on a real socket and reads what the middleware saw.
+    // real express app in memory (no socket) and reads what the middleware saw.
     const app = express();
     let seenPath = '';
     let seenSkip: boolean | null = null;
@@ -257,17 +283,11 @@ describe('req.path at app-level really is the full mounted path', () => {
       express.Router().post('/auth/refresh', (_r, res) => res.json({ ok: true }))
     );
 
-    const server = app.listen(0);
-    try {
-      const { port } = server.address() as AddressInfo;
-      const res = await fetch(`http://127.0.0.1:${port}/api/v1/auth/refresh`, { method: 'POST' });
+    const status = await dispatch(app, 'POST', '/api/v1/auth/refresh');
 
-      expect(res.status).toBe(200);
-      expect(seenPath).toBe('/api/v1/auth/refresh');
-      expect(seenSkip).toBe(true);
-    } finally {
-      server.close();
-    }
+    expect(status).toBe(200);
+    expect(seenPath).toBe('/api/v1/auth/refresh');
+    expect(seenSkip).toBe(true);
   });
 
   it('is /api/v1/inngest, not /inngest, and only skips with the signature header', async () => {
@@ -282,20 +302,11 @@ describe('req.path at app-level really is the full mounted path', () => {
       express.Router().post('/inngest', (_r, res) => res.json({ ok: true }))
     );
 
-    const server = app.listen(0);
-    try {
-      const { port } = server.address() as AddressInfo;
-      await fetch(`http://127.0.0.1:${port}/api/v1/inngest`, {
-        method: 'POST',
-        headers: { 'x-inngest-signature': 't=123&s=abc' },
-      });
-      await fetch(`http://127.0.0.1:${port}/api/v1/inngest`, { method: 'POST' });
+    await dispatch(app, 'POST', '/api/v1/inngest', { 'x-inngest-signature': 't=123&s=abc' });
+    await dispatch(app, 'POST', '/api/v1/inngest');
 
-      expect(seen[0]).toEqual({ path: '/api/v1/inngest', skip: true });
-      expect(seen[1]).toEqual({ path: '/api/v1/inngest', skip: false });
-    } finally {
-      server.close();
-    }
+    expect(seen[0]).toEqual({ path: '/api/v1/inngest', skip: true });
+    expect(seen[1]).toEqual({ path: '/api/v1/inngest', skip: false });
   });
 });
 

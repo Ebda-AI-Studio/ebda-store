@@ -74,7 +74,7 @@ export default function BoldHero({
       {/* Content */}
       <div className="relative z-10 container mx-auto px-4 min-h-[50vh] sm:min-h-[640px] md:min-h-screen flex flex-col justify-center py-16 sm:py-20 md:py-24">
         <div
-          className={`max-w-3xl motion-reduce:animate-none ${isRtl ? 'mr-auto ml-0 text-right' : 'ml-0 text-left'}`}
+          className="max-w-3xl motion-reduce:animate-none me-auto text-start"
           style={{ animation: 'boldSlideIn 0.6s ease-out both' }}
         >
           {/* "New Drop" pill removed — was hardcoded demo copy. If a

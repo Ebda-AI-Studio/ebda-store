@@ -104,10 +104,10 @@ shadow-lg shadow-primary/20 hover:shadow-xl hover:shadow-primary/30
 hover:-translate-y-0.5 transition-all duration-300
 ```
 
-**Order Summary CTA (Checkout)**
+**Order Summary CTA (Checkout)** (one label from `lib/checkout-cta.ts`, mirrored `ArrowIcon`, no coloured glow; C-03)
 
 ```
-flex h-12 w-full items-center justify-center rounded-xl bg-primary px-4 text-sm font-semibold
+flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 text-sm font-semibold
 text-primary-foreground transition-colors hover:bg-primary/90
 focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2
 ```

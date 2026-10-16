@@ -8,6 +8,7 @@ import { useNumerals } from '../../hooks/useNumerals';
 import { useBodyScrollLock } from '../../hooks/useBodyScrollLock';
 import { buildSidebarVars, countActiveFilters } from './filter-sidebar-state';
 import { localizeOptionName, localizeOptionValue } from '@/lib/option-localization';
+import { Sheet } from '@/components/ui/Sheet';
 
 import { REGION, roundToMinor } from '@ebda/shared';
 interface SortOption {
@@ -531,6 +532,7 @@ export function ProductsFilterSidebar(props: ProductsFilterSidebarProps) {
         onClick={() => setIsOpen(true)}
         aria-haspopup="dialog"
         aria-expanded={isOpen}
+        aria-controls="products-filter-sheet"
         className="lg:hidden mb-4 flex h-11 w-full items-center justify-between rounded-xl bg-[hsl(var(--primary))] px-4 text-sm font-semibold text-[hsl(var(--primary-foreground))] transition-colors hover:bg-[hsl(var(--primary)/0.9)]"
       >
         <span className="inline-flex items-center gap-2">
@@ -557,72 +559,34 @@ export function ProductsFilterSidebar(props: ProductsFilterSidebarProps) {
         </span>
       </button>
 
-      {/* Mobile bottom-sheet (spec § 4.4). Rendered into the regular tree —
-          z-50 + fixed positioning is enough for our z stack here, no portal
-          needed. Tapping the backdrop closes; tapping inside doesn't. */}
-      {isOpen && (
-        <div
-          className="fixed inset-0 z-50 flex flex-col justify-end bg-black/40 lg:hidden animate-in fade-in duration-200"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="products-filter-sheet-title"
-          onClick={() => setIsOpen(false)}
-        >
-          <div
-            className="max-h-[85vh] overflow-hidden rounded-t-3xl bg-[hsl(var(--primary))] shadow-2xl flex flex-col animate-in slide-in-from-bottom duration-300"
-            onClick={e => e.stopPropagation()}
+      {/* Mobile bottom-sheet (spec § 4.4) on the shared Sheet primitive (R-04):
+          Escape, focus in/trap/return, scroll lock, a 44px close. */}
+      <Sheet
+        open={isOpen}
+        onClose={() => setIsOpen(false)}
+        side="bottom"
+        id="products-filter-sheet"
+        focusClose
+        title={t('Filters', 'فلاتر')}
+        closeLabel={t('Close', 'إغلاق')}
+        className="bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] lg:hidden"
+        titleClassName="text-base font-semibold text-[hsl(var(--primary-foreground))]"
+        closeClassName="text-[hsl(var(--primary-foreground))] hover:bg-[hsl(var(--primary-foreground)/0.15)]"
+        bodyClassName="px-5 pb-4 space-y-6"
+        footerClassName="border-t border-[hsl(var(--primary-foreground)/0.2)] px-5 py-3"
+        footer={
+          <button
+            type="button"
+            onClick={() => setIsOpen(false)}
+            className="w-full rounded-xl bg-primary py-3 text-sm font-semibold text-primary-foreground hover:bg-primary/90 transition-colors"
           >
-            <div className="flex flex-col items-center bg-[hsl(var(--primary))] pt-3 pb-2 shrink-0">
-              <span
-                className="h-1 w-12 rounded-full bg-[hsl(var(--primary-foreground)/0.3)]"
-                aria-hidden
-              />
-              <div className="mt-2 flex w-full items-center justify-between px-5">
-                <h2
-                  id="products-filter-sheet-title"
-                  className="text-base font-semibold text-[hsl(var(--primary-foreground))]"
-                >
-                  {t('Filters', 'فلاتر')}
-                </h2>
-                <button
-                  type="button"
-                  onClick={() => setIsOpen(false)}
-                  className="inline-flex h-9 w-9 items-center justify-center rounded-full hover:bg-[hsl(var(--primary-foreground)/0.15)]"
-                  aria-label={t('Close', 'إغلاق')}
-                >
-                  <svg
-                    className="h-5 w-5 text-[hsl(var(--primary-foreground))]"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                    aria-hidden
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M6 18L18 6M6 6l12 12"
-                    />
-                  </svg>
-                </button>
-              </div>
-            </div>
-
-            <div className="flex-1 overflow-y-auto px-5 pb-4 space-y-6">{renderBody(true)}</div>
-
-            <div className="border-t border-[hsl(var(--primary-foreground)/0.2)] bg-[hsl(var(--primary))] px-5 py-3 shrink-0">
-              <button
-                type="button"
-                onClick={() => setIsOpen(false)}
-                className="w-full rounded-xl bg-primary py-3 text-sm font-semibold text-primary-foreground hover:bg-primary/90 transition-colors"
-              >
-                {t('View results', 'عرض النتائج')}
-                {meta && <span className="ms-2 opacity-80">({meta.total})</span>}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+            {t('View results', 'عرض النتائج')}
+            {meta && <span className="ms-2 opacity-80">({meta.total})</span>}
+          </button>
+        }
+      >
+        {renderBody(true)}
+      </Sheet>
 
       {/* Desktop inline sidebar — collapsible via the header button. Initial
           open state driven by the merchant's filterSidebar.defaultOpen setting. */}

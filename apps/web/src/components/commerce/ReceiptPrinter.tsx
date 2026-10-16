@@ -20,6 +20,7 @@ import { VariantText } from '@ebda/ui';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { groupOrderLinesForDisplay, orderTaxPlacement, orderLineVariantTitle } from '@ebda/shared';
 import type { Order } from '@/lib/api';
+import { MINUS, signedText } from '@/lib/bidi';
 import type { StoreData } from '@/contexts/StoreContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useLocalePrice } from '@/hooks/useLocalePrice';
@@ -30,6 +31,7 @@ import { pickLocalizedName } from '@/templates/shared/display-helpers';
 import { CartLineNote } from './CartLineNote';
 import { Barcode } from './Barcode';
 import styles from './ReceiptPrinter.module.css';
+import { countText, ITEMS } from '@/lib/plural';
 
 /** The success page's verified payment outcome (SuccessClient owns it). */
 export type PaymentState =
@@ -49,6 +51,13 @@ export interface ReceiptPrinterProps {
   store: ReceiptStore;
   /** The order is still being fetched: printer + spinner + empty slot. */
   loading?: boolean;
+  /**
+   * S-02: the store's delivery window from the order's date (`useDeliveryWindow`),
+   * already formatted; null/absent = the store has no delivery numbers → no row.
+   */
+  deliveryWindow?: { from: string; to: string } | null;
+  /** S-02: the store's "ask about this order" wa.me link; null/absent = no line. */
+  whatsappHref?: string | null;
 }
 
 const REDUCED = '(prefers-reduced-motion: reduce)';
@@ -105,6 +114,8 @@ export function ReceiptPrinter({
   paymentState,
   store,
   loading = false,
+  deliveryWindow = null,
+  whatsappHref = null,
 }: ReceiptPrinterProps) {
   const { t, language, isRtl } = useLanguage();
   const formatPrice = useLocalePrice();
@@ -188,8 +199,8 @@ export function ReceiptPrinter({
               <p className="mt-0.5 truncate text-xs opacity-60">
                 {order
                   ? t(
-                      `${itemCount} ${itemCount === 1 ? 'item' : 'items'}`,
-                      arabicPieces(itemCount, localize)
+                      countText('en', itemCount, ITEMS),
+                      countText('ar', itemCount, ITEMS, localize(itemCount))
                     )
                   : storeName}
               </p>
@@ -323,7 +334,35 @@ export function ReceiptPrinter({
                     })}
                   </Num>
                 </MetaRow>
+                {/* S-02: when it arrives, from the store's own zones/settings. A
+                    failed payment is not on its way, so it gets no window. */}
+                {deliveryWindow && paymentState !== 'failed' && (
+                  <MetaRow label={t('Arrives', 'يصلك')} ar={ar}>
+                    <span data-testid="receipt-delivery-window">
+                      {deliveryWindow.from === deliveryWindow.to
+                        ? deliveryWindow.from
+                        : `${deliveryWindow.from} – ${deliveryWindow.to}`}
+                    </span>
+                  </MetaRow>
+                )}
               </dl>
+
+              {whatsappHref && (
+                <p className="mt-4 text-center text-xs">
+                  <a
+                    data-testid="receipt-whatsapp"
+                    href={whatsappHref}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className={`${styles.ink} underline underline-offset-4`}
+                  >
+                    {t(
+                      'Questions? Message the store on WhatsApp',
+                      'هل لديك سؤال؟ راسل المتجر على واتساب'
+                    )}
+                  </a>
+                </p>
+              )}
 
               <div className="mt-6 flex flex-col items-center gap-1.5 pb-4">
                 <Barcode value={order.orderNumber} className={`h-11 w-[78%] ${styles.ink}`} />
@@ -370,7 +409,7 @@ function Totals({
       )}
       {(order.discount ?? 0) > 0 && (
         <MoneyRow label={t('Discount', 'الخصم')} ar={ar}>
-          <Num>{`−${formatPrice(order.discount ?? 0)}`}</Num>
+          <Num>{signedText(MINUS, formatPrice(order.discount ?? 0))}</Num>
         </MoneyRow>
       )}
       {typeof order.shipping === 'number' && (
@@ -406,7 +445,7 @@ function Totals({
       {wallet > 0 && (
         <>
           <MoneyRow label={t('From wallet', 'من المحفظة')} ar={ar}>
-            <Num>{`−${formatPrice(wallet)}`}</Num>
+            <Num>{signedText(MINUS, formatPrice(wallet))}</Num>
           </MoneyRow>
           {/* The rest is owed only when nobody charged it yet (COD, transfer);
               on a paid order the gateway already took it. */}
@@ -454,31 +493,24 @@ function paymentLabel(order: Order, state: PaymentState, lang: 'ar' | 'en'): str
   return state === 'cod' ? paymentProviderLabel('cod', lang) : null;
 }
 
-/** "قطعة واحدة" / "قطعتين" / "٣ قطع" / "١١ قطعة". */
-function arabicPieces(n: number, localize: (v: number) => string): string {
-  if (n === 1) return 'قطعة واحدة';
-  if (n === 2) return 'قطعتين';
-  return `${localize(n)} ${n <= 10 ? 'قطع' : 'قطعة'}`;
-}
-
 function statusCopy(kind: StatusKind, t: (en: string, ar: string) => string): string {
   switch (kind) {
     case 'printing':
     case 'verifying':
-      return t('Printing your receipt…', 'بنطبع فاتورتك…');
+      return t('Printing your receipt…', 'جارٍ طباعة فاتورتك…');
     case 'paid':
-      return t('Paid, order confirmed', 'تم الدفع، طلبك اتأكد');
+      return t('Paid, order confirmed', 'تم الدفع وتأكيد طلبك');
     case 'cod':
-      return t('Order placed, pay on delivery', 'طلبك اتسجل، الدفع عند الاستلام');
+      return t('Order placed, pay on delivery', 'تم تسجيل طلبك، الدفع عند الاستلام');
     case 'awaiting':
-      return t('Order placed, awaiting payment', 'طلبك اتسجل، في انتظار الدفع');
+      return t('Order placed, awaiting payment', 'تم تسجيل طلبك، في انتظار الدفع');
     case 'pending':
-      return t('Order placed, confirming payment', 'طلبك اتسجل، بنأكد الدفع');
+      return t('Order placed, confirming payment', 'تم تسجيل طلبك، جارٍ تأكيد الدفع');
     case 'failed':
-      return t('Payment failed', 'الدفع ما تمش');
+      return t('Payment failed', 'لم يكتمل الدفع');
     case 'unknown':
     default:
-      return t('Order received', 'طلبك وصل');
+      return t('Order received', 'تم استلام طلبك');
   }
 }
 

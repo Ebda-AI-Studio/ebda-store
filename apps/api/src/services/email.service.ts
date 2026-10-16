@@ -326,6 +326,11 @@ async function getPlatformResend(): Promise<import('resend').Resend> {
   return _platformResend;
 }
 
+/** A header value on one line: a shopper-typed subject must not carry CR/LF into the email. */
+function oneLine(value: string): string {
+  return value.replace(/[\r\n]+/g, ' ').trim();
+}
+
 export class EmailService {
   // ---------------------------------------------------------------------------
   // Internal routing helpers
@@ -343,6 +348,7 @@ export class EmailService {
       content: string;
       text?: string;
       language?: 'en' | 'ar';
+      replyTo?: string;
     },
     // `queue: true` routes the rendered email through the durable Redis retry
     // queue (email-queue.service) instead of calling Resend inline — used by the
@@ -403,11 +409,13 @@ export class EmailService {
       subject: args.subject,
       html,
       text: args.text,
+      replyTo: args.replyTo,
     });
   }
 
   /**
-   * Platform-level send (no store context). Used for admin alerts only.
+   * Platform-level send (Ebda sender, no store branding): a store's refund alert to its own
+   * order address (FU46-1a). (The old contact-form fallback to Ebda's inbox is gone — FU46-1c.)
    */
   private static async sendPlatform(
     args: {
@@ -1044,24 +1052,11 @@ export class EmailService {
   // ---------------------------------------------------------------------------
 
   /**
-   * Admin Alert: New Order
-   */
-  static async sendAdminNewOrder(data: OrderEmailData): Promise<void> {
-    const content = this.adminNewOrderTemplate(data);
-    await this.sendPlatform(
-      {
-        to: config.smtpFromEmail,
-        subject: `New Order Received - #${data.orderNumber}`,
-        content,
-      },
-      { queue: true }
-    );
-  }
-
-  /**
-   * Admin Alert: Refund Processed
+   * Refund processed, to the STORE's order-notification address the caller resolved
+   * (`settings.orderInvoiceEmail`; Ruling FU46-1a). Never Ebda's own address.
    */
   static async sendAdminRefund(data: {
+    to: string;
     orderNumber: string;
     amount: number;
     reason?: string;
@@ -1070,7 +1065,7 @@ export class EmailService {
     const content = this.adminRefundTemplate(data);
     await this.sendPlatform(
       {
-        to: config.smtpFromEmail,
+        to: data.to,
         subject: `Refund Processed - Order #${data.orderNumber}`,
         content,
       },
@@ -1079,31 +1074,18 @@ export class EmailService {
   }
 
   /**
-   * Send Contact Form Email to Admin
+   * A shopper's storefront contact message, to the STORE (Ruling FU46-1): from the store's own
+   * sender, reply-to the shopper, in the store's branded shell.
    */
-  static async sendContactForm(data: {
-    name: string;
-    email: string;
-    subject: string;
-    message: string;
-  }): Promise<void> {
-    const content = this.contactFormTemplate(data);
-    await this.sendPlatform({
-      to: config.smtpFromEmail,
-      subject: `Contact Form: ${data.subject}`,
-      content,
-      text: this.htmlToText(
-        renderBrandedShell(content, {
-          name: BRAND.product.nameEn,
-          nameAr: BRAND.product.nameAr,
-          logo: BRAND_EMAIL_LOGO_URL,
-          theme: null,
-          email: null,
-          phone: null,
-          address: null,
-          defaultLanguage: 'en',
-        })
-      ),
+  static async sendStoreContactMessage(
+    storeId: string,
+    to: string,
+    data: { name: string; email: string; subject: string; message: string }
+  ): Promise<void> {
+    await this.sendForStore(storeId, {
+      to,
+      subject: `Contact Form: ${oneLine(data.subject)}`,
+      content: this.contactFormTemplate(data),
       replyTo: data.email,
     });
   }
@@ -1114,24 +1096,6 @@ export class EmailService {
 
   /**
    * Admin New Order Template
-   */
-  private static adminNewOrderTemplate(d: OrderEmailData): string {
-    return `
-      <h2>New Order Received</h2>
-      <p><strong>Order #${escapeHtml(d.orderNumber)}</strong></p>
-      <p><strong>Customer:</strong> ${escapeHtml(d.customerName)} (${escapeHtml(
-        d.customerEmail
-      )})</p>
-      <p><strong>Total:</strong> ${emailMoney(d.total, d.currency, 'en')}</p>
-      <p><strong>Items:</strong> ${d.items.length}</p>
-      <p style="text-align: center; margin: 24px 0;">
-        <a href="${config.adminUrl}/orders" class="button">View Order</a>
-      </p>
-    `;
-  }
-
-  /**
-   * Admin Refund Template
    */
   private static adminRefundTemplate(d: {
     orderNumber: string;

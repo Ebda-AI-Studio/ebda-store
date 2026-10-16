@@ -84,7 +84,6 @@ describe('wrangler.jsonc', () => {
       'ioredis',
       'socket.io',
       'rate-limit-redis',
-      'sharp',
       'imapflow',
       'pino',
       'multer',

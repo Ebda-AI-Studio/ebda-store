@@ -33,6 +33,7 @@ import { cartLineUnitPrice } from '../lib/cart-pricing';
 import { pairBackorderedLines } from '../lib/backorder-pairing';
 import { restoreCartShape } from '../lib/order-cart-restore';
 import { AppError } from '../middleware/error-handler';
+import { variantRequiredError } from '../lib/variant-required';
 import { CartService } from './cart.service';
 import { resolveBundle } from './bundle.service';
 import { STOREFRONT_PRODUCT_SELECT } from './product.service';
@@ -59,6 +60,7 @@ import { affiliateService } from './affiliate.service';
 import { auditLog } from '../middleware/security';
 import { hasCapturedPayment, shouldApplyRefundEffects } from './order-refund-gating';
 import logger from '../lib/logger';
+import { lineAllowsBackorder } from '../lib/effective-inventory';
 import { frozenTaxInvoiceFields, resolveActiveTaxRate } from '../lib/order-tax';
 import {
   invalidateStoreProductCachesAfterOrder,
@@ -683,6 +685,10 @@ export class OrderService {
         id: true,
         trackInventory: true,
         costPrice: true,
+        name: true,
+        nameAr: true,
+        // Every variant row (disabled included): the sizeless-line gate below.
+        _count: { select: { variants: true } },
         categories: { select: { categoryId: true } },
         variants: {
           where: { id: { in: cartVariantIds } },
@@ -720,6 +726,29 @@ export class OrderService {
         'A product in your cart is no longer available. Remove it and try again.',
         { productIds: missingProductIds }
       );
+    }
+
+    // A variant product is sold as one of its variants (C-01). Cart writes enforce it, but a
+    // line written before C-01 (or merged in from an old guest cart) can still be sizeless, and
+    // with backorder on it would be sold with no size the warehouse can pick. Refuse it here,
+    // bilingual, naming the product, with the line ids so the cart can mark them (FU46 M-6).
+    const sizelessLines = cart.items.flatMap(item => {
+      const variantId = (item as { variantId?: string | null }).variantId;
+      const internals = productInternalsById.get(item.productId);
+      return !variantId && internals && internals._count.variants > 0
+        ? [{ productId: item.productId, name: internals.name, nameAr: internals.nameAr ?? null }]
+        : [];
+    });
+    if (sizelessLines.length > 0) {
+      const first = sizelessLines[0];
+      const messageEn = `Please choose a size for “${first.name}” before checking out`;
+      const messageAr = `يرجى اختيار المقاس لـ «${first.nameAr || first.name}» قبل إتمام الطلب`;
+      throw new AppError(400, 'VARIANT_REQUIRED', messageEn, {
+        messageEn,
+        messageAr,
+        productIds: sizelessLines.map(l => l.productId),
+        products: sizelessLines,
+      });
     }
 
     // A required personalisation is re-checked HERE, not only at add-to-cart:
@@ -1310,20 +1339,23 @@ export class OrderService {
             // dual-check as before: a disabled feature must never silently
             // backorder just because the per-product flag is on). Fetched fresh
             // to match the prior FOR UPDATE behavior, only on the rare miss path.
-            const perFlag = variantId
-              ? (
-                  await tx.productVariant.findUnique({
-                    where: { id: variantId },
-                    select: { allowBackorder: true },
-                  })
-                )?.allowBackorder
-              : (
-                  await tx.product.findUnique({
-                    where: { id: productId, storeId },
-                    select: { allowBackorder: true },
-                  })
-                )?.allowBackorder;
-            if (!backorderFeatureEnabled || !perFlag) {
+            // A variant inherits the product's flag: the shared rule
+            // (`lineAllowsBackorder`, X-02 fix round), the same one the cart and
+            // the storefront's pre-order label use.
+            const productFlags = await tx.product.findUnique({
+              where: { id: productId, storeId },
+              select: { allowBackorder: true },
+            });
+            const variantFlags = variantId
+              ? await tx.productVariant.findUnique({
+                  where: { id: variantId },
+                  select: { allowBackorder: true },
+                })
+              : null;
+            if (
+              !productFlags ||
+              !lineAllowsBackorder(productFlags, variantFlags, backorderFeatureEnabled)
+            ) {
               throw new AppError(
                 400,
                 'INSUFFICIENT_INVENTORY',
@@ -2760,6 +2792,12 @@ export class OrderService {
       let variantSku: string | undefined;
       let variantTitle: string | undefined;
       let variantTitleAr: string | null = null;
+      // C-01 on the merchant path: a product with variants is ordered as one
+      // of them. Without this a phone order wrote a SIZELESS line the
+      // warehouse cannot pick (W1a review, fix the class).
+      if (!it.variantId && product.variants.length > 0) {
+        throw variantRequiredError(product.id, product.name);
+      }
       if (it.variantId) {
         const variant = product.variants.find(v => v.id === it.variantId);
         if (!variant) {
@@ -2767,6 +2805,17 @@ export class OrderService {
             404,
             'VARIANT_NOT_FOUND',
             `Variant ${it.variantId} not found for product ${product.name}`
+          );
+        }
+        // A disabled variant is not for sale on any path (inventory model):
+        // checkout, the cart and payment links already refuse it; a manual
+        // order wrote a line for it and decremented its stock (W1a re-review).
+        if (variant.isActive === false) {
+          throw new AppError(
+            409,
+            'VARIANT_INACTIVE',
+            `Variant ${variant.title ?? it.variantId} of ${product.name} is disabled`,
+            { productId: product.id, variantId: it.variantId, productName: product.name }
           );
         }
         if (typeof variant.price === 'number') unitPrice = variant.price;

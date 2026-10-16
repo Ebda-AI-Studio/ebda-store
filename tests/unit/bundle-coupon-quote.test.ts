@@ -231,7 +231,6 @@ vi.mock('@api/services/cart.service', () => ({
 vi.mock('@api/services/email.service', () => ({
   EmailService: {
     sendOrderConfirmation: vi.fn().mockResolvedValue(undefined),
-    sendAdminNewOrder: vi.fn().mockResolvedValue(undefined),
   },
 }));
 
@@ -371,7 +370,15 @@ describe('coupon on a cart containing a bundle — quote must equal charge', () 
     mockPrisma.bundleItem.findMany.mockResolvedValue(BUNDLE_ITEM_ROWS);
     mockPrisma.coupon.findFirst.mockResolvedValue(couponRow());
     mockPrisma.product.findMany.mockResolvedValue([
-      { id: 'p-loose', trackInventory: false, costPrice: null, categories: [] },
+      {
+        id: 'p-loose',
+        name: 'Loose Tea',
+        nameAr: null,
+        trackInventory: false,
+        costPrice: null,
+        _count: { variants: 0 },
+        categories: [],
+      },
     ]);
     mockPrisma.store.findUnique.mockResolvedValue({ name: 'Test Store', settings: null });
     mockPrisma.taxRate.findMany.mockResolvedValue([]);

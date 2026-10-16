@@ -7,6 +7,7 @@ import { LoyaltyService } from '../../../services/loyalty.service';
 import { affiliateService } from '../../../services/affiliate.service';
 import logger from '../../logger';
 import { inngest } from '../client';
+import { resolveOrderInvoiceRecipient } from '../../order-notification-address';
 
 /**
  * Fans out the post-purchase side effects of an order STATUS transition
@@ -105,7 +106,9 @@ export async function handleOrderStatusChanged(
 
   const store = await step.run('load-store', () =>
     runInTenantContext(storeId, () =>
-      prisma.store.findUnique({ where: { id: storeId }, select: { name: true } }).catch(() => null)
+      prisma.store
+        .findUnique({ where: { id: storeId }, select: { name: true, settings: true } })
+        .catch(() => null)
     )
   );
   const storeName = store?.name ?? storeId;
@@ -245,14 +248,22 @@ export async function handleOrderStatusChanged(
     // claimed customer set), has no counterpart in the fanout, and fires at most
     // once per order because `refunded` is terminal in the status machine
     // (`order-status-machine.ts`), so no order can re-enter this branch.
-    add('email-admin-refund', () =>
-      EmailService.sendAdminRefund({
-        orderNumber: order.orderNumber,
-        amount: order.total,
-        reason: 'Order refunded',
-        currency: order.currency,
-      })
-    );
+    //
+    // Ruling FU46-1a: it goes to the store's order-notification address
+    // (`settings.orderInvoiceEmail`) and nowhere else; never Ebda's own address.
+    // No address set = no email.
+    const refundTo = resolveOrderInvoiceRecipient(store?.settings);
+    if (refundTo) {
+      add('email-admin-refund', () =>
+        EmailService.sendAdminRefund({
+          to: refundTo,
+          orderNumber: order.orderNumber,
+          amount: order.total,
+          reason: 'Order refunded',
+          currency: order.currency,
+        })
+      );
+    }
   }
 
   const results = await Promise.allSettled(jobs);

@@ -6,8 +6,10 @@ import { CartIcon } from '@ebda/ui';
 import { StoreLogo } from '../shared/StoreLogo';
 import type { HeaderProps } from '../types';
 import { useLanguage } from '../../contexts/LanguageContext';
+import { Sheet } from '../../components/ui/Sheet';
 import { LanguageSwitcher } from '../../components/LanguageSwitcher';
 import { SearchAutocomplete } from '../../components/SearchAutocomplete';
+import { countText, ITEMS } from '../../lib/plural';
 
 export default function ModernHeader({
   branding,
@@ -19,7 +21,7 @@ export default function ModernHeader({
   urlPrefix = '',
   headerBgColor,
 }: HeaderProps) {
-  const { isRtl: ctxIsRtl } = useLanguage();
+  const { isRtl: ctxIsRtl, t } = useLanguage();
   const isRtl = isRtlProp ?? ctxIsRtl;
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -74,7 +76,7 @@ export default function ModernHeader({
               type="button"
               onClick={() => setIsMenuOpen(!isMenuOpen)}
               className="md:hidden inline-flex h-11 w-11 items-center justify-center rounded-lg hover:bg-muted transition-colors duration-300 ease-out cursor-pointer"
-              aria-label={isRtl ? 'القائمة' : 'Menu'}
+              aria-label={t('Menu', 'القائمة')}
               aria-expanded={isMenuOpen}
             >
               <svg
@@ -115,7 +117,7 @@ export default function ModernHeader({
             </Link>
 
             {/* Desktop Navigation */}
-            <nav className={`hidden md:flex items-center gap-1 ${isRtl ? 'flex-row-reverse' : ''}`}>
+            <nav className="hidden md:flex items-center gap-1">
               {navigation.map(item => (
                 <Link
                   key={item.href}
@@ -128,7 +130,7 @@ export default function ModernHeader({
             </nav>
 
             {/* Actions */}
-            <div className={`flex items-center gap-1 ${isRtl ? 'flex-row-reverse' : ''}`}>
+            <div className="flex items-center gap-1">
               {/* Search Button — desktop-only. On mobile the search bar is
                   always visible as its own row below this one (pecannbee
                   target layout), so the toggle button there would be
@@ -137,7 +139,7 @@ export default function ModernHeader({
                 type="button"
                 onClick={() => setIsSearchOpen(!isSearchOpen)}
                 className="hidden md:inline-flex h-11 w-11 items-center justify-center rounded-lg hover:bg-muted transition-colors duration-300 ease-out cursor-pointer"
-                aria-label={isRtl ? 'بحث' : 'Search'}
+                aria-label={t('Search', 'بحث')}
                 aria-expanded={isSearchOpen}
               >
                 {isSearchOpen ? (
@@ -183,7 +185,7 @@ export default function ModernHeader({
               <Link
                 href={isLoggedIn ? `${urlPrefix}/account` : `${urlPrefix}/auth/login`}
                 className="hidden md:inline-flex h-11 w-11 items-center justify-center rounded-lg hover:bg-muted transition-colors duration-300 ease-out"
-                aria-label={isRtl ? 'الحساب' : 'Account'}
+                aria-label={t('Account', 'الحساب')}
               >
                 <svg
                   className="w-5 h-5"
@@ -205,14 +207,15 @@ export default function ModernHeader({
               <Link
                 href={`${urlPrefix}/cart`}
                 className="relative hidden md:inline-flex h-11 w-11 items-center justify-center rounded-lg hover:bg-muted transition-colors duration-300 ease-out"
-                aria-label={
-                  isRtl ? `سلة التسوق (${cartItemCount})` : `Cart (${cartItemCount} items)`
-                }
+                aria-label={t(
+                  `Cart (${countText('en', cartItemCount, ITEMS)})`,
+                  `سلة التسوق (${cartItemCount})`
+                )}
               >
                 <CartIcon className="w-5 h-5" aria-hidden="true" />
                 {cartItemCount > 0 && (
                   <span
-                    className={`absolute -top-0.5 ${isRtl ? '-left-0.5' : '-right-0.5'} bg-primary text-primary-foreground text-[10px] font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1 transition-transform duration-200 ${cartPulse ? 'scale-125' : 'scale-100'}`}
+                    className={`absolute -top-0.5 -end-0.5 bg-primary text-primary-foreground text-xs font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1 transition-transform duration-200 ${cartPulse ? 'scale-125' : 'scale-100'}`}
                   >
                     {cartItemCount > 99 ? '99+' : cartItemCount}
                   </span>
@@ -231,7 +234,7 @@ export default function ModernHeader({
           <div className="hidden pb-3 border-t border-border/40 pt-3" data-zone="mobile-search">
             <form onSubmit={handleSearch} className="relative">
               <svg
-                className={`absolute top-1/2 -translate-y-1/2 ${isRtl ? 'right-3' : 'left-3'} w-5 h-5 text-muted-foreground pointer-events-none`}
+                className="absolute top-1/2 -translate-y-1/2 start-3 w-5 h-5 text-muted-foreground pointer-events-none"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -248,10 +251,10 @@ export default function ModernHeader({
                 type="text"
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
-                placeholder={isRtl ? 'ابحث...' : 'Search'}
-                className={`w-full ${isRtl ? 'pr-11 pl-4' : 'pl-11 pr-4'} py-3 bg-muted rounded-full border border-border focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-base sm:text-sm transition-colors duration-300 ease-out`}
+                placeholder={t('Search', 'ابحث...')}
+                className="w-full ps-11 pe-4 py-3 bg-muted rounded-full border border-border focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-base sm:text-sm transition-colors duration-300 ease-out"
                 dir={isRtl ? 'rtl' : 'ltr'}
-                aria-label={isRtl ? 'بحث عن المنتجات' : 'Search products'}
+                aria-label={t('Search products', 'بحث عن المنتجات')}
               />
               <SearchAutocomplete
                 query={searchQuery}
@@ -272,11 +275,11 @@ export default function ModernHeader({
                 type="text"
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
-                placeholder={isRtl ? 'ابحث عن المنتجات...' : 'Search products...'}
+                placeholder={t('Search products...', 'ابحث عن المنتجات...')}
                 className="min-w-0 flex-1 px-4 py-2.5 bg-muted rounded-lg border border-border focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-base sm:text-sm transition-colors duration-300 ease-out"
                 dir={isRtl ? 'rtl' : 'ltr'}
                 autoFocus={isSearchOpen}
-                aria-label={isRtl ? 'بحث عن المنتجات' : 'Search products'}
+                aria-label={t('Search products', 'بحث عن المنتجات')}
               />
               <button
                 type="submit"
@@ -296,47 +299,22 @@ export default function ModernHeader({
         </div>
       </header>
 
-      {/* Mobile Menu Overlay — item 5 (2026-07-12): shared enter/exit curve
-          (220ms in / 160ms out, motion-safe via motion-reduce:duration-0). */}
-      <div
-        className={`fixed inset-0 z-40 md:hidden transition-opacity ease-out motion-reduce:duration-0 ${isMenuOpen ? 'opacity-100 pointer-events-auto duration-[220ms]' : 'opacity-0 pointer-events-none duration-[160ms]'}`}
-        onClick={() => setIsMenuOpen(false)}
-        aria-hidden="true"
+      {/* Mobile menu drawer on the shared Sheet primitive (R-04 fix round): Escape,
+          backdrop tap, focus in / trap / return to the hamburger, scroll lock; a
+          closed drawer holds no tabbable links. */}
+      <Sheet
+        open={isMenuOpen}
+        onClose={() => setIsMenuOpen(false)}
+        side="end"
+        dir={isRtl ? 'rtl' : 'ltr'}
+        title={t('Menu', 'القائمة')}
+        closeLabel={t('Close menu', 'إغلاق القائمة')}
+        className="md:hidden bg-background text-foreground"
+        headerClassName="border-b border-border !py-2"
+        titleClassName="font-semibold text-foreground"
+        closeClassName="text-muted-foreground hover:text-foreground hover:bg-muted"
+        bodyClassName=""
       >
-        <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
-      </div>
-
-      {/* Mobile Menu Drawer — capped at 320px so on a 320px screen the
-          overlay still has a touch-target outside the panel for dismiss.
-          Item 5 (2026-07-12): same enter/exit curve as the overlay above. */}
-      <div
-        className={`fixed top-0 ${isRtl ? 'left-0' : 'right-0'} z-50 h-full w-[85vw] max-w-xs bg-background shadow-2xl md:hidden transition-transform ease-out motion-reduce:duration-0 overscroll-contain ${isMenuOpen ? 'translate-x-0 duration-[220ms]' : isRtl ? '-translate-x-full duration-[160ms]' : 'translate-x-full duration-[160ms]'}`}
-        aria-label={isRtl ? 'قائمة التنقل' : 'Navigation menu'}
-      >
-        <div className="flex items-center justify-between p-4 border-b border-border">
-          <span className="font-semibold text-foreground">{isRtl ? 'القائمة' : 'Menu'}</span>
-          <button
-            type="button"
-            onClick={() => setIsMenuOpen(false)}
-            className="inline-flex h-11 w-11 items-center justify-center rounded-lg hover:bg-muted transition-colors duration-300 ease-out cursor-pointer"
-            aria-label={isRtl ? 'إغلاق' : 'Close menu'}
-          >
-            <svg
-              className="w-5 h-5"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-              aria-hidden="true"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M6 18L18 6M6 6l12 12"
-              />
-            </svg>
-          </button>
-        </div>
         <nav className="p-4 flex flex-col gap-1" dir={isRtl ? 'rtl' : 'ltr'}>
           {navigation.map(item => (
             <Link
@@ -349,7 +327,7 @@ export default function ModernHeader({
             </Link>
           ))}
         </nav>
-      </div>
+      </Sheet>
     </>
   );
 }

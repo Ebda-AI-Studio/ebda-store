@@ -98,7 +98,7 @@ export default function CompareClient() {
           </h1>
           <div className="text-center py-12 bg-muted rounded-lg">
             <svg
-              className="w-16 h-16 text-muted-foreground/70 mx-auto mb-4"
+              className="w-16 h-16 text-muted-foreground mx-auto mb-4"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -124,7 +124,7 @@ export default function CompareClient() {
             </p>
             <Link
               href={storeUrl('/products')}
-              className="inline-flex items-center px-6 py-3 bg-primary text-white rounded-lg hover:bg-primary/90"
+              className="inline-flex items-center px-6 py-3 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90"
             >
               {t(
                 'Browse Products',
@@ -209,7 +209,7 @@ export default function CompareClient() {
                               sizes="128px"
                             />
                           ) : (
-                            <div className="w-full h-full flex items-center justify-center text-muted-foreground/70">
+                            <div className="w-full h-full flex items-center justify-center text-muted-foreground">
                               <svg
                                 className="w-8 h-8"
                                 fill="none"
@@ -244,7 +244,7 @@ export default function CompareClient() {
                   <td key={product.id} className="p-4 text-center">
                     <span className="font-bold text-lg">{money(product.price)} EGP</span>
                     {isOnSale(product) && (
-                      <span className="block text-muted-foreground/70 line-through text-sm">
+                      <span className="block text-muted-foreground line-through text-sm">
                         {money(product.compareAtPrice)} EGP
                       </span>
                     )}
@@ -260,7 +260,7 @@ export default function CompareClient() {
                     {product.description ? (
                       <p className="line-clamp-3">{product.description}</p>
                     ) : (
-                      <span className="text-muted-foreground/70">-</span>
+                      <span className="text-muted-foreground">-</span>
                     )}
                   </td>
                 ))}
@@ -271,7 +271,7 @@ export default function CompareClient() {
                   {products.map(product => (
                     <td key={product.id} className="p-4 text-center text-sm">
                       {product.specifications?.[spec] || (
-                        <span className="text-muted-foreground/70">-</span>
+                        <span className="text-muted-foreground">-</span>
                       )}
                     </td>
                   ))}
@@ -283,7 +283,7 @@ export default function CompareClient() {
                   {products.map(product => (
                     <td key={product.id} className="p-4 text-center text-sm">
                       {row.values[product.id] || (
-                        <span className="text-muted-foreground/70">&mdash;</span>
+                        <span className="text-muted-foreground">&mdash;</span>
                       )}
                     </td>
                   ))}
@@ -296,7 +296,7 @@ export default function CompareClient() {
                     <button
                       type="button"
                       onClick={() => handleAddToCart(product)}
-                      className="w-full px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90"
+                      className="w-full px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90"
                     >
                       {t(
                         'Add to Cart',

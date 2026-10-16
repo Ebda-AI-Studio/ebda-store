@@ -1,11 +1,12 @@
 'use client';
 
-import { useState, useEffect, type ReactNode } from 'react';
+import { useState, useEffect, useId, useRef, type ReactNode } from 'react';
 import Image from 'next/image';
 import type { ProductVariant, ProductOption } from '@/lib/api';
 import { useLanguage } from '../contexts/LanguageContext';
 import { localizeOptionName, localizeOptionValue } from '@/lib/option-localization';
 import { autoSelection } from '@/lib/single-variant';
+import { canBuyNow } from '@/lib/can-buy-now';
 import { swatchOf } from '@ebda/shared';
 
 interface VariantSelectorProps {
@@ -31,6 +32,14 @@ interface VariantSelectorProps {
    * (`isSizeOption`), else once under the selector. Omitted = nothing renders.
    */
   sizeGuide?: ReactNode;
+  /**
+   * Bumped by the page when add-to-cart was tapped with an option still unset
+   * (C-02). Each increment scrolls to the FIRST unset option group, focuses it,
+   * rings it and says what is missing in a live region — the buy button itself
+   * stays full-weight and enabled (it is never painted disabled for a choice the
+   * shopper can still make). Same shape as `PersonalisationField`'s `nudge`.
+   */
+  nudge?: number;
 }
 
 /**
@@ -59,9 +68,14 @@ export function VariantSelector({
   swatchColor,
   appearance = 'pill',
   sizeGuide,
+  nudge = 0,
 }: VariantSelectorProps) {
   const swatch = appearance === 'swatch';
   const { t, isRtl } = useLanguage();
+  const uid = useId();
+  // The option group a blocked add-to-cart pointed at (cleared once it is picked).
+  const [nudged, setNudged] = useState<string | null>(null);
+  const groupRefs = useRef<Record<string, HTMLDivElement | null>>({});
   // Track selected value per option name. A product with exactly one
   // (tappable) variant starts with it picked — there is nothing to choose.
   const [selected, setSelected] = useState<Record<string, string>>(() =>
@@ -74,6 +88,28 @@ export function VariantSelector({
   useEffect(() => {
     onSelectionChange?.(selected);
   }, [selected, onSelectionChange]);
+
+  // A blocked add: go to the first option still missing. With every option
+  // picked but no matching variant (an unavailable combination) the first
+  // group is the place to change.
+  useEffect(() => {
+    if (nudge <= 0) return;
+    const target = options.find(o => selected[o.name] === undefined) ?? options[0];
+    if (!target) return;
+    setNudged(target.name);
+    const el = groupRefs.current[target.name];
+    if (!el) return;
+    let smooth = true;
+    try {
+      smooth = !window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+    } catch {
+      /* no matchMedia: smooth */
+    }
+    el.scrollIntoView?.({ block: 'center', behavior: smooth ? 'smooth' : 'auto' });
+    el.focus({ preventScroll: true });
+    // Only the nudge counter drives this; `selected`/`options` are read fresh.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [nudge]);
 
   // Derive the matching variant whenever selections change
   useEffect(() => {
@@ -93,6 +129,7 @@ export function VariantSelector({
 
   function handleSelect(optionName: string, value: string) {
     onShopperSelect?.();
+    if (nudged === optionName) setNudged(null);
     // Toggle: clicking an already-selected pill clears it. Customer
     // feedback was that a single-axis product (e.g. "4 liters / 6 liters")
     // looked like a forced choice with no escape — they expected to be
@@ -108,9 +145,10 @@ export function VariantSelector({
   }
 
   /**
-   * Determine whether a particular option value is currently available.
-   * A value is available if at least one variant with that value still has
-   * inventory > 0 (or inventory is undefined, meaning untracked).
+   * Determine whether a particular option value can be picked: at least one
+   * variant with that value (and every option already chosen) can be bought
+   * now — in stock OR accepting backorders (X-02). A sold-out size of a
+   * backorderable product stays pickable; the buy button then says "Pre-order".
    */
   function isValueAvailable(optionName: string, value: string): boolean {
     // Build a partial selection with the candidate value applied
@@ -120,9 +158,7 @@ export function VariantSelector({
       const matches = Object.entries(partialSelection).every(
         ([name, val]) => v.options[name] === val
       );
-      if (!matches) return false;
-      // Treat null/undefined inventory as in-stock (untracked)
-      return v.inventory === undefined || v.inventory === null || v.inventory > 0;
+      return matches && canBuyNow(null, v);
     });
   }
 
@@ -171,10 +207,30 @@ export function VariantSelector({
         // An option with >=1 swatch value renders round swatches; values with
         // neither hex nor image fall back to a text chip (never an empty circle).
         const swatchOption = option.values.some(v => swatchOf(v));
+        const optionIndex = options.indexOf(option);
+        const labelId = `${uid}-label-${optionIndex}`;
+        const hintId = `${uid}-hint-${optionIndex}`;
+        const isNudged = nudged === option.name;
         return (
-          <div key={option.name}>
+          <div
+            key={option.name}
+            ref={el => {
+              groupRefs.current[option.name] = el;
+            }}
+            role="group"
+            aria-labelledby={labelId}
+            aria-describedby={hintId}
+            tabIndex={-1}
+            data-option-group={option.name}
+            data-nudged={isNudged ? '' : undefined}
+            className={[
+              'rounded-[var(--radius)] outline-none',
+              isNudged ? 'ring-2 ring-ring ring-offset-4 ring-offset-background' : '',
+            ].join(' ')}
+          >
             <div className="flex items-center gap-2 mb-2">
               <span
+                id={labelId}
                 className={
                   swatch ? 'text-sm text-muted-foreground' : 'text-sm font-medium text-foreground'
                 }
@@ -231,7 +287,7 @@ export function VariantSelector({
                       {!available && (
                         <span
                           aria-hidden="true"
-                          className="pointer-events-none absolute inset-0 text-foreground/50"
+                          className="pointer-events-none absolute inset-0 text-foreground/70"
                         >
                           <svg
                             className="h-full w-full"
@@ -273,7 +329,7 @@ export function VariantSelector({
                             'relative min-w-[2.75rem] rounded-lg border px-3 py-2 text-sm font-medium transition-all',
                             thumbnail || dotColor ? 'inline-flex items-center gap-2' : '',
                             isSelected
-                              ? 'border-primary bg-primary text-white shadow-md shadow-primary/25'
+                              ? 'border-primary bg-primary text-primary-foreground'
                               : available
                                 ? 'border-border bg-background text-foreground hover:border-primary/50 hover:bg-muted'
                                 : 'cursor-not-allowed border-border bg-muted text-muted-foreground line-through opacity-50',
@@ -318,7 +374,7 @@ export function VariantSelector({
                         className="absolute inset-0 flex items-center justify-center pointer-events-none"
                       >
                         <svg
-                          className="w-full h-full absolute inset-0 text-muted-foreground/40"
+                          className="w-full h-full absolute inset-0 text-muted-foreground"
                           viewBox="0 0 100 100"
                           preserveAspectRatio="none"
                         >
@@ -337,6 +393,23 @@ export function VariantSelector({
                 );
               })}
             </div>
+            {/* Live region: present before it has text, so the message is
+                announced when a blocked add fills it (C-02). */}
+            <p
+              id={hintId}
+              aria-live="polite"
+              data-testid="variant-nudge"
+              className={isNudged ? 'mt-2 text-sm font-medium text-destructive-ink' : 'sr-only'}
+            >
+              {isNudged
+                ? selectedValue === undefined
+                  ? t(`Choose ${axisLabel}`, `اختر ${axisLabel}`)
+                  : t(
+                      'This combination is not available. Please choose a different option.',
+                      'هذه التركيبة غير متوفرة. يرجى اختيار خيار آخر.'
+                    )
+                : ''}
+            </p>
           </div>
         );
       })}
@@ -348,7 +421,7 @@ export function VariantSelector({
           price/inventory of a valid variant is reflected in the main
           product price + qty stepper area on ProductDetailClient, so a
           duplicate display here was just visual noise. */}
-      {allPicked && currentVariant && (currentVariant.inventory ?? 1) <= 0 && (
+      {allPicked && currentVariant && !canBuyNow(null, currentVariant) && (
         <div className="rounded-lg border border-destructive/40 bg-destructive/5 px-4 py-3 text-sm">
           <span className="font-medium text-destructive-ink">{t('Out of Stock', 'غير متوفر')}</span>
         </div>

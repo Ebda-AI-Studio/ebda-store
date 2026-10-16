@@ -757,8 +757,8 @@
       "tier": "unit",
       "why": "a suspended or soft-deleted admin keeps a fully working merchant key after losing every dashboard session",
       "source": "apps/api/src/mcp/merchant-auth.ts",
-      "find": "    (key.expiresAt === null || key.expiresAt > now) &&\n    userActive;",
-      "replace": "    (key.expiresAt === null || key.expiresAt > now);",
+      "find": "    (key.expiresAt === null || key.expiresAt > now) &&\n    userActive &&",
+      "replace": "    (key.expiresAt === null || key.expiresAt > now) &&",
       "test": "tests/unit/merchant-mcp-auth.test.ts"
     },
     {
@@ -1557,8 +1557,8 @@
       "tier": "unit",
       "why": "returns:write (held by staff) was the only gate on completing a return with a gateway method, which sends a real, irreversible Tap/MyFatoorah/KNET refund — the orders:refund permission staff deliberately lack (issue 2024)",
       "source": "apps/api/src/routes/return.routes.ts",
-      "find": "        (GATEWAY_REFUND_METHODS as readonly string[]).includes(refundMethod) &&",
-      "replace": "        false &&",
+      "find": "        ((GATEWAY_REFUND_METHODS as readonly string[]).includes(refundMethod) ||",
+      "replace": "        (false ||",
       "test": "tests/unit/return-complete-gateway-permission.test.ts"
     },
     {
@@ -1817,7 +1817,7 @@
       "tier": "integration",
       "why": "the store toggle route enables a gateway without a current passing Test connection",
       "source": "apps/api/src/routes/payment-settings.routes.ts",
-      "find": "        assertEnableAllowed(existing);",
+      "find": "        assertEnableAllowed(existing, {\n          storeActivated: await isProviderActivatedForStore(storeId, existing.provider),\n        });",
       "replace": "        void existing;",
       "test": "tests/integration/provider-connect-routes.test.ts"
     },
@@ -1867,8 +1867,8 @@
       "tier": "unit",
       "why": "a carrier that never completed a flow against its real sandbox (PROVIDERS-2) can be enabled by a merchant",
       "source": "apps/api/src/services/carriers/carrier-connection.service.ts",
-      "find": "  if (!isProviderUsable(row.carrier)) {\n    throw new AppError(\n      409,\n      'PROVIDER_NOT_VERIFIED',",
-      "replace": "  if (false) {\n    throw new AppError(\n      409,\n      'PROVIDER_NOT_VERIFIED',",
+      "find": "  if (!isProviderUsable(row.carrier) && !opts.storeActivated) {",
+      "replace": "  if (false) {",
       "test": "tests/unit/shipping-provider-connect.test.ts"
     },
     {
@@ -2070,6 +2070,66 @@
       "find": "  return cur.material && sent.some(s => s.docKey === docKey && s.version === cur.version);",
       "replace": "  return sent.some(s => s.docKey === docKey && s.version === cur.version);",
       "test": "tests/unit/legal-notice-eligibility.test.ts"
+    },
+    {
+      "id": "cart-add-variant-required",
+      "domain": "data integrity",
+      "tier": "unit",
+      "why": "a quick-add with no variantId on a product that HAS variants falls back to the parent's inventory column (0 by the inventory model): an in-stock sized product is refused as out of stock, and with backorder on a SIZELESS cart line is written that checkout then sells (C-01, 2026-10-15). The storefront card CTA is only a hint; this is the gate",
+      "source": "apps/api/src/services/cart.service.ts",
+      "find": "      if (!variantId && product._count.variants > 0) {",
+      "replace": "      if (false) {",
+      "test": "tests/unit/cart-variant-required.test.ts"
+    },
+    {
+      "id": "cart-sync-skips-variant-parent",
+      "domain": "data integrity",
+      "tier": "unit",
+      "why": "the guest-to-login cart sync (addItems) carries a variant product with no variantId across as a sizeless line, so the same gap the addItem gate closes reopens one login later (C-01, Ruling FU46-W1a-2: skipped, not failed, like an invalid variant)",
+      "source": "apps/api/src/services/cart.service.ts",
+      "find": "      if (!item.variantId && product._count.variants > 0) return [];",
+      "replace": "",
+      "test": "tests/unit/cart-variant-required.test.ts"
+    },
+    {
+      "id": "cart-sync-variant-belongs-to-line",
+      "domain": "data integrity",
+      "tier": "unit",
+      "why": "the guest-to-login cart sync (addItems) resolves variants against EVERY product in the payload, so [{A, vB}, {B}] writes an (A, vB) line: product A carrying product B's size, stock and price, and it also bypasses the VARIANT_REQUIRED skip (C-01 fix round, W1a review #1)",
+      "source": "apps/api/src/services/cart.service.ts",
+      "find": "        if (found.productId !== item.productId) {",
+      "replace": "        if (false) {",
+      "test": "tests/unit/cart-variant-required.test.ts"
+    },
+    {
+      "id": "order-admin-refuses-inactive-variant",
+      "domain": "data integrity",
+      "tier": "unit",
+      "why": "an admin manual order resolves the chosen variantId against every variant row, so a size the merchant DISABLED is sold anyway: an order line and a stock decrement on a variant every other surface reads as 0 / not for sale (W1a re-review, order.service.ts createAdminOrder)",
+      "source": "apps/api/src/services/order.service.ts",
+      "find": "        if (variant.isActive === false) {",
+      "replace": "        if (false) {",
+      "test": "tests/unit/order.test.ts"
+    },
+    {
+      "id": "upload-image-content-sniffed",
+      "domain": "injection",
+      "tier": "unit",
+      "why": "POST /uploads/image stores whatever bytes arrive under the client's own filename and mime, so an HTML/JS file called .png is served from the public bucket",
+      "source": "apps/api/src/routes/upload.routes.ts",
+      "find": "      const sniffed = sniffImage(req.file.buffer);\n      if (!sniffed) {",
+      "replace": "      const sniffed = sniffImage(req.file.buffer) ?? 'image/png';\n      if (!sniffed) {",
+      "test": "tests/unit/upload-routes.test.ts"
+    },
+    {
+      "id": "upload-images-batch-content-sniffed",
+      "domain": "injection",
+      "tier": "unit",
+      "why": "POST /uploads/images lets one non-image file ride inside a batch of real ones",
+      "source": "apps/api/src/routes/upload.routes.ts",
+      "find": "      if (sniffedAll.some(kind => kind === null)) {",
+      "replace": "      if (false) {",
+      "test": "tests/unit/upload-routes.test.ts"
     }
   ]
 }

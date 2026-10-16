@@ -153,7 +153,7 @@ export default function AccountLayout({ children }: { children: React.ReactNode 
                 <button
                   onClick={handleLogout}
                   className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-destructive-ink hover:bg-destructive/10 transition"
-                  aria-label="Log out"
+                  aria-label={t('Log out', 'تسجيل الخروج')}
                 >
                   <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path

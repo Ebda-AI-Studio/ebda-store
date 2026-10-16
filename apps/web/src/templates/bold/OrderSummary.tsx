@@ -1,8 +1,10 @@
 'use client';
 
 import Link from 'next/link';
+import { MINUS, SignedAmount } from '@/lib/bidi';
 import type { OrderSummaryProps } from '../types';
 import { useOrderSummaryBase } from '../shared/useOrderSummaryBase';
+import { ArrowIcon } from '../shared/icons';
 
 import { REGION } from '@ebda/shared';
 export default function BoldOrderSummary({
@@ -71,7 +73,7 @@ export default function BoldOrderSummary({
               {discountLabel ?? (isRtl ? 'الخصم' : 'Discount')}
             </dt>
             <dd className="font-black tabular-nums" style={typography?.price}>
-              −{fmt(discount)}
+              <SignedAmount sign={MINUS} value={fmt(discount)} />
             </dd>
           </div>
         )}
@@ -139,10 +141,11 @@ export default function BoldOrderSummary({
             <Link
               href={ctaHref}
               data-cta="button"
-              className="flex h-14 w-full items-center justify-center bg-primary px-5 text-sm font-black uppercase tracking-[0.18em] text-primary-foreground hover:bg-primary/90 transition-colors duration-200 ease-out focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2"
+              className="flex h-12 w-full items-center justify-center gap-2 bg-primary px-5 text-sm font-black uppercase tracking-[0.18em] text-primary-foreground hover:bg-primary/90 transition-colors duration-200 ease-out focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2"
               style={typography?.cta}
             >
-              {ctaText} {isRtl ? '←' : '→'}
+              {ctaText}
+              <ArrowIcon className="h-4 w-4 shrink-0" isRtl={isRtl} />
             </Link>
           ) : (
             <button
@@ -150,10 +153,17 @@ export default function BoldOrderSummary({
               onClick={onCtaClick}
               disabled={ctaDisabled || ctaLoading}
               data-cta="button"
-              className="flex h-14 w-full items-center justify-center bg-primary px-5 text-sm font-black uppercase tracking-[0.18em] text-primary-foreground hover:bg-primary/90 transition-colors duration-200 ease-out disabled:opacity-50 focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2"
+              className="flex h-12 w-full items-center justify-center gap-2 bg-primary px-5 text-sm font-black uppercase tracking-[0.18em] text-primary-foreground hover:bg-primary/90 transition-colors duration-200 ease-out disabled:opacity-50 focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2"
               style={typography?.cta}
             >
-              {ctaLoading ? '···' : `${ctaText} ${isRtl ? '←' : '→'}`}
+              {ctaLoading ? (
+                '···'
+              ) : (
+                <>
+                  {ctaText}
+                  <ArrowIcon className="h-4 w-4 shrink-0" isRtl={isRtl} />
+                </>
+              )}
             </button>
           )}
         </div>

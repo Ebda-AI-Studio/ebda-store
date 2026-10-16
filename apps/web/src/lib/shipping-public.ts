@@ -55,6 +55,8 @@ export async function fetchPublicShippingZones(storeId: string): Promise<PublicS
         estimatedDaysMin: (z.estimatedDaysMin as number | null) ?? null,
         estimatedDaysMax: (z.estimatedDaysMax as number | null) ?? null,
         estimatedDays: (z.estimatedDays as number | null) ?? null,
+        areas: Array.isArray(z.areas) ? (z.areas as unknown[]).map(String) : [],
+        areasAr: Array.isArray(z.areasAr) ? (z.areasAr as unknown[]).map(String) : [],
       });
     }
   }

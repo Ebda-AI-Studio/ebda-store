@@ -24,7 +24,7 @@ export default function MinimalCartTable({
   onRemove,
   typography,
 }: CartTableProps) {
-  const { isRtl: ctxIsRtl } = useLanguage();
+  const { isRtl: ctxIsRtl, t } = useLanguage();
   const { localize, money } = useNumerals();
   const isRtl = isRtlProp ?? ctxIsRtl;
   const format = (price: number) => `${money(price)} ${currency}`;
@@ -86,7 +86,7 @@ export default function MinimalCartTable({
                     disabled={item.unavailable || item.quantity <= 1}
                     onClick={() => onUpdateQuantity?.(item.id, Math.max(1, item.quantity - 1))}
                     className="inline-flex h-11 w-11 items-center justify-center hover:text-foreground disabled:opacity-30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary cursor-pointer transition-colors duration-200"
-                    aria-label={isRtl ? 'تقليل' : 'Decrease'}
+                    aria-label={t('Decrease', 'تقليل')}
                     style={typography?.cta}
                   >
                     −
@@ -102,7 +102,7 @@ export default function MinimalCartTable({
                     disabled={item.unavailable}
                     onClick={() => onUpdateQuantity?.(item.id, item.quantity + 1)}
                     className="inline-flex h-11 w-11 items-center justify-center hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary cursor-pointer transition-colors duration-200 disabled:opacity-40"
-                    aria-label={isRtl ? 'زيادة' : 'Increase'}
+                    aria-label={t('Increase', 'زيادة')}
                     style={typography?.cta}
                   >
                     +
@@ -111,7 +111,7 @@ export default function MinimalCartTable({
                     type="button"
                     onClick={() => onRemove?.(item.id)}
                     className="ms-4 inline-flex min-h-[44px] items-center text-sm hover:text-destructive-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-destructive cursor-pointer transition-colors duration-200"
-                    aria-label={isRtl ? 'إزالة' : 'Remove'}
+                    aria-label={t('Remove', 'إزالة')}
                     style={typography?.cta}
                   >
                     {isRtl ? 'إزالة' : 'Remove'}

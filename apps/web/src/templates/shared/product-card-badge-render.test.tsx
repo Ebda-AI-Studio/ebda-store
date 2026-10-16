@@ -201,7 +201,7 @@ describe('custom badge — a product with no label renders byte-identically to t
     // store has NULL labels, so this is the regression that would hit all of
     // them at once.
     const before = render(Card, ON_SALE);
-    expect(before).toContain('-38%');
+    expect(before).toContain('\u221238%');
   });
 });
 
@@ -284,7 +284,7 @@ describe('custom badge — the collision rule on the real cards', () => {
         }
       );
       expect(html).toContain('>Offer</span>');
-      expect(html).not.toContain('-38%');
+      expect(html).not.toContain('\u221238%');
     }
   );
 
@@ -300,7 +300,7 @@ describe('custom badge — the collision rule on the real cards', () => {
       }
     );
     expect(html).toContain('>Offer</span>');
-    expect(html).toContain('-38%');
+    expect(html).toContain('\u221238%');
   });
 
   it.each(CARDS)('%s: out of stock → no custom badge, sale chip untouched', (_name, Card) => {
@@ -312,7 +312,7 @@ describe('custom badge — the collision rule on the real cards', () => {
       ),
     });
     expect(html).not.toContain('>Offer</span>');
-    expect(html).toContain('-38%');
+    expect(html).toContain('\u221238%');
   });
 
   it.each(CARDS)(
@@ -339,7 +339,7 @@ describe('custom badge — the collision rule on the real cards', () => {
       }
     );
     expect(html).toContain('>Offer</span>');
-    expect(html).toContain('-38%');
+    expect(html).toContain('\u221238%');
   });
 });
 
@@ -414,7 +414,7 @@ describe.each([
       }
     );
     expect(html).toContain('>Offer</span>');
-    expect(html).not.toContain('-38%');
+    expect(html).not.toContain('\u221238%');
   });
 
   it('different corners → both chips render', () => {
@@ -428,11 +428,11 @@ describe.each([
       }
     );
     expect(html).toContain('>Offer</span>');
-    expect(html).toContain('-38%');
+    expect(html).toContain('\u221238%');
   });
 
   it('a discounted product with NO label keeps its sale chip', () => {
-    expect(renderPath(ON_SALE)).toContain('-38%');
+    expect(renderPath(ON_SALE)).toContain('\u221238%');
   });
 });
 
@@ -443,8 +443,9 @@ describe('custom badge — out of stock on the two non-grid paths', () => {
   });
 
   it('ProductListItem: suppressed, and the row equals the no-label OOS render', () => {
-    // ProductListItem derives `orderable` from `inventory`, not `inStock`.
-    const oos = { ...ON_SALE, inventory: 0 };
+    // ProductListItem reads the server's `inStock` first (C-01, the shared card
+    // rule); a sold-out listing payload carries both flags.
+    const oos = { ...ON_SALE, inStock: false, inventory: 0 };
     expect(renderListItem({ ...oos, ...LABEL })).toBe(renderListItem(oos));
   });
 });
@@ -493,7 +494,7 @@ describe.each(ALL_PATHS)('custom badge colours + tap-through — %s', (_name, re
 
   it('neither does the corner discount chip (minimal renders it inline, not as a chip)', () => {
     const html = renderPath(ON_SALE);
-    const m = html.match(/<span[^>]*>-38%<\/span>/);
+    const m = html.match(/<span[^>]*>\u2066\u221238%\u2069<\/span>/);
     if (_name === 'minimal/ProductCard') return;
     expect(m, 'discount chip not rendered').not.toBeNull();
     expect(m![0]).toContain('pointer-events-none');

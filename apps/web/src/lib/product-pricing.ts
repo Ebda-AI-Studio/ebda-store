@@ -1,4 +1,5 @@
 import { formatMoney, localizeDigits, type Numerals } from '@ebda/shared';
+import { MINUS, signedText } from './bidi';
 /**
  * Variant-aware pricing helpers for storefront + admin product cards.
  *
@@ -86,9 +87,10 @@ export function getDiscountBadgeText(
     return `Save ${formatMoney(savingMinor, 'en')}`;
   }
 
-  // Percentage / legacy path — same inline text the templates previously computed.
+  // Percentage / legacy path. The sign is U+2212 and travels with its number in a
+  // left-to-right isolate (R-02): a bare "-21%" painted as "21%-" on Arabic cards.
   const pct = Math.round((1 - effectivePrice / effectiveCompare) * 100);
-  return `-${isRtl ? localizeDigits(pct, numerals) : pct}%`;
+  return signedText(MINUS, `${isRtl ? localizeDigits(pct, numerals) : pct}%`);
 }
 
 interface ProductLike {

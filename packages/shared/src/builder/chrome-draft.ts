@@ -62,6 +62,43 @@ const utilityLinkSchema = z
   })
   .strict();
 
+/**
+ * The footer legal row's settings (`settings.footerLinks.bottomBar`, S-01): the
+ * bar switch, the per-link toggles and the © override. Every route that writes
+ * settings validates it (store.routes `addSettingsIssues`), and the builder's
+ * chrome patch carries it. Unknown legacy keys from rows written before the
+ * 2026-05-21 removal are tolerated (ignored by the storefront).
+ */
+export const COPYRIGHT_OVERRIDE_MAX = 200;
+export const footerBottomBarSchema = z.object({
+  enabled: z.boolean().optional(),
+  copyrightOverride: z.string().max(COPYRIGHT_OVERRIDE_MAX).optional(),
+  copyrightOverrideAr: z.string().max(COPYRIGHT_OVERRIDE_MAX).optional(),
+  privacyEnabled: z.boolean().optional(),
+  termsEnabled: z.boolean().optional(),
+  shippingEnabled: z.boolean().optional(),
+  returnsEnabled: z.boolean().optional(),
+});
+/**
+ * Tolerant read of a STORED bottomBar before it is validated (FU46 M-7). A row saved before the
+ * 2026-05-21 removal can hold `copyrightOverride: null` or an over-long string, and every
+ * settings PUT re-validates the whole blob, so the strict schema answered 400 on a field the
+ * merchant never touched. null reads as unset and a long value is clamped (the admin input is
+ * capped at 200 and the storefront clamps on read too). Any other shape is returned untouched
+ * for the schema to judge.
+ */
+export function normalizeStoredBottomBar(raw: unknown): unknown {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return raw;
+  const out: Record<string, unknown> = { ...(raw as Record<string, unknown>) };
+  for (const key of ['copyrightOverride', 'copyrightOverrideAr']) {
+    const v = out[key];
+    if (v === null) delete out[key];
+    else if (typeof v === 'string') out[key] = v.slice(0, COPYRIGHT_OVERRIDE_MAX);
+  }
+  return out;
+}
+export type FooterBottomBarSettings = z.infer<typeof footerBottomBarSchema>;
+
 export const draftChromeSchema = z
   .object({
     navMenu: z.array(navItemSchema).max(MAX_NAV_ITEMS).optional(),
@@ -71,6 +108,7 @@ export const draftChromeSchema = z
         support: z.array(footerLinkSchema).max(MAX_FOOTER_LINKS_PER_COLUMN).optional(),
         company: z.array(footerLinkSchema).max(MAX_FOOTER_LINKS_PER_COLUMN).optional(),
         newsletterEnabled: z.boolean().optional(),
+        bottomBar: footerBottomBarSchema.optional(),
       })
       .strict()
       .optional(),
@@ -156,6 +194,9 @@ export function applyChromePatch(
     }
     if (patch.footerLinks.newsletterEnabled !== undefined)
       next.newsletterEnabled = patch.footerLinks.newsletterEnabled;
+    // Merged key by key: a patch that only flips one toggle never drops the rest.
+    if (patch.footerLinks.bottomBar)
+      next.bottomBar = { ...asObject(next.bottomBar), ...patch.footerLinks.bottomBar };
     out.footerLinks = next;
   }
   if (patch.utilityBar) {
