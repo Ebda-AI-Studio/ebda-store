@@ -421,9 +421,9 @@ function ElegantProductCard({
               )}
               labels={{
                 addToCart: isRtl ? 'أضف للسلة' : 'Add to Bag',
-                addedToCart: isRtl ? 'تمت الإضافة' : 'Added',
+                addedToCart: isRtl ? 'اتضاف' : 'Added',
                 outOfStock: isRtl ? 'نفذت الكمية' : 'Sold Out',
-                adding: isRtl ? 'استنى...' : 'Adding...',
+                adding: isRtl ? 'لحظة...' : 'Adding...',
                 view: isRtl ? 'عرض' : 'View',
               }}
               ctaShape={resolvedCtaShape}

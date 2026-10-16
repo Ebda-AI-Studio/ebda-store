@@ -38,7 +38,7 @@ function ResetPasswordForm() {
     }
 
     if (formData.newPassword !== formData.confirmPassword) {
-      setError(t('Passwords do not match.', 'كلمتين المرور مش زي بعض.'));
+      setError(t('Passwords do not match.', 'كلمة المرور وتأكيدها مش زي بعض.'));
       return;
     }
 
@@ -67,11 +67,11 @@ function ResetPasswordForm() {
             );
           }
           throw new Error(
-            result.error?.message || t('Failed to reset password', 'تغيير كلمة المرور ما نفعش')
+            result.error?.message || t('Failed to reset password', 'تغيير كلمة المرور منفعش')
           );
         }
       },
-      t('Failed to reset password. Please try again.', 'تغيير كلمة المرور ما نفعش. جرّب تاني.')
+      t('Failed to reset password. Please try again.', 'تغيير كلمة المرور منفعش. جرّب تاني.')
     );
     if (ok) setSuccess(true);
   };

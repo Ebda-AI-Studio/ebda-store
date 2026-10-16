@@ -62,7 +62,7 @@ export function bundleCartErrorCopy(
       };
     default:
       return {
-        title: t('Unable to add to cart', 'الإضافة للسلة ما نفعتش'),
+        title: t('Unable to add to cart', 'الإضافة للسلة منفعتش'),
         message: t('Please try again.', 'جرّب تاني.'),
       };
   }

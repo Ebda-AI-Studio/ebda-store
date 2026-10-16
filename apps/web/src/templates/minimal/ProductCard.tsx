@@ -374,7 +374,7 @@ function MinimalProductCard({
               )}
               labels={{
                 addToCart: isRtl ? 'أضف للسلة' : 'Add to Cart',
-                addedToCart: isRtl ? 'تمت الإضافة' : 'Added',
+                addedToCart: isRtl ? 'اتضاف' : 'Added',
                 outOfStock: isRtl ? 'نفذت الكمية' : 'Sold Out',
                 adding: isRtl ? '...' : '...',
                 view: isRtl ? 'عرض' : 'View',

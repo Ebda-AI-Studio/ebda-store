@@ -59,14 +59,14 @@ export default function ForgotPasswordClient() {
               <p className="mt-4 text-xs text-muted-foreground">
                 {t(
                   "Didn't receive the email? Check your spam folder or",
-                  'ما وصلكش البريد؟ بُص في مجلد الرسائل غير المرغوبة أو'
+                  'موصلكش البريد؟ بُص في مجلد الرسائل غير المرغوبة أو'
                 )}{' '}
                 <button
                   type="button"
                   onClick={() => setIsSubmitted(false)}
                   className="text-primary hover:underline"
                 >
-                  {t('try again', 'حاول مرة أخرى')}
+                  {t('try again', 'جرّب تاني')}
                 </button>
               </p>
             </div>
@@ -95,7 +95,7 @@ export default function ForgotPasswordClient() {
             <p className="mt-2 text-sm text-muted-foreground">
               {t(
                 "No worries, we'll send you reset instructions.",
-                'ما تقلقش، هنبعتلك خطوات تغيير كلمة المرور.'
+                'متقلقش، هنبعتلك خطوات تغيير كلمة المرور.'
               )}
             </p>
           </div>

@@ -17,7 +17,7 @@ const GENERIC_FAQS = [
     answer:
       'Simply browse our products, add items to your cart, and proceed to checkout. You can pay securely using your preferred payment method.',
     answerAr:
-      'بس تصفح منتجاتنا وضيف اللي عاجبك للسلة وكمّل للدفع. تقدر تدفع بأمان بالطريقة اللي تريحك.',
+      'سهلة: تصفّح منتجاتنا، ضيف اللي عاجبك للسلة، وكمّل للدفع. تقدر تدفع بأمان بالطريقة اللي تريحك.',
   },
   {
     question: 'What payment methods do you accept?',
@@ -41,7 +41,7 @@ const GENERIC_FAQS = [
     answer:
       'We offer a 30-day return policy for all unused items in original packaging. Please visit our Returns page for more details.',
     answerAr:
-      'بنقبل الإرجاع خلال 30 يوم لكل المنتجات اللي ما اتستعملتش وفي علبتها الأصلية. شوف صفحة المرتجعات لتفاصيل أكتر.',
+      'بنقبل الإرجاع خلال 30 يوم لكل المنتجات اللي متستعملتش وفي علبتها الأصلية. شوف صفحة المرتجعات لتفاصيل أكتر.',
   },
   {
     question: 'How can I track my order?',
@@ -56,7 +56,8 @@ const GENERIC_FAQS = [
     questionAr: 'أقدر ألغي أو أعدّل طلبي؟',
     answer:
       'Orders can be cancelled or modified within 1 hour of placement. After that, please contact our support team for assistance.',
-    answerAr: 'تقدر تلغي أو تعدّل الطلب خلال ساعة من ما تعمله. بعد كده، كلّم فريق الدعم وهيساعدك.',
+    answerAr:
+      'تقدر تلغي أو تعدّل الطلب خلال ساعة من وقت ما تعمله. بعد كده، كلّم فريق الدعم وهيساعدك.',
   },
   {
     question: 'Do you offer gift wrapping?',

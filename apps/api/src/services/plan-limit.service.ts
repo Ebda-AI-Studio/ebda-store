@@ -162,7 +162,7 @@ export async function assertAnalyticsTier(
   if (!e) throw new AppError(404, 'STORE_NOT_FOUND', 'Store not found');
   if (ANALYTICS_TIER_RANK[e.limits.analyticsTier] >= ANALYTICS_TIER_RANK[min]) return;
   const messageEn = `${min === 'advanced' ? 'Advanced' : 'Standard'} analytics are not included in your plan. Upgrade to unlock them.`;
-  const messageAr = `${min === 'advanced' ? 'التحليلات المتقدمة' : 'التحليلات القياسية'} مش متاحة في باقتك. رقّي باقتك عشان تفتحها.`;
+  const messageAr = `${min === 'advanced' ? 'التحليلات المتقدمة' : 'التحليلات القياسية'} مش متاحة في باقتك. اعمل ترقية لباقتك عشان تفتحها.`;
   throw new AppError(402, PLAN_LIMIT_ERROR_CODE, messageEn, {
     limitKey: 'analyticsTier',
     limit: e.limits.analyticsTier,
@@ -230,7 +230,7 @@ export async function assertOrderAllowed(storeId: string): Promise<void> {
   if (row.isDemo) {
     throw new AppError(403, 'DEMO_STORE', 'This is a demo store; orders are disabled', {
       messageEn: 'This is a demo store: ordering is disabled',
-      messageAr: 'ده متجر تجريبي — الطلب مقفول',
+      messageAr: 'ده متجر تجريبي — الطلبات مقفولة',
     });
   }
   const e = await getEntitlements(storeId);

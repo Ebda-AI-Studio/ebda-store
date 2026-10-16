@@ -320,7 +320,7 @@ export default function WishlistClient() {
                   className="flex-shrink-0 text-sm text-primary hover:text-primary/80 font-medium"
                   aria-label={t('Copy link', 'نسخ الرابط')}
                 >
-                  {copied ? t('Copied!', 'تم النسخ!') : t('Copy', 'نسخ')}
+                  {copied ? t('Copied!', 'اتنسخ!') : t('Copy', 'نسخ')}
                 </button>
               </div>
 

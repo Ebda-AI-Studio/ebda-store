@@ -257,12 +257,12 @@ function ReturnRequestForm({ storeId }: { storeId: string }) {
               : transportFailure
                 ? t(
                     'Failed to submit return request. Please check your connection.',
-                    'طلب الإرجاع ما اتبعتش. اتأكد من اتصالك.'
+                    'طلب الإرجاع متبعتش. اتأكد من اتصالك.'
                   )
                 : json.error?.message ||
                   t(
                     'Failed to submit return request. Please try again.',
-                    'طلب الإرجاع ما اتبعتش. جرّب تاني.'
+                    'طلب الإرجاع متبعتش. جرّب تاني.'
                   ),
         });
       }
@@ -271,7 +271,7 @@ function ReturnRequestForm({ storeId }: { storeId: string }) {
         type: 'error',
         text: t(
           'Failed to submit return request. Please check your connection.',
-          'طلب الإرجاع ما اتبعتش. اتأكد من اتصالك.'
+          'طلب الإرجاع متبعتش. اتأكد من اتصالك.'
         ),
       });
     } finally {
@@ -408,7 +408,7 @@ function ReturnRequestForm({ storeId }: { storeId: string }) {
             <p className="mt-1 text-sm text-muted-foreground">
               {t(
                 'No eligible orders found. Only delivered orders can be returned.',
-                'ملقيناش طلبات ينفع ترجعها. الطلبات اللي وصلت بس هي اللي ينفع ترجع.'
+                'ملقيناش طلبات ينفع ترجّعها. ينفع ترجّع الطلبات اللي اتسلّمت بس.'
               )}
             </p>
           )}
@@ -532,7 +532,7 @@ export default function ReturnsClient() {
       <div className="mx-auto w-full max-w-3xl flex-1 px-4 py-12 sm:px-6 lg:px-8">
         <div className="text-center">
           <h1 className="text-3xl font-bold text-foreground">
-            {t('Returns & Refunds', 'المرتجعات والاستبدال')}
+            {t('Returns & Refunds', 'المرتجعات واسترداد الفلوس')}
           </h1>
           <p className="mt-2 text-muted-foreground">
             {t('Our hassle-free return policy', 'سياسة إرجاع سهلة')}

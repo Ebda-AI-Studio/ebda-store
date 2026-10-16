@@ -325,7 +325,7 @@ export default function ReviewSection({ storeId, productId }: Props) {
           type: 'error',
           text:
             json.error?.message ||
-            t('Failed to submit review. Please try again.', 'التقييم ما اتبعتش. جرّب تاني.'),
+            t('Failed to submit review. Please try again.', 'التقييم متبعتش. جرّب تاني.'),
         });
       }
     } catch {
@@ -333,7 +333,7 @@ export default function ReviewSection({ storeId, productId }: Props) {
         type: 'error',
         text: t(
           'Failed to submit review. Please check your connection.',
-          'التقييم ما اتبعتش. اتأكد من اتصالك.'
+          'التقييم متبعتش. اتأكد من اتصالك.'
         ),
       });
     } finally {
@@ -510,7 +510,7 @@ export default function ReviewSection({ storeId, productId }: Props) {
           <p className="text-muted-foreground mb-8">
             {t(
               'No reviews yet. Be the first to review this product.',
-              'مفيش تقييمات لسه. كن أول واحد يقيّم المنتج ده.'
+              'مفيش تقييمات لسه. خليك أول واحد يقيّم المنتج ده.'
             )}
           </p>
 

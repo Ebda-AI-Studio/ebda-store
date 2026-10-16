@@ -365,7 +365,7 @@ function BoldProductCard({
               )}
               labels={{
                 addToCart: isRtl ? 'أضف إلى السلة' : 'Add to cart',
-                addedToCart: isRtl ? 'تمت الإضافة' : 'Added to cart',
+                addedToCart: isRtl ? 'اتضاف' : 'Added to cart',
                 outOfStock: isRtl ? 'نفد المخزون' : 'Out of stock',
                 adding: isRtl ? '...' : '...',
                 view: isRtl ? 'عرض' : 'View',

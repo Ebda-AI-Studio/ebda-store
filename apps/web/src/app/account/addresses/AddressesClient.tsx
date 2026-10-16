@@ -123,11 +123,9 @@ export default function AddressesClient() {
 
       if (result.success) {
         success(
+          editingId ? t('Address updated', 'العنوان اتحدّث') : t('Address added', 'العنوان اتضاف'),
           editingId
-            ? t('Address updated', 'تم تحديث العنوان')
-            : t('Address added', 'تمت إضافة العنوان'),
-          editingId
-            ? t('Your address has been updated.', 'تم تحديث عنوانك.')
+            ? t('Your address has been updated.', 'عنوانك اتحدّث.')
             : t('New address has been saved.', 'العنوان الجديد اتحفظ.')
         );
         fetchAddresses();
@@ -135,7 +133,7 @@ export default function AddressesClient() {
       } else {
         toastError(
           t('Error', 'خطأ'),
-          result.error?.message || t('Failed to save address', 'تعذر حفظ العنوان')
+          result.error?.message || t('Failed to save address', 'معرفناش نحفظ العنوان')
         );
       }
     } catch {
@@ -153,11 +151,11 @@ export default function AddressesClient() {
       if (result.success) {
         setAddresses(prev => prev.filter(a => a.id !== deleteTargetId));
         success(
-          t('Address deleted', 'تم حذف العنوان'),
-          t('The address has been removed.', 'تمت إزالة العنوان.')
+          t('Address deleted', 'العنوان اتمسح'),
+          t('The address has been removed.', 'العنوان اتشال.')
         );
       } else {
-        toastError(t('Error', 'خطأ'), t('Failed to delete address', 'تعذر حذف العنوان'));
+        toastError(t('Error', 'خطأ'), t('Failed to delete address', 'معرفناش نمسح العنوان'));
       }
     } catch {
       toastError(t('Error', 'خطأ'), t('An unexpected error occurred.', 'حصل خطأ مش متوقع.'));
@@ -173,14 +171,14 @@ export default function AddressesClient() {
       if (result.success) {
         setAddresses(prev => prev.map(a => ({ ...a, isDefault: a.id === id })));
         success(
-          t('Default updated', 'تم تحديث العنوان الافتراضي'),
+          t('Default updated', 'العنوان الافتراضي اتحدّث'),
           t('Default address has been changed.', 'العنوان الافتراضي اتغيّر.')
         );
       }
     } catch {
       toastError(
         t('Error', 'خطأ'),
-        t('Failed to update default address', 'تعذر تحديث العنوان الافتراضي')
+        t('Failed to update default address', 'معرفناش نحدّث العنوان الافتراضي')
       );
     }
   }
@@ -283,7 +281,7 @@ export default function AddressesClient() {
             </div>
 
             <Input
-              label={t('Phone Number', 'رقم الهاتف')}
+              label={t('Phone Number', 'رقم الموبايل')}
               type="tel"
               value={formData.phone}
               onChange={e => setFormData({ ...formData, phone: e.target.value })}

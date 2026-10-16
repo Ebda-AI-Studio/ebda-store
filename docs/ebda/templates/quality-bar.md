@@ -30,6 +30,37 @@ Every template (Qamar, Souq, Jasmine, Lamma, Dahab) and every look inside it mus
 | Storefront full sentences are Egyptian Arabic ("طلبك اتسجل", "يوصلك بين …", "سلتك فاضية"), including AI-generated shopper copy (product FAQ, excerpt, how-to, SEO/AEO, review replies, marketing email — one instruction, `EGYPTIAN_ARABIC_REGISTER`); short buttons and labels keep a neutral form ("أرسل الإيصال", "موعد الوصول"); legal text stays formal (privacy, terms, the returns-policy body, cookie consent); one form of address per page (Rulings FU46-Y02a/b/d, Ahmad 2026-10-16). Merchant-typed text is never rewritten. [Y-02] | critique + test: `tests/unit/storefront-arabic-register.test.ts` (MSA-only sentence markers banned in every storefront string and shopper `messageAr`, `\u06xx` escapes decoded; legal text exempt only in the named files / fenced `legal-register` regions; the Egyptian sentences and neutral labels pinned), `tests/unit/ai-arabic-register.test.ts` (no generator asks for MSA), plural forms `tests/unit/plural-counted-nouns.test.ts` |
 | Every accessible name, title and alt goes through `t()`. There are no Latin-only names on an Arabic page. [R-05]                                                                                                                                                                                                                                                                                                                                                                                                                               | test: `tests/unit/arabic-accessible-names.test.tsx` (chrome rendered under `ar` + static scan)                                                                                                                                                                                                                                                                                                                                               |
 
+### Egyptian copy style guide (Rulings FU46-Y02a/b/d, review 2026-10-16)
+
+Every shopper-facing full sentence is Egyptian Arabic. Labels and buttons use neutral forms. Legal text is formal.
+
+- **Address:** masculine singular, generic ("اختار", "جرّب", "إنت"). Never "حضرتك", and never mixed forms of address on one page.
+- **Spellings:**
+  - "إنت", with the hamza (never "انت" or "وانت").
+  - "عشان" (never "علشان").
+  - "مفيش", "معرفناش", "ملقيناش".
+  - "نتايج" in sentences; "نتائج" only in labels and counted nouns.
+- **Negation:** one joined style. Write "منفعش", "متبعتش", "موصلش", "مضفتش", "متحسبتش", "مكملش", "متمش", "مفتحش" — never "ما نفعش" / "ما اتبعتش".
+- **Toasts that name a product:** use the gender-free "we" form: "شيلنا ‹الاسم› من السلة", "ضفنا ‹الاسم› للمفضلة". Never "‹الاسم› اتشال", which takes the gender of an arbitrary name.
+- **Status and toast titles:** short Egyptian past forms ("اتنسخ", "اتشحن", "اتسلّم", "اتضاف"), never "تم …" / "تمت …".
+- **Loading states:** "بنحمّل…", "بنبعت…", "لحظة…". Use "بنسجّلك…" for joining and "بنسجّل اشتراكك…" for subscribing (the subject is the shopper, not us).
+- **Retry:** "جرّب تاني" in sentences and on buttons; never "حاول مرة أخرى".
+- **Phone:** "تليفون" in sentences; "رقم الموبايل" as the field label.
+- **Counted nouns:** go through `countText` with Egyptian forms ("قطعتين", "يومين", "١٤ يوم"). Legal text uses `DAYS_FORMAL` ("١٤ يومًا"), and only inside a `legal-register` fence.
+- **AI copy shoppers read:** `EGYPTIAN_ARABIC_REGISTER` in every generator; the cache key carries the instruction.
+
+**Enforced mechanically:** `tests/unit/storefront-arabic-register.test.ts`.
+
+- It reads every string literal, template text, JSX text node and JSX attribute (TypeScript AST), and every `messageAr` value at any depth or line count. An indirect `messageAr` must come from a listed message table, and those tables are scanned in full.
+- It bans:
+  - the MSA-only markers ("هذا", "لم", "يرجى", "كن", "مرة أخرى", "تم", "تعذّر", "أدناه", "بنجاح", "الخاص بك", …);
+  - "انت" without the hamza;
+  - "ما …ش" split negation;
+  - "حضرتك" and "علشان".
+- The only exceptions are the named legal files and fenced regions.
+- `tests/unit/legal-formal-counts.test.ts` and `tests/unit/ai-arabic-register.test.ts` cover the legal counts and the AI prompts.
+- The critique owns everything else: wording, tone and gender-safe toasts.
+
 ## 3. Accessibility
 
 | Rule                                                                                                                                                                                                                                                                                                                      | Check                                                                                                                                                                                                                                                                                                                                                                                        |

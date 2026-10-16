@@ -157,11 +157,11 @@ function iconError(
 ): AppError {
   const got = dims ? ` (${dims.width}×${dims.height})` : '';
   const text = {
-    ICON_NOT_PNG: ['The icon must be a PNG image.', 'يجب أن تكون الأيقونة صورة PNG.'],
-    ICON_NOT_SQUARE: [`The icon must be square${got}.`, `يجب أن تكون الأيقونة مربعة${got}.`],
+    ICON_NOT_PNG: ['The icon must be a PNG image.', 'الأيقونة لازم تكون صورة PNG.'],
+    ICON_NOT_SQUARE: [`The icon must be square${got}.`, `الأيقونة لازم تكون مربعة${got}.`],
     ICON_TOO_SMALL: [
       `The icon must be at least ${MIN_ICON_DIMENSION}×${MIN_ICON_DIMENSION}px${got}.`,
-      `يجب ألا تقل الأيقونة عن ${MIN_ICON_DIMENSION}×${MIN_ICON_DIMENSION} بكسل${got}.`,
+      `الأيقونة لازم تكون ${MIN_ICON_DIMENSION}×${MIN_ICON_DIMENSION} بكسل على الأقل${got}.`,
     ],
   }[code];
   return new AppError(400, code, text[0], { messageEn: text[0], messageAr: text[1] });

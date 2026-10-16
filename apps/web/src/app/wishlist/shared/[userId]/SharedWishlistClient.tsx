@@ -109,12 +109,12 @@ export default function SharedWishlistClient({ userId }: Props) {
       } else {
         setActionError(
           (response.error as { message?: string })?.message ||
-            t('Failed to add to cart', 'الإضافة للسلة ما نفعتش')
+            t('Failed to add to cart', 'الإضافة للسلة منفعتش')
         );
       }
     } catch {
       setActionError(
-        t('Failed to add to cart. Please try again.', 'الإضافة للسلة ما نفعتش. جرّب تاني.')
+        t('Failed to add to cart. Please try again.', 'الإضافة للسلة منفعتش. جرّب تاني.')
       );
     }
   }
@@ -158,10 +158,7 @@ export default function SharedWishlistClient({ userId }: Props) {
               {t('This wishlist is private', 'المفضلة دي خاصة')}
             </h2>
             <p className="text-muted-foreground">
-              {t(
-                'The owner has not made this wishlist public.',
-                'صاحبها ما خلاّش المفضلة دي عامة.'
-              )}
+              {t('The owner has not made this wishlist public.', 'صاحبها مخلّاش المفضلة دي عامة.')}
             </p>
           </div>
         </div>

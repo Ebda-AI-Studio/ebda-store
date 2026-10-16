@@ -40,7 +40,7 @@ const defaultLabels = {
   },
   ar: {
     addToCart: 'أضف للسلة',
-    addedToCart: 'تمت الإضافة!',
+    addedToCart: 'اتضاف!',
     outOfStock: 'نفذت الكمية',
     adding: 'بنضيف...',
   },

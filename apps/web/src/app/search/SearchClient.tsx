@@ -138,7 +138,7 @@ function SearchContent() {
         setAllProducts(response.data.products || []);
       } else {
         setError(
-          response.error?.message || t('Failed to search products', 'البحث عن المنتجات ما نفعش')
+          response.error?.message || t('Failed to search products', 'البحث عن المنتجات منفعش')
         );
       }
     } catch {

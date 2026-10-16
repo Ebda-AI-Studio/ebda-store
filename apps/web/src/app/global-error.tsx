@@ -26,7 +26,7 @@ export default function GlobalError({
             className="cursor-pointer rounded-lg border-none px-6 py-2.5 text-sm font-medium text-white hover:opacity-90"
             style={{ backgroundColor: BRAND.colors.night }}
           >
-            {t('Try Again', 'حاول مرة أخرى')}
+            {t('Try Again', 'جرّب تاني')}
           </button>
         </div>
       </body>

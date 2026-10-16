@@ -128,6 +128,16 @@ export const DAYS: CountedNoun = {
   },
 };
 
+/**
+ * Calendar days in LEGAL text only (the returns-policy body and the terms sentence, inside a
+ * `legal-register` fence; Ruling FU46-Y02b, review I6): formal Arabic keeps the accusative
+ * tanween at 11–99 ("خلال ١٤ يومًا"). The dual follows a preposition there, so it is "يومين".
+ */
+export const DAYS_FORMAL: CountedNoun = {
+  en: DAYS.en,
+  ar: { ...DAYS.ar, many: '{n} يومًا' },
+};
+
 /** Business days (shipping-zone estimates). */
 export const BUSINESS_DAYS: CountedNoun = {
   en: { one: '{n} business day', other: '{n} business days' },
@@ -145,7 +155,7 @@ export const BUSINESS_DAYS: CountedNoun = {
 export const ITEMS_ADDED: CountedNoun = {
   en: { one: '{n} item added to your cart', other: '{n} items added to your cart' },
   ar: {
-    zero: 'ما اتضافتش أي قطعة لسلتك',
+    zero: 'متضافتش أي قطعة لسلتك',
     one: 'اتضافت قطعة واحدة لسلتك',
     two: 'اتضافت قطعتين لسلتك',
     few: 'اتضافت {n} قطع لسلتك',

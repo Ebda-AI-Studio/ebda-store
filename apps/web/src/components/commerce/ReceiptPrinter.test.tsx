@@ -155,7 +155,7 @@ describe('ReceiptPrinter', () => {
     render(<ReceiptPrinter order={order} paymentState="paid" store={store} />);
     finishFeed();
     expect(screen.getByText('المدفوع')).toBeTruthy();
-    expect(screen.getByRole('status').textContent).toContain('تم الدفع، طلبك اتأكد');
+    expect(screen.getByRole('status').textContent).toContain('اتدفع، طلبك اتأكد');
   });
 
   it('renders every line, bundle as one row, and the order number under the barcode', () => {

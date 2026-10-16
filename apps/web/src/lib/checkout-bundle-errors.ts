@@ -90,7 +90,7 @@ export function checkoutBundleErrorCopy(
     if (!bundleName) return null;
     return t(
       `An item in the "${bundleName}" bundle just sold out. Please remove that bundle from your cart and try again.`,
-      `في حاجة جوه باقة "${bundleName}" خلصت حالاً. شيل الباقة دي من سلتك وجرّب تاني.`
+      `في حاجة جوه باقة "${bundleName}" خلصت من المخزون دلوقتي. شيل الباقة دي من سلتك وجرّب تاني.`
     );
   }
 

@@ -442,13 +442,13 @@ export default function ProductDetailClient({
         await api.delete(`/wishlist/product/${product.id}`);
         toastSuccess(
           t('Removed from wishlist', 'اتشال من المفضلة'),
-          t(`${name} removed from your wishlist`, `${name} اتشال من المفضلة`)
+          t(`${name} removed from your wishlist`, `شيلنا ${name} من المفضلة`)
         );
       } else {
         await api.post('/wishlist', { productId: product.id });
         toastSuccess(
           t('Added to wishlist', 'اتضاف للمفضلة'),
-          t(`${name} added to your wishlist`, `${name} اتضاف للمفضلة`)
+          t(`${name} added to your wishlist`, `ضفنا ${name} للمفضلة`)
         );
       }
     } catch {
@@ -769,7 +769,7 @@ export default function ProductDetailClient({
               outOfStock && !canBackorder
                 ? t('Out of stock', 'مش متوفر دلوقتي')
                 : canBackorder
-                  ? t('Made to order — ships when ready', 'بيتعمل مخصوص — يتشحن أول ما يجهز')
+                  ? t('Made to order — ships when ready', 'بيتعمل مخصوص — بيتشحن أول ما يجهز')
                   : null
             }
             onAddToCart={handleAddToCart}

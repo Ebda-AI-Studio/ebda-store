@@ -192,7 +192,9 @@ function AffiliatePageContent() {
             <p className="text-muted-foreground">
               {t(
                 `Partner with ${store?.name || 'us'} and earn commissions for every sale you refer.`,
-                `بقى شريك مع ${store?.name || 'نا'} واكسب عمولة على كل بيعة تجيبها.`
+                store?.name
+                  ? `خليك شريك مع ${store.name} واكسب عمولة على كل بيعة تجيبها.`
+                  : 'اشترك معانا في برنامج الشراكة واكسب عمولة على كل بيعة تجيبها.'
               )}
             </p>
           </div>
@@ -216,7 +218,7 @@ function AffiliatePageContent() {
                 </svg>
               </div>
               <h2 className="text-lg font-semibold text-success-ink mb-2">
-                {t('Application Submitted!', 'تم إرسال الطلب!')}
+                {t('Application Submitted!', 'الطلب اتبعت!')}
               </h2>
               <p className="text-success-ink">
                 {t(
@@ -270,7 +272,7 @@ function AffiliatePageContent() {
 
                 <div>
                   <label htmlFor="phone" className="block text-sm font-medium text-foreground mb-1">
-                    {t('Phone Number', 'رقم الهاتف')}
+                    {t('Phone Number', 'رقم الموبايل')}
                   </label>
                   <input
                     id="phone"

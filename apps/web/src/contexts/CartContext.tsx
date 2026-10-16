@@ -306,7 +306,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
           await refetchCart().catch(() => {});
           if (res.error?.code === 'VARIANT_REQUIRED') {
             toast.info(
-              t('Choose your options first', 'اختار الاختيارات الأول'),
+              t('Choose your options first', 'اختار المواصفات الأول'),
               t('Pick them on the product page.', 'اختارها من صفحة المنتج.')
             );
           } else {
@@ -331,7 +331,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         // updateQuantity/removeItem, never addItem, so quantity bumps from
         // the cart drawer/page never reach this branch.
         const localizedName = language === 'ar' && item.nameAr ? item.nameAr : item.name;
-        toast.success(t('Added to cart', 'تمت الإضافة للسلة'), localizedName);
+        toast.success(t('Added to cart', 'اتضاف للسلة'), localizedName);
         return true;
       } catch {
         await refetchCart().catch(() => {});
@@ -342,7 +342,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         // rejection, and a caller that cares (e.g. the PDP conversion pixel) can
         // branch on the result.
         toast.error(
-          t('Unable to add to cart', 'الإضافة للسلة ما نفعتش'),
+          t('Unable to add to cart', 'الإضافة للسلة منفعتش'),
           t('Please try again.', 'جرّب تاني.')
         );
         return false;
@@ -418,7 +418,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
             ((res.data.cart.bundles as ServerCartBundle[] | undefined) ?? []).map(mapServerBundle)
           );
           toast.success(
-            t('Added to cart', 'تمت الإضافة للسلة'),
+            t('Added to cart', 'اتضاف للسلة'),
             t('Bundle added to your cart', 'الباقة اتضافت لسلتك')
           );
           return true;
@@ -436,7 +436,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       } catch {
         await refetchCart().catch(() => {});
         toast.error(
-          t('Unable to add to cart', 'الإضافة للسلة ما نفعتش'),
+          t('Unable to add to cart', 'الإضافة للسلة منفعتش'),
           t('Please try again.', 'جرّب تاني.')
         );
         return false;

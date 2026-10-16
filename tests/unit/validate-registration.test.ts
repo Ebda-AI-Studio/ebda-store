@@ -38,7 +38,7 @@ describe('validateRegistration', () => {
   it('uses the translator for the message it returns', () => {
     const ar = (_en: string, arText: string) => arText;
     expect(validateRegistration({ password: 'a', confirmPassword: 'b' }, ar)).toBe(
-      'كلمتين المرور مش زي بعض'
+      'كلمة المرور وتأكيدها مش زي بعض'
     );
   });
 });

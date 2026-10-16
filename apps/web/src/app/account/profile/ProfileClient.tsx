@@ -64,18 +64,18 @@ export default function ProfileClient() {
       if (result.success) {
         await refreshUser();
         success(
-          t('Profile updated', 'تم تحديث الملف الشخصي'),
+          t('Profile updated', 'الملف الشخصي اتحدّث'),
           t('Your profile has been saved successfully.', 'ملفك الشخصي اتحفظ.')
         );
       } else {
         toastError(
-          t('Update failed', 'تعذّر التحديث'),
-          result.error?.message || t('Failed to update profile', 'تعذّر تحديث الملف الشخصي')
+          t('Update failed', 'معرفناش نحدّث'),
+          result.error?.message || t('Failed to update profile', 'معرفناش نحدّث الملف الشخصي')
         );
       }
     } catch {
       toastError(
-        t('Update failed', 'تعذّر التحديث'),
+        t('Update failed', 'معرفناش نحدّث'),
         t('An unexpected error occurred.', 'حصل خطأ مش متوقع.')
       );
     } finally {
@@ -107,13 +107,13 @@ export default function ProfileClient() {
 
       if (result.success) {
         success(
-          t('Password changed', 'تم تغيير كلمة المرور'),
+          t('Password changed', 'كلمة المرور اتغيّرت'),
           t('Your password has been updated.', 'كلمة المرور اتحدّثت.')
         );
         setPasswords({ currentPassword: '', newPassword: '', confirmPassword: '' });
       } else {
         setPasswordError(
-          result.error?.message || t('Failed to change password', 'تعذّر تغيير كلمة المرور')
+          result.error?.message || t('Failed to change password', 'معرفناش نغيّر كلمة المرور')
         );
       }
     } catch {
@@ -175,7 +175,7 @@ export default function ProfileClient() {
             />
 
             <Input
-              label={t('Phone', 'الهاتف')}
+              label={t('Phone', 'رقم الموبايل')}
               type="tel"
               value={profile.phone}
               onChange={e => setProfile({ ...profile, phone: e.target.value })}

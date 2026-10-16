@@ -152,7 +152,7 @@ export default function ClassicOrderSummary({
           >
             {ctaLoading ? (
               isRtl ? (
-                'استنى...'
+                'لحظة...'
               ) : (
                 'Processing...'
               )

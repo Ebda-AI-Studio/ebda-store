@@ -74,16 +74,16 @@ describe('DeliveryChip', () => {
     render(<DeliveryChip leadTimeDays={5} />);
     const chip = await screen.findByTestId('delivery-chip');
     expect(chip.textContent).toContain('يوصلك بين');
-    expect(chip.textContent).toContain('بيتجهز خصيصًا لك في 5 أيام');
+    expect(chip.textContent).toContain('بيتجهزلك مخصوص في 5 أيام');
     // The "و" attaches to the second date.
     expect(chip.textContent).toMatch(/بين \S+ \d+ \S+ و\S+ \d+ \S+/);
   });
 
   it.each([
-    [1, 'ar', 'بيتجهز خصيصًا لك في يوم واحد'],
-    [2, 'ar', 'بيتجهز خصيصًا لك في يومين'],
-    [5, 'ar', 'بيتجهز خصيصًا لك في 5 أيام'],
-    [11, 'ar', 'بيتجهز خصيصًا لك في 11 يوم'],
+    [1, 'ar', 'بيتجهزلك مخصوص في يوم واحد'],
+    [2, 'ar', 'بيتجهزلك مخصوص في يومين'],
+    [5, 'ar', 'بيتجهزلك مخصوص في 5 أيام'],
+    [11, 'ar', 'بيتجهزلك مخصوص في 11 يوم'],
     [1, 'en', 'Made for you in 1 day'],
     [2, 'en', 'Made for you in 2 days'],
     [5, 'en', 'Made for you in 5 days'],

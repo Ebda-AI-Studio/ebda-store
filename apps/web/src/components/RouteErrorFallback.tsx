@@ -236,7 +236,7 @@ export function RouteErrorFallback({ error, reset }: RouteErrorFallbackProps) {
           aria-busy={buttonBusy}
           className="rounded-lg bg-primary px-5 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-wait disabled:opacity-70"
         >
-          {buttonBusy ? t('Retrying…', translations['Retrying…']) : t('Try Again', 'حاول مرة أخرى')}
+          {buttonBusy ? t('Retrying…', translations['Retrying…']) : t('Try Again', 'جرّب تاني')}
         </button>
         {/* "Go Home" is suppressed during a transient ONLY on a platform host.
             We do not know which store this is there — `getStore()` fell back

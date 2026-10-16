@@ -94,7 +94,7 @@ describe('DemoCheckoutNotice', () => {
   it('says ordering is closed, Arabic', () => {
     lang = 'ar';
     render(<DemoCheckoutNotice />);
-    expect(screen.getByText('ده متجر تجريبي — الطلب مقفول')).toBeTruthy();
+    expect(screen.getByText('ده متجر تجريبي — الطلبات مقفولة')).toBeTruthy();
   });
   it('says ordering is closed, English', () => {
     render(<DemoCheckoutNotice />);

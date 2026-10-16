@@ -174,8 +174,8 @@ export default function CartClient() {
         await removeCartItem(itemId);
         if (item) {
           info(
-            t('Item removed', 'تمت الإزالة'),
-            t(`${item.name} removed from cart`, `${item.name} اتشال من السلة`)
+            t('Item removed', 'اتشال'),
+            t(`${item.name} removed from cart`, `شيلنا ${item.name} من السلة`)
           );
         }
       } catch {
@@ -183,8 +183,8 @@ export default function CartClient() {
       }
     } else if (newQuantity > 10) {
       info(
-        t('Limit reached', 'تم الوصول للحد'),
-        t('Maximum 10 items per product', 'أقصى حاجة 10 قطع لكل منتج')
+        t('Limit reached', 'وصلت للحد'),
+        t('Maximum 10 items per product', 'تقدر تطلب لحد 10 قطع من كل منتج')
       );
     } else {
       try {
@@ -201,8 +201,8 @@ export default function CartClient() {
       await removeCartItem(itemId);
       if (item) {
         success(
-          t('Item removed', 'تمت الإزالة'),
-          t(`${item.name} has been removed from your cart`, `${item.name} اتشال من السلة`)
+          t('Item removed', 'اتشال'),
+          t(`${item.name} has been removed from your cart`, `شيلنا ${item.name} من السلة`)
         );
       }
     } catch {
@@ -214,8 +214,8 @@ export default function CartClient() {
     try {
       await removeCartBundle(cartBundleId);
       success(
-        t('Item removed', 'تمت الإزالة'),
-        t(`${name} has been removed from your cart`, `${name} اتشال من السلة`)
+        t('Item removed', 'اتشال'),
+        t(`${name} has been removed from your cart`, `شيلنا ${name} من السلة`)
       );
     } catch {
       cartErrorToast();
@@ -255,10 +255,10 @@ export default function CartClient() {
           }
         }
         success(
-          t('Promo applied', 'تم تطبيق الخصم'),
+          t('Promo applied', 'الخصم اتطبّق'),
           t(
             `${result.data.coupon.name} discount has been applied`,
-            `تم تطبيق خصم ${result.data.coupon.name}`
+            `اتطبّق خصم ${result.data.coupon.name}`
           )
         );
       } else {
@@ -478,7 +478,7 @@ export default function CartClient() {
                   title="Your cart is empty"
                   titleAr="سلة التسوق فاضية"
                   description="Looks like you haven't added any items yet."
-                  descriptionAr="شكلك لسه ما ضفتش أي منتجات."
+                  descriptionAr="شكلك لسه مضفتش أي منتجات."
                   ctaLabel="Start Shopping"
                   ctaLabelAr="ابدأ التسوق"
                   ctaHref={storeUrl('/products')}
@@ -494,7 +494,7 @@ export default function CartClient() {
                   {t('Your cart is empty', 'سلة التسوق فاضية')}
                 </h2>
                 <p className="mt-2 text-muted-foreground">
-                  {t("Looks like you haven't added any items yet.", 'شكلك لسه ما ضفتش أي منتجات.')}
+                  {t("Looks like you haven't added any items yet.", 'شكلك لسه مضفتش أي منتجات.')}
                 </p>
                 <Link href={storeUrl('/products')}>
                   <Button className="mt-8 gap-2 rounded-xl" size="lg">
@@ -840,7 +840,7 @@ export default function CartClient() {
                                 className="h-11 rounded-lg bg-muted px-4 text-sm font-medium text-foreground transition-colors hover:bg-muted/80 disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer"
                               >
                                 {promoApplied
-                                  ? t('Applied', 'تم')
+                                  ? t('Applied', 'اتطبّق')
                                   : isValidating
                                     ? '…'
                                     : t('Apply', 'تطبيق')}
@@ -923,7 +923,7 @@ export default function CartClient() {
                                   className="h-10 min-w-[88px] rounded-lg bg-muted px-4 text-sm font-medium text-foreground transition-colors hover:bg-muted/80 disabled:cursor-not-allowed disabled:opacity-50"
                                 >
                                   {promoApplied
-                                    ? t('Applied', 'تم التطبيق')
+                                    ? t('Applied', 'اتطبّق')
                                     : isValidating
                                       ? t('Validating...', 'بنتأكد...')
                                       : t('Apply', 'تطبيق')}

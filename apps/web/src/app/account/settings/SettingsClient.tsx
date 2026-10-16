@@ -69,13 +69,13 @@ export default function SettingsClient() {
       } else {
         toastError(
           t('SMS offers', translations['SMS offers']),
-          result.error?.message || t('Failed to update', 'تعذّر التحديث')
+          result.error?.message || t('Failed to update', 'معرفناش نحدّث')
         );
       }
     } catch {
       toastError(
         t('SMS offers', translations['SMS offers']),
-        t('Failed to update', 'تعذّر التحديث')
+        t('Failed to update', 'معرفناش نحدّث')
       );
     } finally {
       setIsSavingSms(false);
@@ -119,14 +119,14 @@ export default function SettingsClient() {
         fetchSmsConsent();
         setMessage({ type: 'success', text: 'Profile updated successfully!' });
         toastSuccess(
-          t('Profile saved', 'تم حفظ الملف الشخصي'),
+          t('Profile saved', 'الملف الشخصي اتحفظ'),
           t('Your profile has been updated.', 'ملفك الشخصي اتحدّث.')
         );
       } else {
         const msg =
-          result.error?.message || t('Failed to update profile', 'تعذّر تحديث الملف الشخصي');
+          result.error?.message || t('Failed to update profile', 'معرفناش نحدّث الملف الشخصي');
         setMessage({ type: 'error', text: msg });
-        toastError(t('Update failed', 'تعذّر التحديث'), msg);
+        toastError(t('Update failed', 'معرفناش نحدّث'), msg);
       }
     } catch {
       setMessage({
@@ -137,7 +137,7 @@ export default function SettingsClient() {
         ),
       });
       toastError(
-        t('Update failed', 'تعذّر التحديث'),
+        t('Update failed', 'معرفناش نحدّث'),
         t('Failed to update profile. Please try again.', 'معرفناش نحدّث الملف الشخصي. جرّب تاني.')
       );
     } finally {
@@ -196,13 +196,13 @@ export default function SettingsClient() {
         setMessage({ type: 'success', text: 'Password updated successfully!' });
         setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' });
         toastSuccess(
-          t('Password updated', 'تم تحديث كلمة المرور'),
+          t('Password updated', 'كلمة المرور اتحدّثت'),
           t('Your password has been changed.', 'كلمة المرور اتغيّرت.')
         );
       } else {
         const msg = result.error?.message || 'Failed to update password';
         setMessage({ type: 'error', text: msg });
-        toastError(t('Update failed', 'تعذّر التحديث'), msg);
+        toastError(t('Update failed', 'معرفناش نحدّث'), msg);
       }
     } catch {
       setMessage({
@@ -213,7 +213,7 @@ export default function SettingsClient() {
         ),
       });
       toastError(
-        t('Update failed', 'تعذّر التحديث'),
+        t('Update failed', 'معرفناش نحدّث'),
         t('Failed to update password. Please try again.', 'معرفناش نحدّث كلمة المرور. جرّب تاني.')
       );
     } finally {
@@ -244,7 +244,7 @@ export default function SettingsClient() {
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
       toastSuccess(
-        t('Data downloaded', 'تم تنزيل البيانات'),
+        t('Data downloaded', 'البيانات اتنزّلت'),
         t('Your account data has been saved to your device.', 'بيانات حسابك اتحفظت على جهازك.')
       );
     } catch {
@@ -271,8 +271,8 @@ export default function SettingsClient() {
           localStorage.removeItem('refreshToken');
         }
         toastSuccess(
-          t('Account deleted', 'تم حذف الحساب'),
-          t('Your account data has been anonymized.', 'بيانات حسابك اتخفت.')
+          t('Account deleted', 'الحساب اتمسح'),
+          t('Your account data has been anonymized.', 'بياناتك الشخصية اتشالت من الحساب.')
         );
         // Redirect to home after account deletion
         router.push(storeUrl('/'));
@@ -280,7 +280,7 @@ export default function SettingsClient() {
         toastError(
           t('Delete failed', 'فشل الحذف'),
           result.error?.message ||
-            t('Failed to delete account. Please try again.', 'حذف الحساب ما نفعش. جرّب تاني.')
+            t('Failed to delete account. Please try again.', 'حذف الحساب منفعش. جرّب تاني.')
         );
         setMessage({
           type: 'error',
@@ -290,7 +290,7 @@ export default function SettingsClient() {
     } catch {
       toastError(
         t('Delete failed', 'فشل الحذف'),
-        t('Failed to delete account. Please try again.', 'حذف الحساب ما نفعش. جرّب تاني.')
+        t('Failed to delete account. Please try again.', 'حذف الحساب منفعش. جرّب تاني.')
       );
       setMessage({ type: 'error', text: 'Failed to delete account. Please try again.' });
     } finally {
@@ -375,7 +375,7 @@ export default function SettingsClient() {
           />
 
           <Input
-            label={t('Phone Number', 'رقم الهاتف')}
+            label={t('Phone Number', 'رقم الموبايل')}
             type="tel"
             value={profileData.phone}
             onChange={e => setProfileData({ ...profileData, phone: e.target.value })}
@@ -577,7 +577,7 @@ export default function SettingsClient() {
             <p className="mt-2 text-sm text-muted-foreground">
               {t(
                 'Your name, email, phone, and addresses will be permanently anonymized. Your past order records will remain (with personal data removed) for tax-compliance retention under applicable law. You will be signed out immediately. This cannot be undone.',
-                'اسمك وبريدك الإلكتروني وتليفونك وعناوينك هيتخفوا نهائي. سجلات طلباتك القديمة (من غير بيانات شخصية) هتفضل موجودة عشان الالتزامات الضريبية حسب القانون. هيتعملك تسجيل خروج فورًا. الخطوة دي مالهاش رجوع.'
+                'اسمك وبريدك الإلكتروني وتليفونك وعناوينك هيتخفوا نهائي. سجلات طلباتك القديمة (من غير بيانات شخصية) هتفضل موجودة عشان الالتزامات الضريبية حسب القانون. وهنخرّجك من حسابك على طول. الخطوة دي مالهاش رجوع.'
               )}
             </p>
             <div className="mt-6 flex items-center justify-end gap-3">

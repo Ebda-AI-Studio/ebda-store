@@ -101,7 +101,7 @@ export function ProductModel3dPanel({
         error: t('3D view unavailable right now.', 'عرض الـ 3D مش متاح دلوقتي.'),
         hint: t(
           'Drag to rotate · pinch or +/− to zoom · arrow keys',
-          'اسحب للف · قرّب بإصبعين أو +/− · الأسهم'
+          'اسحب عشان تلفّه · قرّب بإصبعين أو +/− · الأسهم'
         ),
         ar: t('View in your space', 'اعرضه في مكانك'),
       }}

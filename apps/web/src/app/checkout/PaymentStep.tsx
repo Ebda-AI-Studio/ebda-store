@@ -228,7 +228,7 @@ export default function PaymentStep({
             disabled={!selectedProvider || isProcessing || belowMinimumOrder}
           >
             {isProcessing
-              ? t('Processing...', 'بنجهّز...')
+              ? t('Processing...', 'بنكمّل الدفع...')
               : selectedProvider === 'cod'
                 ? t('Place Order', translations['Place Order'])
                 : `${t('Pay', 'ادفع')} ${formatPrice(total)}`}

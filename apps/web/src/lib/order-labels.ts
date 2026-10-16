@@ -11,12 +11,12 @@ export type LabelLanguage = 'ar' | 'en';
 const ORDER_STATUS: Record<string, LabelPair> = {
   pending: ['Pending', 'قيد الانتظار'],
   awaiting_payment_confirmation: ['Awaiting payment confirmation', 'في انتظار تأكيد الدفع'],
-  confirmed: ['Confirmed', 'تم التأكيد'],
+  confirmed: ['Confirmed', 'اتأكد'],
   processing: ['Processing', 'قيد التجهيز'],
-  shipped: ['Shipped', 'تم الشحن'],
-  delivered: ['Delivered', 'تم التوصيل'],
+  shipped: ['Shipped', 'اتشحن'],
+  delivered: ['Delivered', 'اتسلّم'],
   cancelled: ['Cancelled', 'ملغي'],
-  refunded: ['Refunded', 'تم الاسترداد'],
+  refunded: ['Refunded', 'اترد المبلغ'],
 };
 
 const ORDER_PAYMENT_STATUS: Record<string, LabelPair> = {
@@ -24,7 +24,7 @@ const ORDER_PAYMENT_STATUS: Record<string, LabelPair> = {
   paid: ['Paid', 'مدفوع'],
   partially_paid: ['Partially paid', 'مدفوع جزئياً'],
   failed: ['Payment failed', 'فشل الدفع'],
-  refunded: ['Refunded', 'تم الاسترداد'],
+  refunded: ['Refunded', 'اترد المبلغ'],
   disputed: ['Disputed', 'قيد النزاع'],
 };
 
@@ -35,7 +35,7 @@ const PAYMENT_STATUS: Record<string, LabelPair> = {
   failed: ['Failed', 'فشل'],
   cancelled: ['Cancelled', 'ملغي'],
   expired: ['Expired', 'انتهت المهلة'],
-  refunded: ['Refunded', 'تم الاسترداد'],
+  refunded: ['Refunded', 'اترد المبلغ'],
   partially_refunded: ['Partially refunded', 'استرداد جزئي'],
   disputed: ['Disputed', 'قيد النزاع'],
   cod_pending: ['Pay on delivery', 'الدفع عند الاستلام'],

@@ -813,7 +813,7 @@ export default function CheckoutClient() {
 
     // Phone validation (Egypt format)
     if (!formData.phone.trim()) {
-      errors.phone = t('Phone number is required', 'رقم الهاتف مطلوب');
+      errors.phone = t('Phone number is required', 'رقم الموبايل مطلوب');
     } else {
       // Egyptian mobile: 010/011/012/015 + 8 digits, with or without the
       // trunk 0 / +20 (Eastern Arabic digits accepted). One shared rule.
@@ -1206,7 +1206,7 @@ export default function CheckoutClient() {
     // Enter-key implicit submit of the payment form from reaching createOrder.
     if (store.isDemo) {
       setCheckoutError(
-        t('This is a demo store — ordering is closed', 'ده متجر تجريبي — الطلب مقفول')
+        t('This is a demo store — ordering is closed', 'ده متجر تجريبي — الطلبات مقفولة')
       );
       return;
     }
@@ -1527,7 +1527,7 @@ export default function CheckoutClient() {
           setCheckoutError(
             t(
               'Please fix the highlighted fields and try again.',
-              'صحّح الخانات المعلّمة وجرّب تاني.'
+              'صحّح الخانات اللي متعلّم عليها وجرّب تاني.'
             )
           );
           setIsProcessing(false);
@@ -1584,7 +1584,7 @@ export default function CheckoutClient() {
         case 'MANUAL_HOLD_NOT_ADMITTED':
           friendly = t(
             'To use cash on delivery or InstaPay, return to checkout and choose that method when placing a new order.',
-            'عشان تدفع عند الاستلام أو بإنستاباي، ارجع لإتمام الطلب واختار طريقة الدفع وانت بتعمل طلب جديد.'
+            'عشان تدفع عند الاستلام أو بإنستاباي، ارجع لإتمام الطلب واختار طريقة الدفع وإنت بتعمل طلب جديد.'
           );
           break;
         case 'TOO_MANY_OPEN_HOLDS':
@@ -1604,7 +1604,7 @@ export default function CheckoutClient() {
           // it was rolled back, so placing it again shows the fee first.
           friendly = t(
             'The cash-on-delivery fee was not included in your total. Your cart is back — review the total with the fee and place the order again.',
-            'رسوم الدفع عند الاستلام ما اتحسبتش في الإجمالي. رجّعنا سلتك زي ما كانت — راجع الإجمالي بالرسوم وأكّد الطلب تاني.'
+            'رسوم الدفع عند الاستلام متحسبتش في الإجمالي. رجّعنا سلتك زي ما كانت — راجع الإجمالي بالرسوم وأكّد الطلب تاني.'
           );
           break;
         case 'PAYMENT_PROVIDER_ERROR':
@@ -1698,7 +1698,7 @@ export default function CheckoutClient() {
         case 'COUPON_LIMIT_REACHED':
           friendly = t(
             'The coupon you applied has reached its usage limit. Please remove it and try again.',
-            'الكوبون اللي استخدمته خلص. شيله وجرّب تاني.'
+            'الكوبون ده خلصت مرات استخدامه. شيله وجرّب تاني.'
           );
           break;
         case 'COUPON_NOT_ELIGIBLE':
@@ -1728,7 +1728,7 @@ export default function CheckoutClient() {
         case 'MIN_ORDER_NOT_MET':
           friendly = t(
             'Your order does not meet the minimum amount required for this coupon.',
-            'طلبك ما وصلش للحد الأدنى المطلوب للكوبون ده.'
+            'طلبك موصلش للحد الأدنى المطلوب للكوبون ده.'
           );
           break;
         case 'MINIMUM_ORDER_NOT_MET':
@@ -1739,7 +1739,7 @@ export default function CheckoutClient() {
             minimumOrderMessage ??
             t(
               'Your cart does not meet this store’s minimum order value.',
-              'سلتك ما وصلتش للحد الأدنى لقيمة الطلب في المتجر ده.'
+              'سلتك موصلتش للحد الأدنى لقيمة الطلب في المتجر ده.'
             );
           setStep(1);
           break;

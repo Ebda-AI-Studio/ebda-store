@@ -378,7 +378,7 @@ export default function OrderDetailClient() {
               {t('Order', 'طلب')} #{order.orderNumber}
             </h1>
             <p className="mt-1 text-muted-foreground">
-              {t('Placed on', 'تم الطلب في')} {formatDateTime(order.createdAt)}
+              {t('Placed on', 'اتطلب في')} {formatDateTime(order.createdAt)}
             </p>
           </div>
         </div>
@@ -404,13 +404,13 @@ export default function OrderDetailClient() {
           <div className="flex flex-wrap gap-6 text-sm">
             {order.shippedAt && (
               <div>
-                <span className="text-muted-foreground">{t('Shipped', 'تم الشحن')}:</span>{' '}
+                <span className="text-muted-foreground">{t('Shipped', 'اتشحن')}:</span>{' '}
                 <span className="font-medium text-foreground">{formatDate(order.shippedAt)}</span>
               </div>
             )}
             {order.deliveredAt && (
               <div>
-                <span className="text-muted-foreground">{t('Delivered', 'تم التوصيل')}:</span>{' '}
+                <span className="text-muted-foreground">{t('Delivered', 'اتسلّم')}:</span>{' '}
                 <span className="font-medium text-foreground">{formatDate(order.deliveredAt)}</span>
               </div>
             )}
@@ -753,7 +753,7 @@ export default function OrderDetailClient() {
             )}
             {shippingAddr.phone && (
               <p className="pt-2 text-muted-foreground">
-                {t('Phone', 'الهاتف')}: {shippingAddr.phone}
+                {t('Phone', 'رقم الموبايل')}: {shippingAddr.phone}
               </p>
             )}
           </div>
@@ -811,7 +811,7 @@ export default function OrderDetailClient() {
                     )}
                     {payment.paidAt && (
                       <p className="text-muted-foreground">
-                        {t('Paid on', 'تم الدفع في')} {formatDateTime(payment.paidAt)}
+                        {t('Paid on', 'اتدفع في')} {formatDateTime(payment.paidAt)}
                       </p>
                     )}
                   </div>

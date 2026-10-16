@@ -109,7 +109,7 @@ export function InstapayCard({
           </p>
         </div>
         <Button variant="outline" size="sm" type="button" onClick={() => void copy(key, value)}>
-          {copied === key ? t('Copied', 'تم النسخ') : t('Copy', 'نسخ')}
+          {copied === key ? t('Copied', 'اتنسخ') : t('Copy', 'نسخ')}
         </Button>
       </div>
     ) : null;
@@ -122,7 +122,7 @@ export function InstapayCard({
     >
       <h2 className="text-lg font-semibold text-foreground">
         {confirmed
-          ? t('Transfer confirmed', 'تم تأكيد التحويل')
+          ? t('Transfer confirmed', 'التحويل اتأكد')
           : cancelled
             ? t('This order expired', 'مهلة الطلب ده خلصت')
             : t('Pay by InstaPay', 'ادفع عبر إنستاباي')}

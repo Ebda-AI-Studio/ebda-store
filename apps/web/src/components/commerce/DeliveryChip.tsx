@@ -30,8 +30,8 @@ function zonesFor(storeId: string): Promise<Zones> {
 /** "in N days" tail of the made-to-order line, through the one plural helper (Y-01). */
 function leadTimeText(n: number, lang: 'ar' | 'en', localize: (v: number) => string): string {
   if (lang === 'en') return `Made for you in ${countText('en', n, DAYS)}`;
-  // Egyptian sentence (Ruling FU46-Y02a): "بيتجهز خصيصًا لك في يومين".
-  return `بيتجهز خصيصًا لك في ${countText('ar', n, DAYS, localize(n))}`;
+  // Egyptian sentence (Ruling FU46-Y02a): "بيتجهزلك مخصوص في يومين".
+  return `بيتجهزلك مخصوص في ${countText('ar', n, DAYS, localize(n))}`;
 }
 
 /**

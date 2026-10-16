@@ -192,7 +192,7 @@ export default function VerifyEmailClient() {
                     onClick={() => verify()}
                     className="inline-flex w-full items-center justify-center rounded-lg bg-primary px-6 py-3 font-medium text-primary-foreground hover:bg-primary/90 transition"
                   >
-                    {t('Try again', 'حاول مرة أخرى')}
+                    {t('Try again', 'جرّب تاني')}
                   </button>
                   <Link
                     href={storeUrl('/')}

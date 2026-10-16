@@ -140,7 +140,7 @@ export const translations = {
   Reviews: 'التقييمات',
 
   // Cart
-  'Added to cart': 'تمت الإضافة للسلة',
+  'Added to cart': 'اتضاف للسلة',
   'View cart': 'عرض السلة',
   'Shopping Cart': 'سلة التسوق',
   'Your cart is empty': 'سلة التسوق فاضية',
@@ -183,7 +183,7 @@ export const translations = {
   Company: 'الشركة',
   FAQ: 'الأسئلة الشائعة',
   'Shipping Info': 'معلومات الشحن',
-  'Returns & Refunds': 'المرتجعات والاستبدال',
+  'Returns & Refunds': 'المرتجعات واسترداد الفلوس',
   'Privacy Policy': 'سياسة الخصوصية',
   'Terms of Service': 'الشروط والأحكام',
   'About Us': 'من نحن',
@@ -203,11 +203,11 @@ export const translations = {
   'No results found': 'ملقيناش نتايج',
   'Loading...': 'بنحمّل...',
   Error: 'خطأ',
-  Success: 'تم بنجاح',
+  Success: 'تمام',
   EGP: 'ج.م',
   Retry: 'إعادة المحاولة',
   'Something went wrong': 'حدث خطأ ما',
-  'Try Again': 'حاول مرة أخرى',
+  'Try Again': 'جرّب تاني',
   'Go Home': 'العودة للرئيسية',
 
   // Shipping
@@ -222,7 +222,7 @@ export const translations = {
   Password: 'كلمة المرور',
   'Confirm Password': 'تأكيد كلمة المرور',
   'Full Name': 'الاسم الكامل',
-  Phone: 'الهاتف',
+  Phone: 'رقم الموبايل',
 
   // Locations page
   Locations: 'الفروع',
@@ -265,7 +265,7 @@ export const translations = {
   'Promotional messages only. You can stop them anytime.': 'رسايل عروض بس. تقدر توقفها في أي وقت.',
   'SMS offers': 'عروض الرسائل القصيرة',
   'Get offers and reminders from this store by SMS.':
-    'وصّلني العروض والتذكيرات من المتجر ده في رسايل SMS.',
+    'ابعتولي العروض والتذكيرات من المتجر ده في رسايل SMS.',
   'Order updates are not affected.': 'تحديثات الطلبات مش هتتأثر.',
   'Offers will be sent to': 'العروض هتتبعت على',
   'Add a phone number to your profile to get SMS offers.':
@@ -282,8 +282,8 @@ export const translations = {
   // copy, not merchant-editable, so every signup form carries it.
   'Your email': 'بريدك الإلكتروني',
   Subscribe: 'اشترك',
-  'Subscribing…': 'بنشترك…',
-  'Thanks — you are subscribed.': 'شكراً — تم اشتراكك.',
+  'Subscribing…': 'بنسجّل اشتراكك…',
+  'Thanks — you are subscribed.': 'شكرًا — اشتراكك اتسجّل.',
   'Please enter a valid email.': 'اكتب بريد إلكتروني صحيح.',
   'By subscribing you agree to receive marketing emails from this store.':
     'لما تشترك، إنت موافق إنك تستلم رسايل تسويقية من المتجر ده.',

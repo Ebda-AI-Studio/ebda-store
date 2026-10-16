@@ -14,7 +14,7 @@ export function DemoCheckoutNotice() {
       data-demo-checkout-notice
       className="rounded-lg border border-dashed bg-muted/40 px-4 py-3 text-sm font-medium text-foreground"
     >
-      {t('This is a demo store — ordering is closed', 'ده متجر تجريبي — الطلب مقفول')}
+      {t('This is a demo store — ordering is closed', 'ده متجر تجريبي — الطلبات مقفولة')}
     </p>
   );
 }

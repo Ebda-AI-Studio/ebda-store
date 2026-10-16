@@ -155,10 +155,10 @@ export default function LoyaltyClient() {
       const result = await api.joinLoyalty(storeId);
       if (result.success && result.data) {
         toastSuccess(
-          t('Welcome to the loyalty program!', '!أهلاً بيك في برنامج الولاء'),
+          t('Welcome to the loyalty program!', 'أهلاً بيك في برنامج الولاء!'),
           t(
             'Your points balance has been created. Start earning on every order.',
-            'رصيد نقطك اتعمل. ابدأ اكسب مع كل طلب.'
+            'حسابك في برنامج النقط جاهز. ابدأ اكسب نقط مع كل طلب.'
           )
         );
         // Re-fetch to pick up the new record (includes the signup bonus).
@@ -186,12 +186,12 @@ export default function LoyaltyClient() {
       } else {
         const msg =
           result.error?.message ||
-          t('Failed to join. Please try again.', 'الانضمام ما نفعش. جرّب تاني.');
-        toastError(t('Could not join', 'تعذّر الانضمام'), msg);
+          t('Failed to join. Please try again.', 'الانضمام منفعش. جرّب تاني.');
+        toastError(t('Could not join', 'معرفناش نسجّلك'), msg);
       }
     } catch {
       toastError(
-        t('Could not join', 'تعذّر الانضمام'),
+        t('Could not join', 'معرفناش نسجّلك'),
         t('An unexpected error occurred. Please try again.', 'حصل خطأ مش متوقع. جرّب تاني.')
       );
     } finally {
@@ -207,7 +207,7 @@ export default function LoyaltyClient() {
             {t('Loyalty Program', 'برنامج الولاء')}
           </h1>
           <p className="mt-1 text-muted-foreground">
-            {t('Your points and rewards', 'نقاطك ومكافآتك')}
+            {t('Your points and rewards', 'نقطك ومكافآتك')}
           </p>
         </div>
         <div className="flex justify-center py-12">
@@ -225,7 +225,7 @@ export default function LoyaltyClient() {
             {t('Loyalty Program', 'برنامج الولاء')}
           </h1>
           <p className="mt-1 text-muted-foreground">
-            {t('Your points and rewards', 'نقاطك ومكافآتك')}
+            {t('Your points and rewards', 'نقطك ومكافآتك')}
           </p>
         </div>
         <div className="rounded-xl border bg-card p-10 text-center shadow-sm">
@@ -365,7 +365,7 @@ export default function LoyaltyClient() {
               {isJoining ? (
                 <>
                   <span className="h-4 w-4 animate-spin rounded-full border-2 border-primary-foreground border-t-transparent" />
-                  {t('Joining…', 'بننضم…')}
+                  {t('Joining…', 'بنسجّلك…')}
                 </>
               ) : (
                 t('Join Now', 'انضم الآن')
@@ -384,7 +384,7 @@ export default function LoyaltyClient() {
           {t('Loyalty Program', 'برنامج الولاء')}
         </h1>
         <p className="mt-1 text-muted-foreground">
-          {t('Your points and rewards', 'نقاطك ومكافآتك')}
+          {t('Your points and rewards', 'نقطك ومكافآتك')}
         </p>
       </div>
 
@@ -408,7 +408,7 @@ export default function LoyaltyClient() {
                 <p className="mt-1 text-5xl font-bold text-primary">
                   {localize(loyaltyPoints.points.toLocaleString('en-US'))}
                 </p>
-                <p className="mt-1 text-sm text-muted-foreground">{t('points', 'نقاط')}</p>
+                <p className="mt-1 text-sm text-muted-foreground">{t('points', 'نقط')}</p>
               </div>
               {loyaltyPoints.tier && (
                 <div className="text-right">
@@ -432,7 +432,7 @@ export default function LoyaltyClient() {
       {/* Transaction history */}
       <div className="rounded-xl border bg-card shadow-sm">
         <div className="border-b p-4">
-          <h2 className="font-semibold text-foreground">{t('Points History', 'سجل النقاط')}</h2>
+          <h2 className="font-semibold text-foreground">{t('Points History', 'سجل النقط')}</h2>
           <p className="text-sm text-muted-foreground">
             {t('Your recent loyalty activity', 'نشاط الولاء الأخير')}
           </p>
@@ -482,7 +482,7 @@ export default function LoyaltyClient() {
                     {t('Description', 'الوصف')}
                   </th>
                   <th className="px-6 py-3 text-right font-medium text-muted-foreground">
-                    {t('Points', 'النقاط')}
+                    {t('Points', 'النقط')}
                   </th>
                 </tr>
               </thead>

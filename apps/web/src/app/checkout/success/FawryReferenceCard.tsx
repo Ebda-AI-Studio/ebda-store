@@ -51,7 +51,7 @@ export function FawryReferenceCard({ code }: { code: string }) {
           onClick={copy}
           className="rounded-md border border-border px-3 py-1.5 text-sm font-medium text-foreground hover:bg-muted"
         >
-          {copied ? t('Copied', 'تم النسخ') : t('Copy', 'نسخ')}
+          {copied ? t('Copied', 'اتنسخ') : t('Copy', 'نسخ')}
         </button>
       </div>
     </section>

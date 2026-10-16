@@ -499,7 +499,7 @@ function statusCopy(kind: StatusKind, t: (en: string, ar: string) => string): st
     case 'verifying':
       return t('Printing your receipt…', 'بنطبع فاتورتك…');
     case 'paid':
-      return t('Paid, order confirmed', 'تم الدفع، طلبك اتأكد');
+      return t('Paid, order confirmed', 'اتدفع، طلبك اتأكد');
     case 'cod':
       return t('Order placed, pay on delivery', 'طلبك اتسجل، الدفع عند الاستلام');
     case 'awaiting':
@@ -507,7 +507,7 @@ function statusCopy(kind: StatusKind, t: (en: string, ar: string) => string): st
     case 'pending':
       return t('Order placed, confirming payment', 'طلبك اتسجل، بنأكد الدفع');
     case 'failed':
-      return t('Payment failed', 'الدفع ما تمش');
+      return t('Payment failed', 'الدفع متمش');
     case 'unknown':
     default:
       return t('Order received', 'طلبك وصل');

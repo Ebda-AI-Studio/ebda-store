@@ -157,7 +157,7 @@ function SuccessContent() {
       : paymentState === 'awaiting'
         ? t('Waiting for your transfer', 'بانتظار التحويل')
         : paymentState === 'failed'
-          ? t('Payment not completed', 'الدفع ما كملش')
+          ? t('Payment not completed', 'الدفع مكملش')
           : paymentState === 'pending'
             ? t('Confirming your payment…', 'بنأكد الدفع…')
             : t('Thank you for your order!', 'شكراً لطلبك!');
