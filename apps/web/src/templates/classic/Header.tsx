@@ -122,7 +122,10 @@ export default function ClassicHeader({
           </button>
 
           {/* Desktop: left nav */}
-          <nav className="hidden md:flex items-center gap-8 flex-1 justify-start">
+          <nav
+            aria-label={t('Main', 'الرئيسية')}
+            className="hidden md:flex items-center gap-8 flex-1 justify-start"
+          >
             {leftNav.map(item => (
               <Link
                 key={item.href}
@@ -157,7 +160,10 @@ export default function ClassicHeader({
           </Link>
 
           {/* Desktop: right nav */}
-          <nav className="hidden md:flex items-center gap-8 flex-1 justify-end">
+          <nav
+            aria-label={t('More', 'المزيد')}
+            className="hidden md:flex items-center gap-8 flex-1 justify-end"
+          >
             {rightNav.map(item => (
               <Link
                 key={item.href}
@@ -317,7 +323,11 @@ export default function ClassicHeader({
           : {})}
       >
         <div className="min-h-0 overflow-hidden">
-          <nav className="container mx-auto px-4 py-5" dir={isRtl ? 'rtl' : 'ltr'}>
+          <nav
+            aria-label={t('Menu', 'القائمة')}
+            className="container mx-auto px-4 py-5"
+            dir={isRtl ? 'rtl' : 'ltr'}
+          >
             <ul className="space-y-1">
               {navigation.map(item => (
                 <li key={item.href}>

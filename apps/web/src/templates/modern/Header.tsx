@@ -121,7 +121,7 @@ export default function ModernHeader({
             </Link>
 
             {/* Desktop Navigation */}
-            <nav className="hidden md:flex items-center gap-1">
+            <nav aria-label={t('Main', 'الرئيسية')} className="hidden md:flex items-center gap-1">
               {navigation.map(item => (
                 <Link
                   key={item.href}
@@ -319,7 +319,11 @@ export default function ModernHeader({
         closeClassName="text-muted-foreground hover:text-foreground hover:bg-muted"
         bodyClassName=""
       >
-        <nav className="p-4 flex flex-col gap-1" dir={isRtl ? 'rtl' : 'ltr'}>
+        <nav
+          aria-label={t('Menu', 'القائمة')}
+          className="p-4 flex flex-col gap-1"
+          dir={isRtl ? 'rtl' : 'ltr'}
+        >
           {navigation.map(item => (
             <Link
               key={item.href}

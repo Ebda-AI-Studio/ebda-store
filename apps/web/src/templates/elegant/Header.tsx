@@ -212,7 +212,10 @@ export default function ElegantHeader({
         </div>
 
         {/* Desktop navigation — below logo */}
-        <nav className="hidden md:flex items-center justify-center gap-10 pb-5">
+        <nav
+          aria-label={t('Main', 'الرئيسية')}
+          className="hidden md:flex items-center justify-center gap-10 pb-5"
+        >
           {navigation.map(item => (
             <Link
               key={item.href}
@@ -301,7 +304,7 @@ export default function ElegantHeader({
             ? ({ inert: true } as unknown as React.HTMLAttributes<HTMLDivElement>)
             : {})}
         >
-          <nav className="min-h-0 overflow-hidden">
+          <nav aria-label={t('Menu', 'القائمة')} className="min-h-0 overflow-hidden">
             <ul className="space-y-5 py-6 text-center">
               {navigation.map(item => (
                 <li key={item.href}>

@@ -238,7 +238,7 @@ export default function DahabHeader({
           </div>
         }
       >
-        <nav aria-label={t('Main', 'الرئيسية')}>
+        <nav aria-label={t('Menu', 'القائمة')}>
           <ul className="px-5 py-3">
             {nav.map(item => (
               <li

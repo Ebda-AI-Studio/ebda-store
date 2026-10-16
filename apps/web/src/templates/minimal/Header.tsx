@@ -117,6 +117,7 @@ export default function MinimalHeader({
 
           {/* Desktop nav — centered absolutely */}
           <nav
+            aria-label={t('Main', 'الرئيسية')}
             className={
               isCentre
                 ? 'hidden lg:flex items-center gap-8 col-start-1 justify-self-start'
@@ -318,7 +319,7 @@ export default function MinimalHeader({
             ? ({ inert: true } as unknown as React.HTMLAttributes<HTMLDivElement>)
             : {})}
         >
-          <nav className="min-h-0 overflow-hidden">
+          <nav aria-label={t('Menu', 'القائمة')} className="min-h-0 overflow-hidden">
             <ul className="space-y-5 pb-6 text-center">
               {navigation.map(item => (
                 <li key={item.href}>
