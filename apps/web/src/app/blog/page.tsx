@@ -74,15 +74,15 @@ export default function BlogIndexPage() {
           </header>
 
           {isLoading ? (
-            <p className="text-center text-sm text-foreground/60 py-16">
+            <p className="text-center text-sm text-foreground/70 py-16">
               {isRtl ? 'جارٍ التحميل…' : 'Loading…'}
             </p>
           ) : disabled ? (
-            <p className="text-center text-sm text-foreground/60 py-16">
+            <p className="text-center text-sm text-foreground/70 py-16">
               {isRtl ? 'المدونة غير متاحة حالياً.' : 'Blog is not available right now.'}
             </p>
           ) : posts.length === 0 ? (
-            <p className="text-center text-sm text-foreground/60 py-16">
+            <p className="text-center text-sm text-foreground/70 py-16">
               {isRtl ? 'لا توجد مقالات بعد.' : 'No posts yet.'}
             </p>
           ) : (
@@ -111,7 +111,7 @@ export default function BlogIndexPage() {
                         ) : null}
                       </div>
                       <div className="p-4">
-                        <p className="text-xs text-foreground/55">
+                        <p className="text-xs text-muted-foreground">
                           {new Date(date).toLocaleDateString(
                             intlLocale(isRtl ? 'ar' : 'en', numerals),
                             {
@@ -125,7 +125,7 @@ export default function BlogIndexPage() {
                           {title}
                         </h2>
                         {excerpt && (
-                          <p className="mt-2 text-sm text-foreground/65 line-clamp-3">{excerpt}</p>
+                          <p className="mt-2 text-sm text-foreground/70 line-clamp-3">{excerpt}</p>
                         )}
                       </div>
                     </Link>

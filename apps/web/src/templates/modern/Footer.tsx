@@ -152,7 +152,7 @@ export default function ModernFooter({
               <h3 className="hidden md:block text-xl font-bold text-foreground">{displayName}</h3>
             )}
             {displayDescription && (
-              <p className="text-foreground/60 text-sm leading-relaxed">{displayDescription}</p>
+              <p className="text-foreground/70 text-sm leading-relaxed">{displayDescription}</p>
             )}
 
             {/* Social Icons */}
@@ -191,7 +191,7 @@ export default function ModernFooter({
                     <li key={link.href}>
                       <Link
                         href={link.href}
-                        className="text-sm text-foreground/60 hover:text-foreground transition-colors duration-300 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+                        className="text-sm text-foreground/70 hover:text-foreground transition-colors duration-300 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
                       >
                         {link.label}
                       </Link>
@@ -210,7 +210,7 @@ export default function ModernFooter({
                   <li key={item.href}>
                     <Link
                       href={item.href}
-                      className="text-sm text-foreground/60 hover:text-foreground transition-colors duration-300 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+                      className="text-sm text-foreground/70 hover:text-foreground transition-colors duration-300 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
                     >
                       {isRtl && item.labelAr ? item.labelAr : item.label}
                     </Link>
@@ -232,10 +232,10 @@ export default function ModernFooter({
                   <li>
                     <a
                       href={`mailto:${contact.email}`}
-                      className="flex items-center gap-3 text-sm text-foreground/60 hover:text-foreground transition-colors duration-300 ease-out"
+                      className="flex items-center gap-3 text-sm text-foreground/70 hover:text-foreground transition-colors duration-300 ease-out"
                     >
                       <svg
-                        className="w-4 h-4 shrink-0 text-foreground/55"
+                        className="w-4 h-4 shrink-0 text-foreground/70"
                         fill="none"
                         stroke="currentColor"
                         viewBox="0 0 24 24"
@@ -256,11 +256,11 @@ export default function ModernFooter({
                   <li>
                     <a
                       href={`tel:${contact.phone}`}
-                      className="flex items-center gap-3 text-sm text-foreground/60 hover:text-foreground transition-colors duration-300 ease-out"
+                      className="flex items-center gap-3 text-sm text-foreground/70 hover:text-foreground transition-colors duration-300 ease-out"
                       dir="ltr"
                     >
                       <svg
-                        className="w-4 h-4 shrink-0 text-foreground/55"
+                        className="w-4 h-4 shrink-0 text-foreground/70"
                         fill="none"
                         stroke="currentColor"
                         viewBox="0 0 24 24"
@@ -283,7 +283,7 @@ export default function ModernFooter({
                   (() => {
                     const mapIcon = (
                       <svg
-                        className="w-4 h-4 mt-0.5 shrink-0 text-foreground/55"
+                        className="w-4 h-4 mt-0.5 shrink-0 text-foreground/70"
                         fill="none"
                         stroke="currentColor"
                         viewBox="0 0 24 24"
@@ -309,14 +309,14 @@ export default function ModernFooter({
                           href={addressMapHref}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="flex items-start gap-3 text-sm text-foreground/60 hover:text-foreground transition-colors duration-300 ease-out"
+                          className="flex items-start gap-3 text-sm text-foreground/70 hover:text-foreground transition-colors duration-300 ease-out"
                         >
                           {mapIcon}
                           {displayAddress}
                         </a>
                       </li>
                     ) : (
-                      <li className="flex items-start gap-3 text-sm text-foreground/60">
+                      <li className="flex items-start gap-3 text-sm text-foreground/70">
                         {mapIcon}
                         {displayAddress}
                       </li>
@@ -335,7 +335,7 @@ export default function ModernFooter({
               {/* Body line — render store description when set; previously
                   was hardcoded demo copy. */}
               {displayDescription && (
-                <p className="text-sm text-foreground/60 leading-relaxed">{displayDescription}</p>
+                <p className="text-sm text-foreground/70 leading-relaxed">{displayDescription}</p>
               )}
               {subscribed ? (
                 <p className="text-sm text-primary font-medium">
@@ -349,7 +349,7 @@ export default function ModernFooter({
                     onChange={e => setEmail(e.target.value)}
                     placeholder={t('Email address', 'البريد الإلكتروني')}
                     aria-label={t('Email address', 'البريد الإلكتروني')}
-                    className="w-full px-4 py-2.5 bg-foreground/10 rounded-lg border border-white/10 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 text-sm text-foreground placeholder:text-foreground/55 transition-colors duration-300 ease-out"
+                    className="w-full px-4 py-2.5 bg-foreground/10 rounded-lg border border-white/10 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 text-sm text-foreground placeholder:text-foreground/70 transition-colors duration-300 ease-out"
                     dir={isRtl ? 'rtl' : 'ltr'}
                     required
                     disabled={submitting}
@@ -386,7 +386,7 @@ export default function ModernFooter({
               </h4>
               <ul className="space-y-3">
                 {branches.map(loc => (
-                  <li key={loc.id} className="text-sm text-foreground/60">
+                  <li key={loc.id} className="text-sm text-foreground/70">
                     <p className="text-foreground/90">{loc.name}</p>
                     {loc.mapsHref ? (
                       <a

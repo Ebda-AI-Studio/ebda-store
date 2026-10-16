@@ -100,7 +100,7 @@ export default function ElegantHeader({
           <button
             type="button"
             onClick={() => setIsMenuOpen(!isMenuOpen)}
-            className="md:hidden inline-flex h-11 w-11 items-center justify-center text-foreground/60 hover:text-foreground transition-colors duration-500 ease-out cursor-pointer"
+            className="md:hidden inline-flex h-11 w-11 items-center justify-center text-foreground/70 hover:text-foreground transition-colors duration-500 ease-out cursor-pointer"
             aria-label={t('Menu', 'القائمة')}
             aria-expanded={isMenuOpen}
           >
@@ -146,7 +146,7 @@ export default function ElegantHeader({
             <button
               type="button"
               onClick={() => setIsSearchOpen(!isSearchOpen)}
-              className="hidden md:inline-flex h-11 w-11 items-center justify-center text-foreground/50 hover:text-foreground transition-colors duration-500 ease-out cursor-pointer"
+              className="hidden md:inline-flex h-11 w-11 items-center justify-center text-foreground/70 hover:text-foreground transition-colors duration-500 ease-out cursor-pointer"
               aria-label={t('Search', 'بحث')}
             >
               <svg
@@ -169,13 +169,13 @@ export default function ElegantHeader({
                 can switch even when the rest of the actions row collapses. */}
             <LanguageSwitcher
               variant="compact"
-              className="text-foreground/60 hover:text-foreground"
+              className="text-foreground/70 hover:text-foreground"
             />
 
             {/* Account */}
             <Link
               href={isLoggedIn ? `${urlPrefix}/account` : `${urlPrefix}/auth/login`}
-              className="hidden md:inline-flex h-11 w-11 items-center justify-center text-foreground/50 hover:text-foreground transition-colors duration-500 ease-out cursor-pointer"
+              className="hidden md:inline-flex h-11 w-11 items-center justify-center text-foreground/70 hover:text-foreground transition-colors duration-500 ease-out cursor-pointer"
               aria-label={t('Account', 'الحساب')}
             >
               <svg
@@ -197,7 +197,7 @@ export default function ElegantHeader({
             {/* Cart */}
             <Link
               href={`${urlPrefix}/cart`}
-              className="relative hidden md:inline-flex h-11 w-11 items-center justify-center text-foreground/50 hover:text-foreground transition-colors duration-500 ease-out cursor-pointer"
+              className="relative hidden md:inline-flex h-11 w-11 items-center justify-center text-foreground/70 hover:text-foreground transition-colors duration-500 ease-out cursor-pointer"
               aria-label={t(`Cart (${cartItemCount})`, `السلة (${cartItemCount})`)}
             >
               <CartIcon className="w-5 h-5" strokeWidth={1} aria-hidden="true" />
@@ -229,7 +229,7 @@ export default function ElegantHeader({
         <div className="hidden pb-4 -mt-2" data-zone="mobile-search">
           <form onSubmit={handleSearch} className="relative">
             <svg
-              className="absolute top-1/2 -translate-y-1/2 start-3 w-5 h-5 text-foreground/40 pointer-events-none"
+              className="absolute top-1/2 -translate-y-1/2 start-3 w-5 h-5 text-foreground/70 pointer-events-none"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"

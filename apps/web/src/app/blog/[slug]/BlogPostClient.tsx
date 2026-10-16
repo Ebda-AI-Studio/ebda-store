@@ -53,7 +53,7 @@ export function BlogPostClient({ post }: { post: BlogDetail | null }) {
         <div className="mx-auto max-w-3xl px-4 sm:px-6 lg:px-8">
           {!post ? (
             <div className="text-center py-16">
-              <p className="text-foreground/60">
+              <p className="text-foreground/70">
                 {isRtl ? 'المقال غير موجود.' : 'Post not found.'}
               </p>
               <Link
@@ -69,11 +69,11 @@ export function BlogPostClient({ post }: { post: BlogDetail | null }) {
                 <Link
                   href={storeUrl('/blog')}
                   prefetch={false}
-                  className="text-sm font-semibold text-foreground/60 hover:text-foreground"
+                  className="text-sm font-semibold text-foreground/70 hover:text-foreground"
                 >
                   {isRtl ? '← المدونة' : '← Blog'}
                 </Link>
-                <p className="mt-6 text-xs text-foreground/55">
+                <p className="mt-6 text-xs text-muted-foreground">
                   {new Date(post.publishedAt ?? post.createdAt).toLocaleDateString(
                     intlLocale(isRtl ? 'ar' : 'en', numerals),
                     { year: 'numeric', month: 'long', day: 'numeric' }

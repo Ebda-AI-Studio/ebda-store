@@ -215,7 +215,7 @@ export default function DahabFooter({
           )}
         >
           <DahabPaymentMarks />
-          <p className="text-xs text-foreground/60">
+          <p className="text-xs text-foreground/70">
             © {year} {name}
           </p>
         </div>

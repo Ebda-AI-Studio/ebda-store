@@ -170,7 +170,7 @@ export default function ClassicHeader({
             <div className="flex items-center gap-4">
               <button
                 onClick={() => document.getElementById('classic-search-input')?.focus()}
-                className="cursor-pointer text-foreground/60 hover:text-foreground transition-colors duration-500"
+                className="cursor-pointer text-foreground/70 hover:text-foreground transition-colors duration-500"
                 aria-label={t('Search', 'بحث')}
               >
                 <svg
@@ -193,7 +193,7 @@ export default function ClassicHeader({
 
               <Link
                 href={isLoggedIn ? `${urlPrefix}/account` : `${urlPrefix}/auth/login`}
-                className="text-foreground/60 hover:text-foreground transition-colors duration-500"
+                className="text-foreground/70 hover:text-foreground transition-colors duration-500"
                 aria-label={t('Account', 'الحساب')}
               >
                 <svg
@@ -213,7 +213,7 @@ export default function ClassicHeader({
               </Link>
               <Link
                 href={`${urlPrefix}/cart`}
-                className="relative text-foreground/60 hover:text-foreground transition-colors duration-500 cursor-pointer"
+                className="relative text-foreground/70 hover:text-foreground transition-colors duration-500 cursor-pointer"
                 aria-label={t(`Cart (${cartItemCount} items)`, `سلة التسوق (${cartItemCount})`)}
               >
                 <CartIcon className="w-5 h-5" strokeWidth={1.5} aria-hidden="true" />
@@ -233,7 +233,7 @@ export default function ClassicHeader({
           <div className="flex md:hidden items-center gap-1">
             <Link
               href={`${urlPrefix}/cart`}
-              className="relative hidden md:inline-flex h-11 w-11 items-center justify-center text-foreground/60 hover:text-foreground transition-colors duration-500 cursor-pointer"
+              className="relative hidden md:inline-flex h-11 w-11 items-center justify-center text-foreground/70 hover:text-foreground transition-colors duration-500 cursor-pointer"
               aria-label={t('Cart', 'السلة')}
             >
               <CartIcon className="w-5 h-5" strokeWidth={1.5} aria-hidden="true" />

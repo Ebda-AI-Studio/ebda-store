@@ -237,7 +237,7 @@ export function BottomTabBar({ bottomBar, theme, navigation = [] }: BottomTabBar
                       : 'text-foreground'
                     : resolvedInactive
                       ? ''
-                      : 'text-foreground/60 hover:text-foreground'
+                      : 'text-foreground/70 hover:text-foreground'
                 }`}
                 style={tabColorStyle}
                 aria-current={active ? 'page' : undefined}
@@ -277,7 +277,7 @@ export function BottomTabBar({ bottomBar, theme, navigation = [] }: BottomTabBar
                   : 'text-foreground'
                 : resolvedInactive
                   ? ''
-                  : 'text-foreground/60 hover:text-foreground'
+                  : 'text-foreground/70 hover:text-foreground'
             }`}
             style={menuColorStyle}
           >
@@ -310,7 +310,7 @@ export function BottomTabBar({ bottomBar, theme, navigation = [] }: BottomTabBar
       closeLabel={t('Close menu', 'إغلاق القائمة')}
       className="bg-[hsl(var(--bg-section-alt))] text-foreground md:hidden"
       style={resolvedBg ? { backgroundColor: resolvedBg } : undefined}
-      titleClassName="text-xs font-semibold uppercase tracking-wider text-foreground/50"
+      titleClassName="text-sm font-semibold text-muted-foreground"
       bodyClassName="mx-auto w-full max-w-md px-4 pb-[calc(1rem+env(safe-area-inset-bottom))]"
     >
       <ul className="flex flex-col">

@@ -198,7 +198,7 @@ const PACK_STYLES: Record<TemplateId, PackStyles> = {
     sectionHeading:
       'text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-extralight tracking-[-0.01em] text-foreground leading-[1.1] text-balance',
     sectionSeeAll:
-      'text-sm font-light ui-caps-toggle tracking-[0.32em] text-foreground/60 hover:text-foreground transition-colors duration-[var(--duration-slower)]',
+      'text-sm font-light ui-caps-toggle tracking-[0.32em] text-foreground/70 hover:text-foreground transition-colors duration-[var(--duration-slower)]',
     heroOverlay: 'bg-gradient-to-b from-foreground/0 via-foreground/10 to-foreground/30',
     heroHeadline:
       'text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-extralight tracking-[-0.01em] drop-shadow-xl leading-[1.05]',

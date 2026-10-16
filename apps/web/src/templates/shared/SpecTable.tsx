@@ -55,7 +55,7 @@ export function SpecTable({ specifications, className = '' }: SpecTableProps) {
               key={row.label}
               className="grid grid-cols-[minmax(0,1fr)_minmax(0,1.5fr)] gap-3 px-4 py-2.5 text-sm"
             >
-              <dt className="text-foreground/65 font-medium">{label}</dt>
+              <dt className="text-foreground/70 font-medium">{label}</dt>
               <dd className="text-foreground">{value}</dd>
             </div>
           );

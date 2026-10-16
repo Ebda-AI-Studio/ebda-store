@@ -287,7 +287,7 @@ export function VariantSelector({
                       {!available && (
                         <span
                           aria-hidden="true"
-                          className="pointer-events-none absolute inset-0 text-foreground/50"
+                          className="pointer-events-none absolute inset-0 text-foreground/70"
                         >
                           <svg
                             className="h-full w-full"
