@@ -1160,6 +1160,7 @@ export function PageRenderer({
                 />
               ) : def.type === 'shop-the-look' ? (
                 <ShopTheLookSection
+                  sectionId={section.id}
                   settings={settings as ShopTheLookSettings}
                   blocks={section.blocks ?? []}
                   // Store-scoped pools only: an unknown or foreign id is absent, never rendered (C11).

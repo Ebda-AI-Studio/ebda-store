@@ -7,7 +7,9 @@
  * The piece rows are a PRODUCT RENDER PATH (C19, CLAUDE.md card paths): name, price, compare-at
  * and sold-out come through the same helpers as the cards (`toTemplateProduct`,
  * `getProductPricing`, `useLocalePrice`, `soldOutLabel`, the store's card-price switch). A row is
- * a link to the PDP and nothing else: no quick add, no "add the whole look" (Ruling B1-6).
+ * a link to the PDP and nothing else: no quick add, no "add the whole look" (Ruling B1-6). Each
+ * panel ends in one "Shop this look" link to `/looks/<section>/<look>`, the page that lists only
+ * that panel's pieces side by side with a size choice and an add each (W2a, amends B1-6).
  *
  * Products resolve against the store's own pool (the homepage fetch is store-scoped), so an
  * unknown or another store's id is simply absent and never renders (C11). A look with no piece
@@ -33,6 +35,7 @@ import { sectionBgStyle } from '../../templates/shared/section-bg';
 import { sectionSpacingClasses } from '../../templates/shared/section-spacing';
 import { EmptySectionHint } from '../render/EmptySectionHint';
 import { SectionHeader } from './SectionHeader';
+import { lookPanelPath } from '../../lib/shop-the-look';
 
 export interface ShopTheLookSettings extends SectionPaddingMaxWidthVisibility {
   heading?: string;
@@ -44,6 +47,7 @@ export interface ShopTheLookSettings extends SectionPaddingMaxWidthVisibility {
 const PANEL = 'w-[85%] shrink-0 snap-start sm:w-[45%] lg:w-[32%]';
 
 export function ShopTheLookSection({
+  sectionId,
   settings,
   blocks,
   products,
@@ -51,6 +55,8 @@ export function ShopTheLookSection({
   showPrice = true,
   cardLayout,
 }: {
+  /** The section's node id; with the block id it addresses the panel's own page. */
+  sectionId?: string;
   settings: ShopTheLookSettings;
   blocks: BlockNode[];
   /** The store's own product pool (store-scoped fetch). */
@@ -206,6 +212,18 @@ export function ShopTheLookSection({
                         {`${totalFrom ? `${from} ` : ''}${formatPrice(total)}`}
                       </bdi>
                     </p>
+                  )}
+                  {/* One entry to the whole outfit (W2a, Ahmad 2026-10-16): a quiet secondary
+                      link, not a second accent; the page beside it takes a size per piece. Not in
+                      the editor canvas, where links are inert anyway. */}
+                  {sectionId && !editorMode && (
+                    <Link
+                      href={storeUrl(lookPanelPath(sectionId, l.id))}
+                      data-part="shop-this-look"
+                      className="mt-4 inline-flex min-h-[44px] w-full items-center justify-center rounded-[var(--radius)] border border-input px-4 text-sm font-medium text-foreground transition-colors hover:bg-foreground/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    >
+                      {t('Shop this look', 'تسوّق هذا اللوك')}
+                    </Link>
                   )}
                 </article>
               </li>

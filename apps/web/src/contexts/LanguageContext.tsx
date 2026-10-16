@@ -318,6 +318,12 @@ export const translations = {
   'Shop the look': 'تسوّق اللوك',
   'Items in this look': 'قطع اللوك',
   'Look total': 'مجموع اللوك',
+  // W2a "Shop this look" page (amends Ruling B1-6); neutral noun forms (decision (e)).
+  'Shop this look': 'تسوّق هذا اللوك',
+  'Choose a size for each piece and add the ones you want.':
+    'اختيار المقاس لكل قطعة وإضافة القطع المطلوبة.',
+  'Choose the options above first': 'اختيار الخيارات أولًا',
+  'Personalise on the product page': 'التخصيص من صفحة المنتج',
 
   // Demo showroom bar (Rulings B1-11/B1-12) and its refusals (B1-13).
   'Demo store': 'متجر تجريبي',
