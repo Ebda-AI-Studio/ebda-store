@@ -18,6 +18,7 @@ import { parseAiJson } from './parse-ai-json';
 import { rethrowAsAppError } from './gemini-errors';
 import { recordUsage } from '../../services/ai.service';
 import { assertAiQuota } from '../ai-quota';
+import { inventedAttributeFilter } from './search-terms-attribute-filter';
 
 export interface SearchTermsInput {
   storeId: string;
@@ -93,8 +94,21 @@ export async function generateProductSearchTerms(
   if (!parsed || !Array.isArray(parsed.terms)) return null;
   // Split on the stored separators FIRST (as cleanSearchTerms will), so the PII gate sees
   // every piece that can end up stored, not a "words, 0101…" string it might pass whole.
+  // Enforced, not only asked for (I5): a gender / age / season word the product data never
+  // states is dropped. Source = everything the prompt showed the model.
+  const invented = inventedAttributeFilter(
+    [
+      input.product.name,
+      input.product.nameAr,
+      input.product.description,
+      input.product.descriptionAr,
+      ...input.categoryNames,
+    ]
+      .filter(Boolean)
+      .join(' ')
+  );
   const terms = parsed.terms
     .flatMap(t => (typeof t === 'string' ? t.split(/[,،\n]/) : []))
-    .filter(t => t.trim() && !isPersonalDataTerm(t) && !hasMixedScriptWord(t));
+    .filter(t => t.trim() && !isPersonalDataTerm(t) && !hasMixedScriptWord(t) && !invented(t));
   return cleanSearchTerms(terms.join(','));
 }

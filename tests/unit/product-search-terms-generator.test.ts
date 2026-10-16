@@ -139,6 +139,120 @@ describe('generateProductSearchTerms', () => {
     expect(buildSearchTermsPrompt(input)).toMatch(/gender, season or use/);
   });
 
+  describe('invented attributes are filtered deterministically (I5: gender, age, season)', () => {
+    const boot = {
+      ...input,
+      product: {
+        name: 'Half boot',
+        nameAr: 'هاف بوت',
+        description: null,
+        descriptionAr: 'هاف بوت شمواه برباط',
+      },
+      categoryNames: ['أحذية'],
+    };
+    it('drops the live-run failures when the product data states no gender', async () => {
+      // Live run 2026-10-16: "بوت رجالي" (run 2) and "حذاء نسائي" (run 1) on this boot.
+      generateContent.mockResolvedValue(
+        reply(
+          JSON.stringify({
+            terms: [
+              'هاف بوت',
+              'بوت رجالي',
+              'حذاء نسائي',
+              'boot nos',
+              'sandal 7erimy',
+              'mens boot',
+              'ankle boot',
+            ],
+          })
+        )
+      );
+      expect(await generateProductSearchTerms(boot, 'k', 'm')).toBe(
+        'هاف بوت, boot nos, ankle boot'
+      );
+    });
+
+    it('drops an unstated season or age group, in Arabic, Franco and English', async () => {
+      const tshirt = {
+        ...input,
+        product: {
+          name: 'Cotton t-shirt',
+          nameAr: 'تيشيرت قطن',
+          description: null,
+          descriptionAr: null,
+        },
+        categoryNames: [],
+      };
+      generateContent.mockResolvedValue(
+        reply(
+          JSON.stringify({
+            terms: [
+              'تيشيرت قطن',
+              'تيشيرت صيفي',
+              'tshirt sefy',
+              'summer tshirt',
+              'تيشيرت شتوي',
+              'kids tshirt',
+              'تيشيرت اطفال',
+              'teshert qotn',
+            ],
+          })
+        )
+      );
+      expect(await generateProductSearchTerms(tshirt, 'k', 'm')).toBe('تيشيرت قطن, teshert qotn');
+    });
+
+    it('keeps a group word the product data states, in any spelling of that group', async () => {
+      const slippers = {
+        ...input,
+        product: {
+          name: 'Summer slippers',
+          nameAr: 'شبشب حريمى',
+          description: null,
+          descriptionAr: null,
+        },
+        categoryNames: [],
+      };
+      generateContent.mockResolvedValue(
+        reply(
+          JSON.stringify({
+            terms: [
+              'شبشب حريمي',
+              'shebshab haremi',
+              'women slippers',
+              'شبشب صيفي',
+              'sefy',
+              'mens slippers',
+            ],
+          })
+        )
+      );
+      // FEMALE + SUMMER are stated (حريمى, Summer); MALE is not, even though the group test is per group.
+      expect(await generateProductSearchTerms(slippers, 'k', 'm')).toBe(
+        'شبشب حريمي, shebshab haremi, women slippers, شبشب صيفي, sefy'
+      );
+    });
+
+    it('catches article / lil- prefixed and plural feminine forms (للأطفال, السيدات, رجالية)', async () => {
+      generateContent.mockResolvedValue(
+        reply(
+          '{"terms":["هاف بوت","بوت للأطفال","بوت السيدات","سيدات","شنطة رجالية","بوت للشتاء","half boot"]}'
+        )
+      );
+      expect(await generateProductSearchTerms(boot, 'k', 'm')).toBe('هاف بوت, half boot');
+    });
+
+    it('a category name justifies the group (ملابس حريمي → women / نسائي)', async () => {
+      generateContent.mockResolvedValue(
+        reply('{"terms":["عبايه","women abaya","عباية نسائي","girls abaya"]}')
+      );
+      // input: categoryNames ['ملابس حريمي'] → FEMALE stated; "girls" is FEMALE too.
+      expect(await generateProductSearchTerms(input, 'k', 'm')).toBe(
+        'عبايه, women abaya, عباية نسائي, girls abaya'
+      );
+    });
+  });
+
   it('returns null when every term is dropped', async () => {
     generateContent.mockResolvedValue(reply('{"terms":["01012345678","  ", "a@b.co"]}'));
     expect(await generateProductSearchTerms(input, 'k', 'm')).toBeNull();
