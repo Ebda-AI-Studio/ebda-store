@@ -1304,7 +1304,7 @@ router.get('/:storeId/search/suggest', async (req: Request, res: Response, next:
     // the term is part of the cache key, so an unbounded term is unbounded
     // cache-key cardinality AND an unbounded ILIKE pattern).
     const trimmed = q.trim().slice(0, 100);
-    if (trimmed.length < 2) {
+    if (trimmed.length < 1) {
       res.json({ success: true, data: { suggestions: [] } });
       return;
     }

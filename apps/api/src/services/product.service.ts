@@ -2311,7 +2311,7 @@ export class ProductService {
    */
   static async getSuggestSuggestions(storeId: string, query: string, limit = 25) {
     const trimmed = (query ?? '').trim();
-    if (trimmed.length < 2) return { suggestions: [] as Array<unknown> };
+    if (trimmed.length < 1) return { suggestions: [] as Array<unknown> };
 
     // 25 is enough to actually scroll inside the typeahead's
     // max-h-[70vh] container — the previous cap of 8 made the

@@ -12,7 +12,7 @@
 -- database long before the application. The planner tests ran as the owner (BYPASSRLS), so they
 -- never saw it.
 --
--- Fix: ebda_product_search_ids(store, field, with_sku, only_active, include_deleted, patterns)
+-- Fix: ebda_product_search_ids(store, field, with_sku, only_active, include_deleted, word_start, patterns)
 -- returns the candidate product ids of ONE store. It is SECURITY DEFINER (owner-run, like every
 -- other ebda_* function, and for the same reason: the owner bypasses RLS, so the indexes are
 -- usable) and therefore checks its caller exactly as the policy does: the store id must equal the
@@ -31,6 +31,7 @@ CREATE OR REPLACE FUNCTION public.ebda_product_search_ids(
   p_with_sku boolean,
   p_only_active boolean,
   p_include_deleted boolean,
+  p_word_start boolean,
   p_patterns text[]
 )
 RETURNS SETOF text
@@ -43,9 +44,16 @@ DECLARE
   n int := coalesce(array_length(p_patterns, 1), 0);
   i int;
 BEGIN
-  -- The RLS policy's own predicate: only the store this transaction is scoped to.
-  IF p_store_id IS NULL
-     OR p_store_id IS DISTINCT FROM nullif(current_setting('app.current_store_id', true), '') THEN
+  -- The RLS policy's own predicate: only the store this transaction is scoped to. A session whose
+  -- role bypasses RLS anyway (the owner: migrations, scripts, owner-role test fixtures) is not
+  -- restricted by the policy, so it is not restricted here either; session_user cannot be forged
+  -- and ebda_app is neither superuser nor BYPASSRLS.
+  IF p_store_id IS NULL THEN
+    RETURN;
+  END IF;
+  IF p_store_id IS DISTINCT FROM nullif(current_setting('app.current_store_id', true), '')
+     AND NOT EXISTS (SELECT 1 FROM pg_catalog.pg_roles r
+                     WHERE r.rolname = session_user AND (r.rolsuper OR r.rolbypassrls)) THEN
     RETURN;
   END IF;
   -- searchTokens() caps a query at 8 words; refuse anything else rather than build a huge AND.
@@ -59,8 +67,20 @@ BEGIN
   ELSE
     RETURN;
   END IF;
+  -- p_word_start (Ruling SEARCH-T14-3): a query made only of words under 3 characters cannot use a
+  -- trigram index as a substring, so the caller sends PREFIX patterns ('ab%') and the word must
+  -- START a word of the document: `doc LIKE 'ab%' OR doc LIKE '% ab%'`. Both arms are
+  -- trigram-indexable (the blank before the word is part of the pg_trgm word boundary), so a
+  -- 20,000-product store answers in milliseconds instead of normalising every row. The SKU arm
+  -- becomes a SKU prefix.
   FOR i IN 1..n LOOP
-    IF coalesce(p_with_sku, false) THEN
+    IF coalesce(p_word_start, false) THEN
+      arms := arms || format(' AND (%s LIKE $1[%s] OR %s LIKE (''%% '' || $1[%s])', doc, i, doc, i);
+      IF coalesce(p_with_sku, false) THEN
+        arms := arms || format(' OR public.ebda_ar_norm(coalesce(p.sku, '''')) LIKE $1[%s]', i);
+      END IF;
+      arms := arms || ')';
+    ELSIF coalesce(p_with_sku, false) THEN
       arms := arms || format(
         ' AND (%s LIKE $1[%s] OR public.ebda_ar_norm(coalesce(p.sku, '''')) LIKE $1[%s])', doc, i, i);
     ELSE
@@ -76,5 +96,5 @@ BEGIN
 END
 $fn$;
 
-REVOKE ALL ON FUNCTION public.ebda_product_search_ids(text, text, boolean, boolean, boolean, text[]) FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION public.ebda_product_search_ids(text, text, boolean, boolean, boolean, text[]) TO ebda_app;
+REVOKE ALL ON FUNCTION public.ebda_product_search_ids(text, text, boolean, boolean, boolean, boolean, text[]) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.ebda_product_search_ids(text, text, boolean, boolean, boolean, boolean, text[]) TO ebda_app;

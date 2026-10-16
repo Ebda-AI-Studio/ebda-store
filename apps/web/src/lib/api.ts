@@ -1385,7 +1385,7 @@ class ApiClient {
         error: { code: 'NO_STORE', message: 'Store context not set' },
       } as ApiResponse<{ suggestions: SearchSuggestion[] }>;
     }
-    if (trimmed.length < 2) {
+    if (trimmed.length < 1) {
       return {
         success: true,
         data: { suggestions: [] as SearchSuggestion[] },

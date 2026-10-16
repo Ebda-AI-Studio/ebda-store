@@ -84,13 +84,16 @@ export function productSearchSql(
   // and scanned (and normalised) every row of the store. The function finds the candidate ids of
   // THIS store (it refuses any other) with the trigram indexes; this statement still reads
   // `products` as ebda_app, so RLS, status, soft-delete and ordering apply to the final rows.
-  const patterns = tokens.map(t => `%${escapeLike(t)}%`);
+  // A query made ONLY of words under 3 characters has no trigram to look up as a substring, so it
+  // matches the START of a word instead (SEARCH-T14-3); anything with a longer word is unchanged.
+  const wordStart = tokens.every(t => t.length < 3);
+  const patterns = tokens.map(t => (wordStart ? `${escapeLike(t)}%` : `%${escapeLike(t)}%`));
   // limit + 1: the extra row only says "there were more" (truncated).
   return Prisma.sql`SELECT p.id FROM products p
     WHERE p.store_id = ${storeId} ${deleted} ${status}
       AND p.id IN (SELECT public.ebda_product_search_ids(
         ${storeId}, ${opts.field === 'name' ? 'name' : 'all'}, ${withSku}, ${storefront},
-        ${opts.includeDeleted === true}, ${patterns}::text[]))
+        ${opts.includeDeleted === true}, ${wordStart}, ${patterns}::text[]))
     ORDER BY ${orderBy}
     LIMIT ${limit + 1}`;
 }
