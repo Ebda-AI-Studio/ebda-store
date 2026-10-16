@@ -342,6 +342,15 @@ describe('assertEmbeddingConfig (boot check)', () => {
     vi.stubEnv('CF_AI_API_TOKEN', 'tok');
     expect(assertEmbeddingConfig(log())).toEqual({ provider: 'rest', semantic: true });
   });
+  it('uses the same resolution as getEmbeddingProvider, test override included (review M4)', () => {
+    vi.stubEnv('SEARCH_SEMANTIC_ENABLED', 'true');
+    setEmbeddingProviderForTests({ model: EMBED_MODEL, embed: async () => [] });
+    expect(assertEmbeddingConfig(log())).toEqual({ provider: 'test', semantic: true });
+    withAi(async () => ({ data: [vec()] }));
+    setEmbeddingProviderForTests(null);
+    expect(getEmbeddingProvider()).toBeNull();
+    expect(() => assertEmbeddingConfig(log())).toThrow(/no embedding provider/);
+  });
   it('an unrecognised flag value is refused, not read as off', () => {
     vi.stubEnv('SEARCH_SEMANTIC_ENABLED', 'yes');
     expect(() => assertEmbeddingConfig(log())).toThrow(/SEARCH_SEMANTIC_ENABLED/);

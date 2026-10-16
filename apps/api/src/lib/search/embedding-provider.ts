@@ -28,7 +28,7 @@ export interface EmbeddingProvider {
   embed(texts: string[], opts?: EmbedOptions): Promise<number[][]>;
 }
 
-export type EmbeddingProviderKind = 'workers-ai' | 'rest' | 'none';
+export type EmbeddingProviderKind = 'workers-ai' | 'rest' | 'test' | 'none';
 
 export type EmbeddingErrorKind =
   | 'input' // an empty/whitespace text: fix the caller, never retry
@@ -209,9 +209,21 @@ export function setEmbeddingProviderForTests(p: EmbeddingProvider | null | undef
   override = p;
 }
 
+/** The ONE resolution order; the boot check's log and every caller read it from here. */
+function resolveEmbeddingProvider(): {
+  kind: EmbeddingProviderKind;
+  provider: EmbeddingProvider | null;
+} {
+  if (override !== undefined) return { kind: override ? 'test' : 'none', provider: override };
+  const binding = bindingProvider();
+  if (binding) return { kind: 'workers-ai', provider: binding };
+  const rest = restProvider();
+  if (rest) return { kind: 'rest', provider: rest };
+  return { kind: 'none', provider: null };
+}
+
 export function getEmbeddingProvider(): EmbeddingProvider | null {
-  if (override !== undefined) return override;
-  return bindingProvider() ?? restProvider();
+  return resolveEmbeddingProvider().provider;
 }
 
 export function semanticSearchEnabled(): boolean {
@@ -222,12 +234,6 @@ export function semanticSearchEnabled(): boolean {
 export function toHalfvecLiteral(v: number[]): string {
   check([v], 1);
   return `[${v.join(',')}]`;
-}
-
-function providerKind(): EmbeddingProviderKind {
-  if (cfBindings()?.AI) return 'workers-ai';
-  if (restCredentials()) return 'rest';
-  return 'none';
 }
 
 /**
@@ -249,7 +255,7 @@ export function assertEmbeddingConfig(log: { info: (obj: object, msg: string) =>
   const hasToken = Boolean(process.env.CF_AI_API_TOKEN);
   if (hasAcct !== hasToken)
     throw new Error('CF_AI_ACCOUNT_ID and CF_AI_API_TOKEN must be set together (or neither)');
-  const provider = providerKind();
+  const provider = resolveEmbeddingProvider().kind;
   if (flag === 'true' && provider === 'none')
     throw new Error(
       'SEARCH_SEMANTIC_ENABLED=true but no embedding provider: bind Workers AI (`"ai": { "binding": "AI" }`) ' +
