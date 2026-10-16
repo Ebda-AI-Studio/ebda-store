@@ -481,8 +481,10 @@ export interface HeroBannerProps {
    * corner. Absent / `'center'` = the centred overlay as before.
    */
   textAnchor?: 'center' | 'bottom-start';
-  /** Set by HeroSlider: the slide has fixed geometry, so the copy can never move under the photo. */
+  /** Set by HeroSlider: the slide has fixed geometry; its anchored copy shows on the photo from xl only. */
   inSlider?: boolean;
+  /** Set by HeroSlider: render ONLY the anchored copy as page text (under the track, below xl). */
+  copyOnly?: boolean;
   /**
    * Per-section typography zone override for the hero headline h1.
    * Resolved via resolveSectionZone() in HomePageContent and applied as

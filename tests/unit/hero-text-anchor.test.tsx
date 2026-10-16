@@ -3,7 +3,8 @@
  * - The scrim covers the text block only and is measured BY IMPORT (HERO_TEXT_SCRIM): white text
  *   over it over a white photo is >= 4.5:1, so the headline (>= 3:1) and the line both pass.
  * - A single banner puts the copy under the photo below `xl` (no scrim at all there) and over the
- *   photo's bottom-start corner from `xl`; a slide keeps it on the photo at every width.
+ *   photo's bottom-start corner from `xl`; a slider does the same (W2a fix round 1, I-1): the
+ *   active slide's copy sits under the track below `xl` and on the photo from `xl`.
  * - Absent / 'center' renders the centred overlay exactly as before (no copy block, no scrim).
  * - Atelier and Vitrine set it through their mix; Lookbook (collage) does not.
  */
@@ -109,25 +110,53 @@ describe('HeroBanner textAnchor', () => {
     expect(button).toContain('xl:bg-white xl:text-[#141414]');
   });
 
-  it('bottom-start in a slider: the copy stays on the photo with the scrim at every width', () => {
+  it('bottom-start in a slider: the copy is on the photo from xl ONLY (never on a phone/tablet slide)', () => {
     const html = render({ textAnchor: 'bottom-start', inSlider: true });
-    expect(html).toContain('data-anchor="corner"');
-    expect(html).not.toContain('data-hero-anchor');
     const copy = html.match(/<div[^>]*data-part="hero-copy"[^>]*>/)![0];
+    expect(copy).toContain('data-anchor="corner"');
+    // hidden below xl: a 390x292 / 820x299 slide could not keep >= 60% of the photo clear
+    expect(copy).toMatch(/class="[^"]*\bhidden\b[^"]*\bxl:block\b/);
     expect(copy).toContain(`rgb(${HERO_TEXT_SCRIM.rgb} / ${HERO_TEXT_SCRIM.alpha})`);
     expect(html.indexOf('data-part="hero-copy"')).toBeLessThan(html.indexOf('</section>'));
   });
 
-  it('the slider forwards the key and moves its dots off the button', () => {
+  it('copyOnly renders just the page-text copy, hidden from xl (HeroSlider below the track)', () => {
+    const html = render({ textAnchor: 'bottom-start', inSlider: true, copyOnly: true });
+    expect(html).not.toContain('<section');
+    expect(html).not.toContain('<img');
+    expect(html).toMatch(/^<div class="xl:hidden">/);
+    expect(html).toContain('data-anchor="stacked"');
+    expect(html).toMatch(/<h1[^>]*class="[^"]*text-foreground/);
+  });
+
+  it('the slider puts the active slide copy under the track below xl, the corner copy only from xl', () => {
     const html = renderToStaticMarkup(
       React.createElement(HeroSlider, {
-        slides: [slide, { ...slide, image: '/b.webp' }],
+        slides: [slide, { ...slide, image: '/b.webp', headline: 'Second slide' }],
         pack: 'qamar',
         textAnchor: 'bottom-start',
       } as never)
     );
-    expect(html.match(/data-anchor="corner"/g)?.length).toBe(2);
+    const corners = html.match(/<div[^>]*data-anchor="corner"[^>]*>/g) ?? [];
+    expect(corners).toHaveLength(2);
+    // RED on the old behaviour: no corner copy may be visible below xl
+    for (const c of corners) expect(c).toMatch(/class="[^"]*\bhidden\b[^"]*\bxl:block\b/);
+    // exactly one below-track block, for the active (first) slide, after the photo track
+    const below = html.match(/<div class="xl:hidden">/g) ?? [];
+    expect(below).toHaveLength(1);
+    expect(html.lastIndexOf('data-anchor="stacked"')).toBeGreaterThan(html.lastIndexOf('<img'));
     expect(html).toContain('absolute bottom-4 end-4 z-20');
+  });
+
+  it('a centred slider keeps its dots where they were (unchanged markup)', () => {
+    const html = renderToStaticMarkup(
+      React.createElement(HeroSlider, {
+        slides: [slide, { ...slide, image: '/b.webp' }],
+        pack: 'qamar',
+      } as never)
+    );
+    expect(html).not.toContain('xl:hidden');
+    expect(html).toContain('absolute bottom-4 left-1/2 z-20 flex -translate-x-1/2');
   });
 
   it('Arabic copy anchors at the inline start of an RTL hero', () => {

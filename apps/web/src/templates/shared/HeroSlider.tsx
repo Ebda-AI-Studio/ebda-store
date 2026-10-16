@@ -112,6 +112,37 @@ export function HeroSlider({
     goTo(activeIndex + (isRtl ? -dir : dir));
   };
 
+  const anchoredBelow = textAnchor === 'bottom-start';
+  // Pagination dots. With the copy anchored bottom-start they sit in the track's inline-end corner.
+  const dots = (
+    <div
+      // Copy anchored bottom-start: the dots move to the inline-end corner, off the button.
+      className={
+        textAnchor === 'bottom-start'
+          ? 'absolute bottom-4 end-4 z-20 flex items-center gap-2'
+          : 'absolute bottom-4 left-1/2 z-20 flex -translate-x-1/2 items-center gap-2'
+      }
+      role="tablist"
+      aria-label={isRtl ? 'شرائح البانر الرئيسي' : 'Hero slides'}
+    >
+      {slides.map((_, i) => (
+        <button
+          key={i}
+          type="button"
+          role="tab"
+          aria-selected={i === activeIndex}
+          aria-label={
+            isRtl ? `الشريحة ${i + 1} من ${slides.length}` : `Slide ${i + 1} of ${slides.length}`
+          }
+          onClick={() => goTo(i)}
+          className={`h-2 rounded-full transition-[width,background-color,box-shadow] ${
+            i === activeIndex ? 'w-6 bg-white shadow-md' : 'w-2 bg-white/60 hover:bg-white/80'
+          }`}
+        />
+      ))}
+    </div>
+  );
+
   return (
     <section
       className="relative w-full overflow-hidden"
@@ -164,35 +195,23 @@ export function HeroSlider({
             />
           </div>
         ))}
+        {anchoredBelow && dots}
       </div>
-
-      {/* Pagination dots */}
-      <div
-        // Copy anchored bottom-start: the dots move to the inline-end corner, off the button.
-        className={
-          textAnchor === 'bottom-start'
-            ? 'absolute bottom-4 end-4 z-20 flex items-center gap-2'
-            : 'absolute bottom-4 left-1/2 z-20 flex -translate-x-1/2 items-center gap-2'
-        }
-        role="tablist"
-        aria-label={isRtl ? 'شرائح البانر الرئيسي' : 'Hero slides'}
-      >
-        {slides.map((_, i) => (
-          <button
-            key={i}
-            type="button"
-            role="tab"
-            aria-selected={i === activeIndex}
-            aria-label={
-              isRtl ? `الشريحة ${i + 1} من ${slides.length}` : `Slide ${i + 1} of ${slides.length}`
-            }
-            onClick={() => goTo(i)}
-            className={`h-2 rounded-full transition-[width,background-color,box-shadow] ${
-              i === activeIndex ? 'w-6 bg-white shadow-md' : 'w-2 bg-white/60 hover:bg-white/80'
-            }`}
-          />
-        ))}
-      </div>
+      {!anchoredBelow && dots}
+      {/* W2a fix round 1 (I-1): below xl the active slide's copy sits under the track as page
+          text, so the slides keep >= 60% of the photo clear on phones and tablets too. */}
+      {anchoredBelow && slides[activeIndex] && (
+        <HeroBanner
+          {...slides[activeIndex]}
+          isRtl={isRtl}
+          pack={pack}
+          textAnchor={textAnchor}
+          inSlider
+          copyOnly
+          headingZone={headingZone}
+          urlPrefix={urlPrefix}
+        />
+      )}
     </section>
   );
 }

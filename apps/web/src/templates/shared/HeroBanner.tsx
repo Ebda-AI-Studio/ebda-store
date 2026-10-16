@@ -52,6 +52,7 @@ export function HeroBanner({
   frameLine = false,
   textAnchor,
   inSlider = false,
+  copyOnly = false,
   headingZone,
   urlPrefix,
 }: HeroBannerProps) {
@@ -91,7 +92,9 @@ export function HeroBanner({
   // headline and a button over less than 40% of the photo); a slide keeps fixed geometry, so its
   // copy stays on the photo at every width.
   const anchored = textAnchor === 'bottom-start' && showOverlay;
-  const stacked = anchored && !inSlider;
+  // W2a fix round 1 (I-1): a slider keeps its slides' geometry, so below xl its copy is rendered
+  // under the track by HeroSlider (`copyOnly`), and the copy on the photo shows from xl only.
+  const stacked = anchored && (!inSlider || copyOnly);
 
   // Store-slug prefix (relative internal links only — see urlPrefix doc on
   // HeroBannerProps) so the CTA keeps store context on a platform host.
@@ -190,7 +193,7 @@ export function HeroBanner({
                 ? `px-1 sm:px-0 ${drawFrame ? 'xl:rounded-b-[var(--radius)]' : 'xl:rounded-b-2xl'}`
                 : 'px-5 sm:px-8'
             )
-          : 'absolute inset-x-0 bottom-0 z-10 px-5 pb-5 pt-8 sm:px-10 sm:pb-7',
+          : 'absolute inset-x-0 bottom-0 z-10 hidden px-10 pb-7 pt-8 xl:block',
         'text-start'
       )}
       // The scrim paints only where the copy is on the photo.
@@ -348,6 +351,9 @@ export function HeroBanner({
       )}
     </section>
   );
+
+  // HeroSlider's below-the-track copy for the active slide (phones and tablets only).
+  if (copyOnly) return anchored ? <div className="xl:hidden">{anchoredCopy}</div> : null;
 
   // A stacked copy block follows the photo in flow (below xl) and is laid over its bottom from xl,
   // so the photo keeps its exact aspect and crop at every width.
