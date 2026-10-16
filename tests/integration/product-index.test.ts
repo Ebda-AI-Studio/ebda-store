@@ -41,7 +41,7 @@ const { setEmbeddingProviderForTests, EMBED_DIMS, EMBED_MODEL, EmbeddingError } 
 const { indexStore, findStaleProducts, storeIndexStatus, hasStaleProducts } =
   await import('../../apps/api/src/services/product-index.service');
 const { requestStoreReindex } = await import('../../apps/api/src/lib/search/reindex');
-const { handleSearchProductIndex, handleSearchIndexBackstop, INDEX_RETRIES } =
+const { handleSearchProductIndex, handleSearchIndexBackstop, INDEX_RETRIES, ISOLATE_CHUNK } =
   await import('../../apps/api/src/lib/inngest/functions/search-product-index');
 
 /** Deterministic fake: same text → same vector; counts calls. */
@@ -502,7 +502,7 @@ describe.skipIf(!hasDb)('product embedding indexer (Task 11)', () => {
       expect(await embeddingRow(good1)).toBeDefined();
       // (b) one more single retry after a durable backoff, in its own step; failing again = 24 h.
       expect(step.sleeps).toEqual(['backoff-0']);
-      expect([...step.memo.keys()].some(k => k.startsWith('retry-0'))).toBe(true);
+      expect([...step.memo.keys()].some(k => k.startsWith('retry-0-'))).toBe(true);
       expect(await failureRow(bad)).toMatchObject({ retryable: true, ttl_h: 24 });
       expect(quarantineAlerts()).toHaveLength(1);
       expect(quarantineAlerts()[0].context).toMatchObject({ permanent: 0, temporary: 1 });
@@ -591,6 +591,21 @@ describe.skipIf(!hasDb)('product embedding indexer (Task 11)', () => {
         productId,
         model
       );
+
+    it('review N-M3: the single pass runs in memoized steps of at most ISOLATE_CHUNK products', async () => {
+      const { s, bad } = await poisonStore('nm3');
+      for (let i = 0; i < 4; i++) await mkProduct(s, { name: `Extra ${i}` });
+      setEmbeddingProviderForTests(
+        poisonProvider(() => new EmbeddingError('input', 'rejected', { retryable: false })).provider
+      );
+      const step = fakeStep();
+      await asApp(() => handleSearchProductIndex({ event: { data: { storeId: s } }, step }));
+      const singleSteps = [...step.memo.entries()].filter(([k]) => k.startsWith('single-0-'));
+      expect(singleSteps.map(([k]) => k)).toEqual(['single-0-0', 'single-0-1']);
+      for (const [, out] of singleSteps)
+        expect((out as unknown[]).length).toBeLessThanOrEqual(ISOLATE_CHUNK);
+      expect(await failureRow(bad)).toMatchObject({ retryable: false });
+    });
 
     it('review N-M1: quarantining a product deletes its old vector (old words stop matching)', async () => {
       const { s, bad } = await poisonStore('nm1');

@@ -52,6 +52,15 @@ export const INDEX_BATCH = 25;
  * per step / 32 MiB per run (inngest.com/docs/usage-limits/inngest).
  */
 export const MAX_ROUNDS = 8;
+/**
+ * Products per memoized step in the single pass (review N-M3). Worst case per step: 5 × (the 15 s
+ * per-call timeout, EMBED_TIMEOUT_MS, + the 200 ms throttle) ≈ 76 s and ≤ ~50 KB of output. Inngest
+ * allows a step "up to 2 hours, subject to the function host's shorter timeout" and 4 MiB of output
+ * (inngest.com/docs/usage-limits/inngest); the host, a Worker HTTP request, has no wall-clock limit
+ * while Inngest stays connected but only a 20-minute grace when the runtime is updated
+ * (developers.cloudflare.com/workers/platform/limits). 76 s sits far inside both.
+ */
+export const ISOLATE_CHUNK = 5;
 /** Inngest retries per step; attempt numbers run 0..INDEX_RETRIES. */
 export const INDEX_RETRIES = 3;
 const FAN_OUT_CHUNK = 1000;
@@ -187,12 +196,21 @@ async function isolate(
   items: StaleDoc[],
   batchKind: string
 ): Promise<Settled> {
-  const singles = async (label: string, list: StaleDoc[]) =>
-    (await step.run(label, async () => {
-      const provider = getEmbeddingProvider();
-      if (!provider) throw new NonRetriableError('search-index: embedding provider went away');
-      return embedSingles(provider, list, embedThrottleMs());
-    })) as SingleResult[];
+  // Review N-M3: memoized steps of ISOLATE_CHUNK products, so no step holds 25 sequential calls.
+  const singles = async (label: string, list: StaleDoc[]) => {
+    const out: SingleResult[] = [];
+    for (let c = 0; c * ISOLATE_CHUNK < list.length; c++) {
+      const chunk = list.slice(c * ISOLATE_CHUNK, (c + 1) * ISOLATE_CHUNK);
+      out.push(
+        ...((await step.run(`${label}-${c}`, async () => {
+          const provider = getEmbeddingProvider();
+          if (!provider) throw new NonRetriableError('search-index: embedding provider went away');
+          return embedSingles(provider, chunk, embedThrottleMs());
+        })) as SingleResult[])
+      );
+    }
+    return out;
+  };
 
   const first = await singles(`single-${round}`, items);
   const again = retryableFailures(items, first);
