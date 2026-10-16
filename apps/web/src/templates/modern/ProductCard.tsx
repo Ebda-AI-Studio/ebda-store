@@ -36,7 +36,7 @@ import {
   resolveCardBadges,
 } from '../shared/custom-badge';
 import { PlaceholderImageIcon } from '../shared/icons';
-import { CompareButton, RemoveFromWishlistButton } from '../shared/card-actions';
+import { CompareButton, RemoveFromWishlistButton, cardActionLabel } from '../shared/card-actions';
 import { TaxInclusiveLabel } from '../shared/tax-inclusive-label';
 import { productCardPropsEqual } from '../shared/product-card-memo';
 import {
@@ -86,7 +86,7 @@ function ModernProductCard({
   showCardName,
   showCardPrice,
 }: ProductCardProps) {
-  const { isRtl: ctxIsRtl, t } = useLanguage();
+  const { isRtl: ctxIsRtl } = useLanguage();
   const { store, layout } = useStore();
   const renderNow = useRenderNow();
   // Ruling NUMERALS-1: Western digits unless the store opted in (Arabic only).
@@ -244,7 +244,7 @@ function ModernProductCard({
                 ? 'bg-destructive text-destructive-foreground scale-[1.05]'
                 : 'bg-white/95 text-foreground hover:bg-white hover:scale-[1.05]'
             )}
-            aria-label={t('Add to wishlist', 'إضافة للمفضلة')}
+            aria-label={cardActionLabel('wishlist-add', isRtl, displayName)}
             aria-pressed={isWishlisted}
           >
             <svg
@@ -382,6 +382,7 @@ function ModernProductCard({
           {onToggleCompare && (
             <CompareButton
               productId={product.id}
+              productName={displayName}
               isInCompare={isInCompare}
               onToggle={onToggleCompare}
               isRtl={isRtl}
@@ -390,6 +391,7 @@ function ModernProductCard({
           {onRemoveFromWishlist && (
             <RemoveFromWishlistButton
               productId={product.id}
+              productName={displayName}
               onRemove={onRemoveFromWishlist}
               isRtl={isRtl}
             />

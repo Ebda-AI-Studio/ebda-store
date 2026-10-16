@@ -230,6 +230,7 @@ function BoldProductCard({
           {onToggleCompare && (
             <CompareButton
               productId={product.id}
+              productName={isRtl && product.nameAr ? product.nameAr : product.name}
               isInCompare={isInCompare}
               onToggle={onToggleCompare}
               isRtl={isRtl}
@@ -238,6 +239,7 @@ function BoldProductCard({
           {onRemoveFromWishlist && (
             <RemoveFromWishlistButton
               productId={product.id}
+              productName={isRtl && product.nameAr ? product.nameAr : product.name}
               onRemove={onRemoveFromWishlist}
               isRtl={isRtl}
             />

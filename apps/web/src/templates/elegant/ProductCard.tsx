@@ -27,7 +27,7 @@ import {
   REGION,
   storeNumerals,
 } from '@ebda/shared';
-import { CompareButton, RemoveFromWishlistButton } from '../shared/card-actions';
+import { CompareButton, RemoveFromWishlistButton, cardActionLabel } from '../shared/card-actions';
 import { Price, ProductBadge, ProductBadgeGroup, cn } from '@ebda/ui';
 import { PlaceholderImageIcon } from '../shared/icons';
 import { TaxInclusiveLabel } from '../shared/tax-inclusive-label';
@@ -86,7 +86,7 @@ function ElegantProductCard({
   showCardName,
   showCardPrice,
 }: ProductCardProps) {
-  const { isRtl: ctxIsRtl, t } = useLanguage();
+  const { isRtl: ctxIsRtl } = useLanguage();
   const { store, layout } = useStore();
   const renderNow = useRenderNow();
   // Ruling NUMERALS-1: Western digits unless the store opted in (Arabic only).
@@ -228,7 +228,11 @@ function ElegantProductCard({
             'opacity-100 lg:opacity-0',
             (isHovered || isWishlisted) && 'lg:opacity-100'
           )}
-          aria-label={t('Add to wishlist', 'إضافة للمفضلة')}
+          aria-label={cardActionLabel(
+            'wishlist-add',
+            isRtl,
+            isRtl && product.nameAr ? product.nameAr : product.name
+          )}
           aria-pressed={isWishlisted}
         >
           <svg
@@ -289,6 +293,7 @@ function ElegantProductCard({
           {onToggleCompare && (
             <CompareButton
               productId={product.id}
+              productName={isRtl && product.nameAr ? product.nameAr : product.name}
               isInCompare={isInCompare}
               onToggle={onToggleCompare}
               isRtl={isRtl}
@@ -297,6 +302,7 @@ function ElegantProductCard({
           {onRemoveFromWishlist && (
             <RemoveFromWishlistButton
               productId={product.id}
+              productName={isRtl && product.nameAr ? product.nameAr : product.name}
               onRemove={onRemoveFromWishlist}
               isRtl={isRtl}
             />

@@ -37,6 +37,7 @@ import { AdaptiveAddButton, OosImageDim, OutOfStockRibbon, isProductNew } from '
 import { BrandPill } from './BrandPill';
 import { getDiscountBadgeColor } from './discount-badge';
 import { newBadgeCornerCls } from './badge-collision';
+import { cardActionLabel } from './card-actions';
 import { getCustomBadgeColor, getCustomBadgeTextColor, resolveCardBadges } from './custom-badge';
 import {
   lookCardCta,
@@ -323,7 +324,7 @@ function PecannbeeProductCardImpl({
       <button
         type="button"
         onClick={handleWishlist}
-        aria-label={t('Add to wishlist', 'إضافة للمفضلة')}
+        aria-label={cardActionLabel('wishlist-add', isRtl, name)}
         aria-pressed={isWishlisted}
         // Touch hitbox: the visual circle stays 40px (h-10 w-10, unchanged),
         // but before:-inset-1.5 grows the actual tap target to ~52px so it
