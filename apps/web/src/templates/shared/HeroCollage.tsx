@@ -52,10 +52,11 @@ export function HeroCollage({
   // Logical grid columns: in Arabic the lead photo starts on the right. LB-a: a gapped grid,
   // no overlap and no stroke (a background ring cut into the lead photo, and the near-equal
   // tops, 5px apart, read as accidental). The lead and the first side tile share a top edge;
-  // the second side tile closes the bottom. Each photo is a positioned frame for next/image.
+  // the second side tile closes the bottom; both side tiles are square (P2-10: 148 vs 111px read as
+  // accidental). Each photo is a positioned frame for next/image.
   const frames = [
     'col-span-4 col-start-1 aspect-[4/5]',
-    'col-span-2 col-start-5 self-start aspect-[3/4]',
+    'col-span-2 col-start-5 self-start aspect-square',
     'col-span-2 col-start-5 self-end aspect-square',
   ];
   const sizes = [

@@ -607,3 +607,24 @@ describe('hero collage tiles (LB-a)', () => {
     expect(src).toMatch(/className="grid grid-cols-6 gap-3 /);
   });
 });
+
+// Taste re-audit P2-10: after LB-a the two side tiles were 148 and 111px tall with an uneven gap,
+// which still read as accidental. The two side tiles share one shape; the gap between them is
+// what is left of the lead's height, the same on every width.
+describe('hero collage side tiles are equal (P2-10)', () => {
+  it('both side frames use one aspect ratio', async () => {
+    const { readFileSync } = await import('node:fs');
+    const { join } = await import('node:path');
+    const src = readFileSync(
+      join(__dirname, '../../apps/web/src/templates/shared/HeroCollage.tsx'),
+      'utf8'
+    );
+    const frames = /const frames = \[([\s\S]*?)\];/
+      .exec(src)![1]
+      .split(',')
+      .filter(f => f.includes('col-start-5'));
+    const ratios = frames.map(f => /aspect-[^\s']+/.exec(f)![0]);
+    expect(ratios.length).toBe(2);
+    expect(ratios[0]).toBe(ratios[1]);
+  });
+});
