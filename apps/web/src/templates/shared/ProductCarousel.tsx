@@ -24,6 +24,7 @@ import {
   ctaSizeClass,
 } from './card-size';
 import { AdaptiveAddButton, OosImageDim, OutOfStockRibbon, isProductNew } from './ProductCardCta';
+import { PecannbeeProductCard } from './PecannbeeProductCard';
 import {
   lookCardCta,
   lookCtaVisible,
@@ -38,7 +39,7 @@ import { BrandPill } from './BrandPill';
 import { useStore } from '../../contexts/StoreContext';
 import { useNumerals } from '../../hooks/useNumerals';
 import { useLocalePrice } from '../../hooks/useLocalePrice';
-import { getProductCardTextSizes, resolveColor } from '@ebda/shared';
+import { getLook, getProductCardTextSizes, resolveColor } from '@ebda/shared';
 import { cn } from '@ebda/ui';
 import type { ProductCarouselProps } from '../types';
 import { DahabProductCarousel } from '../dahab/ProductCarousel';
@@ -156,6 +157,7 @@ function SharedProductCarousel({
   const customBadgeColor = getCustomBadgeColor(cardDefaults?.customBadge?.color, store.theme);
   // Look card tokens (W2b); all legacy on a store with no look.
   const lookCta = lookCardCta(store.theme, layout);
+  const onLook = !!getLook(store.look);
   const ctaCls = lookCta === 'quiet' ? QUIET_CARD_CTA_CLS : styles.productCardCta;
   const chip = lookChip(store.theme);
   const customBadgeTextColor = getCustomBadgeTextColor(
@@ -390,6 +392,30 @@ function SharedProductCarousel({
             style={{ scrollbarWidth: 'thin' }}
           >
             {products.map((product, i) => {
+              // IA-08 (W4): on a look store the strip renders the SAME shared card as the grid
+              // (heart, name slot, chips, CTA token), so a page never shows two card dialects.
+              if (onLook)
+                return (
+                  <li
+                    key={product.id}
+                    className="snap-start shrink-0 w-[44vw] sm:w-[28vw] md:w-[22vw] lg:w-[19vw] xl:w-[17vw]"
+                  >
+                    <PecannbeeProductCard
+                      product={product}
+                      isRtl={isRtl}
+                      pack={pack}
+                      onAddToCart={onAddToCart}
+                      urlPrefix={urlPrefix}
+                      priority={i < 4}
+                      cardImageAspect={cardImageAspect}
+                      cardImageRadius={cardImageRadius}
+                      showCardName={showCardName}
+                      showCardPrice={showCardPrice}
+                      productNameZone={productNameZone}
+                      productPriceZone={productPriceZone}
+                    />
+                  </li>
+                );
               const name = pickLocalizedName(product, Boolean(isRtl)) ?? product.name;
               const href = `${urlPrefix}/products/${product.slug}`;
               const img = product.images?.[0]?.url;

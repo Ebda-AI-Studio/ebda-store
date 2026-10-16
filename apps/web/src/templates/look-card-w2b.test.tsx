@@ -543,3 +543,39 @@ describe('ProductCarousel autoplay (rule e)', () => {
     expect(strip.getAttribute('data-autoplay')).toBe('paused');
   });
 });
+
+// IA-08 part 2 (W4): grid cards had a heart and a semibold title, carousel cards neither: two card
+// dialects on one page. On a look store the carousel renders the SAME shared card as the grid.
+describe('one card anatomy on a look store: grid and carousel', () => {
+  it('the carousel item is the shared card (heart, name slot, chips) on a look', () => {
+    selectLook('qamar.lookbook');
+    const c = render(
+      React.createElement(
+        ProductCarousel as never,
+        {
+          products: [product('sale')],
+          isRtl: true,
+          pack: state.template,
+        } as never
+      )
+    ).container;
+    const li = c.querySelector('li')!;
+    expect(li.querySelector('article[itemtype="https://schema.org/Product"]')).toBeTruthy();
+    expect(li.querySelector('button[aria-pressed]')).toBeTruthy();
+    expect(li.querySelector('#prod-p-sale-name')).toBeTruthy();
+  });
+  it('no look: the carousel keeps its own card (no heart)', () => {
+    selectLook(null);
+    const c = render(
+      React.createElement(
+        ProductCarousel as never,
+        {
+          products: [product('sale')],
+          isRtl: true,
+          pack: 'minimal',
+        } as never
+      )
+    ).container;
+    expect(c.querySelector('li button[aria-pressed]')).toBeNull();
+  });
+});
