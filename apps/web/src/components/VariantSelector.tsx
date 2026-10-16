@@ -326,7 +326,7 @@ export function VariantSelector({
                                 : 'cursor-not-allowed border-input text-muted-foreground line-through opacity-50',
                           ].join(' ')
                         : [
-                            'relative min-w-[2.75rem] rounded-lg border px-3 py-2 text-sm font-medium transition-all',
+                            'relative min-w-[2.75rem] rounded-lg border px-3 py-2 text-sm font-medium transition',
                             thumbnail || dotColor ? 'inline-flex items-center gap-2' : '',
                             isSelected
                               ? 'border-primary bg-primary text-primary-foreground'

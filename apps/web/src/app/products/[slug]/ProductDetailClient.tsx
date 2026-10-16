@@ -1015,7 +1015,7 @@ export default function ProductDetailClient({
                     {images.map((_, i) => (
                       <span
                         key={i}
-                        className={`h-1.5 rounded-full transition-all ${
+                        className={`h-1.5 rounded-full transition-[width,background-color] ${
                           i === selectedImage ? 'w-4 bg-primary' : 'w-1.5 bg-foreground/30'
                         }`}
                       />

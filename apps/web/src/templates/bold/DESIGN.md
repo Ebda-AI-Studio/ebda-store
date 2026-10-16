@@ -122,7 +122,7 @@ inline-flex items-center gap-3 px-10 py-5
 bg-primary text-primary-foreground rounded-none
 font-black text-base uppercase tracking-wider
 hover:bg-primary/90 hover:scale-[1.02]
-transition-all duration-200
+transition duration-200
 shadow-2xl shadow-primary/30
 ```
 
@@ -195,7 +195,7 @@ Slides up from the bottom of the card, dark by default, lights up on hover.
 group block relative overflow-hidden rounded-2xl
 bg-background border-2 border-gray-950/10
 hover:border-primary hover:scale-[1.03]
-transition-all duration-200
+transition duration-200
 ```
 
 Note: `rounded-2xl` here is intentional — it gives the chunky border a softer geometric quality, like a printed sticker. Inside, the image stays `aspect-square` with `rounded-none`.

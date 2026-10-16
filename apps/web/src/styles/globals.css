@@ -319,7 +319,7 @@
 @layer components {
   /* Product Card */
   .product-card {
-    @apply relative overflow-hidden rounded-2xl border bg-card transition-all duration-300;
+    @apply relative overflow-hidden rounded-2xl border bg-card transition duration-300;
   }
 
   .product-card:hover {
@@ -354,7 +354,7 @@
 
   /* Add to Cart Button */
   .add-to-cart-btn {
-    @apply inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-6 py-3 text-sm font-semibold text-primary-foreground shadow-lg transition-all duration-200;
+    @apply inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-6 py-3 text-sm font-semibold text-primary-foreground shadow-lg transition duration-200;
     box-shadow: 0 4px 14px 0 hsl(var(--primary) / 0.35);
   }
 
@@ -383,7 +383,7 @@
 
   /* Category Card */
   .category-card {
-    @apply relative overflow-hidden rounded-2xl bg-gradient-to-br transition-all duration-300;
+    @apply relative overflow-hidden rounded-2xl bg-gradient-to-br transition duration-300;
   }
 
   .category-card:hover {
@@ -434,7 +434,7 @@
   /* Search Box — keep h-12 on mobile so the embedded input meets the 44px
      tap target; densify slightly to h-11 on desktop. */
   .search-box {
-    @apply flex h-12 w-full items-center gap-3 rounded-xl border border-input bg-card px-4 transition-all duration-200 sm:h-11;
+    @apply flex h-12 w-full items-center gap-3 rounded-xl border border-input bg-card px-4 transition duration-200 sm:h-11;
     @apply focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/20;
   }
 
@@ -534,7 +534,7 @@
   }
 
   .gallery-thumbnail {
-    @apply aspect-square cursor-pointer overflow-hidden rounded-xl border-2 border-transparent transition-all;
+    @apply aspect-square cursor-pointer overflow-hidden rounded-xl border-2 border-transparent transition;
   }
 
   .gallery-thumbnail:hover,
@@ -566,7 +566,7 @@
 
   /* Color Swatch */
   .color-swatch {
-    @apply h-8 w-8 cursor-pointer rounded-full border-2 border-transparent transition-all;
+    @apply h-8 w-8 cursor-pointer rounded-full border-2 border-transparent transition;
   }
 
   .color-swatch:hover,
@@ -576,7 +576,7 @@
 
   /* Size Selector */
   .size-option {
-    @apply flex h-10 min-w-[40px] cursor-pointer items-center justify-center rounded-lg border text-sm font-medium transition-all;
+    @apply flex h-10 min-w-[40px] cursor-pointer items-center justify-center rounded-lg border text-sm font-medium transition;
   }
 
   .size-option:hover {

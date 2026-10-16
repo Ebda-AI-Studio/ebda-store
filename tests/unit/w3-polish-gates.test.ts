@@ -34,3 +34,15 @@ describe('R-15: a text wordmark (store name zone) is never machine-translated', 
     expect(misses).toEqual([]);
   });
 });
+
+describe('M-04: no transition-all in the storefront (it animates layout and every future property)', () => {
+  it('storefront sources and globals.css name the properties they animate', () => {
+    const hits = [...files(), path.join(WEB, 'styles/globals.css')]
+      .filter(
+        f => !f.includes(`${path.sep}landing${path.sep}`) && !f.endsWith('liquid-glass-button.tsx')
+      )
+      .filter(f => /\btransition-all\b/.test(readFileSync(f, 'utf8').replace(/\/\/.*$/gm, '')))
+      .map(f => path.relative(WEB, f));
+    expect(hits).toEqual([]);
+  });
+});

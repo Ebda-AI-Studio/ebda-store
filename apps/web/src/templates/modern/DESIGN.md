@@ -4,7 +4,7 @@
 
 The Modern template is the friendly, contemporary default of the Force storefront family — a soft, approachable surface language built on rounded corners, gentle elevation, and a single warm gradient lift on the hero. It suits general-purpose retail (lifestyle, electronics, home goods, food, casual fashion) where the goal is conversion clarity rather than editorial mood. Cards lift on hover (`hover:-translate-y-0.5`), images zoom subtly (`group-hover:scale-105`), and the brand accent (Force Orange by default) appears as a soft halo behind the hero image, on the gradient headline text, and as a glowing CTA shadow (`shadow-primary/20`).
 
-Surfaces are predominantly `bg-background` and `bg-card` with translucent `border-border/60` hairlines. The header uses `bg-background/85 backdrop-blur-lg` (theme-token, not hardcoded white/slate) so it sits on top of content and always matches the store's surface colour — no clash when the OS prefers dark mode. The footer flips to `bg-gray-950 text-gray-300` to ground the page, with social tiles on `bg-white/8` and the brand color reserved for the newsletter CTA. Motion is consistent and bouncy: `transition-all duration-300`, the staggered grid fade-in (`fadeUp` keyframe with `--i` delay), and the `cartPulse` 700ms scale on cart count change.
+Surfaces are predominantly `bg-background` and `bg-card` with translucent `border-border/60` hairlines. The header uses `bg-background/85 backdrop-blur-lg` (theme-token, not hardcoded white/slate) so it sits on top of content and always matches the store's surface colour — no clash when the OS prefers dark mode. The footer flips to `bg-gray-950 text-gray-300` to ground the page, with social tiles on `bg-white/8` and the brand color reserved for the newsletter CTA. Motion is consistent and bouncy: `transition duration-300`, the staggered grid fade-in (`fadeUp` keyframe with `--i` delay), and the `cartPulse` 700ms scale on cart count change.
 
 **Key Characteristics:**
 
@@ -13,7 +13,7 @@ Surfaces are predominantly `bg-background` and `bg-card` with translucent `borde
 - Subtle elevation: `shadow-sm` resting → `shadow-xl` on hover with a `-translate-y-0.5` lift
 - Hero headline rendered with `bg-gradient-to-r from-primary via-primary/80 to-primary/60 bg-clip-text text-transparent`
 - Translucent header (`bg-white/80 backdrop-blur-lg`) becomes opaque-bordered on scroll
-- Bouncy animations: `transition-all duration-300`, `hover:scale-105` on product images, `cartPulse` 125% scale on add-to-cart
+- Bouncy animations: `transition duration-300`, `hover:scale-105` on product images, `cartPulse` 125% scale on add-to-cart
 - Footer is `bg-gray-950` — the only dark surface in the template, used for visual grounding
 - Plus Jakarta Sans body, semibold weight as the workhorse, no serif anywhere
 - Border weight is whisper-thin: `border border-border/60` (1px at 60% opacity)
@@ -101,7 +101,7 @@ All colors flow through `globals.css` CSS variables. Each tenant overrides `--pr
 inline-flex items-center gap-2.5 px-8 py-4 bg-primary text-primary-foreground rounded-xl
 hover:bg-primary/90 font-semibold text-base
 shadow-lg shadow-primary/20 hover:shadow-xl hover:shadow-primary/30
-hover:-translate-y-0.5 transition-all duration-300
+hover:-translate-y-0.5 transition duration-300
 ```
 
 **Order Summary CTA (Checkout)** (one label from `lib/checkout-cta.ts`, mirrored `ArrowIcon`, no coloured glow; C-03)
@@ -147,7 +147,7 @@ bg-destructive text-destructive-foreground scale-110
 ```
 group relative bg-background rounded-xl overflow-hidden border border-border/60
 hover:border-primary/20 hover:shadow-xl hover:shadow-black/5 hover:-translate-y-0.5
-transition-all duration-300 flex flex-col
+transition duration-300 flex flex-col
 ```
 
 **Cart Item Card**
@@ -254,14 +254,14 @@ Modern uses `@ebda/ui`'s `ProductBadge` with default styling — `rounded-full`,
 | CTA Glow | `shadow-lg shadow-primary/20` resting → `shadow-xl shadow-primary/30` hover | Hero primary button                       |
 | Drawer   | `shadow-2xl`                                                                | Mobile menu drawer                        |
 
-**Shadow Philosophy**: Modern uses shadows as a primary depth language alongside hairline borders. Hover always combines a shadow shift with a small `-translate-y-0.5` lift and a 300ms `transition-all`. The hero CTA has a colored shadow (`shadow-primary/20`) — this is the only place where the brand color enters the shadow system.
+**Shadow Philosophy**: Modern uses shadows as a primary depth language alongside hairline borders. Hover always combines a shadow shift with a small `-translate-y-0.5` lift and a 300ms `transition`. The hero CTA has a colored shadow (`shadow-primary/20`) — this is the only place where the brand color enters the shadow system.
 
 ## 7. Do's and Don'ts
 
 ### Do
 
 - Use `rounded-xl` for product/cart cards and `rounded-2xl` for larger panels (hero image, summary, form, empty state).
-- Pair every hover with a `transition-all duration-300` (or `duration-200` for color-only changes) — no instant snaps.
+- Pair every hover with a `transition duration-300` (or `duration-200` for color-only changes) — no instant snaps.
 - Lift surfaces with `hover:-translate-y-0.5` paired with `hover:shadow-xl` for the signature bouncy feel.
 - Use `border-border/60` as the default hairline — never solid `border-border`.
 - Use `hsl(var(--primary))` (via `bg-primary`, `text-primary`, etc.) for ALL CTAs and brand accents — every tenant ships its own primary.
@@ -321,17 +321,17 @@ Modern uses `@ebda/ui`'s `ProductBadge` with default styling — `rounded-full`,
 - Hero text: `motion-safe:[animation:heroFadeIn_0.7s_ease-out_both]`, image lags by 150ms with `motion-safe:[animation:heroFadeIn_0.7s_ease-out_0.15s_both]`.
 - Product grid stagger: each card is wrapped in a div with `style={{ '--i': index }}` and `motion-safe:[animation:fadeUp_0.5s_ease-out_calc(var(--i)*60ms)_both]`. The keyframe and stagger logic lives in `globals.css` — do not re-declare.
 - Cart pulse: `setCartPulse(true)` on `cartItemCount > prevCartCount`, then `setTimeout(700)` to clear. The badge gets `transition-transform duration-200 ${cartPulse ? 'scale-125' : 'scale-100'}`.
-- Search expand: `overflow-hidden transition-all duration-300 ${isSearchOpen ? 'max-h-20 opacity-100 py-3 border-t border-border/60' : 'max-h-0 opacity-0 py-0'}` — max-height + opacity combo.
+- Search expand: `overflow-hidden transition-[max-height,opacity] duration-300 ${isSearchOpen ? 'max-h-20 opacity-100 py-3 border-t border-border/60' : 'max-h-0 opacity-0 py-0'}` — max-height + opacity combo.
 - ALWAYS pair with `motion-reduce:opacity-100` (or equivalent reset) so reduced-motion users see content without animation.
 
 ## 9. Agent Prompt Guide
 
-When generating new components for the Modern template, treat the existing `Header.tsx`, `Hero.tsx`, and `ProductCard.tsx` as the canonical reference. Use `rounded-xl` for compact surfaces and `rounded-2xl` for featured panels. Default the resting border to `border border-border/60` (1px hairline). Default the elevation to `shadow-sm` and lift to `shadow-xl shadow-black/5` plus `hover:-translate-y-0.5` on hover, transitioning with `transition-all duration-300 ease-out`. Type uses Plus Jakarta Sans (`font-sans` / `--font-sans`) — never `font-serif`. Workhorse weight is `font-semibold` (600); reserve `font-extrabold` for the hero headline (`text-4xl md:text-5xl lg:text-6xl tracking-tight letterSpacing:-0.02em` plus the `bg-gradient-to-r from-primary` clip-text treatment). All chromatic color flows through `hsl(var(--primary))` and friends — never hardcode hex. Status colors use `text-success`, `text-destructive`, `text-warning`, `text-info`. RTL is supported via `dir={isRtl ? 'rtl' : 'ltr'}` and `start-*`/`end-*` logical properties; mirror chevrons with `rotate-180` and arabic strings via `isRtl && nameAr ? nameAr : name`. Animations must respect `prefers-reduced-motion` — pair `motion-safe:[animation:…]` with `motion-reduce:opacity-100`. The footer is the ONE intentionally dark surface (`bg-gray-950 text-gray-300`) — do not lighten it.
+When generating new components for the Modern template, treat the existing `Header.tsx`, `Hero.tsx`, and `ProductCard.tsx` as the canonical reference. Use `rounded-xl` for compact surfaces and `rounded-2xl` for featured panels. Default the resting border to `border border-border/60` (1px hairline). Default the elevation to `shadow-sm` and lift to `shadow-xl shadow-black/5` plus `hover:-translate-y-0.5` on hover, transitioning with `transition duration-300 ease-out`. Type uses Plus Jakarta Sans (`font-sans` / `--font-sans`) — never `font-serif`. Workhorse weight is `font-semibold` (600); reserve `font-extrabold` for the hero headline (`text-4xl md:text-5xl lg:text-6xl tracking-tight letterSpacing:-0.02em` plus the `bg-gradient-to-r from-primary` clip-text treatment). All chromatic color flows through `hsl(var(--primary))` and friends — never hardcode hex. Status colors use `text-success`, `text-destructive`, `text-warning`, `text-info`. RTL is supported via `dir={isRtl ? 'rtl' : 'ltr'}` and `start-*`/`end-*` logical properties; mirror chevrons with `rotate-180` and arabic strings via `isRtl && nameAr ? nameAr : name`. Animations must respect `prefers-reduced-motion` — pair `motion-safe:[animation:…]` with `motion-reduce:opacity-100`. The footer is the ONE intentionally dark surface (`bg-gray-950 text-gray-300`) — do not lighten it.
 
 ### Quick Token Reference
 
 - Primary CTA: `bg-primary text-primary-foreground rounded-xl shadow-lg shadow-primary/20 hover:bg-primary/90 hover:shadow-xl hover:shadow-primary/30 hover:-translate-y-0.5`
-- Card frame: `bg-background rounded-xl border border-border/60 hover:border-primary/20 hover:shadow-xl hover:shadow-black/5 hover:-translate-y-0.5 transition-all duration-300`
+- Card frame: `bg-background rounded-xl border border-border/60 hover:border-primary/20 hover:shadow-xl hover:shadow-black/5 hover:-translate-y-0.5 transition duration-300`
 - Heading text: `text-foreground font-semibold` (cards/panels), `font-extrabold tracking-tight letterSpacing:-0.02em` (hero only)
 - Body text: `text-muted-foreground` (default secondary), `text-foreground/70 hover:text-foreground` (interactive nav)
 - Border (default): `border-border/60` — never solid `border-border`
@@ -340,6 +340,6 @@ When generating new components for the Modern template, treat the existing `Head
 
 ### Example Component Prompts
 
-- "Create a Modern product preview card on `bg-background` with `rounded-xl border border-border/60`, `aspect-[3/4]` image inside, `font-semibold` product name, `Price` component below, `hover:-translate-y-0.5 hover:shadow-xl hover:shadow-black/5 transition-all duration-300 ease-out`."
+- "Create a Modern product preview card on `bg-background` with `rounded-xl border border-border/60`, `aspect-[3/4]` image inside, `font-semibold` product name, `Price` component below, `hover:-translate-y-0.5 hover:shadow-xl hover:shadow-black/5 transition duration-300 ease-out`."
 - "Add a notification toast: `fixed bottom-4 right-4 rounded-xl border border-border/60 bg-card p-4 shadow-lg`, animation `animate-slide-in-right`, body in `text-sm`."
 - "Build a filter pill row: each pill is `rounded-full border border-border/60 bg-card px-3 py-1.5 text-sm font-medium text-foreground/70 hover:text-foreground hover:bg-muted`. Active state adds `bg-primary text-primary-foreground border-transparent`."

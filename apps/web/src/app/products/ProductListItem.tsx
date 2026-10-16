@@ -137,7 +137,7 @@ export function ProductListItem({
     <Link
       href={storeUrl(`/products/${product.slug}`)}
       /* boundary: card-frame (decoration, not a control) */
-      className="flex gap-4 rounded-2xl border border-border bg-card p-4 transition-all hover:border-primary/30 hover:shadow-lg"
+      className="flex gap-4 rounded-2xl border border-border bg-card p-4 transition hover:border-primary/30 hover:shadow-lg"
     >
       {/* Image */}
       <div className="relative h-32 w-32 flex-shrink-0 overflow-hidden rounded-xl bg-gradient-to-br from-primary/5 to-primary/10">
