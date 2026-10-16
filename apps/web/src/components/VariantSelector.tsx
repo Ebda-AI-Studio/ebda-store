@@ -240,9 +240,7 @@ export function VariantSelector({
               {selectedDisplay && (
                 <span className="text-sm text-muted-foreground">{selectedDisplay}</span>
               )}
-              {option.name === sizeGuideOption && (
-                <span className="-my-3 ms-auto">{sizeGuide}</span>
-              )}
+              {option.name === sizeGuideOption && <span className="-my-3 ms-2">{sizeGuide}</span>}
             </div>
             <div className="flex flex-wrap gap-2">
               {option.values.map(({ value, valueAr, swatchHex, swatchImageUrl }) => {

@@ -163,3 +163,11 @@ describe('L-08: the PDP category chip is the phone way back to the category, nev
     );
   });
 });
+
+describe('L-08: the size guide sits beside its label, not at the far edge', () => {
+  it('no ms-auto push on the size guide slot', () => {
+    const src = read('components/VariantSelector.tsx');
+    expect(src).not.toContain('<span className="-my-3 ms-auto">{sizeGuide}</span>');
+    expect(src).toContain('<span className="-my-3 ms-2">{sizeGuide}</span>');
+  });
+});
