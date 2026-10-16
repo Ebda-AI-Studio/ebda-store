@@ -196,7 +196,13 @@ describe('shop-the-look', () => {
     expect(html).toContain(`/products/${PRODUCTS[2].slug}`);
     expect(html).toContain('لوك الكتان');
     expect(html).toContain('كاجو');
-    expect(html).not.toMatch(/add-to-cart|data-cta|<button/i);
+    // The row's own prev/next pair (P2-13) is navigation, not a buy control.
+    expect(html.match(/<button[^>]*data-scroll-(prev|next)/g)).toHaveLength(2);
+    const buyable = html.replace(
+      /<button[^>]*data-scroll-(prev|next)[^>]*>[\s\S]*?<\/button>/g,
+      ''
+    );
+    expect(buyable).not.toMatch(/add-to-cart|data-cta|<button/i);
     expect(html).toContain('data-section="shop-the-look"');
   });
 
