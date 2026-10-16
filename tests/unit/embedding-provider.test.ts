@@ -79,6 +79,18 @@ describe('embedding provider', () => {
     );
     await expect(getEmbeddingProvider()!.embed(['x'])).rejects.toThrow(/success=false/);
   });
+  it('REST 200 with a non-JSON body never quotes the body (review M1)', async () => {
+    vi.stubEnv('CF_AI_ACCOUNT_ID', 'acc');
+    vi.stubEnv('CF_AI_API_TOKEN', 'tok');
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response('<html>proxy page leaked-value</html>', { status: 200 })
+    );
+    const err = await getEmbeddingProvider()!
+      .embed(['x'])
+      .catch((e: Error) => e);
+    expect(String(err)).toMatch(/embedding REST: non-JSON body/);
+    expect(String(err)).not.toMatch(/html|leaked-value/);
+  });
   it('the binding wins over REST credentials', async () => {
     vi.stubEnv('CF_AI_ACCOUNT_ID', 'acc');
     vi.stubEnv('CF_AI_API_TOKEN', 'tok');
