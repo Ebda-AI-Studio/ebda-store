@@ -844,12 +844,7 @@
 }
 
 .force-gradient-hero {
-  background: linear-gradient(
-    135deg,
-    hsl(36 36% 96%) 0%,
-    hsl(0 0% 100%) 40%,
-    hsl(36 36% 97%) 100%
-  );
+  background: linear-gradient(135deg, hsl(36 36% 96%) 0%, hsl(0 0% 100%) 40%, hsl(36 36% 97%) 100%);
 }
 
 /* RTL Utilities */
