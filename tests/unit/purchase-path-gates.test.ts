@@ -103,3 +103,15 @@ describe('IA-04: the cart summary carries one trust line, not two generic cards'
     expect(badges).not.toContain("t('We Accept', 'نقبل الدفع عبر')}\n      </p>");
   });
 });
+
+// a11y P1-9 (W4): an inline link told apart by colour alone (receipt "Contact support": 2.75:1
+// against its own sentence, no underline at rest) fails 1.4.1. On the purchase path a link or
+// text button that underlines on hover is underlined at rest too.
+describe('1.4.1: purchase-path text links are underlined at rest', () => {
+  it.each([...manifest.files, 'app/checkout/success/SuccessClient.tsx'])('%s', f => {
+    const hits = (src(f).match(/className="[^"]*\bhover:underline\b[^"]*"/g) ?? []).filter(
+      c => !/(?:^|[\s"])underline(?=[\s"])/.test(c.replace(/hover:underline/g, ''))
+    );
+    expect(hits).toEqual([]);
+  });
+});

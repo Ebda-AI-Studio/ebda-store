@@ -2326,7 +2326,7 @@ export default function CheckoutClient() {
                         <button
                           type="button"
                           onClick={handleClearSavedData}
-                          className="mt-2 ms-7 text-xs text-destructive-ink hover:underline"
+                          className="mt-2 ms-7 text-xs text-destructive-ink underline underline-offset-4"
                         >
                           {t(
                             'Clear saved data',
@@ -2353,7 +2353,7 @@ export default function CheckoutClient() {
                     <div className="hidden lg:flex mt-6 flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
                       <Link
                         href={storeUrl('/cart')}
-                        className="inline-flex min-h-11 items-center text-sm text-primary hover:underline"
+                        className="inline-flex min-h-11 items-center text-sm text-primary underline underline-offset-4"
                       >
                         {language === 'ar'
                           ? '\u0627\u0644\u0639\u0648\u062f\u0629 \u0625\u0644\u0649 \u0627\u0644\u0633\u0644\u0629 \u2192'
@@ -2478,7 +2478,7 @@ export default function CheckoutClient() {
               <div className="order-3 lg:hidden mt-4 flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
                 <Link
                   href={storeUrl('/cart')}
-                  className="inline-flex min-h-11 items-center text-sm text-primary hover:underline"
+                  className="inline-flex min-h-11 items-center text-sm text-primary underline underline-offset-4"
                 >
                   {language === 'ar' ? 'العودة إلى السلة →' : '← Return to cart'}
                 </Link>

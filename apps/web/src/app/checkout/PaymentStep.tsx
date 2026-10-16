@@ -80,7 +80,7 @@ export default function PaymentStep({
           <button
             type="button"
             onClick={onEditShipping}
-            className="text-sm text-primary hover:underline"
+            className="text-sm text-primary underline underline-offset-4"
           >
             {t('Edit', 'تعديل')}
           </button>
@@ -209,7 +209,7 @@ export default function PaymentStep({
         <button
           type="button"
           onClick={onEditShipping}
-          className="text-sm text-primary hover:underline"
+          className="text-sm text-primary underline underline-offset-4"
         >
           {language === 'ar' ? 'العودة إلى الشحن →' : '← Return to shipping'}
         </button>
