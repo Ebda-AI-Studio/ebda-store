@@ -35,12 +35,15 @@ CREATE EXTENSION IF NOT EXISTS vector;
 CREATE OR REPLACE FUNCTION public.ebda_product_embed_doc(
   p_name text, p_name_ar text, p_terms text, p_desc text, p_desc_ar text
 ) RETURNS text LANGUAGE sql IMMUTABLE PARALLEL SAFE AS $$
-  SELECT concat_ws(E'\n',
-    nullif(btrim(p_name_ar), ''),
-    nullif(btrim(p_name), ''),
-    nullif(btrim(p_terms), ''),
-    nullif(btrim(left(regexp_replace(p_desc_ar, '<[^>]*>', '', 'g'), 1500)), ''),
-    nullif(btrim(left(regexp_replace(p_desc, '<[^>]*>', '', 'g'), 1500)), '')
+  -- Only IMMUTABLE operators (||, coalesce, nullif, btrim, rtrim, left, regexp_replace): concat_ws
+  -- and array_to_string are STABLE, which would make the IMMUTABLE label a lie and stop inlining.
+  SELECT rtrim(
+    coalesce(nullif(btrim(p_name_ar), '') || E'\n', '') ||
+    coalesce(nullif(btrim(p_name), '') || E'\n', '') ||
+    coalesce(nullif(btrim(p_terms), '') || E'\n', '') ||
+    coalesce(nullif(btrim(left(regexp_replace(p_desc_ar, '<[^>]*>', '', 'g'), 1500)), '') || E'\n', '') ||
+    coalesce(nullif(btrim(left(regexp_replace(p_desc, '<[^>]*>', '', 'g'), 1500)), '') || E'\n', ''),
+    E'\n'
   )
 $$;
 

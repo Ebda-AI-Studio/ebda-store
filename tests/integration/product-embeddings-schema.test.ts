@@ -149,6 +149,16 @@ describe.skipIf(!hasDb)('product_embeddings', () => {
     expect(f).toEqual({ vol: 'i', secdef: false });
   });
 
+  it('embed doc is honestly IMMUTABLE: the planner inlines it (no STABLE call in its body)', async () => {
+    // Postgres inlines an IMMUTABLE sql function only when its body contains no mutable call, so a
+    // label that hides a STABLE function (concat_ws, array_to_string) leaves the call in the plan.
+    const plan = await prisma.$queryRaw<Array<{ 'QUERY PLAN': string }>>`
+      EXPLAIN (VERBOSE) SELECT public.ebda_product_embed_doc(p.name, p.name_ar, p.search_terms, p.description, p.description_ar)
+      FROM products p LIMIT 1`;
+    const text = plan.map(r => r['QUERY PLAN']).join('\n');
+    expect(text).not.toMatch(/ebda_product_embed_doc/);
+  });
+
   it('both FKs cascade and no table references product_embeddings (no NO ACTION child)', async () => {
     const fks = await prisma.$queryRaw<Array<{ col: string; ref: string; del: string }>>`
       SELECT kcu.column_name::text AS col, ccu.table_name::text AS ref, rc.delete_rule::text AS del
