@@ -281,6 +281,13 @@ describe('generateProductSearchTerms', () => {
     expect(await generateProductSearchTerms(input, 'k', 'm')).toBe('3abaya, عبايه');
   });
 
+  it('M3: folds Arabic Presentation Forms (NFKC) before the checks and before storage', async () => {
+    // ﻋﺒﺎﻳﺔ / ﺟﺰﻣﺔ are presentation-form glyphs (U+FExx); the SQL fold does not NFKC
+    // (Ruling SEARCH-2), so storing them raw would never match a shopper's query.
+    generateContent.mockResolvedValue(reply('{"terms":["ﻋﺒﺎﻳﺔabaya","ﺟﺰﻣﺔ","gazma"]}'));
+    expect(await generateProductSearchTerms(input, 'k', 'm')).toBe('جزمة, gazma');
+  });
+
   it('returns null when every term is dropped', async () => {
     generateContent.mockResolvedValue(reply('{"terms":["01012345678","  ", "a@b.co"]}'));
     expect(await generateProductSearchTerms(input, 'k', 'm')).toBeNull();

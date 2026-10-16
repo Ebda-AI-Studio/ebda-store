@@ -116,7 +116,9 @@ export async function generateProductSearchTerms(
       .join(' ')
   );
   const terms = parsed.terms
-    .flatMap(t => (typeof t === 'string' ? t.split(/[,،\n]/) : []))
+    // M3: NFKC first, so presentation-form glyphs (U+FB50–U+FEFF) become ordinary Arabic letters
+    // for every check below AND for storage (the SQL fold does not NFKC, Ruling SEARCH-2).
+    .flatMap(t => (typeof t === 'string' ? t.normalize('NFKC').split(/[,،\n]/) : []))
     .filter(
       t =>
         t.trim() &&
