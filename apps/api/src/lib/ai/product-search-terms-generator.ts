@@ -14,6 +14,7 @@
  */
 import { SEARCH_TERM_MAX_LENGTH, cleanSearchTerms, isPersonalDataTerm } from '@ebda/shared';
 import { GeminiFailoverClient } from './gemini-keys';
+import { z } from 'zod';
 import { parseAiJson } from './parse-ai-json';
 import { rethrowAsAppError } from './gemini-errors';
 import { recordUsage } from '../../services/ai.service';
@@ -70,6 +71,10 @@ function hasMixedScriptWord(term: string): boolean {
 const DOMAIN_LIKE =
   /[a-z0-9-]+\.(?:com|net|org|eg|me|io|ly|co|info|biz|shop|store|online|app|link|page)\b/i;
 
+const SearchTermsReply = z.object({
+  terms: z.array(z.string().max(200).nullable().catch(null)).max(100),
+});
+
 export async function generateProductSearchTerms(
   input: SearchTermsInput,
   apiKey: string,
@@ -93,13 +98,17 @@ export async function generateProductSearchTerms(
     { model: modelName }
   );
   // parseAiJson THROWS on a non-JSON reply; an unusable reply is "no words", not an error.
-  let parsed: { terms?: unknown } | null;
+  let raw: unknown;
   try {
-    parsed = parseAiJson<{ terms?: unknown }>(result.response.text());
+    raw = parseAiJson(result.response.text());
   } catch {
     return null;
   }
-  if (!parsed || !Array.isArray(parsed.terms)) return null;
+  // M4: Zod at the edge. Bounded before any split or filter: more than 100 items is not a
+  // usable reply; a non-string or over-long item is dropped on its own.
+  const parsed = SearchTermsReply.safeParse(raw);
+  if (!parsed.success) return null;
+  const replyTerms = parsed.data.terms.filter((t): t is string => t !== null);
   // Split on the stored separators FIRST (as cleanSearchTerms will), so the PII gate sees
   // every piece that can end up stored, not a "words, 0101…" string it might pass whole.
   // Enforced, not only asked for (I5): a gender / age / season word the product data never
@@ -115,10 +124,10 @@ export async function generateProductSearchTerms(
       .filter(Boolean)
       .join(' ')
   );
-  const terms = parsed.terms
+  const terms = replyTerms
     // M3: NFKC first, so presentation-form glyphs (U+FB50–U+FEFF) become ordinary Arabic letters
     // for every check below AND for storage (the SQL fold does not NFKC, Ruling SEARCH-2).
-    .flatMap(t => (typeof t === 'string' ? t.normalize('NFKC').split(/[,،\n]/) : []))
+    .flatMap(t => t.normalize('NFKC').split(/[,،\n]/))
     .filter(
       t =>
         t.trim() &&

@@ -288,6 +288,26 @@ describe('generateProductSearchTerms', () => {
     expect(await generateProductSearchTerms(input, 'k', 'm')).toBe('جزمة, gazma');
   });
 
+  describe('M4: the reply is validated with Zod at the edge', () => {
+    it('rejects a reply with more than 100 terms (bounded before split and filter)', async () => {
+      const terms = Array.from({ length: 101 }, (_, i) => `gazma ${i}`);
+      generateContent.mockResolvedValue(reply(JSON.stringify({ terms })));
+      expect(await generateProductSearchTerms(input, 'k', 'm')).toBeNull();
+    });
+
+    it('ignores an oversized or non-string item, keeps the valid ones', async () => {
+      generateContent.mockResolvedValue(
+        reply(JSON.stringify({ terms: ['gazma', 'x'.repeat(201), { t: 1 }, null, 'جزمه'] }))
+      );
+      expect(await generateProductSearchTerms(input, 'k', 'm')).toBe('gazma, جزمه');
+    });
+
+    it('rejects a reply whose terms is not an array or is missing', async () => {
+      generateContent.mockResolvedValue(reply('{"words":["gazma"]}'));
+      expect(await generateProductSearchTerms(input, 'k', 'm')).toBeNull();
+    });
+  });
+
   it('returns null when every term is dropped', async () => {
     generateContent.mockResolvedValue(reply('{"terms":["01012345678","  ", "a@b.co"]}'));
     expect(await generateProductSearchTerms(input, 'k', 'm')).toBeNull();
