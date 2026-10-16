@@ -17,6 +17,7 @@ import { CheckoutErrorAlert } from './CheckoutErrorAlert';
 import {
   orderLocale,
   personalisationRequiredCopy,
+  variantRequiredCopy,
   subscriptionRequiredCopy,
 } from './_lib/checkoutErrors';
 import { checkoutBundleErrorCopy } from '../../lib/checkout-bundle-errors';
@@ -1553,6 +1554,17 @@ export default function CheckoutClient() {
       const personalisationFriendly = personalisationRequiredCopy(code, details, t, language);
       if (personalisationFriendly) {
         setCheckoutError(personalisationFriendly);
+        setCheckoutErrorCartLink(true);
+        setStep(1);
+        setIsProcessing(false);
+        return;
+      }
+
+      // A sizeless line on a product that has sizes (cart written before the cart gate): name
+      // the item and link back to the cart; the size is chosen on the product page.
+      const variantFriendly = variantRequiredCopy(code, details, t, language);
+      if (variantFriendly) {
+        setCheckoutError(variantFriendly);
         setCheckoutErrorCartLink(true);
         setStep(1);
         setIsProcessing(false);

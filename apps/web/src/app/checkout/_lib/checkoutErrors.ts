@@ -64,3 +64,34 @@ export function personalisationRequiredCopy(
     )
     .join(' ');
 }
+
+/**
+ * `VARIANT_REQUIRED` at order creation: a cart line of a product with sizes/options carries none
+ * (written before the cart gate, FU46 M-6). The size is chosen on the product page, so the copy
+ * names the item(s) and the alert links back to the cart. Product names fall back across
+ * languages, never blank.
+ */
+export function variantRequiredCopy(
+  code: string,
+  details: unknown,
+  t: (en: string, ar: string) => string,
+  language: string
+): string | null {
+  if (code !== 'VARIANT_REQUIRED') return null;
+  const ar = language === 'ar';
+  const raw = (details as { products?: unknown } | null | undefined)?.products;
+  const names = ((Array.isArray(raw) ? raw : []) as { name?: string; nameAr?: string | null }[])
+    .map(p => (ar ? p.nameAr || p.name : p.name || p.nameAr) || '')
+    .filter(Boolean);
+  if (names.length === 0) {
+    return t(
+      'An item in your cart needs a size. Choose it on the product page.',
+      'يوجد منتج في سلتك يحتاج إلى اختيار المقاس. اختره من صفحة المنتج.'
+    );
+  }
+  const list = names.join(ar ? '، ' : ', ');
+  return t(
+    `Please choose a size for ${list} on its product page.`,
+    `يرجى اختيار المقاس لـ ${list} من صفحة المنتج.`
+  );
+}

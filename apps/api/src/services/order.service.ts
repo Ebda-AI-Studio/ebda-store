@@ -685,6 +685,10 @@ export class OrderService {
         id: true,
         trackInventory: true,
         costPrice: true,
+        name: true,
+        nameAr: true,
+        // Every variant row (disabled included): the sizeless-line gate below.
+        _count: { select: { variants: true } },
         categories: { select: { categoryId: true } },
         variants: {
           where: { id: { in: cartVariantIds } },
@@ -722,6 +726,29 @@ export class OrderService {
         'A product in your cart is no longer available. Remove it and try again.',
         { productIds: missingProductIds }
       );
+    }
+
+    // A variant product is sold as one of its variants (C-01). Cart writes enforce it, but a
+    // line written before C-01 (or merged in from an old guest cart) can still be sizeless, and
+    // with backorder on it would be sold with no size the warehouse can pick. Refuse it here,
+    // bilingual, naming the product, with the line ids so the cart can mark them (FU46 M-6).
+    const sizelessLines = cart.items.flatMap(item => {
+      const variantId = (item as { variantId?: string | null }).variantId;
+      const internals = productInternalsById.get(item.productId);
+      return !variantId && internals && internals._count.variants > 0
+        ? [{ productId: item.productId, name: internals.name, nameAr: internals.nameAr ?? null }]
+        : [];
+    });
+    if (sizelessLines.length > 0) {
+      const first = sizelessLines[0];
+      const messageEn = `Please choose a size for “${first.name}” before checking out`;
+      const messageAr = `يرجى اختيار المقاس لـ «${first.nameAr || first.name}» قبل إتمام الطلب`;
+      throw new AppError(400, 'VARIANT_REQUIRED', messageEn, {
+        messageEn,
+        messageAr,
+        productIds: sizelessLines.map(l => l.productId),
+        products: sizelessLines,
+      });
     }
 
     // A required personalisation is re-checked HERE, not only at add-to-cart:

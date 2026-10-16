@@ -22,6 +22,8 @@ import { describe, it, expect, beforeAll } from 'vitest';
 import request from 'supertest';
 import type { Express } from 'express';
 import { withRlsBypass } from '@ebda/database';
+import { CartService } from '@api/services/cart.service';
+import { OrderService } from '@api/services/order.service';
 import { errorHandler } from '@api/middleware/error-handler';
 import { API_BASE } from '../helpers/api-base';
 import {
@@ -31,6 +33,7 @@ import {
   seedProduct,
   cartClientFor,
   cartSessionId,
+  testShippingAddress,
   type FixtureStore,
 } from '../helpers/bundle-fixtures';
 
@@ -163,5 +166,32 @@ describe.skipIf(!hasDb)('cart refuses a variant product with no variant (VARIANT
     expect(await linesFor(headers['x-session-id'])).toEqual([
       { productId: sizedId, variantId, quantity: 1 },
     ]);
+  });
+
+  it('checkout refuses an OLD sizeless line on a variant product, bilingual, 0 orders (FU46 M-6)', async () => {
+    const sessionId = cartSessionId('varreq-legacy-line');
+    const cart = await CartService.getOrCreate(store.storeId, sessionId, undefined);
+    // A line written before C-01: variantId null on a product that has variants.
+    await withRlsBypass(tx =>
+      tx.cartItem.create({
+        data: { cartId: cart.id, productId: sizedId, variantId: null, quantity: 1 },
+      })
+    );
+    const err = await OrderService.create(store.storeId, undefined, sessionId, {
+      shippingAddress: testShippingAddress(),
+      paymentMethod: 'paymob',
+    }).then(
+      () => null,
+      (e: unknown) => e as { code?: string; statusCode?: number; details?: Record<string, unknown> }
+    );
+    expect(err?.code).toBe('VARIANT_REQUIRED');
+    expect(err?.statusCode).toBe(400);
+    expect(String(err?.details?.messageEn)).toMatch(/choose a size/i);
+    expect(String(err?.details?.messageAr)).toContain('المقاس');
+    expect(err?.details?.productIds).toEqual([sizedId]);
+    const orders = await withRlsBypass(tx =>
+      tx.order.count({ where: { storeId: store.storeId, items: { some: { productId: sizedId } } } })
+    );
+    expect(orders).toBe(0);
   });
 });
