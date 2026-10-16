@@ -406,3 +406,29 @@ describe('minimal/ProductCard chips (the Qamar search grid) follow cardBadge', (
     expect(c.getAttribute('style')).toContain('hsl(var(--accent))');
   });
 });
+
+// R-12 (W3): the card's photo link is its one tab stop to the product page; the name repeats it
+// for the pointer only, and a visible "View" names the product it opens.
+describe('PecannbeeProductCard keyboard stops (R-12)', () => {
+  it.each([null, 'qamar.atelier'])('%s', look => {
+    selectLook(look);
+    const c = render(
+      React.createElement(
+        PecannbeeProductCard as never,
+        {
+          product: product('sized'),
+          isRtl: true,
+          pack: state.template,
+        } as never
+      )
+    ).container;
+    const href = '/products/product-sized';
+    const stops = [...c.querySelectorAll<HTMLAnchorElement>(`a[href="${href}"]`)].filter(
+      a => a.tabIndex !== -1
+    );
+    const view = stops.find(a => a.getAttribute('data-cta'));
+    // photo link (+ the visible View when the look keeps one), never the name a second time
+    expect(stops.length).toBe(view ? 2 : 1);
+    if (view) expect(view.getAttribute('aria-label')).toBe('عرض منتج sized');
+  });
+});

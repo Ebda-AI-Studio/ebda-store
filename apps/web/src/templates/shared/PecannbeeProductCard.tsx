@@ -513,9 +513,11 @@ function PecannbeeProductCardImpl({
         {showLabel !== false && (nameVisible || priceVisible) && (
           <>
             {nameVisible && (
+              // R-12: the photo link is the card's tab stop; the name repeats it for the pointer.
               <Link
                 href={href}
                 prefetch={false}
+                tabIndex={-1}
                 className="focus:outline-none focus-visible:underline"
               >
                 <p
@@ -598,6 +600,7 @@ function PecannbeeProductCardImpl({
               ctaExtraCls
             )}
             data-cta="button"
+            aria-label={`${(isRtl ? resolvedCtaLabelTextAr : resolvedCtaLabelTextEn) ?? (isRtl ? 'عرض' : 'View')} ${name}`}
             style={{
               fontFamily: productCtaZone?.fontFamily,
               fontSize: responsiveFontSize(productCtaZone?.fontSize),
