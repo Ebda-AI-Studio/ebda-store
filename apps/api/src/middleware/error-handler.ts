@@ -204,12 +204,17 @@ export function errorHandler(err: Error, req: Request, res: Response, next: Next
   if (isZodError(err)) {
     logger.debug({ issues: err.issues }, 'Validation error');
     const details: Record<string, string[]> = {};
-    for (const issue of err.issues) {
-      const path = issue.path.join('.');
+    // A duck-typed ZodError (another zod copy) only promises an `issues` array: an issue
+    // without a `path` array is filed under the root key, never a 500 (review M-1).
+    for (const issue of err.issues as unknown[]) {
+      if (!issue || typeof issue !== 'object') continue;
+      const { path: rawPath, message } = issue as { path?: unknown; message?: unknown };
+      const path = Array.isArray(rawPath) ? rawPath.join('.') : '';
+      if (typeof message !== 'string') continue;
       if (!details[path]) {
         details[path] = [];
       }
-      details[path].push(issue.message);
+      details[path].push(message);
     }
 
     res.status(400).json({

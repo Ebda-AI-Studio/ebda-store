@@ -58,7 +58,15 @@ export function chunk<T>(items: readonly T[], size: number): T[][] {
  * The API's error text for a failed upload in the admin's language (a byte-sniff refusal
  * carries `details.messageEn` / `details.messageAr`), else its message, else `fallback`.
  */
-export function uploadErrorText(data: UploadResponse | undefined, fallback: string): string {
+export function uploadErrorText(
+  data:
+    | {
+        error?: { code?: string; message?: string; details?: Record<string, unknown> };
+      }
+    | null
+    | undefined,
+  fallback: string
+): string {
   const err = data?.error;
   return localizedApiMessage(err?.code, err?.message || fallback, err?.details);
 }

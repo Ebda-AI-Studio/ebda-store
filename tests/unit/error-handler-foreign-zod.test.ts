@@ -43,3 +43,20 @@ describe('ZodError detection across zod instances', () => {
     expect(isZodError(Object.assign(new Error('x'), { name: 'ZodError' }))).toBe(false);
   });
 });
+
+describe('a duck-typed ZodError whose issues carry no path (review M-1)', () => {
+  it('answers 400 with the message under the root key, never 500', async () => {
+    const app = express();
+    app.get('/x', () => {
+      throw Object.assign(new Error('x'), {
+        name: 'ZodError',
+        issues: [{ message: 'Required' }, { path: ['size', 0], message: 'Too small' }, null],
+      });
+    });
+    app.use(errorHandler);
+    const res = await request(app).get('/x');
+    expect(res.status).toBe(400);
+    expect(res.body.error.code).toBe('VALIDATION_ERROR');
+    expect(res.body.error.details).toEqual({ '': ['Required'], 'size.0': ['Too small'] });
+  });
+});
