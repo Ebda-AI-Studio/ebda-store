@@ -39,7 +39,7 @@ vi.mock('../../apps/api/src/services/alerts.service', () => ({
 
 const { setEmbeddingProviderForTests, EMBED_MODEL, EmbeddingError } =
   await import('../../apps/api/src/lib/search/embedding-provider');
-const { indexStore, findStaleProducts, storeIndexStatus, hasStaleProducts } =
+const { indexStore, findStaleProducts, storeIndexStatus, hasStaleProducts, writeEmbeddings } =
   await import('../../apps/api/src/services/product-index.service');
 const { requestStoreReindex } = await import('../../apps/api/src/lib/search/reindex');
 const { handleSearchProductIndex, handleSearchIndexBackstop, INDEX_RETRIES, ISOLATE_CHUNK } =
@@ -993,6 +993,65 @@ describe.skipIf(!hasDb)('SEARCH-T13-7: a second vector for the AI search words',
     expect((await runInStoreScope(s, () => findStaleProducts(s, 10))).map(x => x.id)).toEqual([p]);
     await runInStoreScope(s, () => indexStore(s, { retryBackoffMs: 0 }));
     expect(await row(p)).toMatchObject({ terms_hash: md5('shanta'), has_terms: true });
+  });
+
+  it('re-review M-R1: a doc-only edit (name) re-embeds ONLY the doc; the words vector is kept', async () => {
+    const s = await store('w8');
+    const p = await mkProduct(s, { name: 'Cup', nameAr: 'كوب', searchTerms: 'kobaya' });
+    const f = fakeProvider();
+    setEmbeddingProviderForTests(f.provider);
+    await runInStoreScope(s, () => indexStore(s));
+    const before = await row(p);
+    f.calls.length = 0;
+    await prisma.product.update({ where: { id: p }, data: { name: 'Big cup' } });
+    expect(await runInStoreScope(s, () => findStaleProducts(s, 10))).toMatchObject([
+      { id: p, needDoc: true, needWords: false },
+    ]);
+    await runInStoreScope(s, () => indexStore(s));
+    expect(f.calls).toEqual([['كوب\nBig cup']]);
+    const after = await row(p);
+    expect(after.content_hash).not.toBe(before.content_hash);
+    expect(after).toMatchObject({ terms_hash: before.terms_hash, has_terms: true });
+  });
+
+  it('re-review M-R1: a model change re-embeds BOTH vectors in one call', async () => {
+    const s = await store('w9');
+    const p = await mkProduct(s, { name: 'Lamp', nameAr: 'أباجورة', searchTerms: 'abajora' });
+    const f = fakeProvider();
+    setEmbeddingProviderForTests(f.provider);
+    await runInStoreScope(s, () => indexStore(s));
+    f.calls.length = 0;
+    await prisma.$executeRaw`UPDATE product_embeddings SET model = 'old-model' WHERE product_id = ${p}`;
+    expect(await runInStoreScope(s, () => findStaleProducts(s, 10))).toMatchObject([
+      { id: p, needDoc: true, needWords: true },
+    ]);
+    await runInStoreScope(s, () => indexStore(s));
+    expect(f.calls).toEqual([['أباجورة\nLamp', 'abajora']]);
+    expect(await row(p)).toMatchObject({ terms_hash: md5('abajora'), has_terms: true });
+    expect((await embeddingRow(p)).model).toBe(EMBED_MODEL);
+  });
+
+  it("re-review M-R3: a doc write under a NEW model drops the old model's words vector; the same model keeps it", async () => {
+    const s = await store('w10');
+    const p = await mkProduct(s, { name: 'Fan', nameAr: 'مروحة', searchTerms: 'marwa7a' });
+    setEmbeddingProviderForTests(fakeProvider().provider);
+    await runInStoreScope(s, () => indexStore(s));
+    const [{ hash }] = await prisma.$queryRaw<Array<{ hash: string }>>`
+      SELECT md5(public.ebda_product_embed_doc(name, name_ar, description, description_ar)) AS hash
+        FROM products WHERE id = ${p}`;
+    const lit = `[${new Array(1024).fill(0.02).join(',')}]`;
+    // same model: a doc-only write keeps the words vector
+    await runInStoreScope(s, () =>
+      writeEmbeddings(s, [{ id: p, hash, wordsHash: null, doc: lit }])
+    );
+    expect(await row(p)).toMatchObject({ has_terms: true, terms_hash: md5('marwa7a') });
+    // the row was built by another model: the doc write must not leave that model's words vector
+    await prisma.$executeRaw`UPDATE product_embeddings SET model = 'old-model' WHERE product_id = ${p}`;
+    await runInStoreScope(s, () =>
+      writeEmbeddings(s, [{ id: p, hash, wordsHash: null, doc: lit }])
+    );
+    expect(await row(p)).toMatchObject({ has_terms: false, terms_hash: null });
+    expect((await embeddingRow(p)).model).toBe(EMBED_MODEL);
   });
 
   it('budget: one provider call (charged once) carries both texts of a whole batch', async () => {
