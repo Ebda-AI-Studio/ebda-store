@@ -154,59 +154,97 @@ const ROOT = join(__dirname, '../..');
 
 /**
  * Hits the scanner cannot prove safe but that are gated on state that only exists after mount
- * (so no server HTML or hydrating render ever reaches them). Each names the gate; an entry
- * that stops matching fails the test, so this list cannot rot into a blanket exemption.
+ * (so no server HTML or hydrating render ever reaches them). Each names the gate and the exact
+ * source text of its ONE hit: an entry explains a hit only when the file, the kind AND the
+ * snippet on that line all match, and it must match exactly one hit. So a second render-time read
+ * of the same kind added to an allowlisted file is reported, not masked by the first one's entry,
+ * and an entry that stops matching fails the test, so this list cannot rot into a blanket
+ * exemption.
  */
-const GATED: Array<{ file: string; what: string; why: string }> = [
+type Gated = { file: string; what: string; snippet: string; why: string };
+const GATED: Gated[] = [
   {
     file: 'apps/admin/src/app/billing-events/_components/ManualPaymentForm.tsx',
     what: 'render-time new Date()',
+    snippet: 'const today = dayString(new Date());',
     why: 'modal mounted by a click (`form &&` in billing-events/page.tsx)',
   },
   {
     file: 'apps/admin/src/app/billing-events/_components/ManualRefundForm.tsx',
     what: 'render-time new Date()',
+    snippet: 'useState(dayString(new Date()))',
     why: 'modal mounted by a click (`refundTarget &&` in billing-events/page.tsx)',
   },
   {
     file: 'apps/admin/src/app/stores/[id]/billing/page.tsx',
     what: 'render-time new Date()',
+    snippet: 'const currentMonth = new Date().toISOString().slice(0, 7);',
     why: 'only read against `data`, which is fetched after mount (undefined on the hydrating render)',
   },
   {
     file: 'apps/admin/src/app/stores/[id]/orders/[orderId]/_components/PaymentCard.tsx',
     what: 'render-time Date.now()',
+    snippet: 'expiresAt.getTime() <= Date.now()',
     why: 'rendered only once the order is fetched client-side (page state starts null)',
   },
   {
     file: 'apps/admin/src/components/billing/UpsellDialog.tsx',
     what: 'render-time window.location.pathname',
+    snippet: 'billingHref(window.location.pathname,',
     why: '`if (!event) return null` above it; the event arrives after mount',
   },
   {
     file: 'apps/marketing/src/components/Product3D.tsx',
     what: 'render-time window.location.href',
+    snippet: "fallbackUrl: window.location.href.split('#')[0],",
     why: 'inside `showViewer`, which needs the `live` state set in an effect',
   },
 ];
 
+/** A hit is `<file>:<line> <what>`; `lineText` is that source line. */
+type Hit = { hit: string; lineText: string };
+const explains = (g: Gated, h: Hit) =>
+  h.hit.startsWith(g.file + ':') && h.hit.endsWith(g.what) && h.lineText.includes(g.snippet);
+
+/** Hits no entry explains, plus entries that do not explain exactly one hit. */
+export function auditGated(hits: Hit[], gated: Gated[]) {
+  return {
+    unexplained: hits.filter(h => !gated.some(g => explains(g, h))).map(h => h.hit),
+    badEntries: gated
+      .map(g => ({ file: g.file, snippet: g.snippet, n: hits.filter(h => explains(g, h)).length }))
+      .filter(e => e.n !== 1),
+  };
+}
+
 describe('no render-time window.location / Date in any Next app (B0-46)', () => {
   it('web, admin, orders and marketing render paths are clean', () => {
-    const hits = ['web', 'admin', 'orders', 'marketing'].flatMap(app =>
-      sourceFiles(join(ROOT, 'apps', app)).flatMap(f =>
-        scanSource(relative(ROOT, f), readFileSync(f, 'utf8'))
-      )
+    const hits: Hit[] = ['web', 'admin', 'orders', 'marketing'].flatMap(app =>
+      sourceFiles(join(ROOT, 'apps', app)).flatMap(f => {
+        const text = readFileSync(f, 'utf8');
+        const lines = text.split('\n');
+        return scanSource(relative(ROOT, f), text).map(hit => ({
+          hit,
+          lineText: lines[Number(/:(\d+) /.exec(hit)![1]) - 1] ?? '',
+        }));
+      })
     );
-    const unexplained = hits.filter(
-      h => !GATED.some(g => h.startsWith(g.file + ':') && h.endsWith(g.what))
-    );
+    const { unexplained, badEntries } = auditGated(hits, GATED);
     expect(unexplained).toEqual([]);
-    // every allowlist entry must still match a real hit
-    for (const g of GATED)
-      expect(
-        hits.some(h => h.startsWith(g.file + ':') && h.endsWith(g.what)),
-        g.file
-      ).toBe(true);
+    // every allowlist entry explains exactly one real hit
+    expect(badEntries).toEqual([]);
+  });
+
+  it('a second hit of the same kind in an allowlisted file is NOT masked by the first entry', () => {
+    const g = GATED[0];
+    const first = { hit: `${g.file}:68 ${g.what}`, lineText: `  ${g.snippet}` };
+    const second = { hit: `${g.file}:90 ${g.what}`, lineText: '  const later = new Date();' };
+    expect(auditGated([first], [g])).toEqual({ unexplained: [], badEntries: [] });
+    expect(auditGated([first, second], [g]).unexplained).toEqual([second.hit]);
+    // the same snippet twice (copy-pasted line) is two hits for one entry: refused too
+    const copy = { ...first, hit: `${g.file}:70 ${g.what}` };
+    expect(auditGated([first, copy], [g]).badEntries).toEqual([
+      { file: g.file, snippet: g.snippet, n: 2 },
+    ]);
   });
 
   describe('the scanner itself (mutations it must catch / cases it must leave alone)', () => {
