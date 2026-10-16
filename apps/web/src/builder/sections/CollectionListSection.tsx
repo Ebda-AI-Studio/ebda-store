@@ -10,7 +10,13 @@
 import React from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
-import type { BlockNode, SectionPaddingMaxWidthVisibility } from '@ebda/shared';
+import {
+  contrastRatio,
+  pickReadableForeground,
+  type BlockNode,
+  type SectionPaddingMaxWidthVisibility,
+  type StoreTheme,
+} from '@ebda/shared';
 import type { Category } from '@/lib/api';
 import { useStore, useStoreUrl } from '../../contexts/StoreContext';
 import { useLanguage } from '../../contexts/LanguageContext';
@@ -42,6 +48,31 @@ export const BAND_TONES = {
   line: 'bg-border text-foreground',
 } as const;
 const TONE_CYCLE = ['primary', 'accent', 'line'] as const;
+
+/** The theme keys each tone paints: [fill, text]. */
+const TONE_KEYS = {
+  primary: ['primaryColor', 'primaryForeground'],
+  accent: ['accentColor', 'accentForeground'],
+  line: ['borderColor', 'foregroundColor'],
+} as const satisfies Record<string, readonly [keyof StoreTheme, keyof StoreTheme]>;
+
+/**
+ * Task 8 review M4 (W2a): a band label is large display text, so its pair must read at >= 3:1 on
+ * every skin. A skin whose on-token falls short on its own fill (modern's white on orange is
+ * 2.81:1) gets the readable ink for that band instead; every pair that reads is left untouched.
+ */
+export function bandTextOverride(
+  tone: keyof typeof TONE_KEYS,
+  theme: Partial<StoreTheme> | undefined
+): string | undefined {
+  const [fillKey, textKey] = TONE_KEYS[tone];
+  const fill = theme?.[fillKey];
+  const text = theme?.[textKey];
+  if (typeof fill !== 'string' || typeof text !== 'string') return undefined;
+  const wrap = (v: string) => (v.startsWith('#') || v.startsWith('hsl(') ? v : `hsl(${v})`);
+  if (contrastRatio(wrap(fill), wrap(text)) >= 3) return undefined;
+  return pickReadableForeground(wrap(fill)) ?? undefined;
+}
 type BandTone = keyof typeof BAND_TONES;
 
 /** md+ columns for photo-led occasion tiles (VT-01): one row of up to four. */
@@ -143,14 +174,27 @@ export function CollectionListSection({
               key={tile.id}
               data-tone={tones[i]}
               className={`${BAND_TONES[tones[i]]} md:overflow-hidden md:rounded-[var(--radius)]`}
+              style={(() => {
+                const color = bandTextOverride(tones[i], store.theme);
+                return color ? { color } : undefined;
+              })()}
             >
               {/* Focus ring in the band's own text colour (its on-token, >= 4.5:1 on the fill by
-                  K-02), inset so it never sits on the neighbouring band (R-11). */}
+                  K-02), inset 4px so it never sits on the neighbouring band (R-11). The global
+                  :focus-visible ring is switched off here: it drew a second, offset ring that
+                  showed as a dark line at the band's edge (Task 8 deferred minor). */}
               <Link
                 href={tile.href}
                 data-band-link=""
-                className={`grid min-h-40 items-stretch transition-opacity duration-150 active:opacity-80 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-4 focus-visible:outline-current md:flex md:h-full md:min-h-0 md:flex-col ${tile.image ? 'grid-cols-2' : 'grid-cols-1'}`}
+                className={`grid min-h-40 items-stretch transition-opacity duration-150 active:opacity-80 group/band relative focus-visible:outline-none focus-visible:ring-0 focus-visible:ring-offset-0 md:flex md:h-full md:min-h-0 md:flex-col ${tile.image ? 'grid-cols-2' : 'grid-cols-1'}`}
               >
+                {/* The focus ring is a layer ABOVE the photo (an outline on the link would be
+                    painted under the positioned photo and frame only the label half). */}
+                <span
+                  aria-hidden="true"
+                  data-part="band-focus"
+                  className="pointer-events-none absolute inset-1 z-10 border-2 border-current opacity-0 group-focus-visible/band:opacity-100"
+                />
                 <span className="flex items-center gap-2 px-4 py-5 sm:px-6 md:order-2 md:px-5 md:py-4">
                   <span className="font-display text-3xl [text-wrap:balance] sm:text-4xl md:text-3xl">
                     {tile.label}

@@ -112,16 +112,6 @@ function authScope(email: string, storeId: string | null) {
 }
 
 /**
- * Find a user by email inside ONE namespace (`storeId` null = the admin
- * namespace) and read the row.
- *
- * `users` is under strict RLS and a login/forgot-password caller is not scoped
- * to anyone yet, so the id comes from the `ebda_auth_find_user_id` definer
- * (exact email + namespace, id only) and the row is then read AS that user —
- * `withUser` joins an ambient transaction for the same user, else opens a short
- * one. Soft-deleted users are excluded unless `includeDeleted`.
- */
-/**
  * Ruling B1-13: the demo showroom's seeded owner (`storedemo-owner@ebda.app`) has no mailbox and
  * no login. Account mail for it is never sent (a bounce hurts the sender's reputation); callers
  * answer exactly as for an unknown address, so nothing about the account is revealed.
@@ -133,6 +123,16 @@ async function ownsDemoStore(userId: string): Promise<boolean> {
   return row !== null;
 }
 
+/**
+ * Find a user by email inside ONE namespace (`storeId` null = the admin
+ * namespace) and read the row.
+ *
+ * `users` is under strict RLS and a login/forgot-password caller is not scoped
+ * to anyone yet, so the id comes from the `ebda_auth_find_user_id` definer
+ * (exact email + namespace, id only) and the row is then read AS that user —
+ * `withUser` joins an ambient transaction for the same user, else opens a short
+ * one. Soft-deleted users are excluded unless `includeDeleted`.
+ */
 async function findUserInScope<T extends Prisma.UserDefaultArgs>(
   email: string,
   storeId: string | null,

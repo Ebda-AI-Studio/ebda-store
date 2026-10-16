@@ -185,8 +185,15 @@ describe('occasion bands', () => {
     const links = [...bands().matchAll(/<a [^>]*class="([^"]*)"/g)].map(m => m[1]);
     expect(links).toHaveLength(3);
     for (const c of links)
-      expect(c).toContain(
-        'focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-4 focus-visible:outline-current'
+      // no second (global) ring outside the band (W2a, the dark line at the band edge)
+      expect(c).toContain('group/band relative focus-visible:outline-none focus-visible:ring-0');
+    // the ring is a 2px layer in the band's own text colour, inset 4px, ABOVE the photo (W2a:
+    // an outline on the link was painted under the positioned photo)
+    const rings = bands().match(/<span[^>]*data-part="band-focus"[^>]*>/g) ?? [];
+    expect(rings).toHaveLength(3);
+    for (const r of rings)
+      expect(r).toContain(
+        'absolute inset-1 z-10 border-2 border-current opacity-0 group-focus-visible/band:opacity-100'
       );
   });
 

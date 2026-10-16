@@ -972,7 +972,17 @@ router.post(
       const demoScope = (req.body ?? {}).storeId;
       if (typeof demoScope === 'string') await assertNotDemoStore(demoScope);
     } catch (error) {
-      next(error);
+      // Only the demo refusal itself is a 403. Any other failure of the guard (a store lookup
+      // that errors) answers like every other failure on this route: the generic 200 below
+      // (enumeration defence), never a 500 that differs by storeId (T9 review minor).
+      if (error instanceof AppError && error.code === 'DEMO_STORE') {
+        next(error);
+        return;
+      }
+      res.json({
+        success: true,
+        data: { message: 'If an account exists with this email, a reset link has been sent.' },
+      });
       return;
     }
     try {
