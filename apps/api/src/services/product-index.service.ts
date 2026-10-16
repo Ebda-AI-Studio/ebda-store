@@ -24,9 +24,8 @@ import {
 import logger from '../lib/logger';
 
 /** Must stay byte-identical across every query below: the hash is md5 of exactly this. */
-const DOC = Prisma.raw(
-  'public.ebda_product_embed_doc(p.name, p.name_ar, p.search_terms, p.description, p.description_ar)'
-);
+// A value-less Prisma.sql fragment (constant SQL, no Prisma.raw escape hatch).
+const DOC = Prisma.sql`public.ebda_product_embed_doc(p.name, p.name_ar, p.search_terms, p.description, p.description_ar)`;
 const STALE = Prisma.sql`(e.product_id IS NULL OR e.model <> ${EMBED_MODEL} OR e.content_hash <> md5(${DOC}))`;
 
 const DEFAULT_DAILY_CAP = 3000;
