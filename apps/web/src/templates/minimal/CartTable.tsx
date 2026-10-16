@@ -55,7 +55,7 @@ export default function MinimalCartTable({
               <div>
                 <Link
                   href={`${urlPrefix}/products/${item.slug}`}
-                  className="text-sm font-medium text-foreground hover:text-primary"
+                  className="inline-block relative min-w-11 before:absolute before:-inset-y-3 before:inset-x-0 before:content-[''] text-sm font-medium text-foreground hover:text-primary"
                   style={typography?.name}
                 >
                   {displayName}
@@ -114,7 +114,7 @@ export default function MinimalCartTable({
                   <button
                     type="button"
                     onClick={() => onRemove?.(item.id)}
-                    className="ms-4 inline-flex min-h-[44px] items-center text-sm hover:text-destructive-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-destructive cursor-pointer transition-colors duration-200"
+                    className="ms-4 inline-flex min-h-[44px] min-w-11 items-center justify-center text-sm hover:text-destructive-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-destructive cursor-pointer transition-colors duration-200"
                     aria-label={cartLineLabel('remove', isRtl, displayName)}
                     style={typography?.cta}
                   >

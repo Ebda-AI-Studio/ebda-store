@@ -56,7 +56,7 @@ export default function ElegantCartTable({
                 <div>
                   <Link
                     href={`${urlPrefix}/products/${item.slug}`}
-                    className="text-base font-light tracking-wide text-foreground hover:text-primary"
+                    className="inline-block relative min-w-11 before:absolute before:-inset-y-3 before:inset-x-0 before:content-[''] text-base font-light tracking-wide text-foreground hover:text-primary"
                     style={typography?.name}
                   >
                     {displayName}
@@ -87,7 +87,7 @@ export default function ElegantCartTable({
                 <button
                   type="button"
                   onClick={() => onRemove?.(item.id)}
-                  className="inline-flex min-h-[44px] items-center text-sm uppercase tracking-[0.2em] text-muted-foreground hover:text-destructive-ink underline underline-offset-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 cursor-pointer"
+                  className="inline-flex min-h-[44px] min-w-11 items-center justify-center text-sm uppercase tracking-[0.2em] text-muted-foreground hover:text-destructive-ink underline underline-offset-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 cursor-pointer"
                   aria-label={cartLineLabel('remove', isRtl, displayName)}
                   style={typography?.cta}
                 >

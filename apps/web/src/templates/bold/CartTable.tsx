@@ -56,7 +56,7 @@ export default function BoldCartTable({
                 <div>
                   <Link
                     href={`${urlPrefix}/products/${item.slug}`}
-                    className="font-black uppercase tracking-tight text-foreground hover:text-primary line-clamp-2"
+                    className="relative min-w-11 before:absolute before:-inset-y-3 before:inset-x-0 before:content-[''] font-black uppercase tracking-tight text-foreground hover:text-primary line-clamp-2"
                     style={typography?.name}
                   >
                     {displayName}

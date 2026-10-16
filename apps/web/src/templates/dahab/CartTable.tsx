@@ -51,7 +51,7 @@ export default function DahabCartTable({
                 <div className="min-w-0">
                   <Link
                     href={`${urlPrefix}/products/${item.slug}`}
-                    className="line-clamp-2 text-[15px] leading-snug text-foreground hover:text-primary"
+                    className="relative min-w-11 before:absolute before:-inset-y-3 before:inset-x-0 before:content-[''] line-clamp-2 text-[15px] leading-snug text-foreground hover:text-primary"
                     style={typography?.name}
                   >
                     {name}
@@ -115,7 +115,8 @@ export default function DahabCartTable({
                 <button
                   type="button"
                   onClick={() => onRemove?.(item.id)}
-                  className="min-h-[44px] text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  aria-label={cartLineLabel('remove', isRtl, name)}
+                  className="min-h-[44px] min-w-11 text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                   style={typography?.cta}
                 >
                   {t('Remove', 'حذف')}

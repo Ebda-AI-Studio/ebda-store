@@ -72,7 +72,7 @@ export default function ModernCartTable({
               <div>
                 <Link
                   href={`${urlPrefix}/products/${item.slug}`}
-                  className="line-clamp-2 font-semibold text-foreground hover:text-primary transition-colors"
+                  className="relative min-w-11 before:absolute before:-inset-y-3 before:inset-x-0 before:content-[''] line-clamp-2 font-semibold text-foreground hover:text-primary transition-colors"
                   style={typography?.name}
                 >
                   {displayName}

@@ -63,7 +63,7 @@ export default function ClassicCartTable({
                 <div>
                   <Link
                     href={`${urlPrefix}/products/${item.slug}`}
-                    className="font-medium text-foreground hover:text-primary tracking-tight"
+                    className="inline-block relative min-w-11 before:absolute before:-inset-y-3 before:inset-x-0 before:content-[''] font-medium text-foreground hover:text-primary tracking-tight"
                     style={typography?.name}
                   >
                     {displayName}
@@ -94,7 +94,7 @@ export default function ClassicCartTable({
                 <button
                   type="button"
                   onClick={() => onRemove?.(item.id)}
-                  className="inline-flex min-h-[44px] items-center text-base uppercase tracking-widest text-muted-foreground hover:text-destructive-ink transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-destructive cursor-pointer"
+                  className="inline-flex min-h-[44px] min-w-11 items-center justify-center text-base uppercase tracking-widest text-muted-foreground hover:text-destructive-ink transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-destructive cursor-pointer"
                   aria-label={cartLineLabel('remove', isRtl, displayName)}
                   style={typography?.cta}
                 >
