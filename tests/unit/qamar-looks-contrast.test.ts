@@ -13,8 +13,13 @@ const qamar = LOOKS.filter(l => l.template === 'qamar');
 // Every text pair a Qamar skin paints, beyond the generic set in looks-contrast.test.ts.
 const PAIRS: [string, (t: any) => [string, string]][] = [
   ['ink on surface', t => [t.surface, t.ink]],
-  ['accent text on surface (prices, active)', t => [t.surface, t.accent]],
-  ['onPrimary on accent (accentForeground)', t => [t.accent, t.onPrimary]],
+  // A look that declares `onAccent` uses its accent as a FILL only (VT-03): its text pair is
+  // onAccent on accent, and the accent never paints text, so the text-on-surface pair is waived.
+  [
+    'accent text on surface (prices, active)',
+    t => (t.onAccent ? [t.accent, t.onAccent] : [t.surface, t.accent]),
+  ],
+  ['accentForeground on accent', t => [t.accent, t.onAccent ?? t.onPrimary]],
   ['primary text on page (links, chips active)', t => [t.page, t.primary]],
 ];
 
@@ -148,8 +153,11 @@ describe('vitrine band text', () => {
   const t = LOOKS.find(l => l.id === 'qamar.vitrine')!.tokens;
   it('onPrimary on primary band', () =>
     expect(contrastRatio(t.primary, t.onPrimary)).toBeGreaterThanOrEqual(4.5));
-  it('onPrimary on accent band', () =>
-    expect(contrastRatio(t.accent, t.onPrimary)).toBeGreaterThanOrEqual(4.5));
+  it('ink on the dusty rose accent band (VT-03: the brief rose #C98B8B, 6.23:1)', () => {
+    expect(t.accent).toBe('#C98B8B');
+    expect(t.onAccent).toBe(t.ink);
+    expect(contrastRatio(t.accent, t.onAccent!)).toBeGreaterThanOrEqual(6.2);
+  });
   it('ink on champagne line band', () =>
     expect(contrastRatio(t.line, t.ink)).toBeGreaterThanOrEqual(4.5));
   it('champagne hairline ≥ the old line against the page (1.4.11 direction)', () =>
@@ -161,7 +169,7 @@ describe('vitrine band text', () => {
     >;
     const h = (v: string) => hexToHsl(v);
     expect(theme.borderColor).toBe(h(t.line));
-    expect(theme.accentForeground).toBe(h(t.onPrimary));
+    expect(theme.accentForeground).toBe(h(t.onAccent!));
     expect(theme.primaryForeground).toBe(h(t.onPrimary));
   });
 });

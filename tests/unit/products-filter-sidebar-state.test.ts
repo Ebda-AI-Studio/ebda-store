@@ -62,7 +62,8 @@ describe('filter panel is a quiet surface on every skin (Ruling B1-31)', () => {
   it('the panel, sheet and trigger paint the page surface + hairline, never a primary slab', () => {
     expect(src).not.toMatch(/bg-\[hsl\(var\(--primary\)\)\]/);
     expect(src).not.toMatch(/--primary-foreground\)/);
-    expect(src).toMatch(/lg:border lg:border-border lg:bg-\[hsl\(var\(--filter-bg\)\)\]/);
+    // VT-05 (W2a): the frame is an interactive boundary, so it reads --input (B1-43)
+    expect(src).toMatch(/lg:border lg:border-input lg:bg-\[hsl\(var\(--filter-bg\)\)\]/);
     expect(css).toMatch(
       /\[data-zone='filters'\] \{\s*--filter-bg: var\(--bg-page\);\s*--filter-fg: var\(--foreground\);/
     );

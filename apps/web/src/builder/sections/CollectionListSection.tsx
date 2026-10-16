@@ -44,6 +44,14 @@ export const BAND_TONES = {
 const TONE_CYCLE = ['primary', 'accent', 'line'] as const;
 type BandTone = keyof typeof BAND_TONES;
 
+/** md+ columns for photo-led occasion tiles (VT-01): one row of up to four. */
+const BAND_COLS: Record<number, string> = {
+  1: 'md:grid-cols-1',
+  2: 'md:grid-cols-2',
+  3: 'md:grid-cols-3',
+  4: 'md:grid-cols-4',
+};
+
 const COLS: Record<number, string> = {
   2: 'md:grid-cols-2',
   3: 'md:grid-cols-3',
@@ -123,25 +131,51 @@ export function CollectionListSection({
             />
           </div>
         )}
-        <ul>
+        {/* VT-01 (W2a): photo-led occasion tiles. Below md each band gives its inline-end half
+            to the photo at the band's full height; from md the occasions are tall tiles in one
+            row, photo on top (4:5) and the band colour as the caption. The photo covers >= 40%
+            of every tile at every width; the label carries a chevron so it reads as a link. */}
+        <ul
+          className={`md:mx-auto md:grid md:max-w-7xl md:gap-4 md:px-6 lg:px-8 ${BAND_COLS[Math.min(4, tiles.length)] ?? BAND_COLS[3]}`}
+        >
           {tiles.map((tile, i) => (
-            <li key={tile.id} data-tone={tones[i]} className={BAND_TONES[tones[i]]}>
+            <li
+              key={tile.id}
+              data-tone={tones[i]}
+              className={`${BAND_TONES[tones[i]]} md:overflow-hidden md:rounded-[var(--radius)]`}
+            >
               {/* Focus ring in the band's own text colour (its on-token, >= 4.5:1 on the fill by
                   K-02), inset so it never sits on the neighbouring band (R-11). */}
               <Link
                 href={tile.href}
-                className="mx-auto grid max-w-7xl grid-cols-[1fr_auto] items-center gap-4 px-4 py-5 transition-opacity duration-150 active:opacity-80 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-4 focus-visible:outline-current sm:px-6 lg:px-8"
+                data-band-link=""
+                className={`grid min-h-40 items-stretch transition-opacity duration-150 active:opacity-80 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-4 focus-visible:outline-current md:flex md:h-full md:min-h-0 md:flex-col ${tile.image ? 'grid-cols-2' : 'grid-cols-1'}`}
               >
-                <span className="font-display text-3xl [text-wrap:balance] sm:text-4xl">
-                  {tile.label}
+                <span className="flex items-center gap-2 px-4 py-5 sm:px-6 md:order-2 md:px-5 md:py-4">
+                  <span className="font-display text-3xl [text-wrap:balance] sm:text-4xl md:text-3xl">
+                    {tile.label}
+                  </span>
+                  <svg
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                    className="h-5 w-5 shrink-0 rtl:-scale-x-100"
+                    aria-hidden="true"
+                  >
+                    <path d="m9 6 6 6-6 6" />
+                  </svg>
                 </span>
                 {tile.image && (
-                  <span className="relative block h-28 w-20 overflow-hidden rounded-[var(--radius)] sm:h-40 sm:w-28">
+                  <span
+                    data-band-photo=""
+                    className="relative block min-h-40 md:order-1 md:aspect-[4/5] md:min-h-0"
+                  >
                     <Image
                       src={tile.image}
                       alt=""
                       fill
-                      sizes="(min-width: 640px) 112px, 80px"
+                      sizes={`(min-width: 768px) ${Math.round(100 / Math.min(4, tiles.length))}vw, 50vw`}
                       className="object-cover"
                     />
                   </span>

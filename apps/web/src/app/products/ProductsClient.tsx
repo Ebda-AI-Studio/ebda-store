@@ -663,7 +663,7 @@ export default function ProductsClient({
                   }
                 />
                 {/* View Mode */}
-                <div className="hidden items-center gap-1 rounded-lg border border-border bg-background p-1 sm:flex">
+                <div className="hidden items-center gap-1 rounded-lg border border-input bg-background p-1 sm:flex">
                   <button
                     type="button"
                     aria-pressed={viewMode === 'grid'}
@@ -780,7 +780,7 @@ export default function ProductsClient({
                   <div
                     role="group"
                     aria-labelledby="plp-density-label"
-                    className="flex rounded-[var(--radius)] border border-border"
+                    className="flex rounded-[var(--radius)] border border-input"
                   >
                     {([3, 4] as const).map(n => (
                       <button

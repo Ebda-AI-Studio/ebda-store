@@ -32,6 +32,8 @@ export interface LookTokens {
   primary: string;
   onPrimary: string;
   accent: string;
+  /** Text on the accent fill. Absent = `onPrimary` (VT-03: Vitrine's dusty rose carries ink). */
+  onAccent?: string;
   line: string;
   /** Arabic display face, body face (Arabic-capable), Latin display face — Google Fonts family names. */
   fonts: { display: string; body: string; latin: string };

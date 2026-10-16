@@ -178,7 +178,9 @@ export const LOOKS: readonly LookDefinition[] = [
       muted: '#55555E',
       primary: '#1F4E54',
       onPrimary: '#FFFFFF',
-      accent: '#9E5E5E',
+      // VT-03 (W2a): the brief's dusty rose, carrying ink (6.23:1), not a darkened brick under white.
+      accent: '#C98B8B',
+      onAccent: '#1A1A1F',
       // Champagne as the line role (Ruling B1-5): hairlines, the hero frame, the third band.
       line: '#D8B96A',
       fonts: { display: 'Aref Ruqaa', body: 'Noto Sans Arabic', latin: 'Playfair Display' },

@@ -515,7 +515,7 @@ export function ProductsFilterSidebar(props: ProductsFilterSidebarProps) {
     // search input, price range labels, category chips, mobile sheet
     // trigger, the lot.
     <aside
-      className="w-full shrink-0 lg:w-64 lg:rounded-[var(--radius)] lg:overflow-hidden lg:p-4 lg:border lg:border-border lg:bg-[hsl(var(--filter-bg))] lg:text-[hsl(var(--filter-fg))]"
+      className="w-full shrink-0 lg:w-64 lg:rounded-[var(--radius)] lg:overflow-hidden lg:p-4 lg:border lg:border-input lg:bg-[hsl(var(--filter-bg))] lg:text-[hsl(var(--filter-fg))]"
       style={sidebarVars}
       data-zone="filters"
       // merchant filter colours: the active chip gets an ink ring so it never blends into a
@@ -529,7 +529,7 @@ export function ProductsFilterSidebar(props: ProductsFilterSidebarProps) {
         aria-haspopup="dialog"
         aria-expanded={isOpen}
         aria-controls="products-filter-sheet"
-        className="lg:hidden mb-4 flex h-11 w-full items-center justify-between rounded-[var(--radius)] border border-border bg-[hsl(var(--filter-bg))] px-4 text-sm font-semibold text-[hsl(var(--filter-fg))] transition-colors hover:bg-[hsl(var(--filter-fg)/0.05)]"
+        className="lg:hidden mb-4 flex h-11 w-full items-center justify-between rounded-[var(--radius)] border border-input bg-[hsl(var(--filter-bg))] px-4 text-sm font-semibold text-[hsl(var(--filter-fg))] transition-colors hover:bg-[hsl(var(--filter-fg)/0.05)]"
       >
         <span className="inline-flex items-center gap-2">
           <svg

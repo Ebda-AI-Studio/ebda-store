@@ -149,3 +149,32 @@ describe('no storefront form field draws its boundary with the hairline', () => 
     ).toContain('border-border');
   });
 });
+
+// Taste gate VT-05 (W2a): a decorative `line` token below 3:1 (Vitrine's champagne is 1.74:1)
+// never draws an interactive boundary. Option chips, the PDP stepper, the filter trigger and
+// panel frame and the PLP view/density toggles read --input like the fields above.
+describe('interactive control boundaries use --input, never the hairline (VT-05)', () => {
+  const read = (f: string) => readFileSync(path.join(root, 'apps/web/src', f), 'utf8');
+  it('variant option chips (available and unavailable)', () => {
+    const v = read('components/VariantSelector.tsx');
+    expect(v).not.toMatch(/'[^']*border-border[^']*line-through/);
+    expect(v).not.toMatch(/\? 'border-border /);
+    expect(v.match(/border-input/g)?.length).toBeGreaterThanOrEqual(4);
+  });
+  it('filter trigger and the desktop filter panel frame', () => {
+    const f = read('app/products/ProductsFilterSidebar.tsx');
+    expect(f).not.toContain('border-border');
+    expect(f).toContain('lg:border lg:border-input');
+  });
+  it('the PLP view and density toggles and the PDP quantity stepper', () => {
+    expect(read('app/products/ProductsClient.tsx')).toContain(
+      'className="flex rounded-[var(--radius)] border border-input"'
+    );
+    expect(read('app/products/ProductsClient.tsx')).toContain(
+      'rounded-lg border border-input bg-background p-1 sm:flex'
+    );
+    expect(read('app/products/[slug]/ProductDetailClient.tsx')).toContain(
+      '<div className="flex items-center rounded-lg border border-input">'
+    );
+  });
+});

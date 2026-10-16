@@ -168,7 +168,14 @@ describe('occasion bands', () => {
       expect(html).toContain('href="/products?category=nuts"');
       expect(html).toContain('فرح');
       // the photo goes through the image pipeline with sizes, decorative (the label names it)
-      expect(html).toMatch(/<img[^>]*alt=""[^>]*sizes="\(min-width: 640px\) 112px, 80px"/);
+      // VT-01 (W2a): photo-led. Half the band below md, a 4:5 tile photo from md (3 tiles: 33vw)
+      expect(html).toMatch(/<img[^>]*alt=""[^>]*sizes="\(min-width: 768px\) 33vw, 50vw"/);
+      expect(html.match(/data-band-photo=""/g)?.length).toBe(3);
+      expect(html).toMatch(/data-band-link=""[^>]*class="[^"]*grid-cols-2/);
+      expect(html).toContain('md:aspect-[4/5]');
+      expect(html).toContain('md:grid-cols-3');
+      // the label reads as a link: a mirrored chevron beside it
+      expect(html.match(/rtl:-scale-x-100/g)?.length).toBeGreaterThanOrEqual(3);
       // no counted-noun meta on a band (quality bar Y-01, Y-05)
       expect(html).not.toContain('قطعة');
     });

@@ -322,8 +322,8 @@ export function VariantSelector({
                             isSelected
                               ? 'border-primary text-foreground ring-1 ring-inset ring-primary'
                               : available
-                                ? 'border-border text-foreground/85 hover:border-primary/60'
-                                : 'cursor-not-allowed border-border text-muted-foreground line-through opacity-50',
+                                ? 'border-input text-foreground/85 hover:border-primary/60'
+                                : 'cursor-not-allowed border-input text-muted-foreground line-through opacity-50',
                           ].join(' ')
                         : [
                             'relative min-w-[2.75rem] rounded-lg border px-3 py-2 text-sm font-medium transition-all',
@@ -331,8 +331,8 @@ export function VariantSelector({
                             isSelected
                               ? 'border-primary bg-primary text-primary-foreground'
                               : available
-                                ? 'border-border bg-background text-foreground hover:border-primary/50 hover:bg-muted'
-                                : 'cursor-not-allowed border-border bg-muted text-muted-foreground line-through opacity-50',
+                                ? 'border-input bg-background text-foreground hover:border-primary/50 hover:bg-muted'
+                                : 'cursor-not-allowed border-input bg-muted text-muted-foreground line-through opacity-50',
                           ].join(' ')
                     }
                   >
