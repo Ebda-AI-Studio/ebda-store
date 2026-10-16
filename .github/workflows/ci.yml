@@ -405,7 +405,7 @@ jobs:
     timeout-minutes: 20
     services:
       postgres:
-        image: postgres:16-alpine
+        image: pgvector/pgvector:0.8.0-pg16
         env:
           POSTGRES_USER: test
           POSTGRES_PASSWORD: test
@@ -679,7 +679,7 @@ jobs:
     needs: [build]
     services:
       postgres:
-        image: postgres:16-alpine
+        image: pgvector/pgvector:0.8.0-pg16
         env:
           POSTGRES_USER: test
           POSTGRES_PASSWORD: test
@@ -876,7 +876,7 @@ jobs:
     timeout-minutes: 15
     services:
       postgres:
-        image: postgres:16-alpine
+        image: pgvector/pgvector:0.8.0-pg16
         env:
           POSTGRES_USER: test
           POSTGRES_PASSWORD: test
@@ -978,7 +978,7 @@ jobs:
     needs: [build]
     services:
       postgres:
-        image: postgres:16-alpine
+        image: pgvector/pgvector:0.8.0-pg16
         env:
           POSTGRES_USER: test
           POSTGRES_PASSWORD: test
@@ -1047,7 +1047,7 @@ jobs:
     needs: [build]
     services:
       postgres:
-        image: postgres:16-alpine
+        image: pgvector/pgvector:0.8.0-pg16
         env:
           POSTGRES_USER: test
           POSTGRES_PASSWORD: test

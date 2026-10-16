@@ -43,8 +43,8 @@ runs on a **fresh local database per ref**. The fixture is seeded as plain SQL (
 it is identical for both refs), and the built API starts **as the `ebda_app` RLS (override: `PARITY_APP_ROLE`)
 role**, the same way production and CI run it. The scenarios then run over HTTP.
 
-- **Postgres 16 + Redis 7** run as Apple `container`s `ebda-buyflow-pg`
-  (127.0.0.1:55432) and `ebda-buyflow-redis` (127.0.0.1:56379). They are started if
+- **Postgres 16 (with pgvector, `pgvector/pgvector:0.8.0-pg16`) + Redis 7** run as Apple
+  `container`s `ebda-buyflow-pgvector` (127.0.0.1:55432) and `ebda-buyflow-redis` (127.0.0.1:56379). They are started if
   missing and reused otherwise. To use existing servers instead, pass
   `--pg-url`/`--redis-url`. Both must be loopback addresses, and the harness
   refuses anything else.

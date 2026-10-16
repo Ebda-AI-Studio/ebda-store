@@ -114,7 +114,9 @@ function git(args, opts = {}) {
 const coreBare = () => git(['config', '--default', '', '--get', 'core.bare']);
 
 // ---------------------------------------------------------------- infra
-const CONTAINER_PG = 'ebda-buyflow-pg';
+// `-pgvector`: migrations need the `vector` extension (search program P1). A new name, because an
+// existing container under the old name is reused as-is and would keep the old image.
+const CONTAINER_PG = 'ebda-buyflow-pgvector';
 const CONTAINER_REDIS = 'ebda-buyflow-redis';
 
 function sh(cmd, args, opts = {}) {
@@ -168,7 +170,7 @@ async function ensureInfra(args) {
       'POSTGRES_PASSWORD=parity',
       '-m',
       '2048M',
-      'docker.io/library/postgres:16-alpine',
+      'docker.io/pgvector/pgvector:0.8.0-pg16',
     ]);
   }
   if (!args.redisUrl) {

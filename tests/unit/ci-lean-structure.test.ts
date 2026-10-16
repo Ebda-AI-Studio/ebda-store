@@ -165,7 +165,8 @@ describe('ci.yml lanes', () => {
     expect(raw).toMatch(/DB role check: current_user=ebda_app rolbypassrls=false/);
     expect(raw).toMatch(/ALTER ROLE ebda_app WITH PASSWORD/);
     expect(raw).toMatch(/postgresql:\/\/ebda_app:ci-only-app-pw@/);
-    expect(raw).toMatch(/image: postgres:16-alpine/);
+    expect(raw).toMatch(/image: pgvector\/pgvector:0\.8\.0-pg16/);
+    expect(raw).not.toMatch(/image: postgres:/);
     expect(raw).toMatch(/image: redis:7-alpine/);
     for (const n of ['test-integration', 'test-rls-ebda-app']) expect(skipsOnPr(n)).toBe(true);
   });

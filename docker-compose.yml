@@ -4,7 +4,10 @@
 services:
   # PostgreSQL Database
   postgres:
-    image: postgres:16-alpine
+    # Postgres 16 + pgvector (migrations CREATE EXTENSION vector; search program P1). Debian-based,
+    # unlike the old postgres:16-alpine: a data volume created by the alpine image may need
+    # REINDEX DATABASE (glibc vs musl collation) or a fresh volume.
+    image: pgvector/pgvector:0.8.0-pg16
     container_name: force-postgres
     restart: unless-stopped
     environment:
