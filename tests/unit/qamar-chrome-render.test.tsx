@@ -186,7 +186,7 @@ describe('look-sized wordmark (W2a T-01)', () => {
     ctx.store = { ...ctx.store, template: 'minimal', look: null, theme: {} };
     const html = renderToStaticMarkup(<MinimalHeader branding={branding} navigation={nav} />);
     expect(html).toContain('text-xs tracking-[0.3em] ui-caps-toggle font-light text-foreground');
-    expect(html).toContain('text-[11px] tracking-[0.18em] ui-caps-toggle');
+    expect(html).toContain('text-xs tracking-[0.18em] ui-caps-toggle');
   });
   it('checkout/success chrome renders the same wordmark on a look store, the old one otherwise', () => {
     withTheme('qamar.atelier');

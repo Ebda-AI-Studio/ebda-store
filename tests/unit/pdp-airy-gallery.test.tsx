@@ -145,7 +145,7 @@ async function renderPdp(theme: Record<string, unknown>, layout?: Record<string,
 }
 
 describe('airy (image-led) PDP gallery', () => {
-  it('density airy: edge to edge at 4:5 below sm, capped from sm; phone breadcrumb hidden', async () => {
+  it('density airy: edge to edge at 4:5 below sm, capped from sm; phone breadcrumb hidden (all stores, C-04)', async () => {
     const { frame, crumb } = await renderPdp({ density: 'airy' });
     expect(frame.getAttribute('data-gallery')).toBe('airy');
     for (const c of [
@@ -159,9 +159,10 @@ describe('airy (image-led) PDP gallery', () => {
     for (const c of ['sm:max-w-[400px]', 'lg:max-w-[600px]', 'sm:rounded-[var(--radius)]'])
       expect(frame.className.split(' '), c).toContain(c);
     expect(frame.className).not.toContain('max-w-[280px]');
-    expect(crumb.className.split(' ')).toEqual(expect.arrayContaining(['hidden', 'sm:flex']));
+    // The phone breadcrumb is hidden on EVERY store since main's C-04 (shared Breadcrumbs, below md).
+    expect(crumb.className.split(' ')).toEqual(expect.arrayContaining(['hidden', 'md:block']));
   });
-  it('other densities and no density: the capped gallery and the breadcrumb, unchanged', async () => {
+  it('other densities and no density: the capped gallery, unchanged; breadcrumb as on every store', async () => {
     for (const theme of [{}, { density: 'regular' }, { density: 'compact' }]) {
       const { frame, crumb } = await renderPdp(theme);
       cleanup();
@@ -169,8 +170,7 @@ describe('airy (image-led) PDP gallery', () => {
       expect(frame.className).toBe(
         'relative aspect-[3/4] mx-auto max-w-[280px] sm:max-w-[400px] lg:max-w-[600px] overflow-hidden rounded-[var(--radius)] bg-gradient-to-br from-primary/5 to-primary/10'
       );
-      expect(crumb.className.split(' ')).toContain('flex');
-      expect(crumb.className).not.toContain('hidden');
+      expect(crumb.className.split(' ')).toEqual(expect.arrayContaining(['hidden', 'md:block']));
     }
   });
   it('a merchant gallery aspect wins over the airy 4:5', async () => {

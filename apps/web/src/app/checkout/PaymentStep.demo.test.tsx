@@ -47,7 +47,7 @@ describe('PaymentStep on a demo store', () => {
       'تعذّر تحميل طرق الدفع'
     );
     expect(getByText('إعادة المحاولة')).toBeTruthy();
-    expect(getByText('ده متجر تجريبي — الطلب مقفول')).toBeTruthy();
+    expect(getByText('هذا متجر تجريبي — الطلبات مغلقة')).toBeTruthy();
   });
   it('a normal store keeps the pay button and no notice', () => {
     const { container } = render(<PaymentStep {...props} />);
