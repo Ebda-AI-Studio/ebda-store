@@ -1,6 +1,13 @@
 import type { InngestFunction } from 'inngest';
-import { runInTenantContext } from '@ebda/database';
-import { fillProductFields, isAutopilotEnabled } from '../../../services/ai-autofill.service';
+import { runInStoreScope, runInTenantContext } from '@ebda/database';
+import {
+  applyFill,
+  generateFill,
+  isAutopilotEnabled,
+  readFillPlan,
+  type FillGeneration,
+  type FillPlan,
+} from '../../../services/ai-autofill.service';
 import logger from '../../logger';
 import { inngest } from '../client';
 
@@ -30,10 +37,64 @@ import { inngest } from '../client';
  * There is no way to recover a coalesced-away event's data inside this
  * handler; the sweep already bounds the staleness window.
  *
+ * Review I2 (Task 8): three memoized steps, never one transaction around the AI.
+ *   1. `read`     — one short tenant transaction (autopilot flag + the fill plan).
+ *   2. `generate` — `runInStoreScope`: every AI call happens OUTSIDE a transaction; quota checks,
+ *                   cache reads and usage rows are each their own short statement. The output is
+ *                   memoized by Inngest, so a retry of a later step never pays Gemini again.
+ *   3. `write`    — one short guarded transaction (`applyFill`: row lock, re-read, per-field
+ *                   merge — a merchant edit made meanwhile wins, review I1). Idempotent.
+ * It used to run the whole fill inside ONE 30 s `runInTenantContext` transaction: a slow or
+ * failing-over Gemini rolled back every write AND every usage row, and each retry re-billed.
+ *
  * Multiple functions may listen to product.upserted (e.g. product-meta-sync
  * for the Meta Catalog bot) — Inngest runs all registered listeners in
  * parallel.
  */
+interface AutofillEvent {
+  data: {
+    storeId?: string;
+    productId?: string;
+    op?: 'create' | 'update';
+    changedFields?: string[];
+  };
+}
+interface AutofillStep {
+  run<T>(name: string, fn: () => Promise<T>): Promise<unknown>;
+}
+
+/** The function body, exported for tests (a fake `step` memoizes like Inngest). */
+export async function handleAiAutofillProduct({
+  event,
+  step,
+}: {
+  event: AutofillEvent;
+  step: AutofillStep;
+}): Promise<void> {
+  const { storeId, productId, op = 'update', changedFields = [] } = event.data;
+  if (!storeId || !productId) return;
+
+  const plan = (await step.run('read', () =>
+    runInTenantContext(storeId, async () => {
+      if (!(await isAutopilotEnabled(storeId))) {
+        logger.info({ storeId, productId }, '[ai-autofill] autopilot off, skipping');
+        return null;
+      }
+      return readFillPlan(storeId, productId, { op, changedFields });
+    })
+  )) as FillPlan | null;
+  if (!plan) return;
+
+  const gen = (await step.run('generate', () =>
+    runInStoreScope(storeId, () => generateFill(plan))
+  )) as FillGeneration;
+
+  const { filled } = (await step.run('write', () =>
+    runInStoreScope(storeId, () => applyFill(plan, gen))
+  )) as { filled: number };
+  logger.info({ storeId, productId, op, filled, calls: gen.calls }, '[ai-autofill] product filled');
+}
+
 export const aiAutofillProduct: InngestFunction.Any = inngest.createFunction(
   {
     id: 'ai-autofill-product',
@@ -46,32 +107,6 @@ export const aiAutofillProduct: InngestFunction.Any = inngest.createFunction(
     retries: 2,
     triggers: [{ event: 'product.upserted' as any }],
   },
-  async ({ event }) => {
-    const {
-      storeId,
-      productId,
-      op = 'update',
-      changedFields = [],
-    } = event.data as {
-      storeId: string;
-      productId: string;
-      op?: 'create' | 'update';
-      changedFields?: string[];
-    };
-
-    if (!storeId || !productId) return;
-
-    await runInTenantContext(storeId, async () => {
-      if (!(await isAutopilotEnabled(storeId))) {
-        logger.info({ storeId, productId }, '[ai-autofill] autopilot off, skipping');
-        return;
-      }
-
-      const result = await fillProductFields(storeId, productId, { op, changedFields });
-      logger.info(
-        { storeId, productId, op, filled: result.filled },
-        '[ai-autofill] product filled'
-      );
-    }); // end runInTenantContext
-  }
+  async ({ event, step }) =>
+    handleAiAutofillProduct({ event: event as AutofillEvent, step: step as AutofillStep })
 );
