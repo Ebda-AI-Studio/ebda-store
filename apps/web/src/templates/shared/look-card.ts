@@ -78,8 +78,10 @@ export function overPhotoMaterial(
 }
 
 export function overPhotoHeartCls(material: 'soft' | 'bare', wishlisted: boolean): string {
+  // "On" is the filled glyph in the same fixed ink (the svg fills currentColor), never a red
+  // that measures 3.7:1 on the card surface.
   const ink = wishlisted
-    ? 'text-destructive'
+    ? 'text-[rgb(20_20_20)]'
     : 'text-[rgb(20_20_20/0.78)] hover:text-[rgb(20_20_20)]';
   return material === 'bare'
     ? `absolute top-1 start-1 z-20 inline-flex h-11 w-11 items-center justify-center [filter:drop-shadow(0_0_1px_rgb(255_255_255/0.95))] transition-colors duration-[var(--duration-base)] cursor-pointer ${ink}`

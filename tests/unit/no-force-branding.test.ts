@@ -96,6 +96,8 @@ const PHASE_B_PENDING: Record<string, string> = {
   'apps/web/src/templates/shared/custom-badge.ts': 'builder/templates/layout workstream (excluded)',
   'apps/web/src/templates/shared/FloatingWidget.tsx':
     'builder/templates/layout workstream (excluded)',
+  'apps/web/src/templates/look-card-w2b.test.tsx':
+    'PecannbeeProductCard rename (blocked on templates workstream)',
   'apps/web/src/templates/card-mappers-cta.test.tsx':
     'PecannbeeProductCard rename (blocked on templates workstream)',
   'apps/web/src/templates/card-new-badge.test.tsx':
