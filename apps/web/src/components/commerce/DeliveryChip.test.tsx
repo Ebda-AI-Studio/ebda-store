@@ -138,14 +138,14 @@ describe('DeliveryChip', () => {
     const first = render(<DeliveryChip leadTimeDays={null} />);
     // Wed 14 +3 business days, Friday off: Thu 15 - Sun 18.
     expect((await screen.findByTestId('delivery-chip')).textContent).toBe(
-      'Arrives Thu 15 Oct – Sun 18 Oct'
+      'Arrives between Thu 15 Oct and Sun 18 Oct'
     );
     first.unmount();
     storeId = `store-${++n}`;
     settings = { deliveryOffDays: [] };
     render(<DeliveryChip leadTimeDays={null} />);
     expect((await screen.findByTestId('delivery-chip')).textContent).toBe(
-      'Arrives Thu 15 Oct – Sat 17 Oct'
+      'Arrives between Thu 15 Oct and Sat 17 Oct'
     );
   });
 
