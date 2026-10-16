@@ -89,7 +89,10 @@ export async function alertOutageOnce(context: { storeId: string; kind: string }
       .catch(() => 'OK');
     if (first !== 'OK') return;
   }
-  logger.error(context, '[search-index] Workers AI outage: every product failed twice');
+  logger.error(
+    { storeId: context.storeId, kind: context.kind },
+    '[search-index] Workers AI outage: every product failed twice'
+  );
   await sendAlert({
     level: 'p1',
     scope: 'platform',
