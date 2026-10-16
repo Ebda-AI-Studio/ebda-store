@@ -79,6 +79,20 @@ describe('zoneForAddress', () => {
     expect(zoneForAddress({}, ZONES)).toBeNull();
     expect(zoneForAddress(null, ZONES)).toBeNull();
   });
+  it('names match whole, never as a substring of a longer name (carry 5)', () => {
+    const tor = [{ name: 'South Sinai', areas: ['Tor'], areasAr: ['الطور'] }];
+    // "victoria" contains "tor": an Alexandria order must not take the Sinai window.
+    expect(zoneForAddress({ area: 'Victoria', governorate: 'Alexandria' }, tor)).toBeNull();
+    // "New Cairo" is not the zone named "Cairo" by its area; its governorate still is.
+    const cairo = [{ name: 'Cairo', areas: ['Cairo'], areasAr: [] }];
+    expect(zoneForAddress({ area: 'New Cairo' }, cairo)).toBeNull();
+    expect(zoneForAddress({ area: 'New Cairo', governorate: 'Cairo' }, cairo)?.name).toBe('Cairo');
+  });
+  it('matching ignores case, spacing and Arabic letter variants', () => {
+    expect(zoneForAddress({ area: '  nasr   CITY ' }, ZONES)?.name).toBe('Greater Cairo');
+    expect(zoneForAddress({ areaAr: 'الاقصر' }, ZONES)?.name).toBe('Upper Egypt');
+    expect(zoneForAddress({ areaAr: 'مدينه نصر' }, ZONES)?.name).toBe('Greater Cairo');
+  });
 });
 
 describe("the receipt's window is the order's zone", () => {

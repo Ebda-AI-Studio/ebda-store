@@ -1,5 +1,6 @@
 import { prisma, Prisma } from '@ebda/database';
 import { AppError } from '../middleware/error-handler';
+import { zoneForAddress } from '@ebda/shared';
 
 // ─── Pure fee resolver (no DB) ────────────────────────────────────────────────
 
@@ -39,7 +40,7 @@ export interface ResolvedShippingFee {
  *  1. Exact per-area rate (case-insensitive EN match on area name).
  *     When governorate is provided/non-empty, also matches rate.governorate
  *     case-insensitively to disambiguate same-named areas across governorates.
- *  2. Legacy ShippingZone match (existing substring/exact logic)
+ *  2. Legacy ShippingZone match (`zoneForAddress`: whole folded names, area then governorate)
  *  3. Nothing matched → { shippingCost:0, freeShipping:false, matched:false, source:'none' }
  */
 export function resolveShippingFee(
@@ -72,13 +73,14 @@ export function resolveShippingFee(
     };
   }
 
-  // Priority 2 — legacy zone matching (mirrors existing calculateShipping logic)
-  const matchedZone = zones.find(zone => {
-    const areas = zone.areas as string[];
-    return areas.some(
-      a => a.toLowerCase() === area.toLowerCase() || area.toLowerCase().includes(a.toLowerCase())
-    );
-  });
+  // Priority 2 — legacy zone matching: the receipt's rule (`zoneForAddress`), so the
+  // zone the shopper is charged for is the zone whose window the receipt promises.
+  // Whole names after folding, area first, then governorate; never a substring
+  // ("Victoria" is not "Tor"; B0-46 T15 carry 5).
+  const matchedZone = zoneForAddress(
+    { area, governorate },
+    zones as Array<ZoneLike & { areas?: string[] | null; areasAr?: string[] | null }>
+  );
   if (matchedZone) {
     const freeShipping =
       matchedZone.freeShippingThreshold != null && orderTotal >= matchedZone.freeShippingThreshold;
