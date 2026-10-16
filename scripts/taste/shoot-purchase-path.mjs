@@ -95,6 +95,9 @@ export const ACTIONS = {
   },
   async 'pick-options-and-add'(page, url) {
     await page.goto(url, { waitUntil: 'networkidle', timeout: 180000 });
+    // Hydration first: a click before the store context resolves posts the cart with no store
+    // header (STORE_NOT_RESOLVED), a harness race seen once on a freshly compiled dev server.
+    await settle(page);
     await pickOptions(page);
     await page.getByTestId('pdp-add').first().click();
     await page.waitForTimeout(1200);
@@ -105,6 +108,7 @@ export const ACTIONS = {
       waitUntil: 'networkidle',
       timeout: 180000,
     });
+    await settle(page);
     await page.getByTestId('pdp-add').first().click();
     await page.waitForTimeout(1200);
     await page.goto(url, { waitUntil: 'networkidle', timeout: 180000 });
