@@ -3,7 +3,7 @@
  * Franco-Arabic, common misspellings, English). Written into products.search_terms
  * through the autofill engine (field 'searchTerms'); never overwrites a merchant's
  * own words ('human' provenance, or legacy words with no provenance). Bulk quota:
- * it runs from the autofill Inngest function, the 3-day sweep, or the merchant's
+ * it runs from the autofill Inngest function, the daily sweep, or the merchant's
  * "Switch to AI" click. Search program P1 (Task 8).
  *
  * The reply is stored through the same `cleanSearchTerms` the merchant field uses
