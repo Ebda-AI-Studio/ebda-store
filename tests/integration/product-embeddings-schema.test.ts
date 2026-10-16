@@ -155,6 +155,18 @@ describe.skipIf(!hasDb)('product_embeddings', () => {
     expect(r.d).toBe('Bag');
   });
 
+  it('embed doc turns tags into a space, collapses whitespace, and keeps a bare < or >', async () => {
+    const doc = async (desc: string) => {
+      const [r] = await prisma.$queryRaw<Array<{ d: string }>>`
+        SELECT public.ebda_product_embed_doc('X', NULL, NULL, ${desc}, NULL) AS d`;
+      return r.d;
+    };
+    expect(await doc('<p>قطن</p><p>مصري</p>')).toBe('X\nقطن مصري');
+    expect(await doc('price < 50 and > 10')).toBe('X\nprice < 50 and > 10');
+    expect(await doc('<ul>\n  <li>a</li>\n\n  <li>b</li>\n</ul>')).toBe('X\na b');
+    expect(await doc('a<br/>b<!-- note -->c')).toBe('X\na b c');
+  });
+
   it('embed doc is honestly IMMUTABLE: the planner inlines it (no STABLE call in its body)', async () => {
     // Postgres inlines an IMMUTABLE sql function only when its body contains no mutable call, so a
     // label that hides a STABLE function (concat_ws, array_to_string) leaves the call in the plan.
