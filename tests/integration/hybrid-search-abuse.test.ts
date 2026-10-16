@@ -222,7 +222,8 @@ describe.skipIf(!hasDb)('query-embed abuse bound (Ruling SEARCH-T12-3)', () => {
         statuses.add(res.status);
       }
       await awaitDeferredWork(5000);
-      expect([...statuses].every(st => st === 200 || st === 429)).toBe(true);
+      // Array shapes are a 400 at the edge (SEARCH-T12-8); nothing is ever a 500.
+      expect([...statuses].every(st => st === 200 || st === 400 || st === 429)).toBe(true);
       expect(calls.length - before).toBeLessThanOrEqual(
         SEARCH_EMBED_PER_SEARCHER_PER_MIN * windowsSince(t0)
       );

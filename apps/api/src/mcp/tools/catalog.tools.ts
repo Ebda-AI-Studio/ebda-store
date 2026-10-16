@@ -104,7 +104,8 @@ export function registerCatalogTools(
       description:
         "Search this store's active products by keyword (matches English and Arabic). Returns up to `limit` summaries.",
       inputSchema: {
-        query: z.string().min(1).describe('search keywords'),
+        // Same 100-character cap as the storefront list route (Task 12 review I2).
+        query: z.string().min(1).max(100).describe('search keywords'),
         limit: z.number().int().min(1).max(50).optional(),
       },
     },

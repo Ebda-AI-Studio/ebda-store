@@ -237,10 +237,13 @@ const DEFAULT_VECTOR_MAX_DISTANCE = 0.55;
 /**
  * Query-vector cache (in-isolate BoundedMap: the Redis/KV TTL floor rule sends anything this
  * small and hot here, and a vector does not belong in KV).
- * Staleness class: NEVER-stale by construction. A key is (store, model, normalised query) and the
- * vector for a fixed model and text never changes, so no write path can invalidate it; the TTL only
- * bounds memory. A model change changes the key. Per store (not global) so one store's shoppers
- * cannot learn from response timing what was searched in another store. Failures are not cached.
+ * Staleness class: BOUNDED-stale by model version, 10 minutes. The key is (store, model id, the
+ * EXACT embedded text = `queryEmbedText(raw)`), so two spellings that fold to the same text share a
+ * vector by design and nothing else does. No product write affects a query vector; what can change
+ * under an unchanged key is the provider's model behind the same id (a Workers AI model update),
+ * and the TTL bounds that window. A model-id change changes the key. Per store (not global) so one
+ * store's shoppers cannot learn from response timing what was searched in another store. Failures
+ * are not cached. The key holds at most QUERY_EMBED_MAX_CHARS characters of the query.
  * Float32Array: 4 KB per entry (the column is halfvec, so nothing is lost); 500 entries ≈ 2 MB.
  */
 const QUERY_VECTOR_TTL_MS = 10 * 60 * 1000;
@@ -276,6 +279,11 @@ export function shouldEmbedQuery(raw: string): boolean {
 }
 
 /** The query's vector (cached), raced against QUERY_EMBED_BUDGET_MS; the loser is aborted. */
+/** The exact text embedded for a query (and its cache key part): normalised, at most 100 chars. */
+export function queryEmbedText(raw: string): string {
+  return normalizeArabicSearch(raw).slice(0, QUERY_EMBED_MAX_CHARS).trim();
+}
+
 async function queryVector(
   storeId: string,
   raw: string,
@@ -283,7 +291,8 @@ async function queryVector(
 ): Promise<number[] | null> {
   const provider = getEmbeddingProvider();
   if (!provider) return null;
-  const key = `${storeId}\u0000${provider.model}\u0000${normalizeArabicSearch(raw)}`;
+  const text = queryEmbedText(raw);
+  const key = `${storeId}\u0000${provider.model}\u0000${text}`;
   const hit = qCache.get(key);
   if (hit) {
     if (hit.exp > Date.now()) return Array.from(hit.v);
@@ -302,7 +311,7 @@ async function queryVector(
       );
     }, QUERY_EMBED_BUDGET_MS);
   });
-  const call = provider.embed([raw.trim().slice(0, QUERY_EMBED_MAX_CHARS)], { signal: ctl.signal });
+  const call = provider.embed([text], { signal: ctl.signal });
   call.catch(() => undefined); // the race's loser may reject later (aborted): never unhandled
   try {
     const [v] = await Promise.race([call, lost]);

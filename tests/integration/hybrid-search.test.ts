@@ -37,6 +37,7 @@ const {
   clearQueryVectorCacheForTests,
   QUERY_EMBED_BUDGET_MS,
   KEYWORD_STRONG_AT,
+  QUERY_EMBED_MAX_CHARS,
   PRODUCT_SEARCH_ID_CAP,
 } = await import('../../apps/api/src/services/product-search.service');
 const { SEARCH_EMBED_PER_SEARCHER_PER_MIN } =
@@ -348,6 +349,8 @@ describe.skipIf(!hasDb)('hybrid storefront search (Task 12)', () => {
     await runInTenantContext(S, () => semanticProductIds(S, 'احذية رياضية', { searcher: who() }));
     await runInTenantContext(S, () => semanticProductIds(S, 'احذيه رياضيه', { searcher: who() })); // same once folded
     expect(f.calls).toHaveLength(1);
+    // The key IS the embedded text: the normalised query, cut to QUERY_EMBED_MAX_CHARS (I2).
+    expect(f.calls[0]).toEqual(['احذيه رياضيه']);
     await runInTenantContext(F, () => semanticProductIds(F, 'احذية رياضية', { searcher: who() }));
     expect(f.calls).toHaveLength(2);
     // A failure is not cached: the next request tries again.
@@ -363,6 +366,23 @@ describe.skipIf(!hasDb)('hybrid storefront search (Task 12)', () => {
     await runInTenantContext(S, () => semanticProductIds(S, 'shoes', { searcher: who() }));
     await runInTenantContext(S, () => semanticProductIds(S, 'shoes', { searcher: who() }));
     expect(n).toBe(2);
+  });
+
+  it('a 10 000-character query embeds (and caches) only its first 100 normalised characters', async () => {
+    process.env.SEARCH_SEMANTIC_ENABLED = 'true';
+    const f = aliasProvider();
+    setEmbeddingProviderForTests(f.provider);
+    const head = 'حذاء '.repeat(20); // 100 chars
+    await runInTenantContext(S, () =>
+      semanticProductIds(S, head + 'أ'.repeat(10_000), { searcher: who() })
+    );
+    expect(f.calls).toHaveLength(1);
+    expect(f.calls[0][0].length).toBeLessThanOrEqual(QUERY_EMBED_MAX_CHARS);
+    // Another query with the same first 100 normalised characters embeds the same text: one entry.
+    await runInTenantContext(S, () =>
+      semanticProductIds(S, head + 'ب'.repeat(50), { searcher: who() })
+    );
+    expect(f.calls).toHaveLength(1);
   });
 
   it('a strong keyword leg (>= KEYWORD_STRONG_AT) is not embedded, and keeps every match (E10 cap)', async () => {
