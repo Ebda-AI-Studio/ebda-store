@@ -8,6 +8,9 @@ User-visible changes, by who sees them. Rulings: `docs/RULINGS.md` § "2026-10-1
 - **"New" badge is off unless the store turns it on** (D1016-NEW-1): no card shows "جديد / New" by default.
 - **Default store colours are Ebda's** (D1016-ORANGE-1): a store with no colours of its own is night with white buttons and a gold focus ring; the error page, link previews (OG image), invoices and app icons' default colour follow. Colours a merchant picked are unchanged.
 
+- **Every storefront sentence is Egyptian** (FU46-Y02b): cart, checkout and its errors, account, login and password screens, wallet, loyalty, reviews, wishlist, FAQ, shipping, the returns form, empty and loading states. Legal text stays formal: privacy, terms, the returns-policy body and the cookie notice.
+- **AI-written Arabic is Egyptian** for new output (FU46-Y02d): product FAQs, excerpts, how-to guides, AI-answer descriptions, SEO meta, review replies and marketing emails. Nothing already saved is rewritten.
+
 ## Merchants (admin)
 
 - **Page Builder → Product card defaults → "New" badge on cards** (ar + en): turns the "New" chip on for products you mark as new or added in the last 14 days. Off by default (D1016-NEW-1).

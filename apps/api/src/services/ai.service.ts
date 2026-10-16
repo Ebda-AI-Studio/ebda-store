@@ -31,6 +31,7 @@ import { sanitizeJsonControlChars } from '../lib/ai/parse-ai-json';
 import { rethrowAsAppError } from '../lib/ai/gemini-errors';
 import { geminiInlineImage, GeminiImageUnsupported } from '../lib/ai/gemini-image';
 import { withSavepoint } from '../lib/savepoint';
+import { EGYPTIAN_ARABIC_REGISTER } from '../lib/ai/arabic-register';
 
 type Feature =
   | 'translate'
@@ -413,7 +414,8 @@ export class AIService {
       '"description": string, "descriptionAr": string, "keywords": string[]}. ' +
       `Title under ${META_TITLE_MAX} characters. Description under ${META_DESCRIPTION_MAX} characters. ` +
       'Keywords: 5-10 short Egypt + GCC search phrases. Do not mention prices ' +
-      'or out-of-stock status. Match how Egyptian shoppers actually search.';
+      'or out-of-stock status. Match how Egyptian shoppers actually search. ' +
+      EGYPTIAN_ARABIC_REGISTER;
 
     const detailLines = [
       `Store: ${input.storeName}${input.storeNameAr ? ` / ${input.storeNameAr}` : ''}`,
@@ -590,9 +592,9 @@ export class AIService {
       '<ul>, <li> and <a href="https://..."> tags — no <html>/<head>/<body>, no styles, no ' +
       'images, no scripts. Do not invent prices, discounts, codes, dates or URLs that the ' +
       'brief does not give; if the brief gives none, write copy that needs none. Do not add ' +
-      'an unsubscribe line (the platform adds one). The Arabic version is natural, ' +
-      'Egypt-friendly Modern Standard Arabic, not a literal translation. Match how Egyptian shoppers ' +
-      'actually talk: warm, professional, no fake hype.';
+      'an unsubscribe line (the platform adds one). The Arabic version is not a literal ' +
+      'translation; match how Egyptian shoppers actually talk: warm, professional, no fake hype. ' +
+      EGYPTIAN_ARABIC_REGISTER;
 
     const detailLines = [
       `Store: ${input.storeName}${input.storeNameAr ? ` / ${input.storeNameAr}` : ''}`,
