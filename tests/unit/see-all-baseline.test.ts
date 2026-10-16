@@ -26,3 +26,19 @@ describe('See all sits on the heading baseline', () => {
     expect(src).toMatch(/\{seeAllHref && !seeAllInline && /);
   });
 });
+
+// AT-1 (independent audit): "وصل حديثًا" (a builder section) was light while "عبايات"
+// (a layout section) was bold. A Qamar store has one section-title style: the builder
+// header renders the pack's sectionHeading, so both heading paths share one class string.
+describe('one section-title style on a Qamar store (AT-1)', () => {
+  it('the builder header uses the pack heading on Qamar and the pack sets one weight', async () => {
+    const { getPackStyles } = await import('../../apps/web/src/templates/shared/pack-styles');
+    const h = getPackStyles('qamar').sectionHeading;
+    expect(h).toMatch(/\bfont-display\b/);
+    expect(h.match(/\bfont-(thin|light|normal|medium|semibold|bold|black)\b/g)).toEqual([
+      'font-normal',
+    ]);
+    const src = readFileSync(join(WEB, 'builder/sections/SectionHeader.tsx'), 'utf8');
+    expect(src).toMatch(/qamar\s*\?\s*`[^`]*\$\{getPackStyles\('qamar'\)\.sectionHeading\}/);
+  });
+});

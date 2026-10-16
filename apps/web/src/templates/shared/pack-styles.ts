@@ -247,8 +247,9 @@ const PACK_STYLES: Record<TemplateId, PackStyles> = {
     productCardPrice: 'font-medium text-foreground',
     productCardCta:
       'whitespace-nowrap rounded-[var(--radius)] bg-primary px-5 py-3 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors duration-[var(--motion-duration,150ms)] min-h-[44px]',
+    // AT-1: one section-title style per Qamar page; the builder SectionHeader renders this too.
     sectionHeading:
-      'font-display text-2xl sm:text-3xl md:text-4xl font-bold text-foreground leading-[1.25] text-balance',
+      'font-display text-2xl sm:text-3xl md:text-4xl font-normal text-foreground leading-[1.25] text-balance',
     sectionSeeAll:
       'text-sm font-medium text-foreground/70 hover:text-foreground underline-offset-4 hover:underline',
     // Quality bar T-03: one heading alignment per page. The builder sections (SectionHeader:
