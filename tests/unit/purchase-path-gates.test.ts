@@ -90,3 +90,16 @@ describe('IA-04: purchase-path surfaces take the store radius, never a fixed lar
     expect(hits).toEqual([]);
   });
 });
+
+describe('IA-04: the cart summary carries one trust line, not two generic cards', () => {
+  it('no "Need Help?" card; one contact line to the store contact page (44px)', () => {
+    const cart = src('app/cart/CartClient.tsx');
+    expect(cart).not.toContain("'Need Help?'");
+    expect(cart).toMatch(/data-testid="cart-help-line"[\s\S]{0,400}storeUrl\('\/contact'\)/);
+  });
+  it('accepted payments are one inline row, not a bordered card', () => {
+    const badges = src('components/AcceptedPaymentBadges.tsx');
+    expect(badges).not.toContain("'rounded-[var(--radius)] border border-border bg-card p-4'");
+    expect(badges).not.toContain("t('We Accept', 'نقبل الدفع عبر')}\n      </p>");
+  });
+});

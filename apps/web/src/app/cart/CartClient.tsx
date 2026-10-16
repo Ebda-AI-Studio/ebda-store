@@ -1174,42 +1174,17 @@ export default function CartClient() {
 
                     <AcceptedPaymentBadges />
 
-                    {/* Help */}
-                    <div className="rounded-[var(--radius)] border border-border bg-card p-4">
-                      <div className="flex items-center gap-3">
-                        <div className="flex h-10 w-10 items-center justify-center rounded-[var(--radius)] bg-primary/10">
-                          <svg
-                            className="h-5 w-5 text-primary"
-                            fill="none"
-                            viewBox="0 0 24 24"
-                            stroke="currentColor"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                            />
-                          </svg>
-                        </div>
-                        <div>
-                          <p className="text-sm font-medium text-foreground">
-                            {t(
-                              'Need Help?',
-                              '\u062a\u062d\u062a\u0627\u062c \u0645\u0633\u0627\u0639\u062f\u0629\u061f'
-                            )}
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            {store.phone
-                              ? `${t('Contact us at', '\u062a\u0648\u0627\u0635\u0644 \u0645\u0639\u0646\u0627 \u0639\u0644\u0649')} ${store.phone}`
-                              : t(
-                                  'Visit our contact page for help',
-                                  '\u0642\u0645 \u0628\u0632\u064a\u0627\u0631\u0629 \u0635\u0641\u062d\u0629 \u0627\u0644\u062a\u0648\u0627\u0635\u0644 \u0644\u0644\u0645\u0633\u0627\u0639\u062f\u0629'
-                                )}
-                          </p>
-                        </div>
-                      </div>
-                    </div>
+                    {/* IA-04 (W4): one quiet help line, not a card with an icon tile. */}
+                    <p data-testid="cart-help-line" className="text-sm text-muted-foreground">
+                      <Link
+                        href={storeUrl('/contact')}
+                        className="inline-flex min-h-11 items-center underline underline-offset-4 hover:text-foreground"
+                      >
+                        {store.phone
+                          ? `${t('Questions? Call', 'لديك سؤال؟ اتصل على')} ${store.phone}`
+                          : t('Questions? Contact the store', 'لديك سؤال؟ تواصل مع المتجر')}
+                      </Link>
+                    </p>
                   </div>
                 </div>
               </div>
