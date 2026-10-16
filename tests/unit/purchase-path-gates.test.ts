@@ -228,3 +228,23 @@ describe('(d) narrow words get width (stop4 probe: crumbs 33-41, See all 39-43 w
     );
   });
 });
+
+/**
+ * The stop4 Vitrine shoot hit the route error fallback on a PDP (a dev compile hiccup): its two
+ * actions measured 122-124 x 38. global-error also painted its retry in Tailwind orange, which
+ * Ahmad's 2026-10-16 decision rules out. Error surfaces follow the same 44px and token rules.
+ */
+describe('error surfaces: 44px actions, no palette orange', () => {
+  it('RouteErrorFallback actions are 44px', () => {
+    const s = src('components/RouteErrorFallback.tsx');
+    const tags = [...s.matchAll(/<(?:button|Link)\b[\s\S]*?className="([^"]*)"/g)].map(m => m[1]);
+    expect(tags.length).toBeGreaterThanOrEqual(2);
+    for (const c of tags) expect(c).toMatch(/\bmin-h-11\b/);
+  });
+  it('global-error uses no orange and a 44px retry', () => {
+    const s = src('app/global-error.tsx');
+    expect(s).not.toMatch(/orange-\d/);
+    // no stylesheet is guaranteed there, so the floor is inline too
+    expect(s).toMatch(/minHeight: 44/);
+  });
+});

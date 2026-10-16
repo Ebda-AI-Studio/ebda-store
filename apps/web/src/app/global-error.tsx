@@ -24,7 +24,10 @@ export default function GlobalError({
           </p>
           <button
             onClick={reset}
-            className="cursor-pointer rounded-lg border-none bg-orange-500 px-6 py-2.5 text-sm font-medium text-white hover:bg-orange-600"
+            className="min-h-11 cursor-pointer rounded-lg border-none bg-foreground px-6 py-2.5 text-sm font-medium text-background hover:bg-foreground/90"
+            // global-error replaces the root layout, so no stylesheet is guaranteed: ink, white and
+            // the 44px floor are inline (no orange, Ahmad 2026-10-16; rule (d)).
+            style={{ minHeight: 44, background: '#141414', color: '#ffffff' }}
           >
             {t('Try Again', 'حاول مرة أخرى')}
           </button>

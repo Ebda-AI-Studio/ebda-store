@@ -234,7 +234,7 @@ export function RouteErrorFallback({ error, reset }: RouteErrorFallbackProps) {
           onClick={retry}
           disabled={buttonBusy}
           aria-busy={buttonBusy}
-          className="rounded-lg bg-primary px-5 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-wait disabled:opacity-70"
+          className="inline-flex min-h-11 items-center rounded-lg bg-primary px-5 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-wait disabled:opacity-70"
         >
           {buttonBusy ? t('Retrying…', translations['Retrying…']) : t('Try Again', 'حاول مرة أخرى')}
         </button>
@@ -258,7 +258,7 @@ export function RouteErrorFallback({ error, reset }: RouteErrorFallbackProps) {
         {(!isTemporarilyUnavailable || !isPlatform) && (
           <Link
             href={storeUrl('/')}
-            className="rounded-lg border border-input px-5 py-2 text-sm font-medium text-foreground transition-colors hover:bg-muted"
+            className="inline-flex min-h-11 items-center rounded-lg border border-input px-5 py-2 text-sm font-medium text-foreground transition-colors hover:bg-muted"
           >
             {t('Go Home', 'العودة للرئيسية')}
           </Link>
