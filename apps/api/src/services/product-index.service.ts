@@ -181,7 +181,8 @@ export async function embedDocs(
 
 /**
  * Step 3 (WRITE, ONE statement): upsert the vectors. A row is written only if the product still
- * exists, is not deleted, and its CURRENT doc still hashes to what was embedded — a product edited
+ * exists, is still INDEXABLE (not deleted, active — PR3 minor 4), and its CURRENT doc still hashes
+ * to what was embedded — a product edited
  * between read and write is left stale (the next run re-embeds the new text), never stamped with
  * the old vector. Returns rows written.
  */
@@ -199,7 +200,7 @@ export async function writeEmbeddings(
       FROM unnest(${items.map(i => i.id)}::text[], ${items.map(i => i.hash)}::text[], ${literals}::text[])
            AS v(id, hash, emb)
       JOIN products p ON p.id = v.id
-     WHERE p.store_id = ${storeId} AND p.deleted_at IS NULL AND md5(${DOC}) = v.hash
+     WHERE p.store_id = ${storeId} AND ${INDEXABLE} AND md5(${DOC}) = v.hash
     ON CONFLICT (product_id) DO UPDATE
       SET model = EXCLUDED.model, content_hash = EXCLUDED.content_hash,
           embedding = EXCLUDED.embedding, embedded_at = EXCLUDED.embedded_at`;

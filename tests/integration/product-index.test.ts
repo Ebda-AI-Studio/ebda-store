@@ -788,6 +788,25 @@ describe.skipIf(!hasDb)('product embedding indexer (Task 11)', () => {
     expect(sent.filter(e => e.name === 'product.upserted')).toHaveLength(0);
   });
 
+  it('PR3 minor 4: a product unpublished between read and write gets no vector', async () => {
+    const owner = await mkUser('m4');
+    ownerIds.push(owner.id);
+    const s = (await mkStore(owner.id, 'm4')).id;
+    storeIds.push(s);
+    const p = await mkProduct(s, { name: 'Soon draft' });
+    const f = fakeProvider();
+    setEmbeddingProviderForTests({
+      model: EMBED_MODEL,
+      async embed(texts) {
+        await prisma.product.update({ where: { id: p }, data: { status: 'draft' } });
+        return f.provider.embed(texts);
+      },
+    });
+    const r = await runInStoreScope(s, () => indexStore(s, { maxDocs: 1 }));
+    expect(r.embedded).toBe(0);
+    expect(await embeddingRow(p)).toBeUndefined();
+  });
+
   it('as ebda_app: the vector rows are invisible from another store scope', async () => {
     setEmbeddingProviderForTests(fakeProvider().provider);
     await runInStoreScope(storeId, () => indexStore(storeId));
