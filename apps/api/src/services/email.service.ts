@@ -415,7 +415,7 @@ export class EmailService {
 
   /**
    * Platform-level send (Ebda sender, no store branding): a store's refund alert to its own
-   * order address (FU46-1a) and the contact-form fallback.
+   * order address (FU46-1a). (The old contact-form fallback to Ebda's inbox is gone — FU46-1c.)
    */
   private static async sendPlatform(
     args: {

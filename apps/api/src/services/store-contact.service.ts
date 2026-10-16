@@ -32,12 +32,23 @@ export async function storeContactTarget(storeId: string): Promise<StoreContactT
   const ownerActive = store.owner?.status === 'active' && !store.owner.deletedAt;
   // An address that is one of Ebda's own (sender, no-reply, support) would mail the platform: it
   // is skipped and the NEXT candidate is tried (FU46 M-5), never the platform itself.
-  const platform = new Set(
-    [config.smtpFromEmail, BRAND.noReplyEmail, BRAND.supportEmail].map(a => a?.trim().toLowerCase())
-  );
   const to =
     [store.email, ownerActive ? store.owner?.email : null]
       .map(a => a?.trim())
-      .find(a => a && !platform.has(a.toLowerCase())) || null;
+      .find(a => a && !isPlatformAddress(a)) || null;
   return { to, isDemo: store.isDemo, slug: store.slug };
+}
+
+/** Ebda's own mail domain, taken from the brand's no-reply address (e.g. `ebda.app`). */
+const PLATFORM_DOMAIN = BRAND.noReplyEmail.split('@')[1]!.toLowerCase();
+
+/**
+ * True for any address that would mail Ebda itself: the configured sender, or ANY mailbox on
+ * Ebda's domain or a subdomain of it (FU46 M-5, N-2) — not just the three named addresses.
+ */
+export function isPlatformAddress(address: string): boolean {
+  const a = address.trim().toLowerCase();
+  if (config.smtpFromEmail && a === config.smtpFromEmail.trim().toLowerCase()) return true;
+  const domain = a.split('@')[1] ?? '';
+  return domain === PLATFORM_DOMAIN || domain.endsWith(`.${PLATFORM_DOMAIN}`);
 }
