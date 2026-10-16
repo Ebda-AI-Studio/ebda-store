@@ -10,6 +10,7 @@ import { useLanguage } from '../../contexts/LanguageContext';
 import { useNumerals } from '../../hooks/useNumerals';
 import { useLocalePrice } from '../../hooks/useLocalePrice';
 import { MinusIcon, PlusIcon, cx } from './ui';
+import { cartLineLabel } from '../shared/card-actions';
 
 /** The /cart page lines, in the same shape as the bag drawer. */
 export default function DahabCartTable({
@@ -86,7 +87,7 @@ export default function DahabCartTable({
                     type="button"
                     disabled={item.unavailable || item.quantity <= 1}
                     onClick={() => onUpdateQuantity?.(item.id, Math.max(1, item.quantity - 1))}
-                    aria-label={t('Decrease quantity', 'تقليل الكمية')}
+                    aria-label={cartLineLabel('decrease', isRtl, name)}
                     className="flex h-11 w-11 items-center justify-center text-foreground/80 hover:text-primary disabled:opacity-30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                   >
                     <MinusIcon className="h-4 w-4" />
@@ -102,7 +103,7 @@ export default function DahabCartTable({
                     type="button"
                     disabled={item.unavailable}
                     onClick={() => onUpdateQuantity?.(item.id, item.quantity + 1)}
-                    aria-label={t('Increase quantity', 'زيادة الكمية')}
+                    aria-label={cartLineLabel('increase', isRtl, name)}
                     className="flex h-11 w-11 items-center justify-center text-foreground/80 hover:text-primary disabled:opacity-30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                   >
                     <PlusIcon className="h-4 w-4" />

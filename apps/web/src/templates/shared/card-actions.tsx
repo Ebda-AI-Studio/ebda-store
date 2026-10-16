@@ -66,6 +66,17 @@ export function cardLinkLabel(
   ].join(', ');
 }
 
+/** a11y P2-5 class: a cart line's stepper and remove buttons name the line they act on. */
+export function cartLineLabel(
+  kind: 'remove' | 'increase' | 'decrease',
+  isRtl: boolean,
+  name: string
+): string {
+  if (kind === 'remove') return isRtl ? `إزالة ${name}` : `Remove ${name}`;
+  if (kind === 'increase') return isRtl ? `زيادة كمية ${name}` : `Increase quantity of ${name}`;
+  return isRtl ? `تقليل كمية ${name}` : `Decrease quantity of ${name}`;
+}
+
 interface CompareButtonProps {
   productId: string;
   isInCompare?: boolean;

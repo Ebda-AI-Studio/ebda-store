@@ -80,3 +80,23 @@ describe('card link names lead with the product (P2-14)', async () => {
     }
   );
 });
+
+// P2-5 class sweep (found shooting stop3): every skin's cart line named its stepper and
+// remove buttons "Increase", "Decrease", "Remove", identical on every line.
+describe('cart line actions carry the product name (P2-5 class)', () => {
+  it.each(['bold', 'classic', 'dahab', 'elegant', 'minimal', 'modern'])('%s CartTable', skin => {
+    const src = readFileSync(join(T, `${skin}/CartTable.tsx`), 'utf8');
+    expect(
+      [...src.matchAll(/cartLineLabel\('(remove|increase|decrease)'/g)].length
+    ).toBeGreaterThanOrEqual(2);
+    expect(src).not.toMatch(/aria-label=\{t\('(Remove|Increase|Decrease)/);
+  });
+  it('cartLineLabel names the line in both languages', async () => {
+    const { cartLineLabel } = await import('../../apps/web/src/templates/shared/card-actions');
+    expect(cartLineLabel('remove', false, 'Linen abaya')).toBe('Remove Linen abaya');
+    expect(cartLineLabel('increase', true, 'عباية كتان')).toBe('زيادة كمية عباية كتان');
+    expect(cartLineLabel('decrease', false, 'Linen abaya')).toBe(
+      'Decrease quantity of Linen abaya'
+    );
+  });
+});

@@ -21,7 +21,9 @@ describe('decrease controls use the minus sign', () => {
     let seen = 0;
     for (const f of walk(SRC)) {
       const src = readFileSync(f, 'utf8');
-      for (const m of src.matchAll(/aria-label=\{t\('Decrease[^']*'/g)) {
+      for (const m of src.matchAll(
+        /aria-label=\{(?:t\('Decrease[^']*'|cartLineLabel\('decrease')/g
+      )) {
         seen++;
         const end = src.indexOf('</button>', m.index!);
         const body = src.slice(src.indexOf('>', m.index!) + 1, end);

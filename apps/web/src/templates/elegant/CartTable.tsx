@@ -9,6 +9,7 @@ import { CartLineNote } from '../../components/commerce/CartLineNote';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useNumerals } from '../../hooks/useNumerals';
 import { useLocalePrice } from '../../hooks/useLocalePrice';
+import { cartLineLabel } from '../shared/card-actions';
 
 /**
  * Elegant template — cart rendered with thin hairline dividers, generous
@@ -23,7 +24,7 @@ export default function ElegantCartTable({
   onRemove,
   typography,
 }: CartTableProps) {
-  const { isRtl: ctxIsRtl, t } = useLanguage();
+  const { isRtl: ctxIsRtl } = useLanguage();
   const { localize } = useNumerals();
   const isRtl = isRtlProp ?? ctxIsRtl;
   // The ONE storefront price format (Ruling B1-28).
@@ -84,7 +85,7 @@ export default function ElegantCartTable({
                   type="button"
                   onClick={() => onRemove?.(item.id)}
                   className="inline-flex min-h-[44px] items-center text-sm uppercase tracking-[0.2em] text-muted-foreground hover:text-destructive-ink underline underline-offset-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 cursor-pointer"
-                  aria-label={t('Remove', 'إزالة')}
+                  aria-label={cartLineLabel('remove', isRtl, displayName)}
                   style={typography?.cta}
                 >
                   {isRtl ? 'إزالة' : 'Remove'}
@@ -97,7 +98,7 @@ export default function ElegantCartTable({
                     disabled={item.unavailable || item.quantity <= 1}
                     onClick={() => onUpdateQuantity?.(item.id, Math.max(1, item.quantity - 1))}
                     className="inline-flex h-11 w-11 items-center justify-center text-lg text-muted-foreground hover:text-foreground disabled:opacity-30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1 cursor-pointer"
-                    aria-label={t('Decrease', 'تقليل')}
+                    aria-label={cartLineLabel('decrease', isRtl, displayName)}
                   >
                     −
                   </button>
@@ -112,7 +113,7 @@ export default function ElegantCartTable({
                     disabled={item.unavailable}
                     onClick={() => onUpdateQuantity?.(item.id, item.quantity + 1)}
                     className="inline-flex h-11 w-11 items-center justify-center text-lg text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1 cursor-pointer disabled:opacity-40"
-                    aria-label={t('Increase', 'زيادة')}
+                    aria-label={cartLineLabel('increase', isRtl, displayName)}
                   >
                     +
                   </button>
