@@ -58,6 +58,8 @@ interface AiTermsFile {
   note: string;
   model: string;
   generatedAt: string;
+  /** False while a --generate-ai-terms run is still filling it (it resumes from here). */
+  complete: boolean;
   terms: Record<string, string | null>;
 }
 
@@ -183,11 +185,27 @@ async function main(): Promise<number> {
         await import('../../apps/api/src/lib/ai/product-search-terms-generator');
       const model = process.env.GEMINI_MODEL || 'gemini-flash-lite-latest';
       const throttle = Number(process.env.AI_BULK_THROTTLE_MS ?? 1000);
-      const terms: Record<string, string | null> = {};
+      // Resumable: written after every product, so a Gemini outage loses nothing; a rerun only
+      // generates the products still missing.
+      let prior: AiTermsFile | null = null;
+      try {
+        prior = JSON.parse(readFileSync(AI_TERMS_FILE, 'utf8')) as AiTermsFile;
+      } catch {
+        prior = null;
+      }
+      const file: AiTermsFile = {
+        note: 'SYNTHETIC eval store (tests/search-eval/catalogue.ts): Task 8 generator output, products seeded with names only, no description, no category.',
+        model,
+        generatedAt: new Date().toISOString(),
+        complete: false,
+        terms: prior && !prior.complete && prior.model === model ? prior.terms : {},
+      };
+      const save = () => writeFileSync(AI_TERMS_FILE, JSON.stringify(file, null, 2) + '\n');
       for (const r of rows) {
+        if (r.id in file.terms) continue;
         for (let attempt = 1; ; attempt++) {
           try {
-            terms[r.id] = await db.runInStoreScope(S, () =>
+            file.terms[r.id] = await db.runInStoreScope(S, () =>
               generateProductSearchTerms(
                 {
                   storeId: S,
@@ -201,23 +219,25 @@ async function main(): Promise<number> {
             );
             break;
           } catch (err) {
-            if (attempt >= 4) throw err;
-            console.warn(`[eval] terms for ${r.id} failed (attempt ${attempt}); retrying in 20 s`);
-            await sleep(20_000);
+            if (attempt >= 8) throw err;
+            const wait = 15_000 * attempt;
+            console.warn(
+              `[eval] terms for ${r.id} failed (attempt ${attempt}); retrying in ${wait / 1000} s`
+            );
+            await sleep(wait);
           }
         }
+        save();
         await sleep(throttle);
       }
-      aiTerms = {
-        note: 'SYNTHETIC eval store (tests/search-eval/catalogue.ts): Task 8 generator output, products seeded with names only, no description, no category.',
-        model,
-        generatedAt: new Date().toISOString(),
-        terms,
-      };
-      writeFileSync(AI_TERMS_FILE, JSON.stringify(aiTerms, null, 2) + '\n');
-      console.log(`[eval] wrote ${rows.length} products' AI terms to ai-terms.json`);
+      file.complete = true;
+      save();
+      aiTerms = file;
+      console.log(`[eval] ai-terms.json complete: ${rows.length} products`);
     } else if (arg('--ai-terms')) {
       aiTerms = JSON.parse(readFileSync(AI_TERMS_FILE, 'utf8')) as AiTermsFile;
+      if (!aiTerms.complete)
+        throw new Error('ai-terms.json is incomplete: rerun --generate-ai-terms');
     }
 
     // ---- seed + index ------------------------------------------------------------------------
