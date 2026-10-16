@@ -1,6 +1,12 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { deliveryDaysSchema, deliveryOffDaysSchema, deliveryWindow } from '@ebda/shared';
+import {
+  deliveryDaysSchema,
+  deliveryOffDaysSchema,
+  deliveryWindow,
+  zoneForAddress,
+  type DeliveryAddressLike,
+} from '@ebda/shared';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useStore } from '@/contexts/StoreContext';
 import { useStoreNumerals, useNumerals } from '@/hooks/useNumerals';
@@ -39,10 +45,19 @@ function leadTimeText(n: number, lang: 'ar' | 'en', localize: (v: number) => str
 export function useDeliveryWindow({
   leadTimeDays,
   from: start,
+  address,
 }: {
   leadTimeDays?: number | null;
   /** When the window starts; omitted = now (read after mount). null = not yet known. */
   from?: Date | null;
+  /**
+   * An ORDER's shipping address (the receipt). When given, the window is that
+   * address's zone (`zoneForAddress`), never the fastest one; if the store has
+   * zones with numbers and none names the address, there is no window (null).
+   * A store with no zone numbers at all uses its store-wide `deliveryDays`,
+   * which covers every address. `null` = the order is not loaded yet.
+   */
+  address?: DeliveryAddressLike | null;
 } = {}): { from: string; to: string } | null {
   const { language } = useLanguage();
   const { store } = useStore();
@@ -63,21 +78,33 @@ export function useDeliveryWindow({
 
   const clock = start === undefined ? now : start;
   if (!zones || !now || !clock || Number.isNaN(clock.getTime())) return null;
+  if (address === null) return null;
 
   const sets = store.settings as { deliveryDays?: unknown; deliveryOffDays?: unknown } | undefined;
   const parsed = deliveryDaysSchema.safeParse(sets?.deliveryDays);
   const offParsed = deliveryOffDaysSchema.safeParse(sets?.deliveryOffDays);
   const lead = typeof leadTimeDays === 'number' && leadTimeDays > 0 ? leadTimeDays : null;
+  let windowZones = zones;
+  let fallback = parsed.success ? parsed.data : null;
+  if (address !== undefined) {
+    const numbered = zones.filter(z => (z.estimatedDaysMin ?? z.estimatedDays ?? null) != null);
+    if (numbered.length > 0) {
+      const own = zoneForAddress(address, numbered);
+      if (!own) return null;
+      windowZones = [own];
+      fallback = null;
+    }
+  }
   const w = deliveryWindow({
     now: clock,
     leadTimeDays: lead,
-    zones: zones.map(z => ({
+    zones: windowZones.map(z => ({
       isActive: true, // the public endpoint only returns active zones
       estimatedDaysMin: z.estimatedDaysMin,
       estimatedDaysMax: z.estimatedDaysMax,
       estimatedDays: z.estimatedDays,
     })),
-    fallback: parsed.success ? parsed.data : null,
+    fallback,
     timeZone: store.timezone,
     offDays: offParsed.success ? offParsed.data : null,
   });

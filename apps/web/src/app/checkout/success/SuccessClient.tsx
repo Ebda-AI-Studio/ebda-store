@@ -50,14 +50,17 @@ function SuccessContent() {
 
   const [order, setOrder] = useState<Order | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  // S-02: the receipt repeats the delivery window (clock starts at the order's
-  // date; the longest made-to-order lead time on the order) and offers WhatsApp.
+  // S-02: the receipt repeats the delivery window of the order's own shipping
+  // zone (clock starts at the order's date; the longest made-to-order lead time
+  // on the order; no window when the address matches no zone) and offers WhatsApp.
   const orderLead = order
     ? Math.max(0, ...order.items.map(i => i.product?.leadTimeDays ?? 0))
     : null;
   const deliveryWindow = useDeliveryWindow({
     from: order ? new Date(order.createdAt) : null,
     leadTimeDays: orderLead,
+    // The ORDER's zone, never the fastest one (W1c review I4).
+    address: order ? (order.shippingAddress ?? {}) : null,
   });
   const whatsappHref = useOrderQuestionHref(order?.orderNumber);
   const [paymentState, setPaymentState] = useState<PaymentState>(

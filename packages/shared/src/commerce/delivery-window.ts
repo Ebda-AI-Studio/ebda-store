@@ -163,3 +163,41 @@ export function deliveryWindow(a: {
     to: addBusinessDays(a.now, range.max + lead, tz, off),
   };
 }
+
+/** The parts of an order's shipping address a zone can name. */
+export interface DeliveryAddressLike {
+  area?: string | null;
+  areaAr?: string | null;
+  governorate?: string | null;
+  governorateAr?: string | null;
+  city?: string | null;
+}
+
+/**
+ * The shipping zone an ORDER ships to (receipt / order pages): the first zone
+ * whose area names include the address's area (en or ar, case-insensitive; an
+ * area that contains a zone's name matches, as the checkout's fee lookup does),
+ * else its city, else its governorate. null when no zone names the address.
+ * Never "the fastest zone": a dated promise on a known address must be that
+ * address's window (W1c review I4).
+ */
+export function zoneForAddress<
+  Z extends { areas?: readonly string[] | null; areasAr?: readonly string[] | null },
+>(address: DeliveryAddressLike | null | undefined, zones: readonly Z[]): Z | null {
+  if (!address) return null;
+  const norm = (v: string | null | undefined) => (v ?? '').trim().toLowerCase();
+  const names = (z: Z) => [...(z.areas ?? []), ...(z.areasAr ?? [])].map(norm).filter(Boolean);
+  const tries: Array<[string, boolean]> = [
+    [norm(address.area), true],
+    [norm(address.areaAr), true],
+    [norm(address.city), true],
+    [norm(address.governorate), false],
+    [norm(address.governorateAr), false],
+  ];
+  for (const [value, contains] of tries) {
+    if (!value) continue;
+    const hit = zones.find(z => names(z).some(n => n === value || (contains && value.includes(n))));
+    if (hit) return hit;
+  }
+  return null;
+}

@@ -216,6 +216,8 @@ describe('S-02: the receipt repeats the delivery window and offers WhatsApp', ()
       /useDeliveryWindow\(\{\s*from: order \? new Date\(order\.createdAt\) : null/
     );
     expect(src).toMatch(/useOrderQuestionHref\(order\?\.orderNumber\)/);
+    // the ORDER's zone (review I4; behaviour in receipt-delivery-zone.test.tsx)
+    expect(src).toMatch(/address: order \? \(order\.shippingAddress \?\? \{\}\) : null/);
     expect(src).toMatch(/deliveryWindow=\{deliveryWindow\}/);
     expect(src).toMatch(/whatsappHref=\{whatsappHref\}/);
   });

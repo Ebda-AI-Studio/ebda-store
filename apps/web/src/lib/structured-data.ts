@@ -126,6 +126,9 @@ export interface PublicShippingZone {
   estimatedDaysMin: number | null;
   estimatedDaysMax: number | null;
   estimatedDays: number | null;
+  /** A named zone's area names (en / ar); absent on an area-rate row. Matches an order's address. */
+  areas?: string[];
+  areasAr?: string[];
 }
 
 /**
