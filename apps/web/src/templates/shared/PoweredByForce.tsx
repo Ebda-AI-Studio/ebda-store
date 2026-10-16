@@ -41,7 +41,7 @@ export function PoweredByForce({ hidden = false }: { hidden?: boolean }) {
           `Powered by ${t(BRAND.product.nameEn, BRAND.product.nameAr)}`,
           `مدعوم من ${BRAND.product.nameAr}`
         )}
-        className="inline-flex items-center gap-1 align-middle hover:opacity-80 transition-opacity"
+        className="inline-flex min-h-11 items-center  items-center gap-1 align-middle hover:opacity-80 transition-opacity"
       >
         {/* "Powered by Ebda" as a text wordmark. The wordmark is the footer's own ink + semibold:
             the brand gold (#B08D57) measured 3.09:1 on a white footer (STOP 1, Ruling B1-27), and

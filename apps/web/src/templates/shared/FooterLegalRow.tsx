@@ -95,7 +95,7 @@ export function FooterLegalRow({
                 )}
                 <a
                   href={l.href}
-                  className="underline-offset-4 hover:underline focus-visible:underline focus-visible:outline-none"
+                  className="inline-flex min-h-11 items-center underline-offset-4 hover:underline focus-visible:underline focus-visible:outline-none"
                 >
                   {l.label}
                 </a>

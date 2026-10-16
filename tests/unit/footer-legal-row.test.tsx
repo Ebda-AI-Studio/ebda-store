@@ -161,3 +161,38 @@ describe('FU46 I-1: the © year is the per-request render clock, not the local o
     expect(years[1]).toBe(years[0]);
   });
 });
+
+// a11y P1-5 / rule (d) (W4): footer links, legal links and "Powered by" measured 16-24px high.
+describe.each(Object.entries(FOOTERS))(
+  'rule (d): %s footer targets are at least 44px',
+  (_name, Footer) => {
+    it('every link and button in the footer', async () => {
+      const { smallTargets } = await import('../helpers/target-size');
+      const { container } = render(
+        <Footer
+          {...base}
+          hidePoweredBy={false}
+          contact={{ whatsapp: '201012345678', email: 'a@b.co', phone: '01012345678' }}
+          navigation={[{ label: 'Products', href: '/products' }] as never}
+          footerLinks={{ columns: [] } as never}
+        />
+      );
+      expect(smallTargets(container)).toEqual([]);
+    });
+  }
+);
+
+describe('rule (d): the cookie-preferences button under the footer is 44px', () => {
+  it('the layout passes it a 44px hit box', async () => {
+    const { readFileSync } = await import('node:fs');
+    const { hitBox } = await import('../helpers/target-size');
+    const src = readFileSync(
+      require('node:path').resolve(__dirname, '../../apps/web/src/app/layout.tsx'),
+      'utf8'
+    );
+    const cls = /<CookiePreferencesLink className="([^"]+)"/.exec(src)![1];
+    const el = document.createElement('button');
+    el.setAttribute('class', cls);
+    expect(hitBox(el).h).toBeGreaterThanOrEqual(44);
+  });
+});
