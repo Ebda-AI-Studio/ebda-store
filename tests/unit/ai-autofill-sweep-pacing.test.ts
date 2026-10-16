@@ -27,7 +27,7 @@ vi.mock('../../apps/api/src/services/alerts.service', () => ({ sendAlert: vi.fn(
 vi.mock('../../apps/api/src/lib/inngest/client', () => ({ inngest: { send: vi.fn() } }));
 vi.mock('../../apps/api/src/services/ai.service', () => ({ AIService: {} }));
 
-const { sweepStore, RATE_LIMIT_BACKOFF_MS } =
+const { sweepStore, RATE_LIMIT_BACKOFF_MS, MAX_CONSECUTIVE_RATE_LIMITS } =
   await import('../../apps/api/src/services/ai-autofill.service');
 
 const res = (
@@ -98,5 +98,40 @@ describe('sweepStore pacing (I4)', () => {
     const out = await sweepStore('s1', { fill, balance, sleep, throttleMs: 100 });
     expect(fill).toHaveBeenCalledTimes(2);
     expect(out.capped).toBe(true);
+  });
+
+  it('N2: 3 consecutive 429s stop the store for this run, warned once (no 60 s per remaining product)', async () => {
+    const many = Array.from({ length: 10 }, (_, i) => ({ id: `q${i}`, updatedAt: new Date() }));
+    const { prisma } = await import('@ebda/database');
+    vi.mocked(prisma.product.findMany).mockResolvedValueOnce(many as never);
+    // Google's daily quota gone: every key benched, every call an instant synthetic 429.
+    const fill = vi.fn().mockResolvedValue(res({ rateLimited: true }));
+    const balance = vi.fn().mockResolvedValue({ balanced: false, calls: 0 });
+    const out = await sweepStore('s1', { fill, balance, sleep, throttleMs: 100 });
+    expect(MAX_CONSECUTIVE_RATE_LIMITS).toBe(3);
+    expect(fill).toHaveBeenCalledTimes(3);
+    expect(sleeps).toEqual([60_000, 60_000]); // backs off between, not after the stop
+    expect(out.rateLimitStopped).toBe(true);
+    const stopWarns = warn.mock.calls.filter(c => /stopping this store/.test(String(c[1])));
+    expect(stopWarns).toHaveLength(1);
+  });
+
+  it('N2: a success resets the consecutive-429 count', async () => {
+    const many = Array.from({ length: 6 }, (_, i) => ({ id: `r${i}`, updatedAt: new Date() }));
+    const { prisma } = await import('@ebda/database');
+    vi.mocked(prisma.product.findMany).mockResolvedValueOnce(many as never);
+    const fill = vi
+      .fn()
+      .mockResolvedValueOnce(res({ rateLimited: true }))
+      .mockResolvedValueOnce(res({ rateLimited: true }))
+      .mockResolvedValueOnce(res({ calls: 1 }))
+      .mockResolvedValueOnce(res({ rateLimited: true }))
+      .mockResolvedValueOnce(res({ rateLimited: true }))
+      .mockResolvedValueOnce(res({ calls: 1 }));
+    const balance = vi.fn().mockResolvedValue({ balanced: false, calls: 0 });
+    const out = await sweepStore('s1', { fill, balance, sleep, throttleMs: 100 });
+    expect(fill).toHaveBeenCalledTimes(6);
+    expect(out.rateLimitStopped).toBe(false);
+    expect(out.rateLimited).toBe(4);
   });
 });

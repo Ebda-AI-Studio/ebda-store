@@ -787,6 +787,12 @@ const sweepSleep = (ms: number) => new Promise<void>(r => setTimeout(r, ms));
  * (review I4). The throttle alone should keep 429s away; this stops a burst from hammering.
  */
 export const RATE_LIMIT_BACKOFF_MS = 60_000;
+/**
+ * Consecutive provider 429s after which the sweep stops THIS store for this run (review N2).
+ * When Google's daily quota is gone every key is benched and each call fails instantly, so an
+ * unbounded backoff would idle a minute per remaining product (~16 h for 1,000 products).
+ */
+export const MAX_CONSECUTIVE_RATE_LIMITS = 3;
 
 export interface SweepStoreResult {
   products: number;
@@ -794,6 +800,8 @@ export interface SweepStoreResult {
   calls: number;
   rateLimited: number;
   capped: boolean;
+  /** stopped after MAX_CONSECUTIVE_RATE_LIMITS 429s in a row (review N2) */
+  rateLimitStopped: boolean;
 }
 
 interface SweepDeps {
@@ -824,7 +832,14 @@ export async function sweepStore(storeId: string, deps: SweepDeps = {}): Promise
   const balance = deps.balance ?? balanceProductLanguages;
   const sleep = deps.sleep ?? sweepSleep;
   const throttleMs = deps.throttleMs ?? SWEEP_THROTTLE_MS;
-  const out: SweepStoreResult = { products: 0, filled: 0, calls: 0, rateLimited: 0, capped: false };
+  const out: SweepStoreResult = {
+    products: 0,
+    filled: 0,
+    calls: 0,
+    rateLimited: 0,
+    capped: false,
+    rateLimitStopped: false,
+  };
   if (!(await isAutopilotEnabled(storeId))) return out;
 
   const products = await prisma.product.findMany({
@@ -833,13 +848,25 @@ export async function sweepStore(storeId: string, deps: SweepDeps = {}): Promise
   });
   out.products = products.length;
 
-  const backOff = async (productId: string) => {
+  let consecutive429 = 0;
+  /** Returns true when the store must stop for this run. */
+  const backOff = async (productId: string): Promise<boolean> => {
     out.rateLimited++;
+    consecutive429++;
+    if (consecutive429 >= MAX_CONSECUTIVE_RATE_LIMITS) {
+      out.rateLimitStopped = true;
+      logger.warn(
+        { storeId, productId, rateLimited: out.rateLimited, consecutive: consecutive429 },
+        '[ai-autofill-sweep] provider rate limit (429) persists: stopping this store for this run'
+      );
+      return true;
+    }
     logger.warn(
       { storeId, productId, rateLimited: out.rateLimited },
       '[ai-autofill-sweep] provider rate limit (429): backing off one minute window'
     );
     await sleep(RATE_LIMIT_BACKOFF_MS);
+    return false;
   };
 
   const staleBefore = new Date(Date.now() - STALE_TTL_DAYS * 24 * 60 * 60 * 1000);
@@ -855,7 +882,7 @@ export async function sweepStore(storeId: string, deps: SweepDeps = {}): Promise
       break;
     }
     if (res.rateLimited) {
-      await backOff(p.id);
+      if (await backOff(p.id)) break;
       continue;
     }
 
@@ -867,10 +894,11 @@ export async function sweepStore(storeId: string, deps: SweepDeps = {}): Promise
       const balCalls = bal.calls ?? 0;
       out.calls += balCalls;
       if (bal.balanced) out.filled += 1;
+      consecutive429 = 0; // a product got through: the 429s were not persistent
       if (balCalls > 0) await sleep(throttleMs * balCalls);
     } catch (err) {
       if ((err as { code?: unknown } | null)?.code === 'AI_QUOTA_EXCEEDED') {
-        await backOff(p.id);
+        if (await backOff(p.id)) break;
         continue;
       }
       if (isAiQuotaCapError(err)) {
