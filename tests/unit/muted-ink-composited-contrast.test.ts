@@ -177,3 +177,19 @@ describe('K-04: foreground text never drops under 70% alpha', () => {
     expect(fails).toEqual([]);
   });
 });
+
+// LB-b (independent audit): black and navy swatch dots on Lookbook's navy band were near
+// invisible; only a faint ring (ink at 35%) separated them. The dot ring composites to at
+// least 3:1 (WCAG 1.4.11) against every look's page and surface.
+describe('swatch dot ring is a visible boundary on every look (LB-b)', () => {
+  const src = readFileSync(join(WEB, 'components/commerce/SwatchDots.tsx'), 'utf8');
+  const alpha = Number(/border-foreground\/(\d+)/.exec(src)![1]) / 100;
+  it.each(
+    LOOKS.flatMap(l => [
+      [`${l.id} page`, l.tokens.ink, l.tokens.page] as [string, string, string],
+      [`${l.id} surface`, l.tokens.ink, l.tokens.surface] as [string, string, string],
+    ])
+  )('%s', (_n, ink, bg) => {
+    expect(contrastRatio(composite(ink, alpha, bg), bg)).toBeGreaterThanOrEqual(3);
+  });
+});

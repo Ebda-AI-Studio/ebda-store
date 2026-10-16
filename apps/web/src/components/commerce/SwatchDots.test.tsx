@@ -88,7 +88,7 @@ describe('SwatchDots', () => {
     expect(screen.getByText('+7')).toBeTruthy();
   });
 
-  it('a black dot on an ink skin keeps a 35% foreground edge (F7, WCAG 1.4.11)', () => {
+  it('a black dot on an ink skin keeps a 60% foreground edge (F7, raised by LB-b to clear 3:1 on every look)', () => {
     const p = {
       options: [
         {
@@ -100,7 +100,7 @@ describe('SwatchDots', () => {
     };
     render(<SwatchDots product={p as never} max={5} />);
     const dot = screen.getByTestId('swatch-dot');
-    expect(dot.className).toContain('border-foreground/35');
+    expect(dot.className).toContain('border-foreground/60');
     expect(dot.className).not.toContain('border-foreground/15');
   });
 });
