@@ -15,9 +15,12 @@
 --   'customers'     users whose first name / last name / email / phone ILIKE pattern AND who have an
 --                   order in this store (users.store_id is not what scopes them: a registered
 --                   customer's store_id need not be the order's store)
--- SECURITY DEFINER with the same caller check as every other store-scoped definer: a session may
--- ask only for the store in app.current_store_id; a role that bypasses RLS anyway (the owner) is
--- not restricted. The pattern is a BOUND value ($2); the statements are fixed text chosen by `kind`.
+-- SECURITY DEFINER, and therefore NOT an oracle (security review): the store is taken only from
+-- app.current_store_id (no scope: 42501; another store in the argument: empty, like "no match"; no
+-- exemption for owner sessions); it returns ids only; it applies the visibility the app and the
+-- RLS policies apply (soft-deleted orders are excluded, and a 'customers' user must be one the
+-- `users` policy would show: same store, the caller, the store's owner/staff, or a super admin).
+-- The pattern is a BOUND value ($2); the statements are fixed text chosen by `kind`.
 -- Callers join the ids back to `orders` as ebda_app, so RLS, soft-delete and the tenant guard still
 -- apply to the final rows.
 --
@@ -33,13 +36,16 @@ RETURNS SETOF text
 LANGUAGE plpgsql STABLE SECURITY DEFINER ROWS 200
 SET search_path = pg_catalog, public, pg_temp
 AS $fn$
+DECLARE
+  v_scope text;
 BEGIN
-  IF p_store_id IS NULL OR p_pattern IS NULL OR p_limit IS NULL OR p_limit < 1 THEN
-    RETURN;
+  -- The store comes ONLY from the scoped session (see ebda_product_search_ids): no scope = refused
+  -- (42501), an argument naming another store = empty, no exemption for owner/BYPASSRLS sessions.
+  v_scope := nullif(current_setting('app.current_store_id', true), '');
+  IF v_scope IS NULL THEN
+    RAISE EXCEPTION 'ebda_order_search_ids: no store scope' USING ERRCODE = '42501';
   END IF;
-  IF p_store_id IS DISTINCT FROM nullif(current_setting('app.current_store_id', true), '')
-     AND NOT EXISTS (SELECT 1 FROM pg_catalog.pg_roles r
-                     WHERE r.rolname = session_user AND (r.rolsuper OR r.rolbypassrls)) THEN
+  IF p_store_id IS DISTINCT FROM v_scope OR p_pattern IS NULL OR p_limit IS NULL OR p_limit < 1 THEN
     RETURN;
   END IF;
   p_limit := least(p_limit, 5000);
@@ -47,7 +53,7 @@ BEGIN
     RETURN QUERY EXECUTE
       'SELECT o.id FROM public.orders o
         WHERE o.store_id = $1 AND o.deleted_at IS NULL AND o.order_number ILIKE $2
-        LIMIT $3' USING p_store_id, p_pattern, p_limit;
+        LIMIT $3' USING v_scope, p_pattern, p_limit;
   ELSIF p_kind = 'guest' THEN
     RETURN QUERY EXECUTE
       'SELECT o.id FROM public.orders o
@@ -56,13 +62,19 @@ BEGIN
             OR o.shipping_address ->> ''lastName''  ILIKE $2
             OR o.shipping_address ->> ''email''     ILIKE $2
             OR o.shipping_address ->> ''phone''     ILIKE $2)
-        LIMIT $3' USING p_store_id, p_pattern, p_limit;
+        LIMIT $3' USING v_scope, p_pattern, p_limit;
   ELSIF p_kind = 'customers' THEN
     RETURN QUERY EXECUTE
       'SELECT u.id FROM public.users u
         WHERE (u.first_name ILIKE $2 OR u.last_name ILIKE $2 OR u.email ILIKE $2 OR u.phone ILIKE $2)
-          AND EXISTS (SELECT 1 FROM public.orders o WHERE o.store_id = $1 AND o.customer_id = u.id)
-        LIMIT $3' USING p_store_id, p_pattern, p_limit;
+          AND EXISTS (SELECT 1 FROM public.orders o
+                       WHERE o.store_id = $1 AND o.deleted_at IS NULL AND o.customer_id = u.id)
+          AND (u.store_id = $1
+               OR u.id = nullif(current_setting(''app.current_user_id'', true), '''')
+               OR EXISTS (SELECT 1 FROM public.stores s WHERE s.owner_id = u.id AND s.id = $1)
+               OR EXISTS (SELECT 1 FROM public.store_staff ss WHERE ss.user_id = u.id AND ss.store_id = $1)
+               OR public.ebda_is_super_admin())
+        LIMIT $3' USING v_scope, p_pattern, p_limit;
   END IF;
 END
 $fn$;

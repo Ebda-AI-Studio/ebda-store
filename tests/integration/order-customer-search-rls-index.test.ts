@@ -78,11 +78,13 @@ describe.skipIf(!hasDb)(
       await prisma.$executeRaw`
       INSERT INTO public.orders
         (id, store_id, order_number, subtotal, total, shipping_address, billing_address, customer_id, updated_at)
+      -- billing_address carries ~1.2 KB, like a real order (address, phone, notes): a wide heap makes
+      -- the store_id scan + filter clearly dearer than the trigram probes, so the plan does not flip.
       SELECT ${tag} || '-o' || g, ${storeId}, 'EB' || upper(md5(${tag} || 'o' || g)), 1000, 1000,
              CASE WHEN g <= ${REGISTERED_ORDERS}::int THEN '{}'::jsonb ELSE jsonb_build_object(
                'firstName', 'gf' || md5(${tag} || 'gf' || g), 'lastName', 'gl' || md5(${tag} || 'gl' || g),
                'email', 'ge' || md5(${tag} || 'ge' || g) || '@x.test', 'phone', '+2011' || lpad(g::text, 8, '0')) END,
-             '{}'::jsonb,
+             jsonb_build_object('note', repeat('x', 1200)),
              CASE WHEN g <= ${REGISTERED_ORDERS}::int THEN ${tag} || '-u' || ((g % ${USERS}::int) + 1) END,
              now()
       FROM generate_series(1, ${ORDERS}::int) g`;

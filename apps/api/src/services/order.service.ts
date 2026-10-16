@@ -1,3 +1,14 @@
+import {
+  orderSearchIds,
+  ORDER_SEARCH_CUSTOMER_ID_CAP,
+  guestOrderIdsMatching,
+} from '../lib/order-search-ids';
+export {
+  ORDER_SEARCH_CUSTOMER_ID_CAP,
+  orderSearchIds,
+  orderSearchIdsSql,
+  guestOrderIdsMatching,
+} from '../lib/order-search-ids';
 import { randomUUID } from 'node:crypto';
 import {
   prisma,
@@ -209,14 +220,6 @@ export interface OrderListWhere {
   confirmedOnly?: boolean;
 }
 
-/**
- * Most customer ids the order search resolves up front. Above this the term
- * is too broad for an id list to be worth binding, and the search falls back
- * to the relation filter (same rows, unindexed plan). 1000 bind parameters is
- * nowhere near Postgres' 65535 ceiling.
- */
-export const ORDER_SEARCH_CUSTOMER_ID_CAP = 1000;
-
 /** The `shipping_address` keys a guest's contact lives under (see `contactOf`, lib/customer-key.ts). */
 const GUEST_CONTACT_FIELDS = ['firstName', 'lastName', 'email', 'phone'] as const;
 
@@ -255,7 +258,8 @@ const GUEST_CONTACT_FIELDS = ['firstName', 'lastName', 'email', 'phone'] as cons
  */
 export async function orderSearchWhere(
   storeId: string,
-  search: string
+  search: string,
+  opts: { indexed?: boolean } = {}
 ): Promise<Prisma.OrderWhereInput[]> {
   const contains = { contains: search, mode: 'insensitive' as const };
   const customerMatch: Prisma.UserWhereInput[] = [
@@ -279,7 +283,10 @@ export async function orderSearchWhere(
     { customer: { is: { OR: customerMatch } } },
     guestJsonMatch,
   ];
-  if (search.length < 3) return relationFallback;
+  // A customer searching THEIR OWN orders (`indexed: false`) never calls the store-wide id lookup:
+  // the lookup answers for the whole store, and only a store viewer may ask the store a question.
+  // The relation fallback is ANDed with their customerId by the caller.
+  if (search.length < 3 || opts.indexed === false) return relationFallback;
 
   // The three lookups run in the store-scoped SECURITY DEFINER `ebda_order_search_ids` (Ruling
   // SEARCH-T14-5): as `ebda_app` the RLS barrier forbids every ILIKE trigram index, so the same
@@ -312,50 +319,6 @@ export async function orderSearchWhere(
   // Nothing matched anywhere: an explicit match-nothing arm (an empty OR is easy to misread).
   if (arms.length === 0) arms.push({ id: { in: [] } });
   return arms;
-}
-
-/** `%term%` with LIKE metacharacters escaped, so the term is matched literally. */
-function likeContains(term: string): string {
-  return `%${term.replace(/[\\%_]/g, '\\$&')}%`;
-}
-
-/**
- * Ids (capped at `ORDER_SEARCH_CUSTOMER_ID_CAP + 1` so a caller can tell "too many") from the
- * store-scoped SECURITY DEFINER `public.ebda_order_search_ids` (migration
- * 20261024000500_order_customer_search_ids, Ruling SEARCH-T14-5):
- *   'order_number'  live orders whose number contains the term
- *   'guest'         live GUEST orders (`customer_id IS NULL`) whose shipping contact (first name,
- *                   last name, email or phone) contains it, served by the partial expression
- *                   trigram indexes of migration 20261003100000
- *   'customers'     users with an order in this store whose name / email / phone contains it
- * The function refuses any store but the one in `app.current_store_id`; the term is only ever a
- * bound parameter, never logged (it is PII: a phone or an email).
- */
-export async function orderSearchIds(
-  storeId: string,
-  kind: 'order_number' | 'guest' | 'customers',
-  search: string,
-  limit: number = ORDER_SEARCH_CUSTOMER_ID_CAP + 1
-): Promise<string[]> {
-  const rows = await prisma.$queryRaw<Array<{ id: string }>>(
-    orderSearchIdsSql(storeId, kind, search, limit)
-  );
-  return rows.map(r => r.id);
-}
-
-/** The statement behind `orderSearchIds`; exported so the tests run the real SQL. */
-export function orderSearchIdsSql(
-  storeId: string,
-  kind: 'order_number' | 'guest' | 'customers',
-  search: string,
-  limit: number
-): Prisma.Sql {
-  return Prisma.sql`SELECT public.ebda_order_search_ids(${storeId}, ${kind}, ${likeContains(search)}, ${limit}) AS id`;
-}
-
-/** Ids of this store's live GUEST orders whose shipping contact contains `search`. */
-export async function guestOrderIdsMatching(storeId: string, search: string): Promise<string[]> {
-  return orderSearchIds(storeId, 'guest', search);
 }
 
 export class OrderService {
@@ -398,7 +361,7 @@ export class OrderService {
       if (to) (where.createdAt as any).lte = to;
     }
     const search = filters.search?.trim();
-    if (search) where.OR = await orderSearchWhere(storeId, search);
+    if (search) where.OR = await orderSearchWhere(storeId, search, { indexed: !customerId });
     return where;
   }
 

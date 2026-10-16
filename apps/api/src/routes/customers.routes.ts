@@ -10,6 +10,7 @@ import {
 import { prisma, type RfmSegment } from '@ebda/database';
 import { authenticate, authorize, rejectImpersonated } from '../middleware/auth';
 import { requireStoreAccess } from '../middleware/store-access';
+import { requirePermission } from '../middleware/rbac';
 import { AppError } from '../middleware/error-handler';
 import { writeLimiter, auditLog } from '../middleware/security';
 import { invalidateCustomersCache } from '../lib/public-cache';
@@ -606,6 +607,7 @@ router.get(
 router.get(
   '/customers/search',
   ...adminMiddleware,
+  requirePermission('orders:read'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId } = req.params;

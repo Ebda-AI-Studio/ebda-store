@@ -89,4 +89,12 @@ describe('orderSearchWhere: each over-cap half degrades on its own (issue 2444)'
     const w = await orderSearchWhere('store-1', '+9655');
     expect(JSON.stringify(w)).toBe('[{"id":{"in":[]}}]');
   });
+
+  it('a customer searching their own orders (indexed: false) never calls the store-wide lookup', async () => {
+    const w = await orderSearchWhere('store-1', '+9655', { indexed: false });
+    expect(h.queryRaw).not.toHaveBeenCalled();
+    const out = JSON.stringify(w);
+    expect(out).toContain('string_contains'); // the relation / JSON fallback, ANDed with their customerId
+    expect(out).not.toContain('"id":{"in"');
+  });
 });

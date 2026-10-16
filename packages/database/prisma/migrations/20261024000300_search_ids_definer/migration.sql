@@ -16,7 +16,7 @@
 -- returns the candidate product ids of ONE store. It is SECURITY DEFINER (owner-run, like every
 -- other ebda_* function, and for the same reason: the owner bypasses RLS, so the indexes are
 -- usable) and therefore checks its caller exactly as the policy does: the store id must equal the
--- transaction-local app.current_store_id, else it returns nothing. The patterns are BOUND values
+-- transaction-local app.current_store_id (no scope: refused; another store: nothing). The patterns are BOUND values
 -- ($1[i] inside the dynamic statement); the only text built by format() is a fixed column
 -- expression chosen from two literals and the loop index. The application keeps joining the ids
 -- back to `products` as ebda_app, so RLS, soft-delete, status, ordering and the tenant guard all
@@ -40,20 +40,21 @@ SET search_path = pg_catalog, public, pg_temp
 AS $fn$
 DECLARE
   doc text;
+  v_scope text;
   arms text := '';
   n int := coalesce(array_length(p_patterns, 1), 0);
   i int;
 BEGIN
-  -- The RLS policy's own predicate: only the store this transaction is scoped to. A session whose
-  -- role bypasses RLS anyway (the owner: migrations, scripts, owner-role test fixtures) is not
-  -- restricted by the policy, so it is not restricted here either; session_user cannot be forged
-  -- and ebda_app is neither superuser nor BYPASSRLS.
-  IF p_store_id IS NULL THEN
-    RETURN;
+  -- The store comes ONLY from the scoped session (app.current_store_id, set transaction-locally by
+  -- the app), never from the argument. No scope at all is a programming error or a probe: refuse
+  -- (42501). An argument naming any other store gets an empty answer, indistinguishable from "no
+  -- match", so the function is not an existence oracle. There is no exemption for owner or
+  -- BYPASSRLS sessions: the scope is the single source of the store.
+  v_scope := nullif(current_setting('app.current_store_id', true), '');
+  IF v_scope IS NULL THEN
+    RAISE EXCEPTION 'ebda_product_search_ids: no store scope' USING ERRCODE = '42501';
   END IF;
-  IF p_store_id IS DISTINCT FROM nullif(current_setting('app.current_store_id', true), '')
-     AND NOT EXISTS (SELECT 1 FROM pg_catalog.pg_roles r
-                     WHERE r.rolname = session_user AND (r.rolsuper OR r.rolbypassrls)) THEN
+  IF p_store_id IS DISTINCT FROM v_scope THEN
     RETURN;
   END IF;
   -- searchTokens() caps a query at 8 words; refuse anything else rather than build a huge AND.
@@ -92,7 +93,7 @@ BEGIN
     || CASE WHEN coalesce(p_only_active, false) THEN ' AND p.status = ''active''' ELSE '' END
     || CASE WHEN coalesce(p_include_deleted, false) THEN '' ELSE ' AND p.deleted_at IS NULL' END
     || arms
-    USING p_patterns, p_store_id;
+    USING p_patterns, v_scope;
 END
 $fn$;
 

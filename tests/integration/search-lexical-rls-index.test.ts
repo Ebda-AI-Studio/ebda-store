@@ -103,28 +103,8 @@ describe.skipIf(!hasDb)(
       expect(mixed).toEqual([]);
     }, 60_000);
 
-    // The definer runs as the owner, so it must itself refuse what RLS would: another store's id,
-    // and any call outside a store scope.
-    const callDefiner = (scopeStore: string | null, askStore: string) => {
-      const call = () =>
-        prisma.$queryRaw<Array<{ id: string }>>`
-        SELECT public.ebda_product_search_ids(${askStore}, 'all', false, false, true, false, ARRAY['%a%']::text[]) AS id`;
-      return asApp(() => (scopeStore ? runInTenantContext(scopeStore, call) : call()));
-    };
-
-    it('ebda_product_search_ids returns nothing for another store or outside a store scope', async () => {
-      const other = (
-        await prisma.store.create({ data: { name: `${tag}b`, slug: `${tag}b`, ownerId } })
-      ).id;
-      try {
-        expect((await callDefiner(storeId, storeId)).length).toBeGreaterThan(0); // positive control
-        expect(await callDefiner(other, storeId)).toEqual([]); // scoped to B, asking for A
-        expect(await callDefiner(storeId, other)).toEqual([]); // scoped to A, asking for B
-        expect(await callDefiner(null, storeId)).toEqual([]); // no scope at all
-      } finally {
-        await prisma.store.delete({ where: { id: other } }).catch(() => undefined);
-      }
-    }, 60_000);
+    // (The definer's caller checks - another store, no scope, owner sessions - are pinned in
+    // search-definer-authz.test.ts.)
 
     // SEARCH-T14-3 (coordinator ruling): a query made ONLY of words under 3 characters cannot use a
     // trigram index as a substring, so it matches at the START of a word instead, which the same

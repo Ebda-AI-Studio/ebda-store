@@ -1,5 +1,5 @@
 import { prisma } from '@ebda/database';
-import { orderSearchIds } from './order.service';
+import { orderSearchIds } from '../lib/order-search-ids';
 
 /**
  * Typeahead behind GET /stores/:storeId/customers/search (admin "New order" form): REGISTERED

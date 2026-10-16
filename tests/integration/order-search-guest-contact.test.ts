@@ -23,7 +23,7 @@
  *   - (index use as `ebda_app` is proven in order-customer-search-rls-index.test.ts).
  */
 import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
-import { prisma, Prisma } from '@ebda/database';
+import { prisma, Prisma, runInTenantContext } from '@ebda/database';
 import { hasDb } from '../helpers/bundle-fixtures';
 
 vi.mock('../../apps/api/src/lib/inngest/client', () => ({
@@ -32,6 +32,10 @@ vi.mock('../../apps/api/src/lib/inngest/client', () => ({
 
 const { OrderService, ORDER_SEARCH_CUSTOMER_ID_CAP } =
   await import('../../apps/api/src/services/order.service');
+
+/** The search lookups are SECURITY DEFINER and take the store from the scoped session (Task 14
+ * security review): a store scope is part of every search, as in production. */
+const inScope = <T>(fn: () => Promise<T>) => runInTenantContext(storeId, fn);
 
 const suffix = `${Date.now()}-${process.pid}-${Math.random().toString(36).slice(2, 8)}`;
 const tag = suffix.replace(/[^a-z0-9]/gi, '').slice(-10);
@@ -84,7 +88,7 @@ async function expected(search: string): Promise<string[]> {
 }
 
 async function actual(search: string): Promise<string[]> {
-  const where = await OrderService.listWhere(storeId, { search });
+  const where = await inScope(() => OrderService.listWhere(storeId, { search }));
   const rows = await prisma.order.findMany({ where, select: { id: true } });
   return rows.map(r => r.id).sort();
 }
@@ -140,6 +144,7 @@ describe.skipIf(!hasDb)('order search: guest contact', () => {
         firstName: `Regina${tag}`,
         lastName: 'Registered',
         role: 'customer',
+        storeId, // visible to this store's scope under the users RLS policy
       },
     });
     regUserId = reg.id;
@@ -254,7 +259,9 @@ describe.skipIf(!hasDb)('order search: guest contact', () => {
   });
 
   it('serves an ordinary term with the resolved-id arm, not the JSON filter', async () => {
-    const where = await OrderService.listWhere(storeId, { search: `gwendolyn${tag}` });
+    const where = await inScope(() =>
+      OrderService.listWhere(storeId, { search: `gwendolyn${tag}` })
+    );
     expect(JSON.stringify(where.OR)).toContain(`"id":{"in":["${guestIds.byFirst}"]}`);
     expect(JSON.stringify(where.OR)).not.toContain('string_contains');
   });
@@ -274,6 +281,7 @@ describe.skipIf(!hasDb)('order search: guest contact', () => {
         firstName: crowd,
         lastName: 'Registered',
         role: 'customer',
+        storeId, // visible to this store's scope under the users RLS policy
       },
     });
     try {
@@ -289,7 +297,7 @@ describe.skipIf(!hasDb)('order search: guest contact', () => {
       });
       const regOrder = await order(storeId, {}, { customerId: user.id });
 
-      const where = await OrderService.listWhere(storeId, { search: crowd });
+      const where = await inScope(() => OrderService.listWhere(storeId, { search: crowd }));
       const arms = JSON.stringify(where.OR);
       // The guest half is over the cap -> the JSON filter ...
       expect(arms).toContain('string_contains');
