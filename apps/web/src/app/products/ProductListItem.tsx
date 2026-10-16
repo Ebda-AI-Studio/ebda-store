@@ -16,6 +16,7 @@ import { useStore, useStoreUrl } from '../../contexts/StoreContext';
 import { resolveColor } from '@ebda/shared';
 import { cn, CartIcon } from '@ebda/ui';
 import { OosImageDim, OutOfStockRibbon } from '../../templates/shared/ProductCardCta';
+import { lookCardCta, lookCtaVisible, QUIET_CARD_CTA_CLS } from '../../templates/shared/look-card';
 import { needsOptions } from '../../templates/adapters';
 import { ctaShapeClass, ctaSizeClass } from '../../templates/shared/card-size';
 import { getDiscountBadgeColor } from '../../templates/shared/discount-badge';
@@ -88,6 +89,8 @@ export function ProductListItem({
     nameCase,
     viewOnly,
   } = resolveProductCardCtaOosDefaults(layout);
+  // Look card action (W2b, L-01): undefined on a store with no look.
+  const lookCta = lookCardCta(store.theme, layout);
   // Discount/sale + custom badge — same single-owner mutex as the grid
   // cards. `orderable` here is the list view's richer inventory-based signal
   // computed above, not `product.inStock`. No collision inputs needed here:
@@ -296,7 +299,10 @@ export function ProductListItem({
                 When ctaMode==='viewOnly', show a View label instead of Add to cart.
                 The entire ProductListItem is wrapped in a Link so no nested anchor
                 is needed — a span with the same visual chrome suffices. */}
-            {viewOnly || hasVariants ? (
+            {!lookCtaVisible(lookCta, {
+              hasVariants: viewOnly || hasVariants,
+              orderable,
+            }) ? null : viewOnly || hasVariants ? (
               <span
                 className={cn(
                   'flex h-10 items-center gap-2 rounded-xl bg-primary px-4 text-sm font-medium text-primary-foreground pointer-events-none',
@@ -327,7 +333,9 @@ export function ProductListItem({
             ) : (
               <button
                 className={cn(
-                  'flex h-10 items-center gap-2 rounded-xl bg-primary px-4 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90',
+                  lookCta === 'quiet'
+                    ? `flex h-10 items-center gap-2 ${QUIET_CARD_CTA_CLS}`
+                    : 'flex h-10 items-center gap-2 rounded-xl bg-primary px-4 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90',
                   ctaExtraCls
                 )}
                 onClick={e => onAddToCart(product, e)}

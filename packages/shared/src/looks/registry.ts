@@ -72,6 +72,11 @@ export const LOOKS: readonly LookDefinition[] = [
       wordmarkSize: 'lg',
       overPhotoChrome: 'bare',
       receiptStyle: 'framed',
+      // W2b: the photo is the card (L-01: no control, the card is the link), no hover lift (M-03),
+      // sale/new chips in the oxblood accent on the square radius (K-01).
+      cardCta: 'none',
+      cardHover: 'none',
+      cardBadge: 'accent',
     },
   }),
   L({
@@ -133,6 +138,12 @@ export const LOOKS: readonly LookDefinition[] = [
       motion: 'expressive',
       // T-01: the wordmark leads the header (it was 12px tracked caps).
       wordmarkSize: 'lg',
+      // W2b: no saffron slab under every card (L-01: only a simple in-stock piece gets an outline
+      // add); the heart is a white disc with FIXED ink, never the page's light foreground (LB-02,
+      // 1.12:1 before); chips in saffron with indigo ink (K-01). The hover lift stays (expressive).
+      cardCta: 'quiet',
+      overPhotoChrome: 'soft',
+      cardBadge: 'accent',
     },
   }),
   L({
@@ -190,6 +201,12 @@ export const LOOKS: readonly LookDefinition[] = [
       motion: 'subtle',
       // The centred Ruqaa wordmark at its current size (24/30px), now also on checkout/success.
       wordmarkSize: 'xl',
+      // W2b: one label system in a row (L-01: no "View" next to "Add to cart"), a still card
+      // (motion subtle, M-03), the heart on a disc with fixed ink, rose chips with ink (K-01).
+      cardCta: 'quiet',
+      cardHover: 'none',
+      overPhotoChrome: 'soft',
+      cardBadge: 'accent',
     },
   }),
   L({

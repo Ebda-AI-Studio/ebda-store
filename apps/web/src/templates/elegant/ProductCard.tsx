@@ -3,6 +3,7 @@
 import { memo, useState } from 'react';
 import { canBuyNow } from '@/lib/can-buy-now';
 import { resolveProductCardCtaOosDefaults } from '../shared/product-card-defaults';
+import { lookCardCta } from '../shared/look-card';
 import Link from 'next/link';
 import Image from 'next/image';
 import type { ProductCardProps } from '../types';
@@ -435,6 +436,7 @@ function ElegantProductCard({
               oosDimColor={resolvedOosDimColor}
               theme={store.theme}
               viewOnly={viewOnly}
+              lookCta={lookCardCta(store.theme, layout)}
             />
           </div>
         </div>

@@ -3,6 +3,7 @@
 import { memo } from 'react';
 import { canBuyNow } from '@/lib/can-buy-now';
 import { resolveProductCardCtaOosDefaults } from '../shared/product-card-defaults';
+import { lookCardCta, lookCtaVisible } from '../shared/look-card';
 import Link from 'next/link';
 import Image from 'next/image';
 import type { ProductCardProps } from '../types';
@@ -147,6 +148,8 @@ function MinimalProductCard({
     nameCase,
     viewOnly,
   } = resolveProductCardCtaOosDefaults(layout);
+  // Look card action (W2b, L-01): undefined on a store with no look.
+  const lookCta = lookCardCta(store.theme, layout);
   // Discount/sale badge — minimal's badge is inline text below the price
   // (no corner overlay by design, "minimal pack stays chrome-free"), so
   // only the merchant-configurable COLOR applies here; the position field
@@ -343,51 +346,56 @@ function MinimalProductCard({
               faster, mobile stays pure'. Text-only underlined link
               vocabulary matches minimal's font-light tracking-[0.2em]
               language. */}
-          <div
-            className={cn(
-              'flex absolute bottom-0 inset-x-0 items-center justify-center px-3 pb-4 pt-12',
-              'bg-gradient-to-t from-background/95 via-background/70 to-transparent',
-              // Mobile: the underlined add-link is always tappable (no hover to
-              // reveal). Desktop: keep the on-hover reveal — "mobile stays pure"
-              // still holds visually, mobile just gains a tap-to-add affordance.
-              'opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity duration-500 ease-out'
-            )}
-            onClick={e => e.preventDefault()}
-          >
-            {/* Task 3 B2: thread CTA customization props. */}
-            <ProductCardCta
-              productId={product.id}
-              inStock={orderable}
-              hasVariants={!!product.variants && product.variants.length > 0}
-              viewHref={`${urlPrefix}/products/${product.slug}`}
-              quantityInCart={quantityInCart}
-              isRtl={isRtl}
-              onAddToCart={handleAddToCart}
-              variant="ghost"
+          {lookCtaVisible(lookCta, {
+            hasVariants: (!!product.variants && product.variants.length > 0) || viewOnly,
+            orderable,
+          }) && (
+            <div
               className={cn(
-                'max-w-full overflow-hidden text-ellipsis bg-transparent text-xs tracking-[0.14em] uppercase font-normal text-foreground',
-                'underline underline-offset-4 decoration-foreground/30 hover:decoration-foreground',
-                'hover:bg-transparent hover:text-foreground transition-colors duration-300',
-                'py-1 h-auto cursor-pointer'
+                'flex absolute bottom-0 inset-x-0 items-center justify-center px-3 pb-4 pt-12',
+                'bg-gradient-to-t from-background/95 via-background/70 to-transparent',
+                // Mobile: the underlined add-link is always tappable (no hover to
+                // reveal). Desktop: keep the on-hover reveal — "mobile stays pure"
+                // still holds visually, mobile just gains a tap-to-add affordance.
+                'opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity duration-500 ease-out'
               )}
-              labels={{
-                addToCart: isRtl ? 'أضف للسلة' : 'Add to Cart',
-                addedToCart: isRtl ? 'تمت الإضافة' : 'Added',
-                outOfStock: isRtl ? 'نفذت الكمية' : 'Sold Out',
-                adding: isRtl ? '...' : '...',
-                view: isRtl ? 'عرض' : 'View',
-              }}
-              ctaShape={resolvedCtaShape}
-              ctaSize={resolvedCtaSize}
-              ctaColor={resolvedCtaColor}
-              ctaTextColor={resolvedCtaTextColor}
-              ctaLabelTextEn={resolvedCtaLabelTextEn}
-              ctaLabelTextAr={resolvedCtaLabelTextAr}
-              oosDimColor={resolvedOosDimColor}
-              theme={store.theme}
-              viewOnly={viewOnly}
-            />
-          </div>
+              onClick={e => e.preventDefault()}
+            >
+              {/* Task 3 B2: thread CTA customization props. */}
+              <ProductCardCta
+                productId={product.id}
+                inStock={orderable}
+                hasVariants={!!product.variants && product.variants.length > 0}
+                viewHref={`${urlPrefix}/products/${product.slug}`}
+                quantityInCart={quantityInCart}
+                isRtl={isRtl}
+                onAddToCart={handleAddToCart}
+                variant="ghost"
+                className={cn(
+                  'max-w-full overflow-hidden text-ellipsis bg-transparent text-xs tracking-[0.14em] uppercase font-normal text-foreground',
+                  'underline underline-offset-4 decoration-foreground/30 hover:decoration-foreground',
+                  'hover:bg-transparent hover:text-foreground transition-colors duration-300',
+                  'py-1 h-auto cursor-pointer'
+                )}
+                labels={{
+                  addToCart: isRtl ? 'أضف للسلة' : 'Add to Cart',
+                  addedToCart: isRtl ? 'تمت الإضافة' : 'Added',
+                  outOfStock: isRtl ? 'نفذت الكمية' : 'Sold Out',
+                  adding: isRtl ? '...' : '...',
+                  view: isRtl ? 'عرض' : 'View',
+                }}
+                ctaShape={resolvedCtaShape}
+                ctaSize={resolvedCtaSize}
+                ctaColor={resolvedCtaColor}
+                ctaTextColor={resolvedCtaTextColor}
+                ctaLabelTextEn={resolvedCtaLabelTextEn}
+                ctaLabelTextAr={resolvedCtaLabelTextAr}
+                oosDimColor={resolvedOosDimColor}
+                theme={store.theme}
+                viewOnly={viewOnly}
+              />
+            </div>
+          )}
         </div>
 
         {/* Text — PC-1: name/price sizes from textSizes; PC-2: pad from textSizes.pad. */}

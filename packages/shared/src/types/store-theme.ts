@@ -13,6 +13,9 @@ import type {
   OverPhotoChrome,
   ReceiptStyle,
   WordmarkSize,
+  CardCta,
+  CardHover,
+  CardBadge,
 } from '../looks/types';
 import { getLook } from '../looks/registry';
 import { resolveLookFonts } from '../looks/fonts';
@@ -153,6 +156,9 @@ export interface StoreTheme {
   wordmarkSize?: WordmarkSize;
   overPhotoChrome?: OverPhotoChrome;
   receiptStyle?: ReceiptStyle;
+  cardCta?: CardCta;
+  cardHover?: CardHover;
+  cardBadge?: CardBadge;
 
   // Per-store homepage section background preset — see BackgroundPreset
   // for behavior. Optional; missing or 'none' means flat-surface (no

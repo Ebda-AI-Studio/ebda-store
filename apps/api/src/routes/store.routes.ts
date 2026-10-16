@@ -31,6 +31,9 @@ import {
   LOOK_OVER_PHOTO_CHROMES,
   LOOK_RECEIPT_STYLES,
   LOOK_WORDMARK_SIZES,
+  LOOK_CARD_CTAS,
+  LOOK_CARD_HOVERS,
+  LOOK_CARD_BADGES,
   LOOK_MOTIONS,
   deliveryDaysSchema,
   deliveryOffDaysSchema,
@@ -264,6 +267,9 @@ const themeSchema = z
       wordmarkSize: LOOK_WORDMARK_SIZES,
       overPhotoChrome: LOOK_OVER_PHOTO_CHROMES,
       receiptStyle: LOOK_RECEIPT_STYLES,
+      cardCta: LOOK_CARD_CTAS,
+      cardHover: LOOK_CARD_HOVERS,
+      cardBadge: LOOK_CARD_BADGES,
     };
     for (const [key, values] of Object.entries(allowed)) {
       if (!(key in data) || data[key] === null) continue;

@@ -15,13 +15,25 @@ export type Motion = (typeof LOOK_MOTIONS)[number];
  * - `wordmarkSize`: the text wordmark size in the header and the checkout/success header (T-01).
  * - `overPhotoChrome`: material of controls that sit on a product photo (`soft` disc, `bare` glyph).
  * - `receiptStyle`: the order receipt housing (`device` slab today, `framed` paper in the page ink).
+ * - `cardCta` (W2b, L-01): the product card's action. `none` = no control, the card is the link;
+ *   `quiet` = only an in-stock product with no sizes gets an outline add (never a navigate-only
+ *   "View" slab). Absent = the skin's CTA system. A merchant `productCardDefaults.ctaMode` wins.
+ * - `cardHover` (W2b, M-03): `none` drops the card's hover scale and shadow lift.
+ * - `cardBadge` (W2b, K-01): `accent` paints the sale / new / custom chips in the look's accent pair
+ *   with the look radius and no glow, unless the merchant picked a badge colour.
  */
 export const LOOK_WORDMARK_SIZES = ['lg', 'xl'] as const;
 export const LOOK_OVER_PHOTO_CHROMES = ['soft', 'bare'] as const;
 export const LOOK_RECEIPT_STYLES = ['device', 'framed'] as const;
+export const LOOK_CARD_CTAS = ['none', 'quiet'] as const;
+export const LOOK_CARD_HOVERS = ['none', 'lift'] as const;
+export const LOOK_CARD_BADGES = ['accent'] as const;
 export type WordmarkSize = (typeof LOOK_WORDMARK_SIZES)[number];
 export type OverPhotoChrome = (typeof LOOK_OVER_PHOTO_CHROMES)[number];
 export type ReceiptStyle = (typeof LOOK_RECEIPT_STYLES)[number];
+export type CardCta = (typeof LOOK_CARD_CTAS)[number];
+export type CardHover = (typeof LOOK_CARD_HOVERS)[number];
+export type CardBadge = (typeof LOOK_CARD_BADGES)[number];
 
 /** Colour roles as hex; converted to HSL triplets by lookTheme(). */
 export interface LookTokens {
@@ -45,6 +57,9 @@ export interface LookTokens {
   wordmarkSize?: WordmarkSize;
   overPhotoChrome?: OverPhotoChrome;
   receiptStyle?: ReceiptStyle;
+  cardCta?: CardCta;
+  cardHover?: CardHover;
+  cardBadge?: CardBadge;
 }
 
 export interface LookDefinition {
@@ -145,6 +160,9 @@ export const LOOK_UI_TOKEN_KEYS = [
   'wordmarkSize',
   'overPhotoChrome',
   'receiptStyle',
+  'cardCta',
+  'cardHover',
+  'cardBadge',
 ] as const satisfies readonly (keyof StoreTheme)[];
 
 /** Every StoreTheme key a look owns: the always-set tokens plus the optional UI tokens. */

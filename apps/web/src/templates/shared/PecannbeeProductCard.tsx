@@ -37,6 +37,17 @@ import { AdaptiveAddButton, OosImageDim, OutOfStockRibbon, isProductNew } from '
 import { BrandPill } from './BrandPill';
 import { getDiscountBadgeColor } from './discount-badge';
 import { getCustomBadgeColor, getCustomBadgeTextColor, resolveCardBadges } from './custom-badge';
+import {
+  lookCardCta,
+  lookCtaVisible,
+  QUIET_CARD_CTA_CLS,
+  cardHoverCls,
+  lookChip,
+  LOOK_CHIP_CLS,
+  LOOK_CHIP_STYLE,
+  overPhotoMaterial,
+  overPhotoHeartCls,
+} from './look-card';
 
 import { fromMinor } from '@ebda/shared';
 import { REGION } from '@ebda/shared';
@@ -243,6 +254,19 @@ function PecannbeeProductCardImpl({
       ? resolveColor(resolvedCtaTextColor, store.theme)
       : undefined;
 
+  // Look card tokens (W2b). Every one is undefined / legacy on a store with no look.
+  const hasVariants = !!product.variants && product.variants.length > 0;
+  const lookCta = lookCardCta(store.theme, layout);
+  const ctaShown = lookCtaVisible(lookCta, { hasVariants: hasVariants || viewOnly, orderable });
+  const ctaCls = lookCta === 'quiet' ? QUIET_CARD_CTA_CLS : styles.productCardCta;
+  const chip = lookChip(store.theme);
+  // A merchant badge colour beats the look accent (merchant > look).
+  const discountChipStyle =
+    chip && !defaults?.discountBadge?.color
+      ? LOOK_CHIP_STYLE
+      : { backgroundColor: discountBadgeColor };
+  const heartMaterial = overPhotoMaterial(store.theme, store.look);
+
   return (
     <article
       // max-w cap on desktop so product cards in a 4-col grid don't
@@ -262,7 +286,8 @@ function PecannbeeProductCardImpl({
       // verified zero rendered-output change for the `showCardFrame` +
       // pack-style combination (see design-sweep PR).
       className={cn(
-        'group relative flex flex-col w-full mx-auto transition-[transform,box-shadow] duration-[var(--duration-slow)] ease-[var(--ease-out)] md:hover:scale-[1.02] md:hover:shadow-[0_20px_40px_-20px_hsl(var(--foreground)/0.18)]',
+        'group relative flex flex-col w-full mx-auto transition-[transform,box-shadow] duration-[var(--duration-slow)] ease-[var(--ease-out)]',
+        cardHoverCls(store.theme),
         sizeCap || 'md:max-w-[200px]',
         frameCls,
         styles.card,
@@ -293,9 +318,13 @@ function PecannbeeProductCardImpl({
         // Touch hitbox: the visual circle stays 40px (h-10 w-10, unchanged),
         // but before:-inset-1.5 grows the actual tap target to ~52px so it
         // clears the 44px a11y floor without changing the rendered size.
-        className={`before:absolute before:-inset-1.5 before:content-[''] absolute top-3 start-3 z-20 inline-flex h-10 w-10 items-center justify-center rounded-full bg-white/95 backdrop-blur-sm shadow-[0_8px_20px_-8px_hsl(var(--foreground)/0.30)] transition-[transform,background-color,color] duration-[var(--duration-base)] ease-[var(--ease-out)] hover:scale-[1.05] hover:bg-white active:scale-95 cursor-pointer ${
-          isWishlisted ? 'text-destructive' : 'text-foreground/70 hover:text-foreground'
-        }`}
+        className={
+          heartMaterial
+            ? overPhotoHeartCls(heartMaterial, isWishlisted)
+            : `before:absolute before:-inset-1.5 before:content-[''] absolute top-3 start-3 z-20 inline-flex h-10 w-10 items-center justify-center rounded-full bg-white/95 backdrop-blur-sm shadow-[0_8px_20px_-8px_hsl(var(--foreground)/0.30)] transition-[transform,background-color,color] duration-[var(--duration-base)] ease-[var(--ease-out)] hover:scale-[1.05] hover:bg-white active:scale-95 cursor-pointer ${
+                isWishlisted ? 'text-destructive' : 'text-foreground/70 hover:text-foreground'
+              }`
+        }
       >
         <svg
           className="h-5 w-5"
@@ -400,7 +429,12 @@ function PecannbeeProductCardImpl({
           />
           {showNewBadge && (
             <span
-              className="absolute top-3 start-3 z-10 rounded-full bg-[hsl(var(--primary))] px-2.5 py-1 text-xs font-bold uppercase tracking-wider text-[hsl(var(--primary-foreground))] shadow-[0_6px_14px_-6px_hsl(var(--primary)/0.5)]"
+              className={
+                chip
+                  ? cn(LOOK_CHIP_CLS, 'top-3 start-3')
+                  : 'absolute top-3 start-3 z-10 rounded-full bg-[hsl(var(--primary))] px-2.5 py-1 text-xs font-bold uppercase tracking-wider text-[hsl(var(--primary-foreground))] shadow-[0_6px_14px_-6px_hsl(var(--primary)/0.5)]'
+              }
+              style={chip ? LOOK_CHIP_STYLE : undefined}
               aria-label={t('New product', 'منتج جديد')}
             >
               {isRtl ? 'جديد' : 'NEW'}
@@ -416,11 +450,19 @@ function PecannbeeProductCardImpl({
               or bottom-left when theme.saleBadgeLegacyCorner, #1998). */}
           {onSale && discountBadgeAllowed && discountBadgeText && (
             <span
-              className={cn(
-                'pointer-events-none absolute z-10 rounded-full px-2.5 py-1 text-xs font-semibold tracking-wide text-white shadow-[0_8px_20px_-8px_rgba(220,38,38,0.45)]',
-                discountBadgePositionCls
-              )}
-              style={{ backgroundColor: discountBadgeColor }}
+              className={
+                chip
+                  ? cn(
+                      LOOK_CHIP_CLS,
+                      defaults?.discountBadge?.color && 'text-white',
+                      discountBadgePositionCls
+                    )
+                  : cn(
+                      'pointer-events-none absolute z-10 rounded-full px-2.5 py-1 text-xs font-semibold tracking-wide text-white shadow-[0_8px_20px_-8px_rgba(220,38,38,0.45)]',
+                      discountBadgePositionCls
+                    )
+              }
+              style={discountChipStyle}
             >
               {discountBadgeText}
             </span>
@@ -432,10 +474,16 @@ function PecannbeeProductCardImpl({
           {customBadgeText && (
             <span
               className={cn(
-                'pointer-events-none absolute z-10 rounded-full px-2.5 py-1 text-xs font-semibold tracking-wide text-white shadow-[0_8px_20px_-8px_rgba(0,0,0,0.35)]',
+                chip
+                  ? LOOK_CHIP_CLS
+                  : 'pointer-events-none absolute z-10 rounded-full px-2.5 py-1 text-xs font-semibold tracking-wide text-white shadow-[0_8px_20px_-8px_rgba(0,0,0,0.35)]',
                 customBadgePositionCls
               )}
-              style={{ backgroundColor: customBadgeColor, color: customBadgeTextColor }}
+              style={
+                chip && !defaults?.customBadge?.color
+                  ? LOOK_CHIP_STYLE
+                  : { backgroundColor: customBadgeColor, color: customBadgeTextColor }
+              }
             >
               {customBadgeText}
             </span>
@@ -535,7 +583,7 @@ function PecannbeeProductCardImpl({
             variants add to cart directly. Matches pecannbee target IMG_7994
             where two adjacent cards show different button texts based on
             inventory state. */}
-        {(product.variants && product.variants.length > 0) || viewOnly ? (
+        {!ctaShown ? null : (product.variants && product.variants.length > 0) || viewOnly ? (
           <Link
             href={href}
             prefetch={false}
@@ -565,7 +613,7 @@ function PecannbeeProductCardImpl({
             disabled
             data-cta="button"
             className={cn(
-              `mt-auto inline-flex w-full items-center justify-center gap-2 min-h-[44px] ${styles.productCardCta} disabled:cursor-not-allowed disabled:opacity-60`,
+              `mt-auto inline-flex w-full items-center justify-center gap-2 min-h-[44px] ${ctaCls} disabled:cursor-not-allowed disabled:opacity-60`,
               ctaExtraCls
             )}
             style={{
@@ -596,7 +644,7 @@ function PecannbeeProductCardImpl({
               (isRtl ? 'إضافة للسلة' : 'Add to Cart')
             }
             className={cn(
-              `mt-auto inline-flex w-full items-center justify-center gap-2 min-h-[44px] ${styles.productCardCta} disabled:cursor-not-allowed disabled:opacity-60`,
+              `mt-auto inline-flex w-full items-center justify-center gap-2 min-h-[44px] ${ctaCls} disabled:cursor-not-allowed disabled:opacity-60`,
               ctaExtraCls
             )}
             style={{

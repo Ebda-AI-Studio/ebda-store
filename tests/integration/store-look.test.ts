@@ -235,6 +235,8 @@ describe.skipIf(!hasDb)('PUT /stores/:id/look (ebda_app + tenant guard)', () => 
       wordmarkSize: 'xl',
       overPhotoChrome: 'soft',
       receiptStyle: 'device',
+      cardCta: 'quiet',
+      cardHover: 'lift',
       showQuickAdd: true,
     });
     const res = await put(m.storeId, m.token, { lookId: LOOK_ID, design: 'reset' });
@@ -259,6 +261,9 @@ describe.skipIf(!hasDb)('PUT /stores/:id/look (ebda_app + tenant guard)', () => 
       { wordmarkSize: 'huge' },
       { overPhotoChrome: 'glass' },
       { receiptStyle: 'thermal' },
+      { cardCta: 'slab' },
+      { cardHover: 'bounce' },
+      { cardBadge: 'red' },
     ]) {
       const res = await putTheme(bad);
       expect(res.status, JSON.stringify(bad)).toBe(400);
@@ -274,6 +279,14 @@ describe.skipIf(!hasDb)('PUT /stores/:id/look (ebda_app + tenant guard)', () => 
       imageRatio: '3/4',
       wordmarkSize: 'lg',
       overPhotoChrome: 'bare',
+    });
+    // W2b card tokens: known values only, merchant-storable like the W2a ones.
+    const card = await putTheme({ cardCta: 'quiet', cardHover: 'lift', cardBadge: 'accent' });
+    expect(card.status, JSON.stringify(card.body)).toBe(200);
+    expect((await row(m.storeId)).theme).toMatchObject({
+      cardCta: 'quiet',
+      cardHover: 'lift',
+      cardBadge: 'accent',
     });
   });
 

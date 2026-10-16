@@ -42,6 +42,9 @@ export function lookTheme(look: LookDefinition): Partial<StoreTheme> {
     ...(t.wordmarkSize ? { wordmarkSize: t.wordmarkSize } : {}),
     ...(t.overPhotoChrome ? { overPhotoChrome: t.overPhotoChrome } : {}),
     ...(t.receiptStyle ? { receiptStyle: t.receiptStyle } : {}),
+    ...(t.cardCta ? { cardCta: t.cardCta } : {}),
+    ...(t.cardHover ? { cardHover: t.cardHover } : {}),
+    ...(t.cardBadge ? { cardBadge: t.cardBadge } : {}),
   };
 }
 

@@ -24,6 +24,15 @@ import {
   ctaSizeClass,
 } from './card-size';
 import { AdaptiveAddButton, OosImageDim, OutOfStockRibbon, isProductNew } from './ProductCardCta';
+import {
+  lookCardCta,
+  lookCtaVisible,
+  QUIET_CARD_CTA_CLS,
+  cardHoverCls,
+  lookChip,
+  LOOK_CHIP_CLS,
+  LOOK_CHIP_STYLE,
+} from './look-card';
 import { smoothScrollLeftTo, smoothScrollLeftBy } from '@/lib/smooth-scroll';
 import { BrandPill } from './BrandPill';
 import { useStore } from '../../contexts/StoreContext';
@@ -145,6 +154,10 @@ function SharedProductCarousel({
   // whether quick-add will actually render for THIS product.
   const discountBadgeColor = getDiscountBadgeColor(cardDefaults?.discountBadge?.color, store.theme);
   const customBadgeColor = getCustomBadgeColor(cardDefaults?.customBadge?.color, store.theme);
+  // Look card tokens (W2b); all legacy on a store with no look.
+  const lookCta = lookCardCta(store.theme, layout);
+  const ctaCls = lookCta === 'quiet' ? QUIET_CARD_CTA_CLS : styles.productCardCta;
+  const chip = lookChip(store.theme);
   const customBadgeTextColor = getCustomBadgeTextColor(
     cardDefaults?.customBadge?.color,
     store.theme
@@ -432,7 +445,8 @@ function SharedProductCarousel({
                       verified zero rendered-output change. */}
                   <div
                     className={cn(
-                      'flex flex-col h-full overflow-hidden transition-[transform,box-shadow] duration-[var(--duration-slow)] ease-[var(--ease-out)] md:hover:scale-[1.02] md:hover:shadow-[0_20px_40px_-20px_hsl(var(--foreground)/0.18)]',
+                      'flex flex-col h-full overflow-hidden transition-[transform,box-shadow] duration-[var(--duration-slow)] ease-[var(--ease-out)]',
+                      cardHoverCls(store.theme),
                       dedupInnerFrame ? '' : styles.card,
                       // LAST: the merchant's cardShape radius must beat the
                       // pack's rounded-* under tailwind-merge (#665).
@@ -474,7 +488,12 @@ function SharedProductCarousel({
                             because OOS hides NEW (see isProductNew gate). */}
                         {showNewBadge && (
                           <span
-                            className="absolute top-3 start-3 z-10 rounded-full bg-[hsl(var(--primary))] px-2.5 py-1 text-xs font-bold uppercase tracking-wider text-[hsl(var(--primary-foreground))] shadow-[0_6px_14px_-6px_hsl(var(--primary)/0.5)]"
+                            className={
+                              chip
+                                ? cn(LOOK_CHIP_CLS, 'top-3 start-3')
+                                : 'absolute top-3 start-3 z-10 rounded-full bg-[hsl(var(--primary))] px-2.5 py-1 text-xs font-bold uppercase tracking-wider text-[hsl(var(--primary-foreground))] shadow-[0_6px_14px_-6px_hsl(var(--primary)/0.5)]'
+                            }
+                            style={chip ? LOOK_CHIP_STYLE : undefined}
                             aria-label={isRtl ? 'منتج جديد' : 'New product'}
                           >
                             {isRtl ? 'جديد' : 'NEW'}
@@ -540,10 +559,19 @@ function SharedProductCarousel({
                         {onSale && discountBadgeAllowed && discountBadgeText && (
                           <span
                             className={cn(
-                              'pointer-events-none absolute z-10 rounded-full px-2.5 py-1 text-xs font-semibold tracking-wide text-white shadow-[0_6px_16px_-6px_rgba(220,38,38,0.45)]',
+                              chip
+                                ? cn(
+                                    LOOK_CHIP_CLS,
+                                    cardDefaults?.discountBadge?.color && 'text-white'
+                                  )
+                                : 'pointer-events-none absolute z-10 rounded-full px-2.5 py-1 text-xs font-semibold tracking-wide text-white shadow-[0_6px_16px_-6px_rgba(220,38,38,0.45)]',
                               discountBadgePositionCls
                             )}
-                            style={{ backgroundColor: discountBadgeColor }}
+                            style={
+                              chip && !cardDefaults?.discountBadge?.color
+                                ? LOOK_CHIP_STYLE
+                                : { backgroundColor: discountBadgeColor }
+                            }
                           >
                             {discountBadgeText}
                           </span>
@@ -554,13 +582,19 @@ function SharedProductCarousel({
                         {customBadgeText && (
                           <span
                             className={cn(
-                              'pointer-events-none absolute z-10 rounded-full px-2.5 py-1 text-xs font-semibold tracking-wide text-white shadow-[0_6px_16px_-6px_rgba(0,0,0,0.35)]',
+                              chip
+                                ? LOOK_CHIP_CLS
+                                : 'pointer-events-none absolute z-10 rounded-full px-2.5 py-1 text-xs font-semibold tracking-wide text-white shadow-[0_6px_16px_-6px_rgba(0,0,0,0.35)]',
                               customBadgePositionCls
                             )}
-                            style={{
-                              backgroundColor: customBadgeColor,
-                              color: customBadgeTextColor,
-                            }}
+                            style={
+                              chip && !cardDefaults?.customBadge?.color
+                                ? LOOK_CHIP_STYLE
+                                : {
+                                    backgroundColor: customBadgeColor,
+                                    color: customBadgeTextColor,
+                                  }
+                            }
                           >
                             {customBadgeText}
                           </span>
@@ -758,12 +792,19 @@ function SharedProductCarousel({
                         const ctaAddLabel =
                           (isRtl ? resolvedCtaLabelTextAr : resolvedCtaLabelTextEn) ??
                           (isRtl ? 'إضافة للسلة' : 'Add to cart');
+                        if (
+                          !lookCtaVisible(lookCta, {
+                            hasVariants: hasVariants || viewOnly,
+                            orderable,
+                          })
+                        )
+                          return null;
                         return hasVariants || viewOnly ? (
                           <Link
                             href={href}
                             prefetch={false}
                             className={cn(
-                              `block w-full text-center cursor-pointer ${styles.productCardCta}`,
+                              `block w-full text-center cursor-pointer ${ctaCls}`,
                               ctaExtraCls
                             )}
                             data-zone="productCta"
@@ -777,7 +818,7 @@ function SharedProductCarousel({
                             type="button"
                             disabled
                             className={cn(
-                              `block w-full text-center opacity-60 cursor-not-allowed ${styles.productCardCta}`,
+                              `block w-full text-center opacity-60 cursor-not-allowed ${ctaCls}`,
                               ctaExtraCls
                             )}
                             data-zone="productCta"
@@ -791,7 +832,7 @@ function SharedProductCarousel({
                             <AdaptiveAddButton
                               onClick={() => onAddToCart(product.id)}
                               className={cn(
-                                `block w-full text-center cursor-pointer ${styles.productCardCta}`,
+                                `block w-full text-center cursor-pointer ${ctaCls}`,
                                 ctaExtraCls
                               )}
                               dataZone="productCta"

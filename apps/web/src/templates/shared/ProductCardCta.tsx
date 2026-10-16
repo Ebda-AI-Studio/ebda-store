@@ -9,6 +9,8 @@ import { resolveColor } from '@ebda/shared';
 import type { CtaShape, CtaSize } from './card-size';
 import { ctaShapeClass, ctaSizeClass, labelShapeClass, oosPlacementClass } from './card-size';
 import { avoidReservedCorner, soldOutCorner } from './badge-collision';
+import type { CardCta } from '@ebda/shared';
+import { lookCtaVisible, QUIET_CARD_CTA_CLS } from './look-card';
 
 /**
  * Shared platform-level CTA used by EVERY theme's ProductCard.
@@ -192,6 +194,11 @@ interface ProductCardCtaProps {
    * Driven by productCardDefaults.ctaMode === 'viewOnly'.
    */
   viewOnly?: boolean;
+  /**
+   * The look's card action (W2b, L-01; `lookCardCta(theme, layout)`): `none` renders nothing,
+   * `quiet` only an outline add for a simple buyable product. Undefined = the system above.
+   */
+  lookCta?: CardCta;
 }
 
 export function ProductCardCta({
@@ -215,6 +222,7 @@ export function ProductCardCta({
   oosDimColor: _oosDimColor,
   theme,
   viewOnly = false,
+  lookCta,
 }: ProductCardCtaProps) {
   const router = useRouter();
   const { ref: ctaRef, compact: compactRaw } = useCompactCta();
@@ -237,6 +245,12 @@ export function ProductCardCta({
   // oosDimColor is an IMAGE overlay (see OosImageDim) — not a CTA background.
   // No CTA-specific oosDim styling here.
   const oosDimStyle: React.CSSProperties = {};
+
+  if (
+    !lookCtaVisible(lookCta, { hasVariants: hasVariants || viewOnly, orderable: inStock !== false })
+  )
+    return null;
+  if (lookCta === 'quiet') className = QUIET_CARD_CTA_CLS;
 
   // viewOnly: force the View link path for no-variant in-stock products too.
   if ((hasVariants || viewOnly) && viewHref) {
