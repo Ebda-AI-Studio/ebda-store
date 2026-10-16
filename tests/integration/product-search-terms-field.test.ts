@@ -9,7 +9,7 @@
 import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
 import express, { type NextFunction, type Request, type Response } from 'express';
 import request from 'supertest';
-import { prisma, runInTenantContext } from '@ebda/database';
+import { prisma, runInTenantContext, createPrismaClient } from '@ebda/database';
 import { SEARCH_TERMS_MAX_LENGTH } from '@ebda/shared';
 import { hasDb } from '../helpers/bundle-fixtures';
 
@@ -144,6 +144,48 @@ describe.skipIf(!hasDb)('search terms: stored, searchable, every writer capped',
       ProductService.update(storeId, p.id, updateProductSchema.parse({ searchTerms: null }))
     );
     expect((await termsOf(p.id))!.searchTerms).toBeNull();
+  });
+
+  it('N1: a merchant save never writes back a stale provenance map over a fresh AI stamp', async () => {
+    const p = await inStore(() =>
+      ProductService.create(
+        storeId,
+        createProductSchemaChecked.parse({ name: 'Race', price: 1000 })
+      )
+    );
+    // A separate connection, so the "AI write" commits on its own while the merchant's
+    // request transaction is still open (between its read and its UPDATE).
+    const other = createPrismaClient({
+      connectionString: process.env.DIRECT_URL || process.env.DATABASE_URL || '',
+      role: 'owner',
+    } as never);
+    const realGetById = ProductService.getById.bind(ProductService);
+    const spy = vi.spyOn(ProductService, 'getById').mockImplementationOnce(async (sid, pid) => {
+      const stale = await realGetById(sid, pid); // the merchant's read: no AI stamp yet
+      await other.product.update({
+        where: { id: p.id },
+        data: { searchTerms: 'kobaya, mug', aiFieldSources: { searchTerms: 'ai' } },
+      });
+      return stale;
+    });
+    try {
+      await inStore(() =>
+        ProductService.update(
+          storeId,
+          p.id,
+          updateProductSchema.parse({ price: 2000, nameAr: 'مج' })
+        )
+      );
+    } finally {
+      spy.mockRestore();
+      await other.$disconnect();
+    }
+    const row = await prisma.product.findUnique({ where: { id: p.id } });
+    const src = row!.aiFieldSources as Record<string, string>;
+    expect(src.searchTerms).toBe('ai'); // the AI stamp that committed meanwhile survives
+    expect(src.nameAr).toBe('human'); // and the merchant's own edit is stamped
+    expect(row!.searchTerms).toBe('kobaya, mug');
+    expect(row!.price).toBe(2000);
   });
 
   it('service re-caps even if a caller bypasses Zod (MCP/AI-fill defence in depth)', async () => {

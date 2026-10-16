@@ -911,6 +911,15 @@ export class ProductService {
       product as Record<string, unknown>,
       data as Record<string, unknown>
     );
+    // Write only what THIS save changed in the provenance map (review N1): the map read above
+    // can be stale — an AI guarded write may have committed since — and writing it back whole
+    // would drop that fresh 'ai' stamp. The delta is merged in SQL below, in the same
+    // transaction as the field write.
+    const prevSources = (product.aiFieldSources as Record<string, string>) ?? {};
+    const setSources = Object.fromEntries(
+      Object.entries(nextSources).filter(([k, v]) => prevSources[k] !== v)
+    );
+    const removedSources = Object.keys(prevSources).filter(k => !(k in nextSources));
 
     // Wrap image/category replacement and product update in a transaction
     // so that a failure mid-way does not leave orphaned or missing relations.
@@ -1016,13 +1025,25 @@ export class ProductService {
           ...(data.metaDescriptionAeoAr !== undefined
             ? { metaDescriptionAeoAr: data.metaDescriptionAeoAr }
             : {}),
-          aiFieldSources: nextSources,
         },
         include: {
           images: { orderBy: { position: 'asc' } },
           categories: { include: { category: true } },
         },
       });
+      if (Object.keys(setSources).length > 0 || removedSources.length > 0) {
+        // Per-key merge on the row as it is NOW (this UPDATE holds its lock): concurrent
+        // stamps on other keys survive. store_id keeps the raw statement tenant-keyed.
+        const merged = await tx.$queryRaw<Array<{ ai_field_sources: unknown }>>`
+          UPDATE products
+             SET ai_field_sources =
+                 (COALESCE(ai_field_sources, '{}'::jsonb) || ${JSON.stringify(setSources)}::jsonb)
+                 - ${removedSources}::text[]
+           WHERE id = ${productId} AND store_id = ${storeId}
+       RETURNING ai_field_sources`;
+        (updated as { aiFieldSources: unknown }).aiFieldSources =
+          merged[0]?.ai_field_sources ?? updated.aiFieldSources;
+      }
 
       if (data.slug && finalSlug !== product.slug) {
         await recordSlugRedirect(tx, storeId, SlugEntityType.PRODUCT, product.slug, finalSlug!);
