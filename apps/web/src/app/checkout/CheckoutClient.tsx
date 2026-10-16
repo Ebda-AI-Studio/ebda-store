@@ -1886,7 +1886,7 @@ export default function CheckoutClient() {
 
   return (
     <MinimalChrome label={checkoutLabelEn} labelAr={checkoutLabelAr}>
-      <div className="flex-1" style={checkoutBgStyle}>
+      <div className="flex-1" style={checkoutBgStyle} data-transactional>
         <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8" style={checkoutDensity}>
           {/* Progress Steps */}
           <div className="mb-8">

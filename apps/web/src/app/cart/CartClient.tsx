@@ -429,7 +429,8 @@ export default function CartClient() {
 
   return (
     <ShopChrome>
-      <div className="flex-1" style={cartBgStyle}>
+      {/* rule (g): sub-headings and item names here read in the body face, not the display face. */}
+      <div className="flex-1" style={cartBgStyle} data-transactional>
         <div className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 lg:px-8" style={cartDensity}>
           {/* Breadcrumb */}
           <Breadcrumbs

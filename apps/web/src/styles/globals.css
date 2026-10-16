@@ -1407,11 +1407,16 @@ h1:where([data-zone='productName']) {
 [data-look] {
   font-family: var(--font-body, var(--font-arabic), var(--font-sans));
 }
+/* Rule (g), W4: the display face is for display text: page and section titles (h1, h2) and an
+   explicit `.font-display`. h3 (card names, captions, small headings) reads in the body face, and
+   inside a transactional surface (cart, checkout, receipt) every sub-heading does. */
 [data-look] h1,
 [data-look] h2,
-[data-look] h3,
 [data-look] .font-display {
   font-family: var(--font-display);
+}
+html[lang] [data-look] [data-transactional] :is(h2, h3, h4) {
+  font-family: var(--font-body, var(--font-arabic), var(--font-sans));
 }
 /* Section rhythm: only sections whose spacing is UNSET (sectionSpacingClasses adds
    sp-top-default / sp-bottom-default, and only for a store with a look) scale by
@@ -1454,7 +1459,6 @@ html[lang] body[data-look][data-pack='dahab'] {
 /* English locale: Latin display face first, Arabic display stack as fallback. */
 html[lang='en'] [data-look] h1,
 html[lang='en'] [data-look] h2,
-html[lang='en'] [data-look] h3,
 html[lang='en'] [data-look] .font-display {
   font-family: var(--font-latin, var(--font-display)), var(--font-display);
 }

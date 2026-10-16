@@ -201,7 +201,7 @@ function SuccessContent() {
 
   return (
     <MinimalChrome>
-      <div className="mx-auto max-w-2xl px-4 py-16 sm:px-6 lg:px-8">
+      <div className="mx-auto max-w-2xl px-4 py-16 sm:px-6 lg:px-8" data-transactional>
         <div className="text-center">
           {/* Status icon \u2014 reflects the VERIFIED payment state, not an
               unconditional checkmark. */}
