@@ -329,8 +329,8 @@ export const translations = {
   'Demo store': 'متجر تجريبي',
   Template: 'القالب',
   Look: 'الشكل',
-  'Choose a look': 'اختار شكل',
-  'This is a demo store: this is turned off here': 'ده متجر تجريبي — الخاصية دي مقفولة هنا',
+  'Choose a look': 'اختر شكلاً',
+  'This is a demo store: this is turned off here': 'هذا متجر تجريبي — هذه الخاصية مغلقة هنا',
 
   // Route error fallback — Try Again while the refresh is in flight.
   'Retrying…': 'جارٍ إعادة المحاولة…',

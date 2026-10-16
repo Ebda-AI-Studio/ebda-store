@@ -19,6 +19,8 @@ import { useCart } from '../../../../contexts/CartContext';
 import { useLocalePrice } from '../../../../hooks/useLocalePrice';
 import { ShopChrome } from '../../../../components';
 import { VariantSelector } from '../../../../components/VariantSelector';
+import { Breadcrumbs } from '../../../../components/Breadcrumbs';
+import { canBuyNow } from '../../../../lib/can-buy-now';
 import { toTemplateProduct } from '../../../../templates/adapters';
 import { getProductPricing } from '../../../../lib/product-pricing';
 import { soldOutLabel } from '../../../../templates/shared/ProductCardCta';
@@ -47,22 +49,14 @@ export function LookPiecesClient({ panel, pieces }: { panel: LookPanel; pieces: 
   return (
     <ShopChrome>
       <div className="mx-auto max-w-7xl px-4 pb-10 pt-6 sm:px-6 lg:px-8" data-page="look-panel">
-        <Link
-          href={storeUrl('/')}
-          className="inline-flex min-h-[44px] items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
-        >
-          <svg
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            className="h-4 w-4 rotate-180 rtl:rotate-0"
-            aria-hidden="true"
-          >
-            <path d="m9 6 6 6-6 6" />
-          </svg>
-          {t('Home', 'الرئيسية')}
-        </Link>
+        {/* The ONE storefront trail (R-06): home, then this look. */}
+        <Breadcrumbs
+          className="text-sm"
+          items={[
+            { label: t('Home', 'الرئيسية'), href: storeUrl('/') },
+            { label: title || t('Shop this look', 'تسوّق هذا اللوك') },
+          ]}
+        />
         <div className="mt-4 grid gap-6 md:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] md:items-end">
           {image && (
             <div className="relative aspect-[4/5] w-full max-w-sm overflow-hidden rounded-[var(--radius)] bg-muted">
@@ -131,11 +125,8 @@ function LookPiece({
   const name = (ar && product.nameAr ? product.nameAr : product.name) || '';
   const hasVariants = (product.variants?.length ?? 0) > 0 && (product.options?.length ?? 0) > 0;
   const pricing = getProductPricing(tp, variant ?? undefined, 'detail');
-  const backorder = product.acceptsBackorder === true;
-  const orderable = variant
-    ? (variant.inventory ?? 0) > 0 ||
-      (variant as { acceptsBackorder?: boolean }).acceptsBackorder === true
-    : tp.inStock !== false || backorder;
+  // The ONE stock rule (X-02): stock or backorder, the variant deciding once one is picked.
+  const orderable = canBuyNow(product, variant);
   const needsNote = product.personalisation?.enabled === true && product.personalisation.required;
   const href = storeUrl(`/products/${product.slug}`);
   const thumb = product.images?.[0]?.url;

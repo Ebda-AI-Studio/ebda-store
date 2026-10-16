@@ -29,6 +29,7 @@ import { useLanguage } from '../../contexts/LanguageContext';
 import { useLocalePrice } from '../../hooks/useLocalePrice';
 import { toTemplateProduct } from '../../templates/adapters';
 import { getProductPricing } from '../../lib/product-pricing';
+import { canBuyNow } from '../../lib/can-buy-now';
 import { soldOutLabel } from '../../templates/shared/ProductCardCta';
 import { resolveProductCardCtaOosDefaults } from '../../templates/shared/product-card-defaults';
 import { sectionBgStyle } from '../../templates/shared/section-bg';
@@ -89,9 +90,8 @@ export function ShopTheLookSection({
         .map(p => {
           const tp = toTemplateProduct(p);
           const pricing = getProductPricing(tp, undefined, 'card');
-          // Same orderable signal as the shared card: in stock, or backorder allowed.
-          const orderable =
-            tp.inStock !== false || (p as { acceptsBackorder?: boolean }).acceptsBackorder === true;
+          // Same orderable signal as the shared card (X-02: the one stock rule).
+          const orderable = canBuyNow(p);
           return { tp, pricing, orderable };
         });
       return {

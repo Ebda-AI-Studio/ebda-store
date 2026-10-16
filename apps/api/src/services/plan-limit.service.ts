@@ -274,7 +274,7 @@ export async function assertNotDemoStore(storeId: string): Promise<void> {
   if (row?.isDemo) {
     throw new AppError(403, 'DEMO_STORE', 'This is a demo store; this action is disabled', {
       messageEn: 'This is a demo store: this is turned off here',
-      messageAr: 'ده متجر تجريبي — الخاصية دي مقفولة هنا',
+      messageAr: 'هذا متجر تجريبي — هذه الخاصية مغلقة هنا',
     });
   }
 }

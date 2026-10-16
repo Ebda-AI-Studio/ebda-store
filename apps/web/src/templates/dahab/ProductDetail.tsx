@@ -550,7 +550,7 @@ export function DahabProductDetail(p: DahabProductDetailProps) {
               href={p.cartHref}
               aria-label={p.cartLabel}
               data-testid="dahab-pinned-cart"
-              className="relative inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-[var(--radius)] border border-border text-foreground"
+              className="relative inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-[var(--radius)] border border-input text-foreground"
             >
               <BagIcon className="h-[22px] w-[22px]" aria-hidden="true" />
               {(p.cartCount ?? 0) > 0 && (
