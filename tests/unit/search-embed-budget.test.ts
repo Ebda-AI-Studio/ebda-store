@@ -149,7 +149,11 @@ describe('takeQueryEmbed', () => {
   it('the searcher identity collapses IPv6 to its /64 (rotating the low bits is the same client)', () => {
     expect(searcherFromIp('2001:db8:1:2:aaaa::1')).toBe(searcherFromIp('2001:db8:1:2:bbbb::9'));
     expect(searcherFromIp('198.51.100.1')).not.toBe(searcherFromIp('198.51.100.2'));
-    expect(searcherFromIp(undefined)).toBe('ip:noip');
+    // /64 explicitly (the library default is /56): two different /64s inside one /56 are two clients.
+    expect(searcherFromIp('2001:db8:1:200::1')).not.toBe(searcherFromIp('2001:db8:1:201::1'));
+    // No IP is no identity: never one shared bucket for every such request (review M4).
+    expect(searcherFromIp(undefined)).toBeUndefined();
+    expect(searcherFromIp('')).toBeUndefined();
   });
 
   it('defaults, and a bad value falls back to the default', () => {

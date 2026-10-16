@@ -75,9 +75,16 @@ export const SEARCH_EMBED_PER_SEARCHER_PER_MIN = 20;
 /** The per-minute searcher key lives two windows (Redis/KV TTL floor 120 s). */
 const SEARCHER_KEY_TTL_SECONDS = 120;
 
-/** The searcher identity for the query-embed limit: the client IP, IPv6 collapsed to its /64. */
-export function searcherFromIp(ip: string | undefined): string {
-  return `ip:${ipKeyGenerator(ip ?? '') || 'noip'}`;
+/**
+ * The searcher identity for the query-embed limit: the client IP, IPv6 grouped by its /64 (one
+ * subscriber prefix; passed explicitly, the library default is /56). No IP = no identity =
+ * `undefined`, so the gate refuses the embed (keyword-only) instead of putting every IP-less request
+ * in one shared bucket (review M4).
+ */
+export function searcherFromIp(ip: string | undefined): string | undefined {
+  if (!ip) return undefined;
+  const key = ipKeyGenerator(ip, 64);
+  return key ? `ip:${key}` : undefined;
 }
 export function searcherEmbedKey(searcher: string, now: Date): string {
   return `search:embed:searcher:${searcher}:${Math.floor(now.getTime() / 60_000)}`;
