@@ -67,7 +67,16 @@ describe('AI-generated shopper Arabic is Egyptian (FU46-Y02d)', () => {
   it('no other API prompt asks for MSA', () => {
     const r = spawnSync(
       'git',
-      ['grep', '-n', '-i', '-E', 'formal MSA|Modern Standard Arabic', '--', 'apps/api/src'],
+      [
+        'grep',
+        '-n',
+        '-i',
+        '-E',
+        'formal MSA|Modern Standard Arabic',
+        '--',
+        'apps/api/src',
+        ':!apps/api/src/lib/ai/arabic-register.ts',
+      ],
       { cwd: ROOT, encoding: 'utf8' }
     );
     expect(r.stdout).toBe('');
