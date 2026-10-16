@@ -318,10 +318,20 @@ describe.skipIf(!hasDb)('demo store refuses visitor PII writes (B1-13)', () => {
     expect(await subscribers(demo.storeId, email)).toBe(0);
   });
 
+  // Since main's FU46 contact fix the route resolves its store itself (never Ebda's inbox) and
+  // refuses the demo with its own message (Ruling B1-63: main's route owns the refusal).
+  const expectContactDemoRefusal = (res: request.Response) => {
+    expect(res.status, JSON.stringify(res.body)).toBe(403);
+    expect(res.body.error.code).toBe('DEMO_STORE');
+    expect(res.body.error.details).toMatchObject({
+      messageAr: 'هذا متجر تجريبي — الرسائل مغلقة',
+    });
+  };
+
   it('contact on the demo: 403 DEMO_STORE, nothing queued', async () => {
     const send = vi.spyOn(inngest, 'send');
     send.mockClear();
-    expectDemoRefusal(await contact(demo.storeId, `demo-ct-${run()}@example.com`));
+    expectContactDemoRefusal(await contact(demo.storeId, `demo-ct-${run()}@example.com`));
     expect(send).not.toHaveBeenCalled();
   });
 
@@ -360,7 +370,7 @@ describe.skipIf(!hasDb)('demo store refuses visitor PII writes (B1-13)', () => {
     expect(await pushes(shop.storeId)).toBe(1);
   });
 
-  it('contact with no resolvable store keeps today’s behaviour (queued, 200)', async () => {
+  it('contact with no resolvable store is refused (400), nothing queued (never Ebda’s inbox)', async () => {
     const send = vi.spyOn(inngest, 'send');
     send.mockClear();
     const res = await request(app)
@@ -371,8 +381,9 @@ describe.skipIf(!hasDb)('demo store refuses visitor PII writes (B1-13)', () => {
         subject: 'Hi',
         message: 'Hello',
       });
-    expect(res.status, JSON.stringify(res.body)).toBe(200);
-    expect(send).toHaveBeenCalledTimes(1);
+    expect(res.status, JSON.stringify(res.body)).toBe(400);
+    expect(res.body.error.code).toBe('STORE_NOT_RESOLVED');
+    expect(send).not.toHaveBeenCalled();
   });
 
   const slugOf = (storeId: string) =>
@@ -380,7 +391,7 @@ describe.skipIf(!hasDb)('demo store refuses visitor PII writes (B1-13)', () => {
       tx.store.findUniqueOrThrow({ where: { id: storeId }, select: { slug: true } })
     ).then(r => r.slug);
 
-  it('contact on the demo HOST is refused without any store id: x-store-domain, or only the Origin', async () => {
+  it('contact on the demo HOST is refused: x-store-domain (DEMO_STORE), or only the Origin (no store)', async () => {
     const host = storeHost(await slugOf(demo.storeId));
     const send = vi.spyOn(inngest, 'send');
     send.mockClear();
@@ -390,21 +401,15 @@ describe.skipIf(!hasDb)('demo store refuses visitor PII writes (B1-13)', () => {
       subject: 'Hi',
       message: 'x',
     };
-    expectDemoRefusal(
+    expectContactDemoRefusal(
       await request(app).post('/api/v1/public/contact').set('x-store-domain', host).send(body)
     );
-    expectDemoRefusal(
-      await request(app).post('/api/v1/public/contact').set('Origin', `https://${host}`).send(body)
-    );
-    expect(send).not.toHaveBeenCalled();
-    // A merchant host's Origin still sends (the Origin fallback is demo-specific in effect).
-    const shopHost = storeHost(await slugOf(shop.storeId));
-    const ok = await request(app)
+    const originOnly = await request(app)
       .post('/api/v1/public/contact')
-      .set('Origin', `https://${shopHost}`)
+      .set('Origin', `https://${host}`)
       .send(body);
-    expect(ok.status, JSON.stringify(ok.body)).toBe(200);
-    expect(send).toHaveBeenCalledTimes(1);
+    expect(originOnly.status, JSON.stringify(originOnly.body)).toBe(400);
+    expect(send).not.toHaveBeenCalled();
   });
 
   const resetRows = (userId: string) =>
