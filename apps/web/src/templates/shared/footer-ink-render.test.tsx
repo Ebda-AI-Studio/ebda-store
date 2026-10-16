@@ -18,6 +18,7 @@ vi.mock('next/link', () => ({
   default: ({
     href,
     children,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     prefetch: _prefetch,
     ...rest
   }: React.PropsWithChildren<{ href: string; prefetch?: boolean }>) =>

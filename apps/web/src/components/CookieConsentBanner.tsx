@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useConsent } from '../contexts/ConsentContext';
 import { useLanguage } from '../contexts/LanguageContext';
@@ -26,6 +27,16 @@ export function CookieConsentBanner() {
   const { hasDecided, setConsent, openPreferences } = useConsent();
   const { t, isRtl } = useLanguage();
   const storeUrl = useStoreUrl();
+  // Admin live-preview iframe (see below). Read AFTER mount: window.top / location are not
+  // known on the server, so reading them during render hydrated differently in the iframe.
+  const [inPreviewFrame, setInPreviewFrame] = useState(false);
+  useEffect(() => {
+    const inIframe = window.top !== window.self;
+    const hasPreviewParam =
+      window.location.search.includes('_preview=') ||
+      window.location.search.includes('_layoutDraft=');
+    setInPreviewFrame(inIframe || hasPreviewParam);
+  }, []);
 
   // Don't render once the user has decided. The footer "Cookie preferences"
   // link is how they get back to change their mind later.
@@ -38,13 +49,7 @@ export function CookieConsentBanner() {
   // `?_preview=` query param (admin live-preview injects it). Either one is
   // sufficient. Real visitors hit the storefront top-level and see the
   // banner normally.
-  if (typeof window !== 'undefined') {
-    const inIframe = window.top !== window.self;
-    const hasPreviewParam =
-      window.location.search.includes('_preview=') ||
-      window.location.search.includes('_layoutDraft=');
-    if (inIframe || hasPreviewParam) return null;
-  }
+  if (inPreviewFrame) return null;
 
   return (
     <div

@@ -5,6 +5,7 @@ import { parse, toRGBA } from 'color-bits';
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { useRenderNow } from '@/contexts/RenderClockContext';
 import { BRAND, BRAND_MARKETING_URL } from '@ebda/shared';
 
 // ---------------------------------------------------------------------------
@@ -281,6 +282,8 @@ export function FlickeringFooter() {
   const isDesktop = useMediaQuery('(min-width: 1024px)');
   const isTablet = useMediaQuery('(min-width: 640px)');
   const { t } = useLanguage();
+  // The server's clock, handed down once per request: new Date() here differed across New Year.
+  const year = new Date(useRenderNow()).getFullYear();
 
   // Big text: "Ebda" on desktop, "Force" on tablet, nothing on mobile
   const bigText = isDesktop ? BRAND.product.nameEn : isTablet ? BRAND.product.nameEn : null;
@@ -402,8 +405,7 @@ export function FlickeringFooter() {
       <div className="relative z-10 border-t border-border/20 px-6 py-6">
         <div className="max-w-6xl mx-auto flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <p className="text-xs text-muted-foreground">
-            &copy; {new Date().getFullYear()}{' '}
-            {t(BRAND.company.shortNameEn, BRAND.company.shortNameAr)}.{' '}
+            &copy; {year} {t(BRAND.company.shortNameEn, BRAND.company.shortNameAr)}.{' '}
             {t('All rights reserved.', 'جميع الحقوق محفوظة.')}
           </p>
           <div className="flex items-center gap-4">

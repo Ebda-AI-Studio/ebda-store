@@ -9,6 +9,7 @@ import { useStore, useStoreUrl } from '../../contexts/StoreContext';
 import { useLanguage, translations } from '../../contexts/LanguageContext';
 import { useCart } from '../../contexts/CartContext';
 import { useTemplateComponents } from '../../hooks/useTemplateComponents';
+import { useCurrentUrl } from '../../hooks/useCurrentUrl';
 import type { TemplateProduct } from '../../templates/types';
 import { wishlistToTemplateProduct, type WishlistCardProduct } from '../../templates/adapters';
 
@@ -36,9 +37,12 @@ export default function WishlistClient() {
 
   // Derive the share URL from the current user's auth state
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  // The page URL is '' until after hydration (useCurrentUrl), so the origin never differs
+  // between the server render and the hydrating one.
+  const currentUrl = useCurrentUrl();
   const shareUrl =
-    currentUserId && typeof window !== 'undefined'
-      ? `${window.location.origin}${storeUrl(`/wishlist/shared/${currentUserId}`)}`
+    currentUserId && currentUrl
+      ? `${new URL(currentUrl).origin}${storeUrl(`/wishlist/shared/${currentUserId}`)}`
       : null;
 
   const loadWishlist = useCallback(async () => {
