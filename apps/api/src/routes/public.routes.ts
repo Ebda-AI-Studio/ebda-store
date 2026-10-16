@@ -23,6 +23,8 @@ import {
   viewIngestLimiter,
 } from '../middleware/security';
 import { recordProductView } from '../services/view-ingest.service';
+import { claimSearcherSearch, recordSearch } from '../services/search-log.service';
+import { deferAfterTenantCommit } from '../lib/after-tenant-commit';
 import { getStoreIdFromRequest } from '../utils/store-helpers';
 import logger from '../lib/logger';
 import { featureService } from '../services/feature.service';
@@ -205,9 +207,9 @@ router.get('/products', async (req: Request, res: Response, next: NextFunction) 
     // AND into the cache key — so unique sub-floor terms ('a', 'aa', 'qx'…)
     // bypassed every cache layer and ran a fresh scan per request. A term
     // under the floor short-circuits to an empty page with NO DB or cache
-    // touch; longer terms are capped at 100 chars (token count is capped in
-    // buildProductSearchAnd) so a crafted query cannot expand into hundreds
-    // of ILIKE clauses.
+    // touch; longer terms are capped at 100 chars (token count is capped at 8
+    // in searchTokens, @ebda/shared) so a crafted query cannot expand into
+    // hundreds of LIKE clauses (product-search.service).
     const rawSearch = typeof search === 'string' ? search.trim() : '';
     if (rawSearch.length === 1) {
       const floorPage = page ? parseInt(page as string) || 1 : 1;
@@ -293,6 +295,26 @@ router.get('/products', async (req: Request, res: Response, next: NextFunction) 
         optionFilters: hasOptionFilters ? optionFilters : undefined,
       })
     );
+
+    // First-party search log (search program P0, Task 5): page 1 of a real query only, so
+    // paging does not double count; typeahead (/search/suggest) is not logged (keystrokes,
+    // Ruling SEARCH-6). Counted after the request transaction commits, in its own tenant
+    // transaction (E2), fail-open. A getCached hit is still counted: it counts searches, not
+    // DB reads. No identity is stored and personal-data-shaped terms are dropped.
+    if (effectiveSearch && (!page || page === '1') && !validCursor) {
+      const total = (result as { meta?: { total?: number } }).meta?.total ?? 0;
+      // The FULL raw term: the log folds it, checks it whole for personal data, and only then
+      // cuts it to 100 characters (a phone past char 100 is caught, not half-stored).
+      // Distinct searchers (Ruling SEARCH-T5-6): a sort/category change or a retry re-fetches
+      // page 1; the same searcher counts a term once per window (salted daily HMAC of IP+UA,
+      // kept only as a short-lived Redis key; fail-open counts once).
+      const searcher = { ip: req.ip ?? '', userAgent: String(req.headers['user-agent'] ?? '') };
+      void deferAfterTenantCommit('search-log', async () =>
+        (await claimSearcherSearch(storeId, rawSearch, searcher))
+          ? recordSearch(storeId, rawSearch, total)
+          : false
+      );
+    }
 
     // Edge-cacheable: product list is identical for all anonymous
     // visitors of the same store. Per-tenant via the default Vary on

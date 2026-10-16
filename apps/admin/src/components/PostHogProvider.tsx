@@ -2,6 +2,7 @@
 
 import { useEffect, type ReactNode } from 'react';
 import * as Sentry from '@sentry/nextjs';
+import { scrubPostHogCapture } from '@ebda/shared';
 
 // posthog-js is lazy-loaded (kept out of the first-load bundle); this holds the
 // instance once loaded so captureEvent() can use it (no-op until then).
@@ -54,6 +55,9 @@ export function PostHogProvider({ children }: Props) {
         // unhandled JS error + promise rejection. Was off — operator-side
         // client errors were invisible in PostHog (0 $exception events ever).
         capture_exceptions: true,
+        // Free-text query values (?q=, ?search=, ?email=, ?phone=) never leave in a capture:
+        // the storefront search page is /search?q=<term> (@ebda/shared sentry-url-scrub).
+        before_send: scrubPostHogCapture,
       });
       // Session-replay is off, so link PostHog ↔ Sentry by distinct_id: a Sentry
       // error carries the id to look up that operator's PostHog events without

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import type { PaletteItem } from './admin-layout/buildPaletteItems';
+import { normalizeArabicSearch as normalize } from '@ebda/shared';
 import { useT } from '@/i18n/useT';
 
 /**
@@ -21,19 +22,6 @@ import { useT } from '@/i18n/useT';
  * of the haystack, so typing "stock" finds every Inventory page even when the
  * page's own name doesn't contain the word.
  */
-
-/** Lowercase + Arabic-fold so EN and AR queries both match leniently. */
-function normalize(s: string): string {
-  return s
-    .toLowerCase()
-    .normalize('NFKD')
-    .replace(/[ً-ٰٟ]/g, '') // tashkeel / dagger alef
-    .replace(/[آأإٱ]/g, 'ا') // أ إ آ ٱ → ا
-    .replace(/ى/g, 'ي') // ى → ي
-    .replace(/ة/g, 'ه') // ة → ه
-    .replace(/ـ/g, '') // tatweel
-    .trim();
-}
 
 export function CommandPalette({ items }: { items: PaletteItem[] }) {
   const router = useRouter();

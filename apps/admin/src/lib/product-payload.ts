@@ -18,6 +18,8 @@ export interface ProductTextFieldsForm {
    */
   badgeLabel: string;
   badgeLabelAr: string;
+  /** Extra shopper words; emptied on edit must send null (clear). Server cleans + caps at 500. */
+  searchTerms: string;
 }
 
 export type ProductTextFieldsPayload = Record<
@@ -54,5 +56,6 @@ export function productTextFields(
     // that would render an empty coloured pill on every card.
     badgeLabel: textFieldValue(form.badgeLabel.trim(), intent),
     badgeLabelAr: textFieldValue(form.badgeLabelAr.trim(), intent),
+    searchTerms: textFieldValue(form.searchTerms.trim(), intent),
   };
 }

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
+import { SearchTermsField } from '@/components/SearchTermsField';
 import { Button, Input, Textarea, Select } from '@ebda/ui';
 import {
   recommendedSizeTextForTemplate,
@@ -63,6 +64,8 @@ export default function NewProductPage() {
     /** Merchant-authored product card badge (EN / AR). Empty = no badge. */
     badgeLabel: '',
     badgeLabelAr: '',
+    /** Extra shopper words (dialect/Franco/English); searched, never shown. */
+    searchTerms: '',
     /** Regular (RRP) price as EGP string entered by the merchant. */
     price: '',
     costPrice: '',
@@ -255,6 +258,11 @@ export default function NewProductPage() {
                   rows={4}
                   lang="ar"
                   dir="rtl"
+                />
+                <SearchTermsField
+                  namespace="products.new.fields"
+                  value={formData.searchTerms}
+                  onChange={v => updateField('searchTerms', v)}
                 />
                 {/* Card badge — the merchant's own promotional chip, shown on
                     every product-card render path and on the PDP. Bilingual

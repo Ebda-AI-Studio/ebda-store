@@ -275,7 +275,7 @@ export interface StoreTheme {
   /**
    * AI-first autopilot. When ON (the default), the platform auto-fills a
    * product's empty AI-writable fields (Arabic name/description, SEO meta)
-   * on create/update and on the 3-day sweep, and generates recommendations
+   * on create/update and on the daily sweep, and generates recommendations
    * for new products. Manual edits always win — a field a merchant types
    * becomes human-owned and the engine never overwrites it (see the
    * per-field provenance map on Product). Set false to pause all automatic

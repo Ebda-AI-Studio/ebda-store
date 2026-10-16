@@ -4,6 +4,7 @@ import { authenticate, authorize } from '../middleware/auth';
 import { requireStoreAccess } from '../middleware/store-access';
 import { requireFeature } from '../middleware/feature-gate';
 import { BulkService } from '../services/bulk.service';
+import { PRODUCT_SEARCH_MAX_LIMIT, searchProductIds } from '../services/product-search.service';
 import { xlsxBufferToImportCsv } from '../services/xlsx-import';
 import { importCsvToPlatformCsv } from '../services/csv-import';
 import { buildImportPreview } from '../services/import-preview';
@@ -120,11 +121,13 @@ router.get(
       if (status) where.status = status as ProductStatus;
       if (includeDeleted !== 'true') where.deletedAt = null;
       if (search) {
-        where.OR = [
-          { name: { contains: search as string, mode: 'insensitive' } },
-          { nameAr: { contains: search as string, mode: 'insensitive' } },
-          { sku: { contains: search as string, mode: 'insensitive' } },
-        ];
+        where.id = {
+          in: await searchProductIds(storeId, search as string, {
+            scope: 'admin',
+            includeDeleted: includeDeleted === 'true',
+            limit: PRODUCT_SEARCH_MAX_LIMIT,
+          }),
+        };
       }
 
       const products = await prisma.product.findMany({
@@ -164,6 +167,7 @@ router.get(
         metaTitleAr: p.metaTitleAr ?? '',
         metaDescription: p.metaDescription ?? '',
         metaDescriptionAr: p.metaDescriptionAr ?? '',
+        searchTerms: p.searchTerms ?? '',
       }));
 
       await auditLog({
@@ -221,6 +225,7 @@ router.get(
           { header: 'Meta Title (AR)', key: 'metaTitleAr', width: 30 },
           { header: 'Meta Description', key: 'metaDescription', width: 40 },
           { header: 'Meta Description (AR)', key: 'metaDescriptionAr', width: 40 },
+          { header: 'Search Words', key: 'searchTerms', width: 40 },
         ],
         rows,
       });

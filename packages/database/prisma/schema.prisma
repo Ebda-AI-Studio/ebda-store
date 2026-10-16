@@ -474,6 +474,7 @@ model Store {
   pageRevisions            StorePageRevision[]
   productModels            ProductModel[]
   sizeCharts               SizeChart[]
+  searchQueryDaily         SearchQueryDaily[]
   productModelBindings     ProductModelBinding[]
   affiliates               Affiliate[]
   affiliateReferrals       AffiliateReferral[]
@@ -896,6 +897,12 @@ model Product {
   slug                 String
   description          String?
   descriptionAr        String?       @map("description_ar")
+  // Extra words shoppers type for this product: Egyptian dialect, Franco-Arabic, English
+  // ("جزمة, كوتشي, 3abaya, sneakers"). Comma-separated, merchant-editable, AI-filled when empty
+  // (P1, AI_AUTOFILL_FIELDS). Searched through public.ebda_product_search_doc /
+  // ebda_product_name_doc (expression trigram indexes, migration 20261019000100) — never shown on the storefront.
+  // DB CHECK products_search_terms_len_chk: at most 500 characters (migration 20261019000200).
+  searchTerms          String?       @map("search_terms")
   price                Int // Price in piastres (1 EGP = 100 piastres)
   compareAtPrice       Int?          @map("compare_at_price")
   costPrice            Int?          @map("cost_price")
@@ -1253,6 +1260,32 @@ model ProductModel {
 
   @@index([storeId])
   @@map("product_models")
+}
+
+// Storefront search log (search program P0, Task 5): one counter row per store, Cairo day and
+// NORMALISED term. Never linked to a user/session/IP/order; phone/email/order-number/id-shaped
+// terms are dropped before insert (apps/api/src/services/search-log.service.ts); free text may
+// still hold a typed name (Ruling SEARCH-T5-6). Viewer: admin /stores/[id]/insights/searches
+// + the analytics "searches with no results" card. Retention 90 days (search-log-purge-daily).
+// Store delete cascades.
+model SearchQueryDaily {
+  id              String   @id @default(uuid())
+  storeId         String   @map("store_id")
+  date            DateTime @db.Date
+  term            String   @db.VarChar(100)
+  searches        Int      @default(0)
+  zeroResults     Int      @default(0) @map("zero_results")
+  lastResultCount Int      @default(0) @map("last_result_count")
+  // Day granularity on purpose (no exact search time): written by search-log.service only.
+  // Deliberately NOT `@updatedAt`: that would stamp an exact time (Ruling SEARCH-T5-6). The raw
+  // SQL upsert is the only writer and sets the Cairo day; a Prisma `update` would NOT touch it.
+  updatedAt       DateTime @default(dbgenerated("CURRENT_DATE")) @map("updated_at")
+
+  store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  @@unique([storeId, date, term])
+  @@index([storeId, date(sort: Desc)])
+  @@map("search_query_daily")
 }
 
 // Size chart (B0 Task 9): a merchant-authored measurements table shown in the PDP size guide

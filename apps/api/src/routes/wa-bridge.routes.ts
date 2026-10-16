@@ -28,6 +28,7 @@ import { prisma } from '@ebda/database';
 import { groupOrderLinesForDisplay, BRAND_MARKETING_URL } from '@ebda/shared';
 import { config } from '../config';
 import { waBridgeAuth } from '../middleware/wa-bridge-auth';
+import { searchProductIds } from '../services/product-search.service';
 import { isWhatsappEnabled, FEATURE_DISABLED_BODY } from '../middleware/wa-feature-gate';
 import { makeRateLimitStore, rateLimitRedisClient } from '../middleware/security';
 import {
@@ -175,47 +176,12 @@ router.get('/products/search', waBridgeAuth, async (req: Request, res: Response)
     const { q, page, limit } = parse.data;
     const storeId = req.bridgeStore!.id;
 
-    // Case-insensitive contains on name + nameAr, plus exact SKU match.
-    // Fetch limit+1 to cheaply determine hasMore without a COUNT query.
-    const products = await prisma.product.findMany({
-      where: {
-        storeId,
-        status: 'active',
-        deletedAt: null,
-        OR: [
-          { name: { contains: q, mode: 'insensitive' } },
-          { nameAr: { contains: q, mode: 'insensitive' } },
-          { sku: { equals: q } },
-        ],
-      },
-      select: {
-        id: true,
-        name: true,
-        nameAr: true,
-        price: true,
-        compareAtPrice: true,
-        inventory: true,
-        trackInventory: true,
-        allowBackorder: true,
-        // Required by the `inStock` flag below: for a variant product the
-        // stock is the variant sum, not `inventory`. See lib/effective-inventory.ts.
-        // All variants WITH `isActive` — never pre-filtered: an all-disabled
-        // product would otherwise read as variant-less and inherit the parent
-        // column (issue 2147). effectiveInventory drops the disabled ones.
-        variants: { select: { inventory: true, allowBackorder: true, isActive: true } },
-        images: {
-          select: { url: true },
-          orderBy: { position: 'asc' },
-          take: 1,
-        },
-      },
-      orderBy: { name: 'asc' },
-      take: limit + 1, // +1 probe for hasMore
-      skip: (page - 1) * limit,
-    });
-
-    const hasMore = products.length > limit;
-    const pageProducts = hasMore ? products.slice(0, limit) : products;
+    const { products: pageProducts, hasMore } = await bridgeProductSearchPage(
+      storeId,
+      q,
+      page,
+      limit
+    );
 
     const backorderOn = await featureService.isFeatureEnabled(storeId, 'inventory.backorder');
     res.json({
@@ -239,6 +205,54 @@ router.get('/products/search', waBridgeAuth, async (req: Request, res: Response)
     res.status(500).json({ success: false, error: 'PRODUCT_SEARCH_FAILED' });
   }
 });
+
+/**
+ * One page of the WhatsApp bridge product search. Arabic-normalised word-AND over names, search
+ * terms, descriptions and the normalised SKU (product-search.service; storefront scope = active,
+ * not deleted, so drafts never take a slot before paging). Every page pages over the SAME match
+ * set (the default 1000-id cap, independent of the page number), ordered by name, so page 2
+ * neither repeats nor skips page 1's products. Behaviour change vs the old `contains` +
+ * exact-SKU match: the SKU now matches as a folded substring ("mug-77" finds "MUG-٧٧"), and
+ * descriptions match too. Exported for the integration test.
+ */
+export async function bridgeProductSearchPage(
+  storeId: string,
+  q: string,
+  page: number,
+  limit: number
+) {
+  const matchIds = await searchProductIds(storeId, q, { scope: 'storefront', withSku: true });
+  // Fetch limit+1 to cheaply determine hasMore without a COUNT query.
+  const products = await prisma.product.findMany({
+    where: { storeId, status: 'active', deletedAt: null, id: { in: matchIds } },
+    select: {
+      id: true,
+      name: true,
+      nameAr: true,
+      price: true,
+      compareAtPrice: true,
+      inventory: true,
+      trackInventory: true,
+      allowBackorder: true,
+      // Required by the `inStock` flag below: for a variant product the
+      // stock is the variant sum, not `inventory`. See lib/effective-inventory.ts.
+      // All variants WITH `isActive` — never pre-filtered: an all-disabled
+      // product would otherwise read as variant-less and inherit the parent
+      // column (issue 2147). effectiveInventory drops the disabled ones.
+      variants: { select: { inventory: true, allowBackorder: true, isActive: true } },
+      images: {
+        select: { url: true },
+        orderBy: { position: 'asc' },
+        take: 1,
+      },
+    },
+    orderBy: [{ name: 'asc' }, { id: 'asc' }],
+    take: limit + 1, // +1 probe for hasMore
+    skip: (page - 1) * limit,
+  });
+  const hasMore = products.length > limit;
+  return { products: hasMore ? products.slice(0, limit) : products, hasMore };
+}
 
 // ─── GET /products/by-category?categoryId=&page= ─────────────────────────────
 const byCategorySchema = z.object({

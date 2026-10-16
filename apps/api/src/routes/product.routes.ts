@@ -13,6 +13,8 @@ import { parseOptionalBooleanQuery } from '../lib/query-params';
 import { EXCERPT_MAX_LENGTH } from '../lib/ai/product-excerpt-generator';
 import {
   PRODUCT_BADGE_LABEL_MAX_LENGTH,
+  SEARCH_TERMS_MAX_LENGTH,
+  cleanSearchTerms,
   personalisationConfigSchema,
   productFactsSchema,
 } from '@ebda/shared';
@@ -98,6 +100,16 @@ const createProductSchema = z.object({
   facts: productFactsSchema.optional(),
   // Made-to-order business days (0-60). null = ready to ship (clears); undefined leaves alone.
   leadTimeDays: z.number().int().min(0).max(60).nullable().optional(),
+  // Extra words shoppers type (dialect / Franco / English). Searched, never displayed.
+  // Over-long raw input is a 400 here (never the DB CHECK's 500); the transform
+  // normalises to the canonical "a, b, c" form (<= SEARCH_TERMS_MAX_LENGTH).
+  // null/'' clears; undefined leaves alone (the partial() update convention).
+  searchTerms: z
+    .string()
+    .max(SEARCH_TERMS_MAX_LENGTH)
+    .nullable()
+    .optional()
+    .transform(v => (v === undefined ? undefined : cleanSearchTerms(v))),
   // Per-line customer text field (e.g. name to embroider). null clears; undefined leaves alone.
   personalisation: personalisationConfigSchema.nullable().optional(),
   // PDP size guide: own chart; null = inherit the category's chart. undefined leaves alone.

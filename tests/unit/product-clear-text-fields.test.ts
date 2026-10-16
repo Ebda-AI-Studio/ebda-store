@@ -29,6 +29,8 @@ const { mockPrisma, txMock } = vi.hoisted(() => {
     product: { update: vi.fn() },
     productImage: { deleteMany: vi.fn(), createMany: vi.fn() },
     productCategory: { findMany: vi.fn(), deleteMany: vi.fn(), createMany: vi.fn() },
+    // The per-key provenance merge (Task 8 review N1).
+    $queryRaw: vi.fn(async () => [{ ai_field_sources: {} }]),
   };
   return {
     txMock,

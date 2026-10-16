@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
+import { SearchTermsField } from '@/components/SearchTermsField';
 import { Button, Input, Textarea, Select } from '@ebda/ui';
 import {
   recommendedSizeTextForTemplate,
@@ -72,6 +73,7 @@ interface Product {
   /** Merchant-authored product card badge (EN / AR). null = no badge. */
   badgeLabel?: string | null;
   badgeLabelAr?: string | null;
+  searchTerms?: string | null;
   /** Spec rows (fabric, care, karat...). */
   facts?: ProductFact[];
   /** PDP personalisation field config (PersonalisationConfig); null = off. */
@@ -165,6 +167,7 @@ export default function EditProductPage() {
     isBestSeller: false,
     badgeLabel: '',
     badgeLabelAr: '',
+    searchTerms: '',
     category: '',
     metaTitle: '',
     metaTitleAr: '',
@@ -287,6 +290,7 @@ export default function EditProductPage() {
           isBestSeller: p.isBestSeller || false,
           badgeLabel: p.badgeLabel || '',
           badgeLabelAr: p.badgeLabelAr || '',
+          searchTerms: p.searchTerms || '',
           category: p.categories?.[0]?.categoryId || p.categories?.[0]?.category?.id || '',
           metaTitle: (p as Product & { metaTitle?: string }).metaTitle || '',
           metaTitleAr: (p as Product & { metaTitleAr?: string }).metaTitleAr || '',
@@ -805,6 +809,24 @@ export default function EditProductPage() {
                     rows={4}
                     lang="ar"
                     dir="rtl"
+                  />
+                </div>
+                <div>
+                  <div className="mb-1 flex justify-end">
+                    {/* searchTerms is an AI_AUTOFILL_FIELDS entry (search program P1): the
+                        autopilot fills empty search words; editing them makes them yours. */}
+                    <AiFieldBadge
+                      field="searchTerms"
+                      sources={aiSources}
+                      storeId={storeId}
+                      productId={product?.id}
+                      onReset={handleAiReset}
+                    />
+                  </div>
+                  <SearchTermsField
+                    namespace="products.edit.fields"
+                    value={formData.searchTerms}
+                    onChange={v => updateField('searchTerms', v)}
                   />
                 </div>
                 <div>

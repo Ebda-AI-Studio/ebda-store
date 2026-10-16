@@ -259,3 +259,11 @@ export function truncate(str: string, maxLength: number, suffix = '...'): string
   return str.slice(0, maxLength - suffix.length) + suffix;
 }
 export { isHostInjectedScriptEvent } from './sentry-host-injected-filter';
+export {
+  redactSensitiveQuery,
+  scrubSentryEvent,
+  scrubSentryBreadcrumb,
+  scrubPostHogCapture,
+  SENSITIVE_QUERY_PARAMS,
+  REDACTED_QUERY_VALUE,
+} from './sentry-url-scrub';

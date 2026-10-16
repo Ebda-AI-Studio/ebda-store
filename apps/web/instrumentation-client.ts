@@ -24,7 +24,7 @@
  * distinct from PostHog which IS marketing analytics and needs explicit consent.
  */
 import * as Sentry from '@sentry/nextjs';
-import { isHostInjectedScriptEvent } from '@ebda/shared';
+import { isHostInjectedScriptEvent, scrubSentryBreadcrumb, scrubSentryEvent } from '@ebda/shared';
 
 const dsn = process.env.NEXT_PUBLIC_SENTRY_DSN_WEB;
 
@@ -78,8 +78,12 @@ if (dsn) {
     // design: see @ebda/shared sentry-host-injected-filter for the evidence.
     beforeSend(event) {
       const ua = typeof navigator === 'undefined' ? '' : navigator.userAgent;
-      return isHostInjectedScriptEvent(event, ua) ? null : event;
+      return isHostInjectedScriptEvent(event, ua) ? null : scrubSentryEvent(event);
     },
+    // Free-text query values (?search=, ?q=, ?email=, ?phone=) never leave in an event,
+    // a transaction or a breadcrumb (@ebda/shared sentry-url-scrub).
+    beforeSendTransaction: event => scrubSentryEvent(event),
+    beforeBreadcrumb: breadcrumb => scrubSentryBreadcrumb(breadcrumb),
   });
 }
 

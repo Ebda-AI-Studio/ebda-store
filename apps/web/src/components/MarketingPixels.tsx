@@ -7,7 +7,7 @@ import type { MarketingPixels } from '@ebda/shared';
 import { useFeatures } from '../contexts/FeatureContext';
 import { useConsent } from '../contexts/ConsentContext';
 
-import { REGION } from '@ebda/shared';
+import { REGION, isPersonalDataTerm } from '@ebda/shared';
 interface MarketingPixelsProps {
   pixels: MarketingPixels;
 }
@@ -464,18 +464,26 @@ export function trackPurchase(params: {
 }
 
 /**
- * Track Search event
+ * Track Search event.
+ *
+ * Ruling SEARCH-T5-9: the term goes to the merchant's ad networks (Meta, TikTok, Snap, Google,
+ * Pinterest) only when it is NOT personal-data shaped (`isPersonalDataTerm`, the same gate the
+ * first-party search log uses). A phone, email, order number, id or link typed into search still
+ * fires the Search event, just without the term.
  */
 export function trackSearch(params: { searchString: string }) {
   if (typeof window === 'undefined') return;
   const w = window as TrackingWindow;
+  const term = isPersonalDataTerm(params.searchString) ? undefined : params.searchString;
+  const withTerm = <K extends string>(key: K) =>
+    term === undefined ? {} : ({ [key]: term } as Record<K, string>);
 
-  w.fbq?.('track', 'Search', { search_string: params.searchString });
-  w.ttq?.track('Search', { query: params.searchString });
-  w.snaptr?.('track', 'SEARCH', { search_string: params.searchString });
-  w.gtag?.('event', 'search', { search_term: params.searchString });
+  w.fbq?.('track', 'Search', withTerm('search_string'));
+  w.ttq?.track('Search', withTerm('query'));
+  w.snaptr?.('track', 'SEARCH', withTerm('search_string'));
+  w.gtag?.('event', 'search', withTerm('search_term'));
   w.twq?.('track', 'Search');
-  w.pintrk?.('track', 'search', { search_query: params.searchString });
+  w.pintrk?.('track', 'search', withTerm('search_query'));
 }
 
 /**

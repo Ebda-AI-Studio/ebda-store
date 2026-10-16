@@ -2,6 +2,7 @@
 
 import { useEffect, type ReactNode } from 'react';
 import * as Sentry from '@sentry/nextjs';
+import { scrubPostHogCapture } from '@ebda/shared';
 
 /**
  * PostHog product analytics — Orders PWA (fulfilment staff tooling).
@@ -51,6 +52,9 @@ export function PostHogProvider({ children }: Props) {
         // unhandled JS error + promise rejection. Was off — fulfilment-staff
         // client errors were invisible in PostHog (0 $exception events ever).
         capture_exceptions: true,
+        // Free-text query values (?q=, ?search=, ?email=, ?phone=) never leave in a capture:
+        // the storefront search page is /search?q=<term> (@ebda/shared sentry-url-scrub).
+        before_send: scrubPostHogCapture,
       });
       // Session-replay is off, so link PostHog ↔ Sentry by distinct_id instead:
       // any Sentry error then carries the id needed to look up that operator's

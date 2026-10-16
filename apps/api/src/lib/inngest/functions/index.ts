@@ -16,6 +16,7 @@ import { reviewRequest } from './review-request';
 import { reviewModeration } from './review-moderation';
 import {
   abandonedCartPurge,
+  searchLogPurge,
   softDeletedUserAnonymize,
   orderAnonymizeAtFiveYears,
 } from './data-retention';
@@ -107,6 +108,7 @@ const allInngestFunctions: InngestFunction.Any[] = [
   reviewRequest,
   reviewModeration,
   abandonedCartPurge,
+  searchLogPurge,
   softDeletedUserAnonymize,
   orderAnonymizeAtFiveYears,
   alertsFailureWatch,
@@ -139,7 +141,7 @@ const allInngestFunctions: InngestFunction.Any[] = [
   aiAutofillProduct,
   // AI-first autofill: purges recommendation graph rows on product delete
   aiAutofillCleanup,
-  // AI-first autofill: 3-day leader-locked catalogue sweep with order-driven recos
+  // AI-first autofill: daily leader-locked catalogue sweep with order-driven recos
   aiAutofillSweep,
   // Server-side conversion API: Meta CAPI + TikTok Events API on purchase
   orderCapiConversion,

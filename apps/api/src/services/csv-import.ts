@@ -63,6 +63,7 @@ export const PLATFORM_COLUMNS = [
   'metaTitleAr',
   'metaDescription',
   'metaDescriptionAr',
+  'searchTerms',
   'parentSku',
   'option1Name',
   'option1Value',

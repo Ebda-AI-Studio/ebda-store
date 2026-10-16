@@ -10,7 +10,8 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // vi.mock is hoisted above every top-level statement, so its factory cannot
 // close over ordinary consts. vi.hoisted lifts the mock with it.
-const { mockPromotion } = vi.hoisted(() => ({
+const { mockPromotion, mockSearchNameIds } = vi.hoisted(() => ({
+  mockSearchNameIds: vi.fn(),
   mockPromotion: {
     findMany: vi.fn(),
     findFirst: vi.fn(),
@@ -23,6 +24,11 @@ const { mockPromotion } = vi.hoisted(() => ({
 
 vi.mock('@ebda/database', () => ({
   prisma: { promotion: mockPromotion },
+}));
+// The Arabic-normalised name search is raw SQL (covered by
+// tests/integration/product-search-normalised.test.ts); here only its wiring.
+vi.mock('../../apps/api/src/services/product-search.service', () => ({
+  searchNameIds: mockSearchNameIds,
 }));
 
 import { PromotionService } from '../../apps/api/src/services/promotion.service';
@@ -235,22 +241,17 @@ describe('PromotionService.list', () => {
     });
   });
 
-  it('applies isActive filter and search on name/nameAr', async () => {
+  it('applies isActive filter and the normalised name/nameAr search as an id set', async () => {
     mockPromotion.findMany.mockResolvedValue([]);
     mockPromotion.count.mockResolvedValue(0);
+    mockSearchNameIds.mockResolvedValue(['promo-1']);
 
     await PromotionService.list(STORE, { isActive: true, search: 'summer' });
 
+    expect(mockSearchNameIds).toHaveBeenCalledWith('promotions', STORE, 'summer');
     expect(mockPromotion.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: {
-          storeId: STORE,
-          isActive: true,
-          OR: [
-            { name: { contains: 'summer', mode: 'insensitive' } },
-            { nameAr: { contains: 'summer', mode: 'insensitive' } },
-          ],
-        },
+        where: { storeId: STORE, isActive: true, id: { in: ['promo-1'] } },
       })
     );
   });
