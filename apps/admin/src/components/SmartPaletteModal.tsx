@@ -544,7 +544,7 @@ export function SmartPaletteModal({
 
               // Build theme updates: only when the merchant entered a raw hex
               // (not a token ref). Convert hex → HSL triplet to match the
-              // format StoreTheme stores (e.g. '26 100% 50%').
+              // format StoreTheme stores (e.g. '36 36% 52%').
               //
               // When a concrete primary hex is available, derive ALL core brand
               // tokens so the Branding color editor fields get filled on apply.

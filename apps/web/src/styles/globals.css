@@ -25,21 +25,21 @@
     --popover: 0 0% 100%;
     --popover-foreground: 222.2 47.4% 11.2%;
 
-    /* Primary - Force Orange #ff6e00. Ink is black: white on it is 2.79:1 (K-02). */
-    --primary: 26 100% 50%;
-    --primary-foreground: 0 0% 0%;
+    /* Primary - Ebda night #0A0B0C with white ink, 19.7:1 (K-02, Ruling D1016-ORANGE-1). */
+    --primary: 210 9% 4%;
+    --primary-foreground: 0 0% 100%;
 
     /* Secondary */
-    --secondary: 30 100% 97%;
-    --secondary-foreground: 26 100% 30%;
+    --secondary: 36 36% 96%;
+    --secondary-foreground: 36 40% 28%;
 
     /* Muted */
     --muted: 210 20% 96%;
     --muted-foreground: 215.4 16.3% 46.9%;
 
     /* Accent */
-    --accent: 30 100% 97%;
-    --accent-foreground: 26 100% 30%;
+    --accent: 36 36% 95%;
+    --accent-foreground: 36 40% 25%;
 
     /* Status Colors */
     --success: 142 76% 36%;
@@ -64,7 +64,7 @@
     /* Borders & Inputs */
     --border: 220 13% 91%;
     --input: 220 13% 91%;
-    --ring: 26 100% 50%;
+    --ring: 36 36% 52%;
 
     /* Border Radius */
     --radius: 0.75rem;
@@ -128,14 +128,14 @@
     --card-foreground: 210 40% 98%;
     --popover: 222.2 47.4% 8%;
     --popover-foreground: 210 40% 98%;
-    --primary: 26 100% 55%;
-    --primary-foreground: 0 0% 0%;
-    --secondary: 26 40% 12%;
-    --secondary-foreground: 30 100% 90%;
+    --primary: 36 46% 62%;
+    --primary-foreground: 210 9% 4%;
+    --secondary: 36 30% 12%;
+    --secondary-foreground: 36 60% 88%;
     --muted: 217.2 32.6% 12%;
     --muted-foreground: 215 20.2% 65.1%;
-    --accent: 26 40% 12%;
-    --accent-foreground: 30 100% 90%;
+    --accent: 36 30% 12%;
+    --accent-foreground: 36 60% 88%;
     --success: 142 76% 40%;
     --success-foreground: 0 0% 100%;
     --warning: 38 92% 55%;
@@ -150,7 +150,7 @@
     --destructive-ink: 0 62.8% 66%;
     --border: 217.2 32.6% 17.5%;
     --input: 217.2 32.6% 17.5%;
-    --ring: 26 100% 55%;
+    --ring: 36 46% 62%;
   }
 
   /* RTL Support */
@@ -395,9 +395,9 @@
   .hero-gradient {
     background: linear-gradient(
       135deg,
-      hsl(30 100% 97%) 0%,
+      hsl(36 36% 96%) 0%,
       hsl(0 0% 100%) 50%,
-      hsl(30 100% 97%) 100%
+      hsl(36 36% 96%) 100%
     );
   }
 
@@ -840,15 +840,15 @@
 
 /* Force Gradient Backgrounds */
 .force-gradient-primary {
-  background: linear-gradient(135deg, hsl(var(--primary)) 0%, hsl(26 100% 40%) 100%);
+  background: linear-gradient(135deg, hsl(var(--primary)) 0%, hsl(var(--primary) / 0.85) 100%);
 }
 
 .force-gradient-hero {
   background: linear-gradient(
     135deg,
-    hsl(30 100% 97%) 0%,
+    hsl(36 36% 96%) 0%,
     hsl(0 0% 100%) 40%,
-    hsl(30 100% 98%) 100%
+    hsl(36 36% 97%) 100%
   );
 }
 

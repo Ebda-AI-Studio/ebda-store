@@ -153,7 +153,7 @@ export function resolveColor(value: ColorValue | undefined, theme: StoreTheme): 
     if (!(COLOR_TOKENS as readonly string[]).includes(key)) return undefined;
     // Use TOKEN_TO_THEME_KEY to map token → StoreTheme field (e.g. 'primary' → 'primaryColor').
     // Fall back to direct key lookup to stay compatible with test fixtures that use
-    // bare Tailwind-style theme objects (e.g. { primary: '24 100% 50%' }).
+    // bare Tailwind-style theme objects (e.g. { primary: '36 36% 52%' }).
     const themeKey = TOKEN_TO_THEME_KEY[key];
     const raw =
       (theme[themeKey] as string | undefined) ??
@@ -199,7 +199,7 @@ export function rgbToHslTriplet(rgb: Rgb): string {
 
 /**
  * Convert a hex color string to a bare HSL triplet string used by
- * Tailwind/shadcn CSS vars (e.g. `"#FF6E01"` → `"26 100% 50%"`).
+ * Tailwind/shadcn CSS vars (e.g. `"#B08D57"` → `"36 36% 52%"`).
  *
  * Implemented on top of the existing `parseColorToRgb` + `rgbToHslTriplet`
  * primitives so rounding behaviour is identical to the rest of the engine.
@@ -211,8 +211,8 @@ export function hexToHsl(hex: string): string {
 }
 
 /**
- * Convert a bare HSL triplet string (e.g. `"26 100% 50%"`) to a lowercase
- * hex color (e.g. `"#ff6e01"`).  The output format matches what
+ * Convert a bare HSL triplet string (e.g. `"36 36% 52%"`) to a lowercase
+ * hex color (e.g. `"#b08d57"`).  The output format matches what
  * `apps/admin/src/lib/color.ts::hslToHex` produced so existing callers are
  * unaffected.
  *
@@ -294,7 +294,7 @@ export function pickReadableForeground(bg: string | undefined): '#ffffff' | '#00
   const lum = relativeLuminance(rgb);
   // 0.179 is the WCAG-correct flip point — the luminance value where contrast
   // against black and white is mathematically balanced (solving 20L²+2L-1=0).
-  // For #FF6E00 (legacy orange, L≈0.324) this returns BLACK because black
+  // For a mid-tone like the legacy Force orange (L≈0.324) this returns BLACK because black
   // gives 7.48:1 contrast (passes AA easily) while white gives 2.81:1 (fails AA).
   //
   // An earlier draft used 0.35 to make the helper return white-on-orange
@@ -410,7 +410,7 @@ function resolveAndMix(value: ColorValue, theme: StoreTheme | undefined, mix: nu
 }
 
 /**
- * Mix a color toward white by `amount` (0..1). For `'#FF6E00'` + 0.4 returns a
+ * Mix a color toward white by `amount` (0..1). For `'#B08D57'` + 0.4 returns a
  * lighter orange suitable for tinted section backgrounds. Token refs pass
  * through unchanged so the caller can resolve at render time.
  */
@@ -424,7 +424,7 @@ export function lightenColor(input: string, amount: number): string {
 }
 
 /**
- * Mix a color toward black by `amount` (0..1). For `'#FF6E00'` + 0.4 returns a
+ * Mix a color toward black by `amount` (0..1). For `'#B08D57'` + 0.4 returns a
  * darker shade suitable for hover states / framed sections.
  */
 export function darkenColor(input: string, amount: number): string {
@@ -439,7 +439,7 @@ export function darkenColor(input: string, amount: number): string {
 // ─── Core brand token derivation (Task 3: Smart Palette fills all tokens) ───
 
 export interface CoreBrandTokens {
-  /** HSL triplets (e.g. '26 100% 50%') matching StoreTheme field names. */
+  /** HSL triplets (e.g. '36 36% 52%') matching StoreTheme field names. */
   primaryColor: string;
   secondaryColor: string;
   accentColor: string;

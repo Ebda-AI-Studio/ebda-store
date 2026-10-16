@@ -127,7 +127,7 @@ export function emailBadge(label: string, tone: 'success' | 'warning' | 'danger'
 }
 
 // ---------------------------------------------------------------------------
-// Colour: brand tokens arrive as HSL components ("26 100% 50%") or hex.
+// Colour: brand tokens arrive as HSL components ("36 36% 52%") or hex.
 // ---------------------------------------------------------------------------
 
 function hslToHex(h: number, s: number, l: number): string {

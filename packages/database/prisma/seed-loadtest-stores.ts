@@ -299,7 +299,7 @@ async function seedLoadtestStore(ownerId: string, storeIndex: number) {
       currency: REGION.currency,
       template: 'modern',
       theme: {
-        primaryColor: '26 100% 50%',
+        primaryColor: '210 9% 4%', // Ebda night (Ruling D1016-ORANGE-1)
         primaryForeground: '0 0% 100%',
         secondaryColor: '220 14% 96%',
         secondaryForeground: '220 9% 46%',

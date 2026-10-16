@@ -28,7 +28,7 @@ export function AeoGeoSection() {
         {/* Cards grid */}
         <div className="mt-12 grid gap-6 md:grid-cols-2">
           {/* AEO card */}
-          <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-8 backdrop-blur transition-all hover:-translate-y-1 hover:border-primary/40 hover:shadow-[0_8px_40px_rgba(255,110,1,0.15)]">
+          <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-8 backdrop-blur transition-all hover:-translate-y-1 hover:border-primary/40 hover:shadow-[0_8px_40px_rgba(176,141,87,0.15)]">
             <span className="inline-flex h-12 w-12 items-center justify-center rounded-xl bg-primary/15 text-primary">
               <Bot className="h-6 w-6" />
             </span>
@@ -44,7 +44,7 @@ export function AeoGeoSection() {
           </div>
 
           {/* GEO card */}
-          <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-8 backdrop-blur transition-all hover:-translate-y-1 hover:border-primary/40 hover:shadow-[0_8px_40px_rgba(255,110,1,0.15)]">
+          <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-8 backdrop-blur transition-all hover:-translate-y-1 hover:border-primary/40 hover:shadow-[0_8px_40px_rgba(176,141,87,0.15)]">
             <span className="inline-flex h-12 w-12 items-center justify-center rounded-xl bg-primary/15 text-primary">
               <Globe className="h-6 w-6" />
             </span>

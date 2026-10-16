@@ -390,7 +390,7 @@ export function FlickeringFooter() {
                 backgroundClip: 'text',
                 WebkitBackgroundClip: 'text',
                 backgroundImage:
-                  'linear-gradient(135deg, rgba(255,110,1,0.18) 0%, rgba(255,255,255,0.10) 100%)',
+                  'linear-gradient(135deg, rgba(176,141,87,0.18) 0%, rgba(255,255,255,0.10) 100%)',
               }}
             >
               {bigText}

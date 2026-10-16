@@ -403,7 +403,7 @@ export function OrderUpdatesTab({ storeId }: { storeId: string }) {
                           disabled={status === 'missing'}
                           className="sr-only peer"
                         />
-                        <div className="relative w-11 h-6 bg-muted peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-orange-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-orange-500 peer-disabled:opacity-40 peer-disabled:cursor-not-allowed" />
+                        <div className="relative w-11 h-6 bg-muted peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-ring rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary peer-disabled:opacity-40 peer-disabled:cursor-not-allowed" />
                       </label>
                     </div>
                   </div>
@@ -415,7 +415,7 @@ export function OrderUpdatesTab({ storeId }: { storeId: string }) {
               <Button
                 onClick={save}
                 disabled={saving || loading}
-                className="bg-orange-500 hover:bg-orange-600"
+                className="bg-primary text-primary-foreground hover:bg-primary/90"
               >
                 {saving ? t('saving') : t('saveChanges')}
               </Button>

@@ -6,6 +6,7 @@ import { featureService } from './feature.service';
 import { StorageService } from './storage.service';
 import { revalidateStorefront } from '../lib/revalidate-storefront';
 import logger from '../lib/logger';
+import { BRAND } from '@ebda/shared';
 
 // PWA Settings structure
 export interface PWASettings {
@@ -181,7 +182,7 @@ const DEFAULT_PWA_SETTINGS: PWASettings = {
   appName: '',
   shortName: '',
   description: '',
-  themeColor: '#f97316', // Orange 500
+  themeColor: BRAND.colors.night, // Ebda night (Ruling D1016-ORANGE-1)
   backgroundColor: '#ffffff',
   display: 'standalone',
   orientation: 'any',
