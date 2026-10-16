@@ -355,8 +355,10 @@ export async function generateFill(plan: FillPlan): Promise<FillGeneration> {
  * is rebuilt from the FRESH map (a concurrent 'human' stamp on any other field is kept).
  * `extra` runs inside the same transaction, after the write, with the fresh row.
  * When a written field feeds the search embedding (name, nameAr, description, descriptionAr, searchTerms), the
- * indexer is asked to look at the store (Task 11): after the COMMIT inside a request, after the
- * short transaction here otherwise. `reindexReason` labels that event (default 'ai-autofill').
+ * indexer is asked to look at the store (Task 11). The event is sent only after the writes commit:
+ * the request's COMMIT, the caller's `runInTenantContext` COMMIT when this joined one (review M7,
+ * `requestStoreReindex`), or this function's own short transaction, which has returned by then.
+ * `reindexReason` labels that event (default 'ai-autofill').
  */
 export async function writeAiFieldsGuarded(
   storeId: string,

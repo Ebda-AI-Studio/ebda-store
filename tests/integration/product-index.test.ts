@@ -6,7 +6,13 @@
  */
 import { describe, it, expect, beforeAll, afterAll, afterEach, vi } from 'vitest';
 import crypto, { createHash } from 'node:crypto';
-import { prisma, createPrismaClient, runWithRequestDb, runInStoreScope } from '@ebda/database';
+import {
+  prisma,
+  createPrismaClient,
+  runWithRequestDb,
+  runInStoreScope,
+  runInTenantContext,
+} from '@ebda/database';
 import { hasDb } from '../helpers/bundle-fixtures';
 
 vi.hoisted(() => {
@@ -34,6 +40,7 @@ const { setEmbeddingProviderForTests, EMBED_DIMS, EMBED_MODEL, EmbeddingError } 
   await import('../../apps/api/src/lib/search/embedding-provider');
 const { indexStore, findStaleProducts, storeIndexStatus, hasStaleProducts } =
   await import('../../apps/api/src/services/product-index.service');
+const { requestStoreReindex } = await import('../../apps/api/src/lib/search/reindex');
 const { handleSearchProductIndex, handleSearchIndexBackstop, INDEX_RETRIES } =
   await import('../../apps/api/src/lib/inngest/functions/search-product-index');
 
@@ -526,6 +533,32 @@ describe.skipIf(!hasDb)('product embedding indexer (Task 11)', () => {
     expect(r).toMatchObject({ embedded: 0, done: true });
     expect(steps).toEqual(['plan-0']);
     expect(f.calls.length).toBe(calls);
+  });
+
+  it('review M7: inside a non-request tenant transaction the reindex event waits for COMMIT; a rollback sends nothing', async () => {
+    setEmbeddingProviderForTests(fakeProvider().provider);
+    sent.length = 0;
+    let insideTx = -1;
+    await asApp(() =>
+      runInTenantContext(storeId, async () => {
+        await prisma.product.update({ where: { id: pid, storeId }, data: { searchTerms: 'm7' } });
+        await requestStoreReindex(storeId, 'm7');
+        insideTx = sent.length;
+      })
+    );
+    expect(insideTx).toBe(0);
+    expect(sent.filter(e => e.data.reason === 'm7')).toHaveLength(1);
+
+    sent.length = 0;
+    await expect(
+      asApp(() =>
+        runInTenantContext(storeId, async () => {
+          await requestStoreReindex(storeId, 'm7-rollback');
+          throw new Error('rollback');
+        })
+      )
+    ).rejects.toThrow('rollback');
+    expect(sent).toHaveLength(0);
   });
 
   it('as ebda_app: the vector rows are invisible from another store scope', async () => {
