@@ -346,8 +346,9 @@ async function main(): Promise<number> {
     // Ruling SEARCH-T13-5 asks whether a SECOND vector for the AI words beats one vector without
     // them. Not production code: the KNN runs here in JS over real bge-m3 vectors of (a) each
     // product's doc as the DB holds it now (names; the eval store has no descriptions) and (b) its
-    // words alone; a product's distance is the nearer of the two. "one@d" (doc only) must reproduce
-    // the production vector leg, and the agreement is printed so the simulation can be trusted.
+    // words alone; a product's distance is the nearer of the two. Since SEARCH-T13-7 production IS
+    // two-vector: "two@d" must reproduce the production vector leg (agreement printed); "one@d"
+    // (doc only) is the pre-T13-7 baseline for comparison.
     let simAgreement: number | null = null;
     if (arg('--two-vector-sim')) {
       if (!aiTerms) throw new Error('--two-vector-sim needs --ai-terms');
@@ -390,7 +391,7 @@ async function main(): Promise<number> {
       for (const a of absent) a.sim = simFor(a.q);
       simAgreement =
         legs.filter(
-          l => JSON.stringify(l.sim!.get('one@0.55')) === JSON.stringify(l.vector.get(0.55))
+          l => JSON.stringify(l.sim!.get('two@0.55')) === JSON.stringify(l.vector.get(0.55))
         ).length / legs.length;
     }
 
@@ -516,7 +517,7 @@ async function main(): Promise<number> {
     console.log(`\nKeyword matches per query: ${JSON.stringify(buckets)}`);
     if (simAgreement !== null)
       console.log(
-        `SIMULATION check: harness one-vector KNN equals the production vector leg on ${(simAgreement * 100).toFixed(1)} % of queries (d=0.55)`
+        `SIMULATION check: harness two-vector KNN equals the production (two-vector, SEARCH-T13-7) vector leg on ${(simAgreement * 100).toFixed(1)} % of queries (d=0.55)`
       );
     console.log(
       `Embeddable queries: ${legs.filter(l => l.embeddable).length}/${legs.length}; provider calls during queries: ${providerCalls - callsBefore}, of them not from the prefetch: ${backendCalls - backendBefore}`
