@@ -44,9 +44,24 @@ describe('sentence case on the purchase path', () => {
   it.each(FILES)('%s', f => {
     const src = readFileSync(join(WEB, f), 'utf8');
     const bad: string[] = [];
-    for (const m of src.matchAll(/\bt\(\s*'([^'\n]+)'\s*,/g)) {
-      if (titleCaseWords(m[1]).length) bad.push(m[1]);
+    // t('English', ...) calls and literal English title props (title="You might also like").
+    for (const m of src.matchAll(/\bt\(\s*'([^'\n]+)'\s*,|\btitle="([^"\n]+)"/g)) {
+      const en = m[1] ?? m[2];
+      if (titleCaseWords(en).length) bad.push(en);
     }
     expect(bad).toEqual([]);
+  });
+});
+
+// VT-c (independent audit): "قد يعجبك أيضاً" sat 32px inside the page gutter at 390: the
+// carousel brings its own px-4/6/8 gutter inside the PDP container's identical one.
+describe('related row keeps the page gutter (VT-c)', () => {
+  it('YouMightAlsoLike cancels the PDP container gutter the carousel repeats', () => {
+    const src = readFileSync(join(WEB, 'components/YouMightAlsoLike.tsx'), 'utf8');
+    const pdp = readFileSync(join(WEB, 'app/products/[slug]/ProductDetailClient.tsx'), 'utf8');
+    const carousel = readFileSync(join(WEB, 'templates/shared/ProductCarousel.tsx'), 'utf8');
+    expect(pdp).toContain('mx-auto max-w-7xl px-4 sm:px-6 lg:px-8');
+    expect(carousel).toContain('<section className="px-4 sm:px-6 lg:px-8"');
+    expect(src).toMatch(/<div className="mt-16 -mx-4 sm:-mx-6 lg:-mx-8">\s*\{\/\*/);
   });
 });

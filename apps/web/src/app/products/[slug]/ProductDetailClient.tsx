@@ -1397,7 +1397,7 @@ export default function ProductDetailClient({
                   and honours the per-store PDP heading typography zone. */}
               <ProductCarousel
                 products={relatedProducts.map(toTemplateProduct)}
-                title="You May Also Like"
+                title="You may also like"
                 titleAr="قد يعجبك أيضاً"
                 headingZone={relatedHeadingZone}
                 isRtl={language === 'ar'}
