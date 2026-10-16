@@ -181,7 +181,9 @@ function ClassicProductCard({
     // of the sale badge (`!hasSale`), at logical top-start; mirror that
     // exact condition so a badge avoiding a reserved heart corner doesn't
     // land on top of it.
-    newOrBrandBadgeReserved: Boolean(!hasSale && isProductNew(product, renderNow) && orderable),
+    newOrBrandBadgeReserved: Boolean(
+      !hasSale && isProductNew(product, renderNow, store.theme) && orderable
+    ),
     // The mobile quick-add CTA band below is an unconditional full-width
     // overlay (hidden only via a `lg:` desktop hover state, never removed
     // from the DOM), so it reserves the whole bottom edge.
@@ -320,7 +322,7 @@ function ClassicProductCard({
             </span>
           ) : (
             !hasSale &&
-            isProductNew(product, renderNow) &&
+            isProductNew(product, renderNow, store.theme) &&
             orderable && (
               <ProductBadge
                 variant="new"

@@ -83,7 +83,7 @@ export default function DahabProductCard({
       ? getDiscountBadgeText(product, isRtl, undefined, undefined, numerals)
       : null;
   const custom = orderable ? getCustomBadgeText(product, isRtl) : null;
-  const isNew = inStock && isProductNew(product, renderNow);
+  const isNew = inStock && isProductNew(product, renderNow, store.theme);
   const badge = !orderable
     ? t('Sold out', 'نفدت الكمية')
     : (custom ?? discount ?? (isNew ? t('New', 'جديد') : null));

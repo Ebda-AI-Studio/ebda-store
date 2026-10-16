@@ -156,6 +156,12 @@ export interface StoreTheme {
   // share/screenshot contexts.
   showBrandBadge?: boolean;
 
+  // Opt-in "New / جديد" badge on product cards (Ahmad 2026-10-16, Ruling
+  // D1016-NEW-1: the merchant's choice). When true, a product the merchant
+  // flagged `isNew` or created in the last 14 days shows the badge on every
+  // card path (`isProductNew`). Default false (new visual features default OFF).
+  showNewBadge?: boolean;
+
   // Opt-in quick-add (+) circle overlay on ProductCarousel cards (Bucket
   // E3, shipped 2026-05-17). When true, in-stock non-variant products
   // get a primary-color circle button bottom-end of the image — single
@@ -600,6 +606,7 @@ export const DEFAULT_THEME: StoreTheme = {
   borderRadius: 'md',
   backgroundPreset: 'none',
   showBrandBadge: false,
+  showNewBadge: false,
   showQuickAdd: false,
   dividers: DEFAULT_DIVIDER_SETTINGS,
   showBrandStory: true,

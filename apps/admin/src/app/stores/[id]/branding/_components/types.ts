@@ -38,6 +38,8 @@ export interface StoreTheme {
    * badge is in that corner. Default false.
    */
   showBrandBadge?: boolean;
+  /** Opt-in "New" badge on product cards (Ruling D1016-NEW-1). Default false. */
+  showNewBadge?: boolean;
   /**
    * Opt-in quick-add (+) circle overlay on carousel cards (E3).
    * Single-tap add-to-cart without leaving the page. Default false.
@@ -213,6 +215,7 @@ const BASE_THEME: StoreTheme = {
   borderRadius: 'md',
   backgroundPreset: 'none',
   showBrandBadge: false,
+  showNewBadge: false,
   showQuickAdd: false,
   showBrandStory: true,
   showTrustStrip: true,

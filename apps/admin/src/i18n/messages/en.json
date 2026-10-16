@@ -1733,6 +1733,8 @@
         "everywhereDescription": "Styling for the product CARD tiles — size, frame, aspect, and name/price/button fonts — wherever they appear (listing, category, search, carousels). This is the card itself, not a page; page backgrounds & headings are in the page cards above.",
         "brandBadgeTitle": "Brand badge on cards",
         "brandBadgeHint": "Small store-name pill in the top corner of every product card.",
+        "newBadgeTitle": "\"New\" badge on cards",
+        "newBadgeHint": "A \"New\" chip on products you mark as new or added in the last 14 days. Off by default.",
         "quickAddTitle": "Quick-add (+) on carousel cards",
         "quickAddHint": "One-tap add-to-cart circle on homepage carousel cards. When ON, the bottom Add to cart button auto-suppresses on the same card.",
         "normalizeImagesTitle": "Normalize product images",

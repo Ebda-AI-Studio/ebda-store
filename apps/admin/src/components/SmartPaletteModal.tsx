@@ -49,6 +49,8 @@ export interface ThemeUpdates {
   /** Card-level toggles staged from the page-builder "Product Cards" section
    *  card (Ahmad 2026-05-20: moved from branding/ThemeTab). */
   showBrandBadge?: boolean;
+  /** Ruling D1016-NEW-1 — the card "New" badge, merchant's choice, default off. */
+  showNewBadge?: boolean;
   showQuickAdd?: boolean;
   /** #1998 — keep the legacy bottom-left sale-badge corner (Page Builder toggle). */
   saleBadgeLegacyCorner?: boolean;

@@ -5,3 +5,8 @@ User-visible changes, by who sees them. Rulings: `docs/RULINGS.md` § "2026-10-1
 ## Shoppers (storefront)
 
 - **Egyptian Arabic sentences** (FU46-Y02a): the receipt ("طلبك اتسجل، الدفع عند الاستلام"), the delivery chip ("يوصلك بين …"), made-to-order ("بيتجهز خصيصًا لك في يومين"), InstaPay receipt upload, contact form, 3D viewer, unknown-store page, demo notices, Dahab bag and product page, return-policy / terms / FAQ return sentences and the size-needed checkout error speak Egyptian again. Buttons and labels keep a neutral form ("أرسل الإيصال", "موعد الوصول"). Counted nouns use Egyptian forms ("قطعتين", "يومين", "١٤ يوم"). Nothing a merchant typed changes.
+- **"New" badge is off unless the store turns it on** (D1016-NEW-1): no card shows "جديد / New" by default.
+
+## Merchants (admin)
+
+- **Page Builder → Product card defaults → "New" badge on cards** (ar + en): turns the "New" chip on for products you mark as new or added in the last 14 days. Off by default (D1016-NEW-1).

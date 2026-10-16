@@ -531,10 +531,11 @@ export function OosImageDim({
 
 /**
  * Sprint 2: helper that decides whether a product should display the
- * NEW badge. Returns true when the merchant explicitly flagged it
- * (`product.isNew === true`) OR when the product was created within
- * the last `NEW_PRODUCT_WINDOW_DAYS` (default 14). Auto-rotation
- * surfaces fresh inventory without merchant intervention.
+ * NEW badge. The badge is the MERCHANT'S choice (Ahmad 2026-10-16, Ruling
+ * D1016-NEW-1): nothing shows unless the store turned it on
+ * (`theme.showNewBadge === true`, default OFF). With it on: the merchant
+ * flagged the product (`product.isNew === true`) OR it was created within the
+ * last `NEW_PRODUCT_WINDOW_DAYS` (default 14).
  *
  * `createdAt` may be absent on synthetic test fixtures — when missing
  * we fall back to the explicit flag only (no auto-rotation), which
@@ -548,8 +549,11 @@ export function isProductNew(
     createdAt?: string | Date | null;
   },
   /** The render clock (`useRenderNow()`), never a fresh read of the time (hydration-safe). */
-  now: number
+  now: number,
+  /** The store theme (`store.theme`): `showNewBadge` is the merchant's switch. Required on purpose. */
+  theme: { showNewBadge?: boolean } | null | undefined
 ): boolean {
+  if (theme?.showNewBadge !== true) return false;
   if (product.isNew === true) return true;
   if (!product.createdAt) return false;
   const created =
