@@ -283,3 +283,19 @@ describe('sold-out PDP steppers are disabled (P2-N11)', () => {
     for (const b of steppers) expect(b.disabled).toBe(true);
   });
 });
+
+// Found by the stop4 rendered probe (rule (d)): on phones the PDP's category link (L-08, the
+// breadcrumb's stand-in below md) measured 33-41px wide for a short category name.
+describe('the phone category link is 44px in both directions', () => {
+  it('min-h-11 and min-w-11', async () => {
+    const { readFileSync } = await import('node:fs');
+    const { join } = await import('node:path');
+    const src = readFileSync(
+      join(__dirname, '../../apps/web/src/app/products/[slug]/ProductDetailClient.tsx'),
+      'utf8'
+    );
+    const i = src.lastIndexOf('href={storeUrl(`/products?category=${cat0.category.slug}`)}');
+    const tag = src.slice(i, src.indexOf('>', i));
+    expect(tag).toMatch(/className="inline-flex min-h-11 min-w-11 /);
+  });
+});

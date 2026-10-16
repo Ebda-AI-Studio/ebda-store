@@ -1309,7 +1309,7 @@ export default function ProductDetailClient({
                 <div className="mt-6 md:hidden">
                   <Link
                     href={storeUrl(`/products?category=${cat0.category.slug}`)}
-                    className="inline-flex min-h-11 items-center gap-1 text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
+                    className="inline-flex min-h-11 min-w-11 items-center gap-1 text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
                   >
                     {categoryName}
                   </Link>
