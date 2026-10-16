@@ -9,7 +9,7 @@
 import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
 import express, { type NextFunction, type Request, type Response } from 'express';
 import request from 'supertest';
-import { prisma, runInTenantContext } from '@ebda/database';
+import { prisma, runInTenantContext, createPrismaClient } from '@ebda/database';
 import { SEARCH_TERMS_MAX_LENGTH } from '@ebda/shared';
 import { hasDb } from '../helpers/bundle-fixtures';
 
@@ -146,6 +146,48 @@ describe.skipIf(!hasDb)('search terms: stored, searchable, every writer capped',
     expect((await termsOf(p.id))!.searchTerms).toBeNull();
   });
 
+  it('N1: a merchant save never writes back a stale provenance map over a fresh AI stamp', async () => {
+    const p = await inStore(() =>
+      ProductService.create(
+        storeId,
+        createProductSchemaChecked.parse({ name: 'Race', price: 1000 })
+      )
+    );
+    // A separate connection, so the "AI write" commits on its own while the merchant's
+    // request transaction is still open (between its read and its UPDATE).
+    const other = createPrismaClient({
+      connectionString: process.env.DIRECT_URL || process.env.DATABASE_URL || '',
+      role: 'owner',
+    } as never);
+    const realGetById = ProductService.getById.bind(ProductService);
+    const spy = vi.spyOn(ProductService, 'getById').mockImplementationOnce(async (sid, pid) => {
+      const stale = await realGetById(sid, pid); // the merchant's read: no AI stamp yet
+      await other.product.update({
+        where: { id: p.id },
+        data: { searchTerms: 'kobaya, mug', aiFieldSources: { searchTerms: 'ai' } },
+      });
+      return stale;
+    });
+    try {
+      await inStore(() =>
+        ProductService.update(
+          storeId,
+          p.id,
+          updateProductSchema.parse({ price: 2000, nameAr: 'مج' })
+        )
+      );
+    } finally {
+      spy.mockRestore();
+      await other.$disconnect();
+    }
+    const row = await prisma.product.findUnique({ where: { id: p.id } });
+    const src = row!.aiFieldSources as Record<string, string>;
+    expect(src.searchTerms).toBe('ai'); // the AI stamp that committed meanwhile survives
+    expect(src.nameAr).toBe('human'); // and the merchant's own edit is stamped
+    expect(row!.searchTerms).toBe('kobaya, mug');
+    expect(row!.price).toBe(2000);
+  });
+
   it('service re-caps even if a caller bypasses Zod (MCP/AI-fill defence in depth)', async () => {
     const p = await inStore(() =>
       ProductService.create(storeId, createProductSchemaChecked.parse({ name: 'Raw', price: 1000 }))
@@ -191,6 +233,75 @@ describe.skipIf(!hasDb)('search terms: stored, searchable, every writer capped',
       const exported = await inStore(() => BulkService.exportProducts(storeId));
       expect(exported.split('\n')[0]).toContain('searchTerms');
       expect(exported).toContain('كوتشي');
+    });
+
+    // Search program P1 (Task 8): the autopilot now writes search words, so an import is a
+    // merchant edit and must stamp 'human' or the next AI refresh would replace it.
+    const rowAr = (name: string, nameAr: string, slug: string, sku: string, terms: string) =>
+      `${name},${nameAr},${slug},,,1000,,,${sku},,5,,true,,active,false,false,,,,,,,,"${terms}"`;
+    const sourcesOf = async (slug: string) =>
+      ((await prisma.product.findFirst({ where: { storeId, slug } }))!.aiFieldSources ??
+        {}) as Record<string, string>;
+
+    it("create: imported words and names are the merchant's (human), empty fields stay fillable", async () => {
+      const slug = `bulk-own-${run}`;
+      const csv = [header, rowAr('Bulk Own', 'كوتشي', slug, `BO-${run}`, 'kotshy, كوتشي')].join(
+        '\n'
+      );
+      await inStore(() => BulkService.importProducts(storeId, csv, { updateExisting: true }));
+      const s = await sourcesOf(slug);
+      expect(s.searchTerms).toBe('human');
+      expect(s.name).toBe('human');
+      expect(s.nameAr).toBe('human');
+      expect(s.descriptionAr).toBeUndefined(); // empty → the autopilot may still fill it
+    });
+
+    it('update: changed words over AI-owned words become human; identical words stay ai', async () => {
+      const slug = `bulk-ai-${run}`;
+      const sku = `BAI-${run}`;
+      const created = await inStore(() =>
+        BulkService.importProducts(
+          storeId,
+          [header, rowAr('Bulk AI', 'جزمة', slug, sku, '')].join('\n'),
+          { updateExisting: true }
+        )
+      );
+      expect(created.created).toBe(1);
+      // What the autopilot would have written.
+      await prisma.product.updateMany({
+        where: { storeId, slug },
+        data: {
+          searchTerms: 'gazma, جزمه',
+          aiFieldSources: { searchTerms: 'ai', nameAr: 'ai', name: 'human' },
+        },
+      });
+
+      // Re-export round trip: same words, same name → ownership unchanged.
+      await inStore(() =>
+        BulkService.importProducts(
+          storeId,
+          [header, rowAr('Bulk AI', 'جزمة', slug, sku, 'gazma, جزمه')].join('\n'),
+          { updateExisting: true }
+        )
+      );
+      expect((await sourcesOf(slug)).searchTerms).toBe('ai');
+      expect((await sourcesOf(slug)).nameAr).toBe('ai');
+
+      // A blank Arabic name is the documented import clear: it keeps the ai stamp (fillable).
+      await inStore(() =>
+        BulkService.importProducts(
+          storeId,
+          [header, rowAr('Bulk AI', '', slug, sku, 'gazma, gezma, جزمه')].join('\n'),
+          { updateExisting: true }
+        )
+      );
+      const s = await sourcesOf(slug);
+      expect(s.searchTerms).toBe('human');
+      expect(s.nameAr).toBe('ai');
+      expect(
+        (await termsOf((await prisma.product.findFirst({ where: { storeId, slug } }))!.id))!
+          .searchTerms
+      ).toBe('gazma, gezma, جزمه');
     });
   });
 

@@ -50,8 +50,28 @@ describe('stampHumanEdits', () => {
   });
 });
 
+describe('stampHumanEdits — search words (search program P1)', () => {
+  it('a merchant edit of AI search words makes them human (the AI never rewrites them)', () => {
+    const next = stampHumanEdits(
+      { searchTerms: 'ai' },
+      { searchTerms: 'جزمه, gazma' },
+      { searchTerms: 'جزمه, gazma, kotshy' }
+    );
+    expect(next.searchTerms).toBe('human');
+  });
+
+  it('re-saving the same AI words keeps them AI-owned', () => {
+    const next = stampHumanEdits(
+      { searchTerms: 'ai' },
+      { searchTerms: 'جزمه, gazma' },
+      { searchTerms: 'جزمه, gazma' }
+    );
+    expect(next.searchTerms).toBe('ai');
+  });
+});
+
 describe('computeFillSet', () => {
-  it('on create fills every empty field (both languages + SEO)', () => {
+  it('on create fills every empty field (both languages + SEO + search words)', () => {
     const fields = computeFillSet({}, 'create', []);
     expect(fields.sort()).toEqual(
       [
@@ -63,6 +83,7 @@ describe('computeFillSet', () => {
         'metaTitleAr',
         'metaDescription',
         'metaDescriptionAr',
+        'searchTerms',
       ].sort()
     );
   });

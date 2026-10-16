@@ -31,6 +31,8 @@ export const AI_AUTOFILL_FIELDS = [
   { field: 'metaTitleAr', sources: ['nameAr', 'name'] },
   { field: 'metaDescription', sources: ['name', 'description', 'nameAr', 'descriptionAr'] },
   { field: 'metaDescriptionAr', sources: ['nameAr', 'descriptionAr', 'name', 'description'] },
+  // Search words (dialect / Franco / EN) — derive from content in EITHER language. Search program P1.
+  { field: 'searchTerms', sources: ['name', 'nameAr', 'description', 'descriptionAr'] },
 ] as const;
 
 export type AiAutofillField = (typeof AI_AUTOFILL_FIELDS)[number]['field'];
