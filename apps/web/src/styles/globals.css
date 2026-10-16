@@ -1280,13 +1280,14 @@ html[dir='rtl'] [data-pack='dahab'] [data-section='newsletter'] h2 {
   body[data-sticky-cart='blocked'] [data-floating-widget='bottom'] {
     bottom: calc(var(--sticky-bar-h, 85px) + 10px);
   }
-  /* IA-17 (supersedes the F2 toast lift): lifted above the bar, the "added" toast still
-   * covered the inline Add button and the delivery line whenever no bar showed. On a
-   * phone it anchors at the top, clear of every CTA band and fixed-bottom bar. */
-  [data-toast-region] {
-    top: calc(env(safe-area-inset-top) + 0.75rem);
-    bottom: auto;
-  }
+}
+/* IA-17 (supersedes the F2 toast lift): lifted above the bar, the "added" toast still covered
+ * the inline Add button and the delivery line whenever no bar showed. It anchors at the top,
+ * clear of every CTA band and fixed-bottom bar; at every width since taste re-audit P2-13 (at
+ * 1280 the bottom-end toast covered the wishlist button beside Add to cart). */
+[data-toast-region] {
+  top: calc(env(safe-area-inset-top) + 0.75rem);
+  bottom: auto;
 }
 
 /* Sticky bar entrance: ease-out-quint, 300ms. The global reduced-motion rule

@@ -79,3 +79,13 @@ describe('toast lift above the sticky bars', () => {
     ).toBeGreaterThan(media);
   });
 });
+
+// Taste re-audit P2-13: at 1280 the toast (bottom-end) covered the wishlist button beside Add to
+// cart. The storefront anchors the toast at the top at every width, not only on phones.
+describe('the storefront toast anchors at the top at every width (P2-13)', () => {
+  it('the top anchor sits outside any media query', () => {
+    const rule =
+      /\n\[data-toast-region\] \{\s*top: calc\(env\(safe-area-inset-top\) \+ 0\.75rem\);\s*bottom: auto;/;
+    expect(css).toMatch(rule);
+  });
+});
