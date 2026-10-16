@@ -227,11 +227,15 @@ export const QUERY_EMBED_MIN_CHARS = 3;
 /** Most characters of a query that are embedded (the same 100 the route caps the term at). */
 export const QUERY_EMBED_MAX_CHARS = 100;
 /**
- * The keyword leg is "strong" at this many matches (a full default page): the query is then NOT
- * embedded and the list is keyword-ranked (Ruling SEARCH-T12-3: the vector leg is for the weak and
- * zero-result queries it exists for, and a broad term never costs a Workers AI call).
+ * The keyword leg is "strong" at this many matches: the query is then NOT embedded and the list is
+ * keyword-ranked. Equal to HYBRID_LEG, so every keyword list the fused head can hold gets semantic
+ * re-ranking and E10's appended tail is live for 20-49 hits (Ruling SEARCH-T12-3, amended). The ONE
+ * constant Task 13 tunes: its eval measures lift at 20, 50 and no threshold. Spend is bounded by the
+ * budgets (`takeQueryEmbed`), not by this. Counted store-wide BEFORE the category, price and option
+ * filters (documented residual: a filtered search with few in-filter hits but >= 50 store-wide is
+ * keyword-only).
  */
-export const KEYWORD_STRONG_AT = 20;
+export const KEYWORD_STRONG_AT = HYBRID_LEG;
 const DEFAULT_VECTOR_MAX_DISTANCE = 0.55;
 
 /**

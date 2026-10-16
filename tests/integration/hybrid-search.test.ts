@@ -37,6 +37,7 @@ const {
   clearQueryVectorCacheForTests,
   QUERY_EMBED_BUDGET_MS,
   KEYWORD_STRONG_AT,
+  HYBRID_LEG,
   QUERY_EMBED_MAX_CHARS,
   PRODUCT_SEARCH_ID_CAP,
 } = await import('../../apps/api/src/services/product-search.service');
@@ -386,9 +387,32 @@ describe.skipIf(!hasDb)('hybrid storefront search (Task 12)', () => {
     expect(f.calls).toHaveLength(1);
   });
 
+  it('30 keyword matches (under the fused head) still embed and fuse (E10 head is live)', async () => {
+    const W = await mkStore('weak30');
+    await prisma.product.createMany({
+      data: Array.from({ length: 30 }, (_, i) => ({
+        storeId: W,
+        slug: `scarf-${i}-${crypto.randomUUID().slice(0, 8)}`,
+        name: `Scarf ${i}`,
+        price: 1000,
+        status: 'active' as const,
+      })),
+    });
+    const extra = await mkProduct(W, { name: 'Wool shawl', nameAr: 'شال صوف' });
+    setEmbeddingProviderForTests(aliasProvider().provider);
+    await runInStoreScope(W, () => indexStore(W));
+    process.env.SEARCH_SEMANTIC_ENABLED = 'true';
+    const f = aliasProvider({ scarf: await docOf(extra) });
+    setEmbeddingProviderForTests(f.provider);
+    const ids = await runInTenantContext(W, () => rankedSearch(W, 'scarf', { searcher: who() }));
+    expect(f.calls).toHaveLength(1); // 30 < KEYWORD_STRONG_AT: the vector leg ran
+    expect(ids).toHaveLength(31); // 30 keyword + the vector-only shawl, fused
+    expect(ids.indexOf(extra)).toBeLessThan(2);
+  });
+
   it('a strong keyword leg (>= KEYWORD_STRONG_AT) is not embedded, and keeps every match (E10 cap)', async () => {
     expect(PRODUCT_SEARCH_ID_CAP).toBe(1000);
-    expect(KEYWORD_STRONG_AT).toBe(20);
+    expect(KEYWORD_STRONG_AT).toBe(HYBRID_LEG); // 50: the fused head (SEARCH-T12-3 amended)
     const B = await mkStore('boots');
     await prisma.product.createMany({
       data: Array.from({ length: 60 }, (_, i) => ({
