@@ -1,6 +1,6 @@
 import type { StoreTheme, TemplateId } from '../types/store-theme';
 import { getTemplateTheme } from '../types/store-theme';
-import { hexToHsl as h } from '../utils/color';
+import { boundaryColorFloor, hexToHsl as h } from '../utils/color';
 import { getLook } from './registry';
 import { LOOK_OWNED_THEME_KEYS, type LookDefinition } from './types';
 
@@ -66,6 +66,11 @@ export function composeStoreTheme(i: {
   // fields on that border, exactly as they drew before the border-input sweep.
   if (!look && stored.borderColor && stored.inputColor === undefined)
     out.inputColor = stored.borderColor;
+  // Taste re-audit (no-look regression): `--input` draws every interactive boundary (VT-05),
+  // so it must itself read against the page, >= 3:1, whatever the skin or the saved border was
+  // (#E5E7EB chips on white measured 1.24:1). Hue kept, lightness moved; --border untouched.
+  if (out.inputColor && out.backgroundColor)
+    out.inputColor = boundaryColorFloor(out.inputColor, out.backgroundColor);
   return out;
 }
 

@@ -848,3 +848,30 @@ export function generateSectionPalette(
 
   return base;
 }
+
+/**
+ * A boundary colour that reads against `bg` (WCAG 1.4.11, >= `min`:1). Keeps the colour's hue
+ * and saturation and moves only its lightness away from the background, so a merchant's or a
+ * skin's border family survives; returns the input unchanged when it already passes or cannot
+ * be parsed. Output is a bare HSL triplet ("H S% L%").
+ */
+export function boundaryColorFloor(color: string, bg: string, min = 3): string {
+  if (contrastRatio(bg, color) >= min) return color;
+  const trimmed = color.trim();
+  const triplet = trimmed.startsWith('#')
+    ? hexToHsl(trimmed)
+    : trimmed
+        .replace(/^hsla?\(\s*/, '')
+        .replace(/\s*\)$/, '')
+        .replace(/,/g, ' ');
+  const m = /^(-?[\d.]+)\s+([\d.]+)%\s+([\d.]+)%/.exec(triplet.replace(/\s+/g, ' '));
+  const bgRgb = parseColorToRgb(bg);
+  if (!m || !bgRgb) return color;
+  const [hh, ss] = [m[1], m[2]];
+  const darken = relativeLuminance(bgRgb) > 0.18;
+  for (let l = Number(m[3]); l >= 0 && l <= 100; l += darken ? -1 : 1) {
+    const candidate = `${hh} ${ss}% ${l}%`;
+    if (contrastRatio(bg, candidate) >= min) return candidate;
+  }
+  return color;
+}
