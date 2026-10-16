@@ -54,11 +54,17 @@ vi.mock('@ebda/database', () => ({
       // miss to `true`. Returning the cart's product means these tests now
       // exercise the state production is actually in; individual tests still
       // override it where they need something else.
-      findMany: vi
-        .fn()
-        .mockResolvedValue([
-          { id: 'prod-123', trackInventory: true, costPrice: 500, categories: [] },
-        ]),
+      findMany: vi.fn().mockResolvedValue([
+        {
+          id: 'prod-123',
+          name: 'Test Product',
+          nameAr: null,
+          trackInventory: true,
+          costPrice: 500,
+          _count: { variants: 0 },
+          categories: [],
+        },
+      ]),
       update: vi.fn(),
     },
     productVariant: {
