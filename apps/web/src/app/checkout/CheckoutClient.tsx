@@ -574,6 +574,8 @@ export default function CheckoutClient() {
   }, [store?.id]);
 
   // Form validation errors
+  // a11y re-audit P2-N8: one announcement for a failed submit; field errors are described, not alerts.
+  const [submitTried, setSubmitTried] = useState(false);
   const [formErrors, setFormErrors] = useState<{
     email?: string;
     firstName?: string;
@@ -1203,6 +1205,7 @@ export default function CheckoutClient() {
     if (step === 1) {
       // Validate before proceeding to payment
       if (!validateForm()) {
+        setSubmitTried(true);
         // R-13: focus the first error once the errors have rendered.
         requestAnimationFrame(() => focusFirstError());
         return;
@@ -1894,6 +1897,14 @@ export default function CheckoutClient() {
           <h1 data-checkout-title className="sr-only">
             {t('Checkout', 'إتمام الطلب')}
           </h1>
+          {submitTried && Object.values(formErrors).some(Boolean) && (
+            <p role="alert" className="sr-only" data-checkout-error-summary>
+              {t(
+                'Some details need fixing before you continue.',
+                'في بيانات محتاجة تتصلح قبل ما تكمل.'
+              )}
+            </p>
+          )}
           {/* Progress Steps */}
           <div className="mb-8">
             <div className="flex items-center justify-center">

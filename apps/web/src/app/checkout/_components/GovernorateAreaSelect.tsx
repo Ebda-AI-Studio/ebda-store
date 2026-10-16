@@ -484,7 +484,7 @@ export function GovernorateAreaSelect({
             clearLabel={clearLabel}
           />
           {governorateError && (
-            <p id={`${govId}-error`} role="alert" className="mt-1 text-sm text-destructive-ink">
+            <p id={`${govId}-error`} className="mt-1 text-sm text-destructive-ink">
               {governorateError}
             </p>
           )}
@@ -504,7 +504,7 @@ export function GovernorateAreaSelect({
             clearLabel={clearLabel}
           />
           {areaError && (
-            <p id={`${areaId}-error`} role="alert" className="mt-1 text-sm text-destructive-ink">
+            <p id={`${areaId}-error`} className="mt-1 text-sm text-destructive-ink">
               {areaError}
             </p>
           )}

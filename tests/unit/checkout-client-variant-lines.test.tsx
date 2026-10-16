@@ -136,3 +136,24 @@ describe('checkout fields are 44px at every breakpoint (P2-N1)', () => {
     expect(smallTargets(holder, 44)).toEqual([]);
   });
 });
+
+// a11y re-audit P2-N8: an empty submit fired 7 role=alert field errors at once. One summary
+// announces; each field keeps its aria-describedby error (not an alert of its own).
+describe('an empty submit announces once (P2-N8)', () => {
+  it('exactly one alert, field errors described, focus on the first invalid field', async () => {
+    const { fireEvent } = await import('@testing-library/react');
+    lang.v = 'ar';
+    const { container } = render(<CheckoutClient />);
+    await screen.findAllByText('وردي · S · 52');
+    const submit = screen
+      .getAllByRole('button')
+      .find(b => /المتابعة للدفع/.test(b.textContent ?? ''))!;
+    fireEvent.click(submit);
+    await new Promise(r => setTimeout(r, 50));
+    const invalid = container.querySelectorAll('[aria-invalid="true"]');
+    expect(invalid.length).toBeGreaterThan(3);
+    expect(container.querySelectorAll('[role="alert"]').length).toBe(1);
+    for (const f of Array.from(invalid))
+      expect(document.getElementById(f.getAttribute('aria-describedby') ?? 'x')).not.toBeNull();
+  });
+});
