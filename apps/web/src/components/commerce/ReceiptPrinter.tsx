@@ -202,7 +202,7 @@ export function ReceiptPrinter({
                   t('Your order', 'طلبك')
                 )}
               </p>
-              <p className="mt-0.5 truncate text-xs opacity-60">
+              <p className="mt-0.5 truncate text-xs opacity-80">
                 {order
                   ? t(
                       countText('en', itemCount, ITEMS),
@@ -213,7 +213,7 @@ export function ReceiptPrinter({
             </div>
             {order && (
               <div className="shrink-0 text-end">
-                <p className="text-xs opacity-60">{t('Order total', 'إجمالي الطلب')}</p>
+                <p className="text-xs opacity-80">{t('Order total', 'إجمالي الطلب')}</p>
                 <p className="text-base font-semibold">
                   <Num>{formatPrice(order.total)}</Num>
                 </p>
@@ -297,7 +297,7 @@ export function ReceiptPrinter({
                     <li key={row.key} data-testid="receipt-line" className="flex gap-3">
                       <div className="min-w-0 flex-1">
                         <p className="font-medium">
-                          <span className="opacity-60">
+                          <span className="opacity-80">
                             <Num>{localize(qty)}</Num>×
                           </span>{' '}
                           {name}

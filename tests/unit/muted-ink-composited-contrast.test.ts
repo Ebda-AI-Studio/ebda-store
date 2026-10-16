@@ -65,6 +65,20 @@ describe('K-03: every receipt ink composites to >= 4.5:1 on the paper', () => {
     });
 });
 
+// a11y P1-2 / P2-12 (W4): the receipt's own muted text was opacity-60 (4.05:1 on Lookbook's screen)
+// and its paper inks 60-62% alpha: under the K-03 70% floor even where they passed 4.5.
+describe('receipt muted text keeps the 70% floor', () => {
+  const css = readFileSync(join(WEB, 'components/commerce/ReceiptPrinter.module.css'), 'utf8');
+  const tsx = readFileSync(join(WEB, 'components/commerce/ReceiptPrinter.tsx'), 'utf8');
+  it('every paper ink is >= 0.7 alpha', () => {
+    for (const m of css.matchAll(/\.(ink\w*)\s*{\s*color:\s*rgb\([^/]+\/\s*([\d.]+)\s*\)/g))
+      expect(+m[2], m[1]).toBeGreaterThanOrEqual(0.7);
+  });
+  it('no text dims below 70% with opacity', () => {
+    expect(tsx).not.toMatch(/\bopacity-(?:[1-6]\d|\d)\b/);
+  });
+});
+
 describe('K-04: foreground text never drops under 70% alpha', () => {
   const walk = (dir: string): string[] =>
     readdirSync(dir).flatMap(n => {
