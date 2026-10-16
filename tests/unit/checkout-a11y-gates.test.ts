@@ -58,3 +58,19 @@ describe('IA-12 / IA-13: marking and the confirm button', () => {
     expect(payment).toMatch(/t\('Place order', 'تأكيد الطلب'\)\} · \$\{formatPrice\(total\)\}/);
   });
 });
+
+// Taste re-audit P2-4: the label said "اسم العائلة" (family name) while its error said "الاسم
+// الأخير مطلوب" (last name), and the street error dropped its label; only the phone field had
+// an example. Each required field's error names its label, and each one shows an example.
+describe('checkout errors name their label; every required field has an example (P2-4)', () => {
+  const cc = readFileSync(path.join(WEB, 'app/checkout/CheckoutClient.tsx'), 'utf8');
+  it('errors repeat the label', () => {
+    expect(cc).toContain("errors.lastName = t('Last name is required', 'اسم العائلة مطلوب')");
+    expect(cc).toContain("errors.street = t('Street is required', 'اسم الشارع مطلوب')");
+  });
+  it.each(['given-name', 'family-name', 'tel', 'address-line1'])('%s has a placeholder', ac => {
+    const i = cc.indexOf(`autoComplete="${ac}"`);
+    const tag = cc.slice(cc.lastIndexOf('<Input', i), cc.indexOf('/>', i));
+    expect(tag).toMatch(/placeholder=/);
+  });
+});

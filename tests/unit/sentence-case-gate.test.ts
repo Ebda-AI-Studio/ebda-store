@@ -21,7 +21,7 @@ const FILES = [
 ];
 /** Proper nouns and acronyms that keep their capital mid-phrase. */
 const PROPER =
-  /^(InstaPay|WhatsApp|Fawry|Paymob|Kashier|Visa|Mastercard|Meeza|Vodafone|Cash|Apple|Google|Pay|COD|SKU|EGP|ID|OK|Egypt|Egyptian|Cairo)$/;
+  /^(InstaPay|WhatsApp|Fawry|Paymob|Kashier|Visa|Mastercard|Meeza|Vodafone|Cash|Apple|Google|Pay|COD|SKU|EGP|ID|OK|Egypt|Egyptian|Cairo|Abbas|El|Akkad|St)$/;
 
 /** Words capitalised mid-sentence (each sentence checked on its own). */
 export function titleCaseWords(s: string): string[] {

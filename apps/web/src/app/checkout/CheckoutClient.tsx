@@ -827,7 +827,7 @@ export default function CheckoutClient() {
 
     // Last name validation
     if (!formData.lastName.trim()) {
-      errors.lastName = t('Last name is required', 'الاسم الأخير مطلوب');
+      errors.lastName = t('Last name is required', 'اسم العائلة مطلوب');
     } else if (formData.lastName.trim().length < 2) {
       errors.lastName = t(
         'Last name must be at least 2 characters',
@@ -859,7 +859,7 @@ export default function CheckoutClient() {
 
     // Street validation (required)
     if (!formData.street.trim()) {
-      errors.street = t('Street is required', 'الشارع مطلوب');
+      errors.street = t('Street is required', 'اسم الشارع مطلوب');
     }
 
     // Building validation (required)
@@ -2018,6 +2018,7 @@ export default function CheckoutClient() {
                               'First name',
                               '\u0627\u0644\u0627\u0633\u0645 \u0627\u0644\u0623\u0648\u0644'
                             )}
+                            placeholder={t('e.g. Mona', 'مثال: منى')}
                             autoComplete="given-name"
                             value={formData.firstName}
                             onChange={e => updateField('firstName', e.target.value)}
@@ -2031,6 +2032,7 @@ export default function CheckoutClient() {
                               'Last name',
                               '\u0627\u0633\u0645 \u0627\u0644\u0639\u0627\u0626\u0644\u0629'
                             )}
+                            placeholder={t('e.g. Adel', 'مثال: عادل')}
                             autoComplete="family-name"
                             value={formData.lastName}
                             onChange={e => updateField('lastName', e.target.value)}
@@ -2195,6 +2197,7 @@ export default function CheckoutClient() {
                       <div data-error={!!formErrors.street}>
                         <Input
                           label={t('Street', 'اسم الشارع')}
+                          placeholder={t('e.g. Abbas El Akkad St.', 'مثال: شارع عباس العقاد')}
                           autoComplete="address-line1"
                           value={formData.street}
                           onChange={e => updateField('street', e.target.value)}
@@ -2207,6 +2210,7 @@ export default function CheckoutClient() {
                         <div data-error={!!formErrors.building}>
                           <Input
                             label={t('Building no.', 'رقم المبنى')}
+                            placeholder={t('e.g. 12', 'مثال: 12')}
                             value={formData.building}
                             onChange={e => updateField('building', e.target.value)}
                             error={formErrors.building}
