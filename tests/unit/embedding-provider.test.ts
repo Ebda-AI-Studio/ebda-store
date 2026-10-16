@@ -92,6 +92,39 @@ describe('embedding provider', () => {
     expect(String(err)).toMatch(/embedding REST: non-JSON body/);
     expect(String(err)).not.toMatch(/html|leaked-value/);
   });
+  it('REST splits into ordered batches of at most 100 (review M6)', async () => {
+    vi.stubEnv('CF_AI_ACCOUNT_ID', 'acc');
+    vi.stubEnv('CF_AI_API_TOKEN', 'tok');
+    const sizes: number[] = [];
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (_u, init) => {
+      const text = JSON.parse(String((init as RequestInit).body)).text as string[];
+      sizes.push(text.length);
+      return new Response(
+        JSON.stringify({
+          success: true,
+          result: { data: text.map(t => [Number(t), ...vec().slice(1)]) },
+        })
+      );
+    });
+    const texts = Array.from({ length: 150 }, (_, i) => String(i));
+    const out = await getEmbeddingProvider()!.embed(texts);
+    expect(sizes).toEqual([100, 50]);
+    expect(out.map(v => v[0])).toEqual(texts.map(Number));
+  });
+  it.each([
+    ['success with no result', { success: true }],
+    ['result with no data', { success: true, result: {} }],
+    ['a JSON null body', null],
+  ])('REST %s is a permanent shape error (review M6)', async (_name, body) => {
+    vi.stubEnv('CF_AI_ACCOUNT_ID', 'acc');
+    vi.stubEnv('CF_AI_API_TOKEN', 'tok');
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify(body)));
+    await expect(getEmbeddingProvider()!.embed(['x'])).rejects.toMatchObject({
+      kind: 'shape',
+      retryable: false,
+      message: expect.stringMatching(/expected 1 vectors/),
+    });
+  });
   it('the binding wins over REST credentials', async () => {
     vi.stubEnv('CF_AI_ACCOUNT_ID', 'acc');
     vi.stubEnv('CF_AI_API_TOKEN', 'tok');

@@ -187,16 +187,16 @@ const restProvider = (): EmbeddingProvider | null => {
       // Status only: never echo the response body or the request (the token is in the header).
       if (!res.ok)
         throw new EmbeddingError('http', `embedding REST ${res.status}`, { status: res.status });
-      let body: { success?: boolean; result?: { data?: unknown } };
+      let body: { success?: boolean; result?: { data?: unknown } } | null;
       try {
         body = JSON.parse(await res.text());
       } catch {
         // JSON.parse's message quotes the start of the body (a proxy/captive page): never echo it.
         throw new EmbeddingError('network', 'embedding REST: non-JSON body');
       }
-      if (body.success === false)
+      if (body?.success === false)
         throw new EmbeddingError('provider', 'embedding REST success=false', { retryable: false });
-      return body.result?.data as number[][];
+      return body?.result?.data as number[][];
     },
     'embedding REST',
     'network'
