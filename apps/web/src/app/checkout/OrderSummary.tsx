@@ -307,7 +307,7 @@ export function OrderSummary({
                     loyalty.onPointsChange(loyalty.points);
                   }
                 }}
-                className="mt-1 h-4 w-4 rounded border-input text-primary focus:ring-primary"
+                className="mt-1 h-4 w-4 rounded border-input accent-primary focus-visible:ring-2 focus-visible:ring-ring"
               />
               <span className="flex-1">
                 <span className="text-sm font-medium text-foreground">
@@ -371,7 +371,7 @@ export function OrderSummary({
                 type="checkbox"
                 checked={wallet.enabled}
                 onChange={e => wallet.onToggle(e.target.checked)}
-                className="mt-1 h-4 w-4 rounded border-input text-primary focus:ring-primary"
+                className="mt-1 h-4 w-4 rounded border-input accent-primary focus-visible:ring-2 focus-visible:ring-ring"
               />
               <span className="flex-1">
                 <span className="text-sm font-medium text-foreground">

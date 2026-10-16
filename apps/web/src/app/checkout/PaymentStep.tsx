@@ -172,7 +172,7 @@ export default function PaymentStep({
                     value={provider.id}
                     checked={selectedProvider === provider.id}
                     onChange={e => onSelectProvider(e.target.value)}
-                    className="h-4 w-4 text-primary focus:ring-primary"
+                    className="h-5 w-5 accent-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                   />
                   <div className="flex-1">
                     <span className="font-medium text-foreground">{displayName}</span>

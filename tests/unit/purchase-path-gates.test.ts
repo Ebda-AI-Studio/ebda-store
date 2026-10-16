@@ -19,6 +19,33 @@ const manifest = JSON.parse(
 ) as { viewports: string[]; screens: { id: string; path: string }[]; files: string[] };
 const src = (f: string) => readFileSync(path.join(WEB, f), 'utf8');
 
+/** Every opening JSX tag named `name`, brace-aware (an `=>` inside a handler does not end it). */
+export function openTags(s: string, name: string): string[] {
+  const out: string[] = [];
+  for (const m of s.matchAll(new RegExp(`<${name}\\b`, 'g'))) {
+    let depth = 0;
+    let j = m.index!;
+    for (; j < s.length; j++) {
+      const c = s[j];
+      if (c === '{') depth++;
+      else if (c === '}') depth--;
+      else if (depth === 0 && c === '>' && s[j - 1] !== '=') break;
+    }
+    out.push(s.slice(m.index!, j + 1));
+  }
+  return out;
+}
+
+describe('openTags self-test', () => {
+  it('reads past an arrow function inside the tag', () => {
+    const t = openTags(
+      '<input type="radio" onChange={e => go(e)} className="accent-primary" />',
+      'input'
+    );
+    expect(t[0]).toContain('accent-primary');
+  });
+});
+
 describe('purchase-path manifest', () => {
   it('every listed file exists', () => {
     for (const f of manifest.files) expect(existsSync(path.join(WEB, f)), f).toBe(true);
@@ -28,10 +55,12 @@ describe('purchase-path manifest', () => {
 describe('(b) no unthemed browser form controls on the purchase path', () => {
   it.each(manifest.files)('%s', f => {
     const s = src(f);
-    for (const m of s.matchAll(/<input\b[^>]*type="(radio|checkbox)"[^>]*\/?>/gs))
-      expect(m[0], `${f}: native ${m[1]}`).toMatch(/accent-\[hsl\(var\(--primary\)\)\]/);
-    for (const m of s.matchAll(/<select\b[^>]*>/gs))
-      expect(m[0], `${f}: native select`).toMatch(/border-input/);
+    for (const tag of openTags(s, 'input').filter(t => /type="(radio|checkbox)"/.test(t)))
+      expect(tag, `${f}: native radio/checkbox`).toMatch(
+        /accent-(?:primary\b|\[hsl\(var\(--primary\)\)\])/
+      );
+    for (const tag of openTags(s, 'select'))
+      expect(tag, `${f}: native select`).toMatch(/border-input/);
   });
 });
 
