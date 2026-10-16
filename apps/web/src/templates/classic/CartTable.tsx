@@ -10,6 +10,7 @@ import { useLanguage } from '../../contexts/LanguageContext';
 import { useNumerals } from '../../hooks/useNumerals';
 import { useLocalePrice } from '../../hooks/useLocalePrice';
 import { cartLineLabel } from '../shared/card-actions';
+import { MinusIcon, PlusIcon } from '../shared/icons';
 
 /**
  * Classic template — cart list as a clean, table-style grid. Square
@@ -111,7 +112,7 @@ export default function ClassicCartTable({
                     aria-label={cartLineLabel('decrease', isRtl, displayName)}
                     style={typography?.cta}
                   >
-                    −
+                    <MinusIcon />
                   </button>
                   <span className="w-10 text-center text-sm font-medium" style={typography?.cta}>
                     {localize(item.quantity)}
@@ -124,7 +125,7 @@ export default function ClassicCartTable({
                     aria-label={cartLineLabel('increase', isRtl, displayName)}
                     style={typography?.cta}
                   >
-                    +
+                    <PlusIcon />
                   </button>
                 </div>
                 <p

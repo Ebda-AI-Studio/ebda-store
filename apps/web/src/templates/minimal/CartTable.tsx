@@ -10,6 +10,7 @@ import { useLanguage } from '../../contexts/LanguageContext';
 import { useNumerals } from '../../hooks/useNumerals';
 import { useLocalePrice } from '../../hooks/useLocalePrice';
 import { cartLineLabel } from '../shared/card-actions';
+import { MinusIcon, PlusIcon } from '../shared/icons';
 
 /**
  * Minimal template — cart rendered with ultra-spare typography-first
@@ -93,7 +94,7 @@ export default function MinimalCartTable({
                     aria-label={cartLineLabel('decrease', isRtl, displayName)}
                     style={typography?.cta}
                   >
-                    −
+                    <MinusIcon />
                   </button>
                   <span
                     className="min-w-[1.5ch] text-center text-foreground"
@@ -109,7 +110,7 @@ export default function MinimalCartTable({
                     aria-label={cartLineLabel('increase', isRtl, displayName)}
                     style={typography?.cta}
                   >
-                    +
+                    <PlusIcon />
                   </button>
                   <button
                     type="button"

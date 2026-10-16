@@ -10,6 +10,7 @@ import { useLanguage } from '../../contexts/LanguageContext';
 import { useNumerals } from '../../hooks/useNumerals';
 import { useLocalePrice } from '../../hooks/useLocalePrice';
 import { cartLineLabel } from '../shared/card-actions';
+import { MinusIcon, PlusIcon } from '../shared/icons';
 
 /**
  * Elegant template — cart rendered with thin hairline dividers, generous
@@ -103,7 +104,7 @@ export default function ElegantCartTable({
                     className="inline-flex h-11 w-11 items-center justify-center text-lg text-muted-foreground hover:text-foreground disabled:opacity-30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1 cursor-pointer"
                     aria-label={cartLineLabel('decrease', isRtl, displayName)}
                   >
-                    −
+                    <MinusIcon />
                   </button>
                   <span
                     className="min-w-[2ch] text-center font-light tracking-wide"
@@ -118,7 +119,7 @@ export default function ElegantCartTable({
                     className="inline-flex h-11 w-11 items-center justify-center text-lg text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1 cursor-pointer disabled:opacity-40"
                     aria-label={cartLineLabel('increase', isRtl, displayName)}
                   >
-                    +
+                    <PlusIcon />
                   </button>
                 </div>
                 <p

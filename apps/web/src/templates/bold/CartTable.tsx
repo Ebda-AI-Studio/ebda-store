@@ -10,6 +10,7 @@ import { useLanguage } from '../../contexts/LanguageContext';
 import { useNumerals } from '../../hooks/useNumerals';
 import { useLocalePrice } from '../../hooks/useLocalePrice';
 import { cartLineLabel } from '../shared/card-actions';
+import { MinusIcon, PlusIcon } from '../shared/icons';
 
 /**
  * Bold template — cart as heavy-blocked rows with strong borders,
@@ -104,7 +105,7 @@ export default function BoldCartTable({
                     aria-label={cartLineLabel('decrease', isRtl, displayName)}
                     style={typography?.cta}
                   >
-                    −
+                    <MinusIcon />
                   </button>
                   <span
                     className="border-x-2 border-foreground w-10 text-center text-sm font-black"
@@ -120,7 +121,7 @@ export default function BoldCartTable({
                     aria-label={cartLineLabel('increase', isRtl, displayName)}
                     style={typography?.cta}
                   >
-                    +
+                    <PlusIcon />
                   </button>
                 </div>
                 <p

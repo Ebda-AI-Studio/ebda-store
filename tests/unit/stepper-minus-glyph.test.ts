@@ -35,3 +35,25 @@ describe('decrease controls use the minus sign', () => {
     expect(bad).toEqual([]);
   });
 });
+
+// Taste re-audit P2-11: the minus sign was the right character but Noto Sans Arabic draws it at
+// hyphen weight next to a full "+". Every stepper draws both signs as icons, never text glyphs.
+describe('steppers draw both signs as icons (P2-11)', () => {
+  it('every Decrease/Increase button body holds an svg or an *Icon component', () => {
+    const bare: string[] = [];
+    let seen = 0;
+    for (const f of walk(SRC)) {
+      const src = readFileSync(f, 'utf8');
+      for (const m of src.matchAll(
+        /aria-label=\{(?:t\('(?:Decrease|Increase)[^']*'|cartLineLabel\('(?:decrease|increase)')/g
+      )) {
+        seen++;
+        const end = src.indexOf('</button>', m.index!);
+        const body = src.slice(src.indexOf('>', m.index!) + 1, end);
+        if (!/<svg|<[A-Z]\w*Icon\b/.test(body)) bare.push(relative(SRC, f));
+      }
+    }
+    expect(seen).toBeGreaterThan(10);
+    expect(bare).toEqual([]);
+  });
+});

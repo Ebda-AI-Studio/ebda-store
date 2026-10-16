@@ -57,9 +57,9 @@ describe('Y-07 / T-07: PDP range and stepper glyphs', () => {
       /t\(\s*`\$\{formatPrice\(minVariantPrice\)\} to \$\{formatPrice\(maxVariantPrice\)\}`/
     );
   });
-  it('T-07: the decrease button shows a real minus (U+2212), aria-hidden, not an ASCII hyphen', () => {
+  it('T-07: the decrease button never shows an ASCII hyphen (taste re-audit P2-11: it is now a drawn MinusIcon)', () => {
     expect(pdp).not.toMatch(/>\s*-\s*<\/button>/);
-    expect(pdp).toContain('<span aria-hidden="true">−</span>');
+    expect(pdp).toContain('<MinusIcon />');
   });
 });
 

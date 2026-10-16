@@ -63,6 +63,7 @@ import {
 } from '../../../components/commerce/PersonalisationField';
 import { activePersonalisation, cleanNote } from '@ebda/shared';
 import { countText, ITEMS } from '../../../lib/plural';
+import { MinusIcon, PlusIcon } from '../../../templates/shared/icons';
 // Lazy-load heavy below-the-fold components to reduce initial bundle size
 const ReviewSection = dynamic(() => import('../../../components/ReviewSection'), { ssr: false });
 const FrequentlyBoughtTogether = dynamic(() =>
@@ -1215,7 +1216,7 @@ export default function ProductDetailClient({
                       disabled={!buyableNow}
                       className="flex h-11 min-w-11 items-center justify-center px-4 text-muted-foreground hover:bg-muted cursor-pointer disabled:cursor-not-allowed disabled:opacity-40"
                     >
-                      <span aria-hidden="true">−</span>
+                      <MinusIcon />
                     </button>
                     <span aria-live="polite" className="w-12 text-center font-medium">
                       {localize(quantity)}
@@ -1233,7 +1234,7 @@ export default function ProductDetailClient({
                       disabled={!buyableNow}
                       className="flex h-11 min-w-11 items-center justify-center px-4 text-muted-foreground hover:bg-muted cursor-pointer disabled:cursor-not-allowed disabled:opacity-40"
                     >
-                      +
+                      <PlusIcon />
                     </button>
                   </div>
                   {effectiveInventory !== undefined &&
