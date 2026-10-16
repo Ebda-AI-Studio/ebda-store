@@ -143,7 +143,7 @@ export function CategoryStrip({
                     {cat.image ? (
                       <Image
                         src={cat.image}
-                        alt={name ?? ''}
+                        alt={showLabel === false ? (name ?? '') : ''}
                         fill
                         sizes="(max-width: 640px) 60vw, (max-width: 768px) 36vw, (max-width: 1024px) 30vw, (max-width: 1280px) 26vw, 400px"
                         className={`object-cover ${showHover ? 'transition-transform duration-[var(--duration-slower)] ease-[var(--ease-out)] group-hover:scale-[1.04]' : ''}`}
