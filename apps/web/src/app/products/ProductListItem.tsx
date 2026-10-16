@@ -136,6 +136,7 @@ export function ProductListItem({
   return (
     <Link
       href={storeUrl(`/products/${product.slug}`)}
+      /* boundary: card-frame (decoration, not a control) */
       className="flex gap-4 rounded-2xl border border-border bg-card p-4 transition-all hover:border-primary/30 hover:shadow-lg"
     >
       {/* Image */}
@@ -276,7 +277,7 @@ export function ProductListItem({
               className={`flex h-10 w-10 items-center justify-center rounded-xl border transition-colors ${
                 isInCompare
                   ? 'border-primary bg-primary text-primary-foreground'
-                  : 'border-border bg-background text-muted-foreground hover:border-primary hover:text-primary'
+                  : 'border-input bg-background text-muted-foreground hover:border-primary hover:text-primary'
               }`}
               onClick={e => onToggleCompare(product, e)}
             >

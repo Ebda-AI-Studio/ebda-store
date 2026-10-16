@@ -22,24 +22,10 @@ import path from 'node:path';
 
 const WEB = path.resolve(__dirname, '../../apps/web/src');
 
-/** Card render paths + the 4 card mappers, owned by W2b (Ruling B1-55): not editable in W2a. */
-const W2B_CARD_FILES = new Set([
-  'app/products/ProductListItem.tsx',
-  // the 4 hand-built card mappers (CLAUDE.md card paths)
-  'app/wishlist/WishlistClient.tsx',
-  'components/YouMightAlsoLike.tsx',
-  'components/CartRecommendations.tsx',
-  'components/FrequentlyBoughtTogether.tsx',
-  'templates/shared/PecannbeeProductCard.tsx',
-  'templates/shared/ProductCardCta.tsx',
-  'templates/shared/ProductCarousel.tsx',
-  'templates/dahab/ProductCarousel.tsx',
-  'templates/dahab/ProductCard.tsx',
-  'templates/modern/ProductCard.tsx',
-  'templates/classic/ProductCard.tsx',
-  'templates/minimal/ProductCard.tsx',
-  'templates/bold/ProductCard.tsx',
-  'templates/elegant/ProductCard.tsx',
+/** Formerly the W2b-owned card files (Ruling B1-55); emptied by W2b. */
+const W2B_CARD_FILES = new Set<string>([
+  // Emptied in W2b (N-1, Ruling B1-61): the card files and the 4 mappers are scanned like every
+  // other storefront file. Keep it empty; an entry here is an unruled exception.
 ]);
 
 const INTERACTIVE_TAG = /^(button|a|Link|select|Select|input|textarea|summary)$/;
@@ -57,7 +43,7 @@ function files(dir: string, out: string[] = []): string[] {
 /** The opening tag (name + text up to `at`) that encloses index `at`, or null outside any tag. */
 function enclosingTag(src: string, at: number): { name: string; start: number } | null {
   let depth = 0;
-  for (let j = at - 1; j > 0; j--) {
+  for (let j = at - 1; j >= 0; j--) {
     const c = src[j];
     if (c === '}') depth++;
     else if (c === '{') depth = Math.max(0, depth - 1);
@@ -83,11 +69,16 @@ function tagEnd(src: string, start: number): number {
 }
 
 export function boundaryViolations(): string[] {
-  const out: string[] = [];
-  for (const f of files(WEB)) {
+  return files(WEB).flatMap(f => {
     const rel = path.relative(WEB, f);
-    if (W2B_CARD_FILES.has(rel)) continue;
-    const src = readFileSync(f, 'utf8');
+    return W2B_CARD_FILES.has(rel) ? [] : scanSource(rel, readFileSync(f, 'utf8'));
+  });
+}
+
+/** The scanner on one file's source (exported so the fixture self-test below drives it). */
+export function scanSource(rel: string, src: string): string[] {
+  const out: string[] = [];
+  {
     const seen = new Set<number>();
     for (const m of src.matchAll(/\bborder-border\b/g)) {
       const tag = enclosingTag(src, m.index!);
@@ -97,6 +88,10 @@ export function boundaryViolations(): string[] {
       // sit in a conditional branch (`selected ? 'border-primary' : 'border-border'`)
       const fullBorder = /[\s'"`]border(-2)?(?=[\s'"`])/.test(open);
       if (!fullBorder) continue;
+      // A whole-card link's own surface frame is the card's decoration, not a control boundary:
+      // it carries a source-only `/* boundary: card-frame */` marker (W2b, Ruling B1-61), visible and
+      // greppable, with no markup change for stores that render it.
+      if (/\/\* boundary: card-frame\b/.test(open)) continue;
       const clickableLabel = tag.name === 'label' && /cursor-pointer/.test(open);
       const interactive =
         INTERACTIVE_TAG.test(tag.name) || clickableLabel || INTERACTIVE_ROLE.test(open);
@@ -116,10 +111,36 @@ export function boundaryViolations(): string[] {
 }
 
 describe('storefront control boundaries never use the hairline token (quality bar § 9, VT-05)', () => {
-  it('positive control: the scanner sees control-shaped markup', () => {
-    // the PDP stepper (a 2-button group) and the variant chips are found by shape, on --input
-    const pdp = readFileSync(path.join(WEB, 'app/products/[slug]/ProductDetailClient.tsx'), 'utf8');
-    expect(pdp).toContain('<div className="flex items-center rounded-lg border border-input">');
+  // N-2 (W2a re-review): a fixture self-test, not one string match in one file, so a scanner that
+  // stops seeing control shapes goes red here instead of passing on an empty result.
+  it.each([
+    ['a bordered button', '<button className="rounded border border-border px-2">x</button>', 1],
+    [
+      'a Link with the hairline in a branch',
+      "<Link className={`border ${on ? 'border-primary' : 'border-border'}`} href=\"/\">x</Link>",
+      1,
+    ],
+    [
+      'a clickable choice label',
+      '<label className="cursor-pointer border border-border">x</label>',
+      1,
+    ],
+    ['a role=radio div', '<div role="radio" className="border-2 border-border">x</div>', 1],
+    [
+      'a stepper group',
+      '<div className="flex border border-border"><button aria-label="Decrease">-</button><span>1</span><button>+</button></div>',
+      1,
+    ],
+    [
+      'a whole-card frame marked as decoration',
+      '<Link /* boundary: card-frame */ className="border border-border" href="/">x</Link>',
+      0,
+    ],
+    ['a one-sided separator', '<button className="border-b border-border">x</button>', 0],
+    ['a control on the input token', '<button className="border border-input">x</button>', 0],
+    ['a bordered non-control', '<div className="border border-border"><p>x</p></div>', 0],
+  ])('fixture: %s', (_name, src, hits) => {
+    expect(scanSource('fixture.tsx', src as string)).toHaveLength(hits as number);
   });
   it('no interactive element or control group draws a full border-border boundary', () => {
     expect(boundaryViolations()).toEqual([]);
