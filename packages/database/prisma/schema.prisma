@@ -475,6 +475,7 @@ model Store {
   productModels            ProductModel[]
   sizeCharts               SizeChart[]
   searchQueryDaily         SearchQueryDaily[]
+  productEmbeddings        ProductEmbedding[]
   productModelBindings     ProductModelBinding[]
   affiliates               Affiliate[]
   affiliateReferrals       AffiliateReferral[]
@@ -1016,6 +1017,7 @@ model Product {
   dailyViews           ProductDailyView[]
   bundleItems          BundleItem[]
   model3d              ProductModel?
+  embedding            ProductEmbedding?
   sizeChart            SizeChart?                 @relation(fields: [sizeChartId], references: [id], onDelete: SetNull)
 
   @@unique([storeId, slug])
@@ -1286,6 +1288,27 @@ model SearchQueryDaily {
   @@unique([storeId, date, term])
   @@index([storeId, date(sort: Desc)])
   @@map("search_query_daily")
+}
+
+// Semantic search vector per product (search program P1). Written ONLY by raw SQL in
+// product-index.service.ts (Prisma cannot read/write halfvec, so this model has no create/update
+// through Prisma). CACHE CLASS: BOUNDED-stale content index (seconds to minutes after a write;
+// Ruling SEARCH-11); never used for price/stock/status, which are read live from products.
+// Viewer: the searches insights page header ("indexed N of M products", Task 12).
+model ProductEmbedding {
+  productId   String                       @id @map("product_id")
+  storeId     String                       @map("store_id")
+  model       String
+  contentHash String                       @map("content_hash")
+  embedding   Unsupported("halfvec(1024)")
+  embeddedAt  DateTime                     @default(now()) @map("embedded_at") @db.Timestamptz(6)
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  store   Store   @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  @@index([storeId])
+  @@index([storeId, embeddedAt])
+  @@map("product_embeddings")
 }
 
 // Size chart (B0 Task 9): a merchant-authored measurements table shown in the PDP size guide

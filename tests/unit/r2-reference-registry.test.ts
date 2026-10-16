@@ -96,6 +96,7 @@ const NOT_R2_REFERENCES: Record<string, string> = {
   'SizeChart.columns': 'size-chart column headers (ar/en text, max 24 chars), no media',
   'SizeChart.rows': 'size-chart cells (text, max 24 chars each), no media',
   'Product.aiBalanceBackup': 'backup of name/description text + aiFieldSources, no media',
+  'ProductEmbedding.contentHash': 'md5 hex of the embedded product text (search P1), never a URL',
   'Order.shippingAddress': 'postal address',
   'Order.billingAddress': 'postal address',
   'OrderEvent.metadata': 'status-transition audit metadata',

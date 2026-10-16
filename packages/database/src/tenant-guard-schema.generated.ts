@@ -120,6 +120,7 @@ export const TENANT_GUARD_SCHEMA: readonly TenantGuardModel[] = [
       productModels: 'ProductModel',
       sizeCharts: 'SizeChart',
       searchQueryDaily: 'SearchQueryDaily',
+      productEmbeddings: 'ProductEmbedding',
       productModelBindings: 'ProductModelBinding',
       affiliates: 'Affiliate',
       affiliateReferrals: 'AffiliateReferral',
@@ -298,6 +299,7 @@ export const TENANT_GUARD_SCHEMA: readonly TenantGuardModel[] = [
       dailyViews: 'ProductDailyView',
       bundleItems: 'BundleItem',
       model3d: 'ProductModel',
+      embedding: 'ProductEmbedding',
       sizeChart: 'SizeChart',
     },
   },
@@ -399,6 +401,15 @@ export const TENANT_GUARD_SCHEMA: readonly TenantGuardModel[] = [
     table: 'search_query_daily',
     storeId: true,
     relations: {
+      store: 'Store',
+    },
+  },
+  {
+    name: 'ProductEmbedding',
+    table: 'product_embeddings',
+    storeId: true,
+    relations: {
+      product: 'Product',
       store: 'Store',
     },
   },
