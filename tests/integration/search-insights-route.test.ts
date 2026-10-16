@@ -180,13 +180,18 @@ describe.skipIf(!hasDb)('GET /stores/:storeId/search-insights', () => {
       prisma.$queryRaw<Array<{ h: string }>>`
         SELECT md5(public.ebda_product_embed_doc(name, name_ar, description, description_ar)) AS h
           FROM products WHERE id = ${id}`.then(r => r[0].h);
+    // The quarantine key is md5 of the doc + words SET (SEARCH-T13-7).
+    const quarantineKey = (id: string) =>
+      prisma.$queryRaw<Array<{ h: string }>>`
+        SELECT md5(coalesce(public.ebda_product_embed_doc(name, name_ar, description, description_ar), '') || chr(31) || coalesce(nullif(regexp_replace(search_terms, '^\\s+|\\s+$', '', 'g'), ''), '')) AS h
+          FROM products WHERE id = ${id}`.then(r => r[0].h);
     const vec = `[${new Array(1024).fill(0.01).join(',')}]`;
     await prisma.$executeRaw`
       INSERT INTO product_embeddings (product_id, store_id, model, content_hash, embedding)
       VALUES (${ready}, ${storeId}, '@cf/baai/bge-m3', ${await doc(ready)}, ${vec}::halfvec(1024))`;
     await prisma.$executeRaw`
       INSERT INTO product_embed_failures (product_id, store_id, content_hash, error_kind, model)
-      VALUES (${bad}, ${storeId}, ${await doc(bad)}, 'input', '@cf/baai/bge-m3')`;
+      VALUES (${bad}, ${storeId}, ${await quarantineKey(bad)}, 'input', '@cf/baai/bge-m3')`;
     const res = await get(storeId, '?days=7');
     expect(res.status).toBe(200);
     expect(res.body.data.index).toEqual({
