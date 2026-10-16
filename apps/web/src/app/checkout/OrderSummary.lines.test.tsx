@@ -77,7 +77,15 @@ describe('checkout OrderSummary lines', () => {
   });
   it('IA-07: the bundle row badge follows the same rule', () => {
     const { getByTestId } = render(
-      <BundleLine variant="row" name="Box" image={null} quantity={3} total={1} available isRtl />
+      <BundleLine
+        variant="row"
+        name="Box"
+        image={null}
+        quantity={3}
+        total={1}
+        available={5}
+        isRtl
+      />
     );
     const badge = getByTestId('line-qty-badge');
     expect(badge.className).toContain('bg-foreground');

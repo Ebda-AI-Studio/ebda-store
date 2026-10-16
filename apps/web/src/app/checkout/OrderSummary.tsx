@@ -169,32 +169,38 @@ export function OrderSummary({
           ))}
           {items.map(item => (
             <div key={item.id} className="flex gap-4 py-4 first:pt-0">
-              <div className="relative h-16 w-16 flex-shrink-0 overflow-hidden rounded-lg bg-muted">
-                {item.product.images?.[0] ? (
-                  <Image
-                    src={item.product.images[0].url}
-                    alt={productLabel(item.product)}
-                    fill
-                    className="object-cover"
-                  />
-                ) : (
-                  <div className="flex h-full items-center justify-center">
-                    <svg
-                      className="h-6 w-6 text-muted-foreground"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={1.5}
-                        d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"
-                      />
-                    </svg>
-                  </div>
-                )}
-                <span className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-muted-foreground text-xs text-white">
+              {/* IA-07: the badge sits outside the clipped thumbnail, logical, on the ink pair. */}
+              <div className="relative h-16 w-16 flex-shrink-0">
+                <div className="relative h-full w-full overflow-hidden rounded-[var(--radius)] bg-muted">
+                  {item.product.images?.[0] ? (
+                    <Image
+                      src={item.product.images[0].url}
+                      alt={productLabel(item.product)}
+                      fill
+                      className="object-cover"
+                    />
+                  ) : (
+                    <div className="flex h-full items-center justify-center">
+                      <svg
+                        className="h-6 w-6 text-muted-foreground"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={1.5}
+                          d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"
+                        />
+                      </svg>
+                    </div>
+                  )}
+                </div>
+                <span
+                  data-testid="line-qty-badge"
+                  className="absolute -end-1 -top-1 z-10 flex h-5 min-w-5 items-center justify-center rounded-full bg-foreground px-1 text-xs text-background"
+                >
                   {localize(item.quantity)}
                 </span>
               </div>
