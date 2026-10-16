@@ -702,7 +702,7 @@
         "badgeLabelHint": "Free text shown as a chip on this product's card and page. Leave empty for no badge. Max 32 characters.",
         "searchTerms": "Search words",
         "searchTermsPlaceholder": "e.g. sneakers, kotshi, 3abaya",
-        "searchTermsHint": "Separate words with commas. Not shown in the store. Leave empty and AI Autopilot suggests them; your own words are never replaced.",
+        "searchTermsHint": "Separate words with commas. Not shown in the store. Leave empty and AI Autopilot suggests them; if you cleared them yourself, press ✨ Switch to AI. Your own words are never replaced.",
         "searchTermsTruncated": "Words that will be cut to 60 characters: {count}",
         "searchTermsDropped": "Words that will not be saved (over the limit): {count}",
         "searchTermsAtLimit": "Limit reached",
