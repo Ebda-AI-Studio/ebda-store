@@ -2,7 +2,14 @@
 --
 --   vector                       NEW extension (pgvector). Production has 0.8.0 available (read-only
 --                                check 2026-10-15; STOP-2 cleared pre-launch); `halfvec` needs >= 0.7.
---                                The neondb_owner migration role can create it on Neon. CI, compose and
+--                                Creatable by the migration role (verified on production 2026-10-16,
+--                                coordinator): the DIRECT_URL role is `neondb_owner`, which owns
+--                                search_query_daily (created by the previous migration) and is a member
+--                                of neon_superuser; `CREATE EXTENSION IF NOT EXISTS vector` succeeded as
+--                                that role inside a transaction that was rolled back (vector is not yet
+--                                installed). pgvector's control file is not `trusted`, so a plain
+--                                non-superuser owner would be refused; CI migrates as a superuser and
+--                                cannot catch that, hence the production check. CI, compose and
 --                                the buy-flow harness run pgvector/pgvector:0.8.0-pg17 (production is 17.11).
 --   ebda_product_embed_doc(...)  NEW IMMUTABLE sql helper: the text a product is embedded from. Raw
 --                                (un-normalised) names + search terms + descriptions with HTML tags
