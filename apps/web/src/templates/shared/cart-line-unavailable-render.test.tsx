@@ -90,3 +90,28 @@ describe.each(Object.entries(themes))('%s CartTable — #1766 unavailable line',
     expect(increase[0]).not.toMatch(/\sdisabled=""/);
   });
 });
+
+// Taste re-audit P2-2 (Y-05, one fact in one place): at quantity 1 the unit price under the
+// name repeated the line total beside it. The unit price shows only when quantity > 1.
+describe.each(Object.entries({ ...themes, dahab: (await import('../dahab/CartTable')).default }))(
+  '%s CartTable — unit price only when it differs from the line total',
+  (_name, Table) => {
+    it('quantity 1: the price appears once; quantity 3: unit and total both appear', () => {
+      lang.current = 'en';
+      const one = render(Table, [line({ quantity: 1, price: 14900 })]);
+      expect(one.split('149').length - 1).toBe(1);
+      const three = render(Table, [line({ quantity: 3, price: 14900 })]);
+      expect(three).toContain('149');
+      expect(three).toContain('447');
+    });
+  }
+);
+
+describe('the default cart (no theme table) follows the same rule (P2-2)', () => {
+  it('its "each" unit price is gated on quantity > 1', async () => {
+    const { readFileSync } = await import('node:fs');
+    const { join } = await import('node:path');
+    const src = readFileSync(join(__dirname, '../../app/cart/CartClient.tsx'), 'utf8');
+    expect(src).toMatch(/item\.quantity > 1 && \(\s*<p[\s\S]{0,400}?t\('each'/);
+  });
+});

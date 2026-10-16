@@ -74,12 +74,15 @@ export default function ElegantCartTable({
                   )}
                   <CartLineNote note={item.note} />
                   {item.unavailable && <CartLineUnavailableNotice />}
-                  <p
-                    className="mt-2 text-xs uppercase tracking-[0.2em] text-muted-foreground tabular-nums"
-                    style={typography?.price}
-                  >
-                    {format(item.price)}
-                  </p>
+                  {/* Taste re-audit P2-2: at quantity 1 the line total already says it. */}
+                  {item.quantity > 1 && (
+                    <p
+                      className="mt-2 text-xs uppercase tracking-[0.2em] text-muted-foreground tabular-nums"
+                      style={typography?.price}
+                    >
+                      {format(item.price)}
+                    </p>
+                  )}
                 </div>
                 <button
                   type="button"

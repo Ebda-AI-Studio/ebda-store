@@ -73,12 +73,15 @@ export default function MinimalCartTable({
                 )}
                 <CartLineNote note={item.note} />
                 {item.unavailable && <CartLineUnavailableNotice />}
-                <p
-                  className="mt-1 text-sm text-muted-foreground tabular-nums"
-                  style={typography?.price}
-                >
-                  {format(item.price)}
-                </p>
+                {/* Taste re-audit P2-2: at quantity 1 the line total already says it. */}
+                {item.quantity > 1 && (
+                  <p
+                    className="mt-1 text-sm text-muted-foreground tabular-nums"
+                    style={typography?.price}
+                  >
+                    {format(item.price)}
+                  </p>
+                )}
               </div>
               <div className="flex items-center justify-between text-sm">
                 <div className="flex items-center gap-3 text-muted-foreground">

@@ -63,12 +63,15 @@ export default function DahabCartTable({
                   )}
                   <CartLineNote note={item.note} />
                   {item.unavailable && <CartLineUnavailableNotice />}
-                  <p
-                    className="mt-1.5 text-sm tabular-nums text-muted-foreground"
-                    style={typography?.price}
-                  >
-                    {formatPrice(item.price)}
-                  </p>
+                  {/* Taste re-audit P2-2: at quantity 1 the line total already says it. */}
+                  {item.quantity > 1 && (
+                    <p
+                      className="mt-1.5 text-sm tabular-nums text-muted-foreground"
+                      style={typography?.price}
+                    >
+                      {formatPrice(item.price)}
+                    </p>
+                  )}
                 </div>
                 <p
                   className="shrink-0 text-[15px] tabular-nums text-primary"

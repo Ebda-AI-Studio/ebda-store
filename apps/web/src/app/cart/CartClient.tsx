@@ -666,14 +666,17 @@ export default function CartClient() {
                                   className="mt-0.5 text-sm text-muted-foreground"
                                 />
                                 {item.unavailable && <CartLineUnavailableNotice />}
-                                <p
-                                  className="mt-1 text-base font-bold text-muted-foreground sm:text-lg"
-                                  data-zone="productPrice"
-                                  style={cartZoneStyle(cartPriceZone)}
-                                >
-                                  {formatPrice(item.price)}{' '}
-                                  {t('each', '\u0644\u0644\u0648\u0627\u062d\u062f')}
-                                </p>
+                                {/* Taste re-audit P2-2: at quantity 1 the line total already says it. */}
+                                {item.quantity > 1 && (
+                                  <p
+                                    className="mt-1 text-base font-bold text-muted-foreground sm:text-lg"
+                                    data-zone="productPrice"
+                                    style={cartZoneStyle(cartPriceZone)}
+                                  >
+                                    {formatPrice(item.price)}{' '}
+                                    {t('each', '\u0644\u0644\u0648\u0627\u062d\u062f')}
+                                  </p>
+                                )}
                               </div>
                               <button
                                 onClick={() => handleRemoveItem(item.id)}
