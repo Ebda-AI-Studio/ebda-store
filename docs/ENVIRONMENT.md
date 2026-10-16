@@ -140,6 +140,15 @@ The API Worker has a Workers AI binding, `"ai": { "binding": "AI" }` in `apps/ap
 - `SEARCH_VECTOR_MAX_DISTANCE` (optional, default `0.55`) — cosine-distance cut-off for vector hits; tuned by the eval harness (Task 13).
 - `CF_AI_ACCOUNT_ID` + `CF_AI_API_TOKEN` (optional, **local/dev REST fallback only**) — Workers AI REST (`POST https://api.cloudflare.com/client/v4/accounts/<id>/ai/run/@cf/baai/bge-m3`) for Node dev and scripts that have no binding. Set both or neither. **Never set on the Worker** (it uses the binding). The token is a secret (Workers AI read scope on the Whisky account); it is only ever sent as the `Authorization` header and never logged.
 
+#### Semantic search — emergency stop (indexer spend)
+
+`SEARCH_EMBED_STORE_DAILY_CAP=0` stops **every** Workers AI call the indexer makes (backfill, edits, the 6-hourly backstop): each run reports `capped` before it picks a batch (Ruling SEARCH-T11-8). `SEARCH_SEMANTIC_ENABLED=false` does **not** do this — it only turns off the query-time vector leg; the indexer runs whenever the `AI` binding exists. To stop indexing spend on production:
+
+1. **Durable (preferred):** add `"SEARCH_EMBED_STORE_DAILY_CAP": "0"` to `vars` in `apps/api/wrangler.jsonc`, merge, and run `cf-api-deploy.yml` (the deploy probes `/health` and rolls back on failure).
+2. **Emergency (minutes):** set `SEARCH_EMBED_STORE_DAILY_CAP` = `0` as a variable on `ebda-api` in the Cloudflare dashboard (Workers & Pages → ebda-api → Settings → Variables and Secrets). Caveats: it creates a new version with no post-deploy probe and no automatic rollback; the value is not boot-checked, so anything that is not a non-negative integer silently falls back to the default 3000 (type exactly `0`, then confirm `[search-index] daily cap reached` in Workers Logs); and the next `cf-api-deploy` REPLACES dashboard vars with the `wrangler.jsonc` vars (no `keep_vars`), so follow up with step 1 or the stop is undone.
+
+To resume, remove the var (or set the old value) the same way. Re-enabling semantic results for shoppers is a separate switch (`SEARCH_SEMANTIC_ENABLED`, STOP-3b).
+
 ## Admin (Cloudflare Worker `ebda-admin`)
 
 - `NEXT_PUBLIC_API_URL` — the live API host, `https://api.force-ai.co` (Cloudflare custom domain in front of the Railway API service; the old raw `api-production-c058.up.railway.app` hostname 404s — corrected 2026-09-02)
