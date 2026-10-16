@@ -49,12 +49,14 @@ export function HeroCollage({
   const ctaHref = urlPrefix && safeCta.startsWith('/') ? `${urlPrefix}${safeCta}` : safeCta;
   const label = headline || lead.alt || (isRtl ? translations['View more'] : 'View more');
 
-  // Logical grid columns: in Arabic the lead photo starts on the right and the others overlap
-  // towards the left. Each photo is a positioned frame so next/image can `fill` it.
+  // Logical grid columns: in Arabic the lead photo starts on the right. LB-a: a gapped grid,
+  // no overlap and no stroke (a background ring cut into the lead photo, and the near-equal
+  // tops, 5px apart, read as accidental). The lead and the first side tile share a top edge;
+  // the second side tile closes the bottom. Each photo is a positioned frame for next/image.
   const frames = [
     'col-span-4 col-start-1 aspect-[4/5]',
-    'z-10 col-span-3 col-start-4 mb-16 aspect-[3/4] ring-4 ring-background',
-    'z-20 col-span-2 col-start-5 -mb-6 aspect-square ring-4 ring-background',
+    'col-span-2 col-start-5 self-start aspect-[3/4]',
+    'col-span-2 col-start-5 self-end aspect-square',
   ];
   const sizes = [
     '(min-width: 768px) 38vw, 66vw',
@@ -66,7 +68,7 @@ export function HeroCollage({
     <div data-presentation="collage" className="relative overflow-hidden bg-background">
       <HeroBannerLink link={lead.link} label={label} urlPrefix={urlPrefix}>
         <div className="mx-auto grid max-w-7xl gap-y-8 px-4 pb-10 pt-6 sm:px-6 md:grid-cols-12 md:items-center md:gap-x-10 md:pb-14 md:pt-10 lg:px-8">
-          <div className="grid grid-cols-6 items-end md:col-span-7" data-collage-settle>
+          <div className="grid grid-cols-6 gap-3 md:col-span-7" data-collage-settle>
             {photos.map((p, i) => (
               <div
                 key={i}

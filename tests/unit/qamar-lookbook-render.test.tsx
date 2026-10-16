@@ -586,3 +586,24 @@ describe('qamar display headings are not shrunk/grown by the Arabic font-size-ad
     expect(css).toMatch(/collage-settle-lead 280ms cubic-bezier\(0\.22, 1, 0\.36, 1\)/);
   });
 });
+
+// LB-a (independent audit): the two top tiles sat ~5px apart (266 vs 276), which read as
+// accidental, and the background-coloured ring on the overlapping tile cut into the lead
+// photo (navy on Lookbook). The collage is now a gapped grid: no stroke, no overlap, the
+// lead and the first side tile share a top edge, the second side tile closes the bottom.
+describe('hero collage tiles (LB-a)', () => {
+  it('no ring stroke, a real gap, tops aligned', async () => {
+    const { readFileSync } = await import('node:fs');
+    const { join } = await import('node:path');
+    const src = readFileSync(
+      join(__dirname, '../../apps/web/src/templates/shared/HeroCollage.tsx'),
+      'utf8'
+    );
+    const frames = /const frames = \[([\s\S]*?)\];/.exec(src)![1];
+    expect(frames).not.toMatch(/\bring-/);
+    expect(frames).not.toMatch(/-?mb-\d/);
+    expect(frames).toMatch(/self-start/);
+    expect(frames).toMatch(/self-end/);
+    expect(src).toMatch(/className="grid grid-cols-6 gap-3 /);
+  });
+});
