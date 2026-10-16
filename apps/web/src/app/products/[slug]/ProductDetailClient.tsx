@@ -908,7 +908,7 @@ export default function ProductDetailClient({
           {/* Product Details */}
           <div className="grid gap-8 md:grid-cols-12">
             {/* Images */}
-            <div className="space-y-4 md:col-span-5">
+            <div className="space-y-4 md:col-span-5 md:sticky md:top-24 md:self-start">
               <div className={galleryFrameClass} data-gallery={airyGallery ? 'airy' : undefined}>
                 {model3d && (
                   <Model3dToggle

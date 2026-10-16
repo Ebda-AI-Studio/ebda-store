@@ -146,3 +146,10 @@ describe('R-13: checkout errors move focus, not only the scroll', () => {
     expect(src.match(/focusFirstError\(\)/g)?.length).toBeGreaterThanOrEqual(4);
   });
 });
+
+describe('L-08: the desktop PDP gallery stays in view while the buy column scrolls', () => {
+  it('the gallery column is sticky from md, under the header, aligned to the top of the grid', () => {
+    const src = read('app/products/[slug]/ProductDetailClient.tsx');
+    expect(src).toMatch(/className="space-y-4 md:col-span-5 md:sticky md:top-24 md:self-start"/);
+  });
+});
