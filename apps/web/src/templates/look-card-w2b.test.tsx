@@ -578,3 +578,35 @@ describe('one card anatomy on a look store: grid and carousel', () => {
     expect(c.querySelector('li button[aria-pressed]')).toBeNull();
   });
 });
+
+// LB-c (independent audit): on Lookbook the collage and look cards were rounded, product
+// images square, chips pills and the heart a 40px white disc: four shape idioms at once.
+// On a look store the product image, the heart and the chips all take the look's radius.
+describe('one radius per look (LB-c)', () => {
+  const card = (C: unknown) =>
+    render(
+      React.createElement(
+        C as never,
+        { product: product('sale'), isRtl: true, pack: state.template } as never
+      )
+    ).container;
+  it.each(['qamar.atelier', 'qamar.lookbook', 'qamar.vitrine'])(
+    '%s: card image and heart use var(--radius); no pill, no disc',
+    look => {
+      selectLook(look);
+      for (const C of [PecannbeeProductCard, MinimalProductCard]) {
+        const c = card(C);
+        const img = c.querySelector('img')!.closest('div')!;
+        expect(img.className).toContain('rounded-[var(--radius)]');
+        const heart = c.querySelector('button[aria-pressed]') as HTMLElement | null;
+        if (heart) expect(heart.className).not.toMatch(/\brounded-full\b/);
+        cleanup();
+      }
+    }
+  );
+  it('no look: the card image keeps the skin shape', () => {
+    selectLook(null);
+    const img = card(PecannbeeProductCard).querySelector('img')!.closest('div')!;
+    expect(img.className).not.toContain('rounded-[var(--radius)]');
+  });
+});

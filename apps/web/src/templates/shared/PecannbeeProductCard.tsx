@@ -371,7 +371,7 @@ function PecannbeeProductCardImpl({
             when normalizeImages is on, object-fill bg ensures transparent PNGs read cleanly.
             overflow-hidden STAYS on the image div so images still clip to the shape. */}
         <div
-          className={`relative overflow-hidden bg-muted ${imgRadiusCls || shape.radius} ${imgAspectCls || aspectOverride || lookImageAspectClass(store.look) || 'aspect-square sm:aspect-[3/4]'}`}
+          className={`relative overflow-hidden bg-muted ${imgRadiusCls || (getLook(store.look) ? 'rounded-[var(--radius)]' : shape.radius)} ${imgAspectCls || aspectOverride || lookImageAspectClass(store.look) || 'aspect-square sm:aspect-[3/4]'}`}
         >
           {img ? (
             <>
