@@ -99,6 +99,18 @@ export function summarise(scores: readonly QueryScore[]): Summary {
   return { byClass, core: mean(scores.filter(s => s.core)) };
 }
 
+export interface BarCheck {
+  name: string;
+  value: number;
+  need: string;
+  ok: boolean;
+  /**
+   * How many queries of this check's class can still go wrong before it fails (negative = how many
+   * short): floor((value - minimum) × n). For MRR it is the rank headroom in "whole first hits".
+   */
+  marginQueries: number;
+}
+
 export interface BarResult {
   ok: boolean;
   /** Names of the failed rules (empty when ok). */
@@ -107,17 +119,36 @@ export interface BarResult {
   lift: number;
   /** lift >= +0.15: semantic search is earning its cost (else STOP-3b stays off). */
   earnsCost: boolean;
-  checks: Array<{ name: string; value: number; need: string; ok: boolean }>;
+  checks: BarCheck[];
 }
 
 const EPS = 1e-9;
+/** One query in 50, the same tolerance SEARCH-10 already uses for "no regression". */
+export const FLOOR_TOLERANCE = 0.02;
+
+function check(name: string, value: number, min: number, n: number, need?: string): BarCheck {
+  return {
+    name,
+    value,
+    need: need ?? `>= ${min.toFixed(2)}`,
+    ok: value >= min - EPS,
+    marginQueries: Math.floor((value - min) * n + 1e-6),
+  };
+}
 
 /**
  * Ruling SEARCH-10: hybrid hit-rate@10 >= 0.90 overall and >= 0.80 on each of dialect and franco;
  * MRR >= 0.70; no msa or en regression worse than -0.02 against lexical-only; and a dialect +
  * franco lift of at least +0.15 hit-rate@10, or semantic is not earning its cost.
+ * Plus ABSOLUTE floors (review M5, Ruling SEARCH-T13-4): msa and en hybrid hit-rate@10 never below
+ * `floors` (the names-only hybrid result of record, baseline.json) minus FLOOR_TOLERANCE, so a
+ * change that helps Franco but costs MSA or English (AI words did: msa 0.98 → 0.94) is visible.
  */
-export function passBar(lexical: Summary, hybrid: Summary): BarResult {
+export function passBar(
+  lexical: Summary,
+  hybrid: Summary,
+  floors: Record<'msa' | 'en', number>
+): BarResult {
   const c = (s: Summary, cls: string) =>
     s.byClass[cls] ?? { n: 0, hit10: 0, mrr: 0, ndcg10: 0, zero: 0 };
   const df = ['dialect', 'franco'];
@@ -125,36 +156,30 @@ export function passBar(lexical: Summary, hybrid: Summary): BarResult {
   const lift = nDf
     ? df.reduce((a, k) => a + (c(hybrid, k).hit10 - c(lexical, k).hit10) * c(hybrid, k).n, 0) / nDf
     : 0;
-  const checks = [
-    {
-      name: 'hybrid hit-rate@10 overall',
-      value: hybrid.core.hit10,
-      need: '>= 0.90',
-      ok: hybrid.core.hit10 >= 0.9 - EPS,
-    },
-    {
-      name: 'dialect hit-rate@10',
-      value: c(hybrid, 'dialect').hit10,
-      need: '>= 0.80',
-      ok: c(hybrid, 'dialect').hit10 >= 0.8 - EPS,
-    },
-    {
-      name: 'franco hit-rate@10',
-      value: c(hybrid, 'franco').hit10,
-      need: '>= 0.80',
-      ok: c(hybrid, 'franco').hit10 >= 0.8 - EPS,
-    },
-    {
-      name: 'hybrid MRR overall',
-      value: hybrid.core.mrr,
-      need: '>= 0.70',
-      ok: hybrid.core.mrr >= 0.7 - EPS,
-    },
-    ...['msa', 'en'].map(k => {
-      const d = c(hybrid, k).hit10 - c(lexical, k).hit10;
-      return { name: `${k} no regression`, value: d, need: '>= -0.02', ok: d >= -0.02 - EPS };
-    }),
-    { name: 'dialect+franco lift', value: lift, need: '>= +0.15', ok: lift >= 0.15 - EPS },
+  const checks: BarCheck[] = [
+    check('hybrid hit-rate@10 overall', hybrid.core.hit10, 0.9, hybrid.core.n),
+    check('dialect hit-rate@10', c(hybrid, 'dialect').hit10, 0.8, c(hybrid, 'dialect').n),
+    check('franco hit-rate@10', c(hybrid, 'franco').hit10, 0.8, c(hybrid, 'franco').n),
+    check('hybrid MRR overall', hybrid.core.mrr, 0.7, hybrid.core.n),
+    ...(['msa', 'en'] as const).map(k =>
+      check(
+        `${k} no regression`,
+        c(hybrid, k).hit10 - c(lexical, k).hit10,
+        -0.02,
+        c(hybrid, k).n,
+        '>= -0.02'
+      )
+    ),
+    ...(['msa', 'en'] as const).map(k =>
+      check(
+        `${k} floor`,
+        c(hybrid, k).hit10,
+        floors[k] - FLOOR_TOLERANCE,
+        c(hybrid, k).n,
+        `>= ${floors[k].toFixed(2)} - ${FLOOR_TOLERANCE}`
+      )
+    ),
+    check('dialect+franco lift', lift, 0.15, nDf, '>= +0.15'),
   ];
   const failed = checks.filter(x => !x.ok).map(x => x.name);
   return { ok: failed.length === 0, failed, lift, earnsCost: lift >= 0.15 - EPS, checks };

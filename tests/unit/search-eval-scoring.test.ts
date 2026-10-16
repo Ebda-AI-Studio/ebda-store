@@ -103,38 +103,70 @@ describe('pass bar (Ruling SEARCH-10)', () => {
     };
   };
   const lex = summary({ msa: 0.95, dialect: 0.6, franco: 0.5, en: 0.95 });
+  const NO_FLOORS = { msa: 0, en: 0 };
+  const passBar0 = (l: Summary, h: Summary) => passBar(l, h, NO_FLOORS);
 
   it('passes at exactly the bar', () => {
     const hy = summary({ msa: 0.93, dialect: 0.8, franco: 0.8, en: 0.93 }, 0.7);
     // overall 0.865 < 0.90: fails only the overall check
-    expect(passBar(lex, hy).failed).toEqual(['hybrid hit-rate@10 overall']);
+    expect(passBar0(lex, hy).failed).toEqual(['hybrid hit-rate@10 overall']);
     const hy2 = summary({ msa: 0.98, dialect: 0.82, franco: 0.82, en: 0.98 }, 0.7);
-    const r = passBar(lex, hy2);
+    const r = passBar0(lex, hy2);
     expect(r.ok).toBe(true);
     expect(r.earnsCost).toBe(true);
   });
 
   it('fails each rule on its own', () => {
     const good = { msa: 0.98, dialect: 0.9, franco: 0.9, en: 0.98 };
-    expect(passBar(lex, summary({ ...good, dialect: 0.79 })).failed).toContain(
+    expect(passBar0(lex, summary({ ...good, dialect: 0.79 })).failed).toContain(
       'dialect hit-rate@10'
     );
-    expect(passBar(lex, summary({ ...good, franco: 0.79 })).failed).toContain('franco hit-rate@10');
-    expect(passBar(lex, summary(good, 0.69)).failed).toEqual(['hybrid MRR overall']);
+    expect(passBar0(lex, summary({ ...good, franco: 0.79 })).failed).toContain(
+      'franco hit-rate@10'
+    );
+    expect(passBar0(lex, summary(good, 0.69)).failed).toEqual(['hybrid MRR overall']);
     // msa regression of 0.03 vs lexical 0.95 (overall stays >= 0.90)
-    expect(passBar(lex, summary({ ...good, msa: 0.92 })).failed).toEqual(['msa no regression']);
+    expect(passBar0(lex, summary({ ...good, msa: 0.92 })).failed).toEqual(['msa no regression']);
     // exactly -0.02 is allowed
-    expect(passBar(lex, summary({ ...good, en: 0.93 })).failed).toEqual([]);
+    expect(passBar0(lex, summary({ ...good, en: 0.93 })).failed).toEqual([]);
   });
 
   it('a lift under +0.15 on dialect + franco is "not earning its cost" and fails', () => {
     const lex2 = summary({ msa: 0.95, dialect: 0.8, franco: 0.8, en: 0.95 });
     const hy = summary({ msa: 0.98, dialect: 0.9, franco: 0.9, en: 0.98 });
-    const r = passBar(lex2, hy);
+    const r = passBar0(lex2, hy);
     expect(r.lift).toBeCloseTo(0.1);
     expect(r.earnsCost).toBe(false);
     expect(r.ok).toBe(false);
     expect(r.failed).toEqual(['dialect+franco lift']);
+  });
+});
+
+describe('absolute floors (review M5): msa and en never below the names-only hybrid', () => {
+  const at = (msa: number, en: number, df = 0.9): Summary => ({
+    byClass: Object.fromEntries(
+      Object.entries({ msa, dialect: df, franco: df, en }).map(([k, v]) => [
+        k,
+        { n: 50, hit10: v, mrr: 0.9, ndcg10: v, zero: 0 },
+      ])
+    ),
+    core: { n: 200, hit10: (msa + en + 2 * df) / 4, mrr: 0.9, ndcg10: 0, zero: 0 },
+  });
+  const lex = at(0.5, 0.8, 0.5);
+  const floors = { msa: 0.98, en: 1.0 };
+
+  it('one query (0.02) below the floor is allowed, two is not', () => {
+    expect(passBar(lex, at(0.96, 0.98), floors).failed).toEqual([]);
+    expect(passBar(lex, at(0.94, 1.0), floors).failed).toEqual(['msa floor']);
+    expect(passBar(lex, at(1.0, 0.96), floors).failed).toEqual(['en floor']);
+  });
+
+  it('reports the margin of each check in queries', () => {
+    const r = passBar(lex, at(0.96, 1.0), floors);
+    const m = Object.fromEntries(r.checks.map(c => [c.name, c.marginQueries]));
+    expect(m['msa floor']).toBe(0); // exactly on the floor
+    expect(m['en floor']).toBe(1); // one query above it
+    expect(m['franco hit-rate@10']).toBe(5); // 0.90 vs 0.80 over 50 queries
   });
 });
 

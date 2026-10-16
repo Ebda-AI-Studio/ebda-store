@@ -53,6 +53,7 @@ import {
 export { hitAt, reciprocalRank } from './scoring';
 
 const AI_TERMS_FILE = new URL('./ai-terms.json', import.meta.url);
+const BASELINE_FILE = new URL('./baseline.json', import.meta.url);
 const THRESHOLDS: Array<number | null> = [20, 50, null];
 const DISTANCES: Array<number | null> = [0.45, 0.55, 0.65, null];
 const SEARCHER = 'eval:harness';
@@ -383,7 +384,11 @@ async function main(): Promise<number> {
         absentIn10: absent.reduce((a, x) => a + Math.min(10, f(x).length), 0) / absent.length,
       };
     }
-    for (const r of Object.values(results)) r.bar = passBar(results.lexical.summary, r.summary);
+    const { floors } = JSON.parse(readFileSync(BASELINE_FILE, 'utf8')) as {
+      floors: Record<'msa' | 'en', number>;
+    };
+    for (const r of Object.values(results))
+      r.bar = passBar(results.lexical.summary, r.summary, floors);
 
     // ---- report ------------------------------------------------------------------------------
     const L = results.lexical;
@@ -446,7 +451,9 @@ async function main(): Promise<number> {
     const verdict = H.bar;
     console.log(`\nBar (SEARCH-10) on the shipped config ${shippedLabel}:`);
     for (const c of verdict.checks)
-      console.log(`  ${c.ok ? 'ok  ' : 'FAIL'} ${c.name}: ${fmt(c.value)} (${c.need})`);
+      console.log(
+        `  ${c.ok ? 'ok  ' : 'FAIL'} ${c.name}: ${fmt(c.value)} (${c.need}) · margin ${c.marginQueries} ${Math.abs(c.marginQueries) === 1 ? 'query' : 'queries'}`
+      );
     if (!verdict.earnsCost)
       console.log(
         'SEMANTIC NOT EARNING ITS COST: keep SEARCH_SEMANTIC_ENABLED off (Ruling SEARCH-10)'
