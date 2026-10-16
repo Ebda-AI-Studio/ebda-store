@@ -330,11 +330,25 @@ export async function semanticProductIds(
   raw: string,
   opts: { searcher?: string; limit?: number } = {}
 ): Promise<string[]> {
+  return (await vectorLeg(storeId, raw, opts)).ids;
+}
+
+/**
+ * The vector leg with its mode. `degraded` = the leg was WANTED (semantic on, an embeddable query)
+ * but did not answer: no searcher, a budget or the searcher's limit refused, the race was lost, the
+ * provider or the SQL failed. Skipped by design (off, not embeddable) is not degraded, and a cached
+ * query vector is a full answer. A degraded list must never be cached as the full one (SEARCH-T12-7).
+ */
+async function vectorLeg(
+  storeId: string,
+  raw: string,
+  opts: { searcher?: string; limit?: number }
+): Promise<{ ids: string[]; degraded: boolean }> {
   const limit = opts.limit ?? HYBRID_LEG;
-  if (!semanticSearchEnabled() || !shouldEmbedQuery(raw)) return [];
+  if (!semanticSearchEnabled() || !shouldEmbedQuery(raw)) return { ids: [], degraded: false };
   try {
     const v = await queryVector(storeId, raw, opts.searcher);
-    if (!v) return [];
+    if (!v) return { ids: [], degraded: true };
     const q = toHalfvecLiteral(v);
     const rows = await withSavepoint(
       () => prisma.$queryRaw<Array<{ id: string }>>`
@@ -350,12 +364,12 @@ export async function semanticProductIds(
         ORDER BY k.d, k.id
         LIMIT ${Math.max(1, Math.floor(limit))}`
     );
-    return rows.map(r => r.id);
+    return { ids: rows.map(r => r.id), degraded: false };
   } catch (err) {
     const kind = err instanceof EmbeddingError ? err.kind : 'sql';
     const log = kind === 'timeout' || kind === 'aborted' ? logger.info : logger.warn;
     log.call(logger, { storeId, kind }, '[search] vector leg unavailable; keyword results only');
-    return [];
+    return { ids: [], degraded: true };
   }
 }
 
@@ -372,8 +386,17 @@ export async function rankedSearch(
   raw: string,
   opts: { searcher?: string } = {}
 ): Promise<string[]> {
+  return (await rankedSearchWithMode(storeId, raw, opts)).ids;
+}
+
+/** `rankedSearch` plus whether the vector leg was wanted but unavailable (see `vectorLeg`). */
+export async function rankedSearchWithMode(
+  storeId: string,
+  raw: string,
+  opts: { searcher?: string } = {}
+): Promise<{ ids: string[]; degraded: boolean }> {
   const lexical = await searchProductIds(storeId, raw, { scope: 'storefront' });
-  if (lexical.length >= KEYWORD_STRONG_AT) return lexical;
-  const vector = await semanticProductIds(storeId, raw, { searcher: opts.searcher });
-  return hybridOrder(lexical, vector, HYBRID_LEG);
+  if (lexical.length >= KEYWORD_STRONG_AT) return { ids: lexical, degraded: false };
+  const vector = await vectorLeg(storeId, raw, { searcher: opts.searcher });
+  return { ids: hybridOrder(lexical, vector.ids, HYBRID_LEG), degraded: vector.degraded };
 }

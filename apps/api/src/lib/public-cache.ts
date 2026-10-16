@@ -112,7 +112,12 @@ async function bumpGeneration(name: string): Promise<void> {
 export async function getCached<T>(
   key: string,
   ttlSeconds: number,
-  fetchFn: () => Promise<T>
+  fetchFn: () => Promise<T>,
+  /**
+   * `cacheIf(data) === false` = return this value but store it in NO layer (a degraded answer,
+   * e.g. a keyword-only fallback of a hybrid search, must never stand in for the full one).
+   */
+  opts: { cacheIf?: (data: T) => boolean } = {}
 ): Promise<T> {
   // FIX-002: the in-memory layer is a fallback for a DOWN Redis only. While
   // Redis is healthy another replica's invalidation clears Redis but can never
@@ -156,7 +161,8 @@ export async function getCached<T>(
       label: `getCached:${key.split(':')[1] ?? key}`,
     });
 
-    if (sharedBefore !== null && (await readSharedGens(genNames)) === sharedBefore) {
+    const cacheable = opts.cacheIf ? opts.cacheIf(data) : true;
+    if (cacheable && sharedBefore !== null && (await readSharedGens(genNames)) === sharedBefore) {
       try {
         await redis.set(key, JSON.stringify(data), ttlSeconds);
         // An invalidation that bumped between the check above and this write
@@ -171,7 +177,12 @@ export async function getCached<T>(
     }
     // Memory only when the shared layer is down (FIX-002), and never with a
     // value a local invalidation has superseded since the fetch began.
-    if (!isWorkers && sharedBefore === null && readLocalGens(genNames) === localBefore) {
+    if (
+      cacheable &&
+      !isWorkers &&
+      sharedBefore === null &&
+      readLocalGens(genNames) === localBefore
+    ) {
       memoryCache.set(key, { data, expiresAt: Date.now() + ttlSeconds * 1000 });
     }
     return data;

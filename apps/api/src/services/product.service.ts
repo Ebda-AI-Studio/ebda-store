@@ -36,7 +36,7 @@ import { assertWithinLimit } from './plan-limit.service';
 import {
   buildProductSearchWhere,
   productSearchFilter,
-  rankedSearch,
+  rankedSearchWithMode,
   searchNameIds,
   searchProductIds,
 } from './product-search.service';
@@ -1350,10 +1350,15 @@ export class ProductService {
     }
 
     let rankedIds: string[] | null = null;
+    let rankedDegraded = false;
     if (search && ranked) {
       // The ranked id list replaces the keyword id filter (it already holds every keyword match up
       // to the cap, plus the vector-only hits). ANDed, so an `ids` filter on `where.id` still applies.
-      rankedIds = await rankedSearch(storeId, search, { searcher: options.searcher });
+      const rankedResult = await rankedSearchWithMode(storeId, search, {
+        searcher: options.searcher,
+      });
+      rankedIds = rankedResult.ids;
+      rankedDegraded = rankedResult.degraded;
       where.AND = [
         ...(Array.isArray(where.AND) ? where.AND : where.AND ? [where.AND] : []),
         { id: { in: rankedIds } },
@@ -1467,6 +1472,11 @@ export class ProductService {
           skipCapped: skipCapped || undefined,
           /** The order is the hybrid relevance order (the storefront labels it "Most relevant"). */
           ranked: true as const,
+          /**
+           * The vector leg was wanted but unavailable: keyword order only. The route never caches
+           * such a list (Ruling SEARCH-T12-7). Present only when true.
+           */
+          ...(rankedDegraded ? { degraded: true as const } : {}),
         },
       };
     }

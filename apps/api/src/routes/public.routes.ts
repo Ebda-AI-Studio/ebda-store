@@ -23,6 +23,7 @@ import {
   viewIngestLimiter,
 } from '../middleware/security';
 import { searcherFromIp } from '../lib/search/embed-budget';
+import { semanticSearchEnabled } from '../lib/search/embedding-provider';
 import { recordProductView } from '../services/view-ingest.service';
 import { claimSearcherSearch, recordSearch } from '../services/search-log.service';
 import { deferAfterTenantCommit } from '../lib/after-tenant-commit';
@@ -36,7 +37,12 @@ import { storeLookupForHost } from '../lib/store-host';
 import { lookupStore, publicStorePage, type StoreStatusName } from '../lib/definer';
 import { redis } from '../services/redis.service';
 import { previewTokenKey } from '../lib/builder-preview-token';
-import { isReservedSlug, storefrontOrigin, CONTACT_HONEYPOT_FIELD } from '@ebda/shared';
+import {
+  isReservedSlug,
+  storefrontOrigin,
+  CONTACT_HONEYPOT_FIELD,
+  normalizeArabicSearch,
+} from '@ebda/shared';
 import { parseOptionalBooleanQuery } from '../lib/query-params';
 import { setEdgeCache } from '../lib/edge-cache';
 import { buildProductFeed } from '../lib/product-feed';
@@ -262,7 +268,6 @@ router.get('/products', async (req: Request, res: Response, next: NextFunction) 
     const optionFilters: Record<string, string[]> = {};
     const MAX_OPTION_NAMES = 10;
     const MAX_OPTION_VALUES = 20;
-    let optionFilterKey = '';
     for (const [key, raw] of Object.entries(req.query)) {
       if (!key.startsWith('opt_')) continue;
       if (Object.keys(optionFilters).length >= MAX_OPTION_NAMES) break;
@@ -275,35 +280,49 @@ router.get('/products', async (req: Request, res: Response, next: NextFunction) 
         .slice(0, MAX_OPTION_VALUES);
       if (vals.length > 0) {
         optionFilters[optionName] = vals;
-        optionFilterKey += `${optionName}=${vals.join(',')};`;
       }
     }
     const hasOptionFilters = Object.keys(optionFilters).length > 0;
 
-    // Cache key includes cursor + ids + option filters — different selections get distinct entries.
-    const cacheKey = `public:products:${storeId}:${page || 1}:${limit || 20}:${category || ''}:${
-      effectiveSearch || ''
-    }:${featuredFilter ?? ''}:${sortValue || ''}:${minPrice || ''}:${maxPrice || ''}:${
-      validCursor || ''
-    }:${idsParam?.sort().join(',') ?? ''}:${optionFilterKey}`;
+    // The EXACT options the service receives (ids sorted: their order never changes the result).
+    const listOptions: Parameters<typeof ProductService.listPublic>[1] = {
+      page: page ? parseInt(page as string) : undefined,
+      limit: limit ? parseInt(limit as string) : undefined,
+      category: category as string,
+      search: effectiveSearch,
+      featured: featuredFilter,
+      sort: sortValue,
+      minPrice: minPrice ? parseInt(minPrice as string, 10) : undefined,
+      maxPrice: maxPrice ? parseInt(maxPrice as string, 10) : undefined,
+      cursor: validCursor,
+      ids: idsParam?.sort(),
+      optionFilters: hasOptionFilters ? optionFilters : undefined,
+    };
+    // Cache key (Ruling SEARCH-T12-7) = the store + a JSON encoding of exactly those options + the
+    // semantic-search mode. JSON quotes every value, so no value can borrow a delimiter: the old
+    // `a:b:…;name=v,v;` join let `?category=x:y&search=z` and `?category=x&search=y:z` (or
+    // `opt_A=1;B=2` and `opt_A=1&opt_B=2`) share one entry, i.e. one URL could fill another's
+    // cache. The response does not vary by locale (both name and nameAr are returned), so locale
+    // is not part of it. CACHE CLASS: BOUNDED-stale 120 s, busted by invalidateStoreProductCaches
+    // on every product write (prefix `public:products:<storeId>:` kept). A DEGRADED hybrid list
+    // (the vector leg was wanted but unavailable) is never cached under any key (`cacheIf`).
+    const cacheKey = `public:products:${storeId}:${JSON.stringify({
+      ...listOptions,
+      semantic: semanticSearchEnabled(),
+    })}`;
 
-    const result = await getCached(cacheKey, 120, () =>
-      ProductService.listPublic(storeId, {
-        page: page ? parseInt(page as string) : undefined,
-        limit: limit ? parseInt(limit as string) : undefined,
-        category: category as string,
-        search: effectiveSearch,
-        featured: featuredFilter,
-        sort: sortValue,
-        minPrice: minPrice ? parseInt(minPrice as string, 10) : undefined,
-        maxPrice: maxPrice ? parseInt(maxPrice as string, 10) : undefined,
-        cursor: validCursor,
-        ids: idsParam,
-        optionFilters: hasOptionFilters ? optionFilters : undefined,
-        // The query-embed limit is charged inside the service at the provider call (SEARCH-T12-6).
-        searcher: searcherFromIp(req.ip),
-      })
+    const result = await getCached(
+      cacheKey,
+      120,
+      () =>
+        ProductService.listPublic(storeId, {
+          ...listOptions,
+          // The query-embed limit is charged inside the service at the provider call (SEARCH-T12-6).
+          searcher: searcherFromIp(req.ip),
+        }),
+      { cacheIf: r => (r.meta as { degraded?: boolean }).degraded !== true }
     );
+    const ranked = (result.meta as { ranked?: boolean }).ranked === true;
 
     // First-party search log (search program P0, Task 5): page 1 of a real query only, so
     // paging does not double count; typeahead (/search/suggest) is not logged (keystrokes,
@@ -338,7 +357,11 @@ router.get('/products', async (req: Request, res: Response, next: NextFunction) 
     // sMaxAge 60s + staleWhileRevalidate 300s. BOUNDED-stale by design: the cart and
     // checkout re-read the feature uncached (lineAllowsBackorder) and stay authoritative.
     const backorderOn = await featureService.isFeatureEnabled(storeId, 'inventory.backorder');
-    setEdgeCache(res, { sMaxAge: 60, staleWhileRevalidate: 300 });
+    // A hybrid-ranked list (semantic search on) depends on the mode and on the provider's health at
+    // that moment, which no edge key can see: never shared-cacheable (SEARCH-T12-7). Every other
+    // list keeps the edge policy unchanged.
+    if (ranked) res.setHeader('Cache-Control', 'private, no-store');
+    else setEdgeCache(res, { sMaxAge: 60, staleWhileRevalidate: 300 });
     res.json({
       success: true,
       data: gateBackorderPayload(result, backorderOn),
@@ -1254,7 +1277,11 @@ router.get('/:storeId/search/suggest', async (req: Request, res: Response, next:
       return;
     }
 
-    const cacheKey = `public:suggest:${storeId}:${trimmed.toLowerCase()}`;
+    // Keyed by exactly what the result depends on: the suggestions are computed from the
+    // Arabic-normalised term only (searchProductIds folds it), so two raw spellings that fold the
+    // same share an entry, and two that fold differently never do (Ruling SEARCH-T12-7: the old
+    // `toLowerCase()` key also folded non-ASCII letters the search does not, e.g. É and é).
+    const cacheKey = `public:suggest:${storeId}:${normalizeArabicSearch(trimmed)}`;
     const result = await getCached(cacheKey, 120, () =>
       ProductService.getSuggestSuggestions(storeId, trimmed, 25)
     );
