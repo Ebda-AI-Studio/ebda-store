@@ -29,11 +29,15 @@ else
   psql -v ON_ERROR_STOP=1 -q -d ebda_s1 -f scripts/cf-seed.sql
 fi
 
+# The API config without its Workers AI binding: that binding runs remotely and needs a login
+# (scripts/cf-api-local-config.mjs, Ruling SEARCH-T10-4).
+node ../../scripts/cf-api-local-config.mjs
+
 pass=0
 for i in $(seq 1 "$RUNS"); do
   echo "=== run $i / $RUNS ==="
   if curl -s -m 1 "localhost:$PORT/health" >/dev/null 2>&1; then echo "something already answers on :$PORT" >&2; exit 3; fi
-  NO_PROXY=127.0.0.1,localhost setsid npx wrangler dev --port "$PORT" --local > "$OUT/wrangler-$i.log" 2>&1 &
+  NO_PROXY=127.0.0.1,localhost setsid npx wrangler dev --port "$PORT" --local --config .wrangler.local.jsonc > "$OUT/wrangler-$i.log" 2>&1 &
   WR=$!
   for _ in $(seq 1 90); do curl -s -m 2 "localhost:$PORT/health" >/dev/null && break; sleep 2; done
   if node scripts/stage1-exit-test.mjs --rounds 1 --n "$N" --base "http://127.0.0.1:$PORT" --out "$OUT/run-$i.json"; then
