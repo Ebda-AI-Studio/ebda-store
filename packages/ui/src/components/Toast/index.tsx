@@ -38,7 +38,14 @@ export function useToast() {
   return context;
 }
 
-export function ToastProvider({ children }: { children: React.ReactNode }) {
+export function ToastProvider({
+  children,
+  dismissLabel = 'Dismiss notification',
+}: {
+  children: React.ReactNode;
+  /** The close button's name, in the page language (the storefront passes the Arabic one). */
+  dismissLabel?: string;
+}) {
   const [toasts, setToasts] = useState<Toast[]>([]);
 
   const removeToast = useCallback((id: string) => {
@@ -86,7 +93,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   return (
     <ToastContext.Provider value={{ toasts, addToast, removeToast, success, error, warning, info }}>
       {children}
-      <ToastContainer toasts={toasts} removeToast={removeToast} />
+      <ToastContainer toasts={toasts} removeToast={removeToast} dismissLabel={dismissLabel} />
     </ToastContext.Provider>
   );
 }
@@ -95,9 +102,11 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
 function ToastContainer({
   toasts,
   removeToast,
+  dismissLabel,
 }: {
   toasts: Toast[];
   removeToast: (id: string) => void;
+  dismissLabel: string;
 }) {
   return (
     <div
@@ -108,14 +117,27 @@ function ToastContainer({
       aria-relevant="additions removals"
     >
       {toasts.map(toast => (
-        <ToastItem key={toast.id} toast={toast} onClose={() => removeToast(toast.id)} />
+        <ToastItem
+          key={toast.id}
+          toast={toast}
+          onClose={() => removeToast(toast.id)}
+          dismissLabel={dismissLabel}
+        />
       ))}
     </div>
   );
 }
 
 // Individual Toast Component
-function ToastItem({ toast, onClose }: { toast: Toast; onClose: () => void }) {
+function ToastItem({
+  toast,
+  onClose,
+  dismissLabel,
+}: {
+  toast: Toast;
+  onClose: () => void;
+  dismissLabel: string;
+}) {
   const duration = toast.duration && toast.duration > 0 ? toast.duration : 0;
 
   useEffect(() => {
@@ -246,8 +268,9 @@ function ToastItem({ toast, onClose }: { toast: Toast; onClose: () => void }) {
       {/* Close button */}
       <button
         onClick={onClose}
-        aria-label="Dismiss notification"
-        className="flex-shrink-0 cursor-pointer text-muted-foreground hover:text-foreground transition-colors duration-150 rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        aria-label={dismissLabel}
+        // a11y re-audit (stop4 probe): 16x16 was below rule (d); the -m-3 keeps the toast's size.
+        className="-m-3 inline-flex h-11 w-11 flex-shrink-0 items-center justify-center cursor-pointer text-muted-foreground hover:text-foreground transition-colors duration-150 rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
       >
         <svg
           className="w-4 h-4"

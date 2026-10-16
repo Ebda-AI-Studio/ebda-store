@@ -48,3 +48,18 @@ describe('Toast', () => {
     expect(screen.queryByRole('alert')).toBeNull();
   });
 });
+
+// a11y re-audit (stop4 probe, rule (d)): the toast's close button measured 16x16 and was named
+// "Dismiss notification" in English on Arabic pages. It is a 44px target named by the provider.
+describe('Toast close', () => {
+  it('is a 44px box, named in the page language', () => {
+    render(
+      <ToastProvider dismissLabel="إغلاق الإشعار">
+        <Fire />
+      </ToastProvider>
+    );
+    const close = screen.getByRole('button', { name: 'إغلاق الإشعار' });
+    expect(close.className).toMatch(/\bh-11\b/);
+    expect(close.className).toMatch(/\bw-11\b/);
+  });
+});

@@ -608,7 +608,9 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                   ) : (
                     <FeatureProvider>
                       <AuthProvider>
-                        <ToastProvider>
+                        <ToastProvider
+                          dismissLabel={lang === 'ar' ? 'إغلاق الإشعار' : 'Dismiss notification'}
+                        >
                           <CartProvider>
                             {store.isDemo && <DemoLookBar activeLook={store.look} />}
                             <div id="main-content">{children}</div>
