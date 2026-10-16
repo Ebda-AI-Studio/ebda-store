@@ -21,6 +21,7 @@ import { redis } from './redis.service';
 import { invalidateStoreProductCaches } from '../lib/public-cache';
 import logger from '../lib/logger';
 import { requestStoreReindex } from '../lib/search/reindex';
+import { sendEventAfterCommit } from '../lib/inngest/send-after-commit';
 import { cleanupRemovedImages } from './r2-cleanup.service';
 import { LISTING_SWATCH_OPTIONS_SELECT } from '../lib/listing-swatch-select';
 import { PUBLIC_MODEL3D_SELECT, toPublicModel3d } from './product-model.service';
@@ -29,7 +30,6 @@ import {
   resolvePdpSizeChart,
   SIZE_CHART_PUBLIC_SELECT,
 } from './size-chart.service';
-import { inngest } from '../lib/inngest/client';
 import { stampHumanEdits, enqueueRecommendationsSweepForNewProduct } from './ai-autofill.service';
 import { recordSlugRedirect } from './slug-redirect.service';
 import { assertWithinLimit } from './plan-limit.service';
@@ -817,14 +817,16 @@ export class ProductService {
 
     // Fire product.upserted for Meta Catalog sync (Phase A — native catalog bot).
     // Fire-and-forget: catalog sync failure must never block the product save.
-    void inngest
-      .send({
+    // After COMMIT (Ruling SEARCH-T11-20): consumers (Meta sync, autofill, the search indexer)
+    // must not read an uncommitted or rolled-back product.
+    await sendEventAfterCommit(
+      'product.create',
+      {
         name: 'product.upserted' as any,
         data: { storeId, productId: product.id, op: 'create', changedFields: [] },
-      })
-      .catch(err =>
-        logger.warn({ err, productId: product.id }, '[product.create] inngest send failed')
-      );
+      },
+      { ifUnhookable: 'send' }
+    );
 
     // #1937: kick the recommendations sweep HERE, at the one true creation
     // site, rather than in the debounced `product.upserted` Inngest
@@ -1056,12 +1058,14 @@ export class ProductService {
     await this.invalidateStoreProductCache(storeId);
 
     // Fire product.upserted for Meta Catalog sync. Fire-and-forget.
-    void inngest
-      .send({
+    await sendEventAfterCommit(
+      'product.update',
+      {
         name: 'product.upserted' as any,
         data: { storeId, productId, op: 'update', changedFields },
-      })
-      .catch(err => logger.warn({ err, productId }, '[product.update] inngest send failed'));
+      },
+      { ifUnhookable: 'send' }
+    );
 
     // Fire-and-forget R2 cleanup for any image URL that disappeared
     // during this update. Runs AFTER the transaction commits so a
@@ -1096,9 +1100,11 @@ export class ProductService {
     await requestStoreReindex(storeId, 'product-delete');
 
     // Fire product.deleted for Meta Catalog sync. Fire-and-forget.
-    void inngest
-      .send({ name: 'product.deleted' as any, data: { storeId, productId } })
-      .catch(err => logger.warn({ err, productId }, '[product.delete] inngest send failed'));
+    await sendEventAfterCommit(
+      'product.delete',
+      { name: 'product.deleted' as any, data: { storeId, productId } },
+      { ifUnhookable: 'send' }
+    );
   }
 
   static async updateInventory(storeId: string, productId: string, quantity: number) {

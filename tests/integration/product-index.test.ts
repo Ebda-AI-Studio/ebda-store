@@ -756,6 +756,38 @@ describe.skipIf(!hasDb)('product embedding indexer (Task 11)', () => {
     }
   });
 
+  it('PR3 minor 3: ProductService.update sends product.upserted only after its transaction commits', async () => {
+    const { ProductService } = await import('../../apps/api/src/services/product.service');
+    const owner = await mkUser('m3');
+    ownerIds.push(owner.id);
+    const s = (await mkStore(owner.id, 'm3')).id;
+    storeIds.push(s);
+    const p = await mkProduct(s, { name: 'Before commit' });
+    sent.length = 0;
+    let insideTx = -1;
+    await asApp(() =>
+      runInTenantContext(s, async () => {
+        await ProductService.update(s, p, { name: 'After commit' });
+        insideTx = sent.filter(e => e.name === 'product.upserted').length;
+      })
+    );
+    expect(insideTx).toBe(0);
+    expect(sent.filter(e => e.name === 'product.upserted' && e.data.productId === p)).toHaveLength(
+      1
+    );
+
+    sent.length = 0;
+    await expect(
+      asApp(() =>
+        runInTenantContext(s, async () => {
+          await ProductService.update(s, p, { name: 'Rolled back' });
+          throw new Error('rollback');
+        })
+      )
+    ).rejects.toThrow('rollback');
+    expect(sent.filter(e => e.name === 'product.upserted')).toHaveLength(0);
+  });
+
   it('as ebda_app: the vector rows are invisible from another store scope', async () => {
     setEmbeddingProviderForTests(fakeProvider().provider);
     await runInStoreScope(storeId, () => indexStore(storeId));

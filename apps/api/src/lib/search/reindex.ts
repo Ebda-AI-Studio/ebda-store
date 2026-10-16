@@ -1,8 +1,5 @@
-import { inngest } from '../inngest/client';
-import { afterTenantTxCommit, hasTenantContext } from '@ebda/database';
-import { deferAfterTenantCommit, hasDeferralScope } from '../after-tenant-commit';
+import { sendEventAfterCommit } from '../inngest/send-after-commit';
 import { getEmbeddingProvider } from './embedding-provider';
-import logger from '../logger';
 
 /** Product columns that feed `ebda_product_embed_doc` (Task 9). A write touching one makes the embedding stale. */
 export const EMBED_DOC_FIELDS = [
@@ -35,35 +32,11 @@ export function touchesEmbedDoc(fields: Iterable<string>): boolean {
  * content hash within 6 h). With no embedding provider it sends nothing (the consumer would skip).
  */
 export async function requestStoreReindex(storeId: string, reason: string): Promise<void> {
-  const send = async () => {
-    try {
-      await inngest.send({ name: 'search/store.reindex-requested', data: { storeId, reason } });
-    } catch (err) {
-      logger.warn(
-        { err, storeId, reason },
-        '[search-index] enqueue failed; backstop will catch it'
-      );
-    }
-  };
-  try {
-    if (!getEmbeddingProvider()) return;
-    if (hasDeferralScope()) {
-      await deferAfterTenantCommit('search.reindex-requested', send);
-      return;
-    }
-    if (hasTenantContext()) {
-      if (!afterTenantTxCommit(send))
-        logger.warn(
-          { storeId, reason },
-          '[search-index] inside an unhookable transaction; not sent, backstop will catch it'
-        );
-      return;
-    }
-    await send();
-  } catch (err) {
-    logger.warn(
-      { err, storeId, reason },
-      '[search-index] reindex request failed; backstop will catch it'
-    );
-  }
+  if (!getEmbeddingProvider()) return;
+  // 'drop' when it cannot know the commit: the 6-hourly backstop finds the change by hash.
+  await sendEventAfterCommit(
+    'search.reindex-requested',
+    { name: 'search/store.reindex-requested', data: { storeId, reason } },
+    { ifUnhookable: 'drop' }
+  );
 }
