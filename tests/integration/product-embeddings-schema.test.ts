@@ -138,6 +138,22 @@ describe.skipIf(!hasDb)('product_embeddings', () => {
     expect(r.d.length).toBeLessThan(1500 + 200);
   });
 
+  it('SEARCH-T13-7: a nullable words vector + hash, set together or not at all', async () => {
+    const cols = await prisma.$queryRaw<Array<{ c: string; t: string; n: string }>>`
+      SELECT a.attname::text AS c, format_type(a.atttypid, a.atttypmod) AS t,
+             CASE WHEN a.attnotnull THEN 'NO' ELSE 'YES' END AS n
+        FROM pg_attribute a WHERE a.attrelid = 'product_embeddings'::regclass
+         AND a.attname IN ('terms_embedding', 'terms_hash') ORDER BY 1`;
+    expect(cols).toEqual([
+      { c: 'terms_embedding', t: 'halfvec(1024)', n: 'YES' },
+      { c: 'terms_hash', t: 'text', n: 'YES' },
+    ]);
+    const [c] = await prisma.$queryRaw<Array<{ def: string }>>`
+      SELECT pg_get_constraintdef(oid) AS def FROM pg_constraint
+       WHERE conrelid = 'product_embeddings'::regclass AND conname = 'product_embeddings_terms_pair_chk'`;
+    expect(c?.def).toMatch(/terms_embedding IS NULL.*=.*terms_hash IS NULL/);
+  });
+
   it('SEARCH-T13-5: the embed doc has no search-words part and the 5-argument version is gone', async () => {
     const sigs = await prisma.$queryRaw<Array<{ args: string }>>`
       SELECT pg_get_function_identity_arguments(p.oid) AS args FROM pg_proc p

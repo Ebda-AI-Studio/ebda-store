@@ -26,8 +26,10 @@ import { acrossStores, runInStoreScope } from '@ebda/database';
 import { inngest } from '../client';
 import {
   alertQuarantined,
-  embedDocs,
+  embedItems,
   embedSingles,
+  providerCallsFor,
+  type ItemVectors,
   quarantineEmbedFailures,
   retryableFailures,
   settleSingles,
@@ -45,7 +47,10 @@ import { alertOutageOnce, takeEmbedCalls } from '../../search/embed-budget';
 import logger from '../../logger';
 
 export const REINDEX_EVENT = 'search/store.reindex-requested';
-/** Products per provider call (bge-m3 takes up to 100; 25 keeps one call well under the timeout). */
+/**
+ * Products per batch: up to 50 texts (doc + words each, SEARCH-T13-7), one provider call (bge-m3
+ * takes up to 100); 25 keeps one call well under the timeout.
+ */
 export const INDEX_BATCH = 25;
 /**
  * Rounds per run before handing off to a continuation run (~200 products). Step state measured at
@@ -106,7 +111,7 @@ export async function handleSearchProductIndex({
 }
 
 type Settled = {
-  ok: Array<{ id: string; hash: string; lit: string }>;
+  ok: Array<{ id: string; hash: string; vec: ItemVectors }>;
   failures: EmbedFailure[];
 };
 
@@ -130,15 +135,13 @@ async function indexRounds(
     const batch = (await step.run(`embed-${round}`, async () => {
       const provider = getEmbeddingProvider();
       if (!provider) throw new NonRetriableError('search-index: embedding provider went away');
-      // Account-wide ceiling on provider calls (SEARCH-T11-19).
-      if (!(await takeEmbedCalls(1))) return { globalCapped: true };
+      // Account-wide ceiling on provider calls (SEARCH-T11-19), charged per real call: a batch's
+      // doc AND words texts share one call (SEARCH-T13-7).
+      if (!(await takeEmbedCalls(providerCallsFor(plan.items)))) return { globalCapped: true };
       try {
-        const literals = await embedDocs(
-          provider,
-          plan.items.map(i => i.doc)
-        );
+        const vectors = await embedItems(provider, plan.items);
         await sleep(embedThrottleMs()); // sleep-after-success, per real call
-        return { literals };
+        return { vectors };
       } catch (err) {
         if (!(err instanceof EmbeddingError)) throw err;
         // A retryable batch failure is retried by Inngest first. On the LAST attempt, or at once for
@@ -146,17 +149,17 @@ async function indexRounds(
         if (err.retryable && attempt < INDEX_RETRIES) throw err;
         return { failed: err.kind };
       }
-    })) as { literals?: string[]; failed?: string; globalCapped?: boolean };
+    })) as { vectors?: ItemVectors[]; failed?: string; globalCapped?: boolean };
     if (batch.globalCapped) {
       logger.warn({ storeId, embedded }, '[search-index] global daily embedding budget reached');
       return { embedded, capped: 'global' };
     }
 
     let settled: Settled;
-    if (batch.literals) {
-      const literals = batch.literals;
+    if (batch.vectors) {
+      const vectors = batch.vectors;
       settled = {
-        ok: plan.items.map((it, i) => ({ id: it.id, hash: it.hash, lit: literals[i] })),
+        ok: vectors.map((vec, i) => ({ id: vec.id, hash: plan.items[i].key, vec })),
         failures: [],
       };
     } else {
@@ -170,8 +173,7 @@ async function indexRounds(
       runInStoreScope(storeId, async () => {
         const written = await writeEmbeddings(
           storeId,
-          settled.ok.map(({ id, hash }) => ({ id, hash })),
-          settled.ok.map(o => o.lit)
+          settled.ok.map(o => o.vec)
         );
         const q = await quarantineEmbedFailures(storeId, settled.failures);
         return { written, ...q };

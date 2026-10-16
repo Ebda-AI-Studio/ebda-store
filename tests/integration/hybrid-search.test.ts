@@ -271,6 +271,32 @@ describe.skipIf(!hasDb)('hybrid storefront search (Task 12)', () => {
     }
   });
 
+  it('SEARCH-T13-7: a product matches through its words vector (the nearer of its two vectors)', async () => {
+    const W = await mkStore('words');
+    const shoe = await mkProduct(W, {
+      name: 'Sport trainer',
+      nameAr: 'حذاء رياضي',
+      searchTerms: 'gazma riyada',
+    });
+    const plain = await mkProduct(W, { name: 'Wool scarf', nameAr: 'كوفية صوف' });
+    setEmbeddingProviderForTests(aliasProvider().provider);
+    await runInStoreScope(W, () => indexStore(W));
+    process.env.SEARCH_SEMANTIC_ENABLED = 'true';
+    // the query's vector equals the WORDS vector (distance 0) and is far from every doc vector
+    setEmbeddingProviderForTests(aliasProvider({ 'gazma rgl': 'gazma riyada' }).provider);
+    const ids = await runInTenantContext(W, () =>
+      semanticProductIds(W, 'gazma rgl', { searcher: who() })
+    );
+    expect(ids).toEqual([shoe]);
+    expect(ids).not.toContain(plain);
+    // and the doc vector still answers on its own
+    clearQueryVectorCacheForTests();
+    setEmbeddingProviderForTests(aliasProvider({ 'scarf q': await docOf(plain) }).provider);
+    expect(
+      await runInTenantContext(W, () => semanticProductIds(W, 'scarf q', { searcher: who() }))
+    ).toEqual([plain]);
+  });
+
   it('honours SEARCH_VECTOR_MAX_DISTANCE', async () => {
     process.env.SEARCH_SEMANTIC_ENABLED = 'true';
     // ~0.2 cosine distance from the sneaker's vector: 0.8·v + 0.6·(an unrelated vector).

@@ -338,7 +338,8 @@ async function queryVector(
 }
 
 /**
- * Vector leg: up to `limit` product ids of THIS store nearest to the query (exact KNN per store,
+ * Vector leg: up to `limit` product ids of THIS store nearest to the query by the nearer of each
+ * product's two vectors, doc and AI words (SEARCH-T13-7) (exact KNN per store,
  * Ruling SEARCH-8), within SEARCH_VECTOR_MAX_DISTANCE, storefront-visible only (active, not
  * deleted, read live in the same SQL: Ruling SEARCH-11). `[]` when semantic search is off, the
  * query is not embeddable, no `searcher` is given or a budget refuses (`takeQueryEmbed`), the
@@ -378,7 +379,9 @@ async function vectorLeg(
     const rows = await withSavepoint(
       () => prisma.$queryRaw<Array<{ id: string }>>`
         SELECT k.id FROM (
-          SELECT e.product_id AS id, e.embedding <=> q.v AS d
+          -- The nearer of the product's two vectors (SEARCH-T13-7): the doc and, when it has
+          -- any, the AI search words alone. LEAST ignores the NULL words vector.
+          SELECT e.product_id AS id, LEAST(e.embedding <=> q.v, e.terms_embedding <=> q.v) AS d
             FROM product_embeddings e
             JOIN products p ON p.id = e.product_id AND p.store_id = ${storeId}
             CROSS JOIN (SELECT ${q}::halfvec(1024) AS v) q
