@@ -291,7 +291,7 @@ export default function BundleDetailClient({ initialBundle }: BundleDetailClient
                       disabled={!isPurchasable}
                       className="flex h-11 min-w-11 items-center justify-center px-4 text-muted-foreground hover:bg-muted cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
                     >
-                      -
+                      <span aria-hidden="true">−</span>
                     </button>
                     <span aria-live="polite" className="w-12 text-center font-medium">
                       {localize(quantity)}
