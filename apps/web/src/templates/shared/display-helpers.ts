@@ -210,9 +210,10 @@ export function resolveBottomBar(
     ? (bottomBar?.copyrightOverrideAr ?? bottomBar?.copyrightOverride)
     : bottomBar?.copyrightOverride;
   const override = typeof overrideRaw === 'string' ? overrideRaw.trim() : '';
+  const name = storeName.trim();
   const fallback = isRtl
-    ? `© ${year} ${storeName}. جميع الحقوق محفوظة.`
-    : `© ${year} ${storeName}. All rights reserved.`;
+    ? `© ${year} ${name ? `${name}.` : '·'} جميع الحقوق محفوظة.`
+    : `© ${year} ${name ? `${name}.` : '·'} All rights reserved.`;
   const disabled = new Set(disabledCmsSlugs ?? []);
   return {
     enabled,

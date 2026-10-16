@@ -49,6 +49,20 @@ import { resolveBottomBar } from '../../apps/web/src/templates/shared/display-he
 const ROOT = join(__dirname, '../..');
 const cols = { shop: [], support: [], company: [], newsletterEnabled: true };
 
+describe('FU46 M-9: the default © line with no store name', () => {
+  it('has no stray " ." (en and ar), and a blank name counts as none', () => {
+    expect(resolveBottomBar(undefined, '', false, undefined, 2026).copyright).toBe(
+      '© 2026 · All rights reserved.'
+    );
+    expect(resolveBottomBar(undefined, '  ', true, undefined, 2026).copyright).toBe(
+      '© 2026 · جميع الحقوق محفوظة.'
+    );
+    expect(resolveBottomBar(undefined, 'Shop', false, undefined, 2026).copyright).toBe(
+      '© 2026 Shop. All rights reserved.'
+    );
+  });
+});
+
 describe('the admin footer save never drops the legal row settings', () => {
   it('keeps every stored bottom-bar key the editor did not change (the 2026-05 wipe)', () => {
     const stored = {
