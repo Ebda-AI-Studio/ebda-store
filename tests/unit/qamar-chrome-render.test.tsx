@@ -98,7 +98,9 @@ describe('qamar header', () => {
     const html = renderToStaticMarkup(<QamarHeader branding={{ ...branding, nameAr: longName }} />);
     expect(html).toContain('grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]');
     expect(html).toContain('max-w-[calc(100%-13rem)]');
-    expect(html).toContain('min-w-0');
+    // A flex item shrinks below its content only with a small min-width: min-w-11 (P2-N2's 44px
+    // floor) still lets the name truncate, where min-w-0 used to.
+    expect(html).toMatch(/\bmin-w-(0|11)\b/);
     expect(html).toMatch(/class="[^"]*\btruncate\b[^"]*"[^>]*title="/);
     expect(html).toContain(`title="${longName}"`);
   });
@@ -231,8 +233,20 @@ describe('rule (d): Qamar header targets are 44px', () => {
           <QamarHeader branding={branding} navigation={nav} cartItemCount={2} />
         );
         const doc = new JSDOM(`<body>${html}</body>`).window.document;
-        expect(smallTargets(doc.body)).toEqual([]);
+        // a11y re-audit P2-N2: nav words measured 32-42px wide, so width is enforced too.
+        expect(smallTargets(doc.body, 44, { requireWidth: true })).toEqual([]);
       });
     }
   }
+});
+
+describe('checkout header brand link is 44px tall (P2-N2)', () => {
+  it('MinimalChrome brand link', async () => {
+    const { readFileSync } = await import('node:fs');
+    const src = readFileSync(
+      path.join(__dirname, '../../apps/web/src/components/MinimalChrome.tsx'),
+      'utf8'
+    );
+    expect(src).toMatch(/<Link href=\{storeUrl\('\/'\)\} className="[^"]*\bmin-h-11\b/);
+  });
 });

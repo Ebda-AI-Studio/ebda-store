@@ -47,7 +47,7 @@ export function MinimalChrome({
           aria-label={displayLabel || (isRtl ? 'التنقل' : 'Navigation')}
         >
           <div className="mx-auto flex h-20 max-w-7xl items-center justify-between px-4 md:h-24 md:px-6 lg:px-8">
-            <Link href={storeUrl('/')} className="flex items-center gap-2">
+            <Link href={storeUrl('/')} className="flex min-h-11 min-w-11 items-center gap-2">
               {store.logo ? (
                 // Adaptive StoreLogo (same component as the 5 theme headers) so
                 // checkout / auth / share pages honor the store's `theme.logoSize`

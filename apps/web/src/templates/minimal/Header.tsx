@@ -7,7 +7,7 @@ import { StoreLogo } from '../shared/StoreLogo';
 import { WORDMARK_NAV_LINK_CLASS, wordmarkClass } from '../shared/wordmark';
 
 /** a11y P2-10 / rule (d): header text links measured 16-20px; every one is a 44px target. */
-const HEADER_TARGET = 'inline-flex min-h-11 items-center';
+const HEADER_TARGET = 'inline-flex min-h-11 min-w-11 items-center justify-center';
 import type { HeaderProps } from '../types';
 import { useTabBarShown, HEADER_MENU_WITH_TAB_BAR } from '../shared/tab-bar-visibility';
 import { useLanguage } from '../../contexts/LanguageContext';
@@ -95,9 +95,9 @@ export default function MinimalHeader({
               every theme's logo MUST center on mobile. */}
           <Link
             href={urlPrefix || '/'}
-            className={`absolute left-1/2 -translate-x-1/2 md:relative md:left-auto md:translate-x-0 flex min-h-11 items-center justify-center flex-shrink-0 ${
+            className={`absolute left-1/2 -translate-x-1/2 md:relative md:left-auto md:translate-x-0 flex min-h-11 min-w-11 items-center justify-center flex-shrink-0 ${
               isCentre
-                ? 'min-w-0 max-w-[calc(100%-13rem)] md:max-w-[40vw] md:col-start-2'
+                ? 'max-w-[calc(100%-13rem)] md:max-w-[40vw] md:col-start-2'
                 : 'max-w-[65%] md:max-w-none'
             }`}
           >
