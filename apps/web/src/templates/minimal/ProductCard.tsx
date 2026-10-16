@@ -148,9 +148,13 @@ function MinimalProductCard({
   // Discount/sale badge — minimal's badge is inline text below the price
   // (no corner overlay by design, "minimal pack stays chrome-free"), so
   // only the merchant-configurable COLOR applies here; the position field
-  // is a no-op for this theme. Unset color falls back to the platform
-  // destructive/red default (matches the previous hardcoded text-red-600).
-  const discountBadgeColor = getDiscountBadgeColor(defaults?.discountBadge?.color, store.theme);
+  // is a no-op for this theme. The label is TEXT here, so an unset color
+  // falls back to the store's destructive ink (>= 4.5:1 on its page, K-01).
+  const discountBadgeColor = getDiscountBadgeColor(
+    defaults?.discountBadge?.color,
+    store.theme,
+    'text'
+  );
   // Custom (merchant-authored) badge. Unlike the other four themes, minimal's
   // DISCOUNT indicator is inline text under the price with no corner at all,
   // so the two can never collide: `discountOccupiesCorner: false` keeps the
