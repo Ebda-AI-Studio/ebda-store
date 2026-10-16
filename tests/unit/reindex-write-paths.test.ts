@@ -7,6 +7,7 @@
  *                descriptionAr);
  *   - dynamic  — `data` is an identifier, or has a spread / computed key at top level (may be text);
  *   - none     — anything else (stock, price, flags, positions...).
+ * `status` and `deletedAt` count too: only active, non-deleted products are indexed (review M5).
  * Every file with a text or dynamic call is listed in REVIEWED with the exact count and how it
  * keeps the index current. A new text/dynamic call anywhere fails here until someone decides:
  * add `requestStoreReindex(...)` after the write commits, or record why it is not text.
@@ -18,27 +19,36 @@ import { describe, it, expect } from 'vitest';
 
 const ROOT = join(__dirname, '..', '..');
 const SRC = join(ROOT, 'apps/api/src');
-const DOC_FIELDS = new Set(['name', 'nameAr', 'searchTerms', 'description', 'descriptionAr']);
+/** The embed doc's columns, plus what decides whether a product is indexed at all (review M5). */
+const INDEX_FIELDS = new Set([
+  'name',
+  'nameAr',
+  'searchTerms',
+  'description',
+  'descriptionAr',
+  'status',
+  'deletedAt',
+]);
 
-type Via =
-  | { via: 'requestStoreReindex' }
-  | { via: 'product.upserted' }
-  | { via: 'not-text'; why: string };
+type Via = 'requestStoreReindex' | 'product.upserted';
 
-const REVIEWED: Record<string, { sites: number } & Via & { note?: string }> = {
-  // create (:758) + update (:967) emit product.upserted (consumed by search-product-index);
-  // bulkUpdate's `scalarData` is status/featured/isNew/isBestSeller only.
-  'apps/api/src/services/product.service.ts': { sites: 3, via: 'product.upserted' },
+const REVIEWED: Record<string, { sites: number; via: Via[] }> = {
+  // create + update emit product.upserted (consumed by search-product-index); soft delete and
+  // bulkUpdate (`scalarData`, when it carries status) request a reindex (review M5).
+  'apps/api/src/services/product.service.ts': {
+    sites: 4,
+    via: ['product.upserted', 'requestStoreReindex'],
+  },
   // writeAiFieldsGuarded (fill + balance) and revertProductBalance.
-  'apps/api/src/services/ai-autofill.service.ts': { sites: 2, via: 'requestStoreReindex' },
+  'apps/api/src/services/ai-autofill.service.ts': { sites: 2, via: ['requestStoreReindex'] },
   // AI hand-back clears one field by computed key before regenerating it.
-  'apps/api/src/routes/ai.routes.ts': { sites: 1, via: 'requestStoreReindex' },
-  // CSV/XLSX import create + update (`...productFields`).
-  'apps/api/src/services/bulk.service.ts': { sites: 2, via: 'requestStoreReindex' },
+  'apps/api/src/routes/ai.routes.ts': { sites: 1, via: ['requestStoreReindex'] },
+  // CSV/XLSX import create + update (`...productFields`), soft bulk delete, bulk status.
+  'apps/api/src/services/bulk.service.ts': { sites: 4, via: ['requestStoreReindex'] },
   // Catalogue translation sweep (`data: updates` = name/nameAr/description/descriptionAr).
   'apps/api/src/lib/inngest/functions/bulk-ai-translate.ts': {
     sites: 1,
-    via: 'requestStoreReindex',
+    via: ['requestStoreReindex'],
   },
 };
 
@@ -111,7 +121,7 @@ export function classifyCall(args: string): 'text' | 'dynamic' | 'none' {
     for (const m of topLevelMembers(obj.slice(1, -1))) {
       if (m.startsWith('...') || m.startsWith('[')) kind = 'dynamic';
       const key = /^([A-Za-z_$][\w$]*)\s*(:|$)/.exec(m)?.[1];
-      if (key && DOC_FIELDS.has(key)) return 'text';
+      if (key && INDEX_FIELDS.has(key)) return 'text';
     }
   }
   return kind;
@@ -156,14 +166,14 @@ describe('product text writers keep the search index current (Task 11)', () => {
     expect(found).toEqual(expected);
   });
 
-  it.each(Object.entries(REVIEWED).filter(([, r]) => r.via === 'requestStoreReindex'))(
+  it.each(Object.entries(REVIEWED).filter(([, r]) => r.via.includes('requestStoreReindex')))(
     '%s requests a reindex',
     f => {
       expect(readFileSync(join(ROOT, f), 'utf8')).toMatch(/requestStoreReindex\(/);
     }
   );
 
-  it.each(Object.entries(REVIEWED).filter(([, r]) => r.via === 'product.upserted'))(
+  it.each(Object.entries(REVIEWED).filter(([, r]) => r.via.includes('product.upserted')))(
     '%s emits product.upserted (the indexer consumes it)',
     f => {
       expect(readFileSync(join(ROOT, f), 'utf8')).toMatch(/name: 'product\.upserted'/);

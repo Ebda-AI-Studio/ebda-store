@@ -20,6 +20,7 @@ import {
 import { redis } from './redis.service';
 import { invalidateStoreProductCaches } from '../lib/public-cache';
 import logger from '../lib/logger';
+import { requestStoreReindex } from '../lib/search/reindex';
 import { cleanupRemovedImages } from './r2-cleanup.service';
 import { LISTING_SWATCH_OPTIONS_SELECT } from '../lib/listing-swatch-select';
 import { PUBLIC_MODEL3D_SELECT, toPublicModel3d } from './product-model.service';
@@ -1091,6 +1092,8 @@ export class ProductService {
     });
 
     await this.invalidateStoreProductCache(storeId);
+    // A deleted product leaves the search index (its vector is pruned; review M5).
+    await requestStoreReindex(storeId, 'product-delete');
 
     // Fire product.deleted for Meta Catalog sync. Fire-and-forget.
     void inngest
@@ -1189,6 +1192,8 @@ export class ProductService {
         where: { storeId, id: { in: allIds }, deletedAt: null },
         data: scalarData,
       });
+      // Only active products are indexed: a status change adds or removes vectors (review M5).
+      if (scalarData.status !== undefined) await requestStoreReindex(storeId, 'bulk-status');
     }
 
     // --- 2. Category link (additive, per-product) ---

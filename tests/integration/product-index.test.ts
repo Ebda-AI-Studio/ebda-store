@@ -119,6 +119,7 @@ async function mkProduct(storeId: string, data: Record<string, unknown> = {}) {
         name: 'Shoes',
         nameAr: 'أحذية',
         price: 100,
+        status: 'active', // only storefront-searchable products are indexed (review M5)
         ...data,
       },
     })
@@ -329,6 +330,36 @@ describe.skipIf(!hasDb)('product embedding indexer (Task 11)', () => {
       handleSearchProductIndex({ event: { data: { storeId: s } }, step: fakeStep() })
     );
     expect(await embeddingRow(p)).toBeUndefined();
+  });
+
+  it('review M5: soft delete and unpublish remove the vector; republish restores it', async () => {
+    const owner = await mkUser('m5');
+    ownerIds.push(owner.id);
+    const s = (await mkStore(owner.id, 'm5')).id;
+    storeIds.push(s);
+    const gone = await mkProduct(s, { name: 'Gone', status: 'active' });
+    const draft = await mkProduct(s, { name: 'Draft later', status: 'active' });
+    const f = fakeProvider();
+    setEmbeddingProviderForTests(f.provider);
+    await runInStoreScope(s, () => indexStore(s));
+    expect(await embeddingRow(gone)).toBeDefined();
+    expect(await embeddingRow(draft)).toBeDefined();
+    await prisma.product.update({ where: { id: gone }, data: { deletedAt: new Date() } });
+    await prisma.product.update({ where: { id: draft }, data: { status: 'draft' } });
+    expect(await runInStoreScope(s, () => hasStaleProducts(s))).toBe(true);
+    await asApp(() =>
+      handleSearchProductIndex({ event: { data: { storeId: s } }, step: fakeStep() })
+    );
+    expect(await embeddingRow(gone)).toBeUndefined();
+    expect(await embeddingRow(draft)).toBeUndefined();
+    expect(await runInStoreScope(s, () => storeIndexStatus(s))).toEqual({
+      products: 0,
+      indexed: 0,
+      stale: 0,
+    });
+    await prisma.product.update({ where: { id: draft }, data: { status: 'active' } });
+    await runInStoreScope(s, () => indexStore(s));
+    expect(await embeddingRow(draft)).toBeDefined();
   });
 
   it('as ebda_app: the vector rows are invisible from another store scope', async () => {

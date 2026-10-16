@@ -27,8 +27,13 @@ import logger from '../lib/logger';
 // A value-less Prisma.sql fragment (constant SQL, no Prisma.raw escape hatch).
 const DOC = Prisma.sql`public.ebda_product_embed_doc(p.name, p.name_ar, p.search_terms, p.description, p.description_ar)`;
 const STALE = Prisma.sql`(e.product_id IS NULL OR e.model <> ${EMBED_MODEL} OR e.content_hash <> md5(${DOC}))`;
-/** A product the index should hold a vector for. Any other product's vector is an orphan to delete. */
-const INDEXABLE = Prisma.sql`(p.deleted_at IS NULL AND ${DOC} IS NOT NULL)`;
+/**
+ * A product the index should hold a vector for: what storefront search can return (active, not
+ * deleted, `product-search.service.ts` storefront scope) and has text. Any other product's vector
+ * is an orphan and is deleted (review M5: soft delete and unpublish remove the vector; a republish
+ * makes it stale again and it is re-embedded).
+ */
+const INDEXABLE = Prisma.sql`(p.deleted_at IS NULL AND p.status = 'active' AND ${DOC} IS NOT NULL)`;
 
 const DEFAULT_DAILY_CAP = 3000;
 /** `SEARCH_EMBED_STORE_DAILY_CAP` (docs/ENVIRONMENT.md). A bad value falls back to the default. */
@@ -83,7 +88,7 @@ export async function hasStaleProducts(storeId: string): Promise<boolean> {
 
 /**
  * The viewer's numbers (Task 12, searches page: "{indexed} of {products} products ready").
- * `products` = non-deleted products that HAVE text to embed; `indexed` = those whose embedding is
+ * `products` = active, non-deleted products that HAVE text to embed (INDEXABLE); `indexed` = those whose embedding is
  * current (same model, same text); `stale` = the rest. A stale-but-present row is not "ready".
  */
 export async function storeIndexStatus(

@@ -1382,6 +1382,8 @@ export class BulkService {
       where: { id: { in: productIds }, storeId },
       data: { deletedAt: new Date() },
     });
+    // Deleted products leave the search index (vectors pruned; review M5). A hard delete cascades.
+    if (result.count > 0) await requestStoreReindex(storeId, 'bulk-delete');
 
     return { deleted: result.count, failed: productIds.length - result.count, errors: [] };
   }
@@ -1403,6 +1405,8 @@ export class BulkService {
       where: { id: { in: productIds }, storeId, deletedAt: null },
       data: { status },
     });
+    // Only active products are indexed: publish adds vectors, unpublish removes them (review M5).
+    if (result.count > 0) await requestStoreReindex(storeId, 'bulk-status');
 
     return { updated: result.count, failed: productIds.length - result.count, errors: [] };
   }
