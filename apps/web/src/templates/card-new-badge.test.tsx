@@ -15,7 +15,7 @@ import { describe, it, expect, vi, afterEach } from 'vitest';
 import React from 'react';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { render, cleanup, fireEvent, act } from '@testing-library/react';
+import { render, cleanup } from '@testing-library/react';
 
 const state = { template: 'minimal' };
 
@@ -72,7 +72,6 @@ const { default: ClassicProductCard } = await import('./classic/ProductCard');
 const { default: BoldProductCard } = await import('./bold/ProductCard');
 const { default: MinimalProductCard } = await import('./minimal/ProductCard');
 const { ProductCarousel } = await import('./shared/ProductCarousel');
-const { ProductListItem } = await import('../app/products/ProductListItem');
 
 type Tpl = import('./types').TemplateProduct;
 
