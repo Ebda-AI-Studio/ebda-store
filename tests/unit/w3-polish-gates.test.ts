@@ -99,3 +99,27 @@ describe('M-6 (B1-57 parked): the editor says why the headline colour is not use
     }
   });
 });
+
+describe('Y-08 / R-09: cart coupon field and back arrows', () => {
+  const cart = read('app/cart/CartClient.tsx');
+  it('Y-08: both coupon fields are code fields (no autocorrect, caps, done key)', () => {
+    const inputs = [...cart.matchAll(/<input\s+id="cart-promo-code(-t)?"[\s\S]*?\/>/g)].map(
+      m => m[0]
+    );
+    expect(inputs).toHaveLength(2);
+    for (const i of inputs) {
+      expect(i).toContain('spellCheck={false}');
+      expect(i).toContain('autoCapitalize="characters"');
+      expect(i).toContain('autoCorrect="off"');
+      expect(i).toContain('enterKeyHint="done"');
+    }
+  });
+  it('Y-08: Apply stays enabled while the field is empty (a tap explains / focuses)', () => {
+    expect(cart).not.toMatch(/disabled=\{promoApplied \|\| !promoCode \|\| isValidating\}/);
+  });
+  it('R-09: the back-to-shopping arrows mirror in Arabic', () => {
+    const arrows = [...cart.matchAll(/<svg[^>]*>\s*<path[^>]*d="M10 19l-7-7m0 0l7-7m-7 7h18"/g)];
+    expect(arrows.length).toBeGreaterThan(0);
+    for (const a of arrows) expect(a[0]).toContain('rtl:-scale-x-100');
+  });
+});

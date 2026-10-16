@@ -222,7 +222,15 @@ export default function CartClient() {
   };
 
   const applyPromoCode = useCallback(async () => {
-    if (!promoCode.trim() || isValidating) return;
+    if (isValidating) return;
+    if (!promoCode.trim()) {
+      // Y-08: Apply is never dead; an empty tap puts the cursor in the (visible) code field.
+      const field = [
+        ...document.querySelectorAll<HTMLInputElement>('#cart-promo-code, #cart-promo-code-t'),
+      ].find(el => el.offsetParent !== null);
+      field?.focus();
+      return;
+    }
     setIsValidating(true);
     try {
       const result = await api.post<{
@@ -517,7 +525,12 @@ export default function CartClient() {
                     href={storeUrl('/products')}
                     className="inline-flex items-center gap-2 text-sm font-medium text-muted-foreground transition-colors hover:text-primary"
                   >
-                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <svg
+                      className="h-4 w-4 rtl:-scale-x-100"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
                       <path
                         strokeLinecap="round"
                         strokeLinejoin="round"
@@ -772,7 +785,7 @@ export default function CartClient() {
                       className="inline-flex items-center gap-2 text-sm font-medium text-muted-foreground transition-colors hover:text-primary"
                     >
                       <svg
-                        className="h-4 w-4"
+                        className="h-4 w-4 rtl:-scale-x-100"
                         fill="none"
                         viewBox="0 0 24 24"
                         stroke="currentColor"
@@ -841,6 +854,10 @@ export default function CartClient() {
                             <div className="mt-2 flex gap-2">
                               <input
                                 id="cart-promo-code-t"
+                                spellCheck={false}
+                                autoCapitalize="characters"
+                                autoCorrect="off"
+                                enterKeyHint="done"
                                 type="text"
                                 autoComplete="off"
                                 value={promoCode}
@@ -851,7 +868,7 @@ export default function CartClient() {
                               />
                               <button
                                 onClick={applyPromoCode}
-                                disabled={promoApplied || !promoCode || isValidating}
+                                disabled={promoApplied || isValidating}
                                 className="h-11 rounded-lg bg-muted px-4 text-sm font-medium text-foreground transition-colors hover:bg-muted/80 disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer"
                               >
                                 {promoApplied
@@ -929,6 +946,10 @@ export default function CartClient() {
                               <div className="mt-2 flex gap-2">
                                 <input
                                   id="cart-promo-code"
+                                  spellCheck={false}
+                                  autoCapitalize="characters"
+                                  autoCorrect="off"
+                                  enterKeyHint="done"
                                   type="text"
                                   autoComplete="off"
                                   value={promoCode}
@@ -943,7 +964,7 @@ export default function CartClient() {
                                 <button
                                   type="button"
                                   onClick={applyPromoCode}
-                                  disabled={promoApplied || !promoCode || isValidating}
+                                  disabled={promoApplied || isValidating}
                                   className="h-10 min-w-[88px] rounded-lg bg-muted px-4 text-sm font-medium text-foreground transition-colors hover:bg-muted/80 disabled:cursor-not-allowed disabled:opacity-50"
                                 >
                                   {promoApplied
