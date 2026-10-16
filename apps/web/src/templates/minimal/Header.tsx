@@ -150,7 +150,8 @@ export default function MinimalHeader({
             <button
               type="button"
               onClick={() => setIsSearchOpen(!isSearchOpen)}
-              className="hidden lg:inline-flex h-11 w-11 items-center justify-center text-muted-foreground hover:text-foreground transition-colors duration-200 cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+              // P2-12: from md (the tab bar's search is gone there), not only lg.
+              className="hidden md:inline-flex h-11 w-11 items-center justify-center text-muted-foreground hover:text-foreground transition-colors duration-200 cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
               aria-label={t('Search', 'بحث')}
               aria-expanded={isSearchOpen}
             >
@@ -232,7 +233,7 @@ export default function MinimalHeader({
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
-                strokeWidth={1}
+                strokeWidth={1.5}
                 aria-hidden="true"
               >
                 {isMenuOpen ? (
@@ -285,7 +286,7 @@ export default function MinimalHeader({
         {/* Desktop search field — smooth expand toggled by the search icon
             in the actions row. lg+ only since mobile has its own row above. */}
         <div
-          className={`hidden lg:block overflow-visible transition-[max-height,opacity,padding] duration-300 ${
+          className={`hidden md:block overflow-visible transition-[max-height,opacity,padding] duration-300 ${
             isSearchOpen ? 'max-h-16 opacity-100 pb-4' : 'max-h-0 opacity-0 pointer-events-none'
           }`}
         >

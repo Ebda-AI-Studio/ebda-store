@@ -250,3 +250,16 @@ describe('checkout header brand link is 44px tall (P2-N2)', () => {
     expect(src).toMatch(/<Link href=\{storeUrl\('\/'\)\} className="[^"]*\bmin-h-11\b/);
   });
 });
+
+// Taste re-audit P2-12: at 820 the header had no search (the toggle was lg-only and the tab bar is
+// hidden from md up), and the hamburger's 1px strokes on half pixels drew lighter than its
+// neighbours. Search shows from md, and the menu glyph draws at 1.5.
+describe('820 header: search from md, a solid menu glyph (P2-12)', () => {
+  it('minimal header', () => {
+    ctx.store = { ...ctx.store, template: 'minimal', look: null };
+    ctx.language = 'en';
+    const html = renderToStaticMarkup(<MinimalHeader branding={branding} navigation={nav} />);
+    expect(html).toMatch(/class="hidden md:inline-flex h-11 w-11[^"]*" aria-label="Search"/);
+    expect(html).toMatch(/aria-label="Menu"[^>]*><svg[^>]*stroke-width="1.5"/);
+  });
+});
