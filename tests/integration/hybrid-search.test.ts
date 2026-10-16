@@ -40,7 +40,7 @@ const {
   QUERY_EMBED_MAX_CHARS,
   PRODUCT_SEARCH_ID_CAP,
 } = await import('../../apps/api/src/services/product-search.service');
-const { SEARCH_EMBED_PER_SEARCHER_PER_MIN } =
+const { SEARCH_EMBED_PER_SEARCHER_PER_MIN, clearQueryBudgetSpentForTests } =
   await import('../../apps/api/src/lib/search/embed-budget');
 const { ProductService } = await import('../../apps/api/src/services/product.service');
 
@@ -196,6 +196,7 @@ describe.skipIf(!hasDb)('hybrid storefront search (Task 12)', () => {
   afterEach(() => {
     setEmbeddingProviderForTests(undefined);
     clearQueryVectorCacheForTests();
+    clearQueryBudgetSpentForTests();
     delete process.env.SEARCH_SEMANTIC_ENABLED;
     delete process.env.SEARCH_VECTOR_MAX_DISTANCE;
   });

@@ -25,6 +25,9 @@ const { setEmbeddingProviderForTests, EMBED_MODEL } =
 const { indexStore } = await import('../../apps/api/src/services/product-index.service');
 const { clearQueryVectorCacheForTests } =
   await import('../../apps/api/src/services/product-search.service');
+const { clearQueryBudgetSpentForTests } =
+  await import('../../apps/api/src/lib/search/embed-budget');
+const { ProductService } = await import('../../apps/api/src/services/product.service');
 
 const OWNER_URL = process.env.DIRECT_URL || process.env.DATABASE_URL || '';
 function appUrl(): string {
@@ -121,8 +124,10 @@ beforeAll(async () => {
   expect(redis.isAvailable()).toBe(true);
 });
 afterEach(() => {
+  vi.restoreAllMocks();
   setEmbeddingProviderForTests(undefined);
   clearQueryVectorCacheForTests();
+  clearQueryBudgetSpentForTests();
   delete process.env.SEARCH_SEMANTIC_ENABLED;
   delete process.env.SEARCH_QUERY_EMBED_STORE_DAILY_CAP;
 });
@@ -161,6 +166,58 @@ describe.skipIf(!hasDb)('/public/products cache keys and caching (Ruling SEARCH-
     expect(ar.body.data.products[0]).toMatchObject({ name: 'Canvas shoes', nameAr: 'حذاء قماش' });
   });
 
+  it('budget spent (cap 0): the keyword-only list IS cached under its own mode key', async () => {
+    const s = await seedStore('spent0', [{ name: 'Canvas shoes' }]);
+    setEmbeddingProviderForTests({
+      model: EMBED_MODEL,
+      embed: async t => t.map(x => fakeVector(x)),
+    });
+    process.env.SEARCH_SEMANTIC_ENABLED = 'true';
+    process.env.SEARCH_QUERY_EMBED_STORE_DAILY_CAP = '0';
+    const spy = vi.spyOn(ProductService, 'listPublic');
+    const qs = `search=${encodeURIComponent(`shoes ${word()}`)}`;
+    const first = await get(s.storeId, qs);
+    expect(first.status).toBe(200);
+    expect(spy).toHaveBeenCalledTimes(1);
+    const second = await get(s.storeId, qs);
+    expect(second.body.data).toEqual(first.body.data);
+    expect(spy).toHaveBeenCalledTimes(1); // a cache hit: no service call
+  });
+
+  it('budget spent by use: discovered once (uncached), then cached under the spent mode', async () => {
+    const s = await seedStore('spentuse', [{ name: 'Sport trainer' }]);
+    setEmbeddingProviderForTests({
+      model: EMBED_MODEL,
+      embed: async t => t.map(x => fakeVector(x)),
+    });
+    process.env.SEARCH_SEMANTIC_ENABLED = 'true';
+    process.env.SEARCH_QUERY_EMBED_STORE_DAILY_CAP = '1';
+    await get(s.storeId, `search=${encodeURIComponent(`kotshy ${word()}`)}`); // spends the 1 call
+    const spy = vi.spyOn(ProductService, 'listPublic');
+    const qs = `search=${encodeURIComponent(`kotshy ${word()}`)}`;
+    const discovered = await get(s.storeId, qs); // refused: this request learns the budget is spent
+    expect(discovered.body.data.meta.degraded).toBe(true);
+    await get(s.storeId, qs); // spent mode now known: computed and cached
+    await get(s.storeId, qs); // hit
+    expect(spy).toHaveBeenCalledTimes(2);
+  });
+
+  it('a transient failure (provider error) is never cached', async () => {
+    const s = await seedStore('transient', [{ name: 'Sport trainer' }]);
+    process.env.SEARCH_SEMANTIC_ENABLED = 'true';
+    setEmbeddingProviderForTests({
+      model: EMBED_MODEL,
+      embed: async () => {
+        throw new Error('5xx');
+      },
+    });
+    const spy = vi.spyOn(ProductService, 'listPublic');
+    const qs = `search=${encodeURIComponent(`kotshy ${word()}`)}`;
+    expect((await get(s.storeId, qs)).body.data.meta.degraded).toBe(true);
+    await get(s.storeId, qs);
+    expect(spy).toHaveBeenCalledTimes(2);
+  });
+
   it('a keyword-only fallback is never cached: the same URL recovers when the budget does', async () => {
     const s = await seedStore('recover', [{ name: 'Sport trainer', nameAr: 'حذاء رياضي' }]);
     setEmbeddingProviderForTests({
@@ -183,7 +240,9 @@ describe.skipIf(!hasDb)('/public/products cache keys and caching (Ruling SEARCH-
     const degraded = await get(s.storeId, qs);
     expect(degraded.status).toBe(200);
     expect(idsOf(degraded)).toEqual([]);
-    expect(degraded.body.data.meta).toMatchObject({ ranked: true, degraded: true });
+    // A spent budget is a stable keyword-only MODE (review I1), not a transient failure.
+    expect(degraded.body.data.meta).toMatchObject({ ranked: true });
+    expect(degraded.body.data.meta.degraded).toBeUndefined();
     expect(degraded.headers['cache-control']).toBe('private, no-store');
     delete process.env.SEARCH_QUERY_EMBED_STORE_DAILY_CAP; // budget back
     const healthy = await get(s.storeId, qs);

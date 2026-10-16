@@ -10,7 +10,7 @@ import {
   toHalfvecLiteral,
 } from '../lib/search/embedding-provider';
 import { hybridOrder } from '../lib/search/rrf';
-import { takeQueryEmbed } from '../lib/search/embed-budget';
+import { queryBudgetSpent, takeQueryEmbed } from '../lib/search/embed-budget';
 import { withSavepoint } from '../lib/savepoint';
 import logger from '../lib/logger';
 
@@ -355,6 +355,9 @@ async function vectorLeg(
 ): Promise<{ ids: string[]; degraded: boolean }> {
   const limit = opts.limit ?? HYBRID_LEG;
   if (!semanticSearchEnabled() || !shouldEmbedQuery(raw)) return { ids: [], degraded: false };
+  // Budget-spent MODE (SEARCH-T12-10): keyword-only is the full answer until the next Cairo day,
+  // with no Redis round trip and no cached-vector exception, so every list of this mode agrees.
+  if (queryBudgetSpent(storeId)) return { ids: [], degraded: false };
   try {
     const v = await queryVector(storeId, raw, opts.searcher);
     if (!v) return { ids: [], degraded: true };

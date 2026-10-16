@@ -22,7 +22,11 @@ import {
   newsletterLimiter,
   viewIngestLimiter,
 } from '../middleware/security';
-import { searcherFromIp } from '../lib/search/embed-budget';
+import {
+  queryBudgetSpent,
+  queryBudgetSpentUntil,
+  searcherFromIp,
+} from '../lib/search/embed-budget';
 import { semanticSearchEnabled } from '../lib/search/embedding-provider';
 import { recordProductView } from '../services/view-ingest.service';
 import { claimSearcherSearch, recordSearch } from '../services/search-log.service';
@@ -312,9 +316,19 @@ router.get('/products', async (req: Request, res: Response, next: NextFunction) 
     // is not part of it. CACHE CLASS: BOUNDED-stale 120 s, busted by invalidateStoreProductCaches
     // on every product write (prefix `public:products:<storeId>:` kept). A DEGRADED hybrid list
     // (the vector leg was wanted but unavailable) is never cached under any key (`cacheIf`).
+    // The semantic MODE a search runs in (absent for a list without a search: it never ranks, so a
+    // mode change must not cold-start every list): off, on, or budget-spent (a daily embed budget
+    // is spent until the next Cairo day, SEARCH-T12-10: keyword-only is that mode's full answer).
+    const semanticMode = !effectiveSearch
+      ? undefined
+      : !semanticSearchEnabled()
+        ? 'off'
+        : queryBudgetSpent(storeId)
+          ? 'budget-spent'
+          : 'on';
     const cacheKey = `public:products:${storeId}:${JSON.stringify({
       ...listOptions,
-      semantic: semanticSearchEnabled(),
+      semantic: semanticMode,
     })}`;
 
     const result = await getCached(
@@ -326,7 +340,16 @@ router.get('/products', async (req: Request, res: Response, next: NextFunction) 
           // The query-embed limit is charged inside the service at the provider call (SEARCH-T12-6).
           searcher: searcherFromIp(req.ip),
         }),
-      { cacheIf: r => (r as { meta?: { degraded?: boolean } }).meta?.degraded !== true }
+      {
+        // Never cache a degraded list (transient: race lost, provider/SQL error, searcher limit, or
+        // the request that DISCOVERS a spent budget, whose key still says `on`). A budget-spent list
+        // is cached for 120 s only while 120 s remain before the next Cairo day (TTL floor), so no
+        // entry outlives the budget reset.
+        cacheIf: r =>
+          (r as { meta?: { degraded?: boolean } }).meta?.degraded !== true &&
+          (semanticMode !== 'budget-spent' ||
+            queryBudgetSpentUntil(storeId) - Date.now() >= 120_000),
+      }
     );
     const ranked = (result as { meta?: { ranked?: boolean } }).meta?.ranked === true;
 

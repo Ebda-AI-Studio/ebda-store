@@ -7,7 +7,8 @@
 // `SEARCH_EMBED_GLOBAL_DAILY_CAP` (default 20 000 calls ≈ ≤ 500 000 products ≈ ≤ ~300 M input
 // tokens ≈ ≤ ~$3.5/day at bge-m3's $0.0118/M). Fails CLOSED: with no Redis there is no proof of
 // budget, so the indexer does not spend (it stays lexical-only and logs why).
-import { regionDayStart } from '@ebda/shared';
+import { regionDayStart, regionDayStartOffset } from '@ebda/shared';
+import { BoundedMap } from '../bounded-map';
 import { ipKeyGenerator } from 'express-rate-limit';
 import { redis } from '../../services/redis.service';
 import { sendAlert } from '../../services/alerts.service';
@@ -104,23 +105,84 @@ export function queryEmbedStoreKey(storeId: string, now: Date): string {
  * Charge ONE query-time provider call to every budget; false = do not call the provider.
  * Call it once per real call, right before it (never on a cache hit).
  */
-export async function takeQueryEmbed(
+/**
+ * Why a query embed was refused. `budget-store` / `budget-platform` = a DAILY cap is spent: a stable
+ * state until the next Cairo day, so keyword-only results are a full answer of that mode and may be
+ * cached under a key that says so (Ruling SEARCH-T12-10). Every other reason is per client or
+ * transient and its results are never cached.
+ */
+export type QueryEmbedRefusal =
+  | 'no-searcher'
+  | 'searcher-limit'
+  | 'budget-store'
+  | 'budget-platform'
+  | 'no-redis'
+  | 'error';
+
+/**
+ * In-isolate "daily budget spent until <next Cairo day start, ms>" marks, keyed by store id or
+ * PLATFORM. Set by the refusal that discovers it; while set, `takeQueryEmbed` refuses without any
+ * Redis round trip. Staleness: BOUNDED by the Cairo day (the mark expires at the day start the
+ * counters roll over); an isolate that never saw the refusal learns it on its own first refusal.
+ */
+const PLATFORM = '*';
+const spentUntil = new BoundedMap<string, number>(1000);
+
+/** Test seam. */
+export function clearQueryBudgetSpentForTests(): void {
+  spentUntil.clear();
+}
+
+function nextCairoDayStart(now: Date): number {
+  return regionDayStartOffset(now, 1).getTime();
+}
+
+/** End (ms) of the spent state for this store, or 0 when its query budget is not known spent. */
+export function queryBudgetSpentUntil(storeId: string, now: Date = new Date()): number {
+  // A configured cap of 0 is "spent" by definition, with no round trip.
+  if (
+    embedGlobalDailyCap() <= 0 ||
+    queryEmbedGlobalDailyCap() <= 0 ||
+    queryEmbedStoreDailyCap() <= 0
+  )
+    return nextCairoDayStart(now);
+  const t = now.getTime();
+  const until = Math.max(spentUntil.get(storeId) ?? 0, spentUntil.get(PLATFORM) ?? 0);
+  return until > t ? until : 0;
+}
+
+/** True while this store's (or the platform's) daily query-embed budget is known to be spent. */
+export function queryBudgetSpent(storeId: string, now: Date = new Date()): boolean {
+  return queryBudgetSpentUntil(storeId, now) > 0;
+}
+
+/**
+ * Charge ONE query-time provider call to every budget; `ok: false` = do not call the provider, with
+ * the reason. Call it once per real call, right before it (never on a cache hit).
+ */
+export async function takeQueryEmbedResult(
   storeId: string,
   searcher: string | undefined
-): Promise<boolean> {
-  if (!searcher) return false;
-  const daily = [embedGlobalDailyCap(), queryEmbedGlobalDailyCap(), queryEmbedStoreDailyCap()];
-  if (daily.some(c => c <= 0)) return false;
-  const client = redis.getClient();
-  if (!client || !redis.isAvailable()) return false;
+): Promise<{ ok: true } | { ok: false; reason: QueryEmbedRefusal }> {
   const now = new Date();
+  if (queryBudgetSpent(storeId, now)) {
+    const platform =
+      (spentUntil.get(PLATFORM) ?? 0) > now.getTime() ||
+      embedGlobalDailyCap() <= 0 ||
+      queryEmbedGlobalDailyCap() <= 0;
+    return { ok: false, reason: platform ? 'budget-platform' : 'budget-store' };
+  }
+  if (!searcher) return { ok: false, reason: 'no-searcher' };
+  const daily = [embedGlobalDailyCap(), queryEmbedGlobalDailyCap(), queryEmbedStoreDailyCap()];
+  const client = redis.getClient();
+  if (!client || !redis.isAvailable()) return { ok: false, reason: 'no-redis' };
   try {
     // 1. The searcher's per-minute limit FIRST, and alone: a client over its limit never touches
     //    the shared daily budgets, so it cannot burn the store's or the platform's day.
     const sKey = searcherEmbedKey(searcher, now);
     const sUsed = await client.incr(sKey);
     if (sUsed === 1) await client.expire(sKey, SEARCHER_KEY_TTL_SECONDS);
-    if (sUsed > SEARCH_EMBED_PER_SEARCHER_PER_MIN) return false;
+    if (sUsed > SEARCH_EMBED_PER_SEARCHER_PER_MIN) return { ok: false, reason: 'searcher-limit' };
     // 2. The daily budgets (INCR, then compare). A refusal by ANY of them refunds all three, so each
     //    daily counter equals the provider calls actually made (a crash between the two steps
     //    over-counts by one; it can never under-count).
@@ -133,8 +195,11 @@ export async function takeQueryEmbed(
     await Promise.all(
       used.map((u, i) => (u === 1 ? client.expire(keys[i], DAY_TTL_SECONDS) : undefined))
     );
-    if (used.every((u, i) => u <= daily[i])) return true;
+    if (used.every((u, i) => u <= daily[i])) return { ok: true };
     await Promise.all(keys.map(k => client.decr(k)));
+    // Mark the spent scope until the next Cairo day (no more round trips in this isolate).
+    const platformSpent = used[0] > daily[0] || used[1] > daily[1];
+    spentUntil.set(platformSpent ? PLATFORM : storeId, nextCairoDayStart(now));
     // Log the FIRST refusal per counter per day only (u === cap + 1), never every request.
     used.forEach((u, i) => {
       if (u === daily[i] + 1)
@@ -143,11 +208,19 @@ export async function takeQueryEmbed(
           '[search] query embed budget reached; keyword-only search until the next Cairo day'
         );
     });
-    return false;
+    return { ok: false, reason: platformSpent ? 'budget-platform' : 'budget-store' };
   } catch (err) {
     logger.warn({ err }, '[search] query embed budget check failed, not spending');
-    return false;
+    return { ok: false, reason: 'error' };
   }
+}
+
+/** Boolean form of `takeQueryEmbedResult`. */
+export async function takeQueryEmbed(
+  storeId: string,
+  searcher: string | undefined
+): Promise<boolean> {
+  return (await takeQueryEmbedResult(storeId, searcher)).ok;
 }
 
 /** One P1 per Cairo day when the account-wide ceiling is reached. */

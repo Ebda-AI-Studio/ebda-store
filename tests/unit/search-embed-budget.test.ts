@@ -33,7 +33,11 @@ const {
   DEFAULT_QUERY_GLOBAL_DAILY_CAP,
   SEARCH_EMBED_PER_SEARCHER_PER_MIN,
   searcherFromIp,
+  queryBudgetSpent,
+  queryBudgetSpentUntil,
+  clearQueryBudgetSpentForTests,
 } = await import('../../apps/api/src/lib/search/embed-budget');
+const { regionDayStartOffset } = await import('@ebda/shared');
 
 describe('takeEmbedCalls', () => {
   beforeEach(() => {
@@ -76,6 +80,8 @@ describe('takeQueryEmbed', () => {
   const A = '11111111-1111-4111-8111-111111111111';
   const B = '22222222-2222-4222-8222-222222222222';
   beforeEach(() => {
+    clearQueryBudgetSpentForTests();
+    client.incr.mockClear();
     store.clear();
     available = true;
     client.expire.mockClear();
@@ -153,5 +159,38 @@ describe('takeQueryEmbed', () => {
     expect(queryEmbedGlobalDailyCap()).toBe(DEFAULT_QUERY_GLOBAL_DAILY_CAP);
     // The query-wide cap stays below the account-wide one, so shoppers can never use up the indexer's.
     expect(DEFAULT_QUERY_GLOBAL_DAILY_CAP).toBeLessThan(DEFAULT_GLOBAL_DAILY_CAP);
+  });
+
+  // Review I1: a spent daily budget is a STABLE state until the next Cairo day, not a transient one.
+  it('a spent store budget marks the store spent until the next Cairo day, and skips Redis', async () => {
+    process.env.SEARCH_QUERY_EMBED_STORE_DAILY_CAP = '2';
+    expect(queryBudgetSpent(A)).toBe(false);
+    expect(await takeQueryEmbed(A, 'ip:1')).toBe(true);
+    expect(await takeQueryEmbed(A, 'ip:2')).toBe(true);
+    expect(await takeQueryEmbed(A, 'ip:3')).toBe(false); // the refusal that discovers it
+    expect(queryBudgetSpent(A)).toBe(true);
+    expect(queryBudgetSpent(B)).toBe(false); // another store is not affected
+    expect(queryBudgetSpentUntil(A)).toBe(regionDayStartOffset(new Date(), 1).getTime());
+    client.incr.mockClear();
+    expect(await takeQueryEmbed(A, 'ip:4')).toBe(false);
+    expect(client.incr).not.toHaveBeenCalled(); // no round trips while spent
+  });
+
+  it('a spent platform budget (query-wide or account-wide) marks every store spent', async () => {
+    process.env.SEARCH_QUERY_EMBED_GLOBAL_DAILY_CAP = '1';
+    expect(await takeQueryEmbed(A, 'ip:1')).toBe(true);
+    expect(await takeQueryEmbed(B, 'ip:2')).toBe(false);
+    expect(queryBudgetSpent(A)).toBe(true);
+    expect(queryBudgetSpent(B)).toBe(true);
+  });
+
+  it('a configured cap of 0 reads as spent with no Redis call; a searcher refusal does not', async () => {
+    process.env.SEARCH_QUERY_EMBED_STORE_DAILY_CAP = '0';
+    expect(queryBudgetSpent(A)).toBe(true);
+    delete process.env.SEARCH_QUERY_EMBED_STORE_DAILY_CAP;
+    expect(queryBudgetSpent(A)).toBe(false);
+    for (let i = 0; i < SEARCH_EMBED_PER_SEARCHER_PER_MIN + 5; i++)
+      await takeQueryEmbed(A, 'ip:same');
+    expect(queryBudgetSpent(A)).toBe(false); // per-client and transient: never the store's state
   });
 });
