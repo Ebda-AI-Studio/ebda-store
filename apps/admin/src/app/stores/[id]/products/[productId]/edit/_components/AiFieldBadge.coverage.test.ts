@@ -36,4 +36,12 @@ describe('EditProductPage AiFieldBadge coverage (#1577)', () => {
       expect(badgedFields).toContain(field);
     }
   });
+
+  it('shows the AI provenance badge (with the hand-back control) for the search words field', () => {
+    // Search program P1: searchTerms is an AI_AUTOFILL_FIELDS entry the autopilot fills.
+    expect(badgedFields).toContain('searchTerms');
+    expect(source).toMatch(
+      /<AiFieldBadge\s+field="searchTerms"[\s\S]*?storeId=\{storeId\}[\s\S]*?onReset=\{handleAiReset\}/
+    );
+  });
 });

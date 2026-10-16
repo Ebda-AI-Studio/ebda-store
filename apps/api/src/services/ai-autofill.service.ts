@@ -7,6 +7,8 @@ import logger from '../lib/logger';
 import { inngest } from '../lib/inngest/client';
 import { deferAfterTenantCommit } from '../lib/after-tenant-commit';
 import { withSavepoint } from '../lib/savepoint';
+import { config } from '../config';
+import { generateProductSearchTerms } from '../lib/ai/product-search-terms-generator';
 
 /**
  * Diff incoming admin-form values against the stored values and update the
@@ -229,6 +231,43 @@ export async function fillProductFields(
       ) {
         writes.metaDescriptionAr = suggestion.descriptionAr;
         stampedSources.metaDescriptionAr = 'ai';
+      }
+    }
+
+    // Search words (dialect / Franco / EN) for products.search_terms — search program P1.
+    // canWrite keeps merchant words (human, or legacy words with no provenance) untouched.
+    // No Gemini key → skip quietly, exactly like the bulk sweeps.
+    if (
+      canWrite('searchTerms', product.searchTerms) &&
+      config.googleAiKey &&
+      (effName?.trim() || effNameAr?.trim())
+    ) {
+      const catNames = product.categories.length
+        ? (
+            await prisma.category.findMany({
+              where: { storeId, id: { in: product.categories.map(c => c.categoryId) } },
+              select: { name: true, nameAr: true },
+            })
+          ).flatMap(c => [c.nameAr, c.name].filter((v): v is string => !!v))
+        : [];
+      const terms = await generateProductSearchTerms(
+        {
+          storeId,
+          storeName: store?.nameAr || store?.name || '',
+          product: {
+            name: effName ?? '',
+            nameAr: effNameAr,
+            description: effDescription,
+            descriptionAr: effDescriptionAr,
+          },
+          categoryNames: catNames,
+        },
+        config.googleAiKey,
+        process.env.GEMINI_MODEL || 'gemini-flash-lite-latest'
+      );
+      if (terms) {
+        writes.searchTerms = terms;
+        stampedSources.searchTerms = 'ai';
       }
     }
 

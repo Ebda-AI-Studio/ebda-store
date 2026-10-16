@@ -24,7 +24,29 @@ vi.mock('../../apps/api/src/services/ai.service', () => ({
     suggestSeo: vi.fn(),
     suggestCategories: vi.fn(),
   },
+  recordUsage: vi.fn(),
 }));
+
+// Search words (search program P1): the REAL generator runs (quota check against this DB,
+// PII gate, cleanSearchTerms, the products_search_terms_len_chk CHECK) behind a fake Gemini
+// client, so no network and no key is used even when GEMINI_API_KEY is set in the shell.
+const searchTermsReply = vi.fn();
+vi.mock('../../apps/api/src/lib/ai/gemini-keys', () => ({
+  GeminiFailoverClient: vi.fn(function () {
+    return {
+      getGenerativeModel: () => ({
+        generateContent: async () => ({
+          response: { text: () => searchTermsReply(), usageMetadata: {} },
+        }),
+      }),
+    };
+  }),
+  geminiKeyCount: () => 1,
+}));
+vi.mock('../../apps/api/src/config', async importOriginal => {
+  const mod = await importOriginal<typeof import('../../apps/api/src/config')>();
+  return { ...mod, config: { ...mod.config, googleAiKey: 'fake-key-for-tests' } };
+});
 
 // The global tests/setup.ts runs vi.clearAllMocks() in beforeEach and
 // vi.restoreAllMocks() in afterEach, which would wipe top-level mock
@@ -43,6 +65,7 @@ beforeEach(() => {
     cached: false,
   });
   vi.mocked(AIService.suggestCategories).mockResolvedValue({ suggestions: [], cached: false });
+  searchTermsReply.mockReturnValue('{"terms":["مج","mag","kobaya","كوبايه","mug"]}');
 });
 
 const SUFFIX = `ai-autofill-${Date.now()}`;
@@ -155,5 +178,62 @@ describe('fillProductFields', () => {
     const p = await prisma.product.findUnique({ where: { id: productId } });
     expect(p?.nameAr).toBe('اسم عربي'); // regenerated
     expect((p?.aiFieldSources as Record<string, string>).nameAr).toBe('ai');
+  });
+
+  it('search words: fills an empty field with cleaned, PII-free words and stamps ai', async () => {
+    searchTermsReply.mockReturnValue(
+      JSON.stringify({ terms: ['كوبايه', 'كوباية', 'kobaya', 'mug', '01012345678', 'a@b.co'] })
+    );
+    await prisma.product.update({
+      where: { id: productId },
+      data: { name: 'Blue Ceramic Mug', searchTerms: null, aiFieldSources: {} },
+    });
+
+    await fillProductFields(storeId, productId, { op: 'create', onlyFields: ['searchTerms'] });
+
+    const p = await prisma.product.findUnique({ where: { id: productId } });
+    expect(p?.searchTerms).toBe('كوبايه, kobaya, mug'); // folded duplicate + phone + email gone
+    expect((p?.aiFieldSources as Record<string, string>).searchTerms).toBe('ai');
+  });
+
+  it('search words: a reply longer than the column cap is stored within the DB CHECK', async () => {
+    const terms = Array.from({ length: 80 }, (_, i) => `kobaya ${'z'.repeat(i % 40)} ${i}`);
+    searchTermsReply.mockReturnValue(JSON.stringify({ terms }));
+    await prisma.product.update({
+      where: { id: productId },
+      data: { searchTerms: null, aiFieldSources: {} },
+    });
+
+    await fillProductFields(storeId, productId, { op: 'create', onlyFields: ['searchTerms'] });
+
+    const p = await prisma.product.findUnique({ where: { id: productId } });
+    expect(p?.searchTerms).toBeTruthy();
+    expect(p!.searchTerms!.length).toBeLessThanOrEqual(500);
+  });
+
+  it('search words: merchant words (human) are never replaced, even when a source changes', async () => {
+    await prisma.product.update({
+      where: { id: productId },
+      data: { searchTerms: 'مج قهوة', aiFieldSources: { searchTerms: 'human' } },
+    });
+
+    await fillProductFields(storeId, productId, { op: 'update', changedFields: ['name'] });
+
+    const p = await prisma.product.findUnique({ where: { id: productId } });
+    expect(p?.searchTerms).toBe('مج قهوة');
+    expect((p?.aiFieldSources as Record<string, string>).searchTerms).toBe('human');
+  });
+
+  it('search words: legacy merchant words with no provenance are never replaced', async () => {
+    await prisma.product.update({
+      where: { id: productId },
+      data: { searchTerms: 'kobaya, مج', aiFieldSources: {} },
+    });
+
+    await fillProductFields(storeId, productId, { op: 'sweep', refreshStale: true });
+
+    const p = await prisma.product.findUnique({ where: { id: productId } });
+    expect(p?.searchTerms).toBe('kobaya, مج');
+    expect((p?.aiFieldSources as Record<string, string>).searchTerms).toBeUndefined();
   });
 });

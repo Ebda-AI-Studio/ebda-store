@@ -811,11 +811,24 @@ export default function EditProductPage() {
                     dir="rtl"
                   />
                 </div>
-                <SearchTermsField
-                  namespace="products.edit.fields"
-                  value={formData.searchTerms}
-                  onChange={v => updateField('searchTerms', v)}
-                />
+                <div>
+                  <div className="mb-1 flex justify-end">
+                    {/* searchTerms is an AI_AUTOFILL_FIELDS entry (search program P1): the
+                        autopilot fills empty search words; editing them makes them yours. */}
+                    <AiFieldBadge
+                      field="searchTerms"
+                      sources={aiSources}
+                      storeId={storeId}
+                      productId={product?.id}
+                      onReset={handleAiReset}
+                    />
+                  </div>
+                  <SearchTermsField
+                    namespace="products.edit.fields"
+                    value={formData.searchTerms}
+                    onChange={v => updateField('searchTerms', v)}
+                  />
+                </div>
                 <div>
                   <div className="mb-1 flex justify-end">
                     {/* No storeId/productId here on purpose: `excerpt` is written

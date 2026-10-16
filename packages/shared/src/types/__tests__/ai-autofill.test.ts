@@ -13,6 +13,7 @@ describe('AI autofill registry', () => {
       'metaTitleAr',
       'metaDescription',
       'metaDescriptionAr',
+      'searchTerms',
     ]);
   });
 
@@ -30,6 +31,7 @@ describe('AI autofill registry', () => {
         'metaTitle',
         'metaTitleAr',
         'nameAr',
+        'searchTerms',
       ].sort()
     );
     expect(result).not.toContain('name'); // human
@@ -59,6 +61,7 @@ describe('AI autofill registry', () => {
         'metaTitle',
         'metaTitleAr',
         'nameAr',
+        'searchTerms',
       ].sort()
     );
     expect(result).not.toContain('name');
@@ -68,5 +71,15 @@ describe('AI autofill registry', () => {
     // nameAr is ai-owned, only `price` changed (not a source) → no refresh.
     const result = fieldsNeedingRefresh({ nameAr: 'ai' }, ['price']);
     expect(result).not.toContain('nameAr');
+  });
+
+  it('searchTerms refreshes when either language name or description changes, never when human', () => {
+    expect(fieldsNeedingRefresh({ searchTerms: 'ai' }, ['nameAr'])).toContain('searchTerms');
+    expect(fieldsNeedingRefresh({ searchTerms: 'human' }, ['nameAr'])).not.toContain('searchTerms');
+    for (const src of ['name', 'nameAr', 'description', 'descriptionAr']) {
+      expect(fieldsNeedingRefresh({ searchTerms: 'ai' }, [src])).toContain('searchTerms');
+    }
+    // A merchant editing only the price leaves AI search words alone.
+    expect(fieldsNeedingRefresh({ searchTerms: 'ai' }, ['price'])).not.toContain('searchTerms');
   });
 });
