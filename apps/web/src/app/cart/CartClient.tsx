@@ -32,6 +32,7 @@ import { resolveColor, checkMinimumOrder, computeOrderAmounts } from '@ebda/shar
 import { AcceptedPaymentBadges } from '../../components/AcceptedPaymentBadges';
 import { CartLineNote } from '../../components/commerce/CartLineNote';
 import { StickyCartTotal } from '../../components/commerce/StickyCartTotal';
+import { cartRemovalToast } from './cart-removal';
 import { countText, ITEMS } from '../../lib/plural';
 import { CART_CHECKOUT_CTA } from '../../lib/checkout-cta';
 import { ArrowIcon } from '../../templates/shared/icons';
@@ -43,6 +44,7 @@ export default function CartClient() {
     bundles: cartBundles,
     updateQuantity: updateCartQuantity,
     removeItem: removeCartItem,
+    addItem,
     removeBundle: removeCartBundle,
     itemCount,
     total: cartTotal,
@@ -154,7 +156,7 @@ export default function CartClient() {
   const [shippingFee, setShippingFee] = useState(0);
   const [freeShippingThreshold, setFreeShippingThreshold] = useState(0);
   const [shippingLoaded, setShippingLoaded] = useState(false);
-  const { info, success, error: errorToast } = useToast();
+  const { info, success, error: errorToast, addToast } = useToast();
 
   // Cart mutations optimistically update, reconcile via refetch, then re-throw
   // on API failure. Without this catch the user saw a "removed"/"updated"
@@ -171,12 +173,7 @@ export default function CartClient() {
     if (newQuantity < 1) {
       try {
         await removeCartItem(itemId);
-        if (item) {
-          info(
-            t('Item removed', 'تمت الإزالة'),
-            t(`${item.name} removed from cart`, `تمت إزالة ${item.name} من السلة`)
-          );
-        }
+        if (item) addToast(cartRemovalToast(item, { isRtl: language === 'ar', t, addItem }));
       } catch {
         cartErrorToast();
       }
@@ -198,12 +195,7 @@ export default function CartClient() {
     const item = cartItems.find(i => i.id === itemId);
     try {
       await removeCartItem(itemId);
-      if (item) {
-        success(
-          t('Item removed', 'تمت الإزالة'),
-          t(`${item.name} has been removed from your cart`, `تمت إزالة ${item.name} من سلة التسوق`)
-        );
-      }
+      if (item) addToast(cartRemovalToast(item, { isRtl: language === 'ar', t, addItem }));
     } catch {
       cartErrorToast();
     }
