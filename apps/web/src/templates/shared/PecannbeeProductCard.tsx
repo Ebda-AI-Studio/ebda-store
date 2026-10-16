@@ -535,7 +535,7 @@ function PecannbeeProductCardImpl({
                 href={href}
                 prefetch={false}
                 tabIndex={-1}
-                className="focus:outline-none focus-visible:underline"
+                className="block min-h-11 focus:outline-none focus-visible:underline"
               >
                 <p
                   id={`prod-${product.id}-name`}

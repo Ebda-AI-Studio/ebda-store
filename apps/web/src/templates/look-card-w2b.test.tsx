@@ -640,3 +640,19 @@ describe('the NEW chip is neutral on a look store (VT-b)', () => {
     }
   });
 });
+
+// a11y re-audit P2-N4 (rule (d)): the card name link measured 144-157 x 40 (hit 41).
+describe('the card name link is a 44px pointer target (P2-N4)', () => {
+  it('a block link with a 44px floor', () => {
+    selectLook('qamar.atelier');
+    const c = render(
+      React.createElement(
+        PecannbeeProductCard as never,
+        { product: product('plain'), isRtl: true, pack: state.template } as never
+      )
+    ).container;
+    const name = c.querySelector('a[tabindex="-1"]') as HTMLElement;
+    expect(name.className).toMatch(/\bblock\b/);
+    expect(name.className).toMatch(/\bmin-h-11\b/);
+  });
+});
