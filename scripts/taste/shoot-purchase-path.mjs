@@ -14,6 +14,7 @@ import { createRequire } from 'node:module';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { probePage } from './purchase-path-probe.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '../..');
 const MANIFEST = JSON.parse(
@@ -138,6 +139,16 @@ export const ACTIONS = {
     await continueToPayment(page);
     await page.waitForTimeout(2000);
   },
+  async 'apply-bad-coupon'(page) {
+    // Continues on the payment step: a code the store does not have.
+    const field = page.getByRole('textbox', { name: /Coupon code|كود الخصم/ }).first();
+    await field.fill('NOPE2026');
+    await page
+      .getByRole('button', { name: /^(Apply|تطبيق)$/ })
+      .first()
+      .click();
+    await page.waitForTimeout(1500);
+  },
   async 'place-cod-order'(page) {
     // Continues from the payment step the previous screen left open.
     const cod = page.locator('input[type="radio"][value="cod"]');
@@ -174,6 +185,7 @@ async function main() {
   const consent = encodeURIComponent(JSON.stringify({ v: 1, marketing: false, analytics: false }));
   const browser = await chromium.launch();
   const run = [];
+  const probes = [];
   for (const vid of MANIFEST.viewports) {
     const vp = viewportOf(vid);
     const ctx = await browser.newContext({
@@ -203,6 +215,9 @@ async function main() {
           await settle(page);
         await page.screenshot({ path: join(out, `${tag}.png`) });
         await page.screenshot({ path: join(out, `${tag}-full.png`), fullPage: true });
+        // Rule (d) on the rendered page, plus contrast where the manifest asks for it (W5).
+        const found = await probePage(page, { contrast: (s.probe ?? []).includes('contrast') });
+        probes.push({ screen: s.id, viewport: vid, ...found });
         run.push({
           screen: s.id,
           viewport: vid,
@@ -220,10 +235,16 @@ async function main() {
   }
   await browser.close();
   writeFileSync(join(out, `${prefix}-manifest-run.json`), JSON.stringify(run, null, 1));
+  writeFileSync(join(out, `${prefix}-probe.json`), JSON.stringify(probes, null, 1));
   const failed = run.filter(r => !r.ok);
   console.log(`${prefix}: ${run.length - failed.length}/${run.length} shot`);
   for (const f of failed) console.log(`  FAILED ${f.screen} ${f.viewport}: ${f.error}`);
-  process.exit(failed.length ? 1 : 0);
+  const bad = probes.filter(p => p.targets.length || p.lowContrast.length);
+  for (const p of bad) {
+    for (const t of p.targets) console.log(`  TARGET<44 ${p.screen} ${p.viewport}: ${t}`);
+    for (const c of p.lowContrast) console.log(`  CONTRAST ${p.screen} ${p.viewport}: ${c}`);
+  }
+  process.exit(failed.length || bad.length ? 1 : 0);
 }
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) await main();

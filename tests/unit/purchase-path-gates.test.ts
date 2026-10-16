@@ -70,7 +70,9 @@ describe('(a) the screen manifest covers the whole purchase path', () => {
     'checkout-shipping',
     'checkout-shipping-errors',
     'checkout-payment',
+    'checkout-coupon-failed',
     'receipt',
+    'cart-empty',
     'footer',
   ];
   it('viewports are exactly 390 Arabic and 1280 English', () => {
