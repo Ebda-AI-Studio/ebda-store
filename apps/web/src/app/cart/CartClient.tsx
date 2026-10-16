@@ -502,7 +502,7 @@ export default function CartClient() {
                   )}
                 </p>
                 <Link href={storeUrl('/products')}>
-                  <Button className="mt-8 gap-2 rounded-xl" size="lg">
+                  <Button className="mt-8 gap-2 rounded-[var(--radius)]" size="lg">
                     <CartIcon className="h-5 w-5" />
                     {t(
                       'Start Shopping',
@@ -602,7 +602,7 @@ export default function CartClient() {
                           style={{ animationDelay: `${index * 100}ms` }}
                         >
                           {/* Product Image */}
-                          <div className="h-28 w-28 flex-shrink-0 overflow-hidden rounded-xl bg-gradient-to-br from-primary/5 to-primary/10 sm:h-32 sm:w-32">
+                          <div className="h-28 w-28 flex-shrink-0 overflow-hidden rounded-[var(--radius)] bg-gradient-to-br from-primary/5 to-primary/10 sm:h-32 sm:w-32">
                             {item.image ? (
                               <Image
                                 src={item.image}
@@ -909,7 +909,7 @@ export default function CartClient() {
                     ) : (
                       <>
                         {/* Summary Card */}
-                        <div className="rounded-2xl border border-border bg-card p-6 shadow-sm">
+                        <div className="rounded-[var(--radius)] border border-border bg-card p-6 shadow-sm">
                           <h2
                             className="text-lg font-bold text-foreground"
                             style={{
@@ -1134,14 +1134,14 @@ export default function CartClient() {
                             <Button
                               type="button"
                               disabled
-                              className="mt-6 w-full gap-2 rounded-xl"
+                              className="mt-6 w-full gap-2 rounded-[var(--radius)]"
                               size="lg"
                             >
                               {t(CART_CHECKOUT_CTA.en, CART_CHECKOUT_CTA.ar)}
                             </Button>
                           ) : (
                             <Link href={storeUrl('/checkout')} className="mt-6 block">
-                              <Button className="w-full gap-2 rounded-xl" size="lg">
+                              <Button className="w-full gap-2 rounded-[var(--radius)]" size="lg">
                                 {t(CART_CHECKOUT_CTA.en, CART_CHECKOUT_CTA.ar)}
                                 <ArrowIcon className="h-5 w-5" isRtl={language === 'ar'} />
                               </Button>
@@ -1175,9 +1175,9 @@ export default function CartClient() {
                     <AcceptedPaymentBadges />
 
                     {/* Help */}
-                    <div className="rounded-2xl border border-border bg-card p-4">
+                    <div className="rounded-[var(--radius)] border border-border bg-card p-4">
                       <div className="flex items-center gap-3">
-                        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10">
+                        <div className="flex h-10 w-10 items-center justify-center rounded-[var(--radius)] bg-primary/10">
                           <svg
                             className="h-5 w-5 text-primary"
                             fill="none"

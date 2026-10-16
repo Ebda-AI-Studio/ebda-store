@@ -47,7 +47,7 @@ export function AcceptedPaymentBadges({
   if (variant === 'dahab') return marks;
   return (
     <div
-      className={['rounded-2xl border border-border bg-card p-4', className]
+      className={['rounded-[var(--radius)] border border-border bg-card p-4', className]
         .filter(Boolean)
         .join(' ')}
     >

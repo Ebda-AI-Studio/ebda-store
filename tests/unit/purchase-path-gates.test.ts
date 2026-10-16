@@ -77,3 +77,16 @@ describe('(c) no colours outside the token set on the purchase path', () => {
     expect(hits).toEqual([]);
   });
 });
+
+describe('IA-04: purchase-path surfaces take the store radius, never a fixed large radius', () => {
+  it.each(manifest.files)('%s', f => {
+    const hits = src(f)
+      .split('\n')
+      .map((line, i) => ({ line, i: i + 1 }))
+      .filter(
+        ({ line }) => !/^\s*(\/\/|\*|\/\*)/.test(line) && /\brounded-(?:xl|2xl|3xl)\b/.test(line)
+      )
+      .map(({ i }) => `${f}:${i}`);
+    expect(hits).toEqual([]);
+  });
+});

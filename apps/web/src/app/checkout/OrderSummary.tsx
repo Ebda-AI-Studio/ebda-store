@@ -148,7 +148,7 @@ export function OrderSummary({
 
   return (
     <div className="order-2 mt-8 lg:order-none lg:col-span-4 lg:mt-0">
-      <div className="sticky top-24 rounded-xl border bg-card p-6 shadow-sm">
+      <div className="sticky top-24 rounded-[var(--radius)] border bg-card p-6 shadow-sm">
         <h2 className="text-lg font-bold text-foreground" style={typography?.heading}>
           {t('Order Summary', translations['Order Summary'])}
         </h2>

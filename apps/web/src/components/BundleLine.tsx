@@ -156,7 +156,7 @@ export function BundleLine({
         data-testid={testId}
         data-bundle-line="true"
         dir={isRtl ? 'rtl' : 'ltr'}
-        className="flex gap-4 rounded-xl border border-border/60 bg-card p-4 sm:p-5"
+        className="flex gap-4 rounded-[var(--radius)] border border-border/60 bg-card p-4 sm:p-5"
       >
         <div className="h-24 w-24 flex-shrink-0 overflow-hidden rounded-lg bg-muted sm:h-28 sm:w-28">
           {image ? (

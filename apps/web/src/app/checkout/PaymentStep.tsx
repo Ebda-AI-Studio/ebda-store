@@ -74,7 +74,7 @@ export default function PaymentStep({
           thing that could show the message. See that component's header. */}
 
       {/* Shipping Summary */}
-      <div className="rounded-xl border bg-card p-6 shadow-sm">
+      <div className="rounded-[var(--radius)] border bg-card p-6 shadow-sm">
         <div className="flex items-center justify-between">
           <h3 className="font-medium text-foreground">{t('Shipping to', 'الشحن إلى')}</h3>
           <button
@@ -99,7 +99,7 @@ export default function PaymentStep({
       {/* Payment Methods. Not on a demo store (there is nothing to choose; the demo notice below
           is the answer), unless loading the methods failed: that error and its retry still show. */}
       {(!isDemo || paymentConfigError) && (
-        <div className="rounded-xl border bg-card p-6 shadow-sm">
+        <div className="rounded-[var(--radius)] border bg-card p-6 shadow-sm">
           <h2 className="text-lg font-semibold text-foreground">
             {t('Payment Method', translations['Payment Method'])}
           </h2>

@@ -73,8 +73,8 @@ import { useWallet } from '../../hooks/useWallet';
 const PaymentStep = dynamic(() => import('./PaymentStep'), {
   loading: () => (
     <div className="animate-pulse space-y-4">
-      <div className="h-32 bg-muted rounded-xl" />
-      <div className="h-48 bg-muted rounded-xl" />
+      <div className="h-32 bg-muted rounded-[var(--radius)]" />
+      <div className="h-48 bg-muted rounded-[var(--radius)]" />
     </div>
   ),
 });
@@ -1982,7 +1982,7 @@ export default function CheckoutClient() {
                   }
                 />
                 {step === 1 && (
-                  <div className="rounded-xl border bg-card p-6 shadow-sm">
+                  <div className="rounded-[var(--radius)] border bg-card p-6 shadow-sm">
                     <h2
                       className="text-lg font-semibold text-foreground"
                       style={zoneStyle(checkoutHeadingZone, checkoutScale)}

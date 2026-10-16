@@ -56,7 +56,7 @@ export function CheckoutErrorAlert({
     <div
       ref={ref}
       role="alert"
-      className="mb-6 rounded-xl border border-destructive/30 bg-destructive/10 p-4"
+      className="mb-6 rounded-[var(--radius)] border border-destructive/30 bg-destructive/10 p-4"
     >
       <div className="flex items-start gap-3">
         <svg

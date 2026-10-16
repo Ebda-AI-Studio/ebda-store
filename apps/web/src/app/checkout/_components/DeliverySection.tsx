@@ -39,7 +39,7 @@ export function DeliverySection({
   if (!showNote && !showWindows) return null;
 
   return (
-    <div className="rounded-xl border bg-card p-4 shadow-sm space-y-3">
+    <div className="rounded-[var(--radius)] border bg-card p-4 shadow-sm space-y-3">
       {showNote && (
         <div className="rounded-lg bg-muted/50 p-3 text-sm text-foreground">
           {language === 'ar' ? settings.note.textAr || settings.note.text : settings.note.text}
