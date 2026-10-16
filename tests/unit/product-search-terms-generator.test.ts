@@ -253,6 +253,15 @@ describe('generateProductSearchTerms', () => {
     });
   });
 
+  it('M1: drops a term longer than 60 characters instead of cutting it mid-word', async () => {
+    const long = 'comfortable everyday leather boots for walking around downtown cairo'; // 69
+    const sixty = 'a'.repeat(58) + ' b'; // exactly 60
+    generateContent.mockResolvedValue(reply(JSON.stringify({ terms: ['3abaya', long, sixty] })));
+    const out = await generateProductSearchTerms(input, 'k', 'm');
+    expect(out).toBe(`3abaya, ${sixty}`);
+    expect(out).not.toMatch(/downto/);
+  });
+
   it('returns null when every term is dropped', async () => {
     generateContent.mockResolvedValue(reply('{"terms":["01012345678","  ", "a@b.co"]}'));
     expect(await generateProductSearchTerms(input, 'k', 'm')).toBeNull();

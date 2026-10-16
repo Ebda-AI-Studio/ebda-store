@@ -12,7 +12,7 @@
  * term with the same `isPersonalDataTerm` gate as the search log: a phone or email
  * copied out of a description must never become an indexed search word.
  */
-import { cleanSearchTerms, isPersonalDataTerm } from '@ebda/shared';
+import { SEARCH_TERM_MAX_LENGTH, cleanSearchTerms, isPersonalDataTerm } from '@ebda/shared';
 import { GeminiFailoverClient } from './gemini-keys';
 import { parseAiJson } from './parse-ai-json';
 import { rethrowAsAppError } from './gemini-errors';
@@ -109,6 +109,16 @@ export async function generateProductSearchTerms(
   );
   const terms = parsed.terms
     .flatMap(t => (typeof t === 'string' ? t.split(/[,،\n]/) : []))
-    .filter(t => t.trim() && !isPersonalDataTerm(t) && !hasMixedScriptWord(t) && !invented(t));
+    .filter(
+      t =>
+        t.trim() &&
+        // M1: cleanSearchTerms would CUT a long piece at 60 (mid-word, and in UTF-16 units).
+        // The merchant form warns about that; the AI path has no reviewer, so drop it whole —
+        // a 60+ character phrase is never a search word. Counted in code points.
+        [...t.trim()].length <= SEARCH_TERM_MAX_LENGTH &&
+        !isPersonalDataTerm(t) &&
+        !hasMixedScriptWord(t) &&
+        !invented(t)
+    );
   return cleanSearchTerms(terms.join(','));
 }
