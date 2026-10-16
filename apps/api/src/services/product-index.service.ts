@@ -27,6 +27,8 @@ import logger from '../lib/logger';
 // A value-less Prisma.sql fragment (constant SQL, no Prisma.raw escape hatch).
 const DOC = Prisma.sql`public.ebda_product_embed_doc(p.name, p.name_ar, p.search_terms, p.description, p.description_ar)`;
 const STALE = Prisma.sql`(e.product_id IS NULL OR e.model <> ${EMBED_MODEL} OR e.content_hash <> md5(${DOC}))`;
+/** A product the index should hold a vector for. Any other product's vector is an orphan to delete. */
+const INDEXABLE = Prisma.sql`(p.deleted_at IS NULL AND ${DOC} IS NOT NULL)`;
 
 const DEFAULT_DAILY_CAP = 3000;
 /** `SEARCH_EMBED_STORE_DAILY_CAP` (docs/ENVIRONMENT.md). A bad value falls back to the default. */
@@ -57,17 +59,24 @@ export async function findStaleProducts(storeId: string, limit: number): Promise
   return prisma.$queryRaw<StaleDoc[]>`
     SELECT p.id, ${DOC} AS doc, md5(${DOC}) AS hash
       FROM products p LEFT JOIN product_embeddings e ON e.product_id = p.id AND e.store_id = ${storeId}
-     WHERE p.store_id = ${storeId} AND p.deleted_at IS NULL AND ${DOC} IS NOT NULL AND ${STALE}
+     WHERE p.store_id = ${storeId} AND ${INDEXABLE} AND ${STALE}
      ORDER BY p.updated_at DESC, p.id
      LIMIT ${limit}`;
 }
 
-/** Cheap existence check (the backstop's per-store probe): stops at the first stale row. */
+/**
+ * Cheap existence check (the backstop's per-store probe): stops at the first hit. True when an
+ * indexable product needs a vector OR a vector is left on a product that is no longer indexable
+ * (review I1: a lost event after the text was cleared must not leave old words matching).
+ */
 export async function hasStaleProducts(storeId: string): Promise<boolean> {
   const [r] = await prisma.$queryRaw<Array<{ stale: boolean }>>`
     SELECT EXISTS (
       SELECT 1 FROM products p LEFT JOIN product_embeddings e ON e.product_id = p.id AND e.store_id = ${storeId}
-       WHERE p.store_id = ${storeId} AND p.deleted_at IS NULL AND ${DOC} IS NOT NULL AND ${STALE}
+       WHERE p.store_id = ${storeId} AND ${INDEXABLE} AND ${STALE}
+    ) OR EXISTS (
+      SELECT 1 FROM product_embeddings e JOIN products p ON p.id = e.product_id
+       WHERE e.store_id = ${storeId} AND p.store_id = ${storeId} AND NOT ${INDEXABLE}
     ) AS stale`;
   return r?.stale === true;
 }
@@ -83,18 +92,18 @@ export async function storeIndexStatus(
   const [r] = await prisma.$queryRaw<Array<{ products: bigint; stale: bigint }>>`
     SELECT count(*) AS products, count(*) FILTER (WHERE ${STALE}) AS stale
       FROM products p LEFT JOIN product_embeddings e ON e.product_id = p.id AND e.store_id = ${storeId}
-     WHERE p.store_id = ${storeId} AND p.deleted_at IS NULL AND ${DOC} IS NOT NULL`;
+     WHERE p.store_id = ${storeId} AND ${INDEXABLE}`;
   const products = Number(r?.products ?? 0);
   const stale = Number(r?.stale ?? 0);
   return { products, indexed: products - stale, stale };
 }
 
-/** Delete embeddings whose product now has no text (NULL doc): the vector leg must not match old words. */
-export async function pruneEmptyDocEmbeddings(storeId: string): Promise<number> {
+/** Delete vectors of products that are no longer indexable (see INDEXABLE): they must not match old words. */
+export async function pruneUnindexableEmbeddings(storeId: string): Promise<number> {
   return prisma.$executeRaw`
     DELETE FROM product_embeddings e USING products p
      WHERE e.product_id = p.id AND e.store_id = ${storeId} AND p.store_id = ${storeId}
-       AND ${DOC} IS NULL`;
+       AND NOT ${INDEXABLE}`;
 }
 
 /**
@@ -110,14 +119,14 @@ async function embeddedToday(storeId: string): Promise<number> {
 }
 
 /**
- * Step 1 (READ, short statements): prune NULL-doc rows, apply the daily cap, pick the next batch.
+ * Step 1 (READ, short statements): prune unindexable products' rows, apply the daily cap, pick the next batch.
  * `capped` is true ONLY when the per-store daily cap is spent (never for a caller's own limit).
  */
 export async function planEmbedBatch(
   storeId: string,
   limit: number
 ): Promise<{ items: StaleDoc[]; capped: boolean }> {
-  await pruneEmptyDocEmbeddings(storeId);
+  await pruneUnindexableEmbeddings(storeId);
   const left = embedStoreDailyCap() - (await embeddedToday(storeId));
   if (left <= 0) {
     const anyStale = await hasStaleProducts(storeId);

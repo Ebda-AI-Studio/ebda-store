@@ -311,6 +311,26 @@ describe.skipIf(!hasDb)('product embedding indexer (Task 11)', () => {
     expect((res as { failed: number }).failed).toBe(0);
   });
 
+  it('review I1: a lost event leaving only an orphan vector (text cleared) is found by the backstop and pruned', async () => {
+    const owner = await mkUser('i1');
+    ownerIds.push(owner.id);
+    const s = (await mkStore(owner.id, 'i1')).id;
+    storeIds.push(s);
+    const p = await mkProduct(s, { name: 'Lamp', nameAr: null });
+    setEmbeddingProviderForTests(fakeProvider().provider);
+    await runInStoreScope(s, () => indexStore(s));
+    expect(await embeddingRow(p)).toBeDefined();
+    // The merchant clears the text; the product.upserted send is lost (no event reaches the indexer).
+    await prisma.product.update({ where: { id: p }, data: { name: ' ' } });
+    const step = fakeStep();
+    await asApp(() => handleSearchIndexBackstop({ step }));
+    expect(step.events.map(e => e.data.storeId)).toContain(s);
+    await asApp(() =>
+      handleSearchProductIndex({ event: { data: { storeId: s } }, step: fakeStep() })
+    );
+    expect(await embeddingRow(p)).toBeUndefined();
+  });
+
   it('as ebda_app: the vector rows are invisible from another store scope', async () => {
     setEmbeddingProviderForTests(fakeProvider().provider);
     await runInStoreScope(storeId, () => indexStore(storeId));

@@ -40,6 +40,7 @@ export const REINDEX_EVENT = 'search/store.reindex-requested';
 export const INDEX_BATCH = 25;
 /** Rounds per run before handing off to a continuation run (~200 products, ~1.6 MB step state). */
 export const MAX_ROUNDS = 8;
+const FAN_OUT_CHUNK = 1000;
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 type Ev = { name: string; data: Record<string, unknown> };
@@ -147,10 +148,13 @@ export async function handleSearchIndexBackstop({
     });
     return { stores: rows.filter(r => r.value).map(r => r.storeId), failed };
   })) as { stores: string[]; failed: number };
-  if (found.stores.length > 0) {
+  // Inngest accepts at most 5,000 events per sendEvent (inngest.com/docs/usage-limits/inngest).
+  for (let i = 0; i < found.stores.length; i += FAN_OUT_CHUNK) {
     await step.sendEvent(
-      'fan-out',
-      found.stores.map(storeId => ({ name: REINDEX_EVENT, data: { storeId, reason: 'backstop' } }))
+      `fan-out-${i / FAN_OUT_CHUNK}`,
+      found.stores
+        .slice(i, i + FAN_OUT_CHUNK)
+        .map(storeId => ({ name: REINDEX_EVENT, data: { storeId, reason: 'backstop' } }))
     );
   }
   logger.info(
