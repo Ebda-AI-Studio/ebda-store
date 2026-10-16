@@ -293,6 +293,10 @@ export default function CheckoutClient() {
           quantity: item.quantity,
           price: item.price,
           note: item.note,
+          // Taste re-audit P1-1: the summary's variant line reads these; dropping them here
+          // left colour, size and length off the irreversible step (Ruling B1-87).
+          variantTitle: item.variantTitle,
+          variantTitleAr: item.variantTitleAr,
           product: {
             id: item.productId,
             name: item.name,
