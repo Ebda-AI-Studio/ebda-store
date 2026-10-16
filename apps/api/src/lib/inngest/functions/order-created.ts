@@ -6,6 +6,7 @@ import { notificationDispatcher } from '../../../services/notification-dispatche
 import { OneSignalService } from '../../../services/onesignal.service';
 import logger from '../../logger';
 import { inngest } from '../client';
+import { resolveOrderInvoiceRecipient } from '../../order-notification-address';
 
 /**
  * Fans out the post-checkout side effects for a freshly-committed order.
@@ -18,19 +19,8 @@ import { inngest } from '../client';
  * cuts checkout p95 by ~600ms in production and lets us retry on
  * provider hiccups without losing notifications.
  */
-/**
- * Resolves the opt-in per-store owner-invoice recipient from a store's
- * `settings` JSON. Returns the trimmed `orderInvoiceEmail` when it's a
- * non-empty string, else null (no owner invoice is sent). Kept pure +
- * exported so the opt-in behaviour is unit-testable without the full fanout.
- */
-export function resolveOrderInvoiceRecipient(settings: unknown): string | null {
-  if (!settings || typeof settings !== 'object') return null;
-  const value = (settings as { orderInvoiceEmail?: unknown }).orderInvoiceEmail;
-  if (typeof value !== 'string') return null;
-  const trimmed = value.trim();
-  return trimmed.length > 0 ? trimmed : null;
-}
+// Re-exported for its existing unit test; the rule lives with the refund path's (FU46-1a).
+export { resolveOrderInvoiceRecipient };
 
 export const orderCreated: InngestFunction.Any = inngest.createFunction(
   {
@@ -239,7 +229,9 @@ export const orderCreated: InngestFunction.Any = inngest.createFunction(
           ? Promise.resolve()
           : EmailService.sendOrderConfirmation(storeId, emailData, emailLocale)
       ),
-      step.run('send-admin-new-order', () => EmailService.sendAdminNewOrder(emailData)),
+      // No "new order" alert to Ebda's own address any more (Ruling FU46-1a): it carried
+      // every store's shopper name, email and items. The store's own notice is the invoice
+      // below, sent only to the address it configured.
       // Opt-in per-store owner invoice: when the store configured
       // `settings.orderInvoiceEmail`, auto-email the rendered invoice to that
       // address (e.g. the store owner) on every order. Stores that didn't

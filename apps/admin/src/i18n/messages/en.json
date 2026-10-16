@@ -8278,7 +8278,7 @@
       "minOrderLabel": "Minimum order (EGP)",
       "minOrderPlaceholder": "e.g. 500.00",
       "invoiceEmailSectionTitle": "Order invoice email",
-      "invoiceEmailSectionHint": "Every order in this store also emails the invoice to this address (e.g. the store owner). Leave empty to disable.",
+      "invoiceEmailSectionHint": "Every order in this store emails its invoice to this address (e.g. the store owner), and refund alerts go here too. Order emails never go anywhere else. Leave empty to disable.",
       "invoiceEmailLabel": "Invoice recipient email",
       "invoiceEmailPlaceholder": "owner@example.com",
       "deliveryDaysTitle": "Delivery time (business days)",

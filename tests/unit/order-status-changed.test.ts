@@ -156,10 +156,25 @@ describe('order-status-changed fanout', () => {
     expect(h.dispatch).not.toHaveBeenCalled();
   });
 
-  it('refunded WITH captured payment → admin bookkeeping email only', async () => {
+  // Ruling FU46-1a: the refund bookkeeping email goes to the STORE's configured
+  // order-notification address (`settings.orderInvoiceEmail`), never to Ebda's
+  // own address; with no address set nothing is sent.
+  it('refunded WITH captured payment → bookkeeping email to the store order address only', async () => {
+    h.storeFindUnique.mockResolvedValue({
+      name: 'Test Store',
+      settings: { orderInvoiceEmail: ' orders@store.test ' },
+    });
     const r = await handleOrderStatusChanged('o1', 's1', 'refunded', true, stepStub);
-    expect(h.sendAdminRefund).toHaveBeenCalled();
+    expect(h.sendAdminRefund).toHaveBeenCalledWith(
+      expect.objectContaining({ to: 'orders@store.test', orderNumber: 'ORD-1' })
+    );
     expect(r.ran).toEqual(['email-admin-refund']);
+  });
+
+  it('refunded WITH captured payment, no order address set → no email at all (FU46-1a)', async () => {
+    const r = await handleOrderStatusChanged('o1', 's1', 'refunded', true, stepStub);
+    expect(h.sendAdminRefund).not.toHaveBeenCalled();
+    expect(r.ran).toEqual([]);
   });
 
   // Once-per-order "Refund issued": the customer-facing set (refund email +

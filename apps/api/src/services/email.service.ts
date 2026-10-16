@@ -414,7 +414,8 @@ export class EmailService {
   }
 
   /**
-   * Platform-level send (no store context). Used for admin alerts only.
+   * Platform-level send (Ebda sender, no store branding): a store's refund alert to its own
+   * order address (FU46-1a) and the contact-form fallback.
    */
   private static async sendPlatform(
     args: {
@@ -1051,24 +1052,11 @@ export class EmailService {
   // ---------------------------------------------------------------------------
 
   /**
-   * Admin Alert: New Order
-   */
-  static async sendAdminNewOrder(data: OrderEmailData): Promise<void> {
-    const content = this.adminNewOrderTemplate(data);
-    await this.sendPlatform(
-      {
-        to: config.smtpFromEmail,
-        subject: `New Order Received - #${data.orderNumber}`,
-        content,
-      },
-      { queue: true }
-    );
-  }
-
-  /**
-   * Admin Alert: Refund Processed
+   * Refund processed, to the STORE's order-notification address the caller resolved
+   * (`settings.orderInvoiceEmail`; Ruling FU46-1a). Never Ebda's own address.
    */
   static async sendAdminRefund(data: {
+    to: string;
     orderNumber: string;
     amount: number;
     reason?: string;
@@ -1077,7 +1065,7 @@ export class EmailService {
     const content = this.adminRefundTemplate(data);
     await this.sendPlatform(
       {
-        to: config.smtpFromEmail,
+        to: data.to,
         subject: `Refund Processed - Order #${data.orderNumber}`,
         content,
       },
@@ -1138,24 +1126,6 @@ export class EmailService {
 
   /**
    * Admin New Order Template
-   */
-  private static adminNewOrderTemplate(d: OrderEmailData): string {
-    return `
-      <h2>New Order Received</h2>
-      <p><strong>Order #${escapeHtml(d.orderNumber)}</strong></p>
-      <p><strong>Customer:</strong> ${escapeHtml(d.customerName)} (${escapeHtml(
-        d.customerEmail
-      )})</p>
-      <p><strong>Total:</strong> ${emailMoney(d.total, d.currency, 'en')}</p>
-      <p><strong>Items:</strong> ${d.items.length}</p>
-      <p style="text-align: center; margin: 24px 0;">
-        <a href="${config.adminUrl}/orders" class="button">View Order</a>
-      </p>
-    `;
-  }
-
-  /**
-   * Admin Refund Template
    */
   private static adminRefundTemplate(d: {
     orderNumber: string;

@@ -8278,7 +8278,7 @@
       "minOrderLabel": "الحد الأدنى للطلب (ج.م)",
       "minOrderPlaceholder": "مثال: 500.00",
       "invoiceEmailSectionTitle": "بريد فاتورة الطلب",
-      "invoiceEmailSectionHint": "يتم إرسال فاتورة كل طلب في هذا المتجر إلى هذا البريد أيضًا (مثل صاحب المتجر). اتركه فارغًا للتعطيل.",
+      "invoiceEmailSectionHint": "تُرسل فاتورة كل طلب في هذا المتجر إلى هذا البريد (مثل صاحب المتجر)، وتصل إليه تنبيهات الاسترداد أيضًا. لا تُرسل رسائل الطلبات إلى أي عنوان آخر. اتركه فارغًا للتعطيل.",
       "invoiceEmailLabel": "بريد مستلم الفاتورة",
       "invoiceEmailPlaceholder": "owner@example.com",
       "deliveryDaysTitle": "مدة التوصيل (أيام عمل)",
