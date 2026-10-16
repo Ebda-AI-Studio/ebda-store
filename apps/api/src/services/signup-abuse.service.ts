@@ -18,7 +18,7 @@
  * None of these reveal whether an ADDRESS already has an account: every refusal
  * depends only on the request, never on the user table.
  */
-import crypto from 'crypto';
+import crypto, { randomBytes } from 'crypto';
 import { emailDomain, isDisposableEmail } from '@ebda/shared';
 import { config } from '../config';
 import logger from '../lib/logger';
@@ -65,14 +65,12 @@ function sign(payload: string): string {
  * Issue a form token: `<issuedAtMs>.<nonce>.<hmac(issuedAtMs.nonce)>`. Stateless; single use is
  * enforced at submit by claiming the signature. The nonce makes two tokens issued in the same
  * millisecond distinct: without it they were byte-identical and the second visitor's submit was
- * refused as already used (Ruling FU46-8). 9 random bytes from Web Crypto (Workers-safe) = 12
+ * refused as already used (Ruling FU46-8). 9 random bytes from node `randomBytes` (nodejs_compat on Workers) = 12
  * base64url characters.
  */
 export function issueSignupFormToken(now: number = Date.now()): string {
   const ts = String(now);
-  const nonce = Buffer.from(globalThis.crypto.getRandomValues(new Uint8Array(9))).toString(
-    'base64url'
-  );
+  const nonce = randomBytes(9).toString('base64url');
   return `${ts}.${nonce}.${sign(`${ts}.${nonce}`)}`;
 }
 
@@ -87,6 +85,7 @@ export function verifySignupFormToken(
   if (typeof token !== 'string') return { verdict: 'invalid' };
   const parts = token.split('.');
   // 3 parts since FU46-8; 2 parts = a token issued before it, accepted until it ages out.
+  // TODO(remove after 2026-10-23): drop the legacy 2-part branch once every pre-FU46-8 token has expired.
   if (parts.length !== 2 && parts.length !== 3) return { verdict: 'invalid' };
   const ts = parts[0];
   const nonce = parts.length === 3 ? parts[1] : null;
