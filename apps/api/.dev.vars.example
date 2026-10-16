@@ -25,6 +25,7 @@ INNGEST_EVENT_KEY=local-dev-event-key
 DEV_STATS=1
 # Semantic search (docs/ENVIRONMENT.md "Semantic search"). The AI binding in wrangler.jsonc runs
 # remotely even under `wrangler dev` (needs `wrangler login` on the Whisky account; billed per token).
+# SEARCH_SEMANTIC_ENABLED is a wrangler.jsonc var ("false"); override it here for local dev only.
 # SEARCH_SEMANTIC_ENABLED=true fails the boot check if no provider resolves.
 # SEARCH_SEMANTIC_ENABLED=false
 # SEARCH_EMBED_STORE_DAILY_CAP=3000

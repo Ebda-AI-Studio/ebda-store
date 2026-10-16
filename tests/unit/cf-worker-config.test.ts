@@ -126,3 +126,16 @@ describe('Cron Triggers', () => {
     for (const jobs of Object.values(CRON_SCHEDULE)) expect(jobs.length).toBeGreaterThan(0);
   });
 });
+
+describe('SEARCH_SEMANTIC_ENABLED is a reviewed var, never a secret (review I2)', () => {
+  it('is declared in vars, default "false", so a flip is a PR + cf-api-deploy (post-deploy probe runs)', () => {
+    expect(config.vars.SEARCH_SEMANTIC_ENABLED).toBe('false');
+  });
+  it('cf-api-deploy refuses to deploy when it is set as a Worker secret', () => {
+    const wf = readFileSync(join(ROOT, '.github/workflows/cf-api-deploy.yml'), 'utf8');
+    const step = wf.slice(wf.indexOf('Require configured runtime secrets'));
+    expect(step.slice(0, step.indexOf('- name:', 10))).toMatch(
+      /\["SEARCH_SEMANTIC_ENABLED"\][^\n]*names\.has\(name\)[^\n]*must be a wrangler\.jsonc var/
+    );
+  });
+});
