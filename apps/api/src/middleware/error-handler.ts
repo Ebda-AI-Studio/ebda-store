@@ -24,6 +24,21 @@ export class AppError extends Error {
 }
 
 /**
+ * A ZodError from ANY zod module instance. `instanceof` alone misses one thrown by a schema built
+ * in @ebda/shared when that package resolves a different copy of zod (measured under vitest; the
+ * "parseChart dual-zod" class, B0-46), and that error then answered 500. The shape check is the
+ * one zod itself documents: name 'ZodError' plus an `issues` array.
+ */
+export function isZodError(err: unknown): err is ZodError {
+  if (err instanceof ZodError) return true;
+  return (
+    err instanceof Error &&
+    err.name === 'ZodError' &&
+    Array.isArray((err as { issues?: unknown }).issues)
+  );
+}
+
+/**
  * multer's own errors (real multer on Node, the formData stub on workerd: two classes with the
  * same `name` and multer's `code` strings, hence duck typing instead of `instanceof`). They
  * reach `errorHandler` through `next(err)` from any bare `upload.single(...)` / `.array(...)`
@@ -59,7 +74,7 @@ function multerClientError(err: unknown): { status: number; code: string; messag
 export function clientErrorStatus(err: unknown): number | undefined {
   if (err instanceof AppError) return err.statusCode < 500 ? err.statusCode : undefined;
   if (err instanceof SyntaxError && 'body' in err) return 400;
-  if (err instanceof ZodError) return 400;
+  if (isZodError(err)) return 400;
   const multerErr = multerClientError(err);
   if (multerErr) return multerErr.status;
   if (err instanceof Prisma.PrismaClientKnownRequestError) {
@@ -186,7 +201,7 @@ export function errorHandler(err: Error, req: Request, res: Response, next: Next
   }
 
   // Handle Zod validation errors
-  if (err instanceof ZodError) {
+  if (isZodError(err)) {
     logger.debug({ issues: err.issues }, 'Validation error');
     const details: Record<string, string[]> = {};
     for (const issue of err.issues) {
