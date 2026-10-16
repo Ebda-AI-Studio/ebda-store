@@ -2,8 +2,11 @@
 
 import Link from 'next/link';
 import { PoweredByForce } from '../shared/PoweredByForce';
+import { FooterLegalRow } from '../shared/FooterLegalRow';
+import { FooterWhatsApp } from '../shared/FooterWhatsApp';
 import type { FooterProps } from '../types';
 import { useLanguage } from '../../contexts/LanguageContext';
+import { footerRootPaint } from '../shared/footer-ink';
 import {
   footerBranchesHeading,
   resolveAddressHref,
@@ -19,6 +22,8 @@ export default function BoldFooter({
   socials,
   navigation = [],
   footerLinks,
+  disabledCmsSlugs,
+  urlPrefix,
   isRtl: isRtlProp,
   bgColor,
   footerLogo,
@@ -51,7 +56,7 @@ export default function BoldFooter({
 
   // Hide the contact column entirely when the store has no contact details
   // configured — empty heading + empty list reads as half-built.
-  const hasContact = !!(contact.email || displayPhone || displayAddress);
+  const hasContact = !!(contact.email || displayPhone || displayAddress || contact.whatsapp);
   // Opt-in "Branches" column — see resolveFooterBranches for the gating
   // rules. Off (+0) reduces this formula to exactly today's totalCells.
   const branches = resolveFooterBranches(locations, theme, isRtl);
@@ -83,7 +88,7 @@ export default function BoldFooter({
   return (
     <footer
       data-zone="footer"
-      style={bgColor ? { backgroundColor: bgColor } : undefined}
+      {...footerRootPaint(bgColor)}
       className={`${bgColor ? '' : invertFooter ? 'bg-foreground' : 'bg-[hsl(var(--bg-section-alt))]'} ${fgFull} mt-auto`}
       dir={isRtl ? 'rtl' : 'ltr'}
     >
@@ -105,6 +110,14 @@ export default function BoldFooter({
                     : undefined
                 }
               />
+            )}
+            {!displayLogo && !hideFooterLogoMobile && (
+              <p
+                data-footer-brand="mobile"
+                className={`md:hidden mb-5 text-center text-3xl font-black ui-caps-toggle tracking-wider ${fgFull}`}
+              >
+                {displayName}
+              </p>
             )}
             {displayLogo ? (
               <img
@@ -226,6 +239,14 @@ export default function BoldFooter({
                     </a>
                   </li>
                 )}
+                {contact.whatsapp && (
+                  <li>
+                    <FooterWhatsApp
+                      whatsapp={contact.whatsapp}
+                      className={`text-sm ${fgMuted} hover:text-primary transition-colors duration-200 font-medium cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2`}
+                    />
+                  </li>
+                )}
                 {displayAddress && (
                   <li className={`text-sm ${fgMuted}`}>
                     {addressMapHref ? (
@@ -284,10 +305,17 @@ export default function BoldFooter({
             </div>
           )}
         </div>
-
-        {/* Bottom bar removed 2026-05-21 — redundant with Company Links. */}
       </div>
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        {/* Legal row (S-01): privacy · terms · returns · ©, from resolveBottomBar. */}
+        <FooterLegalRow
+          footerLinks={footerLinks}
+          disabledCmsSlugs={disabledCmsSlugs}
+          storeName={displayName ?? ''}
+          isRtl={isRtl}
+          urlPrefix={urlPrefix}
+          className={fgMuted}
+        />
         <PoweredByForce hidden={hidePoweredBy} />
       </div>
     </footer>

@@ -93,7 +93,7 @@ export default function ModernHero({
         >
           {/* Content */}
           <div
-            className={`space-y-7 ${isRtl ? 'lg:order-2 text-right' : 'lg:order-1'} motion-safe:[animation:heroFadeIn_0.7s_ease-out_both] motion-reduce:opacity-100`}
+            className={`space-y-7 lg:order-1 motion-safe:[animation:heroFadeIn_0.7s_ease-out_both] motion-reduce:opacity-100`}
           >
             <div className="space-y-4">
               <h1
@@ -109,9 +109,7 @@ export default function ModernHero({
               </p>
             </div>
 
-            <div
-              className={`flex flex-col sm:flex-row gap-3 ${isRtl ? 'items-end sm:flex-row-reverse' : 'items-start'}`}
-            >
+            <div className="flex flex-col sm:flex-row gap-3 items-start">
               <Link
                 href={resolvedCtaLink}
                 className="group inline-flex items-center gap-2.5 px-8 py-4 bg-primary text-primary-foreground rounded-xl hover:bg-primary/90 font-semibold text-base shadow-lg shadow-primary/20 transition-[background-color,box-shadow,transform] duration-300 hover:shadow-xl hover:shadow-primary/30 hover:-translate-y-0.5 w-full sm:w-auto justify-center"
@@ -137,7 +135,7 @@ export default function ModernHero({
 
           {/* Image */}
           <div
-            className={`relative ${isRtl ? 'lg:order-1' : 'lg:order-2'} motion-safe:[animation:heroFadeIn_0.7s_ease-out_0.15s_both] motion-reduce:opacity-100`}
+            className={`relative lg:order-2 motion-safe:[animation:heroFadeIn_0.7s_ease-out_0.15s_both] motion-reduce:opacity-100`}
           >
             <div className="relative aspect-[4/3] lg:aspect-[5/4] rounded-2xl overflow-hidden shadow-2xl shadow-black/10">
               <Image

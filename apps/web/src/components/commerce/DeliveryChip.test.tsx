@@ -73,17 +73,17 @@ describe('DeliveryChip', () => {
     zones = [zone()];
     render(<DeliveryChip leadTimeDays={5} />);
     const chip = await screen.findByTestId('delivery-chip');
-    expect(chip.textContent).toContain('يوصلك بين');
-    expect(chip.textContent).toContain('بيتجهز خصيصًا لك في 5 أيام');
+    expect(chip.textContent).toContain('يصلك بين');
+    expect(chip.textContent).toContain('يُجهَّز خصيصًا لك خلال 5 أيام');
     // The "و" attaches to the second date.
     expect(chip.textContent).toMatch(/بين \S+ \d+ \S+ و\S+ \d+ \S+/);
   });
 
   it.each([
-    [1, 'ar', 'بيتجهز خصيصًا لك في يوم'],
-    [2, 'ar', 'بيتجهز خصيصًا لك في يومين'],
-    [5, 'ar', 'بيتجهز خصيصًا لك في 5 أيام'],
-    [11, 'ar', 'بيتجهز خصيصًا لك في 11 يوم'],
+    [1, 'ar', 'يُجهَّز خصيصًا لك خلال يوم واحد'],
+    [2, 'ar', 'يُجهَّز خصيصًا لك خلال يومين'],
+    [5, 'ar', 'يُجهَّز خصيصًا لك خلال 5 أيام'],
+    [11, 'ar', 'يُجهَّز خصيصًا لك خلال 11 يومًا'],
     [1, 'en', 'Made for you in 1 day'],
     [2, 'en', 'Made for you in 2 days'],
     [5, 'en', 'Made for you in 5 days'],
@@ -105,13 +105,13 @@ describe('DeliveryChip', () => {
     expect(chip.textContent).toContain('Arrives Thu 15 Oct');
   });
 
-  it('single day reads "يوصلك X" and omits the lead line when ready to ship', async () => {
+  it('single day reads "يصلك X" and omits the lead line when ready to ship', async () => {
     zones = [zone({ estimatedDaysMin: 1, estimatedDaysMax: 1 })];
     render(<DeliveryChip leadTimeDays={null} />);
     const chip = await screen.findByTestId('delivery-chip');
-    expect(chip.textContent).toContain('يوصلك');
+    expect(chip.textContent).toContain('يصلك');
     expect(chip.textContent).not.toContain('بين');
-    expect(chip.textContent).not.toContain('بيتجهز');
+    expect(chip.textContent).not.toContain('يُجهَّز');
   });
 
   it('uses the store-wide deliveryDays when zones carry no numbers', async () => {

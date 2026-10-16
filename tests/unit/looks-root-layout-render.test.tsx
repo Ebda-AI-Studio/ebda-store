@@ -31,6 +31,7 @@ vi.mock('../../apps/web/src/components/ServiceWorkerRegistration', () => ({
   ServiceWorkerRegistration: Null,
 }));
 vi.mock('../../apps/web/src/components/ScrollToTop', () => ({ ScrollToTop: Null }));
+vi.mock('../../apps/web/src/components/SkipLink', () => ({ SkipLink: Null }));
 vi.mock('../../apps/web/src/components/PushNotificationPrompt', () => ({
   PushNotificationPrompt: Null,
 }));

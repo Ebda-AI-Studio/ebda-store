@@ -46,7 +46,7 @@ export function ReviewErrorView({ error }: Props) {
 
   return (
     <main className="max-w-lg mx-auto p-6 text-center" dir={lang === 'ar' ? 'rtl' : 'ltr'}>
-      <div className="text-5xl mb-4" role="img" aria-label="warning">
+      <div className="text-5xl mb-4" aria-hidden="true">
         ⚠️
       </div>
       <h1 className="text-xl font-bold mb-3">

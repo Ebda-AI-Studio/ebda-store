@@ -178,6 +178,8 @@ export interface ResolvedBottomBar {
   privacyEnabled: boolean;
   termsEnabled: boolean;
   shippingEnabled: boolean;
+  /** The returns-policy link (S-01): on unless the merchant turned it off. */
+  returnsEnabled: boolean;
 }
 
 /**
@@ -198,17 +200,21 @@ export function resolveBottomBar(
   bottomBar: FooterBottomBarConfig | undefined,
   storeName: string,
   isRtl: boolean,
-  disabledCmsSlugs?: string[]
+  disabledCmsSlugs: string[] | undefined,
+  /** The © year. Passed in (the per-request render clock), never read here: a clock read in a
+   *  helper is a hydration mismatch when server and browser straddle New Year (FU46 I-1). */
+  year: number
 ): ResolvedBottomBar {
   const enabled = bottomBar?.enabled !== false;
   const overrideRaw = isRtl
     ? (bottomBar?.copyrightOverrideAr ?? bottomBar?.copyrightOverride)
     : bottomBar?.copyrightOverride;
-  const override = typeof overrideRaw === 'string' ? overrideRaw.trim() : '';
-  const year = new Date().getFullYear();
+  // Clamped on read: a legacy row may hold more than the 200 the editor now allows (FU46 M-7).
+  const override = typeof overrideRaw === 'string' ? overrideRaw.trim().slice(0, 200) : '';
+  const name = storeName.trim();
   const fallback = isRtl
-    ? `© ${year} ${storeName}. جميع الحقوق محفوظة.`
-    : `© ${year} ${storeName}. All rights reserved.`;
+    ? `© ${year} ${name ? `${name}.` : '·'} جميع الحقوق محفوظة.`
+    : `© ${year} ${name ? `${name}.` : '·'} All rights reserved.`;
   const disabled = new Set(disabledCmsSlugs ?? []);
   return {
     enabled,
@@ -218,6 +224,7 @@ export function resolveBottomBar(
     privacyEnabled: bottomBar?.privacyEnabled !== false && !disabled.has('privacy'),
     termsEnabled: bottomBar?.termsEnabled !== false && !disabled.has('terms'),
     shippingEnabled: bottomBar?.shippingEnabled !== false && !disabled.has('shipping'),
+    returnsEnabled: bottomBar?.returnsEnabled !== false && !disabled.has('returns'),
   };
 }
 

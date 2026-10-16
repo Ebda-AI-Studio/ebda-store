@@ -1,6 +1,7 @@
 'use client';
 
 import Image from 'next/image';
+import { MINUS, SignedAmount } from '@/lib/bidi';
 import { useLocalePrice } from '../../hooks/useLocalePrice';
 import { Button, Input } from '@ebda/ui';
 import type { CSSProperties } from 'react';
@@ -179,7 +180,7 @@ export function OrderSummary({
                 ) : (
                   <div className="flex h-full items-center justify-center">
                     <svg
-                      className="h-6 w-6 text-muted-foreground/70"
+                      className="h-6 w-6 text-muted-foreground"
                       fill="none"
                       viewBox="0 0 24 24"
                       stroke="currentColor"
@@ -400,7 +401,7 @@ export function OrderSummary({
                       className="font-medium text-success-ink tabular-nums"
                       style={typography?.price}
                     >
-                      -{formatPrice(couponPortion)}
+                      <SignedAmount sign={MINUS} value={formatPrice(couponPortion)} />
                     </span>
                   </div>
                 )}
@@ -413,7 +414,7 @@ export function OrderSummary({
                       className="font-medium text-success-ink tabular-nums"
                       style={typography?.price}
                     >
-                      -{formatPrice(promotionDiscount)}
+                      <SignedAmount sign={MINUS} value={formatPrice(promotionDiscount)} />
                     </span>
                   </div>
                 )}
@@ -429,7 +430,7 @@ export function OrderSummary({
                       className="font-medium text-success-ink tabular-nums"
                       style={typography?.price}
                     >
-                      -{formatPrice(loyaltyDiscount)}
+                      <SignedAmount sign={MINUS} value={formatPrice(loyaltyDiscount)} />
                     </span>
                   </div>
                 )}
@@ -516,7 +517,7 @@ export function OrderSummary({
                   className="font-medium text-success-ink tabular-nums"
                   style={typography?.price}
                 >
-                  -{formatPrice(wallet.applied)}
+                  <SignedAmount sign={MINUS} value={formatPrice(wallet.applied)} />
                 </span>
               </div>
               <div className="flex justify-between text-sm">

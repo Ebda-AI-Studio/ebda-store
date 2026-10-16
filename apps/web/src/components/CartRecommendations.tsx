@@ -7,30 +7,11 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { useStore, useStoreUrl } from '../contexts/StoreContext';
 import { useTemplateComponents } from '../hooks/useTemplateComponents';
 import { API_URL } from '@/lib/api';
-import type { TemplateProduct } from '../templates/types';
+import { recommendedToTemplateProduct } from '../templates/adapters';
 
 interface CartRecommendationsProps {
   storeId: string;
   productIds: string[];
-}
-
-function toTpl(p: RecommendedProduct): TemplateProduct {
-  return {
-    id: p.id,
-    name: p.name,
-    nameAr: p.nameAr,
-    slug: p.slug,
-    price: p.price,
-    compareAtPrice: p.compareAtPrice,
-    discountType: p.discountType ?? undefined,
-    discountValue: p.discountValue ?? undefined,
-    badgeLabel: p.badgeLabel ?? undefined,
-    badgeLabelAr: p.badgeLabelAr ?? undefined,
-    images: p.images,
-    inStock: true,
-    options: p.options,
-    facts: p.facts,
-  };
 }
 
 export function CartRecommendations({ storeId, productIds }: CartRecommendationsProps) {
@@ -68,8 +49,12 @@ export function CartRecommendations({ storeId, productIds }: CartRecommendations
         );
         if (!res.ok) return;
         const data = await res.json();
-        if (data.success && data.data?.products?.length) {
-          setProducts(data.data.products.slice(0, 4));
+        // The route answers `{ recommendations }` (recommendation.routes.ts);
+        // this read `data.products`, which never existed, so the section had
+        // never rendered on any store.
+        const recs: RecommendedProduct[] | undefined = data.data?.recommendations;
+        if (data.success && recs?.length) {
+          setProducts(recs.slice(0, 4));
         }
       } catch {
         // Non-critical.
@@ -113,7 +98,7 @@ export function CartRecommendations({ storeId, productIds }: CartRecommendations
         {t('Recommended based on your cart', 'موصى به بناءً على سلتك')}
       </p>
       <T.ProductGrid
-        products={products.map(toTpl)}
+        products={products.map(recommendedToTemplateProduct)}
         isRtl={isRtl}
         currency={store.currency}
         columns={4}

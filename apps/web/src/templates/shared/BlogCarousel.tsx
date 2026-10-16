@@ -37,7 +37,7 @@ interface BlogCarouselProps {
  * Trust strip / Brand story / footer rhythm above and below.
  */
 export function BlogCarousel({ posts, spacingSettings }: BlogCarouselProps) {
-  const { isRtl } = useLanguage();
+  const { isRtl, t } = useLanguage();
   const numerals = useStoreNumerals();
   const storeUrl = useStoreUrl();
   const { store } = useStore();
@@ -47,7 +47,7 @@ export function BlogCarousel({ posts, spacingSettings }: BlogCarouselProps) {
 
   return (
     <section
-      aria-label={isRtl ? 'المدونة' : 'Blog'}
+      aria-label={t('Blog', 'المدونة')}
       dir={isRtl ? 'rtl' : 'ltr'}
       className={`bg-[hsl(var(--bg-page))] ${wrapperClass}`}
     >
@@ -98,7 +98,7 @@ export function BlogCarousel({ posts, spacingSettings }: BlogCarouselProps) {
                   </div>
                   <div className="p-4">
                     {date && (
-                      <p className="text-xs text-foreground/55">
+                      <p className="text-xs text-muted-foreground">
                         {new Date(date).toLocaleDateString(
                           intlLocale(isRtl ? 'ar' : 'en', numerals),
                           {
@@ -113,7 +113,7 @@ export function BlogCarousel({ posts, spacingSettings }: BlogCarouselProps) {
                       {title}
                     </h3>
                     {excerpt && (
-                      <p className="mt-2 text-sm text-foreground/65 line-clamp-2">{excerpt}</p>
+                      <p className="mt-2 text-sm text-foreground/70 line-clamp-2">{excerpt}</p>
                     )}
                     <p className="mt-3 inline-flex items-center gap-1 text-sm font-semibold text-[hsl(var(--primary))]">
                       {isRtl ? 'قراءة المزيد' : 'Read more'}

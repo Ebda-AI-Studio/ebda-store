@@ -5,6 +5,7 @@ import Link from 'next/link';
 import type { CategoryCardProps } from '../types';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useNumerals } from '../../hooks/useNumerals';
+import { countText, PIECES } from '../../lib/plural';
 import { cx } from './ui';
 
 export type DahabTileShape = 'arch' | 'rectangle' | 'circle';
@@ -78,7 +79,7 @@ export default function DahabCategoryCard({
   isRtl: isRtlProp,
   urlPrefix = '',
 }: CategoryCardProps) {
-  const { isRtl: ctxIsRtl, t } = useLanguage();
+  const { isRtl: ctxIsRtl } = useLanguage();
   const { localize } = useNumerals();
   const isRtl = isRtlProp ?? ctxIsRtl;
   const label = (isRtl && category.nameAr ? category.nameAr : category.name) || '';
@@ -88,7 +89,7 @@ export default function DahabCategoryCard({
       href={`${urlPrefix}/products?category=${encodeURIComponent(category.slug)}`}
       image={category.image}
       label={label}
-      meta={count ? `${localize(count)} ${t('pieces', 'قطعة')}` : undefined}
+      meta={count ? countText(isRtl ? 'ar' : 'en', count, PIECES, localize(count)) : undefined}
     />
   );
 }

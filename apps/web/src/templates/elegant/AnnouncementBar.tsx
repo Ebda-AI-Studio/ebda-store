@@ -24,7 +24,7 @@ export default function ElegantAnnouncementBar({
   const resolvedLink = urlPrefix && safeLink.startsWith('/') ? `${urlPrefix}${safeLink}` : safeLink;
 
   const content = (
-    <span className="text-[10px] tracking-[0.3em] uppercase font-extralight text-foreground/70">
+    <span className="text-xs tracking-[0.3em] uppercase font-normal text-foreground/70">
       {displayText}
     </span>
   );

@@ -52,12 +52,12 @@ export function UnknownHostNotFound({ links }: { links: UnknownHostLinks }) {
       </svg>
 
       <h1 className="mt-8 max-w-md text-balance text-2xl font-bold leading-snug sm:text-3xl">
-        {t('This store doesn’t exist or hasn’t opened yet', 'المتجر ده مش موجود أو لسه ما فتحش')}
+        {t('This store doesn’t exist or hasn’t opened yet', 'هذا المتجر غير موجود أو لم يُفتح بعد')}
       </h1>
       <p className="mt-3 max-w-sm text-[15px] leading-relaxed" style={{ color: MUTED }}>
         {t(
           'Check the link, or start your own store on Ebda in minutes.',
-          'اتأكد من الرابط، أو ابدأ متجرك الخاص على إبدأ في دقايق.'
+          'تأكد من الرابط، أو ابدأ متجرك الخاص على إبدأ في دقائق.'
         )}
       </p>
 
@@ -67,7 +67,7 @@ export function UnknownHostNotFound({ links }: { links: UnknownHostLinks }) {
           className={button}
           style={{ background: BRAND.colors.gold, color: BRAND.colors.night, outlineColor: INK }}
         >
-          {t('Create your store on Ebda', 'اعمل متجرك على إبدأ')}
+          {t('Create your store on Ebda', 'أنشئ متجرك على إبدأ')}
         </a>
         {links.whatsappHref && (
           <a
@@ -77,7 +77,7 @@ export function UnknownHostNotFound({ links }: { links: UnknownHostLinks }) {
             className={`${button} border`}
             style={{ borderColor: LINE, color: INK, outlineColor: INK }}
           >
-            {t('Chat with us on WhatsApp', 'كلمنا على واتساب')}
+            {t('Chat with us on WhatsApp', 'تواصل معنا عبر واتساب')}
           </a>
         )}
       </div>

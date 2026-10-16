@@ -6,7 +6,7 @@ import { useRtlText } from '../shared/useRtlText';
 
 const DefaultIcon = () => (
   <svg
-    className="h-16 w-16 text-muted-foreground/60"
+    className="h-16 w-16 text-muted-foreground"
     fill="none"
     stroke="currentColor"
     viewBox="0 0 24 24"

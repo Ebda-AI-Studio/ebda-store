@@ -43,7 +43,7 @@ import {
   checkoutBundleFor,
   groupsOf,
   cartSessionId,
-  DEFAULT_TEST_SHIPPING_ADDRESS,
+  testShippingAddress,
   type FixtureStore,
 } from '../helpers/bundle-fixtures';
 
@@ -184,7 +184,7 @@ describe.skipIf(!hasDb)('order creation expands bundles into component lines', (
 
     await expect(
       OrderService.create(store.storeId, undefined, sessionId, {
-        shippingAddress: DEFAULT_TEST_SHIPPING_ADDRESS,
+        shippingAddress: testShippingAddress(),
         paymentMethod: 'paymob',
       })
     ).rejects.toMatchObject({ statusCode: 400 });
@@ -220,7 +220,7 @@ describe.skipIf(!hasDb)('order creation expands bundles into component lines', (
 
     await expect(
       OrderService.create(store.storeId, undefined, sessionId, {
-        shippingAddress: DEFAULT_TEST_SHIPPING_ADDRESS,
+        shippingAddress: testShippingAddress(),
         paymentMethod: 'paymob',
       })
     ).rejects.toMatchObject({ statusCode: 400 });
@@ -247,7 +247,7 @@ describe.skipIf(!hasDb)('order creation expands bundles into component lines', (
 
     await expect(
       OrderService.create(store.storeId, undefined, sessionId, {
-        shippingAddress: DEFAULT_TEST_SHIPPING_ADDRESS,
+        shippingAddress: testShippingAddress(),
         paymentMethod: 'paymob',
       })
     ).rejects.toMatchObject({ statusCode: 409 });

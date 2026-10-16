@@ -154,7 +154,7 @@ export default function StockInventoryPage() {
     if (!products) return null;
     if (!activeStockFilter) return products;
     return products.filter(p => {
-      const onHand = p.hasVariants ? (p.totalInventory ?? 0) : p.inventory;
+      const onHand = p.totalInventory ?? p.inventory;
       if (activeStockFilter === 'out_of_stock') return onHand === 0;
       if (activeStockFilter === 'low_stock') return onHand > 0 && onHand <= p.lowStockThreshold;
       return true;
@@ -473,7 +473,7 @@ export default function StockInventoryPage() {
                   alignEnd: true,
                   className: 'w-24',
                   cell: p => {
-                    const onHand = p.hasVariants ? (p.totalInventory ?? 0) : p.inventory;
+                    const onHand = p.totalInventory ?? p.inventory;
                     const isLow = onHand > 0 && onHand <= p.lowStockThreshold;
                     return (
                       <span
@@ -539,7 +539,7 @@ export default function StockInventoryPage() {
                       type="button"
                       onClick={() =>
                         router.push(
-                          `/stores/${storeId}/stock/adjustments/new?productId=${p.id}&newQty=${p.hasVariants ? (p.totalInventory ?? 0) : p.inventory}`
+                          `/stores/${storeId}/stock/adjustments/new?productId=${p.id}&newQty=${p.totalInventory ?? p.inventory}`
                         )
                       }
                       className="text-primary text-xs underline underline-offset-2 hover:opacity-80 max-sm:inline-flex max-sm:min-h-11 max-sm:items-center max-sm:px-2"

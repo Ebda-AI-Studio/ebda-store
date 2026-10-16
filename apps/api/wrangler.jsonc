@@ -108,7 +108,6 @@
     "imapflow": "./src/cf/stubs/imapflow.ts",
     "@sentry/node": "./src/cf/stubs/sentry-node.ts",
     "@sentry/profiling-node": "./src/cf/stubs/sentry-profiling-node.ts",
-    "sharp": "./src/cf/stubs/sharp.ts",
     "swagger-jsdoc": "./src/cf/stubs/swagger.ts",
     "swagger-ui-express": "./src/cf/stubs/swagger.ts",
     "compression": "./src/cf/stubs/compression.ts",

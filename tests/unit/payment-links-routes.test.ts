@@ -92,6 +92,7 @@ vi.mock('@api/lib/logger', () => ({
 
 const STORE_ID = '11111111-1111-4111-8111-111111111111';
 const PRODUCT_ID = '22222222-2222-4222-8222-222222222222';
+const VARIANT_ID = '33333333-3333-4333-8333-333333333333';
 const URL = `/stores/${STORE_ID}/payment-links`;
 
 const STORE = {
@@ -260,6 +261,121 @@ describe('POST /stores/:id/payment-links', () => {
     expect(res.body.error.message).toContain('Dates Box');
     expect(res.body.error.details).toMatchObject({ productName: 'Dates Box' });
     expect(mockPrisma.order.create).not.toHaveBeenCalled();
+  });
+
+  it('C-01: a product with variants and no variantId → 400 VARIANT_REQUIRED (ar + en), no order', async () => {
+    mockPrisma.product.findMany.mockResolvedValue([
+      {
+        ...PRODUCT,
+        inventory: 0,
+        variants: [
+          {
+            id: VARIANT_ID,
+            price: 5200,
+            sku: 'DB-M',
+            title: 'M',
+            titleAr: 'وسط',
+            costPrice: 2100,
+            inventory: 5,
+            allowBackorder: false,
+            isActive: true,
+          },
+        ],
+      },
+    ]);
+    const res = await request(app).post(URL).send(BODY);
+    expectEnvelope(res, 400, 'VARIANT_REQUIRED');
+    expect(res.body.error.details).toMatchObject({ productId: PRODUCT_ID });
+    expect(res.body.error.details.messageAr).toMatch(/[\u0600-\u06FF]/);
+    expect(mockPrisma.order.create).not.toHaveBeenCalled();
+  });
+
+  it('C-01: with its variantId the line is that variant (price, names, sku, stock)', async () => {
+    mockPrisma.product.findMany.mockResolvedValue([
+      {
+        ...PRODUCT,
+        inventory: 0,
+        variants: [
+          {
+            id: VARIANT_ID,
+            price: 5200,
+            sku: 'DB-M',
+            title: 'M',
+            titleAr: 'وسط',
+            costPrice: 2100,
+            inventory: 5,
+            allowBackorder: false,
+            isActive: true,
+          },
+        ],
+      },
+    ]);
+    const res = await request(app)
+      .post(URL)
+      .send({ ...BODY, items: [{ productId: PRODUCT_ID, variantId: VARIANT_ID, quantity: 2 }] });
+    expect(res.status).toBe(200);
+    const line = mockPrisma.order.create.mock.calls[0][0].data.items.create[0];
+    expect(line).toMatchObject({
+      variantId: VARIANT_ID,
+      variantName: 'M',
+      variantNameAr: 'وسط',
+      price: 5200,
+      total: 10400,
+      sku: 'DB-M',
+      costPrice: 2100,
+    });
+  });
+
+  it('C-01: a variant of ANOTHER product, or an inactive one, is VARIANT_NOT_FOUND', async () => {
+    mockPrisma.product.findMany.mockResolvedValue([
+      {
+        ...PRODUCT,
+        variants: [
+          {
+            id: VARIANT_ID,
+            price: 5200,
+            sku: null,
+            title: 'M',
+            titleAr: null,
+            costPrice: null,
+            inventory: 5,
+            allowBackorder: false,
+            isActive: false,
+          },
+        ],
+      },
+    ]);
+    const res = await request(app)
+      .post(URL)
+      .send({ ...BODY, items: [{ productId: PRODUCT_ID, variantId: VARIANT_ID, quantity: 1 }] });
+    expectEnvelope(res, 400, 'VARIANT_NOT_FOUND');
+    expect(mockPrisma.order.create).not.toHaveBeenCalled();
+  });
+
+  it("C-01: the chosen variant's own stock gates the line", async () => {
+    mockPrisma.product.findMany.mockResolvedValue([
+      {
+        ...PRODUCT,
+        inventory: 50,
+        variants: [
+          {
+            id: VARIANT_ID,
+            price: null,
+            sku: null,
+            title: 'M',
+            titleAr: null,
+            costPrice: null,
+            inventory: 1,
+            allowBackorder: false,
+            isActive: true,
+          },
+        ],
+      },
+    ]);
+    const res = await request(app)
+      .post(URL)
+      .send({ ...BODY, items: [{ productId: PRODUCT_ID, variantId: VARIANT_ID, quantity: 2 }] });
+    expectEnvelope(res, 400, 'OUT_OF_STOCK');
   });
 
   it('PAYMENT_NOT_CONFIGURED deletes the draft order it already created', async () => {

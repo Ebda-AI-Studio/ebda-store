@@ -1,8 +1,10 @@
 'use client';
 
 import Link from 'next/link';
+import { MINUS, SignedAmount } from '@/lib/bidi';
 import type { OrderSummaryProps } from '../types';
 import { useOrderSummaryBase } from '../shared/useOrderSummaryBase';
+import { ArrowIcon } from '../shared/icons';
 
 import { REGION } from '@ebda/shared';
 export default function ModernOrderSummary({
@@ -69,7 +71,7 @@ export default function ModernOrderSummary({
           <div className="flex items-center justify-between text-success-ink">
             <dt style={typography?.label}>{discountLabel ?? (isRtl ? 'الخصم' : 'Discount')}</dt>
             <dd className="font-medium tabular-nums" style={typography?.price}>
-              −{fmt(discount)}
+              <SignedAmount sign={MINUS} value={fmt(discount)} />
             </dd>
           </div>
         )}
@@ -132,17 +134,20 @@ export default function ModernOrderSummary({
         (ctaHref && !ctaDisabled ? (
           <Link
             href={ctaHref}
-            className="mt-6 flex h-12 w-full items-center justify-center rounded-xl bg-primary px-4 text-sm font-semibold tracking-tight text-primary-foreground transition-[background-color,box-shadow] duration-300 ease-out hover:bg-primary/90 hover:shadow-[0_18px_40px_-18px_hsl(var(--primary)/0.45)] focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+            data-cta="button"
+            className="mt-6 flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 text-sm font-semibold tracking-tight text-primary-foreground transition-colors duration-300 ease-out hover:bg-primary/90 focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
             style={typography?.cta}
           >
             {ctaText}
+            <ArrowIcon className="h-4 w-4 shrink-0" isRtl={isRtl} />
           </Link>
         ) : (
           <button
             type="button"
             onClick={onCtaClick}
             disabled={ctaDisabled || ctaLoading}
-            className="mt-6 flex h-12 w-full items-center justify-center rounded-xl bg-primary px-4 text-sm font-semibold tracking-tight text-primary-foreground transition-[background-color,box-shadow] duration-300 ease-out hover:bg-primary/90 hover:shadow-[0_18px_40px_-18px_hsl(var(--primary)/0.45)] disabled:opacity-50 focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+            data-cta="button"
+            className="mt-6 flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 text-sm font-semibold tracking-tight text-primary-foreground transition-colors duration-300 ease-out hover:bg-primary/90 disabled:opacity-50 focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
             style={typography?.cta}
           >
             {ctaLoading ? (
@@ -151,7 +156,10 @@ export default function ModernOrderSummary({
                 aria-hidden
               />
             ) : (
-              ctaText
+              <>
+                {ctaText}
+                <ArrowIcon className="h-4 w-4 shrink-0" isRtl={isRtl} />
+              </>
             )}
           </button>
         ))}

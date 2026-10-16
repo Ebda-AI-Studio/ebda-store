@@ -41,7 +41,7 @@ export default function ElegantEmptyState({
     >
       {icon ?? (
         <svg
-          className="h-8 w-8 text-muted-foreground/70"
+          className="h-8 w-8 text-muted-foreground"
           fill="none"
           stroke="currentColor"
           viewBox="0 0 24 24"

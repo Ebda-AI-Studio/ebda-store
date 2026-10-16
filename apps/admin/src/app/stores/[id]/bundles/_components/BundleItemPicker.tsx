@@ -29,6 +29,7 @@ import { useEffect, useState } from 'react';
 import { useLocale } from 'next-intl';
 import { useT } from '@/i18n/useT';
 import { apiGet } from '../../../../../lib/api';
+import { isVariantProduct } from '../../../../../lib/variant-product';
 import { formatPrice } from '@/lib/format';
 import { extractVariantOptions } from '../bundlePricing';
 
@@ -67,6 +68,7 @@ interface ProductSearchResult {
   price: number;
   sku?: string | null;
   hasVariants?: boolean;
+  variantCount?: number;
   trackInventory: boolean;
   totalInventory: number;
 }
@@ -139,7 +141,7 @@ export function BundleItemPicker({ storeId, value, onChange }: BundleItemPickerP
   async function selectProduct(p: ProductSearchResult) {
     setSearch('');
     setResults([]);
-    if (!p.hasVariants) {
+    if (!isVariantProduct(p)) {
       addLine({
         productId: p.id,
         variantId: null,

@@ -97,6 +97,8 @@ describe('CartService', () => {
     trackInventory: true,
     status: 'active',
     images: [{ url: 'https://example.com/image.jpg' }],
+    // A plain SKU: no variants (addItem's VARIANT_REQUIRED gate reads this).
+    _count: { variants: 0 },
   };
 
   const mockCart = {

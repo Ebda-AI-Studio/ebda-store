@@ -24,7 +24,7 @@ export default function MinimalAnnouncementBar({
   const resolvedLink = urlPrefix && safeLink.startsWith('/') ? `${urlPrefix}${safeLink}` : safeLink;
 
   const content = (
-    <span className="text-[10px] tracking-[0.28em] uppercase font-light text-foreground/80">
+    <span className="text-xs tracking-[0.28em] uppercase font-normal text-foreground/80">
       {displayText}
     </span>
   );

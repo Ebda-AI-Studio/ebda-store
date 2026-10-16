@@ -1,6 +1,7 @@
 'use client';
 
 import { memo, useState } from 'react';
+import { canBuyNow } from '@/lib/can-buy-now';
 import { resolveProductCardCtaOosDefaults } from '../shared/product-card-defaults';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -37,9 +38,15 @@ import {
 import { PlaceholderImageIcon } from '../shared/icons';
 import { TaxInclusiveLabel } from '../shared/tax-inclusive-label';
 import { productCardPropsEqual } from '../shared/product-card-memo';
-import { OosImageDim, ProductCardCta, OutOfStockRibbon } from '../shared/ProductCardCta';
+import {
+  OosImageDim,
+  ProductCardCta,
+  OutOfStockRibbon,
+  isProductNew,
+} from '../shared/ProductCardCta';
 import { SwatchDots } from '../../components/commerce/SwatchDots';
 import { FactChips } from '../../components/commerce/FactChips';
+import { useRenderNow } from '../../contexts/RenderClockContext';
 
 /**
  * Bold Template - Product Card
@@ -79,6 +86,7 @@ function BoldProductCard({
 }: ProductCardProps) {
   const { isRtl: ctxIsRtl } = useLanguage();
   const { store, layout } = useStore();
+  const renderNow = useRenderNow();
   // Ruling NUMERALS-1: Western digits unless the store opted in (Arabic only).
   const numerals = storeNumerals(store?.theme);
   const isRtl = isRtlProp ?? ctxIsRtl;
@@ -109,7 +117,7 @@ function BoldProductCard({
   // BUG 1 fix: use helper for correct EGP/pct badge text.
   const discountBadgeText = getDiscountBadgeText(product, isRtl, undefined, undefined, numerals);
   // Task 13: backorder-aware orderable signal. OOS + backorder allowed → orderable.
-  const orderable = product.inStock !== false || product.acceptsBackorder === true;
+  const orderable = canBuyNow(product);
 
   const handleAddToCart = async (productId: string) => {
     await onAddToCart?.(productId);
@@ -154,6 +162,7 @@ function BoldProductCard({
     discountBadgeAllowed,
     customBadgePositionCls,
     discountBadgePositionCls,
+    discountTopCorner,
   } = resolveCardBadges({
     discountVisible: Boolean(discountBadgeText),
     product,
@@ -169,7 +178,7 @@ function BoldProductCard({
     // Issue #1997 — the NEW badge below renders at logical top-start under
     // this exact condition; a discount/custom badge avoiding a reserved
     // heart corner must not land on top of it.
-    newOrBrandBadgeReserved: Boolean(orderable && product.isNew),
+    newOrBrandBadgeReserved: Boolean(orderable && isProductNew(product, renderNow)),
     // The mobile quick-add CTA band below is an unconditional full-width
     // overlay (hidden only via a `lg:` desktop hover state, never removed
     // from the DOM), so it reserves the whole bottom edge.
@@ -214,8 +223,8 @@ function BoldProductCard({
             oosLabelColor={resolvedOosLabelColor}
             oosLabelTextColor={resolvedOosLabelTextColor}
             theme={store.theme}
-            topStartReserved={Boolean(onToggleCompare)}
-            topEndReserved={Boolean(onRemoveFromWishlist)}
+            topStartReserved={Boolean(onToggleCompare) || discountTopCorner === 'start'}
+            topEndReserved={Boolean(onRemoveFromWishlist) || discountTopCorner === 'end'}
           />
           {onToggleCompare && (
             <CompareButton
@@ -274,7 +283,7 @@ function BoldProductCard({
               )}
             </>
           ) : (
-            <div className="w-full h-full flex items-center justify-center text-muted-foreground/40">
+            <div className="w-full h-full flex items-center justify-center text-muted-foreground">
               <PlaceholderImageIcon className="w-16 h-16" strokeWidth={1.5} />
             </div>
           )}
@@ -289,7 +298,7 @@ function BoldProductCard({
 
           {/* NEW badge — BUG 2 fix: no inStock gate removed from the group;
               NEW stays top corner, only shown when orderable (unchanged). */}
-          {orderable && product.isNew && (
+          {orderable && isProductNew(product, renderNow) && (
             <ProductBadgeGroup absolute position={isRtl ? 'top-right' : 'top-left'} isRtl={isRtl}>
               <ProductBadge
                 variant="new"
@@ -381,7 +390,7 @@ function BoldProductCard({
               <h3
                 id={`prod-${product.id}-name`}
                 data-zone="productName"
-                className={`font-black ${textSizes.name} ${nameCase === 'uppercase' ? 'uppercase' : ''} tracking-tight line-clamp-1 min-h-[1.5em] group-hover:text-primary transition-colors duration-200`}
+                className={`font-black ${textSizes.name} ${nameCase === 'uppercase' ? 'uppercase' : ''} tracking-tight [overflow-wrap:anywhere] line-clamp-1 min-h-[1.5em] group-hover:text-primary transition-colors duration-200`}
                 itemProp="name"
               >
                 {isRtl && product.nameAr ? product.nameAr : product.name}

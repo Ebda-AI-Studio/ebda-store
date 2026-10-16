@@ -30,7 +30,7 @@ vi.mock('@api/lib/logger', () => ({
 }));
 
 vi.mock('@api/services/email.service', () => ({
-  EmailService: { sendOrderConfirmation: vi.fn(), sendAdminNewOrder: vi.fn() },
+  EmailService: { sendOrderConfirmation: vi.fn() },
 }));
 
 vi.mock('@api/services/account-lockout.service', () => ({

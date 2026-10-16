@@ -16,6 +16,7 @@ import { buildStorefrontMetadata } from '../lib/storefront-metadata';
 import { MarketingPixelsProvider } from '../components/MarketingPixels';
 import { PostHogProvider } from '../components/PostHogProvider';
 import { ServiceWorkerRegistration } from '../components/ServiceWorkerRegistration';
+import { SkipLink } from '../components/SkipLink';
 import { ScrollToTop } from '../components/ScrollToTop';
 import { PushNotificationPrompt } from '../components/PushNotificationPrompt';
 import { OneSignalStorefrontInit } from '../components/OneSignalStorefrontInit';
@@ -33,6 +34,7 @@ import { lookHead } from '../lib/look-head';
 import { DemoLookBar } from '../components/demo/DemoLookBar';
 import { jsonLdScriptContent } from '../lib/json-ld-script';
 import '../styles/globals.css';
+import { RenderClockProvider } from '../contexts/RenderClockContext';
 
 const plusJakarta = Plus_Jakarta_Sans({
   subsets: ['latin'],
@@ -167,6 +169,7 @@ async function fetchDraftBundleForCurrentRequest(
 }
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  const renderNow = Date.now();
   // Fetch store data server-side
   const store = await getStore();
 
@@ -562,114 +565,115 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             container (overflow-x-hidden), so Next's window-targeted scroll
             restoration alone leaves pages loading mid-page. */}
         <ScrollToTop />
-        <a
-          href="#main-content"
-          className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:start-4 focus:z-[9999] focus:rounded-lg focus:bg-background focus:px-4 focus:py-2 focus:text-sm focus:font-medium focus:text-foreground focus:shadow-lg focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
-        >
-          Skip to main content
-        </a>
         <StoreProvider
           initialStore={store}
           previewDraftToken={draftToken}
           initialIsPlatform={initialIsPlatform}
         >
-          <LanguageProvider defaultLanguage={resolvedLanguage}>
-            <ConsentProvider initialConsent={resolvedConsent}>
-              {/* PostHog product analytics — mounted INSIDE ConsentProvider
+          {/* One clock for the whole render, shared by server HTML and hydration
+              (the card "New" badge; W1c review M9). */}
+          <RenderClockProvider now={renderNow}>
+            <LanguageProvider defaultLanguage={resolvedLanguage}>
+              {/* Skip link: still the first focusable element in <body>, now named in
+                the page's language (R-05). */}
+              <SkipLink />
+              <ConsentProvider initialConsent={resolvedConsent}>
+                {/* PostHog product analytics — mounted INSIDE ConsentProvider
                   so it can read the consent state. Init is gated on
                   marketing-consent (see PostHogProvider). When consent is
                   off OR NEXT_PUBLIC_POSTHOG_KEY is missing, the provider
                   renders children as-is with no SDK init — safe in dev
                   and pre-account-creation. */}
-              <PostHogProvider>
-                {store.status === 'suspended' ? (
-                  // Suspended store — render the branded maintenance page in
-                  // place of the entire normal storefront. We deliberately
-                  // skip Cart/Auth/Feature providers, marketing pixels, the
-                  // service worker, OneSignal, the affiliate tracker, etc.
-                  // because they all make API calls (cart sync, /auth/me,
-                  // pixel events) that would either 403 against a suspended
-                  // store or pollute analytics. The maintenance screen only
-                  // needs the store's branding + theme + language, all of
-                  // which already live above this guard.
-                  <div id="main-content">
-                    <StoreMaintenance />
-                  </div>
-                ) : (
-                  <FeatureProvider>
-                    <AuthProvider>
-                      <ToastProvider>
-                        <CartProvider>
-                          {store.isDemo && <DemoLookBar activeLook={store.look} />}
-                          <div id="main-content">{children}</div>
-                          <PushNotificationPrompt />
-                          <OneSignalStorefrontInit />
-                          {/* Activates ONLY when ?probe=typography is on
+                <PostHogProvider>
+                  {store.status === 'suspended' ? (
+                    // Suspended store — render the branded maintenance page in
+                    // place of the entire normal storefront. We deliberately
+                    // skip Cart/Auth/Feature providers, marketing pixels, the
+                    // service worker, OneSignal, the affiliate tracker, etc.
+                    // because they all make API calls (cart sync, /auth/me,
+                    // pixel events) that would either 403 against a suspended
+                    // store or pollute analytics. The maintenance screen only
+                    // needs the store's branding + theme + language, all of
+                    // which already live above this guard.
+                    <div id="main-content">
+                      <StoreMaintenance />
+                    </div>
+                  ) : (
+                    <FeatureProvider>
+                      <AuthProvider>
+                        <ToastProvider>
+                          <CartProvider>
+                            {store.isDemo && <DemoLookBar activeLook={store.look} />}
+                            <div id="main-content">{children}</div>
+                            <PushNotificationPrompt />
+                            <OneSignalStorefrontInit />
+                            {/* Activates ONLY when ?probe=typography is on
                           the URL and the page is in a trusted-admin
                           iframe. Measures real getComputedStyle()
                           values per data-zone and posts them back to
                           the admin so the typography form can show
                           real inherited defaults. */}
-                          <TypographyProbe />
-                        </CartProvider>
-                      </ToastProvider>
-                    </AuthProvider>
-                    {/* Marketing pixels render ONLY when the visitor has
+                            <TypographyProbe />
+                          </CartProvider>
+                        </ToastProvider>
+                      </AuthProvider>
+                      {/* Marketing pixels render ONLY when the visitor has
                     consented (read from the `force-cookie-consent` cookie
                     server-side). No consent → scripts never reach the
                     browser. GDPR/ePrivacy/applicable GCC data-protection
                     law compliance (see docs/legal/gcc-data-protection.md). */}
-                    {marketingConsentGranted &&
-                      store.marketingPixels &&
-                      Object.keys(store.marketingPixels).length > 0 && (
-                        <MarketingPixelsProvider
-                          pixels={store.marketingPixels as MarketingPixels}
-                        />
-                      )}
-                    {/* PWA is active only when BOTH the store toggle AND the
+                      {marketingConsentGranted &&
+                        store.marketingPixels &&
+                        Object.keys(store.marketingPixels).length > 0 && (
+                          <MarketingPixelsProvider
+                            pixels={store.marketingPixels as MarketingPixels}
+                          />
+                        )}
+                      {/* PWA is active only when BOTH the store toggle AND the
                     platform feature flag are on. Without this gate, flipping
                     the per-store feature off had no observable effect. */}
-                    {store.pwaEnabled === true &&
-                      (store.enabledFeatures?.includes('pwa') ?? true) && (
-                        <ServiceWorkerRegistration />
-                      )}
-                    <Suspense fallback={null}>
-                      <AffiliateTracker />
-                    </Suspense>
-                  </FeatureProvider>
-                )}
-                {/* No store resolved (unknown/inactive host, platform host, transient
+                      {store.pwaEnabled === true &&
+                        (store.enabledFeatures?.includes('pwa') ?? true) && (
+                          <ServiceWorkerRegistration />
+                        )}
+                      <Suspense fallback={null}>
+                        <AffiliateTracker />
+                      </Suspense>
+                    </FeatureProvider>
+                  )}
+                  {/* No store resolved (unknown/inactive host, platform host, transient
                   fallback): the page is the generic Ebda 404 / retry body. It sets no
                   tracking, so there is nothing to consent to, and the banner's default-
                   theme orange must not be the only colour on an Ebda-branded page
                   (Ruling SUBDOMAIN-404-1). */}
-                {store.id !== 'demo' && (
-                  <>
-                    {/* Cookie consent UI — always mounted (banner self-hides
+                  {store.id !== 'demo' && (
+                    <>
+                      {/* Cookie consent UI — always mounted (banner self-hides
                   when the user has already decided; modal opens via the
                   footer "Cookie preferences" link or banner Customize). */}
-                    <CookieConsentBanner />
-                    <CookiePreferencesModal />
-                    {/* SSR-rendered compliance fallback (GDPR Art. 7(3) —
+                      <CookieConsentBanner />
+                      <CookiePreferencesModal />
+                      {/* SSR-rendered compliance fallback (GDPR Art. 7(3) —
                     link must be reachable in initial HTML for no-JS
                     visitors + crawlers). Visible on regular pages, hidden
                     on loading screens via the [data-loading] body marker
                     set by loading.tsx files. Ahmad 2026-05-16: 'return
                     [the cookies] but keep it out of any loading screen as
                     the rest of items'. */}
-                    <div
-                      data-zone="cookieFallback"
-                      className="border-t border-border/30 bg-background [body:has([data-loading])_&]:hidden"
-                    >
-                      <div className="container mx-auto px-4 py-3 text-center">
-                        <CookiePreferencesLink className="text-xs text-muted-foreground/70 hover:text-foreground transition-colors duration-200 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2" />
+                      <div
+                        data-zone="cookieFallback"
+                        className="border-t border-border/30 bg-background [body:has([data-loading])_&]:hidden"
+                      >
+                        <div className="container mx-auto px-4 py-3 text-center">
+                          <CookiePreferencesLink className="text-xs text-muted-foreground hover:text-foreground transition-colors duration-200 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2" />
+                        </div>
                       </div>
-                    </div>
-                  </>
-                )}
-              </PostHogProvider>
-            </ConsentProvider>
-          </LanguageProvider>
+                    </>
+                  )}
+                </PostHogProvider>
+              </ConsentProvider>
+            </LanguageProvider>
+          </RenderClockProvider>
         </StoreProvider>
       </body>
     </html>

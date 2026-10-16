@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { Button, Input, Modal, Select, useToast } from '@ebda/ui';
+import { Button, Input, Select, useToast } from '@ebda/ui';
+import { Sheet } from '../../../components/ui/Sheet';
 import { api } from '@/lib/api';
 import { useAuth } from '../../../contexts/AuthContext';
 import { useLanguage } from '../../../contexts/LanguageContext';
@@ -393,7 +394,7 @@ export default function AddressesClient() {
               label={t('Landmark (optional)', 'علامة مميزة (اختياري)')}
               value={formData.address2}
               onChange={e => setFormData({ ...formData, address2: e.target.value })}
-              placeholder={t('Next to the pharmacy…', 'جنب الصيدلية…')}
+              placeholder={t('Next to the pharmacy…', 'بجوار الصيدلية…')}
             />
 
             <label className="flex items-center gap-2">
@@ -529,11 +530,15 @@ export default function AddressesClient() {
         </div>
       ) : null}
 
-      <Modal
-        isOpen={!!deleteTargetId}
+      {/* The shared Sheet primitive (R-04 fix round), centred like the old Modal. */}
+      <Sheet
+        open={!!deleteTargetId}
         onClose={() => (isDeleting ? undefined : setDeleteTargetId(null))}
+        side="center"
         title={t('Delete address', 'حذف العنوان')}
-        size="sm"
+        closeLabel={t('Close', 'إغلاق')}
+        className="bg-background text-foreground"
+        bodyClassName="px-5 pb-5"
       >
         <p className="text-sm text-muted-foreground">
           {t(
@@ -549,7 +554,7 @@ export default function AddressesClient() {
             {isDeleting ? t('Deleting…', 'جاري الحذف…') : t('Delete', 'حذف')}
           </Button>
         </div>
-      </Modal>
+      </Sheet>
     </div>
   );
 }

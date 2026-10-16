@@ -288,12 +288,12 @@ type GscIngestRequestedEvent = EventPayload & {
   };
 };
 
-// #645: the platform "contact us" notification email — see
-// functions/contact-form-send.ts for why this is queued instead of a
-// fire-and-forget send.
+// The storefront contact message (FU46-1): routed to the store named by `storeId`. Events
+// enqueued before FU46-1 carry no `storeId` and keep the platform destination.
 type ContactFormSubmittedEvent = EventPayload & {
   name: 'contact/form.submitted';
   data: {
+    storeId?: string;
     name: string;
     email: string;
     subject: string;

@@ -1,6 +1,8 @@
 'use client';
 
 import { VariantText } from '@ebda/ui';
+import { MINUS, SignedAmount } from '@/lib/bidi';
+import { Sheet } from '@/components/ui/Sheet';
 import { useState, useEffect, useCallback } from 'react';
 import { useLocalePrice } from '../../../../hooks/useLocalePrice';
 import Link from 'next/link';
@@ -492,7 +494,7 @@ export default function OrderDetailClient() {
                               sizes="48px"
                             />
                           ) : (
-                            <div className="flex h-full w-full items-center justify-center text-muted-foreground/70">
+                            <div className="flex h-full w-full items-center justify-center text-muted-foreground">
                               <svg
                                 className="h-5 w-5"
                                 fill="none"
@@ -569,7 +571,7 @@ export default function OrderDetailClient() {
                       sizes="56px"
                     />
                   ) : (
-                    <div className="flex h-full w-full items-center justify-center text-muted-foreground/70">
+                    <div className="flex h-full w-full items-center justify-center text-muted-foreground">
                       <svg
                         className="h-5 w-5"
                         fill="none"
@@ -664,7 +666,9 @@ export default function OrderDetailClient() {
                         {t('Coupon', '\u0643\u0648\u0628\u0648\u0646')}
                         {order.couponCode ? ` (${order.couponCode})` : ''}
                       </span>
-                      <span className="text-success-ink">-{formatPrice(couponPortion)}</span>
+                      <span className="text-success-ink">
+                        <SignedAmount sign={MINUS} value={formatPrice(couponPortion)} />
+                      </span>
                     </div>
                   )}
                   {promotionPortion > 0 && (
@@ -673,7 +677,9 @@ export default function OrderDetailClient() {
                         {t('Promotion', '\u0639\u0631\u0636 \u062a\u0631\u0648\u064a\u062c\u064a')}
                         {promotionName ? ` (${promotionName})` : ''}
                       </span>
-                      <span className="text-success-ink">-{formatPrice(promotionPortion)}</span>
+                      <span className="text-success-ink">
+                        <SignedAmount sign={MINUS} value={formatPrice(promotionPortion)} />
+                      </span>
                     </div>
                   )}
                   {loyaltyPortion > 0 && (
@@ -689,7 +695,9 @@ export default function OrderDetailClient() {
                             )})`
                           : ''}
                       </span>
-                      <span className="text-success-ink">-{formatPrice(loyaltyPortion)}</span>
+                      <span className="text-success-ink">
+                        <SignedAmount sign={MINUS} value={formatPrice(loyaltyPortion)} />
+                      </span>
                     </div>
                   )}
                   {otherDiscount > 0 && (
@@ -697,7 +705,9 @@ export default function OrderDetailClient() {
                       <span className="text-muted-foreground">
                         {t('Discount', '\u0627\u0644\u062e\u0635\u0645')}
                       </span>
-                      <span className="text-success-ink">-{formatPrice(otherDiscount)}</span>
+                      <span className="text-success-ink">
+                        <SignedAmount sign={MINUS} value={formatPrice(otherDiscount)} />
+                      </span>
                     </div>
                   )}
                 </>
@@ -751,7 +761,9 @@ export default function OrderDetailClient() {
                   <span className="text-muted-foreground">
                     {t('Paid from wallet', 'مدفوع من المحفظة')}
                   </span>
-                  <span className="text-success-ink">-{formatPrice(order.walletAmount ?? 0)}</span>
+                  <span className="text-success-ink">
+                    <SignedAmount sign={MINUS} value={formatPrice(order.walletAmount ?? 0)} />
+                  </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-foreground">{t('Amount due', 'المبلغ المستحق')}</span>
@@ -1011,7 +1023,7 @@ export default function OrderDetailClient() {
                 );
               }
             }}
-            className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary/90 transition-colors cursor-pointer"
+            className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors cursor-pointer"
           >
             <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path
@@ -1125,78 +1137,56 @@ export default function OrderDetailClient() {
         )}
       </div>
 
-      {/* Tracking Number Modal -- shown when there is no trackingUrl */}
-      {showTrackingModal && order.trackingNumber && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="tracking-modal-title"
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4"
-          onClick={e => {
-            // Close when clicking the backdrop
-            if (e.target === e.currentTarget) setShowTrackingModal(false);
-          }}
-        >
-          <div className="w-full max-w-sm rounded-2xl bg-card p-6 shadow-xl">
-            <div className="flex items-start justify-between mb-4">
-              <h2 id="tracking-modal-title" className="text-lg font-semibold text-foreground">
-                {t(
-                  'Tracking Information',
-                  '\u0645\u0639\u0644\u0648\u0645\u0627\u062a \u0627\u0644\u062a\u062a\u0628\u0639'
-                )}
-              </h2>
-              <button
-                onClick={() => setShowTrackingModal(false)}
-                aria-label={t('Close', 'إغلاق')}
-                className="rounded-lg p-1 text-muted-foreground/70 hover:bg-muted hover:text-muted-foreground transition-colors"
-              >
-                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M6 18L18 6M6 6l12 12"
-                  />
-                </svg>
-              </button>
-            </div>
+      {/* Tracking number panel (no trackingUrl) on the shared Sheet primitive (R-04). */}
+      <Sheet
+        open={showTrackingModal && !!order.trackingNumber}
+        onClose={() => setShowTrackingModal(false)}
+        side="center"
+        title={t(
+          'Tracking Information',
+          '\u0645\u0639\u0644\u0648\u0645\u0627\u062a \u0627\u0644\u062a\u062a\u0628\u0639'
+        )}
+        closeLabel={t('Close', 'إغلاق')}
+        className="max-w-sm bg-card text-foreground"
+        headerClassName="!pt-4"
+        titleClassName="text-lg font-semibold text-foreground"
+        bodyClassName="px-6 pb-6"
+      >
+        <p className="text-sm text-muted-foreground mb-4">
+          {t(
+            "Use the tracking number below on your carrier's website to check your shipment status.",
+            '\u0627\u0633\u062a\u062e\u062f\u0645 \u0631\u0642\u0645 \u0627\u0644\u062a\u062a\u0628\u0639 \u0623\u062f\u0646\u0627\u0647 \u0639\u0644\u0649 \u0645\u0648\u0642\u0639 \u0634\u0631\u0643\u0629 \u0627\u0644\u0634\u062d\u0646 \u0644\u0644\u062a\u062d\u0642\u0642 \u0645\u0646 \u062d\u0627\u0644\u0629 \u0634\u062d\u0646\u062a\u0643.'
+          )}
+        </p>
 
-            <p className="text-sm text-muted-foreground mb-4">
-              {t(
-                "Use the tracking number below on your carrier's website to check your shipment status.",
-                '\u0627\u0633\u062a\u062e\u062f\u0645 \u0631\u0642\u0645 \u0627\u0644\u062a\u062a\u0628\u0639 \u0623\u062f\u0646\u0627\u0647 \u0639\u0644\u0649 \u0645\u0648\u0642\u0639 \u0634\u0631\u0643\u0629 \u0627\u0644\u0634\u062d\u0646 \u0644\u0644\u062a\u062d\u0642\u0642 \u0645\u0646 \u062d\u0627\u0644\u0629 \u0634\u062d\u0646\u062a\u0643.'
-              )}
-            </p>
-
-            <div className="rounded-lg border border-border bg-muted p-3 flex items-center justify-between gap-3">
-              <span className="font-mono text-foreground break-all">{order.trackingNumber}</span>
-              <button
-                onClick={() => {
-                  navigator.clipboard.writeText(order.trackingNumber!).catch(() => undefined);
-                }}
-                title="Copy to clipboard"
-                className="flex-shrink-0 rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
-              >
-                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"
-                  />
-                </svg>
-              </button>
-            </div>
-
-            <button
-              onClick={() => setShowTrackingModal(false)}
-              className="mt-4 w-full rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary/90 transition-colors"
-            >
-              {t('Close', '\u0625\u063a\u0644\u0627\u0642')}
-            </button>
-          </div>
+        <div className="rounded-lg border border-border bg-muted p-3 flex items-center justify-between gap-3">
+          <span className="font-mono text-foreground break-all">{order.trackingNumber}</span>
+          <button
+            onClick={() => {
+              navigator.clipboard.writeText(order.trackingNumber!).catch(() => undefined);
+            }}
+            title={t('Copy to clipboard', 'نسخ')}
+            aria-label={t('Copy tracking number', 'نسخ رقم التتبع')}
+            className="flex-shrink-0 rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+          >
+            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"
+              />
+            </svg>
+          </button>
         </div>
-      )}
+
+        <button
+          onClick={() => setShowTrackingModal(false)}
+          className="mt-4 w-full rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
+        >
+          {t('Close', '\u0625\u063a\u0644\u0627\u0642')}
+        </button>
+      </Sheet>
     </div>
   );
 }

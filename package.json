@@ -46,6 +46,8 @@
     "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md}\"",
     "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,json,md}\"",
     "test": "vitest run",
+    "test:card-overflow": "node scripts/visual/measure-card-overflow.mjs",
+    "test:fixed-bars": "node scripts/visual/measure-fixed-bars.mjs",
     "test:defence-mutations": "node scripts/defence-mutation-record.mjs",
     "check:clear-on-empty": "node scripts/check-update-payload-clear.mjs",
     "test:unit": "vitest run tests/unit",

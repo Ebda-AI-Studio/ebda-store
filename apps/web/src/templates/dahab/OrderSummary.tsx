@@ -1,8 +1,10 @@
 'use client';
 
 import Link from 'next/link';
+import { MINUS, SignedAmount } from '@/lib/bidi';
 import type { OrderSummaryProps } from '../types';
 import { useOrderSummaryBase } from '../shared/useOrderSummaryBase';
+import { ArrowIcon } from '../shared/icons';
 import { useLocalePrice } from '../../hooks/useLocalePrice';
 import { DahabPaymentMarks } from './Footer';
 import { DAHAB_BTN_PRIMARY, cx } from './ui';
@@ -73,7 +75,7 @@ export default function DahabOrderSummary({
           <div className={cx(row, 'text-success-ink')}>
             <dt style={typography?.label}>{discountLabel ?? (isRtl ? 'الخصم' : 'Discount')}</dt>
             <dd className="tabular-nums" style={typography?.price}>
-              −{fmt(discount)}
+              <SignedAmount sign={MINUS} value={fmt(discount)} />
             </dd>
           </div>
         )}
@@ -141,6 +143,7 @@ export default function DahabOrderSummary({
             style={typography?.cta}
           >
             {ctaText}
+            <ArrowIcon className="h-4 w-4 shrink-0" isRtl={isRtl} />
           </Link>
         ) : (
           <button
@@ -151,7 +154,14 @@ export default function DahabOrderSummary({
             className={cx(DAHAB_BTN_PRIMARY, 'mt-6 w-full')}
             style={typography?.cta}
           >
-            {ctaLoading ? '…' : ctaText}
+            {ctaLoading ? (
+              '…'
+            ) : (
+              <>
+                {ctaText}
+                <ArrowIcon className="h-4 w-4 shrink-0" isRtl={isRtl} />
+              </>
+            )}
           </button>
         ))}
       <DahabPaymentMarks className="mt-6 justify-center" />

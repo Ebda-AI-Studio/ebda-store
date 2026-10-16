@@ -1,6 +1,7 @@
 'use client';
 
 import type React from 'react';
+import { canBuyNow } from '@/lib/can-buy-now';
 import { resolveProductCardCtaOosDefaults } from './product-card-defaults';
 import { memo, useState } from 'react';
 import Image from 'next/image';
@@ -8,7 +9,7 @@ import Link from 'next/link';
 import type { ProductCardProps } from '../types';
 import type { TemplateId, ProductCardSize } from '@ebda/shared';
 import { getProductCardTextSizes, resolveColor } from '@ebda/shared';
-import { cn, CartIcon } from '@ebda/ui';
+import { cn } from '@ebda/ui';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useStore } from '../../contexts/StoreContext';
 import { useNumerals } from '../../hooks/useNumerals';
@@ -31,7 +32,7 @@ import { productCardPropsEqual } from './product-card-memo';
 import DahabProductCard from '../dahab/ProductCard';
 import { responsiveFontSize, guardedCtaColor } from './section-typography';
 import { TaxInclusiveLabel } from './tax-inclusive-label';
-import { OosImageDim, OutOfStockRibbon, isProductNew } from './ProductCardCta';
+import { AdaptiveAddButton, OosImageDim, OutOfStockRibbon, isProductNew } from './ProductCardCta';
 import { BrandPill } from './BrandPill';
 import { getDiscountBadgeColor } from './discount-badge';
 import { getCustomBadgeColor, getCustomBadgeTextColor, resolveCardBadges } from './custom-badge';
@@ -40,6 +41,7 @@ import { fromMinor } from '@ebda/shared';
 import { REGION } from '@ebda/shared';
 import { SwatchDots } from '../../components/commerce/SwatchDots';
 import { FactChips } from '../../components/commerce/FactChips';
+import { useRenderNow } from '../../contexts/RenderClockContext';
 interface PecannbeeProductCardProps extends ProductCardProps {
   pack?: TemplateId;
   /**
@@ -99,8 +101,9 @@ function PecannbeeProductCardImpl({
   showCardName,
   showCardPrice,
 }: PecannbeeProductCardProps) {
-  const { isRtl: ctxIsRtl } = useLanguage();
+  const { isRtl: ctxIsRtl, t } = useLanguage();
   const { store, layout } = useStore();
+  const renderNow = useRenderNow();
   const { money, numerals } = useNumerals();
   const isRtl = isRtlProp ?? ctxIsRtl;
   const styles = getPackStyles(pack);
@@ -138,7 +141,7 @@ function PecannbeeProductCardImpl({
   const inStock = product.inStock !== false;
   // Task 13: backorder-aware orderable signal. OOS products with backorder
   // allowed are still orderable — CTA stays pressable, no OOS label shown.
-  const orderable = inStock || product.acceptsBackorder === true;
+  const orderable = canBuyNow(product);
   const onSale = isOnSale(product);
   // BUG 1 fix: use getDiscountBadgeText so fixed-EGP discounts render correctly.
   const discountBadgeText = getDiscountBadgeText(product, isRtl, undefined, undefined, numerals);
@@ -170,7 +173,7 @@ function PecannbeeProductCardImpl({
     }
   };
 
-  const showNewBadge = inStock && isProductNew(product);
+  const showNewBadge = inStock && isProductNew(product, renderNow);
 
   // Task 3 B: read CTA + OOS defaults from productCardDefaults.
   const defaults = layout?.productCardDefaults;
@@ -209,6 +212,7 @@ function PecannbeeProductCardImpl({
     discountBadgeAllowed,
     customBadgePositionCls,
     discountBadgePositionCls,
+    discountTopCorner,
   } = resolveCardBadges({
     discountVisible: Boolean(onSale && discountBadgeText),
     product,
@@ -281,7 +285,7 @@ function PecannbeeProductCardImpl({
       <button
         type="button"
         onClick={handleWishlist}
-        aria-label={isRtl ? 'إضافة للمفضلة' : 'Add to wishlist'}
+        aria-label={t('Add to wishlist', 'إضافة للمفضلة')}
         aria-pressed={isWishlisted}
         // Touch hitbox: the visual circle stays 40px (h-10 w-10, unchanged),
         // but before:-inset-1.5 grows the actual tap target to ~52px so it
@@ -382,6 +386,7 @@ function PecannbeeProductCardImpl({
             // card's heart is at top-start, so an OOS pill left at its
             // top-start default must move off it, not just narrow in place.
             topStartReserved
+            topEndReserved={discountTopCorner === 'end'}
           />
           {/* Image overlay tint when out-of-stock. z-[5] sits under the OOS
               badge (z-10) and above the product image. */}
@@ -393,7 +398,7 @@ function PecannbeeProductCardImpl({
           {showNewBadge && (
             <span
               className="absolute top-3 start-3 z-10 rounded-full bg-[hsl(var(--primary))] px-2.5 py-1 text-xs font-bold uppercase tracking-wider text-[hsl(var(--primary-foreground))] shadow-[0_6px_14px_-6px_hsl(var(--primary)/0.5)]"
-              aria-label={isRtl ? 'منتج جديد' : 'New product'}
+              aria-label={t('New product', 'منتج جديد')}
             >
               {isRtl ? 'جديد' : 'NEW'}
             </span>
@@ -459,7 +464,7 @@ function PecannbeeProductCardImpl({
                 <p
                   id={`prod-${product.id}-name`}
                   data-zone="productName"
-                  className={`line-clamp-2 min-h-[2.5em] font-semibold ${textSizes.name} ${styles.productCardName}${nameCase === 'uppercase' ? ' uppercase' : ''}`}
+                  className={`[overflow-wrap:anywhere] line-clamp-2 min-h-[2.5em] font-semibold ${textSizes.name} ${styles.productCardName}${nameCase === 'uppercase' ? ' uppercase' : ''}`}
                   style={{
                     textWrap: 'balance',
                     fontFamily: productNameZone?.fontFamily,
@@ -551,11 +556,10 @@ function PecannbeeProductCardImpl({
           >
             {(isRtl ? resolvedCtaLabelTextAr : resolvedCtaLabelTextEn) ?? (isRtl ? 'عرض' : 'View')}
           </Link>
-        ) : (
+        ) : !orderable ? (
           <button
             type="button"
-            disabled={!orderable || isAdding}
-            onClick={handleAdd}
+            disabled
             data-cta="button"
             className={cn(
               `mt-auto inline-flex w-full items-center justify-center gap-2 min-h-[44px] ${styles.productCardCta} disabled:cursor-not-allowed disabled:opacity-60`,
@@ -574,24 +578,37 @@ function PecannbeeProductCardImpl({
               ...(resolvedBg ? { backgroundColor: resolvedBg } : {}),
             }}
           >
-            {!orderable ? (
-              isRtl ? (
-                (resolvedCtaLabelTextAr ?? 'نفدت الكمية')
-              ) : (
-                (resolvedCtaLabelTextEn ?? 'Out Of Stock')
-              )
-            ) : (
-              <>
-                {isAdding ? (
-                  <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent" />
-                ) : (
-                  <CartIcon className="h-4 w-4" aria-hidden={true} />
-                )}
-                {(isRtl ? resolvedCtaLabelTextAr : resolvedCtaLabelTextEn) ??
-                  (isRtl ? 'إضافة للسلة' : 'Add to Cart')}
-              </>
-            )}
+            {isRtl
+              ? (resolvedCtaLabelTextAr ?? 'نفدت الكمية')
+              : (resolvedCtaLabelTextEn ?? 'Out Of Stock')}
           </button>
+        ) : (
+          <AdaptiveAddButton
+            disabled={isAdding}
+            loading={isAdding}
+            showIcon
+            onClick={handleAdd}
+            label={
+              (isRtl ? resolvedCtaLabelTextAr : resolvedCtaLabelTextEn) ??
+              (isRtl ? 'إضافة للسلة' : 'Add to Cart')
+            }
+            className={cn(
+              `mt-auto inline-flex w-full items-center justify-center gap-2 min-h-[44px] ${styles.productCardCta} disabled:cursor-not-allowed disabled:opacity-60`,
+              ctaExtraCls
+            )}
+            style={{
+              fontFamily: productCtaZone?.fontFamily,
+              fontSize: responsiveFontSize(productCtaZone?.fontSize),
+              fontWeight: productCtaZone?.fontWeight,
+              color:
+                resolvedText ??
+                guardedCtaColor(productCtaZone?.color, styles.productCardCta, store.theme),
+              letterSpacing: productCtaZone?.letterSpacing,
+              lineHeight: productCtaZone?.lineHeight,
+              textTransform: productCtaZone?.textTransform as React.CSSProperties['textTransform'],
+              ...(resolvedBg ? { backgroundColor: resolvedBg } : {}),
+            }}
+          />
         )}
       </div>
     </article>

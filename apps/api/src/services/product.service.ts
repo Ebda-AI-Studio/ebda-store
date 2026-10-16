@@ -8,7 +8,7 @@ import {
   withStore,
 } from '@ebda/database';
 import { AppError } from '../middleware/error-handler';
-import { activeVariants, effectiveInventory } from '../lib/effective-inventory';
+import { effectiveInventory, enrichStockFlags } from '../lib/effective-inventory';
 import {
   slugify,
   slugifyWithFallback,
@@ -108,107 +108,10 @@ function stampManualProvenance(
   return next;
 }
 
-/**
- * Availability fields computed by `enrichStockFlags`. Declared explicitly so
- * the function's return type is `P & StockFlags` rather than the input type
- * erased down to its constraint — consumers (e.g. the AI product feed's
- * `buildProductFeed`, which reads `inStock`/`acceptsBackorder`) get compile-
- * time visibility of these fields instead of relying on `listPublic`
- * accidentally returning `any` (which the pre-2026-07-13 inner-cache
- * `JSON.parse` early-return used to cause — see the H1 note in
- * `docs/audits/2026-07-13-cache-stampede.md`).
- */
-interface StockFlags {
-  /** Variant-aware aggregate (sum of variant inventory for variant products). */
-  inventory: number;
-  inStock: boolean;
-  lowStock: boolean;
-  acceptsBackorder: boolean;
-  /** Exact qty when (lowStock || acceptsBackorder); null otherwise. */
-  availableQty: number | null;
-}
-
-export function enrichStockFlags<
-  P extends {
-    inventory: number;
-    allowBackorder: boolean;
-    lowStockThreshold: number;
-    variants?: Array<{
-      inventory: number;
-      allowBackorder?: boolean;
-      isActive?: boolean;
-      [key: string]: unknown;
-    }>;
-    [key: string]: unknown;
-  },
->(product: P): P & StockFlags {
-  const variants = product.variants ?? [];
-  const hasVariants = variants.length > 0;
-  // A disabled variant is not stock (#1103) — the same rule as
-  // lib/effective-inventory.ts, which this must never disagree with.
-  const sellable = activeVariants(variants);
-
-  // Variant products: effective stock = sum of ACTIVE variant inventory (0 when
-  // every variant is disabled). Single-SKU products keep their own column.
-  const effectiveInventory = hasVariants
-    ? sellable.reduce((sum, v) => sum + (v.inventory ?? 0), 0)
-    : product.inventory;
-
-  // Backorder is allowed when the product flag is set, or (for variant products)
-  // any ACTIVE variant permits backorder.
-  const productAllowsBackorder =
-    product.allowBackorder || (hasVariants && sellable.some(v => v.allowBackorder === true));
-
-  const inStock = effectiveInventory > 0;
-  const lowStock = inStock && effectiveInventory <= product.lowStockThreshold;
-  const acceptsBackorder = effectiveInventory <= 0 && productAllowsBackorder;
-  const availableQty = lowStock || acceptsBackorder ? effectiveInventory : null;
-
-  // `isActive` is read here and stripped: it drives the flags, it is not part
-  // of the storefront variant shape.
-  const enrichedVariants = variants.map(({ isActive, ...v }) => {
-    const sellableVariant = isActive !== false;
-    const vInStock = sellableVariant && v.inventory > 0;
-    const vLowStock = vInStock && v.inventory <= product.lowStockThreshold;
-    const vAcceptsBackorder =
-      sellableVariant &&
-      v.inventory <= 0 &&
-      ((v.allowBackorder ?? false) || product.allowBackorder);
-    const vAvailableQty = vLowStock || vAcceptsBackorder ? v.inventory : null;
-    return {
-      ...v,
-      inStock: vInStock,
-      lowStock: vLowStock,
-      acceptsBackorder: vAcceptsBackorder,
-      availableQty: vAvailableQty,
-    };
-  });
-
-  // lowStockThreshold is only needed above to compute the `lowStock` flag —
-  // the raw threshold number itself is never rendered by the storefront, so
-  // it's dropped here rather than leaked through the `...product` spread.
-  // (Return type stays `P & StockFlags`, not `Omit<P, 'lowStockThreshold'>`:
-  // P carries a `[key: string]: unknown` index signature, so TS can't prove
-  // Omit actually narrows it — the runtime strip below is what matters.)
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- destructure-to-discard
-  const { lowStockThreshold: _lowStockThreshold, ...productWithoutThreshold } = product;
-
-  return {
-    ...productWithoutThreshold,
-    // Surface the variant-aware aggregate as `inventory` so storefront cards,
-    // structured data, and the PDP fallback all read the correct stock.
-    inventory: effectiveInventory,
-    inStock,
-    lowStock,
-    acceptsBackorder,
-    availableQty,
-    variants: enrichedVariants,
-    // `unknown` first: TS can't prove Omit<P, 'lowStockThreshold'> overlaps
-    // with the generic P & StockFlags target since P is arbitrary at the
-    // call site — the runtime shape is correct (verified by the callers'
-    // usage), this is a generic-cast limitation, not a real mismatch.
-  } as unknown as P & StockFlags;
-}
+// `enrichStockFlags` moved to lib/effective-inventory.ts (2026-10-15, C-01) so the
+// recommendation and wishlist projections can share it without importing this
+// service; re-exported here so existing callers keep their import path.
+export { enrichStockFlags };
 
 interface CreateProductData {
   name: string;
@@ -547,6 +450,10 @@ export class ProductService {
         include: {
           images: { orderBy: { position: 'asc' } },
           categories: { include: { category: true } },
+          // Every variant row, disabled ones included: the same count the order /
+          // payment-link VARIANT_REQUIRED gates key on, so the admin size pickers
+          // can never disagree with the API (W1a re-review minor 4).
+          _count: { select: { variants: true } },
         },
         orderBy: { createdAt: 'desc' },
       }),
@@ -571,9 +478,11 @@ export class ProductService {
         variantSumByProduct.set(row.productId, row._sum.inventory ?? 0);
       }
     }
-    const withTotalInventory = products.map(p => ({
+    const withTotalInventory = products.map(({ _count, ...p }) => ({
       ...p,
-      totalInventory: p.hasVariants ? (variantSumByProduct.get(p.id) ?? 0) : p.inventory,
+      // Keyed on the real variant rows, not the `hasVariants` column, which can drift.
+      totalInventory: _count.variants > 0 ? (variantSumByProduct.get(p.id) ?? 0) : p.inventory,
+      variantCount: _count.variants,
     }));
 
     // Sales quantity = SUM(order_items.quantity) per product, restricted to the
@@ -1172,17 +1081,21 @@ export class ProductService {
     // Resolve ids that actually belong to this store and are not deleted.
     const existing = await prisma.product.findMany({
       where: { storeId, id: { in: safeIds }, deletedAt: null },
-      select: { id: true, hasVariants: true, price: true, inventory: true },
+      // The real variant ROWS, never the `hasVariants` column (it can drift): a
+      // bulk price/stock write on a variant product would break the inventory
+      // invariant (the parent column stays 0, variant row XOR product row).
+      select: { id: true, price: true, inventory: true, _count: { select: { variants: true } } },
     });
 
     if (existing.length === 0) return { updated: 0, skippedVariantProducts: 0 };
 
     const allIds = existing.map(p => p.id);
-    const simpleProducts = existing.filter(p => !p.hasVariants);
+    const isVariantProduct = (p: (typeof existing)[number]) => p._count.variants > 0;
+    const simpleProducts = existing.filter(p => !isVariantProduct(p));
     const simpleIds = simpleProducts.map(p => p.id);
     // Only count variant products as "skipped" when a price or inventory
     // mutation was requested — a status/flags-only edit isn't skipping anything.
-    const variantCount = existing.filter(p => p.hasVariants).length;
+    const variantCount = existing.filter(isVariantProduct).length;
     const skippedVariantProducts =
       fields.price !== undefined || fields.inventory !== undefined ? variantCount : 0;
 
@@ -1510,6 +1423,7 @@ export class ProductService {
         select: {
           ...STOREFRONT_PRODUCT_SELECT,
           lowStockThreshold: true,
+          trackInventory: true,
           images: { orderBy: { position: 'asc' } as const, take: 2 }, // 2 images: primary + hover-reveal second on cards
           categories: { include: { category: true } },
           options: LISTING_SWATCH_OPTIONS_SELECT,
@@ -1614,6 +1528,7 @@ export class ProductService {
       select: {
         ...STOREFRONT_PRODUCT_SELECT,
         lowStockThreshold: true,
+        trackInventory: true,
         images: { orderBy: { position: 'asc' } as const, take: 2 }, // 2 images: primary + hover-reveal second on cards
         categories: { include: { category: true } },
         options: LISTING_SWATCH_OPTIONS_SELECT,
@@ -1694,6 +1609,7 @@ export class ProductService {
   private static readonly PUBLIC_PRODUCT_DETAIL_SELECT = {
     ...STOREFRONT_PRODUCT_SELECT,
     lowStockThreshold: true,
+    trackInventory: true,
     images: { orderBy: { position: 'asc' } },
     // Each category carries its size chart so the PDP can inherit it (`resolvePdpSizeChart`);
     // the nested chart is stripped from the payload again in `withSizeChart`.

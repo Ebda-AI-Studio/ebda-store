@@ -10,7 +10,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import express from 'express';
 import request from 'supertest';
-import sharp from 'sharp';
+import { fakePng } from '../helpers/png-fixtures';
 
 const h = vi.hoisted(() => ({
   cleanup: vi.fn().mockResolvedValue(undefined),
@@ -58,11 +58,7 @@ describe('POST /:storeId/pwa/icons — superseded generation is cleaned up', () 
     const app = express();
     app.use(pwaRoutes);
     app.use(errorHandler);
-    const png = await sharp({
-      create: { width: 512, height: 512, channels: 3, background: { r: 1, g: 2, b: 3 } },
-    })
-      .png()
-      .toBuffer();
+    const png = fakePng(512, 512);
 
     const res = await request(app)
       .post(`/${STORE}/pwa/icons`)

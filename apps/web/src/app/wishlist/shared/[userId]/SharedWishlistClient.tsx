@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { canBuyNow } from '@/lib/can-buy-now';
 import { isOnSale } from '../../../../lib/product-pricing';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -11,6 +12,7 @@ import { useStore, useStoreUrl } from '../../../../contexts/StoreContext';
 import { useLanguage } from '../../../../contexts/LanguageContext';
 
 import { useLocalePrice } from '../../../../hooks/useLocalePrice';
+import { needsOptions } from '../../../../templates/adapters';
 interface WishlistProduct {
   id: string;
   name: string;
@@ -19,11 +21,20 @@ interface WishlistProduct {
   compareAtPrice?: number;
   images: string[];
   status: string;
+  /** Server-computed (lib/wishlist-card.ts). */
+  inStock?: boolean;
+  acceptsBackorder?: boolean;
+  variants?: Array<{ id: string }>;
 }
 
 interface WishlistItem {
   id: string;
   product: WishlistProduct;
+}
+
+/** Same stock rule as every product card (templates/adapters.ts). */
+function isOrderable(p: WishlistProduct): boolean {
+  return canBuyNow(p);
 }
 
 interface Props {
@@ -88,8 +99,11 @@ export default function SharedWishlistClient({ userId }: Props) {
       const response = await api.addToCart(productId, 1);
       if (response.success) {
         router.push(storeUrl('/cart'));
-      } else if (response.error?.code === 'PERSONALISATION_REQUIRED') {
-        // The merchant requires a personalisation note, typed on the PDP only.
+      } else if (
+        response.error?.code === 'PERSONALISATION_REQUIRED' ||
+        response.error?.code === 'VARIANT_REQUIRED'
+      ) {
+        // A personalisation note or a size/colour: both are chosen on the PDP only.
         const slug = items.find(i => i.product.id === productId)?.product.slug;
         if (slug) router.push(storeUrl(`/products/${slug}`));
       } else {
@@ -210,7 +224,7 @@ export default function SharedWishlistClient({ userId }: Props) {
         {items.length === 0 ? (
           <div className="text-center py-12 bg-background rounded-lg">
             <svg
-              className="w-16 h-16 text-muted-foreground/70 mx-auto mb-4"
+              className="w-16 h-16 text-muted-foreground mx-auto mb-4"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -245,7 +259,7 @@ export default function SharedWishlistClient({ userId }: Props) {
                         sizes="96px"
                       />
                     ) : (
-                      <div className="w-full h-full flex items-center justify-center text-muted-foreground/70">
+                      <div className="w-full h-full flex items-center justify-center text-muted-foreground">
                         <svg
                           className="w-8 h-8"
                           fill="none"
@@ -273,26 +287,45 @@ export default function SharedWishlistClient({ userId }: Props) {
                   <div className="flex items-center gap-2 mt-1">
                     <span className="font-bold">{formatPrice(item.product.price)}</span>
                     {isOnSale(item.product) && (
-                      <span className="text-muted-foreground/70 line-through text-sm">
+                      <span className="text-muted-foreground line-through text-sm">
                         {formatPrice(item.product.compareAtPrice)}
                       </span>
                     )}
                   </div>
-                  {item.product.status !== 'active' && (
+                  {item.product.status !== 'active' ? (
                     <span className="text-destructive-ink text-sm">
                       {t('Currently unavailable', 'غير متوفر حالياً')}
                     </span>
+                  ) : (
+                    !isOrderable(item.product) && (
+                      <span className="text-destructive-ink text-sm">
+                        {t('Out of Stock', 'غير متوفر')}
+                      </span>
+                    )
                   )}
                 </div>
 
                 <div className="flex-shrink-0">
-                  <button
-                    onClick={() => addToCart(item.product.id)}
-                    disabled={item.product.status !== 'active'}
-                    className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {t('Add to Cart', 'أضف إلى السلة')}
-                  </button>
+                  {/* A sized product is chosen on its PDP, never added bare
+                      (C-01; the cart API refuses it with VARIANT_REQUIRED).
+                      Same verb as the product cards' navigate CTA. */}
+                  {item.product.status === 'active' && needsOptions(item.product) ? (
+                    <Link
+                      href={storeUrl(`/products/${item.product.slug}`)}
+                      data-cta="view-variants"
+                      className="inline-flex min-h-[44px] items-center px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90"
+                    >
+                      {t('View', 'عرض')}
+                    </Link>
+                  ) : (
+                    <button
+                      onClick={() => addToCart(item.product.id)}
+                      disabled={!isOrderable(item.product)}
+                      className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {t('Add to Cart', 'أضف إلى السلة')}
+                    </button>
+                  )}
                 </div>
               </div>
             ))}

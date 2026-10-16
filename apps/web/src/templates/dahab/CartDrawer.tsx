@@ -16,6 +16,7 @@ import { useNumerals } from '../../hooks/useNumerals';
 import { DahabDrawer } from './Drawer';
 import { CartLineNote } from '../../components/commerce/CartLineNote';
 import { DAHAB_BTN_PRIMARY, DAHAB_BTN_SECONDARY, MinusIcon, PlusIcon, cx } from './ui';
+import { CART_CHECKOUT_CTA } from '../../lib/checkout-cta';
 
 export function DahabCartDrawer({
   open,
@@ -54,14 +55,14 @@ export function DahabCartDrawer({
             <p className="text-xs text-muted-foreground">
               {t(
                 'Delivery and payment options (cash on delivery, InstaPay, cards) at checkout.',
-                'التوصيل وطرق الدفع (عند الاستلام، إنستاباي، الكروت) في الخطوة الجاية.'
+                'التوصيل وطرق الدفع (عند الاستلام، إنستاباي، البطاقات) في الخطوة التالية.'
               )}
             </p>
             {blocked && (
               <p className="text-xs text-destructive-ink">
                 {t(
                   'Remove the items that are no longer available to check out.',
-                  'احذف القطع اللي مبقتش متاحة عشان تكمل الطلب.'
+                  'احذف القطع التي لم تعد متاحة لإتمام الطلب.'
                 )}
               </p>
             )}
@@ -71,7 +72,7 @@ export function DahabCartDrawer({
                   aria-disabled="true"
                   className={cx(DAHAB_BTN_PRIMARY, 'pointer-events-none opacity-50')}
                 >
-                  {t('Checkout', 'إتمام الطلب')}
+                  {t(CART_CHECKOUT_CTA.en, CART_CHECKOUT_CTA.ar)}
                 </span>
               ) : (
                 <Link
@@ -79,7 +80,7 @@ export function DahabCartDrawer({
                   className={DAHAB_BTN_PRIMARY}
                   onClick={onClose}
                 >
-                  {t('Checkout', 'إتمام الطلب')}
+                  {t(CART_CHECKOUT_CTA.en, CART_CHECKOUT_CTA.ar)}
                 </Link>
               )}
               <Link href={`${urlPrefix}/cart`} className={DAHAB_BTN_SECONDARY} onClick={onClose}>
@@ -93,12 +94,12 @@ export function DahabCartDrawer({
       {empty ? (
         <div className="flex h-full flex-col items-center justify-center gap-5 px-8 text-center">
           <p className="font-display text-2xl text-foreground">
-            {t('Your bag is empty', 'سلتك فاضية')}
+            {t('Your bag is empty', 'سلتك فارغة')}
           </p>
           <p className="text-sm text-muted-foreground">
             {t(
               'Rings, chains, bracelets and earrings are waiting.',
-              'الخواتم والسلاسل والأساور والحلقان في انتظارك.'
+              'الخواتم والسلاسل والأساور والأقراط في انتظارك.'
             )}
           </p>
           <Link href={`${urlPrefix}/products`} className={DAHAB_BTN_SECONDARY} onClick={onClose}>

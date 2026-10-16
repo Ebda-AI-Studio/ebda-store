@@ -11,6 +11,7 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { API_URL } from '../lib/api';
 import { formatDate as formatStoreDate } from '../lib/format-date';
 import { SectionRetryNotice } from './SectionRetryNotice';
+import { countText, VERIFIED_REVIEWS } from '../lib/plural';
 
 // Visual placeholders for the empty state. CRITICAL: these are NEVER
 // emitted as Schema.org Review markup — see ProductDetailPage's JSON-LD
@@ -104,6 +105,7 @@ function StarDisplay({ rating, size = 'sm' }: { rating: number; size?: 'sm' | 'l
 
 /** Clickable star selector used in the write-review form. */
 function StarSelector({ value, onChange }: { value: number; onChange: (rating: number) => void }) {
+  const { t } = useLanguage();
   const [hovered, setHovered] = useState(0);
   return (
     <div className="flex items-center gap-1">
@@ -114,7 +116,7 @@ function StarSelector({ value, onChange }: { value: number; onChange: (rating: n
           onClick={() => onChange(star)}
           onMouseEnter={() => setHovered(star)}
           onMouseLeave={() => setHovered(0)}
-          aria-label={`Rate ${star} out of 5`}
+          aria-label={t(`Rate ${star} out of 5`, `تقييم ${star} من 5`)}
           className="focus:outline-none"
         >
           <svg
@@ -372,8 +374,8 @@ export default function ReviewSection({ storeId, productId }: Props) {
             <StarDisplay rating={Math.round(averageRating)} size="lg" />
             <p className="mt-1 text-sm text-muted-foreground">
               {t(
-                `${averageRating.toFixed(1)} out of 5 — ${totalCount} verified ${totalCount === 1 ? 'review' : 'reviews'}`,
-                `${averageRating.toFixed(1)} من 5 — ${totalCount} ${totalCount === 1 ? 'مراجعة' : 'مراجعة'} موثّقة`
+                `${averageRating.toFixed(1)} out of 5 — ${countText('en', totalCount, VERIFIED_REVIEWS)}`,
+                `${averageRating.toFixed(1)} من 5 — ${countText('ar', totalCount, VERIFIED_REVIEWS)}`
               )}
             </p>
           </div>
@@ -477,7 +479,7 @@ export default function ReviewSection({ storeId, productId }: Props) {
                       {ownerResponseText}
                     </p>
                     {review.ownerResponseAt && (
-                      <p className="mt-1 text-xs text-muted-foreground/70">
+                      <p className="mt-1 text-xs text-muted-foreground">
                         {formatDate(review.ownerResponseAt)}
                       </p>
                     )}

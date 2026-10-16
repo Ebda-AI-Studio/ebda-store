@@ -28,13 +28,14 @@ import { deferAfterTenantCommit } from '../lib/after-tenant-commit';
 import { getStoreIdFromRequest } from '../utils/store-helpers';
 import logger from '../lib/logger';
 import { featureService } from '../services/feature.service';
+import { gateBackorderPayload } from '../lib/effective-inventory';
 import { notificationDispatcher } from '../services/notification-dispatcher.service';
 import { getCached } from '../lib/public-cache';
 import { storeLookupForHost } from '../lib/store-host';
 import { lookupStore, publicStorePage, type StoreStatusName } from '../lib/definer';
 import { redis } from '../services/redis.service';
 import { previewTokenKey } from '../lib/builder-preview-token';
-import { isReservedSlug, storefrontOrigin } from '@ebda/shared';
+import { isReservedSlug, storefrontOrigin, CONTACT_HONEYPOT_FIELD } from '@ebda/shared';
 import { parseOptionalBooleanQuery } from '../lib/query-params';
 import { setEdgeCache } from '../lib/edge-cache';
 import { buildProductFeed } from '../lib/product-feed';
@@ -53,7 +54,7 @@ import { PaymentService } from '../services/payment-providers/payment.factory';
 import { confirmPaymentFromProviderStatus } from '../services/payment-confirm.service';
 import type { PaymentProvider } from '../services/payment-providers/types';
 
-import { fromMinor } from '@ebda/shared';
+import { WISHLIST_CARD_VARIANTS_SELECT, wishlistCardProduct } from '../lib/wishlist-card';
 const router = Router();
 
 // Apply public rate limiter to all routes — per-IP first, then the
@@ -320,10 +321,18 @@ router.get('/products', async (req: Request, res: Response, next: NextFunction) 
     // x-store-id; per-locale because the storefront ?lang= query
     // surfaces in the URL, so it's already in the cache key without
     // needing Accept-Language Vary.
+    // The store's backorder feature is applied AFTER the cache read (an
+    // entitlement never rides the cached payload — the product_3d precedent).
+    // CACHE CLASS (Ruling FU46-W1b-6): the backorder gate is per request, but the
+    // edge copy below is not — after the store's `inventory.backorder` feature flips,
+    // an edge-cached listing/PDP can show the old pre-order state for up to
+    // sMaxAge 60s + staleWhileRevalidate 300s. BOUNDED-stale by design: the cart and
+    // checkout re-read the feature uncached (lineAllowsBackorder) and stay authoritative.
+    const backorderOn = await featureService.isFeatureEnabled(storeId, 'inventory.backorder');
     setEdgeCache(res, { sMaxAge: 60, staleWhileRevalidate: 300 });
     res.json({
       success: true,
-      data: result,
+      data: gateBackorderPayload(result, backorderOn),
     });
   } catch (error) {
     next(error);
@@ -369,10 +378,17 @@ router.get('/products/:slugOrId', async (req: Request, res: Response, next: Next
           : { ...product, model3d: null }
         : product;
 
+    // Backorder feature after the cache read, like product_3d above (X-02 fix round).
+    // CACHE CLASS (Ruling FU46-W1b-6): the backorder gate is per request, but the
+    // edge copy below is not — after the store's `inventory.backorder` feature flips,
+    // an edge-cached listing/PDP can show the old pre-order state for up to
+    // sMaxAge 60s + staleWhileRevalidate 300s. BOUNDED-stale by design: the cart and
+    // checkout re-read the feature uncached (lineAllowsBackorder) and stay authoritative.
+    const backorderOn = await featureService.isFeatureEnabled(storeId, 'inventory.backorder');
     setEdgeCache(res, { sMaxAge: 60, staleWhileRevalidate: 300 });
     res.json({
       success: true,
-      data: { product: payload },
+      data: { product: gateBackorderPayload(payload, backorderOn) },
     });
   } catch (error) {
     next(error);
@@ -486,7 +502,18 @@ router.get('/feed/products.json', async (req: Request, res: Response, next: Next
     });
     const now = new Date();
     const live = inputs.bundles.filter(b => withinSaleWindow(b, now));
-    const feed = buildProductFeed(store, inputs.products, baseUrl, live);
+    // Same backorder gate as the storefront (X-02 fix round): availability in the
+    // AI feed must agree with what the cart accepts.
+    // CACHE CLASS (Ruling FU46-W1b-6): the gated feed rides its own edge window (set
+    // below); an AI agent can read the old pre-order state until it expires.
+    // BOUNDED-stale: a cart built from it is re-checked by the cart and checkout.
+    const backorderOn = await featureService.isFeatureEnabled(storeId, 'inventory.backorder');
+    const feed = buildProductFeed(
+      store,
+      gateBackorderPayload(inputs.products, backorderOn),
+      baseUrl,
+      live
+    );
     // Never let the edge serve this body past the next window boundary: the
     // fresh window AND the stale-while-revalidate tail both end before it.
     const nextBoundarySec = nextSaleWindowBoundarySeconds(inputs.bundles, now);
@@ -1271,6 +1298,9 @@ router.get(
                     orderBy: { position: 'asc' },
                     take: 1,
                   },
+                  // The shared list's button is "choose options" for a sized
+                  // product, never a one-tap add (C-01).
+                  variants: WISHLIST_CARD_VARIANTS_SELECT,
                 },
               },
             },
@@ -1296,22 +1326,13 @@ router.get(
 
       const items = wishlist.items.map(item => ({
         id: item.id,
-        product: {
-          id: item.product.id,
-          name: item.product.name,
-          slug: item.product.slug,
-          price: fromMinor(item.product.price),
-          compareAtPrice: item.product.compareAtPrice
-            ? fromMinor(item.product.compareAtPrice)
-            : undefined,
-          images: item.product.images.map(img => img.url),
-          status: item.product.status,
-        },
+        product: wishlistCardProduct(item.product),
       }));
 
+      const backorderOn = await featureService.isFeatureEnabled(storeId, 'inventory.backorder');
       res.json({
         success: true,
-        data: { items, isPublic: wishlist.isPublic },
+        data: { items: gateBackorderPayload(items, backorderOn), isPublic: wishlist.isPublic },
       });
     } catch (error) {
       next(error);
@@ -2183,7 +2204,16 @@ router.post(
   }
 );
 
-// POST /contact - Submit contact form
+const CONTACT_STORE_WINDOW_SECONDS = 3600; // >= the repo's 120s TTL floor
+const CONTACT_STORE_MAX_PER_WINDOW = 20;
+
+// POST /contact - a shopper's storefront contact-page message, for THIS store (Ruling FU46-1).
+//
+// Resolved from X-Store-ID / x-store-domain like every /public write; a request that names no
+// store is refused (400 STORE_NOT_RESOLVED) instead of landing in a platform inbox. A demo store
+// (the looks showroom) refuses like its checkout does. A filled honeypot is answered as success
+// and dropped. #645: the send is queued on Inngest and the ENQUEUE is awaited, so a visitor is
+// never told "sent" for a message nothing will act on.
 router.post('/contact', writeLimiter, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const contactSchema = z.object({
@@ -2191,22 +2221,58 @@ router.post('/contact', writeLimiter, async (req: Request, res: Response, next: 
       email: z.string().email('Invalid email address'),
       subject: z.string().min(1, 'Subject is required').max(200),
       message: z.string().min(1, 'Message is required').max(5000),
+      // Any type/length: a bot stuffing the trap must get the silent success, never a 400.
+      [CONTACT_HONEYPOT_FIELD]: z.unknown().optional(),
     });
 
     const data = contactSchema.parse(req.body);
+    const storeId = await getStoreIdFromRequest(req);
 
-    // #645: queued on Inngest instead of a fire-and-forget
-    // `EmailService.sendContactForm(...).catch(...)` — that pattern had ZERO
-    // durable record of the submission, so an SMTP failure lost it
-    // permanently and silently while the visitor still saw "sent". Inngest
-    // retries the send 3x and dead-letter-alerts (alerts-failure-watch) past
-    // the final retry. The enqueue itself IS awaited — an enqueue failure
-    // must fail this request, not report success for a message nothing will
-    // ever act on (matches the "mark failed on enqueue error" rule for every
-    // other >300ms/3rd-party path in this codebase).
+    const trap = data[CONTACT_HONEYPOT_FIELD];
+    if (trap !== undefined && trap !== null && String(trap).trim() !== '') {
+      logger.info({ storeId }, '[CONTACT] honeypot tripped; dropped');
+      res.json({ success: true, data: { message: 'Message sent successfully' } });
+      return;
+    }
+
+    const store = await prisma.store.findUnique({
+      where: { id: storeId },
+      select: { isDemo: true },
+    });
+    if (!store) throw new AppError(404, 'STORE_NOT_FOUND', 'Store not found');
+    if (store.isDemo) {
+      throw new AppError(403, 'DEMO_STORE', 'This is a demo store; messages are disabled', {
+        messageEn: 'This is a demo store: messages are disabled',
+        messageAr: 'هذا متجر تجريبي — الرسائل مغلقة',
+      });
+    }
+
+    // Per-STORE cap on top of the per-IP writeLimiter (FU46-1 review I1): a store UUID is public,
+    // so distributed callers could otherwise flood one merchant from its own verified sender.
+    // Over the cap: identical success to the shopper (no oracle), message dropped, store id logged.
+    // FIXED window: the TTL is set when the key is created and dropped hits never extend it (a
+    // sliding window would let a trickle lock the form forever). Returns 0 when Redis is down:
+    // fail-open like writeLimiter (Ruling FU46-1b).
+    const sent = await redis.incrementFixedWindow(
+      `contact:${storeId}`,
+      CONTACT_STORE_WINDOW_SECONDS
+    );
+    if (sent > CONTACT_STORE_MAX_PER_WINDOW) {
+      // First over-cap hit of the window = the one merchant-visible signal: logged at error
+      // level (Sentry/pino alerting) once; the rest stay warn.
+      if (sent === CONTACT_STORE_MAX_PER_WINDOW + 1) {
+        logger.error({ storeId }, '[CONTACT] per-store cap hit; contact form is dropping messages');
+      } else {
+        logger.warn({ storeId }, '[CONTACT] per-store cap reached; message dropped');
+      }
+      res.json({ success: true, data: { message: 'Message sent successfully' } });
+      return;
+    }
+
     await inngest.send({
       name: 'contact/form.submitted',
       data: {
+        storeId,
         name: data.name,
         email: data.email,
         subject: data.subject,

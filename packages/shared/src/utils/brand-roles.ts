@@ -13,6 +13,15 @@ const PAIRS: ReadonlyArray<[string, keyof StoreTheme, string, keyof StoreTheme]>
 // 2:1 floor matches the storefront SectionHeading guard (2026-06-05): kills
 // invisible text (white-on-white = 1:1) while keeping a deliberate brand pick.
 const MIN_CONTRAST = 2;
+/**
+ * The primary fill carries every buy, checkout and selected-pill label (K-02),
+ * so its ink must read at AA (4.5:1), not just "not invisible". A stored theme
+ * cannot say whether its white was the merchant's pick or the template default
+ * copied in at creation (white on the default orange is 2.79:1), so any stored
+ * primary ink under AA yields to the luminance pick: black or white, whichever
+ * reads — one of the two always clears 4.58:1. Ruling FU46-W1c-9.
+ */
+const MIN_CONTRAST_BY_FG: Partial<Record<string, number>> = { '--primary-foreground': 4.5 };
 
 /** Convert pickReadableForeground's hex output to the bare `H S% L%` triple our CSS vars use. */
 function toTriple(value: string | undefined): string | undefined {
@@ -51,7 +60,11 @@ export function deriveBrandRoles(theme: StoreTheme): Record<string, string> {
     } else {
       const storedCss = toCss(stored);
       out[fgVar] =
-        surface && storedCss && contrastRatio(surface, storedCss) >= MIN_CONTRAST ? stored : auto;
+        surface &&
+        storedCss &&
+        contrastRatio(surface, storedCss) >= (MIN_CONTRAST_BY_FG[fgVar] ?? MIN_CONTRAST)
+          ? stored
+          : auto;
     }
   }
   return out;

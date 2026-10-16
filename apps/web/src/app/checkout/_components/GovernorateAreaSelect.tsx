@@ -36,6 +36,8 @@ interface ComboboxProps {
   hasError?: boolean;
   onSelect: (value: string) => void;
   onClear: () => void;
+  /** Accessible name of the clear button, in the shopper's language (R-05). */
+  clearLabel: string;
 }
 
 function Combobox({
@@ -48,6 +50,7 @@ function Combobox({
   hasError = false,
   onSelect,
   onClear,
+  clearLabel,
 }: ComboboxProps) {
   const [query, setQuery] = useState('');
   const [open, setOpen] = useState(false);
@@ -179,7 +182,7 @@ function Combobox({
           <button
             type="button"
             onClick={handleClear}
-            aria-label="Clear selection"
+            aria-label={clearLabel}
             className="ms-1 flex h-5 w-5 items-center justify-center rounded-full text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
           >
             <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -273,6 +276,7 @@ export function GovernorateAreaSelect({
   governorateError,
   areaError,
 }: GovernorateAreaSelectProps) {
+  const clearLabel = locale === 'ar' ? 'مسح الاختيار' : 'Clear selection';
   const govId = useId();
   const areaId = useId();
   const countryId = useId();
@@ -458,6 +462,7 @@ export function GovernorateAreaSelect({
             options={countries}
             onSelect={handleCountrySelect}
             onClear={handleCountryCleared}
+            clearLabel={clearLabel}
           />
         </div>
       )}
@@ -473,6 +478,7 @@ export function GovernorateAreaSelect({
             hasError={!!governorateError}
             onSelect={handleGovernorateSelect}
             onClear={handleGovernorateCleared}
+            clearLabel={clearLabel}
           />
           {governorateError && (
             <p role="alert" className="mt-1 text-sm text-destructive-ink">
@@ -492,6 +498,7 @@ export function GovernorateAreaSelect({
             hasError={!!areaError}
             onSelect={handleAreaSelect}
             onClear={handleAreaCleared}
+            clearLabel={clearLabel}
           />
           {areaError && (
             <p role="alert" className="mt-1 text-sm text-destructive-ink">

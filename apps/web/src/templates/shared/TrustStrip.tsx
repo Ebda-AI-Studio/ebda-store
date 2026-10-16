@@ -105,7 +105,7 @@ export function resolveTrustStripItems(
 }
 
 export function TrustStrip({ settings }: { settings?: TrustStripSettings } = {}) {
-  const { isRtl } = useLanguage();
+  const { isRtl, t } = useLanguage();
   const { store } = useStore();
   // Layout + size: page-builder layout.trustStrip wins; legacy theme.*
   // fallback covers stores saved before the page-builder section landed.
@@ -130,7 +130,7 @@ export function TrustStrip({ settings }: { settings?: TrustStripSettings } = {})
       iconSvgVertical: 'h-4 w-4',
       iconSvgHorizontal: 'h-3.5 w-3.5 sm:h-4 sm:w-4',
       title: 'text-xs font-bold text-foreground',
-      sub: 'text-xs text-foreground/65 max-w-[20ch]',
+      sub: 'text-xs text-foreground/70 max-w-[20ch]',
     },
     md: {
       iconWrapVertical: 'h-12 w-12',
@@ -138,7 +138,7 @@ export function TrustStrip({ settings }: { settings?: TrustStripSettings } = {})
       iconSvgVertical: 'h-6 w-6',
       iconSvgHorizontal: 'h-4 w-4 sm:h-6 sm:w-6',
       title: 'text-xs sm:text-sm font-bold text-foreground',
-      sub: 'text-xs text-foreground/65 max-w-[20ch]',
+      sub: 'text-xs text-foreground/70 max-w-[20ch]',
     },
     lg: {
       iconWrapVertical: 'h-16 w-16',
@@ -146,7 +146,7 @@ export function TrustStrip({ settings }: { settings?: TrustStripSettings } = {})
       iconSvgVertical: 'h-8 w-8',
       iconSvgHorizontal: 'h-6 w-6 sm:h-8 sm:w-8',
       title: 'text-sm sm:text-base font-bold text-foreground',
-      sub: 'text-sm text-foreground/65 max-w-[24ch]',
+      sub: 'text-sm text-foreground/70 max-w-[24ch]',
     },
   } as const;
   const tokens = SIZE_TOKENS[size];
@@ -206,7 +206,7 @@ export function TrustStrip({ settings }: { settings?: TrustStripSettings } = {})
 
   return (
     <section
-      aria-label={isRtl ? 'لماذا تتسوق معنا' : 'Why shop with us'}
+      aria-label={t('Why shop with us', 'لماذا تتسوق معنا')}
       dir={isRtl ? 'rtl' : 'ltr'}
       className={`bg-[hsl(var(--bg-page))] ${wrapperClass}`}
       style={sectionBgStyle(settings?.bgColor, store.theme)}

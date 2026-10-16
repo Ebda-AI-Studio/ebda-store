@@ -7,7 +7,7 @@ import { useLanguage } from '../../contexts/LanguageContext';
 import { useStore } from '../../contexts/StoreContext';
 import { categorySizeClass, cardShapeClasses } from '../shared/card-size';
 import { responsiveFontSize } from '../shared/section-typography';
-import { getCategoryCountUnit } from '../../lib/category-count-unit';
+import { categoryCountText } from '../../lib/category-count-unit';
 
 export default function ElegantCategoryCard({
   category,
@@ -22,7 +22,6 @@ export default function ElegantCategoryCard({
   const isRtl = isRtlProp ?? ctxIsRtl;
   const { store } = useStore();
   const displayName = isRtl && category.nameAr ? category.nameAr : category.name;
-  const countUnit = getCategoryCountUnit(store.theme, isRtl);
   const isOverlay = captionPosition === 'overlay';
   // Named shape overrides elegant's default aspect-square sm:aspect-[2/3]
   // + rounded-md (added 2026-05-16). Falls back to elegant defaults.
@@ -63,7 +62,7 @@ export default function ElegantCategoryCard({
 
         {/* View button that appears on hover */}
         <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-700">
-          <span className="px-7 py-3 bg-background/95 backdrop-blur-sm text-foreground text-[11px] tracking-[0.32em] uppercase font-medium">
+          <span className="px-7 py-3 bg-background/95 backdrop-blur-sm text-foreground text-xs tracking-[0.32em] uppercase font-medium">
             {isRtl ? 'عرض' : 'View'}
           </span>
         </div>
@@ -113,8 +112,8 @@ export default function ElegantCategoryCard({
             {displayName}
           </h3>
           {category.productCount !== undefined && (
-            <p className="text-[11px] text-muted-foreground/80 mt-2 tracking-[0.22em] uppercase">
-              {category.productCount} {countUnit}
+            <p className="text-xs text-muted-foreground mt-2 tracking-[0.22em] uppercase">
+              {categoryCountText(store.theme, isRtl, category.productCount)}
             </p>
           )}
         </div>

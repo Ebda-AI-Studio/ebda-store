@@ -563,7 +563,8 @@ export interface TemplateInfo {
 export const DEFAULT_THEME: StoreTheme = {
   // Core colors
   primaryColor: '26 100% 50%', // Orange
-  primaryForeground: '0 0% 100%',
+  // Black, not white: white on this orange is 2.79:1, black 7.5:1 (K-02, AA).
+  primaryForeground: '0 0% 0%',
   secondaryColor: '220 14% 96%',
   secondaryForeground: '220 9% 46%',
   accentColor: '26 100% 95%',

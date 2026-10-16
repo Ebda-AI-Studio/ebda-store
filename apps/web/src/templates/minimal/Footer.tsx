@@ -1,8 +1,11 @@
 'use client';
 
 import { PoweredByForce } from '../shared/PoweredByForce';
+import { FooterLegalRow } from '../shared/FooterLegalRow';
+import { FooterWhatsApp } from '../shared/FooterWhatsApp';
 import type { FooterProps } from '../types';
 import { useLanguage } from '../../contexts/LanguageContext';
+import { footerRootPaint } from '../shared/footer-ink';
 import {
   footerBranchesHeading,
   resolveFooterBranches,
@@ -17,6 +20,8 @@ export default function MinimalFooter({
   socials,
   navigation = [],
   footerLinks,
+  disabledCmsSlugs,
+  urlPrefix,
   isRtl: isRtlProp,
   bgColor,
   footerLogo,
@@ -62,7 +67,7 @@ export default function MinimalFooter({
   return (
     <footer
       data-zone="footer"
-      style={bgColor ? { backgroundColor: bgColor } : undefined}
+      {...footerRootPaint(bgColor)}
       className={`${bgColor ? '' : 'bg-[hsl(var(--bg-section-alt))]'} mt-auto py-12 md:py-16`}
       dir={isRtl ? 'rtl' : 'ltr'}
     >
@@ -80,6 +85,14 @@ export default function MinimalFooter({
                   : undefined
               }
             />
+          )}
+          {!displayLogo && !hideFooterLogoMobile && (
+            <p
+              data-footer-brand="mobile"
+              className="md:hidden self-center text-xs tracking-[0.25em] ui-caps-toggle font-light text-foreground"
+            >
+              {displayName}
+            </p>
           )}
           {/* Brand — desktop only (Ahmad 2026-06-20: mobile logo is now centered at the top). */}
           <div className="hidden md:block flex-shrink-0">
@@ -106,7 +119,7 @@ export default function MinimalFooter({
 
           {/* Navigation links — horizontal, minimal */}
           {allLinks.length > 0 && (
-            <nav className={`flex flex-wrap gap-x-6 gap-y-2 ${isRtl ? 'flex-row-reverse' : ''}`}>
+            <nav className="flex flex-wrap gap-x-6 gap-y-2">
               {allLinks.map(({ label, href }) => (
                 <a
                   key={href}
@@ -119,10 +132,18 @@ export default function MinimalFooter({
             </nav>
           )}
 
+          {/* S-02: the store's WhatsApp, named (the social row only has an icon). */}
+          {contact.whatsapp && (
+            <FooterWhatsApp
+              whatsapp={contact.whatsapp}
+              className="text-sm tracking-wide text-muted-foreground hover:text-foreground transition-colors duration-200"
+            />
+          )}
+
           {/* Social — only render the row when at least one social link is
               configured, so empty stores don't show a hollow column. */}
           {socialLinks.length > 0 && (
-            <div className={`flex items-center gap-4 ${isRtl ? 'flex-row-reverse' : ''}`}>
+            <div className="flex items-center gap-4">
               {socialLinks.map(s => (
                 <a
                   key={s.key}
@@ -145,7 +166,7 @@ export default function MinimalFooter({
           {/* Branches — opt-in, only rendered when the toggle is on AND at
               least one published location exists. */}
           {showBranches && (
-            <div className={`flex flex-col gap-3 ${isRtl ? 'items-end' : 'items-start'}`}>
+            <div className={`flex flex-col gap-3 items-start`}>
               <h4 className="text-xs tracking-[0.25em] ui-caps-toggle font-light text-foreground">
                 {footerBranchesHeading(isRtl)}
               </h4>
@@ -180,10 +201,17 @@ export default function MinimalFooter({
             </div>
           )}
         </div>
-
-        {/* Bottom bar removed 2026-05-21 — redundant with Company Links. */}
       </div>
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        {/* Legal row (S-01): privacy · terms · returns · ©, from resolveBottomBar. */}
+        <FooterLegalRow
+          footerLinks={footerLinks}
+          disabledCmsSlugs={disabledCmsSlugs}
+          storeName={displayName ?? ''}
+          isRtl={isRtl}
+          urlPrefix={urlPrefix}
+          className="text-muted-foreground"
+        />
         <PoweredByForce hidden={hidePoweredBy} />
       </div>
     </footer>

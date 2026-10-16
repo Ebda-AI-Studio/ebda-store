@@ -76,7 +76,7 @@ export function BundleCard({ bundle }: BundleCardProps) {
           <BundlePlaceholderIcon />
         )}
         {savings > 0 && (
-          <span className="absolute left-3 top-3 rounded-full bg-primary px-2.5 py-1 text-xs font-bold text-white">
+          <span className="absolute left-3 top-3 rounded-full bg-primary px-2.5 py-1 text-xs font-bold text-primary-foreground">
             {t('Save', 'وفّر')} {formatPrice(savings)}
           </span>
         )}

@@ -1,7 +1,3 @@
-import sharp from 'sharp';
-import logger from '../lib/logger';
-import { isWorkers } from '../lib/runtime';
-
 /**
  * Target dimensions per aspect ratio. Picked to match the storefront's
  * sizing-contract defaults (see store-layout.ts + 2026-05-16-mobile-ui-
@@ -32,179 +28,26 @@ export const ASPECT_TARGETS: Record<string, { w: number; h: number }> = {
 };
 
 /**
- * If the requested aspect maps to a known target, returns a sharp-
- * resized buffer cropped to fill the target dimensions (cover fit,
- * centered). Otherwise returns the original buffer untouched.
- *
- * Format preservation: sharp auto-detects input format and re-encodes
- * to the same. Reasonable compression defaults:
- *   - jpeg: quality 85 (default sharp quality, no perceptible loss)
- *   - png: kept as png (lossless)
- *   - webp: quality 85
- *
- * Fire-and-forget design: if sharp throws (corrupt input, unsupported
- * format, OOM), we log the error and return the ORIGINAL buffer. Better
- * to upload a non-resized image than fail the entire upload.
- *
- * EXIF metadata is stripped (sharp default) — protects against camera
- * GPS data leaking through merchant uploads.
- */
-/**
- * Hard ceiling applied to EVERY image upload, aspect or not.
- *
- * 2000px on the longest side is generous for storefront product zoom while
- * keeping a photo around 200-800 KB. Nothing a merchant can do from the admin
- * should put a multi-megabyte image in front of a mobile customer.
- */
-const MAX_LONGEST_SIDE = 2000;
-
-/**
- * Unconditional size ceiling — runs even when no `?aspect=` is supplied.
- *
- * WHY THIS EXISTS
- * ---------------
- * `resizeToAspect` is opt-in: it returns the original buffer untouched when
- * `?aspect=` is absent, and no admin upload surface currently sends that param
- * for product images. So a 26-megapixel camera original uploaded straight from
- * a phone was stored, and served, at full size.
- *
- * That is not hypothetical. On 2026-05-01 the demo-boutique catalog went up as 19
- * images averaging 8 MB — including a 4160x6240 PNG at 28 MB — and those pages
- * shipped exactly that to every mobile customer until 2026-08-09. 178 MB of
- * originals reduced to 7 MB (96%) with no visible quality change, which is the
- * measure of how much was being wasted.
- *
- * Deliberately separate from the aspect crop: aspect is a DESIGN choice about
- * shape, this is a SAFETY floor about bytes. An upload surface can forget the
- * former; it must not be able to opt out of the latter.
- *
- * Fail-soft like its sibling: if sharp throws, return the original rather than
- * failing the upload — a large image beats a broken one.
+ * Upload-time size ceiling (historically 2000px on the longest side) — WHY IT EXISTED: on
+ * 2026-05-01 the demo-boutique catalog went up as 19 images averaging 8 MB (a 4160x6240 PNG at
+ * 28 MB) and shipped that to every mobile customer until 2026-08-09. On Workers, where the API
+ * runs, `sharp` never loaded, so production has stored originals since the Workers move; the
+ * Node-only resize that tests exercised was never the production path (Ruling FU46-8). The
+ * ceiling must come back at delivery (Cloudflare Images), not in this function.
  */
 export async function enforceMaxDimensions(buffer: Buffer): Promise<Buffer> {
-  // Workers: sharp is a native addon and does not run there. Resizing moves to Cloudflare Images
-  // on delivery (the original stays in R2, `/cdn-cgi/image/...` or the IMAGES binding), so the
-  // upload path stores the original. TODO(SP4 stage 2): wire the delivery-side transform and the
-  // 2000px ceiling through it; until then Workers uploads are stored as sent.
-  if (isWorkers) return buffer;
-  try {
-    const metadata = await sharp(buffer).metadata();
-    if (!metadata.width || !metadata.height) return buffer;
-    if (metadata.width <= MAX_LONGEST_SIDE && metadata.height <= MAX_LONGEST_SIDE) {
-      return buffer;
-    }
-
-    // `fit: inside` constrains the LONGEST side. Constraining width alone
-    // leaves a portrait shot at 2000x3000 (6 MP) — still far more than a
-    // storefront needs.
-    const pipeline = sharp(buffer)
-      // Bake in EXIF orientation before stripping metadata, or a phone photo
-      // silently rotates once the orientation tag is gone.
-      .rotate()
-      .resize({
-        width: MAX_LONGEST_SIDE,
-        height: MAX_LONGEST_SIDE,
-        fit: 'inside',
-        withoutEnlargement: true,
-      });
-
-    const format = metadata.format ?? 'jpeg';
-    let out: Buffer;
-    if (format === 'png') {
-      out = await pipeline.png({ compressionLevel: 9 }).toBuffer();
-    } else if (format === 'webp') {
-      out = await pipeline.webp({ quality: 85 }).toBuffer();
-    } else {
-      out = await pipeline.jpeg({ quality: 85, mozjpeg: true }).toBuffer();
-    }
-
-    // Never make a file bigger. Re-encoding an already-optimised image can
-    // do that, and the whole point here is bytes.
-    if (out.length >= buffer.length) return buffer;
-
-    logger.info(
-      {
-        from: `${metadata.width}x${metadata.height}`,
-        bytesBefore: buffer.length,
-        bytesAfter: out.length,
-      },
-      'image-resize: applied max-dimension ceiling'
-    );
-    return out;
-  } catch (err) {
-    logger.warn({ err }, 'image-resize: max-dimension ceiling failed, keeping original');
-    return buffer;
-  }
+  // Ruling FU46-8: no `sharp` anywhere in the API — it cannot load on workerd, where
+  // production runs and where this already returned the original. The ceiling therefore
+  // belongs to delivery (Cloudflare Images `/cdn-cgi/image/...` or the IMAGES binding), which is
+  // NOT wired yet: until it is, every runtime stores the original as sent (≤ 10 MB, the upload
+  // cap). Kept as a function so every upload route keeps one call site to switch on later.
+  return buffer;
 }
 
-export async function resizeToAspect(buffer: Buffer, aspect: string | undefined): Promise<Buffer> {
-  if (!aspect) return buffer;
-  // Workers: see enforceMaxDimensions (sharp does not run there; Cloudflare Images on delivery).
-  if (isWorkers) return buffer;
-  const target = ASPECT_TARGETS[aspect];
-  if (!target) {
-    logger.debug({ aspect }, 'image-resize: unknown aspect, skipping');
-    return buffer;
-  }
-
-  try {
-    const metadata = await sharp(buffer).metadata();
-    const inputFormat = metadata.format ?? 'jpeg';
-
-    // Only resize if the image is LARGER than target in at least one
-    // dimension. Avoids upscaling small uploads (which would soften
-    // them without adding detail).
-    if (
-      metadata.width &&
-      metadata.height &&
-      metadata.width <= target.w &&
-      metadata.height <= target.h
-    ) {
-      logger.debug(
-        { inputWxH: `${metadata.width}x${metadata.height}`, target: `${target.w}x${target.h}` },
-        'image-resize: input already <= target, skipping resize'
-      );
-      return buffer;
-    }
-
-    const pipeline = sharp(buffer).resize(target.w, target.h, {
-      fit: 'cover',
-      position: 'center',
-    });
-
-    // Re-encode preserving format with sane quality defaults
-    let out: Buffer;
-    if (inputFormat === 'png') {
-      out = await pipeline.png({ compressionLevel: 9 }).toBuffer();
-    } else if (inputFormat === 'webp') {
-      out = await pipeline.webp({ quality: 85 }).toBuffer();
-    } else if (inputFormat === 'gif') {
-      // sharp gif animation support requires libvips compiled with gif —
-      // not guaranteed in all envs. resize to first-frame jpeg to keep
-      // behavior consistent.
-      out = await pipeline.jpeg({ quality: 85 }).toBuffer();
-    } else {
-      // jpeg + everything else → jpeg
-      out = await pipeline.jpeg({ quality: 85, mozjpeg: true }).toBuffer();
-    }
-
-    logger.info(
-      {
-        aspect,
-        before: `${metadata.width}x${metadata.height}`,
-        after: `${target.w}x${target.h}`,
-        inputBytes: buffer.length,
-        outputBytes: out.length,
-      },
-      'image-resize: resized image to target aspect'
-    );
-
-    return out;
-  } catch (err) {
-    logger.warn(
-      { err: err instanceof Error ? err.message : 'unknown', aspect },
-      'image-resize: failed, returning original buffer'
-    );
-    return buffer;
-  }
+/**
+ * Same as `enforceMaxDimensions`: the aspect crop moves to delivery (Ruling FU46-8), so the
+ * original is returned on every runtime. `ASPECT_TARGETS` stays the shared size table.
+ */
+export async function resizeToAspect(buffer: Buffer, _aspect: string | undefined): Promise<Buffer> {
+  return buffer;
 }

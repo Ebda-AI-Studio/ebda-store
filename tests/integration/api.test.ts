@@ -174,9 +174,12 @@ describe('API Integration Tests', () => {
       });
       const data = await response.json();
 
-      expect(response.status).toBe(403);
+      // Ruling S11-1 (#75): a customer token works only for the store it was issued for, from
+      // that store's origin; anywhere else it is a dead token (401), the same as FU46-9's
+      // onboarding case.
+      expect(response.status).toBe(401);
       expect(data.success).toBe(false);
-      expect(data.error.code).toBe('FORBIDDEN');
+      expect(data.error.code).toBe('TOKEN_INVALID');
     });
 
     it('should allow admin to access stores', async () => {

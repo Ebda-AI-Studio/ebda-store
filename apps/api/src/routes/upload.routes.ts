@@ -1,5 +1,4 @@
 import { Router, Request, Response, NextFunction } from 'express';
-import { z } from 'zod';
 import multer from 'multer';
 import { authenticate } from '../middleware/auth';
 import { checkStoreAccess } from '../middleware/store-access';
@@ -8,8 +7,21 @@ import { StorageService } from '../services/storage.service';
 import { resizeToAspect, enforceMaxDimensions } from '../services/image-resize.service';
 import { uploadLimiter, dailyUploadLimiter, auditLog } from '../middleware/security';
 import { runInTenantContext } from '@ebda/database';
+import {
+  IMAGE_UPLOAD_MAX_BYTES,
+  IMAGE_UPLOAD_BATCH_MAX,
+  IMAGE_UPLOAD_ACCEPTED_TYPES,
+} from '@ebda/shared';
 import { AppError } from '../middleware/error-handler';
 import { sniffVideo, VIDEO_MAX_BYTES } from '../lib/video-sniff';
+import {
+  sniffImage,
+  IMAGE_EXT,
+  sniffFont,
+  FONT_EXT,
+  renameByKind,
+  uploadContentError,
+} from '../lib/upload-sniff';
 
 /**
  * Run a function under the tenant RLS context if a storeId is known,
@@ -31,20 +43,13 @@ const router = Router();
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: {
-    fileSize: 10 * 1024 * 1024, // 10MB
-    files: 10, // Max 10 files at once
+    fileSize: IMAGE_UPLOAD_MAX_BYTES,
+    files: IMAGE_UPLOAD_BATCH_MAX, // FU46-6: the admin batches larger selections
   },
   fileFilter: (_req, file, cb) => {
-    const allowedTypes = [
-      'image/jpeg',
-      'image/png',
-      'image/gif',
-      'image/webp',
-      'image/x-icon',
-      'image/vnd.microsoft.icon',
-    ];
-
-    if (allowedTypes.includes(file.mimetype)) {
+    // The declared type is only a first filter (the bytes decide, see upload-sniff.ts); it is
+    // the same list the admin picker offers, so ICO/SVG/HEIC never reach the sniff.
+    if ((IMAGE_UPLOAD_ACCEPTED_TYPES as readonly string[]).includes(file.mimetype)) {
       cb(null, true);
     } else {
       cb(new AppError(400, 'INVALID_FILE_TYPE', `Invalid file type: ${file.mimetype}`));
@@ -225,6 +230,11 @@ router.post(
         });
         return;
       }
+      const sniffed = sniffImage(req.file.buffer);
+      if (!sniffed) {
+        res.status(400).json({ success: false, error: uploadContentError('image') });
+        return;
+      }
 
       const resolved = await resolveFolderAndStore(req);
       if (!resolved.ok) {
@@ -251,10 +261,17 @@ router.post(
         // customers for three months.
         const resizedBuffer = await enforceMaxDimensions(aspectResized);
 
-        const uploaded = await StorageService.upload(resizedBuffer, req.file!.originalname, {
-          folder: resolved.folder,
-          storeId: resolved.storeId,
-        });
+        // Named by the bytes we STORE (a resize can re-encode a GIF to JPEG), never the
+        // client's name: storage derives the Content-Type from this extension.
+        const storedKind = sniffImage(resizedBuffer) ?? sniffed;
+        const uploaded = await StorageService.upload(
+          resizedBuffer,
+          renameByKind(req.file!.originalname, IMAGE_EXT[storedKind], 'image'),
+          {
+            folder: resolved.folder,
+            storeId: resolved.storeId,
+          }
+        );
 
         await auditLog({
           action: 'file.uploaded',
@@ -440,7 +457,7 @@ router.post(
   requirePermission('products:write'),
   uploadLimiter,
   dailyUploadLimiter,
-  upload.array('files', 10),
+  upload.array('files', IMAGE_UPLOAD_BATCH_MAX),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const files = req.files as Express.Multer.File[];
@@ -450,6 +467,17 @@ router.post(
           success: false,
           error: { code: 'NO_FILES', message: 'No files uploaded' },
         });
+        return;
+      }
+      // One non-image refuses the whole batch: nothing in it is stored. `invalidIndexes`
+      // (positions in this request, never the client's filenames) lets the admin name the
+      // refused files and re-send the rest.
+      const sniffedAll = files.map(f => sniffImage(f.buffer));
+      if (sniffedAll.some(kind => kind === null)) {
+        const invalidIndexes = sniffedAll.flatMap((kind, i) => (kind === null ? [i] : []));
+        res
+          .status(400)
+          .json({ success: false, error: uploadContentError('image', { invalidIndexes }) });
         return;
       }
 
@@ -466,10 +494,11 @@ router.post(
         // (see enforceMaxDimensions' doc comment for the incident this
         // guards against).
         const capped = await Promise.all(
-          files.map(async f => ({
-            buffer: await enforceMaxDimensions(f.buffer),
-            filename: f.originalname,
-          }))
+          files.map(async (f, i) => {
+            const buffer = await enforceMaxDimensions(f.buffer);
+            const kind = sniffImage(buffer) ?? sniffedAll[i]!;
+            return { buffer, filename: renameByKind(f.originalname, IMAGE_EXT[kind], 'image') };
+          })
         );
         const uploaded = await StorageService.uploadMultiple(capped, {
           folder: resolved.folder,
@@ -494,109 +523,6 @@ router.post(
       res.json({
         success: true,
         data: { files: results },
-      });
-    } catch (error) {
-      next(error);
-    }
-  }
-);
-
-/**
- * POST /uploads/presigned
- * Get a presigned URL for direct upload
- */
-router.post(
-  '/presigned',
-  authenticate,
-  requirePermission('products:write'),
-  async (req: Request, res: Response, next: NextFunction) => {
-    try {
-      const parsed = z
-        .object({
-          filename: z.string().min(1),
-          contentType: z.string().min(1),
-          folder: z.string().optional(),
-          // Read below as a store-id candidate; was cast from `req.body`
-          // unvalidated, so a non-string reached checkStoreAccess. `nullish`
-          // keeps a client that sends `storeId: null` working.
-          storeId: z.string().nullish(),
-        })
-        .safeParse(req.body);
-      if (!parsed.success) {
-        res.status(400).json({
-          success: false,
-          error: { code: 'MISSING_PARAMS', message: 'filename and contentType are required' },
-        });
-        return;
-      }
-      const { filename, contentType, folder, storeId: parsedBodyStoreId } = parsed.data;
-
-      // Validate content type against allowed types
-      const allowedContentTypes = [
-        'image/jpeg',
-        'image/png',
-        'image/gif',
-        'image/webp',
-        'image/x-icon',
-        'image/vnd.microsoft.icon',
-      ];
-      if (!allowedContentTypes.includes(contentType)) {
-        res.status(400).json({
-          success: false,
-          error: {
-            code: 'INVALID_TYPE',
-            message: `Invalid content type: ${contentType}. Allowed: ${allowedContentTypes.join(', ')}`,
-          },
-        });
-        return;
-      }
-
-      const sanitizedFolder = (folder || 'misc').replace(/[^a-zA-Z0-9_-]/g, '');
-      if (!ALLOWED_FOLDERS.has(sanitizedFolder)) {
-        res.status(400).json({
-          success: false,
-          error: {
-            code: 'INVALID_FOLDER',
-            message: `Folder '${sanitizedFolder}' is not allowed. Allowed: ${Array.from(ALLOWED_FOLDERS).join(', ')}`,
-          },
-        });
-        return;
-      }
-      const queryStoreId = (req.query.storeId as string | undefined) || undefined;
-      const bodyStoreId = parsedBodyStoreId || undefined;
-      const headerStoreId = (req.headers['x-store-id'] as string | undefined) || undefined;
-      const presignedStoreId =
-        queryStoreId || bodyStoreId || headerStoreId || req.user?.storeId || null;
-      // Same ownership guard as POST /uploads/image — the storeId
-      // becomes the R2 key prefix verbatim, so we can't trust whatever
-      // the caller passes. super_admin bypasses (no storeId, legacy
-      // platform path); store_admin must own the resolved storeId.
-      if (presignedStoreId) {
-        const access = await checkStoreAccess(presignedStoreId, req.user!);
-        if (!access.ok) {
-          res
-            .status(access.status)
-            .json({ success: false, error: { code: access.code, message: access.message } });
-          return;
-        }
-      } else if (req.user?.role !== 'super_admin') {
-        res.status(403).json({
-          success: false,
-          error: { code: 'FORBIDDEN', message: 'storeId is required for non-super-admin uploads' },
-        });
-        return;
-      }
-      const result = await StorageService.getUploadUrl(
-        filename,
-        contentType,
-        sanitizedFolder,
-        3600,
-        presignedStoreId
-      );
-
-      res.json({
-        success: true,
-        data: result,
       });
     } catch (error) {
       next(error);
@@ -752,6 +678,12 @@ router.post(
         });
         return;
       }
+      // The bytes decide the format (the filter above admits octet-stream and any name).
+      const fontKind = sniffFont(req.file.buffer);
+      if (!fontKind) {
+        res.status(400).json({ success: false, error: uploadContentError('font') });
+        return;
+      }
 
       // Force the folder to `fonts` regardless of what the client sent
       // — keeps every per-store font under a predictable prefix that
@@ -773,23 +705,18 @@ router.post(
         return;
       }
 
-      const ext = (
-        req.file.originalname.match(/\.(woff2|woff|ttf|otf)$/i)?.[1] ?? 'woff2'
-      ).toLowerCase();
+      const ext = FONT_EXT[fontKind].slice(1);
       const result = await withOptionalTenantContext(storeId, async () => {
-        const uploaded = await StorageService.upload(req.file!.buffer, req.file!.originalname, {
-          folder: 'fonts',
-          storeId,
-          contentType:
-            ext === 'woff2'
-              ? 'font/woff2'
-              : ext === 'woff'
-                ? 'font/woff'
-                : ext === 'ttf'
-                  ? 'font/ttf'
-                  : 'font/otf',
-          allowedTypes: ['font/woff2', 'font/woff', 'font/ttf', 'font/otf'],
-        });
+        const uploaded = await StorageService.upload(
+          req.file!.buffer,
+          renameByKind(req.file!.originalname, FONT_EXT[fontKind], 'font'),
+          {
+            folder: 'fonts',
+            storeId,
+            contentType: fontKind,
+            allowedTypes: ['font/woff2', 'font/woff', 'font/ttf', 'font/otf'],
+          }
+        );
 
         await auditLog({
           action: 'font.uploaded',

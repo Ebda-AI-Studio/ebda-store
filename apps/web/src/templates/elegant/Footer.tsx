@@ -2,9 +2,12 @@
 
 import Link from 'next/link';
 import { PoweredByForce } from '../shared/PoweredByForce';
+import { FooterLegalRow } from '../shared/FooterLegalRow';
+import { FooterWhatsApp } from '../shared/FooterWhatsApp';
 import { useState } from 'react';
 import type { FooterProps } from '../types';
 import { useLanguage } from '../../contexts/LanguageContext';
+import { footerRootPaint } from '../shared/footer-ink';
 import { api } from '../../lib/api';
 import {
   footerBranchesHeading,
@@ -22,6 +25,8 @@ export default function ElegantFooter({
   socials,
   navigation = [],
   footerLinks,
+  disabledCmsSlugs,
+  urlPrefix,
   isRtl: isRtlProp,
   bgColor,
   footerLogo,
@@ -30,7 +35,7 @@ export default function ElegantFooter({
   theme,
   locations,
 }: FooterProps) {
-  const { isRtl: ctxIsRtl, language } = useLanguage();
+  const { isRtl: ctxIsRtl, language, t } = useLanguage();
   const isRtl = isRtlProp ?? ctxIsRtl;
   const displayName = isRtl && branding.nameAr ? branding.nameAr : branding.name;
   const displayLogo = footerLogo || (isRtl && branding.logoAr ? branding.logoAr : branding.logo);
@@ -102,7 +107,7 @@ export default function ElegantFooter({
   return (
     <footer
       data-zone="footer"
-      style={bgColor ? { backgroundColor: bgColor } : undefined}
+      {...footerRootPaint(bgColor)}
       className={`${bgColor ? '' : 'bg-[hsl(var(--bg-section-alt))]'} border-t border-border mt-auto`}
       dir={isRtl ? 'rtl' : 'ltr'}
     >
@@ -111,7 +116,7 @@ export default function ElegantFooter({
         <div className="border-b border-border/50">
           <div className="container mx-auto px-4 py-14 sm:py-16 md:py-20">
             <div className="max-w-xl mx-auto text-center">
-              <h3 className="text-xs tracking-[0.3em] ui-caps-toggle text-muted-foreground/70 mb-4 font-serif">
+              <h3 className="text-xs tracking-[0.3em] ui-caps-toggle text-muted-foreground mb-4 font-serif">
                 {isRtl ? 'النشرة البريدية' : 'Newsletter'}
               </h3>
               {/* Body line — render the merchant's brand description when
@@ -138,9 +143,9 @@ export default function ElegantFooter({
                       autoComplete="email"
                       value={email}
                       onChange={e => setEmail(e.target.value)}
-                      placeholder={isRtl ? 'البريد الإلكتروني' : 'Enter your email'}
-                      aria-label={isRtl ? 'البريد الإلكتروني' : 'Email address'}
-                      className="h-12 min-w-0 flex-1 px-6 bg-background border border-border focus:border-foreground focus:outline-none text-sm tracking-wide placeholder:text-muted-foreground/50 transition-colors duration-500"
+                      placeholder={t('Enter your email', 'البريد الإلكتروني')}
+                      aria-label={t('Email address', 'البريد الإلكتروني')}
+                      className="h-12 min-w-0 flex-1 px-6 bg-background border border-border focus:border-foreground focus:outline-none text-sm tracking-wide placeholder:text-muted-foreground transition-colors duration-500"
                       dir={isRtl ? 'rtl' : 'ltr'}
                       required
                       disabled={submitting}
@@ -160,7 +165,7 @@ export default function ElegantFooter({
                     </button>
                   </form>
                   {errorMsg && (
-                    <p className="mt-3 text-[10px] tracking-wide text-destructive" role="alert">
+                    <p className="mt-3 text-xs tracking-wide text-destructive" role="alert">
                       {errorMsg}
                     </p>
                   )}
@@ -189,6 +194,14 @@ export default function ElegantFooter({
                     : undefined
                 }
               />
+            )}
+            {!displayLogo && !hideFooterLogoMobile && (
+              <p
+                data-footer-brand="mobile"
+                className="md:hidden mb-5 text-center text-base font-medium tracking-[0.2em] text-foreground font-serif"
+              >
+                {displayName}
+              </p>
             )}
             {displayLogo ? (
               <img
@@ -259,7 +272,7 @@ export default function ElegantFooter({
 
           {/* Contact — hidden entirely if the store has no contact details
               configured. Empty heading + empty list looks unfinished. */}
-          {(contact.email || displayPhone || displayAddress) && (
+          {(contact.email || displayPhone || displayAddress || contact.whatsapp) && (
             <div>
               <h4 className="text-xs tracking-[0.25em] ui-caps-toggle font-semibold text-foreground mb-6 font-serif">
                 {isRtl ? 'تواصل' : 'Contact'}
@@ -284,6 +297,14 @@ export default function ElegantFooter({
                     >
                       {displayPhone}
                     </a>
+                  </li>
+                )}
+                {contact.whatsapp && (
+                  <li>
+                    <FooterWhatsApp
+                      whatsapp={contact.whatsapp}
+                      className="text-foreground/70 hover:text-foreground transition-colors duration-700 ease-out tracking-wide cursor-pointer"
+                    />
                   </li>
                 )}
                 {displayAddress && (
@@ -321,7 +342,7 @@ export default function ElegantFooter({
                     href={s.url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-foreground/60 hover:text-foreground transition-colors duration-300 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+                    className="text-foreground/70 hover:text-foreground transition-colors duration-300 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
                     aria-label={s.key}
                   >
                     <SocialGlyph
@@ -375,11 +396,16 @@ export default function ElegantFooter({
         </div>
       </div>
 
-      {/* Bottom bar removed 2026-05-21 — was redundant with the Company
-          Links footer section (merchants put Privacy/Terms/Shipping there
-          if they want them). PoweredByForce attribution + the per-section
-          copyright option are kept. */}
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        {/* Legal row (S-01): privacy · terms · returns · ©, from resolveBottomBar. */}
+        <FooterLegalRow
+          footerLinks={footerLinks}
+          disabledCmsSlugs={disabledCmsSlugs}
+          storeName={displayName ?? ''}
+          isRtl={isRtl}
+          urlPrefix={urlPrefix}
+          className="text-foreground/70"
+        />
         <PoweredByForce hidden={hidePoweredBy} />
       </div>
     </footer>

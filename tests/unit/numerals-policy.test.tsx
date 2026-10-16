@@ -62,7 +62,7 @@ describe('the default is Western digits in both languages', () => {
 
   it('discount badges are Western unless the store opted in', () => {
     const product = { price: 45_000, compareAtPrice: 54_000 };
-    expect(getDiscountBadgeText(product, true)).toBe('-17%');
+    expect(getDiscountBadgeText(product, true)).toBe('\u2066\u221217%\u2069');
     const fixed = { ...product, discountType: 'fixed', discountValue: 90 };
     expect(getDiscountBadgeText(fixed as never, true)).toBe('وفّر 90 ج.م');
   });
@@ -90,7 +90,7 @@ describe('the opt-in: Arabic-Indic only for Arabic readers of an opted-in store'
         undefined,
         'arab'
       )
-    ).toBe('-١٧%');
+    ).toBe('\u2066\u2212١٧%\u2069');
     expect(effectiveNumerals('en', 'arab')).toBe('latn');
     expect(localizeDigits('12', 'arab')).toBe('١٢');
     expect(localizeDigits('12')).toBe('12');

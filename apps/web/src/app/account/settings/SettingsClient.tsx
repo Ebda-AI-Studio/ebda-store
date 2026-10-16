@@ -69,11 +69,14 @@ export default function SettingsClient() {
       } else {
         toastError(
           t('SMS offers', translations['SMS offers']),
-          result.error?.message || 'Failed to update'
+          result.error?.message || t('Failed to update', 'تعذّر التحديث')
         );
       }
     } catch {
-      toastError(t('SMS offers', translations['SMS offers']), 'Failed to update');
+      toastError(
+        t('SMS offers', translations['SMS offers']),
+        t('Failed to update', 'تعذّر التحديث')
+      );
     } finally {
       setIsSavingSms(false);
     }
@@ -115,15 +118,28 @@ export default function SettingsClient() {
         // The SMS-offers card shows the profile phone; re-read it.
         fetchSmsConsent();
         setMessage({ type: 'success', text: 'Profile updated successfully!' });
-        toastSuccess('Profile saved', 'Your profile has been updated.');
+        toastSuccess(
+          t('Profile saved', 'تم حفظ الملف الشخصي'),
+          t('Your profile has been updated.', 'تم تحديث ملفك الشخصي.')
+        );
       } else {
-        const msg = result.error?.message || 'Failed to update profile';
+        const msg =
+          result.error?.message || t('Failed to update profile', 'تعذّر تحديث الملف الشخصي');
         setMessage({ type: 'error', text: msg });
-        toastError('Update failed', msg);
+        toastError(t('Update failed', 'تعذّر التحديث'), msg);
       }
     } catch {
-      setMessage({ type: 'error', text: 'Failed to update profile. Please try again.' });
-      toastError('Update failed', 'Failed to update profile. Please try again.');
+      setMessage({
+        type: 'error',
+        text: t(
+          'Failed to update profile. Please try again.',
+          'تعذّر تحديث الملف الشخصي. حاول مرة أخرى.'
+        ),
+      });
+      toastError(
+        t('Update failed', 'تعذّر التحديث'),
+        t('Failed to update profile. Please try again.', 'تعذّر تحديث الملف الشخصي. حاول مرة أخرى.')
+      );
     } finally {
       setIsSaving(false);
     }
@@ -179,15 +195,27 @@ export default function SettingsClient() {
       if (result.success) {
         setMessage({ type: 'success', text: 'Password updated successfully!' });
         setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' });
-        toastSuccess('Password updated', 'Your password has been changed.');
+        toastSuccess(
+          t('Password updated', 'تم تحديث كلمة المرور'),
+          t('Your password has been changed.', 'تم تغيير كلمة المرور.')
+        );
       } else {
         const msg = result.error?.message || 'Failed to update password';
         setMessage({ type: 'error', text: msg });
-        toastError('Update failed', msg);
+        toastError(t('Update failed', 'تعذّر التحديث'), msg);
       }
     } catch {
-      setMessage({ type: 'error', text: 'Failed to update password. Please try again.' });
-      toastError('Update failed', 'Failed to update password. Please try again.');
+      setMessage({
+        type: 'error',
+        text: t(
+          'Failed to update password. Please try again.',
+          'تعذّر تحديث كلمة المرور. حاول مرة أخرى.'
+        ),
+      });
+      toastError(
+        t('Update failed', 'تعذّر التحديث'),
+        t('Failed to update password. Please try again.', 'تعذّر تحديث كلمة المرور. حاول مرة أخرى.')
+      );
     } finally {
       setIsSaving(false);
     }

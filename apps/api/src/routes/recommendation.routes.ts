@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { authenticate, authorize } from '../middleware/auth';
 import { requireStoreAccess } from '../middleware/store-access';
 import { requireFeature } from '../middleware/feature-gate';
+import { gateBackorderPayload } from '../lib/effective-inventory';
 import { featureService } from '../services/feature.service';
 import { recommendationService } from '../services/recommendation.service';
 import logger from '../lib/logger';
@@ -233,7 +234,9 @@ publicRouter.get(
         storeId,
         productId
       );
-      res.json({ success: true, data: recommendations });
+      // Backorder feature applied after the (cached) recommendation read (X-02 fix round).
+      const backorderOn = await featureService.isFeatureEnabled(storeId, 'inventory.backorder');
+      res.json({ success: true, data: gateBackorderPayload(recommendations, backorderOn) });
     } catch (error) {
       next(error);
     }
@@ -262,9 +265,13 @@ publicRouter.get(
             .filter(Boolean)
         : [];
 
+      // The feature gates the "only buyable picks" filter inside the service, so a
+      // feature-off store never shows a sold-out recommendation (fix round 2).
+      const backorderOn = await featureService.isFeatureEnabled(storeId, 'inventory.backorder');
       const recommendations = await recommendationService.getCartRecommendations(
         storeId,
-        productIds
+        productIds,
+        backorderOn
       );
       res.json({ success: true, data: { recommendations } });
     } catch (error) {

@@ -13,6 +13,7 @@ import type { Category } from '@/lib/api';
 import { useStore, useStoreUrl } from '../../contexts/StoreContext';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useNumerals } from '../../hooks/useNumerals';
+import { countText, PIECES } from '../../lib/plural';
 import { sectionBgStyle } from '../../templates/shared/section-bg';
 import { sectionSpacingClasses } from '../../templates/shared/section-spacing';
 import { DahabTile, type DahabTileShape } from '../../templates/dahab/CategoryCard';
@@ -44,7 +45,7 @@ export function CollectionListSection({
   editorMode?: boolean;
 }) {
   const { store } = useStore();
-  const { language, t } = useLanguage();
+  const { language } = useLanguage();
   const { localize } = useNumerals();
   const storeUrl = useStoreUrl();
   const ar = language === 'ar';
@@ -69,7 +70,7 @@ export function CollectionListSection({
         href: cat
           ? storeUrl(`/products?category=${encodeURIComponent(cat.slug)}`)
           : storeUrl('/products'),
-        meta: n ? `${localize(n)} ${t('pieces', 'قطعة')}` : undefined,
+        meta: n ? countText(language === 'ar' ? 'ar' : 'en', n, PIECES, localize(n)) : undefined,
       };
     })
     .filter(tile => tile.label);

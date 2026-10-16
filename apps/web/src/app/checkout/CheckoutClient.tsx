@@ -1,5 +1,6 @@
 'use client';
 
+import { signedText } from '@/lib/bidi';
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useLocalePrice } from '../../hooks/useLocalePrice';
 import dynamic from 'next/dynamic';
@@ -16,6 +17,7 @@ import { CheckoutErrorAlert } from './CheckoutErrorAlert';
 import {
   orderLocale,
   personalisationRequiredCopy,
+  variantRequiredCopy,
   subscriptionRequiredCopy,
 } from './_lib/checkoutErrors';
 import { checkoutBundleErrorCopy } from '../../lib/checkout-bundle-errors';
@@ -653,7 +655,10 @@ export default function CheckoutClient() {
             const hasFee = (cod.fixedFee || 0) > 0 || (cod.percentBps || 0) > 0;
             const pct = cod.percentBps ? `${Number((cod.percentBps / 100).toFixed(2))}%` : '';
             const fixed = cod.fixedFee ? formatPrice(cod.fixedFee) : '';
-            const feeText = hasFee ? ` (+${[fixed, pct].filter(Boolean).join(' + ')})` : '';
+            // Each signed part travels with its sign in an LTR isolate (R-02): a
+            // bare "(+30 ج.م)" painted as "(30+ ج.م)" on the Arabic option.
+            const feeParts = [fixed, pct].filter(Boolean).map(part => signedText('+', part));
+            const feeText = hasFee ? ` (${feeParts.join(' ')})` : '';
             allProviders.push({
               id: 'cod',
               name: `${cod.displayName || 'Cash on Delivery'}${feeText}`,
@@ -1201,7 +1206,7 @@ export default function CheckoutClient() {
     // Enter-key implicit submit of the payment form from reaching createOrder.
     if (store.isDemo) {
       setCheckoutError(
-        t('This is a demo store — ordering is closed', 'ده متجر تجريبي — الطلب مقفول')
+        t('This is a demo store — ordering is closed', 'هذا متجر تجريبي — الطلبات مغلقة')
       );
       return;
     }
@@ -1555,6 +1560,17 @@ export default function CheckoutClient() {
         return;
       }
 
+      // A sizeless line on a product that has sizes (cart written before the cart gate): name
+      // the item and link back to the cart; the size is chosen on the product page.
+      const variantFriendly = variantRequiredCopy(code, details, t, language);
+      if (variantFriendly) {
+        setCheckoutError(variantFriendly);
+        setCheckoutErrorCartLink(true);
+        setStep(1);
+        setIsProcessing(false);
+        return;
+      }
+
       // The store's subscription ended (402): a shopper-facing message, not the merchant-directed one.
       const subscriptionFriendly = subscriptionRequiredCopy(code, t);
       if (subscriptionFriendly) {
@@ -1880,7 +1896,9 @@ export default function CheckoutClient() {
               >
                 <div
                   className={`flex h-8 w-8 items-center justify-center rounded-full transition-colors ${
-                    step >= 1 ? 'bg-primary text-white' : 'bg-muted text-muted-foreground'
+                    step >= 1
+                      ? 'bg-primary text-primary-foreground'
+                      : 'bg-muted text-muted-foreground'
                   } ${step > 1 ? 'group-hover:bg-primary/80' : ''}`}
                 >
                   {step > 1 ? (
@@ -1909,7 +1927,9 @@ export default function CheckoutClient() {
               <div className="flex items-center">
                 <div
                   className={`flex h-8 w-8 items-center justify-center rounded-full ${
-                    step >= 2 ? 'bg-primary text-white' : 'bg-muted text-muted-foreground'
+                    step >= 2
+                      ? 'bg-primary text-primary-foreground'
+                      : 'bg-muted text-muted-foreground'
                   }`}
                 >
                   2

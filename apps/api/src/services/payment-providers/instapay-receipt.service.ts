@@ -31,6 +31,7 @@ import {
   type InstapayReceiptView,
 } from '@ebda/shared';
 import { AppError } from '../../middleware/error-handler';
+import { sniffImage } from '../../lib/upload-sniff';
 import logger from '../../lib/logger';
 import { inngest } from '../../lib/inngest/client';
 import { isP2002 } from '../../lib/prisma-errors';
@@ -52,23 +53,13 @@ const EXT: Record<InstapayReceiptMime, string> = {
   'image/webp': '.webp',
 };
 
-/** Sniff the real type from the first bytes; the client's mimetype is not trusted. */
+/**
+ * Sniff the real type from the first bytes; the client's mimetype is not trusted. One sniffer for
+ * every upload (`lib/upload-sniff.ts`); a receipt is a screenshot or photo, so GIF is refused.
+ */
 export function sniffReceiptMime(buf: Buffer): InstapayReceiptMime | null {
-  if (buf.length >= 3 && buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff) return 'image/jpeg';
-  if (
-    buf.length >= 8 &&
-    buf.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))
-  ) {
-    return 'image/png';
-  }
-  if (
-    buf.length >= 12 &&
-    buf.subarray(0, 4).toString('latin1') === 'RIFF' &&
-    buf.subarray(8, 12).toString('latin1') === 'WEBP'
-  ) {
-    return 'image/webp';
-  }
-  return null;
+  const kind = sniffImage(buf);
+  return kind === 'image/jpeg' || kind === 'image/png' || kind === 'image/webp' ? kind : null;
 }
 
 /** The receipt's local (Cairo) date + time as the instant it happened. */

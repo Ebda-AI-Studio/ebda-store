@@ -2,9 +2,12 @@
 
 import Link from 'next/link';
 import { PoweredByForce } from '../shared/PoweredByForce';
+import { FooterLegalRow } from '../shared/FooterLegalRow';
+import { FooterWhatsApp } from '../shared/FooterWhatsApp';
 import { useState } from 'react';
 import type { FooterProps } from '../types';
 import { useLanguage } from '../../contexts/LanguageContext';
+import { footerRootPaint } from '../shared/footer-ink';
 import { api } from '../../lib/api';
 import {
   footerBranchesHeading,
@@ -24,6 +27,8 @@ export default function ModernFooter({
   socials,
   navigation = [],
   footerLinks,
+  disabledCmsSlugs,
+  urlPrefix,
   isRtl: isRtlProp,
   bgColor,
   footerLogo,
@@ -32,7 +37,7 @@ export default function ModernFooter({
   theme,
   locations,
 }: FooterProps) {
-  const { isRtl: ctxIsRtl, language } = useLanguage();
+  const { isRtl: ctxIsRtl, language, t } = useLanguage();
   const isRtl = isRtlProp ?? ctxIsRtl;
   const [email, setEmail] = useState('');
   const [subscribed, setSubscribed] = useState(false);
@@ -89,10 +94,10 @@ export default function ModernFooter({
 
   // Brand + sections (1 fallback col, or N footerSections) + (contact?) + (newsletter?).
   // We omit columns the store hasn't populated so the grid stays balanced.
-  // WhatsApp is excluded from the trigger because it appears in the social
-  // icon row above — repeating it under "Contact" is the duplication this
-  // pass cleans up.
-  const hasContact = !!(contact.email || displayPhone || displayAddress);
+  // WhatsApp counts: S-02 names the store's WhatsApp under "Contact"
+  // (FooterWhatsApp) as well as the unlabelled icon in the social row, by
+  // design — the contact line is where shoppers look for the number.
+  const hasContact = !!(contact.email || displayPhone || displayAddress || contact.whatsapp);
   // Opt-in "Branches" column — see resolveFooterBranches for the gating
   // rules. Adding its +1 to the SAME formula that already counts contact +
   // newsletter means the off-case (showBranches=false, i.e. +0) reduces to
@@ -116,7 +121,7 @@ export default function ModernFooter({
   return (
     <footer
       data-zone="footer"
-      style={bgColor ? { backgroundColor: bgColor } : undefined}
+      {...footerRootPaint(bgColor)}
       className={`${bgColor ? '' : 'bg-[hsl(var(--bg-section-alt))]'} text-foreground/75 mt-auto`}
       dir={isRtl ? 'rtl' : 'ltr'}
     >
@@ -137,6 +142,14 @@ export default function ModernFooter({
                 }
               />
             )}
+            {!displayLogo && !hideFooterLogoMobile && (
+              <p
+                data-footer-brand="mobile"
+                className="md:hidden mb-5 text-center text-xl font-bold text-foreground"
+              >
+                {displayName}
+              </p>
+            )}
             {displayLogo ? (
               <img
                 src={footerLogo || displayLogo}
@@ -152,7 +165,7 @@ export default function ModernFooter({
               <h3 className="hidden md:block text-xl font-bold text-foreground">{displayName}</h3>
             )}
             {displayDescription && (
-              <p className="text-foreground/60 text-sm leading-relaxed">{displayDescription}</p>
+              <p className="text-foreground/70 text-sm leading-relaxed">{displayDescription}</p>
             )}
 
             {/* Social Icons */}
@@ -191,7 +204,7 @@ export default function ModernFooter({
                     <li key={link.href}>
                       <Link
                         href={link.href}
-                        className="text-sm text-foreground/60 hover:text-foreground transition-colors duration-300 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+                        className="text-sm text-foreground/70 hover:text-foreground transition-colors duration-300 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
                       >
                         {link.label}
                       </Link>
@@ -210,7 +223,7 @@ export default function ModernFooter({
                   <li key={item.href}>
                     <Link
                       href={item.href}
-                      className="text-sm text-foreground/60 hover:text-foreground transition-colors duration-300 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+                      className="text-sm text-foreground/70 hover:text-foreground transition-colors duration-300 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
                     >
                       {isRtl && item.labelAr ? item.labelAr : item.label}
                     </Link>
@@ -232,10 +245,10 @@ export default function ModernFooter({
                   <li>
                     <a
                       href={`mailto:${contact.email}`}
-                      className="flex items-center gap-3 text-sm text-foreground/60 hover:text-foreground transition-colors duration-300 ease-out"
+                      className="flex items-center gap-3 text-sm text-foreground/70 hover:text-foreground transition-colors duration-300 ease-out"
                     >
                       <svg
-                        className="w-4 h-4 shrink-0 text-foreground/55"
+                        className="w-4 h-4 shrink-0 text-foreground/70"
                         fill="none"
                         stroke="currentColor"
                         viewBox="0 0 24 24"
@@ -256,11 +269,11 @@ export default function ModernFooter({
                   <li>
                     <a
                       href={`tel:${contact.phone}`}
-                      className="flex items-center gap-3 text-sm text-foreground/60 hover:text-foreground transition-colors duration-300 ease-out"
+                      className="flex items-center gap-3 text-sm text-foreground/70 hover:text-foreground transition-colors duration-300 ease-out"
                       dir="ltr"
                     >
                       <svg
-                        className="w-4 h-4 shrink-0 text-foreground/55"
+                        className="w-4 h-4 shrink-0 text-foreground/70"
                         fill="none"
                         stroke="currentColor"
                         viewBox="0 0 24 24"
@@ -277,13 +290,21 @@ export default function ModernFooter({
                     </a>
                   </li>
                 )}
-                {/* WhatsApp lives in the social row at the brand block; we
-                    don't repeat it here to avoid duplicating the same link. */}
+                {contact.whatsapp && (
+                  <li>
+                    <FooterWhatsApp
+                      whatsapp={contact.whatsapp}
+                      className="text-sm text-foreground/70 hover:text-foreground transition-colors duration-300 ease-out"
+                    />
+                  </li>
+                )}
+                {/* WhatsApp is named above (S-02, FooterWhatsApp) and also keeps its
+                    icon in the social row at the brand block. */}
                 {displayAddress &&
                   (() => {
                     const mapIcon = (
                       <svg
-                        className="w-4 h-4 mt-0.5 shrink-0 text-foreground/55"
+                        className="w-4 h-4 mt-0.5 shrink-0 text-foreground/70"
                         fill="none"
                         stroke="currentColor"
                         viewBox="0 0 24 24"
@@ -309,14 +330,14 @@ export default function ModernFooter({
                           href={addressMapHref}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="flex items-start gap-3 text-sm text-foreground/60 hover:text-foreground transition-colors duration-300 ease-out"
+                          className="flex items-start gap-3 text-sm text-foreground/70 hover:text-foreground transition-colors duration-300 ease-out"
                         >
                           {mapIcon}
                           {displayAddress}
                         </a>
                       </li>
                     ) : (
-                      <li className="flex items-start gap-3 text-sm text-foreground/60">
+                      <li className="flex items-start gap-3 text-sm text-foreground/70">
                         {mapIcon}
                         {displayAddress}
                       </li>
@@ -335,7 +356,7 @@ export default function ModernFooter({
               {/* Body line — render store description when set; previously
                   was hardcoded demo copy. */}
               {displayDescription && (
-                <p className="text-sm text-foreground/60 leading-relaxed">{displayDescription}</p>
+                <p className="text-sm text-foreground/70 leading-relaxed">{displayDescription}</p>
               )}
               {subscribed ? (
                 <p className="text-sm text-primary font-medium">
@@ -347,9 +368,9 @@ export default function ModernFooter({
                     type="email"
                     value={email}
                     onChange={e => setEmail(e.target.value)}
-                    placeholder={isRtl ? 'البريد الإلكتروني' : 'Email address'}
-                    aria-label={isRtl ? 'البريد الإلكتروني' : 'Email address'}
-                    className="w-full px-4 py-2.5 bg-foreground/10 rounded-lg border border-white/10 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 text-sm text-foreground placeholder:text-foreground/55 transition-colors duration-300 ease-out"
+                    placeholder={t('Email address', 'البريد الإلكتروني')}
+                    aria-label={t('Email address', 'البريد الإلكتروني')}
+                    className="w-full px-4 py-2.5 bg-foreground/10 rounded-lg border border-white/10 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 text-sm text-foreground placeholder:text-foreground/70 transition-colors duration-300 ease-out"
                     dir={isRtl ? 'rtl' : 'ltr'}
                     required
                     disabled={submitting}
@@ -386,7 +407,7 @@ export default function ModernFooter({
               </h4>
               <ul className="space-y-3">
                 {branches.map(loc => (
-                  <li key={loc.id} className="text-sm text-foreground/60">
+                  <li key={loc.id} className="text-sm text-foreground/70">
                     <p className="text-foreground/90">{loc.name}</p>
                     {loc.mapsHref ? (
                       <a
@@ -415,10 +436,17 @@ export default function ModernFooter({
             </div>
           )}
         </div>
-
-        {/* Bottom bar removed 2026-05-21 — redundant with Company Links. */}
       </div>
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        {/* Legal row (S-01): privacy · terms · returns · ©, from resolveBottomBar. */}
+        <FooterLegalRow
+          footerLinks={footerLinks}
+          disabledCmsSlugs={disabledCmsSlugs}
+          storeName={displayName ?? ''}
+          isRtl={isRtl}
+          urlPrefix={urlPrefix}
+          className="text-foreground/75"
+        />
         <PoweredByForce hidden={hidePoweredBy} />
       </div>
     </footer>

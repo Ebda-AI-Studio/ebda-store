@@ -59,7 +59,6 @@ vi.mock('@ebda/database', () => ({
 vi.mock('@api/services/email.service', () => ({
   EmailService: {
     sendOrderConfirmation: vi.fn().mockResolvedValue(undefined),
-    sendAdminNewOrder: vi.fn().mockResolvedValue(undefined),
     sendOrderShipped: vi.fn().mockResolvedValue(undefined),
     sendPaymentSuccess: vi.fn().mockResolvedValue(undefined),
     sendAdminRefund: vi.fn().mockResolvedValue(undefined),

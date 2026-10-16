@@ -1,6 +1,7 @@
 'use client';
 
 import { pickLocalizedName } from '../../templates/shared/display-helpers';
+import { canBuyNow } from '@/lib/can-buy-now';
 import Link from 'next/link';
 import { resolveProductCardCtaOosDefaults } from '../../templates/shared/product-card-defaults';
 import { useLocalePrice } from '../../hooks/useLocalePrice';
@@ -15,6 +16,7 @@ import { useStore, useStoreUrl } from '../../contexts/StoreContext';
 import { resolveColor } from '@ebda/shared';
 import { cn, CartIcon } from '@ebda/ui';
 import { OosImageDim, OutOfStockRibbon } from '../../templates/shared/ProductCardCta';
+import { needsOptions } from '../../templates/adapters';
 import { ctaShapeClass, ctaSizeClass } from '../../templates/shared/card-size';
 import { getDiscountBadgeColor } from '../../templates/shared/discount-badge';
 import {
@@ -57,11 +59,14 @@ export function ProductListItem({
   const pricing = getProductPricing(product, undefined, 'card');
   // BUG 1 fix: use helper for correct EGP/pct badge text.
   const discountBadgeText = getDiscountBadgeText(product, isRtl, undefined, undefined, numerals);
-  // Task 13: orderable = truly in-stock OR backorder allowed. Derived from
-  // inventory because ProductListItem uses a richer inventory check (undefined
-  // means variant-managed stock → treat as orderable). OOS + backorder = orderable.
-  const orderable =
-    product.inventory === undefined || product.inventory > 0 || product.acceptsBackorder === true;
+  // Task 13: orderable = truly in-stock OR backorder allowed. OOS + backorder =
+  // orderable. Stock reads the server's variant-aware `inStock` first (the
+  // shared card rule, lib/can-buy-now.ts canBuyNow).
+  const orderable = canBuyNow(product);
+  // C-01: a sized product is chosen on its PDP. This row used to render the
+  // add button for every product, so a list-view tap added a sizeless line (and
+  // a sold-out product's tap failed with an error toast).
+  const hasVariants = needsOptions(product);
 
   // Task 3 B3/B4: read CTA + OOS defaults from productCardDefaults.
   const defaults = layout?.productCardDefaults;
@@ -96,6 +101,7 @@ export function ProductListItem({
     discountBadgeAllowed,
     customBadgePositionCls,
     discountBadgePositionCls,
+    discountTopCorner,
   } = resolveCardBadges({
     discountVisible: Boolean(discountBadgeText),
     product,
@@ -175,6 +181,8 @@ export function ProductListItem({
           oosLabelColor={resolvedOosLabelColor}
           oosLabelTextColor={resolvedOosLabelTextColor}
           theme={store.theme}
+          topStartReserved={discountTopCorner === 'start'}
+          topEndReserved={discountTopCorner === 'end'}
         />
         {/* Image overlay tint when out-of-stock. z-[5] sits under the OOS
             badge (z-10) and above the product image. */}
@@ -218,7 +226,7 @@ export function ProductListItem({
             </p>
           )}
           <h3
-            className={`mt-1 text-lg font-semibold text-foreground${nameCase === 'uppercase' ? ' uppercase' : ''}`}
+            className={`mt-1 text-lg font-semibold text-foreground [overflow-wrap:anywhere]${nameCase === 'uppercase' ? ' uppercase' : ''}`}
             data-zone="productName"
           >
             {displayName}
@@ -264,7 +272,7 @@ export function ProductListItem({
               }
               className={`flex h-10 w-10 items-center justify-center rounded-xl border transition-colors ${
                 isInCompare
-                  ? 'border-primary bg-primary text-white'
+                  ? 'border-primary bg-primary text-primary-foreground'
                   : 'border-border bg-background text-muted-foreground hover:border-primary hover:text-primary'
               }`}
               onClick={e => onToggleCompare(product, e)}
@@ -288,10 +296,10 @@ export function ProductListItem({
                 When ctaMode==='viewOnly', show a View label instead of Add to cart.
                 The entire ProductListItem is wrapped in a Link so no nested anchor
                 is needed — a span with the same visual chrome suffices. */}
-            {viewOnly ? (
+            {viewOnly || hasVariants ? (
               <span
                 className={cn(
-                  'flex h-10 items-center gap-2 rounded-xl bg-primary px-4 text-sm font-medium text-white pointer-events-none',
+                  'flex h-10 items-center gap-2 rounded-xl bg-primary px-4 text-sm font-medium text-primary-foreground pointer-events-none',
                   ctaExtraCls
                 )}
                 style={{
@@ -301,10 +309,25 @@ export function ProductListItem({
               >
                 {ctaViewLabel}
               </span>
+            ) : !orderable ? (
+              <button
+                type="button"
+                disabled
+                className={cn(
+                  'flex h-10 items-center gap-2 rounded-xl bg-muted px-4 text-sm font-medium text-muted-foreground cursor-not-allowed',
+                  ctaExtraCls
+                )}
+                onClick={e => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                }}
+              >
+                {t('Out of Stock', translations['Out of Stock'])}
+              </button>
             ) : (
               <button
                 className={cn(
-                  'flex h-10 items-center gap-2 rounded-xl bg-primary px-4 text-sm font-medium text-white transition-colors hover:bg-primary/90',
+                  'flex h-10 items-center gap-2 rounded-xl bg-primary px-4 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90',
                   ctaExtraCls
                 )}
                 onClick={e => onAddToCart(product, e)}

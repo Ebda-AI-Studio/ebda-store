@@ -273,7 +273,7 @@ export default function AccountDashboardClient() {
         ) : (
           <div className="p-8 text-center">
             <svg
-              className="mx-auto h-12 w-12 text-muted-foreground/70"
+              className="mx-auto h-12 w-12 text-muted-foreground"
               fill="none"
               viewBox="0 0 24 24"
               stroke="currentColor"

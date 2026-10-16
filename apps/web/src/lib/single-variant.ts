@@ -9,12 +9,12 @@
  * keeps its markup; the pre-selected state is exactly the state a tap on the
  * only pill produces, so a variant is auto-selected ONLY when that pill is
  * tappable — i.e. by the same availability rule `VariantSelector` uses for
- * `disabled` (untracked or inventory > 0). A sold-out single variant stays
- * unselected, as today.
+ * `disabled`: `canBuyNow` (in stock, untracked, or accepting backorders — X-02).
+ * A sold-out single variant with no backorder stays unselected, as today.
  */
+import { canBuyNow, type BuyableVariant } from './can-buy-now';
 
-interface SelectableVariant {
-  inventory?: number | null;
+interface SelectableVariant extends BuyableVariant {
   options: Record<string, string>;
 }
 
@@ -25,8 +25,7 @@ export function autoSelectVariant<V extends SelectableVariant>(
 ): V | null {
   if (!variants || variants.length !== 1 || optionNames.length === 0) return null;
   const only = variants[0];
-  const tappable = only.inventory === undefined || only.inventory === null || only.inventory > 0;
-  if (!tappable) return null;
+  if (!canBuyNow(null, only)) return null;
   // Every axis the picker renders must have a value on this variant, or the
   // picker could not show it as selected.
   if (!optionNames.every(name => only.options?.[name] !== undefined)) return null;
@@ -41,4 +40,19 @@ export function autoSelection<V extends SelectableVariant>(
   const only = autoSelectVariant(variants, optionNames);
   if (!only) return {};
   return Object.fromEntries(optionNames.map(name => [name, only.options[name]]));
+}
+
+/**
+ * A product with variants but NO option groups (W1a fix round, minor 1): there
+ * is no picker to choose from, so the PDP treats it like a single-variant
+ * product. Pick the first buyable variant (`canBuyNow`), else
+ * the first one, which then reads sold out (the button disables on its stock),
+ * never a dead tap that nudges a picker that is not on the page.
+ */
+export function variantWithoutPicker<V extends SelectableVariant>(
+  variants: readonly V[] | null | undefined,
+  optionNames: readonly string[]
+): V | null {
+  if (!variants || variants.length === 0 || optionNames.length > 0) return null;
+  return variants.find(v => canBuyNow(null, v)) ?? variants[0];
 }

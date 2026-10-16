@@ -13,6 +13,9 @@ import { AcceptedPaymentBadges } from '../../components/AcceptedPaymentBadges';
 import type { FooterProps } from '../types';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { PoweredByForce } from '../shared/PoweredByForce';
+import { FooterLegalRow } from '../shared/FooterLegalRow';
+import { FooterWhatsApp } from '../shared/FooterWhatsApp';
+import { footerRootPaint } from '../shared/footer-ink';
 import {
   footerBranchesHeading,
   resolveAddressHref,
@@ -37,6 +40,8 @@ export default function DahabFooter({
   socials,
   navigation = [],
   footerLinks,
+  disabledCmsSlugs,
+  urlPrefix,
   isRtl: isRtlProp,
   bgColor,
   footerLogo,
@@ -56,7 +61,6 @@ export default function DahabFooter({
   const sections = resolveFooterSections(footerLinks, isRtl);
   const socialLinks = getSocialLinks(socials, contact, theme?.socialOrder);
   const branches = resolveFooterBranches(locations, theme, isRtl);
-  const year = new Date().getFullYear();
 
   return (
     <footer
@@ -64,7 +68,7 @@ export default function DahabFooter({
         'mt-auto border-t border-border',
         !bgColor && 'bg-[hsl(var(--bg-section-alt))]'
       )}
-      style={bgColor ? { backgroundColor: bgColor } : undefined}
+      {...footerRootPaint(bgColor)}
       dir={isRtl ? 'rtl' : 'ltr'}
     >
       <div className={cx(DAHAB_CONTAINER, 'grid gap-10 py-14 sm:py-16 md:grid-cols-12 lg:py-20')}>
@@ -142,7 +146,7 @@ export default function DahabFooter({
             </div>
           )}
 
-          {(contact.email || phone || address) && (
+          {(contact.email || phone || address || contact.whatsapp) && (
             <div>
               <h2 className={HEAD}>{t('Visit and contact', 'زورونا وتواصلوا')}</h2>
               <ul className="space-y-1 text-sm">
@@ -151,6 +155,11 @@ export default function DahabFooter({
                     <a href={`tel:${contact.phone}`} dir="ltr" className={LINK}>
                       {phone}
                     </a>
+                  </li>
+                )}
+                {contact.whatsapp && (
+                  <li>
+                    <FooterWhatsApp whatsapp={contact.whatsapp} className={LINK} />
                   </li>
                 )}
                 {contact.email && (
@@ -215,9 +224,17 @@ export default function DahabFooter({
           )}
         >
           <DahabPaymentMarks />
-          <p className="text-xs text-foreground/60">
-            © {year} {name}
-          </p>
+          {/* Legal row (S-01): privacy · terms · returns · ©, from resolveBottomBar.
+              Dahab's bar already has its hairline above. */}
+          <FooterLegalRow
+            footerLinks={footerLinks}
+            disabledCmsSlugs={disabledCmsSlugs}
+            storeName={name}
+            isRtl={isRtl}
+            urlPrefix={urlPrefix}
+            hairline={false}
+            className="text-xs text-foreground/70"
+          />
         </div>
         <div className={DAHAB_CONTAINER}>
           <PoweredByForce hidden={hidePoweredBy} />

@@ -305,7 +305,11 @@ describe('legacy-corner stores are byte-identical (issue 2343, owner rule)', () 
     const h = createHash('sha256');
     let n = 0;
     for (const input of grid()) {
-      h.update(JSON.stringify(resolveCardBadges(input)));
+      // `discountTopCorner` (X-01 fix round) is an additive READ of the resolved
+      // corner, not a placement: the pinned grid hashes the placement fields only.
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { discountTopCorner: _corner, ...placement } = resolveCardBadges(input);
+      h.update(JSON.stringify(placement));
       n++;
     }
     expect(n).toBe(19200);

@@ -1,10 +1,75 @@
 'use client';
 
 import { useCallback, useState } from 'react';
-import { getApiUrl } from '../lib/api';
+import { getApiUrl, localizedApiMessage } from '../lib/api';
 import { useT } from '@/i18n/useT';
+import { IMAGE_UPLOAD_BATCH_MAX } from '@ebda/shared';
 
 type Translator = ReturnType<typeof useT>;
+
+export interface FailedUpload {
+  name: string;
+  reason: string;
+}
+
+export interface MultiUploadResult {
+  /** Every stored image, in selection order. */
+  urls: string[];
+  /** Every file that was not stored, in selection order, with the reason. */
+  failed: FailedUpload[];
+}
+
+/** A refusal from the API that still carries its body (for `details.invalidIndexes`). */
+class UploadRefusal extends Error {
+  constructor(
+    message: string,
+    readonly body: UploadResponse
+  ) {
+    super(message);
+  }
+}
+
+/** The request positions the server refused by their bytes, when it named them validly. */
+function refusedIndexes(err: unknown, batchSize: number): Set<number> | null {
+  if (!(err instanceof UploadRefusal)) return null;
+  const raw = err.body.error?.details?.invalidIndexes;
+  if (!Array.isArray(raw) || raw.length === 0) return null;
+  const ok = raw.every(i => Number.isInteger(i) && i >= 0 && i < batchSize);
+  return ok ? new Set(raw as number[]) : null;
+}
+
+/** "Not uploaded: a.heic, b.jpg — <reason>", one clause per distinct reason. */
+export function describeFailures(t: Translator, failed: readonly FailedUpload[]): string {
+  const byReason = new Map<string, string[]>();
+  for (const f of failed) byReason.set(f.reason, [...(byReason.get(f.reason) ?? []), f.name]);
+  return [...byReason.entries()]
+    .map(([reason, names]) => t('errors.filesNotUploaded', { files: names.join('، '), reason }))
+    .join(' · ');
+}
+
+/** Split `items` into consecutive groups of at most `size`, preserving order. */
+export function chunk<T>(items: readonly T[], size: number): T[][] {
+  const out: T[][] = [];
+  for (let i = 0; i < items.length; i += size) out.push(items.slice(i, i + size));
+  return out;
+}
+
+/**
+ * The API's error text for a failed upload in the admin's language (a byte-sniff refusal
+ * carries `details.messageEn` / `details.messageAr`), else its message, else `fallback`.
+ */
+export function uploadErrorText(
+  data:
+    | {
+        error?: { code?: string; message?: string; details?: Record<string, unknown> };
+      }
+    | null
+    | undefined,
+  fallback: string
+): string {
+  const err = data?.error;
+  return localizedApiMessage(err?.code, err?.message || fallback, err?.details);
+}
 
 /**
  * Shared upload helpers for the ImageUpload widgets. Extracted so the
@@ -61,7 +126,7 @@ export function useImageUpload() {
           onProgress: setProgress,
           parse: data => {
             if (data.success && data.data?.url) return data.data.url as string;
-            throw new Error(data.error?.message || t('errors.uploadFailed'));
+            throw new Error(uploadErrorText(data, t('errors.uploadFailed')));
           },
         });
       } catch (err) {
@@ -87,32 +152,67 @@ export function useImageUpload() {
     [uploadOne]
   );
 
+  /**
+   * FU46-6 + I-1b: the API takes at most IMAGE_UPLOAD_BATCH_MAX files per request, so a larger
+   * selection goes in sequential batches. A failed batch never discards the others: `urls` holds
+   * every stored image in selection order (the caller attaches them), `failed` names each file
+   * that was not stored and why, and `error` says the same to the merchant. When the server
+   * names the refused files (`details.invalidIndexes`), their batch-mates are re-sent once
+   * without them, so one bad photo costs only itself.
+   */
   const uploadMulti = useCallback(
-    async (files: File[], folder: string, storeId?: string): Promise<string[] | null> => {
+    async (files: File[], folder: string, storeId?: string): Promise<MultiUploadResult> => {
       setError(null);
       setUploading(true);
       setProgress(0);
 
-      const formData = new FormData();
-      files.forEach(f => formData.append('files', f));
-
-      try {
-        const urls = await runXhr<string[]>({
+      const batches = chunk(files, IMAGE_UPLOAD_BATCH_MAX);
+      const urls: string[] = [];
+      const failed: FailedUpload[] = [];
+      const send = (batch: File[], i: number) => {
+        const formData = new FormData();
+        batch.forEach(f => formData.append('files', f));
+        return runXhr<string[]>({
           t,
           url: buildUploadUrl('images', folder, storeId),
           formData,
-          onProgress: setProgress,
+          onProgress: pct => setProgress(Math.round(((i + pct / 100) / batches.length) * 100)),
           parse: data => {
             if (data.success && data.data?.files) {
               return (data.data.files as Array<{ url: string }>).map(f => f.url);
             }
-            throw new Error(data.error?.message || t('errors.uploadFailed'));
+            throw new UploadRefusal(uploadErrorText(data, t('errors.uploadFailed')), data);
           },
         });
-        return urls;
-      } catch (err) {
-        setError(err instanceof Error ? err.message : t('errors.uploadFailed'));
-        return null;
+      };
+      const reasonOf = (err: unknown) =>
+        err instanceof Error && err.message ? err.message : t('errors.uploadFailed');
+
+      try {
+        for (let i = 0; i < batches.length; i++) {
+          const batch = batches[i];
+          try {
+            urls.push(...(await send(batch, i)));
+          } catch (err) {
+            const bad = refusedIndexes(err, batch.length);
+            if (!bad) {
+              batch.forEach(f => failed.push({ name: f.name, reason: reasonOf(err) }));
+              continue;
+            }
+            batch.forEach((f, j) => {
+              if (bad.has(j)) failed.push({ name: f.name, reason: reasonOf(err) });
+            });
+            const rest = batch.filter((_, j) => !bad.has(j));
+            if (rest.length === 0) continue;
+            try {
+              urls.push(...(await send(rest, i)));
+            } catch (retryErr) {
+              rest.forEach(f => failed.push({ name: f.name, reason: reasonOf(retryErr) }));
+            }
+          }
+        }
+        if (failed.length > 0) setError(describeFailures(t, failed));
+        return { urls, failed };
       } finally {
         setUploading(false);
         setProgress(0);
@@ -138,7 +238,7 @@ interface UploadResponse {
     url?: string;
     files?: Array<{ url: string }>;
   };
-  error?: { message?: string };
+  error?: { code?: string; message?: string; details?: Record<string, unknown> };
 }
 
 interface RunXhrOptions<T> {
@@ -172,7 +272,10 @@ function runXhr<T>({ t, url, formData, onProgress, parse }: RunXhrOptions<T>): P
         try {
           const data: UploadResponse = JSON.parse(xhr.responseText);
           reject(
-            new Error(data.error?.message || t('errors.uploadFailedWithCode', { code: xhr.status }))
+            new UploadRefusal(
+              uploadErrorText(data, t('errors.uploadFailedWithCode', { code: xhr.status })),
+              data
+            )
           );
         } catch {
           reject(new Error(t('errors.uploadFailedWithCode', { code: xhr.status })));

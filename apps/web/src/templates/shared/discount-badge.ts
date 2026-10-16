@@ -54,13 +54,37 @@ export function getDiscountBadgePosition(
 }
 
 /**
- * Resolve the merchant's discount-badge color (token:* or hex) via
- * `resolveColor`. Falls back to the platform's destructive/red CSS
- * variable when unset or no theme is available — Rule 15: token color
- * resolution must fall back to `hsl(var(--<key>))`, never silently drop
- * the merchant's intent or render unstyled.
+ * The sale badge's fill when the merchant picked no colour (K-01, quality-bar § 3).
+ * Every chip paints white text on it, so it must hold >= 4.5:1 against white. The
+ * old default, `hsl(var(--destructive))` (#EF4444 on a store with no theme red),
+ * measured 3.76:1. Red-700 holds 6.47:1 and stays a sale red. A fixed value, not
+ * a store token: a store's destructive or its derived ink is free to be light
+ * (a dark-page store's ink is), and white on a light red is the bug again.
+ * The look-driven badge colour and shape are W2 (`fix-waves.md` W2 #4).
+ * Measured by `tests/unit/sale-badge-default-contrast.test.ts`.
  */
-export function getDiscountBadgeColor(color: string | undefined, theme?: StoreTheme): string {
+export const DEFAULT_DISCOUNT_BADGE_FILL = '#B91C1C';
+
+/**
+ * The default when the badge colour is used as TEXT on the card (the minimal
+ * pack prints the sale label inline, no chip): the store's destructive ink, which
+ * `statusInkVars` derives per store to read >= 4.5:1 on its page and surfaces.
+ */
+export const DEFAULT_DISCOUNT_BADGE_TEXT = 'hsl(var(--destructive-ink))';
+
+/**
+ * Resolve the merchant's discount-badge color (token:* or hex) via
+ * `resolveColor`. Unset (or no theme) falls back to the AA default for the
+ * way the colour is used: `fill` (a chip under white text, the default) or
+ * `text` (the colour of the label itself). Rule 15 still holds for the
+ * merchant's own `token:*` pick: `resolveColor` falls back to
+ * `hsl(var(--<key>))`, never drops it.
+ */
+export function getDiscountBadgeColor(
+  color: string | undefined,
+  theme?: StoreTheme,
+  usage: 'fill' | 'text' = 'fill'
+): string {
   const resolved = color && theme ? resolveColor(color, theme) : undefined;
-  return resolved ?? 'hsl(var(--destructive))';
+  return resolved ?? (usage === 'text' ? DEFAULT_DISCOUNT_BADGE_TEXT : DEFAULT_DISCOUNT_BADGE_FILL);
 }

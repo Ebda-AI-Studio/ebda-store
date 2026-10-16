@@ -1,6 +1,7 @@
 'use client';
 
 import { pickLocalizedName } from './display-helpers';
+import { canBuyNow } from '@/lib/can-buy-now';
 import type React from 'react';
 import { resolveProductCardCtaOosDefaults } from './product-card-defaults';
 import Image from 'next/image';
@@ -22,7 +23,7 @@ import {
   ctaShapeClass,
   ctaSizeClass,
 } from './card-size';
-import { OosImageDim, OutOfStockRibbon, isProductNew } from './ProductCardCta';
+import { AdaptiveAddButton, OosImageDim, OutOfStockRibbon, isProductNew } from './ProductCardCta';
 import { smoothScrollLeftTo, smoothScrollLeftBy } from '@/lib/smooth-scroll';
 import { BrandPill } from './BrandPill';
 import { useStore } from '../../contexts/StoreContext';
@@ -37,6 +38,7 @@ import { getDiscountBadgeColor } from './discount-badge';
 import { getCustomBadgeColor, getCustomBadgeTextColor, resolveCardBadges } from './custom-badge';
 import { SwatchDots } from '../../components/commerce/SwatchDots';
 import { FactChips } from '../../components/commerce/FactChips';
+import { useRenderNow } from '../../contexts/RenderClockContext';
 
 /**
  * Horizontal-scroll product strip. Card chrome + CTA pill style vary per pack:
@@ -101,6 +103,7 @@ function SharedProductCarousel({
   // When `store.theme.showQuickAdd === true`, in-stock non-variant
   // products get the overlay button; otherwise it's hidden.
   const { store, layout } = useStore();
+  const renderNow = useRenderNow();
   const { money, numerals } = useNumerals();
   const showQuickAdd = store.theme?.showQuickAdd === true;
   // Item 4 (2026-07-12): when the merchant already has the outer showCardFrame
@@ -356,8 +359,8 @@ function SharedProductCarousel({
               const hasVariants = !!product.variants && product.variants.length > 0;
               const inStock = product.inStock !== false;
               // Task 13: backorder-aware orderable signal.
-              const orderable = inStock || product.acceptsBackorder === true;
-              const showNewBadge = inStock && isProductNew(product);
+              const orderable = canBuyNow(product);
+              const showNewBadge = inStock && isProductNew(product, renderNow);
               // Issue #1609 — mirror the EXACT expression the quick-add
               // button below renders on, so a badge only lifts for a
               // product that will actually get a quick-add circle overlaid
@@ -371,6 +374,7 @@ function SharedProductCarousel({
                 discountBadgeAllowed,
                 customBadgePositionCls,
                 discountBadgePositionCls,
+                discountTopCorner,
               } = resolveCardBadges({
                 discountVisible: Boolean(onSale && discountBadgeText),
                 product,
@@ -453,6 +457,8 @@ function SharedProductCarousel({
                           oosLabelColor={resolvedOosLabelColor}
                           oosLabelTextColor={resolvedOosLabelTextColor}
                           theme={store.theme}
+                          topStartReserved={discountTopCorner === 'start'}
+                          topEndReserved={discountTopCorner === 'end'}
                         />
                         {/* Image overlay tint when out-of-stock. z-[5] sits under
                             the OOS badge (z-10) and above the product image. */}
@@ -635,7 +641,7 @@ function SharedProductCarousel({
                             >
                               {nameVisible && (
                                 <p
-                                  className={`line-clamp-2 min-h-[2.5em] ${textSizes.name} ${styles.productCardName}${nameCase === 'uppercase' ? ' uppercase' : ''}`}
+                                  className={`[overflow-wrap:anywhere] line-clamp-2 min-h-[2.5em] ${textSizes.name} ${styles.productCardName}${nameCase === 'uppercase' ? ' uppercase' : ''}`}
                                   data-zone="productName"
                                   style={{
                                     fontFamily: productNameZone?.fontFamily,
@@ -780,19 +786,16 @@ function SharedProductCarousel({
                         ) : (
                           !showQuickAdd &&
                           onAddToCart && (
-                            <button
-                              type="button"
+                            <AdaptiveAddButton
                               onClick={() => onAddToCart(product.id)}
                               className={cn(
                                 `block w-full text-center cursor-pointer ${styles.productCardCta}`,
                                 ctaExtraCls
                               )}
-                              data-zone="productCta"
-                              data-cta="button"
+                              dataZone="productCta"
                               style={ctaStyle}
-                            >
-                              {ctaAddLabel}
-                            </button>
+                              label={ctaAddLabel}
+                            />
                           )
                         );
                       })()}

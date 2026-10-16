@@ -71,10 +71,11 @@ const PACK_STYLES: Record<TemplateId, PackStyles> = {
     // card consumer (PecannbeeProductCard + ProductCarousel inline cards)
     // concatenates the size class. Pack-styles now carries flavor only:
     // weight, color, tracking, leading, font-family.
-    productCardName: 'font-semibold text-foreground tracking-tight leading-snug',
+    productCardName:
+      'font-semibold text-foreground tracking-tight leading-snug [overflow-wrap:anywhere]',
     productCardPrice: 'font-bold text-primary tracking-tight',
     productCardCta:
-      'whitespace-nowrap rounded-2xl bg-primary px-5 py-3.5 text-sm font-semibold text-primary-foreground hover:bg-primary/90 transition-colors duration-[var(--duration-base)] ease-[var(--ease-out)] min-h-[44px]',
+      'whitespace-nowrap max-w-full overflow-hidden text-ellipsis rounded-2xl bg-primary px-2 sm:px-5 py-3.5 text-xs sm:text-sm font-semibold text-primary-foreground hover:bg-primary/90 transition-colors duration-[var(--duration-base)] ease-[var(--ease-out)] min-h-[44px]',
     sectionHeading:
       'text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-semibold tracking-tight text-foreground leading-[1.1] text-balance',
     sectionSeeAll:
@@ -94,11 +95,12 @@ const PACK_STYLES: Record<TemplateId, PackStyles> = {
     categoryFrame:
       'rounded-sm border border-border bg-muted group-hover:border-foreground/35 transition-colors duration-[var(--duration-slower)] ease-[var(--ease-out)]',
     categoryCaption: 'text-base sm:text-lg font-serif font-normal text-foreground tracking-tight',
-    productCardName: 'font-serif font-normal text-foreground tracking-tight leading-snug',
+    productCardName:
+      'font-serif font-normal text-foreground tracking-tight leading-snug [overflow-wrap:anywhere]',
     productCardPrice: 'font-serif font-medium text-foreground tracking-tight',
     productCardBody: 'text-center',
     productCardCta:
-      'whitespace-nowrap border-y border-foreground bg-foreground px-5 py-3.5 text-sm font-serif tracking-[0.22em] text-background hover:bg-foreground/85 transition-colors duration-[var(--duration-slow)] ease-[var(--ease-out)] min-h-[44px]',
+      'whitespace-nowrap max-w-full overflow-hidden text-ellipsis border-y border-foreground bg-foreground px-2 sm:px-5 py-3.5 text-xs sm:text-sm font-serif tracking-[0.08em] sm:tracking-[0.22em] text-background hover:bg-foreground/85 transition-colors duration-[var(--duration-slow)] ease-[var(--ease-out)] min-h-[44px]',
     sectionHeading:
       'text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-serif font-normal tracking-tight text-foreground leading-[1.1] text-balance',
     sectionSeeAll:
@@ -131,11 +133,11 @@ const PACK_STYLES: Record<TemplateId, PackStyles> = {
     categoryCaption:
       'text-base font-extralight tracking-[0.22em] ui-caps-toggle text-muted-foreground group-hover:text-foreground transition-colors duration-[var(--duration-slow)]',
     productCardName:
-      'tracking-[0.18em] font-extralight text-muted-foreground group-hover:text-foreground transition-colors duration-[var(--duration-slow)]',
+      'tracking-normal sm:tracking-[0.18em] [overflow-wrap:anywhere] font-extralight text-muted-foreground group-hover:text-foreground transition-colors duration-[var(--duration-slow)]',
     productCardPrice: 'tracking-wide font-extralight text-muted-foreground',
     productCardBody: 'text-center',
     productCardCta:
-      'whitespace-nowrap mx-auto inline-block border-b border-foreground/70 pb-1 text-sm font-medium tracking-[0.28em] text-foreground hover:text-foreground/70 hover:border-foreground/40 bg-transparent transition-colors duration-[var(--duration-slow)] ease-[var(--ease-out)] min-h-[44px]',
+      'whitespace-nowrap max-w-full overflow-hidden text-ellipsis mx-auto inline-block border-b border-foreground/70 pb-1 text-xs sm:text-sm font-medium tracking-[0.14em] text-foreground hover:text-foreground/70 hover:border-foreground/40 bg-transparent transition-colors duration-[var(--duration-slow)] ease-[var(--ease-out)] min-h-[44px]',
     sectionHeading:
       'text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-extralight tracking-tight text-foreground leading-[1.1] text-balance',
     sectionSeeAll:
@@ -159,10 +161,11 @@ const PACK_STYLES: Record<TemplateId, PackStyles> = {
     categoryFrame:
       'rounded-2xl border-2 border-foreground bg-muted group-hover:shadow-[6px_6px_0_0_hsl(var(--foreground)/0.92)] transition-shadow duration-[var(--duration-fast)] ease-[var(--ease-out)]',
     categoryCaption: 'text-base font-black ui-caps-toggle tracking-[0.05em] text-foreground',
-    productCardName: 'font-black tracking-[0.02em] text-foreground leading-tight',
+    productCardName:
+      'font-black tracking-[0.02em] text-foreground leading-tight [overflow-wrap:anywhere]',
     productCardPrice: 'font-black text-foreground tracking-tight',
     productCardCta:
-      'whitespace-nowrap border-t-2 border-foreground bg-foreground px-5 py-3.5 text-sm font-black tracking-[0.18em] text-background hover:bg-primary hover:text-primary-foreground transition-colors duration-[var(--duration-fast)] ease-[var(--ease-out)] min-h-[44px]',
+      'whitespace-nowrap max-w-full overflow-hidden text-ellipsis border-t-2 border-foreground bg-foreground px-2 sm:px-5 py-3.5 text-xs sm:text-sm font-black tracking-[0.06em] sm:tracking-[0.18em] text-background hover:bg-primary hover:text-primary-foreground transition-colors duration-[var(--duration-fast)] ease-[var(--ease-out)] min-h-[44px]',
     sectionHeading:
       'text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-black ui-caps-toggle tracking-tight text-foreground leading-[1.1] text-balance',
     sectionSeeAll:
@@ -187,15 +190,15 @@ const PACK_STYLES: Record<TemplateId, PackStyles> = {
     categoryCaption:
       'text-base font-extralight ui-caps-toggle tracking-[0.28em] text-foreground/75 group-hover:text-foreground transition-colors duration-[var(--duration-slower)]',
     productCardName:
-      'font-light tracking-[0.22em] text-foreground/75 group-hover:text-foreground transition-colors duration-[var(--duration-slower)]',
+      'font-light tracking-normal sm:tracking-[0.22em] [overflow-wrap:anywhere] text-foreground/75 group-hover:text-foreground transition-colors duration-[var(--duration-slower)]',
     productCardPrice: 'font-light tracking-wide text-foreground',
     productCardBody: 'text-center',
     productCardCta:
-      'whitespace-nowrap border-t border-foreground/15 bg-transparent px-5 py-3.5 text-sm font-medium tracking-[0.32em] text-foreground hover:bg-foreground hover:text-background transition-colors duration-[var(--duration-slower)] ease-[var(--ease-out)] min-h-[44px]',
+      'whitespace-nowrap max-w-full overflow-hidden text-ellipsis border-t border-foreground/15 bg-transparent px-2 sm:px-5 py-3.5 text-xs sm:text-sm font-medium tracking-[0.06em] sm:tracking-[0.32em] text-foreground hover:bg-foreground hover:text-background transition-colors duration-[var(--duration-slower)] ease-[var(--ease-out)] min-h-[44px]',
     sectionHeading:
       'text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-extralight tracking-[-0.01em] text-foreground leading-[1.1] text-balance',
     sectionSeeAll:
-      'text-sm font-light ui-caps-toggle tracking-[0.32em] text-foreground/60 hover:text-foreground transition-colors duration-[var(--duration-slower)]',
+      'text-sm font-light ui-caps-toggle tracking-[0.32em] text-foreground/70 hover:text-foreground transition-colors duration-[var(--duration-slower)]',
     heroOverlay: 'bg-gradient-to-b from-foreground/0 via-foreground/10 to-foreground/30',
     heroHeadline:
       'text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-extralight tracking-[-0.01em] drop-shadow-xl leading-[1.05]',
@@ -213,10 +216,10 @@ const PACK_STYLES: Record<TemplateId, PackStyles> = {
       'rounded-t-[999px] rounded-b-[var(--radius)] bg-card ring-1 ring-inset ring-primary/25',
     categoryCaption:
       'font-display text-lg text-foreground group-hover:text-primary transition-colors',
-    productCardName: 'text-foreground leading-snug',
+    productCardName: 'text-foreground leading-snug [overflow-wrap:anywhere]',
     productCardPrice: 'text-primary tabular-nums',
     productCardCta:
-      'whitespace-nowrap rounded-[var(--radius)] bg-primary px-5 py-3 text-sm font-medium text-primary-foreground hover:bg-accent transition-colors duration-300 min-h-[44px]',
+      'whitespace-nowrap max-w-full overflow-hidden text-ellipsis rounded-[var(--radius)] bg-primary px-2 sm:px-5 py-3 text-xs sm:text-sm font-medium text-primary-foreground hover:bg-accent transition-colors duration-300 min-h-[44px]',
     sectionHeading:
       'font-display text-[clamp(1.6rem,1.15rem+1.5vw,2.4rem)] leading-[1.15] text-foreground text-balance',
     sectionSeeAll: 'text-sm text-primary hover:text-accent transition-colors',

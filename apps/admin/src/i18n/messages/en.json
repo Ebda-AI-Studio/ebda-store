@@ -1297,7 +1297,10 @@
         "missingRequired": "First name and phone are required",
         "createFailed": "Failed to create order",
         "unknownError": "Unknown error",
-        "overrideReasonRequired": "Enter a reason (at least 3 characters) to override the coupon rules"
+        "overrideReasonRequired": "Enter a reason (at least 3 characters) to override the coupon rules",
+        "variantsLoadFailed": "Couldn't load this product's sizes and options. Try again.",
+        "variantRequired": "Pick a size or option for every product that has them.",
+        "variantInactive": "A size on this order is disabled. Re-enable it on the product page or pick another size."
       },
       "toast": {
         "created": "Order {orderNumber} created"
@@ -2933,11 +2936,11 @@
       "nameLabel": "Name *",
       "namePlaceholder": "Summer Sale 20% Off",
       "nameArLabel": "Name (Arabic)",
-      "nameArPlaceholder": "خصم الصيف 20٪",
+      "nameArPlaceholder": "خصم الصيف 20%",
       "descriptionLabel": "Description",
       "descriptionPlaceholder": "Get 20% off on all summer items",
       "descriptionArLabel": "Description (Arabic)",
-      "descriptionArPlaceholder": "احصل على خصم 20٪ على جميع منتجات الصيف",
+      "descriptionArPlaceholder": "احصل على خصم 20% على جميع منتجات الصيف",
       "typeLabel": "Discount Type *",
       "valuePercentageLabel": "Percentage (%) *",
       "valueAmountLabel": "Amount (EGP) *",
@@ -3694,9 +3697,9 @@
     },
     "icons": {
       "title": "App Icons",
-      "uploaderHelp": "Upload one square logo and we'll generate every size your customers need — Android home screen, iOS Add to Home Screen, and the browser tab.",
+      "uploaderHelp": "Upload one square PNG logo and it is used for every size your customers see — Android home screen, iOS Add to Home Screen, and the browser tab.",
       "uploaderLabel": "Upload your store icon",
-      "uploaderSizeHint": "Square PNG, JPEG, WebP or SVG, at least 512×512px",
+      "uploaderSizeHint": "Square PNG, 512×512px or larger, up to 1 MB. Keep the artwork inside the central 80% so the adaptive icon does not clip it.",
       "generatedPreview": "Generated sizes",
       "iconAppleTouchAlt": "iOS home screen icon",
       "favicon32Alt": "Browser tab icon",
@@ -3710,7 +3713,8 @@
       "icon512Help": "High-res icon for splash screen",
       "maskable": "Maskable Icon",
       "maskableAlt": "Maskable",
-      "maskableHelp": "Adaptive icon with safe zone"
+      "maskableHelp": "Adaptive icon with safe zone",
+      "tooLarge": "The icon must be 1 MB or smaller"
     },
     "features": {
       "title": "Features",
@@ -4622,6 +4626,14 @@
       "newsletter": "Newsletter Section",
       "newsletterHint": "Show or hide the newsletter signup form in the footer.",
       "newsletterWhere": "Appears below the footer columns",
+      "legalRow": "Legal row",
+      "legalRowHint": "Privacy, terms and returns links and the © line at the bottom of every footer.",
+      "legalRowWhere": "Appears at the very bottom of the footer",
+      "legalRowPrivacy": "Privacy policy link",
+      "legalRowTerms": "Terms link",
+      "legalRowReturns": "Returns policy link",
+      "legalRowCopyrightPlaceholder": "Custom © line (English, optional)",
+      "legalRowCopyrightArPlaceholder": "Custom © line (Arabic, optional)",
       "utilityBarWhere": "Appears above the header on every page",
       "saveHintEmpty": "Changes apply after Save.",
       "addLink": "Add Link",
@@ -5970,7 +5982,10 @@
         "invalidResponse": "Invalid server response",
         "uploadFailedWithCode": "Upload failed ({code})",
         "maxReached": "Maximum {max} images allowed",
-        "noValidFiles": "No valid image files selected"
+        "noValidFiles": "No valid image files selected",
+        "refusedType": "Not a JPEG, PNG, GIF or WebP image, not uploaded: {files}",
+        "refusedSize": "Over 10 MB, not uploaded: {files}",
+        "filesNotUploaded": "Not uploaded: {files} ({reason})"
       },
       "imageAlt": "Image {index}"
     },
@@ -8010,7 +8025,11 @@
       "errOutOfStock": "{name} does not have enough stock.",
       "errPaymentNotConfigured": "Set up a payment provider in Store Settings → Payments before sending payment links.",
       "errWbsKeyInvalid": "The saved WhatsApp (WBS) key could not be read. Reconnect WBS.",
-      "errWbsSendFailed": "WhatsApp could not send the payment link. Try again shortly."
+      "errWbsSendFailed": "WhatsApp could not send the payment link. Try again shortly.",
+      "errVariantRequired": "Pick a size or option for {name}.",
+      "errVariantNotFound": "That size or option of {name} is no longer available.",
+      "errVariantsLoadFailed": "Couldn't load the sizes and options of {name}. Try again.",
+      "variantLabel": "Size / option"
     },
     "botAnalytics": {
       "notConnected": "WBS is not connected for this store. Configure the integration in the Connection tab first.",
@@ -8304,7 +8323,7 @@
       "minOrderLabel": "Minimum order (EGP)",
       "minOrderPlaceholder": "e.g. 500.00",
       "invoiceEmailSectionTitle": "Order invoice email",
-      "invoiceEmailSectionHint": "Every order in this store also emails the invoice to this address (e.g. the store owner). Leave empty to disable.",
+      "invoiceEmailSectionHint": "Every order in this store emails its invoice to this address (e.g. the store owner), and refund alerts go here too. Order emails never go anywhere else. Leave empty to disable.",
       "invoiceEmailLabel": "Invoice recipient email",
       "invoiceEmailPlaceholder": "owner@example.com",
       "deliveryDaysTitle": "Delivery time (business days)",

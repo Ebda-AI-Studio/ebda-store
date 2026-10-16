@@ -163,3 +163,60 @@ export function deliveryWindow(a: {
     to: addBusinessDays(a.now, range.max + lead, tz, off),
   };
 }
+
+/** The parts of an order's shipping address a zone can name. */
+export interface DeliveryAddressLike {
+  area?: string | null;
+  areaAr?: string | null;
+  governorate?: string | null;
+  governorateAr?: string | null;
+  city?: string | null;
+}
+
+/**
+ * Fold a place name for an exact comparison: case, surrounding and repeated
+ * spacing, Arabic diacritics/tatweel and the common Arabic letter variants
+ * (أ/إ/آ → ا, ى → ي, ة → ه). Nothing is dropped beyond that, so two folded names
+ * are equal only when they name the same place the same way.
+ */
+export function foldPlaceName(v: string | null | undefined): string {
+  return (v ?? '')
+    .toLowerCase()
+    .replace(/[\u064B-\u065F\u0670\u0640]/g, '')
+    .replace(/[أإآٱ]/g, 'ا')
+    .replace(/ى/g, 'ي')
+    .replace(/ة/g, 'ه')
+    .trim()
+    .replace(/\s+/g, ' ');
+}
+
+/**
+ * The shipping zone an ORDER ships to (receipt / order pages AND the checkout's
+ * legacy zone fee, `resolveShippingFee`): the first zone whose area names
+ * include the address's area (en or ar), else its city, else its governorate.
+ * Names match WHOLE after `foldPlaceName`, never as a substring: "Victoria"
+ * contains "Tor" and "New Cairo" contains "Cairo", and a substring hit charged
+ * and promised another zone's fee and window (B0-46 T15 carry 5).
+ * null when no zone names the address. Never "the fastest zone": a dated
+ * promise on a known address must be that address's window (W1c review I4).
+ */
+export function zoneForAddress<
+  Z extends { areas?: readonly string[] | null; areasAr?: readonly string[] | null },
+>(address: DeliveryAddressLike | null | undefined, zones: readonly Z[]): Z | null {
+  if (!address) return null;
+  const names = (z: Z) =>
+    [...(z.areas ?? []), ...(z.areasAr ?? [])].map(foldPlaceName).filter(Boolean);
+  const tries = [
+    address.area,
+    address.areaAr,
+    address.city,
+    address.governorate,
+    address.governorateAr,
+  ].map(foldPlaceName);
+  for (const value of tries) {
+    if (!value) continue;
+    const hit = zones.find(z => names(z).includes(value));
+    if (hit) return hit;
+  }
+  return null;
+}

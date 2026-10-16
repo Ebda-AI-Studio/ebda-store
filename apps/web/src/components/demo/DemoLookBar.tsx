@@ -61,7 +61,7 @@ export function DemoLookBar({
         >
           {!activeLook || !built.some(l => l.id === activeLook) ? (
             <option value="" disabled>
-              {t('Choose a look', 'اختار شكل')}
+              {t('Choose a look', 'اختر شكلاً')}
             </option>
           ) : null}
           {templates.map(tpl => (

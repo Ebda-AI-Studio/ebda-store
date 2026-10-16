@@ -22,23 +22,26 @@ import type { ProductOption, ProductVariant } from '@/lib/api';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useNumerals } from '../../hooks/useNumerals';
 import { VariantSelector } from '../../components/VariantSelector';
+import { Breadcrumbs } from '../../components/Breadcrumbs';
 import { TaxInclusiveLabel } from '../shared/tax-inclusive-label';
 import type { ProductFact } from '@ebda/shared';
 import { FactsTable } from '../../components/commerce/FactsTable';
 import { useAnchorOffscreen } from '../../components/commerce/useAnchorOffscreen';
 import { useStickyBarHeight } from '../../components/commerce/useStickyBarHeight';
 import { DeliveryChip } from '../../components/commerce/DeliveryChip';
+import { TrustLine } from '../../components/commerce/TrustLine';
+import type { CodOffer } from '../../lib/cod-offer';
 import { PersonalisationField } from '../../components/commerce/PersonalisationField';
 import { SizeChartDialog } from '../../components/commerce/SizeChartDialog';
 import type { PublicSizeChart } from '@ebda/shared';
 import {
+  BagIcon,
   CloseIcon,
   DAHAB_BTN_PRIMARY,
   HeartIcon,
   MinusIcon,
   PlusIcon,
   ZoomIcon,
-  ChevronIcon,
   cx,
 } from './ui';
 
@@ -75,6 +78,8 @@ export interface DahabProductDetailProps {
   facts?: ProductFact[];
   /** Made-to-order business days; feeds the delivers-by chip under the buy button. */
   leadTimeDays?: number | null;
+  /** Server-read COD offer for the trust line under the buy button (S-02). */
+  codOffer?: CodOffer | null;
   /** Raw PersonalisationConfig; the field renders above the buy row only when enabled. */
   personalisation?: unknown;
   /** Resolved size chart (product's, else category's); the size-guide button hides without one. */
@@ -83,6 +88,12 @@ export interface DahabProductDetailProps {
   onNoteChange?: (v: string) => void;
   /** Bumped by the page when add-to-cart was tapped with only the required note missing. */
   noteNudge?: number;
+  /** Bumped by the page when add-to-cart was tapped with an option still unset (C-02). */
+  optionNudge?: number;
+  /** Cart link for the pinned bar, which replaces the tab bar while pinned (C-04). */
+  cartHref?: string;
+  cartCount?: number;
+  cartLabel?: string;
   /** Spec table, WhatsApp order button, share row — platform components. */
   specs?: ReactNode;
   extras?: ReactNode;
@@ -329,32 +340,19 @@ export function DahabProductDetail(p: DahabProductDetailProps) {
 
   return (
     <div className="mx-auto max-w-7xl px-4 pb-16 pt-6 sm:px-6 lg:px-8" data-zone="products">
-      <nav
-        aria-label={t('Breadcrumb', 'مسار التصفح')}
-        className="mb-6 text-[13px] text-muted-foreground"
-      >
-        <ol className="flex flex-wrap items-center gap-1.5">
-          <li>
-            <Link href={p.homeHref} className="hover:text-primary">
-              {t('Home', 'الرئيسية')}
-            </Link>
-          </li>
-          <li aria-hidden="true">
-            <ChevronIcon className="h-3 w-3" />
-          </li>
-          <li>
-            <Link href={p.categoryHref ?? p.productsHref} className="hover:text-primary">
-              {p.categoryName ?? t('All pieces', 'كل القطع')}
-            </Link>
-          </li>
-          <li aria-hidden="true">
-            <ChevronIcon className="h-3 w-3" />
-          </li>
-          <li aria-current="page" className="line-clamp-1 text-foreground/80">
-            {p.name}
-          </li>
-        </ol>
-      </nav>
+      {/* Hidden below md (C-04): on a phone the fold is gallery, title, price, the first
+          selector and the buy button; the trail is chrome that pushes them down. */}
+      <Breadcrumbs
+        className="mb-6 hidden text-[13px] md:block"
+        items={[
+          { label: t('Home', 'الرئيسية'), href: p.homeHref },
+          {
+            label: p.categoryName ?? t('All pieces', 'كل القطع'),
+            href: p.categoryHref ?? p.productsHref,
+          },
+          { label: p.name },
+        ]}
+      />
 
       <div className="grid gap-8 md:grid-cols-12 md:gap-10 lg:gap-16">
         <div className="md:col-span-7">
@@ -374,7 +372,7 @@ export function DahabProductDetail(p: DahabProductDetailProps) {
                 {p.badges.map(b => (
                   <li
                     key={b}
-                    className="rounded-[2px] border border-primary/40 px-2 py-1 text-[11px] leading-none text-primary"
+                    className="rounded-[2px] border border-primary/40 px-2 py-1 text-xs leading-none text-primary"
                   >
                     {b}
                   </li>
@@ -382,7 +380,7 @@ export function DahabProductDetail(p: DahabProductDetailProps) {
               </ul>
             )}
             <h1
-              className="font-display text-balance text-[clamp(1.85rem,1.4rem+1.6vw,2.75rem)] leading-[1.12] text-foreground rtl:leading-[1.45]"
+              className="font-display text-balance text-[clamp(1.85rem,1.4rem+1.6vw,2.75rem)] leading-[1.12] text-foreground [overflow-wrap:anywhere] rtl:leading-[1.45]"
               data-zone="productName"
             >
               {p.name}
@@ -414,6 +412,7 @@ export function DahabProductDetail(p: DahabProductDetailProps) {
                 onShopperSelect={p.onShopperSelect}
                 appearance="swatch"
                 sizeGuide={p.sizeChart ? <SizeChartDialog chart={p.sizeChart} /> : undefined}
+                nudge={p.optionNudge}
               />
             ) : (
               <SizeChartDialog chart={p.sizeChart} className="mt-4" />
@@ -474,7 +473,10 @@ export function DahabProductDetail(p: DahabProductDetailProps) {
                 <HeartIcon className="h-5 w-5" filled={p.isWishlisted} />
               </button>
             </div>
-            <DeliveryChip leadTimeDays={p.leadTimeDays} />
+            {/* X-03: a delivery date only for something that can be bought now. */}
+            {!p.addDisabled && <DeliveryChip leadTimeDays={p.leadTimeDays} />}
+            {/* S-02: COD · return window, from the store's own settings. */}
+            <TrustLine cod={p.codOffer ?? null} />
             {p.stockText && <p className="mt-3 text-[13px] text-muted-foreground">{p.stockText}</p>}
 
             <div className="mt-8 border-t border-border">
@@ -498,7 +500,7 @@ export function DahabProductDetail(p: DahabProductDetailProps) {
                 <p>
                   {t(
                     'Delivery times and fees for your area are shown at checkout.',
-                    'مواعيد ومصاريف التوصيل لمنطقتك بتظهر في خطوة إتمام الطلب.'
+                    'مواعيد التوصيل ورسومه لمنطقتك تظهر في خطوة إتمام الطلب.'
                   )}{' '}
                   <Link
                     href={p.shippingHref}
@@ -512,7 +514,7 @@ export function DahabProductDetail(p: DahabProductDetailProps) {
                 <p>
                   {t(
                     'Read how returns and exchanges work for this store.',
-                    'اعرف إزاي الاسترجاع والاستبدال في المتجر ده.'
+                    'اعرف طريقة الاسترجاع والاستبدال في هذا المتجر.'
                   )}{' '}
                   <Link
                     href={p.returnsHref}
@@ -536,15 +538,32 @@ export function DahabProductDetail(p: DahabProductDetailProps) {
         className={cx(
           // Solid ground, no glass (taste bar bans glassmorphism); ease-out-quint like the
           // default path's .sticky-bar-in (F10).
-          'fixed inset-x-0 bottom-[calc(var(--bottom-tab-h)+env(safe-area-inset-bottom))] z-40 border-t border-border bg-background px-4 py-3 transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none md:hidden',
-          pinBar
-            ? 'translate-y-0'
-            : 'translate-y-[calc(100%+var(--bottom-tab-h)+env(safe-area-inset-bottom))]'
+          // C-04: it REPLACES the tab bar while pinned (useStickyBarHeight marks
+          // <html data-task-bar>), so it sits at the bottom edge, safe-area inside.
+          'fixed inset-x-0 bottom-0 z-40 border-t border-border bg-background px-4 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none md:hidden',
+          pinBar ? 'translate-y-0' : 'translate-y-full'
         )}
       >
         <div className="flex items-center gap-3">
+          {p.cartHref && (
+            <Link
+              href={p.cartHref}
+              aria-label={p.cartLabel}
+              data-testid="dahab-pinned-cart"
+              className="relative inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-[var(--radius)] border border-border text-foreground"
+            >
+              <BagIcon className="h-[22px] w-[22px]" aria-hidden="true" />
+              {(p.cartCount ?? 0) > 0 && (
+                <span className="absolute -end-1.5 -top-1.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1 text-xs font-semibold leading-none text-primary-foreground tabular-nums">
+                  {localize(p.cartCount ?? 0)}
+                </span>
+              )}
+            </Link>
+          )}
           <div className="min-w-0 flex-1">
-            <p className="line-clamp-1 text-[13px] text-foreground/80">{p.name}</p>
+            <p className="line-clamp-1 text-[13px] text-foreground/80 [overflow-wrap:anywhere]">
+              {p.name}
+            </p>
             <p className="text-[15px] tabular-nums text-primary">{p.priceText}</p>
           </div>
           <button

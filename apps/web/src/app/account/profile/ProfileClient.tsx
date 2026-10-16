@@ -63,12 +63,21 @@ export default function ProfileClient() {
 
       if (result.success) {
         await refreshUser();
-        success('Profile updated', 'Your profile has been saved successfully.');
+        success(
+          t('Profile updated', 'تم تحديث الملف الشخصي'),
+          t('Your profile has been saved successfully.', 'تم حفظ ملفك الشخصي.')
+        );
       } else {
-        toastError('Update failed', result.error?.message || 'Failed to update profile');
+        toastError(
+          t('Update failed', 'تعذّر التحديث'),
+          result.error?.message || t('Failed to update profile', 'تعذّر تحديث الملف الشخصي')
+        );
       }
     } catch {
-      toastError('Update failed', 'An unexpected error occurred.');
+      toastError(
+        t('Update failed', 'تعذّر التحديث'),
+        t('An unexpected error occurred.', 'حدث خطأ غير متوقع.')
+      );
     } finally {
       setIsSaving(false);
     }
@@ -97,13 +106,18 @@ export default function ProfileClient() {
       });
 
       if (result.success) {
-        success('Password changed', 'Your password has been updated.');
+        success(
+          t('Password changed', 'تم تغيير كلمة المرور'),
+          t('Your password has been updated.', 'تم تحديث كلمة المرور.')
+        );
         setPasswords({ currentPassword: '', newPassword: '', confirmPassword: '' });
       } else {
-        setPasswordError(result.error?.message || 'Failed to change password');
+        setPasswordError(
+          result.error?.message || t('Failed to change password', 'تعذّر تغيير كلمة المرور')
+        );
       }
     } catch {
-      setPasswordError('An unexpected error occurred.');
+      setPasswordError(t('An unexpected error occurred.', 'حدث خطأ غير متوقع.'));
     } finally {
       setIsChangingPassword(false);
     }

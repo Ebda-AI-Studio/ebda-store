@@ -21,6 +21,7 @@ import {
 } from '@/lib/bundle-locale';
 
 import { fromMinor, REGION } from '@ebda/shared';
+import { Breadcrumbs } from '../../../components/Breadcrumbs';
 function BundleSkeleton() {
   return (
     <div className="grid gap-8 lg:grid-cols-2 animate-pulse">
@@ -164,17 +165,14 @@ export default function BundleDetailClient({ initialBundle }: BundleDetailClient
           {/* Breadcrumb — Home / Bundles / <name>, now that the `/bundles`
               index page exists (mirrors ProductDetailClient's
               Home/Products/category chain). */}
-          <nav className="mb-8 flex items-center gap-2 text-sm text-muted-foreground">
-            <Link href={storeUrl('/')} className="hover:text-primary">
-              {t('Home', translations['Home'])}
-            </Link>
-            <span>/</span>
-            <Link href={storeUrl('/bundles')} className="hover:text-primary">
-              {t('Bundles', 'الباقات')}
-            </Link>
-            <span>/</span>
-            <span className="text-foreground">{displayName}</span>
-          </nav>
+          <Breadcrumbs
+            className="mb-8 text-sm"
+            items={[
+              { label: t('Home', translations['Home']), href: storeUrl('/') },
+              { label: t('Bundles', 'الباقات'), href: storeUrl('/bundles') },
+              { label: displayName },
+            ]}
+          />
 
           <div className="grid gap-8 md:grid-cols-12">
             {/* Image */}

@@ -581,9 +581,12 @@ router.post('/refresh', refreshGuards, async (req: Request, res: Response, next:
     if (req.cookies?.token || req.cookies?.refresh_token) {
       clearSessionCookies(res);
     }
-    res.status(400).json({
+    // 401, not 400 (Ruling FU46-2): "there is no session here" is an authentication answer,
+    // and every storefront tab's one evidence-free probe lands here. All three clients already
+    // read 401 and 400 identically (web: SESSION_ENDED; admin/orders: `!res.ok`).
+    res.status(401).json({
       success: false,
-      error: { code: 'VALIDATION_ERROR', message: 'Refresh token is required' },
+      error: { code: 'NO_REFRESH_TOKEN', message: 'No session to refresh' },
     });
     return;
   }

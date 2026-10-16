@@ -64,6 +64,19 @@ describe.skipIf(!hasDb)('customer wallet — integration', () => {
     });
   }
 
+  // One phone per customer: the open-hold cap (#65/#75) counts the fixed baseOrderData phone
+  // across every test in this file. Per CUSTOMER, not per order, so the "full-wallet COD is
+  // exempt at the hold cap" case still stacks its two COD holds on one identity.
+  const customerPhones = new Map<string, string>();
+  function phoneFor(customerId: string): string {
+    let phone = customerPhones.get(customerId);
+    if (!phone) {
+      phone = `9655${String(customerPhones.size + 1).padStart(7, '0')}`;
+      customerPhones.set(customerId, phone);
+    }
+    return phone;
+  }
+
   async function newCustomer(): Promise<string> {
     const u = await prisma.user.create({
       data: {
@@ -116,6 +129,7 @@ describe.skipIf(!hasDb)('customer wallet — integration', () => {
     }
     const order = await OrderService.create(storeId, customerId, sessionId, {
       ...baseOrderData,
+      shippingAddress: { ...baseOrderData.shippingAddress, phone: phoneFor(customerId) },
       paymentMethod,
       useWallet,
     });

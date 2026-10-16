@@ -1,5 +1,6 @@
 'use client';
 
+import { signedText } from '@/lib/bidi';
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { Button, Select } from '@ebda/ui';
@@ -9,6 +10,7 @@ import { useLanguage } from '../../contexts/LanguageContext';
 import { api, API_URL, type Order } from '../../lib/api';
 import { groupOrderLinesForDisplay } from '@ebda/shared';
 import { returnPolicyCopy, returnPolicyKind } from '../../lib/return-policy-text';
+import { useNumerals } from '../../hooks/useNumerals';
 
 const RETURN_REASONS = [
   {
@@ -420,7 +422,7 @@ function ReturnRequestForm({ storeId }: { storeId: string }) {
                     value: order.id,
                     label: `#${order.orderNumber}${
                       firstName
-                        ? ` \u2014 ${firstName}${rows.length > 1 ? ` (+${rows.length - 1} more)` : ''}`
+                        ? ` \u2014 ${firstName}${rows.length > 1 ? ` (${t(`${signedText('+', rows.length - 1)} more`, `${signedText('+', rows.length - 1)} أخرى`)})` : ''}`
                         : ''
                     }`,
                   };
@@ -544,7 +546,7 @@ function ReturnRequestForm({ storeId }: { storeId: string }) {
               'Describe the issue in more detail...',
               '\u0635\u0641 \u0627\u0644\u0645\u0634\u0643\u0644\u0629 \u0628\u0645\u0632\u064a\u062f \u0645\u0646 \u0627\u0644\u062a\u0641\u0635\u064a\u0644...'
             )}
-            className="w-full rounded-lg border border-border px-3 py-2.5 text-base text-foreground placeholder:text-muted-foreground/70 focus:outline-none focus:ring-2 focus:ring-primary/50 resize-none sm:text-sm"
+            className="w-full rounded-lg border border-border px-3 py-2.5 text-base text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 resize-none sm:text-sm"
           />
         </div>
 
@@ -566,7 +568,9 @@ export default function ReturnsClient() {
   const { store } = useStore();
   const storeUrl = useStoreUrl();
   const { t, language } = useLanguage();
-  const policy = returnPolicyCopy(store.returnWindowDays, language);
+  // Days in the store's digits, the same as the PDP trust line (review M8).
+  const { localize } = useNumerals();
+  const policy = returnPolicyCopy(store.returnWindowDays, language, localize);
   const returnsEmail =
     email || t('our support team', '\u0641\u0631\u064a\u0642 \u0627\u0644\u062f\u0639\u0645');
   return (
@@ -742,7 +746,7 @@ export default function ReturnsClient() {
                 },
               ].map(({ step, title, desc }) => (
                 <div key={step} className="flex gap-4">
-                  <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-primary text-sm font-bold text-white">
+                  <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-primary text-sm font-bold text-primary-foreground">
                     {step}
                   </div>
                   <div>

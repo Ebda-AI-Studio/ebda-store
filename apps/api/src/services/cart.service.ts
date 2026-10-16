@@ -18,6 +18,9 @@
  */
 import { prisma, Prisma, hasTenantContext } from '@ebda/database';
 import { AppError } from '../middleware/error-handler';
+import logger from '../lib/logger';
+import { lineAllowsBackorder } from '../lib/effective-inventory';
+import { VARIANT_REQUIRED_MESSAGE } from '../lib/variant-required';
 import { featureService } from './feature.service';
 import { retryOnWriteConflict } from '../lib/db-retry';
 import { withSavepoint } from '../lib/savepoint';
@@ -25,6 +28,10 @@ import { cartLineUnitPrice } from '../lib/cart-pricing';
 import { STOREFRONT_PRODUCT_SELECT } from './product.service';
 import { resolveBundle, type ResolvedBundle } from './bundle.service';
 import { activePersonalisation, cleanNote, stripNote } from '@ebda/shared';
+
+// Bilingual VARIANT_REQUIRED copy lives with the other line writers' guard;
+// re-exported for the cart's tests.
+export { VARIANT_REQUIRED_MESSAGE };
 
 /**
  * Resolve a customer's personalisation note against the product's config.
@@ -389,10 +396,28 @@ export class CartService {
       // add-to-cart path — the bulk `addItems` sibling below had the same hole.
       const product = await tx.product.findFirst({
         where: { id: productId, storeId, status: 'active', deletedAt: null },
+        // Variant count for the VARIANT_REQUIRED gate below. Every variant row,
+        // disabled ones included: a product whose variants are all disabled is
+        // still a variant product, not a plain SKU.
+        include: { _count: { select: { variants: true } } },
       });
 
       if (!product) {
         throw new AppError(404, 'NOT_FOUND', 'Product not found or unavailable');
+      }
+
+      // A product with variants is bought as ONE of its variants, never as the
+      // bare parent (C-01, 2026-10-15). Without this gate a quick-add with no
+      // variantId fell back to the parent's `inventory` column, which the
+      // inventory model holds at 0 for a variant product: an in-stock sized
+      // product failed as "not enough inventory", and with backorder on it
+      // wrote a SIZELESS line that checkout then sold. The storefront card is
+      // only a hint; this is the gate.
+      if (!variantId && product._count.variants > 0) {
+        throw new AppError(400, 'VARIANT_REQUIRED', VARIANT_REQUIRED_MESSAGE.en, {
+          messageEn: VARIANT_REQUIRED_MESSAGE.en,
+          messageAr: VARIANT_REQUIRED_MESSAGE.ar,
+        });
       }
 
       // The note is part of the line identity: (cart, product, variant, note).
@@ -409,7 +434,8 @@ export class CartService {
       const note = resolvedNote.note;
 
       // Resolve the chosen variant — it must belong to this product and
-      // be active. Variant stock + backorder override the product values,
+      // be active. Variant stock overrides the product column; backorder is the
+      // variant flag OR the product flag (lineAllowsBackorder),
       // and the line is keyed by (cartId, productId, variantId) so each
       // variant is its own row (order.service already reads variantId).
       let variant: { id: string; inventory: number; allowBackorder: boolean } | null = null;
@@ -424,8 +450,12 @@ export class CartService {
       }
 
       const availableInventory = variant ? variant.inventory : product.inventory;
-      const effectiveAllowBackorder =
-        backorderFeatureEnabled && (variant ? variant.allowBackorder : product.allowBackorder);
+      // Variant inherits the product flag — the shared rule (X-02 fix round).
+      const effectiveAllowBackorder = lineAllowsBackorder(
+        product,
+        variant,
+        backorderFeatureEnabled
+      );
 
       // Same product+variant+note line if it already exists (null variantId for
       // base-product lines merges only with other base-product lines; `note: null`
@@ -711,17 +741,20 @@ export class CartService {
         trackInventory: true,
         allowBackorder: true,
         personalisation: true,
+        _count: { select: { variants: true } },
       },
     });
     const productById = new Map(products.map(p => [p.id, p]));
 
     // Resolve any chosen variants up front (must belong to one of these products
-    // and be active). Variant stock/backorder override the product values.
+    // and be active). Variant stock overrides the product column; backorder
+    // inherits the product flag (lineAllowsBackorder).
     const variantIds = items.map(i => i.variantId).filter((v): v is string => !!v);
     const variants = variantIds.length
       ? await prisma.productVariant.findMany({
           where: { id: { in: variantIds }, productId: { in: productIds }, isActive: true },
-          select: { id: true, inventory: true, allowBackorder: true },
+          // productId: the ownership check below (a variant must belong to ITS line's product).
+          select: { id: true, productId: true, inventory: true, allowBackorder: true },
         })
       : [];
     const variantById = new Map(variants.map(v => [v.id, v]));
@@ -738,6 +771,34 @@ export class CartService {
     const resolvedItems = items.flatMap(item => {
       const product = productById.get(item.productId);
       if (!product) return [];
+      // A variant product with no variant chosen is skipped, the same way an
+      // invalid variant is below (the VARIANT_REQUIRED gate in addItem, applied
+      // with this path's skip-don't-fail policy — Ruling FU46-W1a-2).
+      if (!item.variantId && product._count.variants > 0) return [];
+      // The variant must belong to THIS line's product. The lookup above only
+      // proves it belongs to SOME product in the payload, so `[{A, vB}, {B}]`
+      // wrote an (A, vB) line carrying B's size, stock and price (W1a review #1).
+      // Skipped, like an invalid variant; store id + code only in the log. A
+      // variant the lookup did not return (disabled, deleted, or not of any
+      // product in the payload) logs its own code: a disabled size is a normal
+      // catalogue change, a mismatch is a malformed or tampered payload.
+      if (item.variantId) {
+        const found = variantById.get(item.variantId);
+        if (!found) {
+          logger.warn(
+            { storeId, code: 'VARIANT_UNAVAILABLE' },
+            '[cart.addItems] skipped a line whose variant is disabled or gone'
+          );
+          return [];
+        }
+        if (found.productId !== item.productId) {
+          logger.warn(
+            { storeId, code: 'VARIANT_PRODUCT_MISMATCH' },
+            '[cart.addItems] skipped a line whose variant is not its product'
+          );
+          return [];
+        }
+      }
       const r = resolveLineNote(product.personalisation, item.note);
       return 'error' in r ? [] : [{ ...item, note: r.note }];
     });
@@ -789,8 +850,11 @@ export class CartService {
         const targetQuantity = (existing?.quantity ?? 0) + item.quantity;
 
         const availableInventory = variant ? variant.inventory : product.inventory;
-        const effectiveAllowBackorder =
-          backorderFeatureEnabled && (variant ? variant.allowBackorder : product.allowBackorder);
+        const effectiveAllowBackorder = lineAllowsBackorder(
+          product,
+          variant,
+          backorderFeatureEnabled
+        );
 
         if (
           product.trackInventory &&
@@ -925,8 +989,12 @@ export class CartService {
       // variant-less line falls back to the product column. Mirrors
       // `addItem` (~:151) and `validate` (~:285), which have always done this.
       const stockHolder = item.variant ?? item.product;
-      const effectiveAllowBackorder =
-        backorderFeatureEnabled && (item.variant?.allowBackorder ?? item.product.allowBackorder);
+      // `??` never fell back (a variant's false is not nullish): one shared rule.
+      const effectiveAllowBackorder = lineAllowsBackorder(
+        item.product,
+        item.variant,
+        backorderFeatureEnabled
+      );
       if (
         item.product.trackInventory &&
         stockHolder.inventory < quantity &&

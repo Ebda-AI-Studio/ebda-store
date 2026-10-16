@@ -1,7 +1,7 @@
 import type { StoreTheme } from '@ebda/shared';
 import { resolveColor } from '@ebda/shared';
 import { DISCOUNT_BADGE_DEFAULT_POSITION, type DiscountBadgePosition } from './discount-badge';
-import { avoidReservedCorner, type CornerV } from './badge-collision';
+import { avoidReservedCorner, soldOutCorner, type CornerV } from './badge-collision';
 
 /**
  * Custom (merchant-authored) product badge — the free-text chip a merchant
@@ -330,15 +330,21 @@ export function pinDefaultDiscountBadge({
       : (customBadgeCorner === 'top-left') !== isRtl
         ? 'start'
         : 'end';
-  // Deepest occupant of each logical top corner.
-  const startDepth: TopDepth = !orderable
-    ? 3
-    : topStartReserved
-      ? 2
-      : newOrBrandBadgeReserved || customAt === 'start'
-        ? 1
-        : 0;
-  const endDepth: TopDepth = topEndReserved ? 2 : customAt === 'end' ? 1 : 0;
+  // Deepest occupant of each logical top corner. A sold-out card's ribbon takes
+  // the corner `soldOutCorner` gives it (top-start, or top-end when a button
+  // holds top-start — X-01), the same answer OutOfStockRibbon renders from.
+  const ribbon = orderable ? null : soldOutCorner({ topStartReserved, topEndReserved });
+  const ribbonAt = ribbon && ribbon.v === 'top' ? ribbon.h : null;
+  const startDepth: TopDepth =
+    ribbonAt === 'start'
+      ? 3
+      : topStartReserved
+        ? 2
+        : newOrBrandBadgeReserved || customAt === 'start'
+          ? 1
+          : 0;
+  const endDepth: TopDepth =
+    ribbonAt === 'end' ? 3 : topEndReserved ? 2 : customAt === 'end' ? 1 : 0;
 
   let side: 'start' | 'end';
   let depth: TopDepth;
@@ -475,6 +481,13 @@ export interface ResolvedCardBadges {
    * the same single-owner reason.
    */
   discountBadgePositionCls: string;
+  /**
+   * X-01 (fix round): the LOGICAL top corner the rendered discount chip
+   * occupies, or null (no chip / bottom edge). The sold-out marker reserves it,
+   * so a MERCHANT-placed sale chip and the ribbon never stack either (the
+   * pinned default chip already plans around the ribbon).
+   */
+  discountTopCorner: 'start' | 'end' | null;
 }
 
 /**
@@ -660,9 +673,25 @@ export function resolveCardBadges({
     return bottomCornerClass(avoided.h, stack, lifted, belowStackedChip);
   }
 
+  const discountRenders = discountVisible && discountBadgeAllowed && discountOccupiesCorner;
+  const discountPhysicalTop: PhysicalH | null = !discountRenders
+    ? null
+    : pinnedDiscount
+      ? (pinnedDiscount.corner.split('-')[1] as PhysicalH)
+      : avoidedDiscount.v === 'top'
+        ? avoidedDiscount.h
+        : null;
+  const discountTopCorner =
+    discountPhysicalTop === null
+      ? null
+      : (discountPhysicalTop === 'left') !== isRtl
+        ? ('start' as const)
+        : ('end' as const);
+
   return {
     customBadgeText,
     discountBadgeAllowed,
+    discountTopCorner,
     customBadgePositionCls: classFor(avoidedCustom, stacked),
     // Rule 4 only ever lifts the CUSTOM chip (stack=false here) — the
     // discount chip stays at its base row so the two never both move.

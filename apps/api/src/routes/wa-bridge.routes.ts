@@ -35,6 +35,7 @@ import {
   EFFECTIVE_STOCK_SELECT,
   effectiveInventory,
   isOrderable,
+  lineAllowsBackorder,
 } from '../lib/effective-inventory';
 import logger from '../lib/logger';
 import { maskPhone } from '../lib/pii-mask';
@@ -182,6 +183,7 @@ router.get('/products/search', waBridgeAuth, async (req: Request, res: Response)
       limit
     );
 
+    const backorderOn = await featureService.isFeatureEnabled(storeId, 'inventory.backorder');
     res.json({
       success: true,
       data: pageProducts.map(p => ({
@@ -191,7 +193,8 @@ router.get('/products/search', waBridgeAuth, async (req: Request, res: Response)
         priceFils: p.price,
         currency: req.bridgeStore!.currency,
         compareAtFils: p.compareAtPrice,
-        inStock: !p.trackInventory || effectiveInventory(p) > 0 || p.allowBackorder,
+        // Same rule as the cart: the store's backorder feature gates the flag.
+        inStock: isOrderable(p, 1, backorderOn),
         inventory: p.trackInventory ? effectiveInventory(p) : null,
         imageUrl: p.images[0]?.url || null,
       })),
@@ -310,6 +313,10 @@ router.get('/products/by-category', waBridgeAuth, async (req: Request, res: Resp
       skip: (page - 1) * PAGE_SIZE,
     });
 
+    const backorderOn = await featureService.isFeatureEnabled(
+      req.bridgeStore!.id,
+      'inventory.backorder'
+    );
     res.json({
       success: true,
       data: products.map(p => ({
@@ -318,7 +325,8 @@ router.get('/products/by-category', waBridgeAuth, async (req: Request, res: Resp
         nameAr: p.nameAr,
         priceFils: p.price,
         currency: req.bridgeStore!.currency,
-        inStock: !p.trackInventory || effectiveInventory(p) > 0 || p.allowBackorder,
+        // Same rule as the cart: the store's backorder feature gates the flag.
+        inStock: isOrderable(p, 1, backorderOn),
         imageUrl: p.images[0]?.url ?? null,
       })),
       pagination: { page, perPage: PAGE_SIZE, hasMore: products.length === PAGE_SIZE },
@@ -702,6 +710,7 @@ router.get('/store-catalog', waBridgeAuth, async (req: Request, res: Response) =
     // (Ruling C3 CLOSED, 2026-09-07 — the consumer PR against that repo is no
     // longer a prerequisite for enabling the flag).
     const bundlesEnabled = await featureService.isFeatureEnabled(store.id, 'bundles');
+    const backorderOn = await featureService.isFeatureEnabled(store.id, 'inventory.backorder');
     const bundles = bundlesEnabled
       ? (await listPurchasableBundles(prisma, store.id)).map(b => {
           const { description, descriptionAr } = describeBundleContents(b);
@@ -733,7 +742,8 @@ router.get('/store-catalog', waBridgeAuth, async (req: Request, res: Response) =
           compareAtPrice: p.compareAtPrice ?? undefined,
           currency: storeRow.currency,
           categoryIds: p.categories.map(pc => pc.categoryId),
-          inStock: !p.trackInventory || effectiveInventory(p) > 0 || p.allowBackorder,
+          // Same rule as the cart: the store's backorder feature gates the flag.
+          inStock: isOrderable(p, 1, backorderOn),
           sku: p.sku ?? undefined,
           imageUrl: p.images[0]?.url ?? undefined,
           variants: p.variants
@@ -742,7 +752,8 @@ router.get('/store-catalog', waBridgeAuth, async (req: Request, res: Response) =
               id: v.id,
               name: v.title,
               price: v.price ?? p.price,
-              inStock: v.inventory > 0 || v.allowBackorder,
+              inStock:
+                !p.trackInventory || v.inventory > 0 || lineAllowsBackorder(p, v, backorderOn),
             })),
         })),
         // Bundle entries: only isPurchasable ones (via listPurchasableBundles),

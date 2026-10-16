@@ -66,7 +66,7 @@ import { Toggle } from '../../../../components/Toggle';
 import { ImageUpload } from '../../../../components/ImageUpload';
 import { FooterLinksEditor } from '../../../../components/FooterLinksEditor';
 import { NavMenuEditor } from '../../../../components/NavMenuEditor';
-import { apiGet, apiPost, apiPut, apiFetch } from '../../../../lib/api';
+import { apiGet, apiPost, apiPut, apiFetch, localizedApiMessage } from '../../../../lib/api';
 import { loadPageRev, saveLayoutAsPage } from '../../../../lib/page-builder-save';
 import { getStoreHref } from '../../../../lib/store-url';
 
@@ -4078,10 +4078,16 @@ function FontsCard({
       const data = (await res.json()) as {
         success?: boolean;
         data?: { url?: string; format?: string };
-        error?: { message?: string };
+        error?: { code?: string; message?: string; details?: Record<string, unknown> };
       };
       if (!res.ok || !data.success || !data.data?.url) {
-        setUploadError(data.error?.message ?? `Upload failed (HTTP ${res.status})`);
+        setUploadError(
+          localizedApiMessage(
+            data.error?.code,
+            data.error?.message ?? `Upload failed (HTTP ${res.status})`,
+            data.error?.details
+          )
+        );
         return;
       }
       onChange([

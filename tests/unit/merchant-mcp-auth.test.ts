@@ -275,9 +275,12 @@ describe('verifyMerchantKey', () => {
   it("REFUSES a suspended user's key — the dashboard lever must reach the device", async () => {
     // A key is a device acting AS a person. Suspending the person has to stop
     // the device, or the platform's strongest lever is a partial one.
+    // The user is still the store's owner (role + ownership intact), so ONLY the
+    // status check can refuse: without the role the membership check refused it
+    // first and this case passed with `userActive` deleted (defence-mutation record).
     const { plaintext } = generateMerchantKey();
     findUnique.mockResolvedValue(
-      validRow(plaintext, { user: { status: 'suspended', deletedAt: null } })
+      validRow(plaintext, { user: { status: 'suspended', deletedAt: null, role: 'store_admin' } })
     );
     await expect(verifyMerchantKey(reqWithKey(plaintext), STORE)).rejects.toMatchObject({
       statusCode: 404,
@@ -287,7 +290,9 @@ describe('verifyMerchantKey', () => {
   it("REFUSES a soft-deleted user's key", async () => {
     const { plaintext } = generateMerchantKey();
     findUnique.mockResolvedValue(
-      validRow(plaintext, { user: { status: 'active', deletedAt: new Date('2026-01-01') } })
+      validRow(plaintext, {
+        user: { status: 'active', deletedAt: new Date('2026-01-01'), role: 'store_admin' },
+      })
     );
     await expect(verifyMerchantKey(reqWithKey(plaintext), STORE)).rejects.toMatchObject({
       statusCode: 404,

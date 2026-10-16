@@ -212,7 +212,7 @@ export const Rating = forwardRef<HTMLDivElement, RatingProps>(
         </div>
 
         {showCount && formattedCount && (
-          <span className={cn('text-muted-foreground/70 tabular-nums', styles.text)}>
+          <span className={cn('text-muted-foreground tabular-nums', styles.text)}>
             {formattedCount}
           </span>
         )}

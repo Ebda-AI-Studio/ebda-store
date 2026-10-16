@@ -1,5 +1,6 @@
 'use client';
 
+import { isVariantProduct } from '../../../../../lib/variant-product';
 import { useState, useEffect } from 'react';
 import { Button, Modal, useToast } from '@ebda/ui';
 import { useT } from '@/i18n/useT';
@@ -132,8 +133,10 @@ export function MassEditModal({
 
   // ── derived ─────────────────────────────────────────────────────────────
 
-  const variantSelectedProducts = selectedProducts.filter(p => p.hasVariants);
-  const simpleSelectedProducts = selectedProducts.filter(p => !p.hasVariants);
+  // The real variant rows (`variantCount` from the list), the column only as a
+  // fallback: the same rule as the API's bulk update (W1b fix round).
+  const variantSelectedProducts = selectedProducts.filter(p => isVariantProduct(p));
+  const simpleSelectedProducts = selectedProducts.filter(p => !isVariantProduct(p));
   const variantProductsToLoad = variantSelectedProducts.slice(0, VARIANT_LOAD_CAP);
   const isCapped = variantSelectedProducts.length > VARIANT_LOAD_CAP;
 

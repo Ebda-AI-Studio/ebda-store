@@ -1,4 +1,5 @@
 import type { ResolvedStore } from './store-resolver';
+import { canBuyNow, inStockNow } from './can-buy-now';
 import { pickMetaDescription } from './seo/meta-description';
 import type { StorefrontLocale } from './seo/resolve-locale';
 import { BRAND_MARKETING_URL, storefrontOrigin } from '@ebda/shared';
@@ -39,6 +40,9 @@ interface ProductForJsonLd {
   slug: string;
   images?: Array<{ url: string; alt?: string }>;
   inventory?: number;
+  /** Server stock flags (enrichStockFlags); a variant product's own `inventory` is 0. */
+  inStock?: boolean;
+  acceptsBackorder?: boolean;
   categories?: Array<{ category?: { name?: string; nameAr?: string | null; slug?: string } }>;
   /** Verified-purchase published reviews for JSON-LD. Server MUST pre-filter
    *  (status='published' AND verifiedPurchase=true) before passing here. */
@@ -122,6 +126,9 @@ export interface PublicShippingZone {
   estimatedDaysMin: number | null;
   estimatedDaysMax: number | null;
   estimatedDays: number | null;
+  /** A named zone's area names (en / ar); absent on an area-rate row. Matches an order's address. */
+  areas?: string[];
+  areasAr?: string[];
 }
 
 /**
@@ -190,9 +197,13 @@ export function productJsonLd(
   const storeName = localizedField(store.name, store.nameAr, locale);
   const productUrl = storeAbsoluteUrl(store, `/products/${product.slug}`);
   const image = product.images?.[0]?.url;
-  const availability =
-    product.inventory === undefined || product.inventory > 0
-      ? 'https://schema.org/InStock'
+  // The same answer as the buy button (X-03): read the server's stock flags, not
+  // raw `inventory` (0 on every variant product, which told search engines a
+  // stocked sized product was out of stock); a backorderable item is BackOrder.
+  const availability = inStockNow(product)
+    ? 'https://schema.org/InStock'
+    : canBuyNow(product)
+      ? 'https://schema.org/BackOrder'
       : 'https://schema.org/OutOfStock';
 
   return {
@@ -418,6 +429,8 @@ interface ItemListProduct {
   price?: number | null; // in piastres (EGP * 1000)
   currency?: string;
   inStock?: boolean;
+  /** Sold out but taking backorders: BackOrder, the same answer as the PDP (X-03). */
+  acceptsBackorder?: boolean;
 }
 
 export function itemList(products: ItemListProduct[], listName?: string): object {
@@ -440,10 +453,13 @@ export function itemList(products: ItemListProduct[], listName?: string): object
                 '@type': 'Offer',
                 price: minorToDecimalString(p.price),
                 priceCurrency: p.currency ?? REGION.currency,
+                // The PDP's rule (X-03): an absent flag reads in stock, as before.
                 availability:
                   p.inStock !== false
                     ? 'https://schema.org/InStock'
-                    : 'https://schema.org/OutOfStock',
+                    : canBuyNow(p)
+                      ? 'https://schema.org/BackOrder'
+                      : 'https://schema.org/OutOfStock',
               },
             }
           : {}),

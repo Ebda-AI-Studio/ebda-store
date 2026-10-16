@@ -310,7 +310,10 @@ describe.skipIf(!hasDb)('self-serve merchant onboarding', () => {
         .post('/api/v1/onboarding/store')
         .set(bearer(jwt))
         .send({ name: 'x', slug: mkSlug('cust') });
-      expect(res.status).toBe(403);
+      // Ruling S11-1 (#75): a customer token works only for the store it was issued for, from
+      // that store's origin; anywhere else it is a dead token (401, same as any other).
+      expect(res.status).toBe(401);
+      expect(res.body.error.code).toBe('TOKEN_INVALID');
     });
 
     it('refuses reserved slugs and taken slugs, and slug-check agrees', async () => {

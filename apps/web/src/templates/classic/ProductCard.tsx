@@ -1,6 +1,7 @@
 'use client';
 
 import { memo } from 'react';
+import { canBuyNow } from '@/lib/can-buy-now';
 import { resolveProductCardCtaOosDefaults } from '../shared/product-card-defaults';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -31,7 +32,12 @@ import { PlaceholderImageIcon } from '../shared/icons';
 import { TaxInclusiveLabel } from '../shared/tax-inclusive-label';
 import { productCardPropsEqual } from '../shared/product-card-memo';
 import { getProductPricing, getDiscountBadgeText } from '../../lib/product-pricing';
-import { OosImageDim, ProductCardCta, OutOfStockRibbon } from '../shared/ProductCardCta';
+import {
+  OosImageDim,
+  ProductCardCta,
+  OutOfStockRibbon,
+  isProductNew,
+} from '../shared/ProductCardCta';
 import { getDiscountBadgeColor } from '../shared/discount-badge';
 import {
   getCustomBadgeColor,
@@ -40,6 +46,7 @@ import {
 } from '../shared/custom-badge';
 import { SwatchDots } from '../../components/commerce/SwatchDots';
 import { FactChips } from '../../components/commerce/FactChips';
+import { useRenderNow } from '../../contexts/RenderClockContext';
 
 /**
  * Classic Template - Product Card
@@ -80,6 +87,7 @@ function ClassicProductCard({
 }: ProductCardProps) {
   const { isRtl: ctxIsRtl } = useLanguage();
   const { store, layout } = useStore();
+  const renderNow = useRenderNow();
   // Ruling NUMERALS-1: Western digits unless the store opted in (Arabic only).
   const numerals = storeNumerals(store?.theme);
   const isRtl = isRtlProp ?? ctxIsRtl;
@@ -115,7 +123,7 @@ function ClassicProductCard({
   // BUG 1 fix: use helper for correct EGP/pct badge text.
   const discountBadgeText = getDiscountBadgeText(product, isRtl, undefined, undefined, numerals);
   // Task 13: backorder-aware orderable signal. OOS + backorder allowed → orderable.
-  const orderable = product.inStock !== false || product.acceptsBackorder === true;
+  const orderable = canBuyNow(product);
 
   const frameCls =
     `${cardFrameClass(showCardFrame, cardFrameStyle)} ${showCardFrame ? cardFrameWidthClass(cardFrameWidth) : ''} ${showCardFrame ? cardFrameSizeClass(cardFrameSize) : ''}`.trim();
@@ -156,6 +164,7 @@ function ClassicProductCard({
     discountBadgeAllowed,
     customBadgePositionCls,
     discountBadgePositionCls,
+    discountTopCorner,
   } = resolveCardBadges({
     discountVisible: Boolean(hasSale && discountBadgeText),
     product,
@@ -172,7 +181,7 @@ function ClassicProductCard({
     // of the sale badge (`!hasSale`), at logical top-start; mirror that
     // exact condition so a badge avoiding a reserved heart corner doesn't
     // land on top of it.
-    newOrBrandBadgeReserved: Boolean(!hasSale && product.isNew && orderable),
+    newOrBrandBadgeReserved: Boolean(!hasSale && isProductNew(product, renderNow) && orderable),
     // The mobile quick-add CTA band below is an unconditional full-width
     // overlay (hidden only via a `lg:` desktop hover state, never removed
     // from the DOM), so it reserves the whole bottom edge.
@@ -249,7 +258,7 @@ function ClassicProductCard({
               )}
             </>
           ) : (
-            <div className="w-full h-full flex items-center justify-center text-muted-foreground/40">
+            <div className="w-full h-full flex items-center justify-center text-muted-foreground">
               <PlaceholderImageIcon />
             </div>
           )}
@@ -311,7 +320,7 @@ function ClassicProductCard({
             </span>
           ) : (
             !hasSale &&
-            product.isNew &&
+            isProductNew(product, renderNow) &&
             orderable && (
               <ProductBadge
                 variant="new"
@@ -319,7 +328,7 @@ function ClassicProductCard({
                 size="sm"
                 absolute
                 position={isRtl ? 'top-right' : 'top-left'}
-                className="font-serif tracking-widest uppercase bg-foreground text-background rounded-none text-[10px]"
+                className="font-serif tracking-widest uppercase bg-foreground text-background rounded-none text-xs"
                 label={isRtl ? 'جديد' : 'New'}
               />
             )
@@ -353,8 +362,8 @@ function ClassicProductCard({
             oosLabelColor={resolvedOosLabelColor}
             oosLabelTextColor={resolvedOosLabelTextColor}
             theme={store.theme}
-            topStartReserved={Boolean(onToggleCompare)}
-            topEndReserved={Boolean(onRemoveFromWishlist)}
+            topStartReserved={Boolean(onToggleCompare) || discountTopCorner === 'start'}
+            topEndReserved={Boolean(onRemoveFromWishlist) || discountTopCorner === 'end'}
           />
           {/* Image overlay tint when out-of-stock. z-[5] sits under the OOS
               badge (z-10) and above the product image. */}
@@ -374,7 +383,7 @@ function ClassicProductCard({
               <h3
                 id={`prod-${product.id}-name`}
                 data-zone="productName"
-                className={`font-serif ${textSizes.name} text-foreground mb-2 group-hover:text-primary transition-colors duration-500 leading-snug tracking-tight line-clamp-2 min-h-[2.5em]${nameCase === 'uppercase' ? ' uppercase' : ''}`}
+                className={`font-serif ${textSizes.name} text-foreground mb-2 group-hover:text-primary transition-colors duration-500 leading-snug tracking-tight [overflow-wrap:anywhere] line-clamp-2 min-h-[2.5em]${nameCase === 'uppercase' ? ' uppercase' : ''}`}
                 itemProp="name"
               >
                 {isRtl && product.nameAr ? product.nameAr : product.name}
@@ -399,7 +408,7 @@ function ClassicProductCard({
               />
             )}
             {priceVisible && (
-              <TaxInclusiveLabel className="mt-1 block font-serif text-xs text-muted-foreground/70" />
+              <TaxInclusiveLabel className="mt-1 block font-serif text-xs text-muted-foreground" />
             )}
             <SwatchDots product={product} max={5} className="mt-1 justify-center" />
             <FactChips product={product} className="mt-1 justify-center" />
