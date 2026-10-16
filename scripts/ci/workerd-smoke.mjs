@@ -41,7 +41,7 @@ export function stripAiBinding(source) {
  */
 export function stripImagesBinding(source) {
   return source.replace(
-    /^[ \t]*"images":[ \t]*\{[ \t]*"binding":[ \t]*"IMAGES"[ \t]*\},?[ \t]*\r?\n/m,
+    /^[ \t]*"images":[ \t]*\{[ \t]*"binding":[ \t]*"IMAGES"[ \t]*\},?[ \t]*\r?\n/gm,
     ''
   );
 }

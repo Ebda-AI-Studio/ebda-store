@@ -2,8 +2,7 @@
 import { readFileSync, realpathSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
-const IMAGES_LINE = '  "images": { "binding": "IMAGES" },\n';
-const AI_LINE = /^([ \t]*"ai":[ \t]*\{[ \t]*"binding":[ \t]*"AI"[ \t]*\},?[ \t]*\r?\n)/m;
+const AI_LINE = /^([ \t]*)("ai":[ \t]*\{[ \t]*"binding":[ \t]*"AI"[ \t]*\},?[ \t]*\r?\n)/gm;
 
 /**
  * The Cloudflare Images binding (PWA icon resizing, Ruling D1016-ICONS-1) goes into the deploy
@@ -13,9 +12,11 @@ const AI_LINE = /^([ \t]*"ai":[ \t]*\{[ \t]*"binding":[ \t]*"AI"[ \t]*\},?[ \t]*
  */
 export function withImagesBinding(source, flag) {
   if (flag !== 'true') return source;
-  if (!AI_LINE.test(source))
+  // Every "ai" line — the top level and each `env.*` section (review M3) — gets an images line
+  // at the same indent, so no environment deploys without the binding.
+  if (!source.match(AI_LINE))
     throw new Error('wrangler config has no "ai" binding line to anchor "images"');
-  return source.replace(AI_LINE, `$1${IMAGES_LINE}`);
+  return source.replace(AI_LINE, '$1$2$1"images": { "binding": "IMAGES" },\n');
 }
 
 function main() {

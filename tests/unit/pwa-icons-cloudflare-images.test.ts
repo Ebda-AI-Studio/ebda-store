@@ -49,7 +49,7 @@ const SIZES: Record<string, number> = {
 
 type Op = Record<string, unknown> & { width?: number; border?: { width?: number; color?: string } };
 /** A fake `env.IMAGES`: records each chain and answers a PNG of the size the chain asks for. */
-function fakeImages(mode: 'ok' | 'throw' | 'wrong-size' = 'ok') {
+function fakeImages(mode: 'ok' | 'throw' | 'wrong-size' | 'hang' = 'ok') {
   const chains: Array<{ ops: Op[]; output: Record<string, unknown> }> = [];
   const binding = {
     input(_stream: ReadableStream) {
@@ -62,6 +62,7 @@ function fakeImages(mode: 'ok' | 'throw' | 'wrong-size' = 'ok') {
         async output(output: Record<string, unknown>) {
           chains.push({ ops, output });
           if (mode === 'throw') throw new Error('IMAGES_TRANSFORM_ERROR 9432: not enabled');
+          if (mode === 'hang') await new Promise(() => {});
           const last = ops[ops.length - 1];
           const side = (last.width ?? 0) + 2 * (last.border?.width ?? 0);
           const px = mode === 'wrong-size' ? side + 1 : side;
@@ -127,6 +128,16 @@ describe('PWA icons through Cloudflare Images (D1016-ICONS-1)', () => {
     }
   );
 
+  it('a hung binding is cut off by the deadline and the whole set falls back (review M1)', async () => {
+    const { binding } = fakeImages('hang');
+    setCfBindings({ HYPERDRIVE: { connectionString: '' }, IMAGES: binding });
+    const source = fakePng(600, 600);
+    await generatePwaIconSet(STORE_ID, source, { background: '#ffffff', deadlineMs: 50 });
+    for (const key of Object.keys(SIZES)) expect(uploaded(key).equals(source), key).toBe(true);
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(String(warn.mock.calls[0][0].err)).toMatch(/deadline/i);
+  });
+
   it('no binding: today’s behaviour, the source under every key', async () => {
     const source = fakePng(600, 600);
     await generatePwaIconSet(STORE_ID, source);
@@ -143,6 +154,15 @@ describe('the binding is behind a deploy switch', () => {
     expect(withImagesBinding(src, undefined)).toBe(src);
     expect(withImagesBinding(src, 'false')).toBe(src);
   });
+  it('every wrangler env section gets the binding too (review M3)', async () => {
+    const { withImagesBinding } = await import('../../scripts/ebda-cf-api-config.mjs');
+    const src =
+      '{\n  "ai": { "binding": "AI" },\n  "env": {\n    "staging": {\n      "ai": { "binding": "AI" },\n    },\n  },\n}\n';
+    const out = withImagesBinding(src, 'true');
+    expect(out.match(/"images": \{ "binding": "IMAGES" \}/g)?.length).toBe(2);
+    expect(out).toMatch(/\n      "images": \{ "binding": "IMAGES" \},\n/); // keeps the env indent
+  });
+
   it('the workerd smoke strips it, like the AI binding', async () => {
     const { stripImagesBinding } = await import('../../scripts/ci/workerd-smoke.mjs');
     const { withImagesBinding } = await import('../../scripts/ebda-cf-api-config.mjs');

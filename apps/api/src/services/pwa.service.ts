@@ -95,23 +95,37 @@ const ICON_TARGETS: ReadonlyArray<{
  * Every target resized through Cloudflare Images, or null (no binding, or ANY target failed:
  * a mixed set of resized and pass-through icons is never stored). One warning on failure.
  */
+/** How long the whole Images resize may take before the set falls back (review M1). */
+export const IMAGES_DEADLINE_MS = 10_000;
+
 async function resizedTargets(
   storeId: string,
   source: Buffer,
-  background: string | undefined
+  background: string | undefined,
+  deadlineMs: number = IMAGES_DEADLINE_MS
 ): Promise<Buffer[] | null> {
   const images = imagesBinding();
   if (!images) return null;
+  let timer: ReturnType<typeof setTimeout> | undefined;
   try {
-    return await Promise.all(
+    const all = Promise.all(
       ICON_TARGETS.map(t => renderIcon(images, source, t.size, { maskable: t.padded, background }))
     );
+    const deadline = new Promise<never>((_, reject) => {
+      timer = setTimeout(
+        () => reject(new Error(`Images resize missed its ${deadlineMs}ms deadline`)),
+        deadlineMs
+      );
+    });
+    return await Promise.race([all, deadline]);
   } catch (err) {
     logger.warn(
       { storeId, err: err instanceof Error ? err.message : String(err) },
       'pwa: Cloudflare Images resize failed; storing the source under every size (FU46-8 fallback)'
     );
     return null;
+  } finally {
+    if (timer) clearTimeout(timer);
   }
 }
 
@@ -141,8 +155,11 @@ async function resizedTargets(
 export async function generatePwaIconSet(
   storeId: string,
   sourceBuffer: Buffer,
-  /** `background`: the maskable icon's padding colour (the store's PWA background). */
-  opts: { background?: string } = {}
+  /**
+   * `background`: the maskable icon's padding colour (the store's PWA background).
+   * `deadlineMs`: the Images resize deadline (default IMAGES_DEADLINE_MS; tests shorten it).
+   */
+  opts: { background?: string; deadlineMs?: number } = {}
 ): Promise<GeneratedPwaIcons> {
   // One version per run, shared by every key (randomUUID: two runs in one millisecond differ).
   const version = randomUUID().slice(0, 8);
@@ -156,7 +173,7 @@ export async function generatePwaIconSet(
     });
   }
   const sourcePng = sourceBuffer;
-  const resized = await resizedTargets(storeId, sourceBuffer, opts.background);
+  const resized = await resizedTargets(storeId, sourceBuffer, opts.background, opts.deadlineMs);
   const prepared = ICON_TARGETS.map((target, i) => ({
     target,
     buffer: resized ? resized[i] : sourceBuffer,
