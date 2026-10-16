@@ -410,11 +410,12 @@ describe('minimal/ProductCard chips (the Qamar search grid) follow cardBadge', (
     selectLook(null);
     expect(card().className).toContain('tracking-[0.18em]');
   });
-  it('a look with cardBadge accent: the accent chip on the radius', () => {
+  it('a look store: the chip on the radius, neutral ink on paper (VT-b supersedes the accent NEW chip)', () => {
     selectLook('qamar.lookbook');
     const c = card();
     expect(c.className).toContain('rounded-[var(--radius)]');
-    expect(c.getAttribute('style')).toContain('hsl(var(--accent))');
+    expect(c.getAttribute('style')).toContain('hsl(var(--background))');
+    expect(c.getAttribute('style')).not.toContain('--accent');
   });
 });
 
@@ -608,5 +609,34 @@ describe('one radius per look (LB-c)', () => {
     selectLook(null);
     const img = card(PecannbeeProductCard).querySelector('img')!.closest('div')!;
     expect(img.className).not.toContain('rounded-[var(--radius)]');
+  });
+});
+
+// VT-b (independent audit): on Vitrine the teal CTA, rose chips, gold rules and three
+// saturated occasion tiles came close to the too-many-colours anti-reference. The NEW chip
+// is neutral (ink on paper) on every look, so the accent belongs to the sale chip only.
+describe('the NEW chip is neutral on a look store (VT-b)', () => {
+  it.each(['qamar.atelier', 'qamar.lookbook', 'qamar.vitrine'])('%s', look => {
+    selectLook(look);
+    for (const C of [PecannbeeProductCard, MinimalProductCard]) {
+      const c = render(
+        React.createElement(
+          C as never,
+          {
+            product: { ...product('plain'), isNew: true },
+            isRtl: true,
+            pack: state.template,
+          } as never
+        )
+      ).container;
+      const chip = c.querySelector('[data-badge="new"]') as HTMLElement;
+      expect(chip).toBeTruthy();
+      // jsdom drops a var() colour from style.backgroundColor, so read the raw attribute.
+      const style = chip.getAttribute('style') ?? '';
+      expect(style).toMatch(/background-color:\s*hsl\(var\(--background\)\)/);
+      expect(style).toMatch(/(^|;)\s*color:\s*hsl\(var\(--foreground\)\)/);
+      expect(style).not.toContain('--accent');
+      cleanup();
+    }
   });
 });

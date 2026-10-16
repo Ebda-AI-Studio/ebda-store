@@ -9,6 +9,7 @@ import {
   lookChip,
   LOOK_CHIP_CLS,
   LOOK_CHIP_STYLE,
+  LOOK_NEW_CHIP_STYLE,
 } from '../shared/look-card';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -257,11 +258,12 @@ function MinimalProductCard({
           {product.inStock !== false && isProductNew(product, renderNow) && (
             <span
               className={
-                chip
+                getLook(store.look)
                   ? cn(LOOK_CHIP_CLS, 'top-2 start-2')
                   : 'absolute top-2 start-2 z-10 px-2 py-0.5 text-xs font-medium uppercase tracking-[0.18em] text-[hsl(var(--primary))] bg-background'
               }
-              style={chip ? LOOK_CHIP_STYLE : undefined}
+              // VT-b: neutral on every look; the accent is the sale chip's alone.
+              style={getLook(store.look) ? LOOK_NEW_CHIP_STYLE : undefined}
               aria-hidden="true"
               data-badge="new"
             >

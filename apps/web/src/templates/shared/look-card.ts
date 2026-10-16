@@ -57,6 +57,15 @@ export const LOOK_CHIP_STYLE = {
   color: 'hsl(var(--accent-foreground))',
 } as const;
 
+/**
+ * VT-b: the NEW chip on a look store is neutral, ink on paper, on every look, so the accent
+ * belongs to the sale chip (engagement) only.
+ */
+export const LOOK_NEW_CHIP_STYLE = {
+  backgroundColor: 'hsl(var(--background))',
+  color: 'hsl(var(--foreground))',
+} as const;
+
 export function lookChip(theme: Pick<StoreTheme, 'cardBadge'> | null | undefined): boolean {
   return theme?.cardBadge === 'accent';
 }

@@ -47,6 +47,7 @@ import {
   lookChip,
   LOOK_CHIP_CLS,
   LOOK_CHIP_STYLE,
+  LOOK_NEW_CHIP_STYLE,
   overPhotoMaterial,
   overPhotoHeartCls,
 } from './look-card';
@@ -449,11 +450,12 @@ function PecannbeeProductCardImpl({
           {showNewBadge && (
             <span
               className={
-                chip
+                onLook
                   ? cn(LOOK_CHIP_CLS, newCorner)
                   : `absolute ${newCorner} z-10 rounded-full bg-[hsl(var(--primary))] px-2.5 py-1 text-xs font-bold uppercase tracking-wider text-[hsl(var(--primary-foreground))] shadow-[0_6px_14px_-6px_hsl(var(--primary)/0.5)]`
               }
-              style={chip ? LOOK_CHIP_STYLE : undefined}
+              // VT-b: neutral on every look; the accent is the sale chip's alone.
+              style={onLook ? LOOK_NEW_CHIP_STYLE : undefined}
               aria-hidden="true"
               data-badge="new"
             >
