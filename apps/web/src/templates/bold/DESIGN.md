@@ -126,10 +126,10 @@ transition-all duration-200
 shadow-2xl shadow-primary/30
 ```
 
-**Order Summary CTA**
+**Order Summary CTA** (48px on every skin, one label "Checkout / إتمام الطلب" from `lib/checkout-cta.ts`, mirrored `ArrowIcon`; C-03)
 
 ```
-flex h-14 w-full items-center justify-center
+flex h-12 w-full items-center justify-center gap-2
 bg-primary px-5 text-sm font-black uppercase tracking-widest text-primary-foreground
 hover:bg-primary/90
 focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2

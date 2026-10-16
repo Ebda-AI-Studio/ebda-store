@@ -16,6 +16,7 @@ import { useNumerals } from '../../hooks/useNumerals';
 import { DahabDrawer } from './Drawer';
 import { CartLineNote } from '../../components/commerce/CartLineNote';
 import { DAHAB_BTN_PRIMARY, DAHAB_BTN_SECONDARY, MinusIcon, PlusIcon, cx } from './ui';
+import { CART_CHECKOUT_CTA } from '../../lib/checkout-cta';
 
 export function DahabCartDrawer({
   open,
@@ -71,7 +72,7 @@ export function DahabCartDrawer({
                   aria-disabled="true"
                   className={cx(DAHAB_BTN_PRIMARY, 'pointer-events-none opacity-50')}
                 >
-                  {t('Checkout', 'إتمام الطلب')}
+                  {t(CART_CHECKOUT_CTA.en, CART_CHECKOUT_CTA.ar)}
                 </span>
               ) : (
                 <Link
@@ -79,7 +80,7 @@ export function DahabCartDrawer({
                   className={DAHAB_BTN_PRIMARY}
                   onClick={onClose}
                 >
-                  {t('Checkout', 'إتمام الطلب')}
+                  {t(CART_CHECKOUT_CTA.en, CART_CHECKOUT_CTA.ar)}
                 </Link>
               )}
               <Link href={`${urlPrefix}/cart`} className={DAHAB_BTN_SECONDARY} onClick={onClose}>

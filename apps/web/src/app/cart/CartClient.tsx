@@ -34,6 +34,8 @@ import { AcceptedPaymentBadges } from '../../components/AcceptedPaymentBadges';
 import { CartLineNote } from '../../components/commerce/CartLineNote';
 import { StickyCartTotal } from '../../components/commerce/StickyCartTotal';
 import { countText, ITEMS } from '../../lib/plural';
+import { CART_CHECKOUT_CTA } from '../../lib/checkout-cta';
+import { ArrowIcon } from '../../templates/shared/icons';
 import { Breadcrumbs } from '../../components/Breadcrumbs';
 
 export default function CartClient() {
@@ -817,8 +819,8 @@ export default function CartClient() {
                         total={total}
                         currency={store.currency}
                         isRtl={language === 'ar'}
-                        ctaLabel="Proceed to Checkout"
-                        ctaLabelAr="المتابعة للدفع"
+                        ctaLabel={CART_CHECKOUT_CTA.en}
+                        ctaLabelAr={CART_CHECKOUT_CTA.ar}
                         ctaHref={storeUrl('/checkout')}
                         ctaDisabled={checkoutBlocked}
                         ctaBlockedMessage={checkoutBlockedMessage}
@@ -1123,31 +1125,13 @@ export default function CartClient() {
                               className="mt-6 w-full gap-2 rounded-xl"
                               size="lg"
                             >
-                              {t(
-                                'Proceed to Checkout',
-                                '\u0627\u0644\u0645\u062a\u0627\u0628\u0639\u0629 \u0644\u0644\u062f\u0641\u0639'
-                              )}
+                              {t(CART_CHECKOUT_CTA.en, CART_CHECKOUT_CTA.ar)}
                             </Button>
                           ) : (
                             <Link href={storeUrl('/checkout')} className="mt-6 block">
                               <Button className="w-full gap-2 rounded-xl" size="lg">
-                                {t(
-                                  'Proceed to Checkout',
-                                  '\u0627\u0644\u0645\u062a\u0627\u0628\u0639\u0629 \u0644\u0644\u062f\u0641\u0639'
-                                )}
-                                <svg
-                                  className="h-5 w-5"
-                                  fill="none"
-                                  viewBox="0 0 24 24"
-                                  stroke="currentColor"
-                                >
-                                  <path
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    strokeWidth={2}
-                                    d="M14 5l7 7m0 0l-7 7m7-7H3"
-                                  />
-                                </svg>
+                                {t(CART_CHECKOUT_CTA.en, CART_CHECKOUT_CTA.ar)}
+                                <ArrowIcon className="h-5 w-5" isRtl={language === 'ar'} />
                               </Button>
                             </Link>
                           )}
@@ -1252,7 +1236,7 @@ export default function CartClient() {
         itemCount={cartCount}
         itemCountLabel={countText(lang, cartCount, ITEMS, localize(cartCount))}
         href={storeUrl('/checkout')}
-        label={t('Checkout', 'إتمام الطلب')}
+        label={t(CART_CHECKOUT_CTA.en, CART_CHECKOUT_CTA.ar)}
         disabled={checkoutBlocked}
         blockedMessage={checkoutBlockedMessage}
       />

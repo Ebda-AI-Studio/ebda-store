@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { MINUS, SignedAmount } from '@/lib/bidi';
 import type { OrderSummaryProps } from '../types';
 import { useOrderSummaryBase } from '../shared/useOrderSummaryBase';
+import { ArrowIcon } from '../shared/icons';
 import { useLocalePrice } from '../../hooks/useLocalePrice';
 import { DahabPaymentMarks } from './Footer';
 import { DAHAB_BTN_PRIMARY, cx } from './ui';
@@ -142,6 +143,7 @@ export default function DahabOrderSummary({
             style={typography?.cta}
           >
             {ctaText}
+            <ArrowIcon className="h-4 w-4 shrink-0" isRtl={isRtl} />
           </Link>
         ) : (
           <button
@@ -152,7 +154,14 @@ export default function DahabOrderSummary({
             className={cx(DAHAB_BTN_PRIMARY, 'mt-6 w-full')}
             style={typography?.cta}
           >
-            {ctaLoading ? '…' : ctaText}
+            {ctaLoading ? (
+              '…'
+            ) : (
+              <>
+                {ctaText}
+                <ArrowIcon className="h-4 w-4 shrink-0" isRtl={isRtl} />
+              </>
+            )}
           </button>
         ))}
       <DahabPaymentMarks className="mt-6 justify-center" />

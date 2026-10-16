@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { MINUS, SignedAmount } from '@/lib/bidi';
 import type { OrderSummaryProps } from '../types';
 import { useOrderSummaryBase } from '../shared/useOrderSummaryBase';
+import { ArrowIcon } from '../shared/icons';
 
 import { REGION } from '@ebda/shared';
 export default function MinimalOrderSummary({
@@ -121,22 +122,30 @@ export default function MinimalOrderSummary({
         (ctaHref && !ctaDisabled ? (
           <Link
             href={ctaHref}
-            data-cta="link"
-            className="mt-8 block border-b border-foreground pb-1 text-sm text-foreground hover:border-primary hover:text-primary transition-colors duration-500 ease-out focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-foreground"
+            data-cta="button"
+            className="mt-8 flex h-12 w-full items-center justify-center gap-2 rounded-[var(--radius)] bg-primary px-4 text-sm font-medium text-primary-foreground transition-colors duration-200 ease-out hover:bg-primary/90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-foreground"
             style={typography?.cta}
           >
-            {ctaText} {isRtl ? '←' : '→'}
+            {ctaText}
+            <ArrowIcon className="h-4 w-4 shrink-0" isRtl={isRtl} />
           </Link>
         ) : (
           <button
             type="button"
             onClick={onCtaClick}
             disabled={ctaDisabled || ctaLoading}
-            data-cta="link"
-            className="mt-8 block w-fit border-b border-foreground pb-1 text-sm text-foreground hover:border-primary hover:text-primary transition-colors duration-500 ease-out disabled:opacity-40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-foreground"
+            data-cta="button"
+            className="mt-8 flex h-12 w-full items-center justify-center gap-2 rounded-[var(--radius)] bg-primary px-4 text-sm font-medium text-primary-foreground transition-colors duration-200 ease-out hover:bg-primary/90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-foreground disabled:opacity-40"
             style={typography?.cta}
           >
-            {ctaLoading ? '···' : `${ctaText} ${isRtl ? '←' : '→'}`}
+            {ctaLoading ? (
+              '···'
+            ) : (
+              <>
+                {ctaText}
+                <ArrowIcon className="h-4 w-4 shrink-0" isRtl={isRtl} />
+              </>
+            )}
           </button>
         ))}
     </aside>
