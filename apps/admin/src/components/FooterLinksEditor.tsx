@@ -4,6 +4,7 @@ import { useState, useEffect, type ReactNode } from 'react';
 import { useToast } from '@ebda/ui';
 import { apiGet, apiPut } from '../lib/api';
 import { useT } from '@/i18n/useT';
+import type { FooterBottomBarSettings } from '@ebda/shared';
 
 /**
  * Reusable footer links + utility bar editor. Extracted from
@@ -50,10 +51,9 @@ interface StoreSettings {
     support: FooterLink[];
     company: FooterLink[];
     newsletterEnabled?: boolean;
-    /** @deprecated removed 2026-05-21 — storefront no longer renders.
-     *  Field stays in shape so existing data on rows that pre-date the
-     *  removal is preserved (just ignored by the storefront). */
-    bottomBar?: unknown;
+    /** The footer legal row (S-01): bar switch, per-link toggles, © override.
+     *  Saved key by key over what is stored, so a save never drops it. */
+    bottomBar?: FooterBottomBarSettings & Record<string, unknown>;
   };
   utilityBar?: UtilityBarSettings;
   [key: string]: unknown;
@@ -92,6 +92,7 @@ export interface FooterLinksEditorState {
     support: FooterLink[];
     company: FooterLink[];
     newsletterEnabled: boolean;
+    bottomBar: FooterBottomBarSettings;
   };
   utilityBar: {
     enabled: boolean;
@@ -126,6 +127,30 @@ interface FooterLinksEditorProps {
    * bundle without requiring a save first.
    */
   stateRef?: React.MutableRefObject<FooterLinksEditorState | null>;
+}
+
+/**
+ * The `settings.footerLinks` this editor saves: its own columns + newsletter +
+ * legal row laid OVER what is stored. Unknown keys and every bottom-bar key the
+ * editor did not touch survive (the 2026-05 version rebuilt the object and
+ * wiped `bottomBar` on every save). Exported for its regression test.
+ */
+export function mergeFooterLinksForSave(
+  stored: StoreSettings['footerLinks'] | undefined,
+  edited: {
+    shop: FooterLink[];
+    support: FooterLink[];
+    company: FooterLink[];
+    newsletterEnabled: boolean;
+    bottomBar: FooterBottomBarSettings;
+  }
+): NonNullable<StoreSettings['footerLinks']> {
+  const base = stored && typeof stored === 'object' ? stored : ({} as Record<string, unknown>);
+  const storedBar =
+    base.bottomBar && typeof base.bottomBar === 'object' && !Array.isArray(base.bottomBar)
+      ? base.bottomBar
+      : {};
+  return { ...base, ...edited, bottomBar: { ...storedBar, ...edited.bottomBar } };
 }
 
 /* ── SectionShell ──────────────────────────────────────────────────────
@@ -333,6 +358,8 @@ export function FooterLinksEditor({
   const [supportLinks, setSupportLinks] = useState<FooterLink[]>(DEFAULT_SUPPORT_LINKS);
   const [companyLinks, setCompanyLinks] = useState<FooterLink[]>(DEFAULT_COMPANY_LINKS);
   const [newsletterEnabled, setNewsletterEnabled] = useState(true);
+  // The footer legal row (S-01). Unset keys keep the storefront default (on).
+  const [bottomBar, setBottomBar] = useState<FooterBottomBarSettings>({});
   const [utilityBarEnabled, setUtilityBarEnabled] = useState(true);
   const [utilityLinks, setUtilityLinks] = useState<UtilityBarLink[]>(DEFAULT_UTILITY_LINKS);
 
@@ -353,7 +380,21 @@ export function FooterLinksEditor({
             if (typeof settings.footerLinks.newsletterEnabled === 'boolean') {
               setNewsletterEnabled(settings.footerLinks.newsletterEnabled);
             }
-            // bottomBar field deprecated 2026-05-21 — no longer loaded/saved.
+            const bb = settings.footerLinks.bottomBar;
+            if (bb && typeof bb === 'object' && !Array.isArray(bb)) {
+              const next: FooterBottomBarSettings = {};
+              for (const k of [
+                'enabled',
+                'privacyEnabled',
+                'termsEnabled',
+                'shippingEnabled',
+                'returnsEnabled',
+              ] as const)
+                if (typeof bb[k] === 'boolean') next[k] = bb[k];
+              for (const k of ['copyrightOverride', 'copyrightOverrideAr'] as const)
+                if (typeof bb[k] === 'string') next[k] = bb[k];
+              setBottomBar(next);
+            }
           }
           if (settings.utilityBar) {
             const ub = settings.utilityBar;
@@ -399,6 +440,7 @@ export function FooterLinksEditor({
           support: supportLinks,
           company: companyLinks,
           newsletterEnabled,
+          bottomBar,
         },
         utilityBar: {
           enabled: utilityBarEnabled,
@@ -411,6 +453,7 @@ export function FooterLinksEditor({
     supportLinks,
     companyLinks,
     newsletterEnabled,
+    bottomBar,
     utilityBarEnabled,
     utilityLinks,
     stateRef,
@@ -431,13 +474,13 @@ export function FooterLinksEditor({
       // rest is preserved from the fresh GET above.
       const newSettings: StoreSettings = { ...currentSettings };
       if (section !== 'utility') {
-        newSettings.footerLinks = {
+        newSettings.footerLinks = mergeFooterLinksForSave(currentSettings.footerLinks, {
           shop: shopLinks,
           support: supportLinks,
           company: companyLinks,
           newsletterEnabled,
-          // bottomBar removed 2026-05-21 — redundant with Company Links.
-        };
+          bottomBar,
+        });
       }
       if (section !== 'links') {
         newSettings.utilityBar = {
@@ -668,7 +711,61 @@ export function FooterLinksEditor({
         </>
       )}
 
-      {/* Bottom bar section removed 2026-05-21 — redundant with Company Links. */}
+      {/* Section 6 — the footer legal row (S-01): privacy · terms · returns · ©. */}
+      {section !== 'utility' && (
+        <SectionShell
+          step={6}
+          title={t('legalRow')}
+          subtitle={t('legalRowHint')}
+          whereShows={isEmbedded ? undefined : t('legalRowWhere')}
+          enabled={bottomBar.enabled !== false}
+          onToggle={v => setBottomBar(b => ({ ...b, enabled: v }))}
+          collapsedWhenDisabled
+          embedded={isEmbedded}
+        >
+          <div className="space-y-3">
+            {(
+              [
+                ['privacyEnabled', 'legalRowPrivacy'],
+                ['termsEnabled', 'legalRowTerms'],
+                ['returnsEnabled', 'legalRowReturns'],
+              ] as const
+            ).map(([key, label]) => (
+              <label key={key} className="flex items-center gap-3 text-sm text-foreground">
+                <input
+                  type="checkbox"
+                  checked={bottomBar[key] !== false}
+                  onChange={e => setBottomBar(b => ({ ...b, [key]: e.target.checked }))}
+                  className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
+                />
+                {t(label)}
+              </label>
+            ))}
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+              <input
+                type="text"
+                value={bottomBar.copyrightOverride ?? ''}
+                maxLength={200}
+                onChange={e => setBottomBar(b => ({ ...b, copyrightOverride: e.target.value }))}
+                placeholder={t('legalRowCopyrightPlaceholder')}
+                aria-label={t('legalRowCopyrightPlaceholder')}
+                className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+              />
+              <input
+                type="text"
+                value={bottomBar.copyrightOverrideAr ?? ''}
+                maxLength={200}
+                onChange={e => setBottomBar(b => ({ ...b, copyrightOverrideAr: e.target.value }))}
+                placeholder={t('legalRowCopyrightArPlaceholder')}
+                aria-label={t('legalRowCopyrightArPlaceholder')}
+                lang="ar"
+                dir="rtl"
+                className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+              />
+            </div>
+          </div>
+        </SectionShell>
+      )}
 
       {/* Sticky save bar — anchored at the bottom of the editor's flow
           (not the viewport) so it doesn't fight the page-builder's own
