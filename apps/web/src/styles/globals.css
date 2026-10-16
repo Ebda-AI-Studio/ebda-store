@@ -1251,6 +1251,27 @@ html[dir='rtl'] [data-pack='dahab'] [data-section='newsletter'] h2 {
   animation: stickyBarIn 300ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
+/* Footer ink on a merchant-painted footer (B0-46 review I-1). `footerRootPaint`
+   (templates/shared/footer-ink.ts) re-scopes --foreground/--muted-foreground on the
+   footer root to an ink picked against the paint; these rules pull the alpha-style and
+   muted classes onto the SOLID muted ink (an /70 alpha on the full ink would dip under
+   4.5:1) and the platform attribution + its brand-gold wordmark onto the ink too. */
+[data-footer-ink] [class*='text-foreground/'],
+[data-footer-ink] [class*='text-muted-foreground'],
+[data-footer-ink] [data-zone='afterFooter'] {
+  color: var(--footer-ink-muted);
+}
+/* the wordmark's gold is an inline style: only !important beats it */
+[data-footer-ink] [data-zone='afterFooter'] span {
+  color: inherit !important;
+}
+[data-footer-ink] .text-primary,
+[data-footer-ink] a:hover,
+[data-footer-ink] [class*='hover:text-primary']:hover,
+[data-footer-ink] a:focus-visible {
+  color: var(--footer-ink);
+}
+
 /* ==========================================================================
    Looks (Phase S). EVERY rule here is scoped under [data-look], which the
    root layout sets on <body> only for stores with a valid look. Legacy
@@ -1311,25 +1332,4 @@ html[lang='en'] [data-look] h2,
 html[lang='en'] [data-look] h3,
 html[lang='en'] [data-look] .font-display {
   font-family: var(--font-latin, var(--font-display)), var(--font-display);
-}
-
-/* Footer ink on a merchant-painted footer (B0-46 review I-1). `footerRootPaint`
-   (templates/shared/footer-ink.ts) re-scopes --foreground/--muted-foreground on the
-   footer root to an ink picked against the paint; these rules pull the alpha-style and
-   muted classes onto the SOLID muted ink (an /70 alpha on the full ink would dip under
-   4.5:1) and the platform attribution + its brand-gold wordmark onto the ink too. */
-[data-footer-ink] [class*='text-foreground/'],
-[data-footer-ink] [class*='text-muted-foreground'],
-[data-footer-ink] [data-zone='afterFooter'] {
-  color: var(--footer-ink-muted);
-}
-/* the wordmark's gold is an inline style: only !important beats it */
-[data-footer-ink] [data-zone='afterFooter'] span {
-  color: inherit !important;
-}
-[data-footer-ink] .text-primary,
-[data-footer-ink] a:hover,
-[data-footer-ink] [class*='hover:text-primary']:hover,
-[data-footer-ink] a:focus-visible {
-  color: var(--footer-ink);
 }
