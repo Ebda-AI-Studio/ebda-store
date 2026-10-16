@@ -104,16 +104,13 @@ describe('findLookPanel: the panel comes from the store document only', () => {
   it('the page path encodes both ids', () => {
     expect(lookPanelPath('stl', 'look-1')).toBe('/looks/stl/look-1');
   });
-  it('the page fetches pieces with the store headers and 404s without a panel', () => {
+  it('the page 404s without a panel and is noindex', () => {
     const src = readFileSync(
       path.resolve(__dirname, '../../apps/web/src/app/looks/[sectionId]/[blockId]/page.tsx'),
       'utf8'
     );
-    expect(src).toContain("'X-Store-ID': store.id");
-    expect(src.match(/headers: storeHeaders/g)?.length).toBe(2);
     expect(src).toContain('if (!loaded) notFound();');
     expect(src).toContain('robots: { index: false, follow: true }');
-    expect(src).toContain('documentForLook(mixed, getLook(store.look))');
   });
 });
 
@@ -243,5 +240,80 @@ describe('the look page: one buy block per piece', () => {
       "'Personalise on the product page': 'التخصيص من صفحة المنتج'",
     ])
       expect(lc).toContain(k);
+  });
+});
+
+// Review M-5 (W2a fix round 1): the store scoping is proven by RUNNING loadPanel against a mocked
+// fetch, not by grepping its source: every call names the resolved store, only the panel's ids are
+// asked for, an id the store's list did not return is never fetched, and a hidden panel or the
+// platform host fetches no product at all.
+describe('loadPanel (fetch mocked): store-scoped end to end', () => {
+  const store = {
+    id: 's1',
+    domain: 'shop.example',
+    isDemo: false,
+    look: null,
+  } as unknown as import('../../apps/web/src/lib/store-resolver').ResolvedStore;
+  const panelDoc = (hidden = false) => ({
+    schemaVersion: 1,
+    pageKey: 'home',
+    sectionGroups: { header: [], footer: [] },
+    siteSettings: {},
+    sections: [
+      {
+        id: 'stl',
+        type: 'shop-the-look',
+        settings: {},
+        hidden,
+        blocks: [
+          {
+            id: 'look-1',
+            type: 'look',
+            settings: { title: 'Linen', productIds: ['a', 'foreign'] },
+          },
+        ],
+      },
+    ],
+  });
+  const mockFetch = (doc: unknown) => {
+    const calls: { url: string; headers?: Record<string, string> }[] = [];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string, init?: { headers?: Record<string, string> }) => {
+        calls.push({ url, headers: init?.headers });
+        const body = /\/layout$/.test(url)
+          ? { data: { definition: doc } }
+          : /products\?ids=/.test(url)
+            ? { data: { products: [{ id: 'a', slug: 'linen-abaya' }] } } // 'foreign' not this store's
+            : { data: { product: { id: 'a', slug: 'linen-abaya', name: 'Linen abaya' } } };
+        return { ok: true, json: async () => body } as Response;
+      })
+    );
+    return calls;
+  };
+  afterEach(() => vi.unstubAllGlobals());
+
+  it('asks for the panel ids with the store headers and loads only what the store returned', async () => {
+    const { loadPanel } =
+      await import('../../apps/web/src/app/looks/[sectionId]/[blockId]/load-panel');
+    const calls = mockFetch(panelDoc());
+    const out = await loadPanel(store, 'stl', 'look-1');
+    expect(out?.pieces.map(p => p.id)).toEqual(['a']);
+    const product = calls.filter(c => c.url.includes('/public/products'));
+    expect(product).toHaveLength(2);
+    expect(decodeURIComponent(product[0].url)).toContain('/public/products?ids=a,foreign&limit=4');
+    expect(product[1].url).toMatch(/\/public\/products\/linen-abaya$/);
+    for (const c of product) expect(c.headers?.['X-Store-ID']).toBe('s1');
+    expect(calls[0].url).toMatch(/\/public\/stores\/s1\/layout$/);
+  });
+  it('a hidden panel or the platform host fetches no product', async () => {
+    const { loadPanel } =
+      await import('../../apps/web/src/app/looks/[sectionId]/[blockId]/load-panel');
+    let calls = mockFetch(panelDoc(true));
+    expect(await loadPanel(store, 'stl', 'look-1')).toBeNull();
+    expect(calls.some(c => c.url.includes('/public/products'))).toBe(false);
+    calls = mockFetch(panelDoc());
+    expect(await loadPanel({ ...store, id: 'demo' } as never, 'stl', 'look-1')).toBeNull();
+    expect(calls).toHaveLength(0);
   });
 });
