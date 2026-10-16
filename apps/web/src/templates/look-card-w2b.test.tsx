@@ -310,10 +310,13 @@ describe('PecannbeeProductCard material (L-12, LB-02, M-03, K-01)', () => {
     selectLook('qamar.atelier');
     const c = card('sale');
     const h = heart(c).className;
+    // a11y P1-8 (W4): a bare glyph measured 2.38:1 on dark photos; it now sits on a plate in the
+    // look's own (square) radius: no disc, no blur, no shadow.
     expect(h).not.toContain('rounded-full');
-    expect(h).not.toContain('bg-white');
+    expect(h).toContain('rounded-[var(--radius)]');
+    expect(h).toContain('bg-white/85');
     expect(h).not.toContain('backdrop-blur');
-    expect(h).toContain('h-11 w-11');
+    expect(h).not.toMatch(/shadow-/);
     expect(c.querySelector('article')!.className).not.toContain('md:hover:scale');
     const chip = Array.from(c.querySelectorAll('span')).find(s => /%/.test(s.textContent ?? ''))!;
     expect(chip.className).toContain('rounded-[var(--radius)]');
@@ -344,6 +347,12 @@ describe('contrast on every look', () => {
       expect(contrastRatio('#ffffff', blend(OVER_PHOTO_INK, 0.78))).toBeGreaterThanOrEqual(3);
     }
   );
+  it('the bare heart on its plate is >= 3:1 even over a black photo (P1-8)', () => {
+    const plateOverBlack = blend('#ffffff', 0.85, '#000000');
+    expect(
+      contrastRatio(plateOverBlack, blend(OVER_PHOTO_INK, 0.78, plateOverBlack))
+    ).toBeGreaterThanOrEqual(3);
+  });
   it.each(LOOKS.filter(l => l.tokens.cardBadge === 'accent').map(l => [l.id, l] as const))(
     '%s: the accent chip pair is >= 4.5:1',
     (_id, l) => {

@@ -83,8 +83,10 @@ export function overPhotoHeartCls(material: 'soft' | 'bare', wishlisted: boolean
   const ink = wishlisted
     ? 'text-[rgb(20_20_20)]'
     : 'text-[rgb(20_20_20/0.78)] hover:text-[rgb(20_20_20)]';
+  // `bare` (Atelier): no disc, but a plate in the look's own radius behind the glyph, so it is
+  // >= 3:1 over a dark photo too (a11y P1-8: the plate-less glyph measured 2.38:1).
   return material === 'bare'
-    ? `absolute top-1 start-1 z-20 inline-flex h-11 w-11 items-center justify-center [filter:drop-shadow(0_0_1px_rgb(255_255_255/0.95))] transition-colors duration-[var(--duration-base)] cursor-pointer ${ink}`
+    ? `before:absolute before:-inset-1 before:content-[''] absolute top-3 start-3 z-20 inline-flex h-9 w-9 items-center justify-center rounded-[var(--radius)] bg-white/85 transition-colors duration-[var(--duration-base)] cursor-pointer ${ink}`
     : `before:absolute before:-inset-1.5 before:content-[''] absolute top-3 start-3 z-20 inline-flex h-10 w-10 items-center justify-center rounded-full bg-white/95 shadow-[0_8px_20px_-8px_rgb(20_20_20/0.30)] transition-[background-color,color] duration-[var(--duration-base)] hover:bg-white cursor-pointer ${ink}`;
 }
 
