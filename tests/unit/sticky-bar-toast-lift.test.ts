@@ -26,19 +26,31 @@ describe('toast lift above the sticky bars', () => {
   });
 
   it.each([
-    ["body[data-sticky-atc='1'] [data-toast-region]", '61px'],
-    ["body[data-sticky-cart='1'] [data-toast-region]", '61px'],
-    ["body[data-sticky-cart='blocked'] [data-toast-region]", '85px'],
+    ["body[data-sticky-atc='1'] [data-floating-widget='bottom']", '61px'],
+    ["body[data-sticky-cart='1'] [data-floating-widget='bottom']", '61px'],
+    ["body[data-sticky-cart='blocked'] [data-floating-widget='bottom']", '85px'],
   ])(
-    '%s lifts by the measured bar height (fallback %s), same as the widget — no tab-bar term (C-04: the tab bar is hidden under a task bar)',
+    '%s lifts by the measured bar height (fallback %s) — no tab-bar term (C-04: the tab bar is hidden under a task bar)',
     (selector, px) => {
       const flat = blockFor(selector).replace(/\s+/g, ' ');
       expect(flat).toContain(`calc(var(--sticky-bar-h, ${px}) + 10px)`);
       expect(flat).not.toContain('--bottom-tab-h');
-      const widget = selector.replace('[data-toast-region]', "[data-floating-widget='bottom']");
-      expect(blockFor(widget)).toBe(blockFor(selector));
     }
   );
+
+  // IA-17 (independent audit, supersedes the F2 toast lift): at 390 the "added" toast
+  // still landed on the inline Add button and the delivery line when no bar showed. On a
+  // phone the toast anchors at the top, clear of every CTA band and bar.
+  it('on a phone the toast region anchors at the top, never in the bottom CTA zone', () => {
+    const media = css.indexOf('@media (max-width: 767px)', css.indexOf('Sticky mobile bars'));
+    const sel = '[data-toast-region] {';
+    const i = css.indexOf(sel, media);
+    expect(i).toBeGreaterThan(media);
+    const flat = blockFor(sel).replace(/\s+/g, ' ');
+    expect(flat).toContain('top: calc(env(safe-area-inset-top) + 0.75rem)');
+    expect(flat).toContain('bottom: auto');
+    expect(css).not.toMatch(/\] \[data-toast-region\]/);
+  });
 
   it('the Dahab bar (73px) never overlaps the toast: the lift tracks the published height', () => {
     // The lift is the bar's own measured height (73 for Dahab, safe-area padding included)
@@ -62,6 +74,8 @@ describe('toast lift above the sticky bars', () => {
   it('the lift lives in the phone-only media block', () => {
     const media = css.indexOf('@media (max-width: 767px)', css.indexOf('Sticky mobile bars'));
     expect(media).toBeGreaterThan(-1);
-    expect(css.indexOf("body[data-sticky-atc='1'] [data-toast-region]")).toBeGreaterThan(media);
+    expect(
+      css.indexOf("body[data-sticky-atc='1'] [data-floating-widget='bottom']")
+    ).toBeGreaterThan(media);
   });
 });
