@@ -757,8 +757,8 @@
       "tier": "unit",
       "why": "a suspended or soft-deleted admin keeps a fully working merchant key after losing every dashboard session",
       "source": "apps/api/src/mcp/merchant-auth.ts",
-      "find": "    (key.expiresAt === null || key.expiresAt > now) &&\n    userActive;",
-      "replace": "    (key.expiresAt === null || key.expiresAt > now);",
+      "find": "    (key.expiresAt === null || key.expiresAt > now) &&\n    userActive &&",
+      "replace": "    (key.expiresAt === null || key.expiresAt > now) &&",
       "test": "tests/unit/merchant-mcp-auth.test.ts"
     },
     {
@@ -1557,8 +1557,8 @@
       "tier": "unit",
       "why": "returns:write (held by staff) was the only gate on completing a return with a gateway method, which sends a real, irreversible Tap/MyFatoorah/KNET refund — the orders:refund permission staff deliberately lack (issue 2024)",
       "source": "apps/api/src/routes/return.routes.ts",
-      "find": "        (GATEWAY_REFUND_METHODS as readonly string[]).includes(refundMethod) &&",
-      "replace": "        false &&",
+      "find": "        ((GATEWAY_REFUND_METHODS as readonly string[]).includes(refundMethod) ||",
+      "replace": "        (false ||",
       "test": "tests/unit/return-complete-gateway-permission.test.ts"
     },
     {
@@ -1817,7 +1817,7 @@
       "tier": "integration",
       "why": "the store toggle route enables a gateway without a current passing Test connection",
       "source": "apps/api/src/routes/payment-settings.routes.ts",
-      "find": "        assertEnableAllowed(existing);",
+      "find": "        assertEnableAllowed(existing, {\n          storeActivated: await isProviderActivatedForStore(storeId, existing.provider),\n        });",
       "replace": "        void existing;",
       "test": "tests/integration/provider-connect-routes.test.ts"
     },
@@ -1867,8 +1867,8 @@
       "tier": "unit",
       "why": "a carrier that never completed a flow against its real sandbox (PROVIDERS-2) can be enabled by a merchant",
       "source": "apps/api/src/services/carriers/carrier-connection.service.ts",
-      "find": "  if (!isProviderUsable(row.carrier)) {\n    throw new AppError(\n      409,\n      'PROVIDER_NOT_VERIFIED',",
-      "replace": "  if (false) {\n    throw new AppError(\n      409,\n      'PROVIDER_NOT_VERIFIED',",
+      "find": "  if (!isProviderUsable(row.carrier) && !opts.storeActivated) {",
+      "replace": "  if (false) {",
       "test": "tests/unit/shipping-provider-connect.test.ts"
     },
     {
