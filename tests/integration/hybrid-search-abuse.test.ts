@@ -124,7 +124,7 @@ beforeAll(async () => {
   await runInStoreScope(storeId, () => indexStore(storeId));
   const doc = (
     await prisma.$queryRaw<Array<{ doc: string }>>`
-      SELECT public.ebda_product_embed_doc(name, name_ar, search_terms, description, description_ar) AS doc
+      SELECT public.ebda_product_embed_doc(name, name_ar, description, description_ar) AS doc
         FROM products WHERE id = ${target}`
   )[0].doc;
   // Every query whose text starts with "كوتشي" embeds to the product's vector.

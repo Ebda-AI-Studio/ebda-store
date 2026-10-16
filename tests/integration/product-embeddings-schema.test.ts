@@ -131,16 +131,27 @@ describe.skipIf(!hasDb)('product_embeddings', () => {
   it('embed doc strips html, keeps arabic as written, caps description', async () => {
     const long = 'x'.repeat(4000);
     const [r] = await prisma.$queryRaw<Array<{ d: string }>>`
-      SELECT public.ebda_product_embed_doc('Shoes', 'أحذية', '3abaya', ${'<p>جلد <b>طبيعي</b></p>'}, ${long}) AS d`;
+      SELECT public.ebda_product_embed_doc('Shoes', 'أحذية', ${'<p>جلد <b>طبيعي</b></p>'}, ${long}) AS d`;
     expect(r.d).toContain('أحذية');
     expect(r.d).toContain('جلد طبيعي');
     expect(r.d).not.toContain('<b>');
     expect(r.d.length).toBeLessThan(1500 + 200);
   });
 
+  it('SEARCH-T13-5: the embed doc has no search-words part and the 5-argument version is gone', async () => {
+    const sigs = await prisma.$queryRaw<Array<{ args: string }>>`
+      SELECT pg_get_function_identity_arguments(p.oid) AS args FROM pg_proc p
+      JOIN pg_namespace n ON n.oid = p.pronamespace
+      WHERE n.nspname = 'public' AND p.proname = 'ebda_product_embed_doc'`;
+    expect(sigs).toEqual([{ args: 'p_name text, p_name_ar text, p_desc text, p_desc_ar text' }]);
+    const [r] = await prisma.$queryRaw<Array<{ d: string }>>`
+      SELECT public.ebda_product_embed_doc('Mug', 'مج', 'سيراميك', NULL) AS d`;
+    expect(r.d).toBe('مج\nMug\nسيراميك');
+  });
+
   it('embed doc tolerates NULL fields and is IMMUTABLE invoker-rights sql', async () => {
     const [r] = await prisma.$queryRaw<Array<{ d: string }>>`
-      SELECT public.ebda_product_embed_doc('Bag', NULL, NULL, NULL, NULL) AS d`;
+      SELECT public.ebda_product_embed_doc('Bag', NULL, NULL, NULL) AS d`;
     expect(r.d).toBe('Bag');
     const [f] = await prisma.$queryRaw<Array<{ vol: string; secdef: boolean }>>`
       SELECT p.provolatile::text AS vol, p.prosecdef AS secdef FROM pg_proc p
@@ -151,14 +162,14 @@ describe.skipIf(!hasDb)('product_embeddings', () => {
 
   it('embed doc trims every kind of whitespace and drops whitespace-only parts', async () => {
     const [r] = await prisma.$queryRaw<Array<{ d: string }>>`
-      SELECT public.ebda_product_embed_doc(${'\t Bag \r\n'}, ${'\n'}, ${'\t\n'}, ${' \t '}, NULL) AS d`;
+      SELECT public.ebda_product_embed_doc(${'\t Bag \r\n'}, ${'\n'}, ${' \t '}, NULL) AS d`;
     expect(r.d).toBe('Bag');
   });
 
   it('embed doc turns tags into a space, collapses whitespace, and keeps a bare < or >', async () => {
     const doc = async (desc: string) => {
       const [r] = await prisma.$queryRaw<Array<{ d: string }>>`
-        SELECT public.ebda_product_embed_doc('X', NULL, NULL, ${desc}, NULL) AS d`;
+        SELECT public.ebda_product_embed_doc('X', NULL, ${desc}, NULL) AS d`;
       return r.d;
     };
     expect(await doc('<p>قطن</p><p>مصري</p>')).toBe('X\nقطن مصري');
@@ -170,8 +181,8 @@ describe.skipIf(!hasDb)('product_embeddings', () => {
   it('embed doc is NULL (not an empty string) when every part is empty', async () => {
     // Task 11 must skip a NULL doc instead of embedding md5('').
     const [r] = await prisma.$queryRaw<Array<{ a: string | null; b: string | null }>>`
-      SELECT public.ebda_product_embed_doc(NULL, NULL, NULL, NULL, NULL) AS a,
-             public.ebda_product_embed_doc(' ', ${'\t'}, '', '<p> </p>', NULL) AS b`;
+      SELECT public.ebda_product_embed_doc(NULL, NULL, NULL, NULL) AS a,
+             public.ebda_product_embed_doc(' ', ${'\t'}, '<p> </p>', NULL) AS b`;
     expect(r).toEqual({ a: null, b: null });
   });
 
@@ -179,7 +190,7 @@ describe.skipIf(!hasDb)('product_embeddings', () => {
     // Postgres inlines an IMMUTABLE sql function only when its body contains no mutable call, so a
     // label that hides a STABLE function (concat_ws, array_to_string) leaves the call in the plan.
     const plan = await prisma.$queryRaw<Array<{ 'QUERY PLAN': string }>>`
-      EXPLAIN (VERBOSE) SELECT public.ebda_product_embed_doc(p.name, p.name_ar, p.search_terms, p.description, p.description_ar)
+      EXPLAIN (VERBOSE) SELECT public.ebda_product_embed_doc(p.name, p.name_ar, p.description, p.description_ar)
       FROM products p LIMIT 1`;
     const text = plan.map(r => r['QUERY PLAN']).join('\n');
     expect(text).not.toMatch(/ebda_product_embed_doc/);

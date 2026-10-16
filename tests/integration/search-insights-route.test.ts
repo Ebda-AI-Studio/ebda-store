@@ -178,7 +178,7 @@ describe.skipIf(!hasDb)('GET /stores/:storeId/search-insights', () => {
     await mk(other, 'Elsewhere');
     const doc = (id: string) =>
       prisma.$queryRaw<Array<{ h: string }>>`
-        SELECT md5(public.ebda_product_embed_doc(name, name_ar, search_terms, description, description_ar)) AS h
+        SELECT md5(public.ebda_product_embed_doc(name, name_ar, description, description_ar)) AS h
           FROM products WHERE id = ${id}`.then(r => r[0].h);
     const vec = `[${new Array(1024).fill(0.01).join(',')}]`;
     await prisma.$executeRaw`

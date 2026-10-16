@@ -227,7 +227,7 @@ describe.skipIf(!hasDb)('/public/products cache keys and caching (Ruling SEARCH-
     await runInStoreScope(s.storeId, () => indexStore(s.storeId));
     const doc = (
       await prisma.$queryRaw<Array<{ doc: string }>>`
-        SELECT public.ebda_product_embed_doc(name, name_ar, search_terms, description, description_ar) AS doc
+        SELECT public.ebda_product_embed_doc(name, name_ar, description, description_ar) AS doc
           FROM products WHERE id = ${s.ids[0]}`
     )[0].doc;
     setEmbeddingProviderForTests({

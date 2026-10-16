@@ -1,14 +1,12 @@
 import { sendEventAfterCommit } from '../inngest/send-after-commit';
 import { getEmbeddingProvider } from './embedding-provider';
 
-/** Product columns that feed `ebda_product_embed_doc` (Task 9). A write touching one makes the embedding stale. */
-export const EMBED_DOC_FIELDS = [
-  'name',
-  'nameAr',
-  'searchTerms',
-  'description',
-  'descriptionAr',
-] as const;
+/**
+ * Product columns that feed `ebda_product_embed_doc` (Task 9). A write touching one makes the
+ * embedding stale. Not `searchTerms`: the AI search words feed only the keyword leg (Ruling
+ * SEARCH-T13-5), so a words-only write needs no re-embed.
+ */
+export const EMBED_DOC_FIELDS = ['name', 'nameAr', 'description', 'descriptionAr'] as const;
 
 export function touchesEmbedDoc(fields: Iterable<string>): boolean {
   for (const f of fields) if ((EMBED_DOC_FIELDS as readonly string[]).includes(f)) return true;

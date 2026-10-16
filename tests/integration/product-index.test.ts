@@ -167,12 +167,60 @@ describe.skipIf(!hasDb)('product embedding indexer (Task 11)', () => {
     expect((await runInStoreScope(storeId, () => indexStore(storeId))).embedded).toBe(1);
     expect((await runInStoreScope(storeId, () => indexStore(storeId))).embedded).toBe(0);
     expect(f.calls).toHaveLength(1);
-    await prisma.product.update({ where: { id: pid }, data: { searchTerms: 'gazma' } });
+    await prisma.product.update({ where: { id: pid }, data: { description: 'جلد طبيعي' } });
     expect(await runInStoreScope(storeId, () => findStaleProducts(storeId, 10))).toHaveLength(1);
     expect((await runInStoreScope(storeId, () => indexStore(storeId))).embedded).toBe(1);
-    expect(f.calls.flat().some(t => t.includes('gazma'))).toBe(true);
+    expect(f.calls.flat().some(t => t.includes('جلد طبيعي'))).toBe(true);
     const row = await embeddingRow(pid);
     expect(row).toMatchObject({ store_id: storeId, model: EMBED_MODEL });
+  });
+
+  it('SEARCH-T13-5: the AI search words are not embedded; editing only them keeps the vector current', async () => {
+    const f = fakeProvider();
+    setEmbeddingProviderForTests(f.provider);
+    const o = await mkUser('t135');
+    ownerIds.push(o.id);
+    const st = (await mkStore(o.id, 't135')).id;
+    storeIds.push(st);
+    const p = await mkProduct(st, {
+      name: 'Kettle',
+      nameAr: 'غلاية',
+      searchTerms: 'kettle, katel',
+    });
+    await runInStoreScope(st, () => indexStore(st));
+    expect(f.calls.flat().some(t => t.includes('غلاية'))).toBe(true);
+    expect(f.calls.flat().some(t => t.includes('katel'))).toBe(false);
+    f.calls.length = 0;
+    await prisma.product.update({
+      where: { id: p },
+      data: { searchTerms: 'kettle, katel, ghalaya' },
+    });
+    expect(await runInStoreScope(st, () => findStaleProducts(st, 10))).toEqual([]);
+    expect((await runInStoreScope(st, () => indexStore(st))).embedded).toBe(0);
+    expect(f.calls).toEqual([]);
+  });
+
+  it('SEARCH-T13-5: a vector hashed from the old words-included doc is stale and re-embedded without them', async () => {
+    const f = fakeProvider();
+    setEmbeddingProviderForTests(f.provider);
+    const o = await mkUser('t135');
+    ownerIds.push(o.id);
+    const st = (await mkStore(o.id, 't135')).id;
+    storeIds.push(st);
+    const p = await mkProduct(st, { name: 'Mug', nameAr: 'مج', searchTerms: 'mug, kobaya' });
+    await runInStoreScope(st, () => indexStore(st));
+    // What a row written before migration 20261024000100 carries: md5 of name_ar, name AND words.
+    await prisma.$executeRaw`
+      UPDATE product_embeddings e SET content_hash = md5(p.name_ar || E'\n' || p.name || E'\n' || p.search_terms)
+        FROM products p WHERE p.id = e.product_id AND e.product_id = ${p}`;
+    const before = (await embeddingRow(p)).content_hash;
+    expect(await runInStoreScope(st, () => hasStaleProducts(st))).toBe(true);
+    const stale = await runInStoreScope(st, () => findStaleProducts(st, 50));
+    expect(stale.map(x => x.id)).toContain(p);
+    f.calls.length = 0;
+    await runInStoreScope(st, () => indexStore(st));
+    expect(f.calls.flat()).toEqual(['مج\nMug']);
+    expect((await embeddingRow(p)).content_hash).not.toBe(before);
   });
 
   it('a model change makes every row stale', async () => {
@@ -185,7 +233,7 @@ describe.skipIf(!hasDb)('product embedding indexer (Task 11)', () => {
   });
 
   it('honours the per-store daily cap and reports capped (not for the per-call maxDocs)', async () => {
-    await prisma.product.update({ where: { id: pid }, data: { searchTerms: 'kotshy' } });
+    await prisma.product.update({ where: { id: pid }, data: { description: 'kotshy' } });
     process.env.SEARCH_EMBED_STORE_DAILY_CAP = '0';
     const f = fakeProvider();
     setEmbeddingProviderForTests(f.provider);
@@ -211,7 +259,7 @@ describe.skipIf(!hasDb)('product embedding indexer (Task 11)', () => {
   });
 
   it('no provider → skipped, nothing written, no throw', async () => {
-    await prisma.product.update({ where: { id: pid }, data: { searchTerms: 'no-provider' } });
+    await prisma.product.update({ where: { id: pid }, data: { description: 'no-provider' } });
     setEmbeddingProviderForTests(null);
     expect(await runInStoreScope(storeId, () => indexStore(storeId))).toMatchObject({
       skipped: 'no-provider',
@@ -279,7 +327,7 @@ describe.skipIf(!hasDb)('product embedding indexer (Task 11)', () => {
       stale: 0,
       failed: 0,
     });
-    await prisma.product.update({ where: { id: pid }, data: { searchTerms: 'changed' } });
+    await prisma.product.update({ where: { id: pid }, data: { description: 'changed' } });
     expect(await runInStoreScope(storeId, () => storeIndexStatus(storeId))).toEqual({
       products: 1,
       indexed: 0,
@@ -289,7 +337,7 @@ describe.skipIf(!hasDb)('product embedding indexer (Task 11)', () => {
   });
 
   it('as ebda_app + guard: the Inngest handler embeds via memoized steps, a retry never re-pays', async () => {
-    await prisma.product.update({ where: { id: pid }, data: { searchTerms: 'retry-safe' } });
+    await prisma.product.update({ where: { id: pid }, data: { description: 'retry-safe' } });
     const f = fakeProvider();
     setEmbeddingProviderForTests(f.provider);
     const step = fakeStep();
@@ -574,7 +622,7 @@ describe.skipIf(!hasDb)('product embedding indexer (Task 11)', () => {
       prisma.$executeRawUnsafe(
         `INSERT INTO product_embed_failures (product_id, store_id, content_hash, error_kind, model)
          SELECT p.id, p.store_id,
-                md5(public.ebda_product_embed_doc(p.name, p.name_ar, p.search_terms, p.description, p.description_ar)),
+                md5(public.ebda_product_embed_doc(p.name, p.name_ar, p.description, p.description_ar)),
                 'provider', $2
            FROM products p WHERE p.id = $1`,
         productId,

@@ -80,7 +80,7 @@ function aliasProvider(alias: Record<string, string | number[]> = {}) {
 const docOf = async (productId: string) =>
   (
     await prisma.$queryRaw<Array<{ doc: string }>>`
-      SELECT public.ebda_product_embed_doc(name, name_ar, search_terms, description, description_ar) AS doc
+      SELECT public.ebda_product_embed_doc(name, name_ar, description, description_ar) AS doc
         FROM products WHERE id = ${productId}`
   )[0].doc;
 

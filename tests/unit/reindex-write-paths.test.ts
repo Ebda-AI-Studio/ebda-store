@@ -3,8 +3,9 @@
  *
  * Scans every `*.product.(create|createMany|update|updateMany|upsert)(...)` call in apps/api/src and
  * reads the TOP-LEVEL keys of its `data` object. A call is
- *   - text     — `data` names a column of the embed doc (name, nameAr, searchTerms, description,
- *                descriptionAr);
+ *   - text     — `data` names a column of the embed doc (name, nameAr, description, descriptionAr),
+ *                or searchTerms: it left the embed doc in SEARCH-T13-5 (keyword leg only) but is
+ *                kept here on purpose, so a new words writer is still reviewed;
  *   - dynamic  — `data` is an identifier, or has a spread / computed key at top level (may be text);
  *   - none     — anything else (stock, price, flags, positions...).
  * `status` and `deletedAt` count too: only active, non-deleted products are indexed (review M5).
