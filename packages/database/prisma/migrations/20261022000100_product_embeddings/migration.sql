@@ -35,14 +35,15 @@ CREATE EXTENSION IF NOT EXISTS vector;
 CREATE OR REPLACE FUNCTION public.ebda_product_embed_doc(
   p_name text, p_name_ar text, p_terms text, p_desc text, p_desc_ar text
 ) RETURNS text LANGUAGE sql IMMUTABLE PARALLEL SAFE AS $$
-  -- Only IMMUTABLE operators (||, coalesce, nullif, btrim, rtrim, left, regexp_replace): concat_ws
+  -- Every part is trimmed of ALL whitespace (\s: space, tab, CR, LF...), not just spaces (btrim).
+  -- Only IMMUTABLE operators (||, coalesce, nullif, rtrim, left, regexp_replace): concat_ws
   -- and array_to_string are STABLE, which would make the IMMUTABLE label a lie and stop inlining.
   SELECT rtrim(
-    coalesce(nullif(btrim(p_name_ar), '') || E'\n', '') ||
-    coalesce(nullif(btrim(p_name), '') || E'\n', '') ||
-    coalesce(nullif(btrim(p_terms), '') || E'\n', '') ||
-    coalesce(nullif(btrim(left(regexp_replace(p_desc_ar, '<[^>]*>', '', 'g'), 1500)), '') || E'\n', '') ||
-    coalesce(nullif(btrim(left(regexp_replace(p_desc, '<[^>]*>', '', 'g'), 1500)), '') || E'\n', ''),
+    coalesce(nullif(regexp_replace(p_name_ar, '^\s+|\s+$', '', 'g'), '') || E'\n', '') ||
+    coalesce(nullif(regexp_replace(p_name, '^\s+|\s+$', '', 'g'), '') || E'\n', '') ||
+    coalesce(nullif(regexp_replace(p_terms, '^\s+|\s+$', '', 'g'), '') || E'\n', '') ||
+    coalesce(nullif(regexp_replace(left(regexp_replace(p_desc_ar, '<[^>]*>', '', 'g'), 1500), '^\s+|\s+$', '', 'g'), '') || E'\n', '') ||
+    coalesce(nullif(regexp_replace(left(regexp_replace(p_desc, '<[^>]*>', '', 'g'), 1500), '^\s+|\s+$', '', 'g'), '') || E'\n', ''),
     E'\n'
   )
 $$;
