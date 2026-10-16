@@ -1,12 +1,18 @@
 /**
  * Search eval scoring (Task 13): pure functions, no DB and no network, unit-tested in
  * tests/unit/search-eval-scoring.test.ts. `ranked` lists hold relevance TYPES (each product id
- * mapped to its type key, see catalogue.ts), so "recall@10" = a product of the wanted type is in
- * the first 10, and the reciprocal rank is that of the first such product.
+ * mapped to its type key, see catalogue.ts).
+ *
+ * The headline metric is HIT-RATE@10 at TYPE level (review M1): 1 when ANY product of the wanted
+ * type is in the first 10, else 0. It is not recall: a type with 21 t-shirts scores 1 on one
+ * t-shirt, and a sibling that does not match the query's attribute (a navy abaya for "black
+ * abaya") counts as a hit. SEARCH-10's "recall@10" is measured as this hit-rate. nDCG@10 is the
+ * metric that rewards filling the top 10 with the right type. The reciprocal rank is that of the
+ * first product of the type.
  */
 import { hybridOrder } from '../../apps/api/src/lib/search/rrf';
 
-export const recallAt = (ranked: readonly string[], target: string, k: number): 0 | 1 =>
+export const hitAt = (ranked: readonly string[], target: string, k: number): 0 | 1 =>
   ranked.slice(0, k).includes(target) ? 1 : 0;
 
 export const reciprocalRank = (ranked: readonly string[], target: string): number => {
@@ -52,7 +58,7 @@ export interface QueryScore {
   core: boolean;
   key: string;
   q: string;
-  recall10: 0 | 1;
+  hit10: 0 | 1;
   rr: number;
   ndcg10: number;
   /** No result at all. */
@@ -61,7 +67,7 @@ export interface QueryScore {
 
 export interface ClassScore {
   n: number;
-  recall10: number;
+  hit10: number;
   mrr: number;
   ndcg10: number;
   /** Share of queries with no result at all. */
@@ -79,7 +85,7 @@ function mean(rows: readonly QueryScore[]): ClassScore {
   const avg = (f: (r: QueryScore) => number) => (n ? rows.reduce((a, r) => a + f(r), 0) / n : 0);
   return {
     n,
-    recall10: avg(r => r.recall10),
+    hit10: avg(r => r.hit10),
     mrr: avg(r => r.rr),
     ndcg10: avg(r => r.ndcg10),
     zero: avg(r => (r.empty ? 1 : 0)),
@@ -97,7 +103,7 @@ export interface BarResult {
   ok: boolean;
   /** Names of the failed rules (empty when ok). */
   failed: string[];
-  /** Hybrid minus lexical recall@10 over dialect + franco together. */
+  /** Hybrid minus lexical hit-rate@10 over dialect + franco together. */
   lift: number;
   /** lift >= +0.15: semantic search is earning its cost (else STOP-3b stays off). */
   earnsCost: boolean;
@@ -107,39 +113,36 @@ export interface BarResult {
 const EPS = 1e-9;
 
 /**
- * Ruling SEARCH-10: hybrid recall@10 >= 0.90 overall and >= 0.80 on each of dialect and franco;
+ * Ruling SEARCH-10: hybrid hit-rate@10 >= 0.90 overall and >= 0.80 on each of dialect and franco;
  * MRR >= 0.70; no msa or en regression worse than -0.02 against lexical-only; and a dialect +
- * franco lift of at least +0.15 recall@10, or semantic is not earning its cost.
+ * franco lift of at least +0.15 hit-rate@10, or semantic is not earning its cost.
  */
 export function passBar(lexical: Summary, hybrid: Summary): BarResult {
   const c = (s: Summary, cls: string) =>
-    s.byClass[cls] ?? { n: 0, recall10: 0, mrr: 0, ndcg10: 0, zero: 0 };
+    s.byClass[cls] ?? { n: 0, hit10: 0, mrr: 0, ndcg10: 0, zero: 0 };
   const df = ['dialect', 'franco'];
   const nDf = df.reduce((a, k) => a + c(hybrid, k).n, 0);
   const lift = nDf
-    ? df.reduce(
-        (a, k) => a + (c(hybrid, k).recall10 - c(lexical, k).recall10) * c(hybrid, k).n,
-        0
-      ) / nDf
+    ? df.reduce((a, k) => a + (c(hybrid, k).hit10 - c(lexical, k).hit10) * c(hybrid, k).n, 0) / nDf
     : 0;
   const checks = [
     {
-      name: 'hybrid recall@10 overall',
-      value: hybrid.core.recall10,
+      name: 'hybrid hit-rate@10 overall',
+      value: hybrid.core.hit10,
       need: '>= 0.90',
-      ok: hybrid.core.recall10 >= 0.9 - EPS,
+      ok: hybrid.core.hit10 >= 0.9 - EPS,
     },
     {
-      name: 'dialect recall@10',
-      value: c(hybrid, 'dialect').recall10,
+      name: 'dialect hit-rate@10',
+      value: c(hybrid, 'dialect').hit10,
       need: '>= 0.80',
-      ok: c(hybrid, 'dialect').recall10 >= 0.8 - EPS,
+      ok: c(hybrid, 'dialect').hit10 >= 0.8 - EPS,
     },
     {
-      name: 'franco recall@10',
-      value: c(hybrid, 'franco').recall10,
+      name: 'franco hit-rate@10',
+      value: c(hybrid, 'franco').hit10,
       need: '>= 0.80',
-      ok: c(hybrid, 'franco').recall10 >= 0.8 - EPS,
+      ok: c(hybrid, 'franco').hit10 >= 0.8 - EPS,
     },
     {
       name: 'hybrid MRR overall',
@@ -148,7 +151,7 @@ export function passBar(lexical: Summary, hybrid: Summary): BarResult {
       ok: hybrid.core.mrr >= 0.7 - EPS,
     },
     ...['msa', 'en'].map(k => {
-      const d = c(hybrid, k).recall10 - c(lexical, k).recall10;
+      const d = c(hybrid, k).hit10 - c(lexical, k).hit10;
       return { name: `${k} no regression`, value: d, need: '>= -0.02', ok: d >= -0.02 - EPS };
     }),
     { name: 'dialect+franco lift', value: lift, need: '>= +0.15', ok: lift >= 0.15 - EPS },

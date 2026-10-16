@@ -42,7 +42,7 @@ import {
   hybridVariant,
   ndcgAt,
   passBar,
-  recallAt,
+  hitAt,
   reciprocalRank,
   summarise,
   type BarResult,
@@ -50,7 +50,7 @@ import {
   type Summary,
 } from './scoring';
 
-export { recallAt, reciprocalRank } from './scoring';
+export { hitAt, reciprocalRank } from './scoring';
 
 const AI_TERMS_FILE = new URL('./ai-terms.json', import.meta.url);
 const THRESHOLDS: Array<number | null> = [20, 50, null];
@@ -342,7 +342,7 @@ async function main(): Promise<number> {
         core: l.q.core,
         key: l.q.key,
         q: l.q.q,
-        recall10: recallAt(t, l.q.key, 10),
+        hit10: hitAt(t, l.q.key, 10),
         rr: reciprocalRank(t, l.q.key),
         ndcg10: ndcgAt(t, l.q.key, 10, relevantTotal.get(l.q.key)!),
         empty: ids.length === 0,
@@ -390,7 +390,7 @@ async function main(): Promise<number> {
     const H = results[shippedLabel];
     const classes = [...EVAL_FORMS, 'typo', 'ortho', 'mixed', 'phrase'];
     console.log(
-      `\nPer class: keyword-only vs hybrid (shipped: ${shippedLabel}). recall@10 / MRR / nDCG@10 / zero-result`
+      `\nPer class: keyword-only vs hybrid (shipped: ${shippedLabel}). hit-rate@10 / MRR / nDCG@10 / zero-result`
     );
     console.log('class     n    | lexical                   | hybrid');
     for (const c of [...classes, 'CORE']) {
@@ -398,26 +398,26 @@ async function main(): Promise<number> {
       const h = c === 'CORE' ? H.summary.core : H.summary.byClass[c];
       if (!l || !h) continue;
       const cell = (x: typeof l) =>
-        `${fmt(x.recall10)} / ${fmt(x.mrr)} / ${fmt(x.ndcg10)} / ${fmt(x.zero)}`;
+        `${fmt(x.hit10)} / ${fmt(x.mrr)} / ${fmt(x.ndcg10)} / ${fmt(x.zero)}`;
       console.log(`${c.padEnd(8)} ${String(l.n).padStart(3)}   | ${cell(l)} | ${cell(h)}`);
     }
     console.log(
-      `\nVariants on the core 200: recall@10 / MRR / nDCG@10 · d+f lift · negatives in top 10 · absent (${absent.length}) answered / shown · bar`
+      `\nVariants on the core 200: hit-rate@10 / MRR / nDCG@10 · d+f lift · negatives in top 10 · absent (${absent.length}) answered / shown · bar`
     );
     for (const [name, r] of Object.entries(results)) {
       const s = r.summary.core;
       console.log(
-        `${name.padEnd(20)} ${fmt(s.recall10)} / ${fmt(s.mrr)} / ${fmt(s.ndcg10)} · ${fmt(r.bar.lift).padStart(5)} · ${fmt(r.negIn10)} · ${fmt(r.absentAnswered)} / ${fmt(r.absentIn10)} · ${r.bar.ok ? 'PASS' : 'fail: ' + r.bar.failed.join(', ')}`
+        `${name.padEnd(20)} ${fmt(s.hit10)} / ${fmt(s.mrr)} / ${fmt(s.ndcg10)} · ${fmt(r.bar.lift).padStart(5)} · ${fmt(r.negIn10)} · ${fmt(r.absentAnswered)} / ${fmt(r.absentIn10)} · ${r.bar.ok ? 'PASS' : 'fail: ' + r.bar.failed.join(', ')}`
       );
     }
     console.log(
-      `\nPer class recall@10 / nDCG@10 by vector distance (threshold ${search.KEYWORD_STRONG_AT}):`
+      `\nPer class hit-rate@10 / nDCG@10 by vector distance (threshold ${search.KEYWORD_STRONG_AT}):`
     );
     for (const d of DISTANCES) {
       const r = results[label(search.KEYWORD_STRONG_AT, d)].summary.byClass;
       console.log(
         `  d=${String(d ?? 'none').padEnd(5)} ` +
-          classes.map(c => `${c} ${fmt(r[c]?.recall10 ?? 0)}/${fmt(r[c]?.ndcg10 ?? 0)}`).join('  ')
+          classes.map(c => `${c} ${fmt(r[c]?.hit10 ?? 0)}/${fmt(r[c]?.ndcg10 ?? 0)}`).join('  ')
       );
     }
     const buckets = { '0': 0, '1-19': 0, '20-49': 0, '50+': 0 };
@@ -430,7 +430,7 @@ async function main(): Promise<number> {
       `Embeddable queries: ${legs.filter(l => l.embeddable).length}/${legs.length}; provider calls during queries: ${providerCalls - callsBefore}, of them not from the prefetch: ${backendCalls - backendBefore}`
     );
     console.log(`\nCore misses (hybrid, shipped config, target type not in top 10):`);
-    for (const s of H.scores.filter(x => x.core && !x.recall10))
+    for (const s of H.scores.filter(x => x.core && !x.hit10))
       console.log(
         `  ${s.cls.padEnd(7)} ${s.key.padEnd(11)} "${s.q}" → ${s.top.join(', ') || '(none)'}`
       );
