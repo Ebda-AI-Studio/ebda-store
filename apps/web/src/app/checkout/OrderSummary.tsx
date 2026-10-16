@@ -3,7 +3,7 @@
 import Image from 'next/image';
 import { MINUS, SignedAmount } from '@/lib/bidi';
 import { useLocalePrice } from '../../hooks/useLocalePrice';
-import { Button, Input } from '@ebda/ui';
+import { Button, Input, VariantText } from '@ebda/ui';
 import type { CSSProperties } from 'react';
 import { useLanguage, translations } from '../../contexts/LanguageContext';
 import { useNumerals } from '../../hooks/useNumerals';
@@ -202,6 +202,18 @@ export function OrderSummary({
                 <h3 className="text-base font-semibold text-foreground">
                   {productLabel(item.product)}
                 </h3>
+                {/* IA-02: the variant, as the cart and the receipt print it. */}
+                {(item.variantTitle || item.variantTitleAr) && (
+                  <p className="mt-0.5 text-sm text-muted-foreground">
+                    <VariantText
+                      title={
+                        (isRtl && item.variantTitleAr
+                          ? item.variantTitleAr
+                          : item.variantTitle || item.variantTitleAr) ?? ''
+                      }
+                    />
+                  </p>
+                )}
                 <CartLineNote note={item.note} />
                 <p className="mt-auto text-sm font-medium text-muted-foreground">
                   {formatPrice(item.price * item.quantity)}
