@@ -93,9 +93,9 @@ export default function ModernFooter({
 
   // Brand + sections (1 fallback col, or N footerSections) + (contact?) + (newsletter?).
   // We omit columns the store hasn't populated so the grid stays balanced.
-  // WhatsApp is excluded from the trigger because it appears in the social
-  // icon row above — repeating it under "Contact" is the duplication this
-  // pass cleans up.
+  // WhatsApp counts: S-02 names the store's WhatsApp under "Contact"
+  // (FooterWhatsApp) as well as the unlabelled icon in the social row, by
+  // design — the contact line is where shoppers look for the number.
   const hasContact = !!(contact.email || displayPhone || displayAddress || contact.whatsapp);
   // Opt-in "Branches" column — see resolveFooterBranches for the gating
   // rules. Adding its +1 to the SAME formula that already counts contact +
@@ -289,8 +289,8 @@ export default function ModernFooter({
                     />
                   </li>
                 )}
-                {/* WhatsApp lives in the social row at the brand block; we
-                    don't repeat it here to avoid duplicating the same link. */}
+                {/* WhatsApp is named above (S-02, FooterWhatsApp) and also keeps its
+                    icon in the social row at the brand block. */}
                 {displayAddress &&
                   (() => {
                     const mapIcon = (
