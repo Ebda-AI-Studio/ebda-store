@@ -6,7 +6,7 @@ Deploy order: web + admin first (they still accept the old API answers), then `g
 
 ## Shoppers (storefront)
 
-- **Contact page messages reach the store** they were written on (store email, else the owner, else the platform inbox labelled with the store), with a honeypot and Arabic feedback (FU46-1, help: create-your-store).
+- **Contact page messages reach the store** they were written on (store email, else the active owner; never Ebda's inbox, so a store with neither gets nothing), with a honeypot and Arabic feedback (FU46-1, help: create-your-store).
 - **Arabic checkout header** shows the Arabic store name (FU46-3).
 - **Product cards** wrap long names and never overflow at 390/360/320; add-to-cart turns icon-only where its label would not fit (FU46-T5).
 - **Phone footer** shows the store name when there is no logo, on all 5 skins (FU46-4).

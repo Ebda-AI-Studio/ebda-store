@@ -47,11 +47,15 @@ describe('contact-form-send (FU46-1)', () => {
     expect(sendPlatformMock).not.toHaveBeenCalled();
   });
 
-  it('a store with no address at all falls back to the platform inbox, labelled with the store', async () => {
+  it("a store with no usable address sends NO mail anywhere (never Ebda's inbox) and does not throw (FU46-1c)", async () => {
     targetMock.mockResolvedValue({ to: null, isDemo: false, slug: 'shop' });
     await handleContactFormSubmitted({ event: event({ storeId: 's1', ...MESSAGE }), step });
     expect(sendStoreMock).not.toHaveBeenCalled();
-    expect(sendPlatformMock).toHaveBeenCalledWith(MESSAGE, { storeLabel: 'shop' });
+    expect(sendPlatformMock).not.toHaveBeenCalled();
+    expect(logger.warn).toHaveBeenCalled();
+    const logged = JSON.stringify(vi.mocked(logger.warn).mock.calls);
+    expect(logged).not.toContain('mona@example.test');
+    expect(logged).not.toContain('Do you have it in M?');
   });
 
   it('a store that is gone or became a demo store sends nothing and does not throw', async () => {
@@ -63,10 +67,11 @@ describe('contact-form-send (FU46-1)', () => {
     expect(sendPlatformMock).not.toHaveBeenCalled();
   });
 
-  it('an event enqueued before this change (no storeId) keeps its old platform destination', async () => {
+  it('an event enqueued before FU46-1 (no storeId) is dropped, not mailed to the platform (FU46-1c)', async () => {
     await handleContactFormSubmitted({ event: event({ ...MESSAGE }), step });
     expect(targetMock).not.toHaveBeenCalled();
-    expect(sendPlatformMock).toHaveBeenCalledWith(MESSAGE);
+    expect(sendPlatformMock).not.toHaveBeenCalled();
+    expect(sendStoreMock).not.toHaveBeenCalled();
   });
 
   it('a send failure is rethrown so Inngest retries and dead-letters', async () => {

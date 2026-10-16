@@ -1074,36 +1074,6 @@ export class EmailService {
   }
 
   /**
-   * A storefront contact message with no store address to go to (Ruling FU46-1's last
-   * fallback), or one enqueued before FU46-1 shipped. Platform inbox, labelled with the store.
-   */
-  static async sendContactForm(
-    data: { name: string; email: string; subject: string; message: string },
-    opts: { storeLabel?: string } = {}
-  ): Promise<void> {
-    const content = this.contactFormTemplate(data);
-    const label = opts.storeLabel ? ` [${opts.storeLabel}]` : '';
-    await this.sendPlatform({
-      to: config.smtpFromEmail,
-      subject: `Contact Form${label}: ${oneLine(data.subject)}`,
-      content,
-      text: this.htmlToText(
-        renderBrandedShell(content, {
-          name: BRAND.product.nameEn,
-          nameAr: BRAND.product.nameAr,
-          logo: BRAND_EMAIL_LOGO_URL,
-          theme: null,
-          email: null,
-          phone: null,
-          address: null,
-          defaultLanguage: 'en',
-        })
-      ),
-      replyTo: data.email,
-    });
-  }
-
-  /**
    * A shopper's storefront contact message, to the STORE (Ruling FU46-1): from the store's own
    * sender, reply-to the shopper, in the store's branded shell.
    */

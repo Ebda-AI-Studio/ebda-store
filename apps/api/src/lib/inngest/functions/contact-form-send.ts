@@ -12,9 +12,10 @@ export interface ContactStep {
 
 /**
  * Sends a storefront contact-page message to the STORE it was written on (Ruling FU46-1):
- * the store's public contact email, else the owner's account email, else (no address at all)
- * the platform inbox labelled with the store. Before FU46-1 every store's messages went to
- * `config.smtpFromEmail` — Ebda's own sender — and no merchant ever saw one.
+ * the store's public contact email, else the owner's account email. With no usable store-owned
+ * address nothing is mailed (Ruling FU46-1c): a shopper's name, email and message never go to
+ * Ebda's own inbox. Before FU46-1 every store's messages went to `config.smtpFromEmail` — Ebda's
+ * own sender — and no merchant ever saw one.
  *
  * #645 still holds: queued on Inngest (3 retries, dead-letter via alerts-failure-watch); a
  * send failure is rethrown so it retries. A store that is gone or turned into a demo store
@@ -37,8 +38,8 @@ export async function handleContactFormSubmitted({
   const data: ContactMessage = { name, email, subject, message };
 
   if (!storeId) {
-    // Enqueued before FU46-1 deployed: keep the destination it was enqueued for.
-    await step.run('send-email', () => EmailService.sendContactForm(data));
+    // Enqueued before FU46-1 deployed: its only destination was Ebda's inbox. Dropped (FU46-1c).
+    logger.warn({ event: event.name }, '[CONTACT] queued without a store; message dropped');
     return;
   }
 
@@ -48,9 +49,14 @@ export async function handleContactFormSubmitted({
       logger.warn({ storeId }, '[CONTACT] store gone or demo; message dropped');
       return;
     }
+    if (!target.to) {
+      // No store-owned address (FU46-1c). No admin inbox model exists to hold it, so it is
+      // dropped, success is returned to the shopper upstream, and the log carries no PII.
+      logger.warn({ storeId }, '[CONTACT] store has no usable address; message not delivered');
+      return;
+    }
     try {
-      if (target.to) await EmailService.sendStoreContactMessage(storeId, target.to, data);
-      else await EmailService.sendContactForm(data, { storeLabel: target.slug });
+      await EmailService.sendStoreContactMessage(storeId, target.to, data);
     } catch (err) {
       // D8: provider errors can echo the recipient/shopper address; never log the raw error.
       const reason = scrubEmails(err instanceof Error ? err.message : String(err), [

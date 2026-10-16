@@ -189,7 +189,19 @@ describe.skipIf(!hasDb)('storefront contact routing (FU46-1)', () => {
 
   it('recipient: a suspended owner is not mailed, and the platform sender address is never a target', async () => {
     expect((await asApp(() => storeContactTarget(suspended.storeId)))?.to).toBeNull();
+    // stores.email equal to the platform sender is skipped, and the ACTIVE owner is tried next
+    // (FU46 M-5); it never becomes the target itself.
+    const plat = (await asApp(() => storeContactTarget(platformAddr.storeId)))?.to;
+    expect(plat).toBe(`bundle-fixture-nofeature-owner-contact-${run}-plat@example.com`);
+    expect(plat?.toLowerCase()).not.toBe(config.smtpFromEmail.toLowerCase());
+    // ... and with the owner suspended too there is nobody: null.
+    await withRlsBypass(tx =>
+      tx.user.update({ where: { id: platformAddr.ownerId }, data: { status: 'suspended' } })
+    );
     expect((await asApp(() => storeContactTarget(platformAddr.storeId)))?.to).toBeNull();
+    await withRlsBypass(tx =>
+      tx.user.update({ where: { id: platformAddr.ownerId }, data: { status: 'active' } })
+    );
   });
 
   it('the cap window is FIXED: over-cap hits never extend the TTL, and the count resets after it', async () => {

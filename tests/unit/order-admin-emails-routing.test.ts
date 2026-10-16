@@ -56,7 +56,7 @@ describe('order alert emails never go to the platform inbox (FU46-1a)', () => {
     expect(fanout).not.toMatch(/send-admin-new-order|sendAdminNewOrder/);
   });
 
-  it('the only send to config.smtpFromEmail left is the contact-form fallback', () => {
+  it('NO send to config.smtpFromEmail is left (the contact fallback went too, FU46-1c)', () => {
     const src = readFileSync(join(ROOT, 'apps/api/src/services/email.service.ts'), 'utf8');
     const sites = [...src.matchAll(/to:\s*config\.smtpFromEmail/g)].map(m => {
       const before = src.slice(0, m.index);
@@ -64,6 +64,7 @@ describe('order alert emails never go to the platform inbox (FU46-1a)', () => {
         before.slice(before.lastIndexOf('static async '))
       )![1];
     });
-    expect(sites).toEqual(['sendContactForm']);
+    expect(sites).toEqual([]);
+    expect((EmailService as unknown as Record<string, unknown>).sendContactForm).toBeUndefined();
   });
 });

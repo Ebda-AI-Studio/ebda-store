@@ -11,7 +11,7 @@ export interface StoreContactTarget {
 
 /**
  * Where a shopper's storefront contact message goes (Ruling FU46-1): the address the store shows
- * on its contact page (`stores.email`), else the owner's account email. Read in the store's own
+ * on its contact page (`stores.email`), else the owner's account email (each skipped when it is one of Ebda's own addresses). Read in the store's own
  * scope: the owner's `users` row is visible there (strict RLS policy on `users`, owner EXISTS
  * clause). Null when the store no longer exists or is soft-deleted.
  */
@@ -30,11 +30,14 @@ export async function storeContactTarget(storeId: string): Promise<StoreContactT
   );
   if (!store || store.deletedAt) return null;
   const ownerActive = store.owner?.status === 'active' && !store.owner.deletedAt;
-  const candidate = store.email?.trim() || (ownerActive ? store.owner?.email?.trim() : '') || null;
-  // An address equal to the platform sender / no-reply would loop mail back to Ebda: fall through.
+  // An address that is one of Ebda's own (sender, no-reply, support) would mail the platform: it
+  // is skipped and the NEXT candidate is tried (FU46 M-5), never the platform itself.
   const platform = new Set(
-    [config.smtpFromEmail, BRAND.noReplyEmail].map(a => a?.trim().toLowerCase())
+    [config.smtpFromEmail, BRAND.noReplyEmail, BRAND.supportEmail].map(a => a?.trim().toLowerCase())
   );
-  const to = candidate && !platform.has(candidate.toLowerCase()) ? candidate : null;
+  const to =
+    [store.email, ownerActive ? store.owner?.email : null]
+      .map(a => a?.trim())
+      .find(a => a && !platform.has(a.toLowerCase())) || null;
   return { to, isDemo: store.isDemo, slug: store.slug };
 }
