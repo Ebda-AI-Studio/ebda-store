@@ -31,6 +31,8 @@
  * --generate-ai-terms   regenerate ai-terms.json with the Task 8 generator first (GEMINI_API_KEY;
  *                       one Gemini call per product), then run with them
  * --out <file>          write the full results (every variant, every query) as JSON
+ * --two-vector-sim      with --ai-terms: also score a SIMULATED second vector for the words (harness
+ *                       KNN, not production code; Ruling SEARCH-T13-5)
  * --keep                keep the seeded store (default: deleted at the end)
  */
 import { readFileSync, writeFileSync } from 'node:fs';
@@ -133,6 +135,7 @@ async function main(): Promise<number> {
   const run = `${Date.now().toString(36)}${createHash('sha1').update(String(Math.random())).digest('hex').slice(0, 4)}`;
   const rows = catalogueRows();
   const typeOf = new Map<string, string>();
+  const rowOf = new Map<string, (typeof rows)[number]>();
   const relevantTotal = new Map<string, number>();
   for (const r of rows) relevantTotal.set(r.type, (relevantTotal.get(r.type) ?? 0) + 1);
 
@@ -242,8 +245,11 @@ async function main(): Promise<number> {
     for (const p of await owner.product.findMany({
       where: { storeId: S },
       select: { id: true, slug: true },
-    }))
-      typeOf.set(p.id, rows.find(r => `${r.id}-${run}` === p.slug)!.type);
+    })) {
+      const r = rows.find(x => `${x.id}-${run}` === p.slug)!;
+      typeOf.set(p.id, r.type);
+      rowOf.set(p.id, r);
+    }
     for (;;) {
       const r = await db.runInStoreScope(S, () =>
         index.indexStore(S, { batchSize: 50, maxDocs: 1000 })
@@ -280,6 +286,8 @@ async function main(): Promise<number> {
       shipped: string[];
       degraded: boolean;
       embeddable: boolean;
+      /** Harness-side vector legs (--two-vector-sim): 'one@d' and 'two@d'. */
+      sim?: Map<string, string[]>;
     }
     const legs: Legs[] = [];
     const tenant = <T>(fn: () => Promise<T>) => db.runInTenantContext(S, fn);
@@ -308,7 +316,7 @@ async function main(): Promise<number> {
       });
     }
     // Absent products: the right answer is nothing.
-    const absent: Array<Pick<Legs, 'lexical' | 'vector'> & { q: string }> = [];
+    const absent: Array<Pick<Legs, 'lexical' | 'vector' | 'sim'> & { q: string }> = [];
     for (const q of EVAL_ABSENT) {
       const lexical = await tenant(() => search.searchProductIds(S, q, { scope: 'storefront' }));
       const vector = new Map<number | null, string[]>();
@@ -334,6 +342,58 @@ async function main(): Promise<number> {
         throw new Error(`harness drift: composed order != rankedSearch for "${l.q.q}"`);
     }
 
+    // ---- two-vector SIMULATION (--two-vector-sim, needs --ai-terms) ---------------------------
+    // Ruling SEARCH-T13-5 asks whether a SECOND vector for the AI words beats one vector without
+    // them. Not production code: the KNN runs here in JS over real bge-m3 vectors of (a) each
+    // product's doc as the DB holds it now (names; the eval store has no descriptions) and (b) its
+    // words alone; a product's distance is the nearer of the two. "one@d" (doc only) must reproduce
+    // the production vector leg, and the agreement is printed so the simulation can be trusted.
+    let simAgreement: number | null = null;
+    if (arg('--two-vector-sim')) {
+      if (!aiTerms) throw new Error('--two-vector-sim needs --ai-terms');
+      const unit = (v: number[]) => {
+        const n = Math.hypot(...v);
+        return v.map(x => x / n);
+      };
+      const ids = [...rowOf.keys()];
+      const docVec = (
+        await backend(ids.map(id => `${rowOf.get(id)!.nameAr}\n${rowOf.get(id)!.name}`))
+      ).map(unit);
+      const withWords = ids.filter(id => aiTerms!.terms[rowOf.get(id)!.id]);
+      const wordVecs = (await backend(withWords.map(id => aiTerms!.terms[rowOf.get(id)!.id]!))).map(
+        unit
+      );
+      const wordVec = new Map(withWords.map((id, i) => [id, wordVecs[i]]));
+      const dist = (a: number[], b: number[]) => 1 - a.reduce((x, y, i) => x + y * b[i], 0);
+      const knn = (q: string, d: number, two: boolean): string[] => {
+        if (!search.shouldEmbedQuery(q)) return [];
+        const qv = unit(prefetched.get(search.queryEmbedText(q))!);
+        return ids
+          .map((id, i) => {
+            const w = two ? wordVec.get(id) : undefined;
+            return { id, d: Math.min(dist(qv, docVec[i]), w ? dist(qv, w) : 2) };
+          })
+          .filter(x => x.d <= d)
+          .sort((a, b) => a.d - b.d || (a.id < b.id ? -1 : 1))
+          .slice(0, search.HYBRID_LEG)
+          .map(x => x.id);
+      };
+      const simFor = (q: string) => {
+        const m = new Map<string, string[]>();
+        for (const d of [0.55, 0.65]) {
+          m.set(`one@${d}`, knn(q, d, false));
+          m.set(`two@${d}`, knn(q, d, true));
+        }
+        return m;
+      };
+      for (const l of legs) l.sim = simFor(l.q.q);
+      for (const a of absent) a.sim = simFor(a.q);
+      simAgreement =
+        legs.filter(
+          l => JSON.stringify(l.sim!.get('one@0.55')) === JSON.stringify(l.vector.get(0.55))
+        ).length / legs.length;
+    }
+
     // ---- score -------------------------------------------------------------------------------
     const types = (ids: string[]) => ids.map(id => typeOf.get(id)!);
     const score = (l: Legs, ids: string[]): QueryScore & { top: string[]; negIn10: number } => {
@@ -351,7 +411,7 @@ async function main(): Promise<number> {
         negIn10: t.slice(0, 10).filter(x => x.startsWith('x-')).length,
       };
     };
-    const variants: Record<string, (l: Pick<Legs, 'lexical' | 'vector'>) => string[]> = {
+    const variants: Record<string, (l: Pick<Legs, 'lexical' | 'vector' | 'sim'>) => string[]> = {
       lexical: l => l.lexical,
       'vector-only d=0.55': l => l.vector.get(0.55)!,
     };
@@ -359,6 +419,10 @@ async function main(): Promise<number> {
       for (const t of THRESHOLDS)
         variants[label(t, d)] = l =>
           hybridVariant(l.lexical, l.vector.get(d)!, t, search.HYBRID_LEG);
+    if (simAgreement !== null)
+      for (const k of ['one@0.55', 'two@0.55', 'two@0.65'])
+        variants[`SIM ${k}`] = l =>
+          hybridVariant(l.lexical, l.sim!.get(k)!, search.KEYWORD_STRONG_AT, search.HYBRID_LEG);
     const shippedLabel = label(search.KEYWORD_STRONG_AT, shippedD);
     const results: Record<
       string,
@@ -450,6 +514,10 @@ async function main(): Promise<number> {
         ` · dialect+franco ${fmt(liftOf(['hard-dialect', 'hard-franco']))} · all ${fmt(liftOf(hardClasses))}`
     );
     console.log(`\nKeyword matches per query: ${JSON.stringify(buckets)}`);
+    if (simAgreement !== null)
+      console.log(
+        `SIMULATION check: harness one-vector KNN equals the production vector leg on ${(simAgreement * 100).toFixed(1)} % of queries (d=0.55)`
+      );
     console.log(
       `Embeddable queries: ${legs.filter(l => l.embeddable).length}/${legs.length}; provider calls during queries: ${providerCalls - callsBefore}, of them not from the prefetch: ${backendCalls - backendBefore}`
     );
