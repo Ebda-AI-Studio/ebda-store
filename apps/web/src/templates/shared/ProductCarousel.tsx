@@ -193,6 +193,19 @@ function SharedProductCarousel({
   const [canScrollPrev, setCanScrollPrev] = useState(false);
   const [canScrollNext, setCanScrollNext] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
+  // Rule (e) (W4, a11y P1-6): autoplay stops while focus is inside the strip and on a visible
+  // toggle, not only on hover/touch. `canAutoplay` is read after mount (reduced motion is a
+  // client fact), so the server markup and the first client render agree.
+  const [focusPaused, setFocusPaused] = useState(false);
+  const [userPaused, setUserPaused] = useState(false);
+  const [canAutoplay, setCanAutoplay] = useState(false);
+  useEffect(() => {
+    const reduced =
+      typeof window !== 'undefined' &&
+      window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+    setCanAutoplay(products.length > 1 && !reduced);
+  }, [products.length]);
+  const autoplayHeld = isPaused || focusPaused || userPaused;
 
   // Update arrow visibility based on current scroll position. Uses scroll
   // events so we don't have to know card widths up front.
@@ -221,12 +234,7 @@ function SharedProductCarousel({
   // when prefers-reduced-motion is on.
   useEffect(() => {
     const el = scrollRef.current;
-    if (!el || products.length <= 1 || isPaused) return;
-
-    const reduced =
-      typeof window !== 'undefined' &&
-      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    if (reduced) return;
+    if (!el || !canAutoplay || autoplayHeld) return;
 
     const id = window.setInterval(() => {
       const max = el.scrollWidth - el.clientWidth;
@@ -240,7 +248,7 @@ function SharedProductCarousel({
       }
     }, 4000);
     return () => window.clearInterval(id);
-  }, [products.length, isPaused, isRtl]);
+  }, [canAutoplay, autoplayHeld, isRtl]);
 
   const scrollByOneCard = (direction: 'prev' | 'next') => {
     const el = scrollRef.current;
@@ -284,11 +292,38 @@ function SharedProductCarousel({
         />
         <div
           className="relative"
+          data-autoplay={!canAutoplay ? 'off' : autoplayHeld ? 'paused' : 'running'}
           onMouseEnter={() => setIsPaused(true)}
           onMouseLeave={() => setIsPaused(false)}
           onTouchStart={() => setIsPaused(true)}
           onTouchEnd={() => setIsPaused(false)}
+          onFocus={() => setFocusPaused(true)}
+          onBlur={e => {
+            if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setFocusPaused(false);
+          }}
         >
+          {canAutoplay && (
+            <button
+              type="button"
+              data-autoplay-toggle
+              aria-pressed={userPaused}
+              onClick={() => setUserPaused(p => !p)}
+              className="absolute -top-12 end-0 z-10 inline-flex h-11 w-11 items-center justify-center rounded-[var(--radius)] text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              aria-label={
+                userPaused
+                  ? isRtl
+                    ? 'تشغيل التمرير التلقائي'
+                    : 'Play automatic scrolling'
+                  : isRtl
+                    ? 'إيقاف التمرير التلقائي'
+                    : 'Pause automatic scrolling'
+              }
+            >
+              <svg className="h-4 w-4" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                {userPaused ? <path d="M8 5v14l11-7z" /> : <path d="M7 5h4v14H7zM13 5h4v14h-4z" />}
+              </svg>
+            </button>
+          )}
           {/* Prev arrow — sits at the leading edge (left in LTR, right in
               RTL). Hidden on small screens where touch-scroll is the primary
               affordance, hidden when there's nothing to scroll back to. */}

@@ -12,7 +12,7 @@
  */
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import React from 'react';
-import { render, cleanup } from '@testing-library/react';
+import { render, cleanup, fireEvent } from '@testing-library/react';
 import {
   composeStoreTheme,
   contrastRatio,
@@ -496,5 +496,38 @@ describe('minimal/ProductCard fills its column on a look store too (IA-05, searc
     cleanup();
     selectLook(null);
     expect(root().className).toContain('mx-auto');
+  });
+});
+
+// a11y P1-6 / rule (e) (W4): Atelier's product carousel auto-advanced every 4s and paused only on
+// hover/touch: a keyboard user's focus scrolled away under them, and nothing could stop it.
+describe('ProductCarousel autoplay (rule e)', () => {
+  const mount = () =>
+    render(
+      React.createElement(
+        ProductCarousel as never,
+        {
+          products: [product('plain'), product('sale'), product('sized')],
+          isRtl: true,
+          pack: state.template,
+        } as never
+      )
+    ).container;
+  it('pauses while focus is inside, and has a visible pause toggle', () => {
+    selectLook('qamar.atelier');
+    const c = mount();
+    const strip = c.querySelector('[data-autoplay]') as HTMLElement;
+    expect(strip.getAttribute('data-autoplay')).toBe('running');
+    const toggle = c.querySelector('button[data-autoplay-toggle]') as HTMLButtonElement;
+    expect(toggle).toBeTruthy();
+    expect(toggle.getAttribute('aria-pressed')).toBe('false');
+    const firstLink = strip.querySelector('a') as HTMLElement;
+    fireEvent.focus(firstLink);
+    expect(strip.getAttribute('data-autoplay')).toBe('paused');
+    fireEvent.blur(firstLink);
+    expect(strip.getAttribute('data-autoplay')).toBe('running');
+    fireEvent.click(toggle);
+    expect(toggle.getAttribute('aria-pressed')).toBe('true');
+    expect(strip.getAttribute('data-autoplay')).toBe('paused');
   });
 });
