@@ -1,5 +1,6 @@
 'use client';
 
+import { focusFirstError } from '@/lib/focus-first-error';
 import { signedText } from '@/lib/bidi';
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useLocalePrice } from '../../hooks/useLocalePrice';
@@ -1187,9 +1188,8 @@ export default function CheckoutClient() {
     if (step === 1) {
       // Validate before proceeding to payment
       if (!validateForm()) {
-        // Scroll to first error
-        const firstError = document.querySelector('[data-error="true"]');
-        firstError?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        // R-13: focus the first error once the errors have rendered.
+        requestAnimationFrame(() => focusFirstError());
         return;
       }
       // The ONLY shipping condition that blocks checkout: the store configured
@@ -1236,8 +1236,7 @@ export default function CheckoutClient() {
       setSelectedDeliveryWindowId(null);
       setSelectedDeliveryDay(null);
       setDeliveryWindowError(lapsedWindowMessage);
-      const firstError = document.querySelector('[data-error="true"]');
-      firstError?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      requestAnimationFrame(() => focusFirstError());
       return;
     }
 
@@ -1247,8 +1246,7 @@ export default function CheckoutClient() {
     // (per the platform rule: never hard-block checkout on this).
     if (checkoutDelivery?.windows?.enabled && freshAnyWindowAvailable && !freshSelectedWindow) {
       setDeliveryWindowError(t('Please select a delivery window', 'يرجى اختيار موعد التوصيل'));
-      const firstError = document.querySelector('[data-error="true"]');
-      firstError?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      requestAnimationFrame(() => focusFirstError());
       return;
     }
     setDeliveryWindowError(null);
@@ -1520,10 +1518,7 @@ export default function CheckoutClient() {
           setFormErrors(prev => ({ ...prev, ...inlineErrors }));
           setStep(1);
           // Scroll the first inline error into view on the shipping step.
-          setTimeout(() => {
-            const firstError = document.querySelector('[data-error="true"]');
-            firstError?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-          }, 50);
+          setTimeout(() => focusFirstError(), 50);
           setCheckoutError(
             t(
               'Please fix the highlighted fields and try again.',

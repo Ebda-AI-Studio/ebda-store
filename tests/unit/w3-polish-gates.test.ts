@@ -138,3 +138,11 @@ describe('L-07: one filter panel, one clear action, no page-size control', () =>
     expect(side).not.toContain("t('Filters', 'فلاتر')");
   });
 });
+
+describe('R-13: checkout errors move focus, not only the scroll', () => {
+  it('CheckoutClient never scrolls to an error without focusFirstError', () => {
+    const src = read('app/checkout/CheckoutClient.tsx');
+    expect(src).not.toMatch(/\[data-error="true"\]'\)[\s\S]{0,80}scrollIntoView/);
+    expect(src.match(/focusFirstError\(\)/g)?.length).toBeGreaterThanOrEqual(4);
+  });
+});
