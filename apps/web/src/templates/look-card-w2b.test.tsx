@@ -451,3 +451,33 @@ describe('relatedHeadingSize', () => {
       );
   });
 });
+
+// IA-05 (independent audit P1): at 1280 the 200px-capped, centred cards floated in ~300px columns,
+// 45px in from the section heading and out of line with the carousels on the same page. On a look
+// store (photo-led, the look owns the ratio) the card fills its grid column, so the first card
+// starts at the heading's edge. A store with no look keeps the compact cap.
+describe('PecannbeeProductCard fills its column on a look store (IA-05)', () => {
+  const article = () =>
+    render(
+      React.createElement(
+        PecannbeeProductCard as never,
+        {
+          product: product('plain'),
+          isRtl: true,
+          pack: state.template,
+        } as never
+      )
+    ).container.querySelector('article')!.className;
+  it('look store: no width cap, no auto margins', () => {
+    selectLook('qamar.lookbook');
+    const c = article();
+    expect(c).not.toMatch(/max-w-\[/);
+    expect(c).not.toContain('mx-auto');
+  });
+  it('no look: the compact cap and centring stay', () => {
+    selectLook(null);
+    const c = article();
+    expect(c).toContain('md:max-w-[200px]');
+    expect(c).toContain('mx-auto');
+  });
+});

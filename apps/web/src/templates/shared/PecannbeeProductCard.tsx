@@ -8,7 +8,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import type { ProductCardProps } from '../types';
 import type { TemplateId, ProductCardSize } from '@ebda/shared';
-import { getProductCardTextSizes, resolveColor } from '@ebda/shared';
+import { getLook, getProductCardTextSizes, resolveColor } from '@ebda/shared';
 import { cn } from '@ebda/ui';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useStore } from '../../contexts/StoreContext';
@@ -267,6 +267,7 @@ function PecannbeeProductCardImpl({
       ? LOOK_CHIP_STYLE
       : { backgroundColor: discountBadgeColor };
   const heartMaterial = overPhotoMaterial(store.theme, store.look);
+  const onLook = !!getLook(store.look);
   // The heart holds top-start on this card; the sale chip may hold top-end (X-01 class).
   const newCorner = newBadgeCornerCls({
     topStartReserved: true,
@@ -292,9 +293,12 @@ function PecannbeeProductCardImpl({
       // verified zero rendered-output change for the `showCardFrame` +
       // pack-style combination (see design-sweep PR).
       className={cn(
-        'group relative flex flex-col w-full mx-auto transition-[transform,box-shadow] duration-[var(--duration-slow)] ease-[var(--ease-out)]',
+        'group relative flex flex-col w-full transition-[transform,box-shadow] duration-[var(--duration-slow)] ease-[var(--ease-out)]',
+        // IA-05 (W4): on a look store the card fills its grid column, so the first card starts at
+        // the section edge like the carousels; a store with no look keeps the compact, centred cap.
+        onLook ? '' : 'mx-auto',
         cardHoverCls(store.theme),
-        sizeCap || 'md:max-w-[200px]',
+        onLook ? '' : sizeCap || 'md:max-w-[200px]',
         frameCls,
         styles.card,
         // LAST so the merchant's explicit cardShape radius beats the pack's
