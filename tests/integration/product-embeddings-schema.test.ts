@@ -167,6 +167,14 @@ describe.skipIf(!hasDb)('product_embeddings', () => {
     expect(await doc('a<br/>b<!-- note -->c')).toBe('X\na b c');
   });
 
+  it('embed doc is NULL (not an empty string) when every part is empty', async () => {
+    // Task 11 must skip a NULL doc instead of embedding md5('').
+    const [r] = await prisma.$queryRaw<Array<{ a: string | null; b: string | null }>>`
+      SELECT public.ebda_product_embed_doc(NULL, NULL, NULL, NULL, NULL) AS a,
+             public.ebda_product_embed_doc(' ', ${'\t'}, '', '<p> </p>', NULL) AS b`;
+    expect(r).toEqual({ a: null, b: null });
+  });
+
   it('embed doc is honestly IMMUTABLE: the planner inlines it (no STABLE call in its body)', async () => {
     // Postgres inlines an IMMUTABLE sql function only when its body contains no mutable call, so a
     // label that hides a STABLE function (concat_ws, array_to_string) leaves the call in the plan.

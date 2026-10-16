@@ -14,7 +14,8 @@
 --   ebda_product_embed_doc(...)  NEW IMMUTABLE sql helper: the text a product is embedded from. Raw
 --                                (un-normalised) names + search terms + descriptions with HTML tags
 --                                turned into spaces, whitespace collapsed, each description capped at
---                                1500 chars; whitespace-only / NULL parts are skipped. md5(of it) is product_embeddings.content_hash, so a stale
+--                                1500 chars; whitespace-only / NULL parts are skipped, and the result
+--                                is NULL when every part is empty (Task 11: skip, never embed md5('')). md5(of it) is product_embeddings.content_hash, so a stale
 --                                row is found in pure SQL (Task 11). Invoker rights, no SET search_path
 --                                (Ruling SEARCH-15 allowlist in rls-ebda-app.test.ts).
 --   product_embeddings           NEW, store-scoped. One row per product: a bge-m3 (1024 dims) halfvec.
@@ -41,7 +42,8 @@ CREATE OR REPLACE FUNCTION public.ebda_product_embed_doc(
   -- space; then the 1500-char cap. Entities (&amp;) are not decoded.
   -- Only IMMUTABLE operators (||, coalesce, nullif, btrim, rtrim, left, regexp_replace): concat_ws
   -- and array_to_string are STABLE, which would make the IMMUTABLE label a lie and stop inlining.
-  SELECT rtrim(
+  -- NULL (never '') when every part is empty: Task 11 skips a NULL doc rather than embed md5('').
+  SELECT nullif(rtrim(
     coalesce(nullif(regexp_replace(p_name_ar, '^\s+|\s+$', '', 'g'), '') || E'\n', '') ||
     coalesce(nullif(regexp_replace(p_name, '^\s+|\s+$', '', 'g'), '') || E'\n', '') ||
     coalesce(nullif(regexp_replace(p_terms, '^\s+|\s+$', '', 'g'), '') || E'\n', '') ||
@@ -50,7 +52,7 @@ CREATE OR REPLACE FUNCTION public.ebda_product_embed_doc(
     coalesce(nullif(btrim(left(btrim(regexp_replace(regexp_replace(p_desc,
       '</?[A-Za-z][^<>]*>|<![^<>]*>', ' ', 'g'), '\s+', ' ', 'g')), 1500)), '') || E'\n', ''),
     E'\n'
-  )
+  ), '')
 $$;
 
 -- CreateTable

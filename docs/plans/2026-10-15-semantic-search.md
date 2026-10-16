@@ -2031,6 +2031,8 @@ EOF
 
 ## Task 11: Indexer: stale detection, every write path, backfill + backstop cron
 
+> **Task 9 contract (Ruling SEARCH-T9-1):** `public.ebda_product_embed_doc(...)` returns **NULL** (never `''`) when every part is empty or whitespace-only. Stale detection and the embed loop must skip a NULL doc (no row, or delete an existing row) and never embed or hash `md5('')`. HTML tags become a space, whitespace collapses, each description is capped at 1500 chars.
+
 **Files:**
 
 - Create: `apps/api/src/services/product-index.service.ts`
