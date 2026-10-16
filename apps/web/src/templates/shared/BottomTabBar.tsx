@@ -250,7 +250,7 @@ export function BottomTabBar({ bottomBar, theme, navigation = [] }: BottomTabBar
                 >
                   {tab.icon}
                   {tab.key === 'cart' && itemCount > 0 && (
-                    <span className="absolute -top-1 -end-1 inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-destructive px-1 text-xs tabular-nums font-bold text-white">
+                    <span className="absolute -top-1 -end-1 inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-foreground px-1 text-xs tabular-nums font-bold text-background">
                       {itemCount > 99 ? '99+' : itemCount}
                     </span>
                   )}
