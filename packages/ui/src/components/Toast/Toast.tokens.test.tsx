@@ -19,7 +19,6 @@ function Fire({ onUndo }: { onUndo?: () => void }) {
       title: 'تمت إزالة عباية كتان',
       action: onUndo ? { label: 'تراجع', onClick: onUndo } : undefined,
     });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   return null;
 }
