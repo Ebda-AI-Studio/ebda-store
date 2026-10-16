@@ -256,7 +256,7 @@ export function SectionHeading({
       // personaChromeV2 is on. Existing theme token only, no new color.
       className={
         inline
-          ? `inline-flex min-h-11 shrink-0 items-center ${styles.sectionSeeAll}`
+          ? `inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center ${styles.sectionSeeAll}`
           : `mt-2 block w-full text-end ${
               elegantPersonaChrome ? 'border-t border-foreground/15 pt-2' : ''
             } ${styles.sectionSeeAll}`

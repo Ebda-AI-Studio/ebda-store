@@ -500,7 +500,7 @@ export default function CartClient() {
                     '\u064a\u0628\u062f\u0648 \u0623\u0646\u0643 \u0644\u0645 \u062a\u0636\u0641 \u0623\u064a \u0645\u0646\u062a\u062c\u0627\u062a \u0628\u0639\u062f.'
                   )}
                 </p>
-                <Link href={storeUrl('/products')}>
+                <Link href={storeUrl('/products')} className="inline-block">
                   <Button className="mt-8 gap-2 rounded-[var(--radius)]" size="lg">
                     <CartIcon className="h-5 w-5" />
                     {t(

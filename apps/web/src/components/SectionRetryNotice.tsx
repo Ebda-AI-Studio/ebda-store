@@ -51,7 +51,7 @@ export function SectionRetryNotice({
       <button
         type="button"
         onClick={onRetry}
-        className="rounded bg-destructive/20 px-3 py-1 text-xs font-medium text-destructive-ink hover:bg-destructive/30"
+        className="inline-flex min-h-11 items-center rounded bg-destructive/20 px-3 py-1 text-xs font-medium text-destructive-ink hover:bg-destructive/30"
       >
         {t('Retry', 'إعادة المحاولة')}
       </button>

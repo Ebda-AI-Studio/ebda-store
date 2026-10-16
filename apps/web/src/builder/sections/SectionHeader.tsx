@@ -59,7 +59,7 @@ export function SectionHeader({
             href={linkHref}
             className={
               qamar
-                ? `inline-flex min-h-[44px] items-center rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${getPackStyles('qamar').sectionSeeAll}`
+                ? `inline-flex min-h-[44px] min-w-11 items-center justify-center rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${getPackStyles('qamar').sectionSeeAll}`
                 : 'inline-flex min-h-[44px] items-center gap-1 text-sm text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm'
             }
             {...editLink}

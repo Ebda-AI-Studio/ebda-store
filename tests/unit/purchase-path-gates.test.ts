@@ -179,6 +179,52 @@ describe('(d) inline purchase-path links carry a 44px hit inset', () => {
     const s = src(f);
     const i = s.indexOf(href);
     const tag = s.slice(i, s.indexOf('>', i));
-    expect(tag).toMatch(/className="[^"]*\brelative\b[^"]*\bbefore:-inset-y-3\b/);
+    // -inset-y-4: a 16px line (Lookbook's body at text-sm) measured 40 with -y-3 in the stop4 probe
+    expect(tag).toMatch(/className="[^"]*\brelative\b[^"]*\bbefore:-inset-y-4\b/);
+  });
+});
+
+/**
+ * Found by the stop4 rendered probe (rule (d), W5), each measured in the browser:
+ *  - checkout checkbox rows (SMS opt-in, save my details): 750x38;
+ *  - a Link wrapping a Button (checkout empty state "متابعة التسوق" 120x17): an inline <a>
+ *    around a block button measures its line, not the button;
+ *  - retry buttons (section and product list): 98-104 x 28.
+ */
+describe('(d) rendered-probe findings stay fixed', () => {
+  it('checkout checkbox rows are 44px', () => {
+    const s = src('app/checkout/CheckoutClient.tsx');
+    expect(s).toMatch(/data-sms-marketing-optin\s*className="[^"]*\bmin-h-11\b/);
+    expect(s).toMatch(/<label className="[^"]*\bmin-h-11\b[^"]*cursor-pointer group">/);
+  });
+  it.each([
+    'app/checkout/CheckoutClient.tsx',
+    'app/checkout/error/ErrorClient.tsx',
+    'app/cart/CartClient.tsx',
+  ])('%s: no bare inline Link around a Button', f => {
+    expect(src(f)).not.toMatch(/<Link href=\{[^}]*\}>\s*<Button/);
+  });
+  it.each(['components/SectionRetryNotice.tsx', 'app/products/ProductsClient.tsx'])(
+    '%s: the retry button is 44px',
+    f => {
+      const s = src(f);
+      const i = s.indexOf("t('Retry', 'إعادة المحاولة')");
+      const tag = s.slice(s.lastIndexOf('<button', i), i);
+      expect(tag).toMatch(/\bmin-h-11\b/);
+    }
+  );
+});
+
+describe('(d) narrow words get width (stop4 probe: crumbs 33-41, See all 39-43 wide)', () => {
+  it('breadcrumb links grow sideways too', () => {
+    expect(src('components/Breadcrumbs.tsx')).toMatch(/before:-inset-x-2/);
+  });
+  it('See all links have a 44px minimum width', () => {
+    expect(src('templates/shared/SectionHeading.tsx')).toMatch(
+      /inline\s*\?\s*`inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center/
+    );
+    expect(src('builder/sections/SectionHeader.tsx')).toMatch(
+      /`inline-flex min-h-\[44px\] min-w-11 items-center justify-center rounded-sm/
+    );
   });
 });

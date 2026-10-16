@@ -1846,7 +1846,7 @@ export default function CheckoutClient() {
           <p role="alert" className="mt-2 text-muted-foreground">
             {unavailableLinesNotice}
           </p>
-          <Link href={storeUrl('/cart')}>
+          <Link href={storeUrl('/cart')} className="inline-block">
             <Button className="mt-6">{t('Go to cart', 'الذهاب إلى السلة')}</Button>
           </Link>
         </div>
@@ -1867,7 +1867,7 @@ export default function CheckoutClient() {
               '\u0623\u0636\u0641 \u0628\u0639\u0636 \u0627\u0644\u0645\u0646\u062a\u062c\u0627\u062a \u0642\u0628\u0644 \u0625\u062a\u0645\u0627\u0645 \u0627\u0644\u062f\u0641\u0639.'
             )}
           </p>
-          <Link href={continueShoppingHref}>
+          <Link href={continueShoppingHref} className="inline-block">
             <Button className="mt-6">
               {t('Continue shopping', translations['Continue Shopping'])}
             </Button>
@@ -2057,7 +2057,7 @@ export default function CheckoutClient() {
                         {showSmsOptIn && (
                           <label
                             data-sms-marketing-optin
-                            className="mt-2 flex cursor-pointer items-start gap-2"
+                            className="mt-2 flex min-h-11 cursor-pointer items-start gap-2"
                           >
                             <input
                               type="checkbox"
@@ -2270,7 +2270,7 @@ export default function CheckoutClient() {
                     {/* Save my info \u2014 device-local localStorage persistence.
                         NO payment data stored. Store-scoped key. */}
                     <div className="pt-3 border-t border-border">
-                      <label className="flex items-start gap-3 cursor-pointer group">
+                      <label className="flex min-h-11 items-start gap-3 cursor-pointer group">
                         <input
                           type="checkbox"
                           checked={saveInfo}

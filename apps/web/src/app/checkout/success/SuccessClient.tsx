@@ -346,7 +346,7 @@ function SuccessContent() {
             )}{' '}
             <Link
               href={storeUrl('/contact')}
-              className="relative text-primary underline underline-offset-4 before:absolute before:-inset-y-3 before:inset-x-0 before:content-['']"
+              className="relative text-primary underline underline-offset-4 before:absolute before:-inset-y-4 before:inset-x-0 before:content-['']"
             >
               {t(
                 'Contact support',

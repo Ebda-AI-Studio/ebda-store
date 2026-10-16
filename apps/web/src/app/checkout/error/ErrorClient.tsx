@@ -140,7 +140,7 @@ export default function ErrorClient() {
                 )}
               </Button>
 
-              <Link href={storeUrl('/cart')}>
+              <Link href={storeUrl('/cart')} className="inline-block">
                 <Button className="w-full" size="lg" variant="outline">
                   {t(
                     'Return to Cart',

@@ -749,7 +749,7 @@ export default function ProductsClient({
                     <button
                       type="button"
                       onClick={() => fetchProducts(page)}
-                      className="px-3 py-1 text-sm bg-destructive/20 text-destructive-ink rounded hover:bg-destructive/30"
+                      className="inline-flex min-h-11 items-center px-3 py-1 text-sm bg-destructive/20 text-destructive-ink rounded hover:bg-destructive/30"
                     >
                       {t('Retry', 'إعادة المحاولة')}
                     </button>

@@ -77,7 +77,7 @@ export function Breadcrumbs({
                   href={item.href}
                   onClick={item.onClick}
                   // P2-10: a 44px hit area, the trail keeps its 20px line.
-                  className="relative transition-colors before:absolute before:-inset-y-3 before:inset-x-0 before:content-[''] hover:text-primary"
+                  className="relative transition-colors before:absolute before:-inset-x-2 before:-inset-y-3 before:content-[''] hover:text-primary"
                 >
                   {item.label}
                 </Link>
