@@ -524,6 +524,7 @@ function SharedProductCarousel({
                       >
                         {/* Task 3 B4: OOS badge customization via productCardDefaults. */}
                         <OutOfStockRibbon
+                          flat={onLook}
                           inStock={orderable}
                           isRtl={isRtl}
                           oosLabel={resolvedOosLabel}

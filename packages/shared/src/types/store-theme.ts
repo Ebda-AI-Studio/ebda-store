@@ -367,9 +367,10 @@ export interface StoreTheme {
    * when the merchant hasn't opted into the full `oosLabel*` badge
    * customization system (`productCardDefaults`). Accepts a `token:<name>`
    * reference (see `COLOR_TOKENS`) or a raw hex/hsl string, resolved via
-   * `resolveColor`. Default (undefined): renders the platform's original
-   * hardcoded terracotta `hsl(15 60% 33%)` — zero visual change for every
-   * EXISTING store (incl. demo-shop + Demo Store), no backfill. Seeded to a
+   * `resolveColor`. Default (undefined): the store's own ink and paper tokens
+   * (`hsl(var(--foreground))` on `hsl(var(--background))`); the old hardcoded
+   * terracotta default was retired on 2026-10-16 (Ebda has no orange, Ruling B1-88).
+   * On a store with a look the label is a flat chip on the look radius, not a sash. Seeded to a
    * neutral slate (`#6b7280`, matching `DEFAULT_THEME.mutedForeground`'s hue)
    * at store-creation time for NEW stores only (`StoreService.create`) and
    * for demo clones — same seeding path as

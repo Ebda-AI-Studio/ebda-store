@@ -13,7 +13,7 @@ import { FactChips } from '../../components/commerce/FactChips';
 import { useLanguage, translations } from '../../contexts/LanguageContext';
 import { getProductPricing, getDiscountBadgeText } from '@/lib/product-pricing';
 import { useStore, useStoreUrl } from '../../contexts/StoreContext';
-import { resolveColor } from '@ebda/shared';
+import { getLook, resolveColor } from '@ebda/shared';
 import { cn, CartIcon } from '@ebda/ui';
 import { OosImageDim, OutOfStockRibbon } from '../../templates/shared/ProductCardCta';
 import { lookCardCta, lookCtaVisible, QUIET_CARD_CTA_CLS } from '../../templates/shared/look-card';
@@ -175,6 +175,7 @@ export function ProductListItem({
         )}
         {/* Task 3 B4: OOS badge on list view — sits inside the image container. */}
         <OutOfStockRibbon
+          flat={!!getLook(store.look)}
           inStock={orderable}
           isRtl={isRtl}
           oosLabel={resolvedOosLabel}

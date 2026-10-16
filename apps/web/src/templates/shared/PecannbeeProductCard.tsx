@@ -424,6 +424,7 @@ function PecannbeeProductCardImpl({
               flagged new OR was created in the last 14 days.
               Task 3 B4: OOS badge customization via productCardDefaults. */}
           <OutOfStockRibbon
+            flat={onLook}
             inStock={orderable}
             isRtl={isRtl}
             oosLabel={resolvedOosLabel}

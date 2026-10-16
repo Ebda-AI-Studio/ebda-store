@@ -43,7 +43,7 @@ import {
   resolveCardBadges,
 } from '../../../templates/shared/custom-badge';
 
-import { fromMinor, model3dSwatchColor } from '@ebda/shared';
+import { fromMinor, getLook, model3dSwatchColor } from '@ebda/shared';
 import { Model3dToggle, ProductModel3dPanel } from '../../../components/ProductModel3d';
 import { captureEvent } from '../../../components/PostHogProvider';
 import { DahabProductDetail } from '../../../templates/dahab/ProductDetail';
@@ -1016,6 +1016,7 @@ export default function ProductDetailClient({
                   />
                 )}
                 <OutOfStockRibbon
+                  flat={!!getLook(store.look)}
                   inStock={buyableNow}
                   isRtl={language === 'ar'}
                   oosLabel={productCardDefaults?.oosLabel}

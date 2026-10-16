@@ -230,6 +230,7 @@ function MinimalProductCard({
               regardless of pack philosophy (2026-05-16).
               Task 3 B4: OOS badge customization via productCardDefaults. */}
           <OutOfStockRibbon
+            flat={!!getLook(store.look)}
             inStock={orderable}
             isRtl={isRtl}
             oosLabel={resolvedOosLabel}

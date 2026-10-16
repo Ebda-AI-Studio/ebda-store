@@ -349,6 +349,8 @@ interface OutOfStockRibbonProps {
    */
   topStartReserved?: boolean;
   topEndReserved?: boolean;
+  /** A look store: a flat chip on the look radius, never the rotated sash (taste re-audit P1-2). */
+  flat?: boolean;
 }
 
 /**
@@ -392,6 +394,7 @@ export function OutOfStockRibbon({
   theme,
   topStartReserved = false,
   topEndReserved = false,
+  flat = false,
 }: OutOfStockRibbonProps) {
   if (inStock) return null;
 
@@ -479,20 +482,38 @@ export function OutOfStockRibbon({
   // sits at top-start (it used to paint UNDER the heart), or a pill on the
   // bottom edge when both top corners hold a button. The sale chip's pin reads
   // the same answer, so the two never share a corner either.
-  // theme.oosRibbonColor: value-preserving theme token (2026-07-12). Default
-  // (undefined) resolves to the exact original hardcoded terracotta so every
-  // EXISTING store renders byte-identical; new stores are seeded a neutral
-  // slate that harmonizes better with an arbitrary brand palette.
+  // theme.oosRibbonColor: the merchant's pick wins. Unset, the band reads the store's own ink
+  // and paper tokens (taste re-audit P1-2, Ahmad 2026-10-16: Ebda has no orange). It used to
+  // default to a fixed terracotta (hue 15, #873B22), which sat in no store's palette.
   const ribbonBg =
     (theme?.oosRibbonColor && theme && resolveColor(theme.oosRibbonColor, theme)) ??
-    'hsl(15 60% 33%)';
-  const label = isRtl ? 'نفدت الكمية' : 'Out of Stock';
+    'hsl(var(--foreground))';
+  const ribbonInk = theme?.oosRibbonColor ? '#ffffff' : 'hsl(var(--background))';
+  const label = isRtl ? 'نفدت الكمية' : 'Sold out';
+  // A look store: a flat chip on the look radius in the band's corner, never a rotated sash.
+  if (flat) {
+    const c = soldOutCorner({ topStartReserved, topEndReserved });
+    return (
+      <span
+        className={`pointer-events-none absolute z-10 rounded-[var(--radius)] px-2.5 py-1 text-xs font-semibold ${
+          c.v === 'bottom'
+            ? oosPlacementClass('bottom-start')
+            : `top-3 ${c.h === 'start' ? 'start-3' : 'end-3'}`
+        } ${className}`}
+        style={{ backgroundColor: ribbonBg, color: ribbonInk }}
+        data-oos-corner={c.v === 'bottom' ? 'bottom-start' : `top-${c.h}`}
+        aria-hidden
+      >
+        {label}
+      </span>
+    );
+  }
   const corner = soldOutCorner({ topStartReserved, topEndReserved });
   if (corner.v === 'bottom') {
     return (
       <span
-        className={`pointer-events-none absolute z-10 px-2 py-0.5 text-xs font-bold uppercase tracking-normal text-white shadow-sm ${oosPlacementClass('bottom-start')} ${className}`}
-        style={{ backgroundColor: ribbonBg }}
+        className={`pointer-events-none absolute z-10 px-2 py-0.5 text-xs font-bold uppercase tracking-normal shadow-sm ${oosPlacementClass('bottom-start')} ${className}`}
+        style={{ backgroundColor: ribbonBg, color: ribbonInk }}
         data-oos-corner="bottom-start"
         aria-hidden
       >
@@ -511,9 +532,10 @@ export function OutOfStockRibbon({
       aria-hidden
     >
       <span
-        className={`absolute top-[18px] ${corner.h === 'start' ? 'start-[-34px]' : 'end-[-34px]'} w-[160px] py-1 text-center text-xs font-bold uppercase tracking-wider text-white shadow-md`}
+        className={`absolute top-[18px] ${corner.h === 'start' ? 'start-[-34px]' : 'end-[-34px]'} w-[160px] py-1 text-center text-xs font-bold uppercase tracking-wider shadow-md`}
         style={{
           backgroundColor: ribbonBg,
+          color: ribbonInk,
           transform: `rotate(${rotation}deg)`,
         }}
       >
