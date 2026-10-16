@@ -128,6 +128,17 @@ All optional. Unset = the feature is a no-op with one info log; nothing breaks. 
 - `EBDA_POSTHOG_KEY` — optional public PostHog project key for the server-side `subscription_paid` event (the one funnel step the browser cannot see). Falls back to `NEXT_PUBLIC_POSTHOG_KEY` if set on the API service; host from `NEXT_PUBLIC_POSTHOG_HOST` (default `https://eu.i.posthog.com`).
 - Migration `20261014000000_user_acquisition` adds the nullable `users.acquisition` jsonb column (apply before deploying this API build).
 
+### Semantic search (Workers AI embeddings, search program P1)
+
+The API Worker has a Workers AI binding, `"ai": { "binding": "AI" }` in `apps/api/wrangler.jsonc` (no id, no secret; billed per input token to the account it deploys to, the Whisky account `69188202…`). It is used only for search embeddings: `@cf/baai/bge-m3`, 1024 dims, stored as `product_embeddings.embedding halfvec(1024)` (`apps/api/src/lib/search/embedding-provider.ts`; a unit test fails if `EMBED_DIMS` and the column disagree). Provider order: the `AI` binding, else the REST pair below, else **none** (search stays lexical). AI bindings always run remotely, also under `wrangler dev`; the workerd smoke boots a copy of the config without the binding.
+
+**Boot check (fail loud):** both shells (`worker.ts` per isolate, `index.ts` before `listen`) run `assertEmbeddingConfig`. It throws — every Worker request answers 500 until fixed or rolled back, the pre/post-deploy probes catch it — when `SEARCH_SEMANTIC_ENABLED=true` and no provider resolves, when only one of `CF_AI_ACCOUNT_ID` / `CF_AI_API_TOKEN` is set, or when `SEARCH_SEMANTIC_ENABLED` is anything but unset/`true`/`false`. Otherwise it logs `[search] embedding provider: workers-ai|rest|none; semantic search ON|OFF` once.
+
+- `SEARCH_SEMANTIC_ENABLED` (optional; unset or `false` = off) — `true` turns on the vector leg of product search. Needs a provider (above). Flipping it on in production is STOP-3 in the search plan (Ahmad).
+- `SEARCH_EMBED_STORE_DAILY_CAP` (optional, default `3000`) — product embeddings per store per Cairo day (the indexer, Task 11).
+- `SEARCH_VECTOR_MAX_DISTANCE` (optional, default `0.55`) — cosine-distance cut-off for vector hits; tuned by the eval harness (Task 13).
+- `CF_AI_ACCOUNT_ID` + `CF_AI_API_TOKEN` (optional, **local/dev REST fallback only**) — Workers AI REST (`POST https://api.cloudflare.com/client/v4/accounts/<id>/ai/run/@cf/baai/bge-m3`) for Node dev and scripts that have no binding. Set both or neither. **Never set on the Worker** (it uses the binding). The token is a secret (Workers AI read scope on the Whisky account); it is only ever sent as the `Authorization` header and never logged.
+
 ## Admin (Cloudflare Worker `ebda-admin`)
 
 - `NEXT_PUBLIC_API_URL` — the live API host, `https://api.force-ai.co` (Cloudflare custom domain in front of the Railway API service; the old raw `api-production-c058.up.railway.app` hostname 404s — corrected 2026-09-02)
