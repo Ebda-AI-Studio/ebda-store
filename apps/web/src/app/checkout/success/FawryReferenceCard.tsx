@@ -35,7 +35,7 @@ export function FawryReferenceCard({ code }: { code: string }) {
       <p className="mt-1 text-sm text-muted-foreground">
         {t(
           'Tell the cashier this code, or enter it in the Fawry app. Your order is confirmed as soon as Fawry receives the payment.',
-          'أعطِ الكاشير هذا الكود أو أدخله في تطبيق فوري. يتأكد طلبك فور استلام فوري للمبلغ.'
+          'ادّي الكاشير الكود ده أو اكتبه في تطبيق فوري. طلبك هيتأكد أول ما فوري يستلم المبلغ.'
         )}
       </p>
       <div className="mt-4 flex items-center justify-between gap-3 rounded-lg border bg-background px-4 py-3">

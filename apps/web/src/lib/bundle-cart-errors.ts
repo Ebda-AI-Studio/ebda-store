@@ -49,7 +49,7 @@ export function bundleCartErrorCopy(
         title: t('Bundle unavailable', 'الباقة غير متاحة'),
         message: t(
           'This bundle is no longer available for purchase.',
-          'هذه الباقة لم تعد متاحة للشراء.'
+          'الباقة دي مبقتش متاحة للشراء.'
         ),
       };
     case 'insufficient_stock':
@@ -57,13 +57,13 @@ export function bundleCartErrorCopy(
         title: t('Not enough stock', 'الكمية غير متوفرة'),
         message: t(
           'Not enough stock to add this quantity right now.',
-          'الكمية المطلوبة غير متوفرة حالياً.'
+          'الكمية المطلوبة مش متوفرة دلوقتي.'
         ),
       };
     default:
       return {
-        title: t('Unable to add to cart', 'تعذّرت الإضافة للسلة'),
-        message: t('Please try again.', 'يرجى المحاولة مرة أخرى.'),
+        title: t('Unable to add to cart', 'الإضافة للسلة ما نفعتش'),
+        message: t('Please try again.', 'جرّب تاني.'),
       };
   }
 }

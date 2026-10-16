@@ -188,7 +188,7 @@ export default function OrderDetailClient() {
       setError(
         t(
           'Unable to load order details. Please check your connection.',
-          'تعذر تحميل تفاصيل الطلب. يرجى التحقق من اتصالك بالإنترنت.'
+          'معرفناش نحمّل تفاصيل الطلب. اتأكد من اتصالك بالإنترنت.'
         )
       );
     } finally {
@@ -277,16 +277,10 @@ export default function OrderDetailClient() {
           </Link>
           <div>
             <h1 className="text-2xl font-bold text-foreground">
-              {t(
-                'Order Details',
-                '\u062a\u0641\u0627\u0635\u064a\u0644 \u0627\u0644\u0637\u0644\u0628'
-              )}
+              {t('Order Details', 'تفاصيل الطلب')}
             </h1>
             <p className="mt-1 text-muted-foreground">
-              {t(
-                'Loading order information...',
-                '\u062c\u0627\u0631\u064a \u062a\u062d\u0645\u064a\u0644 \u0645\u0639\u0644\u0648\u0645\u0627\u062a \u0627\u0644\u0637\u0644\u0628...'
-              )}
+              {t('Loading order information...', 'بنحمّل معلومات الطلب...')}
             </p>
           </div>
         </div>
@@ -316,10 +310,7 @@ export default function OrderDetailClient() {
           </Link>
           <div>
             <h1 className="text-2xl font-bold text-foreground">
-              {t(
-                'Order Details',
-                '\u062a\u0641\u0627\u0635\u064a\u0644 \u0627\u0644\u0637\u0644\u0628'
-              )}
+              {t('Order Details', 'تفاصيل الطلب')}
             </h1>
           </div>
         </div>
@@ -343,10 +334,7 @@ export default function OrderDetailClient() {
               onClick={() => fetchOrder()}
               className="px-3 py-1 text-sm bg-destructive/20 text-destructive-ink rounded hover:bg-destructive/30 transition-colors"
             >
-              {t(
-                'Retry',
-                '\u0625\u0639\u0627\u062f\u0629 \u0627\u0644\u0645\u062d\u0627\u0648\u0644\u0629'
-              )}
+              {t('Retry', 'إعادة المحاولة')}
             </button>
           </div>
         </div>
@@ -387,11 +375,10 @@ export default function OrderDetailClient() {
           </Link>
           <div>
             <h1 className="text-2xl font-bold text-foreground">
-              {t('Order', '\u0637\u0644\u0628')} #{order.orderNumber}
+              {t('Order', 'طلب')} #{order.orderNumber}
             </h1>
             <p className="mt-1 text-muted-foreground">
-              {t('Placed on', '\u062a\u0645 \u0627\u0644\u0637\u0644\u0628 \u0641\u064a')}{' '}
-              {formatDateTime(order.createdAt)}
+              {t('Placed on', 'تم الطلب في')} {formatDateTime(order.createdAt)}
             </p>
           </div>
         </div>
@@ -417,17 +404,13 @@ export default function OrderDetailClient() {
           <div className="flex flex-wrap gap-6 text-sm">
             {order.shippedAt && (
               <div>
-                <span className="text-muted-foreground">
-                  {t('Shipped', '\u062a\u0645 \u0627\u0644\u0634\u062d\u0646')}:
-                </span>{' '}
+                <span className="text-muted-foreground">{t('Shipped', 'تم الشحن')}:</span>{' '}
                 <span className="font-medium text-foreground">{formatDate(order.shippedAt)}</span>
               </div>
             )}
             {order.deliveredAt && (
               <div>
-                <span className="text-muted-foreground">
-                  {t('Delivered', '\u062a\u0645 \u0627\u0644\u062a\u0648\u0635\u064a\u0644')}:
-                </span>{' '}
+                <span className="text-muted-foreground">{t('Delivered', 'تم التوصيل')}:</span>{' '}
                 <span className="font-medium text-foreground">{formatDate(order.deliveredAt)}</span>
               </div>
             )}
@@ -439,8 +422,7 @@ export default function OrderDetailClient() {
       <div className="rounded-xl border bg-card shadow-sm overflow-hidden">
         <div className="border-b bg-muted px-4 py-3">
           <h2 className="font-semibold text-foreground">
-            {t('Order Items', '\u0627\u0644\u0645\u0646\u062a\u062c\u0627\u062a')} (
-            {displayRows.length})
+            {t('Order Items', 'المنتجات')} ({displayRows.length})
           </h2>
         </div>
 
@@ -449,18 +431,10 @@ export default function OrderDetailClient() {
           <table className="w-full">
             <thead>
               <tr className="border-b text-left text-sm text-muted-foreground">
-                <th className="px-4 py-3 font-medium">
-                  {t('Product', '\u0627\u0644\u0645\u0646\u062a\u062c')}
-                </th>
-                <th className="px-4 py-3 font-medium text-center">
-                  {t('Qty', '\u0627\u0644\u0643\u0645\u064a\u0629')}
-                </th>
-                <th className="px-4 py-3 font-medium text-right">
-                  {t('Price', '\u0627\u0644\u0633\u0639\u0631')}
-                </th>
-                <th className="px-4 py-3 font-medium text-right">
-                  {t('Total', '\u0627\u0644\u0625\u062c\u0645\u0627\u0644\u064a')}
-                </th>
+                <th className="px-4 py-3 font-medium">{t('Product', 'المنتج')}</th>
+                <th className="px-4 py-3 font-medium text-center">{t('Qty', 'الكمية')}</th>
+                <th className="px-4 py-3 font-medium text-right">{t('Price', 'السعر')}</th>
+                <th className="px-4 py-3 font-medium text-right">{t('Total', 'الإجمالي')}</th>
               </tr>
             </thead>
             <tbody className="divide-y">
@@ -516,7 +490,7 @@ export default function OrderDetailClient() {
                             {name}
                             {row.kind === 'bundle' && (
                               <span className="ms-2 inline-flex items-center rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
-                                {t('Bundle', '\u0628\u0627\u0642\u0629')}
+                                {t('Bundle', 'باقة')}
                               </span>
                             )}
                           </span>
@@ -534,7 +508,7 @@ export default function OrderDetailClient() {
                     </td>
                     <td className="px-4 py-4 text-center text-foreground">{quantity}</td>
                     <td className="px-4 py-4 text-right text-foreground">
-                      {row.kind === 'bundle' ? '\u2014' : formatPrice(row.item.price)}
+                      {row.kind === 'bundle' ? '—' : formatPrice(row.item.price)}
                     </td>
                     <td className="px-4 py-4 text-right font-medium text-foreground">
                       {formatPrice(total)}
@@ -593,7 +567,7 @@ export default function OrderDetailClient() {
                     {name}
                     {row.kind === 'bundle' && (
                       <span className="ms-2 inline-flex items-center rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
-                        {t('Bundle', '\u0628\u0627\u0642\u0629')}
+                        {t('Bundle', 'باقة')}
                       </span>
                     )}
                   </p>
@@ -605,7 +579,7 @@ export default function OrderDetailClient() {
                   {row.kind === 'item' && <CartLineNote note={row.item.personalisation} />}
                   <p className="text-sm text-muted-foreground">
                     {row.kind === 'bundle'
-                      ? `${t('Qty', '\u0627\u0644\u0643\u0645\u064a\u0629')}: ${quantity}`
+                      ? `${t('Qty', 'الكمية')}: ${quantity}`
                       : `${formatPrice(row.item.price)} x ${quantity}`}
                   </p>
                 </div>
@@ -621,30 +595,23 @@ export default function OrderDetailClient() {
         {/* Order Summary */}
         <div className="rounded-xl border bg-card shadow-sm overflow-hidden">
           <div className="border-b bg-muted px-4 py-3">
-            <h2 className="font-semibold text-foreground">
-              {t('Order Summary', '\u0645\u0644\u062e\u0635 \u0627\u0644\u0637\u0644\u0628')}
-            </h2>
+            <h2 className="font-semibold text-foreground">{t('Order Summary', 'ملخص الطلب')}</h2>
           </div>
           <div className="p-4 space-y-3">
             <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">
-                {t(
-                  'Subtotal',
-                  '\u0627\u0644\u0645\u062c\u0645\u0648\u0639 \u0627\u0644\u0641\u0631\u0639\u064a'
-                )}
-              </span>
+              <span className="text-muted-foreground">{t('Subtotal', 'المجموع الفرعي')}</span>
               <span className="text-foreground">{formatPrice(order.subtotal)}</span>
             </div>
             {(() => {
-              // Break the total discount into its levers \u2014 coupon, automatic
-              // promotion, loyalty-points redemption, and any remainder \u2014
+              // Break the total discount into its levers — coupon, automatic
+              // promotion, loyalty-points redemption, and any remainder —
               // instead of an aggregate "Discount" line alongside a
               // coupon-only sub-line, which used to double-count the coupon
               // portion visually. couponDiscount + promotionDiscount +
               // loyaltyDiscount + "other" always reconciles to `discount`
               // (order.service.ts). Loyalty split out (#197) to match the
               // same "Loyalty points" label checkout's OrderSummary.tsx uses
-              // \u2014 UAT step 11 requires the order detail to show it distinctly,
+              // — UAT step 11 requires the order detail to show it distinctly,
               // not folded into a generic "Discount" line.
               const couponPortion = order.couponDiscount ?? 0;
               const promotionPortion = order.promotionDiscount ?? 0;
@@ -663,7 +630,7 @@ export default function OrderDetailClient() {
                   {couponPortion > 0 && (
                     <div className="flex justify-between text-sm">
                       <span className="text-muted-foreground">
-                        {t('Coupon', '\u0643\u0648\u0628\u0648\u0646')}
+                        {t('Coupon', 'كوبون')}
                         {order.couponCode ? ` (${order.couponCode})` : ''}
                       </span>
                       <span className="text-success-ink">
@@ -674,7 +641,7 @@ export default function OrderDetailClient() {
                   {promotionPortion > 0 && (
                     <div className="flex justify-between text-sm">
                       <span className="text-muted-foreground">
-                        {t('Promotion', '\u0639\u0631\u0636 \u062a\u0631\u0648\u064a\u062c\u064a')}
+                        {t('Promotion', 'عرض ترويجي')}
                         {promotionName ? ` (${promotionName})` : ''}
                       </span>
                       <span className="text-success-ink">
@@ -685,10 +652,7 @@ export default function OrderDetailClient() {
                   {loyaltyPortion > 0 && (
                     <div className="flex justify-between text-sm">
                       <span className="text-muted-foreground">
-                        {t(
-                          'Loyalty points',
-                          '\u0646\u0642\u0627\u0637 \u0627\u0644\u0648\u0644\u0627\u0621'
-                        )}
+                        {t('Loyalty points', 'نقاط الولاء')}
                         {order.loyaltyPointsRedeemed
                           ? ` (${order.loyaltyPointsRedeemed.toLocaleString(
                               intlLocale(language, storeNumerals(store?.theme))
@@ -702,9 +666,7 @@ export default function OrderDetailClient() {
                   )}
                   {otherDiscount > 0 && (
                     <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">
-                        {t('Discount', '\u0627\u0644\u062e\u0635\u0645')}
-                      </span>
+                      <span className="text-muted-foreground">{t('Discount', 'الخصم')}</span>
                       <span className="text-success-ink">
                         <SignedAmount sign={MINUS} value={formatPrice(otherDiscount)} />
                       </span>
@@ -716,9 +678,7 @@ export default function OrderDetailClient() {
             {/* subtotal → discounts → shipping → COD fee → VAT → total (ruling MONEYB-2). */}
             {order.shipping > 0 && (
               <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">
-                  {t('Shipping', '\u0627\u0644\u0634\u062d\u0646')}
-                </span>
+                <span className="text-muted-foreground">{t('Shipping', 'الشحن')}</span>
                 <span className="text-foreground">{formatPrice(order.shipping)}</span>
               </div>
             )}
@@ -735,16 +695,12 @@ export default function OrderDetailClient() {
                 (orderTaxPlacement, issue 2210). */}
             {(taxPlacement.taxRow ?? 0) > 0 && (
               <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">
-                  {t('Tax', '\u0627\u0644\u0636\u0631\u064a\u0628\u0629')}
-                </span>
+                <span className="text-muted-foreground">{t('Tax', 'الضريبة')}</span>
                 <span className="text-foreground">{formatPrice(taxPlacement.taxRow ?? 0)}</span>
               </div>
             )}
             <div className="border-t pt-3 flex justify-between">
-              <span className="font-semibold text-foreground">
-                {t('Total', '\u0627\u0644\u0625\u062c\u0645\u0627\u0644\u064a')}
-              </span>
+              <span className="font-semibold text-foreground">{t('Total', 'الإجمالي')}</span>
               <span className="font-semibold text-foreground">{formatPrice(order.total)}</span>
             </div>
             {taxPlacement.includedTaxCaption !== null && (
@@ -780,10 +736,7 @@ export default function OrderDetailClient() {
         <div className="rounded-xl border bg-card shadow-sm overflow-hidden">
           <div className="border-b bg-muted px-4 py-3">
             <h2 className="font-semibold text-foreground">
-              {t(
-                'Shipping Address',
-                '\u0639\u0646\u0648\u0627\u0646 \u0627\u0644\u0634\u062d\u0646'
-              )}
+              {t('Shipping Address', 'عنوان الشحن')}
             </h2>
           </div>
           <div className="p-4 text-sm text-foreground space-y-1">
@@ -800,7 +753,7 @@ export default function OrderDetailClient() {
             )}
             {shippingAddr.phone && (
               <p className="pt-2 text-muted-foreground">
-                {t('Phone', '\u0627\u0644\u0647\u0627\u062a\u0641')}: {shippingAddr.phone}
+                {t('Phone', 'الهاتف')}: {shippingAddr.phone}
               </p>
             )}
           </div>
@@ -812,10 +765,7 @@ export default function OrderDetailClient() {
         <div className="rounded-xl border bg-card shadow-sm overflow-hidden">
           <div className="border-b bg-muted px-4 py-3">
             <h2 className="font-semibold text-foreground">
-              {t(
-                'Payment Information',
-                '\u0645\u0639\u0644\u0648\u0645\u0627\u062a \u0627\u0644\u062f\u0641\u0639'
-              )}
+              {t('Payment Information', 'معلومات الدفع')}
             </h2>
           </div>
           <div className="p-4">
@@ -849,26 +799,19 @@ export default function OrderDetailClient() {
                     </div>
                     {payment.transactionId && (
                       <p className="text-muted-foreground">
-                        {t(
-                          'Transaction ID',
-                          '\u0631\u0642\u0645 \u0627\u0644\u0645\u0639\u0627\u0645\u0644\u0629'
-                        )}
-                        : <span className="font-mono text-foreground">{payment.transactionId}</span>
+                        {t('Transaction ID', 'رقم المعاملة')}:{' '}
+                        <span className="font-mono text-foreground">{payment.transactionId}</span>
                       </p>
                     )}
                     {payment.invoiceId && (
                       <p className="text-muted-foreground">
-                        {t(
-                          'Invoice ID',
-                          '\u0631\u0642\u0645 \u0627\u0644\u0641\u0627\u062a\u0648\u0631\u0629'
-                        )}
-                        : <span className="font-mono text-foreground">{payment.invoiceId}</span>
+                        {t('Invoice ID', 'رقم الفاتورة')}:{' '}
+                        <span className="font-mono text-foreground">{payment.invoiceId}</span>
                       </p>
                     )}
                     {payment.paidAt && (
                       <p className="text-muted-foreground">
-                        {t('Paid on', '\u062a\u0645 \u0627\u0644\u062f\u0641\u0639 \u0641\u064a')}{' '}
-                        {formatDateTime(payment.paidAt)}
+                        {t('Paid on', 'تم الدفع في')} {formatDateTime(payment.paidAt)}
                       </p>
                     )}
                   </div>
@@ -884,15 +827,13 @@ export default function OrderDetailClient() {
       {(order.notes || order.customerNotes) && (
         <div className="rounded-xl border bg-card shadow-sm overflow-hidden">
           <div className="border-b bg-muted px-4 py-3">
-            <h2 className="font-semibold text-foreground">
-              {t('Notes', '\u0645\u0644\u0627\u062d\u0638\u0627\u062a')}
-            </h2>
+            <h2 className="font-semibold text-foreground">{t('Notes', 'ملاحظات')}</h2>
           </div>
           <div className="p-4 text-sm text-foreground space-y-3">
             {order.customerNotes && (
               <div>
                 <p className="text-xs font-medium text-muted-foreground uppercase mb-1">
-                  {t('Your Notes', '\u0645\u0644\u0627\u062d\u0638\u0627\u062a\u0643')}
+                  {t('Your Notes', 'ملاحظاتك')}
                 </p>
                 <p>{order.customerNotes}</p>
               </div>
@@ -900,10 +841,7 @@ export default function OrderDetailClient() {
             {order.notes && (
               <div>
                 <p className="text-xs font-medium text-muted-foreground uppercase mb-1">
-                  {t(
-                    'Store Notes',
-                    '\u0645\u0644\u0627\u062d\u0638\u0627\u062a \u0627\u0644\u0645\u062a\u062c\u0631'
-                  )}
+                  {t('Store Notes', 'ملاحظات المتجر')}
                 </p>
                 <p>{order.notes}</p>
               </div>
@@ -918,10 +856,7 @@ export default function OrderDetailClient() {
           href={storeUrl('/account/orders')}
           className="rounded-lg border bg-card px-4 py-2 text-sm font-medium text-foreground hover:bg-muted transition-colors"
         >
-          {t(
-            'Back to Orders',
-            '\u0627\u0644\u0639\u0648\u062f\u0629 \u0644\u0644\u0637\u0644\u0628\u0627\u062a'
-          )}
+          {t('Back to Orders', 'العودة للطلبات')}
         </Link>
 
         {/* Track Order button -- enabled only when shipped/delivered AND tracking number exists */}
@@ -964,15 +899,12 @@ export default function OrderDetailClient() {
                     d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"
                   />
                 </svg>
-                {t('Track Order', '\u062a\u062a\u0628\u0639 \u0627\u0644\u0637\u0644\u0628')}
+                {t('Track Order', 'تتبع الطلب')}
               </button>
               {/* Tooltip for disabled state */}
               {!canTrack && (
                 <span className="pointer-events-none absolute -top-9 left-1/2 -translate-x-1/2 whitespace-nowrap rounded bg-foreground px-2 py-1 text-xs text-background opacity-0 transition-opacity group-hover:opacity-100 hidden sm:block">
-                  {t(
-                    'Available when shipped',
-                    '\u0645\u062a\u0627\u062d \u0639\u0646\u062f \u0627\u0644\u0634\u062d\u0646'
-                  )}
+                  {t('Available when shipped', 'متاح عند الشحن')}
                 </span>
               )}
             </div>
@@ -1004,7 +936,7 @@ export default function OrderDetailClient() {
                   alert(
                     t(
                       'Could not load invoice. Please log in again and retry.',
-                      '\u062a\u0639\u0630\u0631 \u062a\u062d\u0645\u064a\u0644 \u0627\u0644\u0641\u0627\u062a\u0648\u0631\u0629. \u0633\u062c\u0651\u0644 \u0627\u0644\u062f\u062e\u0648\u0644 \u0645\u0631\u0629 \u0623\u062e\u0631\u0649 \u062b\u0645 \u062d\u0627\u0648\u0644 \u0645\u062c\u062f\u062f\u0627\u064b.'
+                      'معرفناش نحمّل الفاتورة. سجّل دخول تاني وجرّب كمان مرة.'
                     )
                   );
                   return;
@@ -1018,7 +950,7 @@ export default function OrderDetailClient() {
                 alert(
                   t(
                     'Could not load invoice. Please try again.',
-                    '\u062a\u0639\u0630\u0631 \u062a\u062d\u0645\u064a\u0644 \u0627\u0644\u0641\u0627\u062a\u0648\u0631\u0629. \u062d\u0627\u0648\u0644 \u0645\u0631\u0629 \u0623\u062e\u0631\u0649.'
+                    'معرفناش نحمّل الفاتورة. جرّب تاني.'
                   )
                 );
               }
@@ -1033,10 +965,7 @@ export default function OrderDetailClient() {
                 d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
               />
             </svg>
-            {t(
-              'Download Invoice',
-              '\u062a\u062d\u0645\u064a\u0644 \u0627\u0644\u0641\u0627\u062a\u0648\u0631\u0629'
-            )}
+            {t('Download Invoice', 'تحميل الفاتورة')}
           </button>
         )}
       </div>
@@ -1072,7 +1001,7 @@ export default function OrderDetailClient() {
             )}
             {!timelineLoading && timelineRows.length === 0 && (
               <p className="py-4 text-center text-sm text-muted-foreground">
-                {t('No timeline events yet', 'لا توجد أحداث حتى الآن')}
+                {t('No timeline events yet', 'مفيش أحداث لسه')}
               </p>
             )}
             {!timelineLoading && timelineRows.length > 0 && (
@@ -1142,10 +1071,7 @@ export default function OrderDetailClient() {
         open={showTrackingModal && !!order.trackingNumber}
         onClose={() => setShowTrackingModal(false)}
         side="center"
-        title={t(
-          'Tracking Information',
-          '\u0645\u0639\u0644\u0648\u0645\u0627\u062a \u0627\u0644\u062a\u062a\u0628\u0639'
-        )}
+        title={t('Tracking Information', 'معلومات التتبع')}
         closeLabel={t('Close', 'إغلاق')}
         className="max-w-sm bg-card text-foreground"
         headerClassName="!pt-4"
@@ -1155,7 +1081,7 @@ export default function OrderDetailClient() {
         <p className="text-sm text-muted-foreground mb-4">
           {t(
             "Use the tracking number below on your carrier's website to check your shipment status.",
-            '\u0627\u0633\u062a\u062e\u062f\u0645 \u0631\u0642\u0645 \u0627\u0644\u062a\u062a\u0628\u0639 \u0623\u062f\u0646\u0627\u0647 \u0639\u0644\u0649 \u0645\u0648\u0642\u0639 \u0634\u0631\u0643\u0629 \u0627\u0644\u0634\u062d\u0646 \u0644\u0644\u062a\u062d\u0642\u0642 \u0645\u0646 \u062d\u0627\u0644\u0629 \u0634\u062d\u0646\u062a\u0643.'
+            'استخدم رقم التتبع اللي تحت على موقع شركة الشحن عشان تتابع شحنتك.'
           )}
         </p>
 
@@ -1184,7 +1110,7 @@ export default function OrderDetailClient() {
           onClick={() => setShowTrackingModal(false)}
           className="mt-4 w-full rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
         >
-          {t('Close', '\u0625\u063a\u0644\u0627\u0642')}
+          {t('Close', 'إغلاق')}
         </button>
       </Sheet>
     </div>

@@ -423,7 +423,7 @@ function ElegantProductCard({
                 addToCart: isRtl ? 'أضف للسلة' : 'Add to Bag',
                 addedToCart: isRtl ? 'تمت الإضافة' : 'Added',
                 outOfStock: isRtl ? 'نفذت الكمية' : 'Sold Out',
-                adding: isRtl ? 'جاري...' : 'Adding...',
+                adding: isRtl ? 'استنى...' : 'Adding...',
                 view: isRtl ? 'عرض' : 'View',
               }}
               ctaShape={resolvedCtaShape}

@@ -132,7 +132,7 @@ describe('storefront wa.me buttons', () => {
     expect(hrefOf(cod)).toContain('الإجمالي: 1,250.50 ج.م');
     expect(hrefOf(cod)).toContain('مرحباً متجر النيل');
     const q = html(<WaMeOrderQuestionButton orderNumber="EB-9" />);
-    expect(q).toContain('اسأل عن هذا الطلب');
+    expect(q).toContain('اسأل عن الطلب ده');
     expect(hrefOf(q)).toContain('عندي سؤال بخصوص طلبي رقم #EB-9');
   });
 

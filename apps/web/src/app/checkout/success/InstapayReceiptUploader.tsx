@@ -322,7 +322,7 @@ export function InstapayReceiptUploader({
             )}
           </p>
           {uploading && (
-            <p className="mt-1 text-xs text-muted-foreground">{t('Uploading…', 'جاري الرفع…')}</p>
+            <p className="mt-1 text-xs text-muted-foreground">{t('Uploading…', 'بنرفع…')}</p>
           )}
         </>
       )}

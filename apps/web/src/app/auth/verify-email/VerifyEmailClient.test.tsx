@@ -83,7 +83,7 @@ describe('VerifyEmailClient', () => {
 
     await mount();
 
-    expect(screen.getByText('محاولات كثيرة جدًا')).toBeTruthy();
+    expect(screen.getByText('محاولات كتير')).toBeTruthy();
     expect(screen.getByRole('button', { name: 'حاول مرة أخرى' })).toBeTruthy();
   });
 

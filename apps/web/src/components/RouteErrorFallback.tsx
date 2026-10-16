@@ -213,18 +213,18 @@ export function RouteErrorFallback({ error, reset }: RouteErrorFallbackProps) {
       <div>
         <h2 className="mb-2 text-xl font-semibold text-foreground">
           {isTemporarilyUnavailable
-            ? t('We’re a little busy right now', 'الموقع مزدحم قليلاً الآن')
+            ? t('We’re a little busy right now', 'الموقع زحمة شوية دلوقتي')
             : t('Something went wrong', 'حدث خطأ ما')}
         </h2>
         <p className="mb-6 max-w-md text-sm text-muted-foreground">
           {isTemporarilyUnavailable
             ? t(
                 'This store is getting more requests than usual, so it could not load. Please try again in a moment.',
-                'يتلقى المتجر عددًا من الطلبات أكثر من المعتاد، لذلك تعذّر تحميله. يرجى المحاولة مرة أخرى بعد قليل.'
+                'المتجر جاله طلبات أكتر من العادي، فمعرفناش نحمّله. جرّب تاني بعد شوية.'
               )
             : t(
                 'We hit a snag loading this page. Please try again or head back home.',
-                'واجهنا مشكلة في تحميل هذه الصفحة. يرجى المحاولة مرة أخرى أو العودة للرئيسية.'
+                'حصلت مشكلة واحنا بنحمّل الصفحة دي. جرّب تاني أو ارجع للرئيسية.'
               )}
         </p>
       </div>

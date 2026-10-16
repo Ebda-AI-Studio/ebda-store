@@ -457,7 +457,7 @@ export function DahabProductDetail(p: DahabProductDetailProps) {
                 disabled={p.addDisabled || p.isAdding}
                 className={cx(DAHAB_BTN_PRIMARY, 'flex-1')}
               >
-                {p.isAdding ? t('Adding…', 'جاري الإضافة…') : p.addLabel}
+                {p.isAdding ? t('Adding…', 'بنضيف…') : p.addLabel}
               </button>
               <button
                 type="button"
@@ -573,7 +573,7 @@ export function DahabProductDetail(p: DahabProductDetailProps) {
             disabled={p.addDisabled || p.isAdding}
             className={cx(DAHAB_BTN_PRIMARY, 'px-6')}
           >
-            {p.isAdding ? t('Adding…', 'جاري الإضافة…') : p.addLabel}
+            {p.isAdding ? t('Adding…', 'بنضيف…') : p.addLabel}
           </button>
         </div>
       </div>

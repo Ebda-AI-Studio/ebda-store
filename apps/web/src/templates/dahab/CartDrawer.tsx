@@ -99,7 +99,7 @@ export function DahabCartDrawer({
           <p className="text-sm text-muted-foreground">
             {t(
               'Rings, chains, bracelets and earrings are waiting.',
-              'الخواتم والسلاسل والأساور والحلقان في انتظارك.'
+              'الخواتم والسلاسل والأساور والحلقان مستنياك.'
             )}
           </p>
           <Link href={`${urlPrefix}/products`} className={DAHAB_BTN_SECONDARY} onClick={onClose}>
@@ -139,7 +139,7 @@ export function DahabCartDrawer({
                   <CartLineNote note={item.note} />
                   {item.unavailable && (
                     <p className="mt-1 text-xs text-destructive-ink">
-                      {t('No longer available', 'لم تعد متاحة')}
+                      {t('No longer available', 'مبقتش متاحة')}
                     </p>
                   )}
                   <div className="mt-auto flex items-center justify-between pt-3">

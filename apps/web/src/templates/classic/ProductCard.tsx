@@ -290,7 +290,7 @@ function ClassicProductCard({
                 addToCart: isRtl ? 'أضف للسلة' : 'Add to Bag',
                 addedToCart: isRtl ? 'تمت الإضافة' : 'Added',
                 outOfStock: isRtl ? 'نفذت الكمية' : 'Sold Out',
-                adding: isRtl ? 'جاري الإضافة...' : 'Adding...',
+                adding: isRtl ? 'بنضيف...' : 'Adding...',
                 view: isRtl ? 'عرض' : 'View',
               }}
               ctaShape={resolvedCtaShape}

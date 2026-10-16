@@ -65,7 +65,7 @@ export default function ProfileClient() {
         await refreshUser();
         success(
           t('Profile updated', 'تم تحديث الملف الشخصي'),
-          t('Your profile has been saved successfully.', 'تم حفظ ملفك الشخصي.')
+          t('Your profile has been saved successfully.', 'ملفك الشخصي اتحفظ.')
         );
       } else {
         toastError(
@@ -76,7 +76,7 @@ export default function ProfileClient() {
     } catch {
       toastError(
         t('Update failed', 'تعذّر التحديث'),
-        t('An unexpected error occurred.', 'حدث خطأ غير متوقع.')
+        t('An unexpected error occurred.', 'حصل خطأ مش متوقع.')
       );
     } finally {
       setIsSaving(false);
@@ -108,7 +108,7 @@ export default function ProfileClient() {
       if (result.success) {
         success(
           t('Password changed', 'تم تغيير كلمة المرور'),
-          t('Your password has been updated.', 'تم تحديث كلمة المرور.')
+          t('Your password has been updated.', 'كلمة المرور اتحدّثت.')
         );
         setPasswords({ currentPassword: '', newPassword: '', confirmPassword: '' });
       } else {
@@ -117,7 +117,7 @@ export default function ProfileClient() {
         );
       }
     } catch {
-      setPasswordError(t('An unexpected error occurred.', 'حدث خطأ غير متوقع.'));
+      setPasswordError(t('An unexpected error occurred.', 'حصل خطأ مش متوقع.'));
     } finally {
       setIsChangingPassword(false);
     }
@@ -126,9 +126,7 @@ export default function ProfileClient() {
   if (isLoading || authLoading) {
     return (
       <div className="space-y-6">
-        <h1 className="text-2xl font-bold text-foreground">
-          {t('My Profile', '\u0645\u0644\u0641\u064a \u0627\u0644\u0634\u062e\u0635\u064a')}
-        </h1>
+        <h1 className="text-2xl font-bold text-foreground">{t('My Profile', 'ملفي الشخصي')}</h1>
         <div className="flex justify-center py-12">
           <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
         </div>
@@ -139,14 +137,9 @@ export default function ProfileClient() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-foreground">
-          {t('My Profile', '\u0645\u0644\u0641\u064a \u0627\u0644\u0634\u062e\u0635\u064a')}
-        </h1>
+        <h1 className="text-2xl font-bold text-foreground">{t('My Profile', 'ملفي الشخصي')}</h1>
         <p className="mt-1 text-muted-foreground">
-          {t(
-            'Manage your personal information',
-            '\u0625\u062f\u0627\u0631\u0629 \u0645\u0639\u0644\u0648\u0645\u0627\u062a\u0643 \u0627\u0644\u0634\u062e\u0635\u064a\u0629'
-          )}
+          {t('Manage your personal information', 'إدارة معلوماتك الشخصية')}
         </p>
       </div>
 
@@ -154,28 +147,19 @@ export default function ProfileClient() {
         {/* Personal Information */}
         <div className="rounded-xl border bg-card p-6 shadow-sm">
           <h2 className="text-lg font-semibold text-foreground mb-6">
-            {t(
-              'Personal Information',
-              '\u0627\u0644\u0645\u0639\u0644\u0648\u0645\u0627\u062a \u0627\u0644\u0634\u062e\u0635\u064a\u0629'
-            )}
+            {t('Personal Information', 'المعلومات الشخصية')}
           </h2>
 
           <form onSubmit={handleSaveProfile} className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <Input
-                label={t(
-                  'First Name',
-                  '\u0627\u0644\u0627\u0633\u0645 \u0627\u0644\u0623\u0648\u0644'
-                )}
+                label={t('First Name', 'الاسم الأول')}
                 value={profile.firstName}
                 onChange={e => setProfile({ ...profile, firstName: e.target.value })}
                 required
               />
               <Input
-                label={t(
-                  'Last Name',
-                  '\u0627\u0644\u0627\u0633\u0645 \u0627\u0644\u0623\u062e\u064a\u0631'
-                )}
+                label={t('Last Name', 'الاسم الأخير')}
                 value={profile.lastName}
                 onChange={e => setProfile({ ...profile, lastName: e.target.value })}
                 required
@@ -183,10 +167,7 @@ export default function ProfileClient() {
             </div>
 
             <Input
-              label={t(
-                'Email',
-                '\u0627\u0644\u0628\u0631\u064a\u062f \u0627\u0644\u0625\u0644\u0643\u062a\u0631\u0648\u0646\u064a'
-              )}
+              label={t('Email', 'البريد الإلكتروني')}
               type="email"
               value={profile.email}
               disabled
@@ -194,7 +175,7 @@ export default function ProfileClient() {
             />
 
             <Input
-              label={t('Phone', '\u0627\u0644\u0647\u0627\u062a\u0641')}
+              label={t('Phone', 'الهاتف')}
               type="tel"
               value={profile.phone}
               onChange={e => setProfile({ ...profile, phone: e.target.value })}
@@ -202,10 +183,7 @@ export default function ProfileClient() {
             />
 
             <Button type="submit" isLoading={isSaving}>
-              {t(
-                'Save Changes',
-                '\u062d\u0641\u0638 \u0627\u0644\u062a\u063a\u064a\u064a\u0631\u0627\u062a'
-              )}
+              {t('Save Changes', 'حفظ التغييرات')}
             </Button>
           </form>
         </div>
@@ -213,10 +191,7 @@ export default function ProfileClient() {
         {/* Change Password */}
         <div className="rounded-xl border bg-card p-6 shadow-sm">
           <h2 className="text-lg font-semibold text-foreground mb-6">
-            {t(
-              'Change Password',
-              '\u062a\u063a\u064a\u064a\u0631 \u0643\u0644\u0645\u0629 \u0627\u0644\u0645\u0631\u0648\u0631'
-            )}
+            {t('Change Password', 'تغيير كلمة المرور')}
           </h2>
 
           {passwordError && (
@@ -227,30 +202,21 @@ export default function ProfileClient() {
 
           <form onSubmit={handleChangePassword} className="space-y-4">
             <Input
-              label={t(
-                'Current Password',
-                '\u0643\u0644\u0645\u0629 \u0627\u0644\u0645\u0631\u0648\u0631 \u0627\u0644\u062d\u0627\u0644\u064a\u0629'
-              )}
+              label={t('Current Password', 'كلمة المرور الحالية')}
               type="password"
               value={passwords.currentPassword}
               onChange={e => setPasswords({ ...passwords, currentPassword: e.target.value })}
               required
             />
             <Input
-              label={t(
-                'New Password',
-                '\u0643\u0644\u0645\u0629 \u0627\u0644\u0645\u0631\u0648\u0631 \u0627\u0644\u062c\u062f\u064a\u062f\u0629'
-              )}
+              label={t('New Password', 'كلمة المرور الجديدة')}
               type="password"
               value={passwords.newPassword}
               onChange={e => setPasswords({ ...passwords, newPassword: e.target.value })}
               required
             />
             <Input
-              label={t(
-                'Confirm New Password',
-                '\u062a\u0623\u0643\u064a\u062f \u0643\u0644\u0645\u0629 \u0627\u0644\u0645\u0631\u0648\u0631 \u0627\u0644\u062c\u062f\u064a\u062f\u0629'
-              )}
+              label={t('Confirm New Password', 'تأكيد كلمة المرور الجديدة')}
               type="password"
               value={passwords.confirmPassword}
               onChange={e => setPasswords({ ...passwords, confirmPassword: e.target.value })}
@@ -258,10 +224,7 @@ export default function ProfileClient() {
             />
 
             <Button type="submit" variant="outline" isLoading={isChangingPassword}>
-              {t(
-                'Update Password',
-                '\u062a\u062d\u062f\u064a\u062b \u0643\u0644\u0645\u0629 \u0627\u0644\u0645\u0631\u0648\u0631'
-              )}
+              {t('Update Password', 'تحديث كلمة المرور')}
             </Button>
           </form>
         </div>

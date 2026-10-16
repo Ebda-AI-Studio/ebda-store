@@ -228,7 +228,7 @@ export default function CheckoutClient() {
   );
   const lapsedWindowMessage = t(
     'The time you chose is no longer available — please pick another.',
-    'الموعد الذي اخترته لم يعد متاحًا — يرجى اختيار موعد آخر.'
+    'الموعد اللي اخترته مبقاش متاح — اختار موعد تاني.'
   );
   // A picked window whose cutoff passes while the customer is still on the
   // page is dropped with a SPECIFIC message, and the picker (same clock)
@@ -675,7 +675,7 @@ export default function CheckoutClient() {
               name: paymentResult.data.instapay.displayName || 'InstaPay',
               nameAr: paymentResult.data.instapay.displayNameAr || 'إنستاباي',
               description: 'Transfer with InstaPay, the store confirms when it arrives',
-              descriptionAr: 'حوّل عبر إنستاباي ويؤكد المتجر طلبك عند وصول المبلغ',
+              descriptionAr: 'حوّل على إنستاباي والمتجر هيأكد طلبك لما المبلغ يوصل',
             });
           }
 
@@ -788,7 +788,7 @@ export default function CheckoutClient() {
     // Email validation — optional. Only validate format if the customer
     // chose to enter one; empty is allowed and the order proceeds.
     if (formData.email.trim() && !isValidEmail(formData.email)) {
-      errors.email = t('Please enter a valid email address', 'يرجى إدخال بريد إلكتروني صحيح');
+      errors.email = t('Please enter a valid email address', 'اكتب بريد إلكتروني صحيح');
     }
 
     // First name validation
@@ -797,7 +797,7 @@ export default function CheckoutClient() {
     } else if (formData.firstName.trim().length < 2) {
       errors.firstName = t(
         'First name must be at least 2 characters',
-        'الاسم الأول يجب أن يكون حرفين على الأقل'
+        'الاسم الأول لازم يكون حرفين على الأقل'
       );
     }
 
@@ -807,7 +807,7 @@ export default function CheckoutClient() {
     } else if (formData.lastName.trim().length < 2) {
       errors.lastName = t(
         'Last name must be at least 2 characters',
-        'الاسم الأخير يجب أن يكون حرفين على الأقل'
+        'الاسم الأخير لازم يكون حرفين على الأقل'
       );
     }
 
@@ -820,17 +820,17 @@ export default function CheckoutClient() {
       if (!isValidEgyptianMobile(formData.phone)) {
         errors.phone = t(
           'Please enter a valid Egyptian mobile number (e.g. 01012345678)',
-          'يرجى إدخال رقم موبايل مصري صحيح (مثال: 01012345678)'
+          'اكتب رقم موبايل مصري صحيح (مثال: 01012345678)'
         );
       }
     }
 
     // Governorate + Area validation
     if (!formData.governorate) {
-      errors.governorate = t('Please select a governorate', 'يرجى اختيار المحافظة');
+      errors.governorate = t('Please select a governorate', 'اختار المحافظة');
     }
     if (!formData.area) {
-      errors.area = t('Please select a delivery area', 'يرجى اختيار منطقة التوصيل');
+      errors.area = t('Please select a delivery area', 'اختار منطقة التوصيل');
     }
 
     // Street validation (required)
@@ -894,7 +894,7 @@ export default function CheckoutClient() {
             result.error?.code === 'COUPON_NOT_ELIGIBLE'
               ? t(
                   'This coupon does not apply to the items in your cart.',
-                  'هذا الكوبون لا ينطبق على المنتجات في سلتك.'
+                  'الكوبون ده مش بيتطبق على المنتجات اللي في سلتك.'
                 )
               : result.error?.message || t('Invalid coupon', 'كوبون غير صالح')
           );
@@ -1142,7 +1142,7 @@ export default function CheckoutClient() {
   const minimumOrderMessage = belowMinimumOrder
     ? t(
         `Minimum order is ${formatPrice(minimumOrderFils as number)} — add ${formatPrice(minimumOrderCheck.shortfallFils)} more`,
-        `الحد الأدنى للطلب ${formatPrice(minimumOrderFils as number)} — أضف ${formatPrice(minimumOrderCheck.shortfallFils)} أخرى`
+        `الحد الأدنى للطلب ${formatPrice(minimumOrderFils as number)} — ضيف ${formatPrice(minimumOrderCheck.shortfallFils)} كمان`
       )
     : undefined;
 
@@ -1176,7 +1176,7 @@ export default function CheckoutClient() {
         setCheckoutError(
           t(
             "We couldn't confirm the delivery fee. Please retry shipping before placing your order.",
-            'تعذّر تأكيد رسوم التوصيل. يرجى إعادة حساب الشحن قبل إتمام الطلب.'
+            'معرفناش نأكد رسوم التوصيل. احسب الشحن تاني قبل ما تكمّل الطلب.'
           )
         );
         setStep(1);
@@ -1246,7 +1246,7 @@ export default function CheckoutClient() {
     // "no windows today" message shows and the order proceeds unselected
     // (per the platform rule: never hard-block checkout on this).
     if (checkoutDelivery?.windows?.enabled && freshAnyWindowAvailable && !freshSelectedWindow) {
-      setDeliveryWindowError(t('Please select a delivery window', 'يرجى اختيار موعد التوصيل'));
+      setDeliveryWindowError(t('Please select a delivery window', 'اختار موعد التوصيل'));
       const firstError = document.querySelector('[data-error="true"]');
       firstError?.scrollIntoView({ behavior: 'smooth', block: 'center' });
       return;
@@ -1507,11 +1507,11 @@ export default function CheckoutClient() {
             const rawMsg = msgs[0];
             let translated = rawMsg;
             if (/email/i.test(rawMsg)) {
-              translated = t('Please enter a valid email address', 'يرجى إدخال بريد إلكتروني صحيح');
+              translated = t('Please enter a valid email address', 'اكتب بريد إلكتروني صحيح');
             } else if (/required|min|too small|expected/i.test(rawMsg)) {
-              translated = t('This field is required', 'هذا الحقل مطلوب');
+              translated = t('This field is required', 'الخانة دي مطلوبة');
             } else if (/too big|max|too large/i.test(rawMsg)) {
-              translated = t('This value is too long', 'القيمة المُدخلة طويلة جداً');
+              translated = t('This value is too long', 'اللي كتبته طويل قوي');
             }
             inlineErrors[localField] = translated;
           }
@@ -1527,7 +1527,7 @@ export default function CheckoutClient() {
           setCheckoutError(
             t(
               'Please fix the highlighted fields and try again.',
-              'يرجى تصحيح الحقول المميّزة والمحاولة مرة أخرى.'
+              'صحّح الخانات المعلّمة وجرّب تاني.'
             )
           );
           setIsProcessing(false);
@@ -1584,19 +1584,19 @@ export default function CheckoutClient() {
         case 'MANUAL_HOLD_NOT_ADMITTED':
           friendly = t(
             'To use cash on delivery or InstaPay, return to checkout and choose that method when placing a new order.',
-            'للدفع عند الاستلام أو عبر إنستاباي، ارجع إلى إتمام الطلب واختر طريقة الدفع عند إنشاء طلب جديد.'
+            'عشان تدفع عند الاستلام أو بإنستاباي، ارجع لإتمام الطلب واختار طريقة الدفع وانت بتعمل طلب جديد.'
           );
           break;
         case 'TOO_MANY_OPEN_HOLDS':
           friendly = t(
             'You have too many orders awaiting payment. Complete or cancel an existing order before placing another.',
-            'لديك طلبات كثيرة بانتظار الدفع. أكمل طلباً حالياً أو ألغِه قبل إنشاء طلب آخر.'
+            'عندك طلبات كتير مستنية الدفع. كمّل طلب منهم أو ألغيه قبل ما تعمل طلب جديد.'
           );
           break;
         case 'COD_NOT_AVAILABLE':
           friendly = t(
             'Cash on delivery is currently unavailable. Please choose another payment method.',
-            'الدفع عند الاستلام غير متاح حالياً. يرجى اختيار طريقة دفع أخرى.'
+            'الدفع عند الاستلام مش متاح دلوقتي. اختار طريقة دفع تانية.'
           );
           break;
         case 'COD_FEE_NOT_QUOTED':
@@ -1604,39 +1604,39 @@ export default function CheckoutClient() {
           // it was rolled back, so placing it again shows the fee first.
           friendly = t(
             'The cash-on-delivery fee was not included in your total. Your cart is back — review the total with the fee and place the order again.',
-            'لم تُحتسب رسوم الدفع عند الاستلام في الإجمالي. أعدنا سلتك كما كانت — راجع الإجمالي مع الرسوم ثم أكّد الطلب مرة أخرى.'
+            'رسوم الدفع عند الاستلام ما اتحسبتش في الإجمالي. رجّعنا سلتك زي ما كانت — راجع الإجمالي بالرسوم وأكّد الطلب تاني.'
           );
           break;
         case 'PAYMENT_PROVIDER_ERROR':
           friendly = t(
             'We could not start your payment. Please try again or choose another payment method.',
-            'تعذّر بدء عملية الدفع. يرجى المحاولة مرة أخرى أو اختيار طريقة دفع أخرى.'
+            'معرفناش نبدأ الدفع. جرّب تاني أو اختار طريقة دفع تانية.'
           );
           break;
         case 'PAYMENT_METHOD_UNAVAILABLE':
           // One method is down (circuit open): the cart was restored, the others still work.
           friendly = t(
             'This payment method is temporarily unavailable. Please choose another one, such as cash on delivery or InstaPay.',
-            'طريقة الدفع هذه غير متاحة مؤقتاً. يرجى اختيار طريقة أخرى مثل الدفع عند الاستلام أو إنستاباي.'
+            'طريقة الدفع دي مش متاحة دلوقتي. اختار طريقة تانية زي الدفع عند الاستلام أو إنستاباي.'
           );
           break;
         case 'INSTAPAY_NOT_AVAILABLE':
           friendly = t(
             'InstaPay is not available for this store right now. Please choose another payment method.',
-            'إنستاباي غير متاح لهذا المتجر حالياً. يرجى اختيار طريقة دفع أخرى.'
+            'إنستاباي مش متاح للمتجر ده دلوقتي. اختار طريقة دفع تانية.'
           );
           break;
         case 'PAYMENT_PROVIDER_NOT_CONFIGURED':
         case 'PAYMENT_NOT_CONFIGURED':
           friendly = t(
             'This payment method is not available right now. Please choose another option.',
-            'طريقة الدفع هذه غير متاحة حالياً. يرجى اختيار طريقة أخرى.'
+            'طريقة الدفع دي مش متاحة دلوقتي. اختار طريقة تانية.'
           );
           break;
         case 'EMPTY_CART':
           friendly = t(
             'Your cart is empty. Please add items before checking out.',
-            'سلة التسوق فارغة. يرجى إضافة منتجات قبل إتمام الشراء.'
+            'سلة التسوق فاضية. ضيف منتجات قبل ما تكمّل الشراء.'
           );
           break;
         // A cart line whose product the merchant has since deleted. Before
@@ -1690,7 +1690,7 @@ export default function CheckoutClient() {
         case 'INSUFFICIENT_WALLET_BALANCE':
           friendly = t(
             'Your wallet balance changed. Please review your order and try again.',
-            'تغيّر رصيد محفظتك. يرجى مراجعة طلبك والمحاولة مرة أخرى.'
+            'رصيد محفظتك اتغيّر. راجع طلبك وجرّب تاني.'
           );
           refreshWallet();
           setUseWalletBalance(false);
@@ -1698,7 +1698,7 @@ export default function CheckoutClient() {
         case 'COUPON_LIMIT_REACHED':
           friendly = t(
             'The coupon you applied has reached its usage limit. Please remove it and try again.',
-            'تم استخدام الكوبون الذي طبّقته بالكامل. يرجى إزالته والمحاولة مرة أخرى.'
+            'الكوبون اللي استخدمته خلص. شيله وجرّب تاني.'
           );
           break;
         case 'COUPON_NOT_ELIGIBLE':
@@ -1722,13 +1722,13 @@ export default function CheckoutClient() {
           setStep(1);
           friendly = t(
             'This coupon does not apply to the items in your cart, so it has been removed. Please try again.',
-            'هذا الكوبون لا ينطبق على المنتجات في سلتك، لذلك تمت إزالته. يرجى المحاولة مرة أخرى.'
+            'الكوبون ده مش بيتطبق على المنتجات اللي في سلتك، فشيلناه. جرّب تاني.'
           );
           break;
         case 'MIN_ORDER_NOT_MET':
           friendly = t(
             'Your order does not meet the minimum amount required for this coupon.',
-            'طلبك لا يستوفي الحد الأدنى للمبلغ المطلوب لهذا الكوبون.'
+            'طلبك ما وصلش للحد الأدنى المطلوب للكوبون ده.'
           );
           break;
         case 'MINIMUM_ORDER_NOT_MET':
@@ -1739,14 +1739,14 @@ export default function CheckoutClient() {
             minimumOrderMessage ??
             t(
               'Your cart does not meet this store’s minimum order value.',
-              'سلتك لا تستوفي الحد الأدنى لقيمة الطلب لهذا المتجر.'
+              'سلتك ما وصلتش للحد الأدنى لقيمة الطلب في المتجر ده.'
             );
           setStep(1);
           break;
         case 'INSUFFICIENT_INVENTORY':
           friendly = t(
             'One of the items in your cart is out of stock. Please review your cart.',
-            'أحد المنتجات في سلتك غير متوفر. يرجى مراجعة سلة التسوق.'
+            'في منتج في سلتك مش متوفر. راجع سلة التسوق.'
           );
           break;
         case 'AREA_NOT_DELIVERABLE':
@@ -1758,7 +1758,7 @@ export default function CheckoutClient() {
           // step, not this one.
           friendly = t(
             'This store does not deliver to the area you selected. Please choose a different area.',
-            'هذا المتجر لا يوصل إلى المنطقة التي اخترتها. يرجى اختيار منطقة أخرى.'
+            'المتجر ده مش بيوصّل للمنطقة اللي اخترتها. اختار منطقة تانية.'
           );
           setStep(1);
           break;
@@ -1770,7 +1770,7 @@ export default function CheckoutClient() {
           // status with the server.
           friendly = t(
             'This order has already been paid. Opening your order confirmation…',
-            'تم دفع هذا الطلب بالفعل. جارٍ فتح تأكيد طلبك…'
+            'الطلب ده اتدفع قبل كده. بنفتح تأكيد طلبك…'
           );
           if (createdOrderId) {
             router.push(storeUrl(`/checkout/success?orderId=${createdOrderId}`));
@@ -1779,7 +1779,7 @@ export default function CheckoutClient() {
         case 'TIMEOUT':
           friendly = t(
             'The server took too long to respond. Please try again.',
-            'استغرق الخادم وقتاً طويلاً للاستجابة. يرجى المحاولة مرة أخرى.'
+            'السيرفر اتأخر في الرد. جرّب تاني.'
           );
           break;
         case 'VALIDATION_ERROR':
@@ -1788,14 +1788,14 @@ export default function CheckoutClient() {
           // can review what they typed.
           friendly = t(
             'Some of the information you entered looks invalid. Please review your shipping details and try again.',
-            'بعض المعلومات التي أدخلتها غير صحيحة. يرجى مراجعة بيانات الشحن والمحاولة مرة أخرى.'
+            'في بيانات كتبتها مش صحيحة. راجع بيانات الشحن وجرّب تاني.'
           );
           setStep(1);
           break;
         default:
           friendly = t(
             'Something went wrong while processing your order. Please try again or contact support if the problem persists.',
-            'حدث خطأ أثناء معالجة طلبك. يرجى المحاولة مرة أخرى أو التواصل مع الدعم إذا استمرت المشكلة.'
+            'حصل خطأ واحنا بنجهّز طلبك. جرّب تاني أو كلّم الدعم لو المشكلة فضلت.'
           );
       }
       setCheckoutError(friendly);
@@ -1809,9 +1809,7 @@ export default function CheckoutClient() {
         <div className="flex min-h-[calc(100vh-4rem)] items-center justify-center">
           <div className="flex flex-col items-center gap-3">
             <div className="h-12 w-12 animate-spin rounded-full border-4 border-primary border-t-transparent"></div>
-            <p className="text-sm text-muted-foreground">
-              {t('Loading checkout...', 'جارٍ التحميل...')}
-            </p>
+            <p className="text-sm text-muted-foreground">{t('Loading checkout...', 'بنحمّل...')}</p>
           </div>
         </div>
       </MinimalChrome>
@@ -1828,7 +1826,7 @@ export default function CheckoutClient() {
           data-checkout-nothing-orderable=""
         >
           <h1 className="text-2xl font-bold text-foreground">
-            {t('Nothing in your cart can be ordered', 'لا يمكن طلب أي منتج في سلتك')}
+            {t('Nothing in your cart can be ordered', 'مفيش منتج في سلتك ينفع يتطلب')}
           </h1>
           <p role="alert" className="mt-2 text-muted-foreground">
             {unavailableLinesNotice}
@@ -1849,10 +1847,7 @@ export default function CheckoutClient() {
             {t('Your cart is empty', translations['Your cart is empty'])}
           </h1>
           <p className="mt-2 text-muted-foreground">
-            {t(
-              'Add some products before checking out.',
-              '\u0623\u0636\u0641 \u0628\u0639\u0636 \u0627\u0644\u0645\u0646\u062a\u062c\u0627\u062a \u0642\u0628\u0644 \u0625\u062a\u0645\u0627\u0645 \u0627\u0644\u062f\u0641\u0639.'
-            )}
+            {t('Add some products before checking out.', 'ضيف شوية منتجات قبل ما تدفع.')}
           </p>
           <Link href={continueShoppingHref}>
             <Button className="mt-6">
@@ -1939,7 +1934,7 @@ export default function CheckoutClient() {
                     step >= 2 ? 'text-foreground' : 'text-muted-foreground'
                   }`}
                 >
-                  {t('Payment', '\u0627\u0644\u062f\u0641\u0639')}
+                  {t('Payment', 'الدفع')}
                 </span>
               </div>
             </div>
@@ -1979,20 +1974,14 @@ export default function CheckoutClient() {
                       className="text-lg font-semibold text-foreground"
                       style={zoneStyle(checkoutHeadingZone, checkoutScale)}
                     >
-                      {t(
-                        'Shipping Information',
-                        '\u0645\u0639\u0644\u0648\u0645\u0627\u062a \u0627\u0644\u0634\u062d\u0646'
-                      )}
+                      {t('Shipping Information', 'معلومات الشحن')}
                     </h2>
 
                     <div className="mt-6 space-y-4">
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div data-error={!!formErrors.firstName}>
                           <Input
-                            label={t(
-                              'First name',
-                              '\u0627\u0644\u0627\u0633\u0645 \u0627\u0644\u0623\u0648\u0644'
-                            )}
+                            label={t('First name', 'الاسم الأول')}
                             autoComplete="given-name"
                             value={formData.firstName}
                             onChange={e => updateField('firstName', e.target.value)}
@@ -2011,10 +2000,7 @@ export default function CheckoutClient() {
                         </div>
                         <div data-error={!!formErrors.lastName}>
                           <Input
-                            label={t(
-                              'Last name',
-                              '\u0627\u0633\u0645 \u0627\u0644\u0639\u0627\u0626\u0644\u0629'
-                            )}
+                            label={t('Last name', 'اسم العائلة')}
                             autoComplete="family-name"
                             value={formData.lastName}
                             onChange={e => updateField('lastName', e.target.value)}
@@ -2084,10 +2070,7 @@ export default function CheckoutClient() {
 
                       <div data-error={!!formErrors.email}>
                         <Input
-                          label={t(
-                            'Email (optional)',
-                            '\u0627\u0644\u0628\u0631\u064a\u062f \u0627\u0644\u0625\u0644\u0643\u062a\u0631\u0648\u0646\u064a (\u0627\u062e\u062a\u064a\u0627\u0631\u064a)'
-                          )}
+                          label={t('Email (optional)', 'البريد الإلكتروني (اختياري)')}
                           type="email"
                           autoComplete="email"
                           inputMode="email"
@@ -2107,12 +2090,12 @@ export default function CheckoutClient() {
                         )}
                       </div>
 
-                      {/* Country row \u2014 fixed display for single-country stores.
+                      {/* Country row — fixed display for single-country stores.
                           Multi-country stores get an interactive selector inside GovernorateAreaSelect. */}
                       {isSingleCountryStore && (
                         <div>
                           <label className="block text-sm font-medium text-foreground mb-1">
-                            {t('Country', '\u0627\u0644\u0628\u0644\u062f')}
+                            {t('Country', 'البلد')}
                           </label>
                           <div className="flex items-center rounded-lg border border-border bg-muted/40 px-3 py-2 text-sm text-foreground">
                             {t(singleCountryEn, singleCountryAr)}
@@ -2138,31 +2121,25 @@ export default function CheckoutClient() {
                       {/* Delivery method panel */}
                       <div className="rounded-lg border border-border bg-muted/30 p-4">
                         <p className="text-sm font-medium text-foreground mb-2">
-                          {t(
-                            'Delivery method',
-                            '\u0637\u0631\u064a\u0642\u0629 \u0627\u0644\u062a\u0648\u0635\u064a\u0644'
-                          )}
+                          {t('Delivery method', 'طريقة التوصيل')}
                         </p>
                         {!formData.area ? (
                           <p className="text-sm text-muted-foreground">
                             {t(
                               'Select your address to see delivery options',
-                              '\u062d\u062f\u062f \u0639\u0646\u0648\u0627\u0646\u0643 \u0644\u0639\u0631\u0636 \u062e\u064a\u0627\u0631\u0627\u062a \u0627\u0644\u062a\u0648\u0635\u064a\u0644'
+                              'حدد عنوانك عشان تشوف خيارات التوصيل'
                             )}
                           </p>
                         ) : shippingUnavailable ? (
                           <p className="text-sm text-destructive-ink">
-                            {t(
-                              'Not available for delivery to this area',
-                              '\u063a\u064a\u0631 \u0645\u062a\u0627\u062d \u0644\u0644\u062a\u0648\u0635\u064a\u0644 \u0644\u0647\u0630\u0647 \u0627\u0644\u0645\u0646\u0637\u0642\u0629'
-                            )}
+                            {t('Not available for delivery to this area', 'مفيش توصيل للمنطقة دي')}
                           </p>
                         ) : shippingError ? (
                           <div className="flex items-center justify-between gap-2">
                             <p className="text-sm text-destructive-ink">
                               {t(
                                 "Couldn't calculate shipping. Please retry.",
-                                '\u062a\u0639\u0630\u0651\u0631 \u062d\u0633\u0627\u0628 \u0627\u0644\u0634\u062d\u0646. \u064a\u0631\u062c\u0649 \u0625\u0639\u0627\u062f\u0629 \u0627\u0644\u0645\u062d\u0627\u0648\u0644\u0629.'
+                                'معرفناش نحسب الشحن. جرّب تاني.'
                               )}
                             </p>
                             <button
@@ -2170,33 +2147,24 @@ export default function CheckoutClient() {
                               onClick={() => calculateShipping()}
                               className="text-sm font-medium text-primary underline"
                             >
-                              {t(
-                                'Retry',
-                                '\u0625\u0639\u0627\u062f\u0629 \u0627\u0644\u0645\u062d\u0627\u0648\u0644\u0629'
-                              )}
+                              {t('Retry', 'إعادة المحاولة')}
                             </button>
                           </div>
                         ) : (
                           <div className="flex items-center justify-between">
                             <span className="text-sm text-foreground">
-                              {t(
-                                'Standard delivery',
-                                '\u062a\u0648\u0635\u064a\u0644 \u0639\u0627\u062f\u064a'
-                              )}
+                              {t('Standard delivery', 'توصيل عادي')}
                             </span>
                             <span className="text-sm font-medium text-foreground">
                               {freeShipping
-                                ? t('Free', '\u0645\u062c\u0627\u0646\u064a')
+                                ? t('Free', 'مجاني')
                                 : shippingCost > 0
                                   ? formatPrice(shippingCost)
                                   : rateByArea.has(formData.area)
                                     ? formatPrice(rateByArea.get(formData.area)!.deliveryFee)
                                     : !storeHasAreaRates
-                                      ? t('Free', '\u0645\u062c\u0627\u0646\u064a')
-                                      : t(
-                                          'Calculating...',
-                                          '\u062c\u0627\u0631\u064d \u0627\u0644\u062d\u0633\u0627\u0628...'
-                                        )}
+                                      ? t('Free', 'مجاني')
+                                      : t('Calculating...', 'بنحسب...')}
                             </span>
                           </div>
                         )}
@@ -2266,10 +2234,7 @@ export default function CheckoutClient() {
                           htmlFor="order-notes"
                           className="block text-sm font-medium text-foreground mb-1"
                         >
-                          {t(
-                            'Order Notes (optional)',
-                            '\u0645\u0644\u0627\u062d\u0638\u0627\u062a \u0627\u0644\u0637\u0644\u0628 (\u0627\u062e\u062a\u064a\u0627\u0631\u064a)'
-                          )}
+                          {t('Order Notes (optional)', 'ملاحظات الطلب (اختياري)')}
                         </label>
                         <textarea
                           id="order-notes"
@@ -2283,13 +2248,13 @@ export default function CheckoutClient() {
                           className="min-h-24 w-full rounded-lg border border-border bg-background px-4 py-2 text-base sm:text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
                           placeholder={t(
                             'Any special delivery instructions...',
-                            '\u0623\u064a \u062a\u0639\u0644\u064a\u0645\u0627\u062a \u062e\u0627\u0635\u0629 \u0644\u0644\u062a\u0648\u0635\u064a\u0644...'
+                            'أي تعليمات خاصة بالتوصيل...'
                           )}
                         />
                       </div>
                     </div>
 
-                    {/* Save my info \u2014 device-local localStorage persistence.
+                    {/* Save my info — device-local localStorage persistence.
                         NO payment data stored. Store-scoped key. */}
                     <div className="pt-3 border-t border-border">
                       <label className="flex items-start gap-3 cursor-pointer group">
@@ -2303,13 +2268,13 @@ export default function CheckoutClient() {
                           <span className="text-sm font-medium text-foreground group-hover:text-primary transition-colors">
                             {t(
                               'Save my info to speed up checkout next time',
-                              '\u0627\u062d\u0641\u0638 \u0628\u064a\u0627\u0646\u0627\u062a\u064a \u0644\u062a\u0633\u0631\u064a\u0639 \u0627\u0644\u062f\u0641\u0639 \u0641\u064a \u0627\u0644\u0645\u0631\u0629 \u0627\u0644\u0642\u0627\u062f\u0645\u0629'
+                              'احفظ بياناتي عشان أدفع أسرع المرة الجاية'
                             )}
                           </span>
                           <span className="text-xs text-muted-foreground">
                             {t(
                               'Your info is stored securely on this device. You can delete it anytime.',
-                              '\u0633\u064a\u062a\u0645 \u062a\u062e\u0632\u064a\u0646 \u0645\u0639\u0644\u0648\u0645\u0627\u062a\u0643 \u0628\u0623\u0645\u0627\u0646 \u0639\u0644\u0649 \u0647\u0630\u0627 \u0627\u0644\u062c\u0647\u0627\u0632. \u064a\u0645\u0643\u0646\u0643 \u062d\u0630\u0641\u0647\u0627 \u0641\u064a \u0623\u064a \u0648\u0642\u062a.'
+                              'بياناتك هتتخزن بأمان على الجهاز ده. تقدر تمسحها في أي وقت.'
                             )}
                           </span>
                         </span>
@@ -2320,10 +2285,7 @@ export default function CheckoutClient() {
                           onClick={handleClearSavedData}
                           className="mt-2 ms-7 text-xs text-destructive-ink hover:underline"
                         >
-                          {t(
-                            'Clear saved data',
-                            '\u062d\u0630\u0641 \u0627\u0644\u0628\u064a\u0627\u0646\u0627\u062a \u0627\u0644\u0645\u062d\u0641\u0648\u0638\u0629'
-                          )}
+                          {t('Clear saved data', 'حذف البيانات المحفوظة')}
                         </button>
                       )}
                     </div>
@@ -2338,7 +2300,7 @@ export default function CheckoutClient() {
                       </p>
                     )}
 
-                    {/* Desktop-only button row \u2014 on mobile the button renders
+                    {/* Desktop-only button row — on mobile the button renders
                         AFTER <OrderSummary> so the order is:
                         address \u2192 discount/summary \u2192 Continue to Payment.
                         Hidden below lg; shown as a normal row on lg+. */}
@@ -2347,9 +2309,7 @@ export default function CheckoutClient() {
                         href={storeUrl('/cart')}
                         className="inline-flex min-h-11 items-center text-sm text-primary hover:underline"
                       >
-                        {language === 'ar'
-                          ? '\u0627\u0644\u0639\u0648\u062f\u0629 \u0625\u0644\u0649 \u0627\u0644\u0633\u0644\u0629 \u2192'
-                          : '\u2190 Return to cart'}
+                        {language === 'ar' ? 'العودة إلى السلة \u2192' : '\u2190 Return to cart'}
                       </Link>
                       <Button
                         type="submit"
@@ -2357,10 +2317,7 @@ export default function CheckoutClient() {
                         size="lg"
                         disabled={shippingUnavailable || belowMinimumOrder || !shippingSettled}
                       >
-                        {t(
-                          'Continue to Payment',
-                          '\u0627\u0644\u0645\u062a\u0627\u0628\u0639\u0629 \u0644\u0644\u062f\u0641\u0639'
-                        )}
+                        {t('Continue to Payment', 'المتابعة للدفع')}
                       </Button>
                     </div>
                   </div>

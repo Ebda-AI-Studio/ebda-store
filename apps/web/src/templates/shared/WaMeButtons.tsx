@@ -220,7 +220,7 @@ export function WaMeOrderQuestionButton({
       href={href}
       testId="wa-me-order-question"
       className={className}
-      label={t('Ask about this order', 'اسأل عن هذا الطلب')}
+      label={t('Ask about this order', 'اسأل عن الطلب ده')}
     />
   );
 }

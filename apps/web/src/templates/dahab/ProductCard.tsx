@@ -190,7 +190,7 @@ export default function DahabProductCard({
               >
                 <BagIcon className="h-[18px] w-[18px] [@media(hover:hover)]:hidden" />
                 <span className="hidden [@media(hover:hover)]:inline">
-                  {isAdding ? t('Adding…', 'جاري الإضافة…') : ctaLabel}
+                  {isAdding ? t('Adding…', 'بنضيف…') : ctaLabel}
                 </span>
               </button>
             )}

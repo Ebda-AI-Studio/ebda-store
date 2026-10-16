@@ -299,7 +299,7 @@ export function FlickeringFooter() {
     {
       title: t('Explore', 'استكشف'),
       links: [
-        { label: t('What we do', 'ماذا نقدم'), href: '#features' },
+        { label: t('What we do', 'بنقدم إيه'), href: '#features' },
         { label: t('The AI edge', 'ميزة الذكاء الاصطناعي'), href: '#aeo-geo' },
       ],
     },
@@ -336,7 +336,7 @@ export function FlickeringFooter() {
             <p className="text-sm text-muted-foreground leading-relaxed">
               {t(
                 siteConfig.hero.description,
-                'منصة التجارة الإلكترونية المدعومة بالذكاء الاصطناعي للأعمال المصرية.'
+                'منصة تجارة إلكترونية بالذكاء الاصطناعي للبيزنس المصري.'
               )}
             </p>
             <div className="flex flex-col gap-1.5 text-sm text-muted-foreground">

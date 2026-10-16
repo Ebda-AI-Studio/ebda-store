@@ -2,15 +2,17 @@
  * Ruling FU46-Y02a (Ahmad 2026-10-16, supersedes FU46-Y02): a FULL SENTENCE the storefront
  * generates is Egyptian Arabic ("طلبك اتسجل", "يوصلك بين …", "سلتك فاضية"); a short button or
  * label stays a neutral form that reads right in both registers ("أرسل الإيصال", "موعد الوصول").
+ * Ruling FU46-Y02b (coordinator 2026-10-16): the ONLY exception is legal text — the privacy and
+ * terms pages, the returns-policy body and the cookie consent text stay formal (Ahmad can
+ * override).
  *
- * Three locks, so the register cannot drift back:
+ * Locks, so the register cannot drift back:
  *  1. MSA-only sentence markers (words with no Egyptian reading: "هذا", "لم", "يرجى", "سوف",
- *     "حالياً", "جارٍ", the MSA dual "قطعتان"...) are counted per file over every Arabic string
- *     literal in `apps/web/src` + `packages/ui/src` (and the shopper `messageAr` answers of the API).
- *     A file not in BASELINE must have none; a file in it may only go DOWN, and when it does the
- *     number here must be lowered with it (shrink-only ratchet). The baseline is the MSA copy that
- *     predates the 2026-10-16 decision (checkout errors, legal pages, FAQ defaults, review flow);
- *     converting it is a copy pass waiting on Ahmad (Ruling FU46-Y02b).
+ *     "يجب", "كيف", "فارغة", the MSA dual "قطعتان"...) are banned in every Arabic string literal
+ *     in `apps/web/src` + `packages/ui/src` (`\u06xx` escapes decoded) and in the shopper
+ *     `messageAr` answers of the API. Legal text is exempt only where named: whole files in
+ *     LEGAL_FILES, or the lines between `legal-register:start` / `legal-register:end` comments in
+ *     a file listed in LEGAL_REGION_FILES. A region marker anywhere else fails the gate.
  *  2. The Egyptian sentence set Ahmad asked for is pinned verbatim (EGYPTIAN), so a sweep that
  *     "standardises" them turns this red even if it only uses words the marker list misses.
  *  3. The neutral button/label forms are pinned too (NEUTRAL), so the reverse drift is caught.
@@ -29,14 +31,21 @@ const ROOT = join(__dirname, '../..');
 export const MSA_ONLY = [
   'هذا',
   'هذه',
+  'ذلك',
+  'تلك',
   'لم',
   'لن',
   'سوف',
   'حالياً',
+  'حاليًا',
   'حاليا',
   'يرجى',
+  'نرجو',
+  'الرجاء',
   'جارٍ',
+  'جاري',
   'يوجد',
+  'توجد',
   'لقد',
   'الذي',
   'التي',
@@ -45,96 +54,54 @@ export const MSA_ONLY = [
   'سيراجع',
   'ستظهر',
   'سيظهر',
+  'سيتم',
+  'سنقوم',
   'يصلك',
   'أولاً',
   'قطعتان',
   'يومان',
   'نتيجتان',
   'يمكنك',
+  'بإمكانك',
   'لديك',
+  'لدينا',
+  'لديه',
   'إذا',
+  'يجب',
+  'ليس',
+  'ليست',
+  'كيف',
+  'لماذا',
+  'ماذا',
+  'أين',
+  'متى',
+  'هل',
+  'فقط',
+  'فارغة',
+  'فارغ',
+  'عذراً',
+  'عذرًا',
+  'نأسف',
+  'قم',
 ];
 const AR = '\\u0621-\\u065F\\u0670\\u0640';
 const WORD = new RegExp(`(?:^|[^${AR}])(${MSA_ONLY.join('|')})(?=$|[^${AR}])`, 'g');
 const STRING = /(['"`])((?:(?!\1)[^\\\n]|\\.)*[ء-ي](?:(?!\1)[^\\\n]|\\.)*)\1/g;
 
-/**
- * MSA sentence markers that predate the decision, per file. Shrink-only: lower a number when you
- * convert a sentence to Egyptian; never raise one (write the new sentence in Egyptian instead).
- */
-const BASELINE: Record<string, number> = {
-  // BASELINE_START (generated: node scripts in the test's failure message; do not hand-raise)
-  'apps/web/src/app/account/AccountDashboardClient.tsx': 1,
-  'apps/web/src/app/account/addresses/AddressesClient.tsx': 2,
-  'apps/web/src/app/account/loyalty/LoyaltyClient.tsx': 4,
-  'apps/web/src/app/account/orders/OrdersClient.tsx': 3,
-  'apps/web/src/app/account/orders/[id]/OrderDetailClient.tsx': 1,
-  'apps/web/src/app/account/settings/SettingsClient.tsx': 5,
-  'apps/web/src/app/account/wallet/WalletClient.tsx': 6,
-  'apps/web/src/app/affiliate/page.tsx': 3,
-  'apps/web/src/app/auth/check-email/CheckEmailClient.tsx': 1,
-  'apps/web/src/app/auth/forgot-password/ForgotPasswordClient.tsx': 2,
-  'apps/web/src/app/auth/login/LoginClient.tsx': 1,
-  'apps/web/src/app/auth/register/RegisterClient.tsx': 1,
-  'apps/web/src/app/auth/reset-password/ResetPasswordClient.tsx': 6,
-  'apps/web/src/app/auth/verify-email/VerifyEmailClient.tsx': 9,
-  'apps/web/src/app/blog/page.tsx': 2,
-  'apps/web/src/app/bundles/BundlesClient.tsx': 1,
-  'apps/web/src/app/bundles/[slug]/BundleDetailClient.tsx': 1,
-  'apps/web/src/app/cart/CartClient.tsx': 5,
-  'apps/web/src/app/categories/CategoriesClient.tsx': 1,
-  'apps/web/src/app/checkout/CheckoutClient.tsx': 48,
-  'apps/web/src/app/checkout/OrderSummary.tsx': 1,
-  'apps/web/src/app/checkout/PaymentStep.tsx': 2,
-  'apps/web/src/app/checkout/_lib/checkoutErrors.ts': 1,
-  'apps/web/src/app/checkout/error/ErrorClient.tsx': 3,
-  'apps/web/src/app/checkout/success/FawryReferenceCard.tsx': 1,
-  'apps/web/src/app/checkout/success/InstapayCard.tsx': 5,
-  'apps/web/src/app/contact/ContactClient.tsx': 1,
-  'apps/web/src/app/faq/FAQClient.tsx': 12,
-  'apps/web/src/app/global-error.tsx': 1,
-  'apps/web/src/app/locations/LocationsClient.tsx': 2,
-  'apps/web/src/app/privacy/PrivacyClient.tsx': 12,
-  'apps/web/src/app/products/ProductsClient.tsx': 3,
-  'apps/web/src/app/products/[slug]/ProductDetailClient.tsx': 3,
-  'apps/web/src/app/returns/ReturnsClient.tsx': 11,
-  'apps/web/src/app/review/[orderId]/[productId]/ReviewErrorView.tsx': 7,
-  'apps/web/src/app/review/[orderId]/[productId]/ReviewForm.tsx': 9,
-  'apps/web/src/app/search/SearchClient.tsx': 2,
-  'apps/web/src/app/shipping/ShippingClient.tsx': 3,
-  'apps/web/src/app/terms/TermsClient.tsx': 11,
-  'apps/web/src/app/wishlist/WishlistClient.tsx': 2,
-  'apps/web/src/app/wishlist/shared/[userId]/SharedWishlistClient.tsx': 6,
-  'apps/web/src/components/CmsPageContent.tsx': 1,
-  'apps/web/src/components/CookieConsentBanner.tsx': 1,
-  'apps/web/src/components/CookiePreferencesModal.tsx': 2,
-  'apps/web/src/components/FrequentlyBoughtTogether.tsx': 2,
-  'apps/web/src/components/ReviewSection.tsx': 8,
-  'apps/web/src/components/RouteErrorFallback.tsx': 3,
-  'apps/web/src/components/SearchAutocomplete.tsx': 1,
-  'apps/web/src/components/SectionErrorBoundary.tsx': 1,
-  'apps/web/src/components/SectionRetryNotice.tsx': 1,
-  'apps/web/src/components/StoreMaintenance.tsx': 2,
-  'apps/web/src/components/VariantSelector.tsx': 4,
-  'apps/web/src/contexts/CartContext.tsx': 3,
-  'apps/web/src/contexts/LanguageContext.tsx': 17,
-  'apps/web/src/lib/bundle-cart-errors.ts': 4,
-  'apps/web/src/lib/checkout-bundle-errors.ts': 10,
-  'apps/web/src/lib/product-cart-errors.ts': 5,
-  'apps/web/src/templates/classic/OrderSummary.tsx': 1,
-  'apps/web/src/templates/dahab/CartDrawer.tsx': 1,
-  'apps/web/src/templates/dahab/ProductGrid.tsx': 1,
-  'apps/web/src/templates/elegant/Header.tsx': 1,
-  'apps/web/src/templates/elegant/ProductGrid.tsx': 1,
-  'apps/web/src/templates/modern/ProductGrid.tsx': 1,
-  'apps/web/src/templates/shared/CartLineUnavailable.tsx': 2,
-  'apps/web/src/templates/shared/WaMeButtons.tsx': 1,
-  // BASELINE_END
+/** Whole files that are legal text (Ruling FU46-Y02b): formal register allowed. */
+const LEGAL_FILES: Record<string, string> = {
+  'apps/web/src/app/privacy/PrivacyClient.tsx': 'privacy policy',
+  'apps/web/src/app/terms/TermsClient.tsx': 'terms of service',
+  'apps/web/src/components/CookieConsentBanner.tsx': 'cookie consent notice',
+  'apps/web/src/components/CookiePreferencesModal.tsx': 'cookie preferences (consent text)',
 };
-const API_BASELINE: Record<string, number> = {
-  // API_BASELINE_START
-  // API_BASELINE_END
+/** Files whose legal part is fenced by `legal-register:start` / `legal-register:end` comments. */
+const LEGAL_REGION_FILES: Record<string, string> = {
+  'apps/web/src/app/returns/ReturnsClient.tsx': 'the returns-policy body (eligibility, refunds)',
+  'apps/web/src/lib/return-policy-text.ts': 'the returns-policy and terms return sentences',
 };
+const REGION_START = /legal-register:start/;
+const REGION_END = /legal-register:end/;
 
 /** Ahmad's Egyptian sentences (2026-10-16), pinned in the file that renders them. */
 const EGYPTIAN: Array<[string, string]> = [
@@ -152,7 +119,7 @@ const EGYPTIAN: Array<[string, string]> = [
   ['apps/web/src/components/UnknownHostNotFound.tsx', 'المتجر ده مش موجود أو لسه ما فتحش'],
   ['apps/web/src/components/demo/DemoCheckoutNotice.tsx', 'ده متجر تجريبي — الطلب مقفول'],
   ['apps/web/src/templates/dahab/CartDrawer.tsx', 'سلتك فاضية'],
-  ['apps/web/src/lib/return-policy-text.ts', 'لو الطلب مش مناسبك، تقدر ترجعه خلال'],
+  ['apps/web/src/lib/return-policy-text.ts', 'بنقبل الإرجاع خلال'],
   [
     'apps/web/src/app/checkout/success/SuccessClient.tsx',
     'طلبك اتسجل. جهّز المبلغ لما الطلب يوصلك.',
@@ -185,15 +152,23 @@ function files(dir: string, out: string[] = []): string[] {
 }
 
 /** MSA-marker hits per repo-relative file. */
-export function msaHits(paths: string[], only?: RegExp): Record<string, string[]> {
+export function msaHits(
+  paths: string[],
+  only?: RegExp,
+  opts: { honourRegions?: boolean } = {}
+): Record<string, string[]> {
   const out: Record<string, string[]> = {};
   for (const f of paths) {
+    let inLegal = false;
     readFileSync(f, 'utf8')
       .replace(/\\u(06[0-9a-fA-F]{2})/g, (_: string, h: string) =>
         String.fromCharCode(parseInt(h, 16))
       )
       .split('\n')
       .forEach((line, i) => {
+        if (REGION_START.test(line)) inLegal = true;
+        if (REGION_END.test(line)) inLegal = false;
+        if (inLegal && opts.honourRegions) return;
         const t = line.trim();
         if (t.startsWith('//') || t.startsWith('*') || t.startsWith('/*')) return;
         if (only && !only.test(line)) return;
@@ -208,21 +183,16 @@ export function msaHits(paths: string[], only?: RegExp): Record<string, string[]
   return out;
 }
 
-function ratchet(found: Record<string, string[]>, baseline: Record<string, number>): string[] {
-  const problems: string[] = [];
-  for (const [file, list] of Object.entries(found)) {
-    const allowed = baseline[file] ?? 0;
-    if (list.length > allowed)
-      problems.push(
-        `${file}: ${list.length} MSA sentence markers, baseline ${allowed}. Write the new sentence in Egyptian Arabic (Ruling FU46-Y02a):\n  ${list.join('\n  ')}`
-      );
-  }
-  for (const [file, allowed] of Object.entries(baseline)) {
-    const n = found[file]?.length ?? 0;
-    if (n < allowed)
-      problems.push(`${file}: now ${n} MSA markers — lower its baseline from ${allowed} to ${n}.`);
-  }
-  return problems;
+/** Every hit outside legal text, as one problem list (empty = the rule holds). */
+function nonLegalHits(paths: string[], only?: RegExp): string[] {
+  const regionFiles = paths.filter(p => relative(ROOT, p) in LEGAL_REGION_FILES);
+  const other = paths.filter(
+    p => !(relative(ROOT, p) in LEGAL_FILES) && !(relative(ROOT, p) in LEGAL_REGION_FILES)
+  );
+  return [
+    ...Object.values(msaHits(other, only)).flat(),
+    ...Object.values(msaHits(regionFiles, only, { honourRegions: true })).flat(),
+  ];
 }
 
 const storefrontPaths = () => [
@@ -231,15 +201,31 @@ const storefrontPaths = () => [
 ];
 
 describe('storefront Arabic register (Ruling FU46-Y02a: Egyptian sentences, neutral labels)', () => {
-  it('no NEW MSA sentence in a storefront string (shrink-only baseline)', () => {
+  it('no MSA sentence in any storefront string outside the named legal text', () => {
     const paths = storefrontPaths();
     expect(paths.length).toBeGreaterThan(200);
-    expect(ratchet(msaHits(paths), BASELINE)).toEqual([]);
+    expect(nonLegalHits(paths)).toEqual([]);
   });
 
-  it('no NEW MSA sentence in an Arabic answer the API gives a shopper (`messageAr`)', () => {
-    const found = msaHits(files(join(ROOT, 'apps/api/src')), /messageAr/);
-    expect(ratchet(found, API_BASELINE)).toEqual([]);
+  it('no MSA sentence in an Arabic answer the API gives a shopper (`messageAr`)', () => {
+    expect(nonLegalHits(files(join(ROOT, 'apps/api/src')), /messageAr/)).toEqual([]);
+  });
+
+  it('legal exemptions are named: every listed file exists, and region markers sit only in LEGAL_REGION_FILES', () => {
+    for (const f of [...Object.keys(LEGAL_FILES), ...Object.keys(LEGAL_REGION_FILES)])
+      expect(() => readFileSync(join(ROOT, f)), f).not.toThrow();
+    const stray = storefrontPaths()
+      .filter(p => REGION_START.test(readFileSync(p, 'utf8')))
+      .map(p => relative(ROOT, p))
+      .filter(f => !(f in LEGAL_REGION_FILES));
+    expect(stray).toEqual([]);
+    for (const f of Object.keys(LEGAL_REGION_FILES)) {
+      const src = readFileSync(join(ROOT, f), 'utf8');
+      expect(src, f).toMatch(REGION_START);
+      expect((src.match(/legal-register:start/g) ?? []).length, f).toBe(
+        (src.match(/legal-register:end/g) ?? []).length
+      );
+    }
   });
 
   it("Ahmad's Egyptian sentences are in the files that render them", () => {
@@ -270,6 +256,10 @@ describe('storefront Arabic register (Ruling FU46-Y02a: Egyptian sentences, neut
       'قطعتان',
       'المتجر غير متاح حالياً',
       'سيراجع صاحب المتجر التحويل',
+      'سلة التسوق فارغة',
+      'يجب أن تختار مقاس',
+      'كيف يمكنني تتبع طلبي؟',
+      'هل تحتاج مساعدة؟',
     ])
       expect(hit(s), s).toBe(true);
     for (const s of [
@@ -284,6 +274,12 @@ describe('storefront Arabic register (Ruling FU46-Y02a: Egyptian sentences, neut
       'التيشيرت',
       'يلمع',
       'الهدية',
+      'سلتك فاضية',
+      'لازم تختار مقاس',
+      'إزاي أتابع طلبي؟',
+      'محتاج مساعدة؟',
+      'يمكن يوصل بكرة',
+      'أخرى',
     ])
       expect(hit(s), s).toBe(false);
   });

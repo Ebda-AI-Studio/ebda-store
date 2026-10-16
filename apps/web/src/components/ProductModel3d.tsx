@@ -97,7 +97,7 @@ export function ProductModel3dPanel({
       alt={alt}
       look={look}
       labels={{
-        loading: t('Loading 3D…', 'جاري تحميل الـ 3D…'),
+        loading: t('Loading 3D…', 'بنحمّل الـ 3D…'),
         error: t('3D view unavailable right now.', 'عرض الـ 3D مش متاح دلوقتي.'),
         hint: t(
           'Drag to rotate · pinch or +/− to zoom · arrow keys',

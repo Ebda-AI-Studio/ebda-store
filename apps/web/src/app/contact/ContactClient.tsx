@@ -80,13 +80,11 @@ export default function ContactClient() {
     <ShopChrome>
       <div className="mx-auto w-full max-w-3xl flex-1 px-4 py-12 sm:px-6 lg:px-8">
         <div className="text-center">
-          <h1 className="text-3xl font-bold text-foreground">
-            {t('Contact Us', '\u0627\u062a\u0635\u0644 \u0628\u0646\u0627')}
-          </h1>
+          <h1 className="text-3xl font-bold text-foreground">{t('Contact Us', 'اتصل بنا')}</h1>
           <p className="mt-2 text-muted-foreground">
             {t(
               "Have a question or need help? We're here for you.",
-              '\u0647\u0644 \u0644\u062f\u064a\u0643 \u0633\u0624\u0627\u0644 \u0623\u0648 \u062a\u062d\u062a\u0627\u062c \u0645\u0633\u0627\u0639\u062f\u0629\u061f \u0646\u062d\u0646 \u0647\u0646\u0627 \u0645\u0646 \u0623\u062c\u0644\u0643.'
+              'عندك سؤال أو محتاج مساعدة؟ احنا هنا عشانك.'
             )}
           </p>
         </div>
@@ -119,16 +117,13 @@ export default function ContactClient() {
             </div>
             <div className="grid gap-6 sm:grid-cols-2">
               <Input
-                label={t('Your Name', '\u0627\u0644\u0627\u0633\u0645')}
+                label={t('Your Name', 'الاسم')}
                 value={formData.name}
                 onChange={e => setFormData(prev => ({ ...prev, name: e.target.value }))}
                 required
               />
               <Input
-                label={t(
-                  'Email Address',
-                  '\u0627\u0644\u0628\u0631\u064a\u062f \u0627\u0644\u0625\u0644\u0643\u062a\u0631\u0648\u0646\u064a'
-                )}
+                label={t('Email Address', 'البريد الإلكتروني')}
                 type="email"
                 value={formData.email}
                 onChange={e => setFormData(prev => ({ ...prev, email: e.target.value }))}
@@ -136,20 +131,20 @@ export default function ContactClient() {
               />
             </div>
             <Input
-              label={t('Subject', '\u0627\u0644\u0645\u0648\u0636\u0648\u0639')}
+              label={t('Subject', 'الموضوع')}
               value={formData.subject}
               onChange={e => setFormData(prev => ({ ...prev, subject: e.target.value }))}
               required
             />
             <Textarea
-              label={t('Message', '\u0627\u0644\u0631\u0633\u0627\u0644\u0629')}
+              label={t('Message', 'الرسالة')}
               rows={5}
               value={formData.message}
               onChange={e => setFormData(prev => ({ ...prev, message: e.target.value }))}
               required
             />
             <Button type="submit" className="w-full" isLoading={isSubmitting}>
-              {t('Send Message', '\u0625\u0631\u0633\u0627\u0644 \u0631\u0633\u0627\u0644\u0629')}
+              {t('Send Message', 'إرسال رسالة')}
             </Button>
           </form>
         </div>
@@ -180,7 +175,7 @@ export default function ContactClient() {
                   {store.email}
                 </a>
               ) : (
-                t('Not available', '\u063a\u064a\u0631 \u0645\u062a\u0648\u0641\u0631')
+                t('Not available', 'غير متوفر')
               )}
             </p>
           </div>
@@ -209,7 +204,7 @@ export default function ContactClient() {
                   {store.phone}
                 </a>
               ) : (
-                t('Not available', '\u063a\u064a\u0631 \u0645\u062a\u0648\u0641\u0631')
+                t('Not available', 'غير متوفر')
               )}
             </p>
           </div>
@@ -235,9 +230,7 @@ export default function ContactClient() {
                 />
               </svg>
             </div>
-            <h3 className="mt-4 font-semibold text-foreground">
-              {t('Location', '\u0627\u0644\u0645\u0648\u0642\u0639')}
-            </h3>
+            <h3 className="mt-4 font-semibold text-foreground">{t('Location', 'الموقع')}</h3>
             <p className="mt-1 text-sm text-muted-foreground">
               {store.address ? (
                 addressHref ? (
@@ -253,7 +246,7 @@ export default function ContactClient() {
                   store.address
                 )
               ) : (
-                t('Not available', '\u063a\u064a\u0631 \u0645\u062a\u0648\u0641\u0631')
+                t('Not available', 'غير متوفر')
               )}
             </p>
           </div>

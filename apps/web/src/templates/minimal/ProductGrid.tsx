@@ -67,9 +67,7 @@ export default function MinimalProductGrid({
         {/* Empty State */}
         {products.length === 0 && (
           <div className="text-center py-24">
-            <p className="text-sm text-muted-foreground">
-              {isRtl ? 'لا توجد منتجات' : 'No products'}
-            </p>
+            <p className="text-sm text-muted-foreground">{isRtl ? 'مفيش منتجات' : 'No products'}</p>
           </div>
         )}
       </div>

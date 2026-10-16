@@ -162,7 +162,7 @@ export async function assertAnalyticsTier(
   if (!e) throw new AppError(404, 'STORE_NOT_FOUND', 'Store not found');
   if (ANALYTICS_TIER_RANK[e.limits.analyticsTier] >= ANALYTICS_TIER_RANK[min]) return;
   const messageEn = `${min === 'advanced' ? 'Advanced' : 'Standard'} analytics are not included in your plan. Upgrade to unlock them.`;
-  const messageAr = `${min === 'advanced' ? 'التحليلات المتقدمة' : 'التحليلات القياسية'} غير متاحة في باقتك. قم بالترقية لفتحها.`;
+  const messageAr = `${min === 'advanced' ? 'التحليلات المتقدمة' : 'التحليلات القياسية'} مش متاحة في باقتك. رقّي باقتك عشان تفتحها.`;
   throw new AppError(402, PLAN_LIMIT_ERROR_CODE, messageEn, {
     limitKey: 'analyticsTier',
     limit: e.limits.analyticsTier,

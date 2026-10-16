@@ -33,6 +33,7 @@ export interface ReturnPolicyCopy {
   body: string;
 }
 
+// legal-register:start — the returns-policy body and the terms sentence stay formal (Ruling FU46-Y02b).
 export function returnPolicyCopy(
   days: number | null | undefined,
   lang: PolicyLang,
@@ -44,7 +45,7 @@ export function returnPolicyCopy(
     return lang === 'ar'
       ? {
           title: `سياسة الإرجاع خلال ${daysPhrase(n, 'ar', localize)}`,
-          body: `نتمنى تكون راضي تمامًا عن مشترياتك. لو الطلب مش مناسبك، تقدر ترجعه خلال ${daysPhrase(n, 'ar', localize)} من تاريخ التوصيل.`,
+          body: `نتمنى أن تكون راضياً تماماً عن مشترياتك. إذا لم يناسبك الطلب، يمكنك إرجاعه خلال ${daysPhrase(n, 'ar', localize)} من تاريخ التوصيل.`,
         }
       : {
           title: `${n}-Day Return Policy`,
@@ -55,7 +56,7 @@ export function returnPolicyCopy(
     return lang === 'ar'
       ? {
           title: 'الإرجاع غير متاح',
-          body: 'المتجر ده مش بيقبل الإرجاع. لو وصلك منتج تالف أو مش زي الوصف، كلّم المتجر وهيساعدك.',
+          body: 'هذا المتجر لا يقبل طلبات الإرجاع. إذا وصلك منتج تالف أو غير مطابق، تواصل مع المتجر وسنساعدك.',
         }
       : {
           title: 'Returns Not Accepted',
@@ -65,7 +66,7 @@ export function returnPolicyCopy(
   return lang === 'ar'
     ? {
         title: 'سياسة الإرجاع',
-        body: 'كلّم المتجر عشان تعرف مدة الإرجاع المتاحة لطلبك قبل ما تطلب.',
+        body: 'تواصل مع المتجر لمعرفة مدة الإرجاع المتاحة لطلبك قبل تقديم الطلب.',
       }
     : {
         title: 'Return Policy',
@@ -83,18 +84,20 @@ export function termsReturnSentence(
   if (kind === 'window') {
     const n = days as number;
     return lang === 'ar'
-      ? `سياسة الإرجاع عندنا بتسمح بالإرجاع خلال ${daysPhrase(n, 'ar', localize)} من التوصيل. شوف صفحة المرتجعات عشان تعرف كل التفاصيل عن الشروط والخطوات.`
+      ? `تسمح سياسة الإرجاع لدينا بالإرجاع خلال ${daysPhrase(n, 'ar', localize)} من التوصيل. يرجى الرجوع إلى صفحة المرتجعات لمعرفة التفاصيل الكاملة حول الأهلية والإجراءات.`
       : `Our return policy allows returns within ${daysPhrase(n, 'en')} of delivery. Please refer to our Returns page for complete details on eligibility and process.`;
   }
   if (kind === 'none') {
     return lang === 'ar'
-      ? 'المتجر ده مش بيقبل الإرجاع. شوف صفحة المرتجعات عشان تعرف التفاصيل.'
+      ? 'لا يقبل هذا المتجر طلبات الإرجاع. يرجى الرجوع إلى صفحة المرتجعات لمعرفة التفاصيل.'
       : 'This store does not accept returns. Please refer to our Returns page for details.';
   }
   return lang === 'ar'
-    ? 'مدة الإرجاع بيحددها المتجر. شوف صفحة المرتجعات أو كلّمنا عشان تعرف كل التفاصيل عن الشروط والخطوات.'
+    ? 'تختلف مدة الإرجاع حسب المتجر. يرجى الرجوع إلى صفحة المرتجعات أو التواصل معنا لمعرفة التفاصيل الكاملة حول الأهلية والإجراءات.'
     : 'The return period is set by the store. Please refer to our Returns page or contact us for complete details on eligibility and process.';
 }
+
+// legal-register:end
 
 /** Generic-FAQ answer for "What is your return policy?" (no number unless the store declared one). */
 export function faqReturnAnswer(

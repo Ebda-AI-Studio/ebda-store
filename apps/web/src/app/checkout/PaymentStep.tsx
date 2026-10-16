@@ -122,7 +122,7 @@ export default function PaymentStep({
               <span>
                 {t(
                   "Couldn't load payment methods. Please check your connection and retry.",
-                  'تعذّر تحميل طرق الدفع. يرجى التحقق من اتصالك وإعادة المحاولة.'
+                  'معرفناش نحمّل طرق الدفع. اتأكد من اتصالك وجرّب تاني.'
                 )}
               </span>
               {onRetryPaymentConfig && (
@@ -143,7 +143,7 @@ export default function PaymentStep({
               >
                 {t(
                   'No payment methods are configured for this store. Please contact the store owner.',
-                  'لا توجد طرق دفع مُعدّة لهذا المتجر. يرجى التواصل مع صاحب المتجر.'
+                  'مفيش طرق دفع متظبطة للمتجر ده. كلّم صاحب المتجر.'
                 )}
               </div>
             )
@@ -228,7 +228,7 @@ export default function PaymentStep({
             disabled={!selectedProvider || isProcessing || belowMinimumOrder}
           >
             {isProcessing
-              ? t('Processing...', 'جاري المعالجة...')
+              ? t('Processing...', 'بنجهّز...')
               : selectedProvider === 'cod'
                 ? t('Place Order', translations['Place Order'])
                 : `${t('Pay', 'ادفع')} ${formatPrice(total)}`}

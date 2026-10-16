@@ -306,13 +306,13 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
           await refetchCart().catch(() => {});
           if (res.error?.code === 'VARIANT_REQUIRED') {
             toast.info(
-              t('Choose your options first', 'اختر الخيارات أولاً'),
-              t('Pick them on the product page.', 'اخترها في صفحة المنتج.')
+              t('Choose your options first', 'اختار الاختيارات الأول'),
+              t('Pick them on the product page.', 'اختارها من صفحة المنتج.')
             );
           } else {
             toast.info(
               t('Personalise it first', 'اكتب التخصيص الأول'),
-              t('Add your text on the product page.', 'اكتبه في صفحة المنتج.')
+              t('Add your text on the product page.', 'اكتبه من صفحة المنتج.')
             );
           }
           // Plain navigation, not useRouter: this provider also renders outside
@@ -342,8 +342,8 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         // rejection, and a caller that cares (e.g. the PDP conversion pixel) can
         // branch on the result.
         toast.error(
-          t('Unable to add to cart', 'تعذّرت الإضافة للسلة'),
-          t('Please try again.', 'يرجى المحاولة مرة أخرى.')
+          t('Unable to add to cart', 'الإضافة للسلة ما نفعتش'),
+          t('Please try again.', 'جرّب تاني.')
         );
         return false;
       }
@@ -419,7 +419,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
           );
           toast.success(
             t('Added to cart', 'تمت الإضافة للسلة'),
-            t('Bundle added to your cart', 'تمت إضافة الباقة إلى سلتك')
+            t('Bundle added to your cart', 'الباقة اتضافت لسلتك')
           );
           return true;
         }
@@ -436,8 +436,8 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       } catch {
         await refetchCart().catch(() => {});
         toast.error(
-          t('Unable to add to cart', 'تعذّرت الإضافة للسلة'),
-          t('Please try again.', 'يرجى المحاولة مرة أخرى.')
+          t('Unable to add to cart', 'الإضافة للسلة ما نفعتش'),
+          t('Please try again.', 'جرّب تاني.')
         );
         return false;
       }

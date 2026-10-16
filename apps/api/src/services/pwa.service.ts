@@ -152,7 +152,7 @@ export async function generatePwaIconSet(
     const messageEn = 'The icon must be a square PNG image.';
     throw new AppError(400, 'ICON_GENERATION_FAILED', messageEn, {
       messageEn,
-      messageAr: 'يجب أن تكون الأيقونة صورة PNG مربعة.',
+      messageAr: 'الأيقونة لازم تكون صورة PNG مربعة.',
     });
   }
   const sourcePng = sourceBuffer;

@@ -33,15 +33,12 @@ export default function ShippingClient() {
       <div className="mx-auto w-full max-w-3xl flex-1 px-4 py-12 sm:px-6 lg:px-8">
         <div className="text-center">
           <h1 className="text-3xl font-bold text-foreground">
-            {t(
-              'Shipping Information',
-              '\u0645\u0639\u0644\u0648\u0645\u0627\u062a \u0627\u0644\u0634\u062d\u0646'
-            )}
+            {t('Shipping Information', 'معلومات الشحن')}
           </h1>
           <p className="mt-2 text-muted-foreground">
             {t(
               'Everything you need to know about our shipping policies',
-              '\u0643\u0644 \u0645\u0627 \u062a\u062d\u062a\u0627\u062c \u0645\u0639\u0631\u0641\u062a\u0647 \u0639\u0646 \u0633\u064a\u0627\u0633\u0627\u062a \u0627\u0644\u0634\u062d\u0646 \u0644\u062f\u064a\u0646\u0627'
+              'كل اللي محتاج تعرفه عن الشحن عندنا'
             )}
           </p>
         </div>
@@ -49,30 +46,21 @@ export default function ShippingClient() {
         <div className="mt-12 space-y-8">
           <section className="rounded-xl border bg-card p-6 shadow-sm">
             <h2 className="text-xl font-semibold text-foreground">
-              {t(
-                'Shipping Options',
-                '\u062e\u064a\u0627\u0631\u0627\u062a \u0627\u0644\u0634\u062d\u0646'
-              )}
+              {t('Shipping Options', 'خيارات الشحن')}
             </h2>
 
             {/* Loading state */}
             {isLoading && (
               <div className="mt-4 flex items-center gap-2 text-sm text-muted-foreground">
                 <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-                {t(
-                  'Loading shipping options...',
-                  '\u062c\u0627\u0631\u064a \u062a\u062d\u0645\u064a\u0644 \u062e\u064a\u0627\u0631\u0627\u062a \u0627\u0644\u0634\u062d\u0646...'
-                )}
+                {t('Loading shipping options...', 'بنحمّل خيارات الشحن...')}
               </div>
             )}
 
             {/* Error / no zones configured */}
             {!isLoading && (fetchError || zones.length === 0) && (
               <p className="mt-4 text-muted-foreground">
-                {t(
-                  'Contact us for shipping rates.',
-                  '\u062a\u0648\u0627\u0635\u0644 \u0645\u0639\u0646\u0627 \u0644\u0645\u0639\u0631\u0641\u0629 \u0623\u0633\u0639\u0627\u0631 \u0627\u0644\u0634\u062d\u0646.'
-                )}
+                {t('Contact us for shipping rates.', 'كلّمنا عشان تعرف أسعار الشحن.')}
               </p>
             )}
 
@@ -112,7 +100,7 @@ export default function ShippingClient() {
                       </p>
                       {zone.deliveryFee === 0 ? (
                         <p className="mt-1 text-sm font-medium text-primary">
-                          {t('Free Shipping', '\u0634\u062d\u0646 \u0645\u062c\u0627\u0646\u064a')}
+                          {t('Free Shipping', 'شحن مجاني')}
                         </p>
                       ) : (
                         <p className="mt-1 text-sm font-medium text-foreground">
@@ -121,10 +109,7 @@ export default function ShippingClient() {
                       )}
                       {zone.freeShippingThreshold != null && zone.freeShippingThreshold > 0 && (
                         <p className="text-sm font-medium text-primary">
-                          {t(
-                            'FREE on orders over',
-                            '\u0645\u062c\u0627\u0646\u064a \u0644\u0644\u0637\u0644\u0628\u0627\u062a \u0623\u0643\u062b\u0631 \u0645\u0646'
-                          )}{' '}
+                          {t('FREE on orders over', 'مجاني للطلبات أكثر من')}{' '}
                           {formatPrice(zone.freeShippingThreshold!)}
                         </p>
                       )}
@@ -137,12 +122,12 @@ export default function ShippingClient() {
 
           <section className="rounded-xl border bg-card p-6 shadow-sm">
             <h2 className="text-xl font-semibold text-foreground">
-              {t('Order Tracking', '\u062a\u062a\u0628\u0639 \u0627\u0644\u0637\u0644\u0628')}
+              {t('Order Tracking', 'تتبع الطلب')}
             </h2>
             <p className="mt-2 text-muted-foreground">
               {t(
                 "Once your order ships, you'll receive an email with your tracking number. You can track your package using:",
-                '\u0628\u0645\u062c\u0631\u062f \u0634\u062d\u0646 \u0637\u0644\u0628\u0643\u060c \u0633\u062a\u062a\u0644\u0642\u0649 \u0628\u0631\u064a\u062f\u0627\u064b \u0625\u0644\u0643\u062a\u0631\u0648\u0646\u064a\u0627\u064b \u064a\u062d\u062a\u0648\u064a \u0639\u0644\u0649 \u0631\u0642\u0645 \u0627\u0644\u062a\u062a\u0628\u0639. \u064a\u0645\u0643\u0646\u0643 \u062a\u062a\u0628\u0639 \u0637\u0631\u062f\u0643 \u0628\u0627\u0633\u062a\u062e\u062f\u0627\u0645:'
+                'أول ما طلبك يتشحن، هيوصلك إيميل فيه رقم التتبع. تقدر تتابع شحنتك من:'
               )}
             </p>
             <ul className="mt-4 space-y-2 text-muted-foreground">
@@ -162,7 +147,7 @@ export default function ShippingClient() {
                 </svg>
                 {t(
                   'The tracking link in your shipping confirmation email',
-                  '\u0631\u0627\u0628\u0637 \u0627\u0644\u062a\u062a\u0628\u0639 \u0641\u064a \u0628\u0631\u064a\u062f \u062a\u0623\u0643\u064a\u062f \u0627\u0644\u0634\u062d\u0646'
+                  'رابط التتبع في بريد تأكيد الشحن'
                 )}
               </li>
               <li className="flex items-center gap-2">
@@ -179,10 +164,7 @@ export default function ShippingClient() {
                     d="M5 13l4 4L19 7"
                   />
                 </svg>
-                {t(
-                  'Your account order history (if logged in)',
-                  '\u0633\u062c\u0644 \u0637\u0644\u0628\u0627\u062a \u062d\u0633\u0627\u0628\u0643 (\u0625\u0630\u0627 \u0643\u0646\u062a \u0645\u0633\u062c\u0644\u0627\u064b)'
-                )}
+                {t('Your account order history (if logged in)', 'سجل طلبات حسابك (لو مسجّل)')}
               </li>
               <li className="flex items-center gap-2">
                 <svg
@@ -198,10 +180,7 @@ export default function ShippingClient() {
                     d="M5 13l4 4L19 7"
                   />
                 </svg>
-                {t(
-                  "The carrier's website directly",
-                  '\u0645\u0648\u0642\u0639 \u0634\u0631\u0643\u0629 \u0627\u0644\u0634\u062d\u0646 \u0645\u0628\u0627\u0634\u0631\u0629'
-                )}
+                {t("The carrier's website directly", 'موقع شركة الشحن مباشرة')}
               </li>
             </ul>
           </section>
@@ -209,12 +188,9 @@ export default function ShippingClient() {
 
         <div className="mt-8 text-center">
           <p className="text-muted-foreground">
-            {t(
-              'Have questions about shipping?',
-              '\u0647\u0644 \u0644\u062f\u064a\u0643 \u0623\u0633\u0626\u0644\u0629 \u062d\u0648\u0644 \u0627\u0644\u0634\u062d\u0646\u061f'
-            )}{' '}
+            {t('Have questions about shipping?', 'عندك أسئلة عن الشحن؟')}{' '}
             <Link href={storeUrl('/contact')} className="text-primary hover:underline">
-              {t('Contact us', '\u062a\u0648\u0627\u0635\u0644 \u0645\u0639\u0646\u0627')}
+              {t('Contact us', 'تواصل معنا')}
             </Link>
           </p>
         </div>

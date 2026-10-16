@@ -73,13 +73,13 @@ export default function SharedWishlistClient({ userId }: Props) {
       } else if (data.error?.code === 'NOT_FOUND') {
         setError(t('Wishlist not found', 'قائمة المفضلة غير موجودة'));
       } else {
-        setError(data.error?.message || t('Failed to load wishlist', 'فشل تحميل قائمة المفضلة'));
+        setError(data.error?.message || t('Failed to load wishlist', 'معرفناش نحمّل المفضلة'));
       }
     } catch {
       setError(
         t(
           'Unable to load wishlist. Please check your connection.',
-          'تعذر تحميل قائمة المفضلة. يرجى التحقق من اتصالك.'
+          'معرفناش نحمّل المفضلة. اتأكد من اتصالك.'
         )
       );
     }
@@ -109,15 +109,12 @@ export default function SharedWishlistClient({ userId }: Props) {
       } else {
         setActionError(
           (response.error as { message?: string })?.message ||
-            t('Failed to add to cart', 'فشل الإضافة إلى السلة')
+            t('Failed to add to cart', 'الإضافة للسلة ما نفعتش')
         );
       }
     } catch {
       setActionError(
-        t(
-          'Failed to add to cart. Please try again.',
-          'فشل الإضافة إلى السلة. يرجى المحاولة مرة أخرى.'
-        )
+        t('Failed to add to cart. Please try again.', 'الإضافة للسلة ما نفعتش. جرّب تاني.')
       );
     }
   }
@@ -158,12 +155,12 @@ export default function SharedWishlistClient({ userId }: Props) {
               />
             </svg>
             <h2 className="text-xl font-semibold mb-2">
-              {t('This wishlist is private', 'قائمة المفضلة هذه خاصة')}
+              {t('This wishlist is private', 'المفضلة دي خاصة')}
             </h2>
             <p className="text-muted-foreground">
               {t(
                 'The owner has not made this wishlist public.',
-                'لم يجعل المالك قائمة المفضلة هذه عامة.'
+                'صاحبها ما خلاّش المفضلة دي عامة.'
               )}
             </p>
           </div>
@@ -237,7 +234,7 @@ export default function SharedWishlistClient({ userId }: Props) {
               />
             </svg>
             <h2 className="text-xl font-semibold mb-2">
-              {t('This wishlist is empty', 'قائمة المفضلة فارغة')}
+              {t('This wishlist is empty', 'المفضلة فاضية')}
             </h2>
           </div>
         ) : (
@@ -294,7 +291,7 @@ export default function SharedWishlistClient({ userId }: Props) {
                   </div>
                   {item.product.status !== 'active' ? (
                     <span className="text-destructive-ink text-sm">
-                      {t('Currently unavailable', 'غير متوفر حالياً')}
+                      {t('Currently unavailable', 'مش متوفر دلوقتي')}
                     </span>
                   ) : (
                     !isOrderable(item.product) && (

@@ -86,7 +86,7 @@ export function variantRequiredCopy(
   if (names.length === 0) {
     return t(
       'An item in your cart needs a size. Choose it on the product page.',
-      'يوجد منتج في سلتك يحتاج إلى اختيار المقاس. اختره من صفحة المنتج.'
+      'في منتج في سلتك محتاج تختار المقاس. اختاره من صفحة المنتج.'
     );
   }
   const list = names.join(ar ? '، ' : ', ');

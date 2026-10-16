@@ -89,7 +89,7 @@ export function InstapayCard({
       <p className="mt-6 text-sm text-muted-foreground" data-testid="instapay-load-error">
         {t(
           'We could not load the transfer details. Please refresh this page.',
-          'تعذّر تحميل تفاصيل التحويل. يرجى تحديث الصفحة.'
+          'معرفناش نحمّل تفاصيل التحويل. حدّث الصفحة.'
         )}
       </p>
     );
@@ -124,7 +124,7 @@ export function InstapayCard({
         {confirmed
           ? t('Transfer confirmed', 'تم تأكيد التحويل')
           : cancelled
-            ? t('This order expired', 'انتهت مهلة هذا الطلب')
+            ? t('This order expired', 'مهلة الطلب ده خلصت')
             : t('Pay by InstaPay', 'ادفع عبر إنستاباي')}
       </h2>
 
@@ -133,7 +133,7 @@ export function InstapayCard({
           <p className="mt-1 text-sm text-muted-foreground">
             {t(
               'Transfer exactly this amount, then keep your order number in the transfer note. The store confirms your order once the money arrives.',
-              'حوّل هذا المبلغ بالضبط، واكتب رقم الطلب في ملاحظة التحويل. يؤكد المتجر طلبك فور وصول المبلغ.'
+              'حوّل المبلغ ده بالظبط، واكتب رقم الطلب في ملاحظة التحويل. المتجر هيأكد طلبك أول ما المبلغ يوصل.'
             )}
           </p>
           <div className="mt-3 divide-y rounded-lg border px-3">
@@ -163,7 +163,7 @@ export function InstapayCard({
               })}
               {t(
                 '. After that the order is cancelled and the items go back on sale.',
-                '. بعدها يُلغى الطلب وتعود المنتجات للبيع.'
+                '. بعدها الطلب بيتلغي والمنتجات بترجع للبيع.'
               )}
             </p>
           )}
@@ -180,7 +180,7 @@ export function InstapayCard({
         <p className="mt-1 text-sm text-muted-foreground">
           {t(
             'The store confirmed your transfer. Your order is on its way to being prepared.',
-            'أكّد المتجر استلام التحويل. طلبك قيد التجهيز.'
+            'المتجر أكّد إنه استلم التحويل. طلبك بيتجهز.'
           )}
         </p>
       )}
@@ -188,7 +188,7 @@ export function InstapayCard({
         <p className="mt-1 text-sm text-muted-foreground">
           {t(
             'No transfer was confirmed in time, so the order was cancelled. You can place it again.',
-            'لم يُؤكَّد أي تحويل في الوقت المحدد، لذلك أُلغي الطلب. يمكنك تقديمه من جديد.'
+            'مفيش تحويل اتأكد في الوقت المحدد، فالطلب اتلغى. تقدر تطلب من جديد.'
           )}
         </p>
       )}

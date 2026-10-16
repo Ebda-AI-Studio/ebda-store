@@ -141,7 +141,7 @@ const iconUpload = multer({
       cb(
         new AppError(400, 'INVALID_FILE_TYPE', 'The icon must be a PNG image.', {
           messageEn: 'The icon must be a PNG image.',
-          messageAr: 'يجب أن تكون الأيقونة صورة PNG.',
+          messageAr: 'الأيقونة لازم تكون صورة PNG.',
         })
       );
     }

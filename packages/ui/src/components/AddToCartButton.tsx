@@ -42,7 +42,7 @@ const defaultLabels = {
     addToCart: 'أضف للسلة',
     addedToCart: 'تمت الإضافة!',
     outOfStock: 'نفذت الكمية',
-    adding: 'جاري الإضافة...',
+    adding: 'بنضيف...',
   },
 };
 
