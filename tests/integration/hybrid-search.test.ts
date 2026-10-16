@@ -36,6 +36,7 @@ const {
   semanticProductIds,
   clearQueryVectorCacheForTests,
   QUERY_EMBED_BUDGET_MS,
+  KEYWORD_STRONG_AT,
   PRODUCT_SEARCH_ID_CAP,
 } = await import('../../apps/api/src/services/product-search.service');
 const { ProductService } = await import('../../apps/api/src/services/product.service');
@@ -132,8 +133,10 @@ describe.skipIf(!hasDb)('hybrid storefront search (Task 12)', () => {
   beforeAll(async () => {
     const { redis } = await import('../../apps/api/src/services/redis.service');
     await redis.connect();
-    const { embedCallBudgetKey } = await import('../../apps/api/src/lib/search/embed-budget');
+    const { embedCallBudgetKey, queryEmbedGlobalKey } =
+      await import('../../apps/api/src/lib/search/embed-budget');
     await redis.getClient()?.del(embedCallBudgetKey(new Date()));
+    await redis.getClient()?.del(queryEmbedGlobalKey(new Date()));
 
     S = await mkStore('main');
     F = await mkStore('foreign');
@@ -334,8 +337,9 @@ describe.skipIf(!hasDb)('hybrid storefront search (Task 12)', () => {
     expect(n).toBe(2);
   });
 
-  it('keyword leg keeps every match up to the 1000 cap (E10), not just the fused head of 50', async () => {
+  it('a strong keyword leg (>= KEYWORD_STRONG_AT) is not embedded, and keeps every match (E10 cap)', async () => {
     expect(PRODUCT_SEARCH_ID_CAP).toBe(1000);
+    expect(KEYWORD_STRONG_AT).toBe(20);
     const B = await mkStore('boots');
     await prisma.product.createMany({
       data: Array.from({ length: 60 }, (_, i) => ({
@@ -350,23 +354,49 @@ describe.skipIf(!hasDb)('hybrid storefront search (Task 12)', () => {
     await runInStoreScope(B, () => indexStore(B));
     const target = (await prisma.product.findFirst({ where: { storeId: B, name: 'Boot 55' } }))!.id;
     process.env.SEARCH_SEMANTIC_ENABLED = 'true';
-    setEmbeddingProviderForTests(aliasProvider({ boots: await docOf(target) }).provider);
+    const f = aliasProvider({ boot: await docOf(target), boots: await docOf(target) });
+    setEmbeddingProviderForTests(f.provider);
     const ids = await runInTenantContext(B, () => rankedSearch(B, 'boot'));
     expect(ids).toHaveLength(60);
     expect(new Set(ids).size).toBe(60);
-    clearQueryVectorCacheForTests();
-    const ranked = await runInTenantContext(B, () => rankedSearch(B, 'boots'));
-    // "boots" matches no "Boot N" by keyword: the vector leg alone answers (zero-result fallback).
-    expect(ranked).toEqual([target]);
-    setEmbeddingProviderForTests(aliasProvider({ boot: await docOf(target) }).provider);
-    clearQueryVectorCacheForTests();
-    const fused = await runInTenantContext(B, () => rankedSearch(B, 'boot'));
-    expect(fused).toHaveLength(60);
-    expect(new Set(fused).size).toBe(60);
-    expect(fused.indexOf(target)).toBeLessThan(2); // pulled up from wherever the keyword leg had it
+    expect(f.calls).toHaveLength(0); // 60 keyword matches: no Workers AI call
     const r = await listPublic(B, { search: 'boot', limit: 20, page: 3 });
     expect(r.meta).toMatchObject({ total: 60, totalPages: 3, ranked: true });
-    expect(pageIds(r)).toEqual(fused.slice(40, 60));
+    expect(pageIds(r)).toEqual(ids.slice(40, 60));
+    // "boots" matches no "Boot N" by keyword: the vector leg alone answers (zero-result fallback).
+    expect(await runInTenantContext(B, () => rankedSearch(B, 'boots'))).toEqual([target]);
+    expect(f.calls).toHaveLength(1);
+  });
+
+  it(
+    '1000 unique queries in one store make at most the per-store budget of provider calls',
+    { timeout: 120_000 },
+    async () => {
+      process.env.SEARCH_SEMANTIC_ENABLED = 'true';
+      process.env.SEARCH_QUERY_EMBED_STORE_DAILY_CAP = '25';
+      const Q = await mkStore('budget');
+      const f = aliasProvider();
+      setEmbeddingProviderForTests(f.provider);
+      try {
+        for (let i = 0; i < 1000; i++) {
+          const ids = await runInTenantContext(Q, () => rankedSearch(Q, `zz unique query ${i}`));
+          expect(ids).toEqual([]); // keyword-only once the budget is spent: an answer, never a throw
+        }
+        expect(f.calls).toHaveLength(25);
+      } finally {
+        delete process.env.SEARCH_QUERY_EMBED_STORE_DAILY_CAP;
+      }
+    }
+  );
+
+  it('semantic: false (the per-searcher limiter said no) → keyword only, no provider call', async () => {
+    process.env.SEARCH_SEMANTIC_ENABLED = 'true';
+    const f = aliasProvider({ كوتشي: sneakerDoc });
+    setEmbeddingProviderForTests(f.provider);
+    expect(
+      await runInTenantContext(S, () => rankedSearch(S, 'كوتشي', { semantic: false }))
+    ).toEqual([]);
+    expect(f.calls).toHaveLength(0);
   });
 
   // ---- storefront list (listPublic) -----------------------------------------------------------
@@ -431,8 +461,8 @@ describe.skipIf(!hasDb)('hybrid storefront search (Task 12)', () => {
     setEmbeddingProviderForTests(aliasProvider({ shoes: sneakerDoc }).provider);
     const full = pageIds(await listPublic(S, { search: 'shoes', limit: 10 }));
     expect(full).toHaveLength(4);
-    // The fused head ranks the product both legs found first.
-    expect(full[0]).toBe(p.sneaker);
+    // The vector-only hit ties the keyword leg's #1 (1/61 each); the id decides, so it is 1st or 2nd.
+    expect(full.indexOf(p.sneaker)).toBeLessThan(2);
     const byPage: string[] = [];
     for (let page = 1; page <= 4; page++) {
       const r = await listPublic(S, { search: 'shoes', limit: 1, page });

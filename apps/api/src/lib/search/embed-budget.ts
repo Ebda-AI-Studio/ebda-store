@@ -54,6 +54,68 @@ export async function takeEmbedCalls(n: number): Promise<boolean> {
   }
 }
 
+// ---- Storefront query embeds (Task 12, Ruling SEARCH-T12-3) ----------------------------------
+// Every query embed that is NOT served from the in-isolate query-vector cache takes one call from
+// three Cairo-day counters, all of which must have room: the account-wide total above (shared with
+// the indexer, so the daily spend ceiling covers both), a query-wide cap set BELOW it (shoppers can
+// never use up the indexer's share), and a per-store cap (one store's traffic, or an attacker aimed
+// at it, cannot use up every store's). Refused = keyword-only search, never an error. No Redis =
+// refused (fails closed, like the indexer). Unique queries defeat the cache, so these counters,
+// not the cache, are what bound the spend.
+export const DEFAULT_QUERY_GLOBAL_DAILY_CAP = 10_000;
+export const DEFAULT_QUERY_STORE_DAILY_CAP = 1_000;
+
+function capFromEnv(name: string, fallback: number): number {
+  const n = Number.parseInt(process.env[name] ?? '', 10);
+  return Number.isFinite(n) && n >= 0 ? n : fallback;
+}
+/** `SEARCH_QUERY_EMBED_GLOBAL_DAILY_CAP`: storefront query embeds per Cairo day, all stores. */
+export const queryEmbedGlobalDailyCap = () =>
+  capFromEnv('SEARCH_QUERY_EMBED_GLOBAL_DAILY_CAP', DEFAULT_QUERY_GLOBAL_DAILY_CAP);
+/** `SEARCH_QUERY_EMBED_STORE_DAILY_CAP`: storefront query embeds per Cairo day, per store. */
+export const queryEmbedStoreDailyCap = () =>
+  capFromEnv('SEARCH_QUERY_EMBED_STORE_DAILY_CAP', DEFAULT_QUERY_STORE_DAILY_CAP);
+
+export function queryEmbedGlobalKey(now: Date): string {
+  return `search:embed:query:${regionDayStart(now).toISOString()}`;
+}
+export function queryEmbedStoreKey(storeId: string, now: Date): string {
+  return `search:embed:query:${storeId}:${regionDayStart(now).toISOString()}`;
+}
+
+/** Take one storefront query embed from today's budgets; false = do not call the provider. */
+export async function takeQueryEmbed(storeId: string): Promise<boolean> {
+  const caps = [embedGlobalDailyCap(), queryEmbedGlobalDailyCap(), queryEmbedStoreDailyCap()];
+  if (caps.some(c => c <= 0)) return false;
+  const client = redis.getClient();
+  if (!client || !redis.isAvailable()) return false;
+  const now = new Date();
+  const keys = [
+    embedCallBudgetKey(now),
+    queryEmbedGlobalKey(now),
+    queryEmbedStoreKey(storeId, now),
+  ];
+  try {
+    const used = await Promise.all(keys.map(k => client.incr(k)));
+    await Promise.all(
+      used.map((u, i) => (u === 1 ? client.expire(keys[i], DAY_TTL_SECONDS) : undefined))
+    );
+    const ok = used.every((u, i) => u <= caps[i]);
+    // Log the FIRST refusal per counter per day only (u === cap + 1), never every request.
+    used.forEach((u, i) => {
+      if (u === caps[i] + 1)
+        logger.warn(
+          { storeId, budget: ['account', 'query', 'store'][i], cap: caps[i] },
+          '[search] query embed budget reached; keyword-only search until the next Cairo day'
+        );
+    });
+    return ok;
+  } catch (err) {
+    logger.warn({ err }, '[search] query embed budget check failed, not spending');
+    return false;
+  }
+}
+
 /** One P1 per Cairo day when the account-wide ceiling is reached. */
 async function alertGlobalCapOnce(cap: number): Promise<void> {
   const client = redis.getClient();

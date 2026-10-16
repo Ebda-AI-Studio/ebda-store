@@ -21,6 +21,7 @@ import {
   writeLimiter,
   newsletterLimiter,
   viewIngestLimiter,
+  searchEmbedLimiter,
 } from '../middleware/security';
 import { recordProductView } from '../services/view-ingest.service';
 import { claimSearcherSearch, recordSearch } from '../services/search-log.service';
@@ -191,159 +192,170 @@ export const createOrderSchema = z.object({
 });
 
 // GET /products - List all public products (cached 30s)
-router.get('/products', async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const { page, limit, category, search, featured, sort, minPrice, maxPrice, cursor, ids } =
-      req.query;
-    const storeId = await getStoreIdFromRequest(req);
-    // Tri-state: absent -> undefined (no filter). `featured === 'true'` used
-    // to turn an absent param into `featured: false`, which listPublic applied
-    // as `WHERE featured = false` on every non-"Featured" listing.
-    const featuredFilter = parseOptionalBooleanQuery(featured, 'featured');
+router.get(
+  '/products',
+  searchEmbedLimiter,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { page, limit, category, search, featured, sort, minPrice, maxPrice, cursor, ids } =
+        req.query;
+      const storeId = await getStoreIdFromRequest(req);
+      // Tri-state: absent -> undefined (no filter). `featured === 'true'` used
+      // to turn an absent param into `featured: false`, which listPublic applied
+      // as `WHERE featured = false` on every non-"Featured" listing.
+      const featuredFilter = parseOptionalBooleanQuery(featured, 'featured');
 
-    // Search floor + length cap (adversarial audit P1-3, mirrors the >= 2
-    // floor on /:storeId/search/suggest below). The raw term used to pass
-    // straight into an unbounded leading-wildcard ILIKE over 4 TEXT columns
-    // AND into the cache key — so unique sub-floor terms ('a', 'aa', 'qx'…)
-    // bypassed every cache layer and ran a fresh scan per request. A term
-    // under the floor short-circuits to an empty page with NO DB or cache
-    // touch; longer terms are capped at 100 chars (token count is capped at 8
-    // in searchTokens, @ebda/shared) so a crafted query cannot expand into
-    // hundreds of LIKE clauses (product-search.service).
-    const rawSearch = typeof search === 'string' ? search.trim() : '';
-    if (rawSearch.length === 1) {
-      const floorPage = page ? parseInt(page as string) || 1 : 1;
-      const floorLimit = Math.min(100, Math.max(1, (limit ? parseInt(limit as string) : 20) || 20));
+      // Search floor + length cap (adversarial audit P1-3, mirrors the >= 2
+      // floor on /:storeId/search/suggest below). The raw term used to pass
+      // straight into an unbounded leading-wildcard ILIKE over 4 TEXT columns
+      // AND into the cache key — so unique sub-floor terms ('a', 'aa', 'qx'…)
+      // bypassed every cache layer and ran a fresh scan per request. A term
+      // under the floor short-circuits to an empty page with NO DB or cache
+      // touch; longer terms are capped at 100 chars (token count is capped at 8
+      // in searchTokens, @ebda/shared) so a crafted query cannot expand into
+      // hundreds of LIKE clauses (product-search.service).
+      const rawSearch = typeof search === 'string' ? search.trim() : '';
+      if (rawSearch.length === 1) {
+        const floorPage = page ? parseInt(page as string) || 1 : 1;
+        const floorLimit = Math.min(
+          100,
+          Math.max(1, (limit ? parseInt(limit as string) : 20) || 20)
+        );
+        res.json({
+          success: true,
+          data: {
+            products: [],
+            meta: { page: floorPage, limit: floorLimit, total: 0, totalPages: 0 },
+          },
+        });
+        return;
+      }
+      const effectiveSearch = rawSearch.length >= 2 ? rawSearch.slice(0, 100) : undefined;
+
+      // `relevance` (Task 12) = the hybrid order of a search; the service treats it as no sort
+      // whenever semantic search is off or there is no search term.
+      const sortValue =
+        sort === 'newest' ||
+        sort === 'price_asc' ||
+        sort === 'price_desc' ||
+        sort === 'best_seller' ||
+        sort === 'relevance'
+          ? sort
+          : undefined;
+
+      // Cursor MUST be a v4 UUID — refuse anything else so a malformed cursor
+      // can't bypass the offset cap or trigger a Prisma error path.
+      const validCursor =
+        typeof cursor === 'string' &&
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(cursor)
+          ? cursor
+          : undefined;
+
+      // ids query param — comma-separated product UUIDs. Used by page-builder
+      // ExtraCarousel with `productSource === 'manual'`. Service caps at 50.
+      const idsParam =
+        typeof ids === 'string' && ids.length > 0
+          ? ids
+              .split(',')
+              .map(s => s.trim())
+              .filter(Boolean)
+              .slice(0, 50)
+          : undefined;
+
+      // Variant-option facet filters: ?opt_Size=Large,XL&opt_Color=Red
+      // Each `opt_<OptionName>` param carries comma-separated selected values.
+      // Capped at 10 option names and 20 values each to prevent abuse.
+      const optionFilters: Record<string, string[]> = {};
+      const MAX_OPTION_NAMES = 10;
+      const MAX_OPTION_VALUES = 20;
+      let optionFilterKey = '';
+      for (const [key, raw] of Object.entries(req.query)) {
+        if (!key.startsWith('opt_')) continue;
+        if (Object.keys(optionFilters).length >= MAX_OPTION_NAMES) break;
+        const optionName = key.slice(4); // strip "opt_"
+        if (!optionName || typeof raw !== 'string') continue;
+        const vals = raw
+          .split(',')
+          .map(v => v.trim())
+          .filter(Boolean)
+          .slice(0, MAX_OPTION_VALUES);
+        if (vals.length > 0) {
+          optionFilters[optionName] = vals;
+          optionFilterKey += `${optionName}=${vals.join(',')};`;
+        }
+      }
+      const hasOptionFilters = Object.keys(optionFilters).length > 0;
+
+      // Over the per-searcher embed limit (searchEmbedLimiter): served keyword-only, under its own
+      // cache key so a degraded payload never stands in for a full one (the suffix exists only then).
+      const semanticAllowed = res.locals.searchEmbedDenied !== true;
+      // Cache key includes cursor + ids + option filters — different selections get distinct entries.
+      const cacheKey = `public:products:${storeId}:${page || 1}:${limit || 20}:${category || ''}:${
+        effectiveSearch || ''
+      }:${featuredFilter ?? ''}:${sortValue || ''}:${minPrice || ''}:${maxPrice || ''}:${
+        validCursor || ''
+      }:${idsParam?.sort().join(',') ?? ''}:${optionFilterKey}${semanticAllowed ? '' : ':kw'}`;
+
+      const result = await getCached(cacheKey, 120, () =>
+        ProductService.listPublic(storeId, {
+          page: page ? parseInt(page as string) : undefined,
+          limit: limit ? parseInt(limit as string) : undefined,
+          category: category as string,
+          search: effectiveSearch,
+          featured: featuredFilter,
+          sort: sortValue,
+          minPrice: minPrice ? parseInt(minPrice as string, 10) : undefined,
+          maxPrice: maxPrice ? parseInt(maxPrice as string, 10) : undefined,
+          cursor: validCursor,
+          ids: idsParam,
+          optionFilters: hasOptionFilters ? optionFilters : undefined,
+          semantic: semanticAllowed,
+        })
+      );
+
+      // First-party search log (search program P0, Task 5): page 1 of a real query only, so
+      // paging does not double count; typeahead (/search/suggest) is not logged (keystrokes,
+      // Ruling SEARCH-6). Counted after the request transaction commits, in its own tenant
+      // transaction (E2), fail-open. A getCached hit is still counted: it counts searches, not
+      // DB reads. No identity is stored and personal-data-shaped terms are dropped.
+      if (effectiveSearch && (!page || page === '1') && !validCursor) {
+        const total = (result as { meta?: { total?: number } }).meta?.total ?? 0;
+        // The FULL raw term: the log folds it, checks it whole for personal data, and only then
+        // cuts it to 100 characters (a phone past char 100 is caught, not half-stored).
+        // Distinct searchers (Ruling SEARCH-T5-6): a sort/category change or a retry re-fetches
+        // page 1; the same searcher counts a term once per window (salted daily HMAC of IP+UA,
+        // kept only as a short-lived Redis key; fail-open counts once).
+        const searcher = { ip: req.ip ?? '', userAgent: String(req.headers['user-agent'] ?? '') };
+        void deferAfterTenantCommit('search-log', async () =>
+          (await claimSearcherSearch(storeId, rawSearch, searcher))
+            ? recordSearch(storeId, rawSearch, total)
+            : false
+        );
+      }
+
+      // Edge-cacheable: product list is identical for all anonymous
+      // visitors of the same store. Per-tenant via the default Vary on
+      // x-store-id; per-locale because the storefront ?lang= query
+      // surfaces in the URL, so it's already in the cache key without
+      // needing Accept-Language Vary.
+      // The store's backorder feature is applied AFTER the cache read (an
+      // entitlement never rides the cached payload — the product_3d precedent).
+      // CACHE CLASS (Ruling FU46-W1b-6): the backorder gate is per request, but the
+      // edge copy below is not — after the store's `inventory.backorder` feature flips,
+      // an edge-cached listing/PDP can show the old pre-order state for up to
+      // sMaxAge 60s + staleWhileRevalidate 300s. BOUNDED-stale by design: the cart and
+      // checkout re-read the feature uncached (lineAllowsBackorder) and stay authoritative.
+      const backorderOn = await featureService.isFeatureEnabled(storeId, 'inventory.backorder');
+      setEdgeCache(res, { sMaxAge: 60, staleWhileRevalidate: 300 });
       res.json({
         success: true,
-        data: {
-          products: [],
-          meta: { page: floorPage, limit: floorLimit, total: 0, totalPages: 0 },
-        },
+        data: gateBackorderPayload(result, backorderOn),
       });
-      return;
+    } catch (error) {
+      next(error);
     }
-    const effectiveSearch = rawSearch.length >= 2 ? rawSearch.slice(0, 100) : undefined;
-
-    // `relevance` (Task 12) = the hybrid order of a search; the service treats it as no sort
-    // whenever semantic search is off or there is no search term.
-    const sortValue =
-      sort === 'newest' ||
-      sort === 'price_asc' ||
-      sort === 'price_desc' ||
-      sort === 'best_seller' ||
-      sort === 'relevance'
-        ? sort
-        : undefined;
-
-    // Cursor MUST be a v4 UUID — refuse anything else so a malformed cursor
-    // can't bypass the offset cap or trigger a Prisma error path.
-    const validCursor =
-      typeof cursor === 'string' &&
-      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(cursor)
-        ? cursor
-        : undefined;
-
-    // ids query param — comma-separated product UUIDs. Used by page-builder
-    // ExtraCarousel with `productSource === 'manual'`. Service caps at 50.
-    const idsParam =
-      typeof ids === 'string' && ids.length > 0
-        ? ids
-            .split(',')
-            .map(s => s.trim())
-            .filter(Boolean)
-            .slice(0, 50)
-        : undefined;
-
-    // Variant-option facet filters: ?opt_Size=Large,XL&opt_Color=Red
-    // Each `opt_<OptionName>` param carries comma-separated selected values.
-    // Capped at 10 option names and 20 values each to prevent abuse.
-    const optionFilters: Record<string, string[]> = {};
-    const MAX_OPTION_NAMES = 10;
-    const MAX_OPTION_VALUES = 20;
-    let optionFilterKey = '';
-    for (const [key, raw] of Object.entries(req.query)) {
-      if (!key.startsWith('opt_')) continue;
-      if (Object.keys(optionFilters).length >= MAX_OPTION_NAMES) break;
-      const optionName = key.slice(4); // strip "opt_"
-      if (!optionName || typeof raw !== 'string') continue;
-      const vals = raw
-        .split(',')
-        .map(v => v.trim())
-        .filter(Boolean)
-        .slice(0, MAX_OPTION_VALUES);
-      if (vals.length > 0) {
-        optionFilters[optionName] = vals;
-        optionFilterKey += `${optionName}=${vals.join(',')};`;
-      }
-    }
-    const hasOptionFilters = Object.keys(optionFilters).length > 0;
-
-    // Cache key includes cursor + ids + option filters — different selections get distinct entries.
-    const cacheKey = `public:products:${storeId}:${page || 1}:${limit || 20}:${category || ''}:${
-      effectiveSearch || ''
-    }:${featuredFilter ?? ''}:${sortValue || ''}:${minPrice || ''}:${maxPrice || ''}:${
-      validCursor || ''
-    }:${idsParam?.sort().join(',') ?? ''}:${optionFilterKey}`;
-
-    const result = await getCached(cacheKey, 120, () =>
-      ProductService.listPublic(storeId, {
-        page: page ? parseInt(page as string) : undefined,
-        limit: limit ? parseInt(limit as string) : undefined,
-        category: category as string,
-        search: effectiveSearch,
-        featured: featuredFilter,
-        sort: sortValue,
-        minPrice: minPrice ? parseInt(minPrice as string, 10) : undefined,
-        maxPrice: maxPrice ? parseInt(maxPrice as string, 10) : undefined,
-        cursor: validCursor,
-        ids: idsParam,
-        optionFilters: hasOptionFilters ? optionFilters : undefined,
-      })
-    );
-
-    // First-party search log (search program P0, Task 5): page 1 of a real query only, so
-    // paging does not double count; typeahead (/search/suggest) is not logged (keystrokes,
-    // Ruling SEARCH-6). Counted after the request transaction commits, in its own tenant
-    // transaction (E2), fail-open. A getCached hit is still counted: it counts searches, not
-    // DB reads. No identity is stored and personal-data-shaped terms are dropped.
-    if (effectiveSearch && (!page || page === '1') && !validCursor) {
-      const total = (result as { meta?: { total?: number } }).meta?.total ?? 0;
-      // The FULL raw term: the log folds it, checks it whole for personal data, and only then
-      // cuts it to 100 characters (a phone past char 100 is caught, not half-stored).
-      // Distinct searchers (Ruling SEARCH-T5-6): a sort/category change or a retry re-fetches
-      // page 1; the same searcher counts a term once per window (salted daily HMAC of IP+UA,
-      // kept only as a short-lived Redis key; fail-open counts once).
-      const searcher = { ip: req.ip ?? '', userAgent: String(req.headers['user-agent'] ?? '') };
-      void deferAfterTenantCommit('search-log', async () =>
-        (await claimSearcherSearch(storeId, rawSearch, searcher))
-          ? recordSearch(storeId, rawSearch, total)
-          : false
-      );
-    }
-
-    // Edge-cacheable: product list is identical for all anonymous
-    // visitors of the same store. Per-tenant via the default Vary on
-    // x-store-id; per-locale because the storefront ?lang= query
-    // surfaces in the URL, so it's already in the cache key without
-    // needing Accept-Language Vary.
-    // The store's backorder feature is applied AFTER the cache read (an
-    // entitlement never rides the cached payload — the product_3d precedent).
-    // CACHE CLASS (Ruling FU46-W1b-6): the backorder gate is per request, but the
-    // edge copy below is not — after the store's `inventory.backorder` feature flips,
-    // an edge-cached listing/PDP can show the old pre-order state for up to
-    // sMaxAge 60s + staleWhileRevalidate 300s. BOUNDED-stale by design: the cart and
-    // checkout re-read the feature uncached (lineAllowsBackorder) and stay authoritative.
-    const backorderOn = await featureService.isFeatureEnabled(storeId, 'inventory.backorder');
-    setEdgeCache(res, { sMaxAge: 60, staleWhileRevalidate: 300 });
-    res.json({
-      success: true,
-      data: gateBackorderPayload(result, backorderOn),
-    });
-  } catch (error) {
-    next(error);
   }
-});
+);
 
 // GET /products/:slugOrId - Get a product by slug or ID
 router.get('/products/:slugOrId', async (req: Request, res: Response, next: NextFunction) => {

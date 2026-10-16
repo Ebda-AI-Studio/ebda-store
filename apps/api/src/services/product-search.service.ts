@@ -10,6 +10,7 @@ import {
   toHalfvecLiteral,
 } from '../lib/search/embedding-provider';
 import { hybridOrder } from '../lib/search/rrf';
+import { takeQueryEmbed } from '../lib/search/embed-budget';
 import { withSavepoint } from '../lib/savepoint';
 import logger from '../lib/logger';
 
@@ -223,8 +224,14 @@ export const HYBRID_LEG = 50;
 export const QUERY_EMBED_BUDGET_MS = 400;
 /** Queries shorter than this (letters/digits, spaces ignored) are keyword-only. */
 export const QUERY_EMBED_MIN_CHARS = 3;
-/** Most characters of a query that are embedded (the route already caps the term at 100). */
-const QUERY_EMBED_MAX_CHARS = 200;
+/** Most characters of a query that are embedded (the same 100 the route caps the term at). */
+export const QUERY_EMBED_MAX_CHARS = 100;
+/**
+ * The keyword leg is "strong" at this many matches (a full default page): the query is then NOT
+ * embedded and the list is keyword-ranked (Ruling SEARCH-T12-3: the vector leg is for the weak and
+ * zero-result queries it exists for, and a broad term never costs a Workers AI call).
+ */
+export const KEYWORD_STRONG_AT = 20;
 const DEFAULT_VECTOR_MAX_DISTANCE = 0.55;
 
 /**
@@ -278,6 +285,8 @@ async function queryVector(storeId: string, raw: string): Promise<number[] | nul
     if (hit.exp > Date.now()) return Array.from(hit.v);
     qCache.delete(key);
   }
+  // Unique queries defeat the cache: the daily budgets are what bound spend (fails closed).
+  if (!(await takeQueryEmbed(storeId))) return null;
   const ctl = new AbortController();
   let timer: ReturnType<typeof setTimeout> | undefined;
   const lost = new Promise<never>((_, reject) => {
@@ -346,13 +355,18 @@ export async function semanticProductIds(
 /**
  * Storefront relevance order: the keyword leg (up to PRODUCT_SEARCH_ID_CAP, E10) with its first
  * HYBRID_LEG ids fused (RRF) with the vector leg, then the keyword tail in its own order. With the
- * vector leg off or failing this is exactly the keyword (name-similarity) order. Both legs run
- * concurrently. At most PRODUCT_SEARCH_ID_CAP + HYBRID_LEG ids.
+ * vector leg off, failing, over budget, rate-limited (`semantic: false`) or skipped because the
+ * keyword leg is strong (>= KEYWORD_STRONG_AT), this is exactly the keyword (name-similarity)
+ * order. The keyword leg runs first (it decides whether to embed). At most
+ * PRODUCT_SEARCH_ID_CAP + HYBRID_LEG ids.
  */
-export async function rankedSearch(storeId: string, raw: string): Promise<string[]> {
-  const [lexical, vector] = await Promise.all([
-    searchProductIds(storeId, raw, { scope: 'storefront' }),
-    semanticProductIds(storeId, raw),
-  ]);
+export async function rankedSearch(
+  storeId: string,
+  raw: string,
+  opts: { semantic?: boolean } = {}
+): Promise<string[]> {
+  const lexical = await searchProductIds(storeId, raw, { scope: 'storefront' });
+  if (opts.semantic === false || lexical.length >= KEYWORD_STRONG_AT) return lexical;
+  const vector = await semanticProductIds(storeId, raw);
   return hybridOrder(lexical, vector, HYBRID_LEG);
 }
