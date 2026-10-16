@@ -4,6 +4,7 @@ import { PoweredByForce } from '../shared/PoweredByForce';
 import { FooterLegalRow } from '../shared/FooterLegalRow';
 import { FooterWhatsApp } from '../shared/FooterWhatsApp';
 import type { FooterProps } from '../types';
+import { FOOTER_WORDMARK_CLASS } from '../shared/wordmark';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { footerRootPaint } from '../shared/footer-ink';
 import {
@@ -89,7 +90,12 @@ export default function MinimalFooter({
           {!displayLogo && !hideFooterLogoMobile && (
             <p
               data-footer-brand="mobile"
-              className="md:hidden self-center text-xs tracking-[0.25em] ui-caps-toggle font-light text-foreground"
+              className={
+                theme?.wordmarkSize
+                  ? `md:hidden self-center ${FOOTER_WORDMARK_CLASS}`
+                  : 'md:hidden self-center text-xs tracking-[0.25em] ui-caps-toggle font-light text-foreground'
+              }
+              translate="no"
             >
               {displayName}
             </p>
@@ -111,7 +117,15 @@ export default function MinimalFooter({
                 }
               />
             ) : (
-              <span className="text-xs tracking-[0.25em] ui-caps-toggle font-light text-foreground">
+              <span
+                data-footer-brand="desktop"
+                translate="no"
+                className={
+                  theme?.wordmarkSize
+                    ? FOOTER_WORDMARK_CLASS
+                    : 'text-xs tracking-[0.25em] ui-caps-toggle font-light text-foreground'
+                }
+              >
                 {displayName}
               </span>
             )}
@@ -190,7 +204,7 @@ export default function MinimalFooter({
                       <a
                         href={`tel:${loc.phone}`}
                         dir="ltr"
-                        className="inline-flex min-h-11 items-center  hover:text-foreground transition-colors duration-200"
+                        className="inline-flex min-h-11 items-center hover:text-foreground transition-colors duration-200"
                       >
                         {loc.phone}
                       </a>

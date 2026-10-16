@@ -249,7 +249,7 @@ export default function ModernFooter({
                   <li>
                     <a
                       href={`mailto:${contact.email}`}
-                      className="inline-flex min-h-11 items-center min-w-11 justify-center  items-center gap-3 text-sm text-foreground/70 hover:text-foreground transition-colors duration-300 ease-out"
+                      className="inline-flex min-h-11 items-center gap-3 text-sm text-foreground/70 hover:text-foreground transition-colors duration-300 ease-out"
                     >
                       <svg
                         className="w-4 h-4 shrink-0 text-foreground/70"
@@ -273,7 +273,7 @@ export default function ModernFooter({
                   <li>
                     <a
                       href={`tel:${contact.phone}`}
-                      className="inline-flex min-h-11 items-center min-w-11 justify-center  items-center gap-3 text-sm text-foreground/70 hover:text-foreground transition-colors duration-300 ease-out"
+                      className="inline-flex min-h-11 items-center gap-3 text-sm text-foreground/70 hover:text-foreground transition-colors duration-300 ease-out"
                       dir="ltr"
                     >
                       <svg
@@ -334,7 +334,7 @@ export default function ModernFooter({
                           href={addressMapHref}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="inline-flex min-h-11 items-center  items-start gap-3 text-sm text-foreground/70 hover:text-foreground transition-colors duration-300 ease-out"
+                          className="inline-flex min-h-11 items-center items-start gap-3 text-sm text-foreground/70 hover:text-foreground transition-colors duration-300 ease-out"
                         >
                           {mapIcon}
                           {displayAddress}
@@ -429,7 +429,7 @@ export default function ModernFooter({
                       <a
                         href={`tel:${loc.phone}`}
                         dir="ltr"
-                        className="inline-flex min-h-11 items-center  hover:text-foreground transition-colors duration-300 ease-out"
+                        className="inline-flex min-h-11 items-center hover:text-foreground transition-colors duration-300 ease-out"
                       >
                         {loc.phone}
                       </a>

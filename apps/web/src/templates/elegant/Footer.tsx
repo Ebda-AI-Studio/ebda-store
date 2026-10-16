@@ -387,7 +387,7 @@ export default function ElegantFooter({
                       <a
                         href={`tel:${loc.phone}`}
                         dir="ltr"
-                        className="inline-flex min-h-11 items-center  text-foreground/70 hover:text-foreground transition-colors duration-700 ease-out tracking-wide cursor-pointer"
+                        className="inline-flex min-h-11 items-center text-foreground/70 hover:text-foreground transition-colors duration-700 ease-out tracking-wide cursor-pointer"
                       >
                         {loc.phone}
                       </a>

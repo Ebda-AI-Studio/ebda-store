@@ -196,3 +196,29 @@ describe('rule (d): the cookie-preferences button under the footer is 44px', () 
     expect(hitBox(el).h).toBeGreaterThanOrEqual(44);
   });
 });
+
+// IA-09 (W4): the footer dropped a look's wordmark to 12px tracked plain sans while "Powered by
+// Ebda Store" was larger and semibold: the platform outweighed the store at the last impression.
+describe('IA-09: footer wordmark and attribution weight', () => {
+  it('a look store (wordmarkSize) gets the wordmark in the display face at 24px, both breakpoints', () => {
+    const { container } = render(<Minimal {...base} theme={{ wordmarkSize: 'lg' } as never} />);
+    const marks = container.querySelectorAll('[data-footer-brand]');
+    expect(marks.length).toBe(2);
+    for (const m of marks) {
+      expect(m.className).toContain('font-display');
+      expect(m.className).toContain('text-2xl');
+      expect(m.className).not.toMatch(/tracking-\[|ui-caps-toggle/);
+    }
+  });
+  it('no look: the skin wordmark is unchanged', () => {
+    const { container } = render(<Minimal {...base} />);
+    expect(container.querySelector('[data-footer-brand="mobile"]')!.className).toContain(
+      'tracking-[0.25em]'
+    );
+  });
+  it('"Powered by" never outweighs the store: regular weight, muted, no foreground ink', async () => {
+    const { PoweredByForce } = await import('../../apps/web/src/templates/shared/PoweredByForce');
+    const { container } = render(<PoweredByForce />);
+    expect(container.innerHTML).not.toMatch(/font-semibold|font-bold|text-foreground(?!\/)/);
+  });
+});

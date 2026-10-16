@@ -20,3 +20,10 @@ export function wordmarkClass(size: WordmarkSize): string {
 /** Header nav links next to a sized wordmark: 14px, untracked, sentence case (T-01, decision (a)). */
 export const WORDMARK_NAV_LINK_CLASS =
   'text-sm font-normal text-muted-foreground hover:text-foreground transition-colors duration-200';
+
+/**
+ * IA-09 (W4): the footer's text wordmark on a look store: the same display face as the header,
+ * at 24px (the Latin display face is never set under 24px, decision (a)), never tracked.
+ */
+export const FOOTER_WORDMARK_CLASS =
+  'font-display font-normal leading-normal tracking-normal normal-case text-2xl text-foreground';

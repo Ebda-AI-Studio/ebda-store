@@ -288,7 +288,7 @@ export default function ClassicFooter({
                       <a
                         href={`tel:${loc.phone}`}
                         dir="ltr"
-                        className="inline-flex min-h-11 items-center  hover:text-foreground transition-colors duration-200"
+                        className="inline-flex min-h-11 items-center hover:text-foreground transition-colors duration-200"
                       >
                         {loc.phone}
                       </a>
