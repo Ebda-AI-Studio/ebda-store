@@ -113,6 +113,17 @@ function shouldFeed(orderId: string): boolean {
 
 type StatusKind = 'printing' | PaymentState;
 
+/**
+ * IA-14: an order number read out to a courier, in groups. "ORD-TMZRB9-IR5JY" prints as
+ * "TMZRB9 · IR5JY" (the ORD prefix says nothing the label does not); a plain "1043" is
+ * unchanged. The full value stays the element's accessible name.
+ */
+export function groupOrderNumber(orderNumber: string): string {
+  const parts = orderNumber.split('-').filter(Boolean);
+  if (parts.length > 1 && /^ord$/i.test(parts[0])) parts.shift();
+  return parts.join(' · ');
+}
+
 export function ReceiptPrinter({
   order,
   paymentState,
@@ -189,19 +200,9 @@ export function ReceiptPrinter({
       <div className={`${styles.housing} relative z-10 p-1.5 ${framed ? '' : 'shadow-lg'}`}>
         <div className={`${styles.screen} px-4 pb-3.5 pt-4`}>
           <div className="flex items-start justify-between gap-4">
+            {/* IA-14: the head names the order; its number and total live once, on the paper. */}
             <div className="min-w-0">
-              <p className="truncate text-sm font-semibold">
-                {order ? (
-                  <>
-                    {t('Order', 'طلب')}{' '}
-                    <span className={styles.mono} dir="ltr">
-                      #{order.orderNumber}
-                    </span>
-                  </>
-                ) : (
-                  t('Your order', 'طلبك')
-                )}
-              </p>
+              <p className="truncate text-sm font-semibold">{t('Your order', 'طلبك')}</p>
               <p className="mt-0.5 truncate text-xs opacity-80">
                 {order
                   ? t(
@@ -211,14 +212,6 @@ export function ReceiptPrinter({
                   : storeName}
               </p>
             </div>
-            {order && (
-              <div className="shrink-0 text-end">
-                <p className="text-xs opacity-80">{t('Order total', 'إجمالي الطلب')}</p>
-                <p className="text-base font-semibold">
-                  <Num>{formatPrice(order.total)}</Num>
-                </p>
-              </div>
-            )}
           </div>
           <div className="mt-3 grid min-h-5 text-xs" aria-live="polite" role="status">
             {leaving && (
@@ -381,9 +374,10 @@ export function ReceiptPrinter({
                 <p
                   data-testid="receipt-order-number"
                   dir="ltr"
-                  className={`${styles.mono} text-2xl font-semibold ${styles.ink}`}
+                  aria-label={order.orderNumber}
+                  className={`${styles.mono} text-xl font-semibold ${styles.ink}`}
                 >
-                  #{order.orderNumber}
+                  #{groupOrderNumber(order.orderNumber)}
                 </p>
               </div>
             </article>

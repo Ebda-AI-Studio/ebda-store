@@ -392,7 +392,8 @@ describe('receipt W3', () => {
     expect(screen.queryByTestId('receipt-barcode')).toBeNull();
     const n = screen.getByTestId('receipt-order-number');
     expect(n.textContent).toBe('#1043');
-    expect(n.className).toContain('text-2xl');
+    // IA-14: readable, not huge (text-2xl monospace was hard to read out to a courier)
+    expect(n.className).toContain('text-xl');
     expect(n.className).not.toMatch(/tracking-\[/);
   });
   it('T-04: money is the body face with tabular figures; mono is only the order number', () => {
@@ -425,5 +426,32 @@ describe('receipt W3', () => {
     const { container } = render(<ReceiptPrinter order={order} paymentState="cod" store={store} />);
     expect(container.querySelector('section')!.hasAttribute('data-receipt')).toBe(false);
     expect(container.innerHTML).toContain('shadow-lg');
+  });
+});
+
+// IA-14 (independent audit): the number and the total each printed twice (printer
+// head and paper); the number set huge in one unbroken monospace run.
+describe('receipt IA-14', () => {
+  it('groups a prefixed order number for reading out, keeps the full value for readers', async () => {
+    const { groupOrderNumber } = await import('./ReceiptPrinter');
+    expect(groupOrderNumber('ORD-TMZRB9-IR5JY')).toBe('TMZRB9 · IR5JY');
+    expect(groupOrderNumber('1043')).toBe('1043');
+    render(
+      <ReceiptPrinter
+        order={{ ...order, orderNumber: 'ORD-TMZRB9-IR5JY' }}
+        paymentState="cod"
+        store={store}
+      />
+    );
+    const n = screen.getByTestId('receipt-order-number');
+    expect(n.textContent).toBe('#TMZRB9 · IR5JY');
+    expect(n.getAttribute('aria-label')).toBe('ORD-TMZRB9-IR5JY');
+  });
+
+  it('the order number and the total appear once on the page', () => {
+    render(<ReceiptPrinter order={order} paymentState="cod" store={store} />);
+    expect(screen.getAllByText('#1043')).toHaveLength(1);
+    expect(screen.queryByText('Order total')).toBeNull();
+    expect(screen.queryByText('إجمالي الطلب')).toBeNull();
   });
 });
