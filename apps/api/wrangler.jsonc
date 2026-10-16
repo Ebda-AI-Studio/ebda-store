@@ -50,6 +50,13 @@
   // (Ruling HOST-STORE-1; store.ebda.app is the merchant app now). See lib/revalidate-storefront.ts.
   "services": [{ "binding": "STOREFRONT", "service": "ebda-web" }],
 
+  // Workers AI: search embeddings only (@cf/baai/bge-m3, apps/api/src/lib/search/embedding-provider.ts).
+  // No id; billed per input token to the account the Worker deploys to (Whisky, 69188202...). AI
+  // bindings always run remotely, so the workerd smoke (wrangler dev --local) boots a copy WITHOUT
+  // this line (scripts/ci/workerd-smoke.mjs `stripAiBinding`). Semantic search itself stays off
+  // until SEARCH_SEMANTIC_ENABLED=true (docs/ENVIRONMENT.md).
+  "ai": { "binding": "AI" },
+
   "migrations": [{ "tag": "v1", "new_sqlite_classes": ["AuthState", "StoreRealtime"] }],
 
   "queues": {
