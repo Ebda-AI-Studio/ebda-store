@@ -725,6 +725,27 @@ export const EVAL_EXTRA: ReadonlyArray<{
   { key: 'pot', cls: 'phrase', q: 'ta2m 7alal granite' },
 ];
 
+/**
+ * Things this store does NOT sell: the right answer is an empty list. Measures false positives,
+ * which a looser SEARCH_VECTOR_MAX_DISTANCE trades for recall. Several share a word or substring
+ * with the catalogue on purpose (`عربية` in car tyres and car oil, `اطفال` in kids' books).
+ */
+export const EVAL_ABSENT: readonly string[] = [
+  'ثلاجة',
+  'tlaga',
+  'تكييف',
+  'iphone 15 pro max',
+  'كاوتش عربية',
+  'laptop gaming',
+  'كتب اطفال',
+  'دواء برد',
+  'لحمة مفرومة',
+  'غسالة اطباق',
+  'شقة للايجار',
+  'tv samsung 55',
+  'zeit 3arabeya',
+];
+
 export interface EvalRow {
   /** Unique per product (the slug stem). */
   id: string;

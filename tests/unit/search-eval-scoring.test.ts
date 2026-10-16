@@ -15,6 +15,7 @@ import {
   EVAL_FORMS,
   EVAL_NEGATIVES,
   EVAL_EXTRA,
+  EVAL_ABSENT,
   catalogueRows,
   evalQueries,
 } from '../search-eval/catalogue';
@@ -150,6 +151,12 @@ describe('catalogue', () => {
     const keys = new Set(EVAL_PRODUCTS.map(p => p.key));
     expect(EVAL_EXTRA.every(e => keys.has(e.key))).toBe(true);
     expect(EVAL_NEGATIVES.every(n => keys.has(n.near) && !keys.has(n.key))).toBe(true);
+  });
+
+  it('absent-product queries exist and name nothing the store sells', () => {
+    expect(EVAL_ABSENT.length).toBeGreaterThanOrEqual(10);
+    const names = new Set(catalogueRows().flatMap(r => [r.nameAr, r.name]));
+    expect(EVAL_ABSENT.some(q => names.has(q))).toBe(false);
   });
 
   it('a dense type exists, so the keyword-strong threshold is exercised', () => {

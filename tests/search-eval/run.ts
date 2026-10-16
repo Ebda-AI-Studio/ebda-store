@@ -1,0 +1,491 @@
+#!/usr/bin/env tsx
+/**
+ * Search quality eval (search program P1, Task 13; Ruling SEARCH-10). MANUAL / on demand, never
+ * per-push: it needs a real embedding model (and, for --generate-ai-terms, Gemini).
+ *
+ * Seeds the SYNTHETIC store of catalogue.ts into a throwaway store on DATABASE_URL (a LOCAL scratch
+ * database: any host other than localhost / 127.0.0.1 / ::1 is refused), embeds it with the
+ * production indexer, runs every query through the production code (`searchProductIds`,
+ * `semanticProductIds`, `rankedSearchWithMode`: budgets, race, cache, SQL), and scores keyword-only
+ * against hybrid per query class, for keyword-strong thresholds 20 / 50 / none and vector
+ * distances 0.45 / 0.55 / 0.65 / none. Exit 0 = the shipped configuration meets the bar, 1 = below
+ * the bar (a finding, not a test to edit), 2 = harness error, 3 = fake embeddings (NOT
+ * REPRESENTATIVE: no verdict).
+ *
+ * Embedding provider, first that applies:
+ *   SEARCH_EVAL_EMBED_URL   the local proxy Worker (embed-proxy/, `wrangler dev`, real bge-m3 via
+ *                           the AI binding on the logged-in account; no token copied anywhere)
+ *   CF_AI_ACCOUNT_ID + CF_AI_API_TOKEN   the production REST provider
+ *   neither                 a hash fake (plumbing only)
+ * Query vectors are fetched once, up front, outside the 400 ms race (a laptop's round trip to
+ * Workers AI is not the Worker's), then served to the production path from memory: the eval
+ * measures quality; latency is Task 14's job.
+ *
+ *   npx wrangler dev -c tests/search-eval/embed-proxy/wrangler.jsonc --ip 127.0.0.1 --port 8799 &
+ *   DATABASE_URL=$TEST_DB DIRECT_URL=$TEST_DB REDIS_URL=$TEST_REDIS \
+ *     SEARCH_EVAL_EMBED_URL=http://127.0.0.1:8799 npm run search:eval -- --ai-terms --out f.json
+ * ($TEST_DB = the migrated local pg17 + pgvector of the plan's Global Constraints.)
+ *
+ * --ai-terms            fill products.search_terms from ai-terms.json (Task 8 generator output)
+ * --generate-ai-terms   regenerate ai-terms.json with the Task 8 generator first (GEMINI_API_KEY;
+ *                       one Gemini call per product), then run with them
+ * --out <file>          write the full results (every variant, every query) as JSON
+ * --keep                keep the seeded store (default: deleted at the end)
+ */
+import { readFileSync, writeFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import { catalogueRows, evalQueries, EVAL_ABSENT, EVAL_FORMS, type EvalQuery } from './catalogue';
+import {
+  hybridVariant,
+  ndcgAt,
+  passBar,
+  recallAt,
+  reciprocalRank,
+  summarise,
+  type BarResult,
+  type QueryScore,
+  type Summary,
+} from './scoring';
+
+export { recallAt, reciprocalRank } from './scoring';
+
+const AI_TERMS_FILE = new URL('./ai-terms.json', import.meta.url);
+const THRESHOLDS: Array<number | null> = [20, 50, null];
+const DISTANCES: Array<number | null> = [0.45, 0.55, 0.65, null];
+const SEARCHER = 'eval:harness';
+
+interface AiTermsFile {
+  note: string;
+  model: string;
+  generatedAt: string;
+  terms: Record<string, string | null>;
+}
+
+const arg = (name: string) => process.argv.includes(name);
+const argValue = (name: string) => {
+  const i = process.argv.indexOf(name);
+  return i >= 0 ? process.argv[i + 1] : undefined;
+};
+const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
+const fmt = (n: number) => n.toFixed(2);
+const label = (t: number | null, d: number | null) => `t=${t ?? 'none'} d=${d ?? 'none'}`;
+
+function assertLocalDb(url: string | undefined): string {
+  if (!url) throw new Error('DATABASE_URL is required (a LOCAL scratch database)');
+  const host = new URL(url).hostname;
+  if (!['localhost', '127.0.0.1', '::1', '[::1]'].includes(host))
+    throw new Error(`refusing a non-local DATABASE_URL host (${host}): the eval writes a store`);
+  return url;
+}
+
+async function main(): Promise<number> {
+  const dbUrl = assertLocalDb(process.env.DATABASE_URL);
+  // A local scratch process: lift the spend guards that exist for anonymous traffic (the eval's own
+  // spend is bounded by its size: ~250 product embeds + ~270 query embeds per run).
+  for (const [k, v] of Object.entries({
+    SEARCH_SEMANTIC_ENABLED: 'true',
+    SEARCH_EMBED_PER_SEARCHER_PER_MIN: '1000000',
+    SEARCH_QUERY_EMBED_STORE_DAILY_CAP: '1000000',
+    SEARCH_QUERY_EMBED_GLOBAL_DAILY_CAP: '1000000',
+    SEARCH_EMBED_GLOBAL_DAILY_CAP: '1000000',
+    SEARCH_EMBED_STORE_DAILY_CAP: '1000000',
+    AI_STORE_DAILY_REQUEST_CAP: '100000',
+    INNGEST_DRY_RUN: 'true',
+    LOG_LEVEL: 'warn',
+  }))
+    process.env[k] ??= v;
+  delete process.env.SEARCH_VECTOR_MAX_DISTANCE; // the shipped default is what gets the verdict
+
+  const ep = await import('../../apps/api/src/lib/search/embedding-provider');
+  const search = await import('../../apps/api/src/services/product-search.service');
+  const index = await import('../../apps/api/src/services/product-index.service');
+  const { redis } = await import('../../apps/api/src/services/redis.service');
+  const db = await import('@ebda/database');
+  const { fakeVector } = await import('../helpers/fake-embeddings');
+
+  // ---- embedding provider -------------------------------------------------------------------
+  const proxyUrl = process.env.SEARCH_EVAL_EMBED_URL;
+  const remote = ep.getEmbeddingProvider(); // REST when CF_AI_* are set
+  const mode: 'proxy' | 'rest' | 'fake' = proxyUrl ? 'proxy' : remote ? 'rest' : 'fake';
+  const backend = async (texts: string[]): Promise<number[][]> => {
+    if (mode === 'fake') return texts.map(fakeVector);
+    if (mode === 'rest') return remote!.embed(texts);
+    const out: number[][] = [];
+    for (let i = 0; i < texts.length; i += ep.EMBED_MAX_BATCH) {
+      const res = await fetch(proxyUrl!, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ text: texts.slice(i, i + ep.EMBED_MAX_BATCH) }),
+      });
+      if (!res.ok) throw new Error(`embed proxy HTTP ${res.status}`);
+      out.push(...((await res.json()) as { data: number[][] }).data);
+    }
+    return out;
+  };
+  const prefetched = new Map<string, number[]>();
+  let providerCalls = 0;
+  let backendCalls = 0;
+  ep.setEmbeddingProviderForTests({
+    model: ep.EMBED_MODEL,
+    async embed(texts) {
+      providerCalls++;
+      if (texts.every(t => prefetched.has(t))) return texts.map(t => prefetched.get(t)!);
+      backendCalls++;
+      return backend(texts);
+    },
+  });
+  if (mode === 'fake')
+    console.log(
+      '\n*** FAKE EMBEDDINGS: NOT REPRESENTATIVE. Plumbing only; no verdict on the bar. ***\n'
+    );
+  console.log(`[eval] embedding provider: ${mode} (${ep.EMBED_MODEL})`);
+
+  await redis.connect();
+  const owner = db.createPrismaClient({ connectionString: dbUrl, role: 'owner' });
+  const run = `${Date.now().toString(36)}${createHash('sha1').update(String(Math.random())).digest('hex').slice(0, 4)}`;
+  const rows = catalogueRows();
+  const typeOf = new Map<string, string>();
+  const relevantTotal = new Map<string, number>();
+  for (const r of rows) relevantTotal.set(r.type, (relevantTotal.get(r.type) ?? 0) + 1);
+
+  const user = await owner.user.create({
+    data: {
+      email: `search-eval-${run}@example.test`,
+      passwordHash: 'x',
+      firstName: 'Search',
+      lastName: 'Eval',
+      role: 'store_admin',
+      emailVerified: true,
+      status: 'active',
+    },
+  });
+  const store = await owner.store.create({
+    data: {
+      name: `Search eval ${run}`,
+      nameAr: 'متجر تقييم البحث',
+      slug: `search-eval-${run}`,
+      ownerId: user.id,
+      status: 'active',
+      currency: 'EGP',
+      template: 'modern',
+      theme: {},
+      settings: { defaultLanguage: 'ar' },
+    },
+  });
+  const S = store.id;
+  try {
+    // ---- AI search terms (Task 8 generator) -------------------------------------------------
+    let aiTerms: AiTermsFile | null = null;
+    if (arg('--generate-ai-terms')) {
+      const key = process.env.GEMINI_API_KEY;
+      if (!key) throw new Error('--generate-ai-terms needs GEMINI_API_KEY');
+      const { generateProductSearchTerms } =
+        await import('../../apps/api/src/lib/ai/product-search-terms-generator');
+      const model = process.env.GEMINI_MODEL || 'gemini-flash-lite-latest';
+      const throttle = Number(process.env.AI_BULK_THROTTLE_MS ?? 1000);
+      const terms: Record<string, string | null> = {};
+      for (const r of rows) {
+        for (let attempt = 1; ; attempt++) {
+          try {
+            terms[r.id] = await db.runInStoreScope(S, () =>
+              generateProductSearchTerms(
+                {
+                  storeId: S,
+                  storeName: 'متجر',
+                  product: { name: r.name, nameAr: r.nameAr },
+                  categoryNames: [],
+                },
+                key,
+                model
+              )
+            );
+            break;
+          } catch (err) {
+            if (attempt >= 4) throw err;
+            console.warn(`[eval] terms for ${r.id} failed (attempt ${attempt}); retrying in 20 s`);
+            await sleep(20_000);
+          }
+        }
+        await sleep(throttle);
+      }
+      aiTerms = {
+        note: 'SYNTHETIC eval store (tests/search-eval/catalogue.ts): Task 8 generator output, products seeded with names only, no description, no category.',
+        model,
+        generatedAt: new Date().toISOString(),
+        terms,
+      };
+      writeFileSync(AI_TERMS_FILE, JSON.stringify(aiTerms, null, 2) + '\n');
+      console.log(`[eval] wrote ${rows.length} products' AI terms to ai-terms.json`);
+    } else if (arg('--ai-terms')) {
+      aiTerms = JSON.parse(readFileSync(AI_TERMS_FILE, 'utf8')) as AiTermsFile;
+    }
+
+    // ---- seed + index ------------------------------------------------------------------------
+    await owner.product.createMany({
+      data: rows.map(r => ({
+        storeId: S,
+        slug: `${r.id}-${run}`,
+        name: r.name,
+        nameAr: r.nameAr,
+        searchTerms: aiTerms?.terms[r.id] ?? null,
+        price: 10_000,
+        inventory: 10,
+        status: 'active' as const,
+      })),
+    });
+    for (const p of await owner.product.findMany({
+      where: { storeId: S },
+      select: { id: true, slug: true },
+    }))
+      typeOf.set(p.id, rows.find(r => `${r.id}-${run}` === p.slug)!.type);
+    for (;;) {
+      const r = await db.runInStoreScope(S, () =>
+        index.indexStore(S, { batchSize: 50, maxDocs: 1000 })
+      );
+      if (r.skipped || r.capped) throw new Error(`indexer stopped: ${JSON.stringify(r)}`);
+      if (!r.remaining) break;
+    }
+    const status = await db.runInStoreScope(S, () => index.storeIndexStatus(S));
+    if (status.indexed !== rows.length)
+      throw new Error(`indexed ${status.indexed} of ${rows.length}: ${JSON.stringify(status)}`);
+    console.log(
+      `[eval] store ${S}: ${rows.length} products indexed (${aiTerms ? 'WITH AI search terms' : 'no search terms'})`
+    );
+
+    // ---- query vectors, once, outside the race ----------------------------------------------
+    const queries = evalQueries();
+    const texts = [
+      ...new Set(
+        [...queries.map(q => q.q), ...EVAL_ABSENT]
+          .filter(q => search.shouldEmbedQuery(q))
+          .map(q => search.queryEmbedText(q))
+      ),
+    ];
+    const vecs = await backend(texts);
+    texts.forEach((t, i) => prefetched.set(t, vecs[i]));
+    const callsBefore = providerCalls;
+    const backendBefore = backendCalls;
+
+    // ---- run every query ---------------------------------------------------------------------
+    interface Legs {
+      q: EvalQuery;
+      lexical: string[];
+      vector: Map<number | null, string[]>;
+      shipped: string[];
+      degraded: boolean;
+      embeddable: boolean;
+    }
+    const legs: Legs[] = [];
+    const tenant = <T>(fn: () => Promise<T>) => db.runInTenantContext(S, fn);
+    for (const q of queries) {
+      const lexical = await tenant(() => search.searchProductIds(S, q.q, { scope: 'storefront' }));
+      // The shipped path first (default distance), exactly what /public/products ranks with.
+      const shippedRun = await tenant(() =>
+        search.rankedSearchWithMode(S, q.q, { searcher: SEARCHER })
+      );
+      const vector = new Map<number | null, string[]>();
+      for (const d of DISTANCES) {
+        process.env.SEARCH_VECTOR_MAX_DISTANCE = String(d ?? 2);
+        vector.set(
+          d,
+          await tenant(() => search.semanticProductIds(S, q.q, { searcher: SEARCHER }))
+        );
+      }
+      delete process.env.SEARCH_VECTOR_MAX_DISTANCE;
+      legs.push({
+        q,
+        lexical,
+        vector,
+        shipped: shippedRun.ids,
+        degraded: shippedRun.degraded,
+        embeddable: search.shouldEmbedQuery(q.q),
+      });
+    }
+    // Absent products: the right answer is nothing.
+    const absent: Array<Pick<Legs, 'lexical' | 'vector'> & { q: string }> = [];
+    for (const q of EVAL_ABSENT) {
+      const lexical = await tenant(() => search.searchProductIds(S, q, { scope: 'storefront' }));
+      const vector = new Map<number | null, string[]>();
+      for (const d of DISTANCES) {
+        process.env.SEARCH_VECTOR_MAX_DISTANCE = String(d ?? 2);
+        vector.set(d, await tenant(() => search.semanticProductIds(S, q, { searcher: SEARCHER })));
+      }
+      delete process.env.SEARCH_VECTOR_MAX_DISTANCE;
+      absent.push({ q, lexical, vector });
+    }
+    const degraded = legs.filter(l => l.degraded).length;
+    if (degraded) throw new Error(`${degraded} queries ran degraded (vector leg unavailable)`);
+    // Drift guard: the composed shipped variant must equal the real ranked list.
+    const shippedD = search.vectorMaxDistance();
+    for (const l of legs) {
+      const composed = hybridVariant(
+        l.lexical,
+        l.vector.get(shippedD)!,
+        search.KEYWORD_STRONG_AT,
+        search.HYBRID_LEG
+      );
+      if (JSON.stringify(composed) !== JSON.stringify(l.shipped))
+        throw new Error(`harness drift: composed order != rankedSearch for "${l.q.q}"`);
+    }
+
+    // ---- score -------------------------------------------------------------------------------
+    const types = (ids: string[]) => ids.map(id => typeOf.get(id)!);
+    const score = (l: Legs, ids: string[]): QueryScore & { top: string[]; negIn10: number } => {
+      const t = types(ids);
+      return {
+        cls: l.q.cls,
+        core: l.q.core,
+        key: l.q.key,
+        q: l.q.q,
+        recall10: recallAt(t, l.q.key, 10),
+        rr: reciprocalRank(t, l.q.key),
+        ndcg10: ndcgAt(t, l.q.key, 10, relevantTotal.get(l.q.key)!),
+        empty: ids.length === 0,
+        top: t.slice(0, 5),
+        negIn10: t.slice(0, 10).filter(x => x.startsWith('x-')).length,
+      };
+    };
+    const variants: Record<string, (l: Pick<Legs, 'lexical' | 'vector'>) => string[]> = {
+      lexical: l => l.lexical,
+      'vector-only d=0.55': l => l.vector.get(0.55)!,
+    };
+    for (const d of DISTANCES)
+      for (const t of THRESHOLDS)
+        variants[label(t, d)] = l =>
+          hybridVariant(l.lexical, l.vector.get(d)!, t, search.HYBRID_LEG);
+    const shippedLabel = label(search.KEYWORD_STRONG_AT, shippedD);
+    const results: Record<
+      string,
+      {
+        summary: Summary;
+        bar: BarResult;
+        negIn10: number;
+        /** Share of absent-product queries answered with at least one product (false positives). */
+        absentAnswered: number;
+        /** Mean products in the first 10 for an absent-product query. */
+        absentIn10: number;
+        scores: ReturnType<typeof score>[];
+      }
+    > = {};
+    for (const [name, f] of Object.entries(variants)) {
+      const scores = legs.map(l => score(l, f(l)));
+      results[name] = {
+        scores,
+        summary: summarise(scores),
+        bar: undefined as unknown as BarResult,
+        negIn10: scores.reduce((a, s) => a + s.negIn10, 0) / scores.length,
+        absentAnswered: absent.filter(a => f(a).length > 0).length / absent.length,
+        absentIn10: absent.reduce((a, x) => a + Math.min(10, f(x).length), 0) / absent.length,
+      };
+    }
+    for (const r of Object.values(results)) r.bar = passBar(results.lexical.summary, r.summary);
+
+    // ---- report ------------------------------------------------------------------------------
+    const L = results.lexical;
+    const H = results[shippedLabel];
+    const classes = [...EVAL_FORMS, 'typo', 'ortho', 'mixed', 'phrase'];
+    console.log(
+      `\nPer class: keyword-only vs hybrid (shipped: ${shippedLabel}). recall@10 / MRR / nDCG@10 / zero-result`
+    );
+    console.log('class     n    | lexical                   | hybrid');
+    for (const c of [...classes, 'CORE']) {
+      const l = c === 'CORE' ? L.summary.core : L.summary.byClass[c];
+      const h = c === 'CORE' ? H.summary.core : H.summary.byClass[c];
+      if (!l || !h) continue;
+      const cell = (x: typeof l) =>
+        `${fmt(x.recall10)} / ${fmt(x.mrr)} / ${fmt(x.ndcg10)} / ${fmt(x.zero)}`;
+      console.log(`${c.padEnd(8)} ${String(l.n).padStart(3)}   | ${cell(l)} | ${cell(h)}`);
+    }
+    console.log(
+      `\nVariants on the core 200: recall@10 / MRR / nDCG@10 · d+f lift · negatives in top 10 · absent (${absent.length}) answered / shown · bar`
+    );
+    for (const [name, r] of Object.entries(results)) {
+      const s = r.summary.core;
+      console.log(
+        `${name.padEnd(20)} ${fmt(s.recall10)} / ${fmt(s.mrr)} / ${fmt(s.ndcg10)} · ${fmt(r.bar.lift).padStart(5)} · ${fmt(r.negIn10)} · ${fmt(r.absentAnswered)} / ${fmt(r.absentIn10)} · ${r.bar.ok ? 'PASS' : 'fail: ' + r.bar.failed.join(', ')}`
+      );
+    }
+    console.log(
+      `\nPer class recall@10 / nDCG@10 by vector distance (threshold ${search.KEYWORD_STRONG_AT}):`
+    );
+    for (const d of DISTANCES) {
+      const r = results[label(search.KEYWORD_STRONG_AT, d)].summary.byClass;
+      console.log(
+        `  d=${String(d ?? 'none').padEnd(5)} ` +
+          classes.map(c => `${c} ${fmt(r[c]?.recall10 ?? 0)}/${fmt(r[c]?.ndcg10 ?? 0)}`).join('  ')
+      );
+    }
+    const buckets = { '0': 0, '1-19': 0, '20-49': 0, '50+': 0 };
+    for (const l of legs) {
+      const n = l.lexical.length;
+      buckets[n === 0 ? '0' : n < 20 ? '1-19' : n < 50 ? '20-49' : '50+']++;
+    }
+    console.log(`\nKeyword matches per query: ${JSON.stringify(buckets)}`);
+    console.log(
+      `Embeddable queries: ${legs.filter(l => l.embeddable).length}/${legs.length}; provider calls during queries: ${providerCalls - callsBefore}, of them not from the prefetch: ${backendCalls - backendBefore}`
+    );
+    console.log(`\nCore misses (hybrid, shipped config, target type not in top 10):`);
+    for (const s of H.scores.filter(x => x.core && !x.recall10))
+      console.log(
+        `  ${s.cls.padEnd(7)} ${s.key.padEnd(11)} "${s.q}" → ${s.top.join(', ') || '(none)'}`
+      );
+    console.log(`\nWorse than keyword-only (reciprocal rank dropped):`);
+    H.scores.forEach((s, i) => {
+      const l = L.scores[i];
+      if (s.rr < l.rr)
+        console.log(
+          `  ${s.cls.padEnd(7)} "${s.q}" rr ${fmt(l.rr)} → ${fmt(s.rr)} · top: ${s.top.join(', ')}`
+        );
+    });
+
+    const verdict = H.bar;
+    console.log(`\nBar (SEARCH-10) on the shipped config ${shippedLabel}:`);
+    for (const c of verdict.checks)
+      console.log(`  ${c.ok ? 'ok  ' : 'FAIL'} ${c.name}: ${fmt(c.value)} (${c.need})`);
+    if (!verdict.earnsCost)
+      console.log(
+        'SEMANTIC NOT EARNING ITS COST: keep SEARCH_SEMANTIC_ENABLED off (Ruling SEARCH-10)'
+      );
+    const out = argValue('--out');
+    if (out) {
+      writeFileSync(
+        out,
+        JSON.stringify(
+          {
+            mode,
+            aiTerms: Boolean(aiTerms),
+            products: rows.length,
+            queries: legs.length,
+            shipped: shippedLabel,
+            buckets,
+            results,
+          },
+          null,
+          1
+        )
+      );
+      console.log(`[eval] wrote ${out}`);
+    }
+    if (mode === 'fake') {
+      console.log('\n*** FAKE EMBEDDINGS: NOT REPRESENTATIVE. Exit 3, no verdict. ***');
+      return 3;
+    }
+    return verdict.ok ? 0 : 1;
+  } finally {
+    if (!arg('--keep')) {
+      await owner.store.delete({ where: { id: S } });
+      await owner.user.delete({ where: { id: user.id } });
+    }
+    await owner.$disconnect();
+    await redis.disconnect();
+  }
+}
+
+if (process.argv[1]?.endsWith('run.ts'))
+  main().then(
+    code => process.exit(code),
+    err => {
+      console.error(err);
+      process.exit(2);
+    }
+  );
