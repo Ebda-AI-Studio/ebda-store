@@ -16,10 +16,36 @@ const SCALE = (v: string): number | null => {
 };
 const LINE: Record<string, number> = { xs: 16, sm: 20, base: 24, lg: 28, xl: 28 };
 
+/**
+ * W5: the box at EVERY breakpoint, mobile first (base, then sm:, md:, lg:, xl: override in turn),
+ * and the smallest one wins. The W4 reading dropped every `sm:`-prefixed class, so a field that is
+ * `h-11 sm:h-10` passed here and measured 40px in the browser (a11y re-audit P2-N1). A breakpoint
+ * where the element is `hidden` is skipped.
+ */
+const BREAKPOINTS = ['sm', 'md', 'lg', 'xl'];
 export function hitBox(el: Element): { h: number | null; w: number | null } {
-  const cls = (el.getAttribute('class') ?? '')
-    .split(/\s+/)
-    .filter(c => !c.includes(':') || c.startsWith('before:'));
+  const all = (el.getAttribute('class') ?? '').split(/\s+/).filter(Boolean);
+  const base = all.filter(c => !c.includes(':') || c.startsWith('before:'));
+  const at = (bp: string) =>
+    all.filter(c => c.startsWith(`${bp}:`)).map(c => c.slice(bp.length + 1));
+  const stacks: string[][] = [base];
+  let acc = base;
+  for (const bp of BREAKPOINTS) {
+    const add = at(bp);
+    if (!add.length) continue;
+    acc = [...acc, ...add];
+    stacks.push(acc);
+  }
+  const shown = stacks.filter(cls => {
+    const d = cls.filter(c => /^(hidden|block|flex|inline-flex|inline-block|grid|inline)$/.test(c));
+    return d[d.length - 1] !== 'hidden';
+  });
+  const boxes = (shown.length ? shown : [base]).map(cls => boxFor(el, cls));
+  const ws = boxes.map(b => b.w).filter((w): w is number => w !== null);
+  return { h: Math.min(...boxes.map(b => b.h ?? 0)), w: ws.length ? Math.min(...ws) : null };
+}
+
+function boxFor(el: Element, cls: string[]): { h: number | null; w: number | null } {
   let h: number | null = null;
   let w: number | null = null;
   let minH = 0;

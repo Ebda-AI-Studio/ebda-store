@@ -2206,10 +2206,12 @@ export default function CheckoutClient() {
                           label={t('Floor (optional)', 'الدور (اختياري)')}
                           value={formData.floor}
                           onChange={e => updateField('floor', e.target.value)}
+                          className={CHECKOUT_FIELD}
                         />
                         <Input
                           label={t('Apartment (optional)', 'الشقة (اختياري)')}
                           autoComplete="address-line2"
+                          className={CHECKOUT_FIELD}
                           value={formData.apartment}
                           onChange={e => updateField('apartment', e.target.value)}
                         />
@@ -2219,6 +2221,7 @@ export default function CheckoutClient() {
                         label={t('Landmark (optional)', 'علامة مميزة (اختياري)')}
                         value={formData.landmark}
                         onChange={e => updateField('landmark', e.target.value)}
+                        className={CHECKOUT_FIELD}
                       />
 
                       <div>

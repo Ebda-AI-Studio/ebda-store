@@ -959,7 +959,7 @@ export default function CartClient() {
                                   type="button"
                                   onClick={applyPromoCode}
                                   disabled={promoApplied || isValidating}
-                                  className="h-10 min-w-[88px] rounded-lg bg-muted px-4 text-sm font-medium text-foreground transition-colors hover:bg-muted/80 disabled:cursor-not-allowed disabled:opacity-50"
+                                  className="h-11 min-w-[88px] rounded-lg bg-muted px-4 text-sm font-medium text-foreground transition-colors hover:bg-muted/80 disabled:cursor-not-allowed disabled:opacity-50"
                                 >
                                   {promoApplied
                                     ? t(

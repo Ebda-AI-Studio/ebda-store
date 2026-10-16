@@ -115,3 +115,24 @@ describe('checkout summary names each line variant (through CheckoutClient)', ()
     expect((await screen.findAllByText(variant)).length).toBeGreaterThan(0);
   });
 });
+
+// a11y re-audit P2-N1 (rule (d) at every breakpoint): the governorate and area comboboxes
+// measured 40px at 390 and 36-40px from 640 up, the coupon field 40px (sm:h-10). The W4 class
+// gate ignored `sm:` classes; target-size.ts now reads each breakpoint and keeps the smallest.
+describe('checkout fields are 44px at every breakpoint (P2-N1)', () => {
+  it('every input, combobox and button on step 1', async () => {
+    const { smallTargets } = await import('../helpers/target-size');
+    lang.v = 'ar';
+    const { container } = render(<CheckoutClient />);
+    await screen.findAllByText('وردي · S · 52');
+    const fields = Array.from(
+      container.querySelectorAll(
+        'input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"])'
+      )
+    );
+    expect(fields.length).toBeGreaterThan(5);
+    const holder = document.createElement('div');
+    for (const f of fields) holder.appendChild(f.cloneNode(true));
+    expect(smallTargets(holder, 44)).toEqual([]);
+  });
+});

@@ -285,7 +285,7 @@ export function OrderSummary({
                 }}
                 aria-invalid={couponError ? true : undefined}
                 aria-describedby={couponError ? couponErrorId : undefined}
-                className="flex-1"
+                className="flex-1 sm:h-11"
               />
               <Button type="button" variant="outline" onClick={onApplyCoupon}>
                 {t('Apply', translations['Apply'])}
