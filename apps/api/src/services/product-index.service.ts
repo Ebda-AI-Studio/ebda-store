@@ -253,7 +253,8 @@ export async function embedEachIsolating(
 }
 
 /**
- * Quarantine products whose current text failed to embed, keyed on that text's md5. Returns the ids
+ * Quarantine products whose current text failed to embed, keyed on that text's md5 and the model,
+ * and delete their existing vectors (an older text's vector must stop matching). Returns the ids
  * NEWLY quarantined (new row, or a different text than the one already quarantined) and raises one
  * P1 per such product — a product that stays quarantined does not re-alert on later runs.
  */
@@ -275,6 +276,10 @@ export async function quarantineEmbedFailures(
       WHERE product_embed_failures.content_hash <> EXCLUDED.content_hash
          OR product_embed_failures.model <> EXCLUDED.model
     RETURNING product_id`;
+  // Review N-M1: a quarantined product must not keep matching on its OLD text's vector.
+  await prisma.$executeRaw`
+    DELETE FROM product_embeddings
+     WHERE store_id = ${storeId} AND product_id = ANY(${failures.map(f => f.id)}::text[])`;
   const fresh = rows.map(r => r.product_id);
   for (const productId of fresh) {
     const kind = failures.find(f => f.id === productId)?.kind;

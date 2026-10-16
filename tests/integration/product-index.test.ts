@@ -494,6 +494,23 @@ describe.skipIf(!hasDb)('product embedding indexer (Task 11)', () => {
         model
       );
 
+    it('review N-M1: quarantining a product deletes its old vector (old words stop matching)', async () => {
+      const { s, bad } = await poisonStore('nm1');
+      await prisma.product.update({ where: { id: bad }, data: { name: 'Clean text' } });
+      setEmbeddingProviderForTests(fakeProvider().provider);
+      await runInStoreScope(s, () => indexStore(s));
+      expect(await embeddingRow(bad)).toBeDefined();
+      await prisma.product.update({ where: { id: bad }, data: { name: 'POISON now' } });
+      setEmbeddingProviderForTests(
+        poisonProvider(() => new EmbeddingError('input', 'rejected', { retryable: false })).provider
+      );
+      await asApp(() =>
+        handleSearchProductIndex({ event: { data: { storeId: s } }, step: fakeStep(), attempt: 0 })
+      );
+      expect(await failureRow(bad)).toBeDefined();
+      expect(await embeddingRow(bad)).toBeUndefined();
+    });
+
     it('review N-M2: a quarantine recorded under another model does not block the product', async () => {
       const { s, bad } = await poisonStore('nm2');
       setEmbeddingProviderForTests(fakeProvider().provider);
