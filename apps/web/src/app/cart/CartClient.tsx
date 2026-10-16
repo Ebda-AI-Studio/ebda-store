@@ -477,7 +477,7 @@ export default function CartClient() {
                   titleAr="سلة التسوق فارغة"
                   description="Looks like you haven't added any items yet."
                   descriptionAr="يبدو أنك لم تضف أي منتجات بعد."
-                  ctaLabel="Start Shopping"
+                  ctaLabel="Start shopping"
                   ctaLabelAr="ابدأ التسوق"
                   ctaHref={storeUrl('/products')}
                   isRtl={language === 'ar'}
@@ -514,7 +514,7 @@ export default function CartClient() {
                 <div className="mt-12">
                   <Link
                     href={storeUrl('/products')}
-                    className="inline-flex items-center gap-2 text-sm font-medium text-muted-foreground transition-colors hover:text-primary"
+                    className="inline-flex min-h-11 items-center gap-2 text-sm font-medium text-muted-foreground transition-colors hover:text-primary"
                   >
                     <svg
                       className="h-4 w-4 rtl:-scale-x-100"
@@ -776,7 +776,7 @@ export default function CartClient() {
                   <div className="mt-8">
                     <Link
                       href={continuShoppingHref}
-                      className="inline-flex items-center gap-2 text-sm font-medium text-muted-foreground transition-colors hover:text-primary"
+                      className="inline-flex min-h-11 items-center gap-2 text-sm font-medium text-muted-foreground transition-colors hover:text-primary"
                     >
                       <svg
                         className="h-4 w-4 rtl:-scale-x-100"
