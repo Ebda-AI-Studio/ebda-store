@@ -216,7 +216,14 @@ describe.skipIf(!hasDb)('InstaPay receipts (money batch A)', () => {
         storeId: s.id,
         orderId,
         receiptId: up.id,
-        fields: fieldsFrom('receipt-sent', { reference: freshReference(), ...over }),
+        // The transfer happened after the order (held 4 days ago): yesterday. The recorded
+        // screenshot's own date (2026-10-05) fell before "now - 4 days" from 2026-10-10 on,
+        // which added DATE_BEFORE_ORDER (a calendar time bomb, like the subscription helper avoids).
+        fields: fieldsFrom('receipt-sent', {
+          reference: freshReference(),
+          transferDate: new Date(Date.now() - DAY).toISOString().slice(0, 10),
+          ...over,
+        }),
       })
     );
   }
@@ -224,8 +231,9 @@ describe.skipIf(!hasDb)('InstaPay receipts (money batch A)', () => {
   const orderRow = (id: string) => owner.order.findUniqueOrThrow({ where: { id } });
   const http = () => {
     const t = request(app);
-    const wrap = (m: 'get' | 'post') => (url: string) => t[m](url).set('x-load-test-token', BYPASS);
-    return { get: wrap('get'), post: wrap('post') };
+    const wrap = (m: 'get' | 'post' | 'put') => (url: string) =>
+      t[m](url).set('x-load-test-token', BYPASS);
+    return { get: wrap('get'), post: wrap('post'), put: wrap('put') };
   };
   const bearer = (j: string) => ({ Authorization: `Bearer ${j}` });
 
