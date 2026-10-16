@@ -5,6 +5,7 @@ import { FooterLegalRow } from '../shared/FooterLegalRow';
 import { FooterWhatsApp } from '../shared/FooterWhatsApp';
 import type { FooterProps } from '../types';
 import { useLanguage } from '../../contexts/LanguageContext';
+import { pickReadableForeground } from '@ebda/shared';
 import {
   footerBranchesHeading,
   resolveFooterBranches,
@@ -63,6 +64,9 @@ export default function MinimalFooter({
   const branches = resolveFooterBranches(locations, theme, isRtl);
   const showBranches = branches.length > 0;
 
+  // Ink picked against the footer's own paint, so a dark merchant footer never gets dark text (B0-46).
+  const brandInk = bgColor ? pickReadableForeground(bgColor) : undefined;
+
   return (
     <footer
       data-zone="footer"
@@ -85,6 +89,15 @@ export default function MinimalFooter({
               }
             />
           )}
+          {!displayLogo && !hideFooterLogoMobile && (
+            <p
+              data-footer-brand="mobile"
+              className="md:hidden self-center text-xs tracking-[0.25em] ui-caps-toggle font-light text-foreground"
+              style={brandInk ? { color: brandInk } : undefined}
+            >
+              {displayName}
+            </p>
+          )}
           {/* Brand — desktop only (Ahmad 2026-06-20: mobile logo is now centered at the top). */}
           <div className="hidden md:block flex-shrink-0">
             {displayLogo ? (
@@ -102,7 +115,10 @@ export default function MinimalFooter({
                 }
               />
             ) : (
-              <span className="text-xs tracking-[0.25em] ui-caps-toggle font-light text-foreground">
+              <span
+                className="text-xs tracking-[0.25em] ui-caps-toggle font-light text-foreground"
+                style={brandInk ? { color: brandInk } : undefined}
+              >
                 {displayName}
               </span>
             )}

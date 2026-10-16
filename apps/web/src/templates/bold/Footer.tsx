@@ -6,6 +6,7 @@ import { FooterLegalRow } from '../shared/FooterLegalRow';
 import { FooterWhatsApp } from '../shared/FooterWhatsApp';
 import type { FooterProps } from '../types';
 import { useLanguage } from '../../contexts/LanguageContext';
+import { pickReadableForeground } from '@ebda/shared';
 import {
   footerBranchesHeading,
   resolveAddressHref,
@@ -84,6 +85,9 @@ export default function BoldFooter({
   const fgFull = invertFooter ? 'text-background' : 'text-foreground';
   const fgMuted = invertFooter ? 'text-background/75' : 'text-foreground/75';
 
+  // Ink picked against the footer's own paint, so a dark merchant footer never gets dark text (B0-46).
+  const brandInk = bgColor ? pickReadableForeground(bgColor) : undefined;
+
   return (
     <footer
       data-zone="footer"
@@ -109,6 +113,15 @@ export default function BoldFooter({
                     : undefined
                 }
               />
+            )}
+            {!displayLogo && !hideFooterLogoMobile && (
+              <p
+                data-footer-brand="mobile"
+                className={`md:hidden mb-5 text-center text-3xl font-black ui-caps-toggle tracking-wider ${fgFull}`}
+                style={brandInk ? { color: brandInk } : undefined}
+              >
+                {displayName}
+              </p>
             )}
             {displayLogo ? (
               <img

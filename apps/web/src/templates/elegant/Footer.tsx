@@ -7,6 +7,7 @@ import { FooterWhatsApp } from '../shared/FooterWhatsApp';
 import { useState } from 'react';
 import type { FooterProps } from '../types';
 import { useLanguage } from '../../contexts/LanguageContext';
+import { pickReadableForeground } from '@ebda/shared';
 import { api } from '../../lib/api';
 import {
   footerBranchesHeading,
@@ -103,6 +104,9 @@ export default function ElegantFooter({
           ? 'md:grid-cols-5'
           : 'md:grid-cols-4';
 
+  // Ink picked against the footer's own paint, so a dark merchant footer never gets dark text (B0-46).
+  const brandInk = bgColor ? pickReadableForeground(bgColor) : undefined;
+
   return (
     <footer
       data-zone="footer"
@@ -193,6 +197,15 @@ export default function ElegantFooter({
                     : undefined
                 }
               />
+            )}
+            {!displayLogo && !hideFooterLogoMobile && (
+              <p
+                data-footer-brand="mobile"
+                className="md:hidden mb-5 text-center text-base font-medium tracking-[0.2em] text-foreground font-serif"
+                style={brandInk ? { color: brandInk } : undefined}
+              >
+                {displayName}
+              </p>
             )}
             {displayLogo ? (
               <img
