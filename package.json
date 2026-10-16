@@ -14,7 +14,7 @@
     "url": "https://github.com/Whisky-11/ebda-store/issues"
   },
   "engines": {
-    "node": ">=20.0.0",
+    "node": ">=20.3.0",
     "npm": ">=9.0.0"
   },
   "workspaces": [
