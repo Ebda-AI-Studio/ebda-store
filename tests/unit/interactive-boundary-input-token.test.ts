@@ -22,9 +22,14 @@ import path from 'node:path';
 
 const WEB = path.resolve(__dirname, '../../apps/web/src');
 
-/** Card render paths owned by W2b (Ruling B1-55): not editable in W2a. */
+/** Card render paths + the 4 card mappers, owned by W2b (Ruling B1-55): not editable in W2a. */
 const W2B_CARD_FILES = new Set([
   'app/products/ProductListItem.tsx',
+  // the 4 hand-built card mappers (CLAUDE.md card paths)
+  'app/wishlist/WishlistClient.tsx',
+  'components/YouMightAlsoLike.tsx',
+  'components/CartRecommendations.tsx',
+  'components/FrequentlyBoughtTogether.tsx',
   'templates/shared/PecannbeeProductCard.tsx',
   'templates/shared/ProductCardCta.tsx',
   'templates/shared/ProductCarousel.tsx',
