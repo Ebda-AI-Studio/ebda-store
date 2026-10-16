@@ -377,6 +377,31 @@ describe.skipIf(!hasDb)('/public/products cache keys and caching (Ruling SEARCH-
     expect(lower.body.data.suggestions.map((x: { id: string }) => x.id)).toEqual(s.ids);
   });
 
+  it('a long request still caches: the key is hashed under the invalidation prefix (KV 512 B)', async () => {
+    const s = await seedStore('longkey', [{ name: 'Canvas shoes' }]);
+    const sets: string[] = [];
+    const realSet = redis.set.bind(redis);
+    vi.spyOn(redis, 'set').mockImplementation(async (k: string, v: unknown, ttl?: number) => {
+      sets.push(k);
+      return realSet(k, v as string, ttl);
+    });
+    const spy = vi.spyOn(ProductService, 'listPublic');
+    const search = encodeURIComponent('حذاء '.repeat(20)); // 100 Arabic chars = 200 bytes
+    const opts = Array.from({ length: 10 }, (_, i) => `opt_Option${i}=${'x'.repeat(30)}`).join('&');
+    const qs = `search=${search}&category=${'c'.repeat(60)}&${opts}`;
+    await get(s.storeId, qs);
+    await get(s.storeId, qs);
+    expect(spy).toHaveBeenCalledTimes(1); // the second request was a cache hit
+    const listKey = sets.find(k => k.startsWith(`public:products:${s.storeId}:`))!;
+    expect(new TextEncoder().encode(`cache:${listKey}`).length).toBeLessThanOrEqual(512);
+    expect(listKey).toMatch(new RegExp(`^public:products:${s.storeId}:sha256:[0-9a-f]{64}$`));
+    // A product write still busts the hashed entry (same prefix).
+    const { invalidateStoreProductCaches } = await import('../../apps/api/src/lib/public-cache');
+    await invalidateStoreProductCaches(s.storeId);
+    await get(s.storeId, qs);
+    expect(spy).toHaveBeenCalledTimes(2);
+  });
+
   it('semantic off: the edge policy of the list is unchanged (public, s-maxage)', async () => {
     process.env.SEARCH_SEMANTIC_ENABLED = 'false';
     const s = await seedStore('edge', [{ name: 'Canvas shoes' }]);

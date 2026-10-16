@@ -36,7 +36,7 @@ import logger from '../lib/logger';
 import { featureService } from '../services/feature.service';
 import { gateBackorderPayload } from '../lib/effective-inventory';
 import { notificationDispatcher } from '../services/notification-dispatcher.service';
-import { getCached } from '../lib/public-cache';
+import { boundedCacheKey, getCached } from '../lib/public-cache';
 import { storeLookupForHost } from '../lib/store-host';
 import { lookupStore, publicStorePage, type StoreStatusName } from '../lib/definer';
 import { redis } from '../services/redis.service';
@@ -326,10 +326,12 @@ router.get('/products', async (req: Request, res: Response, next: NextFunction) 
         : queryBudgetSpent(storeId)
           ? 'budget-spent'
           : 'on';
-    const cacheKey = `public:products:${storeId}:${JSON.stringify({
-      ...listOptions,
-      semantic: semanticMode,
-    })}`;
+    // Long keys (a 100-char Arabic term + option filters) are hashed under the same prefix so they
+    // still fit Workers KV's 512-byte limit and still get busted (`boundedCacheKey`, review M7).
+    const cacheKey = boundedCacheKey(
+      `public:products:${storeId}:`,
+      JSON.stringify({ ...listOptions, semantic: semanticMode })
+    );
 
     const result = await getCached(
       cacheKey,

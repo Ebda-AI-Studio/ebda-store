@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { redis } from '../services/redis.service';
 import { BoundedMap } from './bounded-map';
 import { revalidateStorefront } from './revalidate-storefront';
@@ -455,4 +456,19 @@ export function customersCacheKey(storeId: string): string {
  */
 export async function invalidateCustomersCache(storeId: string): Promise<void> {
   await invalidateCached(customersCacheKey(storeId));
+}
+
+/**
+ * Workers KV refuses keys over 512 bytes, and the full KV key is `[namespace]cache:<key>`. A longer
+ * key made the get/put throw and the request silently went uncached (Task 12 review M7). Keys
+ * longer than this are hashed: `<prefix>sha256:<hex of the suffix>`. The prefix stays readable, so
+ * prefix invalidation (`invalidateCachedPrefix('public:products:<storeId>:')`) still covers them;
+ * sha-256 of the canonical suffix keeps distinct inputs distinct.
+ */
+export const CACHE_KEY_MAX_BYTES = 400;
+
+export function boundedCacheKey(prefix: string, suffix: string): string {
+  const full = prefix + suffix;
+  if (new TextEncoder().encode(full).length <= CACHE_KEY_MAX_BYTES) return full;
+  return `${prefix}sha256:${createHash('sha256').update(suffix).digest('hex')}`;
 }
