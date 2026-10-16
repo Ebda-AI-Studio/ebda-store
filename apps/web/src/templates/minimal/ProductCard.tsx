@@ -404,7 +404,7 @@ function MinimalProductCard({
                   'py-1 h-auto cursor-pointer'
                 )}
                 labels={{
-                  addToCart: isRtl ? 'أضف للسلة' : 'Add to Cart',
+                  addToCart: isRtl ? 'أضف للسلة' : 'Add to cart',
                   addedToCart: isRtl ? 'تمت الإضافة' : 'Added',
                   outOfStock: isRtl ? 'نفذت الكمية' : 'Sold Out',
                   adding: isRtl ? '...' : '...',

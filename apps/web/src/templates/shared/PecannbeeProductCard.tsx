@@ -664,7 +664,7 @@ function PecannbeeProductCardImpl({
             onClick={handleAdd}
             label={
               (isRtl ? resolvedCtaLabelTextAr : resolvedCtaLabelTextEn) ??
-              (isRtl ? 'إضافة للسلة' : 'Add to Cart')
+              (isRtl ? 'إضافة للسلة' : 'Add to cart')
             }
             className={cn(
               `mt-auto inline-flex w-full items-center justify-center gap-2 min-h-[44px] ${ctaCls} disabled:cursor-not-allowed disabled:opacity-60`,
