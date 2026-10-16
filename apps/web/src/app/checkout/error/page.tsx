@@ -1,14 +1,17 @@
-import { Metadata } from 'next';
+import type { Metadata } from 'next';
+import { localizedMetadata } from '@/lib/seo/localized-metadata';
 import ErrorClient from './ErrorClient';
 
 // Track-B — see app/cart/page.tsx sibling comment; same rationale.
 export const dynamic = 'force-dynamic';
 
-export const metadata: Metadata = {
-  title: 'Payment Error',
-  description: 'There was an issue processing your payment.',
-  robots: { index: false, follow: false },
-};
+export function generateMetadata(): Promise<Metadata> {
+  return localizedMetadata({
+    title: ['Payment Error', 'تعذّر الدفع'],
+    description: ['There was an issue processing your payment.', 'حدثت مشكلة أثناء معالجة الدفع.'],
+    robots: { index: false, follow: false },
+  });
+}
 
 export default function CheckoutErrorPage() {
   return <ErrorClient />;

@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { localizedMetadata } from '@/lib/seo/localized-metadata';
 import CartClient from './CartClient';
 
 // Track-B (personalized, session-bound) — stays outside the new `tenant-store`
@@ -8,11 +9,13 @@ import CartClient from './CartClient';
 // docs/plans/2026-07-12-tenant-cacheable-routing.md §3.3/§4/§9.
 export const dynamic = 'force-dynamic';
 
-export const metadata: Metadata = {
-  title: 'Cart',
-  description: 'Review items in your shopping cart.',
-  robots: { index: false, follow: false },
-};
+export function generateMetadata(): Promise<Metadata> {
+  return localizedMetadata({
+    title: ['Cart', 'سلة التسوق'],
+    description: ['Review items in your shopping cart.', 'راجع القطع في سلة التسوق.'],
+    robots: { index: false, follow: false },
+  });
+}
 
 export default function CartPage() {
   return <CartClient />;

@@ -1,10 +1,16 @@
 import type { Metadata } from 'next';
+import { localizedMetadata } from '@/lib/seo/localized-metadata';
 import PrivacyClient from './PrivacyClient';
 
-export const metadata: Metadata = {
-  title: 'Privacy Policy',
-  description: 'Read our privacy policy to understand how we collect, use, and protect your data.',
-};
+export function generateMetadata(): Promise<Metadata> {
+  return localizedMetadata({
+    title: ['Privacy Policy', 'سياسة الخصوصية'],
+    description: [
+      'Read our privacy policy to understand how we collect, use, and protect your data.',
+      'اقرأ سياسة الخصوصية لتعرف كيف نجمع بياناتك ونستخدمها ونحميها.',
+    ],
+  });
+}
 
 export default function PrivacyPage() {
   return <PrivacyClient />;

@@ -1,11 +1,8 @@
-import type { Metadata } from 'next';
 import { getStoreByTenantParam } from '@/lib/store-resolver';
 import { ContactPageBody } from '@/app/contact/ContactPageBody';
 
-export const metadata: Metadata = {
-  title: 'Contact',
-  description: 'Get in touch with us. We are happy to help with any questions or feedback.',
-};
+// Rule (f): the same page-language title as the legacy twin (metadata parity, issue 2418).
+export { generateMetadata } from '@/app/contact/page';
 
 export default async function StoreContactPage({
   params,
