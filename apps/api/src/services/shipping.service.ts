@@ -268,7 +268,8 @@ export class ShippingService {
    *
    * Fee resolution priority:
    *  1. Exact per-area ShippingAreaRate (case-insensitive EN match)
-   *  2. Legacy ShippingZone substring/exact match
+   *  2. Legacy ShippingZone, matched by WHOLE place name after folding, area first then
+   *     governorate (`zoneForAddress`, Ruling FU46-13)
    *  3. Fallback to first zone when no area rates exist (legacy behaviour, unchanged)
    *  4. Nothing matched → shippingCost:0, no zone
    *
