@@ -12,3 +12,8 @@ User-visible changes, by who sees them. Rulings: `docs/RULINGS.md` § "2026-10-1
 
 - **Page Builder → Product card defaults → "New" badge on cards** (ar + en): turns the "New" chip on for products you mark as new or added in the last 14 days. Off by default (D1016-NEW-1).
 - **No orange chrome** (D1016-ORANGE-1): the upgrade prompt, staff badge, AI FAQ review box, AI usage chart and WhatsApp settings use the Ebda gold of the rest of the dashboard; the orders app moves from orange to the same gold; a new PWA starts on Ebda night instead of orange.
+- **App icons are made for each size by Cloudflare Images** (D1016-ICONS-1), once the deploy switch is on (D1016-ICONS-2): a sharp 16/32 px favicon, the 180 px Apple icon, and an Android adaptive icon with the art inside the safe zone on your PWA background colour. Until then, icons are stored as uploaded, as before.
+
+## Ops
+
+- New optional repo variable `EBDA_IMAGES_BINDING=true` adds the Cloudflare Images binding to the API deploy (docs/ENVIRONMENT.md). Enable Images on the Whisky account first (steps in Ruling D1016-ICONS-2).

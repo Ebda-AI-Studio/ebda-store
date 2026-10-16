@@ -7,6 +7,7 @@ import { StorageService } from './storage.service';
 import { revalidateStorefront } from '../lib/revalidate-storefront';
 import logger from '../lib/logger';
 import { BRAND } from '@ebda/shared';
+import { imagesBinding, renderIcon } from '../lib/images/icon-resizer';
 
 // PWA Settings structure
 export interface PWASettings {
@@ -70,16 +71,16 @@ export interface GeneratedPwaIcons {
 }
 
 /**
- * The size keys of the icon set. Since Ruling FU46-8 (no `sharp` on workerd) every key holds
- * the merchant's source PNG unchanged; `size` is what the manifest declares for it and the
- * browser scales the image to that size when it renders. `padded` documents that the
- * maskable icon is NOT padded any more: the merchant keeps the artwork inside the central 80%
- * (the admin hint says so).
+ * The size keys of the icon set. With the Cloudflare Images binding (Ruling D1016-ICONS-1) each
+ * key holds a PNG of its own `size`, and the maskable icon is `padded`: the art scaled into the
+ * central 80% on the store's opaque PWA background (Android adaptive icon). Without the binding
+ * (or when it fails) every key holds the source unchanged, as since FU46-8, and the browser
+ * scales it.
  */
 const ICON_TARGETS: ReadonlyArray<{
   key: Exclude<keyof GeneratedPwaIcons, 'iconSource'>;
   size: number;
-  padded: false;
+  padded: boolean;
 }> = [
   { key: 'icon192', size: 192, padded: false },
   { key: 'icon384', size: 384, padded: false },
@@ -87,17 +88,42 @@ const ICON_TARGETS: ReadonlyArray<{
   { key: 'iconAppleTouch', size: 180, padded: false },
   { key: 'favicon32', size: 32, padded: false },
   { key: 'favicon16', size: 16, padded: false },
-  { key: 'maskableIcon', size: 512, padded: false },
+  { key: 'maskableIcon', size: 512, padded: true },
 ];
+
+/**
+ * Every target resized through Cloudflare Images, or null (no binding, or ANY target failed:
+ * a mixed set of resized and pass-through icons is never stored). One warning on failure.
+ */
+async function resizedTargets(
+  storeId: string,
+  source: Buffer,
+  background: string | undefined
+): Promise<Buffer[] | null> {
+  const images = imagesBinding();
+  if (!images) return null;
+  try {
+    return await Promise.all(
+      ICON_TARGETS.map(t => renderIcon(images, source, t.size, { maskable: t.padded, background }))
+    );
+  } catch (err) {
+    logger.warn(
+      { storeId, err: err instanceof Error ? err.message : String(err) },
+      'pwa: Cloudflare Images resize failed; storing the source under every size (FU46-8 fallback)'
+    );
+    return null;
+  }
+}
 
 /**
  * Store the PWA icon set from one merchant-uploaded square PNG under `stores/<storeId>/pwa/`.
  *
- * Workers-safe (Ruling FU46-8): nothing is decoded or resized — `sharp` cannot load on workerd,
- * and before this change every production call threw there. The route has already checked the
- * source is a square PNG of at least 512×512 and at most 1 MB from its bytes; this function
- * re-checks it is a PNG (defence in depth: it is exported) and then stores the SAME bytes as the
- * source and under every target key, `Content-Type: image/png`.
+ * Workers-safe: no image library runs here (`sharp` cannot load on workerd, FU46-8). The route has
+ * already checked the source is a square PNG of at least 512×512 and at most 1 MB from its bytes;
+ * this function re-checks it is a PNG (defence in depth: it is exported), stores the source as
+ * sent, and stores each target RESIZED through the Cloudflare Images binding (Ruling
+ * D1016-ICONS-1, the maskable one padded) — or, with no binding or any resize failure, the SAME
+ * source bytes under every target key, as FU46-8 did. `Content-Type: image/png` throughout.
  *
  * Every key carries a per-generation VERSION suffix (`icon192-<ver>`): `StorageService` sets a
  * one-year `Cache-Control`, so a fixed key kept serving the old icon after a re-upload (#1912),
@@ -114,7 +140,9 @@ const ICON_TARGETS: ReadonlyArray<{
  */
 export async function generatePwaIconSet(
   storeId: string,
-  sourceBuffer: Buffer
+  sourceBuffer: Buffer,
+  /** `background`: the maskable icon's padding colour (the store's PWA background). */
+  opts: { background?: string } = {}
 ): Promise<GeneratedPwaIcons> {
   // One version per run, shared by every key (randomUUID: two runs in one millisecond differ).
   const version = randomUUID().slice(0, 8);
@@ -128,7 +156,11 @@ export async function generatePwaIconSet(
     });
   }
   const sourcePng = sourceBuffer;
-  const prepared = ICON_TARGETS.map(target => ({ target, buffer: sourceBuffer }));
+  const resized = await resizedTargets(storeId, sourceBuffer, opts.background);
+  const prepared = ICON_TARGETS.map((target, i) => ({
+    target,
+    buffer: resized ? resized[i] : sourceBuffer,
+  }));
 
   const results: Partial<GeneratedPwaIcons> = {};
   try {
