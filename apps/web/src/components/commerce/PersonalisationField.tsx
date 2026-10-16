@@ -107,11 +107,11 @@ export function PersonalisationField({
           setFocused(false);
         }}
         placeholder={t('e.g. Mona', 'مثال: منى')}
-        className="mt-2 block h-11 w-full rounded-[var(--radius)] border border-input bg-background px-3 text-base text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:max-w-sm"
+        className="mt-2 block h-11 w-full rounded-[var(--radius)] border border-input bg-background px-3 text-base text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
       />
       <p
         id={`${id}-hint`}
-        className="mt-1.5 flex items-center justify-between gap-3 text-xs text-muted-foreground md:max-w-sm"
+        className="mt-1.5 flex items-center justify-between gap-3 text-xs text-muted-foreground"
       >
         <span data-testid="personalisation-hint">
           {missing && touched ? t(`Fill in “${label}” first`, `اكتب ${label} أولاً`) : ''}

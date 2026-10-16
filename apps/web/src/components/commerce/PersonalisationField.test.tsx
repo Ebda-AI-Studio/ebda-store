@@ -92,10 +92,8 @@ describe('PersonalisationField', () => {
     expect(screen.getByLabelText(/^التخصيص/)).toBeTruthy();
   });
 
-  it('the input stays narrow from md up (F14)', () => {
-    render(<PersonalisationField config={cfg} value="" onChange={() => {}} />);
-    expect(screen.getByLabelText(/الاسم للتطريز/).className).toContain('md:max-w-sm');
-  });
+  // F14 (narrow from md up) is superseded by AT-2 (Ruling B1-70: the independent audit
+  // gates): a field narrower than the CTA under it read as misaligned. See the AT-2 block.
 });
 
 describe('personalisationMissing (feeds the single add-to-cart disabled rule)', () => {
@@ -125,5 +123,19 @@ describe('PersonalisationField optional marker and example', () => {
     expect((screen.getByLabelText(/الاسم للتطريز/) as HTMLInputElement).placeholder).toBe(
       'مثال: منى'
     );
+  });
+});
+
+// AT-2 (independent audit): at 1280 the embroidery field was narrower than the Add
+// button below it (600 vs 930px). The field and its helper row span the buy column,
+// the same width as the CTA.
+describe('PersonalisationField width (AT-2)', () => {
+  it('the input and its helper row are as wide as the buy column', () => {
+    const { container } = render(
+      <PersonalisationField config={cfg} value="" onChange={() => {}} />
+    );
+    const input = container.querySelector('input')!;
+    expect(input.className).toMatch(/\bw-full\b/);
+    expect(container.innerHTML).not.toMatch(/max-w-/);
   });
 });
