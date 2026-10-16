@@ -951,7 +951,20 @@ export default function ProductDetailClient({
                     // Chrome/Firefox, so the index math + scroll-to break and the
                     // gallery desyncs / scrolls into empty space for AR shoppers.
                     dir="ltr"
-                    className="flex h-full w-full snap-x snap-mandatory overflow-x-auto overflow-y-hidden [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+                    // P1-7 (W4): a named, focusable region; arrow keys page it like the buttons.
+                    role="region"
+                    aria-roledescription="carousel"
+                    aria-label={t(`Photos of ${displayName}`, `صور ${displayName}`)}
+                    tabIndex={0}
+                    onKeyDown={e => {
+                      if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+                      e.preventDefault();
+                      const forward = (e.key === 'ArrowLeft') === (language === 'ar');
+                      setSelectedImage(i =>
+                        Math.min(images.length - 1, Math.max(0, i + (forward ? 1 : -1)))
+                      );
+                    }}
+                    className="flex h-full w-full snap-x snap-mandatory overflow-x-auto overflow-y-hidden [scrollbar-width:none] [&::-webkit-scrollbar]:hidden focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
                   >
                     {images.map((img, index) => (
                       <div
@@ -1014,6 +1027,64 @@ export default function ProductDetailClient({
                   oosLabelTextColor={productCardDefaults?.oosLabelTextColor}
                   theme={store?.theme}
                 />
+                {/* P1-7 / AT-2 (W4): real prev/next buttons, 44px, at the inline edges, plus a
+                    polite status line; the dots below stay as the visual position cue. */}
+                {images.length > 1 && !show3d && (
+                  <>
+                    <button
+                      type="button"
+                      data-gallery-prev
+                      disabled={selectedImage === 0}
+                      onClick={() => setSelectedImage(i => Math.max(0, i - 1))}
+                      aria-label={t('Previous photo', 'الصورة السابقة')}
+                      className="absolute start-2 top-1/2 z-10 inline-flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-[var(--radius)] bg-background/85 text-foreground disabled:opacity-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    >
+                      <svg
+                        className="h-5 w-5 rtl:-scale-x-100"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                        aria-hidden="true"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M15 19l-7-7 7-7"
+                        />
+                      </svg>
+                    </button>
+                    <button
+                      type="button"
+                      data-gallery-next
+                      disabled={selectedImage >= images.length - 1}
+                      onClick={() => setSelectedImage(i => Math.min(images.length - 1, i + 1))}
+                      aria-label={t('Next photo', 'الصورة التالية')}
+                      className="absolute end-2 top-1/2 z-10 inline-flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-[var(--radius)] bg-background/85 text-foreground disabled:opacity-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    >
+                      <svg
+                        className="h-5 w-5 rtl:-scale-x-100"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                        aria-hidden="true"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M9 5l7 7-7 7"
+                        />
+                      </svg>
+                    </button>
+                    <span data-gallery-status className="sr-only" aria-live="polite">
+                      {t(
+                        `Photo ${selectedImage + 1} of ${images.length}`,
+                        `الصورة ${selectedImage + 1} من ${images.length}`
+                      )}
+                    </span>
+                  </>
+                )}
                 {/* Dot indicators — current image of total. */}
                 {images.length > 1 && !show3d && (
                   <div className="pointer-events-none absolute inset-x-0 bottom-2 flex justify-center gap-1.5">

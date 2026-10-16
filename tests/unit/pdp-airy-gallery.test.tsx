@@ -117,7 +117,11 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-async function renderPdp(theme: Record<string, unknown>, layout?: Record<string, unknown>) {
+async function renderPdp(
+  theme: Record<string, unknown>,
+  layout?: Record<string, unknown>,
+  images: { id: string; url: string; alt: string }[] = [{ id: 'i1', url: '/a.webp', alt: 'a' }]
+) {
   vi.stubGlobal('IntersectionObserver', IO);
   vi.stubGlobal('localStorage', { getItem: () => null, setItem: () => {}, removeItem: () => {} });
   const { default: ProductDetailClient } =
@@ -131,7 +135,7 @@ async function renderPdp(theme: Record<string, unknown>, layout?: Record<string,
     price: 149000,
     inStock: true,
     inventory: 5,
-    images: [{ id: 'i1', url: '/a.webp', alt: 'a' }],
+    images,
     variants: [],
     options: [],
     categories: [],
@@ -141,7 +145,7 @@ async function renderPdp(theme: Record<string, unknown>, layout?: Record<string,
   );
   const frame = container.querySelector('.snap-x')!.parentElement as HTMLElement;
   const crumb = container.querySelector('[data-zone="products"] > nav') as HTMLElement;
-  return { frame, crumb };
+  return { frame, crumb, container };
 }
 
 describe('airy (image-led) PDP gallery', () => {
@@ -197,5 +201,32 @@ describe('airy (image-led) PDP gallery', () => {
     expect(md).toContain("## Exception: image-led looks (`density: 'airy'`");
     expect(md).toContain('≤ 4 columns at 1280');
     expect(md).toContain('**4:5**');
+  });
+});
+
+// a11y P1-7 / AT-2 / R-08 (W4): the gallery scroller had no role or name and no buttons, so photo 2
+// was reachable by touch or a mouse wheel only.
+describe('PDP gallery is a named region with prev/next buttons', () => {
+  const two = [
+    { id: 'i1', url: '/a.webp', alt: 'a' },
+    { id: 'i2', url: '/b.webp', alt: 'b' },
+  ];
+  it('names the track, and the next button moves to photo 2 (announced)', async () => {
+    const { container } = await renderPdp({}, undefined, two);
+    const track = container.querySelector('[aria-roledescription="carousel"]') as HTMLElement;
+    expect(track.getAttribute('role')).toBe('region');
+    expect(track.getAttribute('aria-label')).toMatch(/Linen Abaya|عباية كتان/);
+    const next = container.querySelector('button[data-gallery-next]') as HTMLButtonElement;
+    const prev = container.querySelector('button[data-gallery-prev]') as HTMLButtonElement;
+    expect(next && prev).toBeTruthy();
+    expect(prev.disabled).toBe(true);
+    const { fireEvent } = await import('@testing-library/react');
+    fireEvent.click(next);
+    expect(container.querySelector('[data-gallery-status]')!.textContent).toContain('2');
+    expect(next.disabled).toBe(true);
+  });
+  it('one photo: no buttons', async () => {
+    const { container } = await renderPdp({});
+    expect(container.querySelector('button[data-gallery-next]')).toBeNull();
   });
 });
