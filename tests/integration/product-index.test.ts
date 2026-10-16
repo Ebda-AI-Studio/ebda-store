@@ -630,6 +630,16 @@ describe.skipIf(!hasDb)('product embedding indexer (Task 11)', () => {
       expect(await embeddingRow(bad)).toBeUndefined();
     });
 
+    it('PR3 minor 5: a quarantined product that becomes unindexable loses its quarantine row', async () => {
+      const { s, bad } = await poisonStore('m5q');
+      await quarantineAs(bad, EMBED_MODEL);
+      expect(await failureRow(bad)).toBeDefined();
+      await prisma.product.update({ where: { id: bad }, data: { status: 'archived' } });
+      setEmbeddingProviderForTests(fakeProvider().provider);
+      await runInStoreScope(s, () => indexStore(s));
+      expect(await failureRow(bad)).toBeUndefined();
+    });
+
     it('review N-M2: a quarantine recorded under another model does not block the product', async () => {
       const { s, bad } = await poisonStore('nm2');
       setEmbeddingProviderForTests(fakeProvider().provider);

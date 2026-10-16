@@ -120,10 +120,17 @@ export async function storeIndexStatus(
 
 /** Delete vectors of products that are no longer indexable (see INDEXABLE): they must not match old words. */
 export async function pruneUnindexableEmbeddings(storeId: string): Promise<number> {
-  return prisma.$executeRaw`
+  const removed = await prisma.$executeRaw`
     DELETE FROM product_embeddings e USING products p
      WHERE e.product_id = p.id AND e.store_id = ${storeId} AND p.store_id = ${storeId}
        AND NOT ${INDEXABLE}`;
+  // PR3 minor 5: a quarantine row for a product that left the index is dead data; a product that
+  // comes back (republished, text restored) is retried from scratch.
+  await prisma.$executeRaw`
+    DELETE FROM product_embed_failures f USING products p
+     WHERE f.product_id = p.id AND f.store_id = ${storeId} AND p.store_id = ${storeId}
+       AND NOT ${INDEXABLE}`;
+  return removed;
 }
 
 /**
