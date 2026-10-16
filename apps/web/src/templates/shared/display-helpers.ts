@@ -209,7 +209,8 @@ export function resolveBottomBar(
   const overrideRaw = isRtl
     ? (bottomBar?.copyrightOverrideAr ?? bottomBar?.copyrightOverride)
     : bottomBar?.copyrightOverride;
-  const override = typeof overrideRaw === 'string' ? overrideRaw.trim() : '';
+  // Clamped on read: a legacy row may hold more than the 200 the editor now allows (FU46 M-7).
+  const override = typeof overrideRaw === 'string' ? overrideRaw.trim().slice(0, 200) : '';
   const name = storeName.trim();
   const fallback = isRtl
     ? `© ${year} ${name ? `${name}.` : '·'} جميع الحقوق محفوظة.`

@@ -69,10 +69,21 @@ const utilityLinkSchema = z
  * chrome patch carries it. Unknown legacy keys from rows written before the
  * 2026-05-21 removal are tolerated (ignored by the storefront).
  */
+export const COPYRIGHT_OVERRIDE_MAX = 200;
+/**
+ * Tolerant on purpose (FU46 M-7): a row saved before the 2026-05-21 removal can hold
+ * `copyrightOverride: null` or an over-long string, and every settings PUT re-validates the whole
+ * blob, so a strict field made unrelated saves answer 400. null reads as unset and a long value
+ * is clamped (the admin input is capped at 200, the storefront clamps on read too).
+ */
+const copyrightField = z.preprocess(
+  v => (v === null ? undefined : typeof v === 'string' ? v.slice(0, COPYRIGHT_OVERRIDE_MAX) : v),
+  z.string().max(COPYRIGHT_OVERRIDE_MAX).optional()
+);
 export const footerBottomBarSchema = z.object({
   enabled: z.boolean().optional(),
-  copyrightOverride: z.string().max(200).optional(),
-  copyrightOverrideAr: z.string().max(200).optional(),
+  copyrightOverride: copyrightField,
+  copyrightOverrideAr: copyrightField,
   privacyEnabled: z.boolean().optional(),
   termsEnabled: z.boolean().optional(),
   shippingEnabled: z.boolean().optional(),

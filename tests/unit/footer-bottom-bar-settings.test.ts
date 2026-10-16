@@ -49,6 +49,17 @@ import { resolveBottomBar } from '../../apps/web/src/templates/shared/display-he
 const ROOT = join(__dirname, '../..');
 const cols = { shop: [], support: [], company: [], newsletterEnabled: true };
 
+describe('FU46 M-7: legacy © values read safely', () => {
+  it('null is unset (default line), an over-long override is clamped to 200', () => {
+    const nul = { copyrightOverride: null } as never;
+    expect(resolveBottomBar(nul, 'Shop', false, undefined, 2026).copyright).toBe(
+      '© 2026 Shop. All rights reserved.'
+    );
+    const long = { copyrightOverride: 'y'.repeat(300) } as never;
+    expect(resolveBottomBar(long, 'Shop', false, undefined, 2026).copyright).toBe('y'.repeat(200));
+  });
+});
+
 describe('FU46 M-9: the default © line with no store name', () => {
   it('has no stray " ." (en and ar), and a blank name counts as none', () => {
     expect(resolveBottomBar(undefined, '', false, undefined, 2026).copyright).toBe(
@@ -116,13 +127,19 @@ describe('the API edge validates the legal row settings', () => {
       const ok = { returnsEnabled: false, privacyEnabled: true, copyrightOverrideAr: '© متجر' };
       expect(schema.safeParse({ name: 'Shop', ...body(ok) }).success).toBe(true);
     });
-    it(`${name}: refuses a non-boolean toggle and a 201-char © line`, () => {
+    it(`${name}: refuses a non-boolean toggle`, () => {
       expect(schema.safeParse({ name: 'Shop', ...body({ returnsEnabled: 'no' }) }).success).toBe(
         false
       );
-      expect(
-        schema.safeParse({ name: 'Shop', ...body({ copyrightOverride: 'x'.repeat(201) }) }).success
-      ).toBe(false);
+    });
+    it(`${name}: a legacy null or over-long © never blocks the save (FU46 M-7)`, () => {
+      for (const legacy of [
+        { copyrightOverride: null },
+        { copyrightOverrideAr: null, privacyEnabled: false },
+        { copyrightOverride: 'x'.repeat(300) },
+      ]) {
+        expect(schema.safeParse({ name: 'Shop', ...body(legacy) }).success).toBe(true);
+      }
     });
   }
   it('the schema is the shared one', () => {
