@@ -46,7 +46,7 @@ export function PoweredByForce({ hidden = false }: { hidden?: boolean }) {
         {/* "Powered by Ebda" as a text wordmark. The wordmark is the footer's own ink + semibold:
             the brand gold (#B08D57) measured 3.09:1 on a white footer (STOP 1, Ruling B1-27), and
             the line is the full muted tone (the old /70 alpha also fell under 4.5:1). On a
-            merchant-coloured footer both re-derive from the surface (data-footer-surface). */}
+            merchant-coloured footer both take the shared footer ink ([data-footer-ink], footer-ink.ts). */}
         <span>{t('Powered by', 'مدعوم من')}</span>
         <span className="font-semibold text-foreground">
           {t(BRAND.product.nameEn, BRAND.product.nameAr)}

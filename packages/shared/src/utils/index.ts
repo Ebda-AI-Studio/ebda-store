@@ -17,8 +17,6 @@ export type { VibeId, VibePreset } from './vibe-presets';
 export {
   resolveColor,
   pickReadableForeground,
-  readableTextVars,
-  footerTextOverride,
   contrastRatio,
   parseColorToRgb,
   relativeLuminance,
