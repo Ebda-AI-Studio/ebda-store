@@ -7,6 +7,9 @@
  * StoreService.delete remove the rows; nothing references the table, so no NO ACTION child is
  * added), the tenant guard covers the model, and `ebda_product_embed_doc` builds the embedding
  * input. Owner-role `prisma` is used only for fixtures and read-backs. Fixtures are per CALL.
+ *
+ * planner-owner-ok: the EXPLAIN here only checks that an IMMUTABLE helper is inlined (SQL shape),
+ * not that any index is used.
  */
 import crypto from 'node:crypto';
 import { describe, it, expect, afterAll, vi } from 'vitest';

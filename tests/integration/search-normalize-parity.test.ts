@@ -2,7 +2,7 @@
  * Parity: SQL `public.ebda_ar_norm` (migration 20261019000100_search_normalisation) must return
  * EXACTLY what `normalizeArabicSearch` (@ebda/shared) returns. The expression trigram indexes
  * store the SQL output and the query side builds its LIKE tokens with the TS function, so any
- * drift makes a search silently miss rows. Every NORMALIZE_VECTORS row and a seeded generated
+ * drift makes a search silently miss rows. planner-owner-ok: the one EXPLAIN here asserts the SQL SHAPE (the match is a call to ebda_product_search_ids), not index use, which search-lexical-rls-index.test.ts proves as ebda_app. Every NORMALIZE_VECTORS row and a seeded generated
  * sample run through both. The planner case runs SET LOCAL inside ONE transaction (a bare
  * SET LOCAL outside a transaction has no effect and may land on another pooled connection).
  */
@@ -139,27 +139,9 @@ describe.skipIf(!hasDb)('ebda_ar_norm parity with normalizeArabicSearch', () => 
     expect(rows.every(r => r.valid)).toBe(true);
   });
 
-  it('the planner can use both doc indexes for a normalised LIKE', async () => {
-    const ROLLBACK = Symbol('rollback');
-    const plans: string[] = [];
-    await prisma
-      .$transaction(async tx => {
-        await tx.$executeRaw`SET LOCAL enable_seqscan = off`;
-        for (const sql of [
-          `EXPLAIN (COSTS OFF) SELECT id FROM products WHERE public.ebda_product_search_doc(name, name_ar, search_terms, description, description_ar) LIKE '%احذيه%'`,
-          `EXPLAIN (COSTS OFF) SELECT id FROM products WHERE public.ebda_product_name_doc(name, name_ar, search_terms) LIKE '%احذيه%'`,
-        ]) {
-          const rows = await tx.$queryRawUnsafe<Array<{ 'QUERY PLAN': string }>>(sql);
-          plans.push(rows.map(p => p['QUERY PLAN']).join('\n'));
-        }
-        throw ROLLBACK;
-      })
-      .catch(e => {
-        if (e !== ROLLBACK) throw e;
-      });
-    expect(plans[0]).toContain('products_search_doc_trgm_idx');
-    expect(plans[1]).toContain('products_name_doc_trgm_idx');
-  });
+  // (The former 'planner can use both doc indexes' case EXPLAINed as the OWNER with seq scans off.
+  // As ebda_app those indexes were unusable for the inline predicate; index use is now proven by
+  // search-lexical-rls-index.test.ts, which reads each index's scan counter as ebda_app.)
 
   /**
    * The statements product-search.service actually runs (storefront list, typeahead, admin with
@@ -197,7 +179,6 @@ describe.skipIf(!hasDb)('ebda_ar_norm parity with normalizeArabicSearch', () => 
                  repeat(md5('d' || g) || ' ', 10), ${tag} || '-' || g, 1000, 'active', now()
           FROM generate_series(1, 20000) g`;
           await tx.$executeRaw`ANALYZE public.products`;
-          await tx.$executeRaw`SET LOCAL enable_seqscan = off`;
           const cases = {
             storefront: productSearchSql(store.id, 'احذيه', { scope: 'storefront' }),
             typeahead: productSearchSql(store.id, 'احذيه', { scope: 'storefront', field: 'name' }),
