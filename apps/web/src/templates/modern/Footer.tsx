@@ -129,7 +129,7 @@ export default function ModernFooter({
       className={`${bgColor ? '' : 'bg-[hsl(var(--bg-section-alt))]'} text-foreground/75 mt-auto`}
       dir={isRtl ? 'rtl' : 'ltr'}
     >
-      <div className="container mx-auto px-4 py-16 lg:py-20">
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-16 lg:py-20">
         <div className={`grid grid-cols-1 md:grid-cols-2 ${lgColsClass} gap-10 lg:gap-12`}>
           {/* Brand Column — logo desktop-only at top; on mobile it
               appears centered at the top of the footer (Ahmad 2026-06-20). */}

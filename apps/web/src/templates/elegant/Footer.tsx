@@ -118,7 +118,7 @@ export default function ElegantFooter({
       {/* Newsletter — hidden when the store explicitly opts out. */}
       {showNewsletter && (
         <div className="border-b border-border/50">
-          <div className="container mx-auto px-4 py-14 sm:py-16 md:py-20">
+          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-14 sm:py-16 md:py-20">
             <div className="max-w-xl mx-auto text-center">
               <h3 className="text-xs tracking-[0.3em] ui-caps-toggle text-muted-foreground mb-4 font-serif">
                 {isRtl ? 'النشرة البريدية' : 'Newsletter'}
@@ -181,7 +181,7 @@ export default function ElegantFooter({
       )}
 
       {/* Main footer */}
-      <div className="container mx-auto px-4 py-14 sm:py-16 md:py-20 lg:py-24">
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-14 sm:py-16 md:py-20 lg:py-24">
         {/* Brand + (sections|explore) + Contact + Follow. Grow the grid so
             extra sections don't crowd the contact / follow columns. */}
         <div className={`grid grid-cols-2 gap-8 sm:gap-10 ${gridColsClass} md:gap-12`}>

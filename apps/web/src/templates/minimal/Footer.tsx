@@ -72,7 +72,7 @@ export default function MinimalFooter({
       className={`${bgColor ? '' : 'bg-[hsl(var(--bg-section-alt))]'} mt-auto py-12 md:py-16`}
       dir={isRtl ? 'rtl' : 'ltr'}
     >
-      <div className="container mx-auto px-6">
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         {/* Single-row layout: logo · links · copyright */}
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-8">
           {displayLogo && !hideFooterLogoMobile && (

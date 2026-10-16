@@ -92,7 +92,7 @@ export default function BoldFooter({
       className={`${bgColor ? '' : invertFooter ? 'bg-foreground' : 'bg-[hsl(var(--bg-section-alt))]'} ${fgFull} mt-auto`}
       dir={isRtl ? 'rtl' : 'ltr'}
     >
-      <div className="container mx-auto px-4 py-12 sm:py-16 md:py-20">
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-12 sm:py-16 md:py-20">
         {/* Main grid */}
         <div
           className={`grid md:grid-cols-2 ${lgColsClass} gap-8 sm:gap-10 md:gap-12 mb-10 sm:mb-12 md:mb-16`}

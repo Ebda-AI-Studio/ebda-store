@@ -227,3 +227,18 @@ describe('IA-09: footer wordmark and attribution weight', () => {
     expect(container.innerHTML).not.toMatch(/font-semibold|font-bold|text-foreground(?!\/)/);
   });
 });
+
+// IA-09 (independent audit): footer gutters measured 24 vs 32px at 1280: the body used
+// `container px-6` (or px-4) while the legal row used the page gutter. One gutter token.
+describe('IA-09: one footer gutter', () => {
+  it.each(['minimal', 'modern', 'elegant', 'classic', 'bold'])('%s', async skin => {
+    const { readFileSync } = await import('node:fs');
+    const { join } = await import('node:path');
+    const src = readFileSync(
+      join(__dirname, `../../apps/web/src/templates/${skin}/Footer.tsx`),
+      'utf8'
+    );
+    expect(src).not.toMatch(/className="container mx-auto/);
+    expect(src).toContain('mx-auto max-w-7xl px-4 sm:px-6 lg:px-8');
+  });
+});

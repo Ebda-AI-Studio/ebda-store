@@ -79,7 +79,7 @@ export default function ClassicFooter({
       className={`${bgColor ? '' : 'bg-[hsl(var(--bg-section-alt))]'} border-t border-border mt-auto`}
       dir={isRtl ? 'rtl' : 'ltr'}
     >
-      <div className="container mx-auto px-4 pt-16 pb-8">
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 pt-16 pb-8">
         {/* Main grid — brand + up to 4 nav columns (+ Branches when opted in) */}
         <div
           className={`grid grid-cols-1 md:grid-cols-2 ${showBranches ? 'lg:grid-cols-6' : 'lg:grid-cols-5'} gap-10 lg:gap-12 mb-12`}
