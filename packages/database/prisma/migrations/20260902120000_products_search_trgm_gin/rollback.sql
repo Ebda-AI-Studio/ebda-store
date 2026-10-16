@@ -12,3 +12,7 @@ DROP INDEX CONCURRENTLY IF EXISTS "products_name_trgm_idx";
 DROP INDEX CONCURRENTLY IF EXISTS "products_name_ar_trgm_idx";
 DROP INDEX CONCURRENTLY IF EXISTS "products_description_trgm_idx";
 DROP INDEX CONCURRENTLY IF EXISTS "products_description_ar_trgm_idx";
+
+-- After running this, delete the migration's row too, or a later `prisma migrate deploy` treats it
+-- as applied and never recreates what was rolled back:
+--   DELETE FROM _prisma_migrations WHERE migration_name = '20260902120000_products_search_trgm_gin';
