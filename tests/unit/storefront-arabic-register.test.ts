@@ -19,7 +19,8 @@
  * docs (merchant voice), and anything a merchant types (data, never in code).
  */
 import { describe, it, expect } from 'vitest';
-import { readFileSync, readdirSync, statSync } from 'node:fs';
+import { mkdtempSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join, relative } from 'node:path';
 
 const ROOT = join(__dirname, '../..');
@@ -65,40 +66,44 @@ const BASELINE: Record<string, number> = {
   // BASELINE_START (generated: node scripts in the test's failure message; do not hand-raise)
   'apps/web/src/app/account/AccountDashboardClient.tsx': 1,
   'apps/web/src/app/account/addresses/AddressesClient.tsx': 2,
-  'apps/web/src/app/account/loyalty/LoyaltyClient.tsx': 2,
-  'apps/web/src/app/account/orders/OrdersClient.tsx': 1,
+  'apps/web/src/app/account/loyalty/LoyaltyClient.tsx': 4,
+  'apps/web/src/app/account/orders/OrdersClient.tsx': 3,
   'apps/web/src/app/account/orders/[id]/OrderDetailClient.tsx': 1,
-  'apps/web/src/app/account/settings/SettingsClient.tsx': 4,
+  'apps/web/src/app/account/settings/SettingsClient.tsx': 5,
   'apps/web/src/app/account/wallet/WalletClient.tsx': 6,
   'apps/web/src/app/affiliate/page.tsx': 3,
   'apps/web/src/app/auth/check-email/CheckEmailClient.tsx': 1,
-  'apps/web/src/app/auth/reset-password/ResetPasswordClient.tsx': 3,
-  'apps/web/src/app/auth/verify-email/VerifyEmailClient.tsx': 6,
+  'apps/web/src/app/auth/forgot-password/ForgotPasswordClient.tsx': 2,
+  'apps/web/src/app/auth/login/LoginClient.tsx': 1,
+  'apps/web/src/app/auth/register/RegisterClient.tsx': 1,
+  'apps/web/src/app/auth/reset-password/ResetPasswordClient.tsx': 6,
+  'apps/web/src/app/auth/verify-email/VerifyEmailClient.tsx': 9,
   'apps/web/src/app/blog/page.tsx': 2,
   'apps/web/src/app/bundles/BundlesClient.tsx': 1,
   'apps/web/src/app/bundles/[slug]/BundleDetailClient.tsx': 1,
-  'apps/web/src/app/cart/CartClient.tsx': 4,
+  'apps/web/src/app/cart/CartClient.tsx': 5,
   'apps/web/src/app/categories/CategoriesClient.tsx': 1,
-  'apps/web/src/app/checkout/CheckoutClient.tsx': 44,
+  'apps/web/src/app/checkout/CheckoutClient.tsx': 48,
   'apps/web/src/app/checkout/OrderSummary.tsx': 1,
   'apps/web/src/app/checkout/PaymentStep.tsx': 2,
   'apps/web/src/app/checkout/_lib/checkoutErrors.ts': 1,
-  'apps/web/src/app/checkout/error/ErrorClient.tsx': 1,
+  'apps/web/src/app/checkout/error/ErrorClient.tsx': 3,
   'apps/web/src/app/checkout/success/FawryReferenceCard.tsx': 1,
   'apps/web/src/app/checkout/success/InstapayCard.tsx': 5,
-  'apps/web/src/app/checkout/success/SuccessClient.tsx': 7,
+  'apps/web/src/app/contact/ContactClient.tsx': 1,
   'apps/web/src/app/faq/FAQClient.tsx': 12,
   'apps/web/src/app/global-error.tsx': 1,
   'apps/web/src/app/locations/LocationsClient.tsx': 2,
   'apps/web/src/app/privacy/PrivacyClient.tsx': 12,
-  'apps/web/src/app/products/ProductsClient.tsx': 1,
+  'apps/web/src/app/products/ProductsClient.tsx': 3,
   'apps/web/src/app/products/[slug]/ProductDetailClient.tsx': 3,
-  'apps/web/src/app/returns/ReturnsClient.tsx': 3,
+  'apps/web/src/app/returns/ReturnsClient.tsx': 11,
   'apps/web/src/app/review/[orderId]/[productId]/ReviewErrorView.tsx': 7,
   'apps/web/src/app/review/[orderId]/[productId]/ReviewForm.tsx': 9,
-  'apps/web/src/app/search/SearchClient.tsx': 1,
+  'apps/web/src/app/search/SearchClient.tsx': 2,
+  'apps/web/src/app/shipping/ShippingClient.tsx': 3,
   'apps/web/src/app/terms/TermsClient.tsx': 11,
-  'apps/web/src/app/wishlist/WishlistClient.tsx': 1,
+  'apps/web/src/app/wishlist/WishlistClient.tsx': 2,
   'apps/web/src/app/wishlist/shared/[userId]/SharedWishlistClient.tsx': 6,
   'apps/web/src/components/CmsPageContent.tsx': 1,
   'apps/web/src/components/CookieConsentBanner.tsx': 1,
@@ -148,6 +153,10 @@ const EGYPTIAN: Array<[string, string]> = [
   ['apps/web/src/components/demo/DemoCheckoutNotice.tsx', 'ده متجر تجريبي — الطلب مقفول'],
   ['apps/web/src/templates/dahab/CartDrawer.tsx', 'سلتك فاضية'],
   ['apps/web/src/lib/return-policy-text.ts', 'لو الطلب مش مناسبك، تقدر ترجعه خلال'],
+  [
+    'apps/web/src/app/checkout/success/SuccessClient.tsx',
+    'طلبك اتسجل. جهّز المبلغ لما الطلب يوصلك.',
+  ],
   ['apps/web/src/lib/plural.ts', "two: 'قطعتين'"],
   ['apps/web/src/lib/plural.ts', "two: 'يومين'"],
   ['apps/api/src/routes/public.routes.ts', 'ده متجر تجريبي — الرسائل مقفولة'],
@@ -180,6 +189,9 @@ export function msaHits(paths: string[], only?: RegExp): Record<string, string[]
   const out: Record<string, string[]> = {};
   for (const f of paths) {
     readFileSync(f, 'utf8')
+      .replace(/\\u(06[0-9a-fA-F]{2})/g, (_: string, h: string) =>
+        String.fromCharCode(parseInt(h, 16))
+      )
       .split('\n')
       .forEach((line, i) => {
         const t = line.trim();
@@ -238,6 +250,14 @@ describe('storefront Arabic register (Ruling FU46-Y02a: Egyptian sentences, neut
   it('short buttons and labels keep their neutral form', () => {
     const missing = NEUTRAL.filter(([f, s]) => !readFileSync(join(ROOT, f), 'utf8').includes(s));
     expect(missing).toEqual([]);
+  });
+
+  it('a \\u-escaped Arabic string is read too (413 single-quoted escaped storefront strings were invisible to the old gate)', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'reg-'));
+    const f = join(dir, 'x.tsx');
+    // "هذا متجر" written as escapes
+    writeFileSync(f, "t('x', '\\u0647\\u0630\\u0627 \\u0645\\u062a\\u062c\\u0631');\n");
+    expect(Object.values(msaHits([f])).flat()).toHaveLength(1);
   });
 
   it('the matcher catches the MSA sentence shapes and leaves Egyptian alone (self-test)', () => {
