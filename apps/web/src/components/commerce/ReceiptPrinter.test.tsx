@@ -210,10 +210,8 @@ describe('ReceiptPrinter', () => {
     }
   });
 
-  it('counts a bundle box as one item on the printer', () => {
-    render(<ReceiptPrinter order={orderWithBundle} paymentState="paid" store={store} />);
-    expect(screen.getByText('4 قطع')).toBeTruthy(); // 1 abaya + 2 scarves + 1 box, not its 2 lines
-  });
+  // (The printer's item count, and its bundle-counts-once rule, left with P2-5: the head carries
+  // the payment status only; see "printer head carries the status only".)
 
   it('keeps the spinner after the feed while payment is still verifying', () => {
     const { rerender } = render(
@@ -456,5 +454,17 @@ describe('receipt IA-14', () => {
     expect(screen.getAllByText('#1043')).toHaveLength(1);
     expect(screen.queryByText('Order total')).toBeNull();
     expect(screen.queryByText('إجمالي الطلب')).toBeNull();
+  });
+});
+
+// Taste re-audit P2-5 (Y-05): the printer head repeated the page headline ("your order") and the
+// paper's item count. It carries only the live payment status now; the paper holds the rest.
+describe('printer head carries the status only (P2-5)', () => {
+  it('no "your order" title and no item count above the paper', () => {
+    render(<ReceiptPrinter order={order} paymentState="cod" store={store} />);
+    const paper = screen.getByTestId('receipt-paper');
+    const head = paper.closest('section')!.textContent!.split(paper.textContent!)[0];
+    expect(head).not.toMatch(/طلبك(?! )|Your order/);
+    expect(head).not.toMatch(/قطعة|قطعتان|قطع|items?\b/);
   });
 });

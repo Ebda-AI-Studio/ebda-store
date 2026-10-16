@@ -31,7 +31,6 @@ import { paymentMethodLabel, paymentProviderLabel } from '@/lib/order-labels';
 import { pickLocalizedName } from '@/templates/shared/display-helpers';
 import { CartLineNote } from './CartLineNote';
 import styles from './ReceiptPrinter.module.css';
-import { countText, ITEMS } from '@/lib/plural';
 
 /** The success page's verified payment outcome (SuccessClient owns it). */
 export type PaymentState =
@@ -181,11 +180,6 @@ export function ReceiptPrinter({
   const storeName = pickLocalizedName(store, ar) ?? '';
   const logo = language === 'ar' && store.logoAr ? store.logoAr : store.logo;
   const rows = order ? groupOrderLinesForDisplay(order.items) : [];
-  // A bundle box counts once, as the customer bought it.
-  const itemCount = rows.reduce(
-    (n, r) => n + (r.kind === 'bundle' ? r.quantity : r.item.quantity),
-    0
-  );
   const paid = paymentState === 'paid';
   const payment = order ? paymentLabel(order, paymentState, language) : null;
   const framed = store.theme?.receiptStyle === 'framed';
@@ -199,21 +193,10 @@ export function ReceiptPrinter({
       {/* Printer */}
       <div className={`${styles.housing} relative z-10 p-1.5 ${framed ? '' : 'shadow-lg'}`}>
         <div className={`${styles.screen} px-4 pb-3.5 pt-4`}>
-          <div className="flex items-start justify-between gap-4">
-            {/* IA-14: the head names the order; its number and total live once, on the paper. */}
-            <div className="min-w-0">
-              <p className="truncate text-sm font-semibold">{t('Your order', 'طلبك')}</p>
-              <p className="mt-0.5 truncate text-xs opacity-80">
-                {order
-                  ? t(
-                      countText('en', itemCount, ITEMS),
-                      countText('ar', itemCount, ITEMS, localize(itemCount))
-                    )
-                  : storeName}
-              </p>
-            </div>
-          </div>
-          <div className="mt-3 grid min-h-5 text-xs" aria-live="polite" role="status">
+          {/* Taste re-audit P2-5 (Y-05): the head carries the live payment status only; the page
+              headline names the order and the paper lists its items (IA-14 moved the number and
+              total there). */}
+          <div className="grid min-h-5 text-xs" aria-live="polite" role="status">
             {leaving && (
               <span
                 key={`out-${leaving}`}
