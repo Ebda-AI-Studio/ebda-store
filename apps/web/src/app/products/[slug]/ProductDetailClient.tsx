@@ -1211,7 +1211,9 @@ export default function ProductDetailClient({
                       type="button"
                       onClick={() => setQuantity(Math.max(1, quantity - 1))}
                       aria-label={t('Decrease quantity', 'تقليل الكمية')}
-                      className="flex h-11 min-w-11 items-center justify-center px-4 text-muted-foreground hover:bg-muted cursor-pointer"
+                      // a11y re-audit P2-N11: no quantity to choose when it cannot be bought.
+                      disabled={!buyableNow}
+                      className="flex h-11 min-w-11 items-center justify-center px-4 text-muted-foreground hover:bg-muted cursor-pointer disabled:cursor-not-allowed disabled:opacity-40"
                     >
                       <span aria-hidden="true">−</span>
                     </button>
@@ -1228,7 +1230,8 @@ export default function ProductDetailClient({
                         setQuantity(Math.min(quantity + 1, maxQty));
                       }}
                       aria-label={t('Increase quantity', 'زيادة الكمية')}
-                      className="flex h-11 min-w-11 items-center justify-center px-4 text-muted-foreground hover:bg-muted cursor-pointer"
+                      disabled={!buyableNow}
+                      className="flex h-11 min-w-11 items-center justify-center px-4 text-muted-foreground hover:bg-muted cursor-pointer disabled:cursor-not-allowed disabled:opacity-40"
                     >
                       +
                     </button>

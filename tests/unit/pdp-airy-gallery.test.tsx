@@ -121,7 +121,8 @@ afterEach(() => {
 async function renderPdp(
   theme: Record<string, unknown>,
   layout?: Record<string, unknown>,
-  images: { id: string; url: string; alt: string }[] = [{ id: 'i1', url: '/a.webp', alt: 'a' }]
+  images: { id: string; url: string; alt: string }[] = [{ id: 'i1', url: '/a.webp', alt: 'a' }],
+  overrides: Record<string, unknown> = {}
 ) {
   vi.stubGlobal('IntersectionObserver', IO);
   vi.stubGlobal('localStorage', { getItem: () => null, setItem: () => {}, removeItem: () => {} });
@@ -140,6 +141,7 @@ async function renderPdp(
     variants: [],
     options: [],
     categories: [],
+    ...overrides,
   };
   const { container } = render(
     <ProductDetailClient initialProduct={p as never} layout={layout as never} />
@@ -263,5 +265,21 @@ describe('the gallery reads in the page direction (P2-N5)', () => {
     } finally {
       ctx.lang = undefined;
     }
+  });
+});
+
+// a11y re-audit P2-N11: on a sold-out PDP the quantity steppers stayed enabled while the buy
+// button read Out of stock (disabled): a control that does nothing.
+describe('sold-out PDP steppers are disabled (P2-N11)', () => {
+  it('both steppers disabled when the product cannot be bought', async () => {
+    const { container } = await renderPdp({}, undefined, undefined, {
+      inStock: false,
+      inventory: 0,
+    });
+    const steppers = Array.from(container.querySelectorAll('button')).filter(b =>
+      /Decrease quantity|Increase quantity/.test(b.getAttribute('aria-label') ?? '')
+    ) as HTMLButtonElement[];
+    expect(steppers.length).toBe(2);
+    for (const b of steppers) expect(b.disabled).toBe(true);
   });
 });
