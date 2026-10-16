@@ -1,5 +1,6 @@
 'use client';
 
+import { AutoplayToggle } from './AutoplayToggle';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { IMAGE_STANDARDS } from '@ebda/shared';
 import { HeroBanner } from './HeroBanner';
@@ -33,6 +34,18 @@ export function HeroSlider({
 }: HeroSliderProps) {
   const [activeIndex, setActiveIndex] = useState(0);
   const pausedRef = useRef(false);
+  // Rule (e) (W4): a visible pause toggle, beside the hover / focus / hidden-tab holds.
+  const [userPaused, setUserPaused] = useState(false);
+  const userPausedRef = useRef(false);
+  userPausedRef.current = userPaused;
+  const [canAutoplay, setCanAutoplay] = useState(false);
+  useEffect(() => {
+    setCanAutoplay(
+      autoplayMs > 0 &&
+        slides.length > 1 &&
+        !window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+    );
+  }, [autoplayMs, slides.length]);
   const touchStartXRef = useRef<number | null>(null);
 
   const goTo = useCallback(
@@ -56,7 +69,7 @@ export function HeroSlider({
     let intervalId: ReturnType<typeof setInterval> | null = null;
 
     const tick = () => {
-      if (pausedRef.current || document.hidden) return;
+      if (pausedRef.current || userPausedRef.current || document.hidden) return;
       setActiveIndex(i => (i + 1) % slides.length);
     };
 
@@ -196,6 +209,18 @@ export function HeroSlider({
           </div>
         ))}
         {anchoredBelow && dots}
+        {canAutoplay && (
+          <AutoplayToggle
+            paused={userPaused}
+            onToggle={() => setUserPaused(p => !p)}
+            labels={
+              isRtl
+                ? { pause: 'إيقاف العرض التلقائي', play: 'تشغيل العرض التلقائي' }
+                : { pause: 'Pause the slideshow', play: 'Play the slideshow' }
+            }
+            className="absolute top-3 end-3"
+          />
+        )}
       </div>
       {!anchoredBelow && dots}
       {/* W2a fix round 1 (I-1): below xl the active slide's copy sits under the track as page

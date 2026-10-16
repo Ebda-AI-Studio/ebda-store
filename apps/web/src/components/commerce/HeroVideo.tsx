@@ -20,6 +20,17 @@
  */
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import type { ReactNode } from 'react';
+import { AutoplayToggle } from '../../templates/shared/AutoplayToggle';
+import { useLanguage } from '../../contexts/LanguageContext';
+
+/** Arabic-first labels when rendered outside a LanguageProvider (isolated renders). */
+function useT(): (en: string, ar: string) => string {
+  try {
+    return useLanguage().t;
+  } catch {
+    return (_en, ar) => ar;
+  }
+}
 
 export interface HeroVideoProps {
   src: string;
@@ -94,13 +105,16 @@ export function HeroVideo({
   const [failed, setFailed] = useState<string | null>(null);
   const ref = useRef<HTMLVideoElement>(null);
   const show = mode !== 'off' && !!chosen && failed !== chosen;
+  // Rule (e) (W4): the looping video can be stopped.
+  const [userPaused, setUserPaused] = useState(false);
+  const t = useT();
 
   useEffect(() => {
     const v = ref.current;
     if (!v) return;
     // React does not reflect `muted` as an attribute; autoplay needs it set.
     v.muted = true;
-    if (!active) {
+    if (!active || userPaused) {
       v.pause();
       return;
     }
@@ -110,7 +124,7 @@ export function HeroVideo({
       const name = (e as { name?: string } | null)?.name;
       if (name === 'NotAllowedError' || name === 'NotSupportedError') setFailed(chosen);
     });
-  }, [active, show, chosen]);
+  }, [active, show, chosen, userPaused]);
 
   return (
     <>
@@ -138,6 +152,17 @@ export function HeroVideo({
           onError={() => setFailed(chosen)}
           className={`pointer-events-none absolute inset-0 h-full w-full ${fit === 'contain' ? 'object-contain' : 'object-cover'}`}
           style={position ? { objectPosition: position } : undefined}
+        />
+      )}
+      {show && active && (
+        <AutoplayToggle
+          paused={userPaused}
+          onToggle={() => setUserPaused(p => !p)}
+          labels={{
+            pause: t('Pause video', 'إيقاف الفيديو'),
+            play: t('Play video', 'تشغيل الفيديو'),
+          }}
+          className="absolute bottom-3 end-3"
         />
       )}
     </>
