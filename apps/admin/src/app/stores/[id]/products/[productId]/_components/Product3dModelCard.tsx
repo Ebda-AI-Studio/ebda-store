@@ -321,7 +321,14 @@ export function Product3dModelCard({ storeId, productId }: { storeId: string; pr
     setBusy(false);
     const url = res.body?.data?.url;
     if (!res.ok || !url) {
-      toastError(t('uploadFailed'), res.body?.error?.message ?? String(res.status));
+      // A byte-sniff refusal carries both languages (B0-46), like the GLB validator's.
+      const d = res.body?.error?.details;
+      toastError(
+        t('uploadFailed'),
+        (locale === 'ar' ? d?.messageAr : d?.messageEn) ??
+          res.body?.error?.message ??
+          String(res.status)
+      );
       return;
     }
     if (await put({ posterUrl: url })) toastSuccess(t('posterSaved'), '');
