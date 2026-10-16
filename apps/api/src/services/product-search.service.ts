@@ -302,9 +302,10 @@ async function queryVector(
     if (hit.exp > Date.now()) return Array.from(hit.v);
     qCache.delete(key);
   }
-  // The ONE charge point (SEARCH-T12-6): once per real provider call, right before it, never on a
-  // cache hit. Budgets + per-searcher limit; no searcher = no call (default deny); fails closed.
-  if (!(await takeQueryEmbed(storeId, searcher))) return null;
+  // ONE timer bounds the whole step (E11 + review M3): the budget round trips (AuthState DO on the
+  // Worker) AND the provider call. Losing it aborts the provider call; a budget answer that lands
+  // after the race was lost never reaches the provider (it may have charged one call: over-count,
+  // never overspend).
   const ctl = new AbortController();
   let timer: ReturnType<typeof setTimeout> | undefined;
   const lost = new Promise<never>((_, reject) => {
@@ -315,10 +316,18 @@ async function queryVector(
       );
     }, QUERY_EMBED_BUDGET_MS);
   });
-  const call = provider.embed([text], { signal: ctl.signal });
-  call.catch(() => undefined); // the race's loser may reject later (aborted): never unhandled
+  const work = (async (): Promise<number[] | null> => {
+    // The ONE charge point (SEARCH-T12-6): once per real provider call, right before it, never on
+    // a cache hit. Budgets + per-searcher limit; no searcher = no call (default deny); fails closed.
+    if (!(await takeQueryEmbed(storeId, searcher))) return null;
+    if (ctl.signal.aborted) return null;
+    const [v] = await provider.embed([text], { signal: ctl.signal });
+    return v;
+  })();
+  work.catch(() => undefined); // the race's loser may reject later (aborted): never unhandled
   try {
-    const [v] = await Promise.race([call, lost]);
+    const v = await Promise.race([work, lost]);
+    if (v === null) return null;
     if (!Array.isArray(v) || v.length !== EMBED_DIMS)
       throw new EmbeddingError('shape', `embedding: expected ${EMBED_DIMS} dims`);
     qCache.set(key, { v: Float32Array.from(v), exp: Date.now() + QUERY_VECTOR_TTL_MS });
