@@ -14,9 +14,18 @@ export function returnPolicyKind(days: number | null | undefined): ReturnPolicyK
   return days <= 0 ? 'none' : 'window';
 }
 
-/** "30 days" / "٣٠ يومًا"-style phrase through the one plural helper (Western digits). */
-export function daysPhrase(n: number, lang: PolicyLang): string {
-  return countText(lang, n, DAYS);
+/**
+ * "14 days" / "١٤ يومًا" after a preposition (every caller says "خلال …" /
+ * "لمدة …"), through the one plural helper in the oblique case ("خلال يومين").
+ * `localize` puts the number in the store's digits (review M8: the PDP trust
+ * line and /returns must agree); default Western.
+ */
+export function daysPhrase(
+  n: number,
+  lang: PolicyLang,
+  localize: (v: number) => string = String
+): string {
+  return countText(lang, n, DAYS, localize(n), 'oblique');
 }
 
 export interface ReturnPolicyCopy {
@@ -26,15 +35,16 @@ export interface ReturnPolicyCopy {
 
 export function returnPolicyCopy(
   days: number | null | undefined,
-  lang: PolicyLang
+  lang: PolicyLang,
+  localize: (v: number) => string = String
 ): ReturnPolicyCopy {
   const kind = returnPolicyKind(days);
   if (kind === 'window') {
     const n = days as number;
     return lang === 'ar'
       ? {
-          title: `سياسة الإرجاع خلال ${daysPhrase(n, 'ar')}`,
-          body: `نتمنى أن تكون راضياً تماماً عن مشترياتك. لو مش مناسبك الطلب، تقدر ترجعه خلال ${daysPhrase(n, 'ar')} من تاريخ التوصيل.`,
+          title: `سياسة الإرجاع خلال ${daysPhrase(n, 'ar', localize)}`,
+          body: `نتمنى أن تكون راضياً تماماً عن مشترياتك. إذا لم يناسبك الطلب، يمكنك إرجاعه خلال ${daysPhrase(n, 'ar', localize)} من تاريخ التوصيل.`,
         }
       : {
           title: `${n}-Day Return Policy`,
@@ -45,7 +55,7 @@ export function returnPolicyCopy(
     return lang === 'ar'
       ? {
           title: 'الإرجاع غير متاح',
-          body: 'هذا المتجر لا يقبل طلبات الإرجاع. لو وصلك منتج تالف أو غير مطابق، تواصل مع المتجر وهنساعدك.',
+          body: 'هذا المتجر لا يقبل طلبات الإرجاع. إذا وصلك منتج تالف أو غير مطابق، تواصل مع المتجر وسنساعدك.',
         }
       : {
           title: 'Returns Not Accepted',
@@ -64,12 +74,16 @@ export function returnPolicyCopy(
 }
 
 /** One sentence for the Terms page, §Returns and Refunds. */
-export function termsReturnSentence(days: number | null | undefined, lang: PolicyLang): string {
+export function termsReturnSentence(
+  days: number | null | undefined,
+  lang: PolicyLang,
+  localize: (v: number) => string = String
+): string {
   const kind = returnPolicyKind(days);
   if (kind === 'window') {
     const n = days as number;
     return lang === 'ar'
-      ? `تسمح سياسة الإرجاع لدينا بالإرجاع خلال ${daysPhrase(n, 'ar')} من التوصيل. يرجى الرجوع إلى صفحة المرتجعات لمعرفة التفاصيل الكاملة حول الأهلية والإجراءات.`
+      ? `تسمح سياسة الإرجاع لدينا بالإرجاع خلال ${daysPhrase(n, 'ar', localize)} من التوصيل. يرجى الرجوع إلى صفحة المرتجعات لمعرفة التفاصيل الكاملة حول الأهلية والإجراءات.`
       : `Our return policy allows returns within ${daysPhrase(n, 'en')} of delivery. Please refer to our Returns page for complete details on eligibility and process.`;
   }
   if (kind === 'none') {
@@ -83,12 +97,16 @@ export function termsReturnSentence(days: number | null | undefined, lang: Polic
 }
 
 /** Generic-FAQ answer for "What is your return policy?" (no number unless the store declared one). */
-export function faqReturnAnswer(days: number | null | undefined, lang: PolicyLang): string {
+export function faqReturnAnswer(
+  days: number | null | undefined,
+  lang: PolicyLang,
+  localize: (v: number) => string = String
+): string {
   const kind = returnPolicyKind(days);
   if (kind === 'window') {
     const n = days as number;
     return lang === 'ar'
-      ? `نقدم سياسة إرجاع لمدة ${daysPhrase(n, 'ar')} للعناصر غير المستخدمة في عبوتها الأصلية. يرجى زيارة صفحة المرتجعات لمزيد من التفاصيل.`
+      ? `نقدم سياسة إرجاع لمدة ${daysPhrase(n, 'ar', localize)} للعناصر غير المستخدمة في عبوتها الأصلية. يرجى زيارة صفحة المرتجعات لمزيد من التفاصيل.`
       : `We offer a ${n}-day return policy for unused items in original packaging. Please visit our Returns page for more details.`;
   }
   if (kind === 'none') {

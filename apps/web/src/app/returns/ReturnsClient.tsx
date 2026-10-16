@@ -10,6 +10,7 @@ import { useLanguage } from '../../contexts/LanguageContext';
 import { api, API_URL, type Order } from '../../lib/api';
 import { groupOrderLinesForDisplay } from '@ebda/shared';
 import { returnPolicyCopy, returnPolicyKind } from '../../lib/return-policy-text';
+import { useNumerals } from '../../hooks/useNumerals';
 
 const RETURN_REASONS = [
   {
@@ -567,7 +568,9 @@ export default function ReturnsClient() {
   const { store } = useStore();
   const storeUrl = useStoreUrl();
   const { t, language } = useLanguage();
-  const policy = returnPolicyCopy(store.returnWindowDays, language);
+  // Days in the store's digits, the same as the PDP trust line (review M8).
+  const { localize } = useNumerals();
+  const policy = returnPolicyCopy(store.returnWindowDays, language, localize);
   const returnsEmail =
     email || t('our support team', '\u0641\u0631\u064a\u0642 \u0627\u0644\u062f\u0639\u0645');
   return (

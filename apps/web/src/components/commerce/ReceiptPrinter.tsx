@@ -358,7 +358,7 @@ export function ReceiptPrinter({
                   >
                     {t(
                       'Questions? Message the store on WhatsApp',
-                      'عندك سؤال؟ كلّم المتجر على واتساب'
+                      'هل لديك سؤال؟ راسل المتجر على واتساب'
                     )}
                   </a>
                 </p>

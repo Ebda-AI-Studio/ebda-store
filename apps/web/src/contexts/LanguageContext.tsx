@@ -4,7 +4,6 @@ import { createContext, useContext, useState, useEffect, useLayoutEffect, ReactN
 import { BRAND } from '@ebda/shared';
 
 import { resolveDefaultLanguage } from '@ebda/shared';
-import { countText, type CountedNoun } from '../lib/plural';
 const useIsomorphicLayoutEffect = typeof window !== 'undefined' ? useLayoutEffect : useEffect;
 
 type Language = 'en' | 'ar';
@@ -19,13 +18,6 @@ interface LanguageContextType {
   isRtl: boolean;
   setLanguage: (lang: Language) => void;
   t: (en: string, ar: string) => string;
-  /**
-   * A counted noun in the current language, through the ONE plural helper
-   * (`lib/plural.ts`, Intl.PluralRules: six Arabic forms). Never join a count
-   * and a noun by hand: "1 منتجات" is the bug this replaces (Y-01).
-   * `shown` is the number as displayed (pass `localize(count)`).
-   */
-  tn: (count: number, noun: CountedNoun, shown?: string) => string;
 }
 
 const LanguageContext = createContext<LanguageContextType | undefined>(undefined);
@@ -102,20 +94,14 @@ export function LanguageProvider({ children, defaultLanguage }: LanguageProvider
     return language === 'ar' ? ar : en;
   };
 
-  const tn = (count: number, noun: CountedNoun, shown?: string) =>
-    countText(language, count, noun, shown);
-
   return (
     <LanguageContext.Provider
-      value={{ language, direction, isRtl: language === 'ar', setLanguage, t, tn }}
+      value={{ language, direction, isRtl: language === 'ar', setLanguage, t }}
     >
       {children}
     </LanguageContext.Provider>
   );
 }
-
-export { countText, plural } from '../lib/plural';
-export type { CountedNoun, PluralForms } from '../lib/plural';
 
 export function useLanguage() {
   const context = useContext(LanguageContext);

@@ -3,7 +3,7 @@
  *
  * The count shown on category cards ("4 pieces" / "٤ قطع"). A store that never
  * set a unit word gets the one plural helper (Y-01, `lib/plural.ts`), which
- * declines the noun for every Arabic category ("قطعة واحدة / قطعتين / ٣ قطع /
+ * declines the noun for every Arabic category ("قطعة واحدة / قطعتان / ٣ قطع /
  * ١١ قطعة"). The default noun is "pieces" / "قطعة" across all templates (bold
  * previously used "items"/"منتج" but is unified here to keep the store-wide
  * setting coherent).

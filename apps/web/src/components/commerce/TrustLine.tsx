@@ -18,8 +18,7 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { useStore, useStoreUrl } from '@/contexts/StoreContext';
 import { useNumerals } from '@/hooks/useNumerals';
 import type { CodOffer } from '@/lib/cod-offer';
-import { countText, DAYS } from '@/lib/plural';
-import { returnPolicyKind } from '@/lib/return-policy-text';
+import { daysPhrase, returnPolicyKind } from '@/lib/return-policy-text';
 
 export function TrustLine({
   cod: codOffer,
@@ -43,8 +42,9 @@ export function TrustLine({
   const returns =
     returnPolicyKind(days) === 'window'
       ? t(
-          `Returns within ${countText('en', days as number, DAYS)}`,
-          `إرجاع خلال ${countText('ar', days as number, DAYS, localize(days as number))}`
+          `Returns within ${daysPhrase(days as number, 'en')}`,
+          // the same phrase (and digits) /returns prints (review M8)
+          `إرجاع خلال ${daysPhrase(days as number, 'ar', localize)}`
         )
       : null;
   if (!cod && !returns) return null;

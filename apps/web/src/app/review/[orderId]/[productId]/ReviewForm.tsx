@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { API_URL } from '../../../../lib/api';
+import { countText, STARS } from '../../../../lib/plural';
 
 interface Product {
   id: string;
@@ -180,7 +181,7 @@ export function ReviewForm({ orderId, productId, token, product, store }: Props)
                 className={`text-3xl leading-none transition-colors ${
                   n <= rating ? 'text-amber-400' : 'text-gray-300 hover:text-amber-300'
                 }`}
-                aria-label={`${n} ${isAr ? 'نجوم' : 'stars'}`}
+                aria-label={countText(isAr ? 'ar' : 'en', n, STARS)}
                 aria-pressed={n <= rating}
               >
                 ★

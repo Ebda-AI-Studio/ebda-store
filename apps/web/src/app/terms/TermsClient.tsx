@@ -2,6 +2,7 @@
 
 import { CmsPageContent, ShopChrome } from '../../components';
 import { termsReturnSentence } from '../../lib/return-policy-text';
+import { useNumerals } from '../../hooks/useNumerals';
 import { useStore, useStoreContact } from '../../contexts/StoreContext';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { formatDate } from '../../lib/format-date';
@@ -22,6 +23,8 @@ const TERMS_FALLBACK_LAST_UPDATED = new Date('2026-07-09T00:00:00Z');
 function TermsFallback() {
   const { email } = useStoreContact();
   const { t, language } = useLanguage();
+  // Days in the store's digits, the same as the PDP trust line (review M8).
+  const { localize } = useNumerals();
   const { store } = useStore();
   const legalEmail = email || t('our support team', 'فريق الدعم');
   const brandName = (language === 'ar' ? store.nameAr : store.name) || store.name || store.nameAr;
@@ -215,7 +218,7 @@ function TermsFallback() {
               {t('7. Returns and Refunds', '7. المرتجعات والاسترداد')}
             </h2>
             <p className="mt-2 text-muted-foreground">
-              {termsReturnSentence(store.returnWindowDays, language)}
+              {termsReturnSentence(store.returnWindowDays, language, localize)}
             </p>
           </section>
 
