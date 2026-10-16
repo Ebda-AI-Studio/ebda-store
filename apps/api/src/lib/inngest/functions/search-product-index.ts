@@ -71,6 +71,11 @@ export async function handleSearchProductIndex({
   if (typeof storeId !== 'string' || !UUID_RE.test(storeId)) return { skipped: 'missing-store' };
   if (!getEmbeddingProvider()) return { skipped: 'no-provider' };
 
+  // Review M6: a price/stock/flag-only `product.upserted` costs ONE plan step and no AI call — the
+  // plan selects only products whose doc hash (or model, or indexability) changed. The handler does
+  // NOT trust `event.data.changedFields` to skip earlier: the 20 s per-store debounce delivers only
+  // the LAST event, so a text edit followed by a price edit would arrive as `changedFields: ['price']`
+  // and be lost. The hash is the source of truth.
   let embedded = 0;
   for (let round = 0; round < MAX_ROUNDS; round++) {
     const plan = (await step.run(`plan-${round}`, () =>

@@ -497,6 +497,37 @@ describe.skipIf(!hasDb)('product embedding indexer (Task 11)', () => {
     });
   });
 
+  it('review M6: a price/stock-only edit that still enqueues makes no AI call and no write step', async () => {
+    const owner = await mkUser('m6');
+    ownerIds.push(owner.id);
+    const s = (await mkStore(owner.id, 'm6')).id;
+    storeIds.push(s);
+    const p = await mkProduct(s, { name: 'Priced' });
+    const f = fakeProvider();
+    setEmbeddingProviderForTests(f.provider);
+    await runInStoreScope(s, () => indexStore(s));
+    const calls = f.calls.length;
+    await prisma.product.update({ where: { id: p }, data: { price: 250, inventory: 7 } });
+    const steps: string[] = [];
+    const step = fakeStep();
+    const run = step.run;
+    step.run = async (name: string, fn: () => Promise<unknown>) => {
+      steps.push(name);
+      return run(name, fn);
+    };
+    const r = await asApp(() =>
+      handleSearchProductIndex({
+        event: {
+          data: { storeId: s, productId: p, op: 'update', changedFields: ['price', 'inventory'] },
+        },
+        step,
+      })
+    );
+    expect(r).toMatchObject({ embedded: 0, done: true });
+    expect(steps).toEqual(['plan-0']);
+    expect(f.calls.length).toBe(calls);
+  });
+
   it('as ebda_app: the vector rows are invisible from another store scope', async () => {
     setEmbeddingProviderForTests(fakeProvider().provider);
     await runInStoreScope(storeId, () => indexStore(storeId));
