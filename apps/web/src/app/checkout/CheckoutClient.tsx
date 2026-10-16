@@ -1904,7 +1904,7 @@ export default function CheckoutClient() {
                   if (step > 1) setStep(1);
                 }}
                 disabled={step <= 1}
-                className={`flex items-center ${
+                className={`flex min-h-11 items-center ${
                   step > 1 ? 'cursor-pointer group' : 'cursor-default'
                 }`}
               >

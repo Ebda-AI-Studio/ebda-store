@@ -91,3 +91,39 @@ describe('PaymentStep "Shipping to" card', () => {
     expect(card).not.toContain('Nasr City');
   });
 });
+
+// a11y re-audit P1-N4 (rule (d)): on step 2 the Edit link measured 20px high and the payment
+// retry button 28px; the step indicator button 32px and the error Dismiss 16x16 (checked below).
+describe('step 2 controls are 44px targets (P1-N4)', () => {
+  it('Edit, the payment choices and Retry', async () => {
+    const { smallTargets } = await import('../../../../../tests/helpers/target-size');
+    const { container } = render(
+      <PaymentStep
+        formData={formData as never}
+        shippingNames={names}
+        onEditShipping={() => {}}
+        paymentProviders={[]}
+        selectedProvider="cod"
+        onSelectProvider={() => {}}
+        isProcessing={false}
+        total={10000}
+        formatPrice={n => String(n)}
+        paymentConfigError
+        onRetryPaymentConfig={() => {}}
+      />
+    );
+    expect(smallTargets(container, 44, { requireWidth: true })).toEqual([]);
+  });
+  it('the checkout step button and the error Dismiss carry a 44px box', async () => {
+    const { readFileSync } = await import('node:fs');
+    const { join } = await import('node:path');
+    const client = readFileSync(join(__dirname, 'CheckoutClient.tsx'), 'utf8');
+    const steps = [...client.matchAll(/disabled=\{step <= \d\}\n\s*className=\{`([^`]*)/g)];
+    expect(steps.length).toBeGreaterThan(0);
+    for (const m of steps) expect(m[1]).toMatch(/min-h-11/);
+    const alert = readFileSync(join(__dirname, 'CheckoutErrorAlert.tsx'), 'utf8');
+    expect(alert).toMatch(
+      /aria-label=\{t\('Dismiss', 'إغلاق'\)\}\n\s*className="[^"]*\bh-11 w-11\b/
+    );
+  });
+});

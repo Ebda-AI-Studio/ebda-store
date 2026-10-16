@@ -80,7 +80,7 @@ export default function PaymentStep({
           <button
             type="button"
             onClick={onEditShipping}
-            className="text-sm text-primary underline underline-offset-4"
+            className="inline-flex min-h-11 min-w-11 items-center justify-center text-sm text-primary underline underline-offset-4"
           >
             {t('Edit', 'تعديل')}
           </button>
@@ -123,7 +123,7 @@ export default function PaymentStep({
                   <button
                     type="button"
                     onClick={onRetryPaymentConfig}
-                    className="flex-shrink-0 font-medium text-primary underline"
+                    className="inline-flex min-h-11 min-w-11 flex-shrink-0 items-center justify-center font-medium text-primary underline"
                   >
                     {t('Retry', 'إعادة المحاولة')}
                   </button>
@@ -209,7 +209,7 @@ export default function PaymentStep({
         <button
           type="button"
           onClick={onEditShipping}
-          className="inline-flex min-h-11 items-center gap-1.5 text-sm text-primary underline underline-offset-4"
+          className="inline-flex min-h-11 min-w-11 items-center gap-1.5 text-sm text-primary underline underline-offset-4"
         >
           <svg
             className="h-4 w-4 shrink-0 rtl:-scale-x-100"

@@ -93,7 +93,7 @@ export function CheckoutErrorAlert({
           type="button"
           onClick={onClear}
           aria-label={t('Dismiss', 'إغلاق')}
-          className="text-destructive-ink hover:text-destructive-ink/80"
+          className="-m-3 inline-flex h-11 w-11 shrink-0 items-center justify-center text-destructive-ink hover:text-destructive-ink/80"
         >
           <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path
