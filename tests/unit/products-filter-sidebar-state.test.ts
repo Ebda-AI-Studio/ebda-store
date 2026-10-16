@@ -80,3 +80,14 @@ describe('filter panel is a quiet surface on every skin (Ruling B1-31)', () => {
     );
   });
 });
+
+describe('filter sidebar heading order (a11y P2-3)', () => {
+  it('the Filters title is an h2 so it follows the page h1 without a skip', async () => {
+    const { readFileSync } = await import('node:fs');
+    const src = readFileSync(
+      new URL('../../apps/web/src/app/products/ProductsFilterSidebar.tsx', import.meta.url),
+      'utf8'
+    );
+    expect(src).toMatch(/<h2\b[^>]*>\s*\{t\('Filters', 'الفلاتر'\)\}\s*<\/h2>/);
+  });
+});

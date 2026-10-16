@@ -320,9 +320,9 @@ export function ProductsFilterSidebar(props: ProductsFilterSidebarProps) {
       )}
 
       <div className="flex items-center justify-between">
-        <h3 className="text-sm lg:text-base font-semibold text-[hsl(var(--filter-fg))]">
+        <h2 className="text-sm lg:text-base font-semibold text-[hsl(var(--filter-fg))]">
           {t('Filters', 'الفلاتر')}
-        </h3>
+        </h2>
         {activeCount > 0 && (
           <button
             type="button"
