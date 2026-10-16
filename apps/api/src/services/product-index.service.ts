@@ -41,7 +41,8 @@ const INDEXABLE = Prisma.sql`(p.deleted_at IS NULL AND p.status = 'active' AND $
  */
 const quarantined = (storeId: string) =>
   Prisma.sql`EXISTS (SELECT 1 FROM product_embed_failures f
-                      WHERE f.product_id = p.id AND f.store_id = ${storeId} AND f.content_hash = md5(${DOC}))`;
+                      WHERE f.product_id = p.id AND f.store_id = ${storeId} AND f.content_hash = md5(${DOC})
+                        AND f.model = ${EMBED_MODEL})`;
 
 const DEFAULT_DAILY_CAP = 3000;
 /** `SEARCH_EMBED_STORE_DAILY_CAP` (docs/ENVIRONMENT.md). A bad value falls back to the default. */
@@ -262,15 +263,17 @@ export async function quarantineEmbedFailures(
 ): Promise<string[]> {
   if (failures.length === 0) return [];
   const rows = await prisma.$queryRaw<Array<{ product_id: string }>>`
-    INSERT INTO product_embed_failures (product_id, store_id, content_hash, error_kind, failed_at)
-    SELECT p.id, p.store_id, v.hash, v.kind, now()
+    INSERT INTO product_embed_failures (product_id, store_id, content_hash, error_kind, model, failed_at)
+    SELECT p.id, p.store_id, v.hash, v.kind, ${EMBED_MODEL}, now()
       FROM unnest(${failures.map(f => f.id)}::text[], ${failures.map(f => f.hash)}::text[],
                   ${failures.map(f => f.kind)}::text[]) AS v(id, hash, kind)
       JOIN products p ON p.id = v.id
      WHERE p.store_id = ${storeId}
     ON CONFLICT (product_id) DO UPDATE
-      SET content_hash = EXCLUDED.content_hash, error_kind = EXCLUDED.error_kind, failed_at = now()
+      SET content_hash = EXCLUDED.content_hash, error_kind = EXCLUDED.error_kind,
+          model = EXCLUDED.model, failed_at = now()
       WHERE product_embed_failures.content_hash <> EXCLUDED.content_hash
+         OR product_embed_failures.model <> EXCLUDED.model
     RETURNING product_id`;
   const fresh = rows.map(r => r.product_id);
   for (const productId of fresh) {

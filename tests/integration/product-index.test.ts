@@ -482,6 +482,29 @@ describe.skipIf(!hasDb)('product embedding indexer (Task 11)', () => {
       expect(await failureRow(bad)).toMatchObject({ error_kind: 'provider' });
     });
 
+    /** Quarantine `productId` against its CURRENT text, as model `model`, by hand. */
+    const quarantineAs = (productId: string, model: string) =>
+      prisma.$executeRawUnsafe(
+        `INSERT INTO product_embed_failures (product_id, store_id, content_hash, error_kind, model)
+         SELECT p.id, p.store_id,
+                md5(public.ebda_product_embed_doc(p.name, p.name_ar, p.search_terms, p.description, p.description_ar)),
+                'provider', $2
+           FROM products p WHERE p.id = $1`,
+        productId,
+        model
+      );
+
+    it('review N-M2: a quarantine recorded under another model does not block the product', async () => {
+      const { s, bad } = await poisonStore('nm2');
+      setEmbeddingProviderForTests(fakeProvider().provider);
+      await quarantineAs(bad, EMBED_MODEL);
+      const stale = await runInStoreScope(s, () => findStaleProducts(s, 10));
+      expect(stale.map(r => r.id)).not.toContain(bad);
+      await prisma.$executeRaw`UPDATE product_embed_failures SET model = 'old-model' WHERE product_id = ${bad}`;
+      const after = await runInStoreScope(s, () => findStaleProducts(s, 10));
+      expect(after.map(r => r.id)).toContain(bad);
+    });
+
     it('an outage (every product fails) quarantines nothing and fails the run', async () => {
       const { s, good1, bad } = await poisonStore('i2c');
       setEmbeddingProviderForTests({

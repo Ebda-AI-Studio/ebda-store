@@ -3,8 +3,10 @@
 --   product_embed_failures  NEW, store-scoped. One row per product whose CURRENT text could not be
 --                           embedded (the provider rejected it while other products in the same
 --                           batch succeeded, or rejected it non-retryably). Keyed on the product,
---                           holding the md5 of the doc that failed: the indexer skips a product only
---                           while md5(current doc) = content_hash, so editing the text re-admits it.
+--                           holding the md5 of the doc that failed and the model that rejected it:
+--                           the indexer skips a product only while md5(current doc) = content_hash
+--                           AND model = the current embedding model, so editing the text or changing
+--                           the model re-admits it (review N-M2).
 --                           A later successful embed deletes the row. Without it, one poison product
 --                           repeats in the same newest-first batch forever and stalls its store.
 --                           Child of products and stores (ON DELETE CASCADE); nothing references it.
@@ -20,6 +22,7 @@ CREATE TABLE "product_embed_failures" (
     "store_id" TEXT NOT NULL,
     "content_hash" TEXT NOT NULL,
     "error_kind" TEXT NOT NULL,
+    "model" TEXT NOT NULL,
     "failed_at" TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "product_embed_failures_pkey" PRIMARY KEY ("product_id")
