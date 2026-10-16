@@ -5965,7 +5965,10 @@
         "invalidResponse": "استجابة غير صالحة من الخادم",
         "uploadFailedWithCode": "فشل الرفع ({code})",
         "maxReached": "الحد الأقصى المسموح به {max} صورة",
-        "noValidFiles": "لم يتم تحديد ملفات صور صالحة"
+        "noValidFiles": "لم يتم تحديد ملفات صور صالحة",
+        "refusedType": "ليست صورة JPEG أو PNG أو GIF أو WebP، لم يتم رفعها: {files}",
+        "refusedSize": "أكبر من 10 ميجابايت، لم يتم رفعها: {files}",
+        "filesNotUploaded": "لم يتم رفع: {files} ({reason})"
       },
       "imageAlt": "صورة {index}"
     },

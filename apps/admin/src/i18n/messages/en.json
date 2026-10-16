@@ -5965,7 +5965,10 @@
         "invalidResponse": "Invalid server response",
         "uploadFailedWithCode": "Upload failed ({code})",
         "maxReached": "Maximum {max} images allowed",
-        "noValidFiles": "No valid image files selected"
+        "noValidFiles": "No valid image files selected",
+        "refusedType": "Not a JPEG, PNG, GIF or WebP image, not uploaded: {files}",
+        "refusedSize": "Over 10 MB, not uploaded: {files}",
+        "filesNotUploaded": "Not uploaded: {files} ({reason})"
       },
       "imageAlt": "Image {index}"
     },

@@ -20,7 +20,7 @@ export interface ImageStandard {
   /** Aspect ratio as "W:H" — what the storefront wraps the image in. */
   aspect: string;
   /** Allowed file formats, ordered by preference. */
-  formats: ReadonlyArray<'JPEG' | 'WebP' | 'PNG' | 'SVG' | 'ICO'>;
+  formats: ReadonlyArray<'JPEG' | 'WebP' | 'PNG'>;
   /**
    * Optional safe zone for text/CTA inside banner-class images. When set,
    * merchants must keep any baked-in headline/CTA within these center
@@ -367,30 +367,30 @@ export const IMAGE_STANDARDS = {
     width: 300,
     height: 150,
     aspect: '2:1',
-    formats: ['PNG', 'SVG'],
+    formats: ['PNG', 'WebP'],
     description: 'Brand logo for the carousel — transparent background mandatory.',
   },
   brandLogoFooter: {
     width: 200,
     height: 80,
     aspect: '2.5:1',
-    formats: ['SVG', 'PNG'],
-    description: 'Brand logo for the footer — smaller mark. SVG preferred for retina.',
+    formats: ['PNG', 'WebP'],
+    description: 'Brand logo for the footer — smaller mark. Upload at 2x for retina.',
   },
   categoryIcon: {
     width: 120,
     height: 120,
     aspect: '1:1',
-    formats: ['SVG', 'PNG'],
-    description: 'Category icon — simple line art at 2px stroke. SVG preferred.',
+    formats: ['PNG', 'WebP'],
+    description: 'Category icon — simple line art at 2px stroke, transparent PNG.',
   },
   storeLogo: {
     width: 400,
     height: 200,
     aspect: '2:1',
-    formats: ['SVG', 'PNG'],
+    formats: ['PNG', 'WebP'],
     description:
-      'Store header logo — horizontal wordmark. Renders at h-24 mobile / h-36 desktop. SVG preferred. See storeLogoSquare for the square-brandmark alternative.',
+      'Store header logo — horizontal wordmark. Renders at h-24 mobile / h-36 desktop. Transparent PNG preferred. See storeLogoSquare for the square-brandmark alternative.',
   },
   storeLogoSquare: {
     // Brands with a circular / square mark (think Instagram avatar style)
@@ -401,7 +401,7 @@ export const IMAGE_STANDARDS = {
     width: 400,
     height: 400,
     aspect: '1:1',
-    formats: ['SVG', 'PNG'],
+    formats: ['PNG', 'WebP'],
     description:
       'Store header logo — square brandmark alternative. Use when brand identity is icon-led rather than wordmark-led.',
   },
@@ -409,7 +409,7 @@ export const IMAGE_STANDARDS = {
     width: 512,
     height: 512,
     aspect: '1:1',
-    formats: ['PNG', 'ICO'],
+    formats: ['PNG'],
     description: 'Favicon + PWA + Apple touch icon — generated from this single source.',
   },
   ogImage: {

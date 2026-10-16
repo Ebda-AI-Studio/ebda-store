@@ -212,6 +212,18 @@ describe('image uploads are judged by their bytes (B0-46)', () => {
     expect(res.body.error.code).toBe('INVALID_IMAGE_CONTENT');
     expect(uploadMultipleMock).not.toHaveBeenCalled();
   });
+
+  it('/images names WHICH files it refused, by index, so the admin can re-send the rest', async () => {
+    const res = await request(app)
+      .post('/api/v1/uploads/images?storeId=store-1')
+      .attach('files', PNG_BYTES, 'a.png')
+      .attach('files', Buffer.from('<html>'), 'b.png')
+      .attach('files', JPEG_BYTES, 'c.jpg')
+      .attach('files', Buffer.from('<svg/>'), 'd.png');
+    expect(res.status).toBe(400);
+    expect(res.body.error.details.invalidIndexes).toEqual([1, 3]);
+    expect(res.body.error.details.messageAr).toMatch(/[\u0600-\u06FF]/);
+  });
 });
 
 describe('font uploads are judged by their bytes (B0-46 class sweep)', () => {

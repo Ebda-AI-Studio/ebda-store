@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { IMAGE_UPLOAD_ACCEPTED_TYPES } from '@ebda/shared';
 import { sniffImage, sniffFont, IMAGE_EXT } from '@api/lib/upload-sniff';
 
 const PNG = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 0x0d]);
@@ -34,5 +35,11 @@ describe('sniffFont', () => {
     expect(sniffFont(Buffer.from([0, 1, 0, 0, 0, 0x0c]))).toBe('font/ttf');
     expect(sniffFont(Buffer.from('trueabcd'))).toBe('font/ttf');
     expect(sniffFont(Buffer.from('<html>'))).toBeNull();
+  });
+});
+
+describe('client accept list ↔ server sniffer parity (FU46 I-1a)', () => {
+  it('the admin accepts exactly the kinds the server sniffs', () => {
+    expect([...IMAGE_UPLOAD_ACCEPTED_TYPES].sort()).toEqual(Object.keys(IMAGE_EXT).sort());
   });
 });

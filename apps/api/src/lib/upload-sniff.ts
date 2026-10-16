@@ -77,11 +77,14 @@ export const UPLOAD_CONTENT_ERRORS = {
   },
 } as const;
 
-export function uploadContentError(kind: keyof typeof UPLOAD_CONTENT_ERRORS): {
+export function uploadContentError(
+  kind: keyof typeof UPLOAD_CONTENT_ERRORS,
+  extra: Record<string, unknown> = {}
+): {
   code: string;
   message: string;
-  details: { messageEn: string; messageAr: string };
+  details: { messageEn: string; messageAr: string } & Record<string, unknown>;
 } {
   const e = UPLOAD_CONTENT_ERRORS[kind];
-  return { code: e.code, message: e.en, details: { messageEn: e.en, messageAr: e.ar } };
+  return { code: e.code, message: e.en, details: { messageEn: e.en, messageAr: e.ar, ...extra } };
 }

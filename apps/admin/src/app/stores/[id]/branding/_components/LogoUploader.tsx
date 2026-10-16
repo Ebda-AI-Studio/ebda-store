@@ -1,7 +1,7 @@
 'use client';
 
 import { useT } from '@/i18n/useT';
-import { IMAGE_STANDARDS } from '@ebda/shared';
+import { IMAGE_STANDARDS, IMAGE_UPLOAD_ACCEPT } from '@ebda/shared';
 import { ImageUpload } from '../../../../../components/ImageUpload';
 import type { StoreBranding } from './types';
 
@@ -12,9 +12,10 @@ interface LogoUploaderProps {
   storeId: string;
 }
 
-const LOGO_ACCEPT = 'image/jpeg,image/png,image/webp,image/gif,image/svg+xml';
-const FAVICON_ACCEPT =
-  'image/jpeg,image/png,image/webp,image/gif,image/svg+xml,image/x-icon,image/vnd.microsoft.icon';
+// The server stores JPEG/PNG/GIF/WebP only (judged by bytes, FU46-5): offering SVG/ICO here
+// only produced a refusal after the pick.
+const LOGO_ACCEPT = IMAGE_UPLOAD_ACCEPT;
+const FAVICON_ACCEPT = IMAGE_UPLOAD_ACCEPT;
 
 // Logo can be EITHER the horizontal wordmark (400×200, 2:1) OR a square
 // brandmark (400×400, 1:1) — depends on the brand identity. Hint lists

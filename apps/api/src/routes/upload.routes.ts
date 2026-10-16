@@ -8,7 +8,11 @@ import { StorageService } from '../services/storage.service';
 import { resizeToAspect, enforceMaxDimensions } from '../services/image-resize.service';
 import { uploadLimiter, dailyUploadLimiter, auditLog } from '../middleware/security';
 import { runInTenantContext } from '@ebda/database';
-import { IMAGE_UPLOAD_MAX_BYTES, IMAGE_UPLOAD_BATCH_MAX } from '@ebda/shared';
+import {
+  IMAGE_UPLOAD_MAX_BYTES,
+  IMAGE_UPLOAD_BATCH_MAX,
+  IMAGE_UPLOAD_ACCEPTED_TYPES,
+} from '@ebda/shared';
 import { AppError } from '../middleware/error-handler';
 import { sniffVideo, VIDEO_MAX_BYTES } from '../lib/video-sniff';
 import {
@@ -44,16 +48,9 @@ const upload = multer({
     files: IMAGE_UPLOAD_BATCH_MAX, // FU46-6: the admin batches larger selections
   },
   fileFilter: (_req, file, cb) => {
-    const allowedTypes = [
-      'image/jpeg',
-      'image/png',
-      'image/gif',
-      'image/webp',
-      'image/x-icon',
-      'image/vnd.microsoft.icon',
-    ];
-
-    if (allowedTypes.includes(file.mimetype)) {
+    // The declared type is only a first filter (the bytes decide, see upload-sniff.ts); it is
+    // the same list the admin picker offers, so ICO/SVG/HEIC never reach the sniff.
+    if ((IMAGE_UPLOAD_ACCEPTED_TYPES as readonly string[]).includes(file.mimetype)) {
       cb(null, true);
     } else {
       cb(new AppError(400, 'INVALID_FILE_TYPE', `Invalid file type: ${file.mimetype}`));
@@ -473,10 +470,15 @@ router.post(
         });
         return;
       }
-      // One non-image refuses the whole batch: nothing in it is stored.
+      // One non-image refuses the whole batch: nothing in it is stored. `invalidIndexes`
+      // (positions in this request, never the client's filenames) lets the admin name the
+      // refused files and re-send the rest.
       const sniffedAll = files.map(f => sniffImage(f.buffer));
       if (sniffedAll.some(kind => kind === null)) {
-        res.status(400).json({ success: false, error: uploadContentError('image') });
+        const invalidIndexes = sniffedAll.flatMap((kind, i) => (kind === null ? [i] : []));
+        res
+          .status(400)
+          .json({ success: false, error: uploadContentError('image', { invalidIndexes }) });
         return;
       }
 
