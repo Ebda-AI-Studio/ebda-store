@@ -2,6 +2,7 @@
  * Search insights route (search program, Task 6): what shoppers searched in the storefront.
  *
  * GET /:storeId/search-insights?days=7|30|90&filter=zero|all
+ * Also returns `index`: the store's smart-search index status (Task 12, counts only).
  *
  * Reads ONLY through `getSearchInsights`, which owns the window (Cairo days, inclusive of
  * today), the ≥2-searches privacy floor (Ruling SEARCH-T5-6) and the store scope. Never query
@@ -20,7 +21,10 @@ import { requirePermission } from '../middleware/rbac';
 import { requireMfaEnrolled } from '../middleware/require-mfa';
 import { requireStoreAccess } from '../middleware/store-access';
 import { AppError } from '../middleware/error-handler';
+import { withStore } from '@ebda/database';
 import { getSearchInsights } from '../services/search-log.service';
+import { storeIndexStatus } from '../services/product-index.service';
+import { semanticSearchEnabled } from '../lib/search/embedding-provider';
 
 const router = Router({ mergeParams: true });
 
@@ -39,10 +43,17 @@ router.get(
     try {
       const parsed = query.safeParse(req.query);
       if (!parsed.success) throw new AppError(400, 'VALIDATION_ERROR', 'days must be 7, 30 or 90');
-      const data: SearchInsightsResponse = await getSearchInsights(req.params.storeId, {
+      const storeId = req.params.storeId;
+      const insights = await getSearchInsights(storeId, {
         days: Number(parsed.data.days) as 7 | 30 | 90,
         filter: parsed.data.filter,
       });
+      // Task 12: the smart-search index line ("N of M ready / N failed"). Counts only; no shopper data.
+      const status = await withStore(storeId, () => storeIndexStatus(storeId));
+      const data: SearchInsightsResponse = {
+        ...insights,
+        index: { ...status, semanticEnabled: semanticSearchEnabled() },
+      };
       res.json({ success: true, data });
     } catch (err) {
       next(err);
