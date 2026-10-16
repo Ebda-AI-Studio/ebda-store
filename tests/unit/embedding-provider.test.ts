@@ -21,15 +21,20 @@ afterEach(() => {
   vi.useRealTimers();
 });
 const vec = () => Array.from({ length: EMBED_DIMS }, (_, i) => i / EMBED_DIMS);
-const withAi = (run: (model: string, input: Record<string, unknown>) => Promise<unknown>) =>
-  setCfBindings({ HYPERDRIVE: { connectionString: '' }, AI: { run } } as never);
+const withAi = (
+  run: (model: string, input: Record<string, unknown>, opts?: unknown) => Promise<unknown>
+) => setCfBindings({ HYPERDRIVE: { connectionString: '' }, AI: { run } } as never);
 
 describe('embedding provider', () => {
   it('uses the AI binding when present', async () => {
     const run = vi.fn(async () => ({ shape: [1, EMBED_DIMS], data: [vec()] }));
     withAi(run);
     const out = await getEmbeddingProvider()!.embed(['أحذية']);
-    expect(run).toHaveBeenCalledWith('@cf/baai/bge-m3', { text: ['أحذية'] });
+    expect(run).toHaveBeenCalledWith(
+      '@cf/baai/bge-m3',
+      { text: ['أحذية'] },
+      { signal: expect.any(AbortSignal) }
+    );
     expect(out[0]).toHaveLength(EMBED_DIMS);
   });
   it('rejects a wrong-dimension answer loudly', async () => {
@@ -112,6 +117,59 @@ describe('embedding provider', () => {
     const settled = expect(p).rejects.toThrow(/timed out/);
     await vi.advanceTimersByTimeAsync(EMBED_TIMEOUT_MS + 1);
     await settled;
+  });
+  it('the binding gets a signal; a timeout aborts it (cancels, not just abandons)', async () => {
+    vi.useFakeTimers();
+    let seen: AbortSignal | undefined;
+    withAi((_m, _i, opts) => {
+      seen = (opts as { signal?: AbortSignal } | undefined)?.signal;
+      return new Promise(() => undefined);
+    });
+    const p = getEmbeddingProvider()!.embed(['x']);
+    const settled = expect(p).rejects.toThrow(/timed out/);
+    expect(seen).toBeInstanceOf(AbortSignal);
+    expect(seen!.aborted).toBe(false);
+    await vi.advanceTimersByTimeAsync(EMBED_TIMEOUT_MS + 1);
+    await settled;
+    expect(seen!.aborted).toBe(true);
+  });
+  it('a caller abort rejects promptly and aborts the in-flight binding call', async () => {
+    let seen: AbortSignal | undefined;
+    withAi((_m, _i, opts) => {
+      seen = (opts as { signal?: AbortSignal } | undefined)?.signal;
+      return new Promise(() => undefined); // ignores the signal: embed must not wait for it
+    });
+    const ctl = new AbortController();
+    const p = getEmbeddingProvider()!.embed(['x'], { signal: ctl.signal });
+    const t0 = Date.now();
+    ctl.abort();
+    await expect(p).rejects.toThrow(/aborted/);
+    expect(Date.now() - t0).toBeLessThan(1000);
+    expect(seen!.aborted).toBe(true);
+  });
+  it('an already-aborted caller signal makes no call', async () => {
+    const run = vi.fn(async () => ({ data: [vec()] }));
+    withAi(run);
+    const ctl = new AbortController();
+    ctl.abort();
+    await expect(getEmbeddingProvider()!.embed(['x'], { signal: ctl.signal })).rejects.toThrow(
+      /aborted/
+    );
+    expect(run).not.toHaveBeenCalled();
+  });
+  it('REST: a caller abort reaches fetch and rejects promptly', async () => {
+    vi.stubEnv('CF_AI_ACCOUNT_ID', 'acc');
+    vi.stubEnv('CF_AI_API_TOKEN', 'tok');
+    let seen: AbortSignal | undefined;
+    vi.spyOn(globalThis, 'fetch').mockImplementation((_u, init) => {
+      seen = (init as RequestInit).signal ?? undefined;
+      return new Promise(() => undefined);
+    });
+    const ctl = new AbortController();
+    const p = getEmbeddingProvider()!.embed(['x'], { signal: ctl.signal });
+    ctl.abort();
+    await expect(p).rejects.toThrow(/aborted/);
+    expect(seen!.aborted).toBe(true);
   });
   it('null provider and disabled semantic search when nothing is configured', () => {
     expect(getEmbeddingProvider()).toBeNull();

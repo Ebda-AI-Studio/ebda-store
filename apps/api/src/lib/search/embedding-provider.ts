@@ -15,12 +15,17 @@ export const EMBED_MODEL = '@cf/baai/bge-m3';
 export const EMBED_DIMS = 1024;
 /** bge-m3 input schema: `text` array `maxItems: 100`. Larger inputs are split. */
 export const EMBED_MAX_BATCH = 100;
-/** Per call to Workers AI (binding or REST). Query-time callers race their own shorter budget. */
+/** Per call to Workers AI (binding or REST); the call is aborted, not abandoned. Query-time callers pass their own shorter `signal`. */
 export const EMBED_TIMEOUT_MS = 15_000;
+
+export interface EmbedOptions {
+  /** Caller cancellation (e.g. the query path's ~400 ms race, E11): aborts the in-flight call. */
+  signal?: AbortSignal;
+}
 
 export interface EmbeddingProvider {
   model: string;
-  embed(texts: string[]): Promise<number[][]>;
+  embed(texts: string[], opts?: EmbedOptions): Promise<number[][]>;
 }
 
 export type EmbeddingProviderKind = 'workers-ai' | 'rest' | 'none';
@@ -39,32 +44,55 @@ function check(data: unknown, n: number): number[][] {
   return data as number[][];
 }
 
-async function withTimeout<T>(p: Promise<T>, label: string): Promise<T> {
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  const timeout = new Promise<never>((_, reject) => {
-    timer = setTimeout(
-      () => reject(new Error(`${label} timed out after ${EMBED_TIMEOUT_MS} ms`)),
-      EMBED_TIMEOUT_MS
-    );
+/**
+ * Runs one provider call under a signal that fires on the caller's abort OR after
+ * EMBED_TIMEOUT_MS, and passes that signal to the call so it is CANCELLED, not just abandoned.
+ * Also rejects as soon as the signal fires, even if the call ignores it.
+ */
+async function cancellable<T>(
+  label: string,
+  caller: AbortSignal | undefined,
+  call: (signal: AbortSignal) => Promise<T>
+): Promise<T> {
+  if (caller?.aborted) throw new Error(`${label} aborted by the caller`);
+  const timeoutCtl = new AbortController();
+  const timer = setTimeout(() => timeoutCtl.abort(), EMBED_TIMEOUT_MS);
+  const signal = caller ? AbortSignal.any([caller, timeoutCtl.signal]) : timeoutCtl.signal;
+  let onAbort: (() => void) | undefined;
+  const aborted = new Promise<never>((_, reject) => {
+    onAbort = () =>
+      reject(
+        new Error(
+          caller?.aborted
+            ? `${label} aborted by the caller`
+            : `${label} timed out after ${EMBED_TIMEOUT_MS} ms`
+        )
+      );
+    signal.addEventListener('abort', onAbort, { once: true });
   });
   try {
-    return await Promise.race([p, timeout]);
+    return await Promise.race([call(signal), aborted]);
   } finally {
     clearTimeout(timer);
+    if (onAbort) signal.removeEventListener('abort', onAbort);
   }
 }
 
 /** Validates the input, splits it into model-sized batches, and keeps the output order. */
-function batched(embedBatch: (texts: string[]) => Promise<number[][]>): EmbeddingProvider {
+function batched(
+  embedBatch: (texts: string[], signal: AbortSignal) => Promise<number[][]>,
+  label: string
+): EmbeddingProvider {
   return {
     model: EMBED_MODEL,
-    async embed(texts) {
+    async embed(texts, opts) {
       if (texts.some(t => typeof t !== 'string' || t.trim() === ''))
         throw new Error('embedding: empty text (the model rejects it; skip the product instead)');
       const out: number[][] = [];
       for (let i = 0; i < texts.length; i += EMBED_MAX_BATCH) {
         const chunk = texts.slice(i, i + EMBED_MAX_BATCH);
-        out.push(...check(await embedBatch(chunk), chunk.length));
+        const data = await cancellable(label, opts?.signal, signal => embedBatch(chunk, signal));
+        out.push(...check(data, chunk.length));
       }
       return out;
     },
@@ -74,13 +102,12 @@ function batched(embedBatch: (texts: string[]) => Promise<number[][]>): Embeddin
 const bindingProvider = (): EmbeddingProvider | null => {
   const ai = cfBindings()?.AI;
   if (!ai) return null;
-  return batched(async texts => {
-    const out = (await withTimeout(
-      ai.run(EMBED_MODEL, { text: texts }),
-      'embedding (AI binding)'
-    )) as { data?: unknown } | null;
+  return batched(async (texts, signal) => {
+    const out = (await ai.run(EMBED_MODEL, { text: texts }, { signal })) as {
+      data?: unknown;
+    } | null;
     return out?.data as number[][];
-  });
+  }, 'embedding (AI binding)');
 };
 
 function restCredentials(): { acct: string; token: string } | null {
@@ -93,22 +120,19 @@ const restProvider = (): EmbeddingProvider | null => {
   const creds = restCredentials();
   if (!creds) return null;
   const url = `https://api.cloudflare.com/client/v4/accounts/${encodeURIComponent(creds.acct)}/ai/run/${EMBED_MODEL}`;
-  return batched(async texts => {
-    const res = await withTimeout(
-      fetch(url, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${creds.token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: texts }),
-        signal: AbortSignal.timeout(EMBED_TIMEOUT_MS),
-      }),
-      'embedding REST'
-    );
+  return batched(async (texts, signal) => {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${creds.token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text: texts }),
+      signal,
+    });
     // Status only: never echo the response body or the request (the token is in the header).
     if (!res.ok) throw new Error(`embedding REST ${res.status}`);
     const body = (await res.json()) as { success?: boolean; result?: { data?: unknown } };
     if (body.success === false) throw new Error('embedding REST success=false');
     return body.result?.data as number[][];
-  });
+  }, 'embedding REST');
 };
 
 let override: EmbeddingProvider | null | undefined;

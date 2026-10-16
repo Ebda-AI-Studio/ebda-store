@@ -39,7 +39,12 @@ export interface RateLimitBindingLike {
 }
 
 export interface AiBindingLike {
-  run(model: string, input: Record<string, unknown>): Promise<unknown>;
+  /** `options.signal` cancels the call (workers-types `AiOptions.signal`). */
+  run(
+    model: string,
+    input: Record<string, unknown>,
+    options?: { signal?: AbortSignal }
+  ): Promise<unknown>;
 }
 
 export interface CfBindings {
