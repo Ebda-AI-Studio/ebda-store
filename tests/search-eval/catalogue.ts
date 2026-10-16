@@ -640,6 +640,7 @@ export const EVAL_NEGATIVES: ReadonlyArray<{
 ];
 
 export type EvalExtraClass = 'typo' | 'ortho' | 'mixed' | 'phrase';
+export type EvalHardClass = `hard-${EvalForm}`;
 
 /**
  * Supplementary queries (not in the bar). `src: 'vocab'` = verbatim from franco-vocab.json's
@@ -746,6 +747,101 @@ export const EVAL_ABSENT: readonly string[] = [
   'zeit 3arabeya',
 ];
 
+/**
+ * Harder queries (review M2): the core set is easy-biased (38/50 en and 14/50 msa queries are
+ * substrings of the product's own name, and siblings use the same dialect words as the dialect
+ * queries). Here no query word of 3+ letters appears inside ANY product name of its type (unit
+ * test), so keyword search can only hit through another type or a search word: paraphrases
+ * ("حاجه اشيل فيها حاجتي", "timepiece"), descriptions and synonyms. 20 per form, reported as
+ * `hard-<form>` with their own lift; not in the bar.
+ */
+export const EVAL_HARD: ReadonlyArray<{ key: string; form: EvalForm; q: string }> = [
+  // msa
+  { key: 'sneakers', form: 'msa', q: 'أحذية للجري والتمارين' },
+  { key: 'handbag', form: 'msa', q: 'محفظة يد نسائية' },
+  { key: 'abaya', form: 'msa', q: 'ثوب فضفاض أسود للنساء' },
+  { key: 'tshirt', form: 'msa', q: 'قميص بأكمام قصيرة' },
+  { key: 'jeans', form: 'msa', q: 'سروال من قماش الدنيم' },
+  { key: 'pajama', form: 'msa', q: 'ملابس للنوم' },
+  { key: 'socks', form: 'msa', q: 'جوارب للقدمين' },
+  { key: 'perfume', form: 'msa', q: 'رائحة زكية للجسم' },
+  { key: 'lipstick', form: 'msa', q: 'طلاء للشفاه' },
+  { key: 'shampoo', form: 'msa', q: 'غسول للرأس' },
+  { key: 'moisturizer', form: 'msa', q: 'مستحضر للبشرة الجافة' },
+  { key: 'honey', form: 'msa', q: 'شهد من الخلية' },
+  { key: 'coffee', form: 'msa', q: 'مشروب الصباح المحمص' },
+  { key: 'phonecase', form: 'msa', q: 'حماية للهاتف المحمول' },
+  { key: 'charger', form: 'msa', q: 'جهاز لشحن الهاتف' },
+  { key: 'watch', form: 'msa', q: 'أداة لمعرفة الوقت على المعصم' },
+  { key: 'kettle', form: 'msa', q: 'إبريق لتسخين الماء' },
+  { key: 'blanket', form: 'msa', q: 'غطاء دافئ للشتاء' },
+  { key: 'stroller', form: 'msa', q: 'عربة لنقل الرضيع' },
+  { key: 'notebook', form: 'msa', q: 'دفتر ملاحظات للمدرسة' },
+  // dialect
+  { key: 'sneakers', form: 'dialect', q: 'جزمه رياضه' },
+  { key: 'abaya', form: 'dialect', q: 'لبس واسع للمحجبات' },
+  { key: 'handbag', form: 'dialect', q: 'حاجه اشيل فيها حاجتي' },
+  { key: 'tshirt', form: 'dialect', q: 'فانله نص كم' },
+  { key: 'pot', form: 'dialect', q: 'طاسه كبيره للطبيخ' },
+  { key: 'pajama', form: 'dialect', q: 'لبس بيت للنوم' },
+  { key: 'slippers', form: 'dialect', q: 'حاجه البسها في رجلي في البيت' },
+  { key: 'hijab', form: 'dialect', q: 'حاجه اغطي بيها شعري' },
+  { key: 'perfume', form: 'dialect', q: 'ريحه حلوه' },
+  { key: 'shampoo', form: 'dialect', q: 'حاجه اغسل بيها شعري' },
+  { key: 'koshari', form: 'dialect', q: 'اكله مصريه بالعدس' },
+  { key: 'tea', form: 'dialect', q: 'مشروب العصاريه' },
+  { key: 'honey', form: 'dialect', q: 'شهد' },
+  { key: 'earbuds', form: 'dialect', q: 'سماعات ودان' },
+  { key: 'charger', form: 'dialect', q: 'حاجه اشحن بيها التليفون' },
+  { key: 'watch', form: 'dialect', q: 'حاجه البسها في ايدي اعرف بيها الوقت' },
+  { key: 'blender', form: 'dialect', q: 'ماكينه عصير' },
+  { key: 'kettle', form: 'dialect', q: 'حاجه اغلي فيها المايه' },
+  { key: 'toycar', form: 'dialect', q: 'لعبه للولاد بتمشي' },
+  { key: 'notebook', form: 'dialect', q: 'دفتر للمدرسه' },
+  // franco
+  { key: 'sneakers', form: 'franco', q: 'gazma riyada' },
+  { key: 'abaya', form: 'franco', q: 'lebs wase3 lel mo7agabat' },
+  { key: 'handbag', form: 'franco', q: '7aga ashil feha 7agty' },
+  { key: 'tshirt', form: 'franco', q: 'fanela nos kom' },
+  { key: 'pajama', form: 'franco', q: 'lebs beit lel nom' },
+  { key: 'slippers', form: 'franco', q: 'zanoba' },
+  { key: 'hijab', form: 'franco', q: '7aga aghaty beha sha3ry' },
+  { key: 'perfume', form: 'franco', q: 'ri7a 7elwa' },
+  { key: 'shampoo', form: 'franco', q: '7aga aghsel beha sha3ry' },
+  { key: 'koshari', form: 'franco', q: 'akla masreya bel 3ads' },
+  { key: 'tea', form: 'franco', q: 'mashroob el 3asreya' },
+  { key: 'honey', form: 'franco', q: 'shahd' },
+  { key: 'earbuds', form: 'franco', q: 'sama3at wedan' },
+  { key: 'charger', form: 'franco', q: '7aga ash7en beha el telephone' },
+  { key: 'watch', form: 'franco', q: '7aga albesha f eidy a3raf el wa2t' },
+  { key: 'blender', form: 'franco', q: 'makanet 3aseer' },
+  { key: 'kettle', form: 'franco', q: '7aga aghly feha el maya' },
+  { key: 'toycar', form: 'franco', q: 'le3ba lel welad btemshy' },
+  { key: 'notebook', form: 'franco', q: 'daftar lel madrasa' },
+  { key: 'pot', form: 'franco', q: 'tasa kbira lel tabee5' },
+  // en
+  { key: 'sneakers', form: 'en', q: 'gym footwear' },
+  { key: 'abaya', form: 'en', q: 'loose modest robe' },
+  { key: 'handbag', form: 'en', q: 'ladies purse' },
+  { key: 'tshirt', form: 'en', q: 'casual top' },
+  { key: 'jeans', form: 'en', q: 'denim trousers' },
+  { key: 'pajama', form: 'en', q: 'sleepwear' },
+  { key: 'socks', form: 'en', q: 'ankle hosiery' },
+  { key: 'perfume', form: 'en', q: 'fragrance' },
+  { key: 'lipstick', form: 'en', q: 'mouth makeup' },
+  { key: 'kohl', form: 'en', q: 'kajal' },
+  { key: 'shampoo', form: 'en', q: 'scalp cleanser' },
+  { key: 'moisturizer', form: 'en', q: 'skin hydration' },
+  { key: 'honey', form: 'en', q: 'golden syrup from hives' },
+  { key: 'coffee', form: 'en', q: 'morning brew' },
+  { key: 'phonecase', form: 'en', q: 'mobile cover' },
+  { key: 'earbuds', form: 'en', q: 'in-ear audio' },
+  { key: 'watch', form: 'en', q: 'timepiece' },
+  { key: 'kettle', form: 'en', q: 'water boiler' },
+  { key: 'stroller', form: 'en', q: 'pram' },
+  { key: 'notebook', form: 'en', q: 'jotter' },
+];
+
 export interface EvalRow {
   /** Unique per product (the slug stem). */
   id: string;
@@ -771,18 +867,19 @@ export function catalogueRows(): EvalRow[] {
 
 export interface EvalQuery {
   /** `msa` / `dialect` / `franco` / `en` (core, in the bar) or an EVAL_EXTRA class. */
-  cls: EvalForm | EvalExtraClass;
+  cls: EvalForm | EvalExtraClass | EvalHardClass;
   core: boolean;
   /** Target type key. */
   key: string;
   q: string;
 }
 
-/** The 200 core queries, then the supplementary ones. */
+/** The 200 core queries, then the supplementary ones, then the hard set. */
 export function evalQueries(): EvalQuery[] {
   const out: EvalQuery[] = [];
   for (const p of EVAL_PRODUCTS)
     for (const f of EVAL_FORMS) out.push({ cls: f, core: true, key: p.key, q: p.q[f] });
   for (const e of EVAL_EXTRA) out.push({ cls: e.cls, core: false, key: e.key, q: e.q });
+  for (const h of EVAL_HARD) out.push({ cls: `hard-${h.form}`, core: false, key: h.key, q: h.q });
   return out;
 }

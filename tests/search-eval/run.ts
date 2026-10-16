@@ -393,7 +393,8 @@ async function main(): Promise<number> {
     // ---- report ------------------------------------------------------------------------------
     const L = results.lexical;
     const H = results[shippedLabel];
-    const classes = [...EVAL_FORMS, 'typo', 'ortho', 'mixed', 'phrase'];
+    const hardClasses = EVAL_FORMS.map(f => `hard-${f}`);
+    const classes = [...EVAL_FORMS, 'typo', 'ortho', 'mixed', 'phrase', ...hardClasses];
     console.log(
       `\nPer class: keyword-only vs hybrid (shipped: ${shippedLabel}). hit-rate@10 / MRR / nDCG@10 / zero-result`
     );
@@ -430,6 +431,24 @@ async function main(): Promise<number> {
       const n = l.lexical.length;
       buckets[n === 0 ? '0' : n < 20 ? '1-19' : n < 50 ? '20-49' : '50+']++;
     }
+    // Hard set (review M2): lift of hybrid over keyword-only, per form and together.
+    const liftOf = (cls: string[]) => {
+      const n = cls.reduce((a, c) => a + (H.summary.byClass[c]?.n ?? 0), 0);
+      return n
+        ? cls.reduce(
+            (a, c) =>
+              a +
+              ((H.summary.byClass[c]?.hit10 ?? 0) - (L.summary.byClass[c]?.hit10 ?? 0)) *
+                (H.summary.byClass[c]?.n ?? 0),
+            0
+          ) / n
+        : 0;
+    };
+    console.log(
+      `\nHard set lift (hybrid − keyword-only hit-rate@10): ` +
+        hardClasses.map(c => `${c} ${fmt(liftOf([c]))}`).join('  ') +
+        ` · dialect+franco ${fmt(liftOf(['hard-dialect', 'hard-franco']))} · all ${fmt(liftOf(hardClasses))}`
+    );
     console.log(`\nKeyword matches per query: ${JSON.stringify(buckets)}`);
     console.log(
       `Embeddable queries: ${legs.filter(l => l.embeddable).length}/${legs.length}; provider calls during queries: ${providerCalls - callsBefore}, of them not from the prefetch: ${backendCalls - backendBefore}`

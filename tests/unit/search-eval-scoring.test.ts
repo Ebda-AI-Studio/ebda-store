@@ -1,5 +1,6 @@
 // Search eval harness (Task 13): the scoring math and the SEARCH-10 pass bar, no DB, no network.
 import { describe, it, expect } from 'vitest';
+import { normalizeArabicSearch } from '../../packages/shared/src/search/arabic-normalize';
 import {
   hitAt,
   reciprocalRank,
@@ -16,6 +17,7 @@ import {
   EVAL_NEGATIVES,
   EVAL_EXTRA,
   EVAL_ABSENT,
+  EVAL_HARD,
   catalogueRows,
   evalQueries,
 } from '../search-eval/catalogue';
@@ -191,6 +193,26 @@ describe('catalogue', () => {
     expect(EVAL_ABSENT.length).toBeGreaterThanOrEqual(10);
     const names = new Set(catalogueRows().flatMap(r => [r.nameAr, r.name]));
     expect(EVAL_ABSENT.some(q => names.has(q))).toBe(false);
+  });
+
+  it('hard set (review M2): 20 per form, no query word inside any product name of its type', () => {
+    for (const f of ['msa', 'dialect', 'franco', 'en'])
+      expect(
+        EVAL_HARD.filter(h => h.form === f),
+        f
+      ).toHaveLength(20);
+    const rows = catalogueRows();
+    const keys = new Set(EVAL_PRODUCTS.map(p => p.key));
+    const leaks: string[] = [];
+    for (const h of EVAL_HARD) {
+      expect(keys.has(h.key), h.q).toBe(true);
+      const names = rows
+        .filter(r => r.type === h.key)
+        .map(r => normalizeArabicSearch(`${r.nameAr} ${r.name}`));
+      for (const t of normalizeArabicSearch(h.q).split(' '))
+        if (t.length >= 3 && names.some(n => n.includes(t))) leaks.push(`${h.q} → ${t}`);
+    }
+    expect(leaks).toEqual([]);
   });
 
   it('a dense type exists, so the keyword-strong threshold is exercised', () => {
