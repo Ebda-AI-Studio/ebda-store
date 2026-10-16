@@ -163,14 +163,15 @@ describe.skipIf(!hasDb)('ebda_ar_norm parity with normalizeArabicSearch', () => 
 
   /**
    * The statements product-search.service actually runs (storefront list, typeahead, admin with
-   * the SKU arm) must use the expression indexes too: a predicate written differently from its
-   * index expression, or an unindexed OR arm, silently falls back to a sequential scan. The table
-   * is filled (inside the rolled-back transaction) with one store's rows carrying ~330-char
-   * descriptions, so the store_id btree + per-row normalisation filter loses by volume, then
-   * ANALYZEd. (With empty descriptions the planner under-costs that filter and picks the store_id
-   * index at 20k rows; measured: BitmapOr runs in ~1.7 ms on this fill.)
+   * the SKU arm). Since Task 14 (Ruling SEARCH-T14-1) the word-AND match runs inside the
+   * SECURITY DEFINER `ebda_product_search_ids`, because as `ebda_app` the RLS barrier forbids the
+   * trigram index for any non-LEAKPROOF predicate. This (owner-role) test therefore proves only
+   * the SHAPE: the statement calls the function and does not scan `products` for the match. That
+   * the indexes are really used under RLS is proven by search-lexical-rls-index.test.ts (index scan
+   * counters read after running these statements as `ebda_app`). The table is filled with ~330-char
+   * descriptions inside the rolled-back transaction, as before.
    */
-  it('the planner uses the indexes for the storefront, typeahead and admin search statements', async () => {
+  it('the storefront, typeahead and admin search statements match through ebda_product_search_ids', async () => {
     const ROLLBACK = Symbol('rollback');
     const tag = `pl${Date.now()}${Math.random().toString(36).slice(2, 6)}`;
     const plans: Record<string, string> = {};
@@ -216,11 +217,9 @@ describe.skipIf(!hasDb)('ebda_ar_norm parity with normalizeArabicSearch', () => 
       .catch(e => {
         if (e !== ROLLBACK) throw e;
       });
-    expect(plans.storefront).toContain('products_search_doc_trgm_idx');
-    expect(plans.typeahead).toContain('products_name_doc_trgm_idx');
-    expect(plans.admin).toContain('products_search_doc_trgm_idx');
-    expect(plans.admin).toContain('products_sku_norm_trgm_idx');
-    expect(plans.admin).toContain('BitmapOr');
-    for (const plan of Object.values(plans)) expect(plan).not.toContain('Seq Scan');
+    for (const plan of Object.values(plans)) {
+      expect(plan).toContain('ebda_product_search_ids');
+      expect(plan).not.toContain('Seq Scan on products');
+    }
   }, 90_000);
 });

@@ -52,8 +52,10 @@ function clampLimit(limit: number | undefined): number {
 
 /**
  * The lexical search statement (selects `p.id`), or null when the query has no tokens. Exported so
- * the planner test EXPLAINs the exact SQL production runs. Each predicate is written exactly as
- * its index expression (migrations 20261019000100 + 20261019000200) or the planner cannot use it:
+ * the planner tests inspect the exact SQL production runs. The match itself is
+ * `public.ebda_product_search_ids` (migration 20261024000300, Ruling SEARCH-T14-1), whose inner
+ * statement writes each predicate exactly as its index expression (migrations 20261019000100 +
+ * 20261019000200) or the planner cannot use it:
  *   public.ebda_product_search_doc(p.name, p.name_ar, p.search_terms, p.description, p.description_ar)
  *   public.ebda_product_name_doc(p.name, p.name_ar, p.search_terms)
  *   public.ebda_ar_norm(coalesce(p.sku, ''))
@@ -68,27 +70,27 @@ export function productSearchSql(
   const tokens = searchTokens(raw);
   if (tokens.length === 0) return null;
   const limit = clampLimit(opts.limit);
-  const doc =
-    opts.field === 'name'
-      ? Prisma.sql`public.ebda_product_name_doc(p.name, p.name_ar, p.search_terms)`
-      : Prisma.sql`public.ebda_product_search_doc(p.name, p.name_ar, p.search_terms, p.description, p.description_ar)`;
   const withSku = opts.withSku ?? opts.scope === 'admin';
-  const arms = tokens.map(t => {
-    const pattern = `%${escapeLike(t)}%`;
-    return withSku
-      ? Prisma.sql`(${doc} LIKE ${pattern} OR public.ebda_ar_norm(coalesce(p.sku, '')) LIKE ${pattern})`
-      : Prisma.sql`${doc} LIKE ${pattern}`;
-  });
-  const status = opts.scope === 'storefront' ? Prisma.sql`AND p.status = 'active'` : Prisma.empty;
+  const storefront = opts.scope === 'storefront';
+  const status = storefront ? Prisma.sql`AND p.status = 'active'` : Prisma.empty;
   const deleted = opts.includeDeleted ? Prisma.empty : Prisma.sql`AND p.deleted_at IS NULL`;
   const orderBy =
     opts.order === 'featured'
       ? Prisma.sql`p.featured DESC, p.name ASC, p.id`
       : Prisma.sql`similarity(public.ebda_product_name_doc(p.name, p.name_ar, p.search_terms), ${normalizeArabicSearch(raw)}) DESC, p.id`;
+  // The word-AND match runs inside public.ebda_product_search_ids (SECURITY DEFINER, Ruling
+  // SEARCH-T14-1): as `ebda_app` the tenant policy is a security barrier and none of the
+  // normalising functions is LEAKPROOF, so an inline `doc LIKE ...` can never be an index condition
+  // and scanned (and normalised) every row of the store. The function finds the candidate ids of
+  // THIS store (it refuses any other) with the trigram indexes; this statement still reads
+  // `products` as ebda_app, so RLS, status, soft-delete and ordering apply to the final rows.
+  const patterns = tokens.map(t => `%${escapeLike(t)}%`);
   // limit + 1: the extra row only says "there were more" (truncated).
   return Prisma.sql`SELECT p.id FROM products p
     WHERE p.store_id = ${storeId} ${deleted} ${status}
-      AND ${Prisma.join(arms, ' AND ')}
+      AND p.id IN (SELECT public.ebda_product_search_ids(
+        ${storeId}, ${opts.field === 'name' ? 'name' : 'all'}, ${withSku}, ${storefront},
+        ${opts.includeDeleted === true}, ${patterns}::text[]))
     ORDER BY ${orderBy}
     LIMIT ${limit + 1}`;
 }
