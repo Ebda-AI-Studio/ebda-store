@@ -262,6 +262,25 @@ describe('generateProductSearchTerms', () => {
     expect(out).not.toMatch(/downto/);
   });
 
+  it('M2: drops scheme-less links and domain-shaped words (facebook.com/myshop)', async () => {
+    generateContent.mockResolvedValue(
+      reply(
+        JSON.stringify({
+          terms: [
+            '3abaya',
+            'facebook.com/myshop',
+            'instagram.com/shop_eg',
+            'shop.eg',
+            'my-store.net',
+            'abaya.io',
+            'عبايه',
+          ],
+        })
+      )
+    );
+    expect(await generateProductSearchTerms(input, 'k', 'm')).toBe('3abaya, عبايه');
+  });
+
   it('returns null when every term is dropped', async () => {
     generateContent.mockResolvedValue(reply('{"terms":["01012345678","  ", "a@b.co"]}'));
     expect(await generateProductSearchTerms(input, 'k', 'm')).toBeNull();

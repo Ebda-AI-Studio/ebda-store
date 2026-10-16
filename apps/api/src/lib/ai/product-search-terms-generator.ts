@@ -62,6 +62,14 @@ function hasMixedScriptWord(term: string): boolean {
   return term.split(/\s+/).some(w => /[A-Za-z]/.test(w) && /[\u0600-\u06FF]/.test(w));
 }
 
+/**
+ * M2: a domain-shaped token ("facebook.com/myshop", "shop.eg") is a link without a scheme, which
+ * the shared PII gate deliberately lets through for the search log (a shopper may type a site
+ * name). On the AI path it is never a search word and can carry a merchant's social handle.
+ */
+const DOMAIN_LIKE =
+  /[a-z0-9-]+\.(?:com|net|org|eg|me|io|ly|co|info|biz|shop|store|online|app|link|page)\b/i;
+
 export async function generateProductSearchTerms(
   input: SearchTermsInput,
   apiKey: string,
@@ -117,6 +125,7 @@ export async function generateProductSearchTerms(
         // a 60+ character phrase is never a search word. Counted in code points.
         [...t.trim()].length <= SEARCH_TERM_MAX_LENGTH &&
         !isPersonalDataTerm(t) &&
+        !DOMAIN_LIKE.test(t) &&
         !hasMixedScriptWord(t) &&
         !invented(t)
     );
