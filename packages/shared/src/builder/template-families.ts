@@ -13,6 +13,8 @@ import type { TemplateId } from '../types/store-theme';
 import { getSectionDefinition } from './registry';
 import { layoutToDefinition, sectionFromPreset } from './adapter';
 import { resolveLayoutSettings } from '../types/store-layout';
+import { TEMPLATE_LAYOUT_BASELINES } from '../types/template-baselines';
+import { getLook } from '../looks/registry';
 import { uniqueSectionId } from './editor/document-reducer';
 import type { LookDefinition, LookSectionSpec } from '../looks/types';
 
@@ -291,7 +293,61 @@ export function applyTemplateFamily(
       });
     if (kept.length) doc = { ...doc, sections: [...doc.sections, ...kept] };
   }
-  return doc;
+  return look?.id && getLook(look.id) ? withoutSkinCardRatio(doc, opts) : doc;
+}
+
+const CARD_RATIO_KEYS = ['cardShape', 'cardAspect'] as const;
+const RATIO_SECTIONS: Record<string, 'newArrivals' | 'bestSellers'> = {
+  'new-arrivals': 'newArrivals',
+  'best-sellers': 'bestSellers',
+};
+
+/**
+ * Ruling LOOKS-15 at the document level (W2b, L-02): a registered look owns the default product
+ * card ratio. A document composed on a skin before the look (a store that published its home
+ * first, then took a look) holds that skin's baseline `cardShape`/`cardAspect` in its card
+ * defaults and product carousels, which would beat the look's `--image-ratio` on every card.
+ * `reset` drops them all (the look's design applies whole); `keep` drops only a value equal to
+ * the outgoing skin's baseline, so a merchant's own pick stays.
+ */
+function withoutSkinCardRatio(doc: PageDefinition, opts: ApplyLookOptions): PageDefinition {
+  const base = opts.fromSkin ? TEMPLATE_LAYOUT_BASELINES[opts.fromSkin.skin] : undefined;
+  const drop = (
+    settings: Record<string, unknown> | undefined,
+    baseline: Record<string, unknown> | undefined
+  ) => {
+    if (!settings) return settings;
+    const out = { ...settings };
+    for (const k of CARD_RATIO_KEYS) {
+      if (out[k] === undefined) continue;
+      if (opts.design !== 'keep' || (baseline && out[k] === baseline[k])) delete out[k];
+    }
+    return out;
+  };
+  const sections = doc.sections.map(n => {
+    const key = RATIO_SECTIONS[n.type];
+    if (!key) return n;
+    return {
+      ...n,
+      settings: drop(n.settings, base?.[key] as unknown as Record<string, unknown>) ?? {},
+    };
+  });
+  const defaults = doc.siteSettings?.productCardDefaults as Record<string, unknown> | undefined;
+  return {
+    ...doc,
+    sections,
+    ...(defaults
+      ? {
+          siteSettings: {
+            ...doc.siteSettings,
+            productCardDefaults: drop(
+              defaults,
+              base?.productCardDefaults as Record<string, unknown> | undefined
+            ) as typeof doc.siteSettings.productCardDefaults,
+          },
+        }
+      : {}),
+  };
 }
 
 /**
