@@ -107,6 +107,7 @@ export default function MinimalHeader({
                       : 'text-xs tracking-[0.3em] ui-caps-toggle font-light text-foreground'
                 }
                 data-zone="storeName"
+                translate="no"
                 title={isCentre || wordmarkSize ? displayName : undefined}
               >
                 {displayName}

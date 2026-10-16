@@ -64,6 +64,7 @@ export function MinimalChrome({
                       : 'text-2xl font-bold text-primary sm:text-3xl'
                   }
                   data-zone={store.theme?.wordmarkSize ? 'storeName' : undefined}
+                  translate="no"
                 >
                   {storeName}
                 </span>

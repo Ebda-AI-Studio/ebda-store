@@ -72,7 +72,10 @@ export default function DahabHeader({
       {logo ? (
         <StoreLogo src={logo} alt={name} priority />
       ) : (
-        <span className="font-display whitespace-nowrap text-[26px] leading-none text-primary sm:text-[30px] rtl:text-[32px] rtl:sm:text-[36px]">
+        <span
+          translate="no"
+          className="font-display whitespace-nowrap text-[26px] leading-none text-primary sm:text-[30px] rtl:text-[32px] rtl:sm:text-[36px]"
+        >
           {name}
         </span>
       )}

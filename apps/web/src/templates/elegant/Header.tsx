@@ -134,6 +134,7 @@ export default function ElegantHeader({
               <span
                 className="text-3xl font-light tracking-[0.25em] text-foreground"
                 data-zone="storeName"
+                translate="no"
               >
                 {displayName}
               </span>

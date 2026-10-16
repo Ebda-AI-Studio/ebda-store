@@ -78,6 +78,7 @@ export default function BoldHeader({
                 <span
                   className="text-xl font-black ui-caps-toggle tracking-wider text-white"
                   data-zone="storeName"
+                  translate="no"
                 >
                   {displayName}
                 </span>

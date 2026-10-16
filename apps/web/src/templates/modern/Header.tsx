@@ -110,7 +110,11 @@ export default function ModernHeader({
               {displayLogo ? (
                 <StoreLogo src={displayLogo} alt={displayName} priority />
               ) : (
-                <span className="text-xl font-bold text-primary" data-zone="storeName">
+                <span
+                  className="text-xl font-bold text-primary"
+                  data-zone="storeName"
+                  translate="no"
+                >
                   {displayName}
                 </span>
               )}

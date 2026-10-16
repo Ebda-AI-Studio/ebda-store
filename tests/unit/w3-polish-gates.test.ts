@@ -22,3 +22,15 @@ describe('R-07: Arabic-capable labels never use leading-none (marks clip)', () =
     expect(read(f)).not.toMatch(/\bleading-none\b/);
   });
 });
+
+describe('R-15: a text wordmark (store name zone) is never machine-translated', () => {
+  it('every data-zone="storeName" element carries translate="no"', () => {
+    const misses: string[] = [];
+    for (const f of files()) {
+      const src = readFileSync(f, 'utf8');
+      for (const m of src.matchAll(/<[a-zA-Z][^<>]*data-zone="storeName"[^<>]*>/gs))
+        if (!/translate="no"/.test(m[0])) misses.push(path.relative(WEB, f));
+    }
+    expect(misses).toEqual([]);
+  });
+});
