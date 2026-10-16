@@ -443,6 +443,19 @@ export default function CheckoutClient() {
     address: '',
   });
 
+  // IA-01: the review card shows the area / governorate in the page language.
+  const reviewGov = EGYPT_GOVERNORATES.find(g => g.en === formData.governorate);
+  const reviewArea =
+    reviewGov?.areas.find(a => a.en === formData.area) ??
+    findGovernorateByArea(formData.area)?.areas.find(a => a.en === formData.area);
+  const reviewPlaceNames = {
+    // Custom (non-static) areas take the rate row's Arabic names, as the order does.
+    area: formData.area
+      ? { en: formData.area, ar: reviewArea?.ar ?? rateByArea.get(formData.area)?.areaAr }
+      : undefined,
+    governorate: formData.governorate ? { en: formData.governorate, ar: reviewGov?.ar } : undefined,
+  };
+
   const checkoutStorageKey = store?.id ? `force-checkout-form-${store.id}` : null;
   const promoStorageKey = store?.id ? `force-promo-${store.id}` : null;
 
@@ -2364,6 +2377,7 @@ export default function CheckoutClient() {
                 {step === 2 && (
                   <PaymentStep
                     formData={formData}
+                    shippingNames={reviewPlaceNames}
                     onEditShipping={() => setStep(1)}
                     paymentProviders={paymentProviders}
                     paymentConfigError={paymentConfigError}

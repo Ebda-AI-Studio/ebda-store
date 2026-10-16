@@ -6,20 +6,18 @@ import { getPaymentIcon, DEFAULT_PAYMENT_PROVIDERS } from '../../components/Paym
 import { useLanguage, translations } from '../../contexts/LanguageContext';
 import type { PaymentProvider } from './types';
 import { DemoCheckoutNotice } from '../../components/demo/DemoCheckoutNotice';
+import {
+  shippingSummaryLines,
+  type LocalizedPlace,
+  type ShippingSummaryForm,
+} from './_lib/shippingSummary';
 
-interface FormData {
-  email: string;
-  firstName: string;
-  lastName: string;
-  phone: string;
-  address: string;
-  apartment: string;
-  area: string;
-  notes: string;
-}
+type FormData = ShippingSummaryForm & { notes?: string };
 
 interface PaymentStepProps {
   formData: FormData;
+  /** IA-01: the localized area / governorate names for the review (canonical value if absent). */
+  shippingNames?: { area?: LocalizedPlace; governorate?: LocalizedPlace };
   onEditShipping: () => void;
   paymentProviders: PaymentProvider[];
   /** True when the payment-config request FAILED (vs. genuinely returned none). */
@@ -52,6 +50,7 @@ interface PaymentStepProps {
 
 export default function PaymentStep({
   formData,
+  shippingNames = {},
   onEditShipping,
   paymentProviders,
   paymentConfigError = false,
@@ -86,20 +85,13 @@ export default function PaymentStep({
             {t('Edit', 'تعديل')}
           </button>
         </div>
-        <p className="mt-2 text-sm text-muted-foreground">
-          {formData.firstName} {formData.lastName}
-          <br />
-          {formData.address}
-          {formData.apartment && `, ${formData.apartment}`}
-          <br />
-          {formData.area}
-          <br />
-          {formData.phone}
-          {formData.email && (
-            <>
-              <br />
-              {formData.email}
-            </>
+        <p data-testid="shipping-summary" className="mt-2 text-sm text-muted-foreground">
+          {shippingSummaryLines(formData, shippingNames, language === 'ar' ? 'ar' : 'en').map(
+            (line, i) => (
+              <span key={i} className="block">
+                {line}
+              </span>
+            )
           )}
         </p>
       </div>
