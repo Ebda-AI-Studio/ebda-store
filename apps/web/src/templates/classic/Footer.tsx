@@ -6,7 +6,7 @@ import { FooterLegalRow } from '../shared/FooterLegalRow';
 import { FooterWhatsApp } from '../shared/FooterWhatsApp';
 import type { FooterProps } from '../types';
 import { useLanguage } from '../../contexts/LanguageContext';
-import { pickReadableForeground } from '@ebda/shared';
+import { footerRootPaint } from '../shared/footer-ink';
 import {
   footerBranchesHeading,
   getDisplayBranding,
@@ -72,13 +72,10 @@ export default function ClassicFooter({
     }
   }
 
-  // Ink picked against the footer's own paint, so a dark merchant footer never gets dark text (B0-46).
-  const brandInk = bgColor ? pickReadableForeground(bgColor) : undefined;
-
   return (
     <footer
       data-zone="footer"
-      style={bgColor ? { backgroundColor: bgColor } : undefined}
+      {...footerRootPaint(bgColor)}
       className={`${bgColor ? '' : 'bg-[hsl(var(--bg-section-alt))]'} border-t border-border mt-auto`}
       dir={isRtl ? 'rtl' : 'ltr'}
     >
@@ -105,7 +102,6 @@ export default function ClassicFooter({
               <p
                 data-footer-brand="mobile"
                 className="md:hidden mb-5 text-center text-xl font-serif font-bold text-foreground"
-                style={brandInk ? { color: brandInk } : undefined}
               >
                 {displayName}
               </p>

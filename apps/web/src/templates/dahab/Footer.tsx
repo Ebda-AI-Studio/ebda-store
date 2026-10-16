@@ -15,6 +15,7 @@ import { useLanguage } from '../../contexts/LanguageContext';
 import { PoweredByForce } from '../shared/PoweredByForce';
 import { FooterLegalRow } from '../shared/FooterLegalRow';
 import { FooterWhatsApp } from '../shared/FooterWhatsApp';
+import { footerRootPaint } from '../shared/footer-ink';
 import {
   footerBranchesHeading,
   resolveAddressHref,
@@ -67,7 +68,7 @@ export default function DahabFooter({
         'mt-auto border-t border-border',
         !bgColor && 'bg-[hsl(var(--bg-section-alt))]'
       )}
-      style={bgColor ? { backgroundColor: bgColor } : undefined}
+      {...footerRootPaint(bgColor)}
       dir={isRtl ? 'rtl' : 'ltr'}
     >
       <div className={cx(DAHAB_CONTAINER, 'grid gap-10 py-14 sm:py-16 md:grid-cols-12 lg:py-20')}>

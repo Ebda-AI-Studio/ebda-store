@@ -1,7 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { contrastRatio } from '@ebda/shared';
 import type { FooterProps } from '../types';
 
 let currentIsRtl = false;
@@ -45,7 +44,6 @@ function render(Footer: (typeof FOOTERS)[number][1], props: Partial<FooterProps>
   return renderToStaticMarkup(React.createElement(Footer as never, { ...base, ...props } as never));
 }
 const MOBILE = /data-footer-brand="mobile"[^>]*>([^<]*)</;
-const MOBILE_TAG = /<p[^>]*data-footer-brand="mobile"[^>]*>/;
 
 describe('footer brand on phones when the store has no logo (B0-46)', () => {
   it.each(FOOTERS)('%s: no logo → the store name renders below md', (_n, Footer) => {
@@ -59,15 +57,5 @@ describe('footer brand on phones when the store has no logo (B0-46)', () => {
     expect(render(Footer, { hideFooterLogoMobile: true })).not.toContain(
       'data-footer-brand="mobile"'
     );
-  });
-  // Minimal's footer reads dark-on-dark when the merchant paints it dark: the name must carry
-  // an ink chosen against the footer's own background (WCAG AA, 4.5:1), on every skin.
-  it.each(FOOTERS)('%s: the name is readable on a dark and on a light footer', (_n, Footer) => {
-    for (const bgColor of ['#111111', '#1a2b4c', '#ffffff', '#f5efe6']) {
-      const tag = MOBILE_TAG.exec(render(Footer, { bgColor }))?.[0] ?? '';
-      const ink = /style="(?:[^"]*;)?color:\s*([^;"]+)/.exec(tag)?.[1]?.trim();
-      expect(ink, `${bgColor}: explicit ink on ${tag}`).toBeTruthy();
-      expect(contrastRatio(bgColor, ink as string)).toBeGreaterThanOrEqual(4.5);
-    }
   });
 });

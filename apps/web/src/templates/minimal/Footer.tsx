@@ -5,7 +5,7 @@ import { FooterLegalRow } from '../shared/FooterLegalRow';
 import { FooterWhatsApp } from '../shared/FooterWhatsApp';
 import type { FooterProps } from '../types';
 import { useLanguage } from '../../contexts/LanguageContext';
-import { pickReadableForeground } from '@ebda/shared';
+import { footerRootPaint } from '../shared/footer-ink';
 import {
   footerBranchesHeading,
   resolveFooterBranches,
@@ -64,13 +64,10 @@ export default function MinimalFooter({
   const branches = resolveFooterBranches(locations, theme, isRtl);
   const showBranches = branches.length > 0;
 
-  // Ink picked against the footer's own paint, so a dark merchant footer never gets dark text (B0-46).
-  const brandInk = bgColor ? pickReadableForeground(bgColor) : undefined;
-
   return (
     <footer
       data-zone="footer"
-      style={bgColor ? { backgroundColor: bgColor } : undefined}
+      {...footerRootPaint(bgColor)}
       className={`${bgColor ? '' : 'bg-[hsl(var(--bg-section-alt))]'} mt-auto py-12 md:py-16`}
       dir={isRtl ? 'rtl' : 'ltr'}
     >
@@ -93,7 +90,6 @@ export default function MinimalFooter({
             <p
               data-footer-brand="mobile"
               className="md:hidden self-center text-xs tracking-[0.25em] ui-caps-toggle font-light text-foreground"
-              style={brandInk ? { color: brandInk } : undefined}
             >
               {displayName}
             </p>
@@ -115,10 +111,7 @@ export default function MinimalFooter({
                 }
               />
             ) : (
-              <span
-                className="text-xs tracking-[0.25em] ui-caps-toggle font-light text-foreground"
-                style={brandInk ? { color: brandInk } : undefined}
-              >
+              <span className="text-xs tracking-[0.25em] ui-caps-toggle font-light text-foreground">
                 {displayName}
               </span>
             )}

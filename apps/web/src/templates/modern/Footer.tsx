@@ -7,7 +7,7 @@ import { FooterWhatsApp } from '../shared/FooterWhatsApp';
 import { useState } from 'react';
 import type { FooterProps } from '../types';
 import { useLanguage } from '../../contexts/LanguageContext';
-import { pickReadableForeground } from '@ebda/shared';
+import { footerRootPaint } from '../shared/footer-ink';
 import { api } from '../../lib/api';
 import {
   footerBranchesHeading,
@@ -118,13 +118,10 @@ export default function ModernFooter({
             ? 'lg:grid-cols-4'
             : 'lg:grid-cols-3';
 
-  // Ink picked against the footer's own paint, so a dark merchant footer never gets dark text (B0-46).
-  const brandInk = bgColor ? pickReadableForeground(bgColor) : undefined;
-
   return (
     <footer
       data-zone="footer"
-      style={bgColor ? { backgroundColor: bgColor } : undefined}
+      {...footerRootPaint(bgColor)}
       className={`${bgColor ? '' : 'bg-[hsl(var(--bg-section-alt))]'} text-foreground/75 mt-auto`}
       dir={isRtl ? 'rtl' : 'ltr'}
     >
@@ -149,7 +146,6 @@ export default function ModernFooter({
               <p
                 data-footer-brand="mobile"
                 className="md:hidden mb-5 text-center text-xl font-bold text-foreground"
-                style={brandInk ? { color: brandInk } : undefined}
               >
                 {displayName}
               </p>
