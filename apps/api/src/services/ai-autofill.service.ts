@@ -234,7 +234,42 @@ export async function fillProductFields(
       }
     }
 
+    // Categories picked in THIS run (M8): the search words below use their names, so a new
+    // product's first words already carry its category vocabulary at no extra call.
+    let pickedCategoryNames: string[] = [];
+    // Categorize ONLY when the product has zero categories. Use whichever
+    // language has content (Arabic-first stores may have only the Arabic).
+    if (product.categories.length === 0 && (effName?.trim() || effNameAr?.trim())) {
+      const cats = await prisma.category.findMany({
+        where: { storeId },
+        select: { id: true, name: true, nameAr: true },
+      });
+      if (cats.length > 0) {
+        const { suggestions } = await AIService.suggestCategories({
+          storeId,
+          productName: effName || effNameAr || '',
+          productDescription: effDescription || effDescriptionAr,
+          existingCategories: cats,
+        });
+        const picked = suggestions.filter(s => s.confidence !== 'low').map(s => s.id);
+        pickedCategoryNames = cats
+          .filter(c => picked.includes(c.id))
+          .flatMap(c => [c.nameAr, c.name].filter((v): v is string => !!v));
+        if (picked.length > 0) {
+          // Savepointed: the catch below swallows, and this can run inside a
+          // request's / Inngest `runInTenantContext` transaction (issue 2215).
+          await withSavepoint(() =>
+            prisma.productCategory.createMany({
+              data: picked.map(categoryId => ({ productId, categoryId })),
+              skipDuplicates: true,
+            })
+          );
+        }
+      }
+    }
+
     // Search words (dialect / Franco / EN) for products.search_terms — search program P1.
+    // Runs AFTER categorize (M8).
     // canWrite keeps merchant words (human, or legacy words with no provenance) untouched.
     // No Gemini key → skip quietly, exactly like the bulk sweeps.
     if (
@@ -249,7 +284,7 @@ export async function fillProductFields(
               select: { name: true, nameAr: true },
             })
           ).flatMap(c => [c.nameAr, c.name].filter((v): v is string => !!v))
-        : [];
+        : pickedCategoryNames;
       const terms = await generateProductSearchTerms(
         {
           storeId,
@@ -268,34 +303,6 @@ export async function fillProductFields(
       if (terms) {
         writes.searchTerms = terms;
         stampedSources.searchTerms = 'ai';
-      }
-    }
-
-    // Categorize ONLY when the product has zero categories. Use whichever
-    // language has content (Arabic-first stores may have only the Arabic).
-    if (product.categories.length === 0 && (effName?.trim() || effNameAr?.trim())) {
-      const cats = await prisma.category.findMany({
-        where: { storeId },
-        select: { id: true, name: true, nameAr: true },
-      });
-      if (cats.length > 0) {
-        const { suggestions } = await AIService.suggestCategories({
-          storeId,
-          productName: effName || effNameAr || '',
-          productDescription: effDescription || effDescriptionAr,
-          existingCategories: cats,
-        });
-        const picked = suggestions.filter(s => s.confidence !== 'low').map(s => s.id);
-        if (picked.length > 0) {
-          // Savepointed: the catch below swallows, and this can run inside a
-          // request's / Inngest `runInTenantContext` transaction (issue 2215).
-          await withSavepoint(() =>
-            prisma.productCategory.createMany({
-              data: picked.map(categoryId => ({ productId, categoryId })),
-              skipDuplicates: true,
-            })
-          );
-        }
       }
     }
   } catch (err) {

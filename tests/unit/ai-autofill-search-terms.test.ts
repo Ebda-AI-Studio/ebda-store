@@ -32,11 +32,12 @@ vi.mock('../../apps/api/src/services/alerts.service', () => ({ sendAlert: vi.fn(
 vi.mock('../../apps/api/src/lib/inngest/client', () => ({ inngest: { send: vi.fn() } }));
 
 const translate = vi.fn();
+const suggestCategories = vi.fn();
 vi.mock('../../apps/api/src/services/ai.service', () => ({
   AIService: {
     translate: (...a: unknown[]) => translate(...a),
     suggestSeo: vi.fn(),
-    suggestCategories: vi.fn(),
+    suggestCategories: (...a: unknown[]) => suggestCategories(...a),
   },
 }));
 
@@ -78,6 +79,7 @@ const humanSources = {
 beforeEach(() => {
   updateSpy.mockClear();
   translate.mockReset();
+  suggestCategories.mockReset();
   generateProductSearchTerms.mockReset();
   generateProductSearchTerms.mockResolvedValue('جزمه, gazma, shoes');
   categoryFindMany.mockReset();
@@ -219,5 +221,27 @@ describe('fillProductFields — searchTerms', () => {
     expect(data.name).toBe('Leather sneakers');
     expect(data).not.toHaveProperty('searchTerms');
     expect((data.aiFieldSources as Record<string, string>).searchTerms).toBeUndefined();
+  });
+
+  it('M8: on a product with no category, the words use the categories picked in the same run', async () => {
+    productRow = {
+      ...baseProduct,
+      categories: [],
+      searchTerms: null,
+      aiFieldSources: { ...humanSources },
+    };
+    categoryFindMany.mockResolvedValue([
+      { id: 'c1', name: 'Shoes', nameAr: 'أحذية' },
+      { id: 'c2', name: 'Bags', nameAr: 'شنط' },
+    ]);
+    suggestCategories.mockResolvedValue({
+      suggestions: [
+        { id: 'c1', confidence: 'high' },
+        { id: 'c2', confidence: 'low' },
+      ],
+      cached: false,
+    });
+    await fillProductFields('s1', 'p1', { op: 'create' });
+    expect(generateProductSearchTerms.mock.calls[0][0].categoryNames).toEqual(['أحذية', 'Shoes']);
   });
 });
