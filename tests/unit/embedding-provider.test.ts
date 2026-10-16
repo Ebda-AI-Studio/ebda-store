@@ -11,6 +11,7 @@ import {
   EMBED_TIMEOUT_MS,
   semanticSearchEnabled,
   assertEmbeddingConfig,
+  EmbeddingError,
 } from '../../apps/api/src/lib/search/embedding-provider';
 
 afterEach(() => {
@@ -216,6 +217,80 @@ describe('embedding provider', () => {
     expect(migDims.length).toBeGreaterThan(0);
     expect(schemaDims.length).toBeGreaterThan(0);
     for (const d of [...migDims, ...schemaDims]) expect(d).toBe(EMBED_DIMS);
+  });
+});
+
+describe('EmbeddingError: retryable vs permanent (review M2)', () => {
+  const rest = (res: Response | Promise<Response>) => {
+    vi.stubEnv('CF_AI_ACCOUNT_ID', 'acc');
+    vi.stubEnv('CF_AI_API_TOKEN', 'tok');
+    vi.spyOn(globalThis, 'fetch').mockImplementation(() => Promise.resolve(res));
+  };
+  const fail = (p: Promise<unknown>) =>
+    p.then(
+      () => null,
+      (e: unknown) => e as EmbeddingError
+    );
+
+  it.each([
+    [429, true],
+    [500, true],
+    [503, true],
+    [400, false],
+    [401, false],
+    [403, false],
+  ])('REST %i -> kind http, retryable %s', async (status, retryable) => {
+    rest(new Response('x', { status }));
+    const e = await fail(getEmbeddingProvider()!.embed(['x']));
+    expect(e).toBeInstanceOf(EmbeddingError);
+    expect(e).toMatchObject({ kind: 'http', status, retryable });
+  });
+  it('network failure is retryable', async () => {
+    vi.stubEnv('CF_AI_ACCOUNT_ID', 'acc');
+    vi.stubEnv('CF_AI_API_TOKEN', 'tok');
+    vi.spyOn(globalThis, 'fetch').mockRejectedValue(new TypeError('fetch failed'));
+    expect(await fail(getEmbeddingProvider()!.embed(['x']))).toMatchObject({
+      kind: 'network',
+      retryable: true,
+    });
+  });
+  it('a throwing binding is retryable (Workers AI capacity errors)', async () => {
+    withAi(async () => {
+      throw new Error('3040: Capacity temporarily exceeded');
+    });
+    expect(await fail(getEmbeddingProvider()!.embed(['x']))).toMatchObject({
+      kind: 'provider',
+      retryable: true,
+    });
+  });
+  it('timeout and caller abort are retryable', async () => {
+    vi.useFakeTimers();
+    withAi(() => new Promise(() => undefined));
+    const p = fail(getEmbeddingProvider()!.embed(['x']));
+    await vi.advanceTimersByTimeAsync(EMBED_TIMEOUT_MS + 1);
+    expect(await p).toMatchObject({ kind: 'timeout', retryable: true });
+    vi.useRealTimers();
+    const ctl = new AbortController();
+    const q = fail(getEmbeddingProvider()!.embed(['x'], { signal: ctl.signal }));
+    ctl.abort();
+    expect(await q).toMatchObject({ kind: 'aborted', retryable: true });
+  });
+  it('a wrong shape, an empty text and success=false are permanent', async () => {
+    withAi(async () => ({ data: [[1, 2]] }));
+    expect(await fail(getEmbeddingProvider()!.embed(['x']))).toMatchObject({
+      kind: 'shape',
+      retryable: false,
+    });
+    expect(await fail(getEmbeddingProvider()!.embed([' ']))).toMatchObject({
+      kind: 'input',
+      retryable: false,
+    });
+    clearCfBindings();
+    rest(new Response(JSON.stringify({ success: false })));
+    expect(await fail(getEmbeddingProvider()!.embed(['x']))).toMatchObject({
+      kind: 'provider',
+      retryable: false,
+    });
   });
 });
 

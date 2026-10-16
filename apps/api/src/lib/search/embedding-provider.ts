@@ -30,15 +30,53 @@ export interface EmbeddingProvider {
 
 export type EmbeddingProviderKind = 'workers-ai' | 'rest' | 'none';
 
+export type EmbeddingErrorKind =
+  | 'input' // an empty/whitespace text: fix the caller, never retry
+  | 'shape' // wrong count, dims or a non-finite component: never retry
+  | 'http' // REST non-2xx: `status` set; 429 and 5xx are retryable
+  | 'network' // fetch itself failed (DNS, reset, a non-JSON proxy page)
+  | 'provider' // the binding threw (capacity, internal), or REST answered success=false
+  | 'timeout' // EMBED_TIMEOUT_MS elapsed; the call was aborted
+  | 'aborted'; // the caller's signal fired; the call was aborted
+
+/**
+ * Every failure of `embed()` is one of these, so the indexer (Task 11) can retry or dead-letter and
+ * the query path (Task 12) can log the fallback reason without matching message strings. Messages
+ * never carry a response body or a credential.
+ */
+export class EmbeddingError extends Error {
+  readonly kind: EmbeddingErrorKind;
+  readonly status?: number;
+  readonly retryable: boolean;
+  constructor(
+    kind: EmbeddingErrorKind,
+    message: string,
+    opts: { status?: number; retryable?: boolean } = {}
+  ) {
+    super(message);
+    this.name = 'EmbeddingError';
+    this.kind = kind;
+    this.status = opts.status;
+    this.retryable =
+      opts.retryable ??
+      (kind === 'timeout' ||
+        kind === 'aborted' ||
+        kind === 'network' ||
+        (kind === 'http' &&
+          opts.status !== undefined &&
+          (opts.status === 429 || opts.status >= 500)));
+  }
+}
+
 function check(data: unknown, n: number): number[][] {
   if (!Array.isArray(data) || data.length !== n)
-    throw new Error(`embedding: expected ${n} vectors`);
+    throw new EmbeddingError('shape', `embedding: expected ${n} vectors`);
   for (const v of data) {
     if (!Array.isArray(v) || v.length !== EMBED_DIMS)
-      throw new Error(`embedding: expected ${EMBED_DIMS} dims`);
+      throw new EmbeddingError('shape', `embedding: expected ${EMBED_DIMS} dims`);
     for (const x of v) {
       if (typeof x !== 'number' || !Number.isFinite(x))
-        throw new Error('embedding: non-finite component');
+        throw new EmbeddingError('shape', 'embedding: non-finite component');
     }
   }
   return data as number[][];
@@ -52,26 +90,31 @@ function check(data: unknown, n: number): number[][] {
 async function cancellable<T>(
   label: string,
   caller: AbortSignal | undefined,
-  call: (signal: AbortSignal) => Promise<T>
+  call: (signal: AbortSignal) => Promise<T>,
+  callFailed: EmbeddingErrorKind
 ): Promise<T> {
-  if (caller?.aborted) throw new Error(`${label} aborted by the caller`);
+  const abortError = () =>
+    caller?.aborted
+      ? new EmbeddingError('aborted', `${label} aborted by the caller`)
+      : new EmbeddingError('timeout', `${label} timed out after ${EMBED_TIMEOUT_MS} ms`);
+  if (caller?.aborted) throw abortError();
   const timeoutCtl = new AbortController();
   const timer = setTimeout(() => timeoutCtl.abort(), EMBED_TIMEOUT_MS);
   const signal = caller ? AbortSignal.any([caller, timeoutCtl.signal]) : timeoutCtl.signal;
   let onAbort: (() => void) | undefined;
   const aborted = new Promise<never>((_, reject) => {
-    onAbort = () =>
-      reject(
-        new Error(
-          caller?.aborted
-            ? `${label} aborted by the caller`
-            : `${label} timed out after ${EMBED_TIMEOUT_MS} ms`
-        )
-      );
+    onAbort = () => reject(abortError());
     signal.addEventListener('abort', onAbort, { once: true });
   });
   try {
     return await Promise.race([call(signal), aborted]);
+  } catch (err) {
+    if (err instanceof EmbeddingError) throw err;
+    if (signal.aborted) throw abortError();
+    // The underlying message is not forwarded: a provider error could echo input text.
+    throw new EmbeddingError(callFailed, `${label} failed (${(err as Error)?.name ?? 'Error'})`, {
+      retryable: true,
+    });
   } finally {
     clearTimeout(timer);
     if (onAbort) signal.removeEventListener('abort', onAbort);
@@ -81,17 +124,26 @@ async function cancellable<T>(
 /** Validates the input, splits it into model-sized batches, and keeps the output order. */
 function batched(
   embedBatch: (texts: string[], signal: AbortSignal) => Promise<number[][]>,
-  label: string
+  label: string,
+  callFailed: EmbeddingErrorKind
 ): EmbeddingProvider {
   return {
     model: EMBED_MODEL,
     async embed(texts, opts) {
       if (texts.some(t => typeof t !== 'string' || t.trim() === ''))
-        throw new Error('embedding: empty text (the model rejects it; skip the product instead)');
+        throw new EmbeddingError(
+          'input',
+          'embedding: empty text (the model rejects it; skip the product instead)'
+        );
       const out: number[][] = [];
       for (let i = 0; i < texts.length; i += EMBED_MAX_BATCH) {
         const chunk = texts.slice(i, i + EMBED_MAX_BATCH);
-        const data = await cancellable(label, opts?.signal, signal => embedBatch(chunk, signal));
+        const data = await cancellable(
+          label,
+          opts?.signal,
+          signal => embedBatch(chunk, signal),
+          callFailed
+        );
         out.push(...check(data, chunk.length));
       }
       return out;
@@ -102,12 +154,16 @@ function batched(
 const bindingProvider = (): EmbeddingProvider | null => {
   const ai = cfBindings()?.AI;
   if (!ai) return null;
-  return batched(async (texts, signal) => {
-    const out = (await ai.run(EMBED_MODEL, { text: texts }, { signal })) as {
-      data?: unknown;
-    } | null;
-    return out?.data as number[][];
-  }, 'embedding (AI binding)');
+  return batched(
+    async (texts, signal) => {
+      const out = (await ai.run(EMBED_MODEL, { text: texts }, { signal })) as {
+        data?: unknown;
+      } | null;
+      return out?.data as number[][];
+    },
+    'embedding (AI binding)',
+    'provider'
+  );
 };
 
 function restCredentials(): { acct: string; token: string } | null {
@@ -120,25 +176,31 @@ const restProvider = (): EmbeddingProvider | null => {
   const creds = restCredentials();
   if (!creds) return null;
   const url = `https://api.cloudflare.com/client/v4/accounts/${encodeURIComponent(creds.acct)}/ai/run/${EMBED_MODEL}`;
-  return batched(async (texts, signal) => {
-    const res = await fetch(url, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${creds.token}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text: texts }),
-      signal,
-    });
-    // Status only: never echo the response body or the request (the token is in the header).
-    if (!res.ok) throw new Error(`embedding REST ${res.status}`);
-    let body: { success?: boolean; result?: { data?: unknown } };
-    try {
-      body = JSON.parse(await res.text());
-    } catch {
-      // JSON.parse's message quotes the start of the body (a proxy/captive page): never echo it.
-      throw new Error('embedding REST: non-JSON body');
-    }
-    if (body.success === false) throw new Error('embedding REST success=false');
-    return body.result?.data as number[][];
-  }, 'embedding REST');
+  return batched(
+    async (texts, signal) => {
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${creds.token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: texts }),
+        signal,
+      });
+      // Status only: never echo the response body or the request (the token is in the header).
+      if (!res.ok)
+        throw new EmbeddingError('http', `embedding REST ${res.status}`, { status: res.status });
+      let body: { success?: boolean; result?: { data?: unknown } };
+      try {
+        body = JSON.parse(await res.text());
+      } catch {
+        // JSON.parse's message quotes the start of the body (a proxy/captive page): never echo it.
+        throw new EmbeddingError('network', 'embedding REST: non-JSON body');
+      }
+      if (body.success === false)
+        throw new EmbeddingError('provider', 'embedding REST success=false', { retryable: false });
+      return body.result?.data as number[][];
+    },
+    'embedding REST',
+    'network'
+  );
 };
 
 let override: EmbeddingProvider | null | undefined;
