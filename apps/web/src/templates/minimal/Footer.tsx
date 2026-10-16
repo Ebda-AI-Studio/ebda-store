@@ -201,6 +201,7 @@ export default function MinimalFooter({
           storeName={displayName ?? ''}
           isRtl={isRtl}
           urlPrefix={urlPrefix}
+          className="text-muted-foreground"
         />
         <PoweredByForce hidden={hidePoweredBy} />
       </div>

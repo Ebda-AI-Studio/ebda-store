@@ -305,6 +305,7 @@ export default function BoldFooter({
           storeName={displayName ?? ''}
           isRtl={isRtl}
           urlPrefix={urlPrefix}
+          className={fgMuted}
         />
         <PoweredByForce hidden={hidePoweredBy} />
       </div>

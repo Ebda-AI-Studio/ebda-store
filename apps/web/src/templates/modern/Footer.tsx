@@ -436,6 +436,7 @@ export default function ModernFooter({
           storeName={displayName ?? ''}
           isRtl={isRtl}
           urlPrefix={urlPrefix}
+          className="text-foreground/75"
         />
         <PoweredByForce hidden={hidePoweredBy} />
       </div>

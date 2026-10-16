@@ -67,6 +67,15 @@ describe.each(Object.entries(FOOTERS))('S-01: %s footer legal row', (_name, Foot
     expect(container.querySelector('[data-footer-legal]')!.textContent).toContain('© ');
   });
 
+  it("paints in the skin's own footer-link ink, never the inherited body ink", () => {
+    // Inherited ink vanished on a dark merchant footer (shot cart-1280-en-minimal, W1c).
+    const { container } = render(<Footer {...base} />);
+    const row = container.querySelector('[data-footer-legal]')!;
+    expect(row.className).toMatch(
+      /(?:^|\s)text-(?:muted-foreground|foreground\/\d+|background\/\d+)(?:\s|$)/
+    );
+  });
+
   it('drops each link whose merchant toggle is off', () => {
     const { container } = render(
       <Footer

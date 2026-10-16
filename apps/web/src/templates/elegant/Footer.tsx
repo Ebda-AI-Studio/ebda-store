@@ -395,6 +395,7 @@ export default function ElegantFooter({
           storeName={displayName ?? ''}
           isRtl={isRtl}
           urlPrefix={urlPrefix}
+          className="text-foreground/70"
         />
         <PoweredByForce hidden={hidePoweredBy} />
       </div>

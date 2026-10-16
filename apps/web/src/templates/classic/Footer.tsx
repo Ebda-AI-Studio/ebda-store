@@ -299,6 +299,7 @@ export default function ClassicFooter({
           storeName={displayName ?? ''}
           isRtl={isRtl}
           urlPrefix={urlPrefix}
+          className="text-muted-foreground"
         />
         <PoweredByForce hidden={hidePoweredBy} />
       </div>

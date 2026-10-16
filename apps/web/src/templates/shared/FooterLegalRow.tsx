@@ -11,8 +11,8 @@
  * copyright override and the bar's `enabled` switch.
  *
  * A link the merchant already placed in a footer column is not repeated here
- * (one fact, one place). Hairline idiom; the row inherits the skin's own footer
- * ink, so it reads wherever the skin's other footer text reads.
+ * (one fact, one place). Hairline idiom. Each skin passes its own footer-link ink
+ * as `className` (inheriting the body ink vanished on a dark merchant footer).
  */
 import { useLanguage } from '../../contexts/LanguageContext';
 import type { FooterLinksConfig } from '../types';
