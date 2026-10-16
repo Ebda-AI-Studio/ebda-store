@@ -171,3 +171,10 @@ describe('L-08: the size guide sits beside its label, not at the far edge', () =
     expect(src).toContain('<span className="-my-3 ms-2">{sizeGuide}</span>');
   });
 });
+
+describe('L-05: a short product row centres (never an empty tail), an overflowing one still scrolls', () => {
+  it('the shared carousel track uses safe centring', () => {
+    const src = read('templates/shared/ProductCarousel.tsx');
+    expect(src).toContain('justify-[safe_center]');
+  });
+});
