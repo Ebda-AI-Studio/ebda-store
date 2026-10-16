@@ -19,6 +19,14 @@ import { join, relative } from 'node:path';
 
 const ROOT = join(__dirname, '../..');
 
+/**
+ * Ahmad 2026-10-16 reversed Y-02 for full sentences (Egyptian Arabic; short labels stay neutral).
+ * main's fix/ahmad-decisions-1016 replaces this gate; until this branch rebases onto it, the
+ * sentences W5 wrote in the new voice are listed here by file (Ruling B1-91). Take main's gate on
+ * rebase and drop this list.
+ */
+const EGYPTIAN_BY_DECISION_1016 = new Set(['apps/web/src/lib/coupon-errors.ts']);
+
 const COLLOQUIAL = [
   'ده',
   'دي',
@@ -64,7 +72,12 @@ function files(dir: string, out: string[] = []): string[] {
     if (statSync(p).isDirectory()) {
       if (n === 'node_modules' || n === '__tests__' || n === 'landing') continue;
       files(p, out);
-    } else if (/\.tsx?$/.test(n) && !/\.(test|spec|d)\.tsx?$/.test(n)) out.push(p);
+    } else if (
+      /\.tsx?$/.test(n) &&
+      !/\.(test|spec|d)\.tsx?$/.test(n) &&
+      !EGYPTIAN_BY_DECISION_1016.has(relative(ROOT, p))
+    )
+      out.push(p);
   }
   return out;
 }

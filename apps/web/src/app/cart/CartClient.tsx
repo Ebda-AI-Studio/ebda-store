@@ -35,6 +35,7 @@ import { StickyCartTotal } from '../../components/commerce/StickyCartTotal';
 import { cartRemovalToast } from './cart-removal';
 import { countText, ITEMS } from '../../lib/plural';
 import { CART_CHECKOUT_CTA } from '../../lib/checkout-cta';
+import { couponErrorCopy } from '../../lib/coupon-errors';
 import { ArrowIcon } from '../../templates/shared/icons';
 import { Breadcrumbs } from '../../components/Breadcrumbs';
 
@@ -261,13 +262,8 @@ export default function CartClient() {
           )
         );
       } else {
-        const message =
-          result.error?.code === 'COUPON_NOT_ELIGIBLE'
-            ? t(
-                'This coupon does not apply to the items in your cart.',
-                'هذا الكوبون لا ينطبق على المنتجات في سلتك.'
-              )
-            : result.error?.message || t('The promo code is not valid', 'كود الخصم غير صالح');
+        // a11y re-audit P1-N1: copy from the error code, in the page language.
+        const message = couponErrorCopy(result.error?.code, t);
         info(t('Invalid code', 'كود غير صالح'), message);
       }
     } catch {

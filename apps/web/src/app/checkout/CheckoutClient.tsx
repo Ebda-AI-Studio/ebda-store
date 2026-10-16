@@ -63,6 +63,7 @@ import {
   pageDensityStyle,
 } from '../../templates/shared/section-typography';
 import { OrderSummary } from './OrderSummary';
+import { couponErrorCopy } from '../../lib/coupon-errors';
 import { estimateLoyaltyRedemption } from './_lib/loyaltyEstimate';
 import { repriceAfterCouponRemoval, isShippingSettled } from './_lib/repriceAfterCouponRemoval';
 import { useLastListing } from '../../hooks/useLastListing';
@@ -911,14 +912,8 @@ export default function CheckoutClient() {
             }
           }
         } else {
-          setCouponError(
-            result.error?.code === 'COUPON_NOT_ELIGIBLE'
-              ? t(
-                  'This coupon does not apply to the items in your cart.',
-                  'هذا الكوبون لا ينطبق على المنتجات في سلتك.'
-                )
-              : result.error?.message || t('Invalid coupon', 'كوبون غير صالح')
-          );
+          // a11y re-audit P1-N1: copy from the error code, in the page language.
+          setCouponError(couponErrorCopy(result.error?.code, t));
           // Stored code is no longer valid -- drop it so we don't auto-apply again.
           if (codeOverride && promoStorageKey && typeof window !== 'undefined') {
             try {

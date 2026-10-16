@@ -4,7 +4,7 @@ import Image from 'next/image';
 import { MINUS, SignedAmount } from '@/lib/bidi';
 import { useLocalePrice } from '../../hooks/useLocalePrice';
 import { Button, Input, VariantText } from '@ebda/ui';
-import type { CSSProperties } from 'react';
+import { useEffect, useId, useRef, type CSSProperties } from 'react';
 import { useLanguage, translations } from '../../contexts/LanguageContext';
 import { useNumerals } from '../../hooks/useNumerals';
 import { formatTaxRowLabel } from '../../lib/tax-display';
@@ -128,6 +128,12 @@ export function OrderSummary({
   const { t, isRtl } = useLanguage();
   const { localize } = useNumerals();
   const formatPrice = useLocalePrice();
+  // a11y re-audit P1-N1: a refused code returns focus to its field, which names the error.
+  const couponErrorId = useId();
+  const couponFieldRef = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    if (couponError) couponFieldRef.current?.focus();
+  }, [couponError]);
   const taxLabel = formatTaxRowLabel(tax, taxRatePercent, taxIncludedInPrice, isRtl, localize);
   const summaryLabelBold = summaryColors?.bold !== false;
   const summaryFontWeight = summaryLabelBold ? 'font-bold' : 'font-normal';
@@ -264,11 +270,21 @@ export function OrderSummary({
           ) : (
             <div className="flex gap-2">
               <Input
+                ref={couponFieldRef}
                 // P2-7 (W4): a placeholder is not a label.
                 aria-label={t('Coupon code', 'كود الخصم')}
                 placeholder={t('Coupon code', '\u0643\u0648\u062f \u0627\u0644\u062e\u0635\u0645')}
                 value={couponCode}
                 onChange={e => onCouponCodeChange(e.target.value.toUpperCase())}
+                // a11y re-audit P1-N1: Enter applies, the field says it is invalid and names its error.
+                onKeyDown={e => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    onApplyCoupon();
+                  }
+                }}
+                aria-invalid={couponError ? true : undefined}
+                aria-describedby={couponError ? couponErrorId : undefined}
                 className="flex-1"
               />
               <Button type="button" variant="outline" onClick={onApplyCoupon}>
@@ -276,7 +292,11 @@ export function OrderSummary({
               </Button>
             </div>
           )}
-          {couponError && <p className="mt-2 text-sm text-destructive-ink">{couponError}</p>}
+          {couponError && (
+            <p id={couponErrorId} role="alert" className="mt-2 text-sm text-destructive-ink">
+              {couponError}
+            </p>
+          )}
           {/* A coupon never discounts a bundle (the box price already is the
               discount), and the quote is computed against the loose items
               only — say so, or the customer reads a 10% coupon returning
