@@ -190,6 +190,17 @@ async function main() {
   const browser = await chromium.launch();
   const run = [];
   const probes = [];
+  // Warm-up: compile each manifest route once before shooting, so a dev server's first-compile
+  // hiccup (an error fallback, a missing store header) never lands in a measured screen.
+  {
+    const warm = await browser.newContext();
+    const wp = await warm.newPage();
+    for (const path of new Set(MANIFEST.screens.map(s => s.path)))
+      await wp
+        .goto(`${origin}${path}`, { waitUntil: 'networkidle', timeout: 180000 })
+        .catch(() => {});
+    await warm.close();
+  }
   for (const vid of MANIFEST.viewports) {
     const vp = viewportOf(vid);
     const ctx = await browser.newContext({
