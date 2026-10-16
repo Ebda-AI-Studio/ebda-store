@@ -8,6 +8,7 @@ import { useNumerals } from '../../hooks/useNumerals';
 import { useLocalePrice } from '../../hooks/useLocalePrice';
 import { useBodyScrollLock } from '../../hooks/useBodyScrollLock';
 import { buildSidebarVars, countActiveFilters } from './filter-sidebar-state';
+import { countText, ITEMS } from '../../lib/plural';
 import { localizeOptionName, localizeOptionValue } from '@/lib/option-localization';
 import { Sheet } from '@/components/ui/Sheet';
 
@@ -236,7 +237,7 @@ export function ProductsFilterSidebar(props: ProductsFilterSidebarProps) {
   const priceNarrowed =
     (priceMin !== undefined && priceFloor !== undefined && priceMin > priceFloor) ||
     (priceMax !== undefined && priceCeil !== undefined && priceMax < priceCeil);
-  const activeCount = activeFilterCount + (priceNarrowed ? 1 : 0);
+  const activeCount = activeFilterCount + (categoryFilter ? 1 : 0) + (priceNarrowed ? 1 : 0);
 
   // Close-and-act helpers — when the user picks an option inside the mobile
   // sheet, we close it so they see the filtered results immediately.
@@ -517,38 +518,70 @@ export function ProductsFilterSidebar(props: ProductsFilterSidebarProps) {
       // panel painted in the same colour as the store primary (review N3)
       data-filter-custom={sidebarVars ? '' : undefined}
     >
-      {/* Mobile trigger — opens the bottom-sheet. */}
-      <button
-        type="button"
-        onClick={() => setIsOpen(true)}
-        aria-haspopup="dialog"
-        aria-expanded={isOpen}
-        aria-controls="products-filter-sheet"
-        className="lg:hidden mb-4 flex h-11 w-full items-center justify-between rounded-[var(--radius)] border border-input bg-[hsl(var(--filter-bg))] px-4 text-sm font-semibold text-[hsl(var(--filter-fg))] transition-colors hover:bg-[hsl(var(--filter-fg)/0.05)]"
-      >
-        <span className="inline-flex items-center gap-2">
-          <svg
-            className="h-4 w-4"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            aria-hidden="true"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"
-            />
-          </svg>
-          {t('Filters', 'الفلاتر')}
-          {activeFilterCount > 0 && (
-            <span className="rounded-full bg-primary px-2 py-0.5 text-xs font-bold text-primary-foreground">
-              {activeFilterCount}
+      {/* Mobile trigger row — the filter sheet, the item count and a sort (IA-11). */}
+      <div className="lg:hidden mb-4 flex items-center gap-2">
+        <button
+          type="button"
+          onClick={() => setIsOpen(true)}
+          aria-haspopup="dialog"
+          aria-expanded={isOpen}
+          aria-controls="products-filter-sheet"
+          className="flex h-11 min-w-0 flex-1 items-center justify-between rounded-[var(--radius)] border border-input bg-[hsl(var(--filter-bg))] px-4 text-sm font-semibold text-[hsl(var(--filter-fg))] transition-colors hover:bg-[hsl(var(--filter-fg)/0.05)]"
+        >
+          <span className="inline-flex items-center gap-2">
+            <svg
+              className="h-4 w-4"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              aria-hidden="true"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"
+              />
+            </svg>
+            {t('Filters', 'الفلاتر')}
+            {activeFilterCount > 0 && (
+              <span className="rounded-full bg-primary px-2 py-0.5 text-xs font-bold text-primary-foreground">
+                {activeFilterCount}
+              </span>
+            )}
+          </span>
+          {!isLoading && (meta?.total ?? resultCount) !== undefined && (
+            <span
+              data-filter-result-count
+              className="text-xs font-normal text-[hsl(var(--filter-fg)/0.8)] tabular-nums"
+            >
+              {(() => {
+                const n = meta?.total ?? resultCount ?? 0;
+                return countText(language === 'ar' ? 'ar' : 'en', n, ITEMS, localize(n));
+              })()}
             </span>
           )}
-        </span>
-      </button>
+        </button>
+        {sortOptions && onSortChange && (
+          <>
+            <label htmlFor="products-sort-bar" className="sr-only">
+              {t('Sort by', 'ترتيب')}
+            </label>
+            <select
+              id="products-sort-bar"
+              value={sortBy ?? ''}
+              onChange={e => onSortChange(e.target.value)}
+              className="h-11 max-w-[45%] rounded-[var(--radius)] border border-input bg-[hsl(var(--filter-bg))] px-3 text-sm text-[hsl(var(--filter-fg))] focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+            >
+              {sortOptions.map(opt => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+          </>
+        )}
+      </div>
 
       {/* Mobile bottom-sheet (spec § 4.4) on the shared Sheet primitive (R-04):
           Escape, focus in/trap/return, scroll lock, a 44px close. */}

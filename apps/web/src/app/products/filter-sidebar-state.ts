@@ -37,13 +37,15 @@ export function buildSidebarVars(
  * Each option NAME with at least one selected value counts once, not once per
  * value — picking three sizes is still one active filter from the shopper's
  * point of view. Search counts only when non-blank, so stray whitespace never
- * shows a phantom active filter.
+ * shows a phantom active filter. The category never counts (IA-11): it is
+ * what the page is about and the h1 already names it, so a "1" on the badge
+ * read as a filter the shopper never set. The clear action still sees it.
  */
 export function countActiveFilters(
   search: string,
-  categoryFilter: string,
+  _categoryFilter: string,
   optionFilters: Record<string, string[]> = {}
 ): number {
   const activeOptionCount = Object.values(optionFilters).filter(v => v.length > 0).length;
-  return (search.trim() ? 1 : 0) + (categoryFilter ? 1 : 0) + activeOptionCount;
+  return (search.trim() ? 1 : 0) + activeOptionCount;
 }

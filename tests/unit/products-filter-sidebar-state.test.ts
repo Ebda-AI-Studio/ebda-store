@@ -44,8 +44,14 @@ describe('countActiveFilters', () => {
     expect(countActiveFilters('', '', { size: [], color: ['red'] })).toBe(1);
   });
 
-  it('sums search, category and options', () => {
-    expect(countActiveFilters('shirt', 'tops', { size: ['m'], color: ['red'] })).toBe(4);
+  it('sums search and options', () => {
+    expect(countActiveFilters('shirt', 'tops', { size: ['m'], color: ['red'] })).toBe(3);
+  });
+
+  it('never counts the category the page is about (IA-11)', () => {
+    // The shopper reached /products?category=abayas by tapping a category; the
+    // h1 already names it, so the badge showing "1" reads as a filter they never set.
+    expect(countActiveFilters('', 'abayas', {})).toBe(0);
   });
 
   it('defaults optionFilters so an omitted argument does not throw', () => {
@@ -89,5 +95,18 @@ describe('filter sidebar heading order (a11y P2-3)', () => {
       'utf8'
     );
     expect(src).toMatch(/<h2\b[^>]*>\s*\{t\('Filters', 'الفلاتر'\)\}\s*<\/h2>/);
+  });
+});
+
+describe('mobile filter row shows the item count and a sort (IA-11)', () => {
+  it('renders the result count with the counted noun and a sort select beside the trigger', async () => {
+    const { readFileSync } = await import('node:fs');
+    const src = readFileSync(
+      new URL('../../apps/web/src/app/products/ProductsFilterSidebar.tsx', import.meta.url),
+      'utf8'
+    );
+    expect(src).toMatch(/data-filter-result-count/);
+    expect(src).toMatch(/countText\([^)]*ITEMS/);
+    expect(src).toMatch(/id="products-sort-bar"/);
   });
 });
