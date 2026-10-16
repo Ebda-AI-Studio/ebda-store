@@ -40,3 +40,4 @@ export * from './model3d';
 export * from './tracking';
 export * from './looks';
 export * from './commerce';
+export * from './uploads';

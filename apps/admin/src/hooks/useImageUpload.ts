@@ -3,8 +3,16 @@
 import { useCallback, useState } from 'react';
 import { getApiUrl, localizedApiMessage } from '../lib/api';
 import { useT } from '@/i18n/useT';
+import { IMAGE_UPLOAD_BATCH_MAX } from '@ebda/shared';
 
 type Translator = ReturnType<typeof useT>;
+
+/** Split `items` into consecutive groups of at most `size`, preserving order. */
+export function chunk<T>(items: readonly T[], size: number): T[][] {
+  const out: T[][] = [];
+  for (let i = 0; i < items.length; i += size) out.push(items.slice(i, i + size));
+  return out;
+}
 
 /**
  * The API's error text for a failed upload in the admin's language (a byte-sniff refusal
@@ -102,22 +110,29 @@ export function useImageUpload() {
       setUploading(true);
       setProgress(0);
 
-      const formData = new FormData();
-      files.forEach(f => formData.append('files', f));
-
+      // FU46-6: the API takes at most IMAGE_UPLOAD_BATCH_MAX files per request, so a larger
+      // selection goes in sequential batches; URLs come back in selection order, or null if
+      // any batch fails (earlier batches stay in R2 for the orphan sweep).
+      const batches = chunk(files, IMAGE_UPLOAD_BATCH_MAX);
+      const urls: string[] = [];
       try {
-        const urls = await runXhr<string[]>({
-          t,
-          url: buildUploadUrl('images', folder, storeId),
-          formData,
-          onProgress: setProgress,
-          parse: data => {
-            if (data.success && data.data?.files) {
-              return (data.data.files as Array<{ url: string }>).map(f => f.url);
-            }
-            throw new Error(uploadErrorText(data, t('errors.uploadFailed')));
-          },
-        });
+        for (let i = 0; i < batches.length; i++) {
+          const formData = new FormData();
+          batches[i].forEach(f => formData.append('files', f));
+          const batchUrls = await runXhr<string[]>({
+            t,
+            url: buildUploadUrl('images', folder, storeId),
+            formData,
+            onProgress: pct => setProgress(Math.round(((i + pct / 100) / batches.length) * 100)),
+            parse: data => {
+              if (data.success && data.data?.files) {
+                return (data.data.files as Array<{ url: string }>).map(f => f.url);
+              }
+              throw new Error(uploadErrorText(data, t('errors.uploadFailed')));
+            },
+          });
+          urls.push(...batchUrls);
+        }
         return urls;
       } catch (err) {
         setError(err instanceof Error ? err.message : t('errors.uploadFailed'));

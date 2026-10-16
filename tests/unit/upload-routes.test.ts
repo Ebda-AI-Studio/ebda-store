@@ -268,3 +268,18 @@ describe('font uploads are judged by their bytes (B0-46 class sweep)', () => {
     expect(res.body.error.details.messageAr).toMatch(/[؀-ۿ]/);
   });
 });
+
+describe('POST /uploads/images file-count ceiling (FU46-6)', () => {
+  it('refuses a 5-file batch: the server buffers at most IMAGE_UPLOAD_BATCH_MAX files', async () => {
+    const { default: uploadRouter } = await import('@api/routes/upload.routes');
+    const a = express();
+    a.use('/api/v1/uploads', uploadRouter);
+    let r = request(a).post('/api/v1/uploads/images?storeId=store-1');
+    for (let i = 0; i < 5; i++) r = r.attach('files', PNG_BYTES, `${i}.png`);
+    const res = await r;
+    // No errorHandler in this harness (its Prisma import is mocked away), so assert the
+    // refusal itself: not stored, not 200.
+    expect(res.status).not.toBe(200);
+    expect(uploadMultipleMock).not.toHaveBeenCalled();
+  });
+});

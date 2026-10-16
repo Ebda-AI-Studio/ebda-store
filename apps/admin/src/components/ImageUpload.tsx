@@ -2,6 +2,7 @@
 
 import { useCallback, useState } from 'react';
 import { useT } from '@/i18n/useT';
+import { IMAGE_UPLOAD_MAX_BYTES } from '@ebda/shared';
 import { useImageUpload } from '../hooks/useImageUpload';
 import { apiDelete } from '../lib/api';
 import { UploadDropzone } from './image-upload/UploadDropzone';
@@ -120,7 +121,8 @@ interface MultiImageUploadProps {
   recommendedSizeHint?: string;
 }
 
-const MAX_FILE_SIZE = 10 * 1024 * 1024;
+/** The API's per-image ceiling (POST /uploads/image(s)), one shared number. */
+const MAX_FILE_SIZE = IMAGE_UPLOAD_MAX_BYTES;
 
 export function ImageUpload({
   value,

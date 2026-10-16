@@ -8,6 +8,7 @@ import { StorageService } from '../services/storage.service';
 import { resizeToAspect, enforceMaxDimensions } from '../services/image-resize.service';
 import { uploadLimiter, dailyUploadLimiter, auditLog } from '../middleware/security';
 import { runInTenantContext } from '@ebda/database';
+import { IMAGE_UPLOAD_MAX_BYTES, IMAGE_UPLOAD_BATCH_MAX } from '@ebda/shared';
 import { AppError } from '../middleware/error-handler';
 import { sniffVideo, VIDEO_MAX_BYTES } from '../lib/video-sniff';
 import {
@@ -39,8 +40,8 @@ const router = Router();
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: {
-    fileSize: 10 * 1024 * 1024, // 10MB
-    files: 10, // Max 10 files at once
+    fileSize: IMAGE_UPLOAD_MAX_BYTES,
+    files: IMAGE_UPLOAD_BATCH_MAX, // FU46-6: the admin batches larger selections
   },
   fileFilter: (_req, file, cb) => {
     const allowedTypes = [
@@ -460,7 +461,7 @@ router.post(
   requirePermission('products:write'),
   uploadLimiter,
   dailyUploadLimiter,
-  upload.array('files', 10),
+  upload.array('files', IMAGE_UPLOAD_BATCH_MAX),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const files = req.files as Express.Multer.File[];
