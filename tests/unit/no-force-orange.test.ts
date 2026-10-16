@@ -206,18 +206,47 @@ describe('no Force orange anywhere that runs (Ruling D1016-ORANGE-1)', () => {
   });
 });
 
-describe('a gold primary fill takes the dark primary ink (admin)', () => {
-  it('no admin class string pairs bg-primary with text-white (white on gold is 3.07:1)', () => {
-    const admin = trackedFiles().filter(f => f.startsWith('apps/admin/src/') && /\.tsx?$/.test(f));
+/**
+ * K-02 for code (review N1): a primary FILL takes the primary's on-token ink, never white. White on
+ * the admin gold is 3.07:1. A fill is `bg-primary` at full or ≥80% alpha, or a gradient that STARTS
+ * at full or ≥80% primary (`from-primary`, `from-primary/80`, `from-primary/90`); a /10 tint is not
+ * a fill. Scans the admin, the storefront and @ebda/ui.
+ */
+export function primaryFillWithWhite(classes: string): boolean {
+  const fill = /(?<![\w:/-])(?:bg|from)-primary(?:\/(\d+))?(?![\w/-])/g;
+  let isFill = false;
+  for (const m of classes.matchAll(fill)) if (!m[1] || Number(m[1]) >= 80) isFill = true;
+  return isFill && /(?<![\w:/-])text-white(?![\w/-])/.test(classes);
+}
+
+describe('a primary fill takes the primary ink, never white (K-02, admin + storefront)', () => {
+  it('the matcher (self-test)', () => {
+    for (const c of [
+      'bg-primary text-white',
+      'bg-gradient-to-br from-primary to-primary/90 text-white',
+      'from-primary/80 to-primary text-white',
+      'bg-primary/90 text-white',
+    ])
+      expect(primaryFillWithWhite(c), c).toBe(true);
+    for (const c of [
+      'bg-primary text-primary-foreground',
+      'from-primary/10 to-primary/10 text-white',
+      'bg-primary/10 text-white',
+      'hover:bg-primary text-white',
+      'bg-black text-white',
+    ])
+      expect(primaryFillWithWhite(c), c).toBe(false);
+  });
+
+  it('no class string pairs a primary fill with text-white', () => {
+    const scan = trackedFiles().filter(
+      f => /^(apps\/admin\/src|apps\/web\/src|packages\/ui\/src)\//.test(f) && /\.tsx?$/.test(f)
+    );
     const bad: string[] = [];
-    for (const f of admin) {
+    for (const f of scan) {
       const src = readFileSync(join(ROOT, f), 'utf8');
       for (const m of src.matchAll(/["'`][^"'`\n]*["'`]/g))
-        if (
-          /(?<![\w:/-])bg-primary(?![\w/-])/.test(m[0]) &&
-          /(?<![\w:/-])text-white(?![\w/-])/.test(m[0])
-        )
-          bad.push(`${f}: ${m[0].slice(0, 80)}`);
+        if (primaryFillWithWhite(m[0])) bad.push(`${f}: ${m[0].slice(0, 90)}`);
     }
     expect(bad).toEqual([]);
   });

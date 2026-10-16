@@ -86,7 +86,7 @@ export function SidebarHeader({
       {mode === 'super_admin' && (
         <div className="border-b border-border/50 px-4 py-3">
           <div className="flex items-center gap-2.5 rounded-xl bg-gradient-to-r from-primary/10 to-primary/10 px-3 py-2.5">
-            <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-primary to-primary/90 text-[10px] font-bold text-white shadow-sm">
+            <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-primary to-primary/90 text-[10px] font-bold text-primary-foreground shadow-sm">
               SA
             </div>
             <div>
@@ -138,7 +138,7 @@ export function SidebarHeader({
       {isSuperAdminViewingStore && (
         <div className="border-b border-border/50 px-4 py-3">
           <div className="flex items-center gap-2.5 rounded-xl bg-gradient-to-r from-primary/10 to-primary/10 px-3 py-2.5">
-            <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-primary to-primary/90 text-[10px] font-bold text-white shadow-sm">
+            <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-primary to-primary/90 text-[10px] font-bold text-primary-foreground shadow-sm">
               SA
             </div>
             <div className="flex-1 min-w-0">
