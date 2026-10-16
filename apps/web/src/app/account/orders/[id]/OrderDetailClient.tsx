@@ -494,7 +494,7 @@ export default function OrderDetailClient() {
                               sizes="48px"
                             />
                           ) : (
-                            <div className="flex h-full w-full items-center justify-center text-muted-foreground/70">
+                            <div className="flex h-full w-full items-center justify-center text-muted-foreground">
                               <svg
                                 className="h-5 w-5"
                                 fill="none"
@@ -571,7 +571,7 @@ export default function OrderDetailClient() {
                       sizes="56px"
                     />
                   ) : (
-                    <div className="flex h-full w-full items-center justify-center text-muted-foreground/70">
+                    <div className="flex h-full w-full items-center justify-center text-muted-foreground">
                       <svg
                         className="h-5 w-5"
                         fill="none"

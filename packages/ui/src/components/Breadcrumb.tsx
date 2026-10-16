@@ -51,7 +51,7 @@ const separatorIcons = {
       />
     </svg>
   ),
-  slash: () => <span className="text-muted-foreground/50">/</span>,
+  slash: () => <span className="text-muted-foreground">/</span>,
   dot: () => <span className="w-1 h-1 rounded-full bg-muted-foreground/50" />,
   arrow: (isRtl: boolean) => (
     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

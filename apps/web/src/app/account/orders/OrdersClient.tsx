@@ -199,7 +199,7 @@ export default function OrdersClient() {
                                 sizes="64px"
                               />
                             ) : (
-                              <div className="flex h-full w-full items-center justify-center text-muted-foreground/70">
+                              <div className="flex h-full w-full items-center justify-center text-muted-foreground">
                                 <svg
                                   className="h-6 w-6"
                                   fill="none"
@@ -271,7 +271,7 @@ export default function OrdersClient() {
       ) : !error ? (
         <div className="rounded-xl border bg-card p-12 text-center shadow-sm">
           <svg
-            className="mx-auto h-12 w-12 text-muted-foreground/70"
+            className="mx-auto h-12 w-12 text-muted-foreground"
             fill="none"
             viewBox="0 0 24 24"
             stroke="currentColor"

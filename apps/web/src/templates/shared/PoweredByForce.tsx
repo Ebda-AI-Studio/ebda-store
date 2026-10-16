@@ -13,7 +13,7 @@ import { BRAND, BRAND_MARKETING_URL } from '@ebda/shared';
  * noreferrer"` because external + visited by anonymous customers; `target=
  * "_blank"` so it doesn't unload the merchant's storefront when clicked.
  *
- * Styling: low-contrast (text-muted-foreground/70) so it reads as platform
+ * Styling: low-contrast (text-muted-foreground) so it reads as platform
  * attribution not store branding. Size bumped from 11px to text-sm sm:text-base
  * (14-16px) 2026-05-17 evening — Ahmad reported the previous 11px was
  * unreadable. `data-zone="afterFooter"` lets the Typography admin override
@@ -31,7 +31,7 @@ export function PoweredByForce({ hidden = false }: { hidden?: boolean }) {
   return (
     <div
       data-zone="afterFooter"
-      className={`mt-3 border-t border-border/40 pt-3 text-sm sm:text-base tracking-wide text-muted-foreground/70 text-start`}
+      className={`mt-3 border-t border-border/40 pt-3 text-sm sm:text-base tracking-wide text-muted-foreground text-start`}
     >
       <a
         href={BRAND_MARKETING_URL}

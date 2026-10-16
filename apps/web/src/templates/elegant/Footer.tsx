@@ -115,7 +115,7 @@ export default function ElegantFooter({
         <div className="border-b border-border/50">
           <div className="container mx-auto px-4 py-14 sm:py-16 md:py-20">
             <div className="max-w-xl mx-auto text-center">
-              <h3 className="text-xs tracking-[0.3em] ui-caps-toggle text-muted-foreground/70 mb-4 font-serif">
+              <h3 className="text-xs tracking-[0.3em] ui-caps-toggle text-muted-foreground mb-4 font-serif">
                 {isRtl ? 'النشرة البريدية' : 'Newsletter'}
               </h3>
               {/* Body line — render the merchant's brand description when
@@ -144,7 +144,7 @@ export default function ElegantFooter({
                       onChange={e => setEmail(e.target.value)}
                       placeholder={t('Enter your email', 'البريد الإلكتروني')}
                       aria-label={t('Email address', 'البريد الإلكتروني')}
-                      className="h-12 min-w-0 flex-1 px-6 bg-background border border-border focus:border-foreground focus:outline-none text-sm tracking-wide placeholder:text-muted-foreground/50 transition-colors duration-500"
+                      className="h-12 min-w-0 flex-1 px-6 bg-background border border-border focus:border-foreground focus:outline-none text-sm tracking-wide placeholder:text-muted-foreground transition-colors duration-500"
                       dir={isRtl ? 'rtl' : 'ltr'}
                       required
                       disabled={submitting}

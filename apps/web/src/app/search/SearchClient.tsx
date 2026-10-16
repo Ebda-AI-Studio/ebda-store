@@ -500,7 +500,7 @@ function SearchContent() {
         {!isLoading && !error && !committedQuery && (
           <div className="text-center py-12">
             <svg
-              className="mx-auto h-12 w-12 text-muted-foreground/50 mb-4"
+              className="mx-auto h-12 w-12 text-muted-foreground mb-4"
               fill="none"
               viewBox="0 0 24 24"
               stroke="currentColor"

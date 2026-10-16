@@ -447,7 +447,7 @@ export default function WishlistClient() {
         {!error && items.length === 0 ? (
           <div className="text-center py-12 bg-background rounded-lg">
             <svg
-              className="w-16 h-16 text-muted-foreground/70 mx-auto mb-4"
+              className="w-16 h-16 text-muted-foreground mx-auto mb-4"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"

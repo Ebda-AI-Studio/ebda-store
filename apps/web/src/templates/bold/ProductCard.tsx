@@ -281,7 +281,7 @@ function BoldProductCard({
               )}
             </>
           ) : (
-            <div className="w-full h-full flex items-center justify-center text-muted-foreground/40">
+            <div className="w-full h-full flex items-center justify-center text-muted-foreground">
               <PlaceholderImageIcon className="w-16 h-16" strokeWidth={1.5} />
             </div>
           )}

@@ -315,7 +315,7 @@ function MinimalProductCard({
               )}
             </>
           ) : (
-            <div className="w-full h-full flex items-center justify-center text-muted-foreground/20">
+            <div className="w-full h-full flex items-center justify-center text-muted-foreground">
               <svg
                 className="w-10 h-10"
                 fill="none"
@@ -434,7 +434,7 @@ function MinimalProductCard({
               </p>
             )}
             {priceVisible && (
-              <TaxInclusiveLabel className="block text-xs tracking-wide font-normal text-muted-foreground/70" />
+              <TaxInclusiveLabel className="block text-xs tracking-wide font-normal text-muted-foreground" />
             )}
             <SwatchDots product={product} max={5} />
             <FactChips product={product} className="mt-1" />

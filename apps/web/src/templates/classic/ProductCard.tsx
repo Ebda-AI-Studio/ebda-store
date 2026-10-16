@@ -256,7 +256,7 @@ function ClassicProductCard({
               )}
             </>
           ) : (
-            <div className="w-full h-full flex items-center justify-center text-muted-foreground/40">
+            <div className="w-full h-full flex items-center justify-center text-muted-foreground">
               <PlaceholderImageIcon />
             </div>
           )}
@@ -406,7 +406,7 @@ function ClassicProductCard({
               />
             )}
             {priceVisible && (
-              <TaxInclusiveLabel className="mt-1 block font-serif text-xs text-muted-foreground/70" />
+              <TaxInclusiveLabel className="mt-1 block font-serif text-xs text-muted-foreground" />
             )}
             <SwatchDots product={product} max={5} className="mt-1 justify-center" />
             <FactChips product={product} className="mt-1 justify-center" />

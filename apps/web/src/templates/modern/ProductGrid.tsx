@@ -48,7 +48,7 @@ export default function ModernProductGrid({
         role="status"
         aria-label={t('No products found', 'لا توجد منتجات')}
       >
-        <div className="w-20 h-20 mx-auto mb-5 rounded-full bg-muted flex items-center justify-center text-muted-foreground/50">
+        <div className="w-20 h-20 mx-auto mb-5 rounded-full bg-muted flex items-center justify-center text-muted-foreground">
           <NoProductsIcon className="w-9 h-9" />
         </div>
         <h3 className="text-base font-semibold text-foreground mb-1.5">

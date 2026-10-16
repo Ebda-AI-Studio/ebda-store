@@ -112,7 +112,7 @@ export default function ElegantCategoryCard({
             {displayName}
           </h3>
           {category.productCount !== undefined && (
-            <p className="text-xs text-muted-foreground/80 mt-2 tracking-[0.22em] uppercase">
+            <p className="text-xs text-muted-foreground mt-2 tracking-[0.22em] uppercase">
               {categoryCountText(store.theme, isRtl, category.productCount)}
             </p>
           )}

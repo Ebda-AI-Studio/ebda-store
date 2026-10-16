@@ -374,7 +374,7 @@ export function VariantSelector({
                         className="absolute inset-0 flex items-center justify-center pointer-events-none"
                       >
                         <svg
-                          className="w-full h-full absolute inset-0 text-muted-foreground/40"
+                          className="w-full h-full absolute inset-0 text-muted-foreground"
                           viewBox="0 0 100 100"
                           preserveAspectRatio="none"
                         >

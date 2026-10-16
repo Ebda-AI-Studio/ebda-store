@@ -479,7 +479,7 @@ export default function ReviewSection({ storeId, productId }: Props) {
                       {ownerResponseText}
                     </p>
                     {review.ownerResponseAt && (
-                      <p className="mt-1 text-xs text-muted-foreground/70">
+                      <p className="mt-1 text-xs text-muted-foreground">
                         {formatDate(review.ownerResponseAt)}
                       </p>
                     )}

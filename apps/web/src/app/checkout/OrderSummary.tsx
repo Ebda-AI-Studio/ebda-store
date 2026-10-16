@@ -180,7 +180,7 @@ export function OrderSummary({
                 ) : (
                   <div className="flex h-full items-center justify-center">
                     <svg
-                      className="h-6 w-6 text-muted-foreground/70"
+                      className="h-6 w-6 text-muted-foreground"
                       fill="none"
                       viewBox="0 0 24 24"
                       stroke="currentColor"

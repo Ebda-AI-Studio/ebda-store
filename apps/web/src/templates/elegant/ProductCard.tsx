@@ -345,7 +345,7 @@ function ElegantProductCard({
               )}
             </>
           ) : (
-            <div className="w-full h-full flex items-center justify-center text-muted-foreground/20">
+            <div className="w-full h-full flex items-center justify-center text-muted-foreground">
               <PlaceholderImageIcon className="w-16 h-16" strokeWidth={0.5} />
             </div>
           )}
@@ -470,7 +470,7 @@ function ElegantProductCard({
               />
             )}
             {priceVisible && (
-              <TaxInclusiveLabel className="block text-xs tracking-[0.2em] uppercase text-muted-foreground/60" />
+              <TaxInclusiveLabel className="block text-xs tracking-[0.2em] uppercase text-muted-foreground" />
             )}
             <SwatchDots product={product} max={5} className="justify-center" />
             <FactChips product={product} className="mt-1 justify-center" />

@@ -224,7 +224,7 @@ export default function SharedWishlistClient({ userId }: Props) {
         {items.length === 0 ? (
           <div className="text-center py-12 bg-background rounded-lg">
             <svg
-              className="w-16 h-16 text-muted-foreground/70 mx-auto mb-4"
+              className="w-16 h-16 text-muted-foreground mx-auto mb-4"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -259,7 +259,7 @@ export default function SharedWishlistClient({ userId }: Props) {
                         sizes="96px"
                       />
                     ) : (
-                      <div className="w-full h-full flex items-center justify-center text-muted-foreground/70">
+                      <div className="w-full h-full flex items-center justify-center text-muted-foreground">
                         <svg
                           className="w-8 h-8"
                           fill="none"
@@ -287,7 +287,7 @@ export default function SharedWishlistClient({ userId }: Props) {
                   <div className="flex items-center gap-2 mt-1">
                     <span className="font-bold">{formatPrice(item.product.price)}</span>
                     {isOnSale(item.product) && (
-                      <span className="text-muted-foreground/70 line-through text-sm">
+                      <span className="text-muted-foreground line-through text-sm">
                         {formatPrice(item.product.compareAtPrice)}
                       </span>
                     )}

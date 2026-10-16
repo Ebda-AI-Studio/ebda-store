@@ -401,7 +401,7 @@ export function FlickeringFooter() {
       {/* ------------------------------------------------------------------ */}
       <div className="relative z-10 border-t border-border/20 px-6 py-6">
         <div className="max-w-6xl mx-auto flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-          <p className="text-xs text-muted-foreground/60">
+          <p className="text-xs text-muted-foreground">
             &copy; {new Date().getFullYear()}{' '}
             {t(BRAND.company.shortNameEn, BRAND.company.shortNameAr)}.{' '}
             {t('All rights reserved.', 'جميع الحقوق محفوظة.')}
@@ -409,13 +409,13 @@ export function FlickeringFooter() {
           <div className="flex items-center gap-4">
             <Link
               href="/privacy"
-              className="text-xs text-muted-foreground/60 hover:text-white transition-colors"
+              className="text-xs text-muted-foreground hover:text-white transition-colors"
             >
               {t('Privacy', 'الخصوصية')}
             </Link>
             <Link
               href="/terms"
-              className="text-xs text-muted-foreground/60 hover:text-white transition-colors"
+              className="text-xs text-muted-foreground hover:text-white transition-colors"
             >
               {t('Terms', 'الشروط')}
             </Link>

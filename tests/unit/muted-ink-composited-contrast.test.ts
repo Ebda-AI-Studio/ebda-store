@@ -8,7 +8,8 @@
  *    at 60% still fails on 13 of the 30 look page/surface pairs (measured
  *    2026-10-16; 70% passes all 30), so `text-foreground/<70` is banned on the
  *    storefront: muted text uses `text-muted-foreground`, or an alpha >= 70,
- *    proven below on the default palette and every look.
+ *    proven below on the default palette and every look. Muted ink takes no
+ *    alpha at all (it is already at the floor); disabled controls aside.
  */
 import { describe, it, expect } from 'vitest';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
@@ -80,6 +81,27 @@ describe('K-04: foreground text never drops under 70% alpha', () => {
         .flatMap((l, i) => (LOW.test(l) ? [`${relative(ROOT, f)}:${i + 1}: ${l.trim()}`] : []))
     );
     expect(hits).toEqual([]);
+  });
+
+  // Muted ink is already near 4.5:1 on its own; any alpha on it fails (review I2:
+  // 44 sites, incl. the cookie-preferences link and the compare-at price). The
+  // one exception is a disabled control (WCAG 1.4.3 exempts inactive UI), marked
+  // by `cursor-not-allowed` in the same class list.
+  const MUTED_ALPHA = /(?:^|[\s'"`:])text-muted-foreground\/\d+/;
+  it('no storefront element puts an alpha on muted ink (disabled controls aside)', () => {
+    const hits = [...walk(WEB), ...walk(join(ROOT, 'packages/ui/src'))].flatMap(f =>
+      readFileSync(f, 'utf8')
+        .split('\n')
+        .flatMap((l, i) =>
+          MUTED_ALPHA.test(l) && !/cursor-not-allowed/.test(l)
+            ? [`${relative(ROOT, f)}:${i + 1}: ${l.trim()}`]
+            : []
+        )
+    );
+    expect(hits).toEqual([]);
+    expect(MUTED_ALPHA.test('"text-xs text-muted-foreground/70 hover:text-foreground"')).toBe(true);
+    expect(MUTED_ALPHA.test("'placeholder:text-muted-foreground/60'")).toBe(true);
+    expect(MUTED_ALPHA.test('"text-muted-foreground"')).toBe(false);
   });
 
   it('the matcher catches the old shapes (self-test)', () => {
