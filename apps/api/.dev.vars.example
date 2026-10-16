@@ -33,6 +33,9 @@ DEV_STATS=1
 # SEARCH_EMBED_GLOBAL_DAILY_CAP=20000
 # SEARCH_EMBED_THROTTLE_MS=200
 # SEARCH_VECTOR_MAX_DISTANCE=0.55
+# Storefront query embeds per Cairo day (all stores / per store); 0 stops them (Ruling SEARCH-T12-3).
+# SEARCH_QUERY_EMBED_GLOBAL_DAILY_CAP=10000
+# SEARCH_QUERY_EMBED_STORE_DAILY_CAP=1000
 # REST fallback for Node dev only, never on the Worker; set both or neither:
 # CF_AI_ACCOUNT_ID=
 # CF_AI_API_TOKEN=
