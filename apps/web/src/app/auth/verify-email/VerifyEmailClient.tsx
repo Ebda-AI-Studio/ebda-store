@@ -150,7 +150,7 @@ export default function VerifyEmailClient() {
                 <div className="mt-8">
                   <Link
                     href={storeUrl('/auth/login')}
-                    className="inline-flex w-full items-center justify-center rounded-lg bg-primary px-6 py-3 font-medium text-white hover:bg-primary/90 transition"
+                    className="inline-flex w-full items-center justify-center rounded-lg bg-primary px-6 py-3 font-medium text-primary-foreground hover:bg-primary/90 transition"
                   >
                     {t(
                       'Go to Login',
@@ -199,7 +199,7 @@ export default function VerifyEmailClient() {
                   <button
                     type="button"
                     onClick={() => verify()}
-                    className="inline-flex w-full items-center justify-center rounded-lg bg-primary px-6 py-3 font-medium text-white hover:bg-primary/90 transition"
+                    className="inline-flex w-full items-center justify-center rounded-lg bg-primary px-6 py-3 font-medium text-primary-foreground hover:bg-primary/90 transition"
                   >
                     {t('Try again', 'حاول مرة أخرى')}
                   </button>
@@ -243,7 +243,7 @@ export default function VerifyEmailClient() {
                 <div className="mt-8 flex flex-col gap-3">
                   <Link
                     href={storeUrl('/auth/login')}
-                    className="inline-flex w-full items-center justify-center rounded-lg bg-primary px-6 py-3 font-medium text-white hover:bg-primary/90 transition"
+                    className="inline-flex w-full items-center justify-center rounded-lg bg-primary px-6 py-3 font-medium text-primary-foreground hover:bg-primary/90 transition"
                   >
                     {t(
                       'Go to Login',

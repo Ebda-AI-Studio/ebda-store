@@ -257,7 +257,7 @@ export default function OrdersClient() {
                 ) : null}
                 <Link
                   href={storeUrl(`/account/orders/${order.id}`)}
-                  className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary/90"
+                  className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
                 >
                   {t(
                     'View Details',
@@ -297,7 +297,7 @@ export default function OrdersClient() {
           </p>
           <Link
             href={storeUrl('/products')}
-            className="mt-6 inline-flex items-center rounded-lg bg-primary px-6 py-3 font-medium text-white hover:bg-primary/90"
+            className="mt-6 inline-flex items-center rounded-lg bg-primary px-6 py-3 font-medium text-primary-foreground hover:bg-primary/90"
           >
             {t('Start Shopping', '\u0627\u0628\u062f\u0623 \u0627\u0644\u062a\u0633\u0648\u0642')}
           </Link>

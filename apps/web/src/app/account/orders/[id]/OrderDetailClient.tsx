@@ -1023,7 +1023,7 @@ export default function OrderDetailClient() {
                 );
               }
             }}
-            className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary/90 transition-colors cursor-pointer"
+            className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors cursor-pointer"
           >
             <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path
@@ -1182,7 +1182,7 @@ export default function OrderDetailClient() {
 
         <button
           onClick={() => setShowTrackingModal(false)}
-          className="mt-4 w-full rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary/90 transition-colors"
+          className="mt-4 w-full rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
         >
           {t('Close', '\u0625\u063a\u0644\u0627\u0642')}
         </button>

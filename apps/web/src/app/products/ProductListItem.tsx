@@ -272,7 +272,7 @@ export function ProductListItem({
               }
               className={`flex h-10 w-10 items-center justify-center rounded-xl border transition-colors ${
                 isInCompare
-                  ? 'border-primary bg-primary text-white'
+                  ? 'border-primary bg-primary text-primary-foreground'
                   : 'border-border bg-background text-muted-foreground hover:border-primary hover:text-primary'
               }`}
               onClick={e => onToggleCompare(product, e)}
@@ -299,7 +299,7 @@ export function ProductListItem({
             {viewOnly || hasVariants ? (
               <span
                 className={cn(
-                  'flex h-10 items-center gap-2 rounded-xl bg-primary px-4 text-sm font-medium text-white pointer-events-none',
+                  'flex h-10 items-center gap-2 rounded-xl bg-primary px-4 text-sm font-medium text-primary-foreground pointer-events-none',
                   ctaExtraCls
                 )}
                 style={{
@@ -327,7 +327,7 @@ export function ProductListItem({
             ) : (
               <button
                 className={cn(
-                  'flex h-10 items-center gap-2 rounded-xl bg-primary px-4 text-sm font-medium text-white transition-colors hover:bg-primary/90',
+                  'flex h-10 items-center gap-2 rounded-xl bg-primary px-4 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90',
                   ctaExtraCls
                 )}
                 onClick={e => onAddToCart(product, e)}

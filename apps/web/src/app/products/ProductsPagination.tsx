@@ -36,7 +36,9 @@ export function ProductsPagination({ meta, page, onPageChange }: ProductsPaginat
               <button
                 onClick={() => onPageChange(p)}
                 className={`flex h-11 w-11 items-center justify-center rounded-lg text-sm font-medium transition-colors ${
-                  page === p ? 'bg-primary text-white' : 'border border-border hover:bg-muted'
+                  page === p
+                    ? 'bg-primary text-primary-foreground'
+                    : 'border border-border hover:bg-muted'
                 }`}
               >
                 {localize(p)}

@@ -1884,7 +1884,9 @@ export default function CheckoutClient() {
               >
                 <div
                   className={`flex h-8 w-8 items-center justify-center rounded-full transition-colors ${
-                    step >= 1 ? 'bg-primary text-white' : 'bg-muted text-muted-foreground'
+                    step >= 1
+                      ? 'bg-primary text-primary-foreground'
+                      : 'bg-muted text-muted-foreground'
                   } ${step > 1 ? 'group-hover:bg-primary/80' : ''}`}
                 >
                   {step > 1 ? (
@@ -1913,7 +1915,9 @@ export default function CheckoutClient() {
               <div className="flex items-center">
                 <div
                   className={`flex h-8 w-8 items-center justify-center rounded-full ${
-                    step >= 2 ? 'bg-primary text-white' : 'bg-muted text-muted-foreground'
+                    step >= 2
+                      ? 'bg-primary text-primary-foreground'
+                      : 'bg-muted text-muted-foreground'
                   }`}
                 >
                   2

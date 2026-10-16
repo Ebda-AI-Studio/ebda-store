@@ -236,7 +236,7 @@ function SearchContent() {
               />
               <button
                 type="submit"
-                className="px-6 py-3 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors font-medium"
+                className="px-6 py-3 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors font-medium"
               >
                 {t('Search', translations['Search'])}
               </button>
@@ -285,7 +285,9 @@ function SearchContent() {
                 </svg>
                 {t('Filters', 'الفلاتر')}
                 {categoryFilter && (
-                  <span className="rounded-full bg-primary px-2 py-0.5 text-xs text-white">1</span>
+                  <span className="rounded-full bg-primary px-2 py-0.5 text-xs text-primary-foreground">
+                    1
+                  </span>
                 )}
               </span>
               <svg

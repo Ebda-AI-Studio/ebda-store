@@ -99,7 +99,7 @@ export function CookieConsentBanner() {
             <button
               type="button"
               onClick={() => setConsent({ marketing: true })}
-              className="inline-flex items-center justify-center min-h-11 rounded-lg bg-primary px-5 py-2 text-sm font-medium text-white hover:bg-primary/90 transition-colors"
+              className="inline-flex items-center justify-center min-h-11 rounded-lg bg-primary px-5 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
             >
               {t('Accept all', 'قبول الكل')}
             </button>

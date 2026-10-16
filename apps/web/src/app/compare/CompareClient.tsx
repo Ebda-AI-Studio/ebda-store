@@ -124,7 +124,7 @@ export default function CompareClient() {
             </p>
             <Link
               href={storeUrl('/products')}
-              className="inline-flex items-center px-6 py-3 bg-primary text-white rounded-lg hover:bg-primary/90"
+              className="inline-flex items-center px-6 py-3 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90"
             >
               {t(
                 'Browse Products',
@@ -296,7 +296,7 @@ export default function CompareClient() {
                     <button
                       type="button"
                       onClick={() => handleAddToCart(product)}
-                      className="w-full px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90"
+                      className="w-full px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90"
                     >
                       {t(
                         'Add to Cart',

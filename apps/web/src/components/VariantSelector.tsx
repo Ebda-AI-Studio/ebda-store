@@ -329,7 +329,7 @@ export function VariantSelector({
                             'relative min-w-[2.75rem] rounded-lg border px-3 py-2 text-sm font-medium transition-all',
                             thumbnail || dotColor ? 'inline-flex items-center gap-2' : '',
                             isSelected
-                              ? 'border-primary bg-primary text-white shadow-md shadow-primary/25'
+                              ? 'border-primary bg-primary text-primary-foreground'
                               : available
                                 ? 'border-border bg-background text-foreground hover:border-primary/50 hover:bg-muted'
                                 : 'cursor-not-allowed border-border bg-muted text-muted-foreground line-through opacity-50',

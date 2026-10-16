@@ -743,7 +743,7 @@ export default function ReturnsClient() {
                 },
               ].map(({ step, title, desc }) => (
                 <div key={step} className="flex gap-4">
-                  <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-primary text-sm font-bold text-white">
+                  <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-primary text-sm font-bold text-primary-foreground">
                     {step}
                   </div>
                   <div>

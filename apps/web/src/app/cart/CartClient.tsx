@@ -499,7 +499,7 @@ export default function CartClient() {
                   )}
                 </p>
                 <Link href={storeUrl('/products')}>
-                  <Button className="mt-8 gap-2 rounded-xl shadow-lg shadow-primary/25" size="lg">
+                  <Button className="mt-8 gap-2 rounded-xl" size="lg">
                     <CartIcon className="h-5 w-5" />
                     {t(
                       'Start Shopping',
@@ -1118,7 +1118,7 @@ export default function CartClient() {
                             <Button
                               type="button"
                               disabled
-                              className="mt-6 w-full gap-2 rounded-xl shadow-lg shadow-primary/25"
+                              className="mt-6 w-full gap-2 rounded-xl"
                               size="lg"
                             >
                               {t(
@@ -1128,10 +1128,7 @@ export default function CartClient() {
                             </Button>
                           ) : (
                             <Link href={storeUrl('/checkout')} className="mt-6 block">
-                              <Button
-                                className="w-full gap-2 rounded-xl shadow-lg shadow-primary/25"
-                                size="lg"
-                              >
+                              <Button className="w-full gap-2 rounded-xl" size="lg">
                                 {t(
                                   'Proceed to Checkout',
                                   '\u0627\u0644\u0645\u062a\u0627\u0628\u0639\u0629 \u0644\u0644\u062f\u0641\u0639'

@@ -49,7 +49,7 @@ export function LanguageSwitcher({ variant = 'default', className = '' }: Langua
         onClick={() => setLanguage('en')}
         className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
           language === 'en'
-            ? 'bg-primary text-white shadow-sm'
+            ? 'bg-primary text-primary-foreground shadow-sm'
             : 'text-muted-foreground hover:text-foreground'
         }`}
       >
@@ -62,7 +62,7 @@ export function LanguageSwitcher({ variant = 'default', className = '' }: Langua
         onClick={() => setLanguage('ar')}
         className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
           language === 'ar'
-            ? 'bg-primary text-white shadow-sm'
+            ? 'bg-primary text-primary-foreground shadow-sm'
             : 'text-muted-foreground hover:text-foreground'
         }`}
       >

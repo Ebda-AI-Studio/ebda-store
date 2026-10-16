@@ -349,12 +349,12 @@
   }
 
   .product-badge-bestseller {
-    @apply bg-primary text-white;
+    @apply bg-primary text-primary-foreground;
   }
 
   /* Add to Cart Button */
   .add-to-cart-btn {
-    @apply inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-6 py-3 text-sm font-semibold text-white shadow-lg transition-all duration-200;
+    @apply inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-6 py-3 text-sm font-semibold text-primary-foreground shadow-lg transition-all duration-200;
     box-shadow: 0 4px 14px 0 hsl(var(--primary) / 0.35);
   }
 
@@ -457,7 +457,7 @@
   }
 
   .checkout-step-active .checkout-step-number {
-    @apply bg-primary text-white;
+    @apply bg-primary text-primary-foreground;
   }
 
   .checkout-step-completed .checkout-step-number {
@@ -584,7 +584,7 @@
   }
 
   .size-option.selected {
-    @apply border-primary bg-primary text-white;
+    @apply border-primary bg-primary text-primary-foreground;
   }
 
   .size-option.out-of-stock {

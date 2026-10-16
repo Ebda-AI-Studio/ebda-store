@@ -234,7 +234,7 @@ export default function WishlistClient() {
             </p>
             <Link
               href={storeUrl('/auth/login?redirect=/wishlist')}
-              className="inline-flex items-center px-6 py-3 bg-primary text-white rounded-lg hover:bg-primary/90"
+              className="inline-flex items-center px-6 py-3 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90"
             >
               {t('Sign In', translations['Sign In'])}
             </Link>
@@ -274,7 +274,7 @@ export default function WishlistClient() {
             disabled={isTogglingVisibility}
             className={`flex items-center gap-2 px-4 py-2 rounded-lg border text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
               isPublic
-                ? 'bg-primary text-white border-primary hover:bg-primary/90'
+                ? 'bg-primary text-primary-foreground border-primary hover:bg-primary/90'
                 : 'bg-background text-foreground border-border hover:bg-muted'
             }`}
           >
@@ -473,7 +473,7 @@ export default function WishlistClient() {
             </p>
             <Link
               href={storeUrl('/products')}
-              className="inline-flex items-center px-6 py-3 bg-primary text-white rounded-lg hover:bg-primary/90"
+              className="inline-flex items-center px-6 py-3 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90"
             >
               {t(
                 'Browse Products',

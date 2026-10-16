@@ -321,7 +321,7 @@ export default function SharedWishlistClient({ userId }: Props) {
                     <button
                       onClick={() => addToCart(item.product.id)}
                       disabled={!isOrderable(item.product)}
-                      className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       {t('Add to Cart', 'أضف إلى السلة')}
                     </button>
