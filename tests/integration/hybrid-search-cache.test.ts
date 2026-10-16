@@ -243,15 +243,49 @@ describe.skipIf(!hasDb)('/public/products cache keys and caching (Ruling SEARCH-
     expect(idsOf(real)).toEqual(s.ids);
   });
 
-  it('repeated or array params are their own request and never collide with the plain one', async () => {
+  it('listing params are scalars: arrays and objects are a 400, never a Prisma operator or a 500', async () => {
     const s = await seedStore('arr', [{ name: 'Canvas shoes' }, { name: 'Wool hat' }]);
-    // An array-valued search is no search: the whole list.
-    const repeated = await get(s.storeId, 'search=shoes&search=shoes');
-    expect(new Set(idsOf(repeated))).toEqual(new Set(s.ids));
-    const bracket = await get(s.storeId, 'search[]=shoes');
-    expect(new Set(idsOf(bracket))).toEqual(new Set(s.ids));
+    // An INACTIVE category: `category[startsWith]=…` used to reach Prisma as `slug: { startsWith }`
+    // and list its products (a slug oracle); `category=a&category=b` used to 500.
+    const hidden = await prisma.category.create({
+      data: {
+        storeId: s.storeId,
+        name: 'Hidden',
+        slug: `secret-${uid()}`,
+        isActive: false,
+      } as never,
+    });
+    await prisma.productCategory.create({ data: { productId: s.ids[0], categoryId: hidden.id } });
+    for (const qs of [
+      'category[startsWith]=secret',
+      'category=a&category=b',
+      'search=shoes&search=shoes',
+      'search[]=shoes',
+      'search[contains]=shoes',
+      'sort[]=price_asc',
+      'page[]=2',
+      'ids[]=x',
+      'cursor[gt]=a',
+      'minPrice[]=1',
+      'opt_Size[]=S',
+      'opt_Size[equals]=S',
+    ]) {
+      const res = await get(s.storeId, qs);
+      expect(res.status, qs).toBe(400);
+      expect(res.body.error.code, qs).toBe('VALIDATION_ERROR');
+    }
     const plain = await get(s.storeId, 'search=shoes');
     expect(idsOf(plain)).toEqual([s.ids[0]]);
+  });
+
+  it('typeahead: an array or object q is a 400 too', async () => {
+    const s = await seedStore('sugarr', [{ name: 'Canvas shoes' }]);
+    for (const qs of ['q=shoes&q=shoes', 'q[]=shoes', 'q[contains]=sh']) {
+      const res = await request(app)
+        .get(`/api/v1/public/${s.storeId}/search/suggest?${qs}`)
+        .set('x-store-id', s.storeId);
+      expect(res.status, qs).toBe(400);
+    }
   });
 
   it('flipping semantic search on never serves the list cached while it was off', async () => {

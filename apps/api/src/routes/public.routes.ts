@@ -43,7 +43,11 @@ import {
   CONTACT_HONEYPOT_FIELD,
   normalizeArabicSearch,
 } from '@ebda/shared';
-import { parseOptionalBooleanQuery } from '../lib/query-params';
+import {
+  assertScalarQuery,
+  parseOptionalBooleanQuery,
+  PUBLIC_PRODUCT_LIST_QUERY_KEYS,
+} from '../lib/query-params';
 import { setEdgeCache } from '../lib/edge-cache';
 import { buildProductFeed } from '../lib/product-feed';
 import {
@@ -202,6 +206,8 @@ router.get('/products', async (req: Request, res: Response, next: NextFunction) 
   try {
     const { page, limit, category, search, featured, sort, minPrice, maxPrice, cursor, ids } =
       req.query;
+    // Scalars only (M1): an array or `?x[op]=…` object is a 400, never a Prisma operator or a 500.
+    assertScalarQuery(req.query, PUBLIC_PRODUCT_LIST_QUERY_KEYS, ['opt_']);
     const storeId = await getStoreIdFromRequest(req);
     // Tri-state: absent -> undefined (no filter). `featured === 'true'` used
     // to turn an absent param into `featured: false`, which listPublic applied
@@ -1267,6 +1273,7 @@ router.get('/:storeId/search/suggest', async (req: Request, res: Response, next:
       return;
     }
 
+    assertScalarQuery(req.query, ['q']);
     const q = typeof req.query.q === 'string' ? req.query.q : '';
     // Length-cap alongside the >= 2 floor (same class as /products' search:
     // the term is part of the cache key, so an unbounded term is unbounded
