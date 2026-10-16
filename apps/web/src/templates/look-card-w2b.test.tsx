@@ -656,3 +656,23 @@ describe('the card name link is a 44px pointer target (P2-N4)', () => {
     expect(name.className).toMatch(/\bmin-h-11\b/);
   });
 });
+
+// Taste re-audit P2-8: on Atelier at 1280 the carousel showed 5 cards ending at ~1175px, a ragged
+// edge under a 4-column grid. On a look store the carousel card is one grid column wide from lg
+// (25% less the row gap's share), so both rows share column edges.
+describe('look carousel columns match the grid (P2-8)', () => {
+  it.each([
+    [undefined, 'lg:w-[calc(25%-12px)]'],
+    ['tight', 'lg:w-[calc(25%-9px)]'],
+    ['loose', 'lg:w-[calc(25%-18px)]'],
+  ])('cardGap %s', (cardGap, cls) => {
+    selectLook('qamar.atelier');
+    const c = render(
+      React.createElement(
+        ProductCarousel as never,
+        { products: [product('plain')], isRtl: true, pack: state.template, cardGap } as never
+      )
+    ).container;
+    expect(c.querySelector('li')!.className).toContain(cls);
+  });
+});

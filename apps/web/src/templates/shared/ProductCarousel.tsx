@@ -16,6 +16,7 @@ import {
   cardFrameWidthClass,
   cardShapeClasses,
   gridGapClass,
+  lookCarouselLgWidth,
   productSizeClass,
   cardImageAspectClass,
   lookImageAspectClass,
@@ -398,7 +399,7 @@ function SharedProductCarousel({
                 return (
                   <li
                     key={product.id}
-                    className="snap-start shrink-0 w-[44vw] sm:w-[28vw] md:w-[22vw] lg:w-[19vw] xl:w-[17vw]"
+                    className={`snap-start shrink-0 w-[44vw] sm:w-[28vw] md:w-[22vw] ${lookCarouselLgWidth(cardGap)}`}
                   >
                     <PecannbeeProductCard
                       product={product}
