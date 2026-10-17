@@ -611,7 +611,9 @@ router.get(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId } = req.params;
-      const q = (req.query.q as string | undefined)?.trim();
+      // Bounded like the storefront suggest route: an unbounded ILIKE pattern would reach the
+      // SECURITY DEFINER lookup (review M-4).
+      const q = typeof req.query.q === 'string' ? req.query.q.trim().slice(0, 100) : undefined;
       if (!q || q.length < 2) {
         res.json({ success: true, data: { customers: [] } });
         return;

@@ -40,4 +40,11 @@ describe('order / customer search routes enforce orders:read', () => {
     );
     expect(list).toContain("hasPermission(role as Role, 'orders:read')");
   });
+
+  it('customers/search caps the term length before it reaches the definer (review M-4)', () => {
+    const src = read('apps/api/src/routes/customers.routes.ts');
+    const at = src.indexOf("'/customers/search'");
+    const handler = src.slice(at, src.indexOf('searchOrderCustomers(', at));
+    expect(handler).toMatch(/\.slice\(0,\s*100\)/);
+  });
 });
