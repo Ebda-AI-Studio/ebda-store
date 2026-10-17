@@ -227,23 +227,22 @@ const GUEST_CONTACT_FIELDS = ['firstName', 'lastName', 'email', 'phone'] as cons
  * The OR arms of the order-list search: order number, or the registered
  * customer's first name / last name / email / phone (issue 2405).
  *
- * WHY two steps. The obvious shape — `customer: { is: { firstName: contains } }`
- * per field — is compiled by Prisma into four LEFT JOINs onto `users` with an
- * OR spanning both tables. No index can serve an OR whose arms live on
- * different sides of a join, so every keystroke walked the store's whole
- * order history (measured: 150-270 ms per query at 50k orders, twice per
- * search because the list also counts). Resolving the matching customers
- * first turns every arm into a predicate on `orders` itself —
- * `order_number ILIKE` (trigram GIN) OR `customer_id IN (...)` (btree) —
- * which Postgres answers with a BitmapOr (measured: under 1 ms). The customer
- * lookup is itself a BitmapOr over the four `users` trigram indexes. Both
- * sets of indexes: migration 20261002090000_order_search_trgm_and_fk_indexes.
+ * WHY lookups first. The obvious shape — `customer: { is: { firstName: contains } }` per
+ * field — is compiled by Prisma into four LEFT JOINs onto `users` with an OR spanning both
+ * tables, which no index can serve (measured: 150-270 ms per query at 50k orders). Resolving the
+ * matching ids first turns every arm into a predicate on `orders` itself: `id IN (...)` for the
+ * order number and the guests, `customer_id IN (...)` (btree) for registered customers.
  *
- * Same rows as the relation filter, by construction: an order matches iff its
- * number matches or its customer matches on one of the four fields. The
- * customer lookup is restricted to users with an order in THIS store (a
- * semi-join, bounded by the store's own customers), not by `users.store_id` —
- * a registered customer's `store_id` is not necessarily the order's store.
+ * The lookups run in the store-scoped SECURITY DEFINER `ebda_order_search_ids` (Ruling
+ * SEARCH-T14-5/-7), because as `ebda_app` the RLS barrier forbids every ILIKE trigram index when
+ * the predicate is written inline. It takes the store only from the session scope and returns ids
+ * only; this function then re-reads orders through RLS.
+ *
+ * Which customers match: users WITH AN ORDER in this store (soft-deleted orders do not count)
+ * whom the `users` RLS policy would show a store scope — registered on THIS store (`users.store_id`),
+ * the caller, the store's owner/staff, or a super admin. A customer with `users.store_id` NULL or
+ * registered on another store is NOT matched, exactly as the relation join already behaved under
+ * `ebda_app` (the old comment here claimed the opposite; that was true only for an owner role).
  *
  * GUEST orders (`customer_id IS NULL`, contact only in the `shipping_address`
  * JSON) are matched by the same term on first name, last name, email and phone
@@ -252,7 +251,7 @@ const GUEST_CONTACT_FIELDS = ['firstName', 'lastName', 'email', 'phone'] as cons
  *
  * Falls back to the relation filter when the term is shorter than a trigram
  * (3 chars — the indexes cannot serve it, so the lookup would only add a
- * scan). A term matching more than `ORDER_SEARCH_CUSTOMER_ID_CAP` customers
+ * scan), and for a customer searching their own orders (`indexed: false`). A term matching more than `ORDER_SEARCH_CUSTOMER_ID_CAP` customers
  * or guest orders degrades ONLY that half to its relation/JSON arm; the other
  * half keeps its indexed `IN (...)` arm (issue 2444).
  */
@@ -288,12 +287,7 @@ export async function orderSearchWhere(
   // The relation fallback is ANDed with their customerId by the caller.
   if (search.length < 3 || opts.indexed === false) return relationFallback;
 
-  // The three lookups run in the store-scoped SECURITY DEFINER `ebda_order_search_ids` (Ruling
-  // SEARCH-T14-5): as `ebda_app` the RLS barrier forbids every ILIKE trigram index, so the same
-  // predicates written inline scanned the whole store. Customers are still read THROUGH this
-  // store's orders (the function requires an order here), which is the exact relation-join
-  // semantics: a customer with users.store_id NULL, or registered on another store, matches when
-  // they ordered here.
+  // Three store-scoped id lookups (see the docblock): order number, customers, guest orders.
   const [numberIds, customerIds, guestOrderIds] = await Promise.all([
     orderSearchIds(storeId, 'order_number', search),
     orderSearchIds(storeId, 'customers', search),
