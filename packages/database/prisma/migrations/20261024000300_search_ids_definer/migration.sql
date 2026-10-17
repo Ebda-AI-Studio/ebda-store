@@ -41,6 +41,9 @@ AS $fn$
 DECLARE
   doc text;
   v_scope text;
+  arm text;
+  b text;
+  v_bounds text[] := ARRAY['', '% ', '%/', '%(', '%-', '%,', '%.', 'ا', '% ا', 'ال', '% ال'];
   arms text := '';
   n int := coalesce(array_length(p_patterns, 1), 0);
   i int;
@@ -70,17 +73,24 @@ BEGIN
   END IF;
   -- p_word_start (Ruling SEARCH-T14-3): a query made only of words under 3 characters cannot use a
   -- trigram index as a substring, so the caller sends PREFIX patterns ('ab%') and the word must
-  -- START a word of the document: `doc LIKE 'ab%' OR doc LIKE '% ab%'`. Both arms are
-  -- trigram-indexable (the blank before the word is part of the pg_trgm word boundary), so a
-  -- 20,000-product store answers in milliseconds instead of normalising every row. The SKU arm
-  -- becomes a SKU prefix.
+  -- START a word of the document. "Starts a word" means, in the normalised document: at the start,
+  -- after a space, after one of the punctuation marks that join sizes and lists (S/XL, (XL), a-b,
+  -- a,b, a.b), or after the Arabic definite article / a one-letter prefix (a short word such as the
+  -- two letters of "rice" must find the article form and the alef-hamza form, which folds to a
+  -- plain alef). Each boundary is one LIKE arm; pg_trgm treats punctuation and spaces alike, so
+  -- every arm extracts the same word-start trigrams and the same GIN index serves all of them
+  -- (BitmapOr). Review I-1. Other prefixes and other punctuation are a residual, see the ruling.
   FOR i IN 1..n LOOP
     IF coalesce(p_word_start, false) THEN
-      arms := arms || format(' AND (%s LIKE $1[%s] OR %s LIKE (''%% '' || $1[%s])', doc, i, doc, i);
+      arm := '';
+      FOREACH b IN ARRAY v_bounds LOOP
+        arm := arm || CASE WHEN arm = '' THEN '' ELSE ' OR ' END
+                   || format('%s LIKE (%L || $1[%s])', doc, b, i);
+      END LOOP;
       IF coalesce(p_with_sku, false) THEN
-        arms := arms || format(' OR public.ebda_ar_norm(coalesce(p.sku, '''')) LIKE $1[%s]', i);
+        arm := arm || format(' OR public.ebda_ar_norm(coalesce(p.sku, '''')) LIKE $1[%s]', i);
       END IF;
-      arms := arms || ')';
+      arms := arms || ' AND (' || arm || ')';
     ELSIF coalesce(p_with_sku, false) THEN
       arms := arms || format(
         ' AND (%s LIKE $1[%s] OR public.ebda_ar_norm(coalesce(p.sku, '''')) LIKE $1[%s])', doc, i, i);

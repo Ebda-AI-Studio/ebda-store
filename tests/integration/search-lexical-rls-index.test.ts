@@ -54,7 +54,9 @@ describe.skipIf(!hasDb)(
       INSERT INTO public.products
         (id, store_id, name, name_ar, sku, description, slug, price, status, updated_at)
       SELECT ${tag} || '-' || g, ${storeId},
-             CASE g % 500 WHEN 0 THEN 'qz' || g || ' ' WHEN 250 THEN 'xqz' || g || ' ' ELSE '' END || md5('n' || g), md5('a' || g), md5('s' || g),
+             CASE g % 500 WHEN 0 THEN 'qz' || g || ' ' WHEN 250 THEN 'xqz' || g || ' '
+               WHEN 100 THEN 'أرز' || g || ' ' WHEN 200 THEN 'الرز' || g || ' ' WHEN 150 THEN 'مرز' || g || ' '
+               WHEN 300 THEN 'S/XL' || g || ' ' WHEN 400 THEN '(XL) ' || g || ' ' ELSE '' END || md5('n' || g), md5('a' || g), md5('s' || g),
              repeat('quality cotton item ', 17), ${tag} || '-' || g, 1000, 'active', now()
       FROM generate_series(1, ${ROWS}::int) g`;
       await prisma.$executeRaw`ANALYZE public.products`;
@@ -109,7 +111,8 @@ describe.skipIf(!hasDb)(
     // SEARCH-T14-3 (coordinator ruling): a query made ONLY of words under 3 characters cannot use a
     // trigram index as a substring, so it matches at the START of a word instead, which the same
     // index serves (`doc LIKE 'ab%' OR doc LIKE '% ab%'`). Oracle: a plain regex over the same
-    // normalised document, computed independently of the SQL under test.
+    // normalised document, computed independently of the SQL under test. A word starts after the
+    // start, any non-alphanumeric, and optionally the Arabic prefixes ا / ال (review I-1).
     const startsWord = async (docFn: 'search' | 'name', prefix: string): Promise<string[]> => {
       const expr =
         docFn === 'search'
@@ -117,7 +120,7 @@ describe.skipIf(!hasDb)(
           : 'public.ebda_product_name_doc(name, name_ar, search_terms)';
       const rows = await prisma.$queryRawUnsafe<Array<{ id: string }>>(
         `SELECT id FROM public.products WHERE store_id = $1 AND status = 'active'
-         AND deleted_at IS NULL AND ${expr} ~ ('(^| )' || $2)`,
+         AND deleted_at IS NULL AND ${expr} ~ ('(^|[^[:alnum:]])(ال|ا)?' || $2)`,
         storeId,
         prefix
       );
@@ -144,6 +147,31 @@ describe.skipIf(!hasDb)(
       await expectScansAbove('products_search_doc_trgm_idx', before);
       // measured before the change: ~700 ms for a short word at 20k (a store scan)
       expect(Math.min(...runs.map(r => r.ms))).toBeLessThan(250);
+    }, 60_000);
+
+    it('I-1: an Arabic noun with the article or a hamza-alef prefix is found by its bare two letters', async () => {
+      const want = await startsWord('search', 'رز');
+      const ids = (n: number) => `${tag}-${n}`;
+      // أرز (folds to ارز) and الرز are word starts; مرز has the letters MID-word and must not match.
+      for (const g of [100, 200, 600, 700]) expect(want).toContain(ids(g));
+      expect(want).not.toContain(ids(150));
+      const before = await idxScans('products_search_doc_trgm_idx');
+      const got = await run('رز', { scope: 'storefront' });
+      expect([...got].sort()).toEqual(want);
+      await expectScansAbove('products_search_doc_trgm_idx', before);
+      // and the article itself, typed as a typeahead keystroke pair
+      const qat = await run('ال', { scope: 'storefront', field: 'name', limit: 25 });
+      expect(qat.length).toBeGreaterThan(0);
+    }, 60_000);
+
+    it('I-1: a size next to punctuation (S/XL, (XL)) is found by xl', async () => {
+      const want = await startsWord('search', 'xl');
+      const ids = (n: number) => `${tag}-${n}`;
+      for (const g of [300, 400, 800, 900]) expect(want).toContain(ids(g));
+      const before = await idxScans('products_search_doc_trgm_idx');
+      const got = await run('xl', { scope: 'storefront' });
+      expect([...got].sort()).toEqual(want);
+      await expectScansAbove('products_search_doc_trgm_idx', before);
     }, 60_000);
 
     it('typeahead accepts ONE character and returns only word-start matches, index-backed', async () => {

@@ -73,7 +73,7 @@ BEGIN
                OR u.id = nullif(current_setting(''app.current_user_id'', true), '''')
                OR EXISTS (SELECT 1 FROM public.stores s WHERE s.owner_id = u.id AND s.id = $1)
                OR EXISTS (SELECT 1 FROM public.store_staff ss WHERE ss.user_id = u.id AND ss.store_id = $1)
-               OR public.ebda_is_super_admin())
+               OR (SELECT public.ebda_is_super_admin()))
         LIMIT $3' USING v_scope, p_pattern, p_limit;
   END IF;
 END
