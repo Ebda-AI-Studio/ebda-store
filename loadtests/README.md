@@ -174,13 +174,13 @@ above.
 typeahead p95 < 300 ms, errors < 1%. It reports two extra rates read from the response meta:
 `search_ranked` (hybrid order) and `search_degraded` (the vector leg was wanted but unavailable).
 
-**Never against production**: a search writes the search log, a hybrid search spends the Workers AI
-query-embed budget, and the script refuses `api.ebda.app` / `ebda.app`. Use local dev or a
-staging/preview Worker with its own store.
+**Never against production**: a search writes the search log and a hybrid search spends the Workers AI
+query-embed budget. The script uses a host ALLOWLIST: `localhost`, or the exact hosts named in
+`LOADTEST_ALLOWED_HOSTS`; `ebda.app`, every `*.ebda.app` and the production Worker are refused even if listed.
 
 ```bash
 # staging / preview (read-only GETs; add the token only if the host sets LOAD_TEST_BYPASS_TOKEN):
-BASE_URL=https://<preview-host>/api/v1 STORE_ID=<uuid> RATE=5 DURATION=2m \
+LOADTEST_ALLOWED_HOSTS=<preview-host> BASE_URL=https://<preview-host>/api/v1 STORE_ID=<uuid> RATE=5 DURATION=2m \
   LOAD_TEST_TOKEN=<token> k6 run loadtests/scenarios/storefront-search.js
 ```
 

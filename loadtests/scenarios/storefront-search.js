@@ -1,5 +1,5 @@
 // Storefront search under load: 70% full search (hybrid path), 30% typeahead (lexical).
-// Run against LOCAL dev or a staging/preview Worker only — never production (a search writes the
+// Run against LOCAL dev or a staging/preview Worker only (host allowlist, see lib/allowed-host.js) — never production (a search writes the
 // search log, and a hybrid search spends the Workers AI query-embed budget).
 //   BASE_URL=http://localhost:4000/api/v1 STORE_ID=<uuid> k6 run loadtests/scenarios/storefront-search.js
 //
@@ -10,12 +10,15 @@
 //                                getCached so the DB path is what gets measured. UNIQUE=false
 //                                repeats the 20 terms (warm cache).
 //   QUERIES_FILE=/abs/queries.json   JSON array of terms (e.g. the eval set) instead of TERMS
+//   LOADTEST_ALLOWED_HOSTS=h1,h2  exact non-local hosts this run may hit (a preview Worker); production
+//                                hosts are refused even when listed
 //   LOAD_TEST_TOKEN=...          sent as x-load-test-token (lifts the 300/min public limiter when
 //                                the host has LOAD_TEST_BYPASS_TOKEN). Not the per-searcher embed
 //                                limit, which stays on by design (see loadtests/README.md).
 import http from 'k6/http';
 import { check } from 'k6';
 import { Rate } from 'k6/metrics';
+import { assertAllowedHost } from './lib/allowed-host.js';
 
 const TERMS = [
   'احذيه',
@@ -44,8 +47,7 @@ const terms = __ENV.QUERIES_FILE ? JSON.parse(open(__ENV.QUERIES_FILE)) : TERMS;
 const base = __ENV.BASE_URL;
 const store = __ENV.STORE_ID;
 if (!base || !store) throw new Error('BASE_URL and STORE_ID are required');
-if (/\/\/(api\.ebda\.app|ebda\.app)(\/|:|$)/.test(base))
-  throw new Error('refusing to run the search load test against production');
+assertAllowedHost(base, __ENV.LOADTEST_ALLOWED_HOSTS);
 
 const searchShare = Number(__ENV.SEARCH_SHARE || 0.7);
 const unique = __ENV.UNIQUE !== 'false';
