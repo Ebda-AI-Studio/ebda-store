@@ -1,9 +1,11 @@
 #!/usr/bin/env node
-// Seed the looks DEMO store (slug `storedemo`, is_demo = true): the showroom that previews every
-// built look through `?look=<id>` (apps/web/src/lib/demo-look.ts) and refuses every order.
+// Seed a looks DEMO store (is_demo = true): the showroom that previews every built look of its
+// template through `?look=<id>` (apps/web/src/lib/demo-look.ts) and refuses every order. One demo
+// store per template (Ruling B2-7): `storedemo` = Qamar (default), `storedemo-souq` = Souq
+// (`--template souq`, SOUQ_DEMO_ASSET_BASE, prod asset base https://media.ebda.app/demo/souq).
 //
 //   DATABASE_URL=<owner-role postgres url> [QAMAR_DEMO_ASSET_BASE=<url or /path>] \
-//     npx tsx scripts/storedemo/seed.mjs [--yes-production] [--local-look-stores]
+//     npx tsx scripts/storedemo/seed.mjs [--template qamar|souq] [--yes-production] [--local-look-stores]
 //
 // Prints the plan first. Refuses any non-local DATABASE_URL (anything but loopback) unless
 // `--yes-production` is passed: Ahmad approves that run, an agent never does (Ruling B1-16), and with
@@ -31,9 +33,11 @@ import {
   QAMAR_PRODUCTS,
   QAMAR_SIZE_CHARTS,
 } from '../qamar-demo/catalogue.mjs';
+import { SOUQ_CATEGORIES, SOUQ_PRODUCTS } from '../souq-demo/catalogue.mjs';
 import { buildQamarHome } from './qamar-home.mjs';
+import { buildSouqHome } from './souq-home.mjs';
 
-export { buildQamarHome };
+export { buildQamarHome, buildSouqHome };
 
 export const SLUG = 'storedemo';
 export const OWNER_EMAIL = 'storedemo-owner@ebda.app';
@@ -138,13 +142,80 @@ export const LOCAL_LOOK_STORES = [
 
 /** The only asset base a production run accepts (Ruling B1-16). */
 export const PROD_ASSET_BASE = 'https://media.ebda.app/demo/qamar';
-/** Where the demo photos are served from. Production: only PROD_ASSET_BASE. */
-export function assetBase(argv, env) {
-  const base = (env.QAMAR_DEMO_ASSET_BASE || PROD_ASSET_BASE).replace(/\/$/, '');
-  if (argv.includes('--yes-production') && base !== PROD_ASSET_BASE)
+export const SOUQ_PROD_ASSET_BASE = 'https://media.ebda.app/demo/souq';
+
+/**
+ * One entry per demo template (Ruling B2-7). Everything a template's showroom differs in is here;
+ * the catalogue writer (`seedCatalogue`) and the home publisher read ONLY this, never a slug.
+ */
+export const TEMPLATE_SPECS = {
+  qamar: {
+    template: 'qamar',
+    slug: SLUG,
+    ownerEmail: OWNER_EMAIL,
+    name: 'Ebda Demo',
+    nameAr: 'إبدا ديمو',
+    defaultLook: DEFAULT_LOOK,
+    categories: QAMAR_CATEGORIES,
+    products: QAMAR_PRODUCTS,
+    sizeCharts: QAMAR_SIZE_CHARTS,
+    occasionSlugs: QAMAR_OCCASIONS.map(o => o.slug),
+    archivePlaceholders: true,
+    assetEnv: 'QAMAR_DEMO_ASSET_BASE',
+    prodAssetBase: PROD_ASSET_BASE,
+    localLookStores: LOCAL_LOOK_STORES,
+    localStoreName: l => [`Qamar ${l.name.en}`, `قمر ${l.name.ar}`],
+    buildHome: buildQamarHome,
+    description:
+      'An illustrative Egyptian boutique: abayas, kaftans, scarves and evening dresses, cut in Heliopolis.',
+    descriptionAr: 'بوتيك مصري توضيحي: عبايات وقفاطين وطرح وفساتين سهرة، متفصلة في مصر الجديدة.',
+    deliveryDays: { min: 2, max: 4 },
+    instalments: null,
+  },
+  souq: {
+    template: 'souq',
+    slug: 'storedemo-souq',
+    ownerEmail: 'storedemo-souq-owner@ebda.app',
+    name: 'Ebda Souq Demo',
+    nameAr: 'إبدا سوق ديمو',
+    defaultLook: 'souq.catalogue',
+    categories: SOUQ_CATEGORIES,
+    products: SOUQ_PRODUCTS,
+    sizeCharts: {},
+    occasionSlugs: [],
+    archivePlaceholders: false,
+    assetEnv: 'SOUQ_DEMO_ASSET_BASE',
+    prodAssetBase: SOUQ_PROD_ASSET_BASE,
+    localLookStores: [
+      ['souq-catalogue', 'souq.catalogue'],
+      ['souq-night', 'souq.night'],
+      ['souq-showroom', 'souq.showroom'],
+    ],
+    localStoreName: l => [`Souq ${l.name.en}`, `سوق ${l.name.ar}`],
+    buildHome: buildSouqHome,
+    description:
+      'An illustrative Egyptian electronics and appliances shop: phones, laptops, audio, watches, screens and home appliances.',
+    descriptionAr:
+      'متجر مصري توضيحي للإلكترونيات والأجهزة المنزلية: موبايلات ولابتوب وصوتيات وساعات وشاشات وأجهزة.',
+    deliveryDays: { min: 2, max: 4 },
+    // Ruling B2-9: arithmetic only, 12 months, no markup, NO provider name.
+    instalments: { enabled: true, months: 12, markupPct: 0 },
+  },
+};
+/** `--template <name>` (default qamar); an unknown name is refused by the caller. */
+export function templateFromArgv(argv) {
+  const i = argv.indexOf('--template');
+  const name = i === -1 ? 'qamar' : argv[i + 1];
+  return TEMPLATE_SPECS[name] ?? null;
+}
+
+/** Where the demo photos are served from. Production: only the template's prod asset base. */
+export function assetBase(argv, env, spec = TEMPLATE_SPECS.qamar) {
+  const base = (env[spec.assetEnv] || spec.prodAssetBase).replace(/\/$/, '');
+  if (argv.includes('--yes-production') && base !== spec.prodAssetBase)
     return {
       ok: false,
-      why: `--yes-production needs the asset base ${PROD_ASSET_BASE}, got ${base}`,
+      why: `--yes-production needs the asset base ${spec.prodAssetBase}, got ${base}`,
     };
   return { ok: true, base };
 }
@@ -167,17 +238,22 @@ export const combos = options =>
   options.reduce((acc, o) => acc.flatMap(a => o.values.map(v => [...a, v])), [[]]);
 
 /** The human-readable plan, printed before anything is written. */
-export function describePlan(url) {
-  const variants = QAMAR_PRODUCTS.reduce(
+export function describePlan(url, spec = TEMPLATE_SPECS.qamar) {
+  const variants = spec.products.reduce(
     (n, p) => n + (p.options ? combos(p.options).length : 0),
     0
   );
+  const charts = Object.keys(spec.sizeCharts).length;
   return [
     `target database host: ${hostOf(url) ?? '(unparseable DATABASE_URL)'}`,
-    `store: slug "${SLUG}", is_demo = true, look ${DEFAULT_LOOK}, theme {} (owner ${OWNER_EMAIL}, no login)`,
-    `qamar: ${QAMAR_PRODUCTS.length} products, ${variants} variants, ${QAMAR_CATEGORIES.length} categories (${QAMAR_CATEGORIES.map(c => c.slug).join(', ')}), 2 size charts, 1 shipping zone`,
-    `archived: ${PLACEHOLDER_CATEGORY_SLUGS.join(', ')} (${PLACEHOLDER_SLUGS.length} placeholder products, status archived, never deleted)`,
-    'home: the Qamar superset document, saved + published through the page builder',
+    `store: slug "${spec.slug}", is_demo = true, look ${spec.defaultLook}, theme {} (owner ${spec.ownerEmail}, no login)`,
+    `${spec.template}: ${spec.products.length} products, ${variants} variants, ${spec.categories.length} categories (${spec.categories.map(c => c.slug).join(', ')}), ${charts} size charts, 1 shipping zone${spec.instalments ? ', instalments enabled (no provider name)' : ''}`,
+    ...(spec.archivePlaceholders
+      ? [
+          `archived: ${PLACEHOLDER_CATEGORY_SLUGS.join(', ')} (${PLACEHOLDER_SLUGS.length} placeholder products, status archived, never deleted)`,
+        ]
+      : []),
+    `home: the ${spec.template === 'qamar' ? 'Qamar' : 'Souq'} superset document, saved + published through the page builder`,
     'idempotent: upsert owner/store/categories/products, find-then-update charts/zone/variants',
   ].join('\n');
 }
@@ -198,23 +274,27 @@ export function guard(url, argv) {
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 
 /** The catalogue, size charts, shipping zone and settings for ONE store (owner client, one tx). */
-export async function seedCatalogue(prisma, Prisma, storeId, base) {
+export async function seedCatalogue(prisma, Prisma, storeId, base, spec = TEMPLATE_SPECS.qamar) {
   const url = f => `${base}/${f}`;
   return prisma.$transaction(
     async tx => {
       // Archive, never delete: Phase S placeholder products and their categories (B1-15, C3).
-      const archived = await tx.product.updateMany({
-        where: { storeId, slug: { in: PLACEHOLDER_SLUGS }, status: { not: 'archived' } },
-        data: { status: 'archived' },
-      });
-      await tx.category.updateMany({
-        where: { storeId, slug: { in: PLACEHOLDER_CATEGORY_SLUGS } },
-        data: { isActive: false },
-      });
+      // Qamar's showroom only: the Souq demo store never had them.
+      const archived = spec.archivePlaceholders
+        ? await tx.product.updateMany({
+            where: { storeId, slug: { in: PLACEHOLDER_SLUGS }, status: { not: 'archived' } },
+            data: { status: 'archived' },
+          })
+        : { count: 0 };
+      if (spec.archivePlaceholders)
+        await tx.category.updateMany({
+          where: { storeId, slug: { in: PLACEHOLDER_CATEGORY_SLUGS } },
+          data: { isActive: false },
+        });
 
       // Size charts: no unique key, so find by (store, name) then update or create (C17).
       const chartIds = {};
-      for (const [key, c] of Object.entries(QAMAR_SIZE_CHARTS)) {
+      for (const [key, c] of Object.entries(spec.sizeCharts)) {
         const data = { ...c, columns: c.columns, rows: c.rows };
         const found = await tx.sizeChart.findFirst({
           where: { storeId, name: c.name },
@@ -226,8 +306,8 @@ export async function seedCatalogue(prisma, Prisma, storeId, base) {
       }
 
       const catIds = new Map();
-      for (const [position, c] of QAMAR_CATEGORIES.entries()) {
-        const occasion = QAMAR_OCCASIONS.some(o => o.slug === c.slug);
+      for (const [position, c] of spec.categories.entries()) {
+        const occasion = spec.occasionSlugs.includes(c.slug);
         const data = {
           name: c.name,
           nameAr: c.nameAr,
@@ -257,11 +337,12 @@ export async function seedCatalogue(prisma, Prisma, storeId, base) {
       // exist on this branch, so `theme` stays {} here. When decisions-1016 merges, the showroom
       // seed MUST set `theme: { showNewBadge: true }` or every NEW chip on the showroom disappears.
       const newIn = new Set(
-        QAMAR_PRODUCTS.filter(p => p.images.length > 0)
+        spec.products
+          .filter(p => p.images.length > 0)
           .slice(0, NEW_IN_COUNT)
           .map(p => p.slug)
       );
-      for (const [i, p] of QAMAR_PRODUCTS.entries()) {
+      for (const [i, p] of spec.products.entries()) {
         const hasVariants = Boolean(p.options?.length);
         const data = {
           name: p.name,
@@ -355,6 +436,7 @@ export async function seedCatalogue(prisma, Prisma, storeId, base) {
         for (const [vPos, combo] of combos(p.options).entries()) {
           const values = combo.map(v => v.value);
           const sku = variantSku(p.slug, values);
+          const step = combo.reduce((n, v) => n + (v.priceAdd ?? 0), 0);
           const vData = {
             title: values.join(' / '),
             titleAr: combo.map(v => v.valueAr).join(' / '),
@@ -362,8 +444,10 @@ export async function seedCatalogue(prisma, Prisma, storeId, base) {
             allowBackorder: p.backorder === true,
             // A sale on a variant product lives on its variants: the PDP shows the strike only
             // when the picked variant carries both prices (product-pricing.ts); null clears it.
-            price: p.compareAtPrice ? p.price : null,
-            compareAtPrice: p.compareAtPrice ?? null,
+            // `priceAdd` on an option value is a price STEP (a bigger storage costs more): the
+            // variant carries base + steps, and the same steps on the compare-at price.
+            price: p.compareAtPrice || step ? p.price + step : null,
+            compareAtPrice: p.compareAtPrice ? p.compareAtPrice + step : null,
             isActive: true,
             position: vPos,
           };
@@ -423,10 +507,8 @@ export async function seedCatalogue(prisma, Prisma, storeId, base) {
       await tx.store.update({
         where: { id: storeId },
         data: {
-          description:
-            'An illustrative Egyptian boutique: abayas, kaftans, scarves and evening dresses, cut in Heliopolis.',
-          descriptionAr:
-            'بوتيك مصري توضيحي: عبايات وقفاطين وطرح وفساتين سهرة، متفصلة في مصر الجديدة.',
+          description: spec.description,
+          descriptionAr: spec.descriptionAr,
           returnWindowDays: 14,
           // "Demo store" is said once, by the demo bar above it (DemoLookBar); this line only
           // labels the photos (Task 9 review).
@@ -440,7 +522,10 @@ export async function seedCatalogue(prisma, Prisma, storeId, base) {
             currency: 'EGP',
             locale: 'ar-EG',
             defaultLanguage: 'ar',
-            deliveryDays: { min: 2, max: 4 },
+            deliveryDays: spec.deliveryDays,
+            // Ruling B2-9: written only for a template that shows instalments; a re-seed of the
+            // Qamar showroom leaves the key out, exactly as before.
+            ...(spec.instalments ? { instalments: spec.instalments } : {}),
           },
         },
       });
@@ -453,13 +538,20 @@ export async function seedCatalogue(prisma, Prisma, storeId, base) {
 async function run() {
   const url = process.env.DATABASE_URL;
   const argv = process.argv.slice(2);
-  console.log(describePlan(url));
+  const spec = templateFromArgv(argv);
+  if (!spec) {
+    console.error(
+      `Unknown --template; expected one of: ${Object.keys(TEMPLATE_SPECS).join(', ')}.`
+    );
+    process.exit(2);
+  }
+  console.log(describePlan(url, spec));
   const g = guard(url, argv);
   if (!g.ok) {
     console.error(g.why);
     process.exit(2);
   }
-  const a = assetBase(argv, process.env);
+  const a = assetBase(argv, process.env, spec);
   if (!a.ok) {
     console.error(a.why);
     process.exit(2);
@@ -472,7 +564,7 @@ async function run() {
     process.exit(2);
   }
   console.log(
-    `assets: ${a.base}${lookStores ? '\nlocal look stores: ' + LOCAL_LOOK_STORES.map(s => s[0]).join(', ') : ''}`
+    `assets: ${a.base}${lookStores ? '\nlocal look stores: ' + spec.localLookStores.map(s => s[0]).join(', ') : ''}`
   );
   process.env.DIRECT_URL ??= url;
 
@@ -483,8 +575,8 @@ async function run() {
     `${root}/apps/api/src/services/page-builder.service.ts`
   );
   const { invalidateStoreProductCaches } = await import(`${root}/apps/api/src/lib/public-cache.ts`);
-  const look = getLook(DEFAULT_LOOK);
-  if (!look) throw new Error(`default look ${DEFAULT_LOOK} is not in the registry`);
+  const look = getLook(spec.defaultLook);
+  if (!look) throw new Error(`default look ${spec.defaultLook} is not in the registry`);
   const video = videoUrl(a.base);
   if (!video) console.warn(`hero clip skipped: ${a.base} is neither https nor a relative path`);
   const img = f => `${a.base}/${f}`;
@@ -493,7 +585,7 @@ async function run() {
   const publishHome = async (storeId, ownerId, productIdBySlug) =>
     runInStoreScope(storeId, async () => {
       const state = await getPageState(storeId, 'home');
-      const doc = buildQamarHome(state.definition, { img, video, productIdBySlug });
+      const doc = spec.buildHome(state.definition, { img, video, productIdBySlug });
       const saved = await saveDraft({
         storeId,
         pageKey: 'home',
@@ -510,10 +602,10 @@ async function run() {
   try {
     const owner = await prisma.$transaction(
       async tx =>
-        (await tx.user.findFirst({ where: { email: OWNER_EMAIL, storeId: null } })) ??
+        (await tx.user.findFirst({ where: { email: spec.ownerEmail, storeId: null } })) ??
         (await tx.user.create({
           data: {
-            email: OWNER_EMAIL,
+            email: spec.ownerEmail,
             passwordHash: '!seed-no-login',
             firstName: 'Store',
             lastName: 'Demo',
@@ -523,8 +615,8 @@ async function run() {
         }))
     );
     const base = {
-      name: 'Ebda Demo',
-      nameAr: 'إبدا ديمو',
+      name: spec.name,
+      nameAr: spec.nameAr,
       template: look.skin,
       look: look.id,
       theme: {},
@@ -536,22 +628,22 @@ async function run() {
       plan: 'professional',
     };
     const store = await prisma.store.upsert({
-      where: { slug: SLUG },
+      where: { slug: spec.slug },
       update: base,
-      create: { ...base, slug: SLUG, ownerId: owner.id },
+      create: { ...base, slug: spec.slug, ownerId: owner.id },
     });
     const seeded = await runInStoreScope(store.id, () =>
-      seedCatalogue(prisma, Prisma, store.id, a.base)
+      seedCatalogue(prisma, Prisma, store.id, a.base, spec)
     );
     const rev = await publishHome(store.id, owner.id, seeded.productIdBySlug);
     await invalidateStoreProductCaches(store.id);
     console.log(
-      `seeded ${SLUG} (${store.id}): ${seeded.productIdBySlug.size} products, ${seeded.variantCount} variants, archived ${seeded.archived} placeholder products, home rev ${rev}`
+      `seeded ${spec.slug} (${store.id}): ${seeded.productIdBySlug.size} products, ${seeded.variantCount} variants, archived ${seeded.archived} placeholder products, home rev ${rev}`
     );
 
     if (lookStores) {
       const { StoreService } = await import(`${root}/apps/api/src/services/store.service.ts`);
-      for (const [slug, lookId] of LOCAL_LOOK_STORES) {
+      for (const [slug, lookId] of spec.localLookStores) {
         const l = getLook(lookId);
         // A NON-demo merchant store (local review only), created on the look's skin as onboarding
         // provisions a store for a chosen look; the look itself is applied below through the
@@ -559,8 +651,8 @@ async function run() {
         const s = await prisma.store.upsert({
           where: { slug },
           update: {
-            name: `Qamar ${l.name.en}`,
-            nameAr: `قمر ${l.name.ar}`,
+            name: spec.localStoreName(l)[0],
+            nameAr: spec.localStoreName(l)[1],
             isDemo: false,
             status: 'active',
             plan: 'professional',
@@ -568,8 +660,8 @@ async function run() {
           create: {
             slug,
             ownerId: owner.id,
-            name: `Qamar ${l.name.en}`,
-            nameAr: `قمر ${l.name.ar}`,
+            name: spec.localStoreName(l)[0],
+            nameAr: spec.localStoreName(l)[1],
             template: l.skin,
             theme: {},
             isDemo: false,
@@ -579,7 +671,7 @@ async function run() {
           },
         });
         const sSeeded = await runInStoreScope(s.id, () =>
-          seedCatalogue(prisma, Prisma, s.id, a.base)
+          seedCatalogue(prisma, Prisma, s.id, a.base, spec)
         );
         await publishHome(s.id, owner.id, sSeeded.productIdBySlug);
         const applied = await runInStoreScope(s.id, async () => {

@@ -193,3 +193,4 @@ scripts/qamar-demo/img-src/
 scripts/qamar-demo/__pycache__/
 # local-only copy of the demo assets for the dev stack (docs/ebda/templates/demo-store.md)
 apps/web/public/__qamar-demo/
+scripts/souq-demo/img-src/

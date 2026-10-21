@@ -8,6 +8,9 @@ import {
   variantSku,
   PHASE_S_PLACEHOLDERS,
   PLACEHOLDER_SLUGS,
+  TEMPLATE_SPECS,
+  templateFromArgv,
+  SOUQ_PROD_ASSET_BASE,
   // @ts-expect-error plain .mjs script
 } from '../../scripts/storedemo/seed.mjs';
 // @ts-expect-error plain .mjs data module
@@ -91,5 +94,73 @@ describe('storedemo seed guard', () => {
     expect(variantSku('linen-abaya', ['Rose', 'M', '56'])).not.toBe(
       variantSku('linen-abaya', ['Rose', 'M', '58'])
     );
+  });
+});
+
+describe('storedemo seed: --template souq (Ruling B2-7)', () => {
+  const souq = TEMPLATE_SPECS.souq;
+  it('--template picks the spec, the default is Qamar, an unknown name is null (the run refuses it)', () => {
+    expect(templateFromArgv([])).toBe(TEMPLATE_SPECS.qamar);
+    expect(templateFromArgv(['--template', 'souq'])).toBe(souq);
+    expect(templateFromArgv(['--template', 'nope'])).toBeNull();
+    expect(templateFromArgv(['--template'])).toBeNull();
+  });
+  it('the second demo store: own slug, own owner without a mailbox, own default look', () => {
+    expect(souq.slug).toBe('storedemo-souq');
+    expect(souq.ownerEmail).toBe('storedemo-souq-owner@ebda.app');
+    expect(souq.defaultLook).toBe('souq.catalogue');
+    expect(souq.slug).not.toBe(TEMPLATE_SPECS.qamar.slug);
+    expect(souq.ownerEmail).not.toBe(TEMPLATE_SPECS.qamar.ownerEmail);
+  });
+  it('local look stores: souq-catalogue, souq-night, souq-showroom on their own looks', () => {
+    expect(souq.localLookStores).toEqual([
+      ['souq-catalogue', 'souq.catalogue'],
+      ['souq-night', 'souq.night'],
+      ['souq-showroom', 'souq.showroom'],
+    ]);
+  });
+  it('production run accepts only https://media.ebda.app/demo/souq for Souq, and never the Qamar base', () => {
+    expect(SOUQ_PROD_ASSET_BASE).toBe('https://media.ebda.app/demo/souq');
+    const ok = assetBase(
+      ['--yes-production'],
+      { SOUQ_DEMO_ASSET_BASE: SOUQ_PROD_ASSET_BASE },
+      souq
+    );
+    expect(ok.ok).toBe(true);
+    expect(assetBase(['--yes-production'], {}, souq).base).toBe(SOUQ_PROD_ASSET_BASE);
+    for (const bad of [
+      'http://localhost:9000',
+      'https://media.ebda.app/demo/qamar',
+      '/__souq-demo',
+    ])
+      expect(assetBase(['--yes-production'], { SOUQ_DEMO_ASSET_BASE: bad }, souq).ok, bad).toBe(
+        false
+      );
+    // local runs take a path or a localhost URL
+    expect(assetBase([], { SOUQ_DEMO_ASSET_BASE: '/__souq-demo' }, souq).base).toBe('/__souq-demo');
+    // the Qamar asset env var does not leak into a Souq run
+    expect(assetBase([], { QAMAR_DEMO_ASSET_BASE: '/__qamar-demo' }, souq).base).toBe(
+      SOUQ_PROD_ASSET_BASE
+    );
+  });
+  it('describePlan names the Souq catalogue, instalments and NO archived placeholder families', () => {
+    const plan = describePlan(pg('user:secretpw@localhost:5432/x'), souq);
+    expect(plan).toContain('souq: 20 products, 24 variants, 7 categories');
+    expect(plan).toContain('instalments enabled (no provider name)');
+    expect(plan).toContain('storedemo-souq');
+    expect(plan).not.toContain('archived:');
+    expect(plan).not.toContain('secretpw');
+  });
+  it('the Qamar plan is unchanged by the new parameter', () => {
+    expect(describePlan(pg('a:b@localhost/x'))).toContain('archived: fashion');
+  });
+  it('Qamar never gets the instalments key; Souq gets it with no provider name (B2-9)', () => {
+    expect(TEMPLATE_SPECS.qamar.instalments).toBeNull();
+    expect(souq.instalments).toEqual({ enabled: true, months: 12, markupPct: 0 });
+  });
+  it('the guard is the same for both templates: a remote host needs --yes-production', () => {
+    const remote = pg('a:b@ep-x.neon.tech/db');
+    expect(guard(remote, ['--template', 'souq']).ok).toBe(false);
+    expect(guard(remote, ['--template', 'souq', '--yes-production']).ok).toBe(true);
   });
 });
