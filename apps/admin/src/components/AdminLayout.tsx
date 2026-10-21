@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { Suspense, useState, useEffect, useMemo } from 'react';
 import { FOCUS_MODE_STORAGE_KEY } from '@/lib/focus-mode-key';
 import { usePathname, useRouter } from 'next/navigation';
 import { storefrontOrigin } from '@ebda/shared';
@@ -8,7 +8,10 @@ import { useAuth } from '../lib/auth';
 import { useStore } from '../contexts/StoreContext';
 import { useCurrentStore } from '../hooks/useCurrentStore';
 import { useFeatures } from '../hooks/useFeatures';
+import { useLocale } from 'next-intl';
 import { useT } from '@/i18n/useT';
+import { mergeRegistryIntoPalette, registryPaletteItems } from '../lib/settings-search';
+import { SettingHighlight } from './SettingHighlight';
 import {
   buildStoreAdminNav,
   buildSuperAdminNav,
@@ -313,14 +316,24 @@ export function AdminLayout({
     webhooks: tcp('pages.webhooks'),
     billing: tcp('pages.billing'),
   };
+  // Admin search registry (E23): every page + individual setting in Arabic and English, deep-linked
+  // to the control. Role- and feature-gated like the sidebar; merged under the palette's own pages.
+  const uiLocale = useLocale() === 'ar' ? 'ar' : 'en';
   const paletteItems: PaletteItem[] =
     mode === 'store_admin' && navStoreId
-      ? buildStorePaletteItems(
-          navItems,
-          navStoreId,
-          hubLabels,
-          settingsPaletteLabels,
-          isHubTabVisible
+      ? mergeRegistryIntoPalette(
+          buildStorePaletteItems(
+            navItems,
+            navStoreId,
+            hubLabels,
+            settingsPaletteLabels,
+            isHubTabVisible
+          ),
+          registryPaletteItems(
+            navStoreId,
+            { role: user?.role, isFeatureEnabled, featuresLoading },
+            uiLocale
+          )
         )
       : navItems.map(n => ({ name: n.name, href: n.href, icon: n.icon, group: n.name }));
 
@@ -447,6 +460,10 @@ export function AdminLayout({
     <div className="flex min-h-screen bg-background">
       {/* Global ⌘K command palette — renders null until opened; searches every admin page. */}
       <CommandPalette items={paletteItems} />
+      {/* ?setting=<id> deep link: scroll to the control and highlight it. */}
+      <Suspense fallback={null}>
+        <SettingHighlight />
+      </Suspense>
       {/* Mobile Sidebar Overlay */}
       {isSidebarOpen && (
         <div

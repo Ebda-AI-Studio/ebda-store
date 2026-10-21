@@ -89,6 +89,11 @@ Full per-table matrix (retention days, exact columns, cron IDs) lives in
   `GET /api/v1/public/products?search=<term>`, so whatever a shopper typed (a phone, an email)
   can sit in that log. Code cannot scrub it: it is written by the platform before our handler
   runs. Our own log lines (pino) and Sentry redact these values (`sentry-url-scrub`).
+- **Admin routes (Ruling SEARCH-P2-9):** the admin ⌘K palette, the Customers and Orders search/export
+  and the Orders PWA list send the typed term in the `X-Search-Query` request header, not in the URL,
+  so a merchant's customer-phone lookup does not enter this log. Request headers are not part of the
+  invocation log. Still open: the storefront → API term (SEARCH-T5-8), and an older admin/PWA build that
+  still sends `?search=`/`?q=` (accepted by the API for one release, then removed).
 - **Retention:** the platform's Workers Logs window, at most 7 days (3 days on Workers Free,
   7 on Workers Paid; the plan in use was not verified from this repo), then deleted by
   Cloudflare. Not exported (no Logpush).

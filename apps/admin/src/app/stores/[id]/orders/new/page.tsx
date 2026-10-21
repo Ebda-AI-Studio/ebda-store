@@ -5,7 +5,13 @@ import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Button, useToast } from '@ebda/ui';
 import { useLocale } from 'next-intl';
-import { EGYPT_GOVERNORATES, areasForGovernorate, roundToMinor, REGION } from '@ebda/shared';
+import {
+  EGYPT_GOVERNORATES,
+  areasForGovernorate,
+  roundToMinor,
+  REGION,
+  searchQueryHeaders,
+} from '@ebda/shared';
 import { AdminLayout } from '../../../../../components/AdminLayout';
 import { apiGet, apiPost } from '../../../../../lib/api';
 import { isVariantProduct } from '../../../../../lib/variant-product';
@@ -153,7 +159,8 @@ export default function NewOrderPage() {
       return;
     }
     apiGet<{ customers: CustomerSearchResult[] }>(
-      `/api/v1/stores/${storeId}/customers/search?q=${encodeURIComponent(debouncedCustomerSearch)}`
+      `/api/v1/stores/${storeId}/customers/search`,
+      searchQueryHeaders(debouncedCustomerSearch)
     )
       .then(({ data }) => {
         if (data?.customers) setCustomerResults(data.customers);

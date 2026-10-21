@@ -1,8 +1,5 @@
-import {
-  orderSearchIds,
-  ORDER_SEARCH_CUSTOMER_ID_CAP,
-  guestOrderIdsMatching,
-} from '../lib/order-search-ids';
+import { orderSearchIds, ORDER_SEARCH_CUSTOMER_ID_CAP } from '../lib/order-search-ids';
+import { matchingCustomers, type CustomerMatches } from './admin-search.service';
 export {
   ORDER_SEARCH_CUSTOMER_ID_CAP,
   orderSearchIds,
@@ -26,6 +23,7 @@ import {
   fromMinor,
   minorToDecimalString,
   normalizePhoneForStorage,
+  normalizeArabicSearch,
   activePersonalisation,
   REGION,
   orderNumberFromScanCode,
@@ -245,10 +243,11 @@ const GUEST_CONTACT_FIELDS = ['firstName', 'lastName', 'email', 'phone'] as cons
  * registered on another store is NOT matched, exactly as the relation join already behaved under
  * `ebda_app` (the old comment here claimed the opposite; that was true only for an owner role).
  *
- * GUEST orders (`customer_id IS NULL`, contact only in the `shipping_address`
- * JSON) are matched by the same term on first name, last name, email and phone
- * through `guestOrderIdsMatching`, served by the partial expression trigram
- * indexes of migration 20261003100000_order_search_guest_contact_trgm_idx.
+ * Customers and GUEST orders (`customer_id IS NULL`, contact only in the `shipping_address` JSON)
+ * both come from `matchingCustomers` (Search P2): Arabic-normalised names ("احمد" finds "أحمد"), the
+ * phone in any form ("0101 234 5678", "+20…", "٠١٠…"), and the email, served by the normalised
+ * expression trigram indexes of migration 20261027000100 (and the older email indexes). The order
+ * number also matches by its digits alone ("#١٢٣٤" finds "EB-1234").
  *
  * Falls back to the relation filter when the term is shorter than a trigram
  * (3 chars — the indexes cannot serve it, so the lookup would only add a
@@ -269,7 +268,13 @@ export function orderNumberFromScan(input: string): string | null {
 export async function orderSearchWhere(
   storeId: string,
   search: string,
-  opts: { indexed?: boolean } = {}
+  opts: {
+    indexed?: boolean;
+    /** The customer lookup, when the caller already ran it (the ⌘K route does): not repeated. */
+    matches?: CustomerMatches;
+    /** Cap for the order-number id lookups (default `ORDER_SEARCH_CUSTOMER_ID_CAP + 1`). */
+    numberIdLimit?: number;
+  } = {}
 ): Promise<Prisma.OrderWhereInput[]> {
   // A scanned receipt/slip/email barcode opens that order: one exact arm, no customer fan-out.
   // Still store-scoped: callers AND this with their own `storeId`.
@@ -300,14 +305,29 @@ export async function orderSearchWhere(
   // A customer searching THEIR OWN orders (`indexed: false`) never calls the store-wide id lookup:
   // the lookup answers for the whole store, and only a store viewer may ask the store a question.
   // The relation fallback is ANDed with their customerId by the caller.
-  if (search.length < 3 || opts.indexed === false) return relationFallback;
+  // Prisma's `contains` does not escape LIKE metacharacters, so the relation fallback would turn a
+  // typed "%" into "match every order": a term holding one always takes the escaped lookups.
+  if ((search.length < 3 && !/[%_\\]/.test(search)) || opts.indexed === false) {
+    return relationFallback;
+  }
 
-  // Three store-scoped id lookups (see the docblock): order number, customers, guest orders.
-  const [numberIds, customerIds, guestOrderIds] = await Promise.all([
-    orderSearchIds(storeId, 'order_number', search),
-    orderSearchIds(storeId, 'customers', search),
-    guestOrderIdsMatching(storeId, search),
+  // Store-scoped id lookups (see the docblock): the order number (the typed text, plus its digits
+  // alone when it has 4+, so "#١٢٣٤" finds "EB-1234"), and the customers + guest orders through
+  // `matchingCustomers` (Arabic-normalised names, any phone form, email; Search P2 Task 17).
+  // Only a term made of digits (with #, spaces, dashes) is also tried as the number's digits alone:
+  // a mixed term like "Gwendolyn58123" must not turn its digits into an order-number filter.
+  const folded = normalizeArabicSearch(search);
+  const digits = /^[#\s-]*[0-9][0-9\s-]*$/.test(folded) ? folded.replace(/\D/g, '') : '';
+  const [numberIdsRaw, digitIds, matches] = await Promise.all([
+    orderSearchIds(storeId, 'order_number', search, opts.numberIdLimit),
+    digits.length >= 4 && digits !== search
+      ? orderSearchIds(storeId, 'order_number', digits, opts.numberIdLimit)
+      : Promise.resolve([] as string[]),
+    opts.matches ?? matchingCustomers(storeId, search),
   ]);
+  const numberIds = [...new Set([...numberIdsRaw, ...digitIds])];
+  const customerIds = matches.usersTruncated ? [] : matches.userIds;
+  const guestOrderIds = matches.guestsTruncated ? [] : matches.guestOrderIds;
   const customers = customerIds.map(id => ({ id }));
   // Each half degrades on its OWN: a broad guest term (every Egyptian guest phone starts `+20`)
   // must not cost the registered half its indexed `customer_id IN (...)` arm, nor the reverse
@@ -315,12 +335,12 @@ export async function orderSearchWhere(
   const arms: Prisma.OrderWhereInput[] = [];
   if (numberIds.length > ORDER_SEARCH_CUSTOMER_ID_CAP) arms.push({ orderNumber: contains });
   else if (numberIds.length > 0) arms.push({ id: { in: numberIds } });
-  if (customers.length > ORDER_SEARCH_CUSTOMER_ID_CAP) {
+  if (matches.usersTruncated || customers.length > ORDER_SEARCH_CUSTOMER_ID_CAP) {
     arms.push({ customer: { is: { OR: customerMatch } } });
   } else if (customers.length > 0) {
     arms.push({ customerId: { in: customers.map(c => c.id) } });
   }
-  if (guestOrderIds.length > ORDER_SEARCH_CUSTOMER_ID_CAP) {
+  if (matches.guestsTruncated || guestOrderIds.length > ORDER_SEARCH_CUSTOMER_ID_CAP) {
     arms.push(guestJsonMatch);
   } else if (guestOrderIds.length > 0) {
     arms.push({ id: { in: guestOrderIds } });

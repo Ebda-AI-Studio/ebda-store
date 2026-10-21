@@ -511,7 +511,12 @@ export default function StoreDomainPage() {
         {/* Email sender card */}
         <div className="mt-6 rounded-lg border border-border bg-card p-6">
           <div className="mb-4">
-            <h2 className="text-lg font-semibold text-foreground">{t('emailSenderTitle')}</h2>
+            <h2
+              data-setting-id="domain.email-sender"
+              className="text-lg font-semibold text-foreground"
+            >
+              {t('emailSenderTitle')}
+            </h2>
             <p className="mt-1 text-sm text-muted-foreground">{t('emailSenderSubtitle')}</p>
           </div>
 

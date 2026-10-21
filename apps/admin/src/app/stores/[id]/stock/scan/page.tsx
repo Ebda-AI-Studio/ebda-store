@@ -23,7 +23,7 @@ import { useFeatures } from '@/hooks/useFeatures';
 import { useLocale } from 'next-intl';
 import { VariantText } from '@ebda/ui';
 import { apiGet, apiPost } from '@/lib/api';
-import { orderLineVariantTitle, withNumerals } from '@ebda/shared';
+import { orderLineVariantTitle, searchQueryHeaders, withNumerals } from '@ebda/shared';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -480,7 +480,7 @@ function PickMode({ storeId }: { storeId: string }) {
     const { data, error } = await apiGet<{
       orders: { id: string; orderNumber: string }[];
       meta: { total: number };
-    }>(`/api/v1/stores/${storeId}/orders?search=${encodeURIComponent(wanted)}&limit=20`);
+    }>(`/api/v1/stores/${storeId}/orders?limit=20`, searchQueryHeaders(wanted));
     const match = data?.orders?.find(o => o.orderNumber.toLowerCase() === wanted.toLowerCase());
     if (error || !match) {
       setOrderErr(scanErrorText(t, error, 'orderNotFound'));
