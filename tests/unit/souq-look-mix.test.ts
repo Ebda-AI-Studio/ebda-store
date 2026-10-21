@@ -458,3 +458,11 @@ describe('Ruling B2-22: a fresh store that applies a Souq look is not painted in
     });
   }
 });
+
+describe('Ruling B2-22 (cards): the listing card frame is the neutral border token', () => {
+  it('souq productCardDefaults frame is token:border, not the primary accent', () => {
+    expect(resolveLayoutSettings({}, 'souq', null).productCardDefaults?.cardFrameColor).toBe(
+      'token:border'
+    );
+  });
+});

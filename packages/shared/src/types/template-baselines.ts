@@ -332,6 +332,9 @@ function buildSouqBaseline(): StoreLayoutSettings {
     delete section.bgColor;
     delete section.typography;
   }
+  // The listing / search / related card keeps its frame (B2-13) but in the neutral border token:
+  // a primary-coloured box round every card is a second loud accent (quality bar: one accent).
+  if (b.productCardDefaults) b.productCardDefaults.cardFrameColor = 'token:border';
   return b;
 }
 

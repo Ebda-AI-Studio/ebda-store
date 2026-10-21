@@ -13,16 +13,16 @@ Looks are **data**, not code: they live in `@ebda/shared` (`packages/shared/src/
 
 ## The 15 looks
 
-3 of the 15 are `status: 'built'` (the Qamar looks, flipped in Phase B1 Task 10 after Ahmad's STOP 2 approval, 2026-10-21); the other 12 are `designed`. The Qamar looks render on the `qamar` skin (Ruling B1-1); the Souq looks render on the `souq` skin since Phase B2 Task 1 (Ruling B2-1; still `designed` until Task 7); the nine others still render on `skin: 'minimal'`. The showroom lists and previews only `built` looks, so today it offers exactly the three Qamar looks. The admin `LookPicker` shows all 15 and, with no look chosen, opens on the first template that has a built look (Qamar; Ruling B1-19).
+6 of the 15 are `status: 'built'` (the three Qamar looks, flipped in Phase B1 Task 10, and the three Souq looks, flipped in Phase B2 Task 7 after the independent audits; Ahmad's STOP rounds were withdrawn 2026-10-21); the other 9 are `designed`. The Qamar looks render on the `qamar` skin (Ruling B1-1); the Souq looks render on the `souq` skin (Ruling B2-1); the nine others still render on `skin: 'minimal'`. The showroom lists and previews only `built` looks, so today it offers the three Qamar and the three Souq looks (each template on its own demo host, Ruling B2-7). The admin `LookPicker` shows all 15 and, with no look chosen, opens on the first template that has a built look (Qamar; Ruling B1-19).
 
 | Id                   | Template | Name (ar)    | Name (en)        | Status   |
 | -------------------- | -------- | ------------ | ---------------- | -------- |
 | `qamar.atelier`      | qamar    | أتيليه       | Atelier          | built    |
 | `qamar.lookbook`     | qamar    | لوك بوك      | Lookbook         | built    |
 | `qamar.vitrine`      | qamar    | فاترينة      | Vitrine          | built    |
-| `souq.catalogue`     | souq     | كتالوج       | Catalogue        | designed |
-| `souq.night`         | souq     | سوق الليل    | Night souq       | designed |
-| `souq.showroom`      | souq     | شو روم       | Showroom         | designed |
+| `souq.catalogue`     | souq     | كتالوج       | Catalogue        | built    |
+| `souq.night`         | souq     | سوق الليل    | Night souq       | built    |
+| `souq.showroom`      | souq     | شو روم       | Showroom         | built    |
 | `jasmine.apothecary` | jasmine  | عطارة        | Apothecary       | designed |
 | `jasmine.bloom`      | jasmine  | بلوم         | Bloom            | designed |
 | `jasmine.clinic`     | jasmine  | عيادة        | Clinic           | designed |

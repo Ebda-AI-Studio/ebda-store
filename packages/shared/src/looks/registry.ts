@@ -215,7 +215,7 @@ export const LOOKS: readonly LookDefinition[] = [
     template: 'souq',
     letter: 'A',
     skin: 'souq',
-    status: 'designed',
+    status: 'built',
     chrome: { header: { logoPlacement: 'start', search: 'prominent' } },
     // Ruling B2-16. Search first, no hero: the first screen is the search field and the category
     // rail, then today's deals, a dense newest grid and the trust line. Carousel headings use the
@@ -278,7 +278,7 @@ export const LOOKS: readonly LookDefinition[] = [
     template: 'souq',
     letter: 'B',
     skin: 'souq',
-    status: 'designed',
+    status: 'built',
     chrome: { header: { logoPlacement: 'start', search: 'icon' } },
     // Ruling B2-16. A lit market: a full-bleed hero, bold square category tiles and the dense grid
     // on ONE light band (quality bar section 9 rule 1: merchant photos shot on white never sit
@@ -355,7 +355,7 @@ export const LOOKS: readonly LookDefinition[] = [
     template: 'souq',
     letter: 'C',
     skin: 'souq',
-    status: 'designed',
+    status: 'built',
     chrome: { header: { logoPlacement: 'start', search: 'icon' } },
     // Ruling B2-16. The product is the hero: categories as chips right under the header (the
     // first screen shows categories), up to three one-product stages (the first reads the store's

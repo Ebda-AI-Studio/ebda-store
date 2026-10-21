@@ -110,11 +110,11 @@ describe('no-orange gate has teeth (negative control)', () => {
 });
 
 describe('souq looks: shape', () => {
-  it('there are exactly three, on the souq skin, still designed until Task 7', () => {
+  it('there are exactly three, on the souq skin, built (flipped in Phase B2 Task 7)', () => {
     expect(souq.map(l => l.id).sort()).toEqual(['souq.catalogue', 'souq.night', 'souq.showroom']);
     for (const l of souq) {
       expect(l.skin, l.id).toBe('souq');
-      expect(l.status, l.id).toBe('designed');
+      expect(l.status, l.id).toBe('built');
       expect(l.tokens.cardBadge, l.id).toBe('accent');
     }
   });
