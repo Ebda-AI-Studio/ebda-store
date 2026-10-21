@@ -284,7 +284,9 @@ const PACK_STYLES: Record<TemplateId, PackStyles> = {
       'whitespace-nowrap rounded-[var(--radius)] bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground hover:bg-primary/90 transition-colors duration-[var(--motion-duration,150ms)] min-h-[44px]',
     sectionHeading:
       'font-display text-xl sm:text-2xl md:text-3xl font-semibold text-foreground leading-[1.25] text-balance',
-    sectionSeeAll: 'text-sm font-medium text-primary hover:underline underline-offset-4',
+    // Ink text with a primary underline: the literal primary is only ~5:1 on a light page.
+    sectionSeeAll:
+      'text-sm font-medium text-foreground underline decoration-primary underline-offset-4 hover:decoration-2',
     sectionHeadingAlign: 'start',
     heroOverlay: 'bg-gradient-to-b from-foreground/0 via-foreground/0 to-foreground/35',
     heroHeadline: 'font-display text-3xl sm:text-5xl md:text-6xl font-bold leading-[1.2]',

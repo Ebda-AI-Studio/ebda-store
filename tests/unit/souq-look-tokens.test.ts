@@ -2,8 +2,9 @@
 // `souq` skin id registration. The gate has a negative control: it must flag the two colours
 // the original Night souq design used (brass #C89B3C, lantern orange #E68245).
 import { describe, it, expect } from 'vitest';
-import { readFileSync, existsSync } from 'node:fs';
+import { readFileSync, existsSync, readdirSync } from 'node:fs';
 import path from 'node:path';
+import { SOUQ_NIGHT_ALT_BRASS } from '../../packages/shared/src/looks/stop-alternatives';
 import {
   LOOKS,
   contrastRatio,
@@ -13,7 +14,7 @@ import {
   TEMPLATE_THEMES,
   TEMPLATE_LAYOUT_BASELINES,
   TEMPLATES,
-  SOUQ_NIGHT_ALT_BRASS,
+  themeToCssVars,
 } from '@ebda/shared';
 
 const root = path.resolve(__dirname, '../..');
@@ -25,9 +26,18 @@ const souq = LOOKS.filter(l => l.template === 'souq');
  * 50% for #F6F3EA (45 deg) although its chroma is 5% of its value, i.e. it is paper, not a
  * colour. The plan's own Night ink is that cream, so an HSL gate would flag the page's text.
  * `value` is a hex colour or a bare `H S% L%` triplet.
+ *
+ * Pale tints (Ruling B2-11 amendment): peach and cream (#FFD9B8, #FBE3B5, #FFE0B2) have HSV
+ * saturation 28-30% yet read as orange-family; they are caught by a second rule: in the hue band
+ * with HSV saturation >= 12% and HSL lightness < 0.95. The cutoff is justified by measurement:
+ * the cream ink #F6F3EA (L 0.94) has saturation 4.9%, a pure paper white; anything with
+ * >= 12% chroma at that lightness is visibly tinted. At L >= 0.95 a tint is indistinguishable
+ * from white on a screen, so it is left alone.
  */
 const ORANGE_HUE: [number, number] = [12, 50];
 const ORANGE_MIN_SAT = 0.35;
+const PALE_MIN_SAT = 0.12;
+const PALE_MAX_LIGHTNESS = 0.95;
 function toRgb(value: string): [number, number, number] {
   const v = value.trim();
   if (v.startsWith('#')) {
@@ -64,7 +74,11 @@ export function isOrangeFamily(value: string): boolean {
   const d = max - min;
   let hue = max === r ? ((g - b) / d) % 6 : max === g ? (b - r) / d + 2 : (r - g) / d + 4;
   hue = (hue * 60 + 360) % 360;
-  return hue >= ORANGE_HUE[0] && hue <= ORANGE_HUE[1] && sat >= ORANGE_MIN_SAT;
+  const inBand = hue >= ORANGE_HUE[0] && hue <= ORANGE_HUE[1];
+  const lightness = (max + min) / 2 / 255;
+  return (
+    inBand && (sat >= ORANGE_MIN_SAT || (sat >= PALE_MIN_SAT && lightness < PALE_MAX_LIGHTNESS))
+  );
 }
 
 describe('no-orange gate has teeth (negative control)', () => {
@@ -73,6 +87,8 @@ describe('no-orange gate has teeth (negative control)', () => {
     expect(isOrangeFamily('#E68245')).toBe(true);
     expect(isOrangeFamily('#FF6E01')).toBe(true);
     expect(isOrangeFamily('#E8A33D')).toBe(true);
+    // pale peach / cream tints (HSV saturation under 35%) are caught by the pale rule
+    for (const c of ['#FFD9B8', '#FBE3B5', '#FFE0B2']) expect(isOrangeFamily(c), c).toBe(true);
     // and the platform's default warning amber (45 93% 47%), which a Souq skin must replace
     expect(isOrangeFamily('45 93% 47%')).toBe(true);
   });
@@ -80,9 +96,10 @@ describe('no-orange gate has teeth (negative control)', () => {
     // the cream ink (paper, 5% chroma) and the muted greens are not orange
     for (const c of [
       '#5FD3C0',
-      '#E8606A',
+      '#F57A83',
       '#1F5FD6',
-      '#1B61FF',
+      '#1D5CE6',
+      '#1757E8',
       '#0F3B2E',
       '#F6F3EA',
       '#B4CDC0',
@@ -113,8 +130,10 @@ describe('souq looks: shape', () => {
     const night = souq.find(l => l.id === 'souq.night')!.tokens;
     expect(night.page).toBe('#0F3B2E');
     expect(night.primary).toBe('#5FD3C0');
-    expect(night.accent).toBe('#E8606A');
-    expect(souq.find(l => l.id === 'souq.showroom')!.tokens.accent).toBe('#1B61FF');
+    expect(night.accent).toBe('#F57A83');
+    const room = souq.find(l => l.id === 'souq.showroom')!.tokens;
+    expect(room.primary).toBe('#1D5CE6');
+    expect(room.accent).toBe('#1757E8');
   });
 });
 
@@ -131,11 +150,6 @@ describe('souq looks: skin-painted text pairs >= 4.5, UI pairs >= 3', () => {
     ])(`${l.id}: %s >= 4.5`, (_n, bg, fg) => {
       expect(contrastRatio(bg, fg)).toBeGreaterThanOrEqual(4.5);
     });
-    it(`${l.id}: primary as text on page is >= 4.5, or the accent is the declared text role`, () => {
-      const primaryText = contrastRatio(t.page, t.primary);
-      const accentText = contrastRatio(t.page, t.accent);
-      expect(Math.max(primaryText, t.onAccent ? 0 : accentText)).toBeGreaterThanOrEqual(4.5);
-    });
     it(`${l.id}: primary fill is a >= 3:1 UI boundary on the page and the surface`, () => {
       expect(contrastRatio(t.page, t.primary)).toBeGreaterThanOrEqual(3);
       expect(contrastRatio(t.surface, t.primary)).toBeGreaterThanOrEqual(3);
@@ -147,9 +161,13 @@ describe('souq looks: skin-painted text pairs >= 4.5, UI pairs >= 3', () => {
       ).toBeGreaterThanOrEqual(3);
     });
   }
-  it('Night: pomegranate is a FILL with dark ink, never a text colour on the page (3.75:1)', () => {
+  it('Night: the chip fill reaches >= 3:1 against the card and the page (a boundary, not just legible text)', () => {
     const t = souq.find(l => l.id === 'souq.night')!.tokens;
-    expect(contrastRatio(t.page, t.accent)).toBeLessThan(4.5);
+    expect(contrastRatio(t.surface, t.accent)).toBeGreaterThanOrEqual(3);
+    expect(contrastRatio(t.page, t.accent)).toBeGreaterThanOrEqual(3);
+  });
+  it('Night: pomegranate is a FILL carrying dark ink (onAccent), declared as such', () => {
+    const t = souq.find(l => l.id === 'souq.night')!.tokens;
     expect(t.onAccent).toBe(t.onPrimary);
     expect(contrastRatio(t.accent, t.onAccent!)).toBeGreaterThanOrEqual(4.5);
   });
@@ -237,10 +255,30 @@ describe('the brass-for-CTAs alternative (STOP-1) is prepared but unwired', () =
       contrastRatio(SOUQ_NIGHT_ALT_BRASS.primary, SOUQ_NIGHT_ALT_BRASS.onPrimary)
     ).toBeGreaterThanOrEqual(4.5);
   });
-  it('is only referenced by the STOP-1 shot script, never by runtime code', () => {
-    const src = readFileSync(path.join(root, 'packages/shared/src/looks/registry.ts'), 'utf8');
-    expect(src).toMatch(/SOUQ_NIGHT_ALT_BRASS/); // defined here
-    expect(src.match(/SOUQ_NIGHT_ALT_BRASS/g)!.length).toBe(1);
+  it('is not in the public barrel and no runtime source imports it', () => {
+    expect(readFileSync(path.join(root, 'packages/shared/src/looks/index.ts'), 'utf8')).not.toMatch(
+      /stop-alternatives/
+    );
+    expect(readFileSync(path.join(root, 'packages/shared/src/index.ts'), 'utf8')).not.toMatch(
+      /stop-alternatives/
+    );
+    const offenders: string[] = [];
+    const walk = (d: string) => {
+      for (const f of readdirSync(d, { withFileTypes: true })) {
+        if (['node_modules', '.next', 'dist', '.open-next', '__tests__'].includes(f.name)) continue;
+        const full = path.join(d, f.name);
+        if (f.isDirectory()) walk(full);
+        else if (
+          /\.(ts|tsx|js|mjs)$/.test(f.name) &&
+          !/\.test\./.test(f.name) &&
+          f.name !== 'stop-alternatives.ts' &&
+          /SOUQ_NIGHT_ALT_BRASS|stop-alternatives/.test(readFileSync(full, 'utf8'))
+        )
+          offenders.push(path.relative(root, full));
+      }
+    };
+    for (const d of ['apps', 'packages']) walk(path.join(root, d));
+    expect(offenders).toEqual([]);
   });
 });
 
@@ -335,5 +373,84 @@ describe('Souq chrome paints no colour of its own (so the gate above stays true)
     const { getPackStyles } = await import('../../apps/web/src/templates/shared/pack-styles');
     const all = Object.values(getPackStyles('souq')).join(' ');
     expect(all).not.toMatch(/\[#|rgb\(|hsl\(|\b(orange|amber|yellow|gold|brass|saffron)\b/i);
+  });
+});
+
+// I1 (review): a text-role test must check the role the pack ACTUALLY applies. Map every colour
+// class in PACK_STYLES.souq to a look token and measure each (text role, ground) pair on every
+// look, with a margin (>= 4.6) so a rounding step cannot take it under AA. Never credit a role
+// nothing applies (the old test let an unused "accent as text" stand in for text-primary).
+describe('PACK_STYLES.souq: every applied text role clears AA with a margin on every look', () => {
+  type Tok = (typeof souq)[number]['tokens'];
+  const TEXT: Record<string, (t: Tok) => string> = {
+    foreground: t => t.ink,
+    'card-foreground': t => t.ink,
+    primary: t => t.primary,
+    accent: t => t.accent,
+    'muted-foreground': t => t.muted,
+    'primary-foreground': t => t.onPrimary,
+    'accent-foreground': t => t.onAccent ?? t.onPrimary,
+  };
+  const GROUND: Record<string, (t: Tok) => string[]> = {
+    // no bg-* class: the text sits on the page or on a card / muted tile
+    none: t => [t.page, t.surface],
+    background: t => [t.page],
+    card: t => [t.surface],
+    muted: t => [t.surface],
+    primary: t => [t.primary],
+    accent: t => [t.accent],
+  };
+  it('the mapping actually finds roles (guards against a regex that matches nothing)', async () => {
+    const { getPackStyles } = await import('../../apps/web/src/templates/shared/pack-styles');
+    const found = Object.values(getPackStyles('souq')).flatMap(
+      cls =>
+        cls.match(
+          /(?<![:\w-])text-(foreground|primary|accent|muted-foreground|primary-foreground)(?![\w-])/g
+        ) ?? []
+    );
+    expect(found.length).toBeGreaterThanOrEqual(4);
+  });
+  for (const l of souq)
+    it(`${l.id}: each pack class string, role against its ground`, async () => {
+      const { getPackStyles } = await import('../../apps/web/src/templates/shared/pack-styles');
+      const bad: string[] = [];
+      for (const [key, cls] of Object.entries(getPackStyles('souq'))) {
+        if (typeof cls !== 'string') continue;
+        const bgm = cls.match(/(?<![:\w-])bg-(background|card|muted|primary|accent)(?![\w\/-])/);
+        const grounds = GROUND[bgm ? bgm[1] : 'none'](l.tokens);
+        for (const m of cls.matchAll(/(?<![:\w-])text-([a-z-]+)(?![\w\/\[-])/g)) {
+          const role = TEXT[m[1]];
+          if (!role) continue; // text-sm, text-center ... are not colours
+          for (const g of grounds) {
+            const r = contrastRatio(g, role(l.tokens));
+            if (r < 4.6) bad.push(`${key}: text-${m[1]} on ${g} = ${r.toFixed(2)}`);
+          }
+        }
+      }
+      expect(bad).toEqual([]);
+    });
+});
+
+// I2 (review): the gate must see every CSS variable a composed theme EMITS (the derived
+// --<role>-ink shades included), not just the theme's colour keys, so a platform amber that
+// reaches the page through a derived or default variable is caught.
+describe('Ruling B2-2: every CSS variable a Souq theme emits is outside the orange band', () => {
+  for (const l of souq)
+    it(`${l.id}: themeToCssVars colour variables`, () => {
+      const theme = composeStoreTheme({ template: 'souq', look: l.id, theme: null });
+      const vars = themeToCssVars(theme, l.id) as Record<string, string>;
+      const colourVars = Object.entries(vars).filter(([, v]) =>
+        /^-?[\d.]+\s+[\d.]+%\s+[\d.]+%$/.test(v)
+      );
+      expect(colourVars.length).toBeGreaterThan(20);
+      // the derived status inks are among them: that is the leak path the review named
+      expect(colourVars.map(([k]) => k)).toContain('--warning-ink');
+      const bad = colourVars.filter(([, v]) => isOrangeFamily(v)).map(([k, v]) => `${k}=${v}`);
+      expect(bad).toEqual([]);
+    });
+  it('negative control: a legacy skin emits an orange --warning-ink, so the check can fail', () => {
+    const theme = composeStoreTheme({ template: 'minimal', look: null, theme: null });
+    const vars = themeToCssVars(theme) as Record<string, string>;
+    expect(isOrangeFamily(vars['--warning-ink'])).toBe(true);
   });
 });

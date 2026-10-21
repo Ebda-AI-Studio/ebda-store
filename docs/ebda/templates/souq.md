@@ -9,30 +9,31 @@ Souq is the Egyptian general-retail and electronics template: phones, appliances
 |              | Catalogue (`souq.catalogue`)                | Night souq (`souq.night`)                                                   | Showroom (`souq.showroom`)                      |
 | ------------ | ------------------------------------------- | --------------------------------------------------------------------------- | ----------------------------------------------- |
 | Scene        | Many SKUs, shoppers who know what they want | A lit market after dark, warmth without clutter                             | A small premium range sold one object at a time |
-| Colour       | Ink on white, cobalt `#1F5FD6`              | Deep green `#0F3B2E`, cream ink, turquoise `#5FD3C0`, pomegranate `#E8606A` | Soft grey page, ink, electric blue `#2A6BFF`    |
+| Colour       | Ink on white, cobalt `#1F5FD6`              | Deep green `#0F3B2E`, cream ink, turquoise `#5FD3C0`, pomegranate `#F57A83` | Soft grey page, ink, electric blue `#1D5CE6`    |
 | Type         | IBM Plex Sans Arabic / IBM Plex Sans        | Changa / Cairo / Manrope                                                    | Alexandria / Readex Pro / Inter Tight           |
 | Radius, etc. | md, compact, 1/1, subtle                    | md, regular, 1/1, expressive                                                | lg, airy, 1/1, subtle                           |
 | Card action  | the skin's quick add                        | the skin's quick add                                                        | quiet outline add (`cardCta: 'quiet'`)          |
 
 ### Tokens and measured contrast (computed 2026-10-21, asserted in `tests/unit/souq-look-tokens.test.ts`)
 
-| Pair                   | Catalogue | Night souq       | Showroom                 |
-| ---------------------- | --------- | ---------------- | ------------------------ |
-| ink on page            | >= 4.5    | 11.23            | >= 4.5                   |
-| muted on page          | >= 4.5    | 7.38             | >= 4.5                   |
-| onPrimary on primary   | 5.73      | 10.09            | 4.52                     |
-| onAccent on accent     | 5.73      | 5.51 (dark ink)  | >= 4.5                   |
-| accent as text on page | n/a       | 3.75 (fill only) | 5.0 (`#1B61FF` on white) |
+| Pair                     | Catalogue | Night souq      | Showroom |
+| ------------------------ | --------- | --------------- | -------- |
+| ink on page              | >= 4.5    | 11.23           | >= 4.5   |
+| muted on page            | >= 4.5    | 7.38            | >= 4.5   |
+| onPrimary on primary     | 5.73      | 10.09           | 5.64     |
+| onAccent on accent       | 5.73      | 6.98 (dark ink) | 5.89     |
+| chip fill on card / page | n/a       | 3.55 / 4.74     | n/a      |
+| primary as text on page  | 5.73      | 6.86            | 5.08     |
 
-Night's pomegranate is a FILL with dark ink for sale and new chips, never a text colour on the page. Inputs read `--input` (the muted ink), so a field boundary is >= 3:1 on every look.
+Night's pomegranate is a FILL with dark ink for sale and new chips (>= 3:1 against the card and the page). Inputs read `--input` (the muted ink), so a field boundary is >= 3:1 on every look.
 
 ## The STOP-1 alternative
 
-If Ahmad prefers a warmer Night souq, `SOUQ_NIGHT_ALT_BRASS` (`registry.ts`) keeps brass `#C89B3C` for CTAs only (4.87:1 on the page) with the same green room and pomegranate chips. It is unwired: only the STOP-1 shot script reads it, and it ships only if Ahmad picks it (Ruling B2-2).
+If Ahmad prefers a warmer Night souq, `SOUQ_NIGHT_ALT_BRASS` (`packages/shared/src/looks/stop-alternatives.ts`, in no barrel) keeps brass `#C89B3C` for CTAs only (4.87:1 on the page) with the same green room and pomegranate chips. It is unwired: only the STOP-1 shot script reads it, and it ships only if Ahmad picks it (Ruling B2-2).
 
 ## Chrome (Task 2)
 
-`apps/web/src/templates/souq/Header.tsx` wraps the minimal header and reads the look's `chrome.header.search`: Catalogue and Night souq are **prominent** (one labelled search field, `role="search"`, 44px tall, with a themed clear button; under the logo row on a phone, in the centre column from `md`, the nav on a second row from `lg`), Showroom keeps the skin's **icon** search (the product is the hero, the chrome stays quiet). The label is "ابحث عن منتج أو ماركة" / "Search for a product or brand" (`LanguageContext` translations). The store name is the sized, untracked display wordmark (`wordmarkSize: 'lg'` on all three looks, so checkout shows the same one). `PACK_STYLES.souq` is the framed tile card with a two-line name, a firm price and one always-visible quick add; the `[data-pack='souq']` CSS sets the type voice only (no colour of its own, pinned by `souq-look-tokens.test.ts`).
+`apps/web/src/templates/souq/Header.tsx` wraps the minimal header and reads the look's `chrome.header.search`: Catalogue and Night souq are **prominent** (one labelled search field, `role="search"`, 44px tall, with a themed clear button; under the logo row on a phone, in the centre column from `md`, the nav on a second row from `lg`), Showroom keeps the skin's **icon** search (the product is the hero, the chrome stays quiet). The label is "دوّر على منتج أو ماركة" / "Search for a product or brand" (`LanguageContext` translations). The store name is the sized, untracked display wordmark (`wordmarkSize: 'lg'` on all three looks, so checkout shows the same one). `PACK_STYLES.souq` is the framed tile card with a two-line name, a firm price and one always-visible quick add; the `[data-pack='souq']` CSS sets the type voice only (no colour of its own, pinned by `souq-look-tokens.test.ts`).
 
 ## Status of the build (Phase B2)
 

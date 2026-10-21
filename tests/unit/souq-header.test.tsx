@@ -90,8 +90,8 @@ describe('souq header: search-first (prominent)', () => {
     expect(input.getAttribute('enterkeyhint')).toBe('search');
     // a real <label> bound to the field, in the page language
     const label = form.querySelector(`label[for="${input.id}"]`);
-    expect(label?.textContent).toBe('ابحث عن منتج أو ماركة');
-    expect(input.placeholder).toBe('ابحث عن منتج أو ماركة');
+    expect(label?.textContent).toBe('دوّر على منتج أو ماركة');
+    expect(input.placeholder).toBe('دوّر على منتج أو ماركة');
   });
   it('is under the logo row on a phone and in the centre column from md (one element, two placements)', () => {
     setLook('souq.night');
@@ -124,14 +124,14 @@ describe('souq header: search-first (prominent)', () => {
     setLook('souq.catalogue', 'ar');
     const { container } = render(<SouqHeader branding={branding} />);
     const input = container.querySelector('input[type="search"]') as HTMLInputElement;
-    expect(container.querySelector('button[aria-label="مسح البحث"]')).toBeNull();
+    expect(container.querySelector('button[aria-label="امسح البحث"]')).toBeNull();
     fireEvent.change(input, { target: { value: 'ثلاجة' } });
-    const clear = container.querySelector('button[aria-label="مسح البحث"]') as HTMLButtonElement;
+    const clear = container.querySelector('button[aria-label="امسح البحث"]') as HTMLButtonElement;
     expect(clear).not.toBeNull();
     fireEvent.click(clear);
     expect(input.value).toBe('');
     expect(document.activeElement).toBe(input);
-    expect(container.querySelector('button[aria-label="مسح البحث"]')).toBeNull();
+    expect(container.querySelector('button[aria-label="امسح البحث"]')).toBeNull();
   });
   it('removes the native WebKit search cancel button (no unthemed native control)', () => {
     setLook('souq.catalogue');

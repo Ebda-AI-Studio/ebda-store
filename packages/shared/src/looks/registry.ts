@@ -10,23 +10,6 @@ export const LOOK_TEMPLATES: readonly LookTemplate[] = [
 
 const L = (d: LookDefinition) => d;
 
-/**
- * STOP-1 alternative for Night souq (Ruling B2-2, prepared, NOT wired): the same room with brass
- * (#C89B3C, 4.87:1 on the page) kept for CTAs only, pomegranate kept for chips. It is in the
- * orange family's neighbourhood (41 deg), so it ships only if Ahmad picks it at STOP-1. Used by
- * the STOP-1 shot script alone; no runtime code and no registry entry reads it.
- */
-export const SOUQ_NIGHT_ALT_BRASS = {
-  page: '#0F3B2E',
-  surface: '#14503F',
-  ink: '#F6F3EA',
-  muted: '#B4CDC0',
-  primary: '#C89B3C',
-  onPrimary: '#10151C',
-  accent: '#E8606A',
-  onAccent: '#10151C',
-  line: '#1E5A48',
-} as const;
 export const LOOKS: readonly LookDefinition[] = [
   L({
     id: 'qamar.atelier',
@@ -289,7 +272,7 @@ export const LOOKS: readonly LookDefinition[] = [
       // brass (#C89B3C, 41 deg) and lantern orange (#E68245, 23 deg) are in the forbidden band.
       primary: '#5FD3C0',
       onPrimary: '#10151C',
-      accent: '#E8606A',
+      accent: '#F57A83',
       onAccent: '#10151C',
       line: '#1E5A48',
       fonts: { display: 'Changa', body: 'Cairo', latin: 'Manrope' },
@@ -322,9 +305,9 @@ export const LOOKS: readonly LookDefinition[] = [
       surface: '#FFFFFF',
       ink: '#0B0C0E',
       muted: '#565B63',
-      primary: '#2A6BFF',
+      primary: '#1D5CE6',
       onPrimary: '#FFFFFF',
-      accent: '#1B61FF',
+      accent: '#1757E8',
       line: '#DFE2E7',
       fonts: { display: 'Alexandria', body: 'Readex Pro', latin: 'Inter Tight' },
       radius: 'lg',
