@@ -59,6 +59,8 @@ vi.mock('@api/middleware/security', () => ({
   verifyEmailLimiter: (_req: unknown, _res: unknown, next: () => void) => next(),
   // customers.routes.ts (#1873) imports this too.
   writeLimiter: (_req: unknown, _res: unknown, next: () => void) => next(),
+  passkeyBeginLimiter: (_req: unknown, _res: unknown, next: () => void) => next(),
+  passkeyFinishLimiter: (_req: unknown, _res: unknown, next: () => void) => next(),
   auditLog: vi.fn(),
   generateCsrfToken: vi.fn(() => 'csrf'),
 }));
@@ -72,6 +74,7 @@ import { rejectImpersonated } from '@api/middleware/auth';
 import authRoutes from '@api/routes/auth.routes';
 import mfaRoutes from '@api/routes/mfa.routes';
 import customersRoutes from '@api/routes/customers.routes';
+import passkeyRoutes from '@api/routes/passkey.routes';
 
 function makeRes() {
   const recorded: { status: number; body: unknown } = { status: 200, body: undefined };
@@ -165,6 +168,9 @@ const ROUTERS: Record<string, Router> = {
   // anonymization DELETE /auth/me uses), so it belongs in DESTRUCTIVE_ROUTES
   // below exactly like that route does (#1873).
   customers: customersRoutes as unknown as Router,
+  // `/auth/passkeys/*` — a FOURTH router (review M1). A passkey is a permanent way into the account, so
+  // adding, renaming or removing one from an impersonation session is the same class as the MFA routes.
+  passkeys: passkeyRoutes as unknown as Router,
 };
 
 function middlewareOn(
@@ -199,6 +205,12 @@ const DESTRUCTIVE_ROUTES: Array<[string, string, string]> = [
   // impersonation session must not be able to trigger this any more than it
   // can erase the impersonated person's own account via `/auth/me/erase`.
   ['customers', 'post', '/customers/:customerId/erase'],
+  // Passkeys (review M1): every write that changes how the account can be entered.
+  ['passkeys', 'post', '/step-up'],
+  ['passkeys', 'post', '/register/begin'],
+  ['passkeys', 'post', '/register/finish'],
+  ['passkeys', 'patch', '/:id'],
+  ['passkeys', 'delete', '/:id'],
 ];
 
 describe('rejectImpersonated — mounted on every account-destructive route', () => {
@@ -224,5 +236,10 @@ describe('rejectImpersonated — mounted on every account-destructive route', ()
     // `/auth/mfa/verify` is the pre-session challenge — there is no
     // `req.user` yet, so it is correctly excluded rather than overlooked.
     expect(middlewareOn('mfa', 'post', '/verify')).not.toContain(rejectImpersonated);
+    // Passkey sign-in and the list are pre-session / read-only.
+    expect(middlewareOn('passkeys', 'post', '/authenticate/finish')).not.toContain(
+      rejectImpersonated
+    );
+    expect(middlewareOn('passkeys', 'get', '/')).not.toContain(rejectImpersonated);
   });
 });
