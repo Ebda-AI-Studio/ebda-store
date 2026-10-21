@@ -139,3 +139,10 @@ describe('PUBLIC_SETTINGS_KEYS covers every storefront settings read (issue 2074
     expect(missing).toEqual([]);
   });
 });
+
+describe('receiptBarcodeShape is public (the receipt renders it)', () => {
+  it('is allowlisted and passes through publicStoreSettings', () => {
+    expect(PUBLIC_SETTINGS_KEYS).toContain('receiptBarcodeShape');
+    expect(publicStoreSettings({ receiptBarcodeShape: 'palm' })).toEqual({ receiptBarcodeShape: 'palm' });
+  });
+});

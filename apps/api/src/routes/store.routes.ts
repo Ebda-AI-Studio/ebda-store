@@ -31,6 +31,7 @@ import {
   LOOK_MOTIONS,
   deliveryDaysSchema,
   deliveryOffDaysSchema,
+  receiptBarcodeShapeSchema,
   footerBottomBarSchema,
   normalizeStoredBottomBar,
 } from '@ebda/shared';
@@ -104,6 +105,21 @@ function addDeliveryOffDaysIssues(
   }
 }
 
+/** `settings.receiptBarcodeShape`: plain | off | one of the approved shape ids; null clears. */
+function addReceiptBarcodeShapeIssues(
+  settings: Record<string, unknown> | undefined,
+  ctx: z.RefinementCtx
+) {
+  const v = settings?.receiptBarcodeShape;
+  if (v === undefined || v === null) return;
+  if (receiptBarcodeShapeSchema.safeParse(v).success) return;
+  ctx.addIssue({
+    code: z.ZodIssueCode.custom,
+    path: ['receiptBarcodeShape'],
+    message: 'Unknown receipt barcode shape',
+  });
+}
+
 /**
  * Everything the open `settings` blob must satisfy, on EVERY route that writes it (create AND
  * update — a check on update only leaves POST /stores as the bypass):
@@ -131,6 +147,7 @@ function addSettingsIssues(settings: Record<string, unknown> | undefined, ctx: z
   }
   addDeliveryDaysIssues(settings, ctx);
   addDeliveryOffDaysIssues(settings, ctx);
+  addReceiptBarcodeShapeIssues(settings, ctx);
   // The footer legal row's toggles + © override (S-01): typed, length-capped.
   const footerLinks = settings?.footerLinks;
   if (footerLinks && typeof footerLinks === 'object' && 'bottomBar' in footerLinks) {
