@@ -163,6 +163,80 @@ export default function MinimalHeader({
             )}
           </Link>
 
+          {/* a11y M3: the search follows the logo in the DOM, as on screen (grid placement is explicit, so this is a pure DOM move): Tab goes logo, search, nav, actions. */}
+          {isProminent && (
+            <form
+              role="search"
+              action={`${urlPrefix}/search`}
+              method="get"
+              onSubmit={handleProminentSearch}
+              className="relative col-span-2 row-start-2 md:col-span-1 md:col-start-2 md:row-start-1"
+              data-zone="souq-search"
+            >
+              <label htmlFor={searchId} className="sr-only">
+                {t('Search for a product or brand', translations['Search for a product or brand'])}
+              </label>
+              <svg
+                className="pointer-events-none absolute start-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+                strokeWidth={1.5}
+                aria-hidden="true"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                />
+              </svg>
+              <input
+                ref={searchInputRef}
+                id={searchId}
+                name="q"
+                type="search"
+                enterKeyHint="search"
+                autoComplete="off"
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                placeholder={t(
+                  'Search for a product or brand',
+                  translations['Search for a product or brand']
+                )}
+                dir={isRtl ? 'rtl' : 'ltr'}
+                className="h-11 w-full appearance-none rounded-[var(--radius)] border border-input bg-card ps-10 pe-11 text-base text-foreground placeholder:text-muted-foreground outline-none transition-colors duration-200 focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary [&::-webkit-search-cancel-button]:appearance-none"
+              />
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSearchQuery('');
+                    searchInputRef.current?.focus();
+                  }}
+                  aria-label={t('Clear search', translations['Clear search'])}
+                  className="absolute inset-y-0 end-0 inline-flex h-11 w-11 items-center justify-center rounded-[var(--radius)] text-muted-foreground transition-colors duration-200 hover:text-foreground outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                >
+                  <svg
+                    className="h-4 w-4"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                    strokeWidth={1.5}
+                    aria-hidden="true"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              )}
+              <SearchAutocomplete
+                query={searchQuery}
+                onSelect={() => {
+                  setSearchQuery('');
+                }}
+              />
+            </form>
+          )}
+
           {/* Desktop nav — centered absolutely */}
           <nav
             aria-label={t('Main', 'الرئيسية')}
@@ -292,79 +366,6 @@ export default function MinimalHeader({
               </svg>
             </button>
           </div>
-
-          {isProminent && (
-            <form
-              role="search"
-              action={`${urlPrefix}/search`}
-              method="get"
-              onSubmit={handleProminentSearch}
-              className="relative col-span-2 row-start-2 md:col-span-1 md:col-start-2 md:row-start-1"
-              data-zone="souq-search"
-            >
-              <label htmlFor={searchId} className="sr-only">
-                {t('Search for a product or brand', translations['Search for a product or brand'])}
-              </label>
-              <svg
-                className="pointer-events-none absolute start-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-                strokeWidth={1.5}
-                aria-hidden="true"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-                />
-              </svg>
-              <input
-                ref={searchInputRef}
-                id={searchId}
-                name="q"
-                type="search"
-                enterKeyHint="search"
-                autoComplete="off"
-                value={searchQuery}
-                onChange={e => setSearchQuery(e.target.value)}
-                placeholder={t(
-                  'Search for a product or brand',
-                  translations['Search for a product or brand']
-                )}
-                dir={isRtl ? 'rtl' : 'ltr'}
-                className="h-11 w-full appearance-none rounded-[var(--radius)] border border-input bg-card ps-10 pe-11 text-base text-foreground placeholder:text-muted-foreground outline-none transition-colors duration-200 focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary [&::-webkit-search-cancel-button]:appearance-none"
-              />
-              {searchQuery && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSearchQuery('');
-                    searchInputRef.current?.focus();
-                  }}
-                  aria-label={t('Clear search', translations['Clear search'])}
-                  className="absolute inset-y-0 end-0 inline-flex h-11 w-11 items-center justify-center rounded-[var(--radius)] text-muted-foreground transition-colors duration-200 hover:text-foreground outline-none focus-visible:ring-2 focus-visible:ring-primary"
-                >
-                  <svg
-                    className="h-4 w-4"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                    strokeWidth={1.5}
-                    aria-hidden="true"
-                  >
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              )}
-              <SearchAutocomplete
-                query={searchQuery}
-                onSelect={() => {
-                  setSearchQuery('');
-                }}
-              />
-            </form>
-          )}
         </div>
 
         {/* Mobile persistent search bar — always visible under the logo
