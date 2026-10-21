@@ -15,6 +15,7 @@ import logger from '../lib/logger';
 import {
   allocatePartialReturn,
   splitByPaymentMix,
+  type AllocationLine,
 } from './accounting/posting/partial-return-allocation';
 import { GATEWAY_REFUND_METHODS, REFUND_METHODS } from '../lib/refund-methods';
 import {
@@ -845,13 +846,13 @@ export class ReturnService {
       // claw back the full affiliate commission and strip loyalty points earned
       // on the kept items (adversarial audit P1-2).
       let isFullReturn = false;
-      let orderLines: Array<{ id: string; quantity: number; price: number }> = [];
+      let orderLines: AllocationLine[] = [];
       if (returnRequest.orderId) {
         const orderItems = await prisma.orderItem.findMany({
           where: { orderId: returnRequest.orderId },
           // `price` is for the partial allocation below, not just the
           // full/partial decision.
-          select: { id: true, quantity: true, price: true },
+          select: { id: true, quantity: true, price: true, priceSource: true },
         });
         orderLines = orderItems;
         const returnedQty = new Map<string, number>();
@@ -1239,11 +1240,11 @@ export class ReturnService {
     const isInventoryRestoring = returnRequest.type === 'return' || returnRequest.type === 'refund';
 
     let isFullReturn = false;
-    let orderLines: Array<{ id: string; quantity: number; price: number }> = [];
+    let orderLines: AllocationLine[] = [];
     if (returnRequest.orderId) {
       orderLines = await prisma.orderItem.findMany({
         where: { orderId: returnRequest.orderId },
-        select: { id: true, quantity: true, price: true },
+        select: { id: true, quantity: true, price: true, priceSource: true },
       });
       const returnedQty = new Map<string, number>();
       for (const it of returnRequest.items) {
@@ -1583,7 +1584,7 @@ export class ReturnService {
     storeId: string,
     returnId: string,
     orderId: string,
-    orderLines: Array<{ id: string; quantity: number; price: number }>,
+    orderLines: AllocationLine[],
     items: Array<{ orderItemId: string; quantity: number }>,
     /** B2B Task 8b: signed piastres this return's tier adjustment (0 for every non-B2B line). */
     thisAdjustment = 0
@@ -1866,7 +1867,7 @@ export class ReturnService {
     storeId: string,
     returnId: string,
     orderId: string,
-    orderLines: Array<{ id: string; quantity: number; price: number }>,
+    orderLines: AllocationLine[],
     items: Array<{ orderItemId: string; quantity: number }>,
     isFullReturn: boolean,
     thisAdjustment = 0

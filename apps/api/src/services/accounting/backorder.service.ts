@@ -199,7 +199,7 @@ export async function cancelBackorder(
         tax: true,
         taxIncludedInPrice: true,
         paymentStatus: true,
-        items: { select: { id: true, quantity: true, price: true } },
+        items: { select: { id: true, quantity: true, price: true, priceSource: true } },
       },
     });
     const { prevQty } = await loadPriorReversedQty(tx, { storeId, orderId, excludeKey: refundKey });

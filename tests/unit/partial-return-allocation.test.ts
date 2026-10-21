@@ -21,8 +21,8 @@ import { allocatePartialReturn } from '@api/services/accounting/posting/partial-
 
 /** Two lines: 2 × 10.000 EGP and 1 × 5.000 EGP. Subtotal 25.000. */
 const LINES = [
-  { id: 'oi-1', quantity: 2, price: 10_000 },
-  { id: 'oi-2', quantity: 1, price: 5_000 },
+  { id: 'oi-1', quantity: 2, price: 10_000, priceSource: null },
+  { id: 'oi-2', quantity: 1, price: 5_000, priceSource: null },
 ];
 const SUBTOTAL = 25_000;
 
@@ -186,5 +186,56 @@ describe('allocatePartialReturn', () => {
     expect(r.discountThis).toBe(0);
     expect(r.taxThis).toBe(0);
     expect(r.cashCredit).toBe(10_000);
+  });
+
+  describe('final review P2-2: a tier / group line never got the coupon, so it carries none of it back (Ruling B2B-5)', () => {
+    // base line 1 x 100 with a 20% coupon (discount 20), tier line 10 x 80 = 800; subtotal 900
+    const MIXED = [
+      { id: 'base', quantity: 1, price: 100, priceSource: 'base' },
+      { id: 'tier', quantity: 10, price: 80, priceSource: 'tier' },
+    ];
+    const mixed = (
+      requested: Array<{ orderItemId: string; quantity: number }>,
+      prev: Array<[string, number]> = []
+    ) =>
+      allocatePartialReturn({
+        subtotal: 900,
+        discount: 20,
+        tax: 0,
+        lines: MIXED,
+        prevQty: new Map(prev),
+        requested,
+      });
+
+    it('returning the whole tier line refunds 800 in full (was 783: floor(20 x 800 / 900) = 17 charged against it)', () => {
+      const r = mixed([{ orderItemId: 'tier', quantity: 10 }]);
+      expect(r.discountThis).toBe(0);
+      expect(r.cashCredit).toBe(800);
+    });
+    it('returning the base line takes back its WHOLE discount share (20, not floor(20 x 100 / 900) = 2)', () => {
+      const r = mixed([{ orderItemId: 'base', quantity: 1 }]);
+      expect(r.discountThis).toBe(20);
+      expect(r.cashCredit).toBe(80);
+    });
+    it('a group-priced line is excluded the same way; returning everything still telescopes to exactly subtotal - discount', () => {
+      const first = mixed([{ orderItemId: 'tier', quantity: 4 }]);
+      const second = mixed(
+        [
+          { orderItemId: 'tier', quantity: 6 },
+          { orderItemId: 'base', quantity: 1 },
+        ],
+        [['tier', 4]]
+      );
+      expect(first.cashCredit + second.cashCredit).toBe(900 - 20);
+      const g = allocatePartialReturn({
+        subtotal: 900,
+        discount: 20,
+        tax: 0,
+        lines: [MIXED[0]!, { ...MIXED[1]!, priceSource: 'group' }],
+        prevQty: new Map(),
+        requested: [{ orderItemId: 'tier', quantity: 10 }],
+      });
+      expect(g.discountThis).toBe(0);
+    });
   });
 });
