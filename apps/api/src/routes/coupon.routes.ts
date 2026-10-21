@@ -99,6 +99,13 @@ const validateTargetingSchema = z.object({
   cartItems: cartItemsSchema.optional(),
   phone: z.string().nullish(),
   email: z.string().nullish(),
+  /**
+   * The WHOLE loose cart (tier / group priced lines included), which a free-shipping code is judged on (Ruling B2B-M2,
+   * final review P2-3); `orderTotal` / `cartItems` stay the base-priced basis every other coupon type uses (B2B-5).
+   * Optional: a client that sends neither keeps the base-priced judgement.
+   */
+  looseOrderTotal: z.number().int().min(0).optional(),
+  looseCartItems: cartItemsSchema.optional(),
 });
 
 /**
@@ -295,12 +302,13 @@ router.post(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId } = req.params;
-      const { code, orderTotal } = req.body;
+      const { code, orderTotal: basisOrderTotal } = req.body;
       // Validated separately from code/orderTotal (left untouched below) so
       // a malformed cartItems/phone/email (e.g. an object or array instead
       // of a string) fails with a clean 400 here rather than reaching
       // Prisma inside resolveCustomerContext as an uncontrolled 500.
-      const { cartItems, phone, email } = validateTargetingSchema.parse(req.body);
+      const parsed = validateTargetingSchema.parse(req.body);
+      const { phone, email } = parsed;
 
       if (!code) {
         res.status(400).json({
@@ -322,6 +330,13 @@ router.post(
         });
         return;
       }
+
+      // A free-shipping code is judged on the whole loose cart (Ruling B2B-M2), exactly as OrderService.create does.
+      const looseBasis = coupon.type === 'free_shipping';
+      const orderTotal =
+        looseBasis && parsed.looseOrderTotal != null ? parsed.looseOrderTotal : basisOrderTotal;
+      const cartItems =
+        looseBasis && parsed.looseCartItems ? parsed.looseCartItems : parsed.cartItems;
 
       // Check minimum order amount. `orderTotal != null` rather than a
       // truthiness check: a bundle-only cart's basis is legitimately `0`

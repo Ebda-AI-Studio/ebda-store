@@ -18,7 +18,11 @@ import { BundleLine } from '../../components/BundleLine';
 import { CartLineUnavailableNotice } from '../../templates/shared/CartLineUnavailable';
 import { summaryMoneyFormatter } from '../../templates/shared/useOrderSummaryBase';
 import { pageSurfaceStyle } from '@/lib/page-surface';
-import { couponQuoteBasis, couponQuoteCartItems } from '@/lib/coupon-quote-basis';
+import {
+  couponQuoteBasis,
+  couponQuoteCartItems,
+  couponQuoteLooseFields,
+} from '@/lib/coupon-quote-basis';
 import { moqShortfalls, moqCartMessage, cartMaxQty, moqFix } from '@/lib/b2b-moq';
 import { productUnavailableCopy } from '@/lib/product-cart-errors';
 import {
@@ -238,6 +242,8 @@ export default function CartClient() {
         // The loose lines themselves, so the route evaluates the coupon's
         // targeting now rather than accepting a code checkout will refuse.
         cartItems: couponQuoteCartItems(cartItems),
+        // A free-shipping code is judged on the whole loose cart (Ruling B2B-M2).
+        ...couponQuoteLooseFields(cartItems),
       });
       if (result.success && result.data) {
         setPromoApplied(true);
@@ -306,6 +312,8 @@ export default function CartClient() {
           // Same loose-items-only basis as the manual apply above.
           orderTotal: couponBasis,
           cartItems: couponQuoteCartItems(cartItems),
+          // A free-shipping code is judged on the whole loose cart (Ruling B2B-M2).
+          ...couponQuoteLooseFields(cartItems),
         });
         if (result.success && result.data) {
           setPromoCode(result.data.coupon.code);

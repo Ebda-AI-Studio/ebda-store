@@ -15,6 +15,8 @@ Plan: `docs/plans/2026-10-21-b2b-wholesale.md`. Rulings: `docs/RULINGS.md` (B2B-
 
 Cart and order endpoints take the buyer from the session only; a typed phone or email never selects a group (Ruling B2B-2c).
 
+`POST /:storeId/coupons/validate` keeps `orderTotal` / `cartItems` as the base-priced basis (tier / group lines excluded, Ruling B2B-5) and also takes optional `looseOrderTotal` / `looseCartItems`, the whole loose cart: a `free_shipping` code's minimum, quantity and scope are judged on those, as at order creation (Ruling B2B-M2). A client that omits them keeps the base-basis judgement.
+
 ## Merchant (`/api/v1/stores/:storeId`, store admin)
 
 | Method and path | Notes |
@@ -29,9 +31,9 @@ Cart and order endpoints take the buyer from the session only; a typed phone or 
 | `POST /wholesale-applications/:id/revoke` | `{ note? }`. Removes the buyer from every wholesale group; response `membership` is `removed` or `already_not_wholesale`. 409 `NOT_APPROVED`. |
 | `GET /analytics/price-source` | Line revenue split `retail` / `tier` / `group` / `wholesale`, `wholesaleSharePercent`. |
 
-### Returns (tier-aware partial refunds, Rulings B2B-14, B2B-15)
+### Returns (tier-aware partial refunds, Rulings B2B-14, B2B-15, B2B-17, B2B-18)
 
-`GET /returns/admin/:id/refund-preview[?overrides=<json>]` adds `lines[]` (`standardRefund`, `adjustment`, `adjustedRefund`, `shortfall`, `keptQty`, `tierMinQty`, `reason`) and `tierAdjustmentTotal`. `POST /returns/admin/:id/complete` accepts `refundOverrides: { [returnItemId]: { amountMinor, reason } }` (needs `orders:refund`; 400 `OVERRIDE_OUT_OF_RANGE`, `OVERRIDE_UNKNOWN_ITEM`, `OVERRIDE_NOT_APPLICABLE`).
+`GET /returns/admin/:id/refund-preview[?overrides=<json>]` adds `lines[]` (`standardRefund`, `adjustment`, `adjustedRefund`, `shortfall`, `keptQty`, `tierMinQty`, `keptUnitMinor`, `reason`) and `tierAdjustmentTotal`. The adjustment is computed per PRODUCT across every loose line of it (`keptQty` is the product's kept quantity) and spread over the return's items of that product; `shortfall` is reported once per product, on its first item; `reason` follows the applied adjustment. The shopper's `refundAmount` estimate at creation uses the same computation. `POST /returns/admin/:id/complete` accepts `refundOverrides: { [returnItemId]: { amountMinor, reason } }` (needs `orders:refund`; 400 `OVERRIDE_OUT_OF_RANGE`, `OVERRIDE_UNKNOWN_ITEM`, `OVERRIDE_NOT_APPLICABLE`).
 
 ## Realtime and jobs
 

@@ -65,3 +65,26 @@ export function couponQuoteCartItems(
     lineTotal: item.price * item.quantity,
   }));
 }
+
+/**
+ * The WHOLE loose cart (tier / group priced lines included, unavailable lines excluded) for the validate route's
+ * free-shipping judgement (Ruling B2B-M2, final review P2-3): a free-shipping code acts on the shipping line, so
+ * `OrderService.create` checks its minimum, quantity and scope against every loose line, not only the base-priced ones.
+ * Spread into every `POST /coupons/validate` body next to `orderTotal` / `cartItems`.
+ */
+export function couponQuoteLooseFields(
+  items: ReadonlyArray<CouponQuoteLine & { productId: string }>
+): {
+  looseOrderTotal: number;
+  looseCartItems: Array<{ productId: string; quantity: number; lineTotal: number }>;
+} {
+  const loose = items.filter(item => !item.unavailable);
+  return {
+    looseOrderTotal: loose.reduce((sum, item) => sum + item.price * item.quantity, 0),
+    looseCartItems: loose.map(item => ({
+      productId: item.productId,
+      quantity: item.quantity,
+      lineTotal: item.price * item.quantity,
+    })),
+  };
+}

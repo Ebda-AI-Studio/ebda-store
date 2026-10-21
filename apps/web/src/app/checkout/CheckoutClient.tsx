@@ -62,7 +62,11 @@ import {
   type DeliveryDay,
 } from './_lib/deliveryWindows';
 import { pageSurfaceStyle } from '@/lib/page-surface';
-import { couponQuoteBasis, couponQuoteCartItems } from '@/lib/coupon-quote-basis';
+import {
+  couponQuoteBasis,
+  couponQuoteCartItems,
+  couponQuoteLooseFields,
+} from '@/lib/coupon-quote-basis';
 import {
   resolveSectionZone,
   zoneStyle,
@@ -881,6 +885,8 @@ export default function CheckoutClient() {
             // way OrderService.create will, instead of accepting a code the
             // order then refuses.
             cartItems: couponQuoteCartItems(cartContextItems),
+            // A free-shipping code is judged on the whole loose cart (Ruling B2B-M2).
+            ...couponQuoteLooseFields(cartContextItems),
             phone: formData.phone.trim() || undefined,
             email: formData.email.trim() || undefined,
           }

@@ -468,6 +468,63 @@ describe.skipIf(!hasDb)('B2B price parity, order-time binding, MOQ, coupon exclu
     expect(o2.subtotal).toBe(85_000);
   });
 
+  it("B2B-M2 (final review P2-3): a free-shipping code's minimum is judged on the whole loose cart, so an all-tier cart qualifies; a percentage code's minimum still is not", async () => {
+    const mk = (code: string, type: 'free_shipping' | 'percentage') =>
+      prisma.coupon.create({
+        data: {
+          storeId: store.storeId,
+          code: `${code}-${SUF}`.toUpperCase(),
+          name: code,
+          type,
+          value: type === 'percentage' ? 10 : 0,
+          minOrderAmount: 50_000,
+        },
+      });
+    const ship = await mk('FS500', 'free_shipping');
+    const pct = await mk('PCT500', 'percentage');
+    // 85000 of tier-priced goods, base basis 0: "free shipping over 500" applies (was 400 MIN_ORDER_NOT_MET)
+    const o = await place(
+      await cartFor(ANONYMOUS_BUYER, undefined, [[id.p1, 10]]),
+      ANONYMOUS_BUYER,
+      {
+        couponCode: ship.code,
+      }
+    );
+    expect(o).toMatchObject({ subtotal: 85_000, shipping: 0, discount: 0, couponCode: ship.code });
+    // the B2B-5 basis still governs a percentage code
+    await expect(
+      place(await cartFor(ANONYMOUS_BUYER, undefined, [[id.p1, 10]]), ANONYMOUS_BUYER, {
+        couponCode: pct.code,
+      })
+    ).rejects.toMatchObject({ code: 'MIN_ORDER_NOT_MET' });
+    // admin order: same split
+    const admin = await OrderService.createAdminOrder(
+      store.storeId,
+      store.ownerId,
+      {
+        shippingAddress: { ...testShippingAddress() },
+        items: [{ productId: id.p1, quantity: 10 }],
+        couponCode: ship.code,
+      },
+      { role: 'store_admin' },
+      { buyer: ANONYMOUS_BUYER }
+    );
+    expect(admin).toMatchObject({ shipping: 0, couponCode: ship.code });
+    await expect(
+      OrderService.createAdminOrder(
+        store.storeId,
+        store.ownerId,
+        {
+          shippingAddress: { ...testShippingAddress() },
+          items: [{ productId: id.p1, quantity: 10 }],
+          couponCode: pct.code,
+        },
+        { role: 'store_admin' },
+        { buyer: ANONYMOUS_BUYER }
+      )
+    ).rejects.toMatchObject({ code: 'MIN_ORDER_NOT_MET' });
+  });
+
   it('I2: the entitlement is read UNCACHED at order time - a plan/override change binds the very next order', async () => {
     const sessionId = () => cartFor(session(id.w), undefined, [[id.p1, 1]]);
     // override OFF -> retail even though the group and tiers exist

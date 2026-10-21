@@ -1038,16 +1038,20 @@ export class OrderService {
     // Build the targeting cart snapshot (product + category ids, per-line
     // totals) shared by coupon targeting and automatic promotion resolution.
     // Only coupon-eligible (base-priced) lines are in it, priced exactly as charged.
-    const cartItems = cart.items
-      .filter(item => eligibleForCoupon(lineUnit(item)))
-      .map(item => ({
-        productId: item.productId,
-        categoryIds: (productInternalsById.get(item.productId)?.categories ?? []).map(
-          c => c.categoryId
-        ),
-        quantity: item.quantity,
-        lineTotal: lineUnit(item).unitMinor * item.quantity,
-      }));
+    // `looseCartItems` keeps EVERY loose line: a free-shipping coupon judges its minimum, quantity and scope on the whole
+    // loose cart, because shipping is not a price discount (Ruling B2B-M2, final review P2-3).
+    const looseCartItems = cart.items.map(item => ({
+      productId: item.productId,
+      categoryIds: (productInternalsById.get(item.productId)?.categories ?? []).map(
+        c => c.categoryId
+      ),
+      quantity: item.quantity,
+      lineTotal: lineUnit(item).unitMinor * item.quantity,
+      eligible: eligibleForCoupon(lineUnit(item)),
+    }));
+    const cartItems = looseCartItems
+      .filter(item => item.eligible)
+      .map(({ eligible: _eligible, ...item }) => item);
 
     // Per-store, opt-in minimum order value (Store.settings.minimumOrderFils,
     // piastres; 0/unset = no minimum). Platform-level — any store can configure
@@ -1171,7 +1175,12 @@ export class OrderService {
       // had just "qualified" for. `looseSubtotal === subtotal` whenever the
       // cart holds no bundle, so this is the identity for every store
       // without the `bundles` feature.
-      if (appliedCoupon.minOrderAmount && couponBasisSubtotal < appliedCoupon.minOrderAmount) {
+      // Ruling B2B-M2 (final review P2-3): a free-shipping code acts on the shipping line, not the discount basis, so its
+      // minimum, quantity and scope are judged on the whole loose cart, tier / group lines included. Every other coupon
+      // type keeps the base-priced basis (B2B-5).
+      const freeShipping = appliedCoupon.type === 'free_shipping';
+      const couponMinBasis = freeShipping ? looseSubtotal : couponBasisSubtotal;
+      if (appliedCoupon.minOrderAmount && couponMinBasis < appliedCoupon.minOrderAmount) {
         throw new AppError(
           400,
           'MIN_ORDER_NOT_MET',
@@ -1188,7 +1197,12 @@ export class OrderService {
       // to a minimum quantity, or to specific products or categories applied to
       // anyone who typed it. `evaluateForCart` already accepts the type — the
       // branch simply never asked it.
-      const evalResult = CouponService.evaluateForCart(appliedCoupon, targetingCtx);
+      const evalResult = CouponService.evaluateForCart(
+        appliedCoupon,
+        freeShipping
+          ? { ...targetingCtx, cartItems: looseCartItems.map(({ eligible: _e, ...item }) => item) }
+          : targetingCtx
+      );
       if (!evalResult.eligible) {
         throw new AppError(400, 'COUPON_NOT_ELIGIBLE', 'This coupon does not apply to your cart.');
       }
@@ -3220,10 +3234,13 @@ export class OrderService {
         { phone: idPhone, email: idEmail, customerId: data.customerId ?? null },
         pricingOpts.buyer ?? ANONYMOUS_BUYER
       );
+      // Ruling B2B-M2 (final review P2-3): a free-shipping code is judged on every line (it acts on the shipping line,
+      // not the discount basis); every other type on the base-priced lines only (B2B-5). Same split as checkout.
+      const freeShipping = appliedCoupon.type === 'free_shipping';
       const targetingCtx = {
         ...custCtx,
         cartItems: resolved
-          .filter(r => eligibleForCoupon(r.pricing))
+          .filter(r => freeShipping || eligibleForCoupon(r.pricing))
           .map(r => ({
             productId: r.productId,
             categoryIds: (productMap.get(r.productId)?.categories ?? []).map(c => c.categoryId),
@@ -3235,7 +3252,7 @@ export class OrderService {
         ...CouponService.adminOrderCouponViolations(
           appliedCoupon,
           targetingCtx,
-          couponBasisSubtotal
+          freeShipping ? subtotal : couponBasisSubtotal
         )
       );
       if (couponViolations.length > 0 && !overrideCoupon) {

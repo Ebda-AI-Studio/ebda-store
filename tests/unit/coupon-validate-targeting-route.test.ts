@@ -417,4 +417,53 @@ describe('POST /public/:storeId/coupons/validate — storefront cart lines (#136
     expect(withLines.body.data.discount).toBe(1200);
     expect(withLines.body.data.discount).toBe(totalOnly.body.data.discount);
   });
+
+  describe('Ruling B2B-M2 (final review P2-3): a free-shipping code is judged on the whole loose cart', () => {
+    const TIER_LINES = [{ productId: 'p1', categoryIds: ['c1'], quantity: 10, lineTotal: 85_000 }];
+    const send = (body: Record<string, unknown>) =>
+      request(app).post(`/api/v1/stores/public/${STORE_ID}/coupons/validate`).send(body);
+
+    it('an all-tier cart (base basis 0) meets a free-shipping minimum of 50000 through looseOrderTotal / looseCartItems', async () => {
+      mockPrisma.coupon.findFirst.mockResolvedValue(
+        couponRow({ type: 'free_shipping', value: 0, minOrderAmount: 50_000 })
+      );
+      const res = await send({
+        code: 'SAVE10',
+        orderTotal: 0,
+        cartItems: [],
+        looseOrderTotal: 85_000,
+        looseCartItems: TIER_LINES,
+      });
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+    });
+
+    it('a percentage code with the same minimum still judges the base basis (B2B-5) and refuses', async () => {
+      mockPrisma.coupon.findFirst.mockResolvedValue(couponRow({ minOrderAmount: 50_000 }));
+      const res = await send({
+        code: 'SAVE10',
+        orderTotal: 0,
+        cartItems: [],
+        looseOrderTotal: 85_000,
+        looseCartItems: TIER_LINES,
+      });
+      expect(res.status).toBe(400);
+      expect(res.body.error.code).toBe('MIN_ORDER_NOT_MET');
+    });
+
+    it('an older client that sends no loose fields keeps the base-basis judgement', async () => {
+      mockPrisma.coupon.findFirst.mockResolvedValue(
+        couponRow({ type: 'free_shipping', value: 0, minOrderAmount: 50_000 })
+      );
+      const res = await send({ code: 'SAVE10', orderTotal: 0, cartItems: [] });
+      expect(res.status).toBe(400);
+      expect(res.body.error.code).toBe('MIN_ORDER_NOT_MET');
+    });
+
+    it('a malformed loose field is a clean 400, never reaching Prisma', async () => {
+      mockPrisma.coupon.findFirst.mockResolvedValue(couponRow({ type: 'free_shipping' }));
+      const res = await send({ code: 'SAVE10', looseOrderTotal: -1 });
+      expect(res.status).toBe(400);
+    });
+  });
 });
