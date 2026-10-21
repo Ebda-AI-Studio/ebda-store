@@ -7,7 +7,7 @@ import { currentTenantGucs, runInTenantContext } from '@ebda/database';
  * Why: 24 tables carry STRICT RLS policies (`store_id = app.current_store_id
  * OR app.bypass_rls`) with no allowance for a query that sets no context —
  * store_faqs, store_howtos, ai_recommendation, blog_posts, the accounting
- * tables, … (the full list is asserted by tests/integration/rls-force-app.test.ts).
+ * tables, … (the full list is asserted by tests/integration/rls-ebda-app.test.ts).
  * Under the non-bypass `ebda_app` role a contextless read of one of them does
  * not error: it returns zero rows. That is how the 2026-09-25 cutover attempt
  * shipped `faqs: []` to every storefront.

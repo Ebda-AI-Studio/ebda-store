@@ -149,7 +149,7 @@ describe.skipIf(!hasDb)('demo store refuses orders', () => {
     const token = jwt.sign(
       { userId: s.ownerId, email: owner.email, role: 'store_admin', tv: 0 },
       config.jwtSecret,
-      { expiresIn: '10m', issuer: 'force-api', audience: 'force-app' }
+      { expiresIn: '10m', issuer: 'ebda-api', audience: 'ebda-app' }
     );
     const app = express();
     app.use(express.json());

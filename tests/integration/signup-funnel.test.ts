@@ -574,7 +574,7 @@ describe.skipIf(!hasDb)('signup funnel', () => {
       const token = jwt.sign(
         { userId: ownerId, email: 'x@test.local', role: 'store_admin', tv: 0 },
         config.jwtSecret,
-        { expiresIn: '10m', issuer: 'force-api', audience: 'force-app' }
+        { expiresIn: '10m', issuer: 'ebda-api', audience: 'ebda-app' }
       );
       const res = await request(app)
         .post(`/api/v1/admin/stores/${storeId}/manual-payment`)

@@ -54,8 +54,8 @@ function accessCookieFor(userId: string): string {
     config.jwtSecret,
     {
       expiresIn: '30m',
-      issuer: 'force-api',
-      audience: 'force-app',
+      issuer: 'ebda-api',
+      audience: 'ebda-app',
     }
   );
 }

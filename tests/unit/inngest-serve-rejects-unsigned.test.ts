@@ -18,7 +18,7 @@ import { serve } from 'inngest/express';
 function appWithRealHandler() {
   const ran = vi.fn();
   const client = new Inngest({
-    id: 'force-api-test',
+    id: 'ebda-api-test',
     isDev: false,
     signingKey: 'signkey-prod-0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef',
   });
@@ -46,7 +46,7 @@ describe('real Inngest serve handler in cloud mode (issue 2064)', () => {
   it('401s a POST with a FORGED x-inngest-signature and runs nothing', async () => {
     const { app, ran } = appWithRealHandler();
     const res = await request(app)
-      .post('/api/v1/inngest?fnId=force-api-test-probe&stepId=step')
+      .post('/api/v1/inngest?fnId=ebda-api-test-probe&stepId=step')
       .set('x-inngest-signature', 'x')
       .send(body);
     expect(res.status).toBe(401);
@@ -56,7 +56,7 @@ describe('real Inngest serve handler in cloud mode (issue 2064)', () => {
   it('401s a POST with NO signature and runs nothing', async () => {
     const { app, ran } = appWithRealHandler();
     const res = await request(app)
-      .post('/api/v1/inngest?fnId=force-api-test-probe&stepId=step')
+      .post('/api/v1/inngest?fnId=ebda-api-test-probe&stepId=step')
       .send(body);
     expect(res.status).toBe(401);
     expect(ran).not.toHaveBeenCalled();

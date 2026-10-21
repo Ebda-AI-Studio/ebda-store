@@ -2,6 +2,7 @@
 // Exports types, utilities, and constants used across all apps
 
 export * from './brand';
+export * from './auth/jwt-claims';
 export * from './search';
 export * from './auth-policy';
 export * from './hosts';

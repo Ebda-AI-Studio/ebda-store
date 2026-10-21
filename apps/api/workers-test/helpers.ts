@@ -2,6 +2,7 @@ import { env } from 'cloudflare:workers';
 import { shardOf } from '../src/cf/auth-state-client';
 import type { Op } from '../src/cf/auth-state';
 
+import { JWT_AUDIENCE, JWT_ISSUER } from '@ebda/shared';
 export interface ApiFetcher {
   fetch(input: Request | string, init?: RequestInit): Promise<Response>;
 }
@@ -53,8 +54,8 @@ export async function accessToken(claims: {
       role: claims.role ?? 'store_admin',
       tv: claims.tv ?? 0,
       jti: claims.jti,
-      iss: 'force-api',
-      aud: 'force-app',
+      iss: JWT_ISSUER,
+      aud: JWT_AUDIENCE,
       iat: now,
       exp: now + 600,
     })

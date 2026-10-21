@@ -26,6 +26,7 @@ import { AppError } from '../middleware/error-handler';
 import { maskEmail } from '../lib/pii-mask';
 import { passwordSchema } from '../services/merchant-signup.service';
 
+import { JWT_AUDIENCES_ACCEPTED, JWT_ISSUERS_ACCEPTED } from '@ebda/shared';
 const router = Router();
 
 /** Shared cookie options for the HTTP-only access-token cookie.
@@ -425,8 +426,8 @@ function mayIssueCsrfToken(
   try {
     const payload = jwt.verify(newAccessToken, config.jwtSecret, {
       algorithms: ['HS256'],
-      issuer: 'force-api',
-      audience: 'force-app',
+      issuer: JWT_ISSUERS_ACCEPTED,
+      audience: JWT_AUDIENCES_ACCEPTED,
     }) as { role?: string };
     return !!payload.role && AMBIENT_CSRF_MINT_ROLES.has(payload.role);
   } catch {
@@ -708,8 +709,8 @@ router.post('/logout', async (req: Request, res: Response, next: NextFunction) =
       if (rawToken) {
         const payload = jwt.verify(rawToken, config.jwtSecret, {
           algorithms: ['HS256'],
-          issuer: 'force-api',
-          audience: 'force-app',
+          issuer: JWT_ISSUERS_ACCEPTED,
+          audience: JWT_AUDIENCES_ACCEPTED,
         }) as { jti?: string; exp?: number };
 
         if (payload.jti) {

@@ -29,8 +29,8 @@ const userIds: string[] = [];
 function token(userId: string, role: 'store_admin' | 'super_admin') {
   return jwt.sign({ userId, email: `${userId}@example.test`, role, tv: 0 }, config.jwtSecret, {
     expiresIn: '30m',
-    issuer: 'force-api',
-    audience: 'force-app',
+    issuer: 'ebda-api',
+    audience: 'ebda-app',
   });
 }
 

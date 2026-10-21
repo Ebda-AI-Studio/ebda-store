@@ -58,8 +58,8 @@ const asApp = <T>(fn: () => Promise<T>) =>
 const token = (userId: string, role: string, storeId?: string) =>
   jwt.sign({ userId, email: `${userId}@example.test`, role, tv: 0, storeId }, config.jwtSecret, {
     expiresIn: '30m',
-    issuer: 'force-api',
-    audience: 'force-app',
+    issuer: 'ebda-api',
+    audience: 'ebda-app',
   });
 
 describe.skipIf(!hasDb)('payment scope: link/retry outside a tx, events definer', () => {

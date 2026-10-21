@@ -34,8 +34,8 @@ function req(over: Partial<Request> = {}): Request {
 const tokenFor = (sub: string) =>
   jwt.sign({ type: 'refresh' }, process.env.JWT_SECRET as string, {
     algorithm: 'HS256',
-    issuer: 'force-api',
-    audience: 'force-app',
+    issuer: 'ebda-api',
+    audience: 'ebda-app',
     subject: sub,
     expiresIn: '365d',
   });
@@ -125,8 +125,8 @@ describe('refresh bucket is per user, not per IP', () => {
         req({
           body: {
             refreshToken: jwt.sign({ type: 'refresh' }, 'attacker-secret', {
-              issuer: 'force-api',
-              audience: 'force-app',
+              issuer: 'ebda-api',
+              audience: 'ebda-app',
               subject: `forged-${i}`,
             }),
           },
@@ -144,8 +144,8 @@ describe('refresh bucket is per user, not per IP', () => {
     // route, so it gets the strict bucket rather than a private one.
     const expired = jwt.sign({ type: 'refresh' }, process.env.JWT_SECRET as string, {
       algorithm: 'HS256',
-      issuer: 'force-api',
-      audience: 'force-app',
+      issuer: 'ebda-api',
+      audience: 'ebda-app',
       subject: 'user-a',
       expiresIn: -60,
     });

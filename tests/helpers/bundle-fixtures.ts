@@ -547,7 +547,7 @@ export function buildReturnTestApp(): Express {
 
 /**
  * A real access-token JWT for `userId`, shaped exactly like login/refresh
- * mint one (`role: 'customer'`, `tv: 0`, `force-api`/`force-app`
+ * mint one (`role: 'customer'`, `tv: 0`, `ebda-api`/`ebda-app`
  * issuer/audience) — see `tests/unit/csrf-merchant-origin.test.ts`'s
  * `accessCookieFor` for the same pattern. `authenticate` only checks the
  * token's own claims plus the DB's `tokenVersion` for this `userId` (a
@@ -560,7 +560,7 @@ export function customerAccessTokenFor(userId: string, storeId?: string): string
   return jwt.sign(
     { userId, email: `${userId}@example.test`, role: 'customer', tv: 0, storeId },
     config.jwtSecret,
-    { expiresIn: '30m', issuer: 'force-api', audience: 'force-app' }
+    { expiresIn: '30m', issuer: 'ebda-api', audience: 'ebda-app' }
   );
 }
 
@@ -586,7 +586,7 @@ export function storeAdminAccessTokenFor(userId: string): string {
   return jwt.sign(
     { userId, email: `${userId}@example.test`, role: 'store_admin', tv: 0 },
     config.jwtSecret,
-    { expiresIn: '30m', issuer: 'force-api', audience: 'force-app' }
+    { expiresIn: '30m', issuer: 'ebda-api', audience: 'ebda-app' }
   );
 }
 

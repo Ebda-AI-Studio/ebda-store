@@ -10,7 +10,7 @@ import { redis } from './redis.service';
 import logger from '../lib/logger';
 import { maskEmail } from '../lib/pii-mask';
 import { AppError } from '../middleware/error-handler';
-import { fromMinor, formatMoney } from '@ebda/shared';
+import { JWT_AUDIENCES_ACCEPTED, JWT_ISSUERS_ACCEPTED, formatMoney, fromMinor } from '@ebda/shared';
 import { isWorkers } from '../lib/runtime';
 import { cfBindings, cfWaitUntil } from '../cf/bindings';
 // UiRefreshEvent is defined in lib/socket-broadcast and re-exported; we inline
@@ -169,13 +169,13 @@ class SocketService {
         }
 
         // M1 fix: verify with full issuer + audience constraints so MFA
-        // challenge tokens (audience:'force-mfa-challenge') and refresh tokens
+        // challenge tokens (audience:'ebda-mfa-challenge') and refresh tokens
         // (type:'refresh') are rejected. Previously the socket auth accepted
         // any JWT signed with our secret regardless of purpose/audience.
         const payload = jwt.verify(token, config.jwtSecret, {
           algorithms: ['HS256'],
-          issuer: 'force-api',
-          audience: 'force-app',
+          issuer: JWT_ISSUERS_ACCEPTED,
+          audience: JWT_AUDIENCES_ACCEPTED,
         }) as AuthPayload & { jti?: string };
 
         // Belt-and-suspenders: reject tokens carrying a non-access purpose claim.

@@ -5,7 +5,7 @@
  *
  * 1. `optionalAuthenticate` ran `jwt.verify` and nothing else, making it a
  *    strictly weaker second verifier on the same secret. Refresh tokens are
- *    minted with the same `force-app` audience, so a 1-year refresh token was
+ *    minted with the same `ebda-app` audience, so a 1-year refresh token was
  *    accepted as an access identity, and tokens revoked via logout /
  *    logout-all / password-change were still honoured on all 5 of its routes.
  *
@@ -41,8 +41,8 @@ const { config } = await import('../../apps/api/src/config');
 function sign(payload: Record<string, unknown>, jti?: string): string {
   return jwt.sign(payload, config.jwtSecret, {
     algorithm: 'HS256',
-    issuer: 'force-api',
-    audience: 'force-app',
+    issuer: 'ebda-api',
+    audience: 'ebda-app',
     expiresIn: '30m',
     ...(jti ? { jwtid: jti } : {}),
   });
@@ -79,7 +79,7 @@ describe('optionalAuthenticate', () => {
   });
 
   it('REFUSES a refresh token used as an access token', async () => {
-    // Refresh tokens carry the same force-app audience, so jwt.verify alone
+    // Refresh tokens carry the same ebda-app audience, so jwt.verify alone
     // accepts them — this is the guard that must reject.
     const req = makeReq(sign({ ...BASE, type: 'refresh' }));
     const next = vi.fn();

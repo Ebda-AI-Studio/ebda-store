@@ -148,8 +148,8 @@ describe('no inherited branding anywhere in the repository', () => {
     ])
       expect(brandViolates(s), s).toBe(false);
     for (const s of [
-      "audience: 'force-app'",
-      "issuer: 'force-api'",
+      "audience: 'ebda-app'",
+      "issuer: 'ebda-api'",
       'FORCE_AI_META_BM_ID',
       'body.fwbStoreId',
       'cart.fwb_order_id',

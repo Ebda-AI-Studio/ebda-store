@@ -27,6 +27,9 @@ import { sendMerchantPasswordResetEmail, sendMerchantVerificationEmail } from '.
 import { accountLockout } from './account-lockout.service';
 import {
   BRAND_STORE_APP_URL,
+  JWT_AUDIENCE,
+  JWT_ISSUER,
+  JWT_MFA_AUDIENCE,
   PASSWORD_RESET_TTL_MINUTES,
   registrationEventId as registrationEventIdFor,
 } from '@ebda/shared';
@@ -818,12 +821,12 @@ export class AuthService {
       const challengeToken = jwt.sign({ userId: user.id, purpose: 'mfa' }, config.jwtSecret, {
         algorithm: 'HS256',
         expiresIn: '5m',
-        issuer: 'force-api',
+        issuer: JWT_ISSUER,
         // Distinct audience so this token is NEVER accepted by the authenticate
-        // middleware (which requires audience:'force-app'). Belt-and-suspenders
+        // middleware (which requires audience:'ebda-app'). Belt-and-suspenders
         // against token-confusion attacks where the challenge is used as a
         // real access token before the second factor is verified.
-        audience: 'force-mfa-challenge',
+        audience: JWT_MFA_AUDIENCE,
         // Unique id — lets /auth/mfa/verify key a per-challenge Redis counter
         // so failed attempts are isolated per login attempt, not per IP.
         jwtid: crypto.randomUUID(),
@@ -2441,8 +2444,8 @@ export class AuthService {
       algorithm: 'HS256',
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       expiresIn: config.jwtExpiresIn as any,
-      issuer: 'force-api',
-      audience: 'force-app',
+      issuer: JWT_ISSUER,
+      audience: JWT_AUDIENCE,
       subject: payload.userId,
       jwtid: accessJti,
     });
@@ -2456,8 +2459,8 @@ export class AuthService {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       expiresIn: config.refreshTokenExpiresIn as any,
       algorithm: 'HS256',
-      issuer: 'force-api',
-      audience: 'force-app',
+      issuer: JWT_ISSUER,
+      audience: JWT_AUDIENCE,
       subject: payload.userId,
       // Unique token id. Without it, two refresh tokens minted for the same
       // user in the same second (login immediately followed by a refresh, or a

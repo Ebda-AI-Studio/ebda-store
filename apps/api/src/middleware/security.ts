@@ -24,6 +24,7 @@ import {
 import { withSavepoint } from '../lib/savepoint';
 import { insertAuditLog } from '../lib/definer';
 
+import { JWT_AUDIENCES_ACCEPTED, JWT_ISSUERS_ACCEPTED } from '@ebda/shared';
 // ==========================================
 // CSRF Protection with Redis + In-Memory Fallback
 // ==========================================
@@ -139,8 +140,8 @@ function csrfPrincipal(req: Request): string {
   try {
     const payload = jwt.verify(cookieToken, config.jwtSecret, {
       algorithms: ['HS256'],
-      issuer: 'force-api',
-      audience: 'force-app',
+      issuer: JWT_ISSUERS_ACCEPTED,
+      audience: JWT_AUDIENCES_ACCEPTED,
       // Expiry is `authenticate`'s job, not ours. A 30-minute-old access
       // cookie still identifies its owner unambiguously (the signature is
       // verified), and treating it as anonymous here would turn every
@@ -1301,7 +1302,7 @@ export function refreshLimiterKey(req: Request): string {
 }
 
 /**
- * Verify a presented refresh token's SIGNATURE (HS256, force-api/force-app)
+ * Verify a presented refresh token's SIGNATURE (HS256, ebda-api/ebda-app)
  * and return its payload, or null for anything that does not verify. One
  * helper for the limiter key above and the `/auth/refresh` route (#1801), so
  * the two cannot drift.
@@ -1325,8 +1326,8 @@ export function verifyRefreshJwt(
   try {
     const verified = jwt.verify(presented, config.jwtSecret, {
       algorithms: ['HS256'],
-      issuer: 'force-api',
-      audience: 'force-app',
+      issuer: JWT_ISSUERS_ACCEPTED,
+      audience: JWT_AUDIENCES_ACCEPTED,
       ignoreExpiration: opts.ignoreExpiration === true,
     });
     return verified && typeof verified === 'object' ? verified : null;

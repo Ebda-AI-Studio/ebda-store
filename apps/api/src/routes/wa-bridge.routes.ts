@@ -25,7 +25,14 @@ import { z } from 'zod';
 import jwt from 'jsonwebtoken';
 import { createHash } from 'node:crypto';
 import { prisma } from '@ebda/database';
-import { groupOrderLinesForDisplay, BRAND_MARKETING_URL } from '@ebda/shared';
+import {
+  BRAND_MARKETING_URL,
+  JWT_ISSUER,
+  JWT_ISSUERS_ACCEPTED,
+  JWT_WA_CART_AUDIENCE,
+  JWT_WA_CART_AUDIENCES_ACCEPTED,
+  groupOrderLinesForDisplay,
+} from '@ebda/shared';
 import { config } from '../config';
 import { waBridgeAuth } from '../middleware/wa-bridge-auth';
 import { searchProductIds } from '../services/product-search.service';
@@ -1065,8 +1072,8 @@ router.post('/cart/from-wa', waBridgeAuth, async (req: Request, res: Response) =
     const checkoutToken = jwt.sign(tokenPayload, config.jwtSecret, {
       algorithm: 'HS256',
       expiresIn: CHECKOUT_TOKEN_TTL_SECONDS,
-      issuer: 'force-api',
-      audience: 'force-wa-cart',
+      issuer: JWT_ISSUER,
+      audience: JWT_WA_CART_AUDIENCE,
     });
 
     // Compute the storefront checkout URL. Per-store custom domain may
@@ -1139,8 +1146,8 @@ router.post('/cart/redeem', async (req: Request, res: Response) => {
 
     const payload = jwt.verify(token, config.jwtSecret, {
       algorithms: ['HS256'],
-      issuer: 'force-api',
-      audience: 'force-wa-cart',
+      issuer: JWT_ISSUERS_ACCEPTED,
+      audience: JWT_WA_CART_AUDIENCES_ACCEPTED,
     }) as Record<string, unknown>;
     if (payload.sub !== 'wa-cart') {
       res.status(400).json({ success: false, error: 'WRONG_TOKEN_TYPE' });

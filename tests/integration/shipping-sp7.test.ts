@@ -78,8 +78,8 @@ const token = (userId: string) =>
     config.jwtSecret,
     {
       expiresIn: '30m',
-      issuer: 'force-api',
-      audience: 'force-app',
+      issuer: 'ebda-api',
+      audience: 'ebda-app',
     }
   );
 /** Run `fn` the way every production caller does: inside the store's tenant scope. */

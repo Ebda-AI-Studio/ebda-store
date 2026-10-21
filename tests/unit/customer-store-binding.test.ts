@@ -50,8 +50,8 @@ const { config } = await import('../../apps/api/src/config');
 function sign(payload: Record<string, unknown>): string {
   return jwt.sign({ email: 'u@example.test', tv: 0, ...payload }, config.jwtSecret, {
     algorithm: 'HS256',
-    issuer: 'force-api',
-    audience: 'force-app',
+    issuer: 'ebda-api',
+    audience: 'ebda-app',
     expiresIn: '30m',
   });
 }

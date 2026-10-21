@@ -140,8 +140,8 @@ async function seedMerchant(
       config.jwtSecret,
       {
         expiresIn: '10m',
-        issuer: 'force-api',
-        audience: 'force-app',
+        issuer: 'ebda-api',
+        audience: 'ebda-app',
       }
     );
     return { storeId: store.id, slug: store.slug, token, userId: user.id };

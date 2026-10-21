@@ -106,8 +106,8 @@ describe('Feature Toggle Engine', () => {
       {
         algorithm: 'HS256',
         expiresIn: '1h',
-        issuer: 'force-api',
-        audience: 'force-app',
+        issuer: 'ebda-api',
+        audience: 'ebda-app',
         subject: storeAdminId!,
       }
     );
