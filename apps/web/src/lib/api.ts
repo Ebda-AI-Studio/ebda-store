@@ -562,6 +562,8 @@ const NO_REFRESH_AUTH_ROUTES = new Set([
   '/auth/verify-email',
   '/auth/resend-verification',
   '/auth/mfa/verify',
+  '/auth/passkeys/authenticate/begin',
+  '/auth/passkeys/authenticate/finish',
 ]);
 
 export function endpointMayRefresh(endpoint: string): boolean {

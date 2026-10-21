@@ -477,6 +477,10 @@ const CSRF_EXEMPT_AUTH_PATHS: ReadonlySet<string> = new Set([
   '/api/v1/auth/verify-email',
   '/api/v1/auth/resend-verification',
   '/api/v1/auth/mfa/verify',
+  // Passkey sign-in (Ruling PASSKEY-6): credential-less, runs before a session exists. Registration and
+  // management are authenticated writes and stay CSRF-checked.
+  '/api/v1/auth/passkeys/authenticate/begin',
+  '/api/v1/auth/passkeys/authenticate/finish',
   // Self-serve merchant signup (SP5): credential-less entry points reached
   // before any session exists, like register / resend-verification above.
   '/api/v1/auth/merchant/signup',
@@ -912,6 +916,42 @@ export function createAuthLimiter(opts?: { skip?: (req: Request) => boolean; pre
 }
 
 export const authLimiter = createAuthLimiter();
+
+/**
+ * Passkey sign-in (Ruling PASSKEY-6) takes NO email, so `authLimiter`'s IP+email key would collapse every
+ * attempt from an IP into one `<ip>-unknown` bucket shared with login — and conditional-UI autofill calls
+ * /begin on every login page load. Two IP-only buckets instead: /begin is cheap (one Redis write) and
+ * generous; /finish is the guessable surface (a signature has to verify) and counts FAILURES only.
+ * Exported with their key function for the same reason as `authLimiterKey`: every limiter is skipped
+ * under vitest, so a test can only see a 429 by building one with the skip turned off.
+ */
+export function passkeyLimiterKey(req: Request): string {
+  return `${ipKeyGenerator(req.ip ?? '')}-passkey`;
+}
+
+export function createPasskeyLimiter(
+  kind: 'begin' | 'finish',
+  opts?: { skip?: (req: Request) => boolean }
+) {
+  return rateLimit({
+    store: makeRateLimitStore(rateLimitRedisClient, `passkey-${kind}`),
+    windowMs: 15 * 60 * 1000,
+    max: kind === 'begin' ? 60 : 20,
+    skipSuccessfulRequests: kind === 'finish',
+    message: {
+      success: false,
+      error: { code: 'RATE_LIMITED', message: 'Too many attempts, please try again later.' },
+    },
+    standardHeaders: true,
+    legacyHeaders: false,
+    // Same availability-over-strictness posture as authLimiter.
+    passOnStoreError: true,
+    skip: opts?.skip ?? skipForLoadTestOrTests,
+    keyGenerator: passkeyLimiterKey,
+  });
+}
+export const passkeyBeginLimiter = createPasskeyLimiter('begin');
+export const passkeyFinishLimiter = createPasskeyLimiter('finish');
 
 /**
  * Exported so it can be unit-tested directly (same reasoning as

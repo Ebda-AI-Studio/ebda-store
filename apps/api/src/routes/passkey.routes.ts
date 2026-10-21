@@ -1,0 +1,264 @@
+import { Router, type NextFunction, type Request, type Response } from 'express';
+import { z } from 'zod';
+import { authenticate, rejectImpersonated } from '../middleware/auth';
+import {
+  auditLog,
+  generateCsrfToken,
+  passkeyBeginLimiter,
+  passkeyFinishLimiter,
+  writeLimiter,
+} from '../middleware/security';
+import { AppError } from '../middleware/error-handler';
+import { AuthService } from '../services/auth.service';
+import { PasskeyService } from '../services/passkey.service';
+import { setSessionCookies } from './auth.routes';
+
+/**
+ * Passkeys (WebAuthn). Mounted at `/auth/passkeys`. Design + rulings: docs/plans/2026-10-21-passkeys.md.
+ *
+ *   POST /authenticate/begin    public   discoverable-credential options (takes NO account input)
+ *   POST /authenticate/finish   public   verify the assertion, mint the session (satisfies MFA, PASSKEY-4)
+ *   GET    /                    session  list my passkeys
+ *   POST   /register/begin      session  creation options (a TOTP code is required when TOTP is on)
+ *   POST   /register/finish     session  verify + store the public key
+ *   PATCH  /:id, DELETE /:id    session  rename / remove
+ *
+ * The host a ceremony is for is the browser `Origin`, never a body field (PASSKEY-3).
+ */
+const router = Router();
+
+const b64url = z.string().min(1).max(16384);
+const clientExtensionResults = z.record(z.string(), z.unknown()).default({});
+const attachment = z.enum(['platform', 'cross-platform']).nullish();
+
+const authenticationResponseSchema = z.object({
+  id: z.string().min(1).max(1024),
+  rawId: z.string().min(1).max(1024),
+  type: z.literal('public-key'),
+  authenticatorAttachment: attachment,
+  clientExtensionResults,
+  response: z.object({
+    clientDataJSON: b64url,
+    authenticatorData: b64url,
+    signature: b64url,
+    userHandle: z
+      .string()
+      .max(1024)
+      .nullish()
+      .transform(v => v ?? undefined),
+  }),
+});
+
+const registrationResponseSchema = z.object({
+  id: z.string().min(1).max(1024),
+  rawId: z.string().min(1).max(1024),
+  type: z.literal('public-key'),
+  authenticatorAttachment: attachment,
+  clientExtensionResults,
+  response: z.object({
+    clientDataJSON: b64url,
+    attestationObject: b64url,
+    transports: z.array(z.string().max(32)).max(8).optional(),
+    authenticatorData: b64url.optional(),
+    publicKey: b64url.optional(),
+    publicKeyAlgorithm: z.number().int().optional(),
+  }),
+});
+
+const nameSchema = z.string().trim().min(1).max(60);
+const idParam = z.string().uuid();
+
+const originOf = (req: Request) => req.headers.origin as string | undefined;
+
+// ---------------------------------------------------------------------------------------------
+// Sign in (public)
+// ---------------------------------------------------------------------------------------------
+
+router.post(
+  '/authenticate/begin',
+  passkeyBeginLimiter,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const options = await PasskeyService.beginAuthentication(originOf(req));
+      res.json({ success: true, data: options });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+router.post(
+  '/authenticate/finish',
+  passkeyFinishLimiter,
+  async (req: Request, res: Response, next: NextFunction) => {
+    let reason = 'malformed';
+    try {
+      const parsed = z.object({ response: authenticationResponseSchema }).safeParse(req.body);
+      // Same answer as every other failure: a malformed body must not be distinguishable.
+      if (!parsed.success) throw new AppError(401, 'PASSKEY_AUTH_FAILED', 'Passkey sign-in failed');
+
+      const verified = await PasskeyService.finishAuthentication(
+        originOf(req),
+        parsed.data.response as never,
+        r => {
+          reason = r;
+        }
+      );
+      const result = await AuthService.issueSessionFor(verified.user);
+
+      // Bound to the user that just authenticated, exactly as POST /auth/login does.
+      const sessionId = req.headers['x-session-id'] as string;
+      const csrfToken = sessionId ? await generateCsrfToken(sessionId, result.user.id) : undefined;
+
+      await auditLog({
+        action: 'passkey.login',
+        userId: result.user.id,
+        resourceType: 'passkey',
+        resourceId: verified.credentialRowId,
+        ip: req.ip,
+        userAgent: req.headers['user-agent'],
+      });
+
+      setSessionCookies(res, result.accessToken, result.refreshToken);
+      res.json({ success: true, data: { ...result, csrfToken } });
+    } catch (error) {
+      await auditLog({
+        action: 'passkey.login.failed',
+        resourceType: 'passkey',
+        details: { reason },
+        ip: req.ip,
+        userAgent: req.headers['user-agent'],
+      });
+      next(error);
+    }
+  }
+);
+
+// ---------------------------------------------------------------------------------------------
+// Manage (session)
+// ---------------------------------------------------------------------------------------------
+
+router.get('/', authenticate, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const items = await PasskeyService.list(req.user!.userId, originOf(req));
+    res.json({ success: true, data: { passkeys: items } });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.post(
+  '/register/begin',
+  authenticate,
+  rejectImpersonated,
+  writeLimiter,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const parsed = z
+        .object({
+          code: z
+            .string()
+            .trim()
+            .regex(/^\d{6}$/)
+            .optional(),
+        })
+        .safeParse(req.body ?? {});
+      if (!parsed.success) throw new AppError(400, 'VALIDATION_ERROR', 'Invalid 2FA code');
+      const options = await PasskeyService.beginRegistration(
+        { userId: req.user!.userId },
+        originOf(req),
+        parsed.data
+      );
+      res.json({ success: true, data: options });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+router.post(
+  '/register/finish',
+  authenticate,
+  rejectImpersonated,
+  writeLimiter,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const parsed = z
+        .object({ response: registrationResponseSchema, name: nameSchema.optional() })
+        .safeParse(req.body);
+      if (!parsed.success) {
+        throw new AppError(400, 'PASSKEY_REGISTRATION_FAILED', 'Passkey could not be registered');
+      }
+      const item = await PasskeyService.finishRegistration(
+        { userId: req.user!.userId },
+        originOf(req),
+        parsed.data as never
+      );
+      await auditLog({
+        action: 'passkey.added',
+        userId: req.user!.userId,
+        resourceType: 'passkey',
+        resourceId: item.id,
+        ip: req.ip,
+        userAgent: req.headers['user-agent'],
+      });
+      res.status(201).json({ success: true, data: { passkey: item } });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+router.patch(
+  '/:id',
+  authenticate,
+  rejectImpersonated,
+  writeLimiter,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const id = idParam.safeParse(req.params.id);
+      const body = z.object({ name: nameSchema }).safeParse(req.body);
+      if (!id.success || !body.success)
+        throw new AppError(400, 'VALIDATION_ERROR', 'Invalid request');
+      await PasskeyService.rename(req.user!.userId, id.data, body.data.name);
+      await auditLog({
+        action: 'passkey.renamed',
+        userId: req.user!.userId,
+        resourceType: 'passkey',
+        resourceId: id.data,
+        ip: req.ip,
+        userAgent: req.headers['user-agent'],
+      });
+      res.json({ success: true, data: { message: 'Passkey renamed' } });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+router.delete(
+  '/:id',
+  authenticate,
+  rejectImpersonated,
+  writeLimiter,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const id = idParam.safeParse(req.params.id);
+      if (!id.success) throw new AppError(400, 'VALIDATION_ERROR', 'Invalid request');
+      await PasskeyService.remove(req.user!.userId, id.data);
+      await auditLog({
+        action: 'passkey.removed',
+        userId: req.user!.userId,
+        resourceType: 'passkey',
+        resourceId: id.data,
+        ip: req.ip,
+        userAgent: req.headers['user-agent'],
+      });
+      res.json({ success: true, data: { message: 'Passkey removed' } });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+export default router;
