@@ -14,6 +14,20 @@ export type SourceEventName =
   | 'product.deleted'
   | 'webhook/inventory.low';
 
+/**
+ * The source row is not (yet) in the state the event announces: the event raced the producer's
+ * COMMIT, or the producer rolled back after sending it. The producers of `order/created` (COD and
+ * wallet) and `order/status-changed` send from INSIDE the request transaction, so "after commit" is
+ * not a property this consumer may assume (review I1). The caller waits and retries a bounded number
+ * of times, then drops the event.
+ */
+export class SourceNotReadyError extends Error {
+  constructor(what: string) {
+    super(`webhook source not ready: ${what}`);
+    this.name = 'SourceNotReadyError';
+  }
+}
+
 export async function buildFanoutEvents(
   storeId: string,
   name: SourceEventName,
@@ -23,7 +37,7 @@ export async function buildFanoutEvents(
   switch (name) {
     case 'order/created': {
       const o = await loadOrderParts(storeId, String(data.orderId));
-      if (!o) return [];
+      if (!o) throw new SourceNotReadyError('order missing');
       const out: FanoutEvent[] = [
         {
           type: 'order.created',
@@ -48,7 +62,9 @@ export async function buildFanoutEvents(
       const status = String(data.status);
       if (!(WEBHOOK_ORDER_STATUSES as readonly string[]).includes(status)) return [];
       const o = await loadOrderParts(storeId, String(data.orderId));
-      if (!o) return [];
+      if (!o) throw new SourceNotReadyError('order missing');
+      // The row, not the event, is the truth: a rolled-back or superseded status is never announced.
+      if (o.row.status !== status) throw new SourceNotReadyError('order status differs from event');
       return [
         {
           type: 'order.status_changed',
@@ -60,7 +76,7 @@ export async function buildFanoutEvents(
     }
     case 'order/refunded': {
       const o = await loadOrderParts(storeId, String(data.orderId));
-      if (!o) return [];
+      if (!o) throw new SourceNotReadyError('order missing');
       return [
         {
           type: 'order.refunded',

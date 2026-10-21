@@ -10,7 +10,11 @@ import logger from '../../logger';
 import { inngest } from '../client';
 import { EmailService } from '../../../services/email.service';
 import { socketService } from '../../../services/socket.service';
-import { buildFanoutEvents, type SourceEventName } from '../../../services/webhook-events';
+import {
+  buildFanoutEvents,
+  SourceNotReadyError,
+  type SourceEventName,
+} from '../../../services/webhook-events';
 import {
   delayBeforeAttempt,
   fanoutWebhookEvent,
@@ -22,8 +26,10 @@ import {
  *   webhook-fanout         source event -> one delivery row per subscribed endpoint -> dispatch events
  *   webhook-deliver        up to WEBHOOK_MAX_ATTEMPTS tries with the step.sleep schedule (~24h)
  *   webhook-delivery-purge daily: rows older than WEBHOOK_LOG_RETENTION_DAYS
- * The source events are already sent AFTER the producer's transaction committed
- * (sendEventAfterCommit / deferAfterTenantCommit), so a consumer here never reads uncommitted rows.
+ * NOT every source event is sent after the producer's COMMIT: `order/created` (COD/wallet) and
+ * `order/status-changed` are sent from inside the request transaction (review I1, Ruling WH-8). The
+ * fan-out therefore never trusts the event: it re-reads the row, requires it to be in the state the
+ * event announces, and otherwise waits (FANOUT_NOT_READY_WAITS_SEC) and retries before dropping.
  */
 
 const SOURCES = [
@@ -35,6 +41,75 @@ const SOURCES = [
   'webhook/inventory.low',
 ] as const;
 
+/** Seconds to wait before re-reading a source row that is not visible / not in the announced state yet. */
+export const FANOUT_NOT_READY_WAITS_SEC = [2, 10, 30, 120, 300] as const;
+
+type FanoutStep = {
+  run: <T>(id: string, fn: () => Promise<T>) => Promise<T>;
+  sleep: (id: string, duration: string) => Promise<unknown>;
+  sendEvent: (id: string, payload: unknown) => Promise<unknown>;
+};
+
+/** The fan-out body, separate from the Inngest wrapper so it is testable with a fake `step`. */
+export async function runWebhookFanout(
+  step: FanoutStep,
+  event: { name: string; id?: string; data: Record<string, unknown> }
+): Promise<Record<string, unknown>> {
+  const storeId = event.data.storeId as string | undefined;
+  if (!storeId) return { skipped: 'no_store' };
+  let ids: string[] | null = null;
+  for (let i = 0; i <= FANOUT_NOT_READY_WAITS_SEC.length; i++) {
+    // Each pass is its own memoised step, so a replay never repeats a completed one.
+    const r = await step.run(`create-deliveries-${i}`, () =>
+      runInTenantContext(storeId, async () => {
+        const subscribers = await prisma.webhookEndpoint.count({
+          where: { storeId, active: true },
+        });
+        if (subscribers === 0) return { ready: true as const, ids: [] as string[] };
+        try {
+          const events = await buildFanoutEvents(
+            storeId,
+            event.name as SourceEventName,
+            event.data,
+            event.id ?? ''
+          );
+          const created: string[] = [];
+          for (const ev of events) created.push(...(await fanoutWebhookEvent(storeId, ev)));
+          return { ready: true as const, ids: created };
+        } catch (err) {
+          if (err instanceof SourceNotReadyError)
+            return { ready: false as const, ids: [] as string[] };
+          throw err;
+        }
+      })
+    );
+    if (r.ready) {
+      ids = r.ids;
+      break;
+    }
+    if (i < FANOUT_NOT_READY_WAITS_SEC.length) {
+      await step.sleep(`wait-source-${i}`, `${FANOUT_NOT_READY_WAITS_SEC[i]}s`);
+    }
+  }
+  if (ids === null) {
+    logger.warn(
+      { storeId, event: event.name },
+      '[webhooks] source never reached the announced state; dropped'
+    );
+    return { skipped: 'source_not_ready' };
+  }
+  if (ids.length > 0) {
+    await step.sendEvent(
+      'dispatch',
+      ids.map((deliveryId: string) => ({
+        name: 'webhook/delivery.requested',
+        data: { storeId, deliveryId },
+      }))
+    );
+  }
+  return { deliveries: ids.length };
+}
+
 export const webhookFanout: InngestFunction.Any = inngest.createFunction(
   {
     id: 'webhook-fanout',
@@ -43,37 +118,8 @@ export const webhookFanout: InngestFunction.Any = inngest.createFunction(
     retries: 3,
     triggers: SOURCES.map(event => ({ event: event as any })),
   },
-  async ({ event, step }) => {
-    const storeId = (event.data as { storeId?: string }).storeId;
-    if (!storeId) return { skipped: 'no_store' };
-    const ids = await step.run('create-deliveries', () =>
-      runInTenantContext(storeId, async () => {
-        const subscribers = await prisma.webhookEndpoint.count({
-          where: { storeId, active: true },
-        });
-        if (subscribers === 0) return [] as string[];
-        const events = await buildFanoutEvents(
-          storeId,
-          event.name as SourceEventName,
-          event.data as Record<string, unknown>,
-          event.id ?? ''
-        );
-        const created: string[] = [];
-        for (const ev of events) created.push(...(await fanoutWebhookEvent(storeId, ev)));
-        return created;
-      })
-    );
-    if (ids.length > 0) {
-      await step.sendEvent(
-        'dispatch',
-        ids.map((deliveryId: string) => ({
-          name: 'webhook/delivery.requested',
-          data: { storeId, deliveryId },
-        }))
-      );
-    }
-    return { deliveries: ids.length };
-  }
+  async ({ event, step }) =>
+    runWebhookFanout(step as unknown as FanoutStep, event as Parameters<typeof runWebhookFanout>[1])
 );
 
 async function notifyEndpointDisabled(storeId: string, endpointId: string): Promise<void> {

@@ -5,10 +5,10 @@ vi.mock('../../apps/api/src/services/webhook-payload', () => ({
   loadOrderParts: loaders.order,
   loadProductData: loaders.product,
 }));
-import { buildFanoutEvents } from '../../apps/api/src/services/webhook-events';
+import { buildFanoutEvents, SourceNotReadyError } from '../../apps/api/src/services/webhook-events';
 
-const order = (paymentStatus: string) => ({
-  row: { id: 'o1', paymentStatus },
+const order = (paymentStatus: string, status = 'confirmed') => ({
+  row: { id: 'o1', paymentStatus, status },
   data: { order: { id: 'o1' } },
   customer: { name: 'A', email: null, phone: null },
 });
@@ -31,8 +31,8 @@ describe('source event -> webhook events', () => {
     expect(a.map(e => e.dedupeKey)).toEqual(b.map(e => e.dedupeKey));
   });
   it('status_changed only for shipped / delivered / cancelled', async () => {
-    loaders.order.mockResolvedValue(order('paid'));
     for (const status of ['shipped', 'delivered', 'cancelled']) {
+      loaders.order.mockResolvedValue(order('paid', status));
       const [e] = await buildFanoutEvents(
         's1',
         'order/status-changed',
@@ -50,11 +50,28 @@ describe('source event -> webhook events', () => {
       )
     ).toEqual([]);
   });
-  it('a vanished or foreign order maps to nothing', async () => {
+  it('I1: an order that is not visible yet (event raced the commit) is NOT dropped: the build throws so the caller retries', async () => {
     loaders.order.mockResolvedValue(null);
-    expect(await buildFanoutEvents('s1', 'order/created', { orderId: 'zz' }, 'x')).toEqual([]);
-    expect(await buildFanoutEvents('s1', 'order/refunded', { orderId: 'zz' }, 'x')).toEqual([]);
+    for (const name of ['order/created', 'order/status-changed', 'order/refunded'] as const) {
+      await expect(
+        buildFanoutEvents('s1', name, { orderId: 'zz', status: 'shipped' }, 'x')
+      ).rejects.toBeInstanceOf(SourceNotReadyError);
+    }
     expect(loaders.order).toHaveBeenCalledWith('s1', 'zz');
+  });
+  it('I1: a rolled-back / stale status is never announced: the row state must match the event', async () => {
+    loaders.order.mockResolvedValue(order('paid', 'confirmed'));
+    await expect(
+      buildFanoutEvents('s1', 'order/status-changed', { orderId: 'o1', status: 'shipped' }, 'x')
+    ).rejects.toBeInstanceOf(SourceNotReadyError);
+    loaders.order.mockResolvedValue(order('paid', 'shipped'));
+    const [e] = await buildFanoutEvents(
+      's1',
+      'order/status-changed',
+      { orderId: 'o1', status: 'shipped' },
+      'x'
+    );
+    expect(e.type).toBe('order.status_changed');
   });
   it('order/refunded carries partial and is keyed by the source event', async () => {
     loaders.order.mockResolvedValue(order('refunded'));
