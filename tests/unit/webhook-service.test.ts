@@ -21,6 +21,8 @@ vi.mock('@ebda/database', () => {
     }
   }
   const need = (where: Row) => {
+    // Postgres: after a failed statement the transaction is aborted until a ROLLBACK TO SAVEPOINT.
+    if (db.aborted) throw new Error('25P02 current transaction is aborted');
     if (where.storeId !== db.ambient)
       throw new Error(`TenantScopeViolation: ${JSON.stringify(where)}`);
   };
@@ -58,8 +60,10 @@ vi.mock('@ebda/database', () => {
           db.deliveries.some(
             d => d.endpointId === data.endpointId && d.dedupeKey === data.dedupeKey
           )
-        )
+        ) {
+          db.aborted = true;
           throw new PrismaClientKnownRequestError('dup', { code: 'P2002' });
+        }
         const row = {
           id: `d${++n}`,
           createdAt: new Date(Date.now() + n),
@@ -103,6 +107,16 @@ vi.mock('@ebda/database', () => {
     runInTenantContext: async (_s: string, fn: () => unknown) => fn(),
   };
 });
+vi.mock('../../apps/api/src/lib/savepoint', () => ({
+  withSavepoint: async (fn: () => Promise<unknown>) => {
+    try {
+      return await fn();
+    } catch (e) {
+      db.aborted = false; // ROLLBACK TO SAVEPOINT
+      throw e;
+    }
+  },
+}));
 vi.mock('../../apps/api/src/lib/webhook-http', () => ({ postWebhook: db.post }));
 vi.mock('../../apps/api/src/services/encryption.service', () => ({
   encryption: { decrypt: (s: string) => `dec(${s})`, encrypt: (s: string) => `enc(${s})` },
@@ -140,6 +154,7 @@ beforeEach(() => {
   db.endpoints = [ep()];
   db.deliveries = [];
   db.ambient = 's1';
+  db.aborted = false;
   db.post.mockReset();
 });
 
@@ -162,6 +177,32 @@ describe('fan-out', () => {
     await fanoutWebhookEvent('s1', ev);
     expect(await fanoutWebhookEvent('s1', ev)).toEqual([]);
     expect(db.deliveries).toHaveLength(1);
+  });
+  it('C1: a duplicate never aborts the transaction; an endpoint added between two identical events still gets its row', async () => {
+    db.endpoints = [ep(), ep({ id: 'e2', events: ['order.created', 'order.paid'] })];
+    const paid = { ...ev, type: 'order.paid', dedupeKey: 'order.paid:o1' };
+    db.endpoints = [ep({ events: ['order.created', 'order.paid'] })];
+    const a = await fanoutWebhookEvent('s1', ev);
+    const a2 = await fanoutWebhookEvent('s1', paid);
+    expect(a).toHaveLength(1);
+    expect(a2).toHaveLength(1);
+    // second endpoint appears, then the SAME two events are emitted again (stuck-sweep / delayed webhook)
+    db.endpoints.push(ep({ id: 'e2', events: ['order.created', 'order.paid'] }));
+    const b = await fanoutWebhookEvent('s1', ev);
+    const b2 = await fanoutWebhookEvent('s1', paid);
+    expect(b).toHaveLength(1);
+    expect(b2).toHaveLength(1);
+    expect(db.aborted).toBe(false);
+    expect(db.deliveries.filter(d => d.endpointId === 'e2')).toHaveLength(2);
+    expect(db.deliveries).toHaveLength(4);
+  });
+  it('C1: duplicates for the FIRST endpoint do not stop the SECOND endpoint in the same call', async () => {
+    db.endpoints = [ep(), ep({ id: 'e2' })];
+    await fanoutWebhookEvent('s1', ev);
+    db.deliveries = db.deliveries.filter(d => d.endpointId === 'e1'); // e2 row lost / never made
+    const ids = await fanoutWebhookEvent('s1', ev);
+    expect(ids).toHaveLength(1);
+    expect(db.deliveries.map(d => d.endpointId).sort()).toEqual(['e1', 'e2']);
   });
   it('minimal PII: customer only for endpoints that opted in', async () => {
     db.endpoints = [ep(), ep({ id: 'e2', includeCustomer: true })];

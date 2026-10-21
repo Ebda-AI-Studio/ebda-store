@@ -18,6 +18,7 @@ import {
 } from '@ebda/shared';
 import { encryption } from './encryption.service';
 import { postWebhook } from '../lib/webhook-http';
+import { withSavepoint } from '../lib/savepoint';
 import type { FanoutEvent } from './webhook-payload';
 
 // ---------------------------------------------------------------------------
@@ -91,32 +92,47 @@ export async function fanoutWebhookEvent(storeId: string, ev: FanoutEvent): Prom
     where: { storeId, active: true, events: { has: ev.type } },
     select: { id: true, includeCustomer: true },
   });
+  // Skip what already exists up front (a replay, or an endpoint that was already served), then
+  // create the rest inside a SAVEPOINT: a lost unique race must never abort the surrounding tenant
+  // transaction (Postgres 25P02 would fail every later insert and roll the whole fan-out back).
+  const existing = new Set(
+    (
+      await prisma.webhookDelivery.findMany({
+        where: { storeId, dedupeKey: ev.dedupeKey, endpointId: { in: endpoints.map(e => e.id) } },
+        select: { endpointId: true },
+      })
+    ).map(r => r.endpointId)
+  );
   const created: string[] = [];
   for (const ep of endpoints) {
+    if (existing.has(ep.id)) continue;
     const eventId = `evt_${randomUUID()}`;
     const data =
       ep.includeCustomer && ev.customer ? { ...ev.data, customer: ev.customer } : ev.data;
     try {
-      const row = await prisma.webhookDelivery.create({
-        data: {
-          storeId,
-          endpointId: ep.id,
-          eventId,
-          eventType: ev.type,
-          dedupeKey: ev.dedupeKey,
-          payload: buildEnvelope({
-            eventId,
-            type: ev.type as WebhookEventType,
+      const row = await withSavepoint(() =>
+        prisma.webhookDelivery.create({
+          data: {
             storeId,
-            data,
-          }) as unknown as Prisma.InputJsonValue,
-        },
-        select: { id: true },
-      });
+            endpointId: ep.id,
+            eventId,
+            eventType: ev.type,
+            dedupeKey: ev.dedupeKey,
+            payload: buildEnvelope({
+              eventId,
+              type: ev.type as WebhookEventType,
+              storeId,
+              data,
+            }) as unknown as Prisma.InputJsonValue,
+          },
+          select: { id: true },
+        })
+      );
       created.push(row.id);
       await pruneLog(storeId, ep.id);
     } catch (err) {
-      // P2002 on (endpoint, dedupeKey): this logical event is already queued for this endpoint.
+      // P2002 on (endpoint, dedupeKey): a concurrent run queued this event first. The savepoint
+      // has already rolled the failed insert back, so the transaction is still usable.
       if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') continue;
       throw err;
     }

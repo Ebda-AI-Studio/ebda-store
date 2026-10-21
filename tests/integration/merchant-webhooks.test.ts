@@ -90,6 +90,20 @@ describe.skipIf(!hasDb)('merchant webhooks on ebda_app (guard + strict RLS)', ()
     expect(await prisma.webhookDelivery.count({ where: { storeId: b } })).toBe(0);
   });
 
+  it('C1: replaying two events after a second endpoint appears creates its rows and never aborts the transaction', async () => {
+    const s = await seedStore('c1');
+    await endpoint(s, ['order.created', 'order.paid']);
+    const paid = { ...ev('p1'), type: 'order.paid' };
+    const run = (e: ReturnType<typeof ev>) =>
+      asApp(() => runInTenantContext(s, () => fanoutWebhookEvent(s, e)));
+    await run(ev('c1'));
+    await run(paid);
+    await endpoint(s, ['order.created', 'order.paid']);
+    expect(await run(ev('c1'))).toHaveLength(1);
+    expect(await run(paid)).toHaveLength(1);
+    expect(await prisma.webhookDelivery.count({ where: { storeId: s } })).toBe(4);
+  });
+
   it("store B's context sees none of store A's endpoints or deliveries, and cannot write into A", async () => {
     const a = await seedStore('iso-a');
     const b = await seedStore('iso-b');
