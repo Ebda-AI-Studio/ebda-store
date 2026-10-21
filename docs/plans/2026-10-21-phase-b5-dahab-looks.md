@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans. Steps use checkbox (`- [ ]`) syntax. **LEAN MODE is binding** (contract below), same shape as the B2 Souq plan (`feat/b2-souq:docs/plans/2026-10-21-phase-b2-souq.md`), with **no Ahmad STOP points** (his 2026-10-21 decision): build → independent audits (≥ 28/40, 0 P0/P1) → fix → merge.
 
-**Goal:** Retire the night + gold + arch Dahab skin (Ruling TPL-2) and ship Dahab as three real looks — Worn (`dahab.worn`), Workshop (`dahab.workshop`), Gift box (`dahab.giftbox`) — on the existing `dahab` skin id, keeping every piece of its commerce wiring (ProductDetail, bag drawer, pinned buy bar, swatch chips, B0 facts / lead time / personalisation / size chart) and wiring the 3D slot it never actually received. Existing Dahab stores move to a new look with their content intact (C8 keep-diff) and no published page breaking. A third demo store `storedemo-dahab` shows the three looks; the marketing illustrations are replaced by captures of it (TPL-4).
+**Goal:** Retire the night + gold + arch Dahab skin (Ruling TPL-2) and ship Dahab as three real looks — Worn (`dahab.worn`), Workshop (`dahab.workshop`), Gift box (`dahab.giftbox`) — on the existing `dahab` skin id, keeping every piece of its commerce wiring (ProductDetail, bag drawer, pinned buy bar, swatch chips, B0 facts / lead time / personalisation / size chart) and wiring the 3D slot it never actually received. Existing Dahab stores move to a new look with their content intact (C8 keep-diff) and no published page breaking. A third demo store `storedemo-dahab` shows the three looks; the marketing illustrations are replaced by captures of it (TPL-4). **Added 2026-10-21 (Ahmad): live gold-rate pricing as a merchant option for any store, shown first on Dahab (Tasks 8–14, Rulings B5-12..B5-21; overturns B5-6).**
 
 **Architecture:** B1/B2 pattern, inverted for Dahab: Dahab already owns a full component skin (`apps/web/src/templates/dahab/`, 2 952 lines) wired into `ProductDetailClient`, `serverTemplate.ts` and `ProductsClient`. Rebuilding it as a chrome-only skin would throw the wiring away, which TPL-2 says to keep. So **the skin id `dahab` stays (no enum value, no SQL migration) and only its visual language is replaced**: arch frames, the gold "draw" hero rule, Amiri/Marcellus loaded for every Dahab page, and `TEMPLATE_THEMES.dahab`'s night/gold defaults go; character comes from look data (tokens in `packages/shared/src/looks/registry.ts`, a per-look section mix, `lookTag` heroes) plus two platform section types every skin can render (`gift-finder`, `process-steps`) and one URL-filter extension on the product list. Dahab-specific facts (karat, width, weight) are B0 product facts; gift wrap and card message reuse variants and personalisation; no schema work.
 
@@ -22,7 +22,7 @@ What Dahab has today, and what B5 does with it:
 | **3D / AR viewer** | default PDP renders `Model3dToggle` + `ProductModel3dPanel` (line ~917); Dahab's `ProductDetail` has a `mediaSlot` prop | **Finding: the Dahab branch never passes `mediaSlot`, so a Dahab product with a 3D model shows no viewer.** Task 2 wires it (same toggle + panel the default PDP uses) and pins it with a test. |
 | Bag drawer (inline-end), menu drawer (inline-start), `CartDrawer`, `Drawer`, `CartTable` with `CartLineNote` + `VariantText` | `templates/dahab/*` | **Keep**, restyle. |
 | Karat / weight / dimensions | `Product.facts` (B0, up to 2 `onCard`, all on the PDP accordion and compare), `Product.weight Float` (admin only), `dimensions Json` | **Karat and width are facts** ("عيار 21", "عرض 4 مم" as the 2 card chips). No new field. |
-| Price = grams × daily rate + making charge | not in code, not in any studied site (research item 13: "inferred from market practice") | **Not built** (Ruling B5-6). |
+| Price = grams × daily rate + making charge | not in code, not in any studied site (research item 13: "inferred from market practice") | **Built as a platform option, Tasks 8–14** (Ruling B5-12 overturns B5-6; any store can use it, Dahab shows it first). |
 | Engraving / name | B0 `Product.personalisation` (label, max length, required) → cart line → order → admin | **Keep**; Worn's engraving band links to it. |
 | Made to order | `leadTimeDays` + `DeliveryChip` + backorder "Pre-order" / "Made to order" stock text | **Keep**; Workshop's lead-time chip on cards is a fact chip, the PDP chip is the existing one. |
 | Ring size | B0 size charts (preset "مقاس الخاتم") | **Keep.** |
@@ -43,7 +43,7 @@ What Dahab has today, and what B5 does with it:
 ## Preconditions (Step 0 of Task 1; a failed one is a STOP-and-report to the controller, not a workaround)
 
 1. **Base.** This worktree is `feat/b5-dahab-looks`, cut from `feat/b1-qamar` (B1 merge is queued, not landed). B5 needs B2's reusable pieces (`apps/web/src/lib/demo-hosts.ts`, `scripts/souq-demo/orange-probe.py`, the `isOrangeFamily` gate in `tests/unit/souq-look-tokens.test.ts`). Order: B1 merges → B2 merges → `git fetch && git rebase origin/main` here. If B2 is still unmerged when Task 1 starts, base on `feat/b2-souq` instead and rebase again when it lands (the controller decides; the implementer never does). Verify with `ls apps/web/src/lib/demo-hosts.ts scripts/souq-demo/orange-probe.py packages/shared/src/looks tests/unit/purchase-path-gates.test.ts scripts/taste/shoot-purchase-path.mjs`.
-2. **Migration order.** B5 plans **no SQL migration** (the `dahab` enum value and the `stores_look_format` CHECK already accept `dahab.*`). Numbers `20261101000100+` are reserved in case Task 4 finds a reason; `node scripts/check-migration-order.mjs` must exit 0 after the rebase either way. Newest known: B1 `20261023000100`, B2 `20261026000100`, webhooks `20261025000100`.
+2. **Migration order.** The look work (Tasks 1–7) still needs **no SQL migration** (the `dahab` enum value and the `stores_look_format` CHECK already accept `dahab.*`). **The reserved number `20261101000100` is now USED by gold-rate pricing (Task 9, `20261101000100_gold_rate_pricing`).** Checked 2026-10-21: no remote branch has a migration with that number (`git ls-tree` over every `origin/*` ref). `20261101000200+` stay reserved in case Task 4 finds a reason. `node scripts/check-migration-order.mjs` must exit 0 after the rebase either way. Newest known: `origin/main` `20261022000200_product_embed_failures`, B1 `20261023000100`, webhooks `20261025000100`, B2 `20261026000100`.
 3. **Overlap with B3 Jasmine (routine in 3 steps) and B4 Lamma.** `process-steps` (Task 3) is generic and may also be wanted by Jasmine's Clinic look. At Step 0 run `git diff origin/main...feat/b3-jasmine -- packages/shared/src/builder/registry.ts | grep -i "steps"` (and the same for B4). If a steps-style section already exists on `main`, reuse it and drop that half of Task 3; never create a second one.
 4. Read the B1 files this plan reuses by name; if a name differs after the rebase, use the real name and note it in the task report.
 
@@ -51,7 +51,8 @@ What Dahab has today, and what B5 does with it:
 
 - **Must work:** a merchant picks Worn, Workshop or Gift box (onboarding or `PUT /stores/:id/look`) and gets a complete jewellery store, Arabic RTL first; the whole purchase path works on all three; a store that was on the old Dahab skin switches to a new look with its products, text, images, logo, personalisation and 3D models intact; a Dahab product with a 3D model shows the viewer.
 - **Exercised:** 3 looks × {390, 820, 1280} × {ar, en} × the scenario matrix; the 17-screen purchase-path pack at 390-ar + 1280-en per look (B1's manifest); `storedemo-dahab` on the real local stack.
-- **Must NOT change:** checkout, pricing, inventory, permissions, tenant isolation, other templates' output (their characterization/snapshot tests stay green byte-for-byte), a saved page document containing `tileShape: 'arch'` still validates and renders, a store with `look = null` on any non-Dahab skin is byte-identical.
+- **Gold-rate pricing must work (Tasks 8–14):** a merchant enters today's rate per karat (or turns on the automatic rate), switches a product or variant to gold-rate pricing, and every surface shows the computed price; a rate change re-prices every gold product in the same transaction and purges every cache layer; checkout re-prices on the server, shows "السعر اتحدّث" when the price moved since add-to-cart, blocks with an Egyptian-Arabic message when the rate is older than the max age, and the order line snapshots rate, karat, weight, making charge and final price, which refunds use.
+- **Must NOT change:** checkout and pricing **for fixed-price products** (byte-identical totals: the existing checkout/coupon/tax/refund suites stay green untouched), inventory, permissions, tenant isolation, other templates' output (their characterization/snapshot tests stay green byte-for-byte), a saved page document containing `tileShape: 'arch'` still validates and renders, a store with `look = null` on any non-Dahab skin is byte-identical.
 - **Done when:** CI green; two independent audits (taste + a11y) score each look ≥ 28/40 with 0 P0/P1; the old night/gold/arch code, fonts, tests, snapshots and the `dahab-preview` host are deleted; docs and marketing updated.
 
 ## LEAN MODE contract (every task obeys it)
@@ -64,11 +65,11 @@ What Dahab has today, and what B5 does with it:
 | Builder scores | **Never** (Ruling B1-70). Only independent auditors score. |
 | Independent audits | **One** taste audit + **one** a11y audit, both at the end of Task 6 on the full purchase-path pack. Gate: each look ≥ 28/40, 0 P0/P1. One fix wave; the re-audit covers only failed findings. No Ahmad STOP: a fail loops fix → re-audit, a second fail escalates to the controller. |
 | Local stack | ONE shared capped Postgres (≤ 1 GiB, DB `ebda_b5`), ONE heavy stack at a time, port passed in (`DAHAB_PORT`), never kill a process you did not start. Tasks 1–3 are unit-test only. Tasks 4–6 may start the stack; the controller serialises them. |
-| Tracks | Max 2. **A (code):** 1 → 2 → 3 → 4. **B (assets):** the asset half of Task 5 starts as soon as Task 1 lands the palettes. Everything else sequential. |
+| Tracks | Max 2. **A (code):** 1 → 2 → 3 → 4 → **8 → 9 → 10 → 11 → 12 → 13 → 14** → 5 → 6 → 7. **B (assets):** the asset half of Task 5 starts as soon as Task 1 lands the palettes. Everything else sequential. Gold pricing sits on Track A (no third track) before Task 5, so the demo seed carries gold-rate pieces and Task 6's audits shoot the price line and the "السعر اتحدّث" notice. |
 | Cost line | Each task report ends `Cost: <runs> · <reviews> · heavy stack: <yes/no, minutes>`. |
 | Reuse | B1/B2: token system, `applyTemplateFamily`, `lookTag`, `LookChrome`, card adapters, purchase-path manifest + 44px probe, shoot script, scenario-store helper, demo surface + `demo-hosts.ts`, the asset pipeline (`scripts/qamar-demo`, `scripts/souq-demo/orange-probe.py`), quality-bar gates. A task that re-implements one is rejected by review. |
 
-Target: **7 tasks**. Planned ≈ 7 implementer runs + 7 reviews + 2 audit agents + 1 Opus PR review; heavy-stack time ≈ Task 4 (migration rehearsal) + Task 5 (seed) + Task 6 (matrix + shoot).
+Target: **14 tasks** (7 looks + 7 gold-rate pricing). Planned ≈ 14 implementer runs + 14 reviews + 2 audit agents + 1 Opus PR review; heavy-stack time ≈ Task 4 (migration rehearsal) + Tasks 9, 10, 12 (real-DB integration: RLS, repricer, checkout) + Task 14 (E2E) + Task 5 (seed) + Task 6 (matrix + shoot). **Gold tasks are money code:** their single review is spec + correctness + money invariants, and the final Opus PR review reads Tasks 8–14 first.
 
 ## Global constraints
 
@@ -78,6 +79,14 @@ Target: **7 tasks**. Planned ≈ 7 implementer runs + 7 reviews + 2 audit agents
 - **Quality bar § 1–10** apply; in particular § 9 (committed Workshop teal puts merchant white-background photos on a light band or matte; over-photo controls take their on-token; a decorative `line` below 3:1 never draws an interactive boundary; one corner allocator per card) and § 10 (purchase path shot in full; ≥ 44 px targets on the rendered DOM; no unthemed native controls; no colour outside the token set on the purchase path; autoplay pause; titles in the page language; one display face per look).
 - **Taste profile applied:** deep rich grounds + metallic accent (Workshop: deep teal + silver/champagne), premium base + playful details (Gift box's ribbon and unwrapping moment), merchandising that sells (gift finder, lead-time promise, shop-by-budget), photo-led, text never covers the product photo on phones.
 - **Tenant/RLS, Zod at every edge, no hardcoded colours in a skin, `git add` specific paths.**
+- **Gold-rate pricing is money code (Tasks 8–14):**
+  - **Integers only.** Rates are piastres per gram (`Int`), weight is milligrams (`Int`), margin is basis points (`Int`), making charge is piastres (fixed) or piastres per gram (per-gram). The math runs in `BigInt` with **one rounding step at the end** (Ruling B5-14). No `Float`, no `Number` intermediate above 2^53, no `toFixed`.
+  - **One implementation of the price formula:** `computeGoldUnitPrice` in `packages/shared/src/commerce/gold-price.ts`. The repricer, the order re-check, the admin preview and the tests call it. SQL never re-implements it.
+  - **The materialised `price` column is the one source every reader uses** (Ruling B5-13). For a gold-priced row, only the repricer writes it, and a DB trigger enforces that.
+  - **Price is NEVER-stale.** Every rate write path (manual, feed, confirm a pending rate, mode switch, spec edit, bulk switch) calls `invalidateStoreProductCaches(storeId)` after commit: the immediate purge, **never** the order-coalesced `…AfterOrder` variant. The full layer list is in Ruling B5-21.
+  - **Fail closed.** A stale rate, a spec that cannot be priced, a drift between the materialised and the recomputed price, or a rate that moved after the shopper's quote throws a typed 409. Nothing ever charges a guessed price.
+  - **Provider anonymity.** The feed provider's name appears only in `apps/api/src/services/gold-rate/feed/**`, `docs/ENVIRONMENT.md` and `docs/RULINGS.md`. A unit gate greps `apps/web`, `apps/admin`, `apps/marketing`, `LanguageContext.tsx`, email templates and `packages/shared` and fails on a hit. Merchant copy says "السعر التلقائي" / "Automatic rate".
+  - **Copy:** Egyptian Arabic for sentences ("السعر اتحدّث", "سعر الجرام النهارده"), neutral buttons ("متابعة", "حفظ السعر", "تأكيد"). The notice and the stale block use look tokens (`--muted`, `--accent`, `--foreground`), **never an amber/orange "warning" colour**. The no-orange gate covers the new components.
 
 ## Rulings made by this plan
 
@@ -88,12 +97,84 @@ Appended to `docs/RULINGS.md` under `## 2026-10-21 — Phase B5 Dahab (B5-*)`, e
 - **Ruling B5-3 — legacy Dahab stores: safe by construction, migrated by script.** `TEMPLATE_THEMES.dahab` and `TEMPLATE_LAYOUT_BASELINES.dahab` become a neutral base (the Qamar pattern: look tokens own colour), so a `template='dahab', look=null` row renders without the night theme instead of crashing or staying night. `tileShape: 'arch'` stays in the section Zod enum (saved documents keep validating) but is dropped from the editor's option list, the registry default becomes `'rectangle'`, and the renderer maps a stored `'arch'` to the look's tile shape. `scripts/dahab-demo/migrate-legacy-dahab.mjs` moves a store with `StoreService.applyLook(id, 'dahab.worn', { design: 'keep' })` — content kept, design overrides reported as the C8 keep-diff, never a raw SQL rewrite (SQL cannot do the keep-diff or the cache purge). Evidence: production has 0 such rows (counted above), so no customer is touched. Cost if wrong: a Dahab store appears that nobody counted; it renders the neutral base until the script runs.
 - **Ruling B5-4 — gift wrap is a variant option, card message is personalisation, no schema.** A gift product carries an option `التغليف: عادي / علبة هدية` (price delta on the variant, the existing path) and a personalisation field labelled `رسالة على الكارت`. On cards "تغليف هدية متاح" is one of the ≤ 2 fact chips (so the taste bar holds); the Gift box PDP shows it in the buy box. Evidence: variants carry a price delta today, personalisation reaches cart → order → admin → invoice → email (B0 §5). Cost if wrong: a merchant cannot sell wrap as an order-level add-on (one wrap per order); a `giftOptions` order field can come later without touching the looks.
 - **Ruling B5-5 — karat, width and weight are product facts.** Card chips: karat ("عيار 21") + width/length ("عرض 4 مم"); PDP accordion: all rows incl. "الوزن: 3.2 جم". `Product.weight` stays an admin/shipping field and is not shown to shoppers. Evidence: B0 §3 limits (2 on cards) and the Worn promise "size line under each name". Cost if wrong: no filter by karat.
-- **Ruling B5-6 — no gold-price-linked pricing, no making-charge pricing.** Not present in code, not seen on Azza Fahmy / Okhtein / Mejuri / Catbird (research item 13 is inferred). Prices stay merchant-set minor units; a rate-driven price would be a pricing-engine change with an audit trail and a refund story, out of a visual redesign. Cost if wrong: gold-by-weight sellers re-price by hand when the rate moves; this is its own program.
+- ~~**Ruling B5-6 — no gold-price-linked pricing, no making-charge pricing.**~~ **OVERTURNED by Ruling B5-12 (2026-10-21).** The original text is kept for the record: "Not present in code, not seen on Azza Fahmy / Okhtein / Mejuri / Catbird (research item 13 is inferred). Prices stay merchant-set minor units; a rate-driven price would be a pricing-engine change with an audit trail and a refund story, out of a visual redesign. Cost if wrong: gold-by-weight sellers re-price by hand when the rate moves; this is its own program."
 - **Ruling B5-7 — the gift finder is one document section over category links and a price URL filter.** Occasions are categories (hidden from the home category row, the B1-15 pattern), budgets are `/products?category=<slug>&maxPrice=<minor>` links; the product list reads `category`, `minPrice`, `maxPrice` from the URL (today it reads only `category` and `sort`). No tag facet, no new API filter. Cost if wrong: occasions cannot overlap on one product beyond category membership.
 - **Ruling B5-8 — "journey of a piece" is a generic `process-steps` section** (2–5 numbered steps, each icon/photo + title + one line), so Jasmine's routine can reuse it. Numbering renders only because the sequence is real (رسم ← صب ← تلميع). Cost if wrong: Clinic builds its own.
-- **Ruling B5-9 — deferred from research, each with a reason.** Appointment/consultation booking (needs a booking model; the WhatsApp product button already is a consult CTA), BNPL (B2 instalment line is Souq-scoped; a jeweller may enable the same setting later), warranty/certificate row (a fact row by convention: "الضمان: ..."), stock "only 1 left" for one-offs (taste bar forbids stock nags), build-a-stack. Product video exists (B0 §7–8), so research item 12 is already covered. Cost if wrong: Worn lacks Mejuri's piercing-studio booking.
+- **Ruling B5-9 — deferred from research, each with a reason.** Appointment/consultation booking (needs a booking model; the WhatsApp product button already is a consult CTA), BNPL (B2 instalment line is Souq-scoped; a jeweller may enable the same setting later), warranty/certificate row (a fact row by convention: "الضمان: ..."), stock "only 1 left" for one-offs (taste bar forbids stock nags), build-a-stack. Product video exists (B0 §7–8), so research item 12 is already covered. **Gold-rate pricing (research item 13) is no longer deferred.** It ships in Tasks 8–14 under Rulings B5-12..B5-21. Still deferred, inside gold pricing: per-customer-group price lists (no such model exists; "B2B tiers" today are customer-group-targeted coupons/promotions, which apply to the computed price, B5-18), silver/platinum rate tables (karat set is 24/21/18 only), buy-back / old-gold trade-in, and a price lock the merchant pays for (B5-17). Cost if wrong: Worn lacks Mejuri's piercing-studio booking; a silver jeweller prices by hand.
 - **Ruling B5-10 — one demo store per template (B2-7): `storedemo-dahab`.** Own owner `storedemo-dahab-owner@ebda.app` (no mailbox), own R2 prefix `demo/dahab/`, the same `is_demo` guards, a row in `demo-hosts.ts`. The old `dahab-preview` host and its seed are retired in Task 7. Cost if wrong: N stores for N templates.
 - **Ruling B5-11 — assets are unbranded and illustrative (TPL-3 / B2-10).** No logos, hallmarks with legible text, or readable engraving in generated photos (the "ZAS" class); every file is viewed before commit; the orange probe runs on every asset (gold jewellery is the risk: a yellow-gold ring measures as orange pixels, so photos favour silver, rose gold, enamel and turquoise stones, and any yellow-gold piece is graded to champagne).
+
+### Gold-rate pricing rulings (B5-12..B5-21, appended by the implementer of the task named in each)
+
+- **Ruling B5-12 — B5-6 is overturned: live gold-rate pricing ships as a merchant option on every plan and every skin, shown first on Dahab (Task 8).** Decision by Ahmad, 2026-10-21. Evidence: Egyptian jewellers sell by weight × the day's rate + مصنعية, so a fixed price is wrong the morning after it is typed. The objection in B5-6 was scope ("a pricing-engine change with an audit trail and a refund story"), not correctness. Tasks 8–14 build that engine, audit trail and refund story explicitly instead of inside a visual redesign. Cost if wrong: about 7 task cycles of money code on a branch whose purpose is a redesign, plus a larger PR for the Opus review. Mitigated by keeping the gold tasks separable: Tasks 8–14 touch no look file except the Dahab/shared price line in Task 14.
+- **Ruling B5-13 — the price is MATERIALISED into the existing `price` columns; the pricing spec lives in new integer columns, never in facts or `weight Float` (Task 9).**
+  - **New columns.** `products.pricing_mode` (`fixed` | `gold_rate`, default `fixed`), `products.gold_karat` (SMALLINT, CHECK in 24/21/18), `products.gold_weight_mg` (INT, CHECK 1..1 000 000), `products.making_charge_type` (`fixed` | `per_gram`), `products.making_charge_value` (INT piastres, ≥ 0), `products.gold_margin_bps` (INT, −5 000..10 000, default 0), `products.gold_rate_id` (the rate row the current price was computed from). The same nullable set on `product_variants`, where null means "inherit the product", plus `product_variants.pricing_mode` (null = inherit).
+  - **The repricer is the only writer.** In the same transaction as the rate write, it recomputes every gold-priced row with `computeGoldUnitPrice` and writes `price`. For a variant product, `products.price` is set to the minimum active variant price, so SQL sort/filter, feeds, search results, JSON-LD and every card path stay correct without a single reader change.
+  - **A BEFORE INSERT/UPDATE trigger enforces it.** `ebda_gold_price_guard` on both tables refuses a `price` / `compare_at_price` change on a gold-priced row unless the transaction set `app.gold_reprice = 'on'` via `set_config(…, true)`. That covers every writer that exists (`ProductService.create/update/bulkUpdate`, `VariantService.createVariant/updateVariant`, CSV/XLSX import in `bulk.service.ts`, the MCP admin-write tools, the admin mass edit) and every future one.
+  - **Why not the alternatives.** `facts` are free text ("عيار 21") and cannot drive money. `Product.weight Float` has no defined unit and is a shipping field (B5-5). Compute-on-read would need every reader changed: `cartLineUnitPrice`, `createAdminOrder`'s own loop, the payment-link `unitPrice`, `getProductPricing`, PLP SQL sort/filter on `p.price`, the feed, `llms.txt`, recommendations, wishlist and the 4 hand-built card mappers. Missing one is a mispriced order.
+  - Cost if wrong: a rate write holds row locks on the store's gold rows for the repricer's duration. It is bounded at 5 000 gold rows per store (refused above that with `GOLD_CATALOGUE_TOO_LARGE`) and measured in Task 10 (2 000 rows < 2 s on the capped local DB, or the task reports the real number and the cap drops).
+- **Ruling B5-14 — the formula and its rounding (Task 8).**
+  - **Formula.** `metal = weight_mg × rate_per_g`, `making = fixed ? value × 1000 : weight_mg × value_per_g` (both in piastre·mg/g), `base = metal + making`, `num = base × (10 000 + margin_bps)`, then **one rounding, directly to the step**: `final = round_half_up(num / (10^7 × step)) × step`, with `step` = the store's rounding step (1, 100, 500 or 1 000 piastres; default **100 = whole pounds**). `round_half_up(a / b)` for positive BigInts is `(2a + b) / (2b)` (floor division). `num > 0` always holds, because `margin_bps ≥ −5 000`.
+  - **Margin scope and rounding.** The margin applies to metal + making together. There is **exactly one rounding in the whole computation**: no per-component rounding and no piastre-then-pound double rounding. Double rounding was caught while writing this plan: 19 230.4975 EGP rounds to 19 231 via piastres-then-pounds but correctly to 19 230. Task 8 pins that case as a negative control.
+  - **Range.** `final` must lie in `1..2 147 483 647` (Postgres `int4`). Otherwise `GOLD_PRICE_OUT_OF_RANGE`.
+  - **Why half-up to the nearest pound.** It is neutral (neither side gains systematically) and matches how Cairo shops quote. Ceil-to-pound would hand the merchant up to 99 piastres per piece silently.
+  - Cost if wrong: a merchant who wants ceil rounding cannot have it. That is one enum value later, with no data change.
+- **Ruling B5-15 — rate sources: (a) the merchant's manual daily rate is always available; (b) the optional automatic rate comes from MetalpriceAPI, Essential plan, behind a neutral adapter (Task 11).**
+  - **Source.** One global hourly fetch: `GET /v1/latest?base=EGP&currencies=XAU`, EGP is in its currency list (verified 2026-10-21 on metalpriceapi.com/currencies). Spot XAU per troy ounce in EGP becomes the per-gram 24k price: `÷ 31.1034768 × 100` piastres. 21k = 24k × 21/24, 18k = 24k × 18/24 (875 and 750 fineness are exactly those fractions). That value plus the store's `feed_premium_bps` (−1 000..+1 000, default 0, merchant label "تعديل على السعر التلقائي") becomes the store's candidate rate.
+  - **Cost.** **US$5/month** (Essential: 1 000 requests/month, 30-minute data; the hourly cron uses about 744/month), billed to Ebda once for all stores. Basic (US$12, 10 000 requests, 10-minute data) if Ahmad wants 30-minute refresh.
+  - **Terms.** Read 2026-10-21 at metalpriceapi.com/terms: the free plan is "solely for personal exploration and evaluation" (so it is **forbidden** here); subscribers may "display … data on their websites for both commercial and personal projects"; reselling the data is forbidden; data is "AS IS" with no accuracy warranty; no attribution requirement. We display a derived price, never resell the feed.
+  - **Merchant control.** The key is `GOLD_FEED_API_KEY` (a neutral name). With the key unset, the admin toggle is disabled with the reason "السعر التلقائي مش متاح دلوقتي" and the cron raises a P1 (fail loud, never a silent stub). The manual rate keeps working.
+  - **Alternatives considered:**
+    - iSagha: the Egyptian Sagha market price, the most accurate local number. No public API or data licence found, so scraping is out.
+    - goldpricez.com and livepriceofgold.com: websites with no licence, so scraping is out.
+    - GoldAPI.io: offers per-gram karat fields, but its pricing page renders client-side and its EGP support could not be verified.
+    - Metals-API: pricing not verified.
+    - APIVerve gold API: EGP support not confirmed.
+    - CBE official FX × USD spot: no official CBE API found, so it would mean two vendors and two failure points.
+  - Cost if wrong: the spot-derived rate differs from the Sagha market price by the local premium, which can be a few percent. Mitigated three ways: `feed_premium_bps`, feed rates passing the same jump gate as manual ones (B5-20), and the manual rate staying the default source. Switching vendor is one adapter file plus one env var.
+- **Ruling B5-16 — max rate age is 26 hours by default and is a hard ceiling; the merchant may lower it to 1 hour (Task 10/12).**
+  - **Why 26 h.** A daily rate typed at 10:00 must survive until the next morning's entry with a 2-hour grace.
+  - **Past the ceiling, fail closed.** Checkout (all three order paths, B5-17) throws 409 `GOLD_RATE_STALE` with "مش هنقدر نكمّل الطلب دلوقتي لأن سعر الدهب ما اتحدّثش النهارده. جرّب تاني بعد شوية أو كلّم المحل." The PDP and cart disable add/checkout with the same sentence. The storefront decides display staleness client-side from `rateAppliedAt` + `maxAgeMinutes` in the payload, so time-based staleness needs no cache purge.
+  - **Merchant alerts.** At 22 h the owner gets an email and the admin dashboard a banner ("حدّث سعر الدهب عشان المحل يفضل يبيع"). At 26 h: a second email, a persistent "البيع واقف" banner, and a store-scoped P1 to operators. Each alert fires once per rate (sentinel).
+  - Cost if wrong: a merchant who skips a day loses sales until they type a rate. That is the requirement ("never sell at a stale price silently"), and the 22 h warning plus the automatic rate exist to make it rare.
+- **Ruling B5-17 — a QUOTE, not a merchant-paid lock; the order snapshot is the lock from order creation through payment (Task 12).**
+  - **Quote on the cart line.** For a gold line, add-to-cart stores `cart_items.quoted_unit_price` + `quoted_at`, read from the server's current price, never from the client. Cart GET returns `priceChanged` / `previousUnitPrice` per line when the current price differs. Checkout shows "السعر اتحدّث" with the new totals, and "متابعة" calls `POST /cart/acknowledge-prices` (quote := current).
+  - **Order creation re-prices in two places.** Before the money transaction it recomputes each gold line with `computeGoldUnitPrice` from the spec and the CURRENT rate, then asserts three things:
+    - the recomputed price equals the materialised price, else 409 `GOLD_PRICE_DRIFT` + P1, because that means a repricer bug;
+    - it equals the line's quote, else 409 `PRICE_CHANGED` + new prices;
+    - the rate is fresh, else 409 `GOLD_RATE_STALE`.
+  - **And again inside `withMoneyTx`.** It takes `FOR SHARE` on the `gold_rates_current` rows it priced from and re-checks their ids, so a rate write that committed between the check and the transaction becomes `PRICE_CHANGED`, never an old-rate order. The rate write takes `FOR UPDATE` on the same rows, so the two serialise.
+  - **Every order path is covered.** The same gate (`assertGoldLinesPriceable`) runs on `OrderService.create` (shopper and the MCP agent checkout), `OrderService.createAdminOrder`, and the payment-link draft order (`payment-links.routes.ts`). Admin and payment-link lines have no shopper quote, so they skip the quote check but not the drift and stale checks. A structural unit test fails if an `orderItem` create site does not call it.
+  - **Why not a merchant-paid lock.** Egyptian gold moves several times a day, and a lock makes the merchant absorb every move inside the window.
+  - Cost if wrong: one extra "متابعة" tap when the rate moves mid-checkout. The merchant still carries the move while an order sits unpaid (gateway session, InstaPay receipt, COD delivery), bounded by the existing unpaid auto-cancel.
+- **Ruling B5-18 — order of operations (Task 12).** `computeGoldUnitPrice` → materialised unit price → × quantity = line total → loose subtotal → best-of coupon / automatic promotion (customer-group-targeted ones are the "B2B tier" that exists today) → loyalty on the remainder → shipping → COD fee → VAT (extracted when `includedInPrice`, added otherwise; MONEYB-2 / M3-6 unchanged) → total → wallet. Gold changes only the first step, so every existing money rule applies to the computed price unchanged. Cost if wrong: a merchant who wants a discount on the making charge only cannot express it; a coupon discounts the whole line.
+- **Ruling B5-19 — exclusions that keep the money story single (Task 8 Zod + Task 12 guards).**
+  - **Excluded:**
+    - a gold-priced product cannot be a bundle component (a bundle price is fixed while its parts drift; `BUNDLE_PRICE_NOT_ALLOCATABLE` would fire daily);
+    - gold mode forbids `compareAtPrice` / `discountType` / `discountValue` on the product and its variants (sales run through coupons/promotions);
+    - the return type `exchange` is refused for a line with a `gold_snapshot` (`GOLD_EXCHANGE_UNSUPPORTED`; return + new order instead).
+  - **What refunds use.** Refunds keep reading `order_items.price`, as `return.service.ts:439` does today. The snapshot is what the refund screen and the invoice line display.
+  - **Switching modes.** Switching gold → fixed freezes the last computed price as the fixed price and writes an audit row.
+  - Cost if wrong: no gold "طقم" bundle (sell the set as one product) and no struck-through gold prices.
+- **Ruling B5-20 — who may write a rate, and the jump gate (Task 10).**
+  - **Who.** Rate writes, rate settings, confirming or rejecting a pending feed rate and the bulk mode switch need `requirePermission('store:settings')` (`store_admin` + `super_admin`; `staff` has `products:write` but not `store:settings`, `rbac.ts:61`). The per-product spec and mode follow `products:write`, like the fixed price staff can already edit.
+  - **Bounds.** A rate lies in 10 000..10 000 000 piastres per gram. A change of more than `jump_confirm_bps` (default **500 = 5 %**) from the current rate of the same karat needs `confirm: true` in the request, which the admin asks for with "السعر الجديد أعلى من آخر سعر بـ 7٪. متأكد إنه صح؟". So does a 21k/18k rate more than 4 % away from 24k × 21/24 or 18/24 when they are entered together (swapped fields).
+  - **Feed rates never self-confirm.** A feed rate over the gate is stored `pending`, not applied, and the merchant is alerted to confirm or reject it.
+  - Cost if wrong: on a genuine crash day (March 2024 float: about −20 % in a day) the feed holds until the merchant taps "تأكيد". That is a stale-rate block rather than a silent sale at a wrong price.
+- **Ruling B5-21 — NEVER-stale cache layers a rate change must clear, and the one bounded residual (Task 10).**
+  - **What the rate write calls.** `GoldRateService.applyRates` commits, then calls `invalidateStoreProductCaches(storeId)` (`apps/api/src/lib/public-cache.ts:317`) via `deferAfterTenantCommit`. The feed path calls it directly per store inside its `step.run`.
+  - **The layers, each named in a test:**
+    1. Redis/KV `public:products:<store>:*`: PLP lists and search results; PLP SQL sort/filter reads the materialised `p.price`.
+    2. `public:product:<store>:*`: the PDP.
+    3. `public:suggest:<store>:*`: search suggest. `ebda_product_search_doc` is text-only (name, name_ar, search_terms, description, description_ar; `product-search.service.ts:44`), so search *docs* hold no price and need no rewrite; only cached *results* do.
+    4. `admin:products:<store>:*`.
+    5. `public:bundles:v2:<store>` and the category caches (via `clearProductsRedis`).
+    6. The in-process `BoundedMap` fallback, cleared by the same `invalidateCached*` calls, plus the generation bump (FIX-001) so an in-flight fill cannot republish the old price.
+    7. Next data-cache tags `products:<store>`, `categories:<store>`, `bundles:<store>` (one `revalidateStorefront` POST): PLP, PDP, home carousels, sitemap, the `/feeds/products.json` and `llms.txt` upstream fetches.
+    8. The cart: no cache. `cartLineUnitPrice` reads the DB per request, and the client's prepainted cart (`contexts/cart-hydration.ts`) is replaced by the cart GET, whose `priceChanged` drives the notice.
+    9. Edge/HTTP caches we cannot purge: `/feeds/products.json` (`s-maxage=600, stale-while-revalidate=86400`) and `llms.txt` (`s-maxage=600`/`60`, SWR 86400). For a store with gold pricing enabled they emit `public, s-maxage=60` without SWR. This is the documented **BOUNDED-stale residual of ≤ 60 s in third-party caches** (crawlers, shopping feeds), written at the cache site.
+  - **The rate reads themselves are never cached.** The checkout gate, the admin rate page and the repricer read the DB directly.
+  - Cost if wrong: a shopping feed can show the previous price for up to a minute. Checkout re-prices from the DB and shows "السعر اتحدّث", so no one is charged it.
 
 ---
 
@@ -117,8 +198,15 @@ Appended to `docs/RULINGS.md` under `## 2026-10-21 — Phase B5 Dahab (B5-*)`, e
 | `docs/ebda/templates/purchase-path.json` | Dahab screens + new control files | 6 |
 | `docs/ebda/templates/{dahab.md (rewritten),looks.md,demo-store.md,platform-commerce.md}`, `docs/RULINGS.md`, `CLAUDE.md`/`handoff.md` pointers | docs | each + 7 |
 | `apps/marketing/scripts/looks/{shots.mjs,dahab.py}`, `apps/marketing/public/looks/dahab.html`, `apps/marketing/public/looks/img/*` | real `storedemo-dahab` captures replace the illustrations | 7 |
+| `packages/shared/src/commerce/gold-price.ts`, `packages/shared/src/schemas/gold-pricing.ts` (or the repo's existing schema home, found in Step 0), `packages/shared/src/commerce/index.ts`, `tests/unit/gold-price.test.ts`, `tests/unit/gold-pricing-schema.test.ts` | the one price formula + rounding; Zod for spec, rates, settings, snapshot | 8 |
+| `packages/database/prisma/migrations/20261101000100_gold_rate_pricing/migration.sql`, `schema.prisma`, `packages/database/src/tenant-guard-schema.generated.ts`, `tests/integration/gold-rate-rls.test.ts`, `tests/integration/gold-price-guard-trigger.test.ts` | 3 tables, product/variant/cart/order columns, RLS + FORCE, guard trigger | 9 |
+| `apps/api/src/services/gold-rate/{gold-rate.service.ts,repricer.ts,gate.ts}`, `apps/api/src/routes/gold-rate.routes.ts`, `tests/integration/gold-rate-apply.test.ts`, `tests/unit/gold-rate-cache-layers.test.ts` | rate writes, jump gate, repricer, audit, cache purge | 10 |
+| `apps/api/src/services/gold-rate/feed/{adapter.ts,metalprice.ts}`, `apps/api/src/lib/inngest/functions/{gold-rate-feed-fetch.ts,gold-rate-staleness-watch.ts}`, `email-templates/gold-rate-*.ts`, `tests/unit/gold-rate-feed.test.ts`, `tests/unit/gold-provider-name-gate.test.ts`, `docs/ENVIRONMENT.md` | automatic rate, staleness alerts, provider anonymity gate | 11 |
+| `apps/api/src/services/{order.service.ts,cart.service.ts,return.service.ts,bundle.service.ts}`, `apps/api/src/routes/{payment-links.routes.ts,cart*.routes.ts}`, `apps/api/src/mcp/tools/{cart.tools.ts,order.tools.ts}`, `tests/integration/gold-checkout.test.ts`, `tests/unit/gold-gate-every-order-path.test.ts` | quote, 3-path gate, snapshot, refund/exchange/bundle guards | 12 |
+| `apps/admin/src/app/stores/[id]/gold-rates/page.tsx` (+ `_components/`), `apps/admin/src/app/stores/[id]/products/[productId]/edit/_components/GoldPricingCard.tsx`, `…/variants/_components/SimpleVariantsForm.tsx`, `apps/admin/src/app/stores/[id]/products/_components/MassEditModal.tsx`, `apps/admin/src/components/admin-layout/hubs.ts`, order detail line, import columns | rate editor + history, settings, mode toggle + preview, bulk switch | 13 |
+| `apps/web/src/components/product/GoldRateLine.tsx`, `apps/web/src/app/checkout/_components/PriceChangedNotice.tsx`, `CartContext.tsx`, `LanguageContext.tsx`, `templates/dahab/ProductDetail.tsx` + the default PDP, `tests/dahab/dahab-gold-price.spec.ts`, `docs/ebda/templates/platform-commerce.md` (§ Gold-rate pricing), `docs/architecture/gold-rate-pricing.md` | storefront line, notice, stale state, E2E, docs | 14 |
 
-Order: **Task 1 → (Track B assets start) 2 → 3 → 4 → 5 → 6 (audits + fix wave) → 7 (delete + marketing + PR)**. No STOP points.
+Order: **Task 1 → (Track B assets start) 2 → 3 → 4 → 8 → 9 → 10 → 11 → 12 → 13 → 14 (gold-rate pricing) → 5 → 6 (audits + fix wave) → 7 (delete + marketing + PR)**. No STOP points. Task numbers are stable IDs, not execution order.
 
 ---
 
@@ -178,7 +266,7 @@ Order: **Task 1 → (Track B assets start) 2 → 3 → 4 → 5 → 6 (audits + f
 
 **Files:** `scripts/dahab-demo/{catalogue.mjs,prompts.py,gen.py,encode.sh,orange-probe.py,assets/,CREDITS.md}`, `scripts/storedemo/{seed.mjs,dahab-home.mjs}`, `apps/web/src/lib/demo-hosts.ts`, `DemoLookBar.tsx`.
 
-- [ ] **Catalogue** (Egyptian jewellery, ~20 pieces, all B0 features once): rings with the "مقاس الخاتم" size chart (a swatch option for metal: silver, rose gold, champagne; no yellow gold swatch photo), necklaces with length option, bracelets, earrings, a set; facts on every piece ("عيار 21", "عرض 4 مم", "الوزن 3.2 جم", "الضمان: سنة"); two pieces with required-engraving personalisation (label "الحروف للحفر", max 12); four made-to-order pieces with `leadTimeDays` 3–7; a gift line (wrap option, "رسالة على الكارت" personalisation, a gift-card-style product at fixed amounts as variants); sale prices on variants (B1 learning: the card path reads the parent); one sold-out piece and one backorder piece; occasion categories (خطوبة، عيد ميلاد، عيد الأم، تخرج) hidden from the home category row; one product with a 3D model if the repo has a free sample asset (Step 0: `product-3d-viewer` plan fixtures), else the 3D path is exercised by the Task 2 test and the scenario store.
+- [ ] **Catalogue** (Egyptian jewellery, ~20 pieces, all B0 features once): rings with the "مقاس الخاتم" size chart (a swatch option for metal: silver, rose gold, champagne; no yellow gold swatch photo), necklaces with length option, bracelets, earrings, a set; facts on every piece ("عيار 21", "عرض 4 مم", "الوزن 3.2 جم", "الضمان: سنة"); two pieces with required-engraving personalisation (label "الحروف للحفر", max 12); four made-to-order pieces with `leadTimeDays` 3–7; a gift line (wrap option, "رسالة على الكارت" personalisation, a gift-card-style product at fixed amounts as variants); sale prices on variants (B1 learning: the card path reads the parent); one sold-out piece and one backorder piece; occasion categories (خطوبة، عيد ميلاد، عيد الأم، تخرج) hidden from the home category row; one product with a 3D model if the repo has a free sample asset (Step 0: `product-3d-viewer` plan fixtures), else the 3D path is exercised by the Task 2 test and the scenario store. **Gold-rate pieces (Tasks 8–14 landed first):** the demo store gets manual rates for 24/21/18 (illustrative numbers, `source: 'manual'`, re-stamped by the seed so the demo never goes stale on a fresh seed), six gold-rate products (two per karat, one with per-gram مصنعية, one with fixed مصنعية, one ring with size variants of different weights), the rest fixed-price. Note in `demo-store.md`: a production demo store's rate goes stale after 26 h by design, so the seed's production run (controller step) either enables the automatic rate or the demo shows the stale state. Which one is Ahmad's call at the production step, not the implementer's.
 - [ ] **Assets** (Track B, may start after Task 1): FLUX prompts per look following the directions (north-light bench and hand-with-ring for Worn; hands, tools, enamel, turquoise for Workshop; emerald box, satin ribbon, unwrapping for Gift box), stored as WebP ≤ 140 KB under `scripts/dahab-demo/assets/`, labelled illustrative (TPL-3, CREDITS.md), **unbranded and free of legible lettering** (B5-11), **orange probe on every file** (hue 12–50, HSV sat ≥ 35 %: a file over 2 % fails and is regenerated or graded), every file viewed before commit. Merchant-style white-background packshots included so § 9 rule 1 is shot against real conditions.
 - [ ] **`storedemo-dahab`** (B2-7): second `is_demo` store, owner `storedemo-dahab-owner@ebda.app`, Professional plan, `defaultLanguage: 'ar'`, Cairo shipping zone, home = a superset document (`dahab-home.mjs`, one `lookTag` hero per look) that `demoHomeDefinition` filters through each look's mix. `demo-hosts.ts` gets the Dahab row; `DemoLookBar` lists Dahab's looks only once they are `built` (flipped in Task 6). `--local-look-stores` also seeds `dahab-worn`, `dahab-workshop`, `dahab-giftbox` non-demo stores through `applyLook(..., { design: 'reset' })`.
 - [ ] Demo isolation tests (same as B2 review focus 7): `storedemo-dahab` refuses orders and PII writes via the `is_demo` guards, no slug-keyed branch, the bar lands on the right host with `?look=` kept, no Qamar/Souq catalogue on it.
@@ -189,7 +277,7 @@ Order: **Task 1 → (Track B assets start) 2 → 3 → 4 → 5 → 6 (audits + f
 **Files:** `playwright.dahab.config.ts`, `tests/dahab/*`, `scripts/storedemo/scenario-stores.mjs`, `docs/ebda/templates/purchase-path.json`, `registry.ts` (`status`), docs.
 
 - [ ] Rewrite the Dahab browser suite as a copy of B2's `tests/souq/*`: stores {demo, empty, one-product, 500 products, wide/tall/no logo, Arabic-Indic on, merchant-extreme primary, **a store whose photos are all white-background**, **a migrated legacy store from Task 4**} × 3 looks × {ar, en} × {390, 820, 1280} × the pages; plus reduced motion, 200 % zoom, keyboard-only, slow 3G, variants/OOS/backorder/sale/personalisation/size chart/delivery chip/3D toggle/gift finder/steps. axe: no serious or critical.
-- [ ] **Checkout data flow, not component level** (B1's worst miss): each scenario store places a COD order through the real cart → checkout → receipt with a variant product (Metal × Size) plus a personalised line, and the test asserts the variant names and the engraving text reach the summary, the receipt and the admin order.
+- [ ] **Checkout data flow, not component level** (B1's worst miss): each scenario store places a COD order through the real cart → checkout → receipt with a variant product (Metal × Size) plus a personalised line, and the test asserts the variant names and the engraving text reach the summary, the receipt and the admin order. **Plus one gold-rate line per scenario store:** the "سعر الجرام النهارده" line renders on card-less surfaces (PDP, cart, summary), the order's snapshot reaches the receipt and the admin order, and the purchase-path pack gains two screens per look: the "السعر اتحدّث" notice and the stale-rate block (both at 390-ar + 1280-en, both through the 44 px probe and the orange probe).
 - [ ] Add every Dahab-specific control file (`GiftFinderSection`, `ProcessStepsSection`, chip rows, drawers) to `purchase-path.json` `files`; `shoot-purchase-path.mjs` shoots 17 screens × {390-ar, 1280-en} × 3 looks; the 44 px probe, § 10 gates (a)–(g) and the orange pixel probe on the shots must pass. Pixel share of each committed look's primary measured (30–60 %; Workshop above 80 % would need a ruling, so it stays banded with white/light sections).
 - [ ] Flip `status: 'built'` for the three looks (the demo bar lists them).
 - [ ] **Independent audits (the only scores):** spawn ONE taste auditor (against the taste profile + quality bar + the 40-point rubric) and ONE a11y auditor on the pack, neither seeing the builder's reasoning. Gate: each look ≥ 28/40, 0 P0/P1. One fix wave for findings (Sonnet, same ≤ 1 round); re-audit only the failed findings. A second fail is reported to the controller with the evidence; it is never waved through and never goes to Ahmad as a STOP.
@@ -198,11 +286,349 @@ Order: **Task 1 → (Track B assets start) 2 → 3 → 4 → 5 → 6 (audits + f
 ### Task 7: Delete the old skin leftovers, docs, marketing captures, minors, PR (sequential)
 
 - [ ] **Delete (only now, after Task 6 shows the new looks live on the demo):** `scripts/dahab-demo/{seed-dahab.mjs,fetch-photos.mjs,photos.json,capture.mjs}` and the Unsplash `CREDITS.md` section, the `dahab-preview` host from `scripts/preview/preview-config.mjs` and the preview-stack section of `dahab.md` (the preview Worker/DNS teardown is a controller production step, listed below), obsolete assertions in `tests/unit/dahab-template-render.test.tsx`, the old `tests/dahab/dahab-storefront.spec.ts`, and the three `tests/fixtures/builder/__snapshots__/dahab-*.html` snapshots regenerated deliberately (diff reviewed: class-only changes plus the removed arch markup). Then run the Task 1 sweep again: `grep -rniE "night|arch|marcellus|amiri|dahab-draw|dahab-rise|--font-dahab" apps packages scripts tests docs` → every hit explained or gone.
-- [ ] **Docs (parity, same session):** rewrite `docs/ebda/templates/dahab.md` from the shipped state (looks, tokens table with the measured contrasts, mixes, the two new sections, the 3D fix, facts/wrap/personalisation conventions, the legacy-store path, the demo store, what is deferred), `looks.md` (15 looks table: Dahab built), `demo-store.md` (third demo store), `platform-commerce.md` (gift-finder, process-steps, URL filters), `quality-bar.md` § status line, `docs/architecture/page-definition.md`, `docs/RULINGS.md` (B5-1..B5-11 present and complete), `docs/ROLLBACK.md` (no schema change: "revert the PR; legacy rows keep rendering the neutral base").
+- [ ] **Docs (parity, same session):** rewrite `docs/ebda/templates/dahab.md` from the shipped state (looks, tokens table with the measured contrasts, mixes, the two new sections, the 3D fix, facts/wrap/personalisation conventions, the legacy-store path, the demo store, what is deferred), `looks.md` (15 looks table: Dahab built), `demo-store.md` (third demo store), `platform-commerce.md` (gift-finder, process-steps, URL filters), `quality-bar.md` § status line, `docs/architecture/page-definition.md`, `docs/RULINGS.md` (B5-1..B5-21 present and complete; B5-6 marked overturned by B5-12), `docs/ROLLBACK.md`:
+  - **Looks.** No schema change: "revert the PR; legacy rows keep rendering the neutral base".
+  - **Gold pricing.** Migration `20261101000100` is additive (new tables and nullable/defaulted columns). Rollback = revert the code, and gold rows keep their last materialised price as a fixed price because the trigger only guards writes. Before reverting, run `scripts/gold-rate/freeze-all.mjs --dry-run`, which sets every `gold_rate` row to `fixed` through the service (audit row per product), so no product is left in a mode the old code cannot read. Re-verify the RLS policy state after any restore. The script is written in Task 13.
 - [ ] **Marketing (TPL-4):** `apps/marketing/scripts/looks/shots.mjs` + `dahab.py` capture the three looks from the real `storedemo-dahab` (the Souq procedure), replacing the illustrations in `apps/marketing/public/looks/dahab.html`; `apps/marketing/src/lib/looks-fonts.ts` and `content.ts` copy updated; no orange in any capture (probe).
 - [ ] **Minors commit** from `minors.md`. Final **Opus** PR review (security: tenant isolation on the two new sections' reference checks and the migration script's loopback guard; correctness of keep-diff; no regressions on other templates). Open the PR; CI green.
 - [ ] **Controller production steps after merge (a human-flagged write, not an agent decision):** (1) `seed.mjs --yes-production` for `storedemo-dahab` and the R2 upload of `demo/dahab/`; (2) re-run the 0-row count query and, if it is not 0, the legacy script dry-run; (3) tear down the `dahab-preview` Worker, DNS record and Neon `preview` data; (4) verify against production per rule F: `curl -sI https://<dahab demo host>/?look=dahab.worn`, read `/health` commit against the tip of `main`, and shoot one page per look in Arabic. Report what could not be verified (e.g. real merchant traffic: zero Dahab merchants exist).
 - [ ] `Cost: 1 · 1 · heavy stack: no`; ledger totals the run.
+
+---
+
+## Gold-rate pricing (Tasks 8–14, Track A after Task 4; Rulings B5-12..B5-21)
+
+**What the code already does, measured 2026-10-21 (the tasks build on these, do not re-derive them):**
+- **Prices.** `products.price` / `product_variants.price` are `Int` piastres. A variant's `null` price means the product price. `cartLineUnitPrice` (`apps/api/src/lib/cart-pricing.ts`) is the line price for the cart, `OrderService.create`, MCP cart tools, abandoned cart and bundles. Two other sites price lines on their own: `OrderService.createAdminOrder` (`order.service.ts:~2783`) and the payment-link draft order (`payment-links.routes.ts:303`).
+- **Carts and orders.** `cart_items` stores no price. `order_items.price` is the snapshot, and refunds read it (`return.service.ts:439`).
+- **Money order.** The order is subtotal → best-of coupon/promotion → loyalty → shipping → COD fee → VAT (`order.service.ts:~1000–1160`, MONEYB-2).
+- **No B2B price lists.** "B2B" = `CustomerGroup`-targeted coupons/promotions (`promotion-targeting.ts:49`).
+- **Roles.** `staff` lacks `store:settings` (`rbac.ts:61`).
+- **Crons.** Inngest crons list stores through `storeDirectory()` and work per store in `step.run` (`stock-low-stock-alert.ts`).
+- **RLS template.** `20261016000900_size_charts` (ENABLE + FORCE + one `ebda_tenant_isolation` policy + GRANT to `ebda_app`).
+- **Alerts.** `sendAlert` is operator Telegram; the merchant channel is owner email (the low-stock pattern) plus an admin banner.
+
+### Task 8: The price formula, rounding and Zod schemas (pure, unit-only)
+
+**Files:** create `packages/shared/src/commerce/gold-price.ts`, `packages/shared/src/schemas/gold-pricing.ts` (Step 0: if Zod schemas for products live elsewhere in `packages/shared/src/schemas/`, put it beside them and note it), export from `packages/shared/src/commerce/index.ts`; tests `tests/unit/gold-price.test.ts`, `tests/unit/gold-pricing-schema.test.ts`; `docs/RULINGS.md` (B5-12, B5-14, B5-19).
+
+**Interfaces (exact):**
+
+```ts
+// packages/shared/src/commerce/gold-price.ts
+export const GOLD_KARATS = [24, 21, 18] as const;
+export type GoldKarat = (typeof GOLD_KARATS)[number];
+export type MakingChargeType = 'fixed' | 'per_gram';
+export const GOLD_ROUNDING_STEPS = [1, 100, 500, 1000] as const; // piastres
+export interface GoldPriceSpec {
+  karat: GoldKarat;
+  weightMg: number;            // int 1..1_000_000
+  makingChargeType: MakingChargeType;
+  makingChargeValue: number;   // int piastres (fixed) or piastres per gram (per_gram), >= 0
+  marginBps: number;           // int -5000..10000
+}
+export interface GoldPriceResult { unitPrice: number; metalValue: number; makingValue: number } // piastres; metal/making are DISPLAY splits, each rounded half-up independently, never summed into unitPrice
+export class GoldPriceError extends Error { code: 'GOLD_SPEC_INVALID' | 'GOLD_RATE_INVALID' | 'GOLD_PRICE_OUT_OF_RANGE' }
+export function computeGoldUnitPrice(spec: GoldPriceSpec, ratePerGram: number, roundingStep: (typeof GOLD_ROUNDING_STEPS)[number]): GoldPriceResult;
+export function resolveVariantGoldSpec(product: Partial<GoldPriceSpec> & { pricingMode: 'fixed' | 'gold_rate' }, variant: Partial<GoldPriceSpec> & { pricingMode: 'fixed' | 'gold_rate' | null }): GoldPriceSpec | null; // null = fixed; throws GOLD_SPEC_INVALID when gold but incomplete
+export function goldRateJumpBps(previous: number, next: number): number; // |next-prev|*10000/prev, integer, rounded up
+export function karatCoherenceBps(rate24: number, rateK: number, karat: 21 | 18): number;
+```
+
+```ts
+// packages/shared/src/schemas/gold-pricing.ts — Zod at every edge
+goldPriceSpecSchema          // the interface above, .strict(), ints, bounds
+productGoldPricingInputSchema // { pricingMode, karat?, weightMg?, makingChargeType?, makingChargeValue?, marginBps? } + refine: gold ⇒ complete spec, gold ⇒ no compareAtPrice/discountType/discountValue (B5-19)
+variantGoldPricingInputSchema // same, pricingMode nullable (inherit), every spec field nullable (inherit)
+goldRateInputSchema          // { rates: [{ karat, ratePerGram (int 10_000..10_000_000) }] (1..3, unique karat), confirm?: boolean }
+goldRateSettingsSchema       // { enabled, feedEnabled, feedPremiumBps (-1000..1000), maxAgeMinutes (60..1560), jumpConfirmBps (100..5000, default 500), roundingStep, showBreakdown (default false) }
+goldLineSnapshotSchema       // { v: 1, karat, weightMg, ratePerGram, rateId, rateAppliedAt (ISO), makingChargeType, makingChargeValue, marginBps, roundingStep, unitPrice }
+publicGoldPricingSchema      // storefront payload: { karat, weightMg, ratePerGram, rateAppliedAt, maxAgeMinutes, breakdown?: { metalValue, makingValue } } — no margin, no rate id, no source
+```
+
+- [ ] **Failing test first** (`tests/unit/gold-price.test.ts`). These vectors were computed with BigInt while writing this plan, and the implementer re-derives each by hand in a comment:
+
+| # | weight | rate (piastres/g) | making | margin | step | expected `unitPrice` |
+| --- | --- | --- | --- | --- | --- | --- |
+| A | 3 250 mg | 576 323 (21k) | per_gram 15 000 | 0 | 100 | **1 921 800** |
+| B | 3 250 mg | 576 323 | per_gram 15 000 | +250 | 100 | **1 969 800** |
+| C | 3 250 mg | 576 323 | fixed 50 000 | 0 | 100 | **1 923 000** (true 19 230.4975 EGP → 19 230; **negative control: a piastre-then-pound implementation returns 1 923 100 and must fail this row**) |
+| C1 | same as C | | | | 1 | **1 923 050** |
+| D | 3 250 mg | 576 323 | per_gram 15 000 | −500 | 100 | **1 825 700** |
+| E | 1 000 000 mg | 10 000 000 | per_gram 10 000 000 | +10 000 | 1 | throws `GOLD_PRICE_OUT_OF_RANGE` (40 000 000 000 > int4) |
+| F | 1 mg | 10 000 | fixed 0 | −5 000 | 1 | **5** |
+| G | 1 000 000 mg | 658 655 (24k) | fixed 0 | 0 | 100 | **658 655 000** |
+
+  Plus:
+  - a **float-path negative control**: a deliberately naive `Number` implementation over vector E's inputs loses precision, and the test asserts the real function's result for 10 000 random in-range specs equals a reference BigInt oracle written independently in the test file;
+  - exact half-boundary cases at each step: `x.5` rounds up, `x.4999…` rounds down;
+  - every bound ±1 (weight 0 / 1 000 001, rate 9 999 / 10 000 001, margin −5 001 / 10 001, non-integer inputs) throws `GOLD_SPEC_INVALID` / `GOLD_RATE_INVALID`;
+  - `resolveVariantGoldSpec` inheritance: a variant with only `weightMg` set takes karat/making/margin from the product, a variant `pricingMode: 'fixed'` on a gold product returns `null`, and an incomplete gold spec throws;
+  - `goldRateJumpBps(500_000, 525_001) === 501`.
+- [ ] Schema tests: each schema accepts a valid fixture and rejects every bound ±1. `productGoldPricingInputSchema` rejects gold + `compareAtPrice` and gold + `discountType`. `goldRateInputSchema` rejects a duplicate karat and 4 rates. `publicGoldPricingSchema` **has no `marginBps`, `rateId` or `source` key** (a test enumerates `Object.keys(shape)`; the margin is the merchant's business, not the shopper's).
+- [ ] Implement until green. No `Number` arithmetic on a product of two inputs: everything converts to `BigInt` at the top of `computeGoldUnitPrice`, and the result is asserted `<= 2_147_483_647n` before `Number()`.
+- [ ] **Verify:** `npx vitest run tests/unit/gold-price.test.ts tests/unit/gold-pricing-schema.test.ts packages/shared`; `npm run typecheck`. Rulings B5-12, B5-14, B5-19 appended. Commit `feat(gold): price formula, single rounding and zod schemas`. `Cost: 1 · 1 · heavy stack: no`.
+
+### Task 9: Migration `20261101000100_gold_rate_pricing`, RLS + FORCE, the price guard trigger
+
+**Files:** `packages/database/prisma/migrations/20261101000100_gold_rate_pricing/migration.sql`, `packages/database/prisma/schema.prisma`, `packages/database/src/tenant-guard-schema.generated.ts` (regenerated: `npm run gen:tenant-guard-schema -w packages/database`), `tests/integration/rls-ebda-app.test.ts` (no allowlist change: the new tables must pass the enumerating test as strict tenant tables), `tests/integration/gold-rate-rls.test.ts`, `tests/integration/gold-price-guard-trigger.test.ts`, `docs/RULINGS.md` (B5-13).
+
+**Schema (exact):**
+- **`gold_rates`** (history, append-only).
+  - Columns: `id uuid pk`, `store_id text not null fk stores on delete cascade`, `karat smallint not null check (karat in (24,21,18))`, `rate_per_gram int not null check (rate_per_gram between 10000 and 10000000)`, `source text not null check (source in ('manual','feed'))`, `status text not null check (status in ('applied','pending','rejected'))`, `jump_bps int`, `feed_reference jsonb` (spot per oz, fetched-at, premium bps; never the provider name), `created_by text null` (null = feed), `decided_by text null`, `created_at timestamptz default now()`, `applied_at timestamptz null`.
+  - Index: `(store_id, karat, created_at desc)`.
+  - Grants: `GRANT SELECT, INSERT` + `GRANT UPDATE (status, decided_by, applied_at)` to `ebda_app`. **No DELETE grant.**
+- **`gold_rates_current`.** `store_id`, `karat`, `rate_id uuid not null fk gold_rates`, `rate_per_gram int not null`, `applied_at timestamptz not null`, `pk (store_id, karat)`. Full CRUD grant.
+- **`gold_rate_settings`.** `store_id pk`, `enabled bool default false`, `feed_enabled bool default false`, `feed_premium_bps int default 0 check (-1000..1000)`, `max_age_minutes int default 1560 check (60..1560)`, `jump_confirm_bps int default 500 check (100..5000)`, `rounding_step int default 100 check (rounding_step in (1,100,500,1000))`, `show_breakdown bool default false`, `updated_by text`, `updated_at`.
+- **`products`.** `pricing_mode text not null default 'fixed' check (in ('fixed','gold_rate'))`, `gold_karat smallint check`, `gold_weight_mg int check (1..1000000)`, `making_charge_type text check`, `making_charge_value int check (>=0)`, `gold_margin_bps int not null default 0 check (-5000..10000)`, `gold_rate_id uuid null` (no FK: history is append-only, the stamp is informational). `CHECK (pricing_mode = 'fixed' OR (gold_karat IS NOT NULL AND gold_weight_mg IS NOT NULL AND making_charge_type IS NOT NULL AND making_charge_value IS NOT NULL))`. Partial index `(store_id, gold_karat) WHERE pricing_mode = 'gold_rate' AND deleted_at IS NULL` (the repricer's scan).
+- **`product_variants`.** The same spec columns, all nullable (inherit), `pricing_mode text null check (in ('fixed','gold_rate'))`, `gold_rate_id uuid null`.
+- **`cart_items`.** `quoted_unit_price int null`, `quoted_at timestamptz null`. The line-identity partial unique indexes are untouched (a test asserts their definitions are byte-equal before and after).
+- **`order_items`.** `gold_snapshot jsonb null check (gold_snapshot is null or jsonb_typeof(gold_snapshot) = 'object')`.
+- **RLS.** `ENABLE` + `FORCE` + `ebda_tenant_isolation` (USING and WITH CHECK `store_id = nullif(current_setting('app.current_store_id', true), '')`) on the three new tables, copied from `size_charts`.
+- **Trigger.** `ebda_gold_price_guard()`, `BEFORE INSERT OR UPDATE OF price, compare_at_price, pricing_mode` on `products` and `product_variants`. It resolves the effective mode (a variant's own mode, else its product's), and if gold-priced AND (`price` or `compare_at_price` changed, or it is an INSERT) AND `coalesce(current_setting('app.gold_reprice', true), '') <> 'on'`, it raises `GOLD_PRICE_MANAGED` (SQLSTATE `P0001`; mapped in `lib/prisma-errors.ts` to a 409). A gold row's `compare_at_price` must be null (B5-19).
+- The migration header lists the tables and states that the number came from the reservation in Preconditions §2.
+
+- [ ] **Failing tests first (real DB, `ebda_app` login, per-call unique fixtures: retry-safe):**
+  - `gold-rate-rls.test.ts`: for each new table, a contextless SELECT returns 0 rows and a contextless INSERT is rejected. Store A's context cannot read or write store B's rates. `ebda_app` cannot `DELETE FROM gold_rates`, and cannot `UPDATE gold_rates SET rate_per_gram` (column grant). `FORCE` is on (`relforcerowsecurity`).
+  - `gold-price-guard-trigger.test.ts`:
+    - an UPDATE of `price` on a gold product without the GUC → `GOLD_PRICE_MANAGED`;
+    - the same inside `set_config('app.gold_reprice','on',true)` → succeeds;
+    - **the GUC does not leak**: the next transaction on the same pooled connection without it is refused again;
+    - a variant with `pricing_mode null` on a gold product is guarded, and one with `'fixed'` on a gold product is not;
+    - a fixed product's price UPDATE is unaffected;
+    - **negative control:** drop the trigger in a savepoint and the first assertion goes green, proving the test can fail.
+  - Both are added to `npm run test:defence-mutations` (money domain): the record entry deletes the trigger, deletes the FORCE line and widens the policy, and asserts red.
+- [ ] Write the migration and Prisma fields, regenerate the tenant-guard snapshot (`tenant-guard-schema-snapshot.test.ts` goes green only after), and run `node scripts/check-migration-order.mjs` (exit 0).
+- [ ] **FK cascade check (global rule):** `select … from information_schema.referential_constraints where constraint_name like '%gold%'`. Deleting a store cascades to all three tables, and the store-delete handler test (`grep -rn "store.delete\|deleteStore" apps/api/src`) still passes.
+- [ ] **Verify:** `npm run test:integration -- gold-rate-rls gold-price-guard-trigger rls-ebda-app tenant-guard-ebda-app`, `npx vitest run tests/unit/tenant-guard-schema-snapshot.test.ts tests/unit/no-session-level-gucs.test.ts`, typecheck. Ruling B5-13 appended. Commit `feat(gold): rate tables, product spec columns, rls and price guard (migration 20261101000100)`. `Cost: 1 · 1 · heavy stack: yes, ~15 min`.
+
+### Task 10: Rate service, repricer, rate API, jump gate, audit, cache purge
+
+**Files:** `apps/api/src/services/gold-rate/{gold-rate.service.ts,repricer.ts,gate.ts}`, `apps/api/src/routes/gold-rate.routes.ts` (+ mount), `apps/api/src/services/{product.service.ts,variant.service.ts}` (spec writes call the repricer for that product), `apps/api/src/services/bulk.service.ts` (import: gold rows reject a price cell with a per-row error), `apps/api/src/mcp/tools/admin-write.tools.ts` (same refusal), `apps/web/src/app/feeds/products.json/route.ts` + `apps/web/src/app/llms.txt/route.ts` (B5-21 item 9), `tests/integration/gold-rate-apply.test.ts`, `tests/unit/gold-rate-cache-layers.test.ts`, `docs/RULINGS.md` (B5-16, B5-20, B5-21).
+
+**Interfaces:**
+
+```ts
+// gold-rate.service.ts
+applyRates(storeId, input: GoldRateInput, actor: { userId: string } | { feed: FeedReference }): Promise<{ applied: RateRow[]; pending: RateRow[]; repriced: number }>
+// → 409 GOLD_RATE_CONFIRM_REQUIRED { karat, jumpBps, coherenceBps } when a manual rate trips the gate without confirm
+decidePending(storeId, rateId, decision: 'confirm' | 'reject', actor)
+getSettings / updateSettings(storeId, input, actor)
+history(storeId, { karat?, cursor?, limit<=50 })            // cursor pagination, explicit select
+// repricer.ts — runs INSIDE the caller's tx, which has set app.gold_reprice
+repriceStore(tx, storeId, karats: GoldKarat[], rates: Map<GoldKarat, {id, ratePerGram}>, step): Promise<number>
+repriceProduct(tx, storeId, productId): Promise<void>      // after a spec/mode edit
+// gate.ts — shared by every order path (Task 12) and the storefront payload
+loadCurrentRates(db, storeId, karats, opts?: { lock?: 'share' | 'update' })
+assertRatesFresh(rates, settings, now): void               // throws GOLD_RATE_STALE
+```
+
+**Routes** (all `authenticate → authorize('store_admin','super_admin','staff') → requireStoreAccess` per the rule, then):
+
+| Route | Permission |
+| --- | --- |
+| `GET /stores/:storeId/gold-rates` (current + settings + `feedAvailable`) | `products:read` |
+| `GET /stores/:storeId/gold-rates/history` | `products:read` |
+| `PUT /stores/:storeId/gold-rates` | `requirePermission('store:settings')` |
+| `POST /stores/:storeId/gold-rates/:rateId/decision` | `requirePermission('store:settings')` |
+| `PUT /stores/:storeId/gold-rates/settings` | `requirePermission('store:settings')` |
+
+Every body is parsed with the Task 8 Zod schemas, and an unknown key is rejected.
+
+- [ ] **Failing integration test first** (`gold-rate-apply.test.ts`, real DB, app client bound per request so RLS + tenant guard both run):
+  1. A store with 3 gold products (21k per-gram, 18k fixed making, a 21k ring with 2 variants of different weights) and 1 fixed product. `PUT` 21k + 18k as `store_admin` → each gold row's `price` equals `computeGoldUnitPrice(...)`, `gold_rate_id` is stamped, the variant product's `products.price` = min variant price, the fixed product is **byte-identical** (full row compare), and one `gold_rates` + one `gold_rates_current` row per karat plus one audit row `gold_rate.set` with `{karat, from, to, jumpBps, source}` exist.
+  2. As `staff` → 403, and nothing changed (negative control on the role).
+  3. +7 % without `confirm` → 409 `GOLD_RATE_CONFIRM_REQUIRED`, nothing written; with `confirm: true` → applied; 21k entered 6 % off 24k × 21/24 with 24k in the same request → confirm required.
+  4. Out-of-range rate → 400 (Zod), not 409.
+  5. **Atomicity:** inject a failure into the repricer after the second UPDATE (test seam) → the rate rows and all prices roll back together.
+  6. **Concurrency:** two `PUT`s for 21k at once → serialised by the `FOR UPDATE` on `gold_rates_current`, the final prices match the later committed rate, with no lost update.
+  7. A spec edit on one product (`PUT /products/:id` with weight changed) reprices only that product. A plain price edit on a gold product → 409 `GOLD_PRICE_MANAGED` (from the trigger, mapped).
+  8. CSV import of a gold product with a price cell → that row fails with a clear error and the other rows import.
+  9. **Size cap:** 5 001 gold rows → `GOLD_CATALOGUE_TOO_LARGE`. 2 000 rows → timed and the number recorded in the task report.
+- [ ] **Failing unit test** `gold-rate-cache-layers.test.ts`: spy on `invalidateCachedPrefix`, `invalidateCached`, `revalidateStorefront`. After `applyRates`, `decidePending('confirm')`, `updateSettings` (rounding step change reprices), a product spec edit and the bulk mode switch, **each** call produces every layer of Ruling B5-21 items 1–7, i.e. `public:products:`, `public:product:`, `public:suggest:`, `admin:products:`, bundles, categories and the three tags in one POST. **And `invalidateStoreProductCachesAfterOrder` is never the one called** (the coalesced order purge is not acceptable for a price change). Negative control: remove the call from one write path and the test names that path. Feed/llms routes: for a store whose public payload says `goldPricingEnabled`, `Cache-Control` is exactly `public, s-maxage=60`; otherwise unchanged (byte-compare).
+- [ ] **Step 0 check, recorded in the report:** read `getCacheGenerations` / `bumpCacheGeneration` in `services/redis.service.ts` + `cf/ioredis-cf.ts` and state whether generation keys live in the strongly consistent `AUTH_STATE` DO or in KV. If in KV, the cross-colo window for a deleted `cache:*` key is KV's propagation (~60 s) **for display only**. Write that into B5-21 as a second named residual; checkout is unaffected because it reads the DB.
+- [ ] Implement: `applyRates` = Zod → `withMoneyTx` → `scopeTransaction` → `set_config('app.gold_reprice','on',true)` → `FOR UPDATE` on `gold_rates_current` for the karats → gate (bounds, jump, coherence) → insert history → upsert current → `repriceStore` (explicit select, `UPDATE … FROM (VALUES …)` in chunks of 500, `storeId` in every where for the tenant guard) → audit row (the store-scoped audit insert used elsewhere) → commit → `deferAfterTenantCommit('gold-rate-purge', () => invalidateStoreProductCaches(storeId))`. Writing the cache-staleness class at the call site as a comment is required (`STALENESS CLASS: price, NEVER-stale`).
+- [ ] **Verify:** the two new tests, `tests/unit/storefront-purge-on-write.test.ts`, the existing product/variant/bulk/import suites unchanged and green, typecheck, lint. Rulings B5-16, B5-20, B5-21 appended. Commit. `Cost: 1 · 1 · heavy stack: yes, ~15 min`.
+
+### Task 11: Automatic rate (feed adapter + hourly cron), staleness watch, merchant alerts, provider anonymity
+
+**Files:** `apps/api/src/services/gold-rate/feed/{adapter.ts,metalprice.ts}`, `apps/api/src/lib/inngest/functions/{gold-rate-feed-fetch.ts,gold-rate-staleness-watch.ts}` (+ register in `functions/index.ts` / `client.ts`), `apps/api/src/services/email-templates/gold-rate-{warning,blocked,pending}.ts`, `apps/api/src/config.ts` (`GOLD_FEED_API_KEY`), `apps/api/wrangler.jsonc` (secret name only), `docs/ENVIRONMENT.md`, `.env.example`, `tests/unit/gold-rate-feed.test.ts`, `tests/unit/gold-rate-staleness-watch.test.ts`, `tests/unit/gold-provider-name-gate.test.ts`, `docs/RULINGS.md` (B5-15).
+
+**Interfaces:**
+
+```ts
+// adapter.ts — the only thing the rest of the code imports
+export interface GoldFeedQuote { per24kGramPiastres: number; fetchedAt: string; reference: { spotPerOzMinor: number } }
+export interface GoldFeedAdapter { available(): boolean; fetch(signal: AbortSignal): Promise<GoldFeedQuote> }
+export function goldFeed(): GoldFeedAdapter;           // returns the MetalpriceAPI adapter; vendor name never leaves feed/**
+export function storeCandidateRates(q: GoldFeedQuote, premiumBps: number): Map<GoldKarat, number>; // 24k × (10000+premium)/10000, 21k/18k by exact fraction, one half-up rounding each
+```
+
+- **`gold-rate-feed-fetch`.**
+  - Trigger: cron `5 * * * *` (hourly), `concurrency: { limit: 1 }`, `retries: 2`.
+  - Step `fetch`: one HTTP call, 8 s timeout, Zod-parse the vendor JSON, reject non-finite / ≤ 0 / > 10× previous quote.
+  - Step `list-stores`: `storeDirectory()`, filtered to stores whose settings have `feed_enabled` (read per store inside its scope).
+  - Per store, `step.run('apply-<id>')`: `runInStoreScope` → `applyRates(..., { feed })`. Over the jump gate → `pending` + email "سعر تلقائي جديد مستني تأكيدك"; otherwise applied + purge.
+  - **Throttle.** One vendor call per run regardless of store count. A 429/5xx → step retry, then P1 `cron.gold-rate-feed`. Measured request count goes in the report against the 1 000/month plan.
+- **`gold-rate-staleness-watch`.**
+  - Trigger: cron `*/30 * * * *`.
+  - Per store with `enabled` and ≥ 1 gold product: age of each karat's current rate that has gold products.
+  - ≥ `maxAge − 240 min` → warning email (sentinel `gold:stale-warn:<store>:<rateId>`, a DO key: fires once per rate).
+  - ≥ `maxAge` → blocked email + `sendAlert({ level: 'p1', scope: 'store', source: 'cron.gold-rate-staleness' })` (sentinel `gold:stale-block:<store>:<rateId>`).
+  - The admin banner reads the same age from `GET /gold-rates`, so no extra state.
+- **Copy.**
+  - Emails: bilingual, Egyptian Arabic first. Subject "حدّث سعر الدهب عشان المحل يفضل يبيع"; body "آخر سعر دهب اتسجّل من {hours} ساعة. لو عدّى {max} ساعة هنوقّف الطلبات على القطع اللي بتتسعّر بالدهب لحد ما تحدّثه."; button "تحديث السعر".
+  - **No provider name anywhere in the copy.**
+
+- [ ] **Failing tests first:**
+  - `gold-rate-feed.test.ts` (vendor HTTP stubbed with recorded fixtures):
+    - 24k/21k/18k candidates from a fixture quote equal hand-computed values;
+    - the premium applies once;
+    - a malformed body, a zero, a 10× spike and a timeout each produce no write and a P1;
+    - `available()` false with the key unset → cron logs + P1, no store touched;
+    - a jump over the store's gate → `pending` row, prices unchanged, email queued;
+    - **negative control:** a fixture 4 % move with gate 5 % applies, 6 % does not.
+  - `gold-rate-staleness-watch.test.ts`: frozen clock at 21 h 59 / 22 h / 25 h 59 / 26 h → nothing / warn / nothing new / block + P1. A second run sends nothing (sentinel). A new rate resets. A store with gold enabled but zero gold products is skipped.
+  - `gold-provider-name-gate.test.ts`: greps `apps/web/src`, `apps/admin/src`, `apps/marketing`, `apps/api/src/services/email-templates`, `packages/shared/src` and `apps/web/src/contexts/LanguageContext.tsx` for `/metalprice|metal price api|lyker/i` → 0 hits. The pattern list is exported from `feed/metalprice.ts` so a vendor switch updates the gate. Negative control: a fixture string in a temp file under a scanned dir makes it fail.
+- [ ] **Step 0:** one call with the paid key confirms whether the plan accepts `base=EGP&currencies=XAU`. If not, use `base=XAU&currencies=EGP` (whichever the plan allows) and record which in B5-15. Without a key, the adapter is built and tested against the recorded fixtures, and the live call is listed under "could not verify".
+- [ ] Implement. Register both functions; `docs/ENVIRONMENT.md` gets `GOLD_FEED_API_KEY` (purpose, plan, "paid plan only: the free plan's terms forbid commercial use", where it is set: `wrangler secret put`, never in `wrangler.jsonc` values). The blast-radius sweep covers `GOLD_FEED_API_KEY` across `.env.example`, `docs/ENVIRONMENT.md`, the CI workflows, `cf-api-deploy.yml`'s pre-deploy smoke (boots with the key unset: the cron must not crash boot), and `apps/api/wrangler.jsonc`.
+- [ ] **Verify:** the three tests, the Inngest registration test (whatever `functions/__tests__` uses to assert registration), typecheck. Ruling B5-15 appended with the measured request budget. Commit. `Cost: 1 · 1 · heavy stack: no`.
+
+### Task 12: Checkout: quote, three-path gate, snapshot, refund/exchange/bundle guards, MCP
+
+**Files:** `apps/api/src/services/cart.service.ts` (quote on add/update, `priceChanged` on read, `acknowledgePrices`), the cart route file (`POST /cart/acknowledge-prices`, Zod body `{}` strict), `apps/api/src/services/order.service.ts` (`create` + `createAdminOrder`), `apps/api/src/routes/payment-links.routes.ts`, `apps/api/src/services/gold-rate/gate.ts` (`assertGoldLinesPriceable`, `buildGoldSnapshot`), `apps/api/src/services/return.service.ts` (exchange refusal), `apps/api/src/services/bundle.service.ts` + `routes/bundle.routes.ts` (gold component refusal; mode switch refused while in an active bundle), `apps/api/src/mcp/tools/{cart.tools.ts,order.tools.ts}` (`cart_acknowledge_prices` tool; `PRICE_CHANGED` / `GOLD_RATE_STALE` returned as structured tool errors), public product serializer (adds `goldPricing: PublicGoldPricing | null` from `publicGoldPricingSchema`), `tests/integration/gold-checkout.test.ts`, `tests/unit/gold-gate-every-order-path.test.ts`, `docs/RULINGS.md` (B5-17, B5-18).
+
+**Interface:**
+
+```ts
+// gate.ts
+assertGoldLinesPriceable(db, storeId, lines: Array<{ productId; variantId: string | null; materialisedUnitPrice: number; quotedUnitPrice: number | null }>, opts: { requireQuote: boolean; lock?: 'share' }): Promise<Map<lineKey, GoldLineSnapshot>>
+// throws 409 GOLD_RATE_STALE | PRICE_CHANGED { lines: [{productId, variantId, previous, current}] } | GOLD_PRICE_DRIFT (+ P1) | GOLD_SPEC_INVALID
+```
+
+- [ ] **Failing integration test first** (`gold-checkout.test.ts`, HTTP through the real app, `cartSessionId()` fixtures, retry-safe):
+  1. **Re-price.** Add a 21k gold piece (quote stored = current price). Change the rate as `store_admin`. Cart GET → `priceChanged: true`, `previousUnitPrice` = old. `POST /orders` → 409 `PRICE_CHANGED` with both prices, **no order, no stock reserved, no coupon redemption reserved** (rows counted). `POST /cart/acknowledge-prices` → `POST /orders` → 201, and `order_items.price` = the new computed price.
+  2. **Client cannot set price.** Send extra `price`, `unitPrice`, `quotedUnitPrice`, `total` keys in the add-to-cart and order bodies → rejected by strict Zod or ignored by construction (assert which). The order total equals the server computation.
+  3. **Stale block.** Move the clock (or backdate `gold_rates_current.applied_at`) past `max_age` → `POST /orders` → 409 `GOLD_RATE_STALE` with the Arabic message key, no order. The same store's fixed-price-only cart still orders (the gate is per gold line, not per store). **Negative control:** at `max_age − 1 min` the order succeeds.
+  4. **Race.** The rate write commits between the pre-check and the money transaction (test seam pauses after the pre-check) → `PRICE_CHANGED`, never an order at the old rate.
+  5. **Drift.** Corrupt a materialised price with the GUC set (simulating a repricer bug) → 409 `GOLD_PRICE_DRIFT` + P1 spy called.
+  6. **Snapshot.** The order line's `gold_snapshot` parses with `goldLineSnapshotSchema` and equals {karat, weightMg, ratePerGram, rateId, rateAppliedAt, making, margin, step, unitPrice}.
+  7. **Refund uses the snapshot.** Change the rate again, then return + refund the line → `refundAmount` = the original `order_items.price` × qty (not today's price). An `exchange` request on it → 409 `GOLD_EXCHANGE_UNSUPPORTED`.
+  8. **Order of operations (B5-18).** A 10 % coupon targeted at a customer group, loyalty points and VAT `includedInPrice: false` on a gold line → `subtotal`, `couponDiscount`, `loyaltyDiscount`, `tax`, `total` equal a hand computation in the test from the computed unit price. The same cart with an equivalent fixed price gives **identical totals** (the gold path changes only the unit price).
+  9. **Admin order and payment link.** `createAdminOrder` and a payment link with a gold line under a stale rate → 409. Fresh → snapshot written.
+  10. **MCP agent checkout.** Add → rate change → order tool returns `PRICE_CHANGED`; `cart_acknowledge_prices` → order succeeds.
+  11. **Bundles.** Adding a gold product to a bundle → 409; switching a bundled product to gold → 409.
+- [ ] **Failing structural test** `gold-gate-every-order-path.test.ts`: parse `apps/api/src` for every site that creates `orderItem`/`order_items` rows (`orderItem.create`, `orderItems: { create`, `createMany`). Each enclosing function must call `assertGoldLinesPriceable`, and the list of sites is asserted equal to the known 3 entry points (a new site fails until it is added). Negative control: a fixture file with an unguarded create is detected.
+- [ ] Implement:
+  - **`OrderService.create`.** Pre-check after the cart load, then inside `withMoneyTx` re-load `gold_rates_current` `FOR SHARE` and compare ids, then write `gold_snapshot` on each gold `orderItem`.
+  - **The other two paths.** `createAdminOrder` and payment links run the same gate with `requireQuote: false`.
+  - **Cart lines.** `CartService` sets the quote when a gold line is created and leaves it untouched on a quantity change (so the notice still fires for a rate move), and returns `priceChanged`.
+  - **Payload.** The public product payload gains `goldPricing` (rate read through `loadCurrentRates`, no cache of its own: it rides the product cache, which every rate write purges).
+- [ ] **Verify:** `gold-checkout`, `gold-gate-every-order-path`, and the **unchanged** existing suites `checkout.test.ts`, `bundle-checkout.test.ts`, coupon, promotion, loyalty, tax, refund, return, MCP order tests green; `npm run test:defence-mutations -- --tier=all` with new entries for the stale gate, the drift check and the quote check (delete each → its test goes red). Rulings B5-17, B5-18 appended. Commit. `Cost: 1 · 1 · heavy stack: yes, ~20 min`.
+
+### Task 13: Admin: rate editor + history, settings, per-product toggle + preview, bulk switch
+
+**Files:**
+- `apps/admin/src/app/stores/[id]/gold-rates/page.tsx` + `_components/{RateEditor,RateHistory,GoldSettingsCard,PendingRateBanner}.tsx`
+- `apps/admin/src/components/admin-layout/hubs.ts` + `buildPaletteItems.ts` (entry under the catalogue/products group: standing rule 4, its own page)
+- the admin dashboard banner (stale/pending)
+- `apps/admin/src/app/stores/[id]/products/[productId]/edit/_components/GoldPricingCard.tsx` (+ wired in `edit/page.tsx` beside `FulfilmentCard`, in storefront order: price block)
+- `…/variants/_components/SimpleVariantsForm.tsx` (per-variant weight/karat/making override columns, shown only when the product is gold)
+- `apps/admin/src/app/stores/[id]/products/_components/MassEditModal.tsx` (bulk "التسعير بسعر الدهب" / "تثبيت السعر")
+- `apps/api` bulk endpoint `POST /stores/:storeId/products/bulk/pricing-mode` (`store:settings`, Zod, cursor-safe ≤ 500 ids per call)
+- the admin order detail line + customer order page + invoice line subtitle (snapshot display only, no fiscal math change)
+- CSV/XLSX import/export columns `pricing_mode`, `gold_karat`, `gold_weight_g` (parsed with the price-cell rules: ≤ 2 decimals, Arabic digits accepted, converted to mg as an integer)
+- `scripts/gold-rate/freeze-all.mjs` (dry-run default, loopback guard like the storedemo seed)
+- the store settings overview discoverability chip "سعر الدهب: تلقائي / يدوي / متوقف"
+- the admin strings in the admin i18n map
+- `tests/unit/gold-admin-*.test.tsx`
+
+**Every field has UI:**
+
+| Data | Surface |
+| --- | --- |
+| `gold_rates` rows | history table: karat, rate, source "يدوي/تلقائي", status, jump %, who, when; cursor-paged |
+| `gold_rates_current` | the editor's current values + age |
+| `gold_rate_settings` | `GoldSettingsCard`: enabled, automatic rate (disabled with reason when `feedAvailable` false), premium, max age (hours, ≤ 26), jump %, rounding step, show breakdown |
+| product/variant spec | `GoldPricingCard`, variants form |
+| `gold_rate_id` stamps | "محسوب على سعر {time}" under the preview |
+| `cart_items.quoted_*` | storefront notice (Task 14) |
+| `order_items.gold_snapshot` | admin order line, customer order page, invoice subtitle |
+| audit rows | the existing audit-log page (new action names listed in its filter) |
+
+- **`GoldPricingCard`.**
+  - Mode segmented control "سعر ثابت / بسعر الدهب"; karat select (24/21/18); weight in grams (2 decimals); making type + value; margin %.
+  - **Live preview** computed client-side with the same `computeGoldUnitPrice` from `@ebda/shared` against the current rates, labelled "معاينة"; the server is still the writer.
+  - The fixed price input is disabled with the helper line "السعر بيتحسب لوحده من سعر الدهب".
+  - A non-blocking lint when a `facts` row labelled عيار/الوزن disagrees with the structured karat/weight ("البيانات المعروضة مختلفة عن بيانات التسعير").
+  - Switching to gold with no fresh rate for the karat is refused with a link to the rates page.
+- **`RateEditor`.** Three integer-safe inputs (EGP with 2 decimals → piastres via `tryToMinor`); "حفظ السعر"; on 409 `GOLD_RATE_CONFIRM_REQUIRED` a confirm dialog with the Egyptian-Arabic sentence and "تأكيد" / "إلغاء".
+- **`PendingRateBanner`.** Shows the pending feed rate, its jump and "تأكيد" / "رفض".
+- **Bulk switch.** Selected products with a complete spec switch; the rest are listed as skipped with the reason ("ناقص الوزن"). Back to fixed freezes the current price. One audit row per product.
+
+- [ ] **Failing tests first:**
+  - `gold-admin-rate-editor.test.tsx`: confirm flow on 409; staff sees read-only (no save button) since the API would 403.
+  - `gold-admin-pricing-card.test.tsx`: the preview equals `computeGoldUnitPrice` for vector A; the price input is disabled in gold mode; incomplete spec → save disabled with the field named.
+  - `gold-admin-bulk.test.ts` (API): mixed selection → switched/skipped counts; staff → 403; caches purged (reuse the Task 10 spy).
+  - Import test: a `gold_weight_g` cell `3.255` (3 decimals) fails like a price cell.
+  - Every admin string has AR + EN (the i18n parity test).
+  - **No `type="color"` and no orange in new files** (existing gates).
+- [ ] **Verify:** vitest for admin + the API bulk test; typecheck; lint; the admin-mirrors-storefront order check (the gold card sits where the price shows on the PDP). Drive the flow in the local admin and screenshot the rates page, the card and the confirm dialog at 390 + 1280 in Arabic (paths in the report). Commit. `Cost: 1 · 1 · heavy stack: yes, ~15 min`.
+
+### Task 14: Storefront: "سعر الجرام النهارده" line, "السعر اتحدّث" notice, stale state, E2E, docs
+
+**Files:**
+- `apps/web/src/components/product/GoldRateLine.tsx`, rendered by the default PDP and `templates/dahab/ProductDetail.tsx` under the price, by the cart line (`CartTable`/`CartDrawer` line subtitle) and by the checkout summary. **Not on cards:** the card taste bar allows ≤ 2 fact chips, and karat/weight are already chips by B5-5.
+- `apps/web/src/app/checkout/_components/PriceChangedNotice.tsx`, `CheckoutClient.tsx`, `OrderSummary.tsx`
+- `apps/web/src/contexts/CartContext.tsx` (`priceChanged`, `acknowledgePrices()`)
+- `apps/web/src/lib/product-pricing.ts` (no math change; it keeps reading the materialised prices)
+- `apps/web/src/contexts/LanguageContext.tsx`
+- `tests/unit/gold-rate-line.test.tsx`, `tests/unit/price-changed-notice.test.tsx`, `tests/dahab/dahab-gold-price.spec.ts` (+ `playwright.dahab.config.ts` project entry), `docs/ebda/templates/purchase-path.json` (both new files)
+- docs: `docs/architecture/gold-rate-pricing.md` (new: model, formula, rulings index, cache layers, failure codes, runbook "a merchant says checkout is blocked"), `docs/ebda/templates/platform-commerce.md` § Gold-rate pricing, `docs/ebda/templates/dahab.md` (pointer), `docs/architecture/inventory-model.md` (one line: gold changes price, never stock), `docs/ROLLBACK.md` (Task 7 text), `CLAUDE.md` (one line under "Inventory model" pointing to the gold doc: the price column is repricer-owned for gold rows)
+
+**Copy (AR / EN):**
+
+| Key | AR | EN |
+| --- | --- | --- |
+| `gold.rateLine` | "عيار {karat} · {weight} جم · سعر الجرام النهارده {rate}" | "{karat}K · {weight} g · Today's gold rate per gram {rate}" |
+| `gold.breakdown` (only when `showBreakdown`) | "قيمة الدهب {metal} · المصنعية {making}" | "Gold value {metal} · Making charge {making}" |
+| `gold.priceChanged.title` | "السعر اتحدّث" | "Price updated" |
+| `gold.priceChanged.body` | "سعر الدهب اتغيّر من ساعة ما ضفت القطعة للسلة، والسعر الجديد ظاهر قدامك." | "The gold rate changed since you added this piece. The new price is shown." |
+| `gold.priceChanged.continue` | "متابعة" | "Continue" |
+| `gold.stale` | "مش هنقدر نكمّل الطلب دلوقتي لأن سعر الدهب ما اتحدّثش النهارده. جرّب تاني بعد شوية أو كلّم المحل." | "We can't take orders for this piece right now because today's gold rate hasn't been updated. Please try again later or contact the store." |
+
+- **Display rules.**
+  - Numbers go through the shared price formatter + NUMERALS-1.
+  - Staleness is computed client-side from `rateAppliedAt` + `maxAgeMinutes` with the render clock (`RenderClockContext`), so a cached PDP turns stale on time without a purge.
+  - When stale, the add button and the pinned buy bar are disabled with `gold.stale` as the one helper line, and the price still shows (it is the last price, labelled by its time: "آخر سعر {time}").
+  - The notice is a token-coloured block (`--muted` surface, `--foreground` text, `--accent` rule), `role="status"` + `aria-live="polite"`, with focus moving to it, the changed lines listed with old (struck, `aria-label` "السعر القديم") → new, one primary "متابعة" (≥ 44 px), and payment held until it is acknowledged.
+  - **No orange/amber** (the no-orange gate runs over the new files and the shots).
+- [ ] **Failing tests first:**
+  - `gold-rate-line.test.tsx`: renders the AR/EN strings with Western and Arabic-Indic digits; renders nothing when `goldPricing` is null (unfilled features render nothing); stale at `maxAge` exactly, fresh at `maxAge − 1 min`; never prints the margin.
+  - `price-changed-notice.test.tsx`: appears only when a line has `priceChanged`; "متابعة" calls `acknowledgePrices` then enables payment; keyboard + screen-reader announcement.
+  - **E2E** `tests/dahab/dahab-gold-price.spec.ts` (real local stack, Dahab demo or scenario store):
+    1. The shopper opens a gold PDP and sees "سعر الجرام النهارده" with karat and weight.
+    2. Adds to cart.
+    3. **The test changes the rate through the admin API as `store_admin`.**
+    4. The shopper opens checkout → sees "السعر اتحدّث" with old → new.
+    5. Taps "متابعة" → places a COD order.
+    6. The receipt shows the new price, and the admin order shows the snapshot line.
+    7. **Negative control in the same file:** with no rate change, the notice does not appear.
+    8. **Stale case:** backdate the rate → the PDP button is disabled with the stale sentence and `POST /orders` (via the UI) shows the same sentence.
+    9. Runs at 390-ar and 1280-en; axe: no serious/critical.
+- [ ] Implement. Add both new control files to `purchase-path.json`; the 44 px probe covers "متابعة".
+- [ ] **Blast-radius sweep for the whole gold change-set (Tasks 8–14), stated in the report:** `pricing_mode`, `gold_karat`, `gold_weight_mg`, `making_charge_*`, `gold_margin_bps`, `gold_rate_id`, `gold_snapshot`, `quoted_unit_price`, `gold_rates`, `gold_rates_current`, `gold_rate_settings`, `app.gold_reprice`, `GOLD_FEED_API_KEY`, `GOLD_PRICE_MANAGED`, `GOLD_RATE_STALE`, `PRICE_CHANGED`, `GOLD_PRICE_DRIFT`, `goldPricing` across `apps/`, `packages/`, `scripts/`, `tests/`, `docs/`, `.github/workflows`, `wrangler*.jsonc`, `.env.example`, `loadtests/`, plus the 8 card paths + Dahab + 4 mappers (each must still read the materialised price only, with no gold-specific branch).
+- [ ] **Verify:** web vitest, the E2E file, `purchase-path-gates.test.ts`, the no-orange gate, typecheck, lint. Commit `feat(gold): storefront rate line, price-updated notice, e2e and docs`. `Cost: 1 · 1 · heavy stack: yes, ~20 min`.
+
+**Controller production steps for gold pricing (after merge, human-flagged, part of Task 7's list):**
+1. `cf-api-deploy.yml` applies migration `20261101000100` (the pre-deploy smoke boots with the new schema).
+2. `wrangler secret put GOLD_FEED_API_KEY` **only after Ahmad buys the paid plan**; until then the automatic toggle stays disabled with its reason.
+3. **Verify against production:**
+   - read-only SQL `select count(*) from gold_rate_settings where enabled` (expected 0 at launch);
+   - `\d+ gold_rates` shows `relforcerowsecurity`;
+   - `curl` `/health` commit = tip of `main`;
+   - on `storedemo-dahab` (if gold-enabled per Task 5's decision) one gold PDP in Arabic shows the line.
+4. **Not verifiable at launch:** a real merchant's rate cycle and a real stale block (zero gold merchants exist). It is proven by the integration and E2E tests only, and the report says so.
 
 ---
 
@@ -216,10 +642,15 @@ Order: **Task 1 → (Track B assets start) 2 → 3 → 4 → 5 → 6 (audits + f
 6. **Look switch keeps content (TPL-1)** — Worn → Workshop → Gift box → Worn keeps hero text, product refs, category photos, logo, personalisation, 3D models.
 7. **Gift honesty** — wrap price comes from the variant delta and shows before checkout; the delivery-date chip is the existing computed one (never a promise the zone data cannot support); card message reaches the order and the invoice.
 8. **3D slot** — appears only with a model and the flag; absent otherwise; does not shift the PDP fold at 390.
+9. **Gold money math** — one implementation (`computeGoldUnitPrice`), BigInt, exactly one rounding (vector C's double-rounding control must fail a two-stage implementation), int4 bound, no `Number` product of two inputs. The reviewer re-derives vectors A and C by hand.
+10. **Gold price is never trusted, never stale, never silent** — the server recomputes on all three order paths (the structural test lists them); `PRICE_CHANGED`, `GOLD_RATE_STALE` and `GOLD_PRICE_DRIFT` each have a negative control and a defence-mutation entry; the in-transaction `FOR SHARE` re-check closes the rate-write race; every rate write path purges every B5-21 layer through the immediate (not order-coalesced) invalidator; the stale state flips on the client clock without a purge.
+11. **Gold tenant and role safety** — the three tables are RLS + FORCE with the strict policy and pass the enumerating `rls-ebda-app` test with no allowlist entry; `gold_rates` is append-only for `ebda_app`; `app.gold_reprice` is transaction-local (`set_config(…, true)`) and proven not to leak across pooled connections; rate writes need `store:settings` (staff 403 tested); a jump over the gate needs `confirm` and a feed rate never self-confirms.
+12. **Gold snapshot and refunds** — the order line's `gold_snapshot` is complete and Zod-valid, refunds read `order_items.price` (unchanged by a later rate), exchange and bundles are refused for gold lines, and fixed-price checkout totals are byte-identical to before.
+13. **Provider anonymity and copy** — the provider-name gate is green and can fail; merchant/shopper copy says "السعر التلقائي"; sentences Egyptian Arabic, buttons neutral; the notice and stale block use look tokens, never amber/orange.
 
 ## Migration naming (summary)
 
-None planned. `20261101000100+` reserved; `node scripts/check-migration-order.mjs` exit 0 is part of Task 1 Step 0 and Task 7.
+**One migration: `20261101000100_gold_rate_pricing` (Task 9), taking the number this plan had reserved.** It was verified unused on every remote branch on 2026-10-21. The look work still adds none. `20261101000200+` stay reserved. `node scripts/check-migration-order.mjs` exit 0 is part of Task 1 Step 0, Task 9 and Task 7. The migration is additive: new tables plus nullable/defaulted columns, no rewrite of an existing row except column defaults.
 
 ## Demo seed (summary)
 
@@ -231,3 +662,27 @@ None planned. `20261101000100+` reserved; `node scripts/check-migration-order.mj
 - Known tension recorded, not hidden: the three designed palettes as registered today fail the project's own no-orange gate (Worn/Gift box brass accents, Workshop coral); B5-2 replaces them with gate-passing metals and states the cost.
 - Placeholder scan: none; every task names files, tests and a verify step.
 - Risk not yet measurable: the exact pixel share and audit scores exist only after Task 6; the plan claims nothing about them.
+- **Gold-rate addendum (2026-10-21, Ahmad's decision).**
+  - **Coverage.** Requirements 1–9 map to these tasks:
+    - mode + formula → Task 8;
+    - rate sources → Tasks 10, 11;
+    - NEVER-stale + max age → Tasks 10, 11, 14 and B5-16/B5-21;
+    - checkout quote, snapshot, refunds and order of operations → Task 12;
+    - admin → Task 13;
+    - storefront → Task 14;
+    - security → Tasks 9, 10;
+    - tests → each task, plus the E2E in Task 14;
+    - migration number → Task 9.
+  - **Found while reading the code, not assumed:**
+    - three separate order-line pricing sites, not one;
+    - no B2B price list exists;
+    - `weight Float` has no unit;
+    - `staff` lacks `store:settings`;
+    - feed and `llms.txt` responses carry `s-maxage`/SWR outside the tag purge;
+    - search docs hold no price.
+  - **Self-caught defect.** The first draft of B5-14 rounded twice. It is fixed, and vector C pins it.
+  - **Not verified while planning:**
+    - whether cache generation counters live in the DO or KV (Task 10 Step 0);
+    - GoldAPI.io and Metals-API pricing (their pages did not render);
+    - whether MetalpriceAPI Essential allows `base=EGP` (Task 11 Step 0: one paid-key call, or switch to `base=XAU&currencies=EGP`);
+    - the spot-vs-Sagha premium in practice (measured once the merchant compares, hence `feed_premium_bps`).
