@@ -15,7 +15,12 @@ export default defineConfig({
   reporter: [['list']],
   timeout: 120_000,
   expect: { timeout: 15_000 },
-  use: { baseURL: BASE, navigationTimeout: 90_000 },
+  use: {
+    baseURL: BASE,
+    navigationTimeout: 90_000,
+    // SOUQ_CHANNEL=chrome drives an installed Chrome when no Playwright chromium is cached.
+    ...(process.env.SOUQ_CHANNEL ? { channel: process.env.SOUQ_CHANNEL } : {}),
+  },
   projects: [
     {
       name: 'phone-390',

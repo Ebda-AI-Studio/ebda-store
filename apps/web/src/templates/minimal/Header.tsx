@@ -120,7 +120,7 @@ export default function MinimalHeader({
               isCentre
                 ? 'max-w-[calc(100%-13rem)] md:max-w-[40vw] md:col-start-2'
                 : isProminent
-                  ? 'max-w-[calc(100%-13rem)] md:col-start-1 md:row-start-1 md:max-w-[16rem]'
+                  ? 'top-3 max-w-[calc(100%-13rem)] md:top-auto md:col-start-1 md:row-start-1 md:max-w-[16rem]'
                   : 'max-w-[65%] md:max-w-none'
             }`}
           >

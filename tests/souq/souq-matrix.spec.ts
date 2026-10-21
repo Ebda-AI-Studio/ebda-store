@@ -221,3 +221,22 @@ test('Night souq on white-background merchant photos: no white rectangle on the 
   });
   expect(bad, 'white photos sitting on a dark ground').toEqual([]);
 });
+
+test('prominent search: the wordmark never sits under the search field (390 and 1280, ar and en)', async ({
+  page,
+}) => {
+  for (const lang of ['ar', 'en'] as const) {
+    await open(page, 'souq-catalogue', lang, '/');
+    const [name, search] = await Promise.all([
+      page.locator('[data-zone="storeName"]').first().boundingBox(),
+      page.locator('header [role="search"]').first().boundingBox(),
+    ]);
+    expect(name && search, `${lang}: both boxes`).toBeTruthy();
+    const overlap =
+      name!.x < search!.x + search!.width &&
+      name!.x + name!.width > search!.x &&
+      name!.y < search!.y + search!.height &&
+      name!.y + name!.height > search!.y;
+    expect(overlap, `${lang}: wordmark overlaps the search field`).toBe(false);
+  }
+});

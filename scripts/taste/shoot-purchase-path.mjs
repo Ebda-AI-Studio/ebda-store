@@ -231,7 +231,10 @@ async function main() {
   mkdirSync(out, { recursive: true });
   const { chromium } = createRequire(join(ROOT, 'package.json'))('playwright');
   const consent = encodeURIComponent(JSON.stringify({ v: 1, marketing: false, analytics: false }));
-  const browser = await chromium.launch();
+  // SHOOT_CHANNEL=chrome drives an installed Chrome when no Playwright chromium is cached.
+  const browser = await chromium.launch(
+    process.env.SHOOT_CHANNEL ? { channel: process.env.SHOOT_CHANNEL } : {}
+  );
   const run = [];
   const probes = [];
   // Warm-up: compile each manifest route once before shooting, so a dev server's first-compile
