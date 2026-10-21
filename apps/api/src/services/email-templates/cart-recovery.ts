@@ -20,6 +20,8 @@ export interface CartRecoveryData {
   total: number;
   cartUrl: string;
   unsubscribeUrl: string;
+  /** What the address agreed to; picks the footer's reason (never claim a newsletter they did not join). */
+  consentScope: 'newsletter' | 'cart_reminders';
 }
 
 const MAX_LISTED = 5;
@@ -51,7 +53,11 @@ export const cartRecoveryTemplate = {
       <p><strong>Cart total: ${escapeHtml(emailMoney(d.total, null, 'en'))}</strong></p>
       <p style="margin:24px 0;"><a href="${escapeHtml(d.cartUrl)}" class="button">Complete your order</a></p>
       <p style="color:#94a3b8;font-size:12px;">Prices shown are as of when you added the items and may have changed. If you already ordered, ignore this email. This is a one-time reminder.</p>
-      <p style="margin-top:28px;font-size:12px;color:#94a3b8;text-align:center;">You are receiving this because you subscribed to ${escapeHtml(d.storeName)}'s newsletter. <a href="${escapeHtml(d.unsubscribeUrl)}" style="color:#94a3b8;">Unsubscribe</a></p>`;
+      <p style="margin-top:28px;font-size:12px;color:#94a3b8;text-align:center;">${
+        d.consentScope === 'cart_reminders'
+          ? `You are receiving this because you opted in to cart reminders from ${escapeHtml(d.storeName)}.`
+          : `You are receiving this because you subscribed to ${escapeHtml(d.storeName)}'s newsletter.`
+      } <a href="${escapeHtml(d.unsubscribeUrl)}" style="color:#94a3b8;">Unsubscribe</a></p>`;
   },
 
   ar: (d: CartRecoveryData) => {
@@ -64,6 +70,10 @@ export const cartRecoveryTemplate = {
       <p><strong>إجمالي السلة: ${escapeHtml(emailMoney(d.total, null, 'ar'))}</strong></p>
       <p style="margin:24px 0;"><a href="${escapeHtml(d.cartUrl)}" class="button">إتمام الطلب</a></p>
       <p style="color:#94a3b8;font-size:12px;">الأسعار المعروضة هي أسعار وقت الإضافة للسلة، وممكن تتغير. لو الطلب اتسجّل خلاص، الرسالة دي مش محتاجة منك حاجة، وهي رسالة تذكير مرة واحدة بس.</p>
-      <p style="margin-top:28px;font-size:12px;color:#94a3b8;text-align:center;">وصلتك الرسالة دي عشان اشتراكك في نشرة ${escapeHtml(d.storeName)} البريدية. <a href="${escapeHtml(d.unsubscribeUrl)}" style="color:#94a3b8;">إلغاء الاشتراك</a></p>`;
+      <p style="margin-top:28px;font-size:12px;color:#94a3b8;text-align:center;">${
+        d.consentScope === 'cart_reminders'
+          ? `وصلتك الرسالة دي عشان اشتراكك في تذكيرات السلة من ${escapeHtml(d.storeName)}.`
+          : `وصلتك الرسالة دي عشان اشتراكك في نشرة ${escapeHtml(d.storeName)} البريدية.`
+      } <a href="${escapeHtml(d.unsubscribeUrl)}" style="color:#94a3b8;">إلغاء الاشتراك</a></p>`;
   },
 };

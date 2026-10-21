@@ -21,6 +21,7 @@ import { prisma, acrossStoresFlat, runInStoreScope, runInTenantContext } from '@
 import { storefrontOrigin } from '@ebda/shared';
 import { inngest } from '../lib/inngest/client';
 import { awaitCampaignSendSlot } from '../lib/campaign-send-pacer';
+import { signCartRestoreToken } from '../lib/cart-restore-token';
 import { signSubscriberUnsubscribeToken } from '../lib/campaign-unsubscribe-token';
 import { storeBrandTheme } from '../lib/store-brand-theme';
 import { config } from '../config';
@@ -205,6 +206,7 @@ export function renderCartRecoveryEmail(args: {
   total: number;
   cartUrl: string;
   unsubscribeUrl: string;
+  consentScope?: 'newsletter' | 'cart_reminders';
   hidePoweredBy?: boolean;
 }): { subject: string; html: string } {
   const { store, locale } = args;
@@ -215,6 +217,7 @@ export function renderCartRecoveryEmail(args: {
     total: args.total,
     cartUrl: args.cartUrl,
     unsubscribeUrl: args.unsubscribeUrl,
+    consentScope: args.consentScope ?? 'newsletter',
   };
   const html = renderBrandedShell(cartRecoveryTemplate[locale](data), {
     name: store.name,
@@ -306,7 +309,14 @@ export async function deliverCartRecoveryEmail(
   const subs = await runInTenantContext(storeId, () =>
     prisma.newsletterSubscriber.findMany({
       where: { storeId, email: { equals: email, mode: 'insensitive' } },
-      select: { id: true, email: true, language: true, isActive: true, unsubscribedAt: true },
+      select: {
+        id: true,
+        email: true,
+        language: true,
+        isActive: true,
+        unsubscribedAt: true,
+        consentScope: true,
+      },
     })
   );
   if (subs.length === 0 || subs.some(s => !s.isActive || s.unsubscribedAt)) {
@@ -334,7 +344,9 @@ export async function deliverCartRecoveryEmail(
     locale,
     items: ac.cartItems,
     total: ac.cartTotal,
-    cartUrl: `${base}/cart`,
+    // Signed, expiring, store-scoped: re-attaches THIS cart for guests too (Ruling CART-RESTORE-1).
+    cartUrl: `${base}/cart?restore=${encodeURIComponent(signCartRestoreToken(storeId, ac.cartId))}`,
+    consentScope: subscriber.consentScope === 'cart_reminders' ? 'cart_reminders' : 'newsletter',
     unsubscribeUrl: `${base}/unsubscribe?token=${encodeURIComponent(token)}`,
     hidePoweredBy: await storeHidesPoweredBy(storeId),
   });

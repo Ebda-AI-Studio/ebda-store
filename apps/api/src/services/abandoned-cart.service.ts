@@ -256,11 +256,18 @@ class AbandonedCartService {
           where: {
             storeId,
             lastActivityAt: { lt: abandonmentCutoff },
-            OR: [{ items: { some: {} } }, { bundles: { some: {} } }],
             abandonedCart: null,
-            customer: {
-              OR: [{ email: { not: '' } }, { phone: { not: null } }],
-            },
+            AND: [
+              { OR: [{ items: { some: {} } }, { bundles: { some: {} } }] },
+              {
+                OR: [
+                  { customer: { OR: [{ email: { not: '' } }, { phone: { not: null } }] } },
+                  // A guest (or any shopper) who ticked the checkout box "email me about my
+                  // cart": reachable by the email channel only. Consent is re-checked at send time.
+                  { guestEmail: { not: null }, guestEmailConsentAt: { not: null } },
+                ],
+              },
+            ],
           },
           include: {
             customer: {
@@ -342,9 +349,13 @@ class AbandonedCartService {
 
             const cartItemCount = cart.items.length + bundleSnapshot.length;
 
-            const nextStepAt = nextStepAtFromConfig();
+            // Push/SMS steps need a customer (a phone, an account); a guest cart has neither, so it
+            // gets no push/SMS sequence and only the email channel serves it.
+            const nextStepAt = cart.customer ? nextStepAtFromConfig() : null;
 
-            const customerEmail = cart.customer?.email ?? null;
+            // The address the shopper consented to at checkout wins over the account email.
+            const customerEmail =
+              (cart.guestEmailConsentAt ? cart.guestEmail : null) ?? cart.customer?.email ?? null;
             const customerPhone = cart.customer?.phone ?? null;
 
             await prisma.abandonedCart.create({

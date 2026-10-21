@@ -15,6 +15,7 @@ type Row = Record<string, any>;
 const h = vi.hoisted(() => {
   process.env.API_URL = 'https://api.test';
   process.env.CAMPAIGN_UNSUBSCRIBE_SECRET = 'unit-test-secret';
+  process.env.CART_RESTORE_SECRET = 'unit-test-cart-restore-secret';
   return {
     db: {
       carts: [] as Row[],
@@ -124,6 +125,7 @@ import {
 } from '@api/services/cart-recovery-email.service';
 import { sentInLast24h } from '@api/services/campaign.service';
 import { verifySubscriberUnsubscribeToken } from '@api/lib/campaign-unsubscribe-token';
+import { verifyCartRestoreToken } from '@api/lib/cart-restore-token';
 
 const MIN = 60_000;
 const NOW = new Date('2026-10-21T12:00:00Z');
@@ -347,7 +349,14 @@ describe('deliverCartRecoveryEmail', () => {
       subscriberId: s.id,
     });
     expect(opts.html).toContain('/unsubscribe?token=');
-    expect(opts.html).toContain('https://nile.ebda.app/cart');
+    // the button restores THIS cart (works for guests): signed, expiring, store-scoped, no PII
+    const rm = /https:\/\/nile\.ebda\.app\/cart\?restore=([^"&]+)/.exec(opts.html);
+    expect(rm).not.toBeNull();
+    expect(verifyCartRestoreToken(decodeURIComponent(rm![1]))).toEqual({
+      storeId: STORE_A,
+      cartId: c.cartId,
+    });
+    expect(decodeURIComponent(rm![1])).not.toContain('@');
     expect(c.emailStatus).toBe('sent');
     expect(c.emailSentAt).toBeInstanceOf(Date);
   });
@@ -523,6 +532,21 @@ describe('deliverCartRecoveryEmail', () => {
     expect(c.emailStatus).toBe('queued');
   });
 
+  it('footer wording follows the consent: checkout cart reminders vs newsletter', async () => {
+    const c = queued();
+    db.subs.push(sub('sara@example.com', { language: 'en', consentScope: 'cart_reminders' }));
+    await deliverCartRecoveryEmail(STORE_A, c.id);
+    const html1 = (h.sendMarketingEmail.mock.calls[0][1] as Row).html as string;
+    expect(html1).toContain('you opted in to cart reminders from Nile Goods');
+    expect(html1).not.toContain('newsletter');
+    db.subs.length = 0;
+    db.subs.push(sub('sara@example.com', { language: 'en', consentScope: 'newsletter' }));
+    const c2 = queued();
+    await deliverCartRecoveryEmail(STORE_A, c2.id);
+    const html2 = (h.sendMarketingEmail.mock.calls[1][1] as Row).html as string;
+    expect(html2).toContain("subscribed to Nile Goods's newsletter");
+  });
+
   it("uses the subscriber's language, else the store default", async () => {
     const c = queued();
     db.subs.push(sub('sara@example.com', { language: 'en' }));
@@ -553,6 +577,7 @@ describe('renderCartRecoveryEmail', () => {
     total: 70000,
     cartUrl: 'https://nile.ebda.app/cart',
     unsubscribeUrl: 'https://nile.ebda.app/unsubscribe?token=abc',
+    consentScope: 'newsletter' as const,
   };
 
   it('Arabic is Egyptian: إنت, joined negation, no حضرتك, no MSA markers', () => {
@@ -588,6 +613,22 @@ describe('renderCartRecoveryEmail', () => {
     const en = renderCartRecoveryEmail({ ...base, locale: 'en' }).html;
     expect(ar).toContain('الأسعار المعروضة هي أسعار وقت الإضافة للسلة');
     expect(en).toContain('Prices shown are as of when you added the items');
+  });
+
+  it('cart-reminder consent gets its own footer in both languages (no newsletter claim)', () => {
+    const ar = renderCartRecoveryEmail({
+      ...base,
+      locale: 'ar',
+      consentScope: 'cart_reminders',
+    }).html;
+    const en = renderCartRecoveryEmail({
+      ...base,
+      locale: 'en',
+      consentScope: 'cart_reminders',
+    }).html;
+    expect(ar).toContain('اشتراكك في تذكيرات السلة');
+    expect(ar).not.toContain('النشرة البريدية');
+    expect(en).toContain('you opted in to cart reminders from Nile Goods');
   });
 
   it('English renders the same facts', () => {
