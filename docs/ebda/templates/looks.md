@@ -130,3 +130,7 @@ Full flow and caching in `docs/ebda/templates/demo-store.md`; the contract:
 The Qamar looks' design record (tokens, section mixes, what was left out) is `docs/ebda/templates/qamar.md`.
 
 Do not add a look to a `Record<TemplateId, ...>` map; the four new template ids join `TemplateId` in Phase B with their skins (Ruling LOOKS-5).
+
+## What a new store may start on (2026-10-28)
+
+Signup, onboarding, the admin look switcher and the API offer only looks with `status: 'built'` in `packages/shared/src/looks/registry.ts` (helpers: `builtLooks`, `builtLookTemplates`, `builtSkins`, `isBuiltSkin`, `defaultNewStoreLook`). There is no second list: flip a look to `built` and its template appears everywhere. The five legacy Force skins (modern, elegant, classic, minimal, bold) are never offered and the API refuses to create a store on one (`TEMPLATE_NOT_AVAILABLE`, Zod at `POST /onboarding/store`, and `ProvisioningService`). The default for a new store is Qamar with its first built look (`stores.template` DB default `qamar`, migration `20261028000800`). Existing stores keep their skin; the admin template page still shows a legacy skin but cannot switch into one (`PUT /stores/:id/template` only re-saves the current skin; moving is `PUT /stores/:id/look`, built looks only).

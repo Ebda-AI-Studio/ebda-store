@@ -31,8 +31,6 @@ import {
   STORE_PLAN_TO_PLAN_CODE,
   NEW_STORE_LAYOUT_SETTINGS,
   getLook,
-  builtSkins,
-  isBuiltSkin,
   LOOK_OWNED_THEME_KEYS,
 } from '@ebda/shared';
 import { applyFamilyForLook } from './page-builder.service';
@@ -944,13 +942,13 @@ export class StoreService {
     const store = await this.getById(storeId);
 
     // Existing stores keep their current skin (a re-save of it is allowed), but nobody can switch
-    // INTO a skin that no built look renders with: the five legacy Force skins are closed to new
-    // choices. The allowed set is the looks registry's built skins, never a list kept here.
-    if (template !== store.template && !isBuiltSkin(template)) {
+    // INTO a bare skin: the five legacy Force skins are closed to new choices and Qamar is only
+    // reachable through a look (Ruling B1-17). Switching is `applyLook`, gated on built looks.
+    if (template !== store.template) {
       throw new AppError(
         400,
         'INVALID_TEMPLATE',
-        `Template must be one of: ${builtSkins().join(', ')}`
+        'A store cannot switch to a bare template; choose a look instead'
       );
     }
 

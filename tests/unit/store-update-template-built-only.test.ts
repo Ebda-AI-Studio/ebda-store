@@ -1,6 +1,6 @@
 /**
  * Admin switcher API for EXISTING stores: a store may keep (re-save) its current skin, but cannot
- * switch INTO a skin that no built look renders with. The allowed set is the looks registry.
+ * switch INTO a bare skin (legacy skins closed; built ones only via a look, gated on registry status).
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { LOOKS, builtSkins } from '@ebda/shared';
@@ -43,10 +43,12 @@ describe('StoreService.updateTemplate', () => {
     expect(m.update).toHaveBeenCalledTimes(1);
   });
 
-  it('can switch into a built skin', async () => {
+  it('cannot switch into a bare built skin either: Qamar is only reachable through a look (Ruling B1-17)', async () => {
     existing('classic');
-    await StoreService.updateTemplate('s1', builtSkins()[0]!);
-    expect(m.update).toHaveBeenCalledTimes(1);
+    await expect(StoreService.updateTemplate('s1', builtSkins()[0]!)).rejects.toMatchObject({
+      code: 'INVALID_TEMPLATE',
+    });
+    expect(m.update).not.toHaveBeenCalled();
   });
 
   it('applyLook refuses a look that is not built, unless it is the store’s current look', async () => {
