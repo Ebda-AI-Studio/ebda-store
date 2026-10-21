@@ -48,6 +48,7 @@ export function ProductSpotlightSection({
   editorMode = false,
   onAddToCart,
   priority = false,
+  showPrice = true,
 }: {
   settings: ProductSpotlightSettings;
   products: TemplateProduct[];
@@ -56,6 +57,8 @@ export function ProductSpotlightSection({
   onAddToCart?: (productId: string) => Promise<void>;
   /** Only the FIRST stage on a page is the LCP candidate; later ones load lazily. */
   priority?: boolean;
+  /** The store's card-price switch (`showPriceOnCards` / `showCardPrice`): false hides every price. */
+  showPrice?: boolean;
 }) {
   if (settings.layout === 'stage') {
     return (
@@ -65,10 +68,18 @@ export function ProductSpotlightSection({
         editorMode={editorMode}
         onAddToCart={onAddToCart}
         priority={priority}
+        showPrice={showPrice}
       />
     );
   }
-  return <SpotlightList settings={settings} products={products} editorMode={editorMode} />;
+  return (
+    <SpotlightList
+      settings={settings}
+      products={products}
+      editorMode={editorMode}
+      showPrice={showPrice}
+    />
+  );
 }
 
 /**
@@ -85,12 +96,14 @@ function SpotlightStage({
   editorMode,
   onAddToCart,
   priority,
+  showPrice,
 }: {
   settings: ProductSpotlightSettings;
   product: TemplateProduct | undefined;
   editorMode: boolean;
   onAddToCart?: (productId: string) => Promise<void>;
   priority: boolean;
+  showPrice: boolean;
 }) {
   const { store } = useStore();
   const { language, t } = useLanguage();
@@ -173,17 +186,19 @@ function SpotlightStage({
             </Link>
           </h2>
           <FactChips product={product} className="mt-3" />
-          <p className="mt-4 flex flex-wrap items-baseline gap-x-3 text-xl font-semibold tabular-nums text-foreground">
-            <span>
-              {pricing.mode === 'fromMin' ? `${t('From', 'من')} ` : ''}
-              {formatPrice(pricing.displayPrice)}
-            </span>
-            {pricing.displayCompare !== null && (
-              <s className="text-base font-normal text-muted-foreground">
-                {formatPrice(pricing.displayCompare)}
-              </s>
-            )}
-          </p>
+          {showPrice && (
+            <p className="mt-4 flex flex-wrap items-baseline gap-x-3 text-xl font-semibold tabular-nums text-foreground">
+              <span>
+                {pricing.mode === 'fromMin' ? `${t('From', 'من')} ` : ''}
+                {formatPrice(pricing.displayPrice)}
+              </span>
+              {pricing.displayCompare !== null && (
+                <s className="text-base font-normal text-muted-foreground">
+                  {formatPrice(pricing.displayCompare)}
+                </s>
+              )}
+            </p>
+          )}
           {!buyable && (
             <p className="mt-2 text-sm font-medium text-muted-foreground">{soldOutLabel(ar)}</p>
           )}
@@ -242,10 +257,12 @@ function SpotlightList({
   settings,
   products,
   editorMode = false,
+  showPrice = true,
 }: {
   settings: ProductSpotlightSettings;
   products: TemplateProduct[];
   editorMode?: boolean;
+  showPrice?: boolean;
 }) {
   const { store } = useStore();
   const { language, t } = useLanguage();
@@ -329,10 +346,12 @@ function SpotlightList({
                       <span className="min-w-0 flex-1 text-[15px] leading-snug text-foreground transition-colors group-hover/row:text-primary">
                         {name}
                       </span>
-                      <span className="shrink-0 text-[15px] tabular-nums text-primary">
-                        {pricing.mode === 'fromMin' ? `${t('From', 'من')} ` : ''}
-                        {formatPrice(pricing.displayPrice)}
-                      </span>
+                      {showPrice && (
+                        <span className="shrink-0 text-[15px] tabular-nums text-primary">
+                          {pricing.mode === 'fromMin' ? `${t('From', 'من')} ` : ''}
+                          {formatPrice(pricing.displayPrice)}
+                        </span>
+                      )}
                     </Link>
                   </li>
                 );

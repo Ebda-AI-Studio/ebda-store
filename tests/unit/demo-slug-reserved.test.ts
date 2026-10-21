@@ -17,15 +17,16 @@ import {
 } from '@ebda/shared';
 import { deriveStoreSlug } from '../../apps/api/src/lib/store-slug';
 
-const DEMO = [
-  'storedemo',
-  'storedemo-souq',
-  'storedemo-qamar',
-  'storedemo-2',
+const DEMO = ['storedemo', 'storedemo-souq', 'storedemo-qamar', 'storedemo-2', 'storedemo-x-y'];
+const ALLOWED = [
+  'demo-shop',
+  'my-storedemo',
+  'store-demo',
+  'demostore',
+  // M5: only `storedemo` and `storedemo-*` are the showroom's; these are ordinary merchant slugs
   'storedemos',
-  'storedemo-x-y',
+  'storedemonstration',
 ];
-const ALLOWED = ['demo-shop', 'my-storedemo', 'store-demo', 'demostore'];
 
 describe('demo showroom slugs are not claimable', () => {
   it.each(DEMO)('validateStoreSlug(%s) -> SLUG_RESERVED', slug => {

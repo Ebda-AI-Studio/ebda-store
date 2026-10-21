@@ -165,6 +165,11 @@ async function fetchHomepageData(
    *  the storefront filter pass; HomePageContent merges them into the
    *  product union for source resolution. */
   extraProducts: Product[];
+  /** The `sort=on_sale` response in the API's order (biggest drop first, disabled variants and
+   *  other stores' products already excluded in SQL). `undefined` = no deals row on this page. The
+   *  deals row reads THIS, never a client re-derivation: the listing payload does not carry
+   *  `isActive`, so a disabled variant's compare-at would count as a sale (STOP-2 final review). */
+  onSalePool?: Product[];
 }> {
   const storeHeaders: Record<string, string> = {
     'Content-Type': 'application/json',
@@ -333,7 +338,19 @@ async function fetchHomepageData(
   }
   const extraProducts: Product[] = Array.from(extraProductsMap.values());
 
-  return { featuredProducts, newArrivals, bestSellers, categories, testimonials, extraProducts };
+  const onSalePool: Product[] | undefined = wantsOnSale
+    ? ((onSaleResult?.data?.products as Product[] | undefined) ?? [])
+    : undefined;
+
+  return {
+    featuredProducts,
+    newArrivals,
+    bestSellers,
+    categories,
+    testimonials,
+    extraProducts,
+    onSalePool,
+  };
 }
 
 interface DraftBundle {
@@ -476,16 +493,23 @@ export async function HomePageBody({
     draftToken && draftBundle.typography
       ? emitZoneCss(draftBundle.typography as Parameters<typeof emitZoneCss>[0], store.theme)
       : '';
-  const { featuredProducts, newArrivals, bestSellers, categories, testimonials, extraProducts } =
-    await fetchHomepageData(
-      store,
-      layout,
-      {
-        featured: featuredPromise,
-        categories: categoriesPromise,
-      },
-      documentSectionRefs(builderDefinition ?? homeDefinition)
-    );
+  const {
+    featuredProducts,
+    newArrivals,
+    bestSellers,
+    categories,
+    testimonials,
+    extraProducts,
+    onSalePool,
+  } = await fetchHomepageData(
+    store,
+    layout,
+    {
+      featured: featuredPromise,
+      categories: categoriesPromise,
+    },
+    documentSectionRefs(builderDefinition ?? homeDefinition)
+  );
 
   const siteUrl = storeAbsoluteUrl(store, '');
   const socialUrls = store.socialLinks
@@ -559,6 +583,7 @@ export async function HomePageBody({
           categories={categories}
           testimonials={testimonials}
           extraProducts={extraProducts}
+          onSalePool={onSalePool}
           storeName={store.name}
           layout={layout}
           initialDefinition={builderDefinition}
@@ -573,6 +598,7 @@ export async function HomePageBody({
           categories={categories}
           testimonials={testimonials}
           extraProducts={extraProducts}
+          onSalePool={onSalePool}
           storeName={store.name}
           layout={layout}
           definition={homeDefinition}

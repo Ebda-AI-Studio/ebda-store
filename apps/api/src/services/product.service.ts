@@ -1298,13 +1298,7 @@ export class ProductService {
     storeId: string,
     options: ListProductsOptions & {
       /** `relevance` = hybrid ranking for a search (Task 12); without a search it means no sort. */
-      sort?:
-        | 'newest'
-        | 'price_asc'
-        | 'price_desc'
-        | 'best_seller'
-        | 'relevance'
-        | 'on_sale';
+      sort?: 'newest' | 'price_asc' | 'price_desc' | 'best_seller' | 'relevance' | 'on_sale';
       cursor?: string;
       /**
        * Who is searching (`searcherFromIp`): the identity the query-embed limit charges. Without it
@@ -1546,14 +1540,11 @@ export class ProductService {
     // top 12 of the filtered set (not the filtered subset of the store-wide top 12), and `ids`
     // is intersected, never overwritten. The route rejects the params this path cannot honour
     // (search, price range, option filters, featured).
-    // B2B INTEGRATION POINT (ON_SALE_VISIBILITY_PREDICATE): TODO(feat/b2b-wholesale): when
-    // wholesale-only / audience-restricted products land, the viewer's visibility predicate MUST be
-    // put into `onSaleVisibility` below (inside the raw SQL, so hidden products never consume the
-    // 12 slots), and into the facet/count path; adding it only to the findMany `where` that
-    // follows would shrink or empty the row for retail shoppers.
+    // B2B visibility (Ruling B2B-7b, B2-28): `p.audience = 'public'` is IN the statement below,
+    // before the LIMIT, so a wholesale-only product never consumes one of the 12 slots nor shows in
+    // the row (a post-filter would shrink or empty it for retail shoppers).
     let onSaleOrder: string[] | undefined;
     if (sort === 'on_sale') {
-      const onSaleVisibility = Prisma.sql`TRUE`; // ON_SALE_VISIBILITY_PREDICATE (see TODO above)
       const safeIds = ids?.slice(0, 50).filter(i => typeof i === 'string' && i.length > 0);
       const categorySql = category
         ? resolvedCategoryId
@@ -1571,7 +1562,7 @@ export class ProductService {
          WHERE p.store_id = ${storeId}
            AND p.status = 'active'
            AND p.deleted_at IS NULL
-           AND ${onSaleVisibility}
+           AND p.audience = 'public'
            AND ${categorySql}
            AND ${idsSql}
            AND (

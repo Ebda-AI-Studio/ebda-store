@@ -23,6 +23,8 @@ export interface ProductPools {
   bestSellers: Product[];
   featured: Product[];
   extra: Product[];
+  /** The API's `sort=on_sale` result in its own order. Absent = derive from the loaded pools. */
+  onSale?: Product[];
 }
 
 interface SaleVariant {
@@ -88,7 +90,7 @@ export function resolveSectionProducts(
     case 'on_sale':
       // Unlike the other sources there is NO newest fallback below for an empty deals row: a
       // "deals" section that shows full-price products is a lie, so it renders nothing.
-      return onSaleProducts([...union.values()]).slice(0, limit);
+      return (pools.onSale ?? onSaleProducts([...union.values()])).slice(0, limit);
     case 'category': {
       const slug = (refs.categorySlug ?? '').toLowerCase();
       list = slug

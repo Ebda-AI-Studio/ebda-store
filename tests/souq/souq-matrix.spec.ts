@@ -398,6 +398,12 @@ test('the sale chip is the look accent or metal, never the error red or a coral'
       // error red #EF4343 / coral #F57A83: red channel high with green AND blue low or mid
       const reddish = r! > 200 && g! < 140 && b! < 150;
       expect(reddish, `${store} ${path} chip ${bg}`).toBe(false);
+      // B2-26: on Night the chip IS the brass CTA metal (the rendered paint, not just the token)
+      if (store === 'souq-night')
+        expect(
+          Math.abs(r! - 200) <= 4 && Math.abs(g! - 156) <= 4 && Math.abs(b! - 60) <= 6,
+          `${store} ${path} chip is brass, got ${bg}`
+        ).toBe(true);
     }
   }
 });

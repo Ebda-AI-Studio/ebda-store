@@ -14,6 +14,7 @@ import {
   templateFromArgv,
   SOUQ_PROD_ASSET_BASE,
   seedStoreClaim,
+  SHOWROOM_THEME,
   // @ts-expect-error plain .mjs script
 } from '../../scripts/storedemo/seed.mjs';
 // @ts-expect-error plain .mjs data module
@@ -223,5 +224,19 @@ describe('storedemo seed: slug ownership (never overwrite a merchant store)', ()
     expect(check).toBeLessThan(run.indexOf('prisma.store.upsert'));
     // and the production flag is still required for a non-loopback database
     expect(run.indexOf('guard(url, argv)')).toBeLessThan(check);
+  });
+});
+
+describe('showroom stores seed the NEW-chip toggle ON (STOP-2 final review, P2-4)', () => {
+  it('SHOWROOM_THEME is exactly { showNewBadge: true }', () => {
+    expect(SHOWROOM_THEME).toEqual({ showNewBadge: true });
+  });
+  it('the demo store, the local look stores and the scenario stores all take it (never `theme: {}`)', () => {
+    const root = path.resolve(__dirname, '../..');
+    for (const f of ['scripts/storedemo/seed.mjs', 'scripts/storedemo/scenario-stores.mjs']) {
+      const src = readFileSync(path.join(root, f), 'utf8');
+      expect(src, f).not.toMatch(/\btheme:\s*\{\s*\}\s*,/);
+      expect(src, f).toContain('SHOWROOM_THEME');
+    }
   });
 });

@@ -94,6 +94,9 @@ export interface PageRendererProps {
    *  (category-slug and manual-ids sources). Merged into the union the
    *  storefront filters against. */
   extraProducts?: Product[];
+  /** The API's `sort=on_sale` result in its own order; the deals row reads it as-is. Absent (the
+   *  editor canvas, a page that fetched none) = the client derivation over the loaded pools. */
+  onSalePool?: Product[];
   /**
    * Editor canvas only (token-gated preview): wrap each section in a
    * `display: contents` marker carrying its id so the overlay can select it,
@@ -126,6 +129,7 @@ export function PageRenderer({
   categories,
   testimonials,
   extraProducts,
+  onSalePool,
 }: PageRendererProps) {
   // The legacy-shaped view of the document: section props plus the
   // cross-section lookups the dividers and the featured fallback need.
@@ -1053,7 +1057,7 @@ export function PageRenderer({
           } else if (extra.productSource === 'on_sale') {
             // Deals row: biggest drop first; an empty match renders nothing (below), never a
             // fallback to unrelated products.
-            sourceProducts = onSaleProducts(allRawProducts).map(toTemplateProduct);
+            sourceProducts = (onSalePool ?? onSaleProducts(allRawProducts)).map(toTemplateProduct);
           } else if (extra.productSource === 'category' && extra.categorySlug) {
             const slug = extra.categorySlug.toLowerCase();
             const matched = allRawProducts.filter(p =>
@@ -1168,6 +1172,7 @@ export function PageRenderer({
               bestSellers,
               featured: featuredProducts,
               extra: extraProducts ?? [],
+              onSale: onSalePool,
             };
             const stagePriority =
               def.type === 'product-spotlight' &&
@@ -1205,6 +1210,7 @@ export function PageRenderer({
                   editorMode={editorMode}
                   onAddToCart={handleAddToCart}
                   priority={stagePriority}
+                  showPrice={showCardPriceEff !== false}
                 />
               ) : def.type === 'shop-the-look' ? (
                 <ShopTheLookSection

@@ -25,6 +25,7 @@ import {
   seedCatalogue,
   seedStoreClaim,
   templateFromArgv,
+  SHOWROOM_THEME,
 } from './seed.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
@@ -122,7 +123,7 @@ async function run() {
           slug,
           ownerId: owner.id,
           template: spec.template,
-          theme: {},
+          theme: SHOWROOM_THEME,
           currency: 'EGP',
           ...data,
         },

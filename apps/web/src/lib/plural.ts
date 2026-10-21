@@ -96,7 +96,6 @@ export const MONTHS: CountedNoun = {
     zero: '{n} شهر',
     one: 'شهر واحد',
     two: 'شهرين',
-    twoOblique: 'شهرين',
     few: '{n} أشهر',
     many: '{n} شهرًا',
     other: '{n} شهر',

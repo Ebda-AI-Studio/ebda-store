@@ -23,8 +23,8 @@
 // qamar-atelier / qamar-lookbook / qamar-vitrine, each switched to its look through
 // StoreService.applyLook(..., { design: 'reset' }) - the real merchant path - for local review.
 //
-// The store's theme is written as {} on purpose: the demo preview composes skin + look with no
-// merchant overrides, and a showroom must show the look itself.
+// The store's theme is SHOWROOM_THEME on purpose (one merchant toggle, NEW chips on): the demo
+// preview composes skin + look with no other merchant overrides, and a showroom must show the look.
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import {
@@ -130,6 +130,9 @@ export const isLocalUrl = url => {
   const h = hostOf(url);
   return h !== null && (['localhost', '127.0.0.1', '::1'].includes(h) || h.startsWith('/'));
 };
+
+/** The only theme key a showroom store sets: the merchant's NEW-chip toggle, ON (see seedCatalogue). */
+export const SHOWROOM_THEME = { showNewBadge: true };
 
 export const PLACEHOLDER_SLUGS = PHASE_S_PLACEHOLDERS.flatMap(f => f.products.map(p => p[0]));
 export const PLACEHOLDER_CATEGORY_SLUGS = PHASE_S_PLACEHOLDERS.map(f => f.category.slug);
@@ -380,10 +383,9 @@ export async function seedCatalogue(prisma, Prisma, storeId, base, spec = TEMPLA
       // "New in" (`productSource: newest`) lists only products flagged `isNew`: flag the first
       // NEW_IN_COUNT products that have a photo (12 fills 2, 3 and 4 columns with no orphan row).
       const NEW_IN_COUNT = 12;
-      // TODO(decisions-1016, Ruling B1-117): the card "New" badge becomes a merchant toggle there
-      // (`theme.showNewBadge`, default OFF; `isProductNew` takes `theme`). That setting does not
-      // exist on this branch, so `theme` stays {} here. When decisions-1016 merges, the showroom
-      // seed MUST set `theme: { showNewBadge: true }` or every NEW chip on the showroom disappears.
+      // Ruling B1-117 (decisions-1016, on main): the card "New" badge is a merchant toggle
+      // (`theme.showNewBadge`, default OFF), so both showrooms and the local look stores seed it ON
+      // (`SHOWROOM_THEME`); with `theme: {}` every NEW chip would disappear (STOP-2 final review).
       const newIn = new Set(
         spec.products
           .filter(p => p.images.length > 0)
@@ -668,7 +670,7 @@ async function run() {
       nameAr: spec.nameAr,
       template: look.skin,
       look: look.id,
-      theme: {},
+      theme: SHOWROOM_THEME,
       isDemo: true,
       status: 'active',
       currency: 'EGP',
@@ -712,7 +714,7 @@ async function run() {
             name: spec.localStoreName(l)[0],
             nameAr: spec.localStoreName(l)[1],
             template: l.skin,
-            theme: {},
+            theme: SHOWROOM_THEME,
             isDemo: false,
             status: 'active',
             currency: 'EGP',

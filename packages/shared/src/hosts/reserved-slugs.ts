@@ -56,5 +56,8 @@ export function isReservedSlug(slug: string | null | undefined): boolean {
  */
 export function isDemoShowroomSlug(slug: string | null | undefined): boolean {
   if (typeof slug !== 'string') return false;
-  return slug.trim().toLowerCase().startsWith('storedemo');
+  // exactly `storedemo` or `storedemo-<anything>` (the demo naming): `storedemonstration` is an
+  // ordinary merchant slug and must stay claimable (STOP-2 final review, M5)
+  const s = slug.trim().toLowerCase();
+  return s === 'storedemo' || s.startsWith('storedemo-');
 }
