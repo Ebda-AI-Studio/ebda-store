@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Button, Input } from '@ebda/ui';
 import { useAuth, postLoginDestination, type MfaChallenge } from '../../lib/auth';
+import { isPasskeyCancel, passkeyAutofillSupported, passkeysSupported } from '../../lib/passkeys';
 import { useT } from '@/i18n/useT';
 import { NileNight } from './_components/NileNight';
 import AdminLanguageSwitcher from '@/components/AdminLanguageSwitcher';
@@ -18,7 +19,13 @@ export default function LoginPage() {
   const tb = useT('components.brand');
   const tSignup = useT('onboarding.signup');
   const router = useRouter();
-  const { login, completeMfaLogin, isLoading: authLoading, isAuthenticated } = useAuth();
+  const {
+    login,
+    completeMfaLogin,
+    loginWithPasskey,
+    isLoading: authLoading,
+    isAuthenticated,
+  } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [rememberMe, setRememberMe] = useState(false);
@@ -46,6 +53,44 @@ export default function LoginPage() {
       router.replace(postLoginDestination());
     }
   }, [authLoading, isAuthenticated, router]);
+
+  // Passkeys (Ruling PASSKEY-4: a passkey satisfies MFA, so there is no code step after it).
+  const [canUsePasskey, setCanUsePasskey] = useState(false);
+  useEffect(() => {
+    if (!passkeysSupported()) return;
+    setCanUsePasskey(true);
+    // Conditional UI: the browser offers the saved passkey in the email field's autofill list and this
+    // promise settles only if the person picks one. A newer ceremony (the button below) replaces it.
+    let live = true;
+    void passkeyAutofillSupported().then(ok => {
+      if (!ok || !live) return;
+      loginWithPasskey('conditional').catch(() => {
+        /* cancelled, replaced, or not chosen: the password form is still right there */
+      });
+    });
+    return () => {
+      live = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  async function handlePasskey() {
+    setError('');
+    setIsLoading(true);
+    try {
+      await loginWithPasskey('modal');
+    } catch (err) {
+      if (!isPasskeyCancel(err)) {
+        setError(
+          err instanceof Error && err.message === t('accessDenied')
+            ? err.message
+            : t('passkeyFailed')
+        );
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  }
 
   // MFA step state
   const [mfaChallenge, setMfaChallenge] = useState<MfaChallenge | null>(null);
@@ -277,7 +322,7 @@ export default function LoginPage() {
                 id="email"
                 name="email"
                 type="email"
-                autoComplete="email"
+                autoComplete="username webauthn"
                 required
                 value={email}
                 onChange={e => setEmail(e.target.value)}
@@ -347,6 +392,28 @@ export default function LoginPage() {
               )}
             </Button>
           </form>
+
+          {canUsePasskey && (
+            <div className="mt-6">
+              <div className="relative">
+                <div className="absolute inset-0 flex items-center" aria-hidden="true">
+                  <div className="w-full border-t border-border" />
+                </div>
+                <div className="relative flex justify-center text-xs">
+                  <span className="bg-background px-3 text-muted-foreground">{t('passkeyOr')}</span>
+                </div>
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                className="mt-6 min-h-11 w-full"
+                onClick={handlePasskey}
+                disabled={isLoading}
+              >
+                {t('passkeySignIn')}
+              </Button>
+            </div>
+          )}
 
           <p className="mt-6 text-center text-sm text-muted-foreground">
             {tSignup('noAccount')}{' '}
