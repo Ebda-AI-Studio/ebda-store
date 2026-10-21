@@ -34,12 +34,19 @@ export function StickyCartTotal(p: {
   // The anchor is the summary's checkout button when there is one (declared before the
   // observer hook so it is resolved when that hook's effect runs).
   const ctaRef = useRef<Element | null>(null);
+  // STOP-2 P2: the summary's own Total row (`[data-cart-total]`). While it is reachable on screen
+  // the bar would quote the same price a second time, so it waits until the row has left too.
+  // Without such a row (a pack that does not tag one) the CTA rule alone decides.
+  const totalRef = useRef<Element | null>(null);
   useEffect(() => {
     const box = p.anchorRef?.current;
     ctaRef.current = box?.querySelector('[data-cta="button"]') ?? box ?? null;
+    totalRef.current = box?.querySelector('[data-cart-total]') ?? null;
   }, [p.anchorRef]);
   const offscreen = useAnchorOffscreen(ctaRef);
-  const show = p.itemCount > 0 && (!p.anchorRef || offscreen);
+  const totalOffscreen = useAnchorOffscreen(totalRef);
+  const show =
+    p.itemCount > 0 && (!p.anchorRef || (offscreen && (totalOffscreen || !totalRef.current)));
   // 'blocked' = the bar also carries the one-line blocked message (~24px taller),
   // so globals.css reserves more body space for it.
   const flag = p.disabled && p.blockedMessage ? 'blocked' : '1';

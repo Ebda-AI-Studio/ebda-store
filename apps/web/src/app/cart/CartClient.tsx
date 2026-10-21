@@ -1090,7 +1090,7 @@ export default function CartClient() {
                               </div>
                             )}
                             <div className="border-t border-border pt-3">
-                              <div className="flex justify-between">
+                              <div className="flex justify-between" data-cart-total="">
                                 <span
                                   className={`text-lg ${summaryFontWeight} text-foreground`}
                                   style={{
