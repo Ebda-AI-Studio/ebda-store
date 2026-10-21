@@ -6,7 +6,7 @@ import rateLimit, {
   type Store,
 } from 'express-rate-limit';
 import { RedisStore } from 'rate-limit-redis';
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import jwt from 'jsonwebtoken';
 import { redis } from '../services/redis.service';
 import { BoundedMap } from '../lib/bounded-map';
@@ -1607,21 +1607,63 @@ export const couponValidateLimiter = rateLimit({
   keyGenerator: req => ipKeyGenerator(req.ip ?? '') || 'noip',
 });
 
-// Coupon attempt limiter — closes the enumeration oracle on every OTHER public
+// Coupon DISTINCT-code budget — closes the enumeration oracle on every public
 // endpoint that evaluates a caller-supplied coupon code (POST /orders/quote,
-// POST /orders). Those routes sit behind cartLimiter/writeLimiter, which are far
-// looser than the 20/min budget above, so testing codes there bypassed it.
-// It delegates to couponValidateLimiter itself (same store, same 'coupon-validate'
-// bucket, same per-IP key), so /coupons/validate, quote and order creation share
-// ONE budget. Requests with no coupon code are not counted and never touch the store.
-export const couponAttemptLimiter = (req: Request, res: Response, next: NextFunction): void => {
-  const code = (req.body as { couponCode?: unknown } | undefined)?.couponCode;
-  if (typeof code === 'string' && code.trim().length > 0) {
-    couponValidateLimiter(req, res, next);
-    return;
-  }
-  next();
-};
+// POST /orders, and POST /coupons/validate itself). Enumeration needs DISTINCT
+// codes, so this counts distinct codes per IP per 60s, not requests: a shopper
+// who re-quotes the same applied coupon on every cart change is never limited,
+// while probing 21 different codes in a window is. One budget across all three
+// endpoints, keyed per IP (ipKeyGenerator collapses IPv6 /128 -> /64).
+//
+// Built from two counters on the same RedisOrMemoryStore the other limiters use
+// (Redis, the Workers AuthState DO, or process memory), because the Workers shim
+// has no set commands: a per-(ip, code-hash) "seen" marker whose FIRST hit in the
+// window means the code is new, and a per-IP counter bumped only for new codes.
+// The marker is the set member (hash only, never the raw code); both expire in 60s.
+const COUPON_DISTINCT_MAX = 20;
+const COUPON_DISTINCT_WINDOW_MS = 60 * 1000;
+const couponSeenStore = makeRateLimitStore(rateLimitRedisClient, 'coupon-validate-distinct-seen');
+const couponDistinctStore = makeRateLimitStore(rateLimitRedisClient, 'coupon-validate-distinct');
+couponSeenStore.init?.({ windowMs: COUPON_DISTINCT_WINDOW_MS } as Options);
+couponDistinctStore.init?.({ windowMs: COUPON_DISTINCT_WINDOW_MS } as Options);
+
+function couponDistinctGate(field: 'couponCode' | 'code') {
+  return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    const raw = (req.body as Record<string, unknown> | undefined)?.[field];
+    if (typeof raw !== 'string' || raw.trim().length === 0 || skipForLoadTest(req)) {
+      next();
+      return;
+    }
+    try {
+      const ip = ipKeyGenerator(req.ip ?? '') || 'noip';
+      const hash = createHash('sha256').update(raw.trim().toUpperCase()).digest('hex');
+      const seen = await couponSeenStore.increment(`${ip}:${hash}`);
+      if (seen.totalHits === 1) {
+        const distinct = await couponDistinctStore.increment(ip);
+        if (distinct.totalHits > COUPON_DISTINCT_MAX) {
+          // Forget the marker so retrying this refused code is still "new" (and refused):
+          // otherwise the 2nd attempt would sail through as a repeat.
+          await couponSeenStore.resetKey(`${ip}:${hash}`);
+          res.setHeader('Retry-After', String(COUPON_DISTINCT_WINDOW_MS / 1000));
+          res.status(429).json({
+            success: false,
+            error: { code: 'RATE_LIMITED', message: 'Too many requests, please slow down.' },
+          });
+          return;
+        }
+      }
+    } catch (err) {
+      // Fail-OPEN on a store error, same posture as passOnStoreError on the other limiters.
+      logger.warn({ err }, 'coupon distinct limiter store error; failing open');
+    }
+    next();
+  };
+}
+
+/** POST /orders/quote + POST /orders: `couponCode` in the body. */
+export const couponAttemptLimiter = couponDistinctGate('couponCode');
+/** POST /coupons/validate: `code` in the body. Runs after couponValidateLimiter. */
+export const couponValidateDistinctLimiter = couponDistinctGate('code');
 
 // Promotion preview limiter — public storefront targeting-preview endpoint.
 // Same posture as couponValidateLimiter (20/min per IP): generous for a

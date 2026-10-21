@@ -4,7 +4,12 @@ import { prisma } from '@ebda/database';
 import { authenticate, authorize, optionalAuthenticate, customerUserId } from '../middleware/auth';
 import { requireStoreAccess } from '../middleware/store-access';
 import { requireFeature } from '../middleware/feature-gate';
-import { couponValidateLimiter, writeLimiter, publicTenantLimiter } from '../middleware/security';
+import {
+  couponValidateLimiter,
+  couponValidateDistinctLimiter,
+  writeLimiter,
+  publicTenantLimiter,
+} from '../middleware/security';
 import { CouponService } from '../services/coupon.service';
 import { resolveCustomerContext } from '../services/promotion-resolver';
 import { buyerFromRequest } from '../lib/buyer-identity';
@@ -292,6 +297,8 @@ router.patch(
 router.post(
   '/public/:storeId/coupons/validate',
   couponValidateLimiter,
+  // Distinct-code budget shared with /orders/quote + /orders (enumeration needs distinct codes).
+  couponValidateDistinctLimiter,
   // Per-tenant aggregate backstop (audit P3) — bounds distributed volume
   // against one store's endpoint regardless of source-IP spread.
   publicTenantLimiter,

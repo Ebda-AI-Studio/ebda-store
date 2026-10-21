@@ -288,6 +288,7 @@ vi.mock('@api/middleware/feature-gate', () => ({
 vi.mock('@api/middleware/security', () => ({
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   couponValidateLimiter: (_req: any, _res: any, next: any) => next(),
+  couponValidateDistinctLimiter: (_req: any, _res: any, next: any) => next(),
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   publicTenantLimiter: (_req: any, _res: any, next: any) => next(),
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
