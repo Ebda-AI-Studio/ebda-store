@@ -64,6 +64,32 @@ Common causes:
 
 ---
 
+## Wholesale — الجملة
+
+### How do I set quantity prices for a product? — إزاي أحط أسعار بالكمية لمنتج؟
+
+Open the product, find **Wholesale pricing**, add a price break (from quantity, unit price). Leave **Who gets it** on *Everyone* for a public break, or pick a customer group for wholesale-only prices. The price must be lower than the current price, and a bigger quantity must be cheaper than a smaller one. The card shows your margin against the cost price and warns (without blocking) when a price is below cost. Wholesale pricing is part of the Business plan.
+
+افتح المنتج، وهتلاقي **أسعار الجملة**: أضف شريحة (من كمية، وسعر الوحدة). سيب **مين بياخدها** على "الكل" لشريحة عامة، أو اختار مجموعة عملاء لأسعار الجملة بس. السعر لازم يبقى أقل من السعر الحالي، والكمية الأكبر أرخص من الأصغر. الكارت بيوريك هامشك على التكلفة وبيحذّرك لو السعر أقل منها. أسعار الجملة جزء من باقة Business.
+
+### How do I approve a wholesale buyer? — إزاي أوافق على تاجر جملة؟
+
+Create a customer group, tick **Wholesale group**, and (optionally) set a percent discount. Buyers apply from their account page; you get a notification, a badge on the **Wholesale applications** tab and an email. Open the application, pick the group and approve. The buyer sees wholesale prices from their next page load, but only when signed in: a phone number or email typed at checkout never unlocks them. Rejecting sends them your note, so do not write internal remarks there. If nobody answers for 48 hours you get a reminder.
+
+اعمل مجموعة عملاء، وعلّم **مجموعة جملة**، وحط نسبة خصم لو عايز. التجار بيقدّموا من صفحة حسابهم، وبيوصلك إشعار وعلامة على تبويب **طلبات الجملة** وإيميل. افتح الطلب، واختار المجموعة ووافق. التاجر بيشوف أسعار الجملة من أول تحميل للصفحة، بس وهو مسجّل دخول: رقم تليفون أو إيميل مكتوب في الدفع عمره ما بيفتحها. لو رفضت، التاجر بيشوف ملاحظتك، فمتكتبش فيها ملاحظات داخلية. لو محدش رد 48 ساعة بيوصلك تذكير.
+
+### Why does a coupon not apply to a wholesale line? — ليه الكوبون مش بيشتغل على صنف جملة؟
+
+Lines sold at a quantity price or a wholesale group price are excluded from coupons, promotions and loyalty redemption, because wholesale margins are thin and stacking can take the price below cost. Free-shipping coupons still work. The rest of the cart (retail lines) keeps its coupon.
+
+الأصناف اللي اتباعت بسعر كمية أو سعر مجموعة جملة مش داخلة في الكوبونات والعروض واستبدال نقاط الولاء، لأن هامش الجملة صغير والتجميع ممكن ينزل بالسعر تحت التكلفة. كوبون الشحن المجاني شغال. باقي السلة (الأصناف العادية) بيفضل عليها الكوبون.
+
+### What happens when a wholesale buyer returns part of an order? — إيه اللي بيحصل لو تاجر جملة رجّع جزء من الطلب؟
+
+If the units the buyer keeps no longer reach the quantity they were sold at, the kept units are repriced at the lowest price break they still reach (otherwise the retail price) and the refund is reduced by the difference. The return screen shows the standard refund, the adjustment with the reason, and the adjusted refund before you confirm. You can override the amount per item (a reason is required and the change is recorded with your name). The refund is never below zero, and a later return that brings the buyer back over the threshold releases what was held back.
+
+لو الوحدات اللي التاجر محتفظ بيها مبقتش توصل للكمية اللي اتباعت بيها، بتتسعّر بأقل شريحة لسه واصلها (أو سعر القطاعي) والمرتجع بيقل بالفرق. شاشة المرتجع بتوريك المرتجع العادي والتعديل بسببه والمرتجع بعد التعديل قبل ما تأكد. تقدر تعدّل المبلغ لكل صنف (السبب مطلوب والتغيير بيتسجّل باسمك). المرتجع عمره ما بينزل تحت صفر، ولو مرتجع بعده رجّع التاجر فوق الحد، اللي اتحجز بيتفك.
+
 ## Orders
 
 ### Where do new orders appear? — وين الطلبات الجديدة؟
