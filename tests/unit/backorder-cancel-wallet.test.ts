@@ -197,3 +197,45 @@ describe('cancelBackorder — transaction ownership (issue 2276)', () => {
     expect(h.withMoneyTx).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('cancelBackorder — the same allocation the GL posts (B2B Task 8b tier adjustments)', () => {
+  it('counts the tier adjustments earlier returns retained, as partial-return-posting does: owed == GL cash credit', async () => {
+    const { allocatePartialReturn } =
+      await import('@api/services/accounting/posting/partial-return-allocation');
+    // oi1: one base line, backordered and cancelled. oi2: 100 tier-priced units, 90 returned earlier with 200 retained.
+    const items = [
+      { id: 'oi1', quantity: 1, price: 999, priceSource: 'base' },
+      { id: 'oi2', quantity: 100, price: 80, priceSource: 'tier' },
+    ];
+    tx.order.findUniqueOrThrow.mockResolvedValueOnce({
+      subtotal: 8999,
+      discount: 0,
+      tax: 15,
+      taxIncludedInPrice: false,
+      paymentStatus: 'paid',
+      items,
+    });
+    tx.backorderLine.findUniqueOrThrow.mockResolvedValueOnce({ qty: 1, qtyFulfilled: 0 });
+    tx.return.findMany.mockResolvedValueOnce([
+      {
+        id: 'r1',
+        reason: null,
+        items: [{ orderItemId: 'oi2', quantity: 90, tierAdjustment: 200 }],
+      },
+    ]);
+    const res = await cancelBackorder('s1', 'bo1', 'r');
+    const base = {
+      subtotal: 8999,
+      discount: 0,
+      tax: 15,
+      taxIncludedInPrice: false,
+      lines: items,
+      prevQty: new Map([['oi2', 90]]),
+      requested: [{ orderItemId: 'oi1', quantity: 1 }],
+    };
+    // What partial-return-posting credits to cash for this cancel (it passes the loader's prevAdjustment)
+    const gl = allocatePartialReturn({ ...base, prevAdjustment: 200 }).cashCredit;
+    expect(gl).not.toBe(allocatePartialReturn(base).cashCredit); // the case where ignoring it disagrees (1 piastre)
+    expect(res.owedToCustomer).toBe(gl);
+  });
+});
