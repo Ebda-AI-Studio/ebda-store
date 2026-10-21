@@ -152,10 +152,12 @@ export const AddToCartButton = forwardRef<HTMLButtonElement, AddToCartButtonProp
           data-zone="cta"
           className={cn(
             'relative flex items-center justify-center w-10 h-10 rounded-full transition-all',
-            'bg-primary text-primary-foreground hover:bg-primary/90',
+            // The added state swaps the whole fill + ink pair (never primary fill + success ink).
+            isAdded
+              ? 'bg-success text-success-foreground hover:bg-success'
+              : 'bg-primary text-primary-foreground hover:bg-primary/90',
             'disabled:opacity-50 disabled:cursor-not-allowed',
             'focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2',
-            isAdded && 'bg-success text-success-foreground hover:bg-success',
             className
           )}
           aria-label={getLabel()}
