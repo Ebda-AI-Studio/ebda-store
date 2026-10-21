@@ -345,6 +345,23 @@ type SearchStoreReindexRequestedEvent = EventPayload & {
   data: { storeId: string; reason: string };
 };
 
+// Merchant outgoing webhooks. `delivery.requested` is sent by the fan-out (after the delivery rows
+// exist) and by the admin test/resend routes; `inventory.low` by the low-stock scan.
+type WebhookDeliveryRequestedEvent = EventPayload & {
+  name: 'webhook/delivery.requested';
+  data: { storeId: string; deliveryId: string };
+};
+
+type WebhookInventoryLowEvent = EventPayload & {
+  name: 'webhook/inventory.low';
+  data: {
+    storeId: string;
+    /** UTC day (YYYY-MM-DD): at most one inventory.low per product per day. */
+    day: string;
+    items: Array<{ productId: string; name: string; inventory: number; lowStockThreshold: number }>;
+  };
+};
+
 export type AppEvent =
   | OrderCreatedEvent
   | BulkImportStartedEvent
@@ -380,7 +397,9 @@ export type AppEvent =
   | CampaignSendRequestedEvent
   | EbdaAdsConversionRequestedEvent
   | LegalNoticeSendRequestedEvent
-  | SearchStoreReindexRequestedEvent;
+  | SearchStoreReindexRequestedEvent
+  | WebhookDeliveryRequestedEvent
+  | WebhookInventoryLowEvent;
 
 // Inngest re-registers the function manifest only when it detects a
 // deploy-version change. Without an explicit deploy id, Railway boots

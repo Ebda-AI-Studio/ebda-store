@@ -50,6 +50,10 @@ import {
   subscriptionBillingTemplate,
   type SubscriptionBillingNoticeData,
 } from './email-templates/subscription-billing';
+import {
+  webhookDisabledTemplate,
+  type WebhookDisabledData,
+} from './email-templates/webhook-disabled';
 import { BRAND, BRAND_EMAIL_LOGO_URL, brandFrom, poweredByBrand } from '@ebda/shared';
 
 import { resolveDefaultLanguage } from '@ebda/shared';
@@ -1023,6 +1027,25 @@ export class EmailService {
       content: planLimitReachedTemplate[lang](data),
       language: lang,
     });
+  }
+
+  /** Merchant notice: a webhook endpoint was switched off after repeated failures. */
+  static async sendWebhookDisabledNotice(
+    storeId: string,
+    data: WebhookDisabledData & { to: string },
+    language?: 'en' | 'ar'
+  ): Promise<void> {
+    const lang: 'en' | 'ar' = language ?? 'ar';
+    await this.sendForStore(
+      storeId,
+      {
+        to: data.to,
+        subject: webhookDisabledTemplate.subject[lang](data),
+        content: webhookDisabledTemplate[lang](data),
+        language: lang,
+      },
+      { queue: true }
+    );
   }
 
   /**

@@ -10,6 +10,7 @@ import {
 import { EmailService } from '../../../services/email.service';
 import { featureService } from '../../../services/feature.service';
 import { config } from '../../../config';
+import type { LowStockAlertItem } from '../../../services/email-templates/low-stock-alert';
 
 /**
  * Cron-triggered low-stock alert — runs every 6 hours (every 6th hour, UTC).
@@ -46,6 +47,9 @@ export const stockLowStockAlertCron: InngestFunction.Any = inngest.createFunctio
       // `stores` is under RLS: a cron lists stores through the directory definer.
       storeDirectory().then(list => list.map(s => ({ id: s.id })))
     );
+
+    // One UTC day for the whole run (memoized), so webhook inventory.low dedupes per product per day.
+    const day = await step.run('webhook-day', () => new Date().toISOString().slice(0, 10));
 
     let totalAlerted = 0;
     let totalCleared = 0;
@@ -86,6 +90,24 @@ export const stockLowStockAlertCron: InngestFunction.Any = inngest.createFunctio
           recipientEmail: scanResult.recipientEmail,
         };
       });
+
+      // Merchant webhooks (inventory.low): independent of the owner email below, so a store with
+      // no recipient address still tells its endpoints. Fan-out dedupes per product per day.
+      if (scan.alertedProducts.length > 0) {
+        await step.sendEvent(`webhook-inventory-low-${store.id}`, {
+          name: 'webhook/inventory.low',
+          data: {
+            storeId: store.id,
+            day,
+            items: scan.alertedProducts.map((p: LowStockAlertItem) => ({
+              productId: p.productId,
+              name: p.name,
+              inventory: p.inventory,
+              lowStockThreshold: p.lowStockThreshold,
+            })),
+          },
+        });
+      }
 
       // Step 2 — send the digest in a SEPARATE memoized step. If the email send
       // throws, only this step is retried; the scan step (and its sentinels) is
