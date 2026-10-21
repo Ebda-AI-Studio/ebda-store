@@ -10,6 +10,7 @@ import { describe, it, expect, afterAll } from 'vitest';
 import { prisma, createPrismaClient, runWithRequestDb, runInTenantContext } from '@ebda/database';
 import { hasDb } from '../helpers/bundle-fixtures';
 import { fanoutWebhookEvent } from '../../apps/api/src/services/webhook.service';
+import { redactWebhookCustomerData } from '../../apps/api/src/services/webhook-erasure';
 
 const OWNER_URL = process.env.DIRECT_URL || process.env.DATABASE_URL || '';
 function appUrl(): string {
@@ -136,6 +137,47 @@ describe.skipIf(!hasDb)('merchant webhooks on ebda_app (guard + strict RLS)', ()
         )
       )
     ).rejects.toThrow();
+  });
+
+  it('M10: erasure strips data.customer from this store only, keeps the order record', async () => {
+    const a = await seedStore('er-a');
+    const b = await seedStore('er-b');
+    for (const s of [a, b]) {
+      await prisma.webhookEndpoint.create({
+        data: {
+          storeId: s,
+          url: 'https://hooks.example.com/x',
+          events: ['order.created'],
+          includeCustomer: true,
+          secretEnc: 'enc',
+          secretHint: 'abcd',
+        },
+      });
+      await asApp(() =>
+        runInTenantContext(s, () =>
+          fanoutWebhookEvent(s, {
+            type: 'order.created',
+            dedupeKey: 'k',
+            data: { order: { id: 'o-shared' } },
+            customer: { name: 'A', email: 'a@x.co', phone: '1' },
+          })
+        )
+      );
+    }
+    await asApp(() =>
+      runInTenantContext(a, () =>
+        redactWebhookCustomerData(prisma, { storeId: a, orderIds: ['o-shared'], email: 'a@x.co' })
+      )
+    );
+    const rowA = await prisma.webhookDelivery.findFirst({ where: { storeId: a } });
+    const rowB = await prisma.webhookDelivery.findFirst({ where: { storeId: b } });
+    expect((rowA!.payload as any).data.customer).toBeUndefined();
+    expect((rowA!.payload as any).data.order.id).toBe('o-shared');
+    expect((rowB!.payload as any).data.customer).toEqual({
+      name: 'A',
+      email: 'a@x.co',
+      phone: '1',
+    });
   });
 
   it('keeps only the last 50 deliveries per endpoint', async () => {

@@ -146,8 +146,9 @@ holding the exact JSON that was signed and sent. By default the payload has no c
 controller of what their own server receives. The last 50 rows per endpoint are kept, every row ages
 out after 30 days (`webhook-delivery-purge-daily`, each store in its own tenant transaction), the
 response body is kept only as a 200-character snippet, and a store deletion removes it (FK `ON DELETE
-CASCADE`). A per-customer erasure does not rewrite delivered payloads; the 30-day purge bounds the
-copy. `webhook_endpoints` holds the endpoint URL and the signing secret encrypted at rest
+CASCADE`). A customer erasure strips `data.customer` from the stored payloads of that shopper's orders and
+email (`redactWebhookCustomerData`, Ruling WH-7); payloads already delivered to the merchant's own
+server cannot be recalled, and the 30-day purge bounds our copy. `webhook_endpoints` holds the endpoint URL and the signing secret encrypted at rest
 (`encryption.encrypt`); it is deleted with the endpoint or the store.
 
 ## Export path
