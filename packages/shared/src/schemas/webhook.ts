@@ -19,6 +19,9 @@ export const WEBHOOK_EVENT_TYPES = [
 ] as const;
 export type WebhookEventType = (typeof WEBHOOK_EVENT_TYPES)[number];
 
+/** Event type of the admin "send test event" button; not subscribable. */
+export const WEBHOOK_TEST_EVENT = 'webhook.test' as const;
+
 /** Bumped only for a breaking payload change; additive fields do not bump it. */
 export const WEBHOOK_PAYLOAD_VERSION = '2026-10-21';
 
@@ -102,7 +105,7 @@ export type WebhookEndpointUpdateInput = z.infer<typeof webhookEndpointUpdateSch
 /** What a receiver gets, as a type for the docs and tests. */
 export interface WebhookEnvelope<T = unknown> {
   id: string;
-  type: WebhookEventType;
+  type: WebhookEventType | typeof WEBHOOK_TEST_EVENT;
   apiVersion: string;
   createdAt: string;
   storeId: string;
