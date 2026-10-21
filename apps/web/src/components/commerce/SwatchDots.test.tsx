@@ -88,7 +88,7 @@ describe('SwatchDots', () => {
     expect(screen.getByText('+7')).toBeTruthy();
   });
 
-  it('a black dot on an ink skin keeps a 60% foreground edge (F7, raised by LB-b to clear 3:1 on every look)', () => {
+  it('a black dot on an ink skin keeps a solid foreground edge (F7, LB-b, B1-107)', () => {
     const p = {
       options: [
         {
@@ -100,8 +100,9 @@ describe('SwatchDots', () => {
     };
     render(<SwatchDots product={p as never} max={5} />);
     const dot = screen.getByTestId('swatch-dot');
-    expect(dot.className).toContain('border-foreground/60');
-    expect(dot.className).not.toContain('border-foreground/15');
+    // solid foreground: a black dot on a dark look still has a >= 3:1 outline (B1-107)
+    expect(dot.className).toMatch(/\bborder-foreground(?!\/)/);
+    expect(dot.className).not.toMatch(/border-foreground\//);
   });
 });
 

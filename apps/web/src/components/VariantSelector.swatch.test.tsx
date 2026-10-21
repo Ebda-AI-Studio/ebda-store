@@ -73,11 +73,11 @@ describe('VariantSelector swatches', () => {
     expect(plain.textContent).toMatch(/Plain/);
   });
 
-  it('an unselected colour circle keeps a 35% foreground ring on dark skins (F7)', () => {
+  it('an unselected colour circle draws a solid foreground ring: >= 3:1 on any surface (B1-107)', () => {
     render(<VariantSelector variants={variants} options={options} onVariantSelect={() => {}} />);
     const teal = screen.getByRole('button', { name: /Teal/ });
-    expect(teal.className).toContain('ring-foreground/35');
-    expect(teal.className).not.toContain('ring-foreground/15');
+    expect(teal.className).toMatch(/\bring-1 ring-foreground(?!\/)/);
+    expect(teal.className).not.toMatch(/ring-foreground\/(15|35)/);
   });
 
   it('strikes the out-of-stock combo once the other axes are picked', () => {

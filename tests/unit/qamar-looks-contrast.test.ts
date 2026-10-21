@@ -205,3 +205,14 @@ describe('lookbook moon-silver accent (B1-102)', () => {
     expect(contrastRatio(t.page, t.ink)).toBeGreaterThanOrEqual(4.5);
   });
 });
+
+// Ruling B1-107: dark colour swatches (navy, black) are outlined in the page foreground at full
+// strength, so the ring reads against every Qamar surface (>= 3:1, WCAG 1.4.11).
+describe('swatch ring on every Qamar surface', () => {
+  for (const l of qamar)
+    for (const surface of ['page', 'surface'] as const)
+      it(`${l.id}: foreground ring on the ${surface} is >= 3:1`, () => {
+        const fg = l.tokens.ink;
+        expect(contrastRatio(l.tokens[surface], fg)).toBeGreaterThanOrEqual(3);
+      });
+});

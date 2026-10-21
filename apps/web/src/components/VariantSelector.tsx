@@ -269,7 +269,7 @@ export function VariantSelector({
                         'relative inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full before:absolute before:-inset-1.5 before:content-[""] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
                         isSelected
                           ? 'ring-2 ring-foreground ring-offset-2 ring-offset-background'
-                          : 'ring-1 ring-foreground/35',
+                          : 'ring-1 ring-foreground',
                         available ? '' : 'cursor-not-allowed opacity-50',
                       ].join(' ')}
                     >
