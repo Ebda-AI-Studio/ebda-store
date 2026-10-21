@@ -44,17 +44,15 @@ Pricing (EGP per month): Basic 1,490, Growth 3,490, Business 9,990; yearly billi
 - Payments and shipping the Egyptian market expects
 - Multiple warehouses and purchase orders (Business plan)
 - Order barcodes and a packing slip
-- Wholesale selling (B2B) (Business plan) — coming soon, not live yet
-- Connect your store to your other tools (Growth and Business plans) — coming soon, not live yet
+- Wholesale selling (B2B) (Business plan)
+- Connect your store to your other tools (Growth and Business plans)
 ### Pricing with no surprises
 - 0% commission on your orders
 
 ## Not there yet (stated plainly)
 - Search by meaning: Coming soon: rolling out gradually, and only switched on for your store once its results pass our quality check on a real catalogue.
-- Connecting other tools (webhooks): Coming soon on Growth and Business: the store will notify the tool you choose when something happens, such as a new order.
 - App marketplace: There is no app marketplace.
 - Custom code: You edit in the page builder without code, and there is no custom code editor.
-- Wholesale (B2B) pricing: Coming soon on the Business plan: quantity price breaks, customer groups, minimum orders and wholesale-buyer approval. Until it ships there are no wholesale price lists.
 - Point of sale (POS): There is no in-store point of sale.
 - Multiple currencies: The store sells in Egyptian pounds only.
 - Size of platform and community: A newer platform, so fewer integrations and a smaller community.
