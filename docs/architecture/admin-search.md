@@ -4,12 +4,21 @@ Search program P2 (Tasks 15 to 18, amendment E23). Plan: `docs/plans/2026-10-15-
 
 ## What a merchant can find
 
-| Kind | Where it is matched | Opens |
-|---|---|---|
-| Products | `GET /stores/:storeId/search` → `searchProductIds` (admin scope, name field) | `/stores/:id/products/:productId/edit` |
-| Orders | same route → `OrderService.listWhere` (number, digits of the number, customer name, phone, email) | `/stores/:id/orders/:orderId` |
-| Customers | same route → `matchingCustomers`; guests are keyed by lowercased email, else phone (the Customers-page key) | `/stores/:id/customers/:customerKey` |
-| Pages and individual settings | the settings registry, in the browser (no request) | the page, or the page at the control (`?setting=<id>`) |
+| Kind                          | Where it is matched                                                                                                | Opens                                                  |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------ |
+| Products                      | `GET /stores/:storeId/search` (term in the `X-Search-Query` header) → `searchProductIds` (admin scope, name field) | `/stores/:id/products/:productId/edit`                 |
+| Orders                        | same route → `OrderService.listWhere` (number, digits of the number, customer name, phone, email)                  | `/stores/:id/orders/:orderId`                          |
+| Customers                     | same route → `matchingCustomers`; guests are keyed by lowercased email, else phone (the Customers-page key)        | `/stores/:id/customers/:customerKey`                   |
+| Pages and individual settings | the settings registry, in the browser (no request)                                                                 | the page, or the page at the control (`?setting=<id>`) |
+
+**The term never travels in the URL** (Ruling SEARCH-P2-9): the palette, the Customers list/export and typeahead,
+the Orders list/export, the stock-scan lookup and the Orders PWA send it in `X-Search-Query` (`searchQueryHeaders` /
+`moveSearchToHeader` in `@ebda/shared`; read by `apps/api/src/lib/search-term.ts`). The palette route accepts no
+`?q=`; the older routes still accept the deprecated query form for one release.
+
+The palette route is rate limited per user (`adminSearchLimiter`, 120/min) and capped (50 customers, 200 guest
+orders, 50 order-number ids; one customer lookup shared with the order search). A 429 or a failure is shown as its
+own state, never as "no results". The Customers list says when a search hit its own cap (`meta.searchTruncated`).
 
 The palette (`apps/admin/src/components/CommandPalette.tsx`) shows pages and settings immediately and the
 three record groups after a 200 ms debounce (two characters minimum, a reply for an older query is dropped).
@@ -25,8 +34,10 @@ customer typeahead's `orders:read`); a kind the role may not read is an empty li
   `users_name_norm_trgm_idx`, `orders_guest_phone_digits_trgm_idx`, `orders_guest_name_norm_trgm_idx`
   (see `docs/DB-INDEX-MIGRATIONS.md`). Names are matched through `public.ebda_ar_norm` ("احمد" finds "أحمد").
 - `public.ebda_customer_search_ids` (migration `20261027000200`) is the store-scoped SECURITY DEFINER lookup that
-  uses them. Same contract as `ebda_order_search_ids`: the store comes only from `app.current_store_id`, ids
-  only, soft-deleted rows and users the `users` policy would hide are excluded. As `ebda_app` the RLS barrier
+  uses them. It is STORE-FIRST (Ruling SEARCH-P2-8): users are matched inside the store's own customer set, and the
+  guest-order indexes are `btree_gin` composites leading with `store_id`, so a small store never pays for the
+  platform's matches of a common name. Same contract as `ebda_order_search_ids`: the store comes only from `app.current_store_id`, ids
+  only, soft-deleted rows and accounts, and users the `users` policy would hide, are excluded. As `ebda_app` the RLS barrier
   makes an inline `ILIKE` unable to use any trigram index, so every customer/order/typeahead search goes
   through it. `apps/api/src/services/admin-search.service.ts` is the only caller.
 - Customers list, export and typeahead: `aggregateCustomersMatching` (list/export rows) and
@@ -35,7 +46,7 @@ customer typeahead's `orders:read`); a kind the role may not read is an empty li
 - Orders: `orderSearchWhere` takes customers and guests from the same lookup; a term made only of digits
   (`#١٢٣٤`) is also tried as the order number's digits.
 - `ebda_order_search_ids` kinds `'guest'` and `'customers'`, and the per-key indexes `orders_guest_first_name /
-  last_name / phone_trgm_idx` and `users_first_name / last_name / phone_trgm_idx`, are no longer called by the
+last_name / phone_trgm_idx` and `users_first_name / last_name / phone_trgm_idx`, are no longer called by the
   app. They stay for one release (rollback safety); drop them in a later contract migration.
 
 ## Pages and settings: the registry
@@ -70,3 +81,5 @@ optional `feature`, optional `syn` (everyday words per language) and, for a sett
 Limits, stated plainly: the registry covers every static admin page and the controls listed in it; it is not an
 automatic index of every input. The label ratchet makes a new labelled control on a registered settings page
 a failing test, but only for the page directories in `SETTINGS_LABEL_BASELINE`.
+
+The `?setting=` value is untrusted: `SettingHighlight` acts only on an id the registry knows, and the DOM lookup escapes it with `CSS.escape` inside a try/catch.
