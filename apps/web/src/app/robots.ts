@@ -3,6 +3,8 @@ import { headers } from 'next/headers';
 import { API_URL } from '../lib/api';
 import { getSiteUrl } from '../lib/structured-data';
 
+const DEMO_PRIVATE_PATHS = ['/account/', '/checkout/', '/cart/', '/auth/', '/affiliate/'];
+
 /**
  * Whether the store that owns this host is the demo showroom (`isDemo`, Ruling B1-14). Asks the
  * same `/public/store/resolve` the storefront resolves with (plan amendment C14). Any failure to
@@ -35,7 +37,7 @@ async function isDemoHost(storeHost: string): Promise<boolean> {
  * the platform sitemap, telling Google to index platform URLs even
  * for merchants who only want their own domain indexed.
  *
- * The demo showroom (`storedemo`) disallows everything and advertises no sitemap (B1-14).
+ * The demo showroom (`storedemo`) stays crawlable (so its `noindex` meta is read) and advertises no sitemap (B1-14).
  */
 export default async function robots(): Promise<MetadataRoute.Robots> {
   const h = await headers();
@@ -43,7 +45,9 @@ export default async function robots(): Promise<MetadataRoute.Robots> {
   const base = host ? `https://${host}` : getSiteUrl();
 
   if (await isDemoHost(h.get('x-store-domain')?.toLowerCase() ?? '')) {
-    return { rules: [{ userAgent: '*', disallow: '/' }] };
+    // Crawlable on purpose: a `Disallow: /` would stop crawlers reading the page's own `noindex`
+    // meta, so an externally linked URL could still be indexed URL-only. No sitemap is advertised.
+    return { rules: [{ userAgent: '*', allow: '/', disallow: DEMO_PRIVATE_PATHS }] };
   }
 
   return {

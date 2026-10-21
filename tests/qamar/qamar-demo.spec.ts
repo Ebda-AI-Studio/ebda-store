@@ -67,5 +67,6 @@ test('storedemo: bar, look switch, persistence, no-store, closed checkout, noind
   // body; it is proved by tests/integration/demo-store.test.ts (every order path), not here.
   await expect(page.locator('button[type="submit"]')).toHaveCount(0);
   const robots = await page.request.get(`${hostOf('storedemo')}/robots.txt`);
-  expect(await robots.text()).toContain('Disallow: /');
+  // Crawlable on purpose (B1-14, M-5): the page's noindex meta must be readable. No bare root disallow.
+  expect(await robots.text()).not.toMatch(/^Disallow: \/$/m);
 });

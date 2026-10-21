@@ -1,6 +1,6 @@
 /**
- * Storefront robots.txt (Ruling B1-14, plan amendment C14): the demo showroom host disallows
- * everything and advertises no sitemap; every other store host keeps today's rules. The store is
+ * Storefront robots.txt (Ruling B1-14, plan amendment C14): the demo showroom host stays crawlable
+ * (its noindex meta is read) and advertises no sitemap; every other store host keeps today's rules. The store is
  * resolved through `/public/store/resolve` (its `isDemo`); a failure to ask keeps today's rules.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -48,11 +48,12 @@ describe('robots.txt and the demo showroom', () => {
     req.storeDomain = 'shop.ebda.app';
   });
 
-  it('the demo host disallows / and lists no sitemap', async () => {
+  it('the demo host stays crawlable (its noindex meta must be readable) and lists no sitemap', async () => {
     req.host = req.storeDomain = 'storedemo.ebda.app';
     stubResolve({ ok: true, isDemo: true });
     const r = await robots();
-    expect(r).toEqual({ rules: [{ userAgent: '*', disallow: '/' }] });
+    expect(r).toEqual({ rules: [NORMAL.rules] });
+    expect(JSON.stringify(r.rules)).not.toContain('"disallow":"/"');
     expect(r.sitemap).toBeUndefined();
   });
 
