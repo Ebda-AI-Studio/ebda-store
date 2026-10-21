@@ -108,6 +108,7 @@ export interface SettingsPaletteLabels {
   announcement: string;
   agentKey: string;
   merchantKeys: string;
+  webhooks: string;
   billing: string;
 }
 
@@ -171,6 +172,7 @@ export function buildStorePaletteItems(
       [settings.staff, `/stores/${storeId}/staff`],
       [settings.agentKey, `/stores/${storeId}/agent-key`],
       [settings.merchantKeys, `/stores/${storeId}/merchant-keys`],
+      [settings.webhooks, `/stores/${storeId}/webhooks`],
       [settings.billing, `/stores/${storeId}/billing`],
     ];
     for (const [name, href] of pages)

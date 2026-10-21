@@ -10,6 +10,8 @@ import {
 import { EmailService } from '../../../services/email.service';
 import { featureService } from '../../../services/feature.service';
 import { config } from '../../../config';
+import { buildInventoryLowEvents } from '../../../services/webhook-events';
+import type { LowStockAlertItem } from '../../../services/email-templates/low-stock-alert';
 
 /**
  * Cron-triggered low-stock alert — runs every 6 hours (every 6th hour, UTC).
@@ -47,6 +49,10 @@ export const stockLowStockAlertCron: InngestFunction.Any = inngest.createFunctio
       storeDirectory().then(list => list.map(s => ({ id: s.id })))
     );
 
+    // One UTC day for the whole run (memoized), so webhook inventory.low dedupes per product per day.
+    const day = await step.run('webhook-day', () => new Date().toISOString().slice(0, 10));
+
+    const webhookPending: Array<{ storeId: string; items: LowStockAlertItem[] }> = [];
     let totalAlerted = 0;
     let totalCleared = 0;
     let totalSkipped = 0;
@@ -86,6 +92,9 @@ export const stockLowStockAlertCron: InngestFunction.Any = inngest.createFunctio
           recipientEmail: scanResult.recipientEmail,
         };
       });
+
+      // Merchant webhooks (inventory.low): collected here, sent once after the loop (M8).
+      webhookPending.push({ storeId: store.id, items: scan.alertedProducts });
 
       // Step 2 — send the digest in a SEPARATE memoized step. If the email send
       // throws, only this step is retried; the scan step (and its sentinels) is
@@ -144,6 +153,12 @@ export const stockLowStockAlertCron: InngestFunction.Any = inngest.createFunctio
       totalSkipped += scan.skipped;
       if (emailed) emailsSent++;
     }
+
+    // Merchant webhooks (inventory.low): independent of the owner email (a store with no recipient
+    // address still tells its endpoints); the fan-out dedupes per product per day. ONE step for all
+    // stores so the cron's step count does not grow with them (M8).
+    const lowEvents = buildInventoryLowEvents(day, webhookPending);
+    if (lowEvents.length > 0) await step.sendEvent('webhook-inventory-low', lowEvents);
 
     logger.info(
       { stores: stores.length, totalAlerted, totalCleared, totalSkipped, emailsSent },

@@ -2522,6 +2522,10 @@
       "billing": {
         "title": "Billing",
         "description": "Plan, usage and limits"
+      },
+      "webhooks": {
+        "title": "Webhooks",
+        "description": "Send order and product events to your own server"
       }
     },
     "metaCatalogCard": {
@@ -5993,7 +5997,8 @@
         "announcement": "Announcement bar",
         "agentKey": "AI agent key",
         "merchantKeys": "Merchant MCP keys",
-        "billing": "Billing"
+        "billing": "Billing",
+        "webhooks": "Webhooks"
       }
     },
     "notificationBell": {
@@ -10372,6 +10377,128 @@
       "sending": "Sending",
       "sent": "Sent",
       "failed": "Failed"
+    }
+  },
+  "webhooks": {
+    "page": {
+      "title": "Webhooks",
+      "subtitle": "Send a signed message to your own server whenever an order or product changes.",
+      "backToSettings": "Back to settings"
+    },
+    "plan": {
+      "title": "Webhooks are on the Growth and Business plans",
+      "body": "Upgrade your plan to send order and product events to your own systems.",
+      "cta": "See plans"
+    },
+    "intro": {
+      "heading": "How it works",
+      "body": "Pick the events you care about and give us an HTTPS address. We send each event as JSON with a signature header, so your server can check it really came from us. If your server is down we retry for about 24 hours.",
+      "pii": "Customer name, email and phone are never included unless you turn that on for an endpoint.",
+      "docs": "Developer guide"
+    },
+    "empty": {
+      "body": "No endpoints yet. Add one to start receiving events."
+    },
+    "actions": {
+      "add": "Add endpoint",
+      "edit": "Edit",
+      "delete": "Delete",
+      "test": "Send test event",
+      "rotate": "New secret",
+      "enable": "Turn on",
+      "disable": "Turn off",
+      "deliveries": "Delivery log",
+      "resend": "Resend",
+      "close": "Close"
+    },
+    "status": {
+      "active": "On",
+      "off": "Off",
+      "autoOff": "Turned off after repeated failures",
+      "failures": "{count} failed in a row"
+    },
+    "table": {
+      "url": "Address",
+      "events": "Events",
+      "status": "Status",
+      "lastSuccess": "Last success",
+      "never": "Never"
+    },
+    "form": {
+      "addTitle": "Add an endpoint",
+      "editTitle": "Edit endpoint",
+      "urlLabel": "Address (HTTPS)",
+      "urlPlaceholder": "https://example.com/ebda-webhook",
+      "urlHelp": "It must be a public HTTPS address. Local and private addresses are not accepted.",
+      "descriptionLabel": "Note (optional)",
+      "eventsLabel": "Events to send",
+      "customerLabel": "Include customer name, email and phone in order events",
+      "customerHelp": "Off by default. Turn it on only if your system needs to contact the customer.",
+      "save": "Save",
+      "saving": "Saving"
+    },
+    "events": {
+      "order.created": "Order placed",
+      "order.paid": "Order paid",
+      "order.status_changed": "Order shipped, delivered or cancelled",
+      "order.refunded": "Order refunded",
+      "product.created": "Product added",
+      "product.updated": "Product changed",
+      "product.deleted": "Product deleted",
+      "inventory.low": "Stock is low",
+      "webhook.test": "Test event"
+    },
+    "secret": {
+      "title": "Your signing secret",
+      "warning": "Copy this secret now. For your security we show it only once. If you lose it, make a new one.",
+      "copy": "Copy",
+      "copied": "Copied",
+      "done": "I saved it"
+    },
+    "rotate": {
+      "title": "Make a new secret?",
+      "body": "The old secret stops working right away. Update your server with the new one first, or events will fail signature checks.",
+      "confirm": "Make new secret"
+    },
+    "delete": {
+      "title": "Delete this endpoint?",
+      "body": "We stop sending events to {url}. Its delivery log is deleted too.",
+      "confirm": "Delete"
+    },
+    "log": {
+      "title": "Delivery log",
+      "subtitle": "The last {count} deliveries for this endpoint.",
+      "empty": "Nothing has been sent yet.",
+      "event": "Event",
+      "result": "Result",
+      "attempts": "Tries",
+      "time": "Time",
+      "success": "Delivered",
+      "failed": "Failed",
+      "pending": "Waiting",
+      "retrying": "Will retry",
+      "test": "Test",
+      "code": "Reply {status}"
+    },
+    "common": {
+      "cancel": "Cancel"
+    },
+    "toast": {
+      "loadFailedTitle": "Could not load webhooks",
+      "saved": "Saved",
+      "saveFailedTitle": "Could not save",
+      "deleted": "Endpoint deleted",
+      "deleteFailedTitle": "Could not delete",
+      "testQueued": "Test event sent. Refresh the log in a few seconds.",
+      "testFailedTitle": "Could not send the test",
+      "rotated": "New secret created",
+      "rotateFailedTitle": "Could not make a new secret",
+      "resent": "Event sent again",
+      "resendFailedTitle": "Could not resend"
+    },
+    "error": {
+      "WEBHOOK_URL_REJECTED": "This address cannot be used. Use a public HTTPS address.",
+      "WEBHOOK_LIMIT": "You reached the maximum number of endpoints."
     }
   },
   "receiptBarcode": {

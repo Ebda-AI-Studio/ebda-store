@@ -1,3 +1,4 @@
+import { redactWebhookCustomerData } from './webhook-erasure';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
@@ -1918,6 +1919,19 @@ export class AuthService {
       // The ambient store of this erasure: the shopper's own store (self-service,
       // retention cron) or the merchant route's store (== user.storeId, checked above).
       const eraseStoreId = user.storeId ?? currentStoreId();
+      // Webhook delivery log: strip the shopper's contact data from stored payloads (Ruling WH-7).
+      // Must run before the orders lose their customer link below. Already-delivered payloads on
+      // the merchant's own server cannot be recalled.
+      await redactWebhookCustomerData(tx, {
+        storeId: eraseStoreId,
+        orderIds: (
+          await tx.order.findMany({
+            where: { customerId: userId, storeId: eraseStoreId },
+            select: { id: true },
+          })
+        ).map(o => o.id),
+        email: user.email,
+      });
       // Orders: preserve for tax records (Egypt MOF ≥5y), drop the PII.
       // The customer FK is already `onDelete: SetNull` but we explicitly
       // null it so the row's history loses the back-reference even before

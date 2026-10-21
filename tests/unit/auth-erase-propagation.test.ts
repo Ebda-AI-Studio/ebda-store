@@ -62,7 +62,12 @@ const { sendMock, mockPrisma } = vi.hoisted(() => {
       findMany: vi.fn().mockResolvedValue([]),
       deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
     },
-    order: { updateMany: vi.fn().mockResolvedValue({ count: 0 }) },
+    order: {
+      updateMany: vi.fn().mockResolvedValue({ count: 0 }),
+      findMany: vi.fn().mockResolvedValue([]),
+    },
+    // webhook delivery-log redaction (Ruling WH-7)
+    $executeRaw: vi.fn().mockResolvedValue(0),
     review: { updateMany: vi.fn().mockResolvedValue({ count: 0 }) },
     address: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
     smsMarketingConsent: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
