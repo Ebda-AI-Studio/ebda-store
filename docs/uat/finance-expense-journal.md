@@ -10,7 +10,7 @@ fixes: C2 (expense date-422), H2 (paid-from guard), H1 (journal role), PR-#86/#8
 **Pre-conditions:**
 
 - Store has Chart of Accounts seeded (Admin → Finance → Accounts → "Seed COA" if empty)
-- At least one cash/bank account exists (code 1000–1099: Cash KNET, Cash Card, Bank Main)
+- At least one cash/bank account exists (code 1000–1099: Cash Online, Cash Card, Cash COD, Bank Main)
 - At least one expense account exists (5xxx or 6xxx codes)
 - MFA enrolled on the reviewer accounts (finance routes require MFA)
 
@@ -22,8 +22,8 @@ fixes: C2 (expense date-422), H2 (paid-from guard), H1 (journal role), PR-#86/#8
 2. Fill in:
    - **Supplier:** (optional, leave blank)
    - **Expense Account:** select any expense account (e.g. "Office Supplies")
-   - **Paid From:** select **Cash KNET** (code 1000) — a valid cash/bank account
-   - **Amount:** 5.000 EGP
+   - **Paid From:** select **Cash Online** (code 1000) — a valid cash/bank account
+   - **Amount:** 5.00 EGP
    - **Date:** click the date picker and select today's date (browser emits `YYYY-MM-DD`)
 3. Click **Save / Submit**
 4. Verify: **201 Created** — expense appears in the list
@@ -36,8 +36,8 @@ fixes: C2 (expense date-422), H2 (paid-from guard), H1 (journal role), PR-#86/#8
 1. Log in as **super_admin** (not store_admin)
 2. Navigate to **Admin → Finance → Journal → New Entry**
 3. Add two balanced lines (total debit = total credit):
-   - Line 1: Account = Cash KNET, Debit = 100.000
-   - Line 2: Account = Sales Revenue, Credit = 100.000
+   - Line 1: Account = Cash Online, Debit = 100.00
+   - Line 2: Account = Sales Revenue, Credit = 100.00
 4. Add a memo: "Audit test entry"
 5. Click **Post Entry**
 6. Verify entry appears in the Journal list with the correct accounts and amounts
@@ -57,7 +57,7 @@ fixes: C2 (expense date-422), H2 (paid-from guard), H1 (journal role), PR-#86/#8
 
 - [ ] **Select Accounts Receivable (1100) as Paid From** — if the dropdown allows it (pre-fix), verify the API now rejects it with `INVALID_PAID_FROM` and an error is shown
 - [ ] **Select Inventory Account as Paid From** — same: must be rejected
-- [ ] **Select Cash KNET (1000)** — must be accepted (golden path above)
+- [ ] **Select Cash Online (1000)** — must be accepted (golden path above)
 - [ ] **Select Bank Main (1030)** — must be accepted
 
 ---

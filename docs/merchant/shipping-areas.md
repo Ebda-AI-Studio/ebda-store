@@ -20,8 +20,8 @@ At checkout, customers pick their **Governorate** (محافظة) then their **Ar
 2. Each governorate appears as a collapsible accordion section. Click a governorate to expand its areas.
    كل محافظة تظهر كقسم قابل للطي. اضغط على المحافظة لعرض مناطقها.
 
-3. For each area, enter the delivery fee in **EGP** (e.g. `1.500` = 1,500 fils). Leave a field empty or zero to exclude that area.
-   أدخل رسوم التوصيل بالدينار مصري لكل منطقة (مثال: `1.500` = 1500 فلس). اترك الحقل فارغًا أو صفرًا لاستثناء المنطقة.
+3. For each area, enter the delivery fee in **EGP** (e.g. `45.00` = 45 EGP). Leave a field empty or zero to exclude that area.
+   أدخل رسوم التوصيل بالدينار مصري لكل منطقة (مثال: `45.00` = 45 جنيه). اترك الحقل فارغًا أو صفرًا لاستثناء المنطقة.
 
 4. Use **"Apply to all areas in this governorate"** (bulk-apply) to set the same fee for every area in a governorate at once. You can still adjust individual areas afterwards.
    استخدم زر **"تطبيق على جميع مناطق المحافظة"** لضبط نفس الرسوم على كل المناطق دفعة واحدة. يمكنك بعدها تعديل أي منطقة بشكل مستقل.

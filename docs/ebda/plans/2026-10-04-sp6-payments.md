@@ -1,6 +1,6 @@
 # SP6 — Payments layer (task plan, 2026-10-04)
 
-Budget $40. Sonnet adapters; Opus money review in the PR. No real-money transaction without Ahmad's explicit OK. Inputs: `docs/ebda/research/egypt-payment-providers.md`, `docs/ebda/plans/sp4-currency-residuals.md` (provider EGP spots), the existing Ebda Store provider factory (`apps/api/src/services/payment.factory.ts`, `payment-providers/*`).
+Budget $40. Sonnet adapters; Opus money review in the PR. No real-money transaction without Ahmad's explicit OK. Inputs: `docs/ebda/research/egypt-payment-providers.md` (provider EGP spots), the existing Ebda Store provider factory (`apps/api/src/services/payment.factory.ts`, `payment-providers/*`).
 
 | #   | Task                                                                                                                                                                                                                                                                                                                                                                   | Notes             |
 | --- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------- |

@@ -127,7 +127,7 @@ never provided a real email address.
 
 For **WhatsApp-origin orders** (placed via the ordering bot), if a payment link
 was already generated for the order, the order detail **action bar** now shows
-the existing MyFatoorah URL inline with **Copy** and **Open** buttons — no new
+the existing payment-link URL inline with **Copy** and **Open** buttons — no new
 link is generated.
 
 If you see a new link being generated instead:

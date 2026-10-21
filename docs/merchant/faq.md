@@ -12,7 +12,7 @@ Pricing is set per merchant by Ebda AI Studio. Contact your account manager. The
 
 ### What's the difference between Ebda Store and Shopify / Salla? — الفرق بين Ebda Store وShopify أو سلّة؟
 
-- **Built for Egypt first**: KNET, all 4 Egypt payment providers (Tap/MyFatoorah/Hesabe/UPayments) ship out of the box. Arabic + English are first-class, not afterthoughts.
+- **Built for Egypt first**: Egyptian payment providers (Paymob, Kashier, Fawry, InstaPay) and Cash on Delivery ship out of the box. Arabic + English are first-class, not afterthoughts.
 - **All AI features free**: translation, SEO meta tags, category suggestions, FAQ generation — built-in via Gemini, no AppStore add-ons.
 - **No commission on sales**: only the flat platform fee. Shopify Plus + a payment app would total 4–6% per sale.
 - **Operated by Ebda AI Studio**: direct WhatsApp support, not a Western support ticket queue.
@@ -121,7 +121,7 @@ Check in order:
 1. **Test mode**: is the toggle set correctly? Test mode rejects real cards; live mode rejects test cards.
 2. **Webhook secret**: was it copied correctly? A single character off and Ebda Store treats every webhook as forged.
 3. **API key permissions**: did the provider give you a "Public" key by mistake? Ebda Store needs the Secret/Live key.
-4. **Provider account status**: is your account in good standing? Tap, MyFatoorah etc. occasionally pause accounts pending compliance review.
+4. **Provider account status**: is your account in good standing? Paymob, Kashier etc. occasionally pause accounts pending compliance review.
 
 تحقّق بهذا الترتيب: وضع الاختبار/المباشر، صحة سر webhook، مفتاح API (سرّي وليس عام)، حالة حسابك عند المزوّد.
 

@@ -262,10 +262,8 @@ Custom domains for per-tenant storefronts are auto-registered via `apps/api/src/
 
 ### Payment Providers
 
-- [ ] Switch Tap to live keys
-- [ ] Configure webhook URLs:
-  - Tap: `https://api.yourdomain.com/api/v1/webhooks/payment/tap`
-  - MyFatoorah: `https://api.yourdomain.com/api/v1/webhooks/payment/myfatoorah`
+- [ ] Switch each payment provider (Paymob, Kashier, Fawry) to live keys
+- [ ] Register each provider's webhook URL (`https://api.yourdomain.com/api/v1/webhooks/payment/<provider>`)
 
 ### Email
 
@@ -361,7 +359,7 @@ When any of these fire, the path to real staging is:
 - Neon branch `staging` from `main` + seed fixtures script at `scripts/seed-staging.mjs`
 - Custom domain `api-staging.ebda.app` → CNAME → Railway service
 - Preview environment `NEXT_PUBLIC_API_URL` swap from `localhost:4000` → `https://api-staging.ebda.app`
-- Per-provider sandbox credentials: Tap/MyFatoorah/Hesabe/UPayments test mode, OneSignal separate "staging" app, Cloudflare R2 separate bucket `force-uploads-staging`, Sentry environment tag `staging`, Inngest separate `INNGEST_DEPLOY_ID`, Axiom dataset `force-api-railway-staging`
+- Per-provider sandbox credentials: Paymob/Kashier/Fawry test mode, OneSignal separate "staging" app, Cloudflare R2 separate bucket `force-uploads-staging`, Sentry environment tag `staging`, Inngest separate `INNGEST_DEPLOY_ID`, Axiom dataset `force-api-railway-staging`
 - Documentation in this section updated with the URLs + dashboards
 
 Estimated effort: ~4h focused session.

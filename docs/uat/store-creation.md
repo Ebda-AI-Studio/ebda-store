@@ -34,7 +34,7 @@ updated: 2026-05-24
 8. Navigate to **Domain** tab → enter `uat-test-store.ebda.app` (or a test slug domain)
 9. Click **Save Domain** → verify no error (domain provisioning may be async; note it is queued)
 10. Navigate to **Products** → click **New Product**
-11. Fill in: name `Test Product`, price `5.000`, stock `10`, category (create if needed)
+11. Fill in: name `Test Product`, price `5.00`, stock `10`, category (create if needed)
 12. Click **Publish** → verify product is active
 13. Open storefront via the store's slug URL: `https://<web-preview>/<slug>` or custom domain
 14. Verify storefront loads with: correct store name, uploaded logo, and the test product visible

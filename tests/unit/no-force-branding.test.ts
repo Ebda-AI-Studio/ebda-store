@@ -17,6 +17,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import { execFileSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 
@@ -30,45 +31,69 @@ const FWB = /(?<![A-Za-z])(?:FWB|fwb)(?![a-z])|fwb[A-Z]/;
 const brandTest = (s: string): boolean => BRAND.test(s) || FWB.test(s);
 const PROVIDERS = /MyFatoorah|Hesabe|UPayments|\bKNET\b/i;
 
-/** line-level exceptions: regex -> why it cannot be renamed here. */
+/**
+ * Line-level exceptions: regex + why + the EXACT files allowed to carry it
+ * (tests/unit/branding-allowlist.json, regenerate with the one-liner in
+ * docs/RULINGS.md BRAND-ZERO-1). A hit anywhere else, including a new file, fails.
+ */
 const ALLOWED: Record<string, { re: RegExp; why: string }> = {
   forceApiApp: {
     re: /(?<![A-Za-z0-9_])force-(?:api|app)\b/gi,
     why: 'JWT iss/aud claim values on every issued token (renaming logs every user out; needs a dual-accept rollout) and the live names of third-party resources (Railway service, Sentry project, Axiom dataset, Inngest app id, OTEL service name)',
   },
   waTemplateNames: {
-    re: /force_[a-z_]+_v\d+/,
+    re: /force_[a-z_]+_v\d+/g,
     why: 'WhatsApp template names (force_order_paid_v1 etc.): renamed on fix/shopper-messages-egyptian; remove from allowlist after it merges',
   },
   hintCookie: {
-    re: /\bforce-session\b/,
+    re: /\bforce-session\b/g,
     why: 'live admin/orders hint cookie name (force-session=1) read by api.ts + middleware; renaming bounces every signed-in merchant through login once',
   },
   metaEnv: {
-    re: /FORCE_AI_META_[A-Z_]+/,
+    re: /FORCE_AI_META_[A-Z_]+/g,
     why: 'Railway env var names for the Meta provisioner; renaming needs a coordinated env change on the deployed service',
   },
   wbsBridge: {
-    re: /fwb(?:StoreId|OrderId)|fwb_(?:store|order)_id/,
+    re: /fwb(?:StoreId|OrderId)|fwb_(?:store|order)_id/g,
     why: 'WBS bridge wire contract (request field names + wa_carts columns owned by the WBS service)',
   },
 };
+const ALLOW_FILES: Record<string, string[]> = JSON.parse(
+  readFileSync(path.join(ROOT, 'tests/unit/branding-allowlist.json'), 'utf8')
+);
 
-export function brandViolates(line: string): boolean {
+export function brandViolates(line: string, file = ''): boolean {
   if (!brandTest(line)) return false;
-  // allowed contracts may share a line with nothing else forbidden
   let rest = line;
-  for (const { re } of Object.values(ALLOWED)) rest = rest.replace(new RegExp(re, 'g'), '');
+  for (const [name, { re }] of Object.entries(ALLOWED))
+    if (!file || (ALLOW_FILES[name] ?? []).includes(file))
+      rest = rest.replace(
+        new RegExp(re.source, re.flags.includes('g') ? re.flags : re.flags + 'g'),
+        ''
+      );
   return brandTest(rest);
 }
 export const providerViolates = (line: string): boolean => PROVIDERS.test(line);
+
+const SIDECARS = ['tests/unit/branding-allowlist.json', 'tests/unit/applied-migrations.json'];
+// sha1 prefixes of the migration directories already on origin/main (applied, immutable).
+// Hashed so the snapshot itself carries no migration name. A migration dir NOT in this set is new
+// and is scanned like any other file.
+const APPLIED: string[] = JSON.parse(
+  readFileSync(path.join(ROOT, 'tests/unit/applied-migrations.json'), 'utf8')
+);
+function isAppliedMigration(f: string): boolean {
+  const m = /^packages\/database\/prisma\/migrations\/([^/]+)\//.exec(f);
+  return !!m && APPLIED.includes(createHash('sha1').update(m[1]).digest('hex').slice(0, 12));
+}
 
 const BINARY = /\.(png|jpe?g|webp|avif|gif|ico|glb|woff2?|ttf|otf|pdf|mp4|webm|zip|gz)$/i;
 const tracked = execFileSync('git', ['ls-files', '-z'], { cwd: ROOT, maxBuffer: 64 * 1024 * 1024 })
   .toString()
   .split('\0')
   .filter(Boolean)
-  .filter(f => !f.startsWith('packages/database/prisma/migrations/') && f !== SELF);
+  .filter(f => f !== SELF && !SIDECARS.includes(f))
+  .filter(f => !isAppliedMigration(f));
 const textFiles = tracked.filter(f => !BINARY.test(f));
 const shipped = (f: string) =>
   /^(apps\/[^/]+\/(src|public|content)|packages\/[^/]+\/src|\.github\/workflows)\//.test(f);
@@ -149,7 +174,7 @@ describe('no inherited branding anywhere in the repository', () => {
       }
       text.split('\n').forEach((line, i) => {
         if (line.includes('sha512-')) return;
-        if (brandViolates(line) || (shipped(f) && providerViolates(line)))
+        if (brandViolates(line, f) || (shipped(f) && providerViolates(line)))
           offenders.push(`${f}:${i + 1}: ${line.trim().slice(0, 100)}`);
       });
     }
@@ -159,11 +184,25 @@ describe('no inherited branding anywhere in the repository', () => {
     ).toEqual([]);
   });
 
-  it('every ALLOWED contract still occurs (the list only shrinks)', () => {
-    const all = textFiles.map(f => {
-      try { return readFileSync(path.join(ROOT, f), 'utf8'); } catch { return ''; }
-    }).join('\n'); // prettier-ignore
-    for (const [name, { re, why }] of Object.entries(ALLOWED))
-      expect(re.test(all), `${name} no longer occurs - drop it (${why})`).toBe(true);
+  it('every ALLOWED contract still occurs in each file listed for it (the list only shrinks)', () => {
+    for (const [name, { re, why }] of Object.entries(ALLOWED)) {
+      const files = ALLOW_FILES[name] ?? [];
+      expect(files.length, `${name} has no files - drop the allowance (${why})`).toBeGreaterThan(0);
+      for (const f of files) {
+        expect(tracked, `${f} (${name}) is not tracked`).toContain(f);
+        const src = readFileSync(path.join(ROOT, f), 'utf8');
+        expect(
+          new RegExp(re.source, re.flags.replace('g', '')).test(src),
+          `${f} no longer needs ${name} - drop it from branding-allowlist.json (${why})`
+        ).toBe(true);
+      }
+    }
+  });
+
+  it('applied-migration skip covers only the snapshot: a new migration dir is scanned', () => {
+    expect(
+      isAppliedMigration('packages/database/prisma/migrations/20990101000000_new_one/migration.sql')
+    ).toBe(false);
+    expect(APPLIED.length).toBeGreaterThan(100);
   });
 });

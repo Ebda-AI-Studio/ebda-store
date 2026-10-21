@@ -111,7 +111,7 @@ deps) — dated reports live in `docs/audits/`.
 - Primary database: Neon Postgres, **AWS eu-central-1 (Frankfurt, Germany)**.
 - Object storage: Cloudflare R2.
 - CDN/edge: Cloudflare global network (sees encrypted traffic only).
-- Data residency requirements per GCC country are tracked in
+- Data residency requirements are tracked in
   `docs/privacy/data-map.md`; for Egypt, the applicable
   reference is the Electronic Transactions Law No. 20/2014. Erasure
   capability is provided platform-wide regardless (see Privacy below).

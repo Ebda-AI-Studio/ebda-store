@@ -2,7 +2,7 @@
 
 > **Status: PLANNING / decision doc — no code.** Driver = **cost + vendor consolidation**
 > (empty the Railway bill). Written 2026-06-26 after the Ebda Store **frontend** cutover to
-> Cloudflare completed (storefront/admin/orders live on `*.ebda.app`, real KNET
+> Cloudflare completed (storefront/admin/orders live on `*.ebda.app`, a real card
 > payment verified end-to-end). Builds on the parked strategy in memory
 > (`project-ebda-cloudflare-migration-strategy`) and the in-repo CF docs
 > (`cloudflare-cutover-runbook.md`, `cloudflare-preview-workers.md`, `cloudflare-ci-deploy.md`).

@@ -2,7 +2,7 @@
 
 > You do this **once**. After it's done, every new merchant onboard just clicks "Provision automatically" in the Ebda Store admin → MetaCatalogCard and the Commerce catalog + business id + access token fill in automatically.
 >
-> Without this setup, the button returns `503 PROVISIONER_NOT_CONFIGURED` and the merchant flow falls back to the manual 11-step runbook at `docs/runbooks/wady-aljuz-meta-commerce-setup.md`.
+> Without this setup, the button returns `503 PROVISIONER_NOT_CONFIGURED` and the merchant flow falls back to setting up the Meta catalog by hand in Meta Business Manager.
 
 ## What you're creating
 
@@ -120,4 +120,3 @@ Save to your password manager:
 - `apps/api/src/services/meta-provisioner.service.ts` — backend code
 - `apps/api/src/routes/wbs-integration.routes.ts` — `POST /:id/integrations/wbs/provision-meta-catalog` endpoint
 - `apps/admin/src/app/stores/[id]/wa-bot/MetaCatalogCard.tsx` — UI button
-- `docs/runbooks/wady-aljuz-meta-commerce-setup.md` — per-merchant runbook (the "fast path" section now points here)

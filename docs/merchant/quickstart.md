@@ -67,16 +67,16 @@ Optional but recommended:
 
 **Admin → Settings → Payment Settings**
 
-Ebda Store supports 4 Egypt-based payment providers:
+Ebda Store supports these Egyptian payment providers:
 
-- Tap Payments
-- MyFatoorah
-- Hesabe
-- UPayments
+- Paymob
+- Kashier
+- Fawry
+- InstaPay
 
 Plus Cash on Delivery (COD) which needs no provider account.
 
-You need merchant accounts with at least one payment provider. See [payment-providers.md](./payment-providers.md) for the per-provider account opening + credential walkthrough.
+You need merchant accounts with at least one payment provider. Open each provider's merchant account first, then paste its credentials in Payment Settings.
 
 Cash on Delivery works out of the box — just enable the toggle. You can add a fixed COD fee (e.g. 1 EGP) which is added to the order total.
 

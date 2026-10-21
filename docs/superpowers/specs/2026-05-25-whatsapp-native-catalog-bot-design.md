@@ -264,7 +264,7 @@ Before any feature work, instrument the existing flow:
 
 ## 7. Testing
 
-Per the [Ebda AI Studio 5-layer testing standard](file:///Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf/memory/feedback-ebda-ci-cd-standard.md):
+Per the Ebda AI Studio 5-layer testing standard:
 
 - **Unit**: state machine transitions (every state → every valid next-state), `wa-interactive.js` builders (output validation), `metaCatalogService.js` mocked Meta responses
 - **Integration**: full state machine drive (mock webhook inbound → assert correct outbound message + state transition); Ebda Store `/wa-bridge/customer-addresses` endpoint roundtrip

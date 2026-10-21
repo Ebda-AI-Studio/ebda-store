@@ -1551,7 +1551,7 @@ export class AuthService {
     // token rotation even before the access token's tv is checked.
     //
     // The caller names the reason. `revokedReason` is the only forensic record
-    // of WHY a session died — docs/audits/2026-05-28-auth-access-audit.md
+    // of WHY a session died
     // reads `password_reset` off these rows to tell a redeemed reset from a
     // sign-out — so folding a password change or reset into a generic
     // `revoke_all` would buy correct ordering at the cost of the audit trail.

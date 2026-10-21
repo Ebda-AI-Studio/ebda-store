@@ -62,7 +62,13 @@ WHERE :'legacy_role' = ANY (roles);
 -- expected: 0 rows
 ```
 
-If any row returns, STOP. Re-point those policies at `ebda_app` in a normal
+Also record the total policy count now; step 7 compares against it:
+
+```sql
+SELECT count(*) AS policies_before FROM pg_policies;   -- write this number down
+```
+
+If any row returns above, STOP. Re-point those policies at `ebda_app` in a normal
 migration, deploy it, and only then continue. Do NOT run `DROP OWNED BY`.
 
 ## 4. Inventory the remaining grants
@@ -76,6 +82,35 @@ SELECT defaclnamespace::regnamespace AS schema, defaclobjtype, defaclacl
 FROM pg_default_acl
 WHERE defaclacl::text LIKE '%' || :'legacy_role' || '%';
 ```
+
+Role membership and grants held by or granted to the role (all must be empty;
+`DROP ROLE` also refuses while memberships remain):
+
+```sql
+SELECT r.rolname AS role, m.rolname AS member
+FROM pg_auth_members am
+JOIN pg_roles r ON r.oid = am.roleid
+JOIN pg_roles m ON m.oid = am.member
+WHERE r.rolname = :'legacy_role' OR m.rolname = :'legacy_role';
+-- expected: 0 rows. Otherwise: REVOKE :"legacy_role" FROM <member>; / REVOKE <role> FROM :"legacy_role";
+```
+
+Default ACLs naming the role, in EVERY schema and for every grantor (not just
+`public`):
+
+```sql
+SELECT defaclrole::regrole AS grantor, defaclnamespace::regnamespace AS schema,
+       defaclobjtype, defaclacl
+FROM pg_default_acl
+WHERE defaclacl::text LIKE '%' || :'legacy_role' || '=%'
+   OR defaclrole = (SELECT oid FROM pg_roles WHERE rolname = :'legacy_role');
+-- expected: only rows you will revoke in step 6 (add one ALTER DEFAULT PRIVILEGES
+-- ... FOR ROLE <grantor> per row if the grantor is not the current user)
+```
+
+Grants in other databases on the same cluster are invisible from here; repeat
+checks 2-4 in each database the role can connect to (`SELECT datname FROM
+pg_database WHERE datallowconn`).
 
 ## 5. Disable login first (reversible), observe, then remove
 
@@ -110,7 +145,7 @@ DROP ROLE :"legacy_role";
 SELECT rolname FROM pg_roles WHERE rolname = :'legacy_role';        -- 0 rows
 SELECT current_user, rolbypassrls, rolsuper FROM pg_roles
 WHERE rolname = 'ebda_app';                                          -- bypass=f, super=f
-SELECT count(*) FROM pg_policies WHERE policyname IS NOT NULL;      -- same count as before step 3
+SELECT count(*) FROM pg_policies;                                    -- equals policies_before from step 3
 ```
 
 Then hit the API `/health` and one tenant-scoped read to confirm RLS still

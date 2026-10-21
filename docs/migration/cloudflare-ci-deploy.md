@@ -171,8 +171,7 @@ it does not read `SCHEDULED_ON_CLOUD`. Per
 [Ruling CI-CRON-1](../RULINGS.md#ruling-ci-cron-1--scheduled-runs-stay-on-self-hosted-pushpr-dispatch-on-cloud-2026-10-03)
 the repo runs push, PR and dispatch on cloud (`USE_SELF_HOSTED=false`); only
 `schedule:` runs in other workflows are pinned to the self-hosted runner. Runner
-outage handling for those crons is in
-[wsl-runner-maintenance.md](../runbooks/wsl-runner-maintenance.md).
+outage handling for those crons is not covered by an in-repo runbook.
 
 **Consequence:** a deploy no longer waits for the self-hosted runner (the Mac being
 awake), but it does use GitHub-hosted minutes (not zero-cost; see Ruling CI-CRON-2).

@@ -156,7 +156,7 @@ checkout does not capture a delivery slot. `admin_get_order` adds
 There is no settlement data to expose: no gateway-settlement model exists
 (only `affiliate_payouts` and per-order `payments`). A tool that presented
 `payments` as payouts would be inventing a concept; a real settlement tool
-needs a MyFatoorah/Tap settlement import first (Ruling MCP-R3).
+needs a gateway settlement import first (Ruling MCP-R3).
 
 `admin_get_analytics` returns `AnalyticsService.getDashboardStats` verbatim, so
 its semantics are the dashboard's (2026-09-30): customers are counted with the

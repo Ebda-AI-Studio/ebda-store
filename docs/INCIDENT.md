@@ -69,10 +69,9 @@ git log --since="1 hour ago" --pretty=oneline
 
 **6. Are payments failing specifically?**
 
-- Filter Sentry by tag `payment.provider` (tap / myfatoorah / hesabe / upayments)
+- Filter Sentry by tag `payment.provider` (paymob / kashier / fawry / instapay)
 - Check the provider's own status page:
-  - MyFatoorah: status from merchant portal
-  - Tap: status.tap.company
+  - Paymob / Kashier / Fawry: status from the provider's merchant portal
 - If provider is up but Ebda Store shows errors → check the recent webhook signatures (per-store credential rotation can break HMAC)
 
 ## Recovery actions

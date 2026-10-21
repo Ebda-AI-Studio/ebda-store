@@ -86,7 +86,6 @@ The platform watches the payment state of online orders for you:
 ## Related — ذات صلة
 
 - [Delivery Areas & Fees — مناطق التوصيل والرسوم](./shipping-areas.md)
-- [Payment Provider Setup — إعداد بوابات الدفع](./payment-providers.md)
 
 ---
 

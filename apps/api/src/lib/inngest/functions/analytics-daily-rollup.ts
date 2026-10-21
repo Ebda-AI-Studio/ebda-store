@@ -22,8 +22,8 @@
  * inside ONE run, so the run's step count — and its wall-clock, serialised by
  * `concurrency: 1` — grew without a ceiling as stores were added. Each run is
  * now bounded (3 steps), and the per-store runs are capped at 3 at a time with
- * one per store, so the DB sees at most 3 rollups at once. Recorded in
- * docs/audits/_slices/06-cost-forecast.md.
+ * one per store, so the DB sees at most 3 rollups at once.
+ *
  */
 
 import type { InngestFunction } from 'inngest';

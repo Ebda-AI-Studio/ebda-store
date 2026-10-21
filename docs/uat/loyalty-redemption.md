@@ -11,13 +11,13 @@ updated: 2026-06-14
 **Pre-conditions:**
 
 - Store on a plan that includes Loyalty (Professional+) **or** with the `loyalty` feature override on.
-- Loyalty enabled on the store with settings: `pointsValue` (fils per point),
+- Loyalty enabled on the store with settings: `pointsValue` (piastres per point),
   `minRedeemPoints` (e.g. 500), `maxRedeemPercentage` (e.g. 50).
 - The reviewer customer has a positive points balance ≥ `minRedeemPoints`
   (admin can award points via **Loyalty → member → Award**, or place + deliver a
   prior order so points are earned).
 - A test store with ≥1 in-stock product (price > 0).
-- Payment provider in **test mode** (MyFatoorah / COD).
+- Payment provider in **test mode** (Kashier / COD).
 - Preview/staging env only — **never run against prod**.
 
 **Browser matrix:** Chrome latest · Safari latest · mobile Safari iOS 17+ · test in **both EN and AR** (RTL).
@@ -28,15 +28,15 @@ updated: 2026-06-14
 
 1. Sign in as the reviewer customer on the storefront.
 2. Add a product to the cart whose price comfortably exceeds the redeemable value
-   (e.g. a 10 EGP item with a 2000-point balance @ 1 fil/point).
+   (e.g. a 100 EGP item with a 2000-point balance @ 1 piastre/point).
 3. Open `/account/loyalty` → note the **current balance** (e.g. 2000 points).
 4. Go to checkout. In the **Order Summary**, verify the **"Use loyalty points"**
    control appears, showing the balance and its cash value (e.g. "Balance: 2,000
-   points · worth 2.000 EGP").
+   points · worth 20.00 EGP").
 5. Tick **Use loyalty points**. Verify the points input defaults to the full balance
    and a **Max** button is present.
 6. Verify a **Loyalty points** discount line appears in the totals and the **Total**
-   drops by exactly `points × pointsValue` (e.g. −2.000 EGP).
+   drops by exactly `points × pointsValue` (e.g. −20.00 EGP).
 7. Reduce the points in the input (e.g. to 1000) → verify the discount + total update
    live to match.
 8. Complete the order (COD → success page; online → test-mode gateway → success).

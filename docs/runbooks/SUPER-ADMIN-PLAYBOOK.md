@@ -134,5 +134,5 @@ accepted what: Users -> the merchant -> **Policy acceptances**. Rulings LEGAL-4/
 
 ## Related runbooks
 
-- [`ROLLBACK.md`](ROLLBACK.md) — code + DB rollback
+- [`ROLLBACK.md`](../ROLLBACK.md) — code + DB rollback
 - [`STAGING-DEPLOYMENT.md`](STAGING-DEPLOYMENT.md) — promotion flow

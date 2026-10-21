@@ -88,7 +88,7 @@ wallet_transactions     (append-only ledger — the source of truth)
 orders.wallet_amount INT NOT NULL DEFAULT 0 (CHECK >= 0)
 ```
 
-- Money is integer fils everywhere; no floats (UI converts EGP↔fils with the
+- Money is integer piastres everywhere; no floats (UI converts EGP↔piastres with the
   existing format helpers).
 - `store_id` on every row; RLS copied verbatim from
   `20260911190000_merchant_api_keys` (latest store-scoped policy set:
