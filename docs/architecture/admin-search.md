@@ -46,7 +46,7 @@ customer typeahead's `orders:read`); a kind the role may not read is an empty li
 - Orders: `orderSearchWhere` takes customers and guests from the same lookup; a term made only of digits
   (`#١٢٣٤`) is also tried as the order number's digits.
 - `ebda_order_search_ids` kinds `'guest'` and `'customers'` were dropped by migration
-  `20261029000100_contract_unused_search_definers` (the function now answers `'order_number'` only), together
+  `20261029000300_contract_unused_search_definers` (the function now answers `'order_number'` only), together
   with the 5-argument `ebda_product_embed_doc`. The per-key indexes `orders_guest_first_name /
 last_name / phone_trgm_idx` and `users_first_name / last_name / phone_trgm_idx` are no longer used by the
   app either; they stay for now and are dropped by a separate contract migration.

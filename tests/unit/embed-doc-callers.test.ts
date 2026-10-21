@@ -1,6 +1,6 @@
 // Ruling SEARCH-T13-8 (expand-then-contract): migration 20261024000100 KEPT the 5-argument
 // `ebda_product_embed_doc` (with the AI words) for the previous Worker; the contract migration
-// 20261029000100 dropped it. A caller passing the words would now fail at runtime ("function does
+// 20261029000300 dropped it. A caller passing the words would now fail at runtime ("function does
 // not exist"); this source guard catches it earlier: every call in apps/api/src passes exactly the
 // 4 arguments (names + descriptions).
 import { readFileSync, readdirSync, statSync } from 'node:fs';

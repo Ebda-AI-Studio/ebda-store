@@ -18,7 +18,7 @@ function likeContains(term: string): string {
  * store-scoped SECURITY DEFINER `public.ebda_order_search_ids` (migration
  * 20261024000500_order_customer_search_ids, Ruling SEARCH-T14-5):
  *   'order_number'  live orders whose number contains the term
- * (The 'guest' and 'customers' kinds were dropped by migration 20261029000100, Ruling
+ * (The 'guest' and 'customers' kinds were dropped by migration 20261029000300, Ruling
  * SEARCH-P2-5: customer and guest lookups go through `ebda_customer_search_ids`.)
  * The function refuses any store but the one in `app.current_store_id`; the term is only ever a
  * bound parameter, never logged (it is PII: a phone or an email).

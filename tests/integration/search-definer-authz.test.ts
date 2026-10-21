@@ -161,7 +161,7 @@ describe.skipIf(!hasDb)('search definers are not an oracle (security review)', (
     expect(await O('order_number', `%${w('ona-gone')}%`, A, A)).toEqual([]);
   });
 
-  it("the dropped 'guest' and 'customers' kinds (migration 20261029000100) answer nothing", async () => {
+  it("the dropped 'guest' and 'customers' kinds (migration 20261029000300) answer nothing", async () => {
     // Their callers moved to ebda_customer_search_ids (covered above); a stale caller gets the
     // empty set, never a row.
     expect(await O('guest', `%${w('guesta')}%`, A, A)).toEqual([]);

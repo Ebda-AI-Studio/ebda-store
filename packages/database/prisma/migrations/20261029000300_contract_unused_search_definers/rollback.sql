@@ -1,4 +1,4 @@
--- rollback.sql for 20261029000100_contract_unused_search_definers.
+-- rollback.sql for 20261029000300_contract_unused_search_definers.
 -- Roll the CODE back first only if you are going back to a release that still calls the 5-argument
 -- embed doc or the 'guest' / 'customers' order-search kinds (none of the current code does).
 -- Recreates the 5-argument ebda_product_embed_doc and the three-kind ebda_order_search_ids exactly
@@ -84,4 +84,4 @@ GRANT EXECUTE ON FUNCTION public.ebda_order_search_ids(text, text, text, integer
 
 -- After running this, delete the migration's row too, or a later `prisma migrate deploy` treats it
 -- as applied and never recreates what was rolled back:
---   DELETE FROM _prisma_migrations WHERE migration_name = '20261029000100_contract_unused_search_definers';
+--   DELETE FROM _prisma_migrations WHERE migration_name = '20261029000300_contract_unused_search_definers';
