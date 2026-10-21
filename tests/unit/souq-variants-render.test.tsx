@@ -399,6 +399,23 @@ describe('on_sale source (resolution, price-drop order)', () => {
       resolveSectionProducts({ productSource: 'on_sale' }, pools([p('a', 10), p('b', 20)]), 8)
     ).toEqual([]);
   });
+  it('an unfilled stage renders nothing: manual with no ids gives no products, never the newest', () => {
+    const list = [p('n1', 10), p('n2', 20)];
+    expect(
+      resolveSectionProducts({ productSource: 'manual', layout: 'stage', limit: 1 }, pools(list), 3)
+    ).toEqual([]);
+    expect(
+      resolveSectionProducts(
+        { productSource: 'manual', layout: 'stage', manualProductIds: ['n2'], limit: 1 },
+        pools(list),
+        3
+      ).map(x => x.id)
+    ).toEqual(['n2']);
+    // the list layout keeps its newest fallback (unchanged behaviour)
+    expect(
+      resolveSectionProducts({ productSource: 'manual', limit: 2 }, pools(list), 3)
+    ).toHaveLength(2);
+  });
   it('a variant product is on sale only through a variant; the stale parent compare-at is ignored', () => {
     expect(
       saleDiscount({

@@ -94,7 +94,7 @@ describe('souq header: search-first (prominent)', () => {
     expect(input.placeholder).toBe('دوّر على منتج أو ماركة');
   });
   it('is under the logo row on a phone and in the centre column from md (one element, two placements)', () => {
-    setLook('souq.night');
+    setLook('souq.catalogue');
     const { container } = render(<SouqHeader branding={branding} navigation={nav} />);
     const cls = container.querySelector('form[role="search"]')!.getAttribute('class')!;
     expect(cls).toMatch(/\bcol-span-2\b/);

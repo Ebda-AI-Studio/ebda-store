@@ -175,7 +175,9 @@ async function seedMerchant(
   });
 }
 
-const LOOK_ID = 'souq.catalogue';
+// A look with no mix and no skin of its own (still on minimal): keeps these cases about the
+// switch plumbing; the Souq mixes have their own cases below and in souq-look-mix.test.ts.
+const LOOK_ID = 'jasmine.clinic';
 
 describe.skipIf(!hasDb)('PUT /stores/:id/look (ebda_app + tenant guard)', () => {
   let app: Express;
@@ -322,6 +324,28 @@ describe.skipIf(!hasDb)('PUT /stores/:id/look (ebda_app + tenant guard)', () => 
     for (const sec of doc.sections.filter(x => x.type === 'product-carousel'))
       expect((sec.settings as Record<string, unknown>).cardShape, sec.id).toBeUndefined();
   });
+
+  it.each(['souq.catalogue', 'souq.night', 'souq.showroom'])(
+    'Souq %s on an empty store: the souq skin + look are set and a home revision is written',
+    async id => {
+      const m = await seedMerchant(`mix-${id.split('.')[1]}`);
+      const res = await put(m.storeId, m.token, { lookId: id, design: 'keep' });
+      expect(res.status, JSON.stringify(res.body)).toBe(200);
+      expect(await row(m.storeId)).toMatchObject({ look: id, template: 'souq' });
+      const revs = await revisions(m.storeId);
+      expect(revs.length).toBeGreaterThan(0);
+      const doc = (
+        await prisma.storePageRevision.findFirstOrThrow({
+          where: { storeId: m.storeId, pageKey: 'home' },
+          orderBy: { rev: 'desc' },
+          select: { document: true },
+        })
+      ).document as { sections: Array<{ type: string }> };
+      // only the mix's section types are written (an unpublishable one may be left out)
+      const mixTypes = new Set(getLook(id)!.sections!.map(x => x.type));
+      for (const sec of doc.sections) expect(mixTypes.has(sec.type), sec.type).toBe(true);
+    }
+  );
 
   it('empty store whose every family section is unpublishable: stays a DRAFT, never an empty live home', async () => {
     const m = await seedMerchant('all-unready');

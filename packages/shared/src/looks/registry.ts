@@ -217,6 +217,31 @@ export const LOOKS: readonly LookDefinition[] = [
     skin: 'souq',
     status: 'designed',
     chrome: { header: { logoPlacement: 'start', search: 'prominent' } },
+    // Ruling B2-16. Search first, no hero: the first screen is the search field and the category
+    // rail, then today's deals, a dense newest grid and the trust line. Carousel headings use the
+    // extra-carousel `title` keys; strings are Egyptian, controls neutral.
+    sections: [
+      {
+        type: 'category-grid',
+        design: { layout: 'rail', layoutMobile: 'rail', paddingTop: 'tight' },
+      },
+      {
+        type: 'product-carousel',
+        preset: {
+          productSource: 'on_sale',
+          limit: 8,
+          title: 'Deals today',
+          titleAr: 'عروض النهاردة',
+        },
+      },
+      {
+        type: 'featured-collection',
+        design: { columns: 4, mobileColumns: 2 },
+        preset: { productSource: 'newest', limit: 12, heading: 'New in', headingAr: 'لسه واصل' },
+      },
+      { type: 'trust-strip' },
+      { type: 'newsletter' },
+    ],
     name: { ar: 'كتالوج', en: 'Catalogue' },
     forWhom: {
       ar: 'لمحل فيه أصناف كتير والزبون عارف عايز إيه.',
@@ -254,7 +279,39 @@ export const LOOKS: readonly LookDefinition[] = [
     letter: 'B',
     skin: 'souq',
     status: 'designed',
-    chrome: { header: { logoPlacement: 'start', search: 'prominent' } },
+    chrome: { header: { logoPlacement: 'start', search: 'icon' } },
+    // Ruling B2-16. A lit market: a full-bleed hero, bold square category tiles and the dense grid
+    // on ONE light band (quality bar section 9 rule 1: merchant photos shot on white never sit
+    // as white rectangles on the green; tiles + grid share the inverse band, like Lookbook), a
+    // curated row and the deals row on the page, then trust and the brand story.
+    sections: [
+      { type: 'hero', design: { presentation: 'full-bleed', textAnchor: 'bottom-start' } },
+      {
+        type: 'category-grid',
+        design: {
+          layout: 'tiles',
+          layoutMobile: 'tiles',
+          captionPosition: 'below',
+          bgColor: 'token:inverse',
+          paddingBottom: 'tight',
+        },
+      },
+      {
+        type: 'product-carousel',
+        preset: { productSource: 'manual', limit: 8, title: 'From the souq', titleAr: 'من السوق' },
+      },
+      {
+        type: 'product-carousel',
+        preset: { productSource: 'on_sale', limit: 8, title: 'Deals', titleAr: 'عروض' },
+      },
+      {
+        type: 'featured-collection',
+        design: { columns: 4, mobileColumns: 2, bgColor: 'token:inverse' },
+        preset: { productSource: 'newest', limit: 8, heading: 'New in', headingAr: 'جديد السوق' },
+      },
+      { type: 'trust-strip' },
+      { type: 'brand-story' },
+    ],
     name: { ar: 'سوق الليل', en: 'Night souq' },
     forWhom: {
       ar: 'لتاجر عايز دفا وشخصية.',
@@ -294,6 +351,53 @@ export const LOOKS: readonly LookDefinition[] = [
     skin: 'souq',
     status: 'designed',
     chrome: { header: { logoPlacement: 'start', search: 'icon' } },
+    // Ruling B2-16. The product is the hero: categories as chips right under the header (the
+    // first screen shows categories), up to three one-product stages (the first reads the store's
+    // featured pool so a new store has a stage; the others are hand-picked and render NOTHING
+    // until filled), a hand-picked collection list of rectangles on the surface (the plan's second
+    // category-grid is impossible: category-grid has cardinality one), a 2-column grid, trust.
+    sections: [
+      {
+        type: 'category-grid',
+        design: {
+          layout: 'chips',
+          layoutMobile: 'chips',
+          paddingTop: 'tight',
+          paddingBottom: 'none',
+        },
+      },
+      {
+        type: 'product-spotlight',
+        design: { layout: 'stage' },
+        preset: { productSource: 'featured', limit: 1 },
+      },
+      {
+        type: 'product-spotlight',
+        design: { layout: 'stage' },
+        preset: { productSource: 'manual', limit: 1 },
+      },
+      {
+        type: 'product-spotlight',
+        design: { layout: 'stage' },
+        preset: { productSource: 'manual', limit: 1 },
+      },
+      {
+        type: 'collection-list',
+        design: { tileShape: 'rectangle', bgColor: 'token:card' },
+        preset: { heading: 'Shop by category', headingAr: 'تسوّق حسب القسم' },
+      },
+      {
+        type: 'featured-collection',
+        design: { columns: 2, mobileColumns: 2 },
+        preset: {
+          productSource: 'newest',
+          limit: 8,
+          heading: 'All products',
+          headingAr: 'كل المنتجات',
+        },
+      },
+      { type: 'trust-strip' },
+    ],
     name: { ar: 'شو روم', en: 'Showroom' },
     forWhom: {
       ar: 'لمجموعة صغيرة فاخرة بتتباع قطعة قطعة.',

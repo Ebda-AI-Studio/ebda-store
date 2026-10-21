@@ -14,6 +14,8 @@ export interface SectionProductRefs {
   categorySlug?: string;
   manualProductIds?: string[];
   limit?: number;
+  /** A `stage` spotlight shows ONE hand-picked product or nothing (no newest fallback). */
+  layout?: string;
 }
 
 export interface ProductPools {
@@ -100,6 +102,9 @@ export function resolveSectionProducts(
       list = (refs.manualProductIds ?? [])
         .map(id => union.get(id))
         .filter((p): p is Product => !!p);
+      // An unfilled stage renders nothing: three stages that all fell back to the newest product
+      // would show the same product three times.
+      if (refs.layout === 'stage') return list.slice(0, limit);
       break;
     default:
       list = pools.newArrivals;
