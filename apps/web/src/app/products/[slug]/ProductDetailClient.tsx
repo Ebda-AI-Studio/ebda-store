@@ -680,12 +680,18 @@ export default function ProductDetailClient({
       : t('Cart', 'السلة');
   const priceText =
     pricing.mode === 'range' && minVariantPrice !== null && maxVariantPrice !== null
-      ? // Y-07: English reads a range in words; Arabic keeps the dash between the two prices.
+      ? // Y-07: English reads a range in words. Arabic reads "from" the lower price, like the cards:
+        // the old "A – B" broke at the dash on a phone and left it hanging at a line end (STOP-2).
         t(
           `${formatPrice(minVariantPrice)} to ${formatPrice(maxVariantPrice)}`,
-          `${formatPrice(minVariantPrice)} – ${formatPrice(maxVariantPrice)}`
+          `من ${formatPrice(minVariantPrice)}`
         )
       : formatPrice(displayPrice);
+  // The sticky bar is one line: a range shows only its lower price, "From EGP 32,000".
+  const stickyPriceText =
+    pricing.mode === 'range' && minVariantPrice !== null
+      ? t(`From ${formatPrice(minVariantPrice)}`, `من ${formatPrice(minVariantPrice)}`)
+      : priceText;
   // The WhatsApp order/ask button carries the typed note and follows the SAME
   // required-personalisation gate as add-to-cart.
   const personalisationCfg = activePersonalisation(product.personalisation);
@@ -1490,7 +1496,7 @@ export default function ProductDetailClient({
       <StickyAddToCart
         anchorRef={buyRef}
         title={displayName}
-        price={priceText}
+        price={stickyPriceText}
         label={addLabel}
         disabled={addDisabled || isAdding}
         onAdd={handleAddToCart}

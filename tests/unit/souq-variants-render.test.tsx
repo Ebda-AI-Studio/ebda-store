@@ -244,9 +244,35 @@ describe.each(SKINS)('product-spotlight stage on %s', skin => {
     // price once through the shared helper, compare-at struck
     expect(container.querySelector('s')).not.toBeNull();
     // the height cap min(78svh, 680px) is on the photo tile (asserted in the clipping test below)
-    expect(container.querySelector('a[aria-label]')!.className).toContain(
+    expect(container.querySelector('a[data-part="card-image"]')!.className).toContain(
       'max-h-[min(78svh,680px)]'
     );
+  });
+  it('every stage control names its product and starts with its visible text; one tab stop per destination (a11y P2-1, P2-4)', () => {
+    useSkin(skin);
+    const { container } = render(
+      <ProductSpotlightSection
+        settings={{ layout: 'stage' }}
+        products={[PRODUCT]}
+        onAddToCart={async () => {}}
+      />
+    );
+    const byText = (t: string) =>
+      Array.from(container.querySelectorAll('button, a')).find(e => e.textContent?.trim() === t)!;
+    expect(byText('Add to cart').getAttribute('aria-label')).toBe('Add to cart: Galaxy S25');
+    expect(byText('Compare').getAttribute('aria-label')).toBe('Compare: Galaxy S25');
+    // aria-pressed carries the state; the name does not flip, so it is not a double toggle
+    expect(byText('Compare').getAttribute('aria-pressed')).toBe('false');
+    // the photo link is the pointer's; the name link is the one keyboard stop to the PDP
+    const photo = container.querySelector('a[data-part="card-image"]')!;
+    expect(photo.getAttribute('tabindex')).toBe('-1');
+    expect(photo.getAttribute('aria-hidden')).toBe('true');
+    const stops = Array.from(container.querySelectorAll('a[href="/products/galaxy-s25"]')).filter(
+      a => a.getAttribute('tabindex') !== '-1'
+    );
+    // the name (h2) link and the variant/view link: both labelled, none duplicated unlabelled
+    for (const a of stops)
+      expect(a.textContent!.trim() || a.getAttribute('aria-label')).toBeTruthy();
   });
   it('add control reads canBuyNow: add for a simple in-stock product, a PDP link otherwise', () => {
     useSkin(skin);
@@ -333,7 +359,7 @@ describe.each(SKINS)('product-spotlight stage on %s', skin => {
     }
     // the grid itself is not height-capped; the photo tile is, and keeps its square
     expect(section.querySelector(':scope > div')!.className).not.toContain('max-h-');
-    const tile = container.querySelector('a[aria-label] ')!;
+    const tile = container.querySelector('a[data-part="card-image"]')!;
     expect(tile.className).toContain('max-h-[min(78svh,680px)]');
     expect(tile.className).toContain('aspect-square');
   });

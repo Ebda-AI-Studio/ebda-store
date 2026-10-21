@@ -22,6 +22,7 @@ import type {
   ResolvedUtilityBar,
 } from '../templates/types';
 import { ReactNode } from 'react';
+import { StickyHeaderOffset } from './StickyHeaderOffset';
 
 interface ShopChromeProps {
   children: ReactNode;
@@ -385,6 +386,7 @@ export function ShopChrome({ children, layout: layoutProp }: ShopChromeProps) {
             .join(' ') || undefined
         }
       >
+        <StickyHeaderOffset />
         <T.Header
           branding={branding}
           navigation={filteredNavigation}

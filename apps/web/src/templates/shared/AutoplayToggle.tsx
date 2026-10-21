@@ -3,7 +3,8 @@
 /**
  * Quality bar § 10 rule (e) (W4, WCAG 2.2.2): anything that moves on its own for more than 5s
  * (a looping hero video, an auto-advancing slider or carousel) carries this visible 44px
- * pause/play toggle. `aria-pressed` = paused. The owner also pauses while focus is inside.
+ * pause/play toggle. ONE pattern: the label flips Pause/Play (no `aria-pressed`: both together read
+ * as "Play, pressed", STOP-2 a11y M1). The owner also pauses while focus is inside.
  */
 export function AutoplayToggle({
   paused,
@@ -20,7 +21,6 @@ export function AutoplayToggle({
     <button
       type="button"
       data-autoplay-toggle
-      aria-pressed={paused}
       aria-label={paused ? labels.play : labels.pause}
       onClick={onToggle}
       className={`z-20 inline-flex h-11 w-11 items-center justify-center rounded-[var(--radius)] bg-background/80 text-foreground hover:bg-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${className}`}

@@ -136,9 +136,13 @@ function SpotlightStage({
       <div
         className={`${spacing.innerContainerClass} grid items-center gap-6 md:grid-cols-2 md:gap-10`}
       >
+        {/* R-12 / a11y P2-4: the name link below is the stage's one tab stop to this product; the photo
+            link repeats it for the pointer only. */}
         <Link
           href={href}
-          aria-label={name}
+          tabIndex={-1}
+          aria-hidden="true"
+          data-part="card-image"
           className="relative mx-auto block aspect-square min-h-11 max-h-[min(78svh,680px)] w-full overflow-hidden rounded-[var(--radius)] bg-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
         >
           {image && (
@@ -186,6 +190,9 @@ function SpotlightStage({
               <button
                 type="button"
                 disabled={adding}
+                // a11y P2-1 / 2.5.3: a Showroom home carries up to three stages, so every control
+                // names its product and starts with its visible text.
+                aria-label={`${t('Add to cart', 'إضافة للسلة')}: ${name}`}
                 onClick={async () => {
                   setAdding(true);
                   try {
@@ -201,6 +208,7 @@ function SpotlightStage({
             ) : (
               <Link
                 href={href}
+                aria-label={`${hasVariants && buyable ? t('Choose options', 'اختيار الخيارات') : t('View', 'عرض')}: ${name}`}
                 className="inline-flex min-h-11 items-center justify-center rounded-[var(--radius)] bg-primary px-6 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
               >
                 {hasVariants && buyable ? t('Choose options', 'اختيار الخيارات') : t('View', 'عرض')}
@@ -209,6 +217,9 @@ function SpotlightStage({
             <button
               type="button"
               aria-pressed={inCompare}
+              // One name for both states (the pressed state carries add/remove): a flipping label
+              // plus aria-pressed would read as a double toggle.
+              aria-label={`${t('Compare', 'قارن')}: ${name}`}
               onClick={onCompare}
               className={`inline-flex min-h-11 min-w-11 items-center justify-center rounded-[var(--radius)] border px-4 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
                 inCompare

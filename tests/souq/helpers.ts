@@ -35,7 +35,10 @@ export async function runAxe(page: Page): Promise<AxeViolation[]> {
   return page.evaluate(async () => {
     // @ts-expect-error injected
     const r = await window.axe.run(document, {
-      runOnly: { type: 'tag', values: ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'] },
+      runOnly: {
+        type: 'tag',
+        values: ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa', 'best-practice'],
+      },
     });
     return r.violations.map(
       (v: { id: string; impact: string; nodes: Array<{ target: string[] }> }) => ({
