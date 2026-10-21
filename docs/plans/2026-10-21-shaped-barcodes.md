@@ -7,6 +7,6 @@ Finish line: every receipt/invoice barcode is a REAL Code 128 of the order numbe
 3. **Scan gate** (`tests/unit/shaped-barcode-decode.test.ts`): every shape x {short numeric, `ORD-` style, long} rasterised with `@resvg/resvg-js` (dev) and decoded with `zxing-wasm` (dev); must equal the input. Failing shapes are excluded and listed in the report.
 4. **Setting** `settings.receiptBarcodeShape` (`plain` default | shape | `off`): shared Zod enum, checked in the store `addSettingsIssues` edge, added to the public settings allowlist; admin picker with live previews, settings save already busts the store cache.
 5. **Surfaces**: storefront `ReceiptPrinter` (replaces the fake `Barcode.tsx`), API invoice HTML (`invoice.service.ts`). No packing-slip view exists in the repo today (reported, not invented). `<bdi dir="ltr">`, print CSS keeps ink.
-6. **Ebda billing (coordinator addition)**: merchant billing payment-success screen reuses the receipt-printer animation, Ebda palette, ghost shape of the payment/invoice number, ar/en, static under reduced motion; ghost on the billing invoice print.
+6. **Ebda billing (coordinator addition)**: merchant billing payment-success screen reuses the receipt-printer animation, Ebda palette, PALM shape (Ahmad correction, not ghost) of the payment/invoice number, ar/en, static under reduced motion; palm on the billing invoice print.
 
 Not changing: order numbers, DB schema (settings is a JSON bag), existing receipt copy. Done = typecheck + lint + full unit suite green, decode gate green, report in `.superpowers/barcode-report.md`.
