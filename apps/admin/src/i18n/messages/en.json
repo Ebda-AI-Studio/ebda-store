@@ -10321,5 +10321,40 @@
       "sent": "Sent",
       "failed": "Failed"
     }
+  },
+  "receiptBarcode": {
+    "title": "Order barcode",
+    "hint": "A real scannable barcode of the order number on receipts, packing slips and invoices. Pick a plain strip, a fun shape, or turn it off.",
+    "save": "Save",
+    "saved": "Saved",
+    "failed": "Couldn't save. Try again.",
+    "shape": {
+      "plain": "Plain bars",
+      "off": "No barcode",
+      "palm": "Palm",
+      "horse": "Horse",
+      "paw": "Paw",
+      "burger": "Burger",
+      "cat": "Cat",
+      "ghost": "Ghost",
+      "angry-shark": "Angry shark",
+      "shark": "Shark",
+      "gym-dude": "Gym dude",
+      "heart": "Heart",
+      "dog": "Dog",
+      "whale": "Whale",
+      "bat": "Bat",
+      "pizza": "Pizza",
+      "cloud": "Cloud",
+      "spider": "Spider",
+      "big-cake": "Big cake",
+      "lemon": "Lemon",
+      "ring": "Ring",
+      "diamond": "Diamond",
+      "pineapple": "Pineapple",
+      "french-fries": "French fries",
+      "hot-dog": "Hot dog",
+      "cookie": "Cookie"
+    }
   }
 }
