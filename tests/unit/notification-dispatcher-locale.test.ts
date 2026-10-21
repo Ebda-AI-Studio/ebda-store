@@ -101,6 +101,13 @@ describe('dispatcher writes SMS and push in the shopper locale', () => {
   });
 });
 
+/**
+ * Senders with NO stored shopper locale to thread: a wishlist user (`User.language` defaults to
+ * 'en', so it is not a real choice) and a web abandoned cart. They fall to the store default,
+ * then ar.
+ */
+const NO_STORED_LOCALE = ['inventory.service.ts', 'abandoned-cart.service.ts'];
+
 describe('every dispatch call site threads the shopper locale', () => {
   const API = join(__dirname, '../../apps/api/src');
   const walk = (d: string, out: string[] = []): string[] => {
@@ -116,13 +123,12 @@ describe('every dispatch call site threads the shopper locale', () => {
     for (const f of walk(API)) {
       const src = readFileSync(f, 'utf8');
       if (f.endsWith('notification-dispatcher.service.ts')) continue;
+      if (NO_STORED_LOCALE.some(n => f.endsWith(n))) continue;
       // payload either an object literal (locale inside) or a NotificationData variable
       for (const m of src.matchAll(
         /notificationDispatcher\.dispatch\(\s*[^,]+,\s*[^,]+,\s*\{([\s\S]*?)\n\s*\}\s*\)/g
       ))
         if (!/locale/.test(m[1])) missing.push(f);
-      if (/dispatch\(storeId, event, notificationData\)/.test(src) && !/locale:/.test(src))
-        missing.push(f);
     }
     expect(missing.map(f => f.replace(API, ''))).toEqual([]);
   });

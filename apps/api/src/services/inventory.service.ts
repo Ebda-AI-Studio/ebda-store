@@ -912,7 +912,6 @@ export class InventoryService {
                   firstName: true,
                   lastName: true,
                   phone: true,
-                  preferredLocale: true,
                 },
               },
             },
@@ -950,7 +949,6 @@ export class InventoryService {
           storeName: store.name,
           productName,
           productUrl,
-          locale: user.preferredLocale,
         });
       }
     } catch (err) {
