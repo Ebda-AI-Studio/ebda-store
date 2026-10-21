@@ -73,7 +73,7 @@ export default function ForgotPasswordClient() {
                 <button
                   type="button"
                   onClick={() => setIsSubmitted(false)}
-                  className="text-primary hover:underline"
+                  className="text-primary underline underline-offset-2"
                 >
                   {t(
                     'try again',
@@ -150,7 +150,10 @@ export default function ForgotPasswordClient() {
           </div>
 
           <p className="text-center text-sm">
-            <Link href={storeUrl('/auth/login')} className="text-primary hover:underline">
+            <Link
+              href={storeUrl('/auth/login')}
+              className="text-primary underline underline-offset-2"
+            >
               &larr;{' '}
               {t(
                 'Back to sign in',

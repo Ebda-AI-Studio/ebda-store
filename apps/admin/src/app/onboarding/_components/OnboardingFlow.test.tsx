@@ -57,6 +57,11 @@ const inactiveStore = {
   planCode: 'free',
 };
 
+/** The picker opens on the first template with a built look (Qamar, B1-19): go to Dahab's tab. */
+function openDahabTab() {
+  fireEvent.click(screen.getByRole('tab', { name: 'Dahab' }));
+}
+
 function mockState(state: unknown) {
   apiGet.mockImplementation(async (url: string) => {
     if (url === '/api/v1/onboarding/state') return { data: state, error: null };
@@ -307,6 +312,7 @@ describe('onboarding stepper', () => {
 
     // Look: pick a Dahab look -> PUT /look (design reset: a brand-new store), then next.
     await screen.findByText('onboarding.flow.template.title');
+    openDahabTab();
     fireEvent.click(
       screen.getByRole('radio', { name: new RegExp(getLook('dahab.worn')!.name.en) })
     );
@@ -379,6 +385,7 @@ describe('onboarding stepper', () => {
     await screen.findByText('onboarding.flow.template.title');
     expect(screen.getByText('onboarding.flow.template.lookNotApplied')).toBeTruthy();
     // Picking a look again goes through the normal PUT /look.
+    openDahabTab();
     fireEvent.click(
       screen.getByRole('radio', { name: new RegExp(getLook('dahab.worn')!.name.en) })
     );
@@ -404,6 +411,7 @@ describe('onboarding stepper', () => {
     apiPut.mockImplementationOnce(() => new Promise((_, rej) => (rejectPut = rej)));
     render(<OnboardingFlow />);
     await screen.findByText('onboarding.flow.template.title');
+    openDahabTab();
     fireEvent.click(
       screen.getByRole('radio', { name: new RegExp(getLook('dahab.worn')!.name.en) })
     );

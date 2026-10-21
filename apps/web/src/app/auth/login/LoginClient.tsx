@@ -64,7 +64,7 @@ export default function LoginClient() {
               )}{' '}
               <Link
                 href={storeUrl('/auth/register')}
-                className="font-medium text-primary hover:underline"
+                className="font-medium text-primary underline underline-offset-2"
               >
                 {t('Sign up', '\u0625\u0646\u0634\u0627\u0621 \u062d\u0633\u0627\u0628')}
               </Link>
@@ -134,14 +134,14 @@ export default function LoginClient() {
               'By signing in, you agree to our',
               '\u0628\u062a\u0633\u062c\u064a\u0644 \u0627\u0644\u062f\u062e\u0648\u0644\u060c \u0623\u0646\u062a \u062a\u0648\u0627\u0641\u0642 \u0639\u0644\u0649'
             )}{' '}
-            <Link href={storeUrl('/terms')} className="text-primary hover:underline">
+            <Link href={storeUrl('/terms')} className="text-primary underline underline-offset-2">
               {t(
                 'Terms of Service',
                 '\u0627\u0644\u0634\u0631\u0648\u0637 \u0648\u0627\u0644\u0623\u062d\u0643\u0627\u0645'
               )}
             </Link>{' '}
             {t('and', '\u0648')}{' '}
-            <Link href={storeUrl('/privacy')} className="text-primary hover:underline">
+            <Link href={storeUrl('/privacy')} className="text-primary underline underline-offset-2">
               {t(
                 'Privacy Policy',
                 '\u0633\u064a\u0627\u0633\u0629 \u0627\u0644\u062e\u0635\u0648\u0635\u064a\u0629'

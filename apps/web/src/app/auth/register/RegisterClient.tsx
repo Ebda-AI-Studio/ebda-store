@@ -85,7 +85,7 @@ export default function RegisterClient() {
               )}{' '}
               <Link
                 href={storeUrl('/auth/login')}
-                className="font-medium text-primary hover:underline"
+                className="font-medium text-primary underline underline-offset-2"
               >
                 {t(
                   'Sign in',
@@ -175,14 +175,20 @@ export default function RegisterClient() {
                 />
                 <label htmlFor="terms" className="text-sm text-muted-foreground">
                   {t('I agree to the', '\u0623\u0648\u0627\u0641\u0642 \u0639\u0644\u0649')}{' '}
-                  <Link href={storeUrl('/terms')} className="text-primary hover:underline">
+                  <Link
+                    href={storeUrl('/terms')}
+                    className="text-primary underline underline-offset-2"
+                  >
                     {t(
                       'Terms of Service',
                       '\u0627\u0644\u0634\u0631\u0648\u0637 \u0648\u0627\u0644\u0623\u062d\u0643\u0627\u0645'
                     )}
                   </Link>{' '}
                   {t('and', '\u0648')}{' '}
-                  <Link href={storeUrl('/privacy')} className="text-primary hover:underline">
+                  <Link
+                    href={storeUrl('/privacy')}
+                    className="text-primary underline underline-offset-2"
+                  >
                     {t(
                       'Privacy Policy',
                       '\u0633\u064a\u0627\u0633\u0629 \u0627\u0644\u062e\u0635\u0648\u0635\u064a\u0629'

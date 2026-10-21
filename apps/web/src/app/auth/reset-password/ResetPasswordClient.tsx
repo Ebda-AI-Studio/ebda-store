@@ -221,7 +221,10 @@ function ResetPasswordForm() {
               'Need a new reset link?',
               '\u062a\u062d\u062a\u0627\u062c \u0631\u0627\u0628\u0637 \u0625\u0639\u0627\u062f\u0629 \u062a\u0639\u064a\u064a\u0646 \u062c\u062f\u064a\u062f\u061f'
             )}{' '}
-            <Link href={storeUrl('/auth/forgot-password')} className="text-primary hover:underline">
+            <Link
+              href={storeUrl('/auth/forgot-password')}
+              className="text-primary underline underline-offset-2"
+            >
               {t(
                 'Request password reset',
                 '\u0637\u0644\u0628 \u0625\u0639\u0627\u062f\u0629 \u062a\u0639\u064a\u064a\u0646 \u0643\u0644\u0645\u0629 \u0627\u0644\u0645\u0631\u0648\u0631'

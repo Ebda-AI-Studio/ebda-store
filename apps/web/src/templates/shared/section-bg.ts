@@ -5,6 +5,7 @@ import {
   getLook,
   pickReadableForeground,
   resolveColor,
+  statusInkVars,
 } from '@ebda/shared';
 import type { StoreTheme } from '@ebda/shared';
 
@@ -61,6 +62,18 @@ function inverseBandStyle(theme: StoreTheme): CSSProperties | undefined {
     '--accent-foreground': ink,
     '--ring': page,
     '--bg-page': ink,
+    // Status inks (the sale percentage, error and success text) were derived for the PAGE
+    // surfaces; the band is the opposite surface, so they are derived again against it (Ruling
+    // B1-111: found live as a 1.83:1 "-21%" on Lookbook /search).
+    ...statusInkVars(
+      {
+        success: triplet(theme.successColor),
+        warning: triplet(theme.warningColor),
+        destructive: triplet(theme.destructiveColor),
+      },
+      [ink],
+      theme.legacyBannerContrast === true
+    ),
   } as CSSProperties;
 }
 

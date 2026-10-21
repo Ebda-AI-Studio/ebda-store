@@ -94,6 +94,17 @@ describe('LB-01 inverse band', () => {
     expect(style['--accent-foreground']).toBe(theme.foregroundColor);
   });
 
+  // T10 (live, Lookbook /search 390): the "-21%" sale text was the PAGE-derived destructive ink
+  // (light pink) on the light band, 1.83:1. The band derives the status inks again against itself.
+  it('status inks inside the band read >= 4.5:1 on the band (sale %, error, success)', () => {
+    for (const role of ['destructive', 'success', 'warning'] as const) {
+      const ink = style[`--${role}-ink`]!;
+      expect(ink, role).toBeDefined();
+      expect(ink, role).not.toMatch(/^var\(/);
+      expect(contrastRatio(hsl(theme.foregroundColor), hsl(ink)), role).toBeGreaterThanOrEqual(4.5);
+    }
+  });
+
   it('every text pair on the band is >= 4.5:1 (ink, prices, the 70% link), the button keeps its pair', () => {
     const band = look.tokens.ink; // #F4F1FA
     const text = look.tokens.page; // #1E2340
