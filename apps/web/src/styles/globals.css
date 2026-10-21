@@ -25,21 +25,21 @@
     --popover: 0 0% 100%;
     --popover-foreground: 222.2 47.4% 11.2%;
 
-    /* Primary - Force Orange #ff6e00. Ink is black: white on it is 2.79:1 (K-02). */
-    --primary: 26 100% 50%;
-    --primary-foreground: 0 0% 0%;
+    /* Primary - Ebda night #0A0B0C with white ink, 19.7:1 (K-02, Ruling D1016-ORANGE-1). */
+    --primary: 210 9% 4%;
+    --primary-foreground: 0 0% 100%;
 
     /* Secondary */
-    --secondary: 30 100% 97%;
-    --secondary-foreground: 26 100% 30%;
+    --secondary: 36 36% 96%;
+    --secondary-foreground: 36 40% 28%;
 
     /* Muted */
     --muted: 210 20% 96%;
     --muted-foreground: 215.4 16.3% 46.9%;
 
     /* Accent */
-    --accent: 30 100% 97%;
-    --accent-foreground: 26 100% 30%;
+    --accent: 36 36% 95%;
+    --accent-foreground: 36 40% 25%;
 
     /* Status Colors */
     --success: 142 76% 36%;
@@ -64,7 +64,7 @@
     /* Borders & Inputs */
     --border: 220 13% 91%;
     --input: 220 13% 91%;
-    --ring: 26 100% 50%;
+    --ring: 36 36% 52%;
 
     /* Border Radius */
     --radius: 0.75rem;
@@ -128,14 +128,14 @@
     --card-foreground: 210 40% 98%;
     --popover: 222.2 47.4% 8%;
     --popover-foreground: 210 40% 98%;
-    --primary: 26 100% 55%;
-    --primary-foreground: 0 0% 0%;
-    --secondary: 26 40% 12%;
-    --secondary-foreground: 30 100% 90%;
+    --primary: 36 46% 62%;
+    --primary-foreground: 210 9% 4%;
+    --secondary: 36 30% 12%;
+    --secondary-foreground: 36 60% 88%;
     --muted: 217.2 32.6% 12%;
     --muted-foreground: 215 20.2% 65.1%;
-    --accent: 26 40% 12%;
-    --accent-foreground: 30 100% 90%;
+    --accent: 36 30% 12%;
+    --accent-foreground: 36 60% 88%;
     --success: 142 76% 40%;
     --success-foreground: 0 0% 100%;
     --warning: 38 92% 55%;
@@ -150,7 +150,7 @@
     --destructive-ink: 0 62.8% 66%;
     --border: 217.2 32.6% 17.5%;
     --input: 217.2 32.6% 17.5%;
-    --ring: 26 100% 55%;
+    --ring: 36 46% 62%;
   }
 
   /* RTL Support */
@@ -319,7 +319,7 @@
 @layer components {
   /* Product Card */
   .product-card {
-    @apply relative overflow-hidden rounded-2xl border bg-card transition-all duration-300;
+    @apply relative overflow-hidden rounded-2xl border bg-card transition duration-300;
   }
 
   .product-card:hover {
@@ -354,7 +354,7 @@
 
   /* Add to Cart Button */
   .add-to-cart-btn {
-    @apply inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-6 py-3 text-sm font-semibold text-primary-foreground shadow-lg transition-all duration-200;
+    @apply inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-6 py-3 text-sm font-semibold text-primary-foreground shadow-lg transition duration-200;
     box-shadow: 0 4px 14px 0 hsl(var(--primary) / 0.35);
   }
 
@@ -370,7 +370,7 @@
 
   /* Quantity Selector */
   .quantity-selector {
-    @apply inline-flex items-center rounded-xl border bg-card;
+    @apply inline-flex items-center rounded-xl border border-input bg-card;
   }
 
   .quantity-btn {
@@ -383,7 +383,7 @@
 
   /* Category Card */
   .category-card {
-    @apply relative overflow-hidden rounded-2xl bg-gradient-to-br transition-all duration-300;
+    @apply relative overflow-hidden rounded-2xl bg-gradient-to-br transition duration-300;
   }
 
   .category-card:hover {
@@ -395,9 +395,9 @@
   .hero-gradient {
     background: linear-gradient(
       135deg,
-      hsl(30 100% 97%) 0%,
+      hsl(36 36% 96%) 0%,
       hsl(0 0% 100%) 50%,
-      hsl(30 100% 97%) 100%
+      hsl(36 36% 96%) 100%
     );
   }
 
@@ -434,12 +434,12 @@
   /* Search Box — keep h-12 on mobile so the embedded input meets the 44px
      tap target; densify slightly to h-11 on desktop. */
   .search-box {
-    @apply flex h-12 w-full items-center gap-3 rounded-xl border bg-card px-4 transition-all duration-200 sm:h-11;
+    @apply flex h-12 w-full items-center gap-3 rounded-xl border border-input bg-card px-4 transition duration-200 sm:h-11;
     @apply focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/20;
   }
 
   .search-input {
-    @apply flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground;
+    @apply min-h-11 flex-1 self-stretch bg-transparent text-base outline-none placeholder:text-muted-foreground sm:text-sm;
   }
 
   /* Cart Item */
@@ -534,7 +534,7 @@
   }
 
   .gallery-thumbnail {
-    @apply aspect-square cursor-pointer overflow-hidden rounded-xl border-2 border-transparent transition-all;
+    @apply aspect-square cursor-pointer overflow-hidden rounded-xl border-2 border-transparent transition;
   }
 
   .gallery-thumbnail:hover,
@@ -566,7 +566,7 @@
 
   /* Color Swatch */
   .color-swatch {
-    @apply h-8 w-8 cursor-pointer rounded-full border-2 border-transparent transition-all;
+    @apply h-8 w-8 cursor-pointer rounded-full border-2 border-transparent transition;
   }
 
   .color-swatch:hover,
@@ -576,7 +576,7 @@
 
   /* Size Selector */
   .size-option {
-    @apply flex h-10 min-w-[40px] cursor-pointer items-center justify-center rounded-lg border text-sm font-medium transition-all;
+    @apply flex h-10 min-w-[40px] cursor-pointer items-center justify-center rounded-lg border text-sm font-medium transition;
   }
 
   .size-option:hover {
@@ -840,16 +840,11 @@
 
 /* Force Gradient Backgrounds */
 .force-gradient-primary {
-  background: linear-gradient(135deg, hsl(var(--primary)) 0%, hsl(26 100% 40%) 100%);
+  background: linear-gradient(135deg, hsl(var(--primary)) 0%, hsl(var(--primary) / 0.85) 100%);
 }
 
 .force-gradient-hero {
-  background: linear-gradient(
-    135deg,
-    hsl(30 100% 97%) 0%,
-    hsl(0 0% 100%) 40%,
-    hsl(30 100% 98%) 100%
-  );
+  background: linear-gradient(135deg, hsl(36 36% 96%) 0%, hsl(0 0% 100%) 40%, hsl(36 36% 97%) 100%);
 }
 
 /* RTL Utilities */
@@ -1043,7 +1038,7 @@ html {
    `:where()` has 0 specificity, so a component's own focus-visible:ring-*
    always wins; this only fills the gaps. */
 :where(button, a, [role='button'], input, select, textarea, summary):focus-visible {
-  outline: 2px solid hsl(var(--primary) / 0.6);
+  outline: 2px solid hsl(var(--primary));
   outline-offset: 2px;
 }
 
@@ -1156,6 +1151,55 @@ html[dir='rtl'] [data-pack='dahab'] .font-display {
   }
 }
 
+/* Collage hero (hero presentation 'collage', Ruling B1-7): the three photos settle once on first
+   paint, 280ms ease-out-quint, 60ms stagger. The first photo is the LCP element, so it only
+   slides (never starts invisible); the other two also fade in. Reduced motion: final state. */
+@keyframes collage-settle {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes collage-settle-lead {
+  from {
+    transform: translateY(12px);
+  }
+  to {
+    transform: none;
+  }
+}
+@media (prefers-reduced-motion: no-preference) {
+  [data-collage-settle] > :nth-child(1) {
+    animation: collage-settle-lead 280ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+  [data-collage-settle] > :nth-child(2) {
+    animation: collage-settle 280ms cubic-bezier(0.22, 1, 0.36, 1) 60ms both;
+  }
+  [data-collage-settle] > :nth-child(3) {
+    animation: collage-settle 280ms cubic-bezier(0.22, 1, 0.36, 1) 120ms both;
+  }
+}
+
+/* Framed hero hairline (Vitrine, Rulings B1-5 / B1-7): the line draws in once from the centre,
+   600ms ease-out-quint. Reduced motion: the line is simply there. */
+@keyframes frame-draw {
+  from {
+    clip-path: inset(50% 50% 50% 50%);
+  }
+  to {
+    clip-path: inset(0 0 0 0);
+  }
+}
+@media (prefers-reduced-motion: no-preference) {
+  [data-frame-draw] > [data-part='frame-line'] {
+    animation: frame-draw 600ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+}
+
 /* Dahab skin on the two Phase 2 document sections (no markup change, so
    every other store renders exactly as before): display-face headings, the
    arch frame on the image, and a quieter newsletter field. */
@@ -1218,23 +1262,27 @@ html[dir='rtl'] [data-pack='dahab'] [data-section='newsletter'] h2 {
   body[data-sticky-cart='blocked'] {
     padding-bottom: calc(8rem + 4.25rem + 1.5rem);
   }
-  /* Floating widget (br/bl, bottom 80px, z-60) and the toast region (@ebda/ui Toast,
-   * bottom 72px) would sit inside the sticky bar's band (F2: "added to cart" covered the
-   * bar's name and price): lift both clear of the bar's REAL height (--sticky-bar-h,
+  /* Floating widget (br/bl, bottom 80px, z-60) would sit inside the sticky bar's band
+   * (F2: it covered the bar's name and price): lift it clear of the bar's REAL height (--sticky-bar-h,
    * published by useStickyBarHeight so the taller Dahab bar and the cart's blocked line are
    * covered; it includes the safe-area padding) + a 10px gap. No tab-bar term: the tab bar
    * is hidden while a task bar shows (C-04). The fallbacks are the default bar (61px) and
    * the cart bar with its blocked line (85px) for the frame before the hook runs. */
   body[data-sticky-atc='1'] [data-floating-widget='bottom'],
-  body[data-sticky-cart='1'] [data-floating-widget='bottom'],
-  body[data-sticky-atc='1'] [data-toast-region],
-  body[data-sticky-cart='1'] [data-toast-region] {
+  body[data-sticky-cart='1'] [data-floating-widget='bottom'] {
     bottom: calc(var(--sticky-bar-h, 61px) + 10px);
   }
-  body[data-sticky-cart='blocked'] [data-floating-widget='bottom'],
-  body[data-sticky-cart='blocked'] [data-toast-region] {
+  body[data-sticky-cart='blocked'] [data-floating-widget='bottom'] {
     bottom: calc(var(--sticky-bar-h, 85px) + 10px);
   }
+}
+/* IA-17 (supersedes the F2 toast lift): lifted above the bar, the "added" toast still covered
+ * the inline Add button and the delivery line whenever no bar showed. It anchors at the top,
+ * clear of every CTA band and fixed-bottom bar; at every width since taste re-audit P2-13 (at
+ * 1280 the bottom-end toast covered the wishlist button beside Add to cart). */
+[data-toast-region] {
+  top: calc(env(safe-area-inset-top) + 0.75rem);
+  bottom: auto;
 }
 
 /* Sticky bar entrance: ease-out-quint, 300ms. The global reduced-motion rule
@@ -1272,6 +1320,82 @@ html[dir='rtl'] [data-pack='dahab'] [data-section='newsletter'] h2 {
   color: var(--footer-ink);
 }
 
+/* Qamar (Phase B1): the look's faces (loaded by the looks system, never a new host) carry the
+   voice. Arabic display faces are never letter-spaced and need open leading for tashkeel and
+   tall ascenders; weight is left to the face (several look faces ship one weight, so forcing
+   700 would fake-bold them). */
+html[dir='rtl'] [data-pack='qamar'] h1,
+html[dir='rtl'] [data-pack='qamar'] h2,
+html[dir='rtl'] [data-pack='qamar'] h3,
+html[dir='rtl'] [data-pack='qamar'] .font-display {
+  line-height: 1.4;
+  letter-spacing: 0;
+}
+/* Decision (a), quality bar T-01/T-05 (W2a): a Qamar store never letter-spaces or uppercases its
+   chrome (nav, footer headings, labels, the announcement, SHARE, eyebrows): the tracked-caps
+   label is the "editorial lane" fingerprint. Shared components keep their classes; this resets
+   them under the qamar skin only. A merchant who turned on "Uppercase headings" keeps uppercase
+   (without the tracking). */
+[data-pack='qamar']
+  :is(
+    .ui-caps-toggle,
+    .uppercase,
+    .tracking-wide,
+    .tracking-wider,
+    .tracking-widest,
+    [class*='tracking-[0.'],
+    [class*='tracking-[.']
+  ) {
+  letter-spacing: normal;
+  text-transform: none;
+}
+[data-pack='qamar'] [data-ui-uppercase='true'] .ui-caps-toggle {
+  text-transform: uppercase;
+}
+/* Decision (a) / quality bar T-02: a display face is never set inside filter UI. The filter
+   panel's group headings take the body face on a Qamar store in both languages (Cormorant and
+   Playfair were painting 16-18px labels; Ruqaa the Arabic ones). Out-specifies the look's
+   `html[lang] [data-look] h3` display rule. */
+html[lang] [data-pack='qamar'] [data-zone='filters'] :is(h2, h3, h4, legend) {
+  font-family: var(--font-body, inherit);
+}
+/* Every heading a look paints in its display face ([data-look] h1-h3) is reset too, not only
+   `.font-display`: a tall display face (Lookbook's Lalezar) under the Arabic 0.5 adjust rendered
+   the PDP title and the look names at ~2.5x their size (Task 7 shots). */
+[data-pack='qamar'] :is(h1, h2, h3, .font-display) {
+  font-size-adjust: none;
+}
+/* Qamar's PDP title voice: the display face. ZERO specificity (:where), so the store-wide
+   productName zone ([data-zone="productName"], emit-zone-css) and the page-level zone (inline)
+   both still win (review I3). The title SIZE default is platform-wide (B1-29, below). */
+:where([data-pack='qamar']) :where(h1[data-zone='productName']) {
+  font-family: var(--font-display, inherit);
+  line-height: 1.3;
+  font-weight: 600;
+}
+
+/* Ruling B1-29: the shared PDP title (h1[data-zone='productName']) has no size class, so with no
+   zone size it fell to the body size, smaller than its own price (design.md: name >= price).
+   Platform default for EVERY skin at specificity (0,0,1): it must beat Tailwind preflight's
+   `h1 { font-size: inherit }` (also 0,0,1, earlier in the file), while any skin class (0,1,0), the
+   store-wide productName zone rule (0,1,0) and the page-level inline zone all override it. */
+h1:where([data-zone='productName']) {
+  font-size: clamp(1.5rem, 1.25rem + 1vw, 2rem);
+  line-height: 1.3;
+}
+
+/* Ruling B1-31: the PLP filter panel is a quiet surface on EVERY skin: the page colour with a
+   hairline border and ink text; the store's primary (accent) marks only the active state
+   (selected chip, count badge, price fill, "View results"). A merchant's own filter colours
+   (bgTriplet / fgTriplet) still override both through inline --filter-bg / --filter-fg. */
+[data-zone='filters'] {
+  --filter-bg: var(--bg-page);
+  --filter-fg: var(--foreground);
+}
+[data-zone='filters'][data-filter-custom] .filter-active {
+  box-shadow: inset 0 0 0 2px hsl(var(--filter-fg));
+}
+
 /* ==========================================================================
    Looks (Phase S). EVERY rule here is scoped under [data-look], which the
    root layout sets on <body> only for stores with a valid look. Legacy
@@ -1282,20 +1406,27 @@ html[dir='rtl'] [data-pack='dahab'] [data-section='newsletter'] h2 {
 [data-look] {
   font-family: var(--font-body, var(--font-arabic), var(--font-sans));
 }
+/* Rule (g), W4: the display face is for display text: page and section titles (h1, h2) and an
+   explicit `.font-display`. h3 (card names, captions, small headings) reads in the body face, and
+   inside a transactional surface (cart, checkout, receipt) every sub-heading does. */
 [data-look] h1,
 [data-look] h2,
-[data-look] h3,
 [data-look] .font-display {
   font-family: var(--font-display);
+}
+html[lang] [data-look] [data-transactional] :is(h2, h3, h4) {
+  font-family: var(--font-body, var(--font-arabic), var(--font-sans));
 }
 /* Section rhythm: only sections whose spacing is UNSET (sectionSpacingClasses adds
    sp-top-default / sp-bottom-default, and only for a store with a look) scale by
    --space-unit. An explicit merchant preset, even "normal", carries no marker. */
+/* AT-1: on a phone the rhythm caps at 80px between sections (2rem x 2 x airy 1.25);
+   48px per side at airy measured 120-150px gaps and read unfinished, not airy. */
 [data-look] .sp-top-default {
-  padding-top: calc(3rem * var(--space-unit, 1));
+  padding-top: calc(2rem * var(--space-unit, 1));
 }
 [data-look] .sp-bottom-default {
-  padding-bottom: calc(3rem * var(--space-unit, 1));
+  padding-bottom: calc(2rem * var(--space-unit, 1));
 }
 @media (min-width: 640px) {
   [data-look] .sp-top-default {
@@ -1329,7 +1460,6 @@ html[lang] body[data-look][data-pack='dahab'] {
 /* English locale: Latin display face first, Arabic display stack as fallback. */
 html[lang='en'] [data-look] h1,
 html[lang='en'] [data-look] h2,
-html[lang='en'] [data-look] h3,
 html[lang='en'] [data-look] .font-display {
   font-family: var(--font-latin, var(--font-display)), var(--font-display);
 }

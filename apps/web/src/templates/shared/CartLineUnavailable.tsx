@@ -16,10 +16,7 @@ export function CartLineUnavailableNotice() {
       data-cart-line-unavailable=""
       className="mt-1 text-xs font-semibold text-destructive-ink"
     >
-      {t(
-        'No longer available — remove it to check out',
-        'لم يعد متوفراً — يرجى إزالته لإتمام الطلب'
-      )}
+      {t('No longer available — remove it to check out', 'مبقاش متوفر — شيله عشان تكمّل الطلب')}
     </p>
   );
 }

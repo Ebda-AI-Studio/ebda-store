@@ -2,4 +2,4 @@
 // server-side) — plan §4 notes these may not need to move at all. Re-export
 // the same client shell for Track-A. See
 // docs/plans/2026-07-12-tenant-cacheable-routing.md §3.6/§9.
-export { metadata, default } from '@/app/privacy/page';
+export { generateMetadata, default } from '@/app/privacy/page';

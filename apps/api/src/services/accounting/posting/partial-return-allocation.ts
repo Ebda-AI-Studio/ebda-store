@@ -29,7 +29,18 @@ export interface AllocationLine {
   quantity: number;
   /** Unit price in piastres. */
   price: number;
+  /**
+   * `OrderItem.priceSource`. A line priced by a tier or a group price ('tier' / 'group') never received the order's
+   * coupon / promotion / loyalty discount (Ruling B2B-5, M3), so it carries no share of it back (final review P2-2).
+   * null / 'base' = discount-eligible (every line sold before B2B). Required, so no caller can silently omit it and
+   * disagree with the others.
+   */
+  priceSource: string | null;
 }
+
+/** Ruling B2B-5: only base-priced lines were in the discount basis. */
+const discountEligible = (l: AllocationLine): boolean =>
+  l.priceSource == null || l.priceSource === 'base';
 
 export interface AllocationResult<L extends AllocationLine> {
   /** Gross value of the lines returned by PRIOR completed returns. */
@@ -76,20 +87,45 @@ export function allocatePartialReturn<L extends AllocationLine>(input: {
   prevQty: Map<string, number>;
   /** The lines this return is claiming. */
   requested: Array<{ orderItemId: string; quantity: number }>;
+  /**
+   * B2B tier-aware returns (Task 8b): signed piastres by which EARLIER returns' credited value was reduced (kept units
+   * repriced below their tier), and by which THIS return's is. Subtracted from the gross each side contributes, so the
+   * discount and tax shares, the revenue debit and the cash credit all follow the adjusted value and the GL and the
+   * provider refund stay one number. Both default to 0: every caller that passes neither is unchanged.
+   */
+  prevAdjustment?: number;
+  thisAdjustment?: number;
 }): AllocationResult<L> {
-  const { subtotal, discount, tax, taxIncludedInPrice = false, lines, prevQty, requested } = input;
+  const {
+    subtotal,
+    discount,
+    tax,
+    taxIncludedInPrice = false,
+    lines,
+    prevQty,
+    requested,
+    prevAdjustment = 0,
+    thisAdjustment = 0,
+  } = input;
 
   // `claimed` runs cumulatively so duplicate orderItemIds in one payload
   // cannot double-count against the same line's remainder.
   let prevGross = 0;
+  // The discount is allocated over the discount-ELIGIBLE gross only (P2-2): its basis is the subtotal less the lines that
+  // never got it. For an order with no tier / group line both equal the old whole-subtotal figures.
+  let prevEligible = 0;
+  let ineligibleSubtotal = 0;
   const claimed = new Map<string, number>();
   for (const line of lines) {
     const prev = Math.min(prevQty.get(line.id) ?? 0, line.quantity);
     prevGross += line.price * prev;
+    if (discountEligible(line)) prevEligible += line.price * prev;
+    else ineligibleSubtotal += line.price * line.quantity;
     claimed.set(line.id, prev);
   }
 
   let curGross = 0;
+  let curEligible = 0;
   const returnedLines: Array<{ line: L; qty: number }> = [];
   for (const req of requested) {
     const line = lines.find(i => i.id === req.orderItemId);
@@ -99,19 +135,30 @@ export function allocatePartialReturn<L extends AllocationLine>(input: {
     if (qty === 0) continue;
     claimed.set(line.id, already + qty);
     curGross += line.price * qty;
+    if (discountEligible(line)) curEligible += line.price * qty;
     returnedLines.push({ line, qty });
   }
 
-  const entitled = (amount: number, gross: number): number => {
-    if (amount <= 0 || subtotal <= 0) return 0;
-    const g = Math.min(gross, subtotal);
-    return Math.min(amount, Math.floor((amount * g) / subtotal));
+  const entitledOver = (amount: number, gross: number, basis: number): number => {
+    if (amount <= 0 || basis <= 0) return 0;
+    const g = Math.min(gross, basis);
+    return Math.min(amount, Math.floor((amount * g) / basis));
   };
+  const entitled = (amount: number, gross: number): number => entitledOver(amount, gross, subtotal);
+  const discountBasis = subtotal - ineligibleSubtotal;
 
-  const cumGross = prevGross + curGross;
+  // Credited value after the tier adjustment. `prevGross` / `curGross` in the RESULT stay the raw gross.
+  const prevCredited = Math.max(0, prevGross - prevAdjustment);
+  const curCredited = Math.max(0, curGross - thisAdjustment);
+  const cumGross = prevCredited + curCredited;
+  // Discount: by the ELIGIBLE gross returned, over the eligible basis. The tier adjustment does not shrink it: it charges
+  // for KEPT units being repriced, which says nothing about how much discount the RETURNED units received (when the
+  // adjustment lands on a base-priced item of the same product, Ruling B2B-17, that item's coupon share still comes back
+  // in full). With no tier / group line and no adjustment this is exactly the old whole-subtotal figure.
   const discountThis = Math.min(
-    entitled(discount, cumGross) - entitled(discount, prevGross),
-    curGross
+    entitledOver(discount, prevEligible + curEligible, discountBasis) -
+      entitledOver(discount, prevEligible, discountBasis),
+    curCredited
   );
   // The line value the customer is being credited for, less their discount
   // share. Which SIDE of it the tax sits on is the only thing the two tax
@@ -123,13 +170,13 @@ export function allocatePartialReturn<L extends AllocationLine>(input: {
   //     is owed that price and NO MORE (adding taxThis on top refunds the VAT
   //     a second time), and the revenue the sale booked was the price LESS
   //     its tax share.
-  const netOfDiscount = curGross - discountThis;
+  const netOfDiscount = curCredited - discountThis;
   // An inclusive share comes OUT of the line value, so it cannot exceed it —
   // clamped so a rounding edge can never produce a negative revenue debit
   // (which partial-return-posting would drop, unbalancing the entry).
   const taxThis = taxIncludedInPrice
-    ? Math.min(entitled(tax, cumGross) - entitled(tax, prevGross), netOfDiscount)
-    : entitled(tax, cumGross) - entitled(tax, prevGross);
+    ? Math.min(entitled(tax, cumGross) - entitled(tax, prevCredited), netOfDiscount)
+    : entitled(tax, cumGross) - entitled(tax, prevCredited);
   const revenueDebit = taxIncludedInPrice ? netOfDiscount - taxThis : netOfDiscount;
   const cashCredit = revenueDebit + taxThis;
 

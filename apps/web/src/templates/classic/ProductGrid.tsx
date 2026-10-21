@@ -78,7 +78,7 @@ export default function ClassicProductGrid({
               <NoProductsIcon className="w-8 h-8 text-muted-foreground" />
             </div>
             <p className="text-muted-foreground">
-              {isRtl ? 'لا توجد منتجات متاحة' : 'No products available'}
+              {isRtl ? 'مفيش منتجات متاحة' : 'No products available'}
             </p>
           </div>
         )}

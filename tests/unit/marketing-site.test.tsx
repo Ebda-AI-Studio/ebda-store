@@ -45,9 +45,12 @@ describe('marketing nav', () => {
   it('names the product (not the studio) in both marketing page titles', () => {
     expect(pageMetadata('ar', '').title).toContain('ابدأ ستور');
     expect(pageMetadata('en', '').title).toContain('Ebda Store');
-    expect(`${pageMetadata('ar', '').title}${pageMetadata('en', '').title}`).not.toMatch(
-      /Ebda AI Studio|ابدأ استوديو/
-    );
+    // the product leads and the studio is not named in the title (the brand line is in OG + JSON-LD)
+    for (const l of ['ar', 'en'] as const) {
+      const t = String(pageMetadata(l, '').title);
+      expect(t.length).toBeLessThanOrEqual(60);
+      expect(t).not.toMatch(/Ebda AI Studio|ابدأ استوديو/);
+    }
   });
   it('has the five links in page order with correct targets (en)', () => {
     const nav = en.match(/<nav aria-label="Main navigation".*?<\/nav>/s)![0];
@@ -154,6 +157,8 @@ describe('marketing hero and structure', () => {
       'model3d',
       'payments',
       'features',
+      'ainative',
+      'capabilities',
       'pricing',
       'faq',
       'start',
@@ -238,8 +243,17 @@ describe('marketing honesty', () => {
       expect(pay).toMatch(/Your own delivery|توصيل بنفسك/);
       expect(pay).toContain('mailto:ahlan@ebda.app');
     }
-    expect(en).not.toMatch(/coming soon/i);
-    expect(ar).not.toMatch(/>قريب</);
+    // "coming soon" now exists, honestly, for registry items (capability-registry.ts), but never in the
+    // payments or pricing sections, and never as the pricing placeholder
+    for (const [html, soon] of [
+      [en, /coming soon/i],
+      [ar, /قريبًا/],
+    ] as const)
+      for (const id of ['payments', 'pricing']) {
+        expect(html.match(new RegExp(`<section id="${id}".*?</section>`, 's'))![0]).not.toMatch(
+          soon
+        );
+      }
     expect(ar).not.toContain('السعر قريب');
   });
   it('the pricing table is built from the shared plan catalogue (every public limit)', () => {
@@ -491,6 +505,7 @@ describe('marketing SEO and trust surface', () => {
   it('JSON-LD has Organization, WebSite, SoftwareApplication, FAQPage and no ratings', () => {
     const g = jsonLd('en')['@graph'];
     expect(g.map(n => n['@type'])).toEqual([
+      'Organization',
       'Organization',
       'WebSite',
       'SoftwareApplication',

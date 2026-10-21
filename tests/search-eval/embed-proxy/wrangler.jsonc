@@ -1,0 +1,10 @@
+// LOCAL-ONLY (search eval embedding proxy, see worker.ts). Never deployed: `wrangler dev` only,
+// started by `npm run search:eval -- --real` with a per-run EVAL_PROXY_SECRET (--env-file).
+{
+  "name": "ebda-search-eval-embed-proxy",
+  "main": "worker.ts",
+  "compatibility_date": "2026-08-01",
+  "account_id": "69188202efc4df480140dd76545aa3ab",
+  "ai": { "binding": "AI" },
+  "dev": { "ip": "127.0.0.1" }
+}

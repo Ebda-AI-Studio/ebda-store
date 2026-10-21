@@ -121,7 +121,7 @@ export default function ClassicOrderSummary({
       </dl>
       {tax > 0 && taxIncludedInPrice && (
         <p className="mt-2 text-xs text-muted-foreground">
-          {taxLabel} {'\u2014'} {fmt(tax)}
+          {taxLabel} {'—'} {fmt(tax)}
         </p>
       )}
       {children && <div className="mt-6">{children}</div>}
@@ -152,7 +152,7 @@ export default function ClassicOrderSummary({
           >
             {ctaLoading ? (
               isRtl ? (
-                'جارٍ...'
+                'لحظة...'
               ) : (
                 'Processing...'
               )

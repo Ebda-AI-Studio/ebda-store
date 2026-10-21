@@ -37,6 +37,19 @@ vi.mock('@api/middleware/store-access', () => ({
     next();
   },
 }));
+// M8: a switch that makes the index-status read fail, to prove it degrades only the index line.
+const indexStatusFails = { on: false };
+vi.mock('../../apps/api/src/services/product-index.service', async importOriginal => {
+  const real =
+    await importOriginal<typeof import('../../apps/api/src/services/product-index.service')>();
+  return {
+    ...real,
+    storeIndexStatus: async (storeId: string) => {
+      if (indexStatusFails.on) throw new Error('index status read failed');
+      return real.storeIndexStatus(storeId);
+    },
+  };
+});
 vi.mock('../../apps/api/src/lib/inngest/client', () => ({
   inngest: { send: vi.fn(async () => ({ ids: [] })), createFunction: vi.fn(() => ({})) },
 }));
@@ -131,7 +144,74 @@ describe.skipIf(!hasDb)('GET /stores/:storeId/search-insights', () => {
       days: 30,
       totals: { searches: 0, zeroResultSearches: 0, zeroResultRate: null },
       terms: [],
+      index: { products: 0, indexed: 0, stale: 0, failed: 0, semanticEnabled: false },
     });
+  });
+
+  // Task 12: the viewer of product_embeddings (every-data-needs-UI) — "N of M ready / N failed".
+  it('an index-status failure drops only the index line; the search insights still answer', async () => {
+    const storeId = await seedStore('index-fail');
+    indexStatusFails.on = true;
+    try {
+      const res = await get(storeId, '?days=7');
+      expect(res.status).toBe(200);
+      expect(res.body.data.totals).toMatchObject({ searches: 0 });
+      expect(res.body.data.index).toBeUndefined();
+    } finally {
+      indexStatusFails.on = false;
+    }
+  });
+
+  it('reports the smart-search index status of THIS store, and whether semantic search is on', async () => {
+    const storeId = await seedStore('index');
+    const other = await seedStore('index-other');
+    const mk = async (store: string, name: string, data: Record<string, unknown> = {}) =>
+      (
+        await prisma.product.create({
+          data: { storeId: store, slug: `p-${uid()}`, name, price: 100, status: 'active', ...data },
+        })
+      ).id;
+    const ready = await mk(storeId, 'Ready');
+    await mk(storeId, 'Waiting');
+    const bad = await mk(storeId, 'Failing');
+    await mk(storeId, 'Draft', { status: 'draft' }); // not searchable: not counted
+    await mk(other, 'Elsewhere');
+    const doc = (id: string) =>
+      prisma.$queryRaw<Array<{ h: string }>>`
+        SELECT md5(public.ebda_product_embed_doc(name, name_ar, description, description_ar)) AS h
+          FROM products WHERE id = ${id}`.then(r => r[0].h);
+    // The quarantine key is md5 of the doc + words SET (SEARCH-T13-7).
+    const quarantineKey = (id: string) =>
+      prisma.$queryRaw<Array<{ h: string }>>`
+        SELECT md5(coalesce(public.ebda_product_embed_doc(name, name_ar, description, description_ar), '') || chr(31) || coalesce(nullif(regexp_replace(search_terms, '^\\s+|\\s+$', '', 'g'), ''), '')) AS h
+          FROM products WHERE id = ${id}`.then(r => r[0].h);
+    const vec = `[${new Array(1024).fill(0.01).join(',')}]`;
+    await prisma.$executeRaw`
+      INSERT INTO product_embeddings (product_id, store_id, model, content_hash, embedding)
+      VALUES (${ready}, ${storeId}, '@cf/baai/bge-m3', ${await doc(ready)}, ${vec}::halfvec(1024))`;
+    await prisma.$executeRaw`
+      INSERT INTO product_embed_failures (product_id, store_id, content_hash, error_kind, model)
+      VALUES (${bad}, ${storeId}, ${await quarantineKey(bad)}, 'input', '@cf/baai/bge-m3')`;
+    const res = await get(storeId, '?days=7');
+    expect(res.status).toBe(200);
+    expect(res.body.data.index).toEqual({
+      products: 3,
+      indexed: 1,
+      stale: 1,
+      failed: 1,
+      semanticEnabled: false,
+    });
+    const { setEmbeddingProviderForTests } =
+      await import('../../apps/api/src/lib/search/embedding-provider');
+    process.env.SEARCH_SEMANTIC_ENABLED = 'true';
+    setEmbeddingProviderForTests({ model: 'm', embed: async () => [] });
+    try {
+      expect((await get(storeId, '?days=7')).body.data.index.semanticEnabled).toBe(true);
+    } finally {
+      setEmbeddingProviderForTests(undefined);
+      delete process.env.SEARCH_SEMANTIC_ENABLED;
+    }
+    await prisma.product.deleteMany({ where: { storeId: { in: [storeId, other] } } });
   });
 
   it('lists zero-result terms first, behind the ≥2 floor, with totals counting every search', async () => {

@@ -135,7 +135,7 @@ async function seedFixtures(db) {
         plan: 'enterprise',
         currency: 'KWD',
         template: 'modern',
-        theme: { primaryColor: '26 100% 50%', showBranchesInFooter: true },
+        theme: { primaryColor: '36 36% 52%', showBranchesInFooter: true },
         marketingPixels: {},
         blogEnabled: true,
         locationsEnabled: true,

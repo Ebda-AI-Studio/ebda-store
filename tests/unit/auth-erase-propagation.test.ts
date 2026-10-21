@@ -62,13 +62,22 @@ const { sendMock, mockPrisma } = vi.hoisted(() => {
       findMany: vi.fn().mockResolvedValue([]),
       deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
     },
-    order: { updateMany: vi.fn().mockResolvedValue({ count: 0 }) },
+    order: {
+      updateMany: vi.fn().mockResolvedValue({ count: 0 }),
+      findMany: vi.fn().mockResolvedValue([]),
+    },
+    // webhook delivery-log redaction (Ruling WH-7)
+    $executeRaw: vi.fn().mockResolvedValue(0),
     review: { updateMany: vi.fn().mockResolvedValue({ count: 0 }) },
     address: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
     smsMarketingConsent: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
     abandonedCart: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
     cart: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
     wishlist: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
+    wholesaleApplication: {
+      deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
+      findMany: vi.fn().mockResolvedValue([]),
+    },
     pushSubscription: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
     refreshToken: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
     verificationToken: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
@@ -83,7 +92,11 @@ const { sendMock, mockPrisma } = vi.hoisted(() => {
       findMany: vi.fn().mockResolvedValue([]),
     },
     customerWallet: { findMany: vi.fn().mockResolvedValue([]) },
-    customer: { findMany: vi.fn().mockResolvedValue([]), update: vi.fn().mockResolvedValue({}) },
+    customer: {
+      findMany: vi.fn().mockResolvedValue([]),
+      update: vi.fn().mockResolvedValue({}),
+      updateMany: vi.fn().mockResolvedValue({ count: 0 }),
+    },
     customerAddress: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
     newsletterSubscriber: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
     campaignRecipient: {

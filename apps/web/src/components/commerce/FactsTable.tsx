@@ -14,7 +14,7 @@ export function FactsTable({
   const lang = language === 'ar' ? 'ar' : 'en';
   return (
     <section aria-label={t('Product details', 'تفاصيل المنتج')} className={className}>
-      <dl className="divide-y divide-border border-y border-border text-sm">
+      <dl className="divide-y divide-border border-t border-border text-sm">
         {facts.map((f, i) => {
           const x = factText(f, lang);
           return (

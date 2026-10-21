@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useStore, useStoreUrl } from '../../contexts/StoreContext';
 import { ShopChrome } from '../../components';
+import { pickLocalizedName } from '../../templates/shared/display-helpers';
 
 interface StoreHowtoStep {
   name: string;
@@ -51,7 +52,7 @@ export default function HowToGuidesClient({ storeHowtos = [] }: HowToGuidesClien
           <p className="mt-2 text-muted-foreground">
             {t(
               `Step-by-step guides for ${store?.name || 'our store'} — ordering, returns, payments, and more.`,
-              `أدلة خطوة بخطوة لمتجر ${store?.name || 'متجرنا'} — الطلب، الإرجاع، الدفع، والمزيد.`
+              `أدلة خطوة بخطوة لمتجر ${pickLocalizedName(store, true) || 'متجرنا'} — الطلب، الإرجاع، الدفع، والمزيد.`
             )}
           </p>
         </div>
@@ -129,7 +130,7 @@ export default function HowToGuidesClient({ storeHowtos = [] }: HowToGuidesClien
             <p className="text-muted-foreground">
               {t(
                 'No how-to guides yet. Check the FAQ for quick answers.',
-                'لا توجد أدلة بعد. تحقق من الأسئلة الشائعة للحصول على إجابات سريعة.'
+                'مفيش أدلة لسه. شوف الأسئلة الشائعة لإجابات سريعة.'
               )}
             </p>
             <Link
@@ -147,7 +148,7 @@ export default function HowToGuidesClient({ storeHowtos = [] }: HowToGuidesClien
         {howtos.length > 0 && (
           <div className="mt-12 rounded-xl border bg-muted/30 p-6 text-center">
             <p className="text-sm text-muted-foreground">
-              {t('Looking for quick answers?', 'تبحث عن إجابات سريعة؟')}
+              {t('Looking for quick answers?', 'بتدوّر على إجابات سريعة؟')}
             </p>
             <Link
               href={storeUrl('/faq')}

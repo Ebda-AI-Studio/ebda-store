@@ -35,6 +35,8 @@ import shippingRoutes from './shipping.routes';
 import taxRoutes from './tax.routes';
 import { fiscalArchiveRoutes, fiscalDocumentRoutes } from './fiscal-document.routes';
 import customerGroupRoutes from './customer-groups.routes';
+import priceTierRoutes from './price-tier.routes';
+import { publicWholesaleRouter, merchantWholesaleRouter } from './wholesale.routes';
 import promotionRoutes from './promotion.routes';
 import bundleRoutes from './bundle.routes';
 import loyaltyRoutes, { publicLoyaltyRoutes } from './loyalty.routes';
@@ -58,6 +60,7 @@ import affiliateRoutes, { publicAffiliateRoutes } from './affiliate.routes';
 import newsletterRoutes from './newsletter.routes';
 import campaignRoutes, { campaignTestSendRouter, campaignAiDraftRouter } from './campaign.routes';
 import campaignPublicRoutes from './campaign-public.routes';
+import merchantWebhookRoutes from './merchant-webhooks.routes';
 import {
   accountRouter as smsConsentAccountRoutes,
   publicRouter as smsConsentPublicRoutes,
@@ -77,8 +80,10 @@ import financeRoutes from './finance.routes';
 import smartLayerRoutes from './smart-layer.routes';
 import insightsRoutes from './insights.routes';
 import searchInsightsRoutes from './search-insights.routes';
+import adminSearchRoutes from './admin-search.routes';
 import suppliersRoutes from './suppliers.routes';
 import purchaseOrdersRoutes from './purchase-orders.routes';
+import packingSlipRoutes from './packing-slip.routes';
 import stockAdjustmentsRoutes from './stock-adjustments.routes';
 import warehouseRoutes from './warehouse.routes';
 import expensesRoutes from './expenses.routes';
@@ -108,6 +113,7 @@ const router = Router();
 // reads, per-query short transactions for writes. See publicStoreContext.
 router.use('/public', publicStoreContext);
 router.use('/public', publicRoutes);
+router.use('/public', publicWholesaleRouter);
 router.use('/public', publicStoreLayoutRoutes);
 
 // Token + store-room authority for the Workers realtime Durable Object (no tenant scope:
@@ -286,6 +292,7 @@ router.use('/stores/:storeId/cart', tenantContext, cartRoutes);
 // Context per request (SP6b): the admin payment link calls a payment gateway, so it runs
 // under store scope (no long transaction held across the call); every other order route
 // keeps its one request transaction. See `orderRouteContext`.
+router.use('/stores/:storeId/orders', orderRouteContext, packingSlipRoutes);
 router.use('/stores/:storeId/orders', orderRouteContext, orderRoutes);
 // Customers export (.xlsx). Mounted at /stores/:storeId so the route
 // has access to storeId via mergeParams.
@@ -328,6 +335,8 @@ router.use('/stores', tenantContext, shippingRoutes);
 router.use('/stores', tenantContext, taxRoutes);
 router.use('/stores', tenantContext, fiscalDocumentRoutes);
 router.use('/stores', tenantContext, customerGroupRoutes);
+router.use('/stores', tenantContext, priceTierRoutes);
+router.use('/stores', tenantContext, merchantWholesaleRouter);
 router.use('/stores', tenantContext, promotionRoutes);
 router.use('/stores', tenantContext, bundleRoutes);
 // Customer wallet (store credit) — every route behind requireFeature('customer_wallet').
@@ -440,6 +449,8 @@ router.use('/stores', tenantContext, newsletterRoutes);
 // chain on the route; every other path falls through to this mount.
 router.use('/stores/:storeId/campaigns', tenantContext, campaignRoutes);
 router.use('/public/campaigns', campaignPublicRoutes);
+// Merchant outgoing webhooks (owner-only, Growth + Business). DNS check on create is the only slow call.
+router.use('/stores/:storeId/webhooks', tenantContext, merchantWebhookRoutes);
 // Login-free opt-out link carried by every promotional SMS (issue 206).
 router.use('/public/sms-consent', smsConsentPublicRoutes);
 
@@ -485,6 +496,9 @@ router.use('/stores', tenantContext, insightsRoutes);
 
 // Storefront search insights (search program Task 6): reads through getSearchInsights (k>=2 floor).
 router.use('/stores', tenantContext, searchInsightsRoutes);
+
+// Admin ⌘K palette record lookup (search program P2 Task 18): products, orders, customers.
+router.use('/stores', tenantContext, adminSearchRoutes);
 
 // Supplier CRUD (Batch 2 accounting).
 // CONTEXT-LESS (Phase 2 candidate, reverted 2026-07-02 PR #499): service

@@ -15,6 +15,7 @@ import logger from '../lib/logger';
 import {
   allocatePartialReturn,
   splitByPaymentMix,
+  type AllocationLine,
 } from './accounting/posting/partial-return-allocation';
 import { GATEWAY_REFUND_METHODS, REFUND_METHODS } from '../lib/refund-methods';
 import {
@@ -25,7 +26,13 @@ import { featureService } from './feature.service';
 import { WalletService } from './wallet.service';
 import { evaluateReturnWindow } from '../lib/return-window';
 
-import { minorToDecimalString } from '@ebda/shared';
+import {
+  minorToDecimalString,
+  productReturnAdjustment,
+  type ReturnLineInput,
+  type SnapshotRung,
+  type TierLadderSnapshot,
+} from '@ebda/shared';
 interface CreateReturnItemInput {
   orderItemId: string;
   productId: string;
@@ -78,6 +85,93 @@ export { GATEWAY_REFUND_METHODS, REFUND_METHODS };
 
 /** Gateway refusals meaning the customer already has the money on the original method. */
 const ALREADY_PAID_TO_CUSTOMER = new Set(['REFUND_ALREADY_ISSUED', 'PAYMENT_FULLY_REFUNDED']);
+
+/** One return item as the merchant is shown it before confirming, and as it is persisted (B2B Task 8b). */
+export interface ReturnLineAdjustment {
+  returnItemId: string;
+  orderItemId: string;
+  productName: string;
+  quantity: number;
+  keptQty: number;
+  tierMinQty: number | null;
+  /** The paid unit price x quantity returned. */
+  standardRefund: number;
+  /** Signed piastres the refund is reduced by AFTER the floor and any override (what is persisted). */
+  adjustment: number;
+  adjustedRefund: number;
+  /** What the floor at 0 swallowed (never charged to the buyer), carried to the product's next return (Ruling B2B-20). */
+  shortfall: number;
+  /** The shortfall earlier returns of this product carried forward and this return collects first (B2B-20). */
+  carriedIn: number;
+  /** Signed change to the product's carry, persisted as `return_items.tier_carry` (+ carried, - consumed or waived). */
+  carryDelta: number;
+  /** What an override on this product's items waived of the carry (B2B-20; audit-logged with the override). */
+  carryWaived: number;
+  keptUnitMinor: number;
+  reason: 'none' | 'kept_below_tier' | 'released';
+  overridden: boolean;
+  overrideReason: string | null;
+}
+
+export type RefundOverrides = Record<string, { amountMinor: number; reason: string }>;
+
+/**
+ * The persisted entitlement snapshot (Json, written by `priceSnapshot`), or null when absent or malformed: then the line is
+ * never repriced (Ruling B2B-14, "a missing snapshot never adjusts"). A rung array in the pre-B2B-17 shape (no scope or
+ * audience) is treated as malformed rather than guessed at; no such row exists outside development databases.
+ */
+function ladderOf(raw: unknown): TierLadderSnapshot | null {
+  if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) return null;
+  const o = raw as { rungs?: unknown; groupPercentMinor?: unknown };
+  if (!Array.isArray(o.rungs)) return null;
+  const g = o.groupPercentMinor;
+  if (g !== null && !Number.isInteger(g)) return null;
+  const rungs: SnapshotRung[] = [];
+  for (const r of o.rungs) {
+    const x = r as { minQty?: unknown; priceMinor?: unknown; variant?: unknown; group?: unknown };
+    if (
+      !Number.isInteger(x?.minQty) ||
+      !Number.isInteger(x?.priceMinor) ||
+      typeof x.variant !== 'boolean' ||
+      typeof x.group !== 'boolean'
+    ) {
+      return null;
+    }
+    rungs.push({
+      minQty: x.minQty as number,
+      priceMinor: x.priceMinor as number,
+      variant: x.variant,
+      group: x.group,
+    });
+  }
+  return { rungs, groupPercentMinor: g as number | null };
+}
+
+/** The order-line columns a partial-return repricing reads (snapshots only; never a live price). */
+const ADJUSTMENT_LINE_SELECT = {
+  id: true,
+  productId: true,
+  variantId: true,
+  bundleGroupId: true,
+  quantity: true,
+  price: true,
+  listPrice: true,
+  priceSource: true,
+  priceTierMinQty: true,
+  tierLadder: true,
+} as const;
+type AdjustmentLine = {
+  id: string;
+  productId: string;
+  variantId: string | null;
+  bundleGroupId: string | null;
+  quantity: number;
+  price: number;
+  listPrice: number | null;
+  priceSource: string | null;
+  priceTierMinQty: number | null;
+  tierLadder: unknown;
+};
 
 /** This return's share of the order's money — see ReturnService.allocateThisReturn. */
 interface PartialAllocation {
@@ -436,13 +530,45 @@ export class ReturnService {
     // requested per bundle group above means this sum equals exactly
     // Σ(line.total) for the group — i.e. the bundle price — never the higher
     // shelf-price total.
-    const refundAmount = items.reduce((total, item) => {
+    const grossRefund = items.reduce((total, item) => {
       const orderItem = order.items.find(oi => oi.id === item.orderItemId);
       if (orderItem) {
         return total + orderItem.price * item.quantity;
       }
       return total;
     }, 0);
+    // B2B Task 8b: what the shopper is told to expect also reflects a tier adjustment (kept units repriced below their
+    // tier), computed by the SAME helper complete() and the preview use (review P2-1): the same full-return test (this
+    // return alone takes back every unit), the same product-scope repricing, the same floor and release clamp. It is an
+    // ESTIMATE like the gross above (another return may complete first); the merchant confirms the exact figure.
+    const thisReturnQty = new Map<string, number>();
+    for (const item of items) {
+      thisReturnQty.set(
+        item.orderItemId,
+        (thisReturnQty.get(item.orderItemId) ?? 0) + item.quantity
+      );
+    }
+    const isFullReturnEstimate =
+      order.items.length > 0 &&
+      order.items.every(oi => (thisReturnQty.get(oi.id) ?? 0) >= oi.quantity);
+    // Only a tier-priced line can be repriced; an order without one (every retail order) needs no lookup.
+    const estimatedAdjustment =
+      isFullReturnEstimate || !order.items.some(oi => oi.priceSource === 'tier')
+        ? 0
+        : (
+            await this.computeLineAdjustments(
+              storeId,
+              null,
+              data.orderId,
+              items.map((item, i) => ({
+                id: `estimate-${i}`,
+                orderItemId: item.orderItemId,
+                quantity: item.quantity,
+                productName: item.productName,
+              }))
+            )
+          ).total;
+    const refundAmount = Math.max(0, grossRefund - estimatedAdjustment);
 
     const returnRequest = await prisma.return.create({
       data: {
@@ -654,7 +780,14 @@ export class ReturnService {
    * restoration and the whole-order reversals (coupon, affiliate, loyalty)
    * happen consistently and only when the entire order actually came back.
    */
-  static async complete(storeId: string, returnId: string, _userId: string, refundMethod: string) {
+  static async complete(
+    storeId: string,
+    returnId: string,
+    _userId: string,
+    refundMethod: string,
+    /** B2B Task 8b: per return item id, the refund the merchant chose instead of the computed one (with a reason). */
+    refundOverrides: RefundOverrides = {}
+  ) {
     const returnRequest = await this.getById(storeId, returnId);
 
     if (returnRequest.status !== 'received' && returnRequest.status !== 'inspecting') {
@@ -719,13 +852,13 @@ export class ReturnService {
       // claw back the full affiliate commission and strip loyalty points earned
       // on the kept items (adversarial audit P1-2).
       let isFullReturn = false;
-      let orderLines: Array<{ id: string; quantity: number; price: number }> = [];
+      let orderLines: AllocationLine[] = [];
       if (returnRequest.orderId) {
         const orderItems = await prisma.orderItem.findMany({
           where: { orderId: returnRequest.orderId },
           // `price` is for the partial allocation below, not just the
           // full/partial decision.
-          select: { id: true, quantity: true, price: true },
+          select: { id: true, quantity: true, price: true, priceSource: true },
         });
         orderLines = orderItems;
         const returnedQty = new Map<string, number>();
@@ -786,13 +919,35 @@ export class ReturnService {
       // and emailed the customer — a figure the ledger never matched. The
       // method decides the channel the money moves through, not how much.
       let partial: PartialAllocation | null = null;
+      // B2B Task 8b: the tier adjustment of a partial return (empty and 0 for every line that is not tier-priced).
+      let tierAdj: { lines: ReturnLineAdjustment[]; total: number } = { lines: [], total: 0 };
+      if (Object.keys(refundOverrides).length > 0 && (!isInventoryRestoring || isFullReturn)) {
+        throw new AppError(
+          400,
+          'OVERRIDE_NOT_APPLICABLE',
+          'Refund overrides apply to a partial return only; this return has no tier adjustment to override.'
+        );
+      }
       if (isInventoryRestoring && returnRequest.orderId && !isFullReturn) {
+        tierAdj = await this.computeLineAdjustments(
+          storeId,
+          returnId,
+          returnRequest.orderId,
+          returnRequest.items.map(i => ({
+            id: i.id,
+            orderItemId: i.orderItemId,
+            quantity: i.quantity,
+            productName: i.productName,
+          })),
+          refundOverrides
+        );
         partial = await this.allocateThisReturn(
           storeId,
           returnId,
           returnRequest.orderId,
           orderLines,
-          returnRequest.items
+          returnRequest.items,
+          tierAdj.total
         );
         if (partial.returnedLineCount === 0) {
           throw new AppError(
@@ -922,7 +1077,8 @@ export class ReturnService {
           returnRequest.orderId,
           orderLines,
           returnRequest.items,
-          isFullReturn
+          isFullReturn,
+          tierAdj.total
         );
         if (!isFullReturn && walletCreditAmount <= 0) {
           throw new AppError(
@@ -949,6 +1105,22 @@ export class ReturnService {
           ...(walletCreditAmount != null ? { refundAmount: walletCreditAmount } : {}),
         },
       });
+
+      // B2B Task 8b: persist what each item's refund was reduced by (and any override, with who and why) in the SAME request
+      // transaction as the completion row. The GL posting and every later return's cumulative allocation read these values,
+      // never re-derive them.
+      for (const l of tierAdj.lines) {
+        await prisma.returnItem.update({
+          where: { id: l.returnItemId },
+          data: {
+            tierAdjustment: l.adjustment,
+            tierCarry: l.carryDelta,
+            adjustmentOverridden: l.overridden,
+            adjustmentOverrideReason: l.overrideReason,
+            adjustmentOverrideBy: l.overridden ? _userId : null,
+          },
+        });
+      }
 
       if (walletCreditAmount != null && walletCreditAmount > 0 && returnRequest.orderId) {
         await WalletService.creditForReturn({
@@ -1020,7 +1192,11 @@ export class ReturnService {
         }
       }
 
-      return updatedReturn;
+      // Ruling B2B-20: what an override waived of a carried shortfall, for the route's audit log (0 when nothing was waived).
+      return {
+        ...updatedReturn,
+        tierCarryWaived: tierAdj.lines.reduce((n, l) => n + l.carryWaived, 0),
+      };
     } catch (err) {
       // RELEASE the claim so a failure does not strand the return — but ONLY
       // when no money can have moved. Once the provider refund has (or may
@@ -1065,16 +1241,21 @@ export class ReturnService {
    * refund on the order lands before the merchant confirms; `complete()`
    * recomputes under the order lock and refuses rather than overshooting.
    */
-  static async refundPreview(storeId: string, returnId: string) {
+  static async refundPreview(
+    storeId: string,
+    returnId: string,
+    /** Optional: preview a merchant override before confirming it. */
+    refundOverrides: RefundOverrides = {}
+  ) {
     const returnRequest = await this.getById(storeId, returnId);
     const isInventoryRestoring = returnRequest.type === 'return' || returnRequest.type === 'refund';
 
     let isFullReturn = false;
-    let orderLines: Array<{ id: string; quantity: number; price: number }> = [];
+    let orderLines: AllocationLine[] = [];
     if (returnRequest.orderId) {
       orderLines = await prisma.orderItem.findMany({
         where: { orderId: returnRequest.orderId },
-        select: { id: true, quantity: true, price: true },
+        select: { id: true, quantity: true, price: true, priceSource: true },
       });
       const returnedQty = new Map<string, number>();
       for (const it of returnRequest.items) {
@@ -1086,13 +1267,28 @@ export class ReturnService {
     }
 
     let partial: PartialAllocation | null = null;
+    // B2B Task 8b: the same helper complete() uses, so the figure shown is the figure sent.
+    let tierAdj: { lines: ReturnLineAdjustment[]; total: number } = { lines: [], total: 0 };
     if (isInventoryRestoring && returnRequest.orderId && !isFullReturn) {
+      tierAdj = await this.computeLineAdjustments(
+        storeId,
+        returnId,
+        returnRequest.orderId,
+        returnRequest.items.map(i => ({
+          id: i.id,
+          orderItemId: i.orderItemId,
+          quantity: i.quantity,
+          productName: i.productName,
+        })),
+        refundOverrides
+      );
       partial = await this.allocateThisReturn(
         storeId,
         returnId,
         returnRequest.orderId,
         orderLines,
-        returnRequest.items
+        returnRequest.items,
+        tierAdj.total
       );
     }
 
@@ -1117,7 +1313,8 @@ export class ReturnService {
             returnRequest.orderId,
             orderLines,
             returnRequest.items,
-            isFullReturn
+            isFullReturn,
+            tierAdj.total
           )
         : null;
 
@@ -1201,7 +1398,218 @@ export class ReturnService {
       recordedAmount,
       storeCreditToWallet,
       gateway,
+      /** Per item: standard refund, the tier adjustment with its reason, the adjusted refund (empty unless a line is tier-priced). */
+      lines: tierAdj.lines,
+      tierAdjustmentTotal: tierAdj.total,
     };
+  }
+
+  /**
+   * B2B Task 8b: per return item, what a partial return of tier-priced units costs the buyer. Reads ONLY the snapshots on
+   * the order lines (paid price, list price, source, threshold, entitlement ladder) and the quantities already taken back:
+   * it never re-resolves a price. Judged per PRODUCT across every loose line of it, the way the tier was awarded (Ruling
+   * B2B-17), at the buyer's full sale-time entitlement (B2B-18). A merchant override (0..standardRefund, with a reason)
+   * replaces the computed refund for that item (B2B-15).
+   *
+   * `returnId` null = the return does not exist yet (the shopper's estimate at creation): nothing to exclude.
+   */
+  static async computeLineAdjustments(
+    storeId: string,
+    returnId: string | null,
+    orderId: string,
+    items: Array<{ id: string; orderItemId: string; quantity: number; productName: string }>,
+    overrides: RefundOverrides = {}
+  ): Promise<{ lines: ReturnLineAdjustment[]; total: number }> {
+    const [orderItems, { prevQty }, retainedRows] = await Promise.all([
+      prisma.orderItem.findMany({ where: { orderId }, select: ADJUSTMENT_LINE_SELECT }),
+      loadPriorReversedQty(prisma, { storeId, orderId, excludeKey: returnId ?? undefined }),
+      // What earlier COMPLETED returns actually retained (floor and overrides included): a later release can never hand back
+      // more than was kept, or the sum of refunds could exceed what the buyer paid for those units.
+      prisma.returnItem.findMany({
+        where: {
+          return: {
+            storeId,
+            orderId,
+            status: 'completed',
+            ...(returnId ? { id: { not: returnId } } : {}),
+          },
+        },
+        select: { orderItemId: true, tierAdjustment: true, tierCarry: true },
+      }),
+    ]);
+    return ReturnService.lineAdjustmentsFrom(orderItems, prevQty, retainedRows, items, overrides);
+  }
+
+  /** The pure half of computeLineAdjustments (exported for the unit suite). */
+  static lineAdjustmentsFrom(
+    orderItems: readonly AdjustmentLine[],
+    prevQty: ReadonlyMap<string, number>,
+    retainedRows: ReadonlyArray<{ orderItemId: string; tierAdjustment: number; tierCarry: number }>,
+    items: Array<{ id: string; orderItemId: string; quantity: number; productName: string }>,
+    overrides: RefundOverrides = {}
+  ): { lines: ReturnLineAdjustment[]; total: number } {
+    for (const key of Object.keys(overrides)) {
+      if (!items.some(i => i.id === key)) {
+        throw new AppError(
+          400,
+          'OVERRIDE_UNKNOWN_ITEM',
+          'A refund override names an item that is not on this return.'
+        );
+      }
+    }
+    const lineById = new Map(orderItems.map(o => [o.id, o]));
+    // Tier quantity is summed over LOOSE lines only (Ruling B2B-8b): a bundle component never counts and is never repriced.
+    const scopeOf = (o: AdjustmentLine): string | null =>
+      o.bundleGroupId === null ? o.productId : null;
+
+    // Units each item really takes back, clamped to what its line has left (duplicates within one return included).
+    const running = new Map(prevQty);
+    const returningOf = new Map<string, number>();
+    for (const it of items) {
+      const oi = lineById.get(it.orderItemId);
+      if (!oi) continue;
+      const before = Math.min(running.get(oi.id) ?? 0, oi.quantity);
+      const returning = Math.max(0, Math.min(it.quantity, oi.quantity - before));
+      running.set(oi.id, before + returning);
+      returningOf.set(it.id, returning);
+    }
+
+    const retainedByProduct = new Map<string, number>();
+    // Ruling B2B-20: the shortfall earlier returns carried forward, net of what later ones consumed or an override waived.
+    const carriedByProduct = new Map<string, number>();
+    for (const r of retainedRows) {
+      const oi = lineById.get(r.orderItemId);
+      const scope = oi ? scopeOf(oi) : null;
+      if (scope !== null) {
+        retainedByProduct.set(scope, (retainedByProduct.get(scope) ?? 0) + r.tierAdjustment);
+        carriedByProduct.set(scope, (carriedByProduct.get(scope) ?? 0) + r.tierCarry);
+      }
+    }
+
+    // One product-scope computation per product on this return.
+    const perItem = new Map<
+      string,
+      {
+        adjustment: number;
+        keptUnitMinor: number;
+        keptQty: number;
+        shortfall: number;
+        carriedIn: number;
+        carryDelta: number;
+        carryWaived: number;
+      }
+    >();
+    const products = new Set<string>();
+    for (const it of items) {
+      const oi = lineById.get(it.orderItemId);
+      const scope = oi ? scopeOf(oi) : null;
+      if (scope !== null && returningOf.has(it.id)) products.add(scope);
+    }
+    for (const productId of products) {
+      const scopeLines = orderItems.filter(o => scopeOf(o) === productId);
+      const scopeItems = items.filter(
+        it => returningOf.has(it.id) && lineById.get(it.orderItemId)?.productId === productId
+      );
+      const res = productReturnAdjustment(
+        scopeLines.map(
+          (o): ReturnLineInput => ({
+            key: o.id,
+            variantId: o.variantId,
+            quantity: o.quantity,
+            paidUnitMinor: o.price,
+            listMinor: o.listPrice,
+            priceSource: (o.priceSource as ReturnLineInput['priceSource']) ?? null,
+            tierMinQty: o.priceTierMinQty,
+            ladder: ladderOf(o.tierLadder),
+            returnedBefore: Math.min(prevQty.get(o.id) ?? 0, o.quantity),
+            returning: scopeItems
+              .filter(it => it.orderItemId === o.id)
+              .reduce((n, it) => n + returningOf.get(it.id)!, 0),
+          })
+        ),
+        scopeItems
+          .filter(it => lineById.get(it.orderItemId)!.bundleGroupId === null)
+          .map(it => ({ key: it.id, lineKey: it.orderItemId, returning: returningOf.get(it.id)! })),
+        retainedByProduct.get(productId) ?? 0,
+        Math.max(0, carriedByProduct.get(productId) ?? 0)
+      );
+      // An override on any of this product's items replaces the computed refund, the carry included: the carry is
+      // WAIVED, never re-claimed by a later return (Rulings B2B-15, B2B-20).
+      const waived = scopeItems.some(it => overrides[it.id] !== undefined);
+      const carryOut = waived ? 0 : res.shortfall;
+      res.items.forEach((r, i) =>
+        perItem.set(r.key, {
+          adjustment: r.adjustment,
+          keptUnitMinor: r.keptUnitMinor,
+          keptQty: res.keptQty,
+          // Reported and persisted once per product (on its first item), so a sum over the items never doubles it.
+          shortfall: i === 0 ? carryOut : 0,
+          carriedIn: i === 0 ? res.carriedIn : 0,
+          carryDelta: i === 0 ? carryOut - res.carriedIn : 0,
+          carryWaived: i === 0 && waived ? res.shortfall : 0,
+        })
+      );
+    }
+
+    const lines: ReturnLineAdjustment[] = [];
+    let total = 0;
+    for (const it of items) {
+      const oi = lineById.get(it.orderItemId);
+      if (!oi || !returningOf.has(it.id)) continue;
+      const returning = returningOf.get(it.id)!;
+      const standardRefund = oi.price * returning;
+      const computed = perItem.get(it.id) ?? {
+        adjustment: 0,
+        keptUnitMinor: oi.price,
+        keptQty: oi.quantity - (running.get(oi.id) ?? 0),
+        shortfall: 0,
+        carriedIn: 0,
+        carryDelta: 0,
+        carryWaived: 0,
+      };
+      let adjustment = computed.adjustment;
+      let overridden = false;
+      let overrideReason: string | null = null;
+      const ov = overrides[it.id];
+      if (ov) {
+        if (
+          !Number.isInteger(ov.amountMinor) ||
+          ov.amountMinor < 0 ||
+          ov.amountMinor > standardRefund
+        ) {
+          throw new AppError(
+            400,
+            'OVERRIDE_OUT_OF_RANGE',
+            'A refund override must be between 0 and the standard refund for that item.'
+          );
+        }
+        adjustment = standardRefund - ov.amountMinor;
+        overridden = true;
+        overrideReason = ov.reason;
+      }
+      total += adjustment;
+      lines.push({
+        returnItemId: it.id,
+        orderItemId: oi.id,
+        productName: it.productName,
+        quantity: returning,
+        keptQty: computed.keptQty,
+        tierMinQty: oi.priceSource === 'tier' ? oi.priceTierMinQty : null,
+        standardRefund,
+        adjustment,
+        adjustedRefund: standardRefund - adjustment,
+        shortfall: computed.shortfall,
+        carriedIn: computed.carriedIn,
+        carryDelta: computed.carryDelta,
+        carryWaived: computed.carryWaived,
+        keptUnitMinor: computed.keptUnitMinor,
+        // From the APPLIED adjustment (review minor 3): a release clamped to nothing is not reported as "released".
+        reason: adjustment > 0 ? 'kept_below_tier' : adjustment < 0 ? 'released' : 'none',
+        overridden,
+        overrideReason,
+      });
+    }
+    return { lines, total };
   }
 
   /**
@@ -1213,12 +1621,14 @@ export class ReturnService {
     storeId: string,
     returnId: string,
     orderId: string,
-    orderLines: Array<{ id: string; quantity: number; price: number }>,
-    items: Array<{ orderItemId: string; quantity: number }>
+    orderLines: AllocationLine[],
+    items: Array<{ orderItemId: string; quantity: number }>,
+    /** B2B Task 8b: signed piastres this return's tier adjustment (0 for every non-B2B line). */
+    thisAdjustment = 0
   ): Promise<PartialAllocation> {
     // Prior completed returns AND single-line backorder cancellations — the
     // same reader the GL posting uses, so the two cannot disagree.
-    const { prevQty } = await loadPriorReversedQty(prisma, {
+    const { prevQty, prevAdjustment } = await loadPriorReversedQty(prisma, {
       storeId,
       orderId,
       excludeKey: returnId,
@@ -1242,6 +1652,8 @@ export class ReturnService {
       lines: orderLines,
       prevQty,
       requested: items.map(i => ({ orderItemId: i.orderItemId, quantity: i.quantity })),
+      prevAdjustment,
+      thisAdjustment,
     });
     const thisQty = new Map<string, number>();
     for (const { line, qty } of alloc.returnedLines) {
@@ -1260,6 +1672,7 @@ export class ReturnService {
         lines: orderLines,
         prevQty: new Map(),
         requested: [...prevQty].map(([orderItemId, quantity]) => ({ orderItemId, quantity })),
+        thisAdjustment: prevAdjustment,
       });
       split = splitByPaymentMix({
         cashCredit: alloc.cashCredit,
@@ -1491,11 +1904,12 @@ export class ReturnService {
     storeId: string,
     returnId: string,
     orderId: string,
-    orderLines: Array<{ id: string; quantity: number; price: number }>,
+    orderLines: AllocationLine[],
     items: Array<{ orderItemId: string; quantity: number }>,
-    isFullReturn: boolean
+    isFullReturn: boolean,
+    thisAdjustment = 0
   ): Promise<number> {
-    const [{ prevQty }, order] = await Promise.all([
+    const [{ prevQty, prevAdjustment }, order] = await Promise.all([
       loadPriorReversedQty(prisma, { storeId, orderId, excludeKey: returnId }),
       prisma.order.findFirst({
         where: { id: orderId, storeId },
@@ -1517,6 +1931,8 @@ export class ReturnService {
       lines: orderLines,
       prevQty,
       requested: items.map(i => ({ orderItemId: i.orderItemId, quantity: i.quantity })),
+      prevAdjustment,
+      thisAdjustment,
     });
     if (!isFullReturn) return alloc.cashCredit;
     return Math.max(0, alloc.cashCredit + (order?.shipping ?? 0) - (order?.walletAmount ?? 0));

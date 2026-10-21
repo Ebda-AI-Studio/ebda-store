@@ -10,7 +10,8 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-const { mockPrisma } = vi.hoisted(() => ({
+const { mockPrisma, mockLoadBuyerGroup } = vi.hoisted(() => ({
+  mockLoadBuyerGroup: vi.fn(),
   mockPrisma: {
     promotion: { findMany: vi.fn() },
     customer: { findFirst: vi.fn() },
@@ -22,12 +23,20 @@ const { mockPrisma } = vi.hoisted(() => ({
 vi.mock('@ebda/database', () => ({
   prisma: mockPrisma,
 }));
+// Group membership is decided by the SHARED buyer-group loader (session / merchant selection only); its own queries are
+// pinned in tests/unit/price-resolver-service.test.ts and tests/integration/b2b-promo-identity.test.ts.
+vi.mock('../../apps/api/src/services/price-resolver.service', () => ({
+  loadBuyerGroup: mockLoadBuyerGroup,
+}));
 
 import {
   resolveBestPromotion,
   resolveCustomerContext,
 } from '../../apps/api/src/services/promotion-resolver';
 import type { TargetingCtx } from '../../apps/api/src/services/promotion-targeting';
+import { ANONYMOUS_BUYER, type BuyerIdentity } from '../../apps/api/src/lib/buyer-identity';
+
+const sessionBuyer = (userId: string) => ({ kind: 'session', userId }) as unknown as BuyerIdentity;
 
 const STORE = 'store-1';
 
@@ -109,43 +118,53 @@ describe('resolveBestPromotion', () => {
 });
 
 describe('resolveCustomerContext', () => {
-  it('treats an anonymous checkout (no identity) as a first order', async () => {
+  beforeEach(() => {
+    mockLoadBuyerGroup.mockResolvedValue(null);
+  });
+
+  it('treats an anonymous checkout (no identity) as a first order with no group', async () => {
     const ctx = await resolveCustomerContext(STORE, { phone: null, email: null });
     expect(ctx).toEqual({ customerGroupId: null, isFirstOrder: true });
-    expect(mockPrisma.customer.findFirst).not.toHaveBeenCalled();
     expect(mockPrisma.order.count).not.toHaveBeenCalled();
   });
 
-  it('resolves the customer group and marks first-order when no prior orders', async () => {
-    mockPrisma.customer.findFirst.mockResolvedValue({ groupId: 'vip' });
+  it('GUEST: a typed phone / email never confers a group (the VIP-phone exploit), and the lookup is anonymous', async () => {
     mockPrisma.order.count.mockResolvedValue(0);
-    const ctx = await resolveCustomerContext(STORE, { phone: '+96550000000', email: null });
-    expect(ctx).toEqual({ customerGroupId: 'vip', isFirstOrder: true });
+    mockPrisma.customer.findFirst.mockResolvedValue({ groupId: 'vip' }); // would have matched the VIP row before
+    const ctx = await resolveCustomerContext(
+      STORE,
+      { phone: '+96550000000', email: 'vip@x.com' },
+      ANONYMOUS_BUYER
+    );
+    expect(ctx).toEqual({ customerGroupId: null, isFirstOrder: true });
+    expect(mockLoadBuyerGroup).toHaveBeenCalledWith(STORE, ANONYMOUS_BUYER);
+    expect(mockPrisma.customer.findFirst).not.toHaveBeenCalled();
+    expect(mockPrisma.user.findUnique).not.toHaveBeenCalled();
   });
 
-  it('marks not-first-order when a prior non-cancelled order exists', async () => {
-    mockPrisma.customer.findFirst.mockResolvedValue(null);
+  it('SESSION / merchant pick: the group is whatever the shared buyer-group loader returns', async () => {
+    mockLoadBuyerGroup.mockResolvedValue({ id: 'vip' });
+    mockPrisma.order.count.mockResolvedValue(3);
+    const buyer = sessionBuyer('user-1');
+    const ctx = await resolveCustomerContext(STORE, { phone: 'ignored', email: 'ignored' }, buyer);
+    expect(ctx).toEqual({ customerGroupId: 'vip', isFirstOrder: false });
+    expect(mockLoadBuyerGroup).toHaveBeenCalledWith(STORE, buyer);
+  });
+
+  it('guest first-order status still comes from the typed identity (not-first when a prior order exists)', async () => {
     mockPrisma.order.count.mockResolvedValue(2);
     const ctx = await resolveCustomerContext(STORE, { phone: null, email: 'a@b.com' });
     expect(ctx).toEqual({ customerGroupId: null, isFirstOrder: false });
   });
 
-  // Fix B regression: a registered customer must be keyed by the reliable
-  // customerId, not the mutable per-order shipping phone/email.
+  // Fix B regression: a registered customer must be keyed by the reliable customerId, not the mutable shipping phone/email.
   it('with customerId: first-order is decided by the customerId order count, not shipping fields', async () => {
-    // Shipping fields look like a repeat guest (would be not-first-order via
-    // the old JSON-path logic), but the customerId-keyed count says 0 prior
-    // orders — the customerId count must win.
     mockPrisma.order.count.mockResolvedValue(0);
-    mockPrisma.user.findUnique.mockResolvedValue(null);
-    mockPrisma.customer.findFirst.mockResolvedValue(null);
-
     const ctx = await resolveCustomerContext(STORE, {
       phone: '+96550000000',
       email: 'shipping@test.com',
       customerId: 'cust-1',
     });
-
     expect(ctx.isFirstOrder).toBe(true);
     expect(mockPrisma.order.count).toHaveBeenCalledWith({
       where: {
@@ -155,38 +174,20 @@ describe('resolveCustomerContext', () => {
         status: { not: 'cancelled' },
       },
     });
-    // Must not fall back to the guest JSON-path count for a registered customer.
     expect(mockPrisma.order.count).toHaveBeenCalledTimes(1);
   });
 
-  it('with customerId: group is resolved via the account (User) phone/email, not the shipping fields', async () => {
+  it('a session buyer without an explicit customerId still keys first-order on the session user', async () => {
     mockPrisma.order.count.mockResolvedValue(1);
-    mockPrisma.user.findUnique.mockResolvedValue({
-      phone: '+96599999999',
-      email: 'account@test.com',
-    });
-    mockPrisma.customer.findFirst.mockResolvedValue({ groupId: 'vip' });
-
-    const ctx = await resolveCustomerContext(STORE, {
-      phone: '+96550000000',
-      email: 'shipping@test.com',
-      customerId: 'cust-1',
-    });
-
-    expect(ctx.customerGroupId).toBe('vip');
-    expect(mockPrisma.user.findUnique).toHaveBeenCalledWith({
-      where: { id: 'cust-1', storeId: STORE },
-      select: { phone: true, email: true },
-    });
-    expect(mockPrisma.customer.findFirst).toHaveBeenCalledWith({
+    const ctx = await resolveCustomerContext(STORE, {}, sessionBuyer('user-9'));
+    expect(ctx.isFirstOrder).toBe(false);
+    expect(mockPrisma.order.count).toHaveBeenCalledWith({
       where: {
         storeId: STORE,
-        OR: [
-          { phone: '+96599999999' },
-          { email: { equals: 'account@test.com', mode: 'insensitive' } },
-        ],
+        customerId: 'user-9',
+        deletedAt: null,
+        status: { not: 'cancelled' },
       },
-      select: { groupId: true },
     });
   });
 });

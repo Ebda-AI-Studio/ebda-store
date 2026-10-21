@@ -34,6 +34,7 @@ import { AiFieldBadge } from './_components/AiFieldBadge';
 import { BalanceDescriptionButton } from './_components/BalanceDescriptionButton';
 import { FactsCard } from './_components/FactsCard';
 import { FulfilmentCard, LEAD_TIME_MAX } from './_components/FulfilmentCard';
+import { WholesalePricingCard } from './_components/WholesalePricingCard';
 import type { SizeChartOption } from '@/components/SizeChartSelect';
 import {
   PersonalisationCard,
@@ -57,6 +58,9 @@ interface Product {
   price: number;
   compareAtPrice?: number | null;
   costPrice?: number | null;
+  /** B2B (owned by WholesalePricingCard, not by this form). */
+  moq?: number | null;
+  audience?: 'public' | 'wholesale_only';
   discountType?: 'percentage' | 'fixed' | null;
   discountValue?: number | null;
   sku?: string;
@@ -123,6 +127,16 @@ export default function EditProductPage() {
   const [aiSources, setAiSources] = useState<Record<string, 'ai' | 'human'>>({});
   const [categories, setCategories] = useState<Category[]>([]);
   const [sizeCharts, setSizeCharts] = useState<SizeChartOption[]>([]);
+  // The store's tax basis, only to label the wholesale price fields (null = tax off / unknown).
+  const [vatBasis, setVatBasis] = useState<'inclusive' | 'exclusive' | null>(null);
+  useEffect(() => {
+    void (async () => {
+      const { data } = await apiGet<{ taxEnabled?: boolean; taxIncludedInPrice?: boolean }>(
+        `/api/v1/stores/${storeId}/tax/settings`
+      );
+      setVatBasis(data?.taxEnabled ? (data.taxIncludedInPrice ? 'inclusive' : 'exclusive') : null);
+    })();
+  }, [storeId]);
   /** Template of the store — used to show per-theme recommended upload sizes. */
   const [storeTemplate, setStoreTemplate] = useState<TemplateId | undefined>();
   const [images, setImages] = useState<string[]>([]);
@@ -1043,6 +1057,18 @@ export default function EditProductPage() {
               </div>
             </div>
 
+            {product ? (
+              <WholesalePricingCard
+                storeId={storeId}
+                productId={product.id}
+                priceMinor={product.price}
+                costPriceMinor={product.costPrice ?? null}
+                moq={product.moq ?? null}
+                audience={product.audience ?? 'public'}
+                vatBasis={vatBasis}
+              />
+            ) : null}
+
             <FulfilmentCard
               value={formData.leadTimeDays}
               onChange={v => updateField('leadTimeDays', v)}
@@ -1069,7 +1095,7 @@ export default function EditProductPage() {
                     type="button"
                     onClick={() => generateAiContent('fill-empty')}
                     disabled={seoGenerating}
-                    className="inline-flex items-center gap-2 rounded-lg border border-[#fc6b02]/40 bg-[#fc6b02]/5 px-3 py-1.5 text-xs font-semibold text-[#fc6b02] transition-colors hover:bg-[#fc6b02]/10 disabled:cursor-not-allowed disabled:opacity-50"
+                    className="inline-flex items-center gap-2 rounded-lg border border-primary/40 bg-primary/5 px-3 py-1.5 text-xs font-semibold text-primary-ink transition-colors hover:bg-primary/10 disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     <span aria-hidden>✨</span>
                     {seoGenerating ? tSeo('generating') : tSeo('aiFillEmpty')}
@@ -1078,7 +1104,7 @@ export default function EditProductPage() {
                     type="button"
                     onClick={() => generateAiContent('overwrite')}
                     disabled={seoGenerating}
-                    className="inline-flex items-center gap-2 rounded-lg border border-[#fc6b02] px-3 py-1.5 text-xs font-semibold text-[#fc6b02] transition-colors hover:bg-[#fc6b02]/5 disabled:cursor-not-allowed disabled:opacity-50"
+                    className="inline-flex items-center gap-2 rounded-lg border border-primary px-3 py-1.5 text-xs font-semibold text-primary-ink transition-colors hover:bg-primary/5 disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     {tSeo('aiRegenerateAll')}
                   </button>

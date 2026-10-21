@@ -8,8 +8,9 @@ import { CartLineUnavailableNotice } from '../shared/CartLineUnavailable';
 import { CartLineNote } from '../../components/commerce/CartLineNote';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useNumerals } from '../../hooks/useNumerals';
+import { useLocalePrice } from '../../hooks/useLocalePrice';
+import { cartLineLabel } from '../shared/card-actions';
 
-import { REGION } from '@ebda/shared';
 /**
  * Modern template — cart item list. Each row is a card with the product
  * image, name, quantity controls, and remove button, using the same
@@ -18,17 +19,17 @@ import { REGION } from '@ebda/shared';
 export default function ModernCartTable({
   items,
   isRtl: isRtlProp,
-  currency = REGION.currency,
   urlPrefix = '',
   onUpdateQuantity,
   onRemove,
   typography,
 }: CartTableProps) {
-  const { isRtl: ctxIsRtl, t } = useLanguage();
-  const { localize, money } = useNumerals();
+  const { isRtl: ctxIsRtl } = useLanguage();
+  const { localize } = useNumerals();
   const isRtl = isRtlProp ?? ctxIsRtl;
 
-  const format = (price: number) => `${money(price)} ${currency}`;
+  // The ONE storefront price format (Ruling B1-28).
+  const format = useLocalePrice();
 
   return (
     <div className="space-y-3" dir={isRtl ? 'rtl' : 'ltr'}>
@@ -71,7 +72,7 @@ export default function ModernCartTable({
               <div>
                 <Link
                   href={`${urlPrefix}/products/${item.slug}`}
-                  className="line-clamp-2 font-semibold text-foreground hover:text-primary transition-colors"
+                  className="relative min-w-11 before:absolute before:-inset-y-3 before:inset-x-0 before:content-[''] line-clamp-2 font-semibold text-foreground hover:text-primary transition-colors"
                   style={typography?.name}
                 >
                   {displayName}
@@ -89,22 +90,25 @@ export default function ModernCartTable({
                 )}
                 <CartLineNote note={item.note} />
                 {item.unavailable && <CartLineUnavailableNotice />}
-                <p
-                  className="mt-1 text-sm font-medium text-primary tabular-nums"
-                  style={typography?.price}
-                >
-                  {format(item.price)}
-                </p>
+                {/* Taste re-audit P2-2: at quantity 1 the line total already says it. */}
+                {item.quantity > 1 && (
+                  <p
+                    className="mt-1 text-sm font-medium text-primary tabular-nums"
+                    style={typography?.price}
+                  >
+                    {format(item.price)}
+                  </p>
+                )}
               </div>
 
               <div className="flex items-center justify-between gap-3">
-                <div className="flex items-center gap-2 rounded-lg border border-border/60 p-1">
+                <div className="flex items-center gap-2 rounded-lg border border-input/60 p-1">
                   <button
                     type="button"
                     onClick={() => onUpdateQuantity?.(item.id, Math.max(1, item.quantity - 1))}
                     className="flex h-11 w-11 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-40 focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1"
                     disabled={item.unavailable || item.quantity <= 1}
-                    aria-label={t('Decrease quantity', 'تقليل الكمية')}
+                    aria-label={cartLineLabel('decrease', isRtl, displayName)}
                     style={typography?.cta}
                   >
                     <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -127,7 +131,7 @@ export default function ModernCartTable({
                     disabled={item.unavailable}
                     onClick={() => onUpdateQuantity?.(item.id, item.quantity + 1)}
                     className="flex h-11 w-11 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1 disabled:opacity-40"
-                    aria-label={t('Increase quantity', 'زيادة الكمية')}
+                    aria-label={cartLineLabel('increase', isRtl, displayName)}
                     style={typography?.cta}
                   >
                     <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -152,7 +156,7 @@ export default function ModernCartTable({
                     type="button"
                     onClick={() => onRemove?.(item.id)}
                     className="flex h-11 w-11 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive-ink focus-visible:ring-2 focus-visible:ring-destructive focus-visible:ring-offset-1"
-                    aria-label={t('Remove', 'إزالة')}
+                    aria-label={cartLineLabel('remove', isRtl, displayName)}
                     style={typography?.cta}
                   >
                     <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

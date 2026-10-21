@@ -8,7 +8,7 @@ import { AppError } from '../middleware/error-handler';
  */
 export const VARIANT_REQUIRED_MESSAGE = {
   en: 'Choose the options for this product before adding it to the cart',
-  ar: 'اختر خيارات المنتج قبل إضافته إلى السلة',
+  ar: 'اختار مواصفات المنتج قبل ما تضيفه للسلة',
 } as const;
 
 /** Merchant-facing copy (admin order, payment link): names the product. */
@@ -21,7 +21,7 @@ export function variantRequiredError(productId?: string, productName?: string): 
     });
   }
   const messageEn = `Choose a size or option for “${productName}”`;
-  const messageAr = `اختر المقاس أو الخيار لـ «${productName}»`;
+  const messageAr = `اختار المقاس أو المواصفات لـ «${productName}»`;
   return new AppError(400, 'VARIANT_REQUIRED', messageEn, {
     messageEn,
     messageAr,

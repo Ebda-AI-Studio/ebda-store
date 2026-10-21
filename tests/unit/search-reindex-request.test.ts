@@ -68,8 +68,9 @@ describe('requestStoreReindex', () => {
     expect(send).not.toHaveBeenCalled();
   });
 
-  it('touchesEmbedDoc knows the five doc columns', () => {
-    expect(touchesEmbedDoc(['metaTitle', 'searchTerms'])).toBe(true);
+  it('touchesEmbedDoc knows the four doc columns AND the search words, which have their own vector (SEARCH-T13-7)', () => {
+    expect(touchesEmbedDoc(['metaTitle', 'description'])).toBe(true);
+    expect(touchesEmbedDoc(['searchTerms'])).toBe(true);
     expect(touchesEmbedDoc(['excerpt', 'metaDescription', 'inventory'])).toBe(false);
   });
 });

@@ -30,4 +30,29 @@ describe('makeRateLimitStore', () => {
       expect((await store.increment('k')).totalHits).toBe(2);
     }
   });
+
+  it('get() reads back what increment() wrote (memory backend)', async () => {
+    const store = makeRateLimitStore(undefined, 'auth');
+    store.init?.(options);
+    expect(await store.get?.('g')).toBeUndefined();
+    await store.increment('g');
+    expect((await store.get?.('g'))?.totalHits).toBe(1);
+  });
+
+  it('get() goes to Redis when a client is provided', async () => {
+    const calls: string[][] = [];
+    const fakeRedis = {
+      call: (...args: string[]) => {
+        calls.push(args);
+        return Promise.resolve(
+          String(args[0]).toUpperCase() === 'SCRIPT' ? 'deadbeefsha' : [3, 60_000]
+        );
+      },
+    };
+    const store = makeRateLimitStore(fakeRedis, 'auth');
+    store.init?.(options);
+    const info = await store.get?.('g');
+    expect(info?.totalHits).toBe(3);
+    expect(calls.some(c => c[0] === 'EVALSHA' && c.includes('rl:auth:g'))).toBe(true);
+  });
 });

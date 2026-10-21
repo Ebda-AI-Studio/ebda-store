@@ -122,3 +122,19 @@ describe('R-06: one breadcrumb implementation in the storefront', () => {
     }
   });
 });
+
+// a11y P2-10: crumb links measured 20px high. The hit area grows to 44px with a
+// before: inset, so the trail keeps its visual height.
+describe('rule (d): crumb links are 44px targets', () => {
+  it('every crumb link clears 44px', async () => {
+    const { smallTargets } = await import('../helpers/target-size');
+    const { Breadcrumbs: B } = await import('../../apps/web/src/components/Breadcrumbs');
+    const { container } = render(
+      <B
+        items={[{ label: 'Home', href: '/' }, { label: 'Abayas', href: '/c' }, { label: 'Linen' }]}
+      />
+    );
+    expect(container.querySelectorAll('a').length).toBe(2);
+    expect(smallTargets(container)).toEqual([]);
+  });
+});

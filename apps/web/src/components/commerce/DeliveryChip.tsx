@@ -30,8 +30,8 @@ function zonesFor(storeId: string): Promise<Zones> {
 /** "in N days" tail of the made-to-order line, through the one plural helper (Y-01). */
 function leadTimeText(n: number, lang: 'ar' | 'en', localize: (v: number) => string): string {
   if (lang === 'en') return `Made for you in ${countText('en', n, DAYS)}`;
-  // MSA (Ruling FU46-Y02): "يُجهَّز خصيصًا لك خلال يومين" (oblique dual after خلال).
-  return `يُجهَّز خصيصًا لك خلال ${countText('ar', n, DAYS, localize(n), 'oblique')}`;
+  // Egyptian sentence (Ruling FU46-Y02a): "بيتجهزلك مخصوص في يومين".
+  return `بيتجهزلك مخصوص في ${countText('ar', n, DAYS, localize(n))}`;
 }
 
 /**
@@ -122,7 +122,7 @@ export function useDeliveryWindow({
 }
 
 /**
- * "Arrives Sun 19 Oct – Tue 21 Oct" under the add-to-cart button, plus one muted line when
+ * "Arrives between Sun 19 Oct and Tue 21 Oct" under the add-to-cart button, plus one muted line when
  * the product is made to order (`useDeliveryWindow`). Hides itself when the store has no
  * numbers. Ink/muted tokens only: the accent belongs to the CTA.
  */
@@ -135,8 +135,8 @@ export function DeliveryChip({ leadTimeDays }: { leadTimeDays?: number | null })
   const { from, to } = win;
   const text =
     from === to
-      ? t(`Arrives ${from}`, `يصلك ${from}`)
-      : t(`Arrives ${from} – ${to}`, `يصلك بين ${from} و${to}`);
+      ? t(`Arrives ${from}`, `يوصلك ${from}`)
+      : t(`Arrives between ${from} and ${to}`, `يوصلك بين ${from} و${to}`);
 
   return (
     <div data-testid="delivery-chip" className="mt-3 flex items-start gap-2 text-foreground">

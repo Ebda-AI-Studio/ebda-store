@@ -1,7 +1,7 @@
 'use client';
 
-import { useMemo, useState } from 'react';
-import { useParams } from 'next/navigation';
+import { useEffect, useMemo, useState } from 'react';
+import { useParams, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { useT } from '@/i18n/useT';
 import { AdminLayout } from '../../../../components/AdminLayout';
@@ -15,6 +15,15 @@ import { LocationsTab } from './_components/LocationsTab';
 import type { BrandingTabId } from './_components/types';
 import { useBranding } from './_hooks/useBranding';
 
+/** The tabs `?tab=` may select (kept in step with BrandingTabId by the type below). */
+const BRANDING_TAB_IDS = [
+  'branding',
+  'theme',
+  'contact',
+  'social',
+  'locations',
+] as const satisfies readonly BrandingTabId[];
+
 export default function StoreBrandingPage() {
   const params = useParams();
   const storeId = params?.id as string;
@@ -25,6 +34,15 @@ export default function StoreBrandingPage() {
   const tTabs = useT('branding.tabs');
 
   const [activeTab, setActiveTab] = useState<BrandingTabId>('branding');
+
+  // Admin search deep link (?tab=theme&setting=branding.logo-size): open the tab that holds the
+  // control. Re-runs when another result on this same page changes the tab.
+  const tabParam = useSearchParams().get('tab');
+  useEffect(() => {
+    if (tabParam && (BRANDING_TAB_IDS as readonly string[]).includes(tabParam)) {
+      setActiveTab(tabParam as BrandingTabId);
+    }
+  }, [tabParam]);
 
   // Memoize so the hook's callback identity is stable across renders.
   const toastMessages = useMemo(

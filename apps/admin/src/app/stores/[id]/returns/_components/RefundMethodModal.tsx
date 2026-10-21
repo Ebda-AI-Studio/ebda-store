@@ -5,15 +5,42 @@ import { Button, Modal } from '@ebda/ui';
 import { useT } from '@/i18n/useT';
 import { apiGet } from '../../../../../lib/api';
 
-import { formatMoney } from '@ebda/shared';
+import { formatMoney, tryToMinor } from '@ebda/shared';
 type RefundMethod = 'original' | 'store_credit' | 'bank_transfer' | 'manual';
 
 // 'manual' ("Already refunded — record only") is offered ONLY when a refund for
 // this return already went to the provider — see `visibleMethods` below.
 const REFUND_METHODS: RefundMethod[] = ['original', 'store_credit', 'bank_transfer', 'manual'];
 
+/** B2B Task 8b: one return item of a partial return on a tier-priced line (ReturnService.computeLineAdjustments). */
+export interface TierAdjustmentLine {
+  returnItemId: string;
+  productName: string;
+  quantity: number;
+  keptQty: number;
+  tierMinQty: number | null;
+  standardRefund: number;
+  adjustment: number;
+  adjustedRefund: number;
+  shortfall: number;
+  /** Ruling B2B-20: a shortfall an earlier return of this product carried forward, collected first by this one. */
+  carriedIn: number;
+  keptUnitMinor: number;
+  reason: 'none' | 'kept_below_tier' | 'released';
+  overridden: boolean;
+  overrideReason: string | null;
+}
+export type RefundOverrides = Record<string, { amountMinor: number; reason: string }>;
+interface OverrideDraft {
+  on: boolean;
+  amount: string;
+  reason: string;
+}
+
 /** `GET /returns/admin/:id/refund-preview` — ReturnService.refundPreview. */
 interface RefundPreview {
+  /** B2B Task 8b: per item standard refund, tier adjustment and adjusted refund (empty unless a line is tier-priced). */
+  lines?: TierAdjustmentLine[];
   isFullReturn: boolean;
   /** What a non-gateway completion records, in piastres. */
   recordedAmount: number;
@@ -55,7 +82,7 @@ interface RefundMethodModalProps {
   storeId: string;
   /** The return being completed; its refund preview is loaded on open. */
   returnId: string | null;
-  onConfirm: (method: RefundMethod) => void;
+  onConfirm: (method: RefundMethod, overrides?: RefundOverrides) => void;
   onClose: () => void;
   isLoading?: boolean;
   /** The store has the customer wallet on: store credit lands in the
@@ -90,6 +117,7 @@ export function RefundMethodModal({
   const [step, setStep] = useState<'choose' | 'confirm'>('choose');
   const [preview, setPreview] = useState<RefundPreview | null>(null);
   const [previewState, setPreviewState] = useState<'loading' | 'ready' | 'error'>('loading');
+  const [drafts, setDrafts] = useState<Record<string, OverrideDraft>>({});
 
   // Start every opening from nothing selected, and load what each method
   // would actually move for THIS return.
@@ -98,6 +126,7 @@ export function RefundMethodModal({
     setMethod(null);
     setStep('choose');
     setPreview(null);
+    setDrafts({});
     if (!returnId) {
       setPreviewState('error');
       return;
@@ -124,7 +153,39 @@ export function RefundMethodModal({
     };
   }, [open, storeId, returnId]);
 
+  // A VALID override per item (amount within 0..standard, reason of 3+ chars); an incomplete draft is not sent.
+  const overrides: RefundOverrides = {};
+  const draftErrors: Record<string, 'amount' | 'reason'> = {};
+  for (const l of preview?.lines ?? []) {
+    const d = drafts[l.returnItemId];
+    if (!d?.on) continue;
+    const minor = d.amount.trim() === '' ? null : tryToMinor(d.amount);
+    if (minor === null || minor < 0 || minor > l.standardRefund)
+      draftErrors[l.returnItemId] = 'amount';
+    else if (d.reason.trim().length < 3) draftErrors[l.returnItemId] = 'reason';
+    else overrides[l.returnItemId] = { amountMinor: minor, reason: d.reason.trim() };
+  }
+  const overridesKey = JSON.stringify(overrides);
+  const hasDraftErrors = Object.keys(draftErrors).length > 0;
+
+  // Re-read the preview when the merchant's override changes, so every figure shown is the one complete() will use.
+  useEffect(() => {
+    if (!open || !returnId || overridesKey === '{}') return;
+    let cancelled = false;
+    apiGet<{ preview: RefundPreview }>(
+      `/api/v1/stores/${storeId}/returns/admin/${returnId}/refund-preview?overrides=${encodeURIComponent(overridesKey)}`
+    ).then(({ data }) => {
+      if (!cancelled && data?.preview) setPreview(data.preview);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [open, storeId, returnId, overridesKey]);
+
   const gateway = preview?.gateway;
+  const adjustmentLines = (preview?.lines ?? []).filter(
+    l => l.adjustment !== 0 || l.overridden || l.reason !== 'none'
+  );
   // The server decides (issue 2003); the reason-code fallback covers an API
   // that predates the flag.
   const alreadyPaid =
@@ -233,6 +294,129 @@ export function RefundMethodModal({
       ) : (
         <>
           <div className="space-y-3">
+            {adjustmentLines.length > 0 && (
+              <section
+                aria-labelledby="tier-adjustment-title"
+                data-testid="tier-adjustment"
+                className="rounded-lg border border-border p-3"
+              >
+                <h3 id="tier-adjustment-title" className="text-sm font-semibold text-foreground">
+                  {t('tierAdjustment.title')}
+                </h3>
+                <p className="mb-2 text-xs text-muted-foreground">{t('tierAdjustment.intro')}</p>
+                <ul className="space-y-3">
+                  {adjustmentLines.map(l => {
+                    const d = drafts[l.returnItemId] ?? { on: false, amount: '', reason: '' };
+                    const err = draftErrors[l.returnItemId];
+                    return (
+                      <li key={l.returnItemId} className="text-sm">
+                        <p className="font-medium text-foreground">
+                          <bdi>{l.productName}</bdi> x {l.quantity}
+                        </p>
+                        <dl className="mt-1 grid grid-cols-[1fr_auto] gap-x-3 text-xs">
+                          <dt className="text-muted-foreground">{t('tierAdjustment.standard')}</dt>
+                          <dd className="tabular-nums">{formatCurrency(l.standardRefund)}</dd>
+                          <dt className="text-muted-foreground">
+                            {t('tierAdjustment.adjustment')}
+                          </dt>
+                          <dd className="tabular-nums">
+                            {l.adjustment > 0 ? '-' : l.adjustment < 0 ? '+' : ''}
+                            {formatCurrency(Math.abs(l.adjustment))}
+                          </dd>
+                          <dt className="font-semibold text-foreground">
+                            {t('tierAdjustment.adjusted')}
+                          </dt>
+                          <dd className="font-semibold tabular-nums">
+                            {formatCurrency(l.adjustedRefund)}
+                          </dd>
+                        </dl>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          {l.overridden
+                            ? t('tierAdjustment.reason.overridden', {
+                                reason: l.overrideReason ?? '',
+                              })
+                            : l.reason === 'kept_below_tier'
+                              ? t('tierAdjustment.reason.kept_below_tier', {
+                                  kept: l.keptQty,
+                                  tier: l.tierMinQty ?? 0,
+                                  price: formatCurrency(l.keptUnitMinor),
+                                })
+                              : t(`tierAdjustment.reason.${l.reason}`)}
+                        </p>
+                        {l.carriedIn > 0 && !l.overridden && (
+                          <p className="mt-1 text-xs text-muted-foreground">
+                            {t('tierAdjustment.carried', { amount: formatCurrency(l.carriedIn) })}
+                          </p>
+                        )}
+                        {l.shortfall > 0 && !l.overridden && (
+                          <p className="mt-1 text-xs text-warning-ink">
+                            {t('tierAdjustment.shortfall', { amount: formatCurrency(l.shortfall) })}
+                          </p>
+                        )}
+                        <label className="mt-2 flex min-h-11 items-center gap-2 text-xs md:min-h-0">
+                          <input
+                            type="checkbox"
+                            checked={d.on}
+                            onChange={e =>
+                              setDrafts({
+                                ...drafts,
+                                [l.returnItemId]: { ...d, on: e.target.checked },
+                              })
+                            }
+                          />
+                          {t('tierAdjustment.override')}
+                        </label>
+                        {d.on && (
+                          <div className="mt-1 grid gap-2 sm:grid-cols-2">
+                            <label className="block text-xs">
+                              {t('tierAdjustment.overrideAmount')}
+                              <input
+                                inputMode="decimal"
+                                dir="ltr"
+                                value={d.amount}
+                                onChange={e =>
+                                  setDrafts({
+                                    ...drafts,
+                                    [l.returnItemId]: { ...d, amount: e.target.value },
+                                  })
+                                }
+                                aria-invalid={err === 'amount'}
+                                className="mt-1 min-h-11 w-full rounded-md border px-3 text-sm"
+                              />
+                            </label>
+                            <label className="block text-xs">
+                              {t('tierAdjustment.overrideReason')}
+                              <input
+                                value={d.reason}
+                                maxLength={300}
+                                onChange={e =>
+                                  setDrafts({
+                                    ...drafts,
+                                    [l.returnItemId]: { ...d, reason: e.target.value },
+                                  })
+                                }
+                                aria-invalid={err === 'reason'}
+                                className="mt-1 min-h-11 w-full rounded-md border px-3 text-sm"
+                              />
+                            </label>
+                            {err && (
+                              <p
+                                role="alert"
+                                className="text-xs text-destructive-ink sm:col-span-2"
+                              >
+                                {t(`tierAdjustment.error.${err}`, {
+                                  max: formatCurrency(l.standardRefund),
+                                })}
+                              </p>
+                            )}
+                          </div>
+                        )}
+                      </li>
+                    );
+                  })}
+                </ul>
+              </section>
+            )}
             {method === 'original' ? (
               <>
                 <p className="text-sm text-foreground">
@@ -274,8 +458,10 @@ export function RefundMethodModal({
             </Button>
             <Button
               variant={method === 'original' ? 'destructive' : 'default'}
-              onClick={() => method && onConfirm(method)}
-              disabled={isLoading || !method}
+              onClick={() =>
+                method && (overridesKey === '{}' ? onConfirm(method) : onConfirm(method, overrides))
+              }
+              disabled={isLoading || !method || hasDraftErrors}
               isLoading={isLoading}
             >
               {method === 'original' ? t('confirmSendRefund') : t('refundMethodConfirm')}

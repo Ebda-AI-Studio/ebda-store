@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { CartIcon } from '@ebda/ui';
 import { StoreLogo } from '../shared/StoreLogo';
 import type { HeaderProps } from '../types';
+import { useTabBarShown, HEADER_MENU_WITH_TAB_BAR_KEEP_SLOT } from '../shared/tab-bar-visibility';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { Sheet } from '../../components/ui/Sheet';
 import { LanguageSwitcher } from '../../components/LanguageSwitcher';
@@ -22,6 +23,7 @@ export default function ModernHeader({
   headerBgColor,
 }: HeaderProps) {
   const { isRtl: ctxIsRtl, t } = useLanguage();
+  const tabBarShown = useTabBarShown();
   const isRtl = isRtlProp ?? ctxIsRtl;
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -75,7 +77,7 @@ export default function ModernHeader({
             <button
               type="button"
               onClick={() => setIsMenuOpen(!isMenuOpen)}
-              className="md:hidden inline-flex h-11 w-11 items-center justify-center rounded-lg hover:bg-muted transition-colors duration-300 ease-out cursor-pointer"
+              className={`md:hidden inline-flex h-11 w-11 items-center justify-center rounded-lg hover:bg-muted transition-colors duration-300 ease-out cursor-pointer ${tabBarShown ? HEADER_MENU_WITH_TAB_BAR_KEEP_SLOT : ''}`}
               aria-label={t('Menu', 'القائمة')}
               aria-expanded={isMenuOpen}
             >
@@ -110,14 +112,18 @@ export default function ModernHeader({
               {displayLogo ? (
                 <StoreLogo src={displayLogo} alt={displayName} priority />
               ) : (
-                <span className="text-xl font-bold text-primary" data-zone="storeName">
+                <span
+                  className="text-xl font-bold text-primary"
+                  data-zone="storeName"
+                  translate="no"
+                >
                   {displayName}
                 </span>
               )}
             </Link>
 
             {/* Desktop Navigation */}
-            <nav className="hidden md:flex items-center gap-1">
+            <nav aria-label={t('Main', 'الرئيسية')} className="hidden md:flex items-center gap-1">
               {navigation.map(item => (
                 <Link
                   key={item.href}
@@ -252,7 +258,7 @@ export default function ModernHeader({
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
                 placeholder={t('Search', 'ابحث...')}
-                className="w-full ps-11 pe-4 py-3 bg-muted rounded-full border border-border focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-base sm:text-sm transition-colors duration-300 ease-out"
+                className="w-full ps-11 pe-4 py-3 bg-muted rounded-full border border-input focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-base sm:text-sm transition-colors duration-300 ease-out"
                 dir={isRtl ? 'rtl' : 'ltr'}
                 aria-label={t('Search products', 'بحث عن المنتجات')}
               />
@@ -276,7 +282,7 @@ export default function ModernHeader({
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
                 placeholder={t('Search products...', 'ابحث عن المنتجات...')}
-                className="min-w-0 flex-1 px-4 py-2.5 bg-muted rounded-lg border border-border focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-base sm:text-sm transition-colors duration-300 ease-out"
+                className="min-w-0 flex-1 px-4 py-2.5 bg-muted rounded-lg border border-input focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-base sm:text-sm transition-colors duration-300 ease-out"
                 dir={isRtl ? 'rtl' : 'ltr'}
                 autoFocus={isSearchOpen}
                 aria-label={t('Search products', 'بحث عن المنتجات')}
@@ -315,7 +321,11 @@ export default function ModernHeader({
         closeClassName="text-muted-foreground hover:text-foreground hover:bg-muted"
         bodyClassName=""
       >
-        <nav className="p-4 flex flex-col gap-1" dir={isRtl ? 'rtl' : 'ltr'}>
+        <nav
+          aria-label={t('Menu', 'القائمة')}
+          className="p-4 flex flex-col gap-1"
+          dir={isRtl ? 'rtl' : 'ltr'}
+        >
           {navigation.map(item => (
             <Link
               key={item.href}

@@ -35,6 +35,10 @@ vi.mock('@ebda/database', () => ({
   withMoneyTx: vi.fn(async (_prisma: unknown, cb: (tx: unknown) => unknown) => cb({})),
 }));
 
+vi.mock('../../apps/api/src/services/feature.service', () => ({
+  featureService: { isFeatureEnabled: vi.fn().mockResolvedValue(false) },
+}));
+
 vi.mock('../../apps/api/src/services/redis.service', () => ({
   redis: {
     get: vi.fn(),

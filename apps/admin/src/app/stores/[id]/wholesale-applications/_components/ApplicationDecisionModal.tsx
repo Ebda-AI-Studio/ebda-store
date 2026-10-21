@@ -1,0 +1,120 @@
+'use client';
+
+import { useState } from 'react';
+import { useT } from '@/i18n/useT';
+
+export type DecisionKind = 'approve' | 'reject' | 'revoke';
+
+interface Props {
+  kind: DecisionKind;
+  businessName: string;
+  /** Active wholesale groups only (the API refuses anything else with 422). */
+  groups: Array<{ id: string; name: string; nameAr: string | null }>;
+  onCancel: () => void;
+  onConfirm: (input: { groupId?: string; note?: string }) => Promise<void>;
+}
+
+/** Approve (group picker), reject (note SHOWN TO THE APPLICANT) or revoke (note) for one application. */
+export function ApplicationDecisionModal({
+  kind,
+  businessName,
+  groups,
+  onCancel,
+  onConfirm,
+}: Props) {
+  const t = useT('wholesale.applications.modal');
+  const [groupId, setGroupId] = useState(groups[0]?.id ?? '');
+  const [note, setNote] = useState('');
+  const [busy, setBusy] = useState(false);
+  const noGroups = kind === 'approve' && groups.length === 0;
+
+  const submit = async () => {
+    setBusy(true);
+    try {
+      await onConfirm(kind === 'approve' ? { groupId } : { note: note.trim() });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="wholesale-decision-title"
+        className="w-full max-w-md rounded-lg bg-background p-5 shadow-lg"
+      >
+        <h2 id="wholesale-decision-title" className="mb-1 text-lg font-semibold">
+          {t(`${kind}Title`)}
+        </h2>
+        <p className="mb-4 text-sm text-muted-foreground">
+          <bdi>{businessName}</bdi>
+        </p>
+
+        {kind === 'approve' ? (
+          noGroups ? (
+            <p role="alert" className="mb-4 text-sm text-destructive-ink">
+              {t('noGroups')}
+            </p>
+          ) : (
+            <label className="mb-4 block">
+              <span className="mb-1 block text-sm font-medium">{t('group')}</span>
+              <select
+                value={groupId}
+                onChange={e => setGroupId(e.target.value)}
+                className="min-h-11 w-full rounded-md border px-3 text-sm"
+              >
+                {groups.map(g => (
+                  <option key={g.id} value={g.id}>
+                    {g.name}
+                    {g.nameAr ? ` / ${g.nameAr}` : ''}
+                  </option>
+                ))}
+              </select>
+              <span className="mt-1 block text-xs text-muted-foreground">{t('groupHint')}</span>
+            </label>
+          )
+        ) : (
+          <label className="mb-4 block">
+            <span className="mb-1 block text-sm font-medium">
+              {kind === 'reject' ? t('noteToApplicant') : t('noteRevoke')}
+            </span>
+            <textarea
+              value={note}
+              onChange={e => setNote(e.target.value)}
+              maxLength={500}
+              rows={3}
+              className="w-full rounded-md border px-3 py-2 text-sm"
+            />
+            {kind === 'reject' ? (
+              <span className="mt-1 block text-xs text-muted-foreground">
+                {t('noteVisibleHint')}
+              </span>
+            ) : (
+              <span className="mt-1 block text-xs text-muted-foreground">{t('revokeHint')}</span>
+            )}
+          </label>
+        )}
+
+        <div className="flex justify-end gap-2">
+          <button
+            type="button"
+            onClick={onCancel}
+            className="min-h-11 rounded-md border px-4 text-sm md:min-h-9"
+          >
+            {t('cancel')}
+          </button>
+          <button
+            type="button"
+            onClick={() => void submit()}
+            disabled={busy || noGroups || (kind === 'approve' && !groupId)}
+            className="min-h-11 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground disabled:opacity-50 md:min-h-9"
+          >
+            {busy ? t('working') : t(`${kind}Confirm`)}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}

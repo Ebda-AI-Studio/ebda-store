@@ -17,7 +17,7 @@ describe('subscriptionRequiredCopy', () => {
       'This store is not taking orders right now. Please try again later.'
     );
     expect(subscriptionRequiredCopy('SUBSCRIPTION_REQUIRED', ar)).toBe(
-      'المتجر لا يستقبل طلبات حالياً. حاول مرة أخرى لاحقاً.'
+      'المتجر مش بيستقبل طلبات دلوقتي. جرّب تاني بعدين.'
     );
   });
   it('ignores other codes', () => {
@@ -60,7 +60,7 @@ describe('personalisationRequiredCopy', () => {
 
   it('still explains itself without details', () => {
     expect(personalisationRequiredCopy('PERSONALISATION_REQUIRED', undefined, tAr, 'ar')).toBe(
-      'يوجد منتج في سلتك يحتاج إلى تخصيص. اكتبه من صفحة المنتج.'
+      'في منتج في سلتك محتاج تخصيص. اكتبه من صفحة المنتج.'
     );
   });
 });
@@ -74,7 +74,7 @@ describe('variantRequiredCopy (FU46 M-6)', () => {
       'Please choose a size for Linen Abaya, Scarf on its product page.'
     );
     expect(variantRequiredCopy('VARIANT_REQUIRED', details, tAr, 'ar')).toBe(
-      'يرجى اختيار المقاس لـ عباية كتان، Scarf من صفحة المنتج.'
+      'اختار المقاس لـ عباية كتان، Scarf من صفحة المنتج.'
     );
   });
   it('still explains itself without details, and ignores other codes', () => {

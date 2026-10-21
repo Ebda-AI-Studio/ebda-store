@@ -1502,7 +1502,11 @@
         "confirmReturnDescription": "The order will be cancelled and nothing is owed on cash on delivery.",
         "restockLabel": "Put the items back in stock",
         "confirmReturn": "Mark as returned"
-      }
+      },
+      "priceTier": "Wholesale price, {qty}+ units",
+      "priceWholesale": "Wholesale price",
+      "priceQuantity": "Quantity price, {qty}+ units",
+      "priceGroup": "Price group"
     },
     "layout": {
       "title": "Storefront layout",
@@ -1535,11 +1539,20 @@
           "modeSlider": "Slider (rotating images)",
           "modeSingleHint": "Shows the first slide only. Best when you have one strong campaign image.",
           "modeSliderHint": "Cycles through every slide automatically. Best for showcasing multiple campaigns or collections.",
-          "fitLabel": "Image fit",
+          "fitLabel": "Presentation",
           "fitFill": "Fill (crop to edges)",
           "fitFit": "Fit (show whole image)",
           "fitFillHint": "The image fills the banner edge-to-edge and is cropped to fit. Best for wide 1920×700 images.",
           "fitFitHint": "The whole image is shown inside the banner without cropping (it may have side bars). Best when your image is smaller or a different shape than recommended.",
+          "fitCollage": "Collage (3 photos)",
+          "fitCollageHint": "Three slide photos overlap with one headline and button beside them. Needs at least 3 slides with images; with fewer it shows as a full banner.",
+          "frameLabel": "Frame line",
+          "frameNone": "None",
+          "frameLine": "Hairline",
+          "textAnchorLabel": "Text position",
+          "textAnchorCenter": "Centre",
+          "textAnchorBottomStart": "Bottom corner",
+          "textAnchorHint": "On phones and tablets the text sits under the photo in the page colours, so the headline colour applies only on large screens.",
           "autoplay": "Autoplay interval (ms)",
           "slides": {
             "title": "Slides",
@@ -1573,7 +1586,11 @@
             "ctaHrefPlaceholder": "/products or /products?category=shoes",
             "link": "Banner link (optional)",
             "linkPlaceholder": "https://… or /products — leave empty for a non-clickable banner",
-            "slideLabel": "Slide {index}"
+            "slideLabel": "Slide {index}",
+            "focus": "Image focus",
+            "focusCenter": "Centre",
+            "focusTop": "Top (keeps heads in frame)",
+            "focusBottom": "Bottom"
           }
         },
         "categories": {
@@ -1583,6 +1600,7 @@
           "mobileLabel": "Mobile",
           "layoutGrid": "Grid",
           "layoutHorizontal": "Horizontal scroll",
+          "layoutChips": "Text chips",
           "captionBelow": "Caption below image",
           "captionOverlay": "Caption over image",
           "desktopColumns": "Desktop columns",
@@ -1733,6 +1751,8 @@
         "everywhereDescription": "Styling for the product CARD tiles — size, frame, aspect, and name/price/button fonts — wherever they appear (listing, category, search, carousels). This is the card itself, not a page; page backgrounds & headings are in the page cards above.",
         "brandBadgeTitle": "Brand badge on cards",
         "brandBadgeHint": "Small store-name pill in the top corner of every product card.",
+        "newBadgeTitle": "\"New\" badge on cards",
+        "newBadgeHint": "A \"New\" chip on products you mark as new or added in the last 14 days. Off by default.",
         "quickAddTitle": "Quick-add (+) on carousel cards",
         "quickAddHint": "One-tap add-to-cart circle on homepage carousel cards. When ON, the bottom Add to cart button auto-suppresses on the same card.",
         "normalizeImagesTitle": "Normalize product images",
@@ -2110,6 +2130,7 @@
       "countPlural": "{count} customers",
       "paginationShowing": "Showing {from} to {to} of {total} customers",
       "truncatedNotice": "This store is very large — the customer list is partial: it covers the most recent orders and the newest sign-ups who have not ordered yet. Use the export for a fuller picture, or contact support.",
+      "searchTruncatedNotice": "This search matches more customers than can be listed. Showing the first {shown} — narrow it by typing more of the name, phone or email.",
       "previous": "Previous",
       "next": "Next",
       "badges": {
@@ -2268,7 +2289,9 @@
           "successTitle": "Wallet updated",
           "failed": "Could not update the wallet."
         }
-      }
+      },
+      "priceSourceGuest": "Guests never get group prices. Prices follow a signed-in, approved account.",
+      "priceSourceGroup": "Pays the prices of \"{name}\" when signed in."
     }
   },
   "analytics": {
@@ -2373,6 +2396,19 @@
       "loadFailedTitle": "Some analytics could not be loaded",
       "loadFailedBody": "A request failed. The figures below may be incomplete.",
       "retry": "Retry"
+    },
+    "priceSource": {
+      "title": "Wholesale vs retail",
+      "shareLabel": "of line revenue came from wholesale prices",
+      "shareBar": "Wholesale share: {percent}%",
+      "source": "Price source",
+      "units": "Units",
+      "revenue": "Revenue",
+      "retail": "Retail",
+      "tier": "Quantity breaks",
+      "group": "Wholesale group",
+      "empty": "No sales in this period yet.",
+      "loadFailed": "Could not load the wholesale split."
     }
   },
   "settings": {
@@ -2505,6 +2541,10 @@
       "billing": {
         "title": "Billing",
         "description": "Plan, usage and limits"
+      },
+      "webhooks": {
+        "title": "Webhooks",
+        "description": "Send order and product events to your own server"
       }
     },
     "metaCatalogCard": {
@@ -4238,6 +4278,14 @@
         "noLimit": "No limit",
         "major": "EGP",
         "hours": "hours"
+      },
+      "email": {
+        "title": "Reminder email",
+        "description": "One email per cart, sent from your store to shoppers who subscribed to your newsletter. Shoppers who unsubscribed are never emailed.",
+        "enable": "Send a reminder email",
+        "sendAfter": "Send after",
+        "minutes": "min of inactivity",
+        "hint": "Between 60 and 1440 minutes. Default 120."
       }
     },
     "list": {
@@ -4258,7 +4306,8 @@
         "total": "Total",
         "items": "Items",
         "status": "Status",
-        "date": "Date"
+        "date": "Date",
+        "email": "Email"
       }
     },
     "messages": {
@@ -4266,6 +4315,19 @@
       "saveSuccessBody": "Abandoned cart settings saved.",
       "saveErrorTitle": "Error",
       "saveErrorBody": "Failed to save settings. Please try again."
+    },
+    "emailStatus": {
+      "none": "Not sent",
+      "queued": "Queued",
+      "sent": "Sent",
+      "skipped": "Skipped",
+      "failed": "Failed"
+    },
+    "emailNudge": {
+      "title": "Get abandoned carts back by email",
+      "body": "One reminder email per cart, sent as your store and only to shoppers who opted in. It is off until you turn it on.",
+      "review": "Review settings",
+      "dismiss": "Not now"
     }
   },
   "returns": {
@@ -4371,7 +4433,10 @@
         "REFUND_EXCEEDS_REMAINING": "The refund is more than what is left un-refunded on this payment. Refresh the page — part of it was refunded elsewhere.",
         "INVALID_REFUND_AMOUNT": "This return has no refund amount. Set the refund amount before completing it.",
         "AMBIGUOUS_PAYMENT": "This payment reference matches more than one payment, so nothing was refunded and the return was not completed. Refund it from the payment provider dashboard and contact support.",
-        "MANUAL_PROVIDER_REFUND": "This order was paid by InstaPay, which cannot refund through the system. Send the money back from your InstaPay app, then complete the return with \"Already refunded — record only\"."
+        "MANUAL_PROVIDER_REFUND": "This order was paid by InstaPay, which cannot refund through the system. Send the money back from your InstaPay app, then complete the return with \"Already refunded — record only\".",
+        "OVERRIDE_NOT_APPLICABLE": "A refund override only applies to a partial return of a tier-priced item. Complete the return without it.",
+        "OVERRIDE_OUT_OF_RANGE": "The override must be between 0 and the standard refund for that item.",
+        "OVERRIDE_UNKNOWN_ITEM": "The override names an item that is not on this return. Reopen the dialog and try again."
       }
     },
     "modal": {
@@ -4424,7 +4489,29 @@
         "REFUND_PERMISSION_REQUIRED": "Not available: sending a refund to the original payment method needs the store owner. Ask them to complete it, or use store credit or bank transfer."
       },
       "cancel": "Cancel",
-      "alreadyFullyRefundedNotice": "This order's payment was already refunded in full — from the order page or in the payment provider's dashboard. Nothing more can be sent to the card. If that refund covered this return, choose \"Already refunded — record only\" to complete it without refunding again."
+      "alreadyFullyRefundedNotice": "This order's payment was already refunded in full — from the order page or in the payment provider's dashboard. Nothing more can be sent to the card. If that refund covered this return, choose \"Already refunded — record only\" to complete it without refunding again.",
+      "tierAdjustment": {
+        "title": "Tier price adjustment",
+        "intro": "The units the customer keeps no longer reach the price break they were sold at, so they are repriced and the refund is reduced by the difference.",
+        "standard": "Standard refund",
+        "adjustment": "Adjustment",
+        "adjusted": "Refund after adjustment",
+        "override": "Override this refund",
+        "overrideAmount": "Refund amount",
+        "overrideReason": "Reason (required)",
+        "shortfall": "The adjustment is larger than this refund, so the refund is 0. {amount} is not charged now: it is taken from this product's next refund on the order, and never below 0.",
+        "carried": "Includes {amount} carried from an earlier return of this product that refunded 0.",
+        "reason": {
+          "none": "No adjustment.",
+          "released": "An earlier adjustment on this item is released.",
+          "overridden": "You overrode the amount. Reason: {reason}",
+          "kept_below_tier": "{kept} units kept are below the {tier}+ price break, so they are repriced at {price} each."
+        },
+        "error": {
+          "amount": "Enter an amount between 0 and {max}.",
+          "reason": "Write a reason (at least 3 characters)."
+        }
+      }
     }
   },
   "marketingPixels": {
@@ -5318,7 +5405,8 @@
         "minimal": "Minimal",
         "bold": "Bold",
         "elegant": "Elegant",
-        "dahab": "Dahab"
+        "dahab": "Dahab",
+        "qamar": "Qamar"
       }
     }
   },
@@ -5927,11 +6015,18 @@
   "components": {
     "commandPalette": {
       "title": "Command palette",
-      "placeholder": "Search pages…",
+      "placeholder": "Search pages, products, orders, customers…",
       "empty": "No matches.",
       "trigger": "Search…",
       "countResults": "{count} results",
       "navHint": "↑↓ to navigate · ↵ to open",
+      "products": "Products",
+      "orders": "Orders",
+      "customers": "Customers",
+      "searching": "Searching…",
+      "guest": "Guest",
+      "rateLimited": "Too many searches. Wait a moment and try again.",
+      "searchFailed": "Search failed. Check your connection and try again.",
       "pages": {
         "branding": "Branding",
         "seo": "SEO",
@@ -5946,7 +6041,8 @@
         "announcement": "Announcement bar",
         "agentKey": "AI agent key",
         "merchantKeys": "Merchant MCP keys",
-        "billing": "Billing"
+        "billing": "Billing",
+        "webhooks": "Webhooks"
       }
     },
     "notificationBell": {
@@ -6056,7 +6152,8 @@
         "locations": "Locations",
         "customerGroups": "Customer groups",
         "wallet": "Wallet",
-        "visualBuilder": "Visual builder"
+        "visualBuilder": "Visual builder",
+        "wholesaleApplications": "Wholesale applications"
       },
       "superAdmin": "Super Admin",
       "superAdminHint": "Full platform access",
@@ -6095,7 +6192,8 @@
       "navPlatformTaxArchive": "Tax archive (platform)",
       "navPlatformPolicyUpdates": "Policy updates",
       "navPlatformSettings": "Platform settings",
-      "navPlatformProviderActivation": "Activation requests (platform)"
+      "navPlatformProviderActivation": "Activation requests (platform)",
+      "wholesalePendingBadge": "{count} wholesale applications waiting"
     },
     "errorState": {
       "defaultTitle": "Something went wrong",
@@ -7231,7 +7329,10 @@
       "days7": "7 days",
       "days30": "30 days",
       "days90": "90 days",
-      "loadFailed": "Could not load searches."
+      "loadFailed": "Could not load searches.",
+      "indexStatus": "Ready for smart search: {indexed} of {products} products",
+      "indexFailed": "Could not be prepared: {failed}",
+      "indexOff": "Smart search is not on for shoppers yet"
     }
   },
   "emailQueue": {
@@ -8372,7 +8473,17 @@
       "deleteConfirm": "Delete \"{name}\"? {count} customer(s) will become ungrouped — they are not deleted.",
       "loadFailed": "Could not load customer groups.",
       "saveFailed": "Could not save the group.",
-      "deleteFailed": "Could not delete the group."
+      "deleteFailed": "Could not delete the group.",
+      "discountInvalid": "Enter a discount between 0 and 90 with at most two decimals.",
+      "planRequired": "Wholesale pricing needs the Business plan.",
+      "pricingTitle": "Pricing",
+      "wholesaleLabel": "Wholesale group (members must be approved)",
+      "wholesaleHint": "Only approved, signed-in accounts get these prices. A phone number or email typed at checkout never does.",
+      "pricingMode": "Group price",
+      "modeNone": "No group discount",
+      "modePercent": "Percent off the price",
+      "discountPct": "Discount (%)",
+      "discountHint": "Applies when it beats any price break. Coupons do not apply to these lines."
     }
   },
   "agentKey": {
@@ -8781,6 +8892,7 @@
       "maxStores": "Stores per owner",
       "brandingRemoval": "Remove \"Powered by Ebda Store\"",
       "apiAccess": "API access",
+      "wholesalePricing": "Wholesale pricing",
       "analyticsTier": "Analytics tier",
       "supportTier": "Support tier"
     },
@@ -9001,7 +9113,9 @@
     "chooseThisPlan": "Choose this plan",
     "instapayPlanNote": "The new plan applies when Ebda Store confirms your payment.",
     "instapayPlanFailed": "We could not start the InstaPay payment for this plan.",
-    "instapayQuoteTitle": "Pay for {plan} ({interval})"
+    "instapayQuoteTitle": "Pay for {plan} ({interval})",
+    "viewReceipt": "View receipt",
+    "receiptProcessing": "Your payment went through. Your receipt will print here in a moment."
   },
   "planLimit": {
     "maxProducts": "Your plan allows up to {limit} products. Upgrade to add more.",
@@ -9014,6 +9128,7 @@
     "maxStores": "Your plan allows up to {limit} store(s). Upgrade to add more.",
     "brandingRemoval": "Removing the \"Powered by Ebda Store\" footer is not included in your plan. Upgrade to turn it off.",
     "apiAccess": "Merchant MCP (running your store from an AI assistant) is not included in your plan. Upgrade to Growth or Business to use it.",
+    "wholesalePricing": "Wholesale pricing (quantity tiers, group prices, wholesale accounts) is not included in your plan. Upgrade to Business to use it.",
     "analyticsTier": "This analytics view is not included in your plan. Upgrade to unlock it."
   },
   "onboarding": {
@@ -10321,5 +10436,285 @@
       "sent": "Sent",
       "failed": "Failed"
     }
+  },
+  "wholesale": {
+    "applications": {
+      "title": "Wholesale applications",
+      "subtitle": "Buyers who asked for a wholesale account. Nobody gets wholesale prices until you approve them.",
+      "filterLabel": "Filter by status",
+      "filter": {
+        "pending": "Pending",
+        "approved": "Approved",
+        "rejected": "Rejected",
+        "revoked": "Revoked"
+      },
+      "loadFailed": "Could not load the applications.",
+      "loading": "Loading...",
+      "emptyTitle": "No applications here",
+      "emptyBody": "When a buyer applies from their account page, the request shows up here and you get a notification.",
+      "regNo": "Reg. no.",
+      "decisionNote": "Note",
+      "waiting": "Waiting {hours} h",
+      "waitingOverdue": "Waiting {hours} h - over 48 hours",
+      "approve": "Approve",
+      "reject": "Reject",
+      "revoke": "Revoke access",
+      "loadMore": "Load more",
+      "alreadyDecided": "Someone already decided this application. The list was refreshed.",
+      "approvedNotice": "{name} is approved. They now see wholesale prices.",
+      "rejectedNotice": "{name} was rejected and has been told.",
+      "revokedNotice": "{name} is no longer a wholesale buyer.",
+      "revokedAlreadyOut": "{name} was already outside every wholesale group, so no prices changed. The application is now closed.",
+      "modal": {
+        "approveTitle": "Approve wholesale account",
+        "rejectTitle": "Reject application",
+        "revokeTitle": "Revoke wholesale access",
+        "noGroups": "There is no active wholesale group. Create one under Customer groups first.",
+        "group": "Wholesale group",
+        "groupHint": "The buyer pays this group's prices from the next page load.",
+        "noteToApplicant": "Note to the applicant (optional)",
+        "noteRevoke": "Note (optional)",
+        "noteVisibleHint": "The applicant sees this note. Do not write internal remarks here.",
+        "revokeHint": "The buyer returns to retail prices. Orders already placed keep the prices they were charged.",
+        "cancel": "Cancel",
+        "working": "Working...",
+        "approveConfirm": "Approve",
+        "rejectConfirm": "Reject",
+        "revokeConfirm": "Revoke access"
+      }
+    },
+    "pricing": {
+      "title": "Wholesale pricing",
+      "hint": "Quantity price breaks, a minimum order and who can see this product. Prices are in the store currency.",
+      "vatInclusive": "Your prices include VAT, so tier prices include it too.",
+      "vatExclusive": "Your prices exclude VAT; VAT is added on top of tier prices too.",
+      "upgrade": "Wholesale pricing is part of the Business plan.",
+      "upgradeLink": "See plans",
+      "scope": "Applies to",
+      "minQty": "From quantity",
+      "unitPrice": "Unit price",
+      "stale": "Not applied: at or above the current price",
+      "remove": "Remove",
+      "empty": "No price breaks yet.",
+      "addTitle": "Add a price break",
+      "audience": "Who gets it",
+      "everyone": "Everyone",
+      "variantLabel": "Variant",
+      "allVariants": "All variants",
+      "variant": "Variant",
+      "margin": "Margin on cost: {percent}%",
+      "add": "Add price break",
+      "rulesTitle": "Order rules",
+      "moq": "Minimum order quantity",
+      "moqPlaceholder": "No minimum",
+      "moqHint": "At least 2. Buyers cannot check out below it.",
+      "audienceField": "Visible to",
+      "audiencePublic": "Everyone",
+      "audienceWholesaleOnly": "Approved wholesale buyers only",
+      "audienceHint": "A wholesale-only product is hidden from the public catalogue, search and feeds.",
+      "saveRules": "Save order rules",
+      "rulesSaved": "Order rules saved.",
+      "tierAdded": "Price break added.",
+      "problem": {
+        "minQty": "The quantity must be a whole number, at least 2.",
+        "price": "Enter a valid price.",
+        "moq": "The minimum order must be a whole number, at least 2.",
+        "TIER_ABOVE_BASE": "The tier price must be lower than the current price.",
+        "TIER_NOT_MONOTONE": "A bigger quantity must have a lower price than the smaller quantities.",
+        "TIER_VARIANT_ABOVE_PRODUCT": "A variant price break cannot be higher than the whole-product break for the same audience.",
+        "TIER_DUPLICATE": "There is already a price break at this quantity for this audience.",
+        "TIER_LIMIT": "You reached the limit of 10 price breaks for this scope."
+      },
+      "warning": {
+        "TIER_BELOW_COST": "This price is below your cost price.",
+        "TIER_BELOW_MOQ": "This starts below the minimum order, so it can never apply."
+      }
+    }
+  },
+  "webhooks": {
+    "page": {
+      "title": "Webhooks",
+      "subtitle": "Send a signed message to your own server whenever an order or product changes.",
+      "backToSettings": "Back to settings"
+    },
+    "plan": {
+      "title": "Webhooks are on the Growth and Business plans",
+      "body": "Upgrade your plan to send order and product events to your own systems.",
+      "cta": "See plans"
+    },
+    "intro": {
+      "heading": "How it works",
+      "body": "Pick the events you care about and give us an HTTPS address. We send each event as JSON with a signature header, so your server can check it really came from us. If your server is down we retry for about 24 hours.",
+      "pii": "Customer name, email and phone are never included unless you turn that on for an endpoint.",
+      "docs": "Developer guide"
+    },
+    "empty": {
+      "body": "No endpoints yet. Add one to start receiving events."
+    },
+    "actions": {
+      "add": "Add endpoint",
+      "edit": "Edit",
+      "delete": "Delete",
+      "test": "Send test event",
+      "rotate": "New secret",
+      "enable": "Turn on",
+      "disable": "Turn off",
+      "deliveries": "Delivery log",
+      "resend": "Resend",
+      "close": "Close"
+    },
+    "status": {
+      "active": "On",
+      "off": "Off",
+      "autoOff": "Turned off after repeated failures",
+      "failures": "{count} failed in a row"
+    },
+    "table": {
+      "url": "Address",
+      "events": "Events",
+      "status": "Status",
+      "lastSuccess": "Last success",
+      "never": "Never"
+    },
+    "form": {
+      "addTitle": "Add an endpoint",
+      "editTitle": "Edit endpoint",
+      "urlLabel": "Address (HTTPS)",
+      "urlPlaceholder": "https://example.com/ebda-webhook",
+      "urlHelp": "It must be a public HTTPS address. Local and private addresses are not accepted.",
+      "descriptionLabel": "Note (optional)",
+      "eventsLabel": "Events to send",
+      "customerLabel": "Include customer name, email and phone in order events",
+      "customerHelp": "Off by default. Turn it on only if your system needs to contact the customer.",
+      "save": "Save",
+      "saving": "Saving"
+    },
+    "events": {
+      "order.created": "Order placed",
+      "order.paid": "Order paid",
+      "order.status_changed": "Order shipped, delivered or cancelled",
+      "order.refunded": "Order refunded",
+      "product.created": "Product added",
+      "product.updated": "Product changed",
+      "product.deleted": "Product deleted",
+      "inventory.low": "Stock is low",
+      "webhook.test": "Test event"
+    },
+    "secret": {
+      "title": "Your signing secret",
+      "warning": "Copy this secret now. For your security we show it only once. If you lose it, make a new one.",
+      "copy": "Copy",
+      "copied": "Copied",
+      "done": "I saved it"
+    },
+    "rotate": {
+      "title": "Make a new secret?",
+      "body": "The old secret stops working right away. Update your server with the new one first, or events will fail signature checks.",
+      "confirm": "Make new secret"
+    },
+    "delete": {
+      "title": "Delete this endpoint?",
+      "body": "We stop sending events to {url}. Its delivery log is deleted too.",
+      "confirm": "Delete"
+    },
+    "log": {
+      "title": "Delivery log",
+      "subtitle": "The last {count} deliveries for this endpoint.",
+      "empty": "Nothing has been sent yet.",
+      "event": "Event",
+      "result": "Result",
+      "attempts": "Tries",
+      "time": "Time",
+      "success": "Delivered",
+      "failed": "Failed",
+      "pending": "Waiting",
+      "retrying": "Will retry",
+      "test": "Test",
+      "code": "Reply {status}"
+    },
+    "common": {
+      "cancel": "Cancel"
+    },
+    "toast": {
+      "loadFailedTitle": "Could not load webhooks",
+      "saved": "Saved",
+      "saveFailedTitle": "Could not save",
+      "deleted": "Endpoint deleted",
+      "deleteFailedTitle": "Could not delete",
+      "testQueued": "Test event sent. Refresh the log in a few seconds.",
+      "testFailedTitle": "Could not send the test",
+      "rotated": "New secret created",
+      "rotateFailedTitle": "Could not make a new secret",
+      "resent": "Event sent again",
+      "resendFailedTitle": "Could not resend"
+    },
+    "error": {
+      "WEBHOOK_URL_REJECTED": "This address cannot be used. Use a public HTTPS address.",
+      "WEBHOOK_LIMIT": "You reached the maximum number of endpoints."
+    }
+  },
+  "receiptBarcode": {
+    "title": "Order barcode",
+    "hint": "A real scannable barcode of the order number on receipts, packing slips and invoices. Pick a plain strip, a fun shape, or turn it off.",
+    "saveShape": "Save",
+    "saved": "Saved",
+    "failed": "Couldn't save. Try again.",
+    "shape": {
+      "plain": "Plain bars",
+      "off": "No barcode",
+      "palm": "Palm",
+      "horse": "Horse",
+      "paw": "Paw",
+      "burger": "Burger",
+      "cat": "Cat",
+      "ghost": "Ghost",
+      "angry-shark": "Angry shark",
+      "shark": "Shark",
+      "gym-dude": "Gym dude",
+      "heart": "Heart",
+      "dog": "Dog",
+      "whale": "Whale",
+      "bat": "Bat",
+      "pizza": "Pizza",
+      "cloud": "Cloud",
+      "spider": "Spider",
+      "big-cake": "Big cake",
+      "lemon": "Lemon",
+      "ring": "Ring",
+      "diamond": "Diamond",
+      "pineapple": "Pineapple",
+      "french-fries": "French fries",
+      "hot-dog": "Hot dog",
+      "cookie": "Cookie"
+    }
+  },
+  "ebdaReceipt": {
+    "aria": "Ebda payment receipt",
+    "subtitle": "Payment receipt",
+    "total": "Total",
+    "paid": "Payment received. Thank you.",
+    "printing": "Printing your receipt...",
+    "plan": "Plan",
+    "date": "Date",
+    "vat": "VAT ({rate}%)",
+    "print": "Print receipt"
+  },
+  "packingSlip": {
+    "title": "Packing slip",
+    "print": "Print packing slip",
+    "printBulk": "Print packing slips ({count})",
+    "size": "Slip size",
+    "sizeA4": "A4",
+    "sizeLabel": "4x6 label",
+    "tooMany": "Select up to 100 orders per print.",
+    "loadFailed": "Couldn't load the packing slip. Try again.",
+    "loading": "Loading...",
+    "noteTitle": "Packing slip note",
+    "noteHint": "Optional text printed at the bottom of every packing slip, like \"Thanks for your order\".",
+    "notePlaceholder": "Thanks for shopping with us!",
+    "noteSave": "Save note",
+    "noteSaved": "Saved",
+    "noteFailed": "Couldn't save. Try again.",
+    "skipped": "{count} orders skipped (not in this store or deleted)."
   }
 }

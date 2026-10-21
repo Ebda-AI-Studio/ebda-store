@@ -320,7 +320,7 @@ test.describe('commerce b0 flow @local-stack', () => {
     await expect(facts).toContainText('العناية');
     await expect(facts).toContainText('المنشأ');
 
-    await expect(page.getByTestId('delivery-chip')).toContainText('يصلك');
+    await expect(page.getByTestId('delivery-chip')).toContainText('يوصلك');
 
     await page.getByRole('button', { name: 'دليل المقاسات' }).click();
     const dialog = page.getByRole('dialog');
@@ -338,11 +338,11 @@ test.describe('commerce b0 flow @local-stack', () => {
     const field = page.locator('input[maxlength="12"]');
     const mainAdd = page.getByTestId('pdp-add');
     await expect(field).toBeVisible();
-    await expect(page.getByText('اكتب الاسم للتطريز أولاً')).toBeHidden();
+    await expect(page.getByText('اكتب الاسم للتطريز الأول')).toBeHidden();
     await expect(mainAdd).toBeEnabled();
     await mainAdd.click();
     await expect(field).toBeFocused();
-    await expect(page.getByText('اكتب الاسم للتطريز أولاً')).toBeVisible();
+    await expect(page.getByText('اكتب الاسم للتطريز الأول')).toBeVisible();
 
     // 4. Type Sara and add; then the sticky bar adds Omar.
     await field.fill('Sara');
@@ -400,7 +400,7 @@ test.describe('commerce b0 flow @local-stack', () => {
     // 8. The admin order (API the admin order page calls; the admin UI is not driven here).
     // Never trust an id that is not provably this run's: verify the buyer email before using it,
     // and before afterAll may cancel it. Nothing is cancelled unless this passes.
-    const num = (await page.getByTestId('receipt-barcode-caption').innerText()).replace('#', '');
+    const num = (await page.getByTestId('receipt-order-number').innerText()).replace('#', '');
     const candidates: string[] = [];
     if (urlOrderId) candidates.push(urlOrderId);
     const list = await adminFetch(

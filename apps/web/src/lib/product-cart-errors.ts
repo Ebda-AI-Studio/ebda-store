@@ -101,11 +101,11 @@ export function productUnavailableCopy(
     count > 1
       ? t(
           'Some items in your cart are no longer sold. Please remove them from your cart to continue.',
-          'بعض المنتجات في سلتك لم تعد متوفرة. يرجى إزالتها من السلة للمتابعة.'
+          'في منتجات في سلتك مبقتش متوفرة. شيلها من السلة عشان تكمّل.'
         )
       : t(
           'An item in your cart is no longer sold. Please remove it from your cart to continue.',
-          'أحد المنتجات في سلتك لم يعد متوفراً. يرجى إزالته من السلة للمتابعة.'
+          'في منتج في سلتك مبقاش متوفر. شيله من السلة عشان تكمّل.'
         );
 
   if (named.length === 0) return base;
@@ -115,7 +115,7 @@ export function productUnavailableCopy(
   // worse than not listing at all: the customer removes what is named, retries,
   // and meets the same refusal.
   const complete = named.length === count;
-  const label = complete ? t('Remove:', 'يرجى إزالة:') : t('Including:', 'من بينها:');
+  const label = complete ? t('Remove:', 'شيل:') : t('Including:', 'من بينها:');
 
   return `${base} ${label} ${named.join(t(', ', '، '))}`;
 }

@@ -19,6 +19,8 @@ import {
 } from '@ebda/shared';
 import { redis } from './redis.service';
 import { invalidateStoreProductCaches } from '../lib/public-cache';
+import { assertWholesaleEntitled } from '../lib/b2b-invalidate';
+import { featureService } from './feature.service';
 import logger from '../lib/logger';
 import { requestStoreReindex } from '../lib/search/reindex';
 import { sendEventAfterCommit } from '../lib/inngest/send-after-commit';
@@ -36,9 +38,11 @@ import { assertWithinLimit } from './plan-limit.service';
 import {
   buildProductSearchWhere,
   productSearchFilter,
+  rankedSearchWithMode,
   searchNameIds,
   searchProductIds,
 } from './product-search.service';
+import { semanticSearchEnabled } from '../lib/search/embedding-provider';
 
 /**
  * Compute availability flags for a product (and its variants) based on
@@ -133,6 +137,9 @@ interface CreateProductData {
   compareAtPrice?: number | null;
   /** Cost-of-goods in piastres. Used for profit reporting. */
   costPrice?: number | null;
+  /** B2B minimum order quantity (null = none) and audience (Task 4). */
+  moq?: number | null;
+  audience?: 'public' | 'wholesale_only';
   /** Admin-authored discount type — 'percentage' | 'fixed'. null clears. */
   discountType?: 'percentage' | 'fixed' | null;
   /**
@@ -187,7 +194,16 @@ interface CreateProductData {
 
 type UpdateProductData = Partial<CreateProductData>;
 
+/** Setting a MOQ or a wholesale-only audience needs b2b.wholesale; clearing / resetting to public never does (B2B-1b). */
+async function assertB2bProductFields(storeId: string, data: UpdateProductData): Promise<void> {
+  if ((data.moq != null && data.moq > 0) || data.audience === 'wholesale_only') {
+    await assertWholesaleEntitled(storeId);
+  }
+}
+
 interface ListProductsOptions {
+  /** 'public' (default) or 'wholesale_only' (the approved-buyer catalogue). Never both in one response. */
+  audience?: 'public' | 'wholesale_only';
   page?: number;
   limit?: number;
   status?: string;
@@ -390,6 +406,41 @@ export const STOREFRONT_PRODUCT_SELECT = {
   personalisation: true,
   updatedAt: true,
   createdAt: true,
+} as const satisfies Prisma.ProductSelect;
+
+/**
+ * The storefront LISTING row (cards): storefront-safe scalars plus what the cards need. One shape
+ * for every `listPublic` path (newest/price, merchant category order, hybrid relevance) so they
+ * serialize identically. `lowStockThreshold` and the variants' stock fields are read by
+ * `enrichStockFlags` and stripped before the row is returned (T-H1, #1103).
+ */
+const PUBLIC_LISTING_SELECT = {
+  ...STOREFRONT_PRODUCT_SELECT,
+  lowStockThreshold: true,
+  trackInventory: true,
+  images: { orderBy: { position: 'asc' } as const, take: 2 }, // 2 images: primary + hover-reveal second on cards
+  categories: { include: { category: true } },
+  options: LISTING_SWATCH_OPTIONS_SELECT,
+  store: { select: { id: true, name: true, slug: true } },
+  // Variants are needed by the storefront card components to (a)
+  // pick between the inline "Add to cart" and "View" CTAs, and
+  // (b) compute the "From <min>" pricing for multi-variant
+  // products. Without this include, every product looks variant-
+  // less to the storefront and the View CTA never appears
+  // regardless of how many variants the merchant created.
+  // Light select (price + compareAtPrice + stock fields) so the join
+  // stays cheap while supplying what enrichStockFlags needs.
+  variants: {
+    select: {
+      id: true,
+      price: true,
+      compareAtPrice: true,
+      inventory: true,
+      allowBackorder: true,
+      // Stock only — enrichStockFlags reads and strips it (#1103).
+      isActive: true,
+    },
+  },
 } as const satisfies Prisma.ProductSelect;
 
 /** Json column write: `null` must become SQL NULL (Prisma.DbNull), `undefined` leaves it alone. */
@@ -636,6 +687,7 @@ export class ProductService {
   }
 
   static async create(storeId: string, data: CreateProductData) {
+    await assertB2bProductFields(storeId, data);
     // Plan ceiling (SP5): one more product must fit the store's maxProducts.
     await assertWithinLimit(storeId, 'maxProducts');
     await this.assertCategoriesInStore(storeId, data.categories);
@@ -679,6 +731,8 @@ export class ProductService {
         price: data.price,
         compareAtPrice: data.compareAtPrice ?? null,
         costPrice: data.costPrice ?? null,
+        moq: data.moq ?? null,
+        audience: data.audience ?? 'public',
         // Discount input columns — stored verbatim; the admin form pre-derives
         // price/compareAtPrice before sending, so the service just persists.
         discountType: data.discountType ?? null,
@@ -751,6 +805,7 @@ export class ProductService {
   }
 
   static async update(storeId: string, productId: string, data: UpdateProductData) {
+    await assertB2bProductFields(storeId, data);
     await this.assertCategoriesInStore(storeId, data.categories);
     await assertSizeChartInStore(storeId, data.sizeChartId);
     const product = await this.getById(storeId, productId);
@@ -897,6 +952,8 @@ export class ProductService {
           // as the curated flags below.
           ...(data.compareAtPrice !== undefined ? { compareAtPrice: data.compareAtPrice } : {}),
           ...(data.costPrice !== undefined ? { costPrice: data.costPrice } : {}),
+          ...(data.moq !== undefined ? { moq: data.moq } : {}),
+          ...(data.audience !== undefined ? { audience: data.audience } : {}),
           // Discount input columns — same undefined/null convention.
           ...(data.discountType !== undefined ? { discountType: data.discountType } : {}),
           ...(data.discountValue !== undefined ? { discountValue: data.discountValue } : {}),
@@ -1237,8 +1294,14 @@ export class ProductService {
   static async listPublic(
     storeId: string,
     options: ListProductsOptions & {
-      sort?: 'newest' | 'price_asc' | 'price_desc' | 'best_seller';
+      /** `relevance` = hybrid ranking for a search (Task 12); without a search it means no sort. */
+      sort?: 'newest' | 'price_asc' | 'price_desc' | 'best_seller' | 'relevance';
       cursor?: string;
+      /**
+       * Who is searching (`searcherFromIp`): the identity the query-embed limit charges. Without it
+       * a ranked search never embeds (default deny, Ruling SEARCH-T12-6).
+       */
+      searcher?: string;
     } = {}
   ) {
     const {
@@ -1248,11 +1311,16 @@ export class ProductService {
       featured,
       minPrice,
       maxPrice,
-      sort,
       cursor,
       ids,
       optionFilters,
     } = options;
+    // `relevance` is the default order of a search, so it is the same request as no sort. With
+    // SEARCH_SEMANTIC_ENABLED off (or no search) everything below is exactly the pre-Task-12 path.
+    const sort = options.sort === 'relevance' ? undefined : options.sort;
+    // Hybrid relevance (Task 12): a search with no explicit sort, semantic search on. Ranks
+    // keyword + vector hits (RRF) and pages through that order; every other filter still applies.
+    const ranked = Boolean(search) && !sort && semanticSearchEnabled();
     const page = Math.max(1, options.page || 1);
     const limit = Math.min(100, Math.max(1, options.limit || 20));
 
@@ -1286,6 +1354,8 @@ export class ProductService {
       storeId,
       status: status as ProductStatus,
       deletedAt: null,
+      // B2B-7b: anonymous public listing by default; the approved-buyer catalogue passes 'wholesale_only'.
+      audience: options.audience ?? 'public',
     };
 
     if (featured !== undefined) {
@@ -1301,7 +1371,21 @@ export class ProductService {
       }
     }
 
-    if (search) {
+    let rankedIds: string[] | null = null;
+    let rankedDegraded = false;
+    if (search && ranked) {
+      // The ranked id list replaces the keyword id filter (it already holds every keyword match up
+      // to the cap, plus the vector-only hits). ANDed, so an `ids` filter on `where.id` still applies.
+      const rankedResult = await rankedSearchWithMode(storeId, search, {
+        searcher: options.searcher,
+      });
+      rankedIds = rankedResult.ids;
+      rankedDegraded = rankedResult.degraded;
+      where.AND = [
+        ...(Array.isArray(where.AND) ? where.AND : where.AND ? [where.AND] : []),
+        { id: { in: rankedIds } },
+      ];
+    } else if (search) {
       // Arabic-normalised word-AND over names, search terms and descriptions
       // (product-search.service): any subset / reordering of words matches.
       where.AND = [
@@ -1359,6 +1443,64 @@ export class ProductService {
           ...optionClauses,
         ];
       }
+    }
+
+    if (rankedIds) {
+      // Hybrid relevance path: keep the ranked order, drop ids any other filter (category, price,
+      // featured, ids, option facets, status) excludes, then page through it in memory like the
+      // merchant-ordered category path. The order is deterministic (RRF ties break by id; each leg
+      // has an id tie-break), so page N and a cursor walk see the same list. The cursor is the id of
+      // the last row the client has; an id no longer in the list yields an empty page.
+      const allowed = new Set(
+        (await prisma.product.findMany({ where, select: { id: true } })).map(r => r.id)
+      );
+      const ordered = rankedIds.filter(id => allowed.has(id));
+      let pageIdList: string[];
+      let nextCursor: string | undefined;
+      if (cursor) {
+        const at = ordered.indexOf(cursor);
+        const after = at === -1 ? [] : ordered.slice(at + 1);
+        pageIdList = after.slice(0, limit);
+        nextCursor = after.length > limit ? pageIdList[limit - 1] : undefined;
+      } else {
+        pageIdList = ordered.slice(skip, skip + limit);
+      }
+      const [rows, facets] = await Promise.all([
+        prisma.product.findMany({
+          where: {
+            storeId,
+            status: status as ProductStatus,
+            deletedAt: null,
+            id: { in: pageIdList },
+          },
+          select: PUBLIC_LISTING_SELECT,
+        }),
+        computeFacets(storeId, whereForFacets),
+      ]);
+      const byId = new Map(rows.map(r => [r.id, r]));
+      const pageRows = pageIdList.flatMap(id => {
+        const row = byId.get(id);
+        return row ? [row] : [];
+      });
+      return {
+        products: pageRows.map(p => enrichStockFlags(p)),
+        facets,
+        meta: {
+          page: cursor ? undefined : page,
+          limit,
+          total: ordered.length,
+          totalPages: cursor ? undefined : Math.ceil(ordered.length / limit),
+          nextCursor,
+          skipCapped: skipCapped || undefined,
+          /** The order is the hybrid relevance order (the storefront labels it "Most relevant"). */
+          ranked: true as const,
+          /**
+           * The vector leg was wanted but unavailable: keyword order only. The route never caches
+           * such a list (Ruling SEARCH-T12-7). Present only when true.
+           */
+          ...(rankedDegraded ? { degraded: true as const } : {}),
+        },
+      };
     }
 
     // `sort=best_seller` is curator-driven: filter to manually-flagged items
@@ -1420,26 +1562,7 @@ export class ProductService {
         // Explicit select (not include) — storefront-safe scalars only, plus
         // lowStockThreshold which enrichStockFlags needs for its lowStock
         // computation but strips before the row is returned. See T-H1.
-        select: {
-          ...STOREFRONT_PRODUCT_SELECT,
-          lowStockThreshold: true,
-          trackInventory: true,
-          images: { orderBy: { position: 'asc' } as const, take: 2 }, // 2 images: primary + hover-reveal second on cards
-          categories: { include: { category: true } },
-          options: LISTING_SWATCH_OPTIONS_SELECT,
-          store: { select: { id: true, name: true, slug: true } },
-          variants: {
-            select: {
-              id: true,
-              price: true,
-              compareAtPrice: true,
-              inventory: true,
-              allowBackorder: true,
-              // Stock only — enrichStockFlags reads and strips it (#1103).
-              isActive: true,
-            },
-          },
-        },
+        select: PUBLIC_LISTING_SELECT,
         orderBy: { createdAt: 'desc' as const },
       };
 
@@ -1525,34 +1648,7 @@ export class ProductService {
       // Explicit select (not include) — storefront-safe scalars only, plus
       // lowStockThreshold which enrichStockFlags needs for its lowStock
       // computation but strips before the row is returned. See T-H1.
-      select: {
-        ...STOREFRONT_PRODUCT_SELECT,
-        lowStockThreshold: true,
-        trackInventory: true,
-        images: { orderBy: { position: 'asc' } as const, take: 2 }, // 2 images: primary + hover-reveal second on cards
-        categories: { include: { category: true } },
-        options: LISTING_SWATCH_OPTIONS_SELECT,
-        store: { select: { id: true, name: true, slug: true } },
-        // Variants are needed by the storefront card components to (a)
-        // pick between the inline "Add to cart" and "View" CTAs, and
-        // (b) compute the "From <min>" pricing for multi-variant
-        // products. Without this include, every product looks variant-
-        // less to the storefront and the View CTA never appears
-        // regardless of how many variants the merchant created.
-        // Light select (price + compareAtPrice + stock fields) so the join
-        // stays cheap while supplying what enrichStockFlags needs.
-        variants: {
-          select: {
-            id: true,
-            price: true,
-            compareAtPrice: true,
-            inventory: true,
-            allowBackorder: true,
-            // Stock only — enrichStockFlags reads and strips it (#1103).
-            isActive: true,
-          },
-        },
-      },
+      select: PUBLIC_LISTING_SELECT,
       orderBy,
     };
 
@@ -1608,6 +1704,8 @@ export class ProductService {
    */
   private static readonly PUBLIC_PRODUCT_DETAIL_SELECT = {
     ...STOREFRONT_PRODUCT_SELECT,
+    // B2B: the minimum order quantity is public product data (a restriction, shown even after a plan downgrade).
+    moq: true,
     lowStockThreshold: true,
     trackInventory: true,
     images: { orderBy: { position: 'asc' } },
@@ -1851,9 +1949,60 @@ export class ProductService {
     };
   }
 
-  static async getPublicBySlug(storeId: string, slug: string) {
+  /**
+   * B2B fields of the PUBLIC (anonymous, cacheable) product payload: the MOQ and the PUBLIC quantity tiers only
+   * (`group_id IS NULL`). Group tiers and group prices NEVER appear here: a cacheable response must not depend on who asked
+   * (Ruling B2B-7b). Tiers are listed only while the store is entitled (benefit), the MOQ always (restriction, B2B-1b), and a
+   * stale tier (at or above the current base) is dropped so the page never promises a break the resolver will not give.
+   */
+  private static async b2bPublicFields(
+    storeId: string,
+    product: {
+      id: string;
+      price: number;
+      moq?: number | null;
+      variants?: ReadonlyArray<{ id: string; price: number | null }>;
+    }
+  ) {
+    const entitled = await featureService.isFeatureEnabled(storeId, 'b2b.wholesale');
+    const rows = entitled
+      ? await prisma.productPriceTier.findMany({
+          where: { storeId, productId: product.id, groupId: null },
+          select: { variantId: true, minQty: true, priceMinor: true },
+          orderBy: [{ variantId: 'asc' }, { minQty: 'asc' }],
+        })
+      : [];
+    // A break at or above the price it would apply to is never applied by the resolver (Ruling B2B-3b), so it is not shown:
+    // a product-level tier against the product price, a variant-level tier against THAT variant's price (variant.price ??
+    // product.price; final review minor 2). A variant tier whose variant is gone is not shown either.
+    const variantBase = new Map(
+      (product.variants ?? []).map(v => [v.id, v.price ?? product.price] as const)
+    );
+    return {
+      moq: product.moq ?? null,
+      priceTiers: rows.filter(t =>
+        t.variantId === null
+          ? t.priceMinor < product.price
+          : variantBase.has(t.variantId) && t.priceMinor < variantBase.get(t.variantId)!
+      ),
+    };
+  }
+
+  static async getPublicBySlug(
+    storeId: string,
+    slug: string,
+    opts: { audience?: 'public' | 'wholesale_only' } = {}
+  ) {
+    // B2B-7b: the public catalogue is anonymous and NEVER returns a wholesale-only product (404, no existence oracle). The
+    // approved-buyer route asks for audience 'wholesale_only' explicitly after checking membership.
     const product = await prisma.product.findFirst({
-      where: { storeId, slug, status: 'active', deletedAt: null },
+      where: {
+        storeId,
+        slug,
+        status: 'active',
+        deletedAt: null,
+        audience: opts.audience ?? 'public',
+      },
       select: this.PUBLIC_PRODUCT_DETAIL_SELECT,
     });
 
@@ -1878,12 +2027,13 @@ export class ProductService {
       ...this.publicDetailWithStock(this.withSizeChart(product)),
       model3d: toPublicModel3d(product.model3d),
       ratingStats,
+      ...(await this.b2bPublicFields(storeId, product)),
     };
   }
 
   static async getPublicById(storeId: string, productId: string) {
     const product = await prisma.product.findFirst({
-      where: { storeId, id: productId, status: 'active', deletedAt: null },
+      where: { storeId, id: productId, status: 'active', deletedAt: null, audience: 'public' },
       select: this.PUBLIC_PRODUCT_DETAIL_SELECT,
     });
 
@@ -1908,6 +2058,7 @@ export class ProductService {
       ...this.publicDetailWithStock(this.withSizeChart(product)),
       model3d: toPublicModel3d(product.model3d),
       ratingStats,
+      ...(await this.b2bPublicFields(storeId, product)),
     };
   }
 
@@ -1961,12 +2112,22 @@ export class ProductService {
           // Storefront "X items" badge = only products a customer can actually
           // see, so archived / draft / deleted products don't inflate the count.
           _count: {
-            select: { products: { where: { product: { status: 'active', deletedAt: null } } } },
+            select: {
+              products: {
+                where: { product: { status: 'active', deletedAt: null, audience: 'public' } },
+              },
+            },
           },
         },
       }),
       prisma.product.count({
-        where: { storeId, isBestSeller: true, deletedAt: null, status: 'active' },
+        where: {
+          storeId,
+          isBestSeller: true,
+          deletedAt: null,
+          status: 'active',
+          audience: 'public',
+        },
       }),
       // Defensive: bestSellersImage was added in migration
       // 20260501000000. Until that lands on every environment, treat a
@@ -2061,6 +2222,8 @@ export class ProductService {
       storeId,
       status: 'active',
       deletedAt: null,
+      // B2B-7b: advanced search is a public surface: wholesale-only products never appear.
+      audience: 'public',
     };
 
     // Text search — Arabic-normalised word-AND (product-search.service), SKU included.
@@ -2190,7 +2353,7 @@ export class ProductService {
       prisma.product.count({ where }),
       // Get price range for filters
       prisma.product.aggregate({
-        where: { storeId, status: 'active' },
+        where: { storeId, status: 'active', audience: 'public' },
         _min: { price: true },
         _max: { price: true },
       }),
@@ -2237,7 +2400,7 @@ export class ProductService {
    */
   static async getSuggestSuggestions(storeId: string, query: string, limit = 25) {
     const trimmed = (query ?? '').trim();
-    if (trimmed.length < 2) return { suggestions: [] as Array<unknown> };
+    if (trimmed.length < 1) return { suggestions: [] as Array<unknown> };
 
     // 25 is enough to actually scroll inside the typeahead's
     // max-h-[70vh] container — the previous cap of 8 made the
@@ -2260,7 +2423,13 @@ export class ProductService {
     });
     if (matchIds.length === 0) return { suggestions: [] as Array<unknown> };
     const products = await prisma.product.findMany({
-      where: { storeId, status: 'active', deletedAt: null, id: { in: matchIds } },
+      where: {
+        storeId,
+        status: 'active',
+        deletedAt: null,
+        audience: 'public',
+        id: { in: matchIds },
+      },
       select: {
         id: true,
         slug: true,
@@ -2298,6 +2467,7 @@ export class ProductService {
         storeId,
         status: 'active',
         deletedAt: null,
+        audience: 'public',
         id: {
           in: await searchProductIds(storeId, query, {
             scope: 'storefront',
@@ -2354,7 +2524,7 @@ export class ProductService {
           _count: {
             select: {
               products: {
-                where: { product: { status: 'active' } },
+                where: { product: { status: 'active', audience: 'public' } },
               },
             },
           },
@@ -2366,7 +2536,7 @@ export class ProductService {
           storeId,
           products: {
             some: {
-              product: { storeId, status: 'active' },
+              product: { storeId, status: 'active', audience: 'public' },
             },
           },
         },
@@ -2376,7 +2546,7 @@ export class ProductService {
           _count: {
             select: {
               products: {
-                where: { product: { storeId, status: 'active' } },
+                where: { product: { storeId, status: 'active', audience: 'public' } },
               },
             },
           },
@@ -2384,7 +2554,7 @@ export class ProductService {
         orderBy: { name: 'asc' },
       }),
       prisma.product.aggregate({
-        where: { storeId, status: 'active' },
+        where: { storeId, status: 'active', audience: 'public' },
         _min: { price: true },
         _max: { price: true },
       }),

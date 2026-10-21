@@ -1,16 +1,12 @@
 'use client';
 
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import { useLocale } from 'next-intl';
 import { useT } from '@/i18n/useT';
-import enMessages from '@/i18n/messages/en.json';
-import arMessages from '@/i18n/messages/ar.json';
-
-export interface SettingsSearchItem {
-  key: string;
-  href: string;
-}
+import { useAuth } from '../lib/auth';
+import { useFeatures } from '../hooks/useFeatures';
+import { entryHref, entryLabel, searchRegistry } from '../lib/settings-search';
 
 interface SearchResult {
   key: string;
@@ -19,21 +15,21 @@ interface SearchResult {
   description: string;
 }
 
-function getCardText(messages: typeof enMessages, key: string) {
-  const cards = (messages.settings as Record<string, unknown>)?.cards as
-    | Record<string, { title?: string; description?: string }>
-    | undefined;
-  return {
-    title: cards?.[key]?.title ?? key,
-    description: cards?.[key]?.description ?? '',
-  };
-}
-
-export function SettingsSearch({ searchItems }: { searchItems: SettingsSearchItem[] }) {
-  const locale = useLocale();
+/**
+ * The search box on the Settings page. Searches the whole admin registry (lib/settings-registry.ts),
+ * not just the cards on this page: any admin page and any individual setting, in Arabic or English,
+ * with everyday synonyms; a result opens the page at the exact control (?setting=). Role- and
+ * feature-gated exactly like the sidebar and the ⌘K palette.
+ */
+export function SettingsSearch() {
+  const locale = useLocale() === 'ar' ? 'ar' : 'en';
   const isRtl = locale === 'ar';
   const t = useT('settings.settingsSearch');
   const router = useRouter();
+  const params = useParams<{ id?: string }>();
+  const storeId = typeof params?.id === 'string' ? params.id : '';
+  const { user } = useAuth();
+  const { isEnabled, isLoading: featuresLoading } = useFeatures();
 
   const [query, setQuery] = useState('');
   const [open, setOpen] = useState(false);
@@ -42,29 +38,20 @@ export function SettingsSearch({ searchItems }: { searchItems: SettingsSearchIte
   const inputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  const results: SearchResult[] = query.trim()
-    ? searchItems
-        .map(item => {
-          const en = getCardText(enMessages, item.key);
-          const ar = getCardText(arMessages, item.key);
-          const display = locale === 'ar' ? ar : en;
-          const q = query.toLowerCase();
-          const matches =
-            en.title.toLowerCase().includes(q) ||
-            en.description.toLowerCase().includes(q) ||
-            ar.title.toLowerCase().includes(q) ||
-            ar.description.toLowerCase().includes(q);
-          return matches
-            ? {
-                key: item.key,
-                href: item.href,
-                title: display.title,
-                description: display.description,
-              }
-            : null;
-        })
-        .filter((r): r is SearchResult => r !== null)
-    : [];
+  const results: SearchResult[] =
+    query.trim() && storeId
+      ? searchRegistry(query, {
+          role: user?.role,
+          isFeatureEnabled: isEnabled,
+          featuresLoading,
+        }).map(({ entry }) => ({
+          key: entry.id,
+          href: entryHref(storeId, entry),
+          title: entryLabel(entry, locale),
+          description:
+            entry.kind === 'setting' ? ((locale === 'ar' ? entry.pageAr : entry.pageEn) ?? '') : '',
+        }))
+      : [];
 
   const navigate = useCallback(
     (href: string) => {

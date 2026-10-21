@@ -30,6 +30,7 @@ export type HubLabels = {
   invoices: string;
   customers: string;
   customerGroups: string;
+  wholesaleApplications: string;
   reviews: string;
   returns: string;
   coupons: string;
@@ -118,6 +119,7 @@ export const HUBS: HubDefinition[] = [
       '/invoices',
       '/customers',
       '/customer-groups',
+      '/wholesale-applications',
       '/sales',
       '/reviews',
       '/returns',
@@ -132,8 +134,19 @@ export const HUBS: HubDefinition[] = [
       // Fiscal documents (tax invoices, receipts, credit notes): issued automatically per
       // sale / refund, so this is a read-only list, not a gated feature.
       { label: labels.invoices, href: `/stores/${storeId}/invoices` },
-      { label: labels.customers, href: `/stores/${storeId}/customers` },
+      // B2B review I5: both tabs carry the count of wholesale applications waiting for a decision. The Wholesale
+      // applications tab is not feature-keyed (the page shows the upgrade prompt when the plan lacks b2b.wholesale).
+      {
+        label: labels.customers,
+        href: `/stores/${storeId}/customers`,
+        badgeKey: 'wholesalePending',
+      },
       { label: labels.customerGroups, href: `/stores/${storeId}/customer-groups` },
+      {
+        label: labels.wholesaleApplications,
+        href: `/stores/${storeId}/wholesale-applications`,
+        badgeKey: 'wholesalePending',
+      },
       { label: labels.reviews, href: `/stores/${storeId}/reviews` },
       { label: labels.returns, href: `/stores/${storeId}/returns` },
       // Coupons and loyalty are feature-gated at the page level via
@@ -218,7 +231,7 @@ export const HUBS: HubDefinition[] = [
       { label: labels.answerEngine, href: `/stores/${storeId}/answer-engine` },
       { label: labels.notifications, href: `/stores/${storeId}/notifications` },
       { label: labels.newsletter, href: `/stores/${storeId}/newsletter` },
-      // Feature-gated (`email_campaigns` is in NO plan baseline) via
+      // Feature-gated (`email_campaigns` is Growth + Business, not Basic) via
       // useRequireFeature('email_campaigns') — same "tab always renders,
       // the page itself gates" pattern as bundles/coupons/loyalty above.
       { label: labels.campaigns, href: `/stores/${storeId}/campaigns` },
@@ -235,6 +248,7 @@ export const HUBS: HubDefinition[] = [
       '/integrations',
       '/agent-key',
       '/merchant-keys',
+      '/webhooks',
       '/whatsapp',
       '/wa-bot',
       '/wa-templates',

@@ -123,6 +123,9 @@ const createProductSchema = z.object({
   metaDescriptionAeo: z.string().max(400).optional().nullable(),
   metaDescriptionAeoAr: z.string().max(400).optional().nullable(),
   categories: z.array(z.string()).optional(),
+  // B2B (Task 4): minimum order quantity (null = none) and audience. Setting either needs b2b.wholesale; clearing never does.
+  moq: z.number().int().min(2).max(1_000_000).nullable().optional(),
+  audience: z.enum(['public', 'wholesale_only']).optional(),
   images: z
     .array(
       z.object({

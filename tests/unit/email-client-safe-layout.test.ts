@@ -58,9 +58,12 @@ import { returnStatusUpdateTemplate } from '@api/services/email-templates/return
 import { reviewRequestTemplate } from '@api/services/email-templates/review-request';
 import { lowStockAlertTemplate } from '@api/services/email-templates/low-stock-alert';
 import { planLimitReachedTemplate } from '@api/services/email-templates/plan-limit-reached';
+import { webhookDisabledTemplate } from '@api/services/email-templates/webhook-disabled';
 import { subscriptionBillingTemplate } from '@api/services/email-templates/subscription-billing';
 import { staffInviteTemplate } from '@api/services/email-templates/staff-invite';
 import { legalNoticeTemplate } from '@api/services/email-templates/legal-notice';
+import { wholesaleNotice } from '@api/services/email-templates/wholesale';
+import { cartRecoveryTemplate } from '@api/services/email-templates/cart-recovery';
 
 type Locale = 'en' | 'ar';
 
@@ -144,6 +147,20 @@ const LEGAL_NOTICE_SAMPLE = {
   url: { ar: 'https://ebda.app/terms/', en: 'https://ebda.app/en/terms/' },
 };
 
+const WS_SAMPLE = {
+  customerName: 'Sara',
+  storeName: 'Demo Store',
+  businessName: 'Sara Trading',
+  note: 'Not now',
+};
+const CART_RECOVERY_SAMPLE = {
+  storeName: 'Demo Store',
+  items: [{ productName: 'Linen shirt', price: 25000, quantity: 2 }],
+  total: 50000,
+  cartUrl: 'https://s.test/cart',
+  unsubscribeUrl: 'https://s.test/unsubscribe?token=t',
+};
+
 type Tpl = Record<Locale, (...a: never[]) => string>;
 const TEMPLATES: Record<string, Tpl> = {
   welcome: welcomeTemplate,
@@ -162,9 +179,20 @@ const TEMPLATES: Record<string, Tpl> = {
   reviewRequest: reviewRequestTemplate,
   lowStockAlert: lowStockAlertTemplate,
   planLimitReached: planLimitReachedTemplate,
+  webhookDisabled: webhookDisabledTemplate,
   subscriptionBilling: subscriptionBillingTemplate,
   staffInvite: staffInviteTemplate,
+  // Recovery email takes a data object, not the (data, storeName, url) triple.
+  cartRecovery: {
+    en: () => cartRecoveryTemplate.en(CART_RECOVERY_SAMPLE),
+    ar: () => cartRecoveryTemplate.ar(CART_RECOVERY_SAMPLE),
+  },
   // One bilingual body for every recipient (Ruling LEGAL-6), so both locale keys render the same.
+  // One entry covers wholesale.ts (received / approved / rejected share a single layout).
+  wholesaleNotice: {
+    en: () => wholesaleNotice('rejected', 'en', WS_SAMPLE).content,
+    ar: () => wholesaleNotice('rejected', 'ar', WS_SAMPLE).content,
+  },
   legalNotice: {
     en: () => legalNoticeTemplate.body(LEGAL_NOTICE_SAMPLE),
     ar: () => legalNoticeTemplate.body(LEGAL_NOTICE_SAMPLE),

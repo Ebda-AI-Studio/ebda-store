@@ -184,7 +184,10 @@ export default function FloatingWidgetPage() {
         <section className="rounded-2xl border border-border bg-card p-6">
           <label className="flex items-center justify-between gap-4 cursor-pointer">
             <span className="flex-1 min-w-0">
-              <span className="block text-sm font-semibold text-foreground">
+              <span
+                data-setting-id="floating-widget.show"
+                className="block text-sm font-semibold text-foreground"
+              >
                 {t('showWidgetLabel')}
               </span>
               <span className="mt-0.5 block text-xs text-muted-foreground">
@@ -203,7 +206,12 @@ export default function FloatingWidgetPage() {
         {/* Position + expand direction */}
         <section className="grid gap-4 rounded-2xl border border-border bg-card p-6 md:grid-cols-2">
           <label className="flex flex-col gap-1">
-            <span className="text-xs font-medium text-muted-foreground">{t('positionLabel')}</span>
+            <span
+              data-setting-id="floating-widget.position"
+              className="text-xs font-medium text-muted-foreground"
+            >
+              {t('positionLabel')}
+            </span>
             <select
               value={config.position ?? 'br'}
               onChange={e => patch({ position: e.target.value as FloatingPosition })}
@@ -217,7 +225,10 @@ export default function FloatingWidgetPage() {
             </select>
           </label>
           <label className="flex flex-col gap-1">
-            <span className="text-xs font-medium text-muted-foreground">
+            <span
+              data-setting-id="floating-widget.expand"
+              className="text-xs font-medium text-muted-foreground"
+            >
               {t('expandDirectionLabel')}
             </span>
             <select

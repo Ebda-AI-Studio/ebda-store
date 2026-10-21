@@ -89,7 +89,7 @@ export default function DahabOrderSummary({
           <dd className="tabular-nums text-foreground" style={typography?.price}>
             {shippingPending ? (
               <span className="text-muted-foreground">
-                {isRtl ? 'يحسب في الخطوة التالية' : 'Calculated at checkout'}
+                {isRtl ? 'بيتحسب في الخطوة الجاية' : 'Calculated at checkout'}
               </span>
             ) : freeShipping ? (
               <span className="text-primary">{isRtl ? 'مجاني' : 'Free'}</span>
@@ -168,6 +168,3 @@ export default function DahabOrderSummary({
     </aside>
   );
 }
-
-/** This summary prints money with `useLocalePrice` (see `summaryMoneyFormatter`). */
-DahabOrderSummary.moneyFormat = 'locale' as const;

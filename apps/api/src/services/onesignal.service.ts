@@ -925,6 +925,62 @@ export class OneSignalService {
   }
 
   /**
+   * B2B: tell the store's admins a wholesale account application is waiting (new application, or the 48h nudge).
+   * Best-effort like every push here: a failure is logged and never reaches the caller.
+   */
+  static async notifyAdminsOfWholesaleApplication(input: {
+    storeId: string;
+    kind: 'received' | 'nudge';
+    pendingCount: number;
+    businessName?: string;
+  }): Promise<void> {
+    if (!isAdminConfigured()) {
+      logger.warn('Admin OneSignal not configured - skipping wholesale application notification');
+      return;
+    }
+    const url = `${config.adminUrl}/stores/${input.storeId}/wholesale-applications`;
+    const storeAdminPlayerIds = await this.getAdminPlayerIds({
+      role: 'store_admin',
+      ownsStoreId: input.storeId,
+    });
+    const received = input.kind === 'received';
+    const body = {
+      app_id: config.onesignalAdminAppId,
+      url,
+      data: { type: 'wholesale.application.received', storeId: input.storeId },
+      headings: received
+        ? { en: 'New wholesale application', ar: 'طلب جملة جديد' }
+        : { en: 'Wholesale applications waiting', ar: 'طلبات جملة مستنية ردك' },
+      contents: received
+        ? {
+            en: `${input.businessName ?? 'A buyer'} applied for a wholesale account. ${input.pendingCount} waiting.`,
+            ar: `${input.businessName ?? 'عميل'} قدّم على حساب جملة. فيه ${input.pendingCount} طلب مستني.`,
+          }
+        : {
+            en: `${input.pendingCount} wholesale application(s) have waited over 48 hours.`,
+            ar: `فيه ${input.pendingCount} طلب جملة مستني ردك بقاله أكتر من 48 ساعة.`,
+          },
+      ...(storeAdminPlayerIds.length > 0
+        ? { include_player_ids: storeAdminPlayerIds }
+        : { filters: [{ field: 'tag', key: 'store_id', relation: '=', value: input.storeId }] }),
+    };
+    try {
+      const res = await fetch(ENDPOINT, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Key ${config.onesignalAdminRestApiKey}`,
+        },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok)
+        logger.error({ status: res.status }, 'OneSignal wholesale application push failed');
+    } catch (err) {
+      logger.error({ err }, 'OneSignal wholesale application push threw');
+    }
+  }
+
+  /**
    * Resolve the OneSignal player_ids for a given admin audience by
    * joining `User` (filtered by role / store ownership) against
    * `OneSignalSubscription`. Used by `notifyAdminsOfOrder` to target

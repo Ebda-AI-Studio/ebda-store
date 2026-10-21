@@ -32,6 +32,13 @@ const accountNav: Array<{ name: string; nameAr?: string; href: string; icon: str
     icon: 'M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z',
   },
   {
+    // B2B wholesale account (apply / status). Shown only while the store has wholesale pricing on.
+    name: 'Wholesale',
+    nameAr: 'حساب الجملة',
+    href: '/account/wholesale',
+    icon: 'M3 7h18M5 7v12a1 1 0 001 1h12a1 1 0 001-1V7M9 11h6M9 15h6M8 7V5a1 1 0 011-1h6a1 1 0 011 1v2',
+  },
+  {
     // Customer wallet (store credit, D1). Shown only when the API confirms the
     // wallet for this store (see useWallet) — never on enabledFeatures alone.
     name: 'Wallet',
@@ -116,6 +123,7 @@ export default function AccountLayout({ children }: { children: React.ReactNode 
                     if (item.href === '/account/loyalty') return isEnabled('loyalty');
                     if (item.href === '/account/returns') return isEnabled('returns');
                     if (item.href === '/account/wallet') return wallet !== null;
+                    if (item.href === '/account/wholesale') return isEnabled('b2b.wholesale');
                     return true;
                   })
                   .map(item => {

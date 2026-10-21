@@ -4,7 +4,10 @@ import { useCallback, useRef, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { useT } from '@/i18n/useT';
 import { AdminLayout } from '../../../../components/AdminLayout';
-import { RefundMethodModal } from './_components/RefundMethodModal';
+import { RefundMethodModal, type RefundOverrides } from './_components/RefundMethodModal';
+
+/** The method alone, or (B2B Task 8b) the method plus the merchant's per-item refund overrides. */
+type RefundChoice = string | { refundMethod: string; refundOverrides: RefundOverrides };
 import { RejectReasonModal } from './_components/RejectReasonModal';
 import { ReturnDetailsDrawer } from './_components/ReturnDetailsDrawer';
 import { ReturnStatusFilter } from './_components/ReturnStatusFilter';
@@ -39,7 +42,7 @@ export default function ReturnsPage() {
   // async function in the hook. When the user confirms or cancels, we resolve
   // the pending promise; the hook then proceeds with (or aborts) the API call.
   const rejectResolverRef = useRef<StringResolver | null>(null);
-  const refundResolverRef = useRef<StringResolver | null>(null);
+  const refundResolverRef = useRef<((choice: RefundChoice | null) => void) | null>(null);
 
   const requestRejectReason = useCallback(() => {
     setRejectOpen(true);
@@ -51,7 +54,7 @@ export default function ReturnsPage() {
   const requestRefundMethod = useCallback((returnId: string) => {
     setRefundReturnId(returnId);
     setRefundOpen(true);
-    return new Promise<string | null>(resolve => {
+    return new Promise<RefundChoice | null>(resolve => {
       refundResolverRef.current = resolve;
     });
   }, []);
@@ -68,9 +71,11 @@ export default function ReturnsPage() {
     rejectResolverRef.current = null;
   };
 
-  const handleRefundConfirm = (method: string) => {
+  const handleRefundConfirm = (method: string, refundOverrides?: RefundOverrides) => {
     setRefundOpen(false);
-    refundResolverRef.current?.(method);
+    refundResolverRef.current?.(
+      refundOverrides ? { refundMethod: method, refundOverrides } : method
+    );
     refundResolverRef.current = null;
   };
 

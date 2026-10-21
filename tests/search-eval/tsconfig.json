@@ -1,0 +1,15 @@
+{
+  "//": "Typechecks the search eval (npm run typecheck + CI): the harness imports API internals, so a signature change in product-search.service.ts must fail here, not at the next manual run.",
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "incremental": false,
+    "declaration": false,
+    "declarationMap": false,
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "types": ["node"]
+  },
+  "include": ["./**/*.ts", "../unit/search-eval-scoring.test.ts"],
+  "exclude": ["./embed-proxy/.wrangler"]
+}

@@ -1,0 +1,3265 @@
+{
+  "meta": {
+    "generated": "2026-10-15",
+    "count": 264,
+    "fields": "msa, egyptian[], franco[] (all variants), franco_seen[] (seen verbatim at a cited source), franco_convention_derived[] (built from documented convention), en, category, sources[] (URLs)",
+    "conventions_sources": [
+      "https://en.wikipedia.org/wiki/Arabic_chat_alphabet",
+      "https://aclanthology.org/W14-3629/",
+      "https://catalog.ldc.upenn.edu/LDC2017T07",
+      "https://catalog.ldc.upenn.edu/LDC2021T17"
+    ],
+    "gulf_contrast_source": "https://huggingface.co/datasets/arbml/Arabizi_Transliteration"
+  },
+  "terms": [
+    {
+      "msa": "عباءة",
+      "egyptian": ["عباية", "عبايه"],
+      "franco": ["3abaya", "3baya", "abaya", "3abaia"],
+      "franco_seen": ["3abaya", "3baya"],
+      "en": "abaya",
+      "category": "abaya",
+      "sources": [
+        "https://www.jumia.com.eg/ar/catalog/?q=%D8%B9%D8%A8%D8%A7%D9%8A%D8%A9",
+        "https://www.instagram.com/3bayastore2020/",
+        "https://www.facebook.com/p/3baya-7kaya-%D8%B9%D8%A8%D8%A7%D9%8A%D9%87-%D8%AD%D9%83%D8%A7%D9%8A%D9%87-100057154911869/"
+      ],
+      "franco_convention_derived": ["abaya", "3abaia"]
+    },
+    {
+      "msa": "عباءات",
+      "egyptian": ["عبايات"],
+      "franco": ["3abayat", "3bayat", "abayat"],
+      "franco_seen": ["3abayat", "3bayat"],
+      "en": "abayas",
+      "category": "abaya",
+      "sources": [
+        "https://www.facebook.com/100094747083760",
+        "https://www.facebook.com/tala.3bayat/",
+        "https://www.facebook.com/kayan.3bayat/"
+      ],
+      "franco_convention_derived": ["abayat"]
+    },
+    {
+      "msa": "عباءة خليجية",
+      "egyptian": ["عباية خليجي", "عبايه خليجى"],
+      "franco": ["3abaya 5aleegy", "3abaya khaleegy", "3baya 5aligi"],
+      "franco_seen": [],
+      "en": "Gulf-style abaya",
+      "category": "abaya",
+      "sources": [
+        "https://www.facebook.com/tala.3bayat/",
+        "https://www.facebook.com/kayan.3bayat/",
+        "https://www.jumia.com.eg/ar/catalog/?q=%D8%B9%D8%A8%D8%A7%D9%8A%D8%A9"
+      ],
+      "franco_convention_derived": ["3abaya 5aleegy", "3abaya khaleegy", "3baya 5aligi"]
+    },
+    {
+      "msa": "عباءة كاجوال",
+      "egyptian": ["عبايه كاجول", "عباية كاجوال", "عبايه كاچول"],
+      "franco": ["3abaya casual", "3abaya kagual", "3baya kagol"],
+      "franco_seen": [],
+      "en": "casual abaya",
+      "category": "abaya",
+      "sources": ["https://www.jumia.com.eg/ar/catalog/?q=%D8%B9%D8%A8%D8%A7%D9%8A%D8%A9"],
+      "franco_convention_derived": ["3abaya casual", "3abaya kagual", "3baya kagol"]
+    },
+    {
+      "msa": "عباءة جينز",
+      "egyptian": ["عباية جينز"],
+      "franco": ["3abaya jeans", "3abaya genz"],
+      "franco_seen": [],
+      "en": "denim abaya",
+      "category": "abaya",
+      "sources": ["https://www.jumia.com.eg/ar/catalog/?q=%D8%B9%D8%A8%D8%A7%D9%8A%D8%A9"],
+      "franco_convention_derived": ["3abaya jeans", "3abaya genz"]
+    },
+    {
+      "msa": "عباءة شامواه",
+      "egyptian": ["عباية شامواه"],
+      "franco": ["3abaya shamwah", "3abaya chamois"],
+      "franco_seen": [],
+      "en": "suede (chamois) abaya",
+      "category": "abaya",
+      "sources": ["https://www.jumia.com.eg/ar/catalog/?q=%D8%B9%D8%A8%D8%A7%D9%8A%D8%A9"],
+      "franco_convention_derived": ["3abaya shamwah", "3abaya chamois"]
+    },
+    {
+      "msa": "عباءة لف",
+      "egyptian": ["عباية لف"],
+      "franco": ["3abaya laf", "3abaya wrap"],
+      "franco_seen": [],
+      "en": "wrap abaya",
+      "category": "abaya",
+      "sources": ["https://www.jumia.com.eg/ar/catalog/?q=%D8%B9%D8%A8%D8%A7%D9%8A%D8%A9"],
+      "franco_convention_derived": ["3abaya laf", "3abaya wrap"]
+    },
+    {
+      "msa": "عباءة بغطاء رأس",
+      "egyptian": ["عباية بهودي"],
+      "franco": ["3abaya b hoodie", "3abaya hoody"],
+      "franco_seen": [],
+      "en": "hooded abaya",
+      "category": "abaya",
+      "sources": ["https://www.jumia.com.eg/ar/catalog/?q=%D8%B9%D8%A8%D8%A7%D9%8A%D8%A9"],
+      "franco_convention_derived": ["3abaya b hoodie", "3abaya hoody"]
+    },
+    {
+      "msa": "عباءة خروج",
+      "egyptian": ["عباية خروج"],
+      "franco": ["3abaya 5orog", "3abayet 5orog", "3abaya khoroog"],
+      "franco_seen": [],
+      "en": "going-out abaya",
+      "category": "abaya",
+      "sources": [
+        "https://www.jumia.com.eg/ar/catalog/?q=%D8%B9%D8%A8%D8%A7%D9%8A%D8%A9",
+        "https://www.jumia.com.eg/ar/catalog/?q=%D8%A7%D8%B3%D8%AF%D8%A7%D9%84+%D8%B5%D9%84%D8%A7%D8%A9"
+      ],
+      "franco_convention_derived": ["3abaya 5orog", "3abayet 5orog", "3abaya khoroog"]
+    },
+    {
+      "msa": "عباءة رمضانية",
+      "egyptian": ["عبايه رمضان", "عباية رمضانيه"],
+      "franco": ["3abaya ramadan", "3abaya ramadaneya"],
+      "franco_seen": [],
+      "en": "Ramadan abaya",
+      "category": "abaya",
+      "sources": ["https://www.jumia.com.eg/ar/catalog/?q=%D9%82%D9%81%D8%B7%D8%A7%D9%86"],
+      "franco_convention_derived": ["3abaya ramadan", "3abaya ramadaneya"]
+    },
+    {
+      "msa": "عباءة قطيفة",
+      "egyptian": ["عباية قطيفة", "عبايه قطيفه"],
+      "franco": ["3abaya 2tifa", "3abaya 2atifa", "3abaya velvet"],
+      "franco_seen": [],
+      "en": "velvet abaya",
+      "category": "abaya",
+      "sources": [
+        "https://www.jumia.com.eg/ar/catalog/?q=%D8%B9%D8%A8%D8%A7%D9%8A%D8%A9",
+        "https://www.jumia.com.eg/ar/catalog/?q=%D9%82%D9%81%D8%B7%D8%A7%D9%86"
+      ],
+      "franco_convention_derived": ["3abaya 2tifa", "3abaya 2atifa", "3abaya velvet"]
+    },
+    {
+      "msa": "عباءة مطرزة",
+      "egyptian": ["عباية مطرزة", "عبايه مطرزه"],
+      "franco": ["3abaya metraza", "3abaya mtrza"],
+      "franco_seen": [],
+      "en": "embroidered abaya",
+      "category": "abaya",
+      "sources": ["https://www.jumia.com.eg/ar/catalog/?q=%D8%B9%D8%A8%D8%A7%D9%8A%D8%A9"],
+      "franco_convention_derived": ["3abaya metraza", "3abaya mtrza"]
+    },
+    {
+      "msa": "إسدال",
+      "egyptian": ["اسدال", "إسدال صلاة", "اسدال صلاه"],
+      "franco": ["esdal", "isdal", "es2dal", "esdal sala"],
+      "franco_seen": ["esdal", "isdal"],
+      "en": "isdal (one-piece prayer garment)",
+      "category": "abaya",
+      "sources": [
+        "https://www.jumia.com.eg/ar/catalog/?q=%D8%A7%D8%B3%D8%AF%D8%A7%D9%84+%D8%B5%D9%84%D8%A7%D8%A9",
+        "https://www.facebook.com/EsdalAndMoreOfficial/",
+        "https://www.instagram.com/isdal_style/"
+      ],
+      "franco_convention_derived": ["es2dal", "esdal sala"]
+    },
+    {
+      "msa": "إسدال صلاة وخروج",
+      "egyptian": ["اسدال صلاة وخروج"],
+      "franco": ["esdal sala w 5orog", "esdal salah w khoroog"],
+      "franco_seen": [],
+      "en": "isdal for prayer and going out",
+      "category": "abaya",
+      "sources": [
+        "https://www.jumia.com.eg/ar/catalog/?q=%D8%A7%D8%B3%D8%AF%D8%A7%D9%84+%D8%B5%D9%84%D8%A7%D8%A9"
+      ],
+      "franco_convention_derived": ["esdal sala w 5orog", "esdal salah w khoroog"]
+    },
+    {
+      "msa": "إسدال مغربي",
+      "egyptian": ["اسدال مغربي بكابشوه"],
+      "franco": ["esdal maghrabi", "esdal maghreby b kapshoh"],
+      "franco_seen": [],
+      "en": "Moroccan-style isdal with hood",
+      "category": "abaya",
+      "sources": [
+        "https://www.jumia.com.eg/ar/catalog/?q=%D8%A7%D8%B3%D8%AF%D8%A7%D9%84+%D8%B5%D9%84%D8%A7%D8%A9"
+      ],
+      "franco_convention_derived": ["esdal maghrabi", "esdal maghreby b kapshoh"]
+    },
+    {
+      "msa": "جلابية",
+      "egyptian": ["جلابية", "جلابيه"],
+      "franco": ["galabeya", "galabya", "gallabeya", "galabiya", "jalabiya"],
+      "franco_seen": ["galabeya", "gallabeya"],
+      "en": "galabeya / jalabiya",
+      "category": "kaftan",
+      "sources": [
+        "https://www.jumia.com.eg/ar/catalog/?q=%D8%AC%D9%84%D8%A7%D8%A8%D9%8A%D8%A9",
+        "https://www.tiktok.com/@pouryourart0ut/video/7264620946168892718"
+      ],
+      "franco_convention_derived": ["galabya", "galabiya", "jalabiya"]
+    },
+    {
+      "msa": "جلابية بيتي",
+      "egyptian": ["جلابيه بيتى", "جلابيه شتوي"],
+      "franco": ["galabeya beity", "galabeya shetwy"],
+      "franco_seen": [],
+      "en": "house galabeya",
+      "category": "kaftan",
+      "sources": ["https://www.jumia.com.eg/ar/catalog/?q=%D8%AC%D9%84%D8%A7%D8%A8%D9%8A%D8%A9"],
+      "franco_convention_derived": ["galabeya beity", "galabeya shetwy"]
+    },
+    {
+      "msa": "قفطان",
+      "egyptian": ["قفطان", "قفطان حريمي"],
+      "franco": ["2aftan", "kaftan", "qaftan", "caftan"],
+      "franco_seen": ["kaftan"],
+      "en": "kaftan",
+      "category": "kaftan",
+      "sources": [
+        "https://www.jumia.com.eg/ar/catalog/?q=%D9%82%D9%81%D8%B7%D8%A7%D9%86",
+        "https://www.instagram.com/egypt_abaya/"
+      ],
+      "franco_convention_derived": ["2aftan", "qaftan", "caftan"]
+    },
+    {
+      "msa": "قفطان رمضاني",
+      "egyptian": ["قفطان رمضاني"],
+      "franco": ["2aftan ramadany", "kaftan ramadan"],
+      "franco_seen": [],
+      "en": "Ramadan kaftan",
+      "category": "kaftan",
+      "sources": ["https://www.jumia.com.eg/ar/catalog/?q=%D9%82%D9%81%D8%B7%D8%A7%D9%86"],
+      "franco_convention_derived": ["2aftan ramadany", "kaftan ramadan"]
+    },
+    {
+      "msa": "بشت",
+      "egyptian": ["بشت"],
+      "franco": ["besht", "bisht"],
+      "franco_seen": [],
+      "en": "bisht (open cloak)",
+      "category": "kaftan",
+      "sources": ["https://www.jumia.com.eg/ar/catalog/?q=%D9%82%D9%81%D8%B7%D8%A7%D9%86"],
+      "franco_convention_derived": ["besht", "bisht"]
+    },
+    {
+      "msa": "كيمونو",
+      "egyptian": ["كيمونو"],
+      "franco": ["kimono", "kemono"],
+      "franco_seen": [],
+      "en": "kimono",
+      "category": "kaftan",
+      "sources": ["https://www.jumia.com.eg/ar/catalog/?q=%D9%82%D9%81%D8%B7%D8%A7%D9%86"],
+      "franco_convention_derived": ["kimono", "kemono"]
+    },
+    {
+      "msa": "كارديجان",
+      "egyptian": ["كارديجان", "كارديجن"],
+      "franco": ["cardigan", "kardigan"],
+      "franco_seen": [],
+      "en": "cardigan",
+      "category": "apparel",
+      "sources": ["https://www.jumia.com.eg/ar/catalog/?q=%D9%82%D9%81%D8%B7%D8%A7%D9%86"],
+      "franco_convention_derived": ["cardigan", "kardigan"]
+    },
+    {
+      "msa": "روب",
+      "egyptian": ["روب"],
+      "franco": ["rob", "robe"],
+      "franco_seen": [],
+      "en": "robe",
+      "category": "kaftan",
+      "sources": ["https://www.jumia.com.eg/ar/catalog/?q=%D9%82%D9%81%D8%B7%D8%A7%D9%86"],
+      "franco_convention_derived": ["rob", "robe"]
+    },
+    {
+      "msa": "قميص نوم",
+      "egyptian": ["قميص نوم حريمي"],
+      "franco": ["2amis nom", "2ames noom", "amis nom"],
+      "franco_seen": [],
+      "en": "nightgown",
+      "category": "apparel",
+      "sources": [
+        "https://www.jumia.com.eg/ar/catalog/?q=%D8%B9%D8%A8%D8%A7%D9%8A%D8%A9",
+        "https://en.wiktionary.org/wiki/%D9%82%D9%85%D9%8A%D8%B5"
+      ],
+      "franco_convention_derived": ["2amis nom", "2ames noom", "amis nom"]
+    },
+    {
+      "msa": "طرحة",
+      "egyptian": ["طرحة", "طرحه"],
+      "franco": ["tar7a", "tr7a", "tar7ah", "tarha", "tar7aa"],
+      "franco_seen": ["tar7a"],
+      "en": "headscarf (tarha)",
+      "category": "hijab",
+      "sources": [
+        "https://www.jumia.com.eg/ar/catalog/?q=%D8%B7%D8%B1%D8%AD%D8%A9",
+        "https://www.facebook.com/tarhaonline/",
+        "https://www.facebook.com/Tar7a-107406154113836/",
+        "https://www.facebook.com/trbona.tar7a/"
+      ],
+      "franco_convention_derived": ["tr7a", "tar7ah", "tarha", "tar7aa"]
+    },
+    {
+      "msa": "طرح",
+      "egyptian": ["طرح"],
+      "franco": ["tora7", "tara7", "tor7"],
+      "franco_seen": [],
+      "en": "headscarves (plural)",
+      "category": "hijab",
+      "sources": ["https://www.jumia.com.eg/ar/catalog/?q=%D8%B7%D8%B1%D8%AD%D8%A9"],
+      "franco_convention_derived": ["tora7", "tara7", "tor7"]
+    },
+    {
+      "msa": "طرحة شيفون",
+      "egyptian": ["طرحة شيفون"],
+      "franco": ["tar7a chiffon", "tar7a shifon", "tar7a sheefon"],
+      "franco_seen": [],
+      "en": "chiffon headscarf",
+      "category": "hijab",
+      "sources": [
+        "https://www.jumia.com.eg/ar/catalog/?q=%D8%B7%D8%B1%D8%AD%D8%A9",
+        "https://www.facebook.com/Chiffon.eg1/"
+      ],
+      "franco_convention_derived": ["tar7a chiffon", "tar7a shifon", "tar7a sheefon"]
+    },
+    {
+      "msa": "طرحة قطن",
+      "egyptian": ["طرحة قطنية", "طرحه قطن"],
+      "franco": ["tar7a 2otn", "tar7a cotton", "tar7a qotn"],
+      "franco_seen": [],
+      "en": "cotton headscarf",
+      "category": "hijab",
+      "sources": ["https://www.jumia.com.eg/ar/catalog/?q=%D8%B7%D8%B1%D8%AD%D8%A9"],
+      "franco_convention_derived": ["tar7a 2otn", "tar7a cotton", "tar7a qotn"]
+    },
+    {
+      "msa": "طرحة سادة",
+      "egyptian": ["طرحه سادة"],
+      "franco": ["tar7a sada", "tar7a plain"],
+      "franco_seen": [],
+      "en": "plain headscarf",
+      "category": "hijab",
+      "sources": ["https://www.jumia.com.eg/ar/catalog/?q=%D8%B7%D8%B1%D8%AD%D8%A9"],
+      "franco_convention_derived": ["tar7a sada", "tar7a plain"]
+    },
+    {
+      "msa": "طرحة لامعة",
+      "egyptian": ["طرحه لامع"],
+      "franco": ["tar7a lame3", "tar7a lam3a"],
+      "franco_seen": [],
+      "en": "shiny headscarf",
+      "category": "hijab",
+      "sources": ["https://www.jumia.com.eg/ar/catalog/?q=%D8%B7%D8%B1%D8%AD%D8%A9"],
+      "franco_convention_derived": ["tar7a lame3", "tar7a lam3a"]
+    },
+    {
+      "msa": "حجاب",
+      "egyptian": ["حجاب"],
+      "franco": ["7egab", "7ijab", "hijab", "hegab"],
+      "franco_seen": [],
+      "en": "hijab",
+      "category": "hijab",
+      "sources": [
+        "https://www.jumia.com.eg/ar/catalog/?q=%D8%B3%D9%83%D8%A7%D8%B1%D9%81",
+        "https://www.facebook.com/Banota.hejab/"
+      ],
+      "franco_convention_derived": ["7egab", "7ijab", "hijab", "hegab"]
+    },
+    {
+      "msa": "خمار",
+      "egyptian": ["خمار", "خمار ماليزي"],
+      "franco": ["5emar", "khemar", "khimar", "5imar"],
+      "franco_seen": ["khemar", "khimar"],
+      "en": "khimar",
+      "category": "hijab",
+      "sources": [
+        "https://www.jumia.com.eg/ar/catalog/?q=%D8%B3%D9%83%D8%A7%D8%B1%D9%81",
+        "https://www.facebook.com/khimarwtarha/",
+        "https://www.tiktok.com/discover/khemarofficial?lang=en"
+      ],
+      "franco_convention_derived": ["5emar", "5imar"]
+    },
+    {
+      "msa": "نقاب",
+      "egyptian": ["نقاب"],
+      "franco": ["ne2ab", "niqab", "neqab", "n2ab"],
+      "franco_seen": ["niqab"],
+      "en": "niqab",
+      "category": "hijab",
+      "sources": ["https://www.facebook.com/khimarwtarha/"],
+      "franco_convention_derived": ["ne2ab", "neqab", "n2ab"]
+    },
+    {
+      "msa": "وشاح",
+      "egyptian": ["سكارف", "إسكارف", "إيشارب"],
+      "franco": ["scarf", "eskarf", "esharb", "wesha7"],
+      "franco_seen": [],
+      "en": "scarf",
+      "category": "hijab",
+      "sources": ["https://www.jumia.com.eg/ar/catalog/?q=%D8%B3%D9%83%D8%A7%D8%B1%D9%81"],
+      "franco_convention_derived": ["scarf", "eskarf", "esharb", "wesha7"]
+    },
+    {
+      "msa": "شال",
+      "egyptian": ["شال"],
+      "franco": ["shal", "shaal", "shawl"],
+      "franco_seen": [],
+      "en": "shawl",
+      "category": "hijab",
+      "sources": [
+        "https://www.jumia.com.eg/ar/catalog/?q=%D8%B3%D9%83%D8%A7%D8%B1%D9%81",
+        "https://huggingface.co/datasets/arbml/Arabizi_Transliteration"
+      ],
+      "franco_convention_derived": ["shal", "shaal", "shawl"]
+    },
+    {
+      "msa": "باندانة",
+      "egyptian": ["بندانه", "باندانة"],
+      "franco": ["bandana", "bandanah"],
+      "franco_seen": ["bandana"],
+      "en": "bandana (under-scarf)",
+      "category": "hijab",
+      "sources": [
+        "https://www.jumia.com.eg/ar/catalog/?q=%D8%B3%D9%83%D8%A7%D8%B1%D9%81",
+        "https://www.facebook.com/Banota.hejab/"
+      ],
+      "franco_convention_derived": ["bandanah"]
+    },
+    {
+      "msa": "تربون",
+      "egyptian": ["تربونة", "تربونه"],
+      "franco": ["trbona", "tarbona", "turban"],
+      "franco_seen": ["trbona", "turban"],
+      "en": "turban / under-cap",
+      "category": "hijab",
+      "sources": [
+        "https://www.facebook.com/trbona.tar7a/",
+        "https://www.facebook.com/Banota.hejab/"
+      ],
+      "franco_convention_derived": ["tarbona"]
+    },
+    {
+      "msa": "بونيه",
+      "egyptian": ["بونيه", "بونيت"],
+      "franco": ["bonnet", "boniya", "bonneh"],
+      "franco_seen": [],
+      "en": "hijab bonnet / underscarf cap",
+      "category": "hijab",
+      "sources": [
+        "https://www.jumia.com.eg/ar/catalog/?q=%D8%B3%D9%83%D8%A7%D8%B1%D9%81",
+        "https://www.jumia.com.eg/ar/catalog/?q=%D8%B7%D8%B1%D8%AD%D8%A9"
+      ],
+      "franco_convention_derived": ["bonnet", "boniya", "bonneh"]
+    },
+    {
+      "msa": "دبوس طرحة",
+      "egyptian": ["دبوس طرحه"],
+      "franco": ["dabbos tar7a", "dabos tar7a"],
+      "franco_seen": [],
+      "en": "hijab pin",
+      "category": "hijab",
+      "sources": ["https://www.jumia.com.eg/ar/catalog/?q=%D8%B7%D8%B1%D8%AD%D8%A9"],
+      "franco_convention_derived": ["dabbos tar7a", "dabos tar7a"]
+    },
+    {
+      "msa": "بشمينة",
+      "egyptian": ["باشمينا"],
+      "franco": ["pashmina", "bashmina"],
+      "franco_seen": [],
+      "en": "pashmina",
+      "category": "hijab",
+      "sources": ["https://www.jumia.com.eg/ar/catalog/?q=%D8%B3%D9%83%D8%A7%D8%B1%D9%81"],
+      "franco_convention_derived": ["pashmina", "bashmina"]
+    },
+    {
+      "msa": "فستان",
+      "egyptian": ["فستان"],
+      "franco": ["fostan", "fustan", "fstan", "festan"],
+      "franco_seen": ["fostan", "fustan"],
+      "en": "dress",
+      "category": "dress",
+      "sources": [
+        "https://www.jumia.com.eg/ar/catalog/?q=%D9%81%D8%B3%D8%AA%D8%A7%D9%86+%D8%B3%D9%88%D8%A7%D8%B1%D9%8A%D9%87",
+        "https://www.tiktok.com/@pouryourart0ut/video/7264620946168892718",
+        "https://www.facebook.com/fostan1elfarah/",
+        "https://huggingface.co/datasets/arbml/Arabizi_Transliteration"
+      ],
+      "franco_convention_derived": ["fstan", "festan"]
+    },
+    {
+      "msa": "فساتين",
+      "egyptian": ["فساتين"],
+      "franco": ["fasaten", "fasatin", "fsatin"],
+      "franco_seen": ["fasaten"],
+      "en": "dresses",
+      "category": "dress",
+      "sources": ["https://www.facebook.com/Fasaten.swarih/"],
+      "franco_convention_derived": ["fasatin", "fsatin"]
+    },
+    {
+      "msa": "فستان سهرة",
+      "egyptian": ["فستان سواريه", "فستان سوارية"],
+      "franco": ["fostan soiree", "fostan swarih", "fostan sowareh", "fostan sahra"],
+      "franco_seen": [],
+      "en": "evening (soirée) dress",
+      "category": "dress",
+      "sources": [
+        "https://www.jumia.com.eg/ar/catalog/?q=%D9%81%D8%B3%D8%AA%D8%A7%D9%86+%D8%B3%D9%88%D8%A7%D8%B1%D9%8A%D9%87",
+        "https://www.facebook.com/Fasaten.swarih/",
+        "https://www.instagram.com/hijabsoiree/"
+      ],
+      "franco_convention_derived": [
+        "fostan soiree",
+        "fostan swarih",
+        "fostan sowareh",
+        "fostan sahra"
+      ]
+    },
+    {
+      "msa": "سواريه",
+      "egyptian": ["سواريه", "سوارية"],
+      "franco": ["soiree", "swarih", "swareh", "sowaree"],
+      "franco_seen": ["soiree", "swarih"],
+      "en": "soirée / evening wear",
+      "category": "dress",
+      "sources": [
+        "https://www.jumia.com.eg/ar/catalog/?q=%D9%81%D8%B3%D8%AA%D8%A7%D9%86+%D8%B3%D9%88%D8%A7%D8%B1%D9%8A%D9%87",
+        "https://www.facebook.com/Fasaten.swarih/",
+        "https://www.instagram.com/hijabsoiree/"
+      ],
+      "franco_convention_derived": ["swareh", "sowaree"]
+    },
+    {
+      "msa": "فستان زفاف",
+      "egyptian": ["فستان فرح", "فستان العروسة"],
+      "franco": ["fostan fara7", "fostan farah", "fostan el3arosa", "fostan elfarah"],
+      "franco_seen": ["fostan farah", "fostan elfarah"],
+      "en": "wedding dress",
+      "category": "dress",
+      "sources": [
+        "https://www.facebook.com/fostan1elfarah/",
+        "https://www.facebook.com/fostanfara/",
+        "https://www.facebook.com/Fostan.elarosa/"
+      ],
+      "franco_convention_derived": ["fostan fara7", "fostan el3arosa"]
+    },
+    {
+      "msa": "فستان خطوبة",
+      "egyptian": ["فستان خطوبه"],
+      "franco": ["fostan 5otoba", "fostan khotoba"],
+      "franco_seen": [],
+      "en": "engagement dress",
+      "category": "dress",
+      "sources": ["https://www.facebook.com/fostanfara/"],
+      "franco_convention_derived": ["fostan 5otoba", "fostan khotoba"]
+    },
+    {
+      "msa": "فستان محجبات",
+      "egyptian": ["فستان محجبات", "سواريه محجبات"],
+      "franco": ["fostan m7agabat", "soiree mo7agabat", "hijab soiree"],
+      "franco_seen": ["hijab soiree"],
+      "en": "modest/hijabi evening dress",
+      "category": "dress",
+      "sources": ["https://www.instagram.com/hijabsoiree/"],
+      "franco_convention_derived": ["fostan m7agabat", "soiree mo7agabat"]
+    },
+    {
+      "msa": "فستان ماكسي",
+      "egyptian": ["فستان ماكسي"],
+      "franco": ["fostan maxi", "maxi dress"],
+      "franco_seen": [],
+      "en": "maxi dress",
+      "category": "dress",
+      "sources": ["https://www.jumia.com.eg/ar/catalog/?q=%D8%B9%D8%A8%D8%A7%D9%8A%D8%A9"],
+      "franco_convention_derived": ["fostan maxi", "maxi dress"]
+    },
+    {
+      "msa": "فستان ميدي",
+      "egyptian": ["فستان ميدي"],
+      "franco": ["fostan midi", "midi dress"],
+      "franco_seen": [],
+      "en": "midi dress",
+      "category": "dress",
+      "sources": [
+        "https://www.jumia.com.eg/ar/catalog/?q=%D9%81%D8%B3%D8%AA%D8%A7%D9%86+%D8%B3%D9%88%D8%A7%D8%B1%D9%8A%D9%87"
+      ],
+      "franco_convention_derived": ["fostan midi", "midi dress"]
+    },
+    {
+      "msa": "فستان ترتر",
+      "egyptian": ["فستان ترتر"],
+      "franco": ["fostan tarter", "fostan sequin"],
+      "franco_seen": [],
+      "en": "sequin dress",
+      "category": "dress",
+      "sources": [
+        "https://www.jumia.com.eg/ar/catalog/?q=%D9%81%D8%B3%D8%AA%D8%A7%D9%86+%D8%B3%D9%88%D8%A7%D8%B1%D9%8A%D9%87"
+      ],
+      "franco_convention_derived": ["fostan tarter", "fostan sequin"]
+    },
+    {
+      "msa": "فستان ميرميد",
+      "egyptian": ["فستان ميرميد"],
+      "franco": ["fostan mermaid", "mermaid"],
+      "franco_seen": [],
+      "en": "mermaid dress",
+      "category": "dress",
+      "sources": [
+        "https://www.jumia.com.eg/ar/catalog/?q=%D9%81%D8%B3%D8%AA%D8%A7%D9%86+%D8%B3%D9%88%D8%A7%D8%B1%D9%8A%D9%87"
+      ],
+      "franco_convention_derived": ["fostan mermaid", "mermaid"]
+    },
+    {
+      "msa": "فستان بدون أكمام",
+      "egyptian": ["فستان بدون اكمام"],
+      "franco": ["fostan men gher akmam", "fostan sleeveless", "bdon akmam"],
+      "franco_seen": [],
+      "en": "sleeveless dress",
+      "category": "dress",
+      "sources": [
+        "https://www.jumia.com.eg/ar/catalog/?q=%D9%81%D8%B3%D8%AA%D8%A7%D9%86+%D8%B3%D9%88%D8%A7%D8%B1%D9%8A%D9%87"
+      ],
+      "franco_convention_derived": ["fostan men gher akmam", "fostan sleeveless", "bdon akmam"]
+    },
+    {
+      "msa": "فستان أطفال",
+      "egyptian": ["فستان أطفال", "فستان بناتي"],
+      "franco": ["fostan atfal", "fostan banaty"],
+      "franco_seen": [],
+      "en": "girls' dress",
+      "category": "dress",
+      "sources": [
+        "https://www.jumia.com.eg/ar/catalog/?q=%D9%81%D8%B3%D8%AA%D8%A7%D9%86+%D8%B3%D9%88%D8%A7%D8%B1%D9%8A%D9%87"
+      ],
+      "franco_convention_derived": ["fostan atfal", "fostan banaty"]
+    },
+    {
+      "msa": "فستاني",
+      "egyptian": ["فستاني"],
+      "franco": ["fostany", "fostani"],
+      "franco_seen": ["fostany", "fostani"],
+      "en": "my dress (brand-style)",
+      "category": "dress",
+      "sources": ["https://www.instagram.com/fostany_fostany/"],
+      "franco_convention_derived": []
+    },
+    {
+      "msa": "ملابس",
+      "egyptian": ["هدوم", "لبس"],
+      "franco": ["hedoom", "hdoum", "hidoom", "hodoom", "lebs"],
+      "franco_seen": ["hidoom", "hdoum", "hedoom"],
+      "en": "clothes",
+      "category": "apparel",
+      "sources": [
+        "https://www.tiktok.com/@pouryourart0ut/video/7264620946168892718",
+        "https://www.facebook.com/hdoumonline",
+        "https://www.facebook.com/hedoomyshop/"
+      ],
+      "franco_convention_derived": ["hodoom", "lebs"]
+    },
+    {
+      "msa": "بنطال",
+      "egyptian": ["بنطلون"],
+      "franco": ["bantalon", "bantaloon", "bntlon"],
+      "franco_seen": ["bantalon"],
+      "en": "trousers",
+      "category": "apparel",
+      "sources": [
+        "https://www.tiktok.com/@pouryourart0ut/video/7264620946168892718",
+        "https://en.wiktionary.org/wiki/%D8%A8%D9%86%D8%B7%D9%84%D9%88%D9%86"
+      ],
+      "franco_convention_derived": ["bantaloon", "bntlon"]
+    },
+    {
+      "msa": "قميص",
+      "egyptian": ["قميص"],
+      "franco": ["2amis", "2ames", "amis", "2amees"],
+      "franco_seen": [],
+      "en": "shirt",
+      "category": "apparel",
+      "sources": [
+        "https://en.wiktionary.org/wiki/%D9%82%D9%85%D9%8A%D8%B5",
+        "https://www.arabicpod101.com/lesson/survival-phrases-s2-20-how-much-in-egyptian-arabic"
+      ],
+      "franco_convention_derived": ["2amis", "2ames", "amis", "2amees"]
+    },
+    {
+      "msa": "بلوزة",
+      "egyptian": ["بلوزة", "بلوزه"],
+      "franco": ["blouza", "bloza", "blouse", "blusa"],
+      "franco_seen": [],
+      "en": "blouse",
+      "category": "apparel",
+      "sources": ["https://openbooks.lib.msu.edu/arb201/chapter/3-1-vocabulary-and-expressions"],
+      "franco_convention_derived": ["blouza", "bloza", "blouse", "blusa"]
+    },
+    {
+      "msa": "تنورة",
+      "egyptian": ["جيبة", "جيبه", "جيب"],
+      "franco": ["gyba", "geeba", "jupe", "giba"],
+      "franco_seen": [],
+      "en": "skirt",
+      "category": "apparel",
+      "sources": ["https://openbooks.lib.msu.edu/arb201/chapter/3-1-vocabulary-and-expressions"],
+      "franco_convention_derived": ["gyba", "geeba", "jupe", "giba"]
+    },
+    {
+      "msa": "طقم",
+      "egyptian": ["طقم", "طقم حريمي"],
+      "franco": ["ta2m", "t2m", "set", "ta2m 7erimy"],
+      "franco_seen": [],
+      "en": "set / outfit",
+      "category": "apparel",
+      "sources": ["https://www.jumia.com.eg/ar/catalog/?q=%D9%82%D9%81%D8%B7%D8%A7%D9%86"],
+      "franco_convention_derived": ["ta2m", "t2m", "set", "ta2m 7erimy"]
+    },
+    {
+      "msa": "جاكيت",
+      "egyptian": ["جاكيت", "جاكت"],
+      "franco": ["jacket", "jaket", "gaket"],
+      "franco_seen": ["jaket"],
+      "en": "jacket",
+      "category": "apparel",
+      "sources": ["https://huggingface.co/datasets/arbml/Arabizi_Transliteration"],
+      "franco_convention_derived": ["jacket", "gaket"]
+    },
+    {
+      "msa": "ترينج",
+      "egyptian": ["ترينج", "ترنج"],
+      "franco": ["trening", "training", "trng"],
+      "franco_seen": [],
+      "en": "tracksuit",
+      "category": "apparel",
+      "sources": [],
+      "sources_note": "convention-derived (no verbatim web attestation found); Arabic form is standard Egyptian usage",
+      "franco_convention_derived": ["trening", "training", "trng"]
+    },
+    {
+      "msa": "بيجامة",
+      "egyptian": ["بيجامة", "بيجامه"],
+      "franco": ["bijama", "pijama", "pyjama", "bigama"],
+      "franco_seen": [],
+      "en": "pyjamas",
+      "category": "apparel",
+      "sources": [],
+      "sources_note": "convention-derived (no verbatim web attestation found); Arabic form is standard Egyptian usage",
+      "franco_convention_derived": ["bijama", "pijama", "pyjama", "bigama"]
+    },
+    {
+      "msa": "ملابس محجبات",
+      "egyptian": ["لبس محجبات"],
+      "franco": ["lebs m7agabat", "modest wear"],
+      "franco_seen": [],
+      "en": "modest wear",
+      "category": "apparel",
+      "sources": ["https://www.facebook.com/khimarwtarha/"],
+      "franco_convention_derived": ["lebs m7agabat", "modest wear"]
+    },
+    {
+      "msa": "ملابس حريمي",
+      "egyptian": ["حريمي", "حريمى"],
+      "franco": ["7erimy", "7arimy", "hareemy", "7rimy"],
+      "franco_seen": [],
+      "en": "women's",
+      "category": "audience",
+      "sources": [
+        "https://www.jumia.com.eg/ar/catalog/?q=%D8%B9%D8%A8%D8%A7%D9%8A%D8%A9",
+        "https://www.jumia.com.eg/ar/catalog/?q=%D8%B5%D9%86%D8%AF%D9%84+%D8%AD%D8%B1%D9%8A%D9%85%D9%8A"
+      ],
+      "franco_convention_derived": ["7erimy", "7arimy", "hareemy", "7rimy"]
+    },
+    {
+      "msa": "رجالي",
+      "egyptian": ["رجالي", "رجالى"],
+      "franco": ["regaly", "rgaly", "rigali"],
+      "franco_seen": [],
+      "en": "men's",
+      "category": "audience",
+      "sources": ["https://www.jumia.com.eg/ar/catalog/?q=%D8%AC%D9%84%D8%A7%D8%A8%D9%8A%D8%A9"],
+      "franco_convention_derived": ["regaly", "rgaly", "rigali"]
+    },
+    {
+      "msa": "بناتي",
+      "egyptian": ["بناتي"],
+      "franco": ["banaty", "bnaty"],
+      "franco_seen": [],
+      "en": "girls'",
+      "category": "audience",
+      "sources": [
+        "https://www.jumia.com.eg/ar/catalog/?q=%D8%A7%D8%B3%D8%AF%D8%A7%D9%84+%D8%B5%D9%84%D8%A7%D8%A9"
+      ],
+      "franco_convention_derived": ["banaty", "bnaty"]
+    },
+    {
+      "msa": "أطفالي",
+      "egyptian": ["اطفالي"],
+      "franco": ["atfaly", "2tfaly"],
+      "franco_seen": [],
+      "en": "kids'",
+      "category": "audience",
+      "sources": ["https://www.jumia.com.eg/ar/catalog/?q=%D8%AC%D9%84%D8%A7%D8%A8%D9%8A%D8%A9"],
+      "franco_convention_derived": ["atfaly", "2tfaly"]
+    },
+    {
+      "msa": "نسائي",
+      "egyptian": ["نسائي"],
+      "franco": ["nesa2y", "nisa2i"],
+      "franco_seen": [],
+      "en": "women's (formal)",
+      "category": "audience",
+      "sources": ["https://www.jumia.com.eg/ar/catalog/?q=%D8%B9%D8%A8%D8%A7%D9%8A%D8%A9"],
+      "franco_convention_derived": ["nesa2y", "nisa2i"]
+    },
+    {
+      "msa": "محجبات",
+      "egyptian": ["محجبات"],
+      "franco": ["m7agabat", "mo7agabat", "mohagabat"],
+      "franco_seen": [],
+      "en": "for hijabis",
+      "category": "audience",
+      "sources": ["https://www.instagram.com/hijabsoiree/"],
+      "franco_convention_derived": ["m7agabat", "mo7agabat", "mohagabat"]
+    },
+    {
+      "msa": "بنات",
+      "egyptian": ["بنات"],
+      "franco": ["banat", "bnat"],
+      "franco_seen": ["banat", "bnat"],
+      "en": "girls",
+      "category": "audience",
+      "sources": ["https://huggingface.co/datasets/arbml/Arabizi_Transliteration"],
+      "franco_convention_derived": []
+    },
+    {
+      "msa": "حذاء",
+      "egyptian": ["جزمة", "جزمه"],
+      "franco": ["gazma", "gezma", "gazmah"],
+      "franco_seen": ["gazma"],
+      "en": "shoe(s)",
+      "category": "shoes",
+      "sources": [
+        "https://www.instagram.com/gazma.eg/",
+        "https://www.facebook.com/gazma.w.shanta/",
+        "https://www.tiktok.com/@pouryourart0ut/video/7264620946168892718",
+        "https://en.wiktionary.org/wiki/%D8%AC%D8%B2%D9%85%D8%A9",
+        "https://www.jumia.com.eg/ar/catalog/?q=%D8%AC%D8%B2%D9%85%D8%A9+%D8%AD%D8%B1%D9%8A%D9%85%D9%8A"
+      ],
+      "franco_convention_derived": ["gezma", "gazmah"]
+    },
+    {
+      "msa": "أحذية",
+      "egyptian": ["جزم", "جزمات"],
+      "franco": ["gizam", "gezam", "gazmat"],
+      "franco_seen": ["gizam"],
+      "en": "shoes (plural)",
+      "category": "shoes",
+      "sources": [
+        "https://www.tiktok.com/@pouryourart0ut/video/7264620946168892718",
+        "https://en.wiktionary.org/wiki/%D8%AC%D8%B2%D9%85%D8%A9"
+      ],
+      "franco_convention_derived": ["gezam", "gazmat"]
+    },
+    {
+      "msa": "حذاء رياضي",
+      "egyptian": ["كوتشي", "كوتش", "كوتشى"],
+      "franco": ["kotshy", "kotchi", "kotshi", "kotsh", "kotchy"],
+      "franco_seen": ["kotshy"],
+      "en": "sneakers",
+      "category": "shoes",
+      "sources": [
+        "https://www.jumia.com.eg/ar/catalog/?q=%D9%83%D9%88%D8%AA%D8%B4%D9%8A",
+        "https://www.facebook.com/p/Kotshy-%D9%83%D9%88%D8%AA%D8%B4%D9%89-100076053281346/",
+        "https://www.facebook.com/kotshyka/",
+        "https://openbooks.lib.msu.edu/arb201/chapter/3-1-vocabulary-and-expressions"
+      ],
+      "franco_convention_derived": ["kotchi", "kotshi", "kotsh", "kotchy"]
+    },
+    {
+      "msa": "أحذية رياضية",
+      "egyptian": ["كوتشيات"],
+      "franco": ["kotshyat", "kotshiat"],
+      "franco_seen": [],
+      "en": "sneakers (plural)",
+      "category": "shoes",
+      "sources": ["https://openbooks.lib.msu.edu/arb201/chapter/3-1-vocabulary-and-expressions"],
+      "franco_convention_derived": ["kotshyat", "kotshiat"]
+    },
+    {
+      "msa": "سنيكرز",
+      "egyptian": ["سنيكرز"],
+      "franco": ["sneakers", "snekers"],
+      "franco_seen": [],
+      "en": "sneakers (loanword)",
+      "category": "shoes",
+      "sources": ["https://www.jumia.com.eg/ar/catalog/?q=%D9%83%D9%88%D8%AA%D8%B4%D9%8A"],
+      "franco_convention_derived": ["sneakers", "snekers"]
+    },
+    {
+      "msa": "خف",
+      "egyptian": ["شبشب", "شبشب زنوبة"],
+      "franco": ["shebsheb", "shibshib", "shbshb", "shebshb"],
+      "franco_seen": ["shibshib"],
+      "en": "slippers / flip-flops",
+      "category": "shoes",
+      "sources": [
+        "https://www.tiktok.com/@talktohabibii/video/7594740588356914446",
+        "https://www.tiktok.com/discover/%D8%A7%D9%81%D8%B6%D9%84-%D8%B4%D8%A8%D8%A7%D8%B4%D8%A8-%D8%AD%D8%B1%D9%8A%D9%85%D9%8A-%D8%B7%D8%A8%D9%8A"
+      ],
+      "franco_convention_derived": ["shebsheb", "shbshb", "shebshb"]
+    },
+    {
+      "msa": "شباشب",
+      "egyptian": ["شباشب"],
+      "franco": ["shabasheb", "shbasheb"],
+      "franco_seen": [],
+      "en": "slippers (plural)",
+      "category": "shoes",
+      "sources": [
+        "https://www.tiktok.com/discover/%D8%A7%D9%81%D8%B6%D9%84-%D8%B4%D8%A8%D8%A7%D8%B4%D8%A8-%D8%AD%D8%B1%D9%8A%D9%85%D9%8A-%D8%B7%D8%A8%D9%8A"
+      ],
+      "franco_convention_derived": ["shabasheb", "shbasheb"]
+    },
+    {
+      "msa": "صندل",
+      "egyptian": ["صندل", "صندل حريمي"],
+      "franco": ["sandal", "sandl", "sandal 7erimy"],
+      "franco_seen": [],
+      "en": "sandal",
+      "category": "shoes",
+      "sources": [
+        "https://www.jumia.com.eg/ar/catalog/?q=%D8%B5%D9%86%D8%AF%D9%84+%D8%AD%D8%B1%D9%8A%D9%85%D9%8A"
+      ],
+      "franco_convention_derived": ["sandal", "sandl", "sandal 7erimy"]
+    },
+    {
+      "msa": "سليبر",
+      "egyptian": ["سليبر"],
+      "franco": ["slipper", "sleeper"],
+      "franco_seen": [],
+      "en": "slipper (loanword)",
+      "category": "shoes",
+      "sources": [
+        "https://www.tiktok.com/discover/%D8%A7%D9%81%D8%B6%D9%84-%D8%B4%D8%A8%D8%A7%D8%B4%D8%A8-%D8%AD%D8%B1%D9%8A%D9%85%D9%8A-%D8%B7%D8%A8%D9%8A"
+      ],
+      "franco_convention_derived": ["slipper", "sleeper"]
+    },
+    {
+      "msa": "كعب",
+      "egyptian": ["كعب", "كعب عالي"],
+      "franco": ["ka3b", "ka3b 3aly", "ka3b 3ali"],
+      "franco_seen": ["ka3b"],
+      "en": "heel / high heel",
+      "category": "shoes",
+      "sources": [
+        "https://www.instagram.com/ka3b_ghazal/",
+        "https://www.facebook.com/ka3bool.shop/"
+      ],
+      "franco_convention_derived": ["ka3b 3aly", "ka3b 3ali"]
+    },
+    {
+      "msa": "هاي هيلز",
+      "egyptian": ["هيلز", "هيلزات"],
+      "franco": ["heels", "heelz"],
+      "franco_seen": [],
+      "en": "heels",
+      "category": "shoes",
+      "sources": [
+        "https://www.tiktok.com/discover/%D8%A7%D9%81%D8%B6%D9%84-%D8%B4%D8%A8%D8%A7%D8%B4%D8%A8-%D8%AD%D8%B1%D9%8A%D9%85%D9%8A-%D8%B7%D8%A8%D9%8A"
+      ],
+      "franco_convention_derived": ["heels", "heelz"]
+    },
+    {
+      "msa": "حذاء مسطح",
+      "egyptian": ["فلات", "حذاء فلات"],
+      "franco": ["flat", "flats", "flat shoes"],
+      "franco_seen": [],
+      "en": "flats",
+      "category": "shoes",
+      "sources": [
+        "https://www.jumia.com.eg/ar/catalog/?q=%D8%B5%D9%86%D8%AF%D9%84+%D8%AD%D8%B1%D9%8A%D9%85%D9%8A",
+        "https://www.jumia.com.eg/ar/catalog/?q=%D8%AC%D8%B2%D9%85%D8%A9+%D8%AD%D8%B1%D9%8A%D9%85%D9%8A"
+      ],
+      "franco_convention_derived": ["flat", "flats", "flat shoes"]
+    },
+    {
+      "msa": "بوت",
+      "egyptian": ["بوت", "بوط", "هاف بوت"],
+      "franco": ["boot", "bot", "half boot"],
+      "franco_seen": [],
+      "en": "boot",
+      "category": "shoes",
+      "sources": [],
+      "sources_note": "convention-derived (no verbatim web attestation found); Arabic form is standard Egyptian usage",
+      "franco_convention_derived": ["boot", "bot", "half boot"]
+    },
+    {
+      "msa": "موكاسين",
+      "egyptian": ["موكاسين"],
+      "franco": ["mocassin", "moccasin"],
+      "franco_seen": [],
+      "en": "moccasin",
+      "category": "shoes",
+      "sources": ["https://www.jumia.com.eg/ar/catalog/?q=%D9%83%D9%88%D8%AA%D8%B4%D9%8A"],
+      "franco_convention_derived": ["mocassin", "moccasin"]
+    },
+    {
+      "msa": "طبي",
+      "egyptian": ["طبي", "طبى"],
+      "franco": ["teby", "tebby", "medical"],
+      "franco_seen": [],
+      "en": "orthopaedic/comfort ('medical')",
+      "category": "shoes",
+      "sources": [
+        "https://www.tiktok.com/discover/%D8%A7%D9%81%D8%B6%D9%84-%D8%B4%D8%A8%D8%A7%D8%B4%D8%A8-%D8%AD%D8%B1%D9%8A%D9%85%D9%8A-%D8%B7%D8%A8%D9%8A",
+        "https://www.jumia.com.eg/ar/catalog/?q=%D8%B5%D9%86%D8%AF%D9%84+%D8%AD%D8%B1%D9%8A%D9%85%D9%8A"
+      ],
+      "franco_convention_derived": ["teby", "tebby", "medical"]
+    },
+    {
+      "msa": "نعل",
+      "egyptian": ["نعل", "سوليه"],
+      "franco": ["na3l", "solya"],
+      "franco_seen": [],
+      "en": "sole",
+      "category": "shoes",
+      "sources": ["https://www.jumia.com.eg/ar/catalog/?q=%D9%83%D9%88%D8%AA%D8%B4%D9%8A"],
+      "franco_convention_derived": ["na3l", "solya"]
+    },
+    {
+      "msa": "رباط",
+      "egyptian": ["رباط", "برباط"],
+      "franco": ["rebat", "b rebat"],
+      "franco_seen": [],
+      "en": "laces / lace-up",
+      "category": "shoes",
+      "sources": [
+        "https://www.jumia.com.eg/ar/catalog/?q=%D8%AC%D8%B2%D9%85%D8%A9+%D8%AD%D8%B1%D9%8A%D9%85%D9%8A"
+      ],
+      "franco_convention_derived": ["rebat", "b rebat"]
+    },
+    {
+      "msa": "مقاس الحذاء",
+      "egyptian": ["مقاس 37", "مقاسات 36-44"],
+      "franco": ["ma2as 37", "size 38", "ma2asat 36-44"],
+      "franco_seen": [],
+      "en": "shoe size",
+      "category": "size",
+      "sources": [
+        "https://www.jumia.com.eg/ar/catalog/?q=%D8%AC%D8%B2%D9%85%D8%A9+%D8%AD%D8%B1%D9%8A%D9%85%D9%8A",
+        "https://www.tiktok.com/discover/%D8%A7%D9%81%D8%B6%D9%84-%D8%B4%D8%A8%D8%A7%D8%B4%D8%A8-%D8%AD%D8%B1%D9%8A%D9%85%D9%8A-%D8%B7%D8%A8%D9%8A"
+      ],
+      "franco_convention_derived": ["ma2as 37", "size 38", "ma2asat 36-44"]
+    },
+    {
+      "msa": "حقيبة",
+      "egyptian": ["شنطة", "شنطه"],
+      "franco": ["shanta", "shantah"],
+      "franco_seen": ["shanta"],
+      "en": "bag",
+      "category": "bags",
+      "sources": [
+        "https://www.instagram.com/your_shanta_store/",
+        "https://www.facebook.com/ShantaBags1/",
+        "https://www.tiktok.com/@talktohabibii/video/7593818679528230158",
+        "https://en.wiktionary.org/wiki/%D8%B4%D9%86%D8%B7%D8%A9"
+      ],
+      "franco_convention_derived": ["shantah"]
+    },
+    {
+      "msa": "حقائب",
+      "egyptian": ["شنط"],
+      "franco": ["shonat", "shunat", "shonaat"],
+      "franco_seen": ["shonat"],
+      "en": "bags (plural)",
+      "category": "bags",
+      "sources": [
+        "https://www.tiktok.com/@talktohabibii/video/7593818679528230158",
+        "https://en.wiktionary.org/wiki/%D8%B4%D9%86%D8%B7%D8%A9"
+      ],
+      "franco_convention_derived": ["shunat", "shonaat"]
+    },
+    {
+      "msa": "حقيبة (مضاف)",
+      "egyptian": ["شنطة ..."],
+      "franco": ["shantet", "shantit"],
+      "franco_seen": ["shantet"],
+      "en": "bag of ... (construct form)",
+      "category": "bags",
+      "sources": ["https://www.facebook.com/shantethamzastore/"],
+      "franco_convention_derived": ["shantit"]
+    },
+    {
+      "msa": "حقيبة يد",
+      "egyptian": ["شنطة يد", "شنطه ايد"],
+      "franco": ["shanta yad", "shantet 2id", "shantet eid"],
+      "franco_seen": [],
+      "en": "handbag",
+      "category": "bags",
+      "sources": [
+        "https://www.jumia.com.eg/ar/catalog/?q=%D8%B4%D9%86%D8%B7%D8%A9+%D8%AD%D8%B1%D9%8A%D9%85%D9%8A"
+      ],
+      "franco_convention_derived": ["shanta yad", "shantet 2id", "shantet eid"]
+    },
+    {
+      "msa": "حقيبة كتف",
+      "egyptian": ["شنطة كتف"],
+      "franco": ["shantet ketf", "shanta ketf"],
+      "franco_seen": [],
+      "en": "shoulder bag",
+      "category": "bags",
+      "sources": [
+        "https://www.jumia.com.eg/ar/catalog/?q=%D8%B4%D9%86%D8%B7%D8%A9+%D8%AD%D8%B1%D9%8A%D9%85%D9%8A"
+      ],
+      "franco_convention_derived": ["shantet ketf", "shanta ketf"]
+    },
+    {
+      "msa": "حقيبة كروس",
+      "egyptian": ["شنطة كروس"],
+      "franco": ["shanta cross", "shantet cross", "cross bag"],
+      "franco_seen": [],
+      "en": "crossbody bag",
+      "category": "bags",
+      "sources": [
+        "https://www.jumia.com.eg/ar/catalog/?q=%D8%B4%D9%86%D8%B7%D8%A9+%D8%AD%D8%B1%D9%8A%D9%85%D9%8A"
+      ],
+      "franco_convention_derived": ["shanta cross", "shantet cross", "cross bag"]
+    },
+    {
+      "msa": "حقيبة توت",
+      "egyptian": ["شنطة توت باج", "توتي باج"],
+      "franco": ["tote bag", "shantet tote"],
+      "franco_seen": [],
+      "en": "tote bag",
+      "category": "bags",
+      "sources": [
+        "https://www.jumia.com.eg/ar/catalog/?q=%D8%B4%D9%86%D8%B7%D8%A9+%D8%AD%D8%B1%D9%8A%D9%85%D9%8A"
+      ],
+      "franco_convention_derived": ["tote bag", "shantet tote"]
+    },
+    {
+      "msa": "حقيبة ظهر",
+      "egyptian": ["شنطة ضهر"],
+      "franco": ["shantet dahr", "shantet dahar", "backpack"],
+      "franco_seen": [],
+      "en": "backpack",
+      "category": "bags",
+      "sources": [],
+      "sources_note": "convention-derived (no verbatim web attestation found); Arabic form is standard Egyptian usage",
+      "franco_convention_derived": ["shantet dahr", "shantet dahar", "backpack"]
+    },
+    {
+      "msa": "كلاتش",
+      "egyptian": ["كلاتش", "شنطة سهرة"],
+      "franco": ["clutch", "shantet sahra"],
+      "franco_seen": [],
+      "en": "clutch / evening bag",
+      "category": "bags",
+      "sources": [
+        "https://www.jumia.com.eg/ar/catalog/?q=%D8%B4%D9%86%D8%B7%D8%A9+%D8%AD%D8%B1%D9%8A%D9%85%D9%8A"
+      ],
+      "franco_convention_derived": ["clutch", "shantet sahra"]
+    },
+    {
+      "msa": "محفظة",
+      "egyptian": ["محفظة", "محفظه"],
+      "franco": ["ma7faza", "m7fza"],
+      "franco_seen": [],
+      "en": "wallet",
+      "category": "bags",
+      "sources": [
+        "https://www.jumia.com.eg/ar/catalog/?q=%D8%B4%D9%86%D8%B7%D8%A9+%D8%AD%D8%B1%D9%8A%D9%85%D9%8A"
+      ],
+      "franco_convention_derived": ["ma7faza", "m7fza"]
+    },
+    {
+      "msa": "حقيبة سفر",
+      "egyptian": ["شنطة سفر"],
+      "franco": ["shantet safar", "shanta safar"],
+      "franco_seen": [],
+      "en": "travel bag",
+      "category": "bags",
+      "sources": [
+        "https://www.jumia.com.eg/ar/catalog/?q=%D8%B4%D9%86%D8%B7%D8%A9+%D8%AD%D8%B1%D9%8A%D9%85%D9%8A"
+      ],
+      "franco_convention_derived": ["shantet safar", "shanta safar"]
+    },
+    {
+      "msa": "جلد طبيعي",
+      "egyptian": ["جلد طبيعي", "جلد اصلي"],
+      "franco": ["gild tabi3y", "geld tabe3y", "leather"],
+      "franco_seen": [],
+      "en": "genuine leather",
+      "category": "material",
+      "sources": [
+        "https://www.jumia.com.eg/ar/catalog/?q=%D8%B4%D9%86%D8%B7%D8%A9+%D8%AD%D8%B1%D9%8A%D9%85%D9%8A",
+        "https://www.facebook.com/ShantaBags1/"
+      ],
+      "franco_convention_derived": ["gild tabi3y", "geld tabe3y", "leather"]
+    },
+    {
+      "msa": "مقاوم للماء",
+      "egyptian": ["ووتر بروف", "وتربروف"],
+      "franco": ["water proof", "waterproof"],
+      "franco_seen": [],
+      "en": "waterproof",
+      "category": "material",
+      "sources": [
+        "https://www.jumia.com.eg/ar/catalog/?q=%D8%B4%D9%86%D8%B7%D8%A9+%D8%AD%D8%B1%D9%8A%D9%85%D9%8A"
+      ],
+      "franco_convention_derived": ["water proof", "waterproof"]
+    },
+    {
+      "msa": "سوستة",
+      "egyptian": ["سوسته", "بسوستة"],
+      "franco": ["sosta", "b sosta", "soosta"],
+      "franco_seen": [],
+      "en": "zip / zipper",
+      "category": "detail",
+      "sources": [
+        "https://www.jumia.com.eg/ar/catalog/?q=%D8%B9%D8%A8%D8%A7%D9%8A%D8%A9",
+        "https://www.jumia.com.eg/ar/catalog/?q=%D8%B4%D9%86%D8%B7%D8%A9+%D8%AD%D8%B1%D9%8A%D9%85%D9%8A"
+      ],
+      "franco_convention_derived": ["sosta", "b sosta", "soosta"]
+    },
+    {
+      "msa": "أسود",
+      "egyptian": ["اسود", "سودا", "سودة"],
+      "franco": ["eswed", "iswid", "aswad", "soda", "souda", "sooda"],
+      "franco_seen": ["eswed", "iswid", "souda"],
+      "en": "black",
+      "category": "colour",
+      "sources": [
+        "https://en.wiktionary.org/wiki/%D8%A7%D8%B3%D9%88%D8%AF",
+        "https://talkinarabic.com/egyptian/vocabulary/colors/",
+        "https://arabicpod101.com/lesson/egyptian-arabic-words-of-the-week-with-peryhan-for-beginners-4-colors",
+        "https://earabiclearning.com/blog/2013/08/how-to-tell-colors-in-egyptian-arabic/",
+        "https://www.jumia.com.eg/ar/catalog/?q=%D8%B9%D8%A8%D8%A7%D9%8A%D8%A9"
+      ],
+      "franco_convention_derived": ["aswad", "soda", "sooda"]
+    },
+    {
+      "msa": "أبيض",
+      "egyptian": ["ابيض", "بيضا"],
+      "franco": ["abyad", "abiad", "bidaa", "beda", "bida"],
+      "franco_seen": ["abyad", "bidaa"],
+      "en": "white",
+      "category": "colour",
+      "sources": [
+        "https://talkinarabic.com/egyptian/vocabulary/colors/",
+        "https://www.jumia.com.eg/ar/catalog/?q=%D9%83%D9%88%D8%AA%D8%B4%D9%8A"
+      ],
+      "franco_convention_derived": ["abiad", "beda", "bida"]
+    },
+    {
+      "msa": "أحمر",
+      "egyptian": ["احمر", "حمرا"],
+      "franco": ["a7mar", "ahmar", "7amra", "hamra"],
+      "franco_seen": ["ahmar", "hamra", "a7mar"],
+      "en": "red",
+      "category": "colour",
+      "sources": [
+        "https://talkinarabic.com/egyptian/vocabulary/colors/",
+        "https://huggingface.co/datasets/arbml/Arabizi_Transliteration",
+        "https://www.jumia.com.eg/ar/catalog/?q=%D9%81%D8%B3%D8%AA%D8%A7%D9%86+%D8%B3%D9%88%D8%A7%D8%B1%D9%8A%D9%87"
+      ],
+      "franco_convention_derived": ["7amra"]
+    },
+    {
+      "msa": "أزرق",
+      "egyptian": ["ازرق", "زرقا"],
+      "franco": ["azra2", "azra'", "zar2a", "zar'a", "azraq"],
+      "franco_seen": ["azra'", "zar'a"],
+      "en": "blue",
+      "category": "colour",
+      "sources": [
+        "https://talkinarabic.com/egyptian/vocabulary/colors/",
+        "https://earabiclearning.com/blog/2013/08/how-to-tell-colors-in-egyptian-arabic/"
+      ],
+      "franco_convention_derived": ["azra2", "zar2a", "azraq"]
+    },
+    {
+      "msa": "أخضر",
+      "egyptian": ["اخضر", "خضرا"],
+      "franco": ["a5dar", "akhdar", "5adra", "khadra"],
+      "franco_seen": ["akhdar", "khadra", "a5dar"],
+      "en": "green",
+      "category": "colour",
+      "sources": [
+        "https://talkinarabic.com/egyptian/vocabulary/colors/",
+        "https://huggingface.co/datasets/arbml/Arabizi_Transliteration"
+      ],
+      "franco_convention_derived": ["5adra"]
+    },
+    {
+      "msa": "أصفر",
+      "egyptian": ["اصفر", "صفرا"],
+      "franco": ["asfar", "safra"],
+      "franco_seen": ["asfar", "safra"],
+      "en": "yellow",
+      "category": "colour",
+      "sources": [
+        "https://talkinarabic.com/egyptian/vocabulary/colors/",
+        "https://www.jumia.com.eg/ar/catalog/?q=%D9%81%D8%B3%D8%AA%D8%A7%D9%86+%D8%B3%D9%88%D8%A7%D8%B1%D9%8A%D9%87"
+      ],
+      "franco_convention_derived": []
+    },
+    {
+      "msa": "برتقالي",
+      "egyptian": ["برتقاني", "برتقالي"],
+      "franco": ["borto2any", "bort2any", "borto'ani", "bortokaly"],
+      "franco_seen": ["borto'ani", "bortokaly"],
+      "en": "orange",
+      "category": "colour",
+      "sources": [
+        "https://en.wiktionary.org/wiki/%D8%A8%D8%B1%D8%AA%D9%82%D8%A7%D9%86%D9%8A",
+        "https://talkinarabic.com/egyptian/vocabulary/colors/"
+      ],
+      "franco_convention_derived": ["borto2any", "bort2any"]
+    },
+    {
+      "msa": "بني",
+      "egyptian": ["بني", "بنى"],
+      "franco": ["bonni", "boni", "bunni"],
+      "franco_seen": ["bonni", "boni"],
+      "en": "brown",
+      "category": "colour",
+      "sources": [
+        "https://en.wiktionary.org/wiki/%D8%A8%D9%86%D9%8A",
+        "https://talkinarabic.com/egyptian/vocabulary/colors/",
+        "https://www.jumia.com.eg/ar/catalog/?q=%D8%B4%D9%86%D8%B7%D8%A9+%D8%AD%D8%B1%D9%8A%D9%85%D9%8A"
+      ],
+      "franco_convention_derived": ["bunni"]
+    },
+    {
+      "msa": "رمادي",
+      "egyptian": ["رمادي", "رصاصي", "جراي"],
+      "franco": ["romady", "rmadi", "rosasy", "rosasi", "grey", "gray"],
+      "franco_seen": ["rmadi", "rosasi"],
+      "en": "grey",
+      "category": "colour",
+      "sources": [
+        "https://en.wiktionary.org/wiki/%D8%B1%D9%85%D8%A7%D8%AF%D9%8A",
+        "https://talkinarabic.com/egyptian/vocabulary/colors/",
+        "https://earabiclearning.com/blog/2013/08/how-to-tell-colors-in-egyptian-arabic/"
+      ],
+      "franco_convention_derived": ["romady", "rosasy", "grey", "gray"]
+    },
+    {
+      "msa": "كحلي",
+      "egyptian": ["كحلي", "كحلى"],
+      "franco": ["ko7ly", "kohly", "kohli", "navy"],
+      "franco_seen": ["kohli"],
+      "en": "navy",
+      "category": "colour",
+      "sources": [
+        "https://en.wiktionary.org/wiki/%D9%83%D8%AD%D9%84%D9%8A",
+        "https://talkinarabic.com/egyptian/vocabulary/colors/",
+        "https://www.jumia.com.eg/ar/catalog/?q=%D8%B9%D8%A8%D8%A7%D9%8A%D8%A9"
+      ],
+      "franco_convention_derived": ["ko7ly", "kohly", "navy"]
+    },
+    {
+      "msa": "لبني",
+      "egyptian": ["لبني", "لبنى"],
+      "franco": ["labany", "labani", "lebny"],
+      "franco_seen": ["labani"],
+      "en": "sky blue / baby blue",
+      "category": "colour",
+      "sources": [
+        "https://talkinarabic.com/egyptian/vocabulary/colors/",
+        "https://www.jumia.com.eg/ar/catalog/?q=%D9%81%D8%B3%D8%AA%D8%A7%D9%86+%D8%B3%D9%88%D8%A7%D8%B1%D9%8A%D9%87"
+      ],
+      "franco_convention_derived": ["labany", "lebny"]
+    },
+    {
+      "msa": "وردي",
+      "egyptian": ["بمبي", "بينك", "روز"],
+      "franco": ["bamby", "bambi", "pink", "rose"],
+      "franco_seen": ["bambi"],
+      "en": "pink",
+      "category": "colour",
+      "sources": [
+        "https://en.wiktionary.org/wiki/%D8%A8%D9%85%D8%A8%D9%8A",
+        "https://talkinarabic.com/egyptian/vocabulary/colors/",
+        "https://www.jumia.com.eg/ar/catalog/?q=%D8%B5%D9%86%D8%AF%D9%84+%D8%AD%D8%B1%D9%8A%D9%85%D9%8A"
+      ],
+      "franco_convention_derived": ["bamby", "pink", "rose"]
+    },
+    {
+      "msa": "بنفسجي",
+      "egyptian": ["بنفسجي", "موف"],
+      "franco": ["banafsegy", "banafsigi", "mov", "mauve"],
+      "franco_seen": ["banafsigi"],
+      "en": "purple / mauve",
+      "category": "colour",
+      "sources": [
+        "https://en.wiktionary.org/wiki/%D8%A8%D9%86%D9%81%D8%B3%D8%AC%D9%8A",
+        "https://talkinarabic.com/egyptian/vocabulary/colors/",
+        "https://www.jumia.com.eg/ar/catalog/?q=%D9%81%D8%B3%D8%AA%D8%A7%D9%86+%D8%B3%D9%88%D8%A7%D8%B1%D9%8A%D9%87"
+      ],
+      "franco_convention_derived": ["banafsegy", "mov", "mauve"]
+    },
+    {
+      "msa": "بيج",
+      "egyptian": ["بيج"],
+      "franco": ["beige", "bej", "beij"],
+      "franco_seen": ["beige"],
+      "en": "beige",
+      "category": "colour",
+      "sources": [
+        "https://talkinarabic.com/egyptian/vocabulary/colors/",
+        "https://www.jumia.com.eg/ar/catalog/?q=%D9%81%D8%B3%D8%AA%D8%A7%D9%86+%D8%B3%D9%88%D8%A7%D8%B1%D9%8A%D9%87",
+        "https://www.jumia.com.eg/ar/catalog/?q=%D8%B5%D9%86%D8%AF%D9%84+%D8%AD%D8%B1%D9%8A%D9%85%D9%8A"
+      ],
+      "franco_convention_derived": ["bej", "beij"]
+    },
+    {
+      "msa": "ذهبي",
+      "egyptian": ["دهبي", "دهبى", "جولد"],
+      "franco": ["dahaby", "dahabi", "gold"],
+      "franco_seen": ["dahabi"],
+      "en": "gold",
+      "category": "colour",
+      "sources": [
+        "https://talkinarabic.com/egyptian/vocabulary/colors/",
+        "https://www.jumia.com.eg/ar/catalog/?q=%D9%81%D8%B3%D8%AA%D8%A7%D9%86+%D8%B3%D9%88%D8%A7%D8%B1%D9%8A%D9%87",
+        "https://www.jumia.com.eg/ar/catalog/?q=%D8%B5%D9%86%D8%AF%D9%84+%D8%AD%D8%B1%D9%8A%D9%85%D9%8A"
+      ],
+      "franco_convention_derived": ["dahaby", "gold"]
+    },
+    {
+      "msa": "فضي",
+      "egyptian": ["فضي", "سيلفر"],
+      "franco": ["faddy", "faddi", "silver"],
+      "franco_seen": ["faddi"],
+      "en": "silver",
+      "category": "colour",
+      "sources": [
+        "https://en.wiktionary.org/wiki/%D9%81%D8%B6%D9%8A",
+        "https://talkinarabic.com/egyptian/vocabulary/colors/",
+        "https://www.jumia.com.eg/ar/catalog/?q=%D9%81%D8%B3%D8%AA%D8%A7%D9%86+%D8%B3%D9%88%D8%A7%D8%B1%D9%8A%D9%87"
+      ],
+      "franco_convention_derived": ["faddy", "silver"]
+    },
+    {
+      "msa": "زيتي",
+      "egyptian": ["زيتي", "زيتوني"],
+      "franco": ["zeity", "zeiti", "zatoony", "zatouni", "olive"],
+      "franco_seen": ["zeiti", "zatouni"],
+      "en": "olive / dark green",
+      "category": "colour",
+      "sources": [
+        "https://talkinarabic.com/egyptian/vocabulary/colors/",
+        "https://www.jumia.com.eg/ar/catalog/?q=%D8%B4%D9%86%D8%B7%D8%A9+%D8%AD%D8%B1%D9%8A%D9%85%D9%8A"
+      ],
+      "franco_convention_derived": ["zeity", "zatoony", "olive"]
+    },
+    {
+      "msa": "تركواز",
+      "egyptian": ["تركواز"],
+      "franco": ["tirkowaz", "turquoise", "tarkwaz"],
+      "franco_seen": ["tirkowaz"],
+      "en": "turquoise",
+      "category": "colour",
+      "sources": [
+        "https://talkinarabic.com/egyptian/vocabulary/colors/",
+        "https://www.jumia.com.eg/ar/catalog/?q=%D8%AC%D9%84%D8%A7%D8%A8%D9%8A%D8%A9"
+      ],
+      "franco_convention_derived": ["turquoise", "tarkwaz"]
+    },
+    {
+      "msa": "نبيتي",
+      "egyptian": ["نبيتي", "نبيتى"],
+      "franco": ["nebity", "nbity", "burgundy"],
+      "franco_seen": [],
+      "en": "burgundy / wine",
+      "category": "colour",
+      "sources": [
+        "https://www.jumia.com.eg/ar/catalog/?q=%D9%81%D8%B3%D8%AA%D8%A7%D9%86+%D8%B3%D9%88%D8%A7%D8%B1%D9%8A%D9%87",
+        "https://www.jumia.com.eg/ar/catalog/?q=%D8%B4%D9%86%D8%B7%D8%A9+%D8%AD%D8%B1%D9%8A%D9%85%D9%8A"
+      ],
+      "franco_convention_derived": ["nebity", "nbity", "burgundy"]
+    },
+    {
+      "msa": "هافان",
+      "egyptian": ["هافان"],
+      "franco": ["havan", "hafan"],
+      "franco_seen": [],
+      "en": "havana (tan brown)",
+      "category": "colour",
+      "sources": [
+        "https://www.jumia.com.eg/ar/catalog/?q=%D8%B4%D9%86%D8%B7%D8%A9+%D8%AD%D8%B1%D9%8A%D9%85%D9%8A",
+        "https://www.jumia.com.eg/ar/catalog/?q=%D8%A7%D8%B3%D8%AF%D8%A7%D9%84+%D8%B5%D9%84%D8%A7%D8%A9"
+      ],
+      "franco_convention_derived": ["havan", "hafan"]
+    },
+    {
+      "msa": "كافيه",
+      "egyptian": ["كافيه", "لون قهوة"],
+      "franco": ["cafe", "kafeh", "lon 2ahwa"],
+      "franco_seen": [],
+      "en": "coffee (colour)",
+      "category": "colour",
+      "sources": [
+        "https://www.jumia.com.eg/ar/catalog/?q=%D9%82%D9%81%D8%B7%D8%A7%D9%86",
+        "https://www.jumia.com.eg/ar/catalog/?q=%D8%AC%D8%B2%D9%85%D8%A9+%D8%AD%D8%B1%D9%8A%D9%85%D9%8A"
+      ],
+      "franco_convention_derived": ["cafe", "kafeh", "lon 2ahwa"]
+    },
+    {
+      "msa": "فوشيا",
+      "egyptian": ["فوشيا"],
+      "franco": ["fushia", "fuchsia"],
+      "franco_seen": [],
+      "en": "fuchsia",
+      "category": "colour",
+      "sources": [
+        "https://www.jumia.com.eg/ar/catalog/?q=%D8%B5%D9%86%D8%AF%D9%84+%D8%AD%D8%B1%D9%8A%D9%85%D9%8A"
+      ],
+      "franco_convention_derived": ["fushia", "fuchsia"]
+    },
+    {
+      "msa": "أزرق ملكي",
+      "egyptian": ["ازرق ملكي", "اخضر ملكي"],
+      "franco": ["azra2 malaky", "royal blue"],
+      "franco_seen": [],
+      "en": "royal (blue/green)",
+      "category": "colour",
+      "sources": ["https://www.jumia.com.eg/ar/catalog/?q=%D8%B9%D8%A8%D8%A7%D9%8A%D8%A9"],
+      "franco_convention_derived": ["azra2 malaky", "royal blue"]
+    },
+    {
+      "msa": "كشمير (لون)",
+      "egyptian": ["كشمير"],
+      "franco": ["kashmir", "cashmere"],
+      "franco_seen": [],
+      "en": "cashmere (tone/pattern)",
+      "category": "colour",
+      "sources": [
+        "https://www.jumia.com.eg/ar/catalog/?q=%D8%B5%D9%86%D8%AF%D9%84+%D8%AD%D8%B1%D9%8A%D9%85%D9%8A",
+        "https://www.jumia.com.eg/ar/catalog/?q=%D8%B3%D9%83%D8%A7%D8%B1%D9%81"
+      ],
+      "franco_convention_derived": ["kashmir", "cashmere"]
+    },
+    {
+      "msa": "لون",
+      "egyptian": ["لون", "ألوان"],
+      "franco": ["lon", "lun", "loon", "alwan", "elwan"],
+      "franco_seen": ["lon", "lun"],
+      "en": "colour / colours",
+      "category": "colour",
+      "sources": [
+        "https://huggingface.co/datasets/arbml/Arabizi_Transliteration",
+        "https://www.jumia.com.eg/ar/catalog/?q=%D8%B9%D8%A8%D8%A7%D9%8A%D8%A9"
+      ],
+      "franco_convention_derived": ["loon", "alwan", "elwan"]
+    },
+    {
+      "msa": "متعدد الألوان",
+      "egyptian": ["الوان متعددة", "ملون"],
+      "franco": ["alwan mot3adeda", "molawen", "multicolour"],
+      "franco_seen": [],
+      "en": "multicolour",
+      "category": "colour",
+      "sources": [
+        "https://www.jumia.com.eg/ar/catalog/?q=%D8%B7%D8%B1%D8%AD%D8%A9",
+        "https://www.jumia.com.eg/ar/catalog/?q=%D8%B5%D9%86%D8%AF%D9%84+%D8%AD%D8%B1%D9%8A%D9%85%D9%8A"
+      ],
+      "franco_convention_derived": ["alwan mot3adeda", "molawen", "multicolour"]
+    },
+    {
+      "msa": "سادة",
+      "egyptian": ["سادة", "ساده"],
+      "franco": ["sada", "sadah", "plain"],
+      "franco_seen": [],
+      "en": "plain (no pattern)",
+      "category": "detail",
+      "sources": [
+        "https://www.jumia.com.eg/ar/catalog/?q=%D8%B7%D8%B1%D8%AD%D8%A9",
+        "https://www.jumia.com.eg/ar/catalog/?q=%D8%A7%D8%B3%D8%AF%D8%A7%D9%84+%D8%B5%D9%84%D8%A7%D8%A9"
+      ],
+      "franco_convention_derived": ["sada", "sadah", "plain"]
+    },
+    {
+      "msa": "فاتح",
+      "egyptian": ["فاتح"],
+      "franco": ["fate7", "fat7"],
+      "franco_seen": [],
+      "en": "light (shade)",
+      "category": "colour",
+      "sources": [
+        "https://www.jumia.com.eg/ar/catalog/?q=%D9%83%D9%88%D8%AA%D8%B4%D9%8A",
+        "https://www.jumia.com.eg/ar/catalog/?q=%D8%AC%D9%84%D8%A7%D8%A8%D9%8A%D8%A9"
+      ],
+      "franco_convention_derived": ["fate7", "fat7"]
+    },
+    {
+      "msa": "غامق",
+      "egyptian": ["غامق"],
+      "franco": ["gham2", "3'am2"],
+      "franco_seen": [],
+      "en": "dark (shade)",
+      "category": "colour",
+      "sources": ["https://www.jumia.com.eg/ar/catalog/?q=%D9%83%D9%88%D8%AA%D8%B4%D9%8A"],
+      "franco_convention_derived": ["gham2", "3'am2"]
+    },
+    {
+      "msa": "قطن",
+      "egyptian": ["قطن"],
+      "franco": ["2otn", "otn", "cotton", "qotn"],
+      "franco_seen": [],
+      "en": "cotton",
+      "category": "material",
+      "sources": [
+        "https://www.jumia.com.eg/ar/catalog/?q=%D8%B7%D8%B1%D8%AD%D8%A9",
+        "https://www.jumia.com.eg/ar/catalog/?q=%D8%AC%D9%84%D8%A7%D8%A8%D9%8A%D8%A9"
+      ],
+      "franco_convention_derived": ["2otn", "otn", "cotton", "qotn"]
+    },
+    {
+      "msa": "شيفون",
+      "egyptian": ["شيفون"],
+      "franco": ["chiffon", "shifon", "sheefon"],
+      "franco_seen": ["chiffon"],
+      "en": "chiffon",
+      "category": "material",
+      "sources": [
+        "https://www.jumia.com.eg/ar/catalog/?q=%D8%B7%D8%B1%D8%AD%D8%A9",
+        "https://www.facebook.com/Chiffon.eg1/"
+      ],
+      "franco_convention_derived": ["shifon", "sheefon"]
+    },
+    {
+      "msa": "ستان",
+      "egyptian": ["ستان", "ساتان"],
+      "franco": ["satan", "stan", "satin"],
+      "franco_seen": [],
+      "en": "satin",
+      "category": "material",
+      "sources": [
+        "https://www.jumia.com.eg/ar/catalog/?q=%D8%A7%D8%B3%D8%AF%D8%A7%D9%84+%D8%B5%D9%84%D8%A7%D8%A9",
+        "https://www.jumia.com.eg/ar/catalog/?q=%D8%B3%D9%83%D8%A7%D8%B1%D9%81"
+      ],
+      "franco_convention_derived": ["satan", "stan", "satin"]
+    },
+    {
+      "msa": "قطيفة",
+      "egyptian": ["قطيفة", "قطيفه", "مخمل"],
+      "franco": ["2tifa", "2atifa", "katifa", "velvet", "ma5mal"],
+      "franco_seen": [],
+      "en": "velvet",
+      "category": "material",
+      "sources": [
+        "https://www.jumia.com.eg/ar/catalog/?q=%D8%B9%D8%A8%D8%A7%D9%8A%D8%A9",
+        "https://www.jumia.com.eg/ar/catalog/?q=%D9%82%D9%81%D8%B7%D8%A7%D9%86"
+      ],
+      "franco_convention_derived": ["2tifa", "2atifa", "katifa", "velvet", "ma5mal"]
+    },
+    {
+      "msa": "حرير",
+      "egyptian": ["حرير"],
+      "franco": ["7arir", "harir", "silk"],
+      "franco_seen": [],
+      "en": "silk",
+      "category": "material",
+      "sources": ["https://www.jumia.com.eg/ar/catalog/?q=%D9%82%D9%81%D8%B7%D8%A7%D9%86"],
+      "franco_convention_derived": ["7arir", "harir", "silk"]
+    },
+    {
+      "msa": "كتان",
+      "egyptian": ["كتان"],
+      "franco": ["kettan", "ketan", "linen"],
+      "franco_seen": [],
+      "en": "linen",
+      "category": "material",
+      "sources": ["https://www.jumia.com.eg/ar/catalog/?q=%D8%AC%D9%84%D8%A7%D8%A8%D9%8A%D8%A9"],
+      "franco_convention_derived": ["kettan", "ketan", "linen"]
+    },
+    {
+      "msa": "كريب",
+      "egyptian": ["كريب"],
+      "franco": ["crepe", "kreb"],
+      "franco_seen": [],
+      "en": "crepe",
+      "category": "material",
+      "sources": ["https://www.jumia.com.eg/ar/catalog/?q=%D8%B3%D9%83%D8%A7%D8%B1%D9%81"],
+      "franco_convention_derived": ["crepe", "kreb"]
+    },
+    {
+      "msa": "فسكوز",
+      "egyptian": ["فسكوز"],
+      "franco": ["viscose", "fiskoz"],
+      "franco_seen": [],
+      "en": "viscose",
+      "category": "material",
+      "sources": [
+        "https://www.jumia.com.eg/ar/catalog/?q=%D8%A7%D8%B3%D8%AF%D8%A7%D9%84+%D8%B5%D9%84%D8%A7%D8%A9"
+      ],
+      "franco_convention_derived": ["viscose", "fiskoz"]
+    },
+    {
+      "msa": "جينز",
+      "egyptian": ["جينز"],
+      "franco": ["jeans", "jeanz", "genz"],
+      "franco_seen": [],
+      "en": "denim",
+      "category": "material",
+      "sources": ["https://www.jumia.com.eg/ar/catalog/?q=%D8%B9%D8%A8%D8%A7%D9%8A%D8%A9"],
+      "franco_convention_derived": ["jeans", "jeanz", "genz"]
+    },
+    {
+      "msa": "جلد",
+      "egyptian": ["جلد"],
+      "franco": ["gild", "geld", "gelda", "leather"],
+      "franco_seen": [],
+      "en": "leather",
+      "category": "material",
+      "sources": [
+        "https://www.jumia.com.eg/ar/catalog/?q=%D9%83%D9%88%D8%AA%D8%B4%D9%8A",
+        "https://www.jumia.com.eg/ar/catalog/?q=%D8%B5%D9%86%D8%AF%D9%84+%D8%AD%D8%B1%D9%8A%D9%85%D9%8A"
+      ],
+      "franco_convention_derived": ["gild", "geld", "gelda", "leather"]
+    },
+    {
+      "msa": "صوف",
+      "egyptian": ["صوف"],
+      "franco": ["sof", "soof", "wool"],
+      "franco_seen": [],
+      "en": "wool",
+      "category": "material",
+      "sources": ["https://www.jumia.com.eg/ar/catalog/?q=%D8%B3%D9%83%D8%A7%D8%B1%D9%81"],
+      "franco_convention_derived": ["sof", "soof", "wool"]
+    },
+    {
+      "msa": "دانتيل",
+      "egyptian": ["دانتيل"],
+      "franco": ["dantel", "dantil", "lace"],
+      "franco_seen": [],
+      "en": "lace",
+      "category": "material",
+      "sources": ["https://www.jumia.com.eg/ar/catalog/?q=%D8%B9%D8%A8%D8%A7%D9%8A%D8%A9"],
+      "franco_convention_derived": ["dantel", "dantil", "lace"]
+    },
+    {
+      "msa": "ليكرا",
+      "egyptian": ["ليكرا"],
+      "franco": ["lycra", "likra"],
+      "franco_seen": [],
+      "en": "lycra",
+      "category": "material",
+      "sources": ["https://www.jumia.com.eg/ar/catalog/?q=%D8%AC%D9%84%D8%A7%D8%A8%D9%8A%D8%A9"],
+      "franco_convention_derived": ["lycra", "likra"]
+    },
+    {
+      "msa": "كستور",
+      "egyptian": ["كستور"],
+      "franco": ["kastor", "kastoor"],
+      "franco_seen": [],
+      "en": "flannelette (kastor)",
+      "category": "material",
+      "sources": ["https://www.jumia.com.eg/ar/catalog/?q=%D8%AC%D9%84%D8%A7%D8%A8%D9%8A%D8%A9"],
+      "franco_convention_derived": ["kastor", "kastoor"]
+    },
+    {
+      "msa": "مودال",
+      "egyptian": ["مودال"],
+      "franco": ["modal"],
+      "franco_seen": [],
+      "en": "modal",
+      "category": "material",
+      "sources": ["https://www.jumia.com.eg/ar/catalog/?q=%D8%B7%D8%B1%D8%AD%D8%A9"],
+      "franco_convention_derived": ["modal"]
+    },
+    {
+      "msa": "ميلتون",
+      "egyptian": ["ميلتون"],
+      "franco": ["milton"],
+      "franco_seen": [],
+      "en": "milton (cotton jersey)",
+      "category": "material",
+      "sources": ["https://www.jumia.com.eg/ar/catalog/?q=%D8%B9%D8%A8%D8%A7%D9%8A%D8%A9"],
+      "franco_convention_derived": ["milton"]
+    },
+    {
+      "msa": "فرو",
+      "egyptian": ["فرو"],
+      "franco": ["farw", "fur"],
+      "franco_seen": [],
+      "en": "fur",
+      "category": "material",
+      "sources": ["https://www.jumia.com.eg/ar/catalog/?q=%D8%B9%D8%A8%D8%A7%D9%8A%D8%A9"],
+      "franco_convention_derived": ["farw", "fur"]
+    },
+    {
+      "msa": "خامة",
+      "egyptian": ["خامه", "خامة", "ماتريال"],
+      "franco": ["5ama", "khama", "matrial", "material"],
+      "franco_seen": [],
+      "en": "fabric / material",
+      "category": "material",
+      "sources": [
+        "https://www.jumia.com.eg/ar/catalog/?q=%D8%B9%D8%A8%D8%A7%D9%8A%D8%A9",
+        "https://www.instagram.com/3bayastore2020/"
+      ],
+      "franco_convention_derived": ["5ama", "khama", "matrial", "material"]
+    },
+    {
+      "msa": "مستورد",
+      "egyptian": ["مستورد"],
+      "franco": ["mostawrad", "mstwrd", "imported"],
+      "franco_seen": [],
+      "en": "imported",
+      "category": "quality",
+      "sources": [
+        "https://www.instagram.com/3bayastore2020/",
+        "https://www.jumia.com.eg/ar/catalog/?q=%D9%82%D9%81%D8%B7%D8%A7%D9%86"
+      ],
+      "franco_convention_derived": ["mostawrad", "mstwrd", "imported"]
+    },
+    {
+      "msa": "ترتر",
+      "egyptian": ["ترتر"],
+      "franco": ["tarter", "tartar", "sequins"],
+      "franco_seen": [],
+      "en": "sequins",
+      "category": "detail",
+      "sources": [
+        "https://www.jumia.com.eg/ar/catalog/?q=%D9%81%D8%B3%D8%AA%D8%A7%D9%86+%D8%B3%D9%88%D8%A7%D8%B1%D9%8A%D9%87",
+        "https://www.jumia.com.eg/ar/catalog/?q=%D8%AC%D9%84%D8%A7%D8%A8%D9%8A%D8%A9"
+      ],
+      "franco_convention_derived": ["tarter", "tartar", "sequins"]
+    },
+    {
+      "msa": "خرز",
+      "egyptian": ["خرز"],
+      "franco": ["5araz", "kharaz", "beads"],
+      "franco_seen": [],
+      "en": "beads",
+      "category": "detail",
+      "sources": [
+        "https://www.jumia.com.eg/ar/catalog/?q=%D9%81%D8%B3%D8%AA%D8%A7%D9%86+%D8%B3%D9%88%D8%A7%D8%B1%D9%8A%D9%87"
+      ],
+      "franco_convention_derived": ["5araz", "kharaz", "beads"]
+    },
+    {
+      "msa": "تطريز",
+      "egyptian": ["تطريز", "مطرز"],
+      "franco": ["tatriz", "tatreez", "metarraz", "mtrz"],
+      "franco_seen": [],
+      "en": "embroidery / embroidered",
+      "category": "detail",
+      "sources": [
+        "https://www.jumia.com.eg/ar/catalog/?q=%D8%B9%D8%A8%D8%A7%D9%8A%D8%A9",
+        "https://www.jumia.com.eg/ar/catalog/?q=%D9%82%D9%81%D8%B7%D8%A7%D9%86"
+      ],
+      "franco_convention_derived": ["tatriz", "tatreez", "metarraz", "mtrz"]
+    },
+    {
+      "msa": "منقوش",
+      "egyptian": ["منقوش", "مشجر", "منقط"],
+      "franco": ["man2osh", "mesha2ar", "men2at"],
+      "franco_seen": [],
+      "en": "patterned / floral / dotted",
+      "category": "detail",
+      "sources": [
+        "https://www.jumia.com.eg/ar/catalog/?q=%D8%B9%D8%A8%D8%A7%D9%8A%D8%A9",
+        "https://www.jumia.com.eg/ar/catalog/?q=%D8%A7%D8%B3%D8%AF%D8%A7%D9%84+%D8%B5%D9%84%D8%A7%D8%A9"
+      ],
+      "franco_convention_derived": ["man2osh", "mesha2ar", "men2at"]
+    },
+    {
+      "msa": "واسع",
+      "egyptian": ["واسع", "فضفاض", "اوفر سايز"],
+      "franco": ["wase3", "wasa3", "oversize", "over size"],
+      "franco_seen": ["wase3"],
+      "en": "loose / wide",
+      "category": "detail",
+      "sources": [
+        "https://huggingface.co/datasets/arbml/Arabizi_Transliteration",
+        "https://www.jumia.com.eg/ar/catalog/?q=%D8%B9%D8%A8%D8%A7%D9%8A%D8%A9"
+      ],
+      "franco_convention_derived": ["wasa3", "oversize", "over size"]
+    },
+    {
+      "msa": "ضيق",
+      "egyptian": ["ضيق", "محزق"],
+      "franco": ["day2", "dayya2", "m7az2"],
+      "franco_seen": [],
+      "en": "tight",
+      "category": "detail",
+      "sources": [],
+      "sources_note": "convention-derived (no verbatim web attestation found); Arabic form is standard Egyptian usage",
+      "franco_convention_derived": ["day2", "dayya2", "m7az2"]
+    },
+    {
+      "msa": "طويل",
+      "egyptian": ["طويل"],
+      "franco": ["tawil", "taweel", "twel"],
+      "franco_seen": ["twel"],
+      "en": "long",
+      "category": "detail",
+      "sources": [
+        "https://huggingface.co/datasets/arbml/Arabizi_Transliteration",
+        "https://www.jumia.com.eg/ar/catalog/?q=%D9%82%D9%81%D8%B7%D8%A7%D9%86"
+      ],
+      "franco_convention_derived": ["tawil", "taweel"]
+    },
+    {
+      "msa": "قصير",
+      "egyptian": ["قصير"],
+      "franco": ["2osayar", "2usayyar", "osayar"],
+      "franco_seen": [],
+      "en": "short",
+      "category": "detail",
+      "sources": ["https://www.jumia.com.eg/ar/catalog/?q=%D8%AC%D9%84%D8%A7%D8%A8%D9%8A%D8%A9"],
+      "franco_convention_derived": ["2osayar", "2usayyar", "osayar"]
+    },
+    {
+      "msa": "أكمام طويلة",
+      "egyptian": ["كم طويل", "اكمام طويلة"],
+      "franco": ["kom tawil", "akmam tawila", "kom taweel"],
+      "franco_seen": [],
+      "en": "long sleeves",
+      "category": "detail",
+      "sources": [
+        "https://www.jumia.com.eg/ar/catalog/?q=%D8%AC%D9%84%D8%A7%D8%A8%D9%8A%D8%A9",
+        "https://www.jumia.com.eg/ar/catalog/?q=%D9%81%D8%B3%D8%AA%D8%A7%D9%86+%D8%B3%D9%88%D8%A7%D8%B1%D9%8A%D9%87"
+      ],
+      "franco_convention_derived": ["kom tawil", "akmam tawila", "kom taweel"]
+    },
+    {
+      "msa": "نصف كم",
+      "egyptian": ["نص كم"],
+      "franco": ["nos kom", "noss kom"],
+      "franco_seen": [],
+      "en": "half sleeves",
+      "category": "detail",
+      "sources": ["https://www.jumia.com.eg/ar/catalog/?q=%D8%AC%D9%84%D8%A7%D8%A8%D9%8A%D8%A9"],
+      "franco_convention_derived": ["nos kom", "noss kom"]
+    },
+    {
+      "msa": "ياقة",
+      "egyptian": ["ياقه"],
+      "franco": ["ya2a", "yaka"],
+      "franco_seen": [],
+      "en": "collar",
+      "category": "detail",
+      "sources": ["https://www.jumia.com.eg/ar/catalog/?q=%D8%AC%D9%84%D8%A7%D8%A8%D9%8A%D8%A9"],
+      "franco_convention_derived": ["ya2a", "yaka"]
+    },
+    {
+      "msa": "حزام",
+      "egyptian": ["حزام"],
+      "franco": ["7ezam", "hizam", "7zam"],
+      "franco_seen": [],
+      "en": "belt",
+      "category": "detail",
+      "sources": [
+        "https://www.jumia.com.eg/ar/catalog/?q=%D9%82%D9%81%D8%B7%D8%A7%D9%86",
+        "https://www.jumia.com.eg/ar/catalog/?q=%D9%81%D8%B3%D8%AA%D8%A7%D9%86+%D8%B3%D9%88%D8%A7%D8%B1%D9%8A%D9%87"
+      ],
+      "franco_convention_derived": ["7ezam", "hizam", "7zam"]
+    },
+    {
+      "msa": "جيب",
+      "egyptian": ["جيب", "2جيب", "جيوب"],
+      "franco": ["geb", "gyob", "2 geb"],
+      "franco_seen": [],
+      "en": "pocket(s)",
+      "category": "detail",
+      "sources": ["https://www.jumia.com.eg/ar/catalog/?q=%D8%B9%D8%A8%D8%A7%D9%8A%D8%A9"],
+      "franco_convention_derived": ["geb", "gyob", "2 geb"]
+    },
+    {
+      "msa": "أزرار",
+      "egyptian": ["زراير", "زرار"],
+      "franco": ["zarayer", "zorar"],
+      "franco_seen": [],
+      "en": "buttons",
+      "category": "detail",
+      "sources": ["https://www.jumia.com.eg/ar/catalog/?q=%D8%AC%D9%84%D8%A7%D8%A8%D9%8A%D8%A9"],
+      "franco_convention_derived": ["zarayer", "zorar"]
+    },
+    {
+      "msa": "فتحة جانبية",
+      "egyptian": ["فتحة جانبية", "فتحه"],
+      "franco": ["fat7a ganbeya", "fat7a"],
+      "franco_seen": [],
+      "en": "side slit",
+      "category": "detail",
+      "sources": [
+        "https://www.jumia.com.eg/ar/catalog/?q=%D9%81%D8%B3%D8%AA%D8%A7%D9%86+%D8%B3%D9%88%D8%A7%D8%B1%D9%8A%D9%87"
+      ],
+      "franco_convention_derived": ["fat7a ganbeya", "fat7a"]
+    },
+    {
+      "msa": "ظهر مكشوف",
+      "egyptian": ["ضهر مفتوح"],
+      "franco": ["dahr maftou7", "backless"],
+      "franco_seen": [],
+      "en": "open back",
+      "category": "detail",
+      "sources": [
+        "https://www.jumia.com.eg/ar/catalog/?q=%D9%81%D8%B3%D8%AA%D8%A7%D9%86+%D8%B3%D9%88%D8%A7%D8%B1%D9%8A%D9%87"
+      ],
+      "franco_convention_derived": ["dahr maftou7", "backless"]
+    },
+    {
+      "msa": "ذيل",
+      "egyptian": ["ديل"],
+      "franco": ["deel", "del"],
+      "franco_seen": [],
+      "en": "train (dress tail)",
+      "category": "detail",
+      "sources": [
+        "https://www.jumia.com.eg/ar/catalog/?q=%D9%81%D8%B3%D8%AA%D8%A7%D9%86+%D8%B3%D9%88%D8%A7%D8%B1%D9%8A%D9%87"
+      ],
+      "franco_convention_derived": ["deel", "del"]
+    },
+    {
+      "msa": "موضة",
+      "egyptian": ["موضه", "موضة", "ترند", "تريندي"],
+      "franco": ["moda", "mooda", "trend", "trendy"],
+      "franco_seen": [],
+      "en": "fashion / trendy",
+      "category": "quality",
+      "sources": [
+        "https://www.jumia.com.eg/ar/catalog/?q=%D8%B9%D8%A8%D8%A7%D9%8A%D8%A9",
+        "https://www.jumia.com.eg/ar/catalog/?q=%D8%B5%D9%86%D8%AF%D9%84+%D8%AD%D8%B1%D9%8A%D9%85%D9%8A"
+      ],
+      "franco_convention_derived": ["moda", "mooda", "trend", "trendy"]
+    },
+    {
+      "msa": "موديل",
+      "egyptian": ["موديل", "موديلات"],
+      "franco": ["model", "modil", "modelat"],
+      "franco_seen": [],
+      "en": "model / style",
+      "category": "quality",
+      "sources": ["https://www.jumia.com.eg/ar/catalog/?q=%D8%B9%D8%A8%D8%A7%D9%8A%D8%A9"],
+      "franco_convention_derived": ["model", "modil", "modelat"]
+    },
+    {
+      "msa": "شيك",
+      "egyptian": ["شيك"],
+      "franco": ["sheek", "chic", "shik"],
+      "franco_seen": [],
+      "en": "chic",
+      "category": "quality",
+      "sources": ["https://www.jumia.com.eg/ar/catalog/?q=%D8%B9%D8%A8%D8%A7%D9%8A%D8%A9"],
+      "franco_convention_derived": ["sheek", "chic", "shik"]
+    },
+    {
+      "msa": "أنيق",
+      "egyptian": ["انيق", "شيك"],
+      "franco": ["ane2", "2ani2", "anee2"],
+      "franco_seen": [],
+      "en": "elegant",
+      "category": "quality",
+      "sources": [
+        "https://www.jumia.com.eg/ar/catalog/?q=%D9%81%D8%B3%D8%AA%D8%A7%D9%86+%D8%B3%D9%88%D8%A7%D8%B1%D9%8A%D9%87"
+      ],
+      "franco_convention_derived": ["ane2", "2ani2", "anee2"]
+    },
+    {
+      "msa": "فاخر",
+      "egyptian": ["فاخر", "فخم"],
+      "franco": ["fa5er", "fakher", "fa5m"],
+      "franco_seen": [],
+      "en": "luxurious",
+      "category": "quality",
+      "sources": [
+        "https://www.jumia.com.eg/ar/catalog/?q=%D9%81%D8%B3%D8%AA%D8%A7%D9%86+%D8%B3%D9%88%D8%A7%D8%B1%D9%8A%D9%87",
+        "https://www.jumia.com.eg/ar/catalog/?q=%D9%82%D9%81%D8%B7%D8%A7%D9%86"
+      ],
+      "franco_convention_derived": ["fa5er", "fakher", "fa5m"]
+    },
+    {
+      "msa": "مريح",
+      "egyptian": ["مريح"],
+      "franco": ["mery7", "morey7", "merye7"],
+      "franco_seen": [],
+      "en": "comfortable",
+      "category": "quality",
+      "sources": [
+        "https://www.jumia.com.eg/ar/catalog/?q=%D8%B9%D8%A8%D8%A7%D9%8A%D8%A9",
+        "https://www.jumia.com.eg/ar/catalog/?q=%D8%AC%D8%B2%D9%85%D8%A9+%D8%AD%D8%B1%D9%8A%D9%85%D9%8A"
+      ],
+      "franco_convention_derived": ["mery7", "morey7", "merye7"]
+    },
+    {
+      "msa": "خفيف",
+      "egyptian": ["خفيف"],
+      "franco": ["5afif", "khafeef", "5fef"],
+      "franco_seen": [],
+      "en": "lightweight",
+      "category": "quality",
+      "sources": [
+        "https://www.jumia.com.eg/ar/catalog/?q=%D8%B5%D9%86%D8%AF%D9%84+%D8%AD%D8%B1%D9%8A%D9%85%D9%8A"
+      ],
+      "franco_convention_derived": ["5afif", "khafeef", "5fef"]
+    },
+    {
+      "msa": "مقاس",
+      "egyptian": ["مقاس"],
+      "franco": ["ma2as", "m2as", "ma2aas", "maqas", "size"],
+      "franco_seen": [],
+      "en": "size",
+      "category": "size",
+      "sources": [
+        "https://www.jumia.com.eg/ar/catalog/?q=%D8%A7%D8%B3%D8%AF%D8%A7%D9%84+%D8%B5%D9%84%D8%A7%D8%A9",
+        "https://www.jumia.com.eg/ar/catalog/?q=%D8%AC%D8%B2%D9%85%D8%A9+%D8%AD%D8%B1%D9%8A%D9%85%D9%8A"
+      ],
+      "franco_convention_derived": ["ma2as", "m2as", "ma2aas", "maqas", "size"]
+    },
+    {
+      "msa": "مقاسات",
+      "egyptian": ["مقاسات"],
+      "franco": ["ma2asat", "m2asat", "sizes"],
+      "franco_seen": [],
+      "en": "sizes",
+      "category": "size",
+      "sources": [
+        "https://www.jumia.com.eg/ar/catalog/?q=%D8%A7%D8%B3%D8%AF%D8%A7%D9%84+%D8%B5%D9%84%D8%A7%D8%A9",
+        "https://www.jumia.com.eg/ar/catalog/?q=%D9%81%D8%B3%D8%AA%D8%A7%D9%86+%D8%B3%D9%88%D8%A7%D8%B1%D9%8A%D9%87"
+      ],
+      "franco_convention_derived": ["ma2asat", "m2asat", "sizes"]
+    },
+    {
+      "msa": "مقاس موحد",
+      "egyptian": ["فري سايز", "مقاس موحد"],
+      "franco": ["free size", "fri size", "ma2as mowa7ad"],
+      "franco_seen": [],
+      "en": "one size / free size",
+      "category": "size",
+      "sources": [
+        "https://www.jumia.com.eg/ar/catalog/?q=%D9%82%D9%81%D8%B7%D8%A7%D9%86",
+        "https://www.jumia.com.eg/ar/catalog/?q=%D8%A7%D8%B3%D8%AF%D8%A7%D9%84+%D8%B5%D9%84%D8%A7%D8%A9",
+        "https://www.jumia.com.eg/ar/catalog/?q=%D8%AC%D9%84%D8%A7%D8%A8%D9%8A%D8%A9"
+      ],
+      "franco_convention_derived": ["free size", "fri size", "ma2as mowa7ad"]
+    },
+    {
+      "msa": "صغير",
+      "egyptian": ["صغير", "سمول"],
+      "franco": ["sogheyar", "so3'ayar", "small", "S"],
+      "franco_seen": [],
+      "en": "small",
+      "category": "size",
+      "sources": ["https://www.jumia.com.eg/ar/catalog/?q=%D8%B9%D8%A8%D8%A7%D9%8A%D8%A9"],
+      "franco_convention_derived": ["sogheyar", "so3'ayar", "small", "S"]
+    },
+    {
+      "msa": "متوسط",
+      "egyptian": ["ميديم", "وسط"],
+      "franco": ["medium", "M", "wasat"],
+      "franco_seen": [],
+      "en": "medium",
+      "category": "size",
+      "sources": ["https://www.jumia.com.eg/ar/catalog/?q=%D8%B9%D8%A8%D8%A7%D9%8A%D8%A9"],
+      "franco_convention_derived": ["medium", "M", "wasat"]
+    },
+    {
+      "msa": "كبير",
+      "egyptian": ["كبير", "لارج"],
+      "franco": ["kebir", "kbeer", "kber", "large", "L"],
+      "franco_seen": ["kbeer", "kber"],
+      "en": "large",
+      "category": "size",
+      "sources": [
+        "https://huggingface.co/datasets/arbml/Arabizi_Transliteration",
+        "https://www.jumia.com.eg/ar/catalog/?q=%D8%B9%D8%A8%D8%A7%D9%8A%D8%A9"
+      ],
+      "franco_convention_derived": ["kebir", "large", "L"]
+    },
+    {
+      "msa": "كبير جداً",
+      "egyptian": ["اكس لارج", "XL", "XXL"],
+      "franco": ["xl", "x large", "2xl", "xxl"],
+      "franco_seen": [],
+      "en": "extra large",
+      "category": "size",
+      "sources": ["https://www.jumia.com.eg/ar/catalog/?q=%D8%B9%D8%A8%D8%A7%D9%8A%D8%A9"],
+      "franco_convention_derived": ["xl", "x large", "2xl", "xxl"]
+    },
+    {
+      "msa": "مقاسات كبيرة",
+      "egyptian": ["مقاسات كبيرة", "بلس سايز"],
+      "franco": ["ma2asat kbera", "plus size"],
+      "franco_seen": [],
+      "en": "plus size",
+      "category": "size",
+      "sources": [
+        "https://www.jumia.com.eg/ar/catalog/?q=%D8%A7%D8%B3%D8%AF%D8%A7%D9%84+%D8%B5%D9%84%D8%A7%D8%A9"
+      ],
+      "franco_convention_derived": ["ma2asat kbera", "plus size"]
+    },
+    {
+      "msa": "وزن",
+      "egyptian": ["بيلبس من 60 كيلو", "كيلو"],
+      "franco": ["yelbes men 60 kilo", "kilo", "wazn"],
+      "franco_seen": [],
+      "en": "fits weight (kg)",
+      "category": "size",
+      "sources": [
+        "https://www.jumia.com.eg/ar/catalog/?q=%D8%A7%D8%B3%D8%AF%D8%A7%D9%84+%D8%B5%D9%84%D8%A7%D8%A9"
+      ],
+      "franco_convention_derived": ["yelbes men 60 kilo", "kilo", "wazn"]
+    },
+    {
+      "msa": "طول",
+      "egyptian": ["طول", "الطول"],
+      "franco": ["tool", "el tool"],
+      "franco_seen": [],
+      "en": "length / height",
+      "category": "size",
+      "sources": ["https://www.jumia.com.eg/ar/catalog/?q=%D8%B7%D8%B1%D8%AD%D8%A9"],
+      "franco_convention_derived": ["tool", "el tool"]
+    },
+    {
+      "msa": "سن",
+      "egyptian": ["سن", "سنين"],
+      "franco": ["sen", "seneen", "snin"],
+      "franco_seen": [],
+      "en": "age (kids' sizing)",
+      "category": "size",
+      "sources": [
+        "https://www.jumia.com.eg/ar/catalog/?q=%D9%81%D8%B3%D8%AA%D8%A7%D9%86+%D8%B3%D9%88%D8%A7%D8%B1%D9%8A%D9%87",
+        "https://www.jumia.com.eg/ar/catalog/?q=%D8%AC%D9%84%D8%A7%D8%A8%D9%8A%D8%A9"
+      ],
+      "franco_convention_derived": ["sen", "seneen", "snin"]
+    },
+    {
+      "msa": "سعر",
+      "egyptian": ["سعر", "السعر"],
+      "franco": ["se3r", "s3r", "el se3r", "else3r"],
+      "franco_seen": ["else3r"],
+      "en": "price / the price",
+      "category": "price",
+      "sources": [
+        "https://huggingface.co/datasets/arbml/Arabizi_Transliteration",
+        "https://www.arabicpod101.com/lesson/survival-phrases-s2-20-how-much-in-egyptian-arabic"
+      ],
+      "franco_convention_derived": ["se3r", "s3r", "el se3r"]
+    },
+    {
+      "msa": "بكم",
+      "egyptian": ["بكام"],
+      "franco": ["bkam", "bekam", "b kam", "be kam"],
+      "franco_seen": ["bkam", "bekam"],
+      "en": "how much?",
+      "category": "price",
+      "sources": [
+        "https://www.arabicpod101.com/lesson/survival-phrases-s2-20-how-much-in-egyptian-arabic",
+        "https://chrome.google.com/webstore/detail/jccedjlgpejonihonobakljablgoimio"
+      ],
+      "franco_convention_derived": ["b kam", "be kam"]
+    },
+    {
+      "msa": "جنيه",
+      "egyptian": ["جنيه", "ج.م", "جنية"],
+      "franco": ["geneh", "gneh", "egp", "le"],
+      "franco_seen": [],
+      "en": "Egyptian pound",
+      "category": "price",
+      "sources": [],
+      "sources_note": "convention-derived (no verbatim web attestation found); Arabic form is standard Egyptian usage",
+      "franco_convention_derived": ["geneh", "gneh", "egp", "le"]
+    },
+    {
+      "msa": "رخيص",
+      "egyptian": ["رخيص"],
+      "franco": ["re5is", "r5is", "rkhees"],
+      "franco_seen": ["r5is"],
+      "en": "cheap",
+      "category": "price",
+      "sources": ["https://huggingface.co/datasets/arbml/Arabizi_Transliteration"],
+      "franco_convention_derived": ["re5is", "rkhees"]
+    },
+    {
+      "msa": "غالي",
+      "egyptian": ["غالي"],
+      "franco": ["ghaly", "3'aly", "3'ale", "ghali"],
+      "franco_seen": ["3'ale"],
+      "en": "expensive",
+      "category": "price",
+      "sources": ["https://huggingface.co/datasets/arbml/Arabizi_Transliteration"],
+      "franco_convention_derived": ["ghaly", "3'aly", "ghali"]
+    },
+    {
+      "msa": "خصم",
+      "egyptian": ["خصم", "خصومات"],
+      "franco": ["5asm", "khasm", "5som"],
+      "franco_seen": [],
+      "en": "discount",
+      "category": "offer",
+      "sources": [
+        "https://www.facebook.com/30Discount/",
+        "https://www.jumia.com.eg/ar/catalog/?q=%D8%B9%D8%A8%D8%A7%D9%8A%D8%A9"
+      ],
+      "franco_convention_derived": ["5asm", "khasm", "5som"]
+    },
+    {
+      "msa": "تخفيضات",
+      "egyptian": ["تخفيضات", "اوكازيون", "سيل"],
+      "franco": ["ta5fedat", "takhfidat", "okazyon", "sale"],
+      "franco_seen": [],
+      "en": "sale / markdowns",
+      "category": "offer",
+      "sources": [
+        "https://www.facebook.com/CairoSaleOfficial/",
+        "https://www.facebook.com/egyptdailyoffers/"
+      ],
+      "franco_convention_derived": ["ta5fedat", "takhfidat", "okazyon", "sale"]
+    },
+    {
+      "msa": "عرض",
+      "egyptian": ["عرض", "العرض"],
+      "franco": ["3ard", "el 3ard", "offer"],
+      "franco_seen": ["3ard"],
+      "en": "offer / deal",
+      "category": "offer",
+      "sources": [
+        "https://huggingface.co/datasets/arbml/Arabizi_Transliteration",
+        "https://www.facebook.com/egyptdailyoffers/"
+      ],
+      "franco_convention_derived": ["el 3ard", "offer"]
+    },
+    {
+      "msa": "عروض",
+      "egyptian": ["عروض"],
+      "franco": ["3orood", "3orod", "3rood"],
+      "franco_seen": ["3orod"],
+      "en": "offers",
+      "category": "offer",
+      "sources": [
+        "https://www.facebook.com/3orodmisr/",
+        "https://huggingface.co/datasets/arbml/Arabizi_Transliteration"
+      ],
+      "franco_convention_derived": ["3orood", "3rood"]
+    },
+    {
+      "msa": "تصفية",
+      "egyptian": ["تصفية", "تصفيه"],
+      "franco": ["tasfeya", "tasfiya"],
+      "franco_seen": [],
+      "en": "clearance",
+      "category": "offer",
+      "sources": ["https://www.facebook.com/CairoSaleOfficial/"],
+      "franco_convention_derived": ["tasfeya", "tasfiya"]
+    },
+    {
+      "msa": "لفترة محدودة",
+      "egyptian": ["لفترة محدودة"],
+      "franco": ["le fatra m7doda", "limited time"],
+      "franco_seen": [],
+      "en": "limited time",
+      "category": "offer",
+      "sources": [
+        "https://www.tiktok.com/discover/%D8%A7%D9%81%D8%B6%D9%84-%D8%B4%D8%A8%D8%A7%D8%B4%D8%A8-%D8%AD%D8%B1%D9%8A%D9%85%D9%8A-%D8%B7%D8%A8%D9%8A"
+      ],
+      "franco_convention_derived": ["le fatra m7doda", "limited time"]
+    },
+    {
+      "msa": "كوبون",
+      "egyptian": ["كود خصم", "كوبون"],
+      "franco": ["code 5asm", "coupon", "promo code"],
+      "franco_seen": [],
+      "en": "discount code",
+      "category": "offer",
+      "sources": [],
+      "sources_note": "convention-derived (no verbatim web attestation found); Arabic form is standard Egyptian usage",
+      "franco_convention_derived": ["code 5asm", "coupon", "promo code"]
+    },
+    {
+      "msa": "هدية",
+      "egyptian": ["هدية", "هديه"],
+      "franco": ["hedeya", "hdya", "gift"],
+      "franco_seen": [],
+      "en": "gift",
+      "category": "offer",
+      "sources": [
+        "https://www.jumia.com.eg/ar/catalog/?q=%D9%81%D8%B3%D8%AA%D8%A7%D9%86+%D8%B3%D9%88%D8%A7%D8%B1%D9%8A%D9%87"
+      ],
+      "franco_convention_derived": ["hedeya", "hdya", "gift"]
+    },
+    {
+      "msa": "جملة وقطاعي",
+      "egyptian": ["جملة وقطاعي", "جمله"],
+      "franco": ["gomla", "gomla w 2eta3y", "wholesale"],
+      "franco_seen": [],
+      "en": "wholesale & retail",
+      "category": "offer",
+      "sources": ["https://www.instagram.com/3bayastore2020/"],
+      "franco_convention_derived": ["gomla", "gomla w 2eta3y", "wholesale"]
+    },
+    {
+      "msa": "جديد",
+      "egyptian": ["جديد", "جديدة", "جديده"],
+      "franco": ["gdid", "gedid", "gedida", "new"],
+      "franco_seen": [],
+      "en": "new",
+      "category": "quality",
+      "sources": [
+        "https://www.jumia.com.eg/ar/catalog/?q=%D8%B9%D8%A8%D8%A7%D9%8A%D8%A9",
+        "https://www.jumia.com.eg/ar/catalog/?q=%D8%B5%D9%86%D8%AF%D9%84+%D8%AD%D8%B1%D9%8A%D9%85%D9%8A"
+      ],
+      "franco_convention_derived": ["gdid", "gedid", "gedida", "new"]
+    },
+    {
+      "msa": "أصلي",
+      "egyptian": ["اصلي", "أورجينال", "اوريجينال"],
+      "franco": ["asly", "2sly", "original", "orginal", "ori"],
+      "franco_seen": [],
+      "en": "original / genuine",
+      "category": "quality",
+      "sources": [
+        "https://www.instagram.com/gazma.eg/",
+        "https://www.jumia.com.eg/ar/catalog/?q=%D8%B4%D9%86%D8%B7%D8%A9+%D8%AD%D8%B1%D9%8A%D9%85%D9%8A"
+      ],
+      "franco_convention_derived": ["asly", "2sly", "original", "orginal", "ori"]
+    },
+    {
+      "msa": "هاي كوبي",
+      "egyptian": ["هاي كوبي", "كوبي", "ميرور"],
+      "franco": ["high copy", "hai copy", "mirror", "copy"],
+      "franco_seen": [],
+      "en": "high-copy / replica",
+      "category": "quality",
+      "sources": [],
+      "sources_note": "convention-derived (no verbatim web attestation found); Arabic form is standard Egyptian usage",
+      "franco_convention_derived": ["high copy", "hai copy", "mirror", "copy"]
+    },
+    {
+      "msa": "حصري",
+      "egyptian": ["حصري", "حصرى"],
+      "franco": ["7asry", "7asri", "exclusive"],
+      "franco_seen": [],
+      "en": "exclusive",
+      "category": "quality",
+      "sources": ["https://www.jumia.com.eg/ar/catalog/?q=%D8%B9%D8%A8%D8%A7%D9%8A%D8%A9"],
+      "franco_convention_derived": ["7asry", "7asri", "exclusive"]
+    },
+    {
+      "msa": "صناعة مصرية",
+      "egyptian": ["صنع في مصر", "صناعه مصريه"],
+      "franco": ["made in egypt", "sena3a masreya"],
+      "franco_seen": [],
+      "en": "made in Egypt",
+      "category": "quality",
+      "sources": [
+        "https://www.jumia.com.eg/ar/catalog/?q=%D8%B9%D8%A8%D8%A7%D9%8A%D8%A9",
+        "https://www.facebook.com/p/3baya-7kaya-%D8%B9%D8%A8%D8%A7%D9%8A%D9%87-%D8%AD%D9%83%D8%A7%D9%8A%D9%87-100057154911869/"
+      ],
+      "franco_convention_derived": ["made in egypt", "sena3a masreya"]
+    },
+    {
+      "msa": "جودة عالية",
+      "egyptian": ["جوده عاليه", "هاي كواليتي"],
+      "franco": ["gawda 3alya", "high quality"],
+      "franco_seen": [],
+      "en": "high quality",
+      "category": "quality",
+      "sources": ["https://www.jumia.com.eg/ar/catalog/?q=%D9%82%D9%81%D8%B7%D8%A7%D9%86"],
+      "franco_convention_derived": ["gawda 3alya", "high quality"]
+    },
+    {
+      "msa": "متوفر",
+      "egyptian": ["متوفر", "متاح", "موجود"],
+      "franco": ["metwafer", "mtwfr", "mota7", "mawgood"],
+      "franco_seen": [],
+      "en": "in stock / available",
+      "category": "stock",
+      "sources": [],
+      "sources_note": "convention-derived (no verbatim web attestation found); Arabic form is standard Egyptian usage",
+      "franco_convention_derived": ["metwafer", "mtwfr", "mota7", "mawgood"]
+    },
+    {
+      "msa": "نفد",
+      "egyptian": ["خلص", "مش متوفر", "سولد اوت"],
+      "franco": ["5ls", "5eles", "msh metwafer", "sold out"],
+      "franco_seen": [],
+      "en": "sold out",
+      "category": "stock",
+      "sources": [],
+      "sources_note": "convention-derived (no verbatim web attestation found); Arabic form is standard Egyptian usage",
+      "franco_convention_derived": ["5ls", "5eles", "msh metwafer", "sold out"]
+    },
+    {
+      "msa": "حجز",
+      "egyptian": ["حجز", "بالحجز"],
+      "franco": ["7agz", "b el 7agz", "pre-order"],
+      "franco_seen": [],
+      "en": "reservation / pre-order",
+      "category": "stock",
+      "sources": ["https://www.instagram.com/3bayastore2020/"],
+      "franco_convention_derived": ["7agz", "b el 7agz", "pre-order"]
+    },
+    {
+      "msa": "طلب",
+      "egyptian": ["اوردر", "طلب"],
+      "franco": ["order", "ordar", "talab", "talb"],
+      "franco_seen": ["talab", "talb"],
+      "en": "order",
+      "category": "order",
+      "sources": ["https://huggingface.co/datasets/arbml/Arabizi_Transliteration"],
+      "franco_convention_derived": ["order", "ordar"]
+    },
+    {
+      "msa": "اطلب الآن",
+      "egyptian": ["اطلبي دلوقتي", "للطلب"],
+      "franco": ["otlobi dl2ty", "lel talab", "order now"],
+      "franco_seen": [],
+      "en": "order now",
+      "category": "order",
+      "sources": [],
+      "sources_note": "convention-derived (no verbatim web attestation found); Arabic form is standard Egyptian usage",
+      "franco_convention_derived": ["otlobi dl2ty", "lel talab", "order now"]
+    },
+    {
+      "msa": "رسالة خاصة",
+      "egyptian": ["كلمينا", "ابعتيلنا", "DM", "انبوكس"],
+      "franco": ["inbox", "dm", "kalemina", "eb3tilna"],
+      "franco_seen": [],
+      "en": "DM / inbox us",
+      "category": "order",
+      "sources": ["https://www.instagram.com/ka3b_ghazal/"],
+      "franco_convention_derived": ["inbox", "dm", "kalemina", "eb3tilna"]
+    },
+    {
+      "msa": "واتساب",
+      "egyptian": ["واتس", "واتساب"],
+      "franco": ["whats", "whatsapp", "wats"],
+      "franco_seen": [],
+      "en": "WhatsApp",
+      "category": "order",
+      "sources": ["https://www.instagram.com/your_shanta_store/"],
+      "franco_convention_derived": ["whats", "whatsapp", "wats"]
+    },
+    {
+      "msa": "توصيل",
+      "egyptian": ["توصيل", "ديليفري"],
+      "franco": ["tawsil", "tawseel", "twsel", "delivery", "delivary"],
+      "franco_seen": [],
+      "en": "delivery",
+      "category": "delivery",
+      "sources": ["https://www.facebook.com/Fastshipping1st/"],
+      "franco_convention_derived": ["tawsil", "tawseel", "twsel", "delivery", "delivary"]
+    },
+    {
+      "msa": "شحن",
+      "egyptian": ["شحن"],
+      "franco": ["sha7n", "shahn", "sh7n"],
+      "franco_seen": [],
+      "en": "shipping",
+      "category": "delivery",
+      "sources": [
+        "https://www.facebook.com/Fastshipping1st/",
+        "https://www.instagram.com/your_shanta_store/"
+      ],
+      "franco_convention_derived": ["sha7n", "shahn", "sh7n"]
+    },
+    {
+      "msa": "شحن لجميع المحافظات",
+      "egyptian": ["شحن لكل المحافظات", "شحن لكل مصر"],
+      "franco": ["sha7n l kol el mo7afzat", "shipping all over egypt", "sha7n l kol masr"],
+      "franco_seen": [],
+      "en": "ships to all governorates",
+      "category": "delivery",
+      "sources": [
+        "https://www.facebook.com/Fastshipping1st/",
+        "https://www.tiktok.com/discover/%D8%A7%D9%81%D8%B6%D9%84-%D8%B4%D8%A8%D8%A7%D8%B4%D8%A8-%D8%AD%D8%B1%D9%8A%D9%85%D9%8A-%D8%B7%D8%A8%D9%8A"
+      ],
+      "franco_convention_derived": [
+        "sha7n l kol el mo7afzat",
+        "shipping all over egypt",
+        "sha7n l kol masr"
+      ]
+    },
+    {
+      "msa": "شحن مجاني",
+      "egyptian": ["شحن مجاني", "شحن ببلاش"],
+      "franco": ["sha7n magany", "free shipping", "sha7n bebalash"],
+      "franco_seen": [],
+      "en": "free shipping",
+      "category": "delivery",
+      "sources": [],
+      "sources_note": "convention-derived (no verbatim web attestation found); Arabic form is standard Egyptian usage",
+      "franco_convention_derived": ["sha7n magany", "free shipping", "sha7n bebalash"]
+    },
+    {
+      "msa": "مصاريف الشحن",
+      "egyptian": ["مصاريف الشحن"],
+      "franco": ["masarif el sha7n", "shipping fees"],
+      "franco_seen": [],
+      "en": "shipping fees",
+      "category": "delivery",
+      "sources": [],
+      "sources_note": "convention-derived (no verbatim web attestation found); Arabic form is standard Egyptian usage",
+      "franco_convention_derived": ["masarif el sha7n", "shipping fees"]
+    },
+    {
+      "msa": "الدفع عند الاستلام",
+      "egyptian": ["الدفع عند الاستلام", "كاش عند الاستلام"],
+      "franco": [
+        "el daf3 3and el estlam",
+        "daf3 3nd el estelam",
+        "cash on delivery",
+        "cod",
+        "cash 3and el estlam"
+      ],
+      "franco_seen": [],
+      "en": "cash on delivery",
+      "category": "payment",
+      "sources": ["https://www.jumia.com.eg/ar/catalog/?q=%D8%B9%D8%A8%D8%A7%D9%8A%D8%A9"],
+      "franco_convention_derived": [
+        "el daf3 3and el estlam",
+        "daf3 3nd el estelam",
+        "cash on delivery",
+        "cod",
+        "cash 3and el estlam"
+      ]
+    },
+    {
+      "msa": "نقدي",
+      "egyptian": ["كاش"],
+      "franco": ["cash", "kash", "ka$"],
+      "franco_seen": ["ka$"],
+      "en": "cash",
+      "category": "payment",
+      "sources": ["https://huggingface.co/datasets/arbml/Arabizi_Transliteration"],
+      "franco_convention_derived": ["cash", "kash"]
+    },
+    {
+      "msa": "دفع",
+      "egyptian": ["دفع"],
+      "franco": ["daf3", "df3"],
+      "franco_seen": ["df3"],
+      "en": "payment",
+      "category": "payment",
+      "sources": ["https://huggingface.co/datasets/arbml/Arabizi_Transliteration"],
+      "franco_convention_derived": ["daf3"]
+    },
+    {
+      "msa": "تقسيط",
+      "egyptian": ["تقسيط", "فاليو"],
+      "franco": ["ta2sit", "t2set", "valu", "installments"],
+      "franco_seen": [],
+      "en": "instalments",
+      "category": "payment",
+      "sources": ["https://www.facebook.com/CairoSaleOfficial/"],
+      "franco_convention_derived": ["ta2sit", "t2set", "valu", "installments"]
+    },
+    {
+      "msa": "فودافون كاش",
+      "egyptian": ["فودافون كاش", "انستاباي"],
+      "franco": ["vodafone cash", "instapay"],
+      "franco_seen": [],
+      "en": "Vodafone Cash / InstaPay",
+      "category": "payment",
+      "sources": [],
+      "sources_note": "convention-derived (no verbatim web attestation found); Arabic form is standard Egyptian usage",
+      "franco_convention_derived": ["vodafone cash", "instapay"]
+    },
+    {
+      "msa": "استبدال",
+      "egyptian": ["استبدال", "تبديل"],
+      "franco": ["estebdal", "tabdil", "exchange"],
+      "franco_seen": [],
+      "en": "exchange",
+      "category": "returns",
+      "sources": ["https://www.instagram.com/gazma.eg/", "https://www.facebook.com/kothsikastore/"],
+      "franco_convention_derived": ["estebdal", "tabdil", "exchange"]
+    },
+    {
+      "msa": "استرجاع",
+      "egyptian": ["مرتجع", "استرجاع"],
+      "franco": ["estrga3", "mortaga3", "refund", "return"],
+      "franco_seen": [],
+      "en": "return / refund",
+      "category": "returns",
+      "sources": ["https://www.instagram.com/gazma.eg/", "https://www.facebook.com/kothsikastore/"],
+      "franco_convention_derived": ["estrga3", "mortaga3", "refund", "return"]
+    },
+    {
+      "msa": "لا يوجد استرجاع",
+      "egyptian": ["لا يوجد استرجاع", "استبدال فقط"],
+      "franco": ["mafeesh estrga3", "estebdal bas", "exchange only"],
+      "franco_seen": [],
+      "en": "no refunds / exchange only",
+      "category": "returns",
+      "sources": ["https://www.facebook.com/kothsikastore/", "https://www.instagram.com/gazma.eg/"],
+      "franco_convention_derived": ["mafeesh estrga3", "estebdal bas", "exchange only"]
+    },
+    {
+      "msa": "معرض",
+      "egyptian": ["شوروم", "معرض"],
+      "franco": ["showroom", "ma3rad"],
+      "franco_seen": [],
+      "en": "showroom",
+      "category": "order",
+      "sources": [
+        "https://www.instagram.com/isdal_style/",
+        "https://www.facebook.com/EsdalAndMoreOfficial/"
+      ],
+      "franco_convention_derived": ["showroom", "ma3rad"]
+    },
+    {
+      "msa": "فرع",
+      "egyptian": ["فرع", "فروع"],
+      "franco": ["far3", "frou3", "branch"],
+      "franco_seen": [],
+      "en": "branch",
+      "category": "order",
+      "sources": ["https://www.instagram.com/hijabsoiree/"],
+      "franco_convention_derived": ["far3", "frou3", "branch"]
+    },
+    {
+      "msa": "زفاف",
+      "egyptian": ["فرح"],
+      "franco": ["fara7", "farah", "far7"],
+      "franco_seen": ["far7", "farah"],
+      "en": "wedding",
+      "category": "occasion",
+      "sources": [
+        "https://www.facebook.com/fostanfara/",
+        "https://huggingface.co/datasets/arbml/Arabizi_Transliteration"
+      ],
+      "franco_convention_derived": ["fara7"]
+    },
+    {
+      "msa": "خطوبة",
+      "egyptian": ["خطوبه"],
+      "franco": ["5otoba", "khotoba", "5otobet"],
+      "franco_seen": ["5otobet"],
+      "en": "engagement",
+      "category": "occasion",
+      "sources": [
+        "https://huggingface.co/datasets/arbml/Arabizi_Transliteration",
+        "https://www.facebook.com/fostanfara/"
+      ],
+      "franco_convention_derived": ["5otoba", "khotoba"]
+    },
+    {
+      "msa": "كتب الكتاب",
+      "egyptian": ["كتب كتاب"],
+      "franco": ["katb ketab", "katb el ketab"],
+      "franco_seen": [],
+      "en": "marriage-contract ceremony",
+      "category": "occasion",
+      "sources": ["https://www.facebook.com/fostanfara/"],
+      "franco_convention_derived": ["katb ketab", "katb el ketab"]
+    },
+    {
+      "msa": "مناسبات",
+      "egyptian": ["مناسبات", "مناسبه"],
+      "franco": ["monasbat", "mnasbat", "occasions"],
+      "franco_seen": [],
+      "en": "occasions",
+      "category": "occasion",
+      "sources": [
+        "https://www.jumia.com.eg/ar/catalog/?q=%D9%81%D8%B3%D8%AA%D8%A7%D9%86+%D8%B3%D9%88%D8%A7%D8%B1%D9%8A%D9%87"
+      ],
+      "franco_convention_derived": ["monasbat", "mnasbat", "occasions"]
+    },
+    {
+      "msa": "سهرة",
+      "egyptian": ["سهرة", "سهرات"],
+      "franco": ["sahra", "sahrat"],
+      "franco_seen": [],
+      "en": "evening out / party",
+      "category": "occasion",
+      "sources": ["https://www.jumia.com.eg/ar/catalog/?q=%D9%82%D9%81%D8%B7%D8%A7%D9%86"],
+      "franco_convention_derived": ["sahra", "sahrat"]
+    },
+    {
+      "msa": "رمضان",
+      "egyptian": ["رمضان", "رمضاني"],
+      "franco": ["ramadan", "ramadany"],
+      "franco_seen": [],
+      "en": "Ramadan",
+      "category": "occasion",
+      "sources": [
+        "https://www.jumia.com.eg/ar/catalog/?q=%D9%82%D9%81%D8%B7%D8%A7%D9%86",
+        "https://www.jumia.com.eg/ar/catalog/?q=%D8%A7%D8%B3%D8%AF%D8%A7%D9%84+%D8%B5%D9%84%D8%A7%D8%A9"
+      ],
+      "franco_convention_derived": ["ramadan", "ramadany"]
+    },
+    {
+      "msa": "عيد",
+      "egyptian": ["العيد"],
+      "franco": ["3id", "el 3eed", "eid"],
+      "franco_seen": [],
+      "en": "Eid",
+      "category": "occasion",
+      "sources": ["https://www.jumia.com.eg/ar/catalog/?q=%D8%AC%D9%84%D8%A7%D8%A8%D9%8A%D8%A9"],
+      "franco_convention_derived": ["3id", "el 3eed", "eid"]
+    },
+    {
+      "msa": "صلاة",
+      "egyptian": ["صلاة", "صلاه"],
+      "franco": ["sala", "salah", "salat"],
+      "franco_seen": [],
+      "en": "prayer",
+      "category": "occasion",
+      "sources": [
+        "https://www.jumia.com.eg/ar/catalog/?q=%D8%A7%D8%B3%D8%AF%D8%A7%D9%84+%D8%B5%D9%84%D8%A7%D8%A9",
+        "https://www.facebook.com/EsdalAndMoreOfficial/"
+      ],
+      "franco_convention_derived": ["sala", "salah", "salat"]
+    },
+    {
+      "msa": "صيفي",
+      "egyptian": ["صيفي"],
+      "franco": ["sefy", "seify", "summer"],
+      "franco_seen": [],
+      "en": "summer",
+      "category": "occasion",
+      "sources": [
+        "https://www.jumia.com.eg/ar/catalog/?q=%D8%B9%D8%A8%D8%A7%D9%8A%D8%A9",
+        "https://www.jumia.com.eg/ar/catalog/?q=%D8%AC%D9%84%D8%A7%D8%A8%D9%8A%D8%A9"
+      ],
+      "franco_convention_derived": ["sefy", "seify", "summer"]
+    },
+    {
+      "msa": "شتوي",
+      "egyptian": ["شتوي", "شتوى"],
+      "franco": ["shetwy", "shitwi", "winter"],
+      "franco_seen": [],
+      "en": "winter",
+      "category": "occasion",
+      "sources": [
+        "https://www.jumia.com.eg/ar/catalog/?q=%D8%B9%D8%A8%D8%A7%D9%8A%D8%A9",
+        "https://www.jumia.com.eg/ar/catalog/?q=%D8%AC%D9%84%D8%A7%D8%A8%D9%8A%D8%A9"
+      ],
+      "franco_convention_derived": ["shetwy", "shitwi", "winter"]
+    },
+    {
+      "msa": "بحر",
+      "egyptian": ["مصيف", "بحر"],
+      "franco": ["ba7r", "masyaf", "beach"],
+      "franco_seen": [],
+      "en": "beach / summer resort",
+      "category": "occasion",
+      "sources": [
+        "https://www.tiktok.com/discover/%D8%A7%D9%81%D8%B6%D9%84-%D8%B4%D8%A8%D8%A7%D8%B4%D8%A8-%D8%AD%D8%B1%D9%8A%D9%85%D9%8A-%D8%B7%D8%A8%D9%8A"
+      ],
+      "franco_convention_derived": ["ba7r", "masyaf", "beach"]
+    },
+    {
+      "msa": "جامعة",
+      "egyptian": ["جامعة", "الجامعة"],
+      "franco": ["gam3a", "el gam3a"],
+      "franco_seen": [],
+      "en": "university (daily wear)",
+      "category": "occasion",
+      "sources": [
+        "https://www.jumia.com.eg/ar/catalog/?q=%D9%83%D9%88%D8%AA%D8%B4%D9%8A",
+        "https://www.jumia.com.eg/ar/catalog/?q=%D8%B4%D9%86%D8%B7%D8%A9+%D8%AD%D8%B1%D9%8A%D9%85%D9%8A"
+      ],
+      "franco_convention_derived": ["gam3a", "el gam3a"]
+    },
+    {
+      "msa": "شغل",
+      "egyptian": ["شغل", "للعمل"],
+      "franco": ["sho3'l", "shoghl", "work"],
+      "franco_seen": [],
+      "en": "work",
+      "category": "occasion",
+      "sources": [
+        "https://www.jumia.com.eg/ar/catalog/?q=%D8%B9%D8%A8%D8%A7%D9%8A%D8%A9",
+        "https://www.jumia.com.eg/ar/catalog/?q=%D8%B4%D9%86%D8%B7%D8%A9+%D8%AD%D8%B1%D9%8A%D9%85%D9%8A"
+      ],
+      "franco_convention_derived": ["sho3'l", "shoghl", "work"]
+    },
+    {
+      "msa": "خروج",
+      "egyptian": ["خروج", "خروجات"],
+      "franco": ["5orog", "khoroog", "5rogat"],
+      "franco_seen": [],
+      "en": "going out",
+      "category": "occasion",
+      "sources": [
+        "https://www.jumia.com.eg/ar/catalog/?q=%D8%A7%D8%B3%D8%AF%D8%A7%D9%84+%D8%B5%D9%84%D8%A7%D8%A9"
+      ],
+      "franco_convention_derived": ["5orog", "khoroog", "5rogat"]
+    },
+    {
+      "msa": "بيت",
+      "egyptian": ["بيتي", "للبيت"],
+      "franco": ["beity", "bety", "lel beit"],
+      "franco_seen": [],
+      "en": "house / homewear",
+      "category": "occasion",
+      "sources": ["https://www.jumia.com.eg/ar/catalog/?q=%D8%AC%D9%84%D8%A7%D8%A8%D9%8A%D8%A9"],
+      "franco_convention_derived": ["beity", "bety", "lel beit"]
+    },
+    {
+      "msa": "محتشم",
+      "egyptian": ["محتشم", "ستايل محجبات"],
+      "franco": ["mo7tashem", "modest"],
+      "franco_seen": [],
+      "en": "modest",
+      "category": "detail",
+      "sources": ["https://www.jumia.com.eg/ar/catalog/?q=%D9%82%D9%81%D8%B7%D8%A7%D9%86"],
+      "franco_convention_derived": ["mo7tashem", "modest"]
+    },
+    {
+      "msa": "عندكم",
+      "egyptian": ["عندك", "عندكم", "فيه"],
+      "franco": ["3andak", "3andek", "3ndko", "fi", "feeh"],
+      "franco_seen": ["3andak", "3andek"],
+      "en": "do you have / is there",
+      "category": "intent",
+      "sources": [
+        "https://noun.town/lessons/english/arabic/street-6-asking-about-age",
+        "https://www.arabicpod101.com/lesson/survival-phrases-s2-20-how-much-in-egyptian-arabic"
+      ],
+      "franco_convention_derived": ["3ndko", "fi", "feeh"]
+    },
+    {
+      "msa": "أريد",
+      "egyptian": ["عايز", "عايزة", "عاوزه"],
+      "franco": ["3ayez", "3ayza", "3awza", "3awez"],
+      "franco_seen": [],
+      "en": "I want",
+      "category": "intent",
+      "sources": [],
+      "sources_note": "convention-derived (no verbatim web attestation found); Arabic form is standard Egyptian usage",
+      "franco_convention_derived": ["3ayez", "3ayza", "3awza", "3awez"]
+    },
+    {
+      "msa": "ممكن",
+      "egyptian": ["ممكن"],
+      "franco": ["momken", "mmkn", "mumkin"],
+      "franco_seen": [],
+      "en": "can I / possible",
+      "category": "intent",
+      "sources": [],
+      "sources_note": "convention-derived (no verbatim web attestation found); Arabic form is standard Egyptian usage",
+      "franco_convention_derived": ["momken", "mmkn", "mumkin"]
+    },
+    {
+      "msa": "أفضل",
+      "egyptian": ["احسن", "أحلى"],
+      "franco": ["a7san", "a7la", "ahla"],
+      "franco_seen": [],
+      "en": "best / prettiest",
+      "category": "intent",
+      "sources": [
+        "https://www.jumia.com.eg/ar/catalog/?q=%D8%A7%D8%B3%D8%AF%D8%A7%D9%84+%D8%B5%D9%84%D8%A7%D8%A9"
+      ],
+      "franco_convention_derived": ["a7san", "a7la", "ahla"]
+    },
+    {
+      "msa": "جميل",
+      "egyptian": ["حلو", "حلوة", "تحفة"],
+      "franco": ["7elw", "7elwa", "7elo", "to7fa"],
+      "franco_seen": ["7elo", "7elw"],
+      "en": "nice / pretty / gorgeous",
+      "category": "intent",
+      "sources": ["https://huggingface.co/datasets/arbml/Arabizi_Transliteration"],
+      "franco_convention_derived": ["7elwa", "to7fa"]
+    },
+    {
+      "msa": "نفس",
+      "egyptian": ["زي", "نفس"],
+      "franco": ["zay", "nafs"],
+      "franco_seen": [],
+      "en": "like / same as",
+      "category": "intent",
+      "sources": [],
+      "sources_note": "convention-derived (no verbatim web attestation found); Arabic form is standard Egyptian usage",
+      "franco_convention_derived": ["zay", "nafs"]
+    },
+    {
+      "msa": "بدون",
+      "egyptian": ["من غير", "بدون"],
+      "franco": ["men gher", "mn 3'er", "bdon"],
+      "franco_seen": [],
+      "en": "without",
+      "category": "intent",
+      "sources": [
+        "https://www.jumia.com.eg/ar/catalog/?q=%D9%81%D8%B3%D8%AA%D8%A7%D9%86+%D8%B3%D9%88%D8%A7%D8%B1%D9%8A%D9%87"
+      ],
+      "franco_convention_derived": ["men gher", "mn 3'er", "bdon"]
+    },
+    {
+      "msa": "مع",
+      "egyptian": ["مع", "ب"],
+      "franco": ["ma3", "m3", "b"],
+      "franco_seen": [],
+      "en": "with",
+      "category": "intent",
+      "sources": [
+        "https://www.jumia.com.eg/ar/catalog/?q=%D8%A7%D8%B3%D8%AF%D8%A7%D9%84+%D8%B5%D9%84%D8%A7%D8%A9"
+      ],
+      "franco_convention_derived": ["ma3", "m3", "b"]
+    },
+    {
+      "msa": "رجالي وحريمي",
+      "egyptian": ["للجنسين", "يونيسكس"],
+      "franco": ["unisex", "lel gensen"],
+      "franco_seen": [],
+      "en": "unisex",
+      "category": "audience",
+      "sources": [
+        "https://www.jumia.com.eg/ar/catalog/?q=%D8%AC%D8%B2%D9%85%D8%A9+%D8%AD%D8%B1%D9%8A%D9%85%D9%8A"
+      ],
+      "franco_convention_derived": ["unisex", "lel gensen"]
+    },
+    {
+      "msa": "ملابس داخلية",
+      "egyptian": ["لانجيري", "لانجري"],
+      "franco": ["lingerie", "lanjery"],
+      "franco_seen": [],
+      "en": "lingerie",
+      "category": "apparel",
+      "sources": [],
+      "sources_note": "convention-derived (no verbatim web attestation found); Arabic form is standard Egyptian usage",
+      "franco_convention_derived": ["lingerie", "lanjery"]
+    },
+    {
+      "msa": "ملابس رياضية",
+      "egyptian": ["سبور", "سبورت"],
+      "franco": ["sport", "spor"],
+      "franco_seen": [],
+      "en": "sportswear",
+      "category": "apparel",
+      "sources": [],
+      "sources_note": "convention-derived (no verbatim web attestation found); Arabic form is standard Egyptian usage",
+      "franco_convention_derived": ["sport", "spor"]
+    },
+    {
+      "msa": "بدلة",
+      "egyptian": ["بدلة", "بدله"],
+      "franco": ["badla", "bdla", "suit"],
+      "franco_seen": [],
+      "en": "suit",
+      "category": "apparel",
+      "sources": [],
+      "sources_note": "convention-derived (no verbatim web attestation found); Arabic form is standard Egyptian usage",
+      "franco_convention_derived": ["badla", "bdla", "suit"]
+    },
+    {
+      "msa": "فانلة",
+      "egyptian": ["فانلة", "تيشيرت", "تي شيرت"],
+      "franco": ["fanela", "tshirt", "t-shirt", "teshert"],
+      "franco_seen": [],
+      "en": "vest / t-shirt",
+      "category": "apparel",
+      "sources": [],
+      "sources_note": "convention-derived (no verbatim web attestation found); Arabic form is standard Egyptian usage",
+      "franco_convention_derived": ["fanela", "tshirt", "t-shirt", "teshert"]
+    },
+    {
+      "msa": "شورت",
+      "egyptian": ["شورت"],
+      "franco": ["short", "shorts"],
+      "franco_seen": [],
+      "en": "shorts",
+      "category": "apparel",
+      "sources": [],
+      "sources_note": "convention-derived (no verbatim web attestation found); Arabic form is standard Egyptian usage",
+      "franco_convention_derived": ["short", "shorts"]
+    },
+    {
+      "msa": "بلوفر",
+      "egyptian": ["بلوفر", "سويت شيرت", "هودي"],
+      "franco": ["pullover", "blover", "sweatshirt", "hoodie"],
+      "franco_seen": [],
+      "en": "pullover / sweatshirt / hoodie",
+      "category": "apparel",
+      "sources": ["https://www.jumia.com.eg/ar/catalog/?q=%D8%B9%D8%A8%D8%A7%D9%8A%D8%A9"],
+      "franco_convention_derived": ["pullover", "blover", "sweatshirt", "hoodie"]
+    },
+    {
+      "msa": "إكسسوارات",
+      "egyptian": ["اكسسوارات", "اكسسوار"],
+      "franco": ["accessories", "eksesorat", "ekseswar"],
+      "franco_seen": [],
+      "en": "accessories",
+      "category": "accessory",
+      "sources": [
+        "https://www.jumia.com.eg/ar/catalog/?q=%D9%81%D8%B3%D8%AA%D8%A7%D9%86+%D8%B3%D9%88%D8%A7%D8%B1%D9%8A%D9%87"
+      ],
+      "franco_convention_derived": ["accessories", "eksesorat", "ekseswar"]
+    },
+    {
+      "msa": "سوار",
+      "egyptian": ["انسيال", "غويشة", "اسورة"],
+      "franco": ["ensyal", "ghwesha", "3'wesha", "aswera"],
+      "franco_seen": [],
+      "en": "bracelet / bangle",
+      "category": "accessory",
+      "sources": [
+        "https://www.jumia.com.eg/ar/catalog/?q=%D9%81%D8%B3%D8%AA%D8%A7%D9%86+%D8%B3%D9%88%D8%A7%D8%B1%D9%8A%D9%87"
+      ],
+      "franco_convention_derived": ["ensyal", "ghwesha", "3'wesha", "aswera"]
+    },
+    {
+      "msa": "حزام",
+      "egyptian": ["حزام", "سير"],
+      "franco": ["7ezam", "seer"],
+      "franco_seen": [],
+      "en": "belt (accessory)",
+      "category": "accessory",
+      "sources": ["https://www.jumia.com.eg/ar/catalog/?q=%D8%B7%D8%B1%D8%AD%D8%A9"],
+      "franco_convention_derived": ["7ezam", "seer"]
+    },
+    {
+      "msa": "شماعة",
+      "egyptian": ["شماعة طرح"],
+      "franco": ["sham3a", "shama3et tora7"],
+      "franco_seen": [],
+      "en": "hanger (scarf hanger)",
+      "category": "accessory",
+      "sources": ["https://www.jumia.com.eg/ar/catalog/?q=%D8%B7%D8%B1%D8%AD%D8%A9"],
+      "franco_convention_derived": ["sham3a", "shama3et tora7"]
+    },
+    {
+      "msa": "نظارة",
+      "egyptian": ["نضارة", "نضارة شمس"],
+      "franco": ["nadara", "naddara shams", "sunglasses"],
+      "franco_seen": [],
+      "en": "glasses / sunglasses",
+      "category": "accessory",
+      "sources": [],
+      "sources_note": "convention-derived (no verbatim web attestation found); Arabic form is standard Egyptian usage",
+      "franco_convention_derived": ["nadara", "naddara shams", "sunglasses"]
+    }
+  ],
+  "queries": [
+    {
+      "q": "3abaya sooda size L",
+      "basis": "3abaya (IG/FB) + sooda (souda, talkinarabic) + English size"
+    },
+    {
+      "q": "طرحة شيفون beige",
+      "basis": "Jumia title طرحة شيفون + beige (Jumia colour label)"
+    },
+    {
+      "q": "tar7a chiffon lebny",
+      "basis": "tar7a (FB page) + chiffon + labani (talkinarabic)"
+    },
+    {
+      "q": "esdal sala free size",
+      "basis": "esdal (Esdal & More) + فري سايز (Jumia)"
+    },
+    {
+      "q": "اسدال صلاه بناتي",
+      "basis": "Jumia title spelling (ه for ة)"
+    },
+    {
+      "q": "fostan soiree m7agabat",
+      "basis": "fostan/soiree (FB pages) + convention 7=ح"
+    },
+    {
+      "q": "fostan swarih a7mar 2atifa",
+      "basis": "swarih (FB Fasaten.swarih) + a7mar (convention) + قطيفة velvet (Jumia)"
+    },
+    {
+      "q": "فستان سواريه دهبي ترتر",
+      "basis": "Jumia titles: سواريه / دهبي / ترتر"
+    },
+    {
+      "q": "gazma ka3b 3aly eswed",
+      "basis": "gazma (IG) + ka3b (IG) + eswed (ArabicPod101)"
+    },
+    {
+      "q": "kotshy abyad 38",
+      "basis": "kotshy (FB) + abyad (talkinarabic) + EU size"
+    },
+    {
+      "q": "كوتشي جلد اسود و ابيض",
+      "basis": "Jumia title verbatim style"
+    },
+    {
+      "q": "shanta cross bamby",
+      "basis": "shanta (IG) + cross (Jumia) + bambi (talkinarabic)"
+    },
+    {
+      "q": "shantet ketf havan",
+      "basis": "shantet (FB) + كتف + هافان colour (Jumia)"
+    },
+    {
+      "q": "shonat tote bag",
+      "basis": "shonat (TikTok lesson) + English"
+    },
+    {
+      "q": "2aftan ramadany ko7ly",
+      "basis": "2aftan (convention 2=ق) + رمضاني (Jumia) + kohli"
+    },
+    {
+      "q": "kaftan velvet 2tifa",
+      "basis": "kaftan + قطيفة (Jumia) convention 2=ق"
+    },
+    {
+      "q": "galabeya beity shetwy",
+      "basis": "galabeya + بيتي/شتوي (Jumia)"
+    },
+    {
+      "q": "جلابيه حريمي قطن",
+      "basis": "Jumia spelling جلابيه"
+    },
+    {
+      "q": "khemar malaysy crepe",
+      "basis": "khemar (TikTok) + خمار ماليزى كريب (Jumia)"
+    },
+    {
+      "q": "trbona 2otn",
+      "basis": "trbona (FB تربونه وطرحه) + قطن convention"
+    },
+    {
+      "q": "shebsheb teby 7erimy",
+      "basis": "shibshib (TikTok) + طبي/حريمي (TikTok/Jumia) convention 7=ح"
+    },
+    {
+      "q": "صندل فلات بيج",
+      "basis": "Jumia sandal titles"
+    },
+    {
+      "q": "3abaya kagual b sosta",
+      "basis": "عبايه كاجول بسوسته (Jumia) transliterated"
+    },
+    {
+      "q": "عبايه سودة كاجول",
+      "basis": "Jumia title verbatim (Egyptian spellings)"
+    },
+    {
+      "q": "3abaya 5aleegy original",
+      "basis": "عباية خليجي (FB pages) + original"
+    },
+    {
+      "q": "bkam el 3abaya di",
+      "basis": "bekam (ArabicPod101) + el + 3abaya + di (fem. demonstrative)"
+    },
+    {
+      "q": "fi delivery l alex?",
+      "basis": "fi (feeh) + English loan 'delivery' + city"
+    },
+    {
+      "q": "daf3 3and el estlam",
+      "basis": "Arabic الدفع عند الاستلام via convention (3=ع)"
+    },
+    {
+      "q": "3orood tar7a 5asm 50%",
+      "basis": "3orod (FB 3orodmisr) + tar7a + 5asm (convention 5=خ) + Jumia discount band"
+    },
+    {
+      "q": "fostan farah plus size",
+      "basis": "fostan farah (FB) + plus size"
+    },
+    {
+      "q": "هدوم محجبات واسعة",
+      "basis": "hedoom (TT/FB) + محجبات + واسع"
+    },
+    {
+      "q": "hedoom 3eid banaty",
+      "basis": "hedoom + 3id + banaty (convention + Jumia بناتي)"
+    }
+  ]
+}

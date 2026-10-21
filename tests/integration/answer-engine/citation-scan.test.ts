@@ -119,6 +119,21 @@ beforeAll(async () => {
       isBestSeller: true,
     },
   });
+  // A wholesale-only best seller, viewed far more: its NAME must never reach a third-party answer engine (Ruling B2B-7,
+  // final review minor 1).
+  await prisma.product.create({
+    data: {
+      storeId,
+      name: 'Secret Bulk Carton',
+      nameAr: 'كرتونة جملة سرية',
+      slug: `secret-bulk-${Date.now()}`,
+      price: 4000,
+      status: 'active',
+      isBestSeller: true,
+      viewCount: 1_000_000,
+      audience: 'wholesale_only',
+    },
+  });
 
   // A second store, entitled by plan, with an explicit override disabling
   // the feature — the "not entitled" fixture for the gate test.
@@ -198,6 +213,8 @@ describe('generatePrompts', () => {
     expect(prompts.some(p => p.locale === 'ar' && p.text.includes('أجهزة'))).toBe(true);
     expect(prompts.some(p => p.locale === 'en' && p.text.includes('Smart Widget'))).toBe(true);
     expect(prompts.some(p => p.locale === 'ar' && p.text.includes('ودجت ذكي'))).toBe(true);
+    expect(prompts.some(p => p.text.includes('Secret Bulk Carton'))).toBe(false);
+    expect(prompts.some(p => p.text.includes('كرتونة جملة سرية'))).toBe(false);
   });
 });
 

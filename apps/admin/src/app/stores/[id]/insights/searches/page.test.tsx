@@ -11,7 +11,12 @@ import type { ReactNode } from 'react';
 const h = vi.hoisted(() => ({ apiGet: vi.fn() }));
 
 vi.mock('next-intl', () => {
-  const t = Object.assign((key: string) => key, { has: () => true });
+  // Params are echoed so a test can see which numbers reached the copy.
+  const t = Object.assign(
+    (key: string, params?: Record<string, unknown>) =>
+      params && !('term' in params) ? `${key}:${JSON.stringify(params)}` : key,
+    { has: () => true }
+  );
   return { useTranslations: () => t, useLocale: () => 'ar' };
 });
 vi.mock('next/navigation', () => ({ useParams: () => ({ id: 'store-1' }) }));
@@ -107,5 +112,42 @@ describe('Insights → Searches page', () => {
     await new Promise(r => setTimeout(r, 20));
     expect(screen.queryByText('كوتشي')).toBeNull();
     expect(screen.getAllByText('تيشرت').length).toBeGreaterThan(0);
+  });
+
+  // Task 12: the viewer of product_embeddings — "N of M ready / N failed" + whether it is on.
+  it('shows the smart-search index line: ready of total, failures, and that it is not on yet', async () => {
+    h.apiGet.mockResolvedValue({
+      data: {
+        ...WITH_TERMS,
+        index: { products: 5, indexed: 3, stale: 0, failed: 2, semanticEnabled: false },
+      },
+    });
+    render(<SearchesPage />);
+    const line = await screen.findByTestId('search-index-status');
+    expect(line.textContent).toContain('indexOff');
+    // Latin digits (NUMERALS-1): the counts reach the copy as plain strings, never locale-formatted.
+    expect(line.textContent).toContain('indexStatus:{"indexed":"3","products":"5"}');
+    expect(line.textContent).toContain('indexFailed:{"failed":"2"}');
+  });
+
+  it('on and nothing failed: no "not on" note and no failure count', async () => {
+    h.apiGet.mockResolvedValue({
+      data: {
+        ...WITH_TERMS,
+        index: { products: 4, indexed: 4, stale: 0, failed: 0, semanticEnabled: true },
+      },
+    });
+    render(<SearchesPage />);
+    const line = await screen.findByTestId('search-index-status');
+    expect(line.textContent).toContain('indexStatus:{"indexed":"4","products":"4"}');
+    expect(line.textContent).not.toContain('indexOff');
+    expect(line.textContent).not.toContain('indexFailed');
+  });
+
+  it('an API without the index field renders no index line', async () => {
+    h.apiGet.mockResolvedValue({ data: WITH_TERMS });
+    render(<SearchesPage />);
+    await screen.findAllByText('كوتشي');
+    expect(screen.queryByTestId('search-index-status')).toBeNull();
   });
 });

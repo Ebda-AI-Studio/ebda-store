@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { localizedMetadata } from '@/lib/seo/localized-metadata';
 // Renamed from the conventional `dynamic` to avoid colliding with the route
 // segment config export of the same name below (tenant-cacheable routing,
 // Phase 1 — see docs/plans/2026-07-12-tenant-cacheable-routing.md §3.3/§9).
@@ -15,9 +16,11 @@ const SharedWishlistClient = nextDynamic(() => import('./SharedWishlistClient'),
 // Track-B — see app/cart/page.tsx sibling comment; same rationale.
 export const dynamic = 'force-dynamic';
 
-export const metadata: Metadata = {
-  title: 'Shared Wishlist',
-};
+export function generateMetadata(): Promise<Metadata> {
+  return localizedMetadata({
+    title: ['Shared Wishlist', 'قائمة مفضلة مشتركة'],
+  });
+}
 
 export default function SharedWishlistPage({ params }: { params: { userId: string } }) {
   return <SharedWishlistClient userId={params.userId} />;

@@ -199,10 +199,16 @@ export async function cancelBackorder(
         tax: true,
         taxIncludedInPrice: true,
         paymentStatus: true,
-        items: { select: { id: true, quantity: true, price: true } },
+        items: { select: { id: true, quantity: true, price: true, priceSource: true } },
       },
     });
-    const { prevQty } = await loadPriorReversedQty(tx, { storeId, orderId, excludeKey: refundKey });
+    // `prevAdjustment`: the B2B tier adjustments earlier returns retained. partial-return-posting passes it for this same
+    // cancel, so leaving it out here let the amount owed and the GL cash credit differ by a piastre on a taxed order.
+    const { prevQty, prevAdjustment } = await loadPriorReversedQty(tx, {
+      storeId,
+      orderId,
+      excludeKey: refundKey,
+    });
     const alloc = allocatePartialReturn({
       subtotal: order.subtotal,
       discount: order.discount,
@@ -211,6 +217,7 @@ export async function cancelBackorder(
       lines: order.items,
       prevQty,
       requested: [{ orderItemId: bo.orderItemId, quantity }],
+      prevAdjustment,
     });
     return {
       quantity,

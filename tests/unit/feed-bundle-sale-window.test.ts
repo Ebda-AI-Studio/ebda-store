@@ -84,6 +84,7 @@ vi.mock('@api/middleware/security', () => {
     publicTenantLimiter: pass,
     storeResolveLimiter: pass,
     cartLimiter: pass,
+    couponAttemptLimiter: pass,
     writeLimiter: pass,
     newsletterLimiter: pass,
     viewIngestLimiter: pass,
@@ -93,7 +94,12 @@ vi.mock('@api/middleware/security', () => {
 
 vi.mock('@api/middleware/auth', () => {
   const pass = (_req: unknown, _res: unknown, next: () => void) => next();
-  return { authenticate: pass, optionalAuthenticate: pass, customerUserId: vi.fn(() => null) };
+  return {
+    authenticate: pass,
+    optionalAuthenticate: pass,
+    rejectImpersonated: pass,
+    customerUserId: vi.fn(() => null),
+  };
 });
 
 vi.mock('@api/middleware/feature-gate', () => ({

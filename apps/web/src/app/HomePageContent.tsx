@@ -24,7 +24,7 @@ interface HomepageTestimonial {
   rating: number;
   title: string | null;
   comment: string;
-  authorName: string;
+  authorName: string | null;
   authorCity: string | null;
   createdAt: string;
 }

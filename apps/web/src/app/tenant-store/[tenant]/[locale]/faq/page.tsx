@@ -1,11 +1,8 @@
-import type { Metadata } from 'next';
 import { getStoreByTenantParam } from '@/lib/store-resolver';
 import { FaqPageBody } from '@/app/faq/FaqPageBody';
 
-export const metadata: Metadata = {
-  title: 'FAQ',
-  description: 'Frequently asked questions about ordering, shipping, returns, and more.',
-};
+// Rule (f): the same page-language title as the legacy twin (metadata parity, issue 2418).
+export { generateMetadata } from '@/app/faq/page';
 
 export default async function StoreFaqPage({
   params,

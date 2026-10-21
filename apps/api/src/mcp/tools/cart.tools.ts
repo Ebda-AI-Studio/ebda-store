@@ -3,7 +3,7 @@ import { randomBytes } from 'node:crypto';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { McpStore } from '../resolve-store';
 import { CartService, type CartBundleView } from '../../services/cart.service';
-import { cartLineUnitPrice } from '../../lib/cart-pricing';
+import { retailUnitPrice } from '../../lib/cart-pricing';
 import {
   agentContextFrom,
   assertAgentWrite,
@@ -26,7 +26,7 @@ import { ok } from './tool-result';
  *     price }`); catalog.tools.ts's `.name` rename only applies to the
  *     product-DETAIL variant shape from `reshapePublicProductDetail`, which
  *     this cart include does not go through.
- *   - Unit price uses the shared `cartLineUnitPrice` helper (variant price
+ *   - Unit price uses the shared `retailUnitPrice` helper (variant price
  *     wins when a variant is chosen, nullish-coalescing so a free variant
  *     priced at 0 doesn't fall through to the parent price) — the same
  *     helper the cart/order subtotal math uses, so the tool's line price can
@@ -59,7 +59,9 @@ export function cartView(cartId: string, cart: any, currency: string) {
       title: item.product?.name,
       title_ar: item.product?.nameAr ?? undefined,
       quantity: item.quantity,
-      unitPrice: cartLineUnitPrice(item),
+      // Server-resolved by the cart service (anonymous buyer for MCP: retail + public tiers); an unavailable line carries
+      // no resolved price and shows its retail shelf price.
+      unitPrice: typeof item.unitPrice === 'number' ? item.unitPrice : retailUnitPrice(item),
       // #1766: the product was deleted — this line is excluded from
       // `subtotal` and blocks checkout until it is removed.
       ...(item.unavailable ? { unavailable: true } : {}),

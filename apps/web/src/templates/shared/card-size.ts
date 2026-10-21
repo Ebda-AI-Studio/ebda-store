@@ -390,3 +390,21 @@ export function oosPlacementClass(
       return 'top-2 start-2';
   }
 }
+
+/**
+ * Taste re-audit P2-8: a look store's carousel card is one grid column wide from lg, so the
+ * carousel and the 4-column grid share column edges (5 cards ending mid-row read as ragged).
+ * The width is 25% less this row gap's share (3 gaps across 4 columns, at the sm+ gap value).
+ */
+export function lookCarouselLgWidth(gap: CardGap | undefined): string {
+  switch (gap) {
+    case 'tight':
+      return 'lg:w-[calc(25%-9px)]';
+    case 'loose':
+      return 'lg:w-[calc(25%-18px)]';
+    case 'xloose':
+      return 'lg:w-[calc(25%-30px)]';
+    default:
+      return 'lg:w-[calc(25%-12px)]';
+  }
+}

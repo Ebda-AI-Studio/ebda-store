@@ -14,6 +14,7 @@ import request from 'supertest';
 
 let role = 'store_admin';
 vi.mock('@api/middleware/auth', () => ({
+  rejectImpersonated: (_req: any, _res: any, next: any) => next(),
   authenticate: (req: any, _res: any, next: any) => {
     req.user = { userId: 'admin-1', role };
     next();

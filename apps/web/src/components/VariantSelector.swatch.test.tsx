@@ -73,11 +73,11 @@ describe('VariantSelector swatches', () => {
     expect(plain.textContent).toMatch(/Plain/);
   });
 
-  it('an unselected colour circle keeps a 35% foreground ring on dark skins (F7)', () => {
+  it('an unselected colour circle draws a solid foreground ring: >= 3:1 on any surface (B1-107)', () => {
     render(<VariantSelector variants={variants} options={options} onVariantSelect={() => {}} />);
     const teal = screen.getByRole('button', { name: /Teal/ });
-    expect(teal.className).toContain('ring-foreground/35');
-    expect(teal.className).not.toContain('ring-foreground/15');
+    expect(teal.className).toMatch(/\bring-1 ring-foreground(?!\/)/);
+    expect(teal.className).not.toMatch(/ring-foreground\/(15|35)/);
   });
 
   it('strikes the out-of-stock combo once the other axes are picked', () => {
@@ -200,5 +200,16 @@ describe('VariantSelector value thumbnails', () => {
     render(<VariantSelector variants={vs} options={opts} onVariantSelect={() => {}} />);
     expect(screen.getByRole('button', { name: '200g' }).querySelector('img')).not.toBeNull();
     expect(screen.getByRole('button', { name: '50g' }).querySelector('img')).toBeNull();
+  });
+});
+
+// a11y P1-4 / P2-10 / rule (d) (W4): size and length chips measured 44x38, swatches 41x45.
+describe('every option control is at least 44x44 (computed hit box)', () => {
+  it('chips and swatches', async () => {
+    const { smallTargets } = await import('../../../../tests/helpers/target-size');
+    const { container } = render(
+      <VariantSelector options={options} variants={variants} onVariantSelect={() => {}} />
+    );
+    expect(smallTargets(container)).toEqual([]);
   });
 });

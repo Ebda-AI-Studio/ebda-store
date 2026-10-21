@@ -288,7 +288,7 @@ export function model3dErrorMessage(code: Model3dErrorCode, locale: 'en' | 'ar')
       'The model needs a glTF extension we do not support.',
       'الموديل محتاج امتداد glTF مش مدعوم عندنا.',
     ],
-    NO_MESH: ['The file has no 3D mesh in it.', 'الملف مافيهوش أي مجسم.'],
+    NO_MESH: ['The file has no 3D mesh in it.', 'الملف مفيهوش أي مجسم.'],
     TOO_COMPLEX: [
       'The model is too detailed for phones. Simplify it (see the help article).',
       'الموديل تفاصيله كتير على الموبايل. بسّطه (شوف مقالة المساعدة).',

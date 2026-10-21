@@ -7,83 +7,53 @@
  */
 import { prisma } from '@ebda/database';
 import { matchesTargeting, computeDiscount, TargetingCtx } from './promotion-targeting';
+import { loadBuyerGroup } from './price-resolver.service';
+import { ANONYMOUS_BUYER, type BuyerIdentity } from '../lib/buyer-identity';
 
 /**
- * Resolve the customer's targeting context from their checkout identity.
- * Guests with no resolvable identity are treated as first-time customers with
- * no group (so only "everyone" promotions and first-order promotions apply).
+ * Resolve the customer's targeting context: the customer GROUP and first-order status.
  *
- * When `customerId` is present (a registered customer), both facets prefer
- * the reliable account identity over the mutable per-order shipping
- * phone/email:
- *  - first-order is decided by a `customerId`-keyed order count, not the
- *    shipping fields — otherwise a registered customer who varies their
- *    shipping contact would re-qualify for `firstOrderOnly` promotions on
- *    every order (a money leak).
- *  - group targeting (`Customer` table, phone/email keyed — the #874
- *    bridge) prefers the account's own contact (`User.phone`/`User.email`)
- *    over the shipping fields, falling back to the passed-in shipping
- *    phone/email only if the account itself lacks both.
- * Guests (no `customerId`) keep the original shipping-address-keyed
- * behavior unchanged.
+ * GROUP (Ruling B2B-2c/2e): group membership gates money benefits (group-targeted promotions and coupons, and group prices),
+ * so it is decided by a `BuyerIdentity` and nothing else: the signed-in customer SESSION (via the `customers.user_id` link)
+ * or a merchant's explicit Customer pick. A typed shipping phone / email and the account's self-edited `User.phone` are NOT
+ * identities for this purpose: before 2026-10-21 they were, and anyone who typed a VIP's phone received the VIP promotion.
+ * Guests (anonymous) get no group benefits.
+ *
+ * FIRST ORDER is unchanged: a registered customer is decided by a `customerId`-keyed order count (not the mutable shipping
+ * fields, or varying them would re-qualify `firstOrderOnly` promotions on every order); a guest by the typed identity. That
+ * path can only ever REDUCE what a typed identity gets (a prior order for that phone/email), it does not grant a group.
  */
 export async function resolveCustomerContext(
   storeId: string,
-  id: { phone?: string | null; email?: string | null; customerId?: string | null }
+  id: { phone?: string | null; email?: string | null; customerId?: string | null },
+  buyer: BuyerIdentity = ANONYMOUS_BUYER
 ): Promise<{ customerGroupId: string | null; isFirstOrder: boolean }> {
-  let isFirstOrder: boolean;
-  let groupPhone = id.phone;
-  let groupEmail = id.email;
+  const group = await loadBuyerGroup(storeId, buyer);
+  const customerGroupId = group?.id ?? null;
+  const customerId = id.customerId ?? (buyer.kind === 'session' ? buyer.userId : null);
 
-  if (id.customerId) {
+  if (customerId) {
     const priorCount = await prisma.order.count({
-      where: {
-        storeId,
-        customerId: id.customerId,
-        deletedAt: null,
-        status: { not: 'cancelled' },
-      },
+      where: { storeId, customerId, deletedAt: null, status: { not: 'cancelled' } },
     });
-    isFirstOrder = priorCount === 0;
-
-    const user = await prisma.user.findUnique({
-      where: { id: id.customerId, storeId },
-      select: { phone: true, email: true },
-    });
-    groupPhone = user?.phone ?? id.phone;
-    groupEmail = user?.email ?? id.email;
-  } else {
-    // Guest checkout — no reliable identity beyond what was typed into the
-    // shipping form this order.
-    if (!id.phone && !id.email) return { customerGroupId: null, isFirstOrder: true };
-
-    // First-order = no prior non-cancelled order for this identity. Matches
-    // the JSON-path identity aggregation used elsewhere for guest orders.
-    const priorCount = await prisma.order.count({
-      where: {
-        storeId,
-        deletedAt: null,
-        status: { not: 'cancelled' },
-        OR: [
-          ...(id.phone ? [{ shippingAddress: { path: ['phone'], equals: id.phone } }] : []),
-          ...(id.email ? [{ shippingAddress: { path: ['email'], equals: id.email } }] : []),
-        ],
-      },
-    });
-    isFirstOrder = priorCount === 0;
+    return { customerGroupId, isFirstOrder: priorCount === 0 };
   }
 
-  const or = [] as { phone?: string; email?: { equals: string; mode: 'insensitive' } }[];
-  if (groupPhone) or.push({ phone: groupPhone });
-  if (groupEmail) or.push({ email: { equals: groupEmail, mode: 'insensitive' } });
-  if (or.length === 0) return { customerGroupId: null, isFirstOrder };
-
-  const customer = await prisma.customer.findFirst({
-    where: { storeId, OR: or },
-    select: { groupId: true },
+  // Guest checkout: no reliable identity beyond what was typed into the shipping form this order. Used ONLY for
+  // first-order status, never for group membership.
+  if (!id.phone && !id.email) return { customerGroupId, isFirstOrder: true };
+  const priorCount = await prisma.order.count({
+    where: {
+      storeId,
+      deletedAt: null,
+      status: { not: 'cancelled' },
+      OR: [
+        ...(id.phone ? [{ shippingAddress: { path: ['phone'], equals: id.phone } }] : []),
+        ...(id.email ? [{ shippingAddress: { path: ['email'], equals: id.email } }] : []),
+      ],
+    },
   });
-
-  return { customerGroupId: customer?.groupId ?? null, isFirstOrder };
+  return { customerGroupId, isFirstOrder: priorCount === 0 };
 }
 
 /**

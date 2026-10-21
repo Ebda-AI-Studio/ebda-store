@@ -8,14 +8,15 @@
     --foreground: 20 14% 12%;
     --card: 0 0% 100%;
     --card-foreground: 20 14% 12%;
-    --primary: 26 100% 50%;
-    --primary-foreground: 0 0% 100%;
+    /* Ebda gold with night ink, as apps/admin (Ruling D1016-ORANGE-1). */
+    --primary: 36.4 36.03% 51.57%;
+    --primary-foreground: 210 9% 4.3%;
     --secondary: 30 40% 96%;
-    --secondary-foreground: 26 80% 25%;
+    --secondary-foreground: 36 50% 25%;
     --muted: 30 15% 95%;
     --muted-foreground: 20 10% 45%;
     --accent: 30 60% 95%;
-    --accent-foreground: 26 90% 25%;
+    --accent-foreground: 36 50% 25%;
     --success: 158 64% 40%;
     --success-foreground: 0 0% 100%;
     --warning: 43 96% 50%;
@@ -27,14 +28,14 @@
     /* Text on a role tint or a plain surface (issues 2341, 2349): the role
        colours themselves fail WCAG AA there (warning 1.7:1). Same values as
        apps/admin; measured per theme by tests/unit/admin-tint-ink-contrast. */
-    --primary-ink: 26 100% 33%;
+    --primary-ink: 36 50% 29%;
     --success-ink: 158 64% 24%;
     --warning-ink: 43 96% 24%;
     --info-ink: 210 100% 35%;
     --destructive-ink: 0 72% 40%;
     --border: 30 15% 90%;
     --input: 30 15% 90%;
-    --ring: 26 100% 50%;
+    --ring: 36.4 36.03% 51.57%;
     --radius: 0.875rem;
   }
 
@@ -43,14 +44,14 @@
     --foreground: 210 40% 98%;
     --card: 222.2 47.4% 8%;
     --card-foreground: 210 40% 98%;
-    --primary: 26 100% 55%;
-    --primary-foreground: 0 0% 100%;
-    --secondary: 26 40% 12%;
-    --secondary-foreground: 30 100% 90%;
+    --primary: 36.4 36.03% 51.57%;
+    --primary-foreground: 210 9% 4.3%;
+    --secondary: 36 15% 12%;
+    --secondary-foreground: 36 40% 85%;
     --muted: 217.2 32.6% 12%;
     --muted-foreground: 215 20.2% 65.1%;
-    --accent: 26 40% 12%;
-    --accent-foreground: 30 100% 90%;
+    --accent: 36 15% 12%;
+    --accent-foreground: 36 40% 85%;
     --success: 158 64% 45%;
     --success-foreground: 0 0% 100%;
     --warning: 43 96% 55%;
@@ -59,14 +60,14 @@
     --info-foreground: 0 0% 100%;
     --destructive: 0 62.8% 50%;
     --destructive-foreground: 210 40% 98%;
-    --primary-ink: 26 100% 62%;
+    --primary-ink: 36.14 45.83% 62.35%;
     --success-ink: 158 64% 65%;
     --warning-ink: 43 96% 62%;
     --info-ink: 210 100% 72%;
     --destructive-ink: 0 72% 70%;
     --border: 217.2 32.6% 17.5%;
     --input: 217.2 32.6% 17.5%;
-    --ring: 26 100% 55%;
+    --ring: 36.4 36.03% 51.57%;
   }
 
   * {

@@ -9,6 +9,8 @@ import { resolveColor } from '@ebda/shared';
 import type { CtaShape, CtaSize } from './card-size';
 import { ctaShapeClass, ctaSizeClass, labelShapeClass, oosPlacementClass } from './card-size';
 import { avoidReservedCorner, soldOutCorner } from './badge-collision';
+import type { CardCta } from '@ebda/shared';
+import { lookCtaVisible, QUIET_CARD_CTA_CLS } from './look-card';
 
 /**
  * Shared platform-level CTA used by EVERY theme's ProductCard.
@@ -192,6 +194,11 @@ interface ProductCardCtaProps {
    * Driven by productCardDefaults.ctaMode === 'viewOnly'.
    */
   viewOnly?: boolean;
+  /**
+   * The look's card action (W2b, L-01; `lookCardCta(theme, layout)`): `none` renders nothing,
+   * `quiet` only an outline add for a simple buyable product. Undefined = the system above.
+   */
+  lookCta?: CardCta;
 }
 
 export function ProductCardCta({
@@ -215,6 +222,7 @@ export function ProductCardCta({
   oosDimColor: _oosDimColor,
   theme,
   viewOnly = false,
+  lookCta,
 }: ProductCardCtaProps) {
   const router = useRouter();
   const { ref: ctaRef, compact: compactRaw } = useCompactCta();
@@ -237,6 +245,12 @@ export function ProductCardCta({
   // oosDimColor is an IMAGE overlay (see OosImageDim) — not a CTA background.
   // No CTA-specific oosDim styling here.
   const oosDimStyle: React.CSSProperties = {};
+
+  if (
+    !lookCtaVisible(lookCta, { hasVariants: hasVariants || viewOnly, orderable: inStock !== false })
+  )
+    return null;
+  if (lookCta === 'quiet') className = QUIET_CARD_CTA_CLS;
 
   // viewOnly: force the View link path for no-variant in-stock products too.
   if ((hasVariants || viewOnly) && viewHref) {
@@ -335,6 +349,8 @@ interface OutOfStockRibbonProps {
    */
   topStartReserved?: boolean;
   topEndReserved?: boolean;
+  /** A look store: a flat chip on the look radius, never the rotated sash (taste re-audit P1-2). */
+  flat?: boolean;
 }
 
 /**
@@ -355,6 +371,15 @@ interface OutOfStockRibbonProps {
  * a configurable badge pill instead of the diagonal ribbon. oosLabel===false
  * suppresses all OOS UI. Falls back to the original ribbon when unset.
  */
+/**
+ * The shared sold-out label text: the merchant's own OOS label (`productCardDefaults.oosLabelText*`)
+ * else the platform default. Used by the card badge below and by every row that lists a product
+ * (shop-the-look), so a sold-out piece reads the same everywhere.
+ */
+export function soldOutLabel(isRtl: boolean, textEn?: string, textAr?: string): string {
+  return (isRtl ? textAr : textEn) ?? (isRtl ? 'نفدت الكمية' : 'Sold Out');
+}
+
 export function OutOfStockRibbon({
   inStock = true,
   isRtl = false,
@@ -369,6 +394,7 @@ export function OutOfStockRibbon({
   theme,
   topStartReserved = false,
   topEndReserved = false,
+  flat = false,
 }: OutOfStockRibbonProps) {
   if (inStock) return null;
 
@@ -391,8 +417,7 @@ export function OutOfStockRibbon({
     // (matches the shorter copy already used on the elegant CTA label) —
     // narrower text keeps the compact pill from growing as wide as the
     // wishlist heart-collision guard below needs to reserve.
-    const labelText =
-      (isRtl ? oosLabelTextAr : oosLabelTextEn) ?? (isRtl ? 'نفدت الكمية' : 'Sold Out');
+    const labelText = soldOutLabel(isRtl, oosLabelTextEn, oosLabelTextAr);
 
     // Issue #548 — the guard below used to reserve the heart's footprint on
     // EVERY top placement via a symmetric max-width, which only actually
@@ -457,20 +482,38 @@ export function OutOfStockRibbon({
   // sits at top-start (it used to paint UNDER the heart), or a pill on the
   // bottom edge when both top corners hold a button. The sale chip's pin reads
   // the same answer, so the two never share a corner either.
-  // theme.oosRibbonColor: value-preserving theme token (2026-07-12). Default
-  // (undefined) resolves to the exact original hardcoded terracotta so every
-  // EXISTING store renders byte-identical; new stores are seeded a neutral
-  // slate that harmonizes better with an arbitrary brand palette.
+  // theme.oosRibbonColor: the merchant's pick wins. Unset, the band reads the store's own ink
+  // and paper tokens (taste re-audit P1-2, Ahmad 2026-10-16: Ebda has no orange). It used to
+  // default to a fixed terracotta (hue 15, #873B22), which sat in no store's palette.
   const ribbonBg =
     (theme?.oosRibbonColor && theme && resolveColor(theme.oosRibbonColor, theme)) ??
-    'hsl(15 60% 33%)';
-  const label = isRtl ? 'نفدت الكمية' : 'Out of Stock';
+    'hsl(var(--foreground))';
+  const ribbonInk = theme?.oosRibbonColor ? '#ffffff' : 'hsl(var(--background))';
+  const label = isRtl ? 'نفدت الكمية' : 'Sold out';
+  // A look store: a flat chip on the look radius in the band's corner, never a rotated sash.
+  if (flat) {
+    const c = soldOutCorner({ topStartReserved, topEndReserved });
+    return (
+      <span
+        className={`pointer-events-none absolute z-10 rounded-[var(--radius)] px-2.5 py-1 text-xs font-semibold ${
+          c.v === 'bottom'
+            ? oosPlacementClass('bottom-start')
+            : `top-3 ${c.h === 'start' ? 'start-3' : 'end-3'}`
+        } ${className}`}
+        style={{ backgroundColor: ribbonBg, color: ribbonInk }}
+        data-oos-corner={c.v === 'bottom' ? 'bottom-start' : `top-${c.h}`}
+        aria-hidden
+      >
+        {label}
+      </span>
+    );
+  }
   const corner = soldOutCorner({ topStartReserved, topEndReserved });
   if (corner.v === 'bottom') {
     return (
       <span
-        className={`pointer-events-none absolute z-10 px-2 py-0.5 text-xs font-bold uppercase tracking-normal text-white shadow-sm ${oosPlacementClass('bottom-start')} ${className}`}
-        style={{ backgroundColor: ribbonBg }}
+        className={`pointer-events-none absolute z-10 px-2 py-0.5 text-xs font-bold uppercase tracking-normal shadow-sm ${oosPlacementClass('bottom-start')} ${className}`}
+        style={{ backgroundColor: ribbonBg, color: ribbonInk }}
         data-oos-corner="bottom-start"
         aria-hidden
       >
@@ -489,9 +532,10 @@ export function OutOfStockRibbon({
       aria-hidden
     >
       <span
-        className={`absolute top-[18px] ${corner.h === 'start' ? 'start-[-34px]' : 'end-[-34px]'} w-[160px] py-1 text-center text-xs font-bold uppercase tracking-wider text-white shadow-md`}
+        className={`absolute top-[18px] ${corner.h === 'start' ? 'start-[-34px]' : 'end-[-34px]'} w-[160px] py-1 text-center text-xs font-bold uppercase tracking-wider shadow-md`}
         style={{
           backgroundColor: ribbonBg,
+          color: ribbonInk,
           transform: `rotate(${rotation}deg)`,
         }}
       >
@@ -531,10 +575,11 @@ export function OosImageDim({
 
 /**
  * Sprint 2: helper that decides whether a product should display the
- * NEW badge. Returns true when the merchant explicitly flagged it
- * (`product.isNew === true`) OR when the product was created within
- * the last `NEW_PRODUCT_WINDOW_DAYS` (default 14). Auto-rotation
- * surfaces fresh inventory without merchant intervention.
+ * NEW badge. The badge is the MERCHANT'S choice (Ahmad 2026-10-16, Ruling
+ * D1016-NEW-1): nothing shows unless the store turned it on
+ * (`theme.showNewBadge === true`, default OFF). With it on: the merchant
+ * flagged the product (`product.isNew === true`) OR it was created within the
+ * last `NEW_PRODUCT_WINDOW_DAYS` (default 14).
  *
  * `createdAt` may be absent on synthetic test fixtures — when missing
  * we fall back to the explicit flag only (no auto-rotation), which
@@ -548,8 +593,11 @@ export function isProductNew(
     createdAt?: string | Date | null;
   },
   /** The render clock (`useRenderNow()`), never a fresh read of the time (hydration-safe). */
-  now: number
+  now: number,
+  /** The store theme (`store.theme`): `showNewBadge` is the merchant's switch. Required on purpose. */
+  theme: { showNewBadge?: boolean } | null | undefined
 ): boolean {
+  if (theme?.showNewBadge !== true) return false;
   if (product.isNew === true) return true;
   if (!product.createdAt) return false;
   const created =

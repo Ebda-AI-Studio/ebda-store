@@ -11,7 +11,13 @@ import { prisma, SlugEntityType, withStore } from '@ebda/database';
 import { readInStoreContext } from '../lib/store-scoped-read';
 import { resolveSlugRedirectCached } from '../services/slug-redirect.service';
 import { AppError } from '../middleware/error-handler';
-import { authenticate, optionalAuthenticate, customerUserId } from '../middleware/auth';
+import {
+  authenticate,
+  optionalAuthenticate,
+  customerUserId,
+  rejectImpersonated,
+} from '../middleware/auth';
+import { buyerFromRequest } from '../lib/buyer-identity';
 import { requireFeature } from '../middleware/feature-gate';
 import {
   publicLimiter,
@@ -19,25 +25,47 @@ import {
   storeResolveLimiter,
   cartLimiter,
   writeLimiter,
+  couponAttemptLimiter,
   newsletterLimiter,
   viewIngestLimiter,
 } from '../middleware/security';
+import {
+  queryBudgetSpent,
+  queryBudgetSpentUntil,
+  searcherFromIp,
+} from '../lib/search/embed-budget';
+import { semanticSearchEnabled } from '../lib/search/embedding-provider';
 import { recordProductView } from '../services/view-ingest.service';
 import { claimSearcherSearch, recordSearch } from '../services/search-log.service';
 import { deferAfterTenantCommit } from '../lib/after-tenant-commit';
 import { getStoreIdFromRequest } from '../utils/store-helpers';
+import { assertNotDemoStore } from '../services/plan-limit.service';
 import logger from '../lib/logger';
 import { featureService } from '../services/feature.service';
 import { gateBackorderPayload } from '../lib/effective-inventory';
 import { notificationDispatcher } from '../services/notification-dispatcher.service';
-import { getCached } from '../lib/public-cache';
+import {
+  recordCartEmailConsent,
+  restoreCartIntoSession,
+  cartEmailOptInAvailable,
+} from '../services/cart-email-optin.service';
+import { boundedCacheKey, getCached } from '../lib/public-cache';
 import { storeLookupForHost } from '../lib/store-host';
 import { lookupStore, publicStorePage, type StoreStatusName } from '../lib/definer';
 import { redis } from '../services/redis.service';
 import { previewTokenKey } from '../lib/builder-preview-token';
-import { isReservedSlug, storefrontOrigin, CONTACT_HONEYPOT_FIELD } from '@ebda/shared';
-import { parseOptionalBooleanQuery } from '../lib/query-params';
-import { setEdgeCache } from '../lib/edge-cache';
+import {
+  isReservedSlug,
+  storefrontOrigin,
+  CONTACT_HONEYPOT_FIELD,
+  normalizeArabicSearch,
+} from '@ebda/shared';
+import {
+  assertScalarQuery,
+  parseOptionalBooleanQuery,
+  PUBLIC_PRODUCT_LIST_QUERY_KEYS,
+} from '../lib/query-params';
+import { setEdgeCache, setBuyerPrivate } from '../lib/edge-cache';
 import { buildProductFeed } from '../lib/product-feed';
 import {
   listSellableBundles,
@@ -188,6 +216,8 @@ export const createOrderSchema = z.object({
    * Defaults to false when omitted (no silent opt-in).
    */
   smsOptIn: z.boolean().optional().default(false),
+  /** The total (piastres) the shopper last saw: compared to the server-resolved total, never used to charge. */
+  expectedTotal: z.number().int().min(0).optional(),
 });
 
 // GET /products - List all public products (cached 30s)
@@ -195,6 +225,8 @@ router.get('/products', async (req: Request, res: Response, next: NextFunction) 
   try {
     const { page, limit, category, search, featured, sort, minPrice, maxPrice, cursor, ids } =
       req.query;
+    // Scalars only (M1): an array or `?x[op]=…` object is a 400, never a Prisma operator or a 500.
+    assertScalarQuery(req.query, PUBLIC_PRODUCT_LIST_QUERY_KEYS, ['opt_']);
     const storeId = await getStoreIdFromRequest(req);
     // Tri-state: absent -> undefined (no filter). `featured === 'true'` used
     // to turn an absent param into `featured: false`, which listPublic applied
@@ -225,8 +257,14 @@ router.get('/products', async (req: Request, res: Response, next: NextFunction) 
     }
     const effectiveSearch = rawSearch.length >= 2 ? rawSearch.slice(0, 100) : undefined;
 
+    // `relevance` (Task 12) = the hybrid order of a search; the service treats it as no sort
+    // whenever semantic search is off or there is no search term.
     const sortValue =
-      sort === 'newest' || sort === 'price_asc' || sort === 'price_desc' || sort === 'best_seller'
+      sort === 'newest' ||
+      sort === 'price_asc' ||
+      sort === 'price_desc' ||
+      sort === 'best_seller' ||
+      sort === 'relevance'
         ? sort
         : undefined;
 
@@ -255,7 +293,6 @@ router.get('/products', async (req: Request, res: Response, next: NextFunction) 
     const optionFilters: Record<string, string[]> = {};
     const MAX_OPTION_NAMES = 10;
     const MAX_OPTION_VALUES = 20;
-    let optionFilterKey = '';
     for (const [key, raw] of Object.entries(req.query)) {
       if (!key.startsWith('opt_')) continue;
       if (Object.keys(optionFilters).length >= MAX_OPTION_NAMES) break;
@@ -268,33 +305,70 @@ router.get('/products', async (req: Request, res: Response, next: NextFunction) 
         .slice(0, MAX_OPTION_VALUES);
       if (vals.length > 0) {
         optionFilters[optionName] = vals;
-        optionFilterKey += `${optionName}=${vals.join(',')};`;
       }
     }
     const hasOptionFilters = Object.keys(optionFilters).length > 0;
 
-    // Cache key includes cursor + ids + option filters — different selections get distinct entries.
-    const cacheKey = `public:products:${storeId}:${page || 1}:${limit || 20}:${category || ''}:${
-      effectiveSearch || ''
-    }:${featuredFilter ?? ''}:${sortValue || ''}:${minPrice || ''}:${maxPrice || ''}:${
-      validCursor || ''
-    }:${idsParam?.sort().join(',') ?? ''}:${optionFilterKey}`;
-
-    const result = await getCached(cacheKey, 120, () =>
-      ProductService.listPublic(storeId, {
-        page: page ? parseInt(page as string) : undefined,
-        limit: limit ? parseInt(limit as string) : undefined,
-        category: category as string,
-        search: effectiveSearch,
-        featured: featuredFilter,
-        sort: sortValue,
-        minPrice: minPrice ? parseInt(minPrice as string, 10) : undefined,
-        maxPrice: maxPrice ? parseInt(maxPrice as string, 10) : undefined,
-        cursor: validCursor,
-        ids: idsParam,
-        optionFilters: hasOptionFilters ? optionFilters : undefined,
-      })
+    // The EXACT options the service receives (ids sorted: their order never changes the result).
+    const listOptions: Parameters<typeof ProductService.listPublic>[1] = {
+      page: page ? parseInt(page as string) : undefined,
+      limit: limit ? parseInt(limit as string) : undefined,
+      category: category as string,
+      search: effectiveSearch,
+      featured: featuredFilter,
+      sort: sortValue,
+      minPrice: minPrice ? parseInt(minPrice as string, 10) : undefined,
+      maxPrice: maxPrice ? parseInt(maxPrice as string, 10) : undefined,
+      cursor: validCursor,
+      ids: idsParam?.sort(),
+      optionFilters: hasOptionFilters ? optionFilters : undefined,
+    };
+    // Cache key (Ruling SEARCH-T12-7) = the store + a JSON encoding of exactly those options + the
+    // semantic-search mode. JSON quotes every value, so no value can borrow a delimiter: the old
+    // `a:b:…;name=v,v;` join let `?category=x:y&search=z` and `?category=x&search=y:z` (or
+    // `opt_A=1;B=2` and `opt_A=1&opt_B=2`) share one entry, i.e. one URL could fill another's
+    // cache. The response does not vary by locale (both name and nameAr are returned), so locale
+    // is not part of it. CACHE CLASS: BOUNDED-stale 120 s, busted by invalidateStoreProductCaches
+    // on every product write (prefix `public:products:<storeId>:` kept). A DEGRADED hybrid list
+    // (the vector leg was wanted but unavailable) is never cached under any key (`cacheIf`).
+    // The semantic MODE a search runs in (absent for a list without a search: it never ranks, so a
+    // mode change must not cold-start every list): off, on, or budget-spent (a daily embed budget
+    // is spent until the next Cairo day, SEARCH-T12-10: keyword-only is that mode's full answer).
+    const semanticMode = !effectiveSearch
+      ? undefined
+      : !semanticSearchEnabled()
+        ? 'off'
+        : queryBudgetSpent(storeId)
+          ? 'budget-spent'
+          : 'on';
+    // Long keys (a 100-char Arabic term + option filters) are hashed under the same prefix so they
+    // still fit Workers KV's 512-byte limit and still get busted (`boundedCacheKey`, review M7).
+    const cacheKey = boundedCacheKey(
+      `public:products:${storeId}:`,
+      JSON.stringify({ ...listOptions, semantic: semanticMode })
     );
+
+    const result = await getCached(
+      cacheKey,
+      120,
+      () =>
+        ProductService.listPublic(storeId, {
+          ...listOptions,
+          // The query-embed limit is charged inside the service at the provider call (SEARCH-T12-6).
+          searcher: searcherFromIp(req.ip),
+        }),
+      {
+        // Never cache a degraded list (transient: race lost, provider/SQL error, searcher limit, or
+        // the request that DISCOVERS a spent budget, whose key still says `on`). A budget-spent list
+        // is cached for 120 s only while 120 s remain before the next Cairo day (TTL floor), so no
+        // entry outlives the budget reset.
+        cacheIf: r =>
+          (r as { meta?: { degraded?: boolean } }).meta?.degraded !== true &&
+          (semanticMode !== 'budget-spent' ||
+            queryBudgetSpentUntil(storeId) - Date.now() >= 120_000),
+      }
+    );
+    const ranked = (result as { meta?: { ranked?: boolean } }).meta?.ranked === true;
 
     // First-party search log (search program P0, Task 5): page 1 of a real query only, so
     // paging does not double count; typeahead (/search/suggest) is not logged (keystrokes,
@@ -329,7 +403,11 @@ router.get('/products', async (req: Request, res: Response, next: NextFunction) 
     // sMaxAge 60s + staleWhileRevalidate 300s. BOUNDED-stale by design: the cart and
     // checkout re-read the feature uncached (lineAllowsBackorder) and stay authoritative.
     const backorderOn = await featureService.isFeatureEnabled(storeId, 'inventory.backorder');
-    setEdgeCache(res, { sMaxAge: 60, staleWhileRevalidate: 300 });
+    // A hybrid-ranked list (semantic search on) depends on the mode and on the provider's health at
+    // that moment, which no edge key can see: never shared-cacheable (SEARCH-T12-7). Every other
+    // list keeps the edge policy unchanged.
+    if (ranked) res.setHeader('Cache-Control', 'private, no-store');
+    else setEdgeCache(res, { sMaxAge: 60, staleWhileRevalidate: 300 });
     res.json({
       success: true,
       data: gateBackorderPayload(result, backorderOn),
@@ -581,61 +659,78 @@ router.get('/redirects/resolve', async (req: Request, res: Response, next: NextF
 
 // Cart endpoints (using default store)
 // GET /cart - Get current cart
-router.get('/cart', cartLimiter, async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const sessionId = req.headers['x-session-id'] as string;
-    if (!sessionId) {
-      res.status(400).json({
-        success: false,
-        error: { code: 'MISSING_SESSION', message: 'Session ID required' },
+router.get(
+  '/cart',
+  cartLimiter,
+  optionalAuthenticate,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const sessionId = req.headers['x-session-id'] as string;
+      if (!sessionId) {
+        res.status(400).json({
+          success: false,
+          error: { code: 'MISSING_SESSION', message: 'Session ID required' },
+        });
+        return;
+      }
+
+      const storeId = await getStoreIdFromRequest(req);
+      setBuyerPrivate(res);
+      const cart = await CartService.getOrCreate(
+        storeId,
+        sessionId,
+        undefined,
+        buyerFromRequest(req)
+      );
+
+      res.json({
+        success: true,
+        data: { cart },
       });
-      return;
+    } catch (error) {
+      next(error);
     }
-
-    const storeId = await getStoreIdFromRequest(req);
-    const cart = await CartService.getOrCreate(storeId, sessionId);
-
-    res.json({
-      success: true,
-      data: { cart },
-    });
-  } catch (error) {
-    next(error);
   }
-});
+);
 
 // POST /cart/items - Add item to cart
-router.post('/cart/items', cartLimiter, async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const sessionId = req.headers['x-session-id'] as string;
-    if (!sessionId) {
-      res.status(400).json({
-        success: false,
-        error: { code: 'MISSING_SESSION', message: 'Session ID required' },
+router.post(
+  '/cart/items',
+  cartLimiter,
+  optionalAuthenticate,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const sessionId = req.headers['x-session-id'] as string;
+      if (!sessionId) {
+        res.status(400).json({
+          success: false,
+          error: { code: 'MISSING_SESSION', message: 'Session ID required' },
+        });
+        return;
+      }
+
+      const { productId, quantity, variantId, note } = addCartItemSchema.parse(req.body);
+      const storeId = await getStoreIdFromRequest(req);
+      const cart = await CartService.addItem(
+        storeId,
+        sessionId,
+        productId,
+        quantity,
+        undefined,
+        variantId,
+        note,
+        buyerFromRequest(req)
+      );
+
+      res.json({
+        success: true,
+        data: { cart },
       });
-      return;
+    } catch (error) {
+      next(error);
     }
-
-    const { productId, quantity, variantId, note } = addCartItemSchema.parse(req.body);
-    const storeId = await getStoreIdFromRequest(req);
-    const cart = await CartService.addItem(
-      storeId,
-      sessionId,
-      productId,
-      quantity,
-      undefined,
-      variantId,
-      note
-    );
-
-    res.json({
-      success: true,
-      data: { cart },
-    });
-  } catch (error) {
-    next(error);
   }
-});
+);
 
 // POST /cart/sync - bulk-merge a guest cart into the session cart (post-login
 // migration). Mirrors POST /cart/items but takes an array; uses the existing
@@ -653,29 +748,111 @@ const syncCartSchema = z.object({
     )
     .max(100),
 });
-router.post('/cart/sync', cartLimiter, async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const sessionId = req.headers['x-session-id'] as string;
-    if (!sessionId) {
-      res.status(400).json({
-        success: false,
-        error: { code: 'MISSING_SESSION', message: 'Session ID required' },
-      });
-      return;
+router.post(
+  '/cart/sync',
+  cartLimiter,
+  optionalAuthenticate,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const sessionId = req.headers['x-session-id'] as string;
+      if (!sessionId) {
+        res.status(400).json({
+          success: false,
+          error: { code: 'MISSING_SESSION', message: 'Session ID required' },
+        });
+        return;
+      }
+      const { items } = syncCartSchema.parse(req.body);
+      const storeId = await getStoreIdFromRequest(req);
+      const cart = await CartService.addItems(
+        storeId,
+        sessionId,
+        items,
+        undefined,
+        buyerFromRequest(req)
+      );
+      res.json({ success: true, data: { cart } });
+    } catch (error) {
+      next(error);
     }
-    const { items } = syncCartSchema.parse(req.body);
-    const storeId = await getStoreIdFromRequest(req);
-    const cart = await CartService.addItems(storeId, sessionId, items);
-    res.json({ success: true, data: { cart } });
-  } catch (error) {
-    next(error);
   }
+);
+
+// POST /cart/email-optin - the checkout box "Email me about my cart" (ticked or unticked).
+// Stores the address on this session's cart with a consent time and upserts the store's
+// newsletter subscriber (source 'checkout', scope 'cart_reminders'). Never re-activates an
+// unsubscribed address (CART-CONSENT-1).
+const cartEmailOptInSchema = z.object({
+  email: z.string().trim().max(254),
+  consent: z.boolean(),
+  language: z.enum(['en', 'ar']).optional(),
 });
+router.post(
+  '/cart/email-optin',
+  cartLimiter,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const sessionId = req.headers['x-session-id'] as string;
+      if (!sessionId) {
+        res.status(400).json({
+          success: false,
+          error: { code: 'MISSING_SESSION', message: 'Session ID required' },
+        });
+        return;
+      }
+      const body = cartEmailOptInSchema.parse(req.body);
+      const storeId = await getStoreIdFromRequest(req);
+      const { status } = await recordCartEmailConsent(storeId, sessionId, body);
+      if (status === 'invalid_email') {
+        res
+          .status(400)
+          .json({ success: false, error: { code: 'INVALID_EMAIL', message: 'Invalid email' } });
+        return;
+      }
+      res.json({ success: true, data: { status } });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// POST /cart/restore - the recovery email's button: copy the emailed cart's lines into THIS
+// session's cart. The signed, expiring, store-scoped token is the only capability; the source
+// cart's session id is never returned.
+router.post(
+  '/cart/restore',
+  cartLimiter,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const sessionId = req.headers['x-session-id'] as string;
+      if (!sessionId) {
+        res.status(400).json({
+          success: false,
+          error: { code: 'MISSING_SESSION', message: 'Session ID required' },
+        });
+        return;
+      }
+      const { token } = z.object({ token: z.string().max(200) }).parse(req.body);
+      const storeId = await getStoreIdFromRequest(req);
+      const result = await restoreCartIntoSession(storeId, token, sessionId);
+      if (!result.restored) {
+        res
+          .status(result.reason === 'invalid' ? 400 : 404)
+          .json({ success: false, error: { code: 'CART_LINK_INVALID', message: 'Link expired' } });
+        return;
+      }
+      res.json({ success: true, data: { added: result.added } });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
 
 // PUT /cart/items/:itemId - Update cart item
 router.put(
   '/cart/items/:itemId',
   cartLimiter,
+  optionalAuthenticate,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const sessionId = req.headers['x-session-id'] as string;
@@ -690,7 +867,14 @@ router.put(
       const { itemId } = req.params;
       const { quantity } = updateCartItemSchema.parse(req.body);
       const storeId = await getStoreIdFromRequest(req);
-      const cart = await CartService.updateItem(storeId, sessionId, itemId, quantity);
+      const cart = await CartService.updateItem(
+        storeId,
+        sessionId,
+        itemId,
+        quantity,
+        undefined,
+        buyerFromRequest(req)
+      );
 
       res.json({
         success: true,
@@ -706,6 +890,7 @@ router.put(
 router.delete(
   '/cart/items/:itemId',
   cartLimiter,
+  optionalAuthenticate,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const sessionId = req.headers['x-session-id'] as string;
@@ -719,7 +904,13 @@ router.delete(
 
       const { itemId } = req.params;
       const storeId = await getStoreIdFromRequest(req);
-      const cart = await CartService.removeItem(storeId, sessionId, itemId);
+      const cart = await CartService.removeItem(
+        storeId,
+        sessionId,
+        itemId,
+        undefined,
+        buyerFromRequest(req)
+      );
 
       res.json({
         success: true,
@@ -766,7 +957,8 @@ router.post(
         sessionId,
         data.bundleId,
         data.quantity,
-        customerId
+        customerId,
+        buyerFromRequest(req)
       );
 
       if (!result.ok) {
@@ -817,7 +1009,13 @@ router.delete(
       const { cartBundleId } = req.params;
       const storeId = await getStoreIdFromRequest(req);
       const customerId = customerUserId(req);
-      const cart = await CartService.removeBundle(storeId, sessionId, cartBundleId, customerId);
+      const cart = await CartService.removeBundle(
+        storeId,
+        sessionId,
+        cartBundleId,
+        customerId,
+        buyerFromRequest(req)
+      );
 
       res.json({
         success: true,
@@ -830,28 +1028,33 @@ router.delete(
 );
 
 // DELETE /cart - Clear cart
-router.delete('/cart', cartLimiter, async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const sessionId = req.headers['x-session-id'] as string;
-    if (!sessionId) {
-      res.status(400).json({
-        success: false,
-        error: { code: 'MISSING_SESSION', message: 'Session ID required' },
+router.delete(
+  '/cart',
+  cartLimiter,
+  optionalAuthenticate,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const sessionId = req.headers['x-session-id'] as string;
+      if (!sessionId) {
+        res.status(400).json({
+          success: false,
+          error: { code: 'MISSING_SESSION', message: 'Session ID required' },
+        });
+        return;
+      }
+
+      const storeId = await getStoreIdFromRequest(req);
+      const cart = await CartService.clear(storeId, sessionId, undefined, buyerFromRequest(req));
+
+      res.json({
+        success: true,
+        data: { cart },
       });
-      return;
+    } catch (error) {
+      next(error);
     }
-
-    const storeId = await getStoreIdFromRequest(req);
-    const cart = await CartService.clear(storeId, sessionId);
-
-    res.json({
-      success: true,
-      data: { cart },
-    });
-  } catch (error) {
-    next(error);
   }
-});
+);
 
 // Order endpoints
 // POST /orders - Create order. Guest checkout supported: customerId is
@@ -863,7 +1066,11 @@ router.delete('/cart', cartLimiter, async (req: Request, res: Response, next: Ne
 router.post(
   '/orders',
   optionalAuthenticate,
+  // Design review I5 / I-4: an impersonation session (support, platform super_admin) must not place a real order as the
+  // impersonated customer, least of all at that account's wholesale price.
+  rejectImpersonated,
   writeLimiter,
+  couponAttemptLimiter,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const sessionId = req.headers['x-session-id'] as string;
@@ -894,13 +1101,80 @@ router.post(
         sessionId,
         orderData,
         undefined,
-        { checkoutIp: ipKeyGenerator(req.ip ?? '') || null }
+        { checkoutIp: ipKeyGenerator(req.ip ?? '') || null, buyer: buyerFromRequest(req) }
       );
 
       res.status(201).json({
         success: true,
         data: { order },
       });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// POST /orders/quote - the EXACT total POST /orders would charge for this cart, buyer and inputs (design review I-1).
+// Computed by OrderService.create in dry-run mode, so pricing, MOQ, coupon / promotion eligibility, loyalty, shipping, COD
+// fee and VAT can never drift from the order. Nothing is written and no stock moves. The checkout displays `total` and sends
+// it back as `expectedTotal`, so a buyer who is repriced between this quote and the order (revoked approval, edited tier)
+// gets a 409 PRICE_CHANGED and confirms the new total instead of being charged a number they never saw.
+const quoteOrderSchema = z.object({
+  shippingAddress: z
+    .object({
+      area: z.string().max(120).optional(),
+      governorate: z.string().max(120).optional(),
+      city: z.string().max(120).optional(),
+      state: z.string().max(120).optional(),
+      country: z.string().max(60).optional(),
+      phone: z.string().max(40).optional(),
+      email: z.string().max(255).optional(),
+    })
+    .default({}),
+  paymentMethod: z.string().min(1),
+  couponCode: z.string().trim().min(1).max(50).optional(),
+  pointsToRedeem: z.number().int().min(0).max(100_000_000).optional(),
+});
+router.post(
+  '/orders/quote',
+  optionalAuthenticate,
+  cartLimiter,
+  couponAttemptLimiter,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const sessionId = req.headers['x-session-id'] as string;
+      if (!sessionId) {
+        res.status(400).json({
+          success: false,
+          error: { code: 'MISSING_SESSION', message: 'Session ID required' },
+        });
+        return;
+      }
+      const storeId = await getStoreIdFromRequest(req);
+      const body = quoteOrderSchema.parse(req.body);
+      const quote = await OrderService.quote(
+        storeId,
+        customerUserId(req),
+        sessionId,
+        {
+          shippingAddress: {
+            firstName: '',
+            lastName: '',
+            address1: '',
+            city: '',
+            state: '',
+            postalCode: '',
+            country: 'EG',
+            ...body.shippingAddress,
+          },
+          paymentMethod: body.paymentMethod,
+          couponCode: body.couponCode,
+          pointsToRedeem: body.pointsToRedeem,
+        } as never,
+        buyerFromRequest(req)
+      );
+      setBuyerPrivate(res);
+      res.json({ success: true, data: { quote } });
     } catch (error) {
       next(error);
     }
@@ -1235,17 +1509,22 @@ router.get('/:storeId/search/suggest', async (req: Request, res: Response, next:
       return;
     }
 
+    assertScalarQuery(req.query, ['q']);
     const q = typeof req.query.q === 'string' ? req.query.q : '';
     // Length-cap alongside the >= 2 floor (same class as /products' search:
     // the term is part of the cache key, so an unbounded term is unbounded
     // cache-key cardinality AND an unbounded ILIKE pattern).
     const trimmed = q.trim().slice(0, 100);
-    if (trimmed.length < 2) {
+    if (trimmed.length < 1) {
       res.json({ success: true, data: { suggestions: [] } });
       return;
     }
 
-    const cacheKey = `public:suggest:${storeId}:${trimmed.toLowerCase()}`;
+    // Keyed by exactly what the result depends on: the suggestions are computed from the
+    // Arabic-normalised term only (searchProductIds folds it), so two raw spellings that fold the
+    // same share an entry, and two that fold differently never do (Ruling SEARCH-T12-7: the old
+    // `toLowerCase()` key also folded non-ASCII letters the search does not, e.g. É and é).
+    const cacheKey = `public:suggest:${storeId}:${normalizeArabicSearch(trimmed)}`;
     const result = await getCached(cacheKey, 120, () =>
       ProductService.getSuggestSuggestions(storeId, trimmed, 25)
     );
@@ -1391,7 +1670,7 @@ router.post(
       // Verify the product belongs to this store (ownership guard).
       // Explicit select to avoid fetching unnecessary columns.
       const product = await prisma.product.findFirst({
-        where: { id: productId, storeId, deletedAt: null },
+        where: { id: productId, storeId, deletedAt: null, audience: 'public' },
         select: { id: true },
       });
 
@@ -1678,6 +1957,7 @@ router.get('/stores/:slugOrId', async (req: Request, res: Response, next: NextFu
         // SWR 600; a provider switched on/off shows up within that window.
         // It is display-only — the send gate re-checks everything live.
         smsMarketingOptIn: await notificationDispatcher.isSmsMarketingAvailable(store.id),
+        cartEmailOptIn: await cartEmailOptInAvailable(store.id),
       };
 
       const enabledFeatures = await featureService.getEnabledFeatureKeys(store.id);
@@ -1902,6 +2182,7 @@ router.get(
           ...(await fetchStoreFaqsAndHowtos(store.id)),
           // Keep in lock-step with /stores/:slugOrId (issue 206, same staleness).
           smsMarketingOptIn: await notificationDispatcher.isSmsMarketingAvailable(store.id),
+          cartEmailOptIn: await cartEmailOptInAvailable(store.id),
         };
 
         const locations = await fetchFooterLocations(store);
@@ -1971,6 +2252,8 @@ router.post(
 
       const data = subscribeSchema.parse(req.body);
       const storeId = await getStoreIdFromRequest(req);
+      // Ruling B1-13: the demo showroom keeps no subscriber list.
+      await assertNotDemoStore(storeId);
       const normalizedEmail = data.email.trim().toLowerCase();
 
       const existing = await prisma.newsletterSubscriber.findUnique({
@@ -2243,7 +2526,7 @@ router.post('/contact', writeLimiter, async (req: Request, res: Response, next: 
     if (store.isDemo) {
       throw new AppError(403, 'DEMO_STORE', 'This is a demo store; messages are disabled', {
         messageEn: 'This is a demo store: messages are disabled',
-        messageAr: 'هذا متجر تجريبي — الرسائل مغلقة',
+        messageAr: 'ده متجر تجريبي — الرسائل مقفولة',
       });
     }
 

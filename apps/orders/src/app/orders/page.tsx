@@ -20,7 +20,7 @@ import { OrderCard } from '@/components/OrderCard';
 import { InstallPrompt } from '@/components/InstallPrompt';
 import { EnableNotifications } from '@/components/EnableNotifications';
 import { NewOrderWatcher } from '@/components/NewOrderWatcher';
-import { reportRangeParams } from '@ebda/shared';
+import { reportRangeParams, searchQueryHeaders } from '@ebda/shared';
 
 const POLL_MS = 30_000;
 const PER_PAGE_OPTIONS = [10, 25, 50] as const;
@@ -170,13 +170,12 @@ export default function OrdersListPage() {
         // `paid` is a payment-status filter; applied server-side so it spans
         // every page (it used to refine only the fetched page).
         if (filter === 'paid') qs.set('paymentStatus', 'paid');
-        if (debouncedSearch) qs.set('search', debouncedSearch);
 
         const { data, error: apiError } = await apiGet<{
           orders: Order[];
           meta?: Pagination;
           pagination?: Pagination;
-        }>(`/api/v1/stores/${selectedStoreId}/orders?${qs}`);
+        }>(`/api/v1/stores/${selectedStoreId}/orders?${qs}`, searchQueryHeaders(debouncedSearch));
         if (!isLatest()) return;
 
         if (apiError) {

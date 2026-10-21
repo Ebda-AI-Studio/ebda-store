@@ -162,7 +162,7 @@ export async function assertAnalyticsTier(
   if (!e) throw new AppError(404, 'STORE_NOT_FOUND', 'Store not found');
   if (ANALYTICS_TIER_RANK[e.limits.analyticsTier] >= ANALYTICS_TIER_RANK[min]) return;
   const messageEn = `${min === 'advanced' ? 'Advanced' : 'Standard'} analytics are not included in your plan. Upgrade to unlock them.`;
-  const messageAr = `${min === 'advanced' ? 'التحليلات المتقدمة' : 'التحليلات القياسية'} غير متاحة في باقتك. قم بالترقية لفتحها.`;
+  const messageAr = `${min === 'advanced' ? 'التحليلات المتقدمة' : 'التحليلات القياسية'} مش متاحة في باقتك. اعمل ترقية لباقتك عشان تفتحها.`;
   throw new AppError(402, PLAN_LIMIT_ERROR_CODE, messageEn, {
     limitKey: 'analyticsTier',
     limit: e.limits.analyticsTier,
@@ -230,7 +230,7 @@ export async function assertOrderAllowed(storeId: string): Promise<void> {
   if (row.isDemo) {
     throw new AppError(403, 'DEMO_STORE', 'This is a demo store; orders are disabled', {
       messageEn: 'This is a demo store: ordering is disabled',
-      messageAr: 'هذا متجر تجريبي — الطلبات مغلقة',
+      messageAr: 'ده متجر تجريبي — الطلبات مقفولة',
     });
   }
   const e = await getEntitlements(storeId);
@@ -259,6 +259,24 @@ export async function assertOrderAllowed(storeId: string): Promise<void> {
   }
   // Recover a missed post-commit notification; its atomic claim starts grace once.
   if (sub?.ordersOverLimitMonth?.getTime() !== monthKey.getTime()) await noteOrderCreated(storeId);
+}
+
+/**
+ * Ruling B1-13: the showroom (`stores.is_demo`) collects no visitor PII. Refuses customer register
+ * (with a storeId), newsletter subscribe, the contact form, affiliate applications and push
+ * subscriptions with the same 403 `DEMO_STORE` shape as `assertOrderAllowed`. An unknown store id
+ * is not this guard's business: the caller keeps its own not-found behaviour.
+ */
+export async function assertNotDemoStore(storeId: string): Promise<void> {
+  const row = await withStore(storeId, tx =>
+    tx.store.findUnique({ where: { id: storeId }, select: { isDemo: true } })
+  );
+  if (row?.isDemo) {
+    throw new AppError(403, 'DEMO_STORE', 'This is a demo store; this action is disabled', {
+      messageEn: 'This is a demo store: this is turned off here',
+      messageAr: 'ده متجر تجريبي — الخاصية دي مقفولة هنا',
+    });
+  }
 }
 
 /** Records first over-limit time and notifies the merchant once per month. */
