@@ -377,3 +377,106 @@ describe('property (seeded)', () => {
     }
   });
 });
+
+describe('Ruling B2B-20: a shortfall the floor swallowed is carried forward and collected once', () => {
+  /** One return of `returning` units after `returnedBefore`, with what earlier returns retained and carried. */
+  const step = (returnedBefore: number, returning: number, retained: number, carried: number) => {
+    const l = line({ returnedBefore, returning });
+    const r = productReturnAdjustment(
+      [l],
+      [{ key: 'i', lineKey: l.key, returning }],
+      retained,
+      carried
+    );
+    return { ...r, item: r.items[0]! };
+  };
+
+  it('the ruling example: buy 100 @ 80 (tier 100+), return 10 then 80 -> the merchant loses 0 (was 200)', () => {
+    const r1 = step(0, 10, 0, 0);
+    // raw 1800 (90 kept at 100), the 800 refund floors at 0, 1000 is carried forward
+    expect(r1).toMatchObject({ rawAdjustment: 1800, applied: 800, carriedIn: 0, shortfall: 1000 });
+    expect(r1.item.adjustedRefund).toBe(0);
+    const r2 = step(10, 80, r1.applied, r1.shortfall);
+    // raw -1600 (10 kept at 100 instead of 90), + 1000 carried = -600 released of the 800 retained
+    expect(r2).toMatchObject({
+      rawAdjustment: -1600,
+      carriedIn: 1000,
+      applied: -600,
+      shortfall: 0,
+    });
+    expect(r2.item.adjustedRefund).toBe(7000);
+    // the 10 kept cost 100 each: 8000 paid - 1000 = 7000 refunded in total
+    expect(r1.item.adjustedRefund + r2.item.adjustedRefund).toBe(7000);
+  });
+
+  it('three steps: 10, 5, 75 -> refunds 0 + 0 + 7000, the carry shrinks 1000 -> 500 -> 0', () => {
+    const r1 = step(0, 10, 0, 0);
+    const r2 = step(10, 5, r1.applied, r1.shortfall);
+    // raw -100, + 1000 carried = 900 > the 400 standard: floored again, 500 still carried
+    expect(r2).toMatchObject({
+      rawAdjustment: -100,
+      carriedIn: 1000,
+      applied: 400,
+      shortfall: 500,
+    });
+    expect(r2.item.adjustedRefund).toBe(0);
+    const r3 = step(15, 75, r1.applied + r2.applied, r2.shortfall);
+    expect(r3).toMatchObject({
+      rawAdjustment: -1500,
+      carriedIn: 500,
+      applied: -1000,
+      shortfall: 0,
+    });
+    expect(r1.item.adjustedRefund + r2.item.adjustedRefund + r3.item.adjustedRefund).toBe(7000);
+  });
+
+  it('the carry is consumed exactly once: the release of the last units hands back only what was retained, never the carry', () => {
+    const r1 = step(0, 10, 0, 0);
+    const last = step(10, 90, r1.applied, r1.shortfall);
+    // raw -1800 + 1000 carried = -800 == the 800 retained: everything paid comes back, nothing more
+    expect(last).toMatchObject({
+      rawAdjustment: -1800,
+      applied: -800,
+      shortfall: 0,
+      reason: 'released',
+    });
+    expect(r1.item.adjustedRefund + last.item.adjustedRefund).toBe(8000);
+  });
+
+  it('the B2B-14 release clamp still holds with a carry: a release never exceeds what was retained', () => {
+    // 1000 carried but only 300 retained (a waiver lowered it): the final release is clamped to 300
+    const r = step(10, 90, 300, 0);
+    expect(r.applied).toBe(-300);
+    // with a carry larger than the raw release, the effective value is a charge, floored at the standard refund
+    const c = step(10, 1, 800, 5000);
+    // raw -20 (89 kept), + 5000 carried = 4980: 80 collected, 4900 still carried
+    expect(c).toMatchObject({ rawAdjustment: -20, applied: 80, shortfall: 4900 });
+    expect(c.item.adjustedRefund).toBe(0);
+  });
+
+  it('a carry never charges the buyer: every refund stays >= 0 and sum(applied) + carry == the single-shot clawback', () => {
+    let seed = 7;
+    const rnd = (n: number) => {
+      seed = (seed * 1103515245 + 12345) % 2147483648;
+      return seed % n;
+    };
+    for (let t = 0; t < 300; t++) {
+      let before = 0;
+      let retained = 0;
+      let carried = 0;
+      while (before < 100) {
+        const returning = 1 + rnd(Math.min(30, 100 - before));
+        const r = step(before, returning, retained, carried);
+        expect(r.item.adjustedRefund).toBeGreaterThanOrEqual(0);
+        expect(r.applied).toBeGreaterThanOrEqual(-retained);
+        before += returning;
+        retained += r.applied;
+        carried = r.shortfall;
+        const single = one({ returning: before });
+        expect(retained + carried).toBe(single.rawAdjustment);
+      }
+      expect(retained).toBe(0);
+      expect(carried).toBe(0);
+    }
+  });
+});

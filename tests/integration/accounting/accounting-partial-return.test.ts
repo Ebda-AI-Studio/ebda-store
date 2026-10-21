@@ -418,10 +418,11 @@ describe.skipIf(!hasDb)('partial-return pro-rata GL adjustment', () => {
       refundKey: ret.id,
       items: items.map(i => ({ orderItemId: i.orderItemId, quantity: i.quantity })),
     });
-    const entry = await prisma.journalEntry.findFirstOrThrow({
+    // A zero refund (the floor bit, Ruling B2B-20) posts no cash entry; every other case asserts a non-zero cash credit.
+    const entry = (await prisma.journalEntry.findFirst({
       where: { storeId, source: 'order', sourceId: `${orderId}:partial:${ret.id}` },
       include: { lines: true },
-    });
+    })) ?? { lines: [] as Array<{ accountId: string; debit: number; credit: number }> };
     const adj = await prisma.returnItem.aggregate({
       where: { returnId: ret.id },
       _sum: { tierAdjustment: true },
@@ -465,6 +466,28 @@ describe.skipIf(!hasDb)('partial-return pro-rata GL adjustment', () => {
     // release 1000 on A2 (4000 + 1000) + B 1000 - its 200 coupon
     expect(r2).toMatchObject({ refund: 5800, cash: 5800, adjustment: -1000 });
     expect(r1.cash + r2.cash).toBe(8800);
+  });
+
+  it('B2B-20 in the GL: return 1 of 5 + 5 (tier 10+) -> refund 0 and 1000 carried; 4 more -> the carry is collected (3000, was 4000); the rest -> cash credits == refunds == 8800', async () => {
+    const { order, a1, a2, b } = await seedTierOrder('B220');
+    await postOrderPaymentJournal({ orderId: order.id });
+    const r1 = await completeAndPost(order.id, [
+      { orderItemId: a1.id, productId: productAId, quantity: 1 },
+    ]);
+    // 9 kept < 10: raw 1800, the 800 refund floors at 0, 1000 carried forward
+    expect(r1).toEqual({ refund: 0, cash: 0, revenue: 0, adjustment: 800 });
+    const r2 = await completeAndPost(order.id, [
+      { orderItemId: a1.id, productId: productAId, quantity: 4 },
+    ]);
+    // 5 kept: raw -800 + 1000 carried = 200 collected from the 3200 standard refund
+    expect(r2).toEqual({ refund: 3000, cash: 3000, revenue: 3000, adjustment: 200 });
+    const r3 = await completeAndPost(order.id, [
+      { orderItemId: a2.id, productId: productAId, quantity: 5 },
+      { orderItemId: b.id, productId: productBId, quantity: 1 },
+    ]);
+    // release the 1000 retained on A (4000 + 1000) + B 1000 less its 200 coupon
+    expect(r3).toMatchObject({ refund: 5800, cash: 5800, adjustment: -1000 });
+    expect(r1.cash + r2.cash + r3.cash).toBe(8800);
   });
 
   it('posts a balanced pro-rata adjustment for a partial return, mirroring full-refund conventions', async () => {

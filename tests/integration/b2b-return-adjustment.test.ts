@@ -288,7 +288,14 @@ describe.skipIf(!hasDb)('B2B Task 8b: tier-aware partial returns', () => {
     ).rejects.toMatchObject({ code: 'OVERRIDE_NOT_APPLICABLE' });
   });
 
-  it('cumulative: 10 back (floor bites, nothing retained beyond the 800 refund), then 80 back releases only what was retained; the buyer is never refunded more than paid', async () => {
+  /** Sum of a return's persisted carry deltas (Ruling B2B-20). */
+  const carryOf = async (returnId: string) =>
+    (await prisma.returnItem.aggregate({ where: { returnId }, _sum: { tierCarry: true } }))._sum
+      .tierCarry ?? 0;
+
+  // Ruling B2B-20 replaced the old pin here (7200: the 1000 the floor swallowed on the first return was never collected, so
+  // the buyer kept 10 units at 80 instead of 100 and the merchant lost 200).
+  it('B2B-20 cumulative: 10 back (floor bites, 1000 carried), then 80 back -> the carry is collected first: refunds total 7000, the merchant loses 0', async () => {
     const o = await makeOrder({ tax: 0 });
     vi.spyOn(OrderService, 'applyRefundEffects').mockResolvedValue(undefined);
     const r1 = await makeReturn(o.orderId, o.itemId, 10);
@@ -298,18 +305,113 @@ describe.skipIf(!hasDb)('B2B Task 8b: tier-aware partial returns', () => {
       adjustment: 800,
       adjustedRefund: 0,
       shortfall: 1000,
+      carriedIn: 0,
     });
     await ReturnService.complete(storeId, r1.id, 'staff-1', 'cash');
+    expect(await carryOf(r1.id)).toBe(1000);
     const r2 = await makeReturn(o.orderId, o.itemId, 80);
     const p2 = await ReturnService.refundPreview(storeId, r2.id);
     expect(p2.lines[0]).toMatchObject({
       standardRefund: 6400,
-      adjustment: -800,
-      adjustedRefund: 7200,
+      adjustment: -600,
+      adjustedRefund: 7000,
+      carriedIn: 1000,
+      shortfall: 0,
     });
     const done2 = await ReturnService.complete(storeId, r2.id, 'staff-1', 'cash');
+    expect(await carryOf(r2.id)).toBe(-1000); // consumed, exactly once
     const first = await prisma.return.findUniqueOrThrow({ where: { id: r1.id } });
-    expect(first.refundAmount + done2.refundAmount).toBe(7200); // 90 units x 80, exactly what was paid for them
+    // 8000 paid; the 10 kept cost 100 each without the tier -> 7000 back
+    expect(first.refundAmount + done2.refundAmount).toBe(7000);
+  });
+
+  it('B2B-20 three steps: 10, 5, 75 -> 0, 0, 7000; the shopper estimate of the last return reflects the carry', async () => {
+    const o = await makeOrder({ tax: 0 });
+    vi.spyOn(OrderService, 'applyRefundEffects').mockResolvedValue(undefined);
+    const r1 = await makeReturn(o.orderId, o.itemId, 10);
+    const d1 = await ReturnService.complete(storeId, r1.id, 'staff-1', 'cash');
+    const r2 = await makeReturn(o.orderId, o.itemId, 5);
+    const p2 = await ReturnService.refundPreview(storeId, r2.id);
+    // raw -100 + 1000 carried = 900 > the 400 standard: floored again, 500 still carried
+    expect(p2.lines[0]).toMatchObject({
+      adjustment: 400,
+      adjustedRefund: 0,
+      carriedIn: 1000,
+      shortfall: 500,
+    });
+    const d2 = await ReturnService.complete(storeId, r2.id, 'staff-1', 'cash');
+    expect(await carryOf(r2.id)).toBe(-500);
+    const est = await ReturnService.create(storeId, {
+      orderId: o.orderId,
+      customerId,
+      type: 'refund',
+      reason: 'defective',
+      items: [{ orderItemId: o.itemId, productId, productName: 'tier-product', quantity: 75 }],
+    });
+    expect(est.refundAmount).toBe(7000); // without the carry the shopper would be told 7500
+    await withRlsBypass(tx =>
+      tx.return.update({ where: { id: est.id }, data: { status: 'received' } })
+    );
+    const d3 = await ReturnService.complete(storeId, est.id, 'staff-1', 'cash');
+    expect([d1.refundAmount, d2.refundAmount, d3.refundAmount]).toEqual([0, 0, 7000]);
+    expect((await carryOf(r1.id)) + (await carryOf(r2.id)) + (await carryOf(est.id))).toBe(0);
+  });
+
+  it('B2B-20 waiver: an override (orders:refund) on a later return waives the carry; it is persisted on the item, reported for the audit log, and never re-claimed', async () => {
+    const o = await makeOrder({ tax: 0 });
+    vi.spyOn(OrderService, 'applyRefundEffects').mockResolvedValue(undefined);
+    const r1 = await makeReturn(o.orderId, o.itemId, 10);
+    await ReturnService.complete(storeId, r1.id, 'staff-1', 'cash');
+    const r2 = await makeReturn(o.orderId, o.itemId, 5);
+    const itemId = r2.items[0]!.id;
+    const done2 = await ReturnService.complete(storeId, r2.id, 'staff-9', 'cash', {
+      [itemId]: { amountMinor: 400, reason: 'goodwill waiver' },
+    });
+    expect(done2.refundAmount).toBe(400);
+    // the 500 that would have been carried is waived: reported to the route's audit log with the override
+    expect(done2.tierCarryWaived).toBe(500);
+    expect(await prisma.returnItem.findFirstOrThrow({ where: { returnId: r2.id } })).toMatchObject({
+      tierAdjustment: 0,
+      tierCarry: -1000,
+      adjustmentOverridden: true,
+      adjustmentOverrideBy: 'staff-9',
+    });
+    // the last 75: no carry left, only the 800 retained comes back on the release (B2B-15: a waiver is never re-claimed)
+    const r3 = await makeReturn(o.orderId, o.itemId, 75);
+    const p3 = await ReturnService.refundPreview(storeId, r3.id);
+    expect(p3.lines[0]).toMatchObject({ carriedIn: 0, adjustment: -800, adjustedRefund: 6800 });
+  });
+
+  it('B2B-20 + the B2B-14 release clamp: returning every last unit after a carry refunds exactly what was paid, never more', async () => {
+    const o = await makeOrder({ tax: 0 });
+    vi.spyOn(OrderService, 'applyRefundEffects').mockResolvedValue(undefined);
+    const r1 = await makeReturn(o.orderId, o.itemId, 10);
+    const d1 = await ReturnService.complete(storeId, r1.id, 'staff-1', 'cash');
+    const r2 = await makeReturn(o.orderId, o.itemId, 90);
+    const p2 = await ReturnService.refundPreview(storeId, r2.id);
+    // raw -1800 + 1000 carried = -800, exactly the 800 retained: nothing beyond what was paid
+    expect(p2.lines[0]).toMatchObject({
+      adjustment: -800,
+      adjustedRefund: 8000,
+      reason: 'released',
+    });
+    const d2 = await ReturnService.complete(storeId, r2.id, 'staff-1', 'cash');
+    expect(d1.refundAmount + d2.refundAmount).toBe(8000);
+    expect((await carryOf(r1.id)) + (await carryOf(r2.id))).toBe(0);
+  });
+
+  it('B2B-20 through the gateway: the provider is sent the carried-adjusted amount', async () => {
+    const o = await makeOrder({ tax: 0, payment: 8000 });
+    vi.spyOn(OrderService, 'applyRefundEffects').mockResolvedValue(undefined);
+    const r1 = await makeReturn(o.orderId, o.itemId, 10);
+    await ReturnService.complete(storeId, r1.id, 'staff-1', 'cash');
+    const refund = vi
+      .spyOn(PaymentService, 'refund')
+      .mockResolvedValue({ refundId: 'r', status: 'pending' } as never);
+    const r2 = await makeReturn(o.orderId, o.itemId, 80);
+    const done = await ReturnService.complete(storeId, r2.id, 'staff-1', 'gateway');
+    expect(refund.mock.calls[0]![0]).toMatchObject({ amount: 7000, itemLevel: true });
+    expect(done.refundAmount).toBe(7000);
   });
 
   // ---- Ruling B2B-17 / B2B-18 (final review P1-1, P1-2, P2-1) -------------------------------------------------------

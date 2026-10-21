@@ -23,6 +23,8 @@ export interface TierAdjustmentLine {
   adjustment: number;
   adjustedRefund: number;
   shortfall: number;
+  /** Ruling B2B-20: a shortfall an earlier return of this product carried forward, collected first by this one. */
+  carriedIn: number;
   keptUnitMinor: number;
   reason: 'none' | 'kept_below_tier' | 'released';
   overridden: boolean;
@@ -341,6 +343,11 @@ export function RefundMethodModal({
                                 })
                               : t(`tierAdjustment.reason.${l.reason}`)}
                         </p>
+                        {l.carriedIn > 0 && !l.overridden && (
+                          <p className="mt-1 text-xs text-muted-foreground">
+                            {t('tierAdjustment.carried', { amount: formatCurrency(l.carriedIn) })}
+                          </p>
+                        )}
                         {l.shortfall > 0 && !l.overridden && (
                           <p className="mt-1 text-xs text-warning-ink">
                             {t('tierAdjustment.shortfall', { amount: formatCurrency(l.shortfall) })}

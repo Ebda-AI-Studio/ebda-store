@@ -99,8 +99,14 @@ export interface ReturnLineAdjustment {
   /** Signed piastres the refund is reduced by AFTER the floor and any override (what is persisted). */
   adjustment: number;
   adjustedRefund: number;
-  /** What the floor at 0 swallowed (reported, never charged to the buyer). */
+  /** What the floor at 0 swallowed (never charged to the buyer), carried to the product's next return (Ruling B2B-20). */
   shortfall: number;
+  /** The shortfall earlier returns of this product carried forward and this return collects first (B2B-20). */
+  carriedIn: number;
+  /** Signed change to the product's carry, persisted as `return_items.tier_carry` (+ carried, - consumed or waived). */
+  carryDelta: number;
+  /** What an override on this product's items waived of the carry (B2B-20; audit-logged with the override). */
+  carryWaived: number;
   keptUnitMinor: number;
   reason: 'none' | 'kept_below_tier' | 'released';
   overridden: boolean;
@@ -1108,6 +1114,7 @@ export class ReturnService {
           where: { id: l.returnItemId },
           data: {
             tierAdjustment: l.adjustment,
+            tierCarry: l.carryDelta,
             adjustmentOverridden: l.overridden,
             adjustmentOverrideReason: l.overrideReason,
             adjustmentOverrideBy: l.overridden ? _userId : null,
@@ -1185,7 +1192,11 @@ export class ReturnService {
         }
       }
 
-      return updatedReturn;
+      // Ruling B2B-20: what an override waived of a carried shortfall, for the route's audit log (0 when nothing was waived).
+      return {
+        ...updatedReturn,
+        tierCarryWaived: tierAdj.lines.reduce((n, l) => n + l.carryWaived, 0),
+      };
     } catch (err) {
       // RELEASE the claim so a failure does not strand the return — but ONLY
       // when no money can have moved. Once the provider refund has (or may
@@ -1423,7 +1434,7 @@ export class ReturnService {
             ...(returnId ? { id: { not: returnId } } : {}),
           },
         },
-        select: { orderItemId: true, tierAdjustment: true },
+        select: { orderItemId: true, tierAdjustment: true, tierCarry: true },
       }),
     ]);
     return ReturnService.lineAdjustmentsFrom(orderItems, prevQty, retainedRows, items, overrides);
@@ -1433,7 +1444,7 @@ export class ReturnService {
   static lineAdjustmentsFrom(
     orderItems: readonly AdjustmentLine[],
     prevQty: ReadonlyMap<string, number>,
-    retainedRows: ReadonlyArray<{ orderItemId: string; tierAdjustment: number }>,
+    retainedRows: ReadonlyArray<{ orderItemId: string; tierAdjustment: number; tierCarry: number }>,
     items: Array<{ id: string; orderItemId: string; quantity: number; productName: string }>,
     overrides: RefundOverrides = {}
   ): { lines: ReturnLineAdjustment[]; total: number } {
@@ -1464,17 +1475,29 @@ export class ReturnService {
     }
 
     const retainedByProduct = new Map<string, number>();
+    // Ruling B2B-20: the shortfall earlier returns carried forward, net of what later ones consumed or an override waived.
+    const carriedByProduct = new Map<string, number>();
     for (const r of retainedRows) {
       const oi = lineById.get(r.orderItemId);
       const scope = oi ? scopeOf(oi) : null;
-      if (scope !== null)
+      if (scope !== null) {
         retainedByProduct.set(scope, (retainedByProduct.get(scope) ?? 0) + r.tierAdjustment);
+        carriedByProduct.set(scope, (carriedByProduct.get(scope) ?? 0) + r.tierCarry);
+      }
     }
 
     // One product-scope computation per product on this return.
     const perItem = new Map<
       string,
-      { adjustment: number; keptUnitMinor: number; keptQty: number; shortfall: number }
+      {
+        adjustment: number;
+        keptUnitMinor: number;
+        keptQty: number;
+        shortfall: number;
+        carriedIn: number;
+        carryDelta: number;
+        carryWaived: number;
+      }
     >();
     const products = new Set<string>();
     for (const it of items) {
@@ -1507,15 +1530,23 @@ export class ReturnService {
         scopeItems
           .filter(it => lineById.get(it.orderItemId)!.bundleGroupId === null)
           .map(it => ({ key: it.id, lineKey: it.orderItemId, returning: returningOf.get(it.id)! })),
-        retainedByProduct.get(productId) ?? 0
+        retainedByProduct.get(productId) ?? 0,
+        Math.max(0, carriedByProduct.get(productId) ?? 0)
       );
+      // An override on any of this product's items replaces the computed refund, the carry included: the carry is
+      // WAIVED, never re-claimed by a later return (Rulings B2B-15, B2B-20).
+      const waived = scopeItems.some(it => overrides[it.id] !== undefined);
+      const carryOut = waived ? 0 : res.shortfall;
       res.items.forEach((r, i) =>
         perItem.set(r.key, {
           adjustment: r.adjustment,
           keptUnitMinor: r.keptUnitMinor,
           keptQty: res.keptQty,
-          // Reported once per product (on its first item), so a merchant summing the lines never doubles it.
-          shortfall: i === 0 ? res.shortfall : 0,
+          // Reported and persisted once per product (on its first item), so a sum over the items never doubles it.
+          shortfall: i === 0 ? carryOut : 0,
+          carriedIn: i === 0 ? res.carriedIn : 0,
+          carryDelta: i === 0 ? carryOut - res.carriedIn : 0,
+          carryWaived: i === 0 && waived ? res.shortfall : 0,
         })
       );
     }
@@ -1532,6 +1563,9 @@ export class ReturnService {
         keptUnitMinor: oi.price,
         keptQty: oi.quantity - (running.get(oi.id) ?? 0),
         shortfall: 0,
+        carriedIn: 0,
+        carryDelta: 0,
+        carryWaived: 0,
       };
       let adjustment = computed.adjustment;
       let overridden = false;
@@ -1564,7 +1598,10 @@ export class ReturnService {
         standardRefund,
         adjustment,
         adjustedRefund: standardRefund - adjustment,
-        shortfall: overridden ? 0 : computed.shortfall,
+        shortfall: computed.shortfall,
+        carriedIn: computed.carriedIn,
+        carryDelta: computed.carryDelta,
+        carryWaived: computed.carryWaived,
         keptUnitMinor: computed.keptUnitMinor,
         // From the APPLIED adjustment (review minor 3): a release clamped to nothing is not reported as "released".
         reason: adjustment > 0 ? 'kept_below_tier' : adjustment < 0 ? 'released' : 'none',

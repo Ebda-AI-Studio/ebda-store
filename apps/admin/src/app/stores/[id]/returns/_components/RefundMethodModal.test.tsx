@@ -224,6 +224,7 @@ describe('RefundMethodModal: tier adjustment (B2B Task 8b)', () => {
     adjustment: 20000,
     adjustedRefund: 700000,
     shortfall: 0,
+    carriedIn: 0,
     keptUnitMinor: 10000,
     reason: 'kept_below_tier',
     overridden: false,
@@ -265,6 +266,16 @@ describe('RefundMethodModal: tier adjustment (B2B Task 8b)', () => {
     expect(box.textContent).toContain('"kept":10');
     expect(box.textContent).toContain('"tier":100');
     expect(box.textContent).not.toMatch(/[٠-٩]/);
+  });
+
+  it('Ruling B2B-20: a carry collected here and a shortfall carried onward are both shown', async () => {
+    withLines([{ ...LINE, carriedIn: 100000, shortfall: 50000 }]);
+    await toConfirm();
+    const box = screen.getByTestId('tier-adjustment');
+    expect(box.textContent).toContain('tierAdjustment.carried');
+    expect(box.textContent).toContain('1,000.00');
+    expect(box.textContent).toContain('tierAdjustment.shortfall');
+    expect(box.textContent).toContain('500.00');
   });
 
   it('is absent when no line is tier-priced (a plain partial return looks exactly as before)', async () => {

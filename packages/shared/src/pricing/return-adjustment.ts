@@ -22,6 +22,11 @@
  *        product's earlier returns actually retained (`retained`), so the sum of refunds can not exceed what was paid
  *   allocated by each item's standard refund (paid unit x units returned), largest remainder, so the integers sum exactly.
  *
+ * CARRY (Ruling B2B-20). What the floor swallowed is not lost: it is carried forward (`shortfall`) and the product's next
+ * return adds it to its raw adjustment BEFORE the floor and the release clamp (`carried`). So a release first cancels the
+ * carry and only then hands back what was retained, and a charge collects the carry from that return's refund, never below
+ * 0. Without overrides `retained + shortfall == clawback(kept now)` after every return: the carry is consumed exactly once.
+ *
  * 'group', 'base', a missing snapshot and a missing ladder are never repriced (their kept units cost what they were paid).
  */
 
@@ -86,11 +91,13 @@ export interface ReturnItemAdjustment {
 export interface ProductReturnAdjustment {
   /** Units of the product the buyer keeps after this return (the quantity the tier is judged on). */
   keptQty: number;
-  /** clawback(after) - clawback(before), before the floor and the release clamp. */
+  /** clawback(after) - clawback(before), before the carry, the floor and the release clamp. */
   rawAdjustment: number;
+  /** The shortfall earlier returns of this product carried forward, added to `rawAdjustment` here (Ruling B2B-20). */
+  carriedIn: number;
   /** What is actually applied across this return's items (sum of their `adjustment`). */
   applied: number;
-  /** What the floor at 0 swallowed; > 0 only when the raw adjustment exceeds the items' standard refund. */
+  /** What the floor at 0 swallowed (carry included); carried forward to the product's next return (Ruling B2B-20). */
   shortfall: number;
   reason: 'none' | 'kept_below_tier' | 'released';
   items: ReturnItemAdjustment[];
@@ -154,12 +161,15 @@ function allocate(amount: number, weights: readonly number[]): number[] {
  * @param items   This return's items of that product (each names a line).
  * @param retained What this product's earlier completed returns retained in total (signed sum of their persisted
  *                 adjustments); bounds a release.
+ * @param carried  The shortfall this product's earlier returns carried forward and nothing has consumed yet (Ruling B2B-20).
  */
 export function productReturnAdjustment(
   lines: readonly ReturnLineInput[],
   items: readonly ReturnItemShare[],
-  retained: number
+  retained: number,
+  carried = 0
 ): ProductReturnAdjustment {
+  assertInt('carried', carried, 0);
   const byKey = new Map<string, ReturnLineInput>();
   for (const l of lines) {
     if (byKey.has(l.key)) throw new RangeError(`productReturnAdjustment: duplicate line ${l.key}`);
@@ -230,16 +240,19 @@ export function productReturnAdjustment(
   const sAfter = sums(true);
   const standards = items.map(it => byKey.get(it.lineKey)!.paidUnitMinor * it.returning);
   const standardTotal = standards.reduce((a, b) => a + b, 0);
+  // The carry is collected first (B2B-20): a release cancels it before handing anything back, a charge adds it.
+  const effective = rawAdjustment + carried;
   const applied =
-    rawAdjustment >= 0
-      ? Math.min(rawAdjustment, standardTotal)
-      : Math.max(rawAdjustment, 0 - Math.max(0, retained)); // `0 -`, not unary minus: never -0
+    effective >= 0
+      ? Math.min(effective, standardTotal)
+      : Math.max(effective, 0 - Math.max(0, retained)); // `0 -`, not unary minus: never -0
   const shares = allocate(applied, standards);
   return {
     keptQty: sAfter.product,
     rawAdjustment,
+    carriedIn: carried,
     applied,
-    shortfall: Math.max(0, rawAdjustment - standardTotal),
+    shortfall: Math.max(0, effective - standardTotal),
     // From the APPLIED value: a release clamped to nothing is not a release (review minor 3).
     reason: applied > 0 ? 'kept_below_tier' : applied < 0 ? 'released' : 'none',
     items: items.map((it, i) => ({

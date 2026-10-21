@@ -514,6 +514,10 @@ router.post(
           ...(Object.keys(refundOverrides).length > 0
             ? { refundOverrides, overriddenBy: req.user!.userId }
             : {}),
+          // Ruling B2B-20: a carried tier shortfall the override waived (never re-claimed later).
+          ...(returnRequest.tierCarryWaived > 0
+            ? { tierCarryWaived: returnRequest.tierCarryWaived }
+            : {}),
         },
         ip: req.ip,
         userAgent: req.headers['user-agent'],

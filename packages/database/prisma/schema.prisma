@@ -2225,6 +2225,10 @@ model ReturnItem {
   adjustmentOverridden     Boolean @default(false) @map("adjustment_overridden")
   adjustmentOverrideReason String? @map("adjustment_override_reason")
   adjustmentOverrideBy     String? @map("adjustment_override_by")
+  /// Ruling B2B-20: signed change this return made to its product's carried-forward shortfall (what the floor at 0 could not
+  /// collect): + carried, - consumed or waived. On the product's first item of the return; the sum over completed returns is
+  /// the carry the next return collects first.
+  tierCarry                Int     @default(0) @map("tier_carry")
 
   return    Return    @relation(fields: [returnId], references: [id], onDelete: Cascade)
   orderItem OrderItem @relation(fields: [orderItemId], references: [id], onDelete: Cascade)

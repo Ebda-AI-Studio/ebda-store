@@ -4458,7 +4458,8 @@
         "override": "Override this refund",
         "overrideAmount": "Refund amount",
         "overrideReason": "Reason (required)",
-        "shortfall": "The adjustment is larger than this refund, so the refund is 0. {amount} is not charged to the customer.",
+        "shortfall": "The adjustment is larger than this refund, so the refund is 0. {amount} is not charged now: it is taken from this product's next refund on the order, and never below 0.",
+        "carried": "Includes {amount} carried from an earlier return of this product that refunded 0.",
         "reason": {
           "none": "No adjustment.",
           "released": "An earlier adjustment on this item is released.",
