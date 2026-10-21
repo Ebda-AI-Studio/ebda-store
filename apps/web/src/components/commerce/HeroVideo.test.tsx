@@ -165,11 +165,14 @@ describe('HeroVideo pause control', () => {
     render(<HeroVideo src={SRC} poster={POSTER} alt="Hero" />);
     const btn = document.querySelector('button[data-autoplay-toggle]') as HTMLButtonElement;
     expect(btn).toBeTruthy();
-    expect(btn.getAttribute('aria-pressed')).toBe('false');
+    // ONE toggle pattern (a11y M1): the label flips Pause / Play, there is no aria-pressed
+    expect(btn.hasAttribute('aria-pressed')).toBe(false);
+    const before = btn.getAttribute('aria-label');
     expect(btn.className).toContain('h-11');
     fireEvent.click(btn);
     expect(HTMLMediaElement.prototype.pause).toHaveBeenCalled();
-    expect(btn.getAttribute('aria-pressed')).toBe('true');
+    expect(btn.hasAttribute('aria-pressed')).toBe(false);
+    expect(btn.getAttribute('aria-label')).not.toBe(before);
   });
   it('no video (reduced motion): no button', () => {
     mockEnv({ reduced: true });

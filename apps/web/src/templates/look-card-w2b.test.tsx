@@ -326,7 +326,8 @@ describe('PecannbeeProductCard material (L-12, LB-02, M-03, K-01)', () => {
     const chip = Array.from(c.querySelectorAll('span')).find(s => /%/.test(s.textContent ?? ''))!;
     expect(chip.className).toContain('rounded-[var(--radius)]');
     expect(chip.className).not.toContain('shadow');
-    expect(chip.getAttribute('style')).toContain('hsl(var(--accent))');
+    // the chip reads --chip-bg and falls back to the accent pair (a look re-derives it, B2-26)
+    expect(chip.getAttribute('style')).toContain('var(--chip-bg, var(--accent))');
   });
 });
 

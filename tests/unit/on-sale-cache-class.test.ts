@@ -20,18 +20,25 @@ describe('on_sale: cache class and invalidation', () => {
 
   it('the public route allows the sort and keys the cache on it (a distinct entry per sort)', () => {
     expect(route).toMatch(/sortValue === 'on_sale'/);
-    const list = route.slice(route.indexOf('const listTail ='));
-    expect(list.slice(0, list.indexOf('`;', 10))).toContain('${sortValue || ');
-    expect(route).toContain(
-      "const cacheKey = `public:products:${storeId}:${sortValue === 'on_sale' ? saleTail : listTail}`;"
-    );
+    // main's key = the store prefix + a JSON of exactly the options the service receives, so the
+    // sort is in it; on_sale then blanks page and cursor and clamps the limit (below)
+    expect(route).toContain('JSON.stringify({ ...listOptions, semantic: semanticMode })');
+    expect(route).toMatch(/sort: sortValue,/);
   });
 
   it('the key sits under the prefix invalidateStoreProductCaches sweeps', () => {
-    // the on_sale tail: no page / cursor in it (a crafted ?page=N mints nothing)
-    const sale = route.slice(route.indexOf('const saleTail ='), route.indexOf('const cacheKey ='));
-    expect(sale).toContain('on_sale:');
-    expect(sale).not.toMatch(/page|cursor/i);
+    // on_sale: no page / cursor in what is keyed (a crafted ?page=N mints nothing), and a limit
+    // clamped to 1..12 (a negative ?limit=-N used to mint one key per N, final review M3)
+    const sale = route.slice(
+      route.indexOf("if (sortValue === 'on_sale') {\n      listOptions.page"),
+      route.indexOf('const semanticMode')
+    );
+    expect(sale).toContain('listOptions.page = undefined');
+    expect(sale).toContain('listOptions.cursor = undefined');
+    expect(sale).toMatch(
+      /Math\.min\(Math\.max\(1, parseInt\(limit as string, 10\) \|\| 12\), 12\)/
+    );
+    expect(route).toContain('`public:products:${storeId}:`');
     expect(cache).toMatch(
       /export async function clearProductsRedis[\s\S]*invalidateCachedPrefix\(`public:products:\$\{storeId\}:`\)/
     );

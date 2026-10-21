@@ -74,11 +74,11 @@ describe('DemoLookBar: template, then look', () => {
     expect(lookSelect(container).value).toBe('qamar.lookbook');
   });
 
-  it('with the real registry it lists exactly the three Qamar looks', () => {
+  it('with the real registry it lists the Qamar and Souq templates (each has a demo host, B2-7), Qamar looks for a Qamar look', () => {
     const { container } = render(
       <DemoLookBar activeLook="qamar.atelier" isBuilt={id => getLook(id)?.status === 'built'} />
     );
-    expect(values(templateSelect(container))).toEqual(['qamar']);
+    expect(values(templateSelect(container))).toEqual(['qamar', 'souq']);
     expect(values(lookSelect(container))).toEqual([
       'qamar.atelier',
       'qamar.lookbook',

@@ -77,6 +77,7 @@ export function InstalmentsCard({ storeId }: { storeId: string }) {
     <section
       className="space-y-3 rounded-xl border border-border bg-card p-4 shadow-sm"
       data-testid="instalments-card"
+      data-setting-id="payment.instalments"
     >
       <div>
         <h2 className="text-sm font-semibold text-foreground">{t('title')}</h2>

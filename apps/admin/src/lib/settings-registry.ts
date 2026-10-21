@@ -638,6 +638,16 @@ export const SETTINGS: SettingEntry[] = [
       ar: 'مدة الاحتفاظ بالطلب ساعات انتهاء الدفع',
     }
   ),
+  setting(
+    'payment.instalments',
+    '/payment-settings',
+    'paymentSettings.instalments.title',
+    'owner',
+    {
+      en: 'instalment installments monthly payment months estimate tagseet product page',
+      ar: 'تقسيط قسط شهري شهور تقريبي صفحة المنتج',
+    }
+  ),
   // ── Tax ────────────────────────────────────────────────────────────────────
   setting('tax.enable', '/tax', 'tax.settings.enable.title', 'owner', {
     en: 'turn on vat charge tax collect tax',
@@ -824,7 +834,7 @@ export const SETTINGS_LABEL_BASELINE: Record<string, number> = {
   '/branding': 43,
   '/delivery': 13,
   '/shipping': 20,
-  '/payment-settings': 17,
+  '/payment-settings': 23, // +6: the instalments card (enable, months, markup, provider ar/en, min price), anchored payment.instalments
   '/tax': 13,
   '/pwa': 13,
   '/language': 0,

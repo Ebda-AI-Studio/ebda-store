@@ -39,6 +39,12 @@ describe('one section-title style on a Qamar store (AT-1)', () => {
       'font-normal',
     ]);
     const src = readFileSync(join(WEB, 'builder/sections/SectionHeader.tsx'), 'utf8');
-    expect(src).toMatch(/qamar\s*\?\s*`[^`]*\$\{getPackStyles\('qamar'\)\.sectionHeading\}/);
+    // qamar and souq share the pack voice (final review P2-3): `packSkin` is 'qamar' | 'souq'
+    expect(src).toMatch(
+      /qamar\s*\?\s*`[^`]*\$\{getPackStyles\(packSkin \?\? 'qamar'\)\.sectionHeading\}/
+    );
+    expect(src).toMatch(
+      /packSkin\s*=\s*store\?\.template === 'qamar' \|\| store\?\.template === 'souq'/
+    );
   });
 });
