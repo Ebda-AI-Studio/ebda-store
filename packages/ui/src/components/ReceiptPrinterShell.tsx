@@ -57,6 +57,8 @@ export interface ReceiptPrinterShellProps {
   ariaLabel?: string;
   className?: string;
   style?: CSSProperties;
+  /** K-07 `receiptStyle: framed`: a quiet frame in the page's colours, no device slab or shadow. */
+  framed?: boolean;
 }
 
 export function ReceiptPrinterShell({
@@ -70,6 +72,7 @@ export function ReceiptPrinterShell({
   ariaLabel,
   className = 'mx-auto mt-8 w-full max-w-[24rem] text-start',
   style,
+  framed = false,
 }: ReceiptPrinterShellProps) {
   // Decided ONCE per key, before the first paint that shows the paper:
   // deciding in an effect would flash the finished receipt, then snap it up.
@@ -95,9 +98,14 @@ export function ReceiptPrinterShell({
   }, [feedKey, feed, storagePrefix]);
 
   return (
-    <section className={className} style={style} aria-label={ariaLabel}>
+    <section
+      className={`${className} ${framed ? 'rp-framed' : ''}`}
+      style={style}
+      aria-label={ariaLabel}
+      data-receipt={framed ? 'framed' : undefined}
+    >
       <style>{CSS}</style>
-      <div className="rp-housing relative z-10 p-1.5 shadow-lg">
+      <div className={`rp-housing relative z-10 p-1.5 ${framed ? '' : 'shadow-lg'}`}>
         <div className="rp-screen px-4 pb-3.5 pt-4">{screen({ feedDone })}</div>
         <div className="rp-slit mx-2.5 mb-0.5 mt-2 h-1.5 rounded-[var(--radius,.5rem)]" />
       </div>
@@ -112,6 +120,10 @@ export function ReceiptPrinterShell({
             onAnimationEnd={e => {
               if (e.target === e.currentTarget) setFedId(feedKey);
             }}
+            // M-05: a tap skips the 1.6s feed (the receipt is already real text under it).
+            onClick={() => {
+              if (feed && !feedDone) setFedId(feedKey);
+            }}
           >
             <article className={`rp-paper ${paperClassName}`}>{children}</article>
           </div>
@@ -124,6 +136,9 @@ export function ReceiptPrinterShell({
 const CSS = `
 .rp-housing{background:var(--rp-housing,color-mix(in oklab,hsl(var(--foreground)) 84%,hsl(var(--background))));border-radius:var(--radius,.5rem)}
 .rp-screen{background:var(--rp-screen-bg,hsl(var(--foreground)));color:var(--rp-screen-fg,hsl(var(--background)));border-radius:max(0px,calc(var(--radius,.5rem) - 4px))}
+.rp-framed .rp-housing{background:transparent;border:1px solid hsl(var(--input));box-shadow:none}
+.rp-framed .rp-screen{background:transparent;color:hsl(var(--foreground))}
+.rp-framed .rp-slit{background:hsl(var(--input));box-shadow:none}
 .rp-slit{background:var(--rp-slit,color-mix(in oklab,hsl(var(--foreground)) 30%,#000));box-shadow:inset 0 1px 2px rgb(0 0 0/.7)}
 .rp-window{position:relative;overflow:hidden;padding-bottom:14px}
 .rp-window::before{content:'';position:absolute;inset-inline:0;top:0;height:8px;z-index:1;pointer-events:none;background:linear-gradient(rgb(0 0 0/.14),rgb(0 0 0/0))}

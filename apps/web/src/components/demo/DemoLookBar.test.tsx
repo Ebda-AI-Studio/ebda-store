@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
 /**
- * The demo showroom bar: lists only BUILT looks (grouped by template), selecting one navigates to
- * `?look=<id>` on the same path, and the label says it is a demo store. Plus the checkout notice
+ * The demo showroom bar (Rulings B1-11, B1-12): template then look, built looks only; choosing
+ * navigates to `?look=<id>` on the same path; while a preview is showing, a same-origin link click
+ * carries the look to the next page; nothing is ever written (no fetch). Plus the checkout notice
  * that replaces the pay action on a demo store.
  */
 import { describe, it, expect, vi, afterEach, beforeAll } from 'vitest';
@@ -16,7 +17,9 @@ vi.mock('next/navigation', () => ({
   useSearchParams: () => new URLSearchParams(search),
 }));
 let lang: 'en' | 'ar' = 'en';
-vi.mock('../../contexts/LanguageContext', () => ({
+vi.mock('../../contexts/LanguageContext', async importOriginal => ({
+  translations: (await importOriginal<typeof import('../../contexts/LanguageContext')>())
+    .translations,
   useLanguage: () => ({
     isRtl: lang === 'ar',
     language: lang,
@@ -25,68 +28,229 @@ vi.mock('../../contexts/LanguageContext', () => ({
 }));
 
 beforeAll(() => {
-  Object.defineProperty(window, 'location', { value: { assign }, writable: true });
+  // Same origin as jsdom's document base, so `a.href` resolves like it does in a browser.
+  const base = new URL(document.baseURI);
+  Object.defineProperty(window, 'location', {
+    value: { assign, href: base.href, origin: base.origin },
+    writable: true,
+  });
 });
 
-import { DemoLookBar } from './DemoLookBar';
+import { DemoLookBar, DEMO_BAR_SELECT_CLASS } from './DemoLookBar';
+import { LOOKS, getLook } from '@ebda/shared';
 import { DemoCheckoutNotice } from './DemoCheckoutNotice';
 
 afterEach(() => {
   cleanup();
   assign.mockReset();
+  vi.unstubAllGlobals();
   pathname = '/products';
   search = '';
   lang = 'en';
 });
 
-const builtIds = new Set(['qamar.atelier', 'qamar.vitrine', 'souq.night']);
+// The three Qamar looks plus one Souq look, injected (the registry flips them in Task 10).
+const builtIds = new Set(['qamar.atelier', 'qamar.lookbook', 'qamar.vitrine', 'souq.night']);
 const isBuilt = (id: string) => builtIds.has(id);
+const qamarOnly = (id: string) => id.startsWith('qamar.');
 
-describe('DemoLookBar', () => {
-  it('lists only built looks, grouped by template', () => {
-    const { container } = render(<DemoLookBar activeLook="qamar.atelier" isBuilt={isBuilt} />);
-    const options = [...container.querySelectorAll('option')].map(o => o.getAttribute('value'));
-    expect(options.sort()).toEqual(['qamar.atelier', 'qamar.vitrine', 'souq.night']);
-    const groups = [...container.querySelectorAll('optgroup')];
-    expect(groups).toHaveLength(2);
-    expect([...groups[0].querySelectorAll('option')].map(o => o.getAttribute('value'))).toEqual([
+const templateSelect = (c: HTMLElement) =>
+  c.querySelector('select[data-demo-template]') as HTMLSelectElement;
+const lookSelect = (c: HTMLElement) =>
+  c.querySelector('select[data-demo-look]') as HTMLSelectElement;
+const values = (s: HTMLSelectElement) =>
+  [...s.querySelectorAll('option')].map(o => o.getAttribute('value'));
+
+describe('DemoLookBar: template, then look', () => {
+  it('lists only templates with a built look, then that template’s built looks', () => {
+    const { container } = render(<DemoLookBar activeLook="qamar.lookbook" isBuilt={isBuilt} />);
+    expect(values(templateSelect(container))).toEqual(['qamar', 'souq']);
+    expect(templateSelect(container).value).toBe('qamar');
+    expect(values(lookSelect(container))).toEqual([
       'qamar.atelier',
+      'qamar.lookbook',
+      'qamar.vitrine',
+    ]);
+    expect(lookSelect(container).value).toBe('qamar.lookbook');
+  });
+
+  it('with the real registry it lists exactly the three Qamar looks', () => {
+    const { container } = render(
+      <DemoLookBar activeLook="qamar.atelier" isBuilt={id => getLook(id)?.status === 'built'} />
+    );
+    expect(values(templateSelect(container))).toEqual(['qamar']);
+    expect(values(lookSelect(container))).toEqual([
+      'qamar.atelier',
+      'qamar.lookbook',
       'qamar.vitrine',
     ]);
   });
 
-  it('renders nothing when no look is built (production today: all designed)', () => {
-    const { container } = render(<DemoLookBar activeLook="qamar.atelier" isBuilt={() => false} />);
-    expect(container.innerHTML).toBe('');
+  it('with only the Qamar looks built, Qamar is the one template listed', () => {
+    const { container } = render(<DemoLookBar activeLook="qamar.atelier" isBuilt={qamarOnly} />);
+    expect(values(templateSelect(container))).toEqual(['qamar']);
+    expect(values(lookSelect(container))).toEqual([
+      'qamar.atelier',
+      'qamar.lookbook',
+      'qamar.vitrine',
+    ]);
   });
 
-  it('with the real registry (all designed in this phase) it renders nothing', () => {
-    const { container } = render(<DemoLookBar activeLook={null} />);
-    expect(container.innerHTML).toBe('');
-  });
-
-  it('is labelled as a demo store, in both languages at once', () => {
-    render(<DemoLookBar activeLook="qamar.atelier" isBuilt={isBuilt} />);
-    expect(screen.getByText('متجر تجريبي · Demo store')).toBeTruthy();
+  it('changing the template selects its first built look', () => {
+    pathname = '/products/linen-shirt';
+    const { container } = render(<DemoLookBar activeLook="qamar.vitrine" isBuilt={isBuilt} />);
+    fireEvent.change(templateSelect(container), { target: { value: 'souq' } });
+    expect(assign).toHaveBeenCalledWith('/products/linen-shirt?look=souq.night');
   });
 
   it('selecting a look navigates to ?look=<id> on the same path', () => {
     pathname = '/products/linen-shirt';
     const { container } = render(<DemoLookBar activeLook="qamar.atelier" isBuilt={isBuilt} />);
-    fireEvent.change(container.querySelector('select')!, { target: { value: 'souq.night' } });
-    expect(assign).toHaveBeenCalledWith('/products/linen-shirt?look=souq.night');
+    fireEvent.change(lookSelect(container), { target: { value: 'qamar.vitrine' } });
+    expect(assign).toHaveBeenCalledWith('/products/linen-shirt?look=qamar.vitrine');
   });
 
   it('keeps other query params and replaces an existing look', () => {
     search = 'sort=new&look=qamar.atelier';
     const { container } = render(<DemoLookBar activeLook="qamar.atelier" isBuilt={isBuilt} />);
-    fireEvent.change(container.querySelector('select')!, { target: { value: 'souq.night' } });
-    expect(assign).toHaveBeenCalledWith('/products?sort=new&look=souq.night');
+    fireEvent.change(lookSelect(container), { target: { value: 'qamar.lookbook' } });
+    expect(assign).toHaveBeenCalledWith('/products?sort=new&look=qamar.lookbook');
   });
 
-  it('shows the active look as selected', () => {
-    const { container } = render(<DemoLookBar activeLook="souq.night" isBuilt={isBuilt} />);
-    expect(container.querySelector('select')!.value).toBe('souq.night');
+  it('a stored look that is not built shows the first template and a placeholder', () => {
+    const { container } = render(<DemoLookBar activeLook="dahab.gold" isBuilt={isBuilt} />);
+    expect(templateSelect(container).value).toBe('qamar');
+    expect(lookSelect(container).value).toBe('');
+    expect(screen.getByText('Choose a look')).toBeTruthy();
+  });
+
+  it('renders nothing when no look is built', () => {
+    const { container } = render(<DemoLookBar activeLook="qamar.atelier" isBuilt={() => false} />);
+    expect(container.innerHTML).toBe('');
+  });
+
+  it('is labelled as a demo store, Arabic first', () => {
+    lang = 'ar';
+    render(<DemoLookBar activeLook="qamar.atelier" isBuilt={isBuilt} />);
+    expect(screen.getByRole('region', { name: 'متجر تجريبي' })).toBeTruthy();
+    expect(screen.getByLabelText('القالب')).toBeTruthy();
+    expect(screen.getByLabelText('الشكل')).toBeTruthy();
+    expect(screen.getByRole('option', { name: 'لوك بوك' })).toBeTruthy();
+  });
+
+  it('the select boundary is >= 3:1 against the bar on every look (WCAG 1.4.11)', () => {
+    // The bar is bg-foreground (the look's ink); the border is the page colour at N% over it.
+    const alpha = Number(/\bborder-background\/(\d+)\b/.exec(DEMO_BAR_SELECT_CLASS)?.[1]) / 100;
+    expect(alpha).toBeGreaterThan(0);
+    const rgb = (hex: string) => [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16));
+    const lum = (c: number[]) => {
+      const [r, g, b] = c.map(v => {
+        const x = v / 255;
+        return x <= 0.03928 ? x / 12.92 : ((x + 0.055) / 1.055) ** 2.4;
+      });
+      return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+    };
+    const ratio = (a: number[], b: number[]) => {
+      const [x, y] = [lum(a), lum(b)].sort((p, q) => q - p);
+      return (x + 0.05) / (y + 0.05);
+    };
+    for (const look of LOOKS) {
+      const bar = rgb(look.tokens.ink);
+      const page = rgb(look.tokens.page);
+      const border = page.map((v, i) => v * alpha + bar[i] * (1 - alpha));
+      expect(ratio(border, bar), look.id).toBeGreaterThanOrEqual(3);
+    }
+  });
+
+  it('every control is at least 44px tall and has a visible focus outline', () => {
+    const { container } = render(<DemoLookBar activeLook="qamar.atelier" isBuilt={isBuilt} />);
+    for (const s of [templateSelect(container), lookSelect(container)]) {
+      expect(s.className).toContain('min-h-11');
+      expect(s.className).toContain('focus-visible:outline-2');
+    }
+  });
+});
+
+describe('DemoLookBar: the previewed look survives link clicks (B1-11)', () => {
+  function clickLink(attrs: Record<string, string>, init: MouseEventInit = {}) {
+    const a = document.createElement('a');
+    for (const [k, v] of Object.entries(attrs)) a.setAttribute(k, v);
+    a.textContent = 'go';
+    document.body.appendChild(a);
+    const ev = new MouseEvent('click', { bubbles: true, cancelable: true, button: 0, ...init });
+    a.dispatchEvent(ev);
+    a.remove();
+    return ev;
+  }
+
+  it('a same-origin link click carries ?look and loads the full document', () => {
+    search = 'look=qamar.lookbook';
+    render(<DemoLookBar activeLook="qamar.lookbook" isBuilt={isBuilt} />);
+    const ev = clickLink({ href: '/products/evening-gown-rose?ref=home#reviews' });
+    expect(ev.defaultPrevented).toBe(true);
+    expect(assign).toHaveBeenCalledWith(
+      '/products/evening-gown-rose?ref=home&look=qamar.lookbook#reviews'
+    );
+  });
+
+  it('a link that already carries the look is left to the browser', () => {
+    search = 'look=qamar.lookbook';
+    render(<DemoLookBar activeLook="qamar.lookbook" isBuilt={isBuilt} />);
+    const ev = clickLink({ href: '/cart?look=qamar.lookbook' });
+    expect(ev.defaultPrevented).toBe(false);
+    expect(assign).not.toHaveBeenCalled();
+  });
+
+  it('an external link, a new-tab link, a download and modified clicks are untouched', () => {
+    search = 'look=qamar.lookbook';
+    render(<DemoLookBar activeLook="qamar.lookbook" isBuilt={isBuilt} />);
+    const cases: Array<[Record<string, string>, MouseEventInit]> = [
+      [{ href: 'https://ebda.app/' }, {}],
+      [{ href: '/products', target: '_blank' }, {}],
+      [{ href: '/lookbook.pdf', download: '' }, {}],
+      [{ href: '/products' }, { metaKey: true }],
+      [{ href: '/products' }, { ctrlKey: true }],
+      [{ href: '/products' }, { shiftKey: true }],
+      [{ href: '/products' }, { altKey: true }],
+      [{ href: '/products' }, { button: 1 }],
+    ];
+    for (const [attrs, init] of cases) {
+      const ev = clickLink(attrs, init);
+      expect(ev.defaultPrevented, JSON.stringify([attrs, init])).toBe(false);
+    }
+    expect(assign).not.toHaveBeenCalled();
+  });
+
+  it('with no preview in the URL (the store’s own look), links are not rewritten', () => {
+    render(<DemoLookBar activeLook="qamar.atelier" isBuilt={isBuilt} />);
+    const ev = clickLink({ href: '/products' });
+    expect(ev.defaultPrevented).toBe(false);
+    expect(assign).not.toHaveBeenCalled();
+  });
+
+  it('a ?look the server did not apply (not built) is not carried', () => {
+    search = 'look=souq.catalogue';
+    render(<DemoLookBar activeLook="qamar.atelier" isBuilt={isBuilt} />);
+    expect(clickLink({ href: '/products' }).defaultPrevented).toBe(false);
+  });
+
+  it('stops rewriting once unmounted', () => {
+    search = 'look=qamar.lookbook';
+    const { unmount } = render(<DemoLookBar activeLook="qamar.lookbook" isBuilt={isBuilt} />);
+    unmount();
+    expect(clickLink({ href: '/products' }).defaultPrevented).toBe(false);
+  });
+
+  it('never writes: choosing a template or look and following links make no request', () => {
+    const fetchSpy = vi.fn();
+    vi.stubGlobal('fetch', fetchSpy);
+    search = 'look=qamar.lookbook';
+    const { container } = render(<DemoLookBar activeLook="qamar.lookbook" isBuilt={isBuilt} />);
+    fireEvent.change(templateSelect(container), { target: { value: 'souq' } });
+    fireEvent.change(lookSelect(container), { target: { value: 'qamar.vitrine' } });
+    clickLink({ href: '/products' });
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(assign).toHaveBeenCalledTimes(3);
   });
 });
 

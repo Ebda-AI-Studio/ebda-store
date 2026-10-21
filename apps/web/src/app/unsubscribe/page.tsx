@@ -1,14 +1,17 @@
 import type { Metadata } from 'next';
+import { localizedMetadata } from '@/lib/seo/localized-metadata';
 import { API_URL } from '../../lib/api';
 import UnsubscribeClient, { type UnsubscribeInfo } from './UnsubscribeClient';
 
 // Token-specific and never cacheable — same Track-B rationale as /review.
 export const dynamic = 'force-dynamic';
 
-export const metadata: Metadata = {
-  title: 'Unsubscribe',
-  robots: { index: false, follow: false },
-};
+export function generateMetadata(): Promise<Metadata> {
+  return localizedMetadata({
+    title: ['Unsubscribe', 'إلغاء الاشتراك'],
+    robots: { index: false, follow: false },
+  });
+}
 
 interface PageProps {
   searchParams: Promise<{ token?: string }>;

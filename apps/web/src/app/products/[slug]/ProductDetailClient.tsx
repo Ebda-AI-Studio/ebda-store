@@ -43,7 +43,7 @@ import {
   resolveCardBadges,
 } from '../../../templates/shared/custom-badge';
 
-import { fromMinor, model3dSwatchColor } from '@ebda/shared';
+import { fromMinor, getLook, model3dSwatchColor } from '@ebda/shared';
 import { Model3dToggle, ProductModel3dPanel } from '../../../components/ProductModel3d';
 import { captureEvent } from '../../../components/PostHogProvider';
 import { DahabProductDetail } from '../../../templates/dahab/ProductDetail';
@@ -51,6 +51,7 @@ import { REGION } from '@ebda/shared';
 import { FactsTable } from '../../../components/commerce/FactsTable';
 import { DeliveryChip } from '../../../components/commerce/DeliveryChip';
 import { TrustLine } from '../../../components/commerce/TrustLine';
+import { relatedHeadingSize } from '../../../templates/shared/look-card';
 import type { CodOffer } from '../../../lib/cod-offer';
 import { Breadcrumbs } from '../../../components/Breadcrumbs';
 import { canBuyNow, inStockNow } from '../../../lib/can-buy-now';
@@ -62,6 +63,7 @@ import {
 } from '../../../components/commerce/PersonalisationField';
 import { activePersonalisation, cleanNote } from '@ebda/shared';
 import { countText, ITEMS } from '../../../lib/plural';
+import { MinusIcon, PlusIcon } from '../../../templates/shared/icons';
 // Lazy-load heavy below-the-fold components to reduce initial bundle size
 const ReviewSection = dynamic(() => import('../../../components/ReviewSection'), { ssr: false });
 const FrequentlyBoughtTogether = dynamic(() =>
@@ -147,7 +149,7 @@ function ProductSkeleton() {
   return (
     <div className="grid gap-8 lg:grid-cols-2 animate-pulse">
       <div className="space-y-4">
-        <div className="aspect-square rounded-2xl bg-muted" />
+        <div className="aspect-square rounded-[var(--radius)] bg-muted" />
       </div>
       <div className="space-y-4">
         <div className="h-6 w-24 rounded bg-muted" />
@@ -249,7 +251,10 @@ export default function ProductDetailClient({
   useEffect(() => {
     const el = galleryRef.current;
     if (!el) return;
-    const target = el.clientWidth * selectedImage;
+    // P2-N5: the strip follows the page direction; in RTL scrollLeft runs 0 -> -max (the
+    // standard every current engine ships), so the target is negative there.
+    const sign = el.getAttribute('dir') === 'rtl' ? -1 : 1;
+    const target = sign * el.clientWidth * selectedImage;
     if (Math.abs(el.scrollLeft - target) > 8) {
       smoothScrollLeftTo(el, target);
     }
@@ -257,7 +262,7 @@ export default function ProductDetailClient({
   const handleGalleryScroll = () => {
     const el = galleryRef.current;
     if (!el || el.clientWidth === 0) return;
-    const idx = Math.round(el.scrollLeft / el.clientWidth);
+    const idx = Math.round(Math.abs(el.scrollLeft) / el.clientWidth);
     setSelectedImage(prev => (prev === idx ? prev : idx));
   };
   const { success: toastSuccess, error: toastError } = useToast();
@@ -317,9 +322,21 @@ export default function ProductDetailClient({
   // scale: cap it at ~20px (text-xl) unless the merchant set a PDP heading zone.
   const relatedHeadingZone = pdpHeadingZone?.fontSize
     ? pdpHeadingZone
-    : { ...(pdpHeadingZone || {}), fontSize: '20px' };
+    : { ...(pdpHeadingZone || {}), fontSize: relatedHeadingSize(store.look) };
   const pdpScale = pageTextScale(pdp?.textScale);
   const pdpDensity = pageDensityStyle(pdp?.density);
+  // Decision (b), L-03 (W2a): an image-led look (`density: 'airy'`, design.md § "Image-led looks")
+  // shows the gallery edge to edge below `sm`, at 4:5 unless the merchant chose a gallery aspect;
+  // from `sm` it is the capped gallery every store has. Every other store is unchanged.
+  const airyGallery = store?.theme?.density === 'airy';
+  const merchantGalleryAspect = pdp?.imageAspect ?? resolvedLayout?.productsPage?.pdpImageAspect;
+  const galleryFrameClass = airyGallery
+    ? `relative ${
+        !merchantGalleryAspect || merchantGalleryAspect === 'auto'
+          ? 'aspect-[4/5] sm:aspect-[3/4]'
+          : pdpAspectClass
+      } -mx-4 w-[calc(100%+2rem)] max-w-none rounded-none sm:mx-auto sm:w-full sm:max-w-[400px] sm:rounded-[var(--radius)] lg:max-w-[600px] overflow-hidden bg-gradient-to-br from-primary/5 to-primary/10`
+    : `relative ${pdpAspectClass} mx-auto max-w-[280px] sm:max-w-[400px] lg:max-w-[600px] overflow-hidden rounded-[var(--radius)] bg-gradient-to-br from-primary/5 to-primary/10`;
   const pdpNameZone = resolveSectionZone(pdp?.typography?.productName, undefined, store.theme);
   const pdpPriceZone = resolveSectionZone(pdp?.typography?.productPrice, undefined, store.theme);
   const pdpBgStyle = pageSurfaceStyle(pdp?.bgColor, store.theme, pdp?.colorScheme);
@@ -546,7 +563,7 @@ export default function ProductDetailClient({
             )}
           </p>
           <Link href={storeUrl('/products')}>
-            <Button className="mt-6">{t('Browse Products', 'تصفح المنتجات')}</Button>
+            <Button className="mt-6">{t('Browse products', 'تصفح المنتجات')}</Button>
           </Link>
         </div>
       </ShopChrome>
@@ -642,8 +659,8 @@ export default function ProductDetailClient({
   const addLabel = canBackorder
     ? t('Pre-order', 'اطلب مسبقاً')
     : outOfStock
-      ? t('Out of Stock', 'غير متوفر')
-      : t('Add to Cart', translations['Add to Cart']);
+      ? t('Out of stock', 'غير متوفر')
+      : t('Add to cart', translations['Add to Cart']);
   // The task bar replaces the tab bar (C-04), the only phone cart entry on most
   // skins, so the bar carries its own cart link (W1a fix round, minor 3).
   const cartLinkLabel =
@@ -655,7 +672,11 @@ export default function ProductDetailClient({
       : t('Cart', 'السلة');
   const priceText =
     pricing.mode === 'range' && minVariantPrice !== null && maxVariantPrice !== null
-      ? `${formatPrice(minVariantPrice)} – ${formatPrice(maxVariantPrice)}`
+      ? // Y-07: English reads a range in words; Arabic keeps the dash between the two prices.
+        t(
+          `${formatPrice(minVariantPrice)} to ${formatPrice(maxVariantPrice)}`,
+          `${formatPrice(minVariantPrice)} – ${formatPrice(maxVariantPrice)}`
+        )
       : formatPrice(displayPrice);
   // The WhatsApp order/ask button carries the typed note and follows the SAME
   // required-personalisation gate as add-to-cart.
@@ -864,7 +885,7 @@ export default function ProductDetailClient({
           carries the per-store product-detail page background. */}
       <div className="flex-1" style={pdpBgStyle}>
         <div
-          className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8"
+          className={`mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 ${airyGallery ? 'pb-8 sm:py-8' : 'py-8'}`}
           style={pdpDensity}
           data-zone="products"
         >
@@ -891,10 +912,8 @@ export default function ProductDetailClient({
           {/* Product Details */}
           <div className="grid gap-8 md:grid-cols-12">
             {/* Images */}
-            <div className="space-y-4 md:col-span-5">
-              <div
-                className={`relative ${pdpAspectClass} mx-auto max-w-[280px] sm:max-w-[400px] lg:max-w-[600px] overflow-hidden rounded-2xl bg-gradient-to-br from-primary/5 to-primary/10`}
-              >
+            <div className="space-y-4 md:col-span-5 md:sticky md:top-24 md:self-start">
+              <div className={galleryFrameClass} data-gallery={airyGallery ? 'airy' : undefined}>
                 {model3d && (
                   <Model3dToggle
                     active={show3d}
@@ -929,14 +948,25 @@ export default function ProductDetailClient({
                   <div
                     ref={galleryRef}
                     onScroll={handleGalleryScroll}
-                    // dir="ltr" even on the Arabic (RTL) storefront: the gallery
-                    // is a sequence of images (not text), so left-to-right order is
-                    // correct, AND it keeps scrollLeft positive (0→max) in every
-                    // browser. Without it, RTL makes scrollLeft go negative in
-                    // Chrome/Firefox, so the index math + scroll-to break and the
-                    // gallery desyncs / scrolls into empty space for AR shoppers.
-                    dir="ltr"
-                    className="flex h-full w-full snap-x snap-mandatory overflow-x-auto overflow-y-hidden [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+                    // a11y re-audit P2-N5: the strip reads in the page direction, so in Arabic
+                    // photo 2 lies to the LEFT, where Next (inline end) and ArrowLeft point. It was
+                    // dir=ltr to keep scrollLeft positive; the scroll math now takes |scrollLeft|
+                    // and a signed target instead (RTL scrollLeft is 0 -> -max in every engine).
+                    dir={language === 'ar' ? 'rtl' : 'ltr'}
+                    // P1-7 (W4): a named, focusable region; arrow keys page it like the buttons.
+                    role="region"
+                    aria-roledescription="carousel"
+                    aria-label={t(`Photos of ${displayName}`, `صور ${displayName}`)}
+                    tabIndex={0}
+                    onKeyDown={e => {
+                      if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+                      e.preventDefault();
+                      const forward = (e.key === 'ArrowLeft') === (language === 'ar');
+                      setSelectedImage(i =>
+                        Math.min(images.length - 1, Math.max(0, i + (forward ? 1 : -1)))
+                      );
+                    }}
+                    className="flex h-full w-full snap-x snap-mandatory overflow-x-auto overflow-y-hidden [scrollbar-width:none] [&::-webkit-scrollbar]:hidden focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
                   >
                     {images.map((img, index) => (
                       <div
@@ -988,6 +1018,7 @@ export default function ProductDetailClient({
                   />
                 )}
                 <OutOfStockRibbon
+                  flat={!!getLook(store.look)}
                   inStock={buyableNow}
                   isRtl={language === 'ar'}
                   oosLabel={productCardDefaults?.oosLabel}
@@ -999,13 +1030,71 @@ export default function ProductDetailClient({
                   oosLabelTextColor={productCardDefaults?.oosLabelTextColor}
                   theme={store?.theme}
                 />
+                {/* P1-7 / AT-2 (W4): real prev/next buttons, 44px, at the inline edges, plus a
+                    polite status line; the dots below stay as the visual position cue. */}
+                {images.length > 1 && !show3d && (
+                  <>
+                    <button
+                      type="button"
+                      data-gallery-prev
+                      disabled={selectedImage === 0}
+                      onClick={() => setSelectedImage(i => Math.max(0, i - 1))}
+                      aria-label={t('Previous photo', 'الصورة السابقة')}
+                      className="absolute start-2 top-1/2 z-10 inline-flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-[var(--radius)] bg-background/85 text-foreground disabled:opacity-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    >
+                      <svg
+                        className="h-5 w-5 rtl:-scale-x-100"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                        aria-hidden="true"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M15 19l-7-7 7-7"
+                        />
+                      </svg>
+                    </button>
+                    <button
+                      type="button"
+                      data-gallery-next
+                      disabled={selectedImage >= images.length - 1}
+                      onClick={() => setSelectedImage(i => Math.min(images.length - 1, i + 1))}
+                      aria-label={t('Next photo', 'الصورة التالية')}
+                      className="absolute end-2 top-1/2 z-10 inline-flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-[var(--radius)] bg-background/85 text-foreground disabled:opacity-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    >
+                      <svg
+                        className="h-5 w-5 rtl:-scale-x-100"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                        aria-hidden="true"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M9 5l7 7-7 7"
+                        />
+                      </svg>
+                    </button>
+                    <span data-gallery-status className="sr-only" aria-live="polite">
+                      {t(
+                        `Photo ${selectedImage + 1} of ${images.length}`,
+                        `الصورة ${selectedImage + 1} من ${images.length}`
+                      )}
+                    </span>
+                  </>
+                )}
                 {/* Dot indicators — current image of total. */}
                 {images.length > 1 && !show3d && (
                   <div className="pointer-events-none absolute inset-x-0 bottom-2 flex justify-center gap-1.5">
                     {images.map((_, i) => (
                       <span
                         key={i}
-                        className={`h-1.5 rounded-full transition-all ${
+                        className={`h-1.5 rounded-full transition-[width,background-color] ${
                           i === selectedImage ? 'w-4 bg-primary' : 'w-1.5 bg-foreground/30'
                         }`}
                       />
@@ -1118,14 +1207,16 @@ export default function ProductDetailClient({
                   <span className="text-sm font-medium text-foreground">
                     {t('Quantity', 'الكمية')}:
                   </span>
-                  <div className="flex items-center rounded-lg border border-border">
+                  <div className="flex items-center rounded-lg border border-input">
                     <button
                       type="button"
                       onClick={() => setQuantity(Math.max(1, quantity - 1))}
                       aria-label={t('Decrease quantity', 'تقليل الكمية')}
-                      className="flex h-11 min-w-11 items-center justify-center px-4 text-muted-foreground hover:bg-muted cursor-pointer"
+                      // a11y re-audit P2-N11: no quantity to choose when it cannot be bought.
+                      disabled={!buyableNow}
+                      className="flex h-11 min-w-11 items-center justify-center px-4 text-muted-foreground hover:bg-muted cursor-pointer disabled:cursor-not-allowed disabled:opacity-40"
                     >
-                      -
+                      <MinusIcon />
                     </button>
                     <span aria-live="polite" className="w-12 text-center font-medium">
                       {localize(quantity)}
@@ -1140,22 +1231,25 @@ export default function ProductDetailClient({
                         setQuantity(Math.min(quantity + 1, maxQty));
                       }}
                       aria-label={t('Increase quantity', 'زيادة الكمية')}
-                      className="flex h-11 min-w-11 items-center justify-center px-4 text-muted-foreground hover:bg-muted cursor-pointer"
+                      disabled={!buyableNow}
+                      className="flex h-11 min-w-11 items-center justify-center px-4 text-muted-foreground hover:bg-muted cursor-pointer disabled:cursor-not-allowed disabled:opacity-40"
                     >
-                      +
+                      <PlusIcon />
                     </button>
                   </div>
-                  {effectiveInventory !== undefined && effectiveInventory !== null && (
-                    <span className="text-sm text-muted-foreground">
-                      {/* From the same stock answer as the button (X-02): a variant
-                          product's own inventory is 0, and a pre-order is not "out". */}
-                      {!outOfStock
-                        ? t('In Stock', 'متوفر')
-                        : canBackorder
+                  {effectiveInventory !== undefined &&
+                    effectiveInventory !== null &&
+                    outOfStock && (
+                      <span className="text-sm text-muted-foreground">
+                        {/* From the same stock answer as the button (X-02): a variant
+                          product's own inventory is 0, and a pre-order is not "out".
+                          Taste re-audit P2-1: "in stock" is true for almost every item, so
+                          only pre-order and out of stock are said (quality bar § 8). */}
+                        {canBackorder
                           ? t('Available to pre-order', 'متاح للطلب المسبق')
-                          : t('Out of Stock', 'غير متوفر')}
-                    </span>
-                  )}
+                          : t('Out of stock', 'غير متوفر')}
+                      </span>
+                    )}
                 </div>
                 {/* BUG 2 fix: discount badge stacked directly below the OOS
                     indicator row when product is out of stock (and not
@@ -1209,9 +1303,16 @@ export default function ProductDetailClient({
               </div>
 
               {/* Below the buy block: the category chip and the description (fold rule above). */}
-              {categoryName && (
-                <div className="mt-6">
-                  <Badge variant="secondary">{categoryName}</Badge>
+              {/* L-08: on phones (no breadcrumb below md) the category is a link back to its PLP;
+                  from md the breadcrumb carries it, so no second, unlinked label. */}
+              {categoryName && cat0?.category?.slug && (
+                <div className="mt-6 md:hidden">
+                  <Link
+                    href={storeUrl(`/products?category=${cat0.category.slug}`)}
+                    className="inline-flex min-h-11 min-w-11 items-center gap-1 text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
+                  >
+                    {categoryName}
+                  </Link>
                 </div>
               )}
               {displayDescription && (
@@ -1304,7 +1405,7 @@ export default function ProductDetailClient({
                   and honours the per-store PDP heading typography zone. */}
               <ProductCarousel
                 products={relatedProducts.map(toTemplateProduct)}
-                title="You May Also Like"
+                title="You may also like"
                 titleAr="قد يعجبك أيضاً"
                 headingZone={relatedHeadingZone}
                 isRtl={language === 'ar'}

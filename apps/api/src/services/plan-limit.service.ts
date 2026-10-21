@@ -261,6 +261,24 @@ export async function assertOrderAllowed(storeId: string): Promise<void> {
   if (sub?.ordersOverLimitMonth?.getTime() !== monthKey.getTime()) await noteOrderCreated(storeId);
 }
 
+/**
+ * Ruling B1-13: the showroom (`stores.is_demo`) collects no visitor PII. Refuses customer register
+ * (with a storeId), newsletter subscribe, the contact form, affiliate applications and push
+ * subscriptions with the same 403 `DEMO_STORE` shape as `assertOrderAllowed`. An unknown store id
+ * is not this guard's business: the caller keeps its own not-found behaviour.
+ */
+export async function assertNotDemoStore(storeId: string): Promise<void> {
+  const row = await withStore(storeId, tx =>
+    tx.store.findUnique({ where: { id: storeId }, select: { isDemo: true } })
+  );
+  if (row?.isDemo) {
+    throw new AppError(403, 'DEMO_STORE', 'This is a demo store; this action is disabled', {
+      messageEn: 'This is a demo store: this is turned off here',
+      messageAr: 'ده متجر تجريبي — الخاصية دي مقفولة هنا',
+    });
+  }
+}
+
 /** Records first over-limit time and notifies the merchant once per month. */
 export async function noteOrderCreated(storeId: string): Promise<{ over: boolean }> {
   try {

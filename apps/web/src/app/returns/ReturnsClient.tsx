@@ -401,7 +401,7 @@ function ReturnRequestForm({ storeId }: { storeId: string }) {
                   };
                 }),
               ]}
-              className="w-full rounded-lg border border-border px-3 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
+              className="w-full rounded-lg border border-input px-3 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
             />
           )}
           {!isLoadingOrders && orders.length === 0 && (
@@ -429,13 +429,13 @@ function ReturnRequestForm({ storeId }: { storeId: string }) {
                   // offered here (see `groupOrderLinesForDisplay`).
                   <label
                     key={row.key}
-                    className="flex items-center gap-3 rounded-lg border border-border px-4 py-3 cursor-pointer hover:bg-muted"
+                    className="flex items-center gap-3 rounded-lg border border-input px-4 py-3 cursor-pointer hover:bg-muted"
                   >
                     <input
                       type="checkbox"
                       checked={selectedBundleGroupIds.has(row.bundleGroupId)}
                       onChange={() => toggleBundleGroup(row.bundleGroupId)}
-                      className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
+                      className="h-4 w-4 rounded border-input text-primary focus:ring-primary"
                     />
                     <span className="flex-1 text-sm text-foreground">
                       {row.name}
@@ -447,13 +447,13 @@ function ReturnRequestForm({ storeId }: { storeId: string }) {
                 ) : (
                   <label
                     key={row.key}
-                    className="flex items-center gap-3 rounded-lg border border-border px-4 py-3 cursor-pointer hover:bg-muted"
+                    className="flex items-center gap-3 rounded-lg border border-input px-4 py-3 cursor-pointer hover:bg-muted"
                   >
                     <input
                       type="checkbox"
                       checked={selectedItemIds.has(row.item.id)}
                       onChange={() => toggleItem(row.item.id)}
-                      className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
+                      className="h-4 w-4 rounded border-input text-primary focus:ring-primary"
                     />
                     <span className="flex-1 text-sm text-foreground">
                       {row.item.product?.name || `Item #${row.item.id.slice(0, 8)}`}
@@ -490,7 +490,7 @@ function ReturnRequestForm({ storeId }: { storeId: string }) {
               },
               ...RETURN_REASONS.map(r => ({ value: r.value, label: t(r.label, r.labelAr) })),
             ]}
-            className="w-full rounded-lg border border-border px-3 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
+            className="w-full rounded-lg border border-input px-3 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
           />
         </div>
 
@@ -504,7 +504,7 @@ function ReturnRequestForm({ storeId }: { storeId: string }) {
             value={notes}
             onChange={e => setNotes(e.target.value)}
             placeholder={t('Describe the issue in more detail...', 'اوصف المشكلة بتفاصيل أكتر...')}
-            className="w-full rounded-lg border border-border px-3 py-2.5 text-base text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 resize-none sm:text-sm"
+            className="w-full rounded-lg border border-input px-3 py-2.5 text-base text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary resize-none sm:text-sm"
           />
         </div>
 

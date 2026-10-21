@@ -113,6 +113,18 @@ function authScope(email: string, storeId: string | null) {
 }
 
 /**
+ * Ruling B1-13: the demo showroom's seeded owner (`storedemo-owner@ebda.app`) has no mailbox and
+ * no login. Account mail for it is never sent (a bounce hurts the sender's reputation); callers
+ * answer exactly as for an unknown address, so nothing about the account is revealed.
+ */
+async function ownsDemoStore(userId: string): Promise<boolean> {
+  const row = await withUser(userId, tx =>
+    tx.store.findFirst({ where: { ownerId: userId, isDemo: true }, select: { id: true } })
+  );
+  return row !== null;
+}
+
+/**
  * Find a user by email inside ONE namespace (`storeId` null = the admin
  * namespace) and read the row.
  *
@@ -694,8 +706,8 @@ export class AuthService {
       { includeDeleted: true }
     );
 
-    if (!user) {
-      // Don't reveal if user exists
+    if (!user || (await ownsDemoStore(user.id))) {
+      // Don't reveal if user exists (and never mail the demo owner, B1-13)
       return { ...GENERIC_RESEND_VERIFICATION_RESULT };
     }
 
@@ -1645,8 +1657,8 @@ export class AuthService {
       { includeDeleted: true }
     );
 
-    if (!user) {
-      // Silently return to prevent email enumeration
+    if (!user || (await ownsDemoStore(user.id))) {
+      // Silently return to prevent email enumeration (and never mail the demo owner, B1-13)
       return null;
     }
 

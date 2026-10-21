@@ -26,7 +26,10 @@ export function LookPicker({ value, onChange, locale }: LookPickerProps) {
   const uid = useId();
   const rtl = locale === 'ar';
   const [active, setActive] = useState<LookTemplate>(
-    () => getLook(value)?.template ?? LOOK_TEMPLATES[0]!
+    () =>
+      getLook(value)?.template ??
+      LOOK_TEMPLATES.find(t => looksForTemplate(t).some(l => l.status === 'built')) ??
+      LOOK_TEMPLATES[0]!
   );
   const tabRefs = useRef<(HTMLButtonElement | null)[]>([]);
 

@@ -8,8 +8,10 @@ import { CartLineUnavailableNotice } from '../shared/CartLineUnavailable';
 import { CartLineNote } from '../../components/commerce/CartLineNote';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useNumerals } from '../../hooks/useNumerals';
+import { useLocalePrice } from '../../hooks/useLocalePrice';
+import { cartLineLabel } from '../shared/card-actions';
+import { MinusIcon, PlusIcon } from '../shared/icons';
 
-import { REGION } from '@ebda/shared';
 /**
  * Elegant template — cart rendered with thin hairline dividers, generous
  * whitespace, and serif-friendly tracking to match Elegant's fashion-
@@ -18,16 +20,16 @@ import { REGION } from '@ebda/shared';
 export default function ElegantCartTable({
   items,
   isRtl: isRtlProp,
-  currency = REGION.currency,
   urlPrefix = '',
   onUpdateQuantity,
   onRemove,
   typography,
 }: CartTableProps) {
-  const { isRtl: ctxIsRtl, t } = useLanguage();
-  const { localize, money } = useNumerals();
+  const { isRtl: ctxIsRtl } = useLanguage();
+  const { localize } = useNumerals();
   const isRtl = isRtlProp ?? ctxIsRtl;
-  const format = (price: number) => `${money(price)} ${currency}`;
+  // The ONE storefront price format (Ruling B1-28).
+  const format = useLocalePrice();
 
   return (
     <div className="divide-y divide-border/50" dir={isRtl ? 'rtl' : 'ltr'}>
@@ -55,7 +57,7 @@ export default function ElegantCartTable({
                 <div>
                   <Link
                     href={`${urlPrefix}/products/${item.slug}`}
-                    className="text-base font-light tracking-wide text-foreground hover:text-primary"
+                    className="inline-block relative min-w-11 before:absolute before:-inset-y-3 before:inset-x-0 before:content-[''] text-base font-light tracking-wide text-foreground hover:text-primary"
                     style={typography?.name}
                   >
                     {displayName}
@@ -73,18 +75,21 @@ export default function ElegantCartTable({
                   )}
                   <CartLineNote note={item.note} />
                   {item.unavailable && <CartLineUnavailableNotice />}
-                  <p
-                    className="mt-2 text-xs uppercase tracking-[0.2em] text-muted-foreground tabular-nums"
-                    style={typography?.price}
-                  >
-                    {format(item.price)}
-                  </p>
+                  {/* Taste re-audit P2-2: at quantity 1 the line total already says it. */}
+                  {item.quantity > 1 && (
+                    <p
+                      className="mt-2 text-xs uppercase tracking-[0.2em] text-muted-foreground tabular-nums"
+                      style={typography?.price}
+                    >
+                      {format(item.price)}
+                    </p>
+                  )}
                 </div>
                 <button
                   type="button"
                   onClick={() => onRemove?.(item.id)}
-                  className="inline-flex min-h-[44px] items-center text-sm uppercase tracking-[0.2em] text-muted-foreground hover:text-destructive-ink underline underline-offset-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 cursor-pointer"
-                  aria-label={t('Remove', 'إزالة')}
+                  className="inline-flex min-h-[44px] min-w-11 items-center justify-center text-sm uppercase tracking-[0.2em] text-muted-foreground hover:text-destructive-ink underline underline-offset-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 cursor-pointer"
+                  aria-label={cartLineLabel('remove', isRtl, displayName)}
                   style={typography?.cta}
                 >
                   {isRtl ? 'إزالة' : 'Remove'}
@@ -97,9 +102,9 @@ export default function ElegantCartTable({
                     disabled={item.unavailable || item.quantity <= 1}
                     onClick={() => onUpdateQuantity?.(item.id, Math.max(1, item.quantity - 1))}
                     className="inline-flex h-11 w-11 items-center justify-center text-lg text-muted-foreground hover:text-foreground disabled:opacity-30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1 cursor-pointer"
-                    aria-label={t('Decrease', 'تقليل')}
+                    aria-label={cartLineLabel('decrease', isRtl, displayName)}
                   >
-                    −
+                    <MinusIcon />
                   </button>
                   <span
                     className="min-w-[2ch] text-center font-light tracking-wide"
@@ -112,9 +117,9 @@ export default function ElegantCartTable({
                     disabled={item.unavailable}
                     onClick={() => onUpdateQuantity?.(item.id, item.quantity + 1)}
                     className="inline-flex h-11 w-11 items-center justify-center text-lg text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1 cursor-pointer disabled:opacity-40"
-                    aria-label={t('Increase', 'زيادة')}
+                    aria-label={cartLineLabel('increase', isRtl, displayName)}
                   >
-                    +
+                    <PlusIcon />
                   </button>
                 </div>
                 <p

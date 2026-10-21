@@ -23,7 +23,7 @@ export function AcceptedPaymentBadges({
       aria-label={t('Ways to pay', 'طرق الدفع')}
       className={[
         'flex flex-wrap items-center',
-        variant === 'dahab' ? 'gap-2' : 'justify-center gap-3',
+        variant === 'dahab' ? 'gap-2' : 'gap-2',
         variant === 'dahab' ? className : undefined,
       ]
         .filter(Boolean)
@@ -36,24 +36,21 @@ export function AcceptedPaymentBadges({
           className={
             variant === 'dahab'
               ? 'flex h-7 items-center rounded-[3px] border border-foreground/20 px-2.5 text-xs font-medium text-foreground/70'
-              : 'flex h-8 items-center rounded-md bg-muted px-3 text-xs font-medium text-muted-foreground'
+              : // P2-6: plain text; a bordered chip read as a button that did nothing (S-04).
+                'flex items-center gap-2 text-xs text-muted-foreground'
           }
         >
+          {variant !== 'dahab' && i > 0 && <span aria-hidden="true">·</span>}
           {t(badge.label, badge.labelAr)}
         </li>
       ))}
     </ul>
   );
   if (variant === 'dahab') return marks;
+  // IA-04 (W4): one inline row under the summary, not a second card; it names the methods once.
   return (
-    <div
-      className={['rounded-2xl border border-border bg-card p-4', className]
-        .filter(Boolean)
-        .join(' ')}
-    >
-      <p className="mb-3 text-center text-xs font-medium text-muted-foreground">
-        {t('We Accept', 'نقبل الدفع عبر')}
-      </p>
+    <div className={['flex flex-wrap items-center gap-2', className].filter(Boolean).join(' ')}>
+      <span className="text-xs text-muted-foreground">{t('We accept', 'نقبل الدفع عبر')}</span>
       {marks}
     </div>
   );

@@ -4,7 +4,12 @@ import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { CartIcon } from '@ebda/ui';
 import { StoreLogo } from '../shared/StoreLogo';
+import { WORDMARK_NAV_LINK_CLASS, wordmarkClass } from '../shared/wordmark';
+
+/** a11y P2-10 / rule (d): header text links measured 16-20px; every one is a 44px target. */
+const HEADER_TARGET = 'inline-flex min-h-11 min-w-11 items-center justify-center';
 import type { HeaderProps } from '../types';
+import { useTabBarShown, HEADER_MENU_WITH_TAB_BAR } from '../shared/tab-bar-visibility';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { LanguageSwitcher } from '../../components/LanguageSwitcher';
 import { SearchAutocomplete } from '../../components/SearchAutocomplete';
@@ -19,8 +24,11 @@ export default function MinimalHeader({
   onSearch,
   urlPrefix = '',
   headerBgColor,
+  logoPlacement,
+  wordmarkSize,
 }: HeaderProps) {
   const { isRtl: ctxIsRtl, t } = useLanguage();
+  const tabBarShown = useTabBarShown();
   const isRtl = isRtlProp ?? ctxIsRtl;
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -54,6 +62,13 @@ export default function MinimalHeader({
     }
   };
 
+  // Only the qamar skin passes logoPlacement; undefined keeps the markup byte-identical.
+  const isCentre = logoPlacement === 'centre';
+  // Only the qamar skin passes wordmarkSize (W2a T-01); undefined keeps the markup byte-identical.
+  const navLinkClass = wordmarkSize
+    ? `${HEADER_TARGET} ${WORDMARK_NAV_LINK_CLASS}`
+    : HEADER_TARGET +
+      ' text-xs tracking-[0.18em] ui-caps-toggle font-normal text-muted-foreground hover:text-foreground transition-colors duration-200';
   const displayName = isRtl && branding.nameAr ? branding.nameAr : branding.name;
   const displayLogo = isRtl && branding.logoAr ? branding.logoAr : branding.logo;
 
@@ -64,23 +79,42 @@ export default function MinimalHeader({
       }`}
       style={headerBgColor ? { backgroundColor: headerBgColor } : undefined}
       dir={isRtl ? 'rtl' : 'ltr'}
+      data-logo-placement={logoPlacement}
     >
       <div className="container mx-auto px-6">
-        <div className="relative flex items-center justify-between py-3">
+        <div
+          className={
+            isCentre
+              ? 'relative grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center py-3'
+              : 'relative flex items-center justify-between py-3'
+          }
+        >
           {/* Logo — absolute-centered on mobile (visual middle of the
               row regardless of asymmetric hamburger/actions widths),
               normal flex item on lg+. Ahmad 2026-05-16 platform rule:
               every theme's logo MUST center on mobile. */}
           <Link
             href={urlPrefix || '/'}
-            className="absolute left-1/2 -translate-x-1/2 md:relative md:left-auto md:translate-x-0 flex items-center justify-center flex-shrink-0 max-w-[65%] md:max-w-none"
+            className={`absolute left-1/2 -translate-x-1/2 md:relative md:left-auto md:translate-x-0 flex min-h-11 min-w-11 items-center justify-center flex-shrink-0 ${
+              isCentre
+                ? 'max-w-[calc(100%-13rem)] md:max-w-[40vw] md:col-start-2'
+                : 'max-w-[65%] md:max-w-none'
+            }`}
           >
             {displayLogo ? (
               <StoreLogo src={displayLogo} alt={displayName} priority />
             ) : (
               <span
-                className="text-xs tracking-[0.3em] ui-caps-toggle font-light text-foreground"
+                className={
+                  wordmarkSize
+                    ? wordmarkClass(wordmarkSize)
+                    : isCentre
+                      ? 'block max-w-full truncate text-2xl sm:text-3xl font-display text-foreground'
+                      : 'text-xs tracking-[0.3em] ui-caps-toggle font-light text-foreground'
+                }
                 data-zone="storeName"
+                translate="no"
+                title={isCentre || wordmarkSize ? displayName : undefined}
               >
                 {displayName}
               </span>
@@ -88,26 +122,36 @@ export default function MinimalHeader({
           </Link>
 
           {/* Desktop nav — centered absolutely */}
-          <nav className="hidden lg:flex items-center gap-10 absolute left-1/2 -translate-x-1/2">
+          <nav
+            aria-label={t('Main', 'الرئيسية')}
+            className={
+              isCentre
+                ? 'hidden lg:flex items-center gap-8 col-start-1 justify-self-start'
+                : 'hidden lg:flex items-center gap-10 absolute left-1/2 -translate-x-1/2'
+            }
+          >
             {navigation.map(item => (
-              <Link
-                key={item.href}
-                href={item.href}
-                className="text-xs tracking-[0.18em] ui-caps-toggle font-normal text-muted-foreground hover:text-foreground transition-colors duration-200"
-              >
+              <Link key={item.href} href={item.href} className={navLinkClass}>
                 {isRtl && item.labelAr ? item.labelAr : item.label}
               </Link>
             ))}
           </nav>
 
           {/* Actions */}
-          <div className="flex items-center gap-2">
+          <div
+            className={
+              isCentre
+                ? 'flex items-center gap-2 col-start-3 justify-self-end'
+                : 'flex items-center gap-2'
+            }
+          >
             {/* Desktop-only search toggle — mobile has a persistent search
                 bar below the logo row so a toggle here would be redundant. */}
             <button
               type="button"
               onClick={() => setIsSearchOpen(!isSearchOpen)}
-              className="hidden lg:inline-flex h-11 w-11 items-center justify-center text-muted-foreground hover:text-foreground transition-colors duration-200 cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+              // P2-12: from md (the tab bar's search is gone there), not only lg.
+              className="hidden md:inline-flex h-11 w-11 items-center justify-center text-muted-foreground hover:text-foreground transition-colors duration-200 cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
               aria-label={t('Search', 'بحث')}
               aria-expanded={isSearchOpen}
             >
@@ -180,7 +224,7 @@ export default function MinimalHeader({
             <button
               type="button"
               onClick={() => setIsMenuOpen(!isMenuOpen)}
-              className="lg:hidden inline-flex h-11 w-11 items-center justify-center text-muted-foreground hover:text-foreground transition-colors duration-200 cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+              className={`lg:hidden inline-flex h-11 w-11 items-center justify-center text-muted-foreground hover:text-foreground transition-colors duration-200 cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 ${tabBarShown ? HEADER_MENU_WITH_TAB_BAR : ''}`}
               aria-label={t('Menu', 'القائمة')}
               aria-expanded={isMenuOpen}
             >
@@ -189,7 +233,7 @@ export default function MinimalHeader({
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
-                strokeWidth={1}
+                strokeWidth={1.5}
                 aria-hidden="true"
               >
                 {isMenuOpen ? (
@@ -226,7 +270,7 @@ export default function MinimalHeader({
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
               placeholder={t('Search', 'بحث')}
-              className="w-full ps-10 pe-3 py-2.5 text-base sm:text-xs tracking-wide bg-transparent border border-border text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-foreground transition-colors duration-200 rounded"
+              className="min-h-11 w-full ps-10 pe-3 py-2.5 text-base sm:text-xs tracking-wide bg-transparent border border-input text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-foreground transition-colors duration-200 rounded"
               dir={isRtl ? 'rtl' : 'ltr'}
               aria-label={t('Search products', 'بحث عن المنتجات')}
             />
@@ -242,7 +286,7 @@ export default function MinimalHeader({
         {/* Desktop search field — smooth expand toggled by the search icon
             in the actions row. lg+ only since mobile has its own row above. */}
         <div
-          className={`hidden lg:block overflow-visible transition-[max-height,opacity,padding] duration-300 ${
+          className={`hidden md:block overflow-visible transition-[max-height,opacity,padding] duration-300 ${
             isSearchOpen ? 'max-h-16 opacity-100 pb-4' : 'max-h-0 opacity-0 pointer-events-none'
           }`}
         >
@@ -252,7 +296,7 @@ export default function MinimalHeader({
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
               placeholder={t('Search...', 'بحث...')}
-              className="w-full text-center text-base sm:text-xs tracking-wide bg-transparent border-b border-border text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-foreground pb-2 transition-colors duration-200"
+              className="w-full text-center text-base sm:text-xs tracking-wide bg-transparent border-b border-input text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-foreground min-h-11 pb-2 transition-colors duration-200"
               dir={isRtl ? 'rtl' : 'ltr'}
               autoFocus={isSearchOpen}
               aria-label={t('Search products', 'بحث عن المنتجات')}
@@ -282,13 +326,13 @@ export default function MinimalHeader({
             ? ({ inert: true } as unknown as React.HTMLAttributes<HTMLDivElement>)
             : {})}
         >
-          <nav className="min-h-0 overflow-hidden">
-            <ul className="space-y-5 pb-6 text-center">
+          <nav aria-label={t('Menu', 'القائمة')} className="min-h-0 overflow-hidden">
+            <ul className="space-y-1 pb-6 text-center">
               {navigation.map(item => (
                 <li key={item.href}>
                   <Link
                     href={item.href}
-                    className="text-xs tracking-[0.18em] ui-caps-toggle font-normal text-muted-foreground hover:text-foreground transition-colors duration-200"
+                    className={navLinkClass}
                     onClick={() => setIsMenuOpen(false)}
                   >
                     {isRtl && item.labelAr ? item.labelAr : item.label}

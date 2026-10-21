@@ -1,6 +1,7 @@
 'use client';
 
 import { storeNumerals } from '@ebda/shared';
+import { pickLocalizedName } from '../templates/shared/display-helpers';
 import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
@@ -355,7 +356,7 @@ export default function ReviewSection({ storeId, productId }: Props) {
   };
 
   // Derive the store name for display - fallback gracefully
-  const storeName = store?.name || t('Store', 'المتجر');
+  const storeName = pickLocalizedName(store, language === 'ar') || t('Store', 'المتجر');
 
   return (
     <section className="mt-16 border-t border-border pt-12">
@@ -622,7 +623,7 @@ export default function ReviewSection({ storeId, productId }: Props) {
                     `Share your experience with this product from ${storeName}...`,
                     `احكي تجربتك مع المنتج ده من ${storeName}...`
                   )}
-                  className="w-full rounded-lg border border-border bg-background px-4 py-3 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 resize-none"
+                  className="w-full rounded-lg border border-input bg-background px-4 py-3 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary resize-none"
                 />
               </div>
 

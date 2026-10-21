@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import type { EmptyStateProps } from '../types';
 import { useRtlText } from '../shared/useRtlText';
-import { useStore } from '../../contexts/StoreContext';
+import { ArrowIcon } from '../shared/icons';
 
 export default function ElegantEmptyState({
   title,
@@ -26,12 +26,8 @@ export default function ElegantEmptyState({
     ctaLabelAr,
     isRtl: isRtlProp,
   });
-  // rtlPolish (2026-07-12): default false/undefined keeps the always-'→'
-  // rendering below for EXISTING stores (incl. wady-aljuz/elegant). When on,
-  // the arrow flips to '←' for RTL so it points the correct reading direction.
-  const { store } = useStore();
-  const rtlPolish = store.theme?.rtlPolish === true;
-  const ctaArrow = rtlPolish ? (isRtl ? '←' : '→') : '→';
+  // a11y re-audit P2-N6: the arrow is the mirroring icon on every store (rtlPolish no longer
+  // decides it; a glyph arrow pointed the wrong way in Arabic unless that flag was on).
 
   return (
     <div
@@ -68,18 +64,24 @@ export default function ElegantEmptyState({
           <Link
             href={ctaHref}
             data-cta="link"
-            className="mt-10 inline-block border-b border-foreground pb-1 text-xs font-light uppercase tracking-[0.3em] text-foreground hover:border-primary hover:text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-foreground"
+            className="group mt-10 inline-flex min-h-11 items-center gap-2 text-xs font-light uppercase tracking-[0.3em] text-foreground hover:text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-foreground"
           >
-            {displayCta} {ctaArrow}
+            <span className="border-b border-foreground pb-1 group-hover:border-primary">
+              {displayCta}
+            </span>
+            <ArrowIcon className="h-4 w-4 shrink-0" isRtl={isRtl} />
           </Link>
         ) : (
           <button
             type="button"
             onClick={onCtaClick}
             data-cta="link"
-            className="mt-10 border-b border-foreground pb-1 text-xs font-light uppercase tracking-[0.3em] text-foreground hover:border-primary hover:text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-foreground"
+            className="group mt-10 inline-flex min-h-11 items-center gap-2 text-xs font-light uppercase tracking-[0.3em] text-foreground hover:text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-foreground"
           >
-            {displayCta} {ctaArrow}
+            <span className="border-b border-foreground pb-1 group-hover:border-primary">
+              {displayCta}
+            </span>
+            <ArrowIcon className="h-4 w-4 shrink-0" isRtl={isRtl} />
           </button>
         ))}
     </div>

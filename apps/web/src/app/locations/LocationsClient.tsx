@@ -292,7 +292,7 @@ export default function LocationsClient({
                                 {loc.phone && (
                                   <a
                                     href={`tel:${loc.phone}`}
-                                    className="rounded-full border border-border px-3 py-1 text-sm font-medium text-foreground"
+                                    className="rounded-full border border-input px-3 py-1 text-sm font-medium text-foreground"
                                   >
                                     {t('Call', 'اتصال')}
                                   </a>
@@ -302,7 +302,7 @@ export default function LocationsClient({
                                     href={`https://wa.me/${waNumber}`}
                                     target="_blank"
                                     rel="noopener noreferrer"
-                                    className="rounded-full border border-border px-3 py-1 text-sm font-medium text-foreground"
+                                    className="rounded-full border border-input px-3 py-1 text-sm font-medium text-foreground"
                                   >
                                     {t('WhatsApp', 'واتساب')}
                                   </a>

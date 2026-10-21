@@ -256,7 +256,7 @@ export default function WishlistClient() {
             className={`flex items-center gap-2 px-4 py-2 rounded-lg border text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
               isPublic
                 ? 'bg-primary text-primary-foreground border-primary hover:bg-primary/90'
-                : 'bg-background text-foreground border-border hover:bg-muted'
+                : 'bg-background text-foreground border-input hover:bg-muted'
             }`}
           >
             {isPublic ? (
@@ -313,7 +313,7 @@ export default function WishlistClient() {
             </p>
             <div className="flex flex-wrap items-center gap-2">
               {/* Share URL input */}
-              <div className="flex flex-1 min-w-0 items-center gap-2 bg-background border border-border rounded-lg px-3 py-2">
+              <div className="flex flex-1 min-w-0 items-center gap-2 bg-background border border-input rounded-lg px-3 py-2">
                 <span className="text-sm text-muted-foreground truncate flex-1">{shareUrl}</span>
                 <button
                   onClick={copyLink}

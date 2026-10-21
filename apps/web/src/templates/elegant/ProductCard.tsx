@@ -1,8 +1,9 @@
 'use client';
 
-import { memo, useState } from 'react';
+import { memo, useState, useId } from 'react';
 import { canBuyNow } from '@/lib/can-buy-now';
 import { resolveProductCardCtaOosDefaults } from '../shared/product-card-defaults';
+import { lookCardCta } from '../shared/look-card';
 import Link from 'next/link';
 import Image from 'next/image';
 import type { ProductCardProps } from '../types';
@@ -26,7 +27,7 @@ import {
   REGION,
   storeNumerals,
 } from '@ebda/shared';
-import { CompareButton, RemoveFromWishlistButton } from '../shared/card-actions';
+import { CompareButton, RemoveFromWishlistButton, cardActionLabel } from '../shared/card-actions';
 import { Price, ProductBadge, ProductBadgeGroup, cn } from '@ebda/ui';
 import { PlaceholderImageIcon } from '../shared/icons';
 import { TaxInclusiveLabel } from '../shared/tax-inclusive-label';
@@ -85,7 +86,9 @@ function ElegantProductCard({
   showCardName,
   showCardPrice,
 }: ProductCardProps) {
-  const { isRtl: ctxIsRtl, t } = useLanguage();
+  // One id per card INSTANCE: a product can render in a grid and a carousel on the same page.
+  const nameId = `prod-${useId()}-name`;
+  const { isRtl: ctxIsRtl } = useLanguage();
   const { store, layout } = useStore();
   const renderNow = useRenderNow();
   // Ruling NUMERALS-1: Western digits unless the store opted in (Arabic only).
@@ -205,7 +208,7 @@ function ElegantProductCard({
     <article
       itemScope
       itemType="https://schema.org/Product"
-      aria-labelledby={`prod-${product.id}-name`}
+      aria-labelledby={nameId}
       // Task 3 Part A: article is relative so the absolute wishlist button
       // positioned here is never clipped by the image div's overflow-hidden.
       className={`relative w-full mx-auto ${productSizeClass(cardSize)} ${frameCls}`.trim()}
@@ -227,7 +230,11 @@ function ElegantProductCard({
             'opacity-100 lg:opacity-0',
             (isHovered || isWishlisted) && 'lg:opacity-100'
           )}
-          aria-label={t('Add to wishlist', 'إضافة للمفضلة')}
+          aria-label={cardActionLabel(
+            'wishlist-add',
+            isRtl,
+            isRtl && product.nameAr ? product.nameAr : product.name
+          )}
           aria-pressed={isWishlisted}
         >
           <svg
@@ -288,6 +295,7 @@ function ElegantProductCard({
           {onToggleCompare && (
             <CompareButton
               productId={product.id}
+              productName={isRtl && product.nameAr ? product.nameAr : product.name}
               isInCompare={isInCompare}
               onToggle={onToggleCompare}
               isRtl={isRtl}
@@ -296,6 +304,7 @@ function ElegantProductCard({
           {onRemoveFromWishlist && (
             <RemoveFromWishlistButton
               productId={product.id}
+              productName={isRtl && product.nameAr ? product.nameAr : product.name}
               onRemove={onRemoveFromWishlist}
               isRtl={isRtl}
             />
@@ -435,6 +444,7 @@ function ElegantProductCard({
               oosDimColor={resolvedOosDimColor}
               theme={store.theme}
               viewOnly={viewOnly}
+              lookCta={lookCardCta(store.theme, layout)}
             />
           </div>
         </div>
@@ -445,7 +455,7 @@ function ElegantProductCard({
           <div className={`text-center flex flex-col gap-2 ${textSizes.pad}`}>
             {nameVisible && (
               <h3
-                id={`prod-${product.id}-name`}
+                id={nameId}
                 data-zone="productName"
                 className={`${textSizes.name} tracking-normal sm:tracking-[0.15em] ${nameCase === 'uppercase' ? 'uppercase' : ''} text-foreground/80 group-hover:text-foreground transition-colors duration-300 [overflow-wrap:anywhere] line-clamp-1 min-h-[1.5em]`}
                 itemProp="name"

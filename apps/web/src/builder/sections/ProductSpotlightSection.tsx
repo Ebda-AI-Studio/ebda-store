@@ -140,7 +140,7 @@ export function ProductSpotlightSection({
           {button && (
             <Link
               href={storeUrl(sanitizeUrl(settings.buttonLink, '/products'))}
-              className="mt-8 inline-flex min-h-[48px] items-center justify-center rounded-[var(--radius)] border border-primary/70 px-7 text-sm font-medium text-primary transition-colors hover:border-accent hover:text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              className="mt-8 inline-flex min-h-[48px] items-center justify-center rounded-[var(--radius)] border border-primary/70 px-7 text-sm font-medium text-primary transition-colors hover:border-primary hover:bg-primary/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               {...edit('buttonText')}
             >
               {button}

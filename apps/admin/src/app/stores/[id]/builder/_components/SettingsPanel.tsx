@@ -448,6 +448,11 @@ function Field({
               </option>
             ))}
           </select>
+          {def.hintEn && (
+            <span className="mt-1 block text-xs text-muted-foreground">
+              {locale === 'ar' ? (def.hintAr ?? def.hintEn) : def.hintEn}
+            </span>
+          )}
         </label>
       );
     case 'range': {
