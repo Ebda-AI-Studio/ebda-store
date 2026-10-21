@@ -79,6 +79,7 @@ import customersRoutes from '@api/routes/customers.routes';
 import publicRoutes from '@api/routes/public.routes';
 import orderRoutes from '@api/routes/order.routes';
 import paymentRoutes from '@api/routes/payment.routes';
+import { publicWholesaleRouter } from '@api/routes/wholesale.routes';
 
 function makeRes() {
   const recorded: { status: number; body: unknown } = { status: 200, body: undefined };
@@ -177,6 +178,7 @@ const ROUTERS: Record<string, Router> = {
   public: publicRoutes as unknown as Router,
   orders: orderRoutes as unknown as Router,
   payments: paymentRoutes as unknown as Router,
+  wholesale: publicWholesaleRouter as unknown as Router,
 };
 
 function middlewareOn(
@@ -244,6 +246,8 @@ const MONEY_ROUTES: Array<[string, string, string]> = [
   ['public', 'post', '/orders'],
   ['orders', 'post', '/'],
   ['payments', 'post', '/create'],
+  // applying for a wholesale account as the impersonated customer (B2B Task 5)
+  ['wholesale', 'post', '/wholesale/apply'],
 ];
 
 describe('rejectImpersonated — mounted on every route that creates an order or starts a payment', () => {

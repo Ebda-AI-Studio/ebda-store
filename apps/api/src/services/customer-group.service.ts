@@ -201,6 +201,90 @@ export const CustomerGroupService = {
   },
 
   /**
+   * Wholesale approval (B2B Task 5, Ruling B2B-2c): attach a REGISTERED shopper to a group through the `customers.user_id`
+   * link. The identity is the applicant's session user id, taken from the application row, NEVER a typed phone / email;
+   * this method does not call `assignByIdentity` and cannot touch another person's CRM row. The shopper's own CRM row is
+   * matched by `user_id`, else created linked to them (account email where free, NO phone, since a profile phone is
+   * unverified and a linked row that held a wholesaler's phone would be matched by it later).
+   */
+  async linkApprovedBuyer(storeId: string, userId: string, groupId: string) {
+    const group = await prisma.customerGroup.findFirst({
+      where: { id: groupId, storeId },
+      select: { id: true },
+    });
+    if (!group) throw new AppError(404, 'NOT_FOUND', 'Customer group not found');
+    const shopper = await prisma.user.findFirst({
+      where: { id: userId, storeId, role: 'customer', status: 'active', deletedAt: null },
+      select: { id: true, email: true, firstName: true, lastName: true },
+    });
+    if (!shopper)
+      throw new AppError(
+        409,
+        'APPLICANT_INACTIVE',
+        'The applicant account is suspended or deleted.'
+      );
+
+    const linked = await prisma.customer.findFirst({
+      where: { storeId, userId },
+      select: { id: true },
+    });
+    let row;
+    if (linked) {
+      row = await prisma.customer.update({
+        where: { id: linked.id, storeId },
+        data: { groupId },
+        select: assignReturnSelect,
+      });
+    } else {
+      const emailTaken = await prisma.customer.findFirst({
+        where: { storeId, email: { equals: shopper.email, mode: 'insensitive' } },
+        select: { id: true },
+      });
+      row = await withSavepoint(() =>
+        prisma.customer.create({
+          data: {
+            storeId,
+            userId,
+            email: emailTaken ? null : shopper.email,
+            phone: null,
+            firstName: shopper.firstName || '',
+            lastName: shopper.lastName || '',
+            groupId,
+          },
+          select: assignReturnSelect,
+        })
+      );
+    }
+    invalidateB2bPricing(storeId); // the buyer now prices at the group's wholesale terms
+    return row;
+  },
+
+  /**
+   * Wholesale revoke: the shopper returns to the store's default group (or none). Membership is read per request, so open
+   * carts re-price to retail at the next read; the persisted lines of orders already created are untouched.
+   */
+  async unlinkBuyer(storeId: string, userId: string, fromGroupId?: string | null) {
+    const linked = await prisma.customer.findFirst({
+      where: { storeId, userId },
+      select: { id: true, groupId: true },
+    });
+    if (!linked) return null;
+    // Only move them if they are still in the group being revoked (a later manual move wins).
+    if (fromGroupId && linked.groupId !== fromGroupId) return null;
+    const dflt = await prisma.customerGroup.findFirst({
+      where: { storeId, isDefault: true, ...(fromGroupId ? { id: { not: fromGroupId } } : {}) },
+      select: { id: true },
+    });
+    const row = await prisma.customer.update({
+      where: { id: linked.id, storeId },
+      data: { groupId: dflt?.id ?? null },
+      select: assignReturnSelect,
+    });
+    invalidateB2bPricing(storeId);
+    return row;
+  },
+
+  /**
    * Assign a customer to a group by contact identity, materializing the
    * `customers` row if it does not exist yet.
    *

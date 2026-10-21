@@ -230,6 +230,11 @@ const ALLOW: Record<string, AllowEntry> = {
     reason: 'merchant read of list price',
     reads: { productSummary: 1, registerAdminReadTools: 2 },
   },
+  'services/price-tier.service.ts': {
+    category: 'writer',
+    reason: 'merchant tier writes validate against the current base price (Task 4)',
+    reads: { loadProduct: 1, validate: 3, list: 3 },
+  },
   'services/bulk.service.ts': {
     category: 'writer',
     reason: 'bulk price edits / import; Task 4 returns tier-above-base warnings',

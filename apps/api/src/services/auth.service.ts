@@ -1956,6 +1956,14 @@ export class AuthService {
         where: { customerId: userId, storeId: eraseStoreId },
       });
       await tx.loyaltyPoints.deleteMany({ where: { customerId: userId, storeId: eraseStoreId } });
+      // B2B wholesale (Task 5): the application holds PII (business name, phone, commercial registration no.) and the
+      // CRM row's user_id link is what grants a group price. Erase the applications and sever the link + membership, so an
+      // erased account can never price as a wholesaler again (the account is anonymised, not deleted, so no FK cascade fires).
+      await tx.wholesaleApplication.deleteMany({ where: { userId, storeId: eraseStoreId } });
+      await tx.customer.updateMany({
+        where: { userId, storeId: eraseStoreId },
+        data: { userId: null, groupId: null },
+      });
 
       // Customer wallet (D1, Ruling W-4). Unlike loyalty, the wallet ledger is
       // a FINANCIAL record of money the merchant owed and paid out, so it is
@@ -2337,6 +2345,7 @@ export class AuthService {
       pushSubscriptions,
       onesignalSubscriptions,
       smsMarketingConsents,
+      wholesaleApplications,
     ] = await Promise.all([
       // Same user-scoped RLS policy as the erase path above: on the
       // merchant-initiated export `current_user_id()` is the MERCHANT, so a
@@ -2401,6 +2410,8 @@ export class AuthService {
           updatedAt: true,
         },
       }),
+      // B2B wholesale applications (business name, phone, commercial registration no., decision note): the applicant's own data.
+      prisma.wholesaleApplication.findMany({ where: { userId, storeId } }),
     ]);
 
     return {
@@ -2419,6 +2430,7 @@ export class AuthService {
       pushSubscriptions,
       onesignalSubscriptions,
       smsMarketingConsents,
+      wholesaleApplications,
     };
   }
 
