@@ -1,4 +1,4 @@
-import { prisma } from '@ebda/database';
+import { prisma, withStore } from '@ebda/database';
 import { isCampaignContentComplete, resolveDefaultLanguage, storefrontOrigin } from '@ebda/shared';
 import { sanitizeNewsletterHtml } from '../lib/email-html-sanitizer';
 import { renderBrandedShell } from './email.service';
@@ -42,9 +42,11 @@ export function campaignDailyCap(plan?: string | null): number {
   return positiveIntEnv('CAMPAIGN_DAILY_SEND_CAP', fallback);
 }
 
-/** The cap for one store, reading its plan tier (call inside the store's tenant context). */
+/** The cap for one store, reading its plan tier in the store's own scope. */
 export async function storeCampaignDailyCap(storeId: string): Promise<number> {
-  const store = await prisma.store.findUnique({ where: { id: storeId }, select: { plan: true } });
+  const store = await withStore(storeId, tx =>
+    tx.store.findUnique({ where: { id: storeId }, select: { plan: true } })
+  );
   return campaignDailyCap(store?.plan);
 }
 
