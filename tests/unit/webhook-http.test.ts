@@ -93,6 +93,9 @@ describe('SSRF guard (registration and send time)', () => {
     'ff02::1',
     '0.0.0.0',
     '2001:db8::1',
+    '2001::1',
+    '2001:0:4136:e378:8000:63bf:3fff:fdd2',
+    '192.88.99.1',
   ])('refuses a hostname that resolves to %s', async addr => {
     useResolver(async () => [{ address: addr }]);
     await expect(assertWebhookUrl('https://hooks.example.com/x')).rejects.toThrow(/SSRF_BLOCKED/);
@@ -227,5 +230,21 @@ describe('every send goes through the guarded transport', () => {
       expect(r.ok).toBe(false);
     }
     expect(fetchImpl).not.toHaveBeenCalled();
+  });
+});
+
+describe('M1 delivery function is idempotent on its request event', () => {
+  it('webhook-deliver declares idempotency by deliveryId', async () => {
+    const { readFileSync } = await import('node:fs');
+    const { resolve } = await import('node:path');
+    const src = readFileSync(
+      resolve(__dirname, '../../apps/api/src/lib/inngest/functions/webhook-delivery.ts'),
+      'utf8'
+    );
+    const deliver = src.slice(
+      src.indexOf("id: 'webhook-deliver'"),
+      src.indexOf("id: 'webhook-delivery-purge-daily'")
+    );
+    expect(deliver).toMatch(/idempotency:\s*'event\.data\.deliveryId'/);
   });
 });

@@ -106,6 +106,7 @@ const V4_BLOCKS: Array<[string, number]> = [
   ['192.0.0.0', 24],
   ['192.168.0.0', 16],
   ['192.0.2.0', 24], // TEST-NET-1
+  ['192.88.99.0', 24], // 6to4 relay anycast (deprecated)
   ['198.18.0.0', 15],
   ['198.51.100.0', 24], // TEST-NET-2
   ['203.0.113.0', 24], // TEST-NET-3
@@ -152,7 +153,7 @@ function isBlockedV6(ip: string): boolean {
   // fc00::/7 unique-local
   if (s.startsWith('fc') || s.startsWith('fd')) return true;
   // ::/96 IPv4-compatible (::7f00:1 is 127.0.0.1), 100::/64 discard, 2001::/32 Teredo
-  if (s.startsWith('::') || s.startsWith('100::') || s.startsWith('2001:0:')) return true;
+  if (s.startsWith('::') || s.startsWith('100::') || /^2001:(0{1,4})?:/.test(s)) return true;
   // fec0::/10 site-local (deprecated, still routable on some networks), ff00::/8 multicast
   if (/^fe[c-f]/.test(s) || s.startsWith('ff')) return true;
   // NAT64 (64:ff9b::/96) and 6to4 (2002::/16) embed an IPv4 address: block rather than decode.

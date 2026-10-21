@@ -167,6 +167,8 @@ async function notifyEndpointDisabled(storeId: string, endpointId: string): Prom
 export const webhookDeliver: InngestFunction.Any = inngest.createFunction(
   {
     id: 'webhook-deliver',
+    // The same delivery request delivered twice must not start two runs that both POST.
+    idempotency: 'event.data.deliveryId',
     name: 'Merchant webhooks - deliver with retries',
     concurrency: { key: 'event.data.storeId', limit: 5 },
     retries: 3,
