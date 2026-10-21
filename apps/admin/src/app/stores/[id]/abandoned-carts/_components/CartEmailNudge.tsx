@@ -58,7 +58,7 @@ export function CartEmailNudge({ storeId, emailEnabled }: Props) {
           onClick={() =>
             document.getElementById(CART_EMAIL_SETTINGS_ID)?.scrollIntoView({ behavior: 'smooth' })
           }
-          className="px-4 py-1.5 bg-primary text-white rounded-lg text-sm font-medium hover:bg-primary/90"
+          className="px-4 py-1.5 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/90"
         >
           {t('review')}
         </button>
