@@ -563,7 +563,9 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         // itself loads on the client). Only Dahab sets it: other stores' markup
         // is unchanged.
         data-pack={
-          store.template === 'dahab' || store.template === 'qamar' ? store.template : undefined
+          store.template === 'dahab' || store.template === 'qamar' || store.template === 'souq'
+            ? store.template
+            : undefined
         }
         // Looks (Phase S): scopes every look rule in globals.css; absent for legacy stores.
         data-look={look?.dataLook}

@@ -23,7 +23,15 @@ import { resolveLookFonts } from '../looks/fonts';
 /**
  * Available store templates
  */
-export type TemplateId = 'modern' | 'classic' | 'minimal' | 'bold' | 'elegant' | 'dahab' | 'qamar';
+export type TemplateId =
+  | 'modern'
+  | 'classic'
+  | 'minimal'
+  | 'bold'
+  | 'elegant'
+  | 'dahab'
+  | 'qamar'
+  | 'souq';
 
 /**
  * Font family options for store themes
@@ -686,6 +694,26 @@ export const TEMPLATE_THEMES: Record<TemplateId, Partial<StoreTheme>> = {
     showTrustStrip: false,
     dividers: { ...DEFAULT_DIVIDER_SETTINGS, enabled: false },
   },
+  // Souq (general retail and electronics, Phase B2): a neutral cool base. Every Souq store has a
+  // look, and the look's tokens own colour, type, radius, density, image ratio and motion. No
+  // orange anywhere in the family (Ruling B2-2); dividers off like Qamar.
+  souq: {
+    primaryColor: '218 74% 48%',
+    primaryForeground: '0 0% 100%',
+    backgroundColor: '0 0% 100%',
+    foregroundColor: '216 24% 9%',
+    fontFamily: 'default',
+    borderRadius: 'md',
+    backgroundPreset: 'none',
+    showBrandStory: false,
+    showTrustStrip: false,
+    dividers: { ...DEFAULT_DIVIDER_SETTINGS, enabled: false },
+    // The platform default warning is amber (45 deg), inside the forbidden band (Ruling B2-2),
+    // and it reaches the cart / checkout notices. Souq's warning is plum: distinct from
+    // destructive (red) and success (green), nothing orange.
+    warningColor: '320 62% 40%',
+    warningForeground: '0 0% 100%',
+  },
   dahab: {
     primaryColor: '39 49% 58%', // gold #C9A35E
     primaryForeground: '222 29% 8%', // night
@@ -796,6 +824,16 @@ export const TEMPLATES: TemplateInfo[] = [
     thumbnail: '/looks/qamar.atelier.webp',
     tags: ['fashion', 'abayas', 'boutique'],
     bestFor: 'Fashion, abayas and boutiques',
+  },
+  {
+    id: 'souq',
+    name: 'Souq',
+    nameAr: 'سوق',
+    description: 'General retail and electronics: Catalogue, Night souq and Showroom looks',
+    descriptionAr: 'متجر عام وإلكترونيات: كتالوج وسوق الليل وشو روم',
+    thumbnail: '/looks/souq.catalogue.webp',
+    tags: ['electronics', 'appliances', 'general'],
+    bestFor: 'General retail, electronics and appliances',
   },
 ];
 

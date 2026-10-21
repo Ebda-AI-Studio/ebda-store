@@ -13,7 +13,7 @@ Looks are **data**, not code: they live in `@ebda/shared` (`packages/shared/src/
 
 ## The 15 looks
 
-3 of the 15 are `status: 'built'` (the Qamar looks, flipped in Phase B1 Task 10 after Ahmad's STOP 2 approval, 2026-10-21); the other 12 are `designed`. The Qamar looks render on the `qamar` skin (Ruling B1-1); the twelve others still render on `skin: 'minimal'`. The showroom lists and previews only `built` looks, so today it offers exactly the three Qamar looks. The admin `LookPicker` shows all 15 and, with no look chosen, opens on the first template that has a built look (Qamar; Ruling B1-19).
+3 of the 15 are `status: 'built'` (the Qamar looks, flipped in Phase B1 Task 10 after Ahmad's STOP 2 approval, 2026-10-21); the other 12 are `designed`. The Qamar looks render on the `qamar` skin (Ruling B1-1); the Souq looks render on the `souq` skin since Phase B2 Task 1 (Ruling B2-1; still `designed` until Task 7); the nine others still render on `skin: 'minimal'`. The showroom lists and previews only `built` looks, so today it offers exactly the three Qamar looks. The admin `LookPicker` shows all 15 and, with no look chosen, opens on the first template that has a built look (Qamar; Ruling B1-19).
 
 | Id                   | Template | Name (ar)    | Name (en)        | Status   |
 | -------------------- | -------- | ------------ | ---------------- | -------- |

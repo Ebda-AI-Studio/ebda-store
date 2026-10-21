@@ -267,6 +267,28 @@ const PACK_STYLES: Record<TemplateId, PackStyles> = {
     testimonialCard: 'bg-transparent p-0',
     testimonialAuthor: 'text-sm font-medium text-muted-foreground',
   },
+  souq: {
+    // Phase B2 (Ruling B2-1): a catalogue of many SKUs. A framed tile (surface + hairline,
+    // radius from the look), a product name that reads at a glance, a firm price. Everything is
+    // a look token; the dense-card details (quick add, compact gaps) are Task 2.
+    card: 'rounded-[var(--radius)] border border-border bg-card',
+    categoryFrame: 'rounded-[var(--radius)] bg-muted',
+    categoryCaption: 'text-sm font-medium text-foreground',
+    productCardName: 'font-medium text-foreground leading-snug',
+    productCardPrice: 'font-semibold text-foreground',
+    productCardCta:
+      'whitespace-nowrap rounded-[var(--radius)] bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors duration-[var(--motion-duration,150ms)] min-h-[44px]',
+    sectionHeading:
+      'font-display text-xl sm:text-2xl md:text-3xl font-semibold text-foreground leading-[1.25] text-balance',
+    sectionSeeAll: 'text-sm font-medium text-primary hover:underline underline-offset-4',
+    sectionHeadingAlign: 'start',
+    heroOverlay: 'bg-gradient-to-b from-foreground/0 via-foreground/0 to-foreground/35',
+    heroHeadline: 'font-display text-3xl sm:text-5xl md:text-6xl font-bold leading-[1.2]',
+    heroCta:
+      'rounded-[var(--radius)] bg-background px-8 py-3.5 text-sm font-medium text-foreground hover:bg-background/90 min-h-[44px]',
+    testimonialCard: 'rounded-[var(--radius)] border border-border bg-card p-5',
+    testimonialAuthor: 'text-sm font-medium text-muted-foreground',
+  },
 };
 
 /** The qamar hero scrim, as painted by `PACK_STYLES.qamar.heroOverlay` (centre = under the text). */

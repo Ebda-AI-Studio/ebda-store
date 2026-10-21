@@ -9,6 +9,24 @@ export const LOOK_TEMPLATES: readonly LookTemplate[] = [
 ];
 
 const L = (d: LookDefinition) => d;
+
+/**
+ * STOP-1 alternative for Night souq (Ruling B2-2, prepared, NOT wired): the same room with brass
+ * (#C89B3C, 4.87:1 on the page) kept for CTAs only, pomegranate kept for chips. It is in the
+ * orange family's neighbourhood (41 deg), so it ships only if Ahmad picks it at STOP-1. Used by
+ * the STOP-1 shot script alone; no runtime code and no registry entry reads it.
+ */
+export const SOUQ_NIGHT_ALT_BRASS = {
+  page: '#0F3B2E',
+  surface: '#14503F',
+  ink: '#F6F3EA',
+  muted: '#B4CDC0',
+  primary: '#C89B3C',
+  onPrimary: '#10151C',
+  accent: '#E8606A',
+  onAccent: '#10151C',
+  line: '#1E5A48',
+} as const;
 export const LOOKS: readonly LookDefinition[] = [
   L({
     id: 'qamar.atelier',
@@ -213,7 +231,7 @@ export const LOOKS: readonly LookDefinition[] = [
     id: 'souq.catalogue',
     template: 'souq',
     letter: 'A',
-    skin: 'minimal',
+    skin: 'souq',
     status: 'designed',
     name: { ar: 'كتالوج', en: 'Catalogue' },
     forWhom: {
@@ -239,13 +257,16 @@ export const LOOKS: readonly LookDefinition[] = [
       density: 'compact',
       imageRatio: '1/1',
       motion: 'subtle',
+      // Ruling B2-1: the sale / new chips read the accent pair; the card keeps the skin's
+      // quick-add system (no cardCta), so a catalogue card has one action.
+      cardBadge: 'accent',
     },
   }),
   L({
     id: 'souq.night',
     template: 'souq',
     letter: 'B',
-    skin: 'minimal',
+    skin: 'souq',
     status: 'designed',
     name: { ar: 'سوق الليل', en: 'Night souq' },
     forWhom: {
@@ -258,22 +279,30 @@ export const LOOKS: readonly LookDefinition[] = [
       surface: '#14503F',
       ink: '#F6F3EA',
       muted: '#B4CDC0',
-      primary: '#C89B3C',
+      // Ruling B2-2: no orange. Khan el-Khalili turquoise carries every primary action
+      // (6.86:1 on the page); pomegranate is a FILL for sale / new chips with dark ink (the
+      // accent is 3.75:1 on the page, so it never paints text there). The first design's
+      // brass (#C89B3C, 41 deg) and lantern orange (#E68245, 23 deg) are in the forbidden band.
+      primary: '#5FD3C0',
       onPrimary: '#10151C',
-      accent: '#E68245',
+      accent: '#E8606A',
+      onAccent: '#10151C',
       line: '#1E5A48',
       fonts: { display: 'Changa', body: 'Cairo', latin: 'Manrope' },
       radius: 'md',
       density: 'regular',
       imageRatio: '1/1',
       motion: 'expressive',
+      // Quality bar section 9: controls on a product photo take their own on-token.
+      overPhotoChrome: 'soft',
+      cardBadge: 'accent',
     },
   }),
   L({
     id: 'souq.showroom',
     template: 'souq',
     letter: 'C',
-    skin: 'minimal',
+    skin: 'souq',
     status: 'designed',
     name: { ar: 'شو روم', en: 'Showroom' },
     forWhom: {
@@ -295,6 +324,9 @@ export const LOOKS: readonly LookDefinition[] = [
       density: 'airy',
       imageRatio: '1/1',
       motion: 'subtle',
+      // The product is the hero: no accent slab under every card, one quiet action.
+      cardCta: 'quiet',
+      cardBadge: 'accent',
     },
   }),
   L({

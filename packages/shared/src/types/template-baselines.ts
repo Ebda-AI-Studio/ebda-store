@@ -191,7 +191,7 @@ export function buildTemplateBaseline(identity: TemplateIdentity): StoreLayoutSe
 
 /** Per-template identities. elegant = the calibrated base (no delta). */
 export const TEMPLATE_IDENTITIES: Record<
-  Exclude<TemplateId, 'elegant' | 'dahab' | 'qamar'>,
+  Exclude<TemplateId, 'elegant' | 'dahab' | 'qamar' | 'souq'>,
   TemplateIdentity
 > = {
   // Modern — clean airy grid: rounded-square category tiles, caption below, framed.
@@ -314,6 +314,17 @@ function buildQamarBaseline(): StoreLayoutSettings {
   return b;
 }
 
+/**
+ * Souq (Phase B2, Ruling B2-1): the minimal identity with the footer on the section-alt surface
+ * for the same reason as Qamar (B1-25): the shared footer paints muted links, unreadable on Night
+ * souq's turquoise primary. Cards keep their frame (a catalogue card is a framed tile).
+ */
+function buildSouqBaseline(): StoreLayoutSettings {
+  const b = buildTemplateBaseline(TEMPLATE_IDENTITIES.minimal);
+  b.footer = {};
+  return b;
+}
+
 /** The packaged per-template baselines. Stores with empty layout inherit by template. */
 export const TEMPLATE_LAYOUT_BASELINES: Record<TemplateId, StoreLayoutSettings> = {
   elegant: BASE_BRANDED_LAYOUT,
@@ -329,6 +340,7 @@ export const TEMPLATE_LAYOUT_BASELINES: Record<TemplateId, StoreLayoutSettings> 
   // reads productCardDefaults (PDP related row, PLP, search), as on the home sections - the
   // photo is the card (B1-1). STOP 1 critique, Ruling B1-25.
   qamar: buildQamarBaseline(),
+  souq: buildSouqBaseline(),
 };
 
 /** Safe lookup. Unknown id → the bare global default (back-compat behavior). */

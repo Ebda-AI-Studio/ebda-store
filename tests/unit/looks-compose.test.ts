@@ -102,9 +102,9 @@ describe('look UI tokens (W2a token plumbing): merchant > look > skin', () => {
       for (const k of LOOK_UI_TOKEN_KEYS) expect(k in t, `${template}.${k}`).toBe(false);
     }
   });
-  it('only the Qamar looks declare UI tokens today (Dahab and the designed looks are unchanged)', async () => {
+  it('only the Qamar and Souq looks declare UI tokens today (Dahab and the designed looks are unchanged)', async () => {
     const { LOOKS, LOOK_UI_TOKEN_KEYS } = await import('@ebda/shared');
-    for (const l of LOOKS.filter(x => x.template !== 'qamar'))
+    for (const l of LOOKS.filter(x => x.template !== 'qamar' && x.template !== 'souq'))
       for (const k of LOOK_UI_TOKEN_KEYS) expect(l.tokens[k], `${l.id}.${k}`).toBeUndefined();
   });
   it('overriddenLookKeys reports a merchant UI-token override', () => {

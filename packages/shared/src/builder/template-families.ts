@@ -51,6 +51,8 @@ export const TEMPLATE_FAMILIES: readonly TemplateFamily[] = [
       'footer',
     ],
     pendingSectionTypes: [],
+    // Phase B2 (Ruling B2-1): Souq has its own chrome skin; the looks decide the mixes.
+    skin: 'souq',
   },
   {
     id: 'dahab',
