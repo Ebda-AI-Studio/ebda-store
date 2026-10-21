@@ -211,7 +211,7 @@ Rules that apply to all of them:
 
 ## 13. Instalment estimate on the PDP (`settings.instalments`, Phase B2)
 
-**What.** A merchant who offers instalments can show "تقسيط يبدأ من 1,290 ج.م / شهر على 12 شهرًا · تقريبي" (English: "From EGP 1,290 / month for 12 months · estimate") in the PDP price row. It is ARITHMETIC over the merchant's own numbers: `ceil(price x (1 + markupPct/100) / months)` in integer minor units (the markup in basis points, so 2.5 % is exact). It is not a payment method, integrates no provider, ships no logo or brand, and never changes a checkout total (Ruling B2-9).
+**What.** A merchant who offers instalments can show "تقسيط من 1,290 ج.م في الشهر على 12 شهرًا · تقريبي" (English: "From EGP 1,290 / month for 12 months · estimate") in the PDP price row. It is ARITHMETIC over the merchant's own numbers: `ceil(price x (1 + markupPct/100) / months)` in integer minor units (the markup in basis points, so 2.5 % is exact). It is not a payment method, integrates no provider, ships no logo or brand, and never changes a checkout total (Ruling B2-9).
 
 **Honesty rules.** Renders only when `enabled`, the displayed price (the selected variant's sale price, never the struck compare-at) is at least `minPrice` (default 0) and the product can be bought now (`canBuyNow`). The word "تقريبي" / "estimate" is always there. A provider appears only as a typed NAME (`providerAr`/`providerEn`, 40 chars), never an image. With the setting absent the PDP is unchanged. Never on any card path, in the cart, or in checkout (`tests/unit/instalment-line-render.test.tsx` pins exactly one importer).
 

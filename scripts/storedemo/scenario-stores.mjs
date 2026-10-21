@@ -95,8 +95,9 @@ async function run() {
     for (const [slug, lookId, shape] of SCENARIO_LIST) {
       const edge = shape.edge;
       const data = {
-        name: `Scenario ${slug}`,
-        nameAr: `سيناريو ${slug}`,
+        // A store's display name is never its slug (STOP-2: "souq-noimg" leaked into a hero).
+        name: isSouq ? 'Cairo Electronics' : 'Heliopolis Boutique',
+        nameAr: isSouq ? 'القاهرة للإلكترونيات' : 'بوتيك مصر الجديدة',
         isDemo: false,
         status: 'active',
         plan: 'professional',
