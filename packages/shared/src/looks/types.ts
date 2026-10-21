@@ -92,7 +92,14 @@ export interface LookSectionSpec {
 
 /** Chrome choices a skin reads from the look (Ruling B1-4). */
 export interface LookChrome {
-  header: { logoPlacement: 'start' | 'centre' };
+  header: {
+    logoPlacement: 'start' | 'centre';
+    /**
+     * Search placement (Ruling B2-1): `prominent` = a full-width labelled search field in the
+     * header (the Souq skin, search-first); `icon` or absent = the skin's own icon search.
+     */
+    search?: 'prominent' | 'icon';
+  };
 }
 
 /**

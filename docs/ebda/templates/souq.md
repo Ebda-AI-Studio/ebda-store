@@ -30,6 +30,10 @@ Night's pomegranate is a FILL with dark ink for sale and new chips, never a text
 
 If Ahmad prefers a warmer Night souq, `SOUQ_NIGHT_ALT_BRASS` (`registry.ts`) keeps brass `#C89B3C` for CTAs only (4.87:1 on the page) with the same green room and pomegranate chips. It is unwired: only the STOP-1 shot script reads it, and it ships only if Ahmad picks it (Ruling B2-2).
 
+## Chrome (Task 2)
+
+`apps/web/src/templates/souq/Header.tsx` wraps the minimal header and reads the look's `chrome.header.search`: Catalogue and Night souq are **prominent** (one labelled search field, `role="search"`, 44px tall, with a themed clear button; under the logo row on a phone, in the centre column from `md`, the nav on a second row from `lg`), Showroom keeps the skin's **icon** search (the product is the hero, the chrome stays quiet). The label is "ابحث عن منتج أو ماركة" / "Search for a product or brand" (`LanguageContext` translations). The store name is the sized, untracked display wordmark (`wordmarkSize: 'lg'` on all three looks, so checkout shows the same one). `PACK_STYLES.souq` is the framed tile card with a two-line name, a firm price and one always-visible quick add; the `[data-pack='souq']` CSS sets the type voice only (no colour of its own, pinned by `souq-look-tokens.test.ts`).
+
 ## Status of the build (Phase B2)
 
 Task 1 (this page's first version): skin id, tokens, gates. Tasks 2-7 add the search-first header, dense-card pack, four platform variants (`rail`, `tiles`, `stage`, `on_sale`), the section mixes, the PDP instalment line, the `storedemo-souq` demo and the scenario matrix. This page is extended by the task that changes the behaviour it describes.

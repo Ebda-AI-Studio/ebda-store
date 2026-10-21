@@ -233,6 +233,7 @@ export const LOOKS: readonly LookDefinition[] = [
     letter: 'A',
     skin: 'souq',
     status: 'designed',
+    chrome: { header: { logoPlacement: 'start', search: 'prominent' } },
     name: { ar: 'كتالوج', en: 'Catalogue' },
     forWhom: {
       ar: 'لمحل فيه أصناف كتير والزبون عارف عايز إيه.',
@@ -260,6 +261,8 @@ export const LOOKS: readonly LookDefinition[] = [
       // Ruling B2-1: the sale / new chips read the accent pair; the card keeps the skin's
       // quick-add system (no cardCta), so a catalogue card has one action.
       cardBadge: 'accent',
+      // T-01: the store name is a sized, untracked wordmark in the header and at checkout.
+      wordmarkSize: 'lg',
     },
   }),
   L({
@@ -268,6 +271,7 @@ export const LOOKS: readonly LookDefinition[] = [
     letter: 'B',
     skin: 'souq',
     status: 'designed',
+    chrome: { header: { logoPlacement: 'start', search: 'prominent' } },
     name: { ar: 'سوق الليل', en: 'Night souq' },
     forWhom: {
       ar: 'لتاجر عايز دفا وشخصية.',
@@ -296,6 +300,8 @@ export const LOOKS: readonly LookDefinition[] = [
       // Quality bar section 9: controls on a product photo take their own on-token.
       overPhotoChrome: 'soft',
       cardBadge: 'accent',
+      // T-01: the store name is a sized, untracked wordmark in the header and at checkout.
+      wordmarkSize: 'lg',
     },
   }),
   L({
@@ -304,6 +310,7 @@ export const LOOKS: readonly LookDefinition[] = [
     letter: 'C',
     skin: 'souq',
     status: 'designed',
+    chrome: { header: { logoPlacement: 'start', search: 'icon' } },
     name: { ar: 'شو روم', en: 'Showroom' },
     forWhom: {
       ar: 'لمجموعة صغيرة فاخرة بتتباع قطعة قطعة.',
@@ -327,6 +334,8 @@ export const LOOKS: readonly LookDefinition[] = [
       // The product is the hero: no accent slab under every card, one quiet action.
       cardCta: 'quiet',
       cardBadge: 'accent',
+      // T-01: the store name is a sized, untracked wordmark in the header and at checkout.
+      wordmarkSize: 'lg',
     },
   }),
   L({

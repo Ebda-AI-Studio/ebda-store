@@ -82,14 +82,23 @@ describe('look UI tokens (W2a token plumbing): merchant > look > skin', () => {
     expect(t.receiptStyle).toBe('framed');
   });
   it('a look that does not declare a token leaves the skin behaviour (undefined)', () => {
-    const t = composeStoreTheme({ template: 'minimal', look: 'souq.catalogue', theme: {} });
+    const t = composeStoreTheme({ template: 'minimal', look: 'jasmine.clinic', theme: {} });
     expect(t.wordmarkSize).toBeUndefined();
     expect(t.overPhotoChrome).toBeUndefined();
     expect(t.receiptStyle).toBeUndefined();
   });
   it('no look: the composed theme is the skin theme byte-for-byte but the input floor (no UI token appears)', async () => {
     const { LOOK_UI_TOKEN_KEYS, boundaryColorFloor } = await import('@ebda/shared');
-    const skins = ['modern', 'classic', 'minimal', 'bold', 'elegant', 'dahab', 'qamar'] as const;
+    const skins = [
+      'modern',
+      'classic',
+      'minimal',
+      'bold',
+      'elegant',
+      'dahab',
+      'qamar',
+      'souq',
+    ] as const;
     for (const template of skins) {
       const t = composeStoreTheme({ template, look: null, theme: {} });
       const skin = getTemplateTheme(template);

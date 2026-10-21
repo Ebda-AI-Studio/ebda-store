@@ -203,6 +203,12 @@ export interface HeaderProps {
    */
   wordmarkSize?: import('@ebda/shared').WordmarkSize;
   /**
+   * Search placement, set only by the Souq skin from the look's chrome data (Ruling B2-1).
+   * `prominent` renders one full-width labelled search field (under the logo row on a phone, in
+   * the centre column from md); undefined or `icon` = the theme's own icon search, unchanged.
+   */
+  searchPlacement?: 'prominent' | 'icon';
+  /**
    * Resolved pre-header utility bar config. Only consumed by packs that
    * render a utility bar (Elegant + Classic). When undefined, the pack
    * falls back to its built-in defaults so legacy stores don't lose

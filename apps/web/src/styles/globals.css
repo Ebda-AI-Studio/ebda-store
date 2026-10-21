@@ -1374,6 +1374,46 @@ html[lang] [data-pack='qamar'] [data-zone='filters'] :is(h2, h3, h4, legend) {
   font-weight: 600;
 }
 
+/* Souq (Phase B2, Ruling B2-1): the type voice of a catalogue. Same rules as Qamar's: the look's
+   faces carry the voice, an Arabic display face is never letter-spaced and gets open leading, and
+   the minimal components' tracked-caps classes (kept for the legacy minimal skin) are reset under
+   the souq skin only (quality bar T-01/T-05). NO colour is set here: every Souq colour is a look
+   token, which is what keeps the no-orange gate (Ruling B2-2) true. */
+html[dir='rtl'] [data-pack='souq'] h1,
+html[dir='rtl'] [data-pack='souq'] h2,
+html[dir='rtl'] [data-pack='souq'] h3,
+html[dir='rtl'] [data-pack='souq'] .font-display {
+  line-height: 1.4;
+  letter-spacing: 0;
+}
+[data-pack='souq']
+  :is(
+    .ui-caps-toggle,
+    .uppercase,
+    .tracking-wide,
+    .tracking-wider,
+    .tracking-widest,
+    [class*='tracking-[0.'],
+    [class*='tracking-[.']
+  ) {
+  letter-spacing: normal;
+  text-transform: none;
+}
+[data-pack='souq'] [data-ui-uppercase='true'] .ui-caps-toggle {
+  text-transform: uppercase;
+}
+html[lang] [data-pack='souq'] [data-zone='filters'] :is(h2, h3, h4, legend) {
+  font-family: var(--font-body, inherit);
+}
+[data-pack='souq'] :is(h1, h2, h3, .font-display) {
+  font-size-adjust: none;
+}
+:where([data-pack='souq']) :where(h1[data-zone='productName']) {
+  font-family: var(--font-display, inherit);
+  line-height: 1.3;
+  font-weight: 600;
+}
+
 /* Ruling B1-29: the shared PDP title (h1[data-zone='productName']) has no size class, so with no
    zone size it fell to the body size, smaller than its own price (design.md: name >= price).
    Platform default for EVERY skin at specificity (0,0,1): it must beat Tailwind preflight's

@@ -269,15 +269,19 @@ const PACK_STYLES: Record<TemplateId, PackStyles> = {
   },
   souq: {
     // Phase B2 (Ruling B2-1): a catalogue of many SKUs. A framed tile (surface + hairline,
-    // radius from the look), a product name that reads at a glance, a firm price. Everything is
-    // a look token; the dense-card details (quick add, compact gaps) are Task 2.
+    // radius from the look), a name that reads at a glance in two lines, a firm price (600; the
+    // struck compare-at price is already muted in the shared card), and ONE always-visible quick
+    // add (a >= 44px target; the card keeps its single action, never a second control).
+    // Everything is a look token, so the orange gate stays true; compact spacing comes from the
+    // look's density, the square photo from its image ratio.
     card: 'rounded-[var(--radius)] border border-border bg-card',
     categoryFrame: 'rounded-[var(--radius)] bg-muted',
     categoryCaption: 'text-sm font-medium text-foreground',
-    productCardName: 'font-medium text-foreground leading-snug',
+    productCardName: 'line-clamp-2 font-medium text-foreground leading-snug',
     productCardPrice: 'font-semibold text-foreground',
+    productCardBody: 'text-start',
     productCardCta:
-      'whitespace-nowrap rounded-[var(--radius)] bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors duration-[var(--motion-duration,150ms)] min-h-[44px]',
+      'whitespace-nowrap rounded-[var(--radius)] bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground hover:bg-primary/90 transition-colors duration-[var(--motion-duration,150ms)] min-h-[44px]',
     sectionHeading:
       'font-display text-xl sm:text-2xl md:text-3xl font-semibold text-foreground leading-[1.25] text-balance',
     sectionSeeAll: 'text-sm font-medium text-primary hover:underline underline-offset-4',

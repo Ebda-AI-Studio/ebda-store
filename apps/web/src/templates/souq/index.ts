@@ -1,8 +1,7 @@
 // Souq template (سوق) - general retail & electronics, Phase B2 (Ruling B2-1).
 // Owns chrome only; every commerce surface is the shared/minimal component, styled by the
-// look's tokens and PACK_STYLES.souq. The search-first Header wrapper lands in Task 2; until
-// then the minimal Header is the Souq header.
-export { default as Header } from '../minimal/Header';
+// look's tokens and PACK_STYLES.souq (the Header wrapper reads the look's search placement).
+export { default as Header } from './Header';
 export { default as Footer } from '../minimal/Footer';
 export { default as Hero } from '../minimal/Hero';
 export { default as ProductCard } from '../minimal/ProductCard';

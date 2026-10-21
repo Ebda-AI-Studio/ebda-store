@@ -315,3 +315,25 @@ describe('souq skin id', () => {
     expect(TEMPLATE_FAMILIES.find(f => f.id === 'souq')?.skin).toBe('souq');
   });
 });
+
+describe('Souq chrome paints no colour of its own (so the gate above stays true)', () => {
+  const css = readFileSync(path.join(root, 'apps/web/src/styles/globals.css'), 'utf8').replace(
+    /\/\*[\s\S]*?\*\//g,
+    ''
+  );
+  const souqRules = [...css.matchAll(/([^{}]*data-pack='souq'[^{}]*)\{([^}]*)\}/g)];
+  it('there are souq pack rules, and none sets a colour literal or colour property', () => {
+    expect(souqRules.length).toBeGreaterThanOrEqual(5);
+    for (const [, sel, body] of souqRules) {
+      expect(body, sel.trim()).not.toMatch(/#[0-9a-fA-F]{3,8}\b|\brgba?\(|\bhsla?\(/);
+      expect(body, sel.trim()).not.toMatch(
+        /(^|;|\s)(color|background(-color)?|border(-\w+)?-color)\s*:/
+      );
+    }
+  });
+  it('PACK_STYLES.souq uses only token colours (no arbitrary colour, no orange/amber/yellow/gold)', async () => {
+    const { getPackStyles } = await import('../../apps/web/src/templates/shared/pack-styles');
+    const all = Object.values(getPackStyles('souq')).join(' ');
+    expect(all).not.toMatch(/\[#|rgb\(|hsl\(|\b(orange|amber|yellow|gold|brass|saffron)\b/i);
+  });
+});
