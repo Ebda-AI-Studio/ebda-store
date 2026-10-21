@@ -127,13 +127,13 @@ describe('the shop-the-look section links each panel to its page', () => {
         {...props}
       />
     );
-  it('one "تسوّق اللوك" link per panel, to /looks/<section>/<look>', () => {
+  it('one "شوف اللوك كامل" link per panel, to /looks/<section>/<look>', () => {
     setStore();
     const out = html({ sectionId: 'stl' });
     expect(out.match(/data-part="shop-this-look"/g)?.length).toBe(2);
     expect(out).toContain('href="/looks/stl/look-1"');
     expect(out).toContain('href="/looks/stl/look-2"');
-    expect(out).toContain('تسوّق اللوك');
+    expect(out).toContain('شوف اللوك كامل');
     // a quiet secondary link, never a second accent fill
     expect(out).toMatch(/data-part="shop-this-look"[^>]*border border-input/);
     expect(out).not.toMatch(/data-part="shop-this-look"[^>]*bg-primary/);
@@ -235,7 +235,7 @@ describe('the look page: one buy block per piece', () => {
       'utf8'
     );
     for (const k of [
-      "'Shop this look': 'تسوّق اللوك'",
+      "'See the full look': 'شوف اللوك كامل'",
       "'Choose the options above first': 'اختيار الخيارات أولًا'",
       "'Personalise on the product page': 'التخصيص من صفحة المنتج'",
     ])

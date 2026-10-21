@@ -228,7 +228,7 @@ export function ShopTheLookSection({
                         data-part="shop-this-look"
                         className="mt-4 inline-flex min-h-[44px] w-full items-center justify-center rounded-[var(--radius)] border border-input px-4 text-sm font-medium text-foreground transition-colors hover:bg-foreground/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                       >
-                        {t('Shop this look', 'تسوّق اللوك')}
+                        {t('See the full look', 'شوف اللوك كامل')}
                       </Link>
                     )}
                   </article>
