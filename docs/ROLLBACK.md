@@ -221,7 +221,7 @@ Adds `dahab` to the `"StoreTemplate"` enum (builder Phase 3 pilot). Postgres can
 
 Adds `qamar` to the `"StoreTemplate"` enum (Phase B1; stamp 2026-10-23 so it sorts after the search and PR #91 migrations). Same shape as the Dahab value above: Postgres cannot drop an enum value, so a rollback is: revert the code, then `UPDATE stores SET template = 'minimal' WHERE template = 'qamar';` and redeploy (re-check RLS policy state after); the `look` column keeps the Qamar look and renders on `minimal` until the skin is back. Leave the enum value unused. Delete the row from `_prisma_migrations` only if you also restore from a pre-migration branch.
 
-## Souq template enum value (`20261029000100_store_template_souq`)
+## Souq template enum value (`20261029000400_store_template_souq`)
 
 Adds `souq` to the `"StoreTemplate"` enum (Phase B2; stamp 2026-10-29 so it sorts after main's newest migration (20261028000700, B2B); renumbered from 20261026000100 before merge (Ruling B2-27)). Same shape as the Qamar value above: Postgres cannot drop an enum value, so a rollback is: revert the code, then `UPDATE stores SET template = 'minimal' WHERE template = 'souq';` and redeploy (re-check RLS policy state after); the `look` column keeps the Souq look and renders on `minimal` until the skin is back. Leave the enum value unused. Delete the row from `_prisma_migrations` only if you also restore from a pre-migration branch.
 

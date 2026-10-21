@@ -365,7 +365,7 @@ describe('souq skin id', () => {
     expect(schema).toMatch(/enum StoreTemplate \{[^}]*\bsouq\b[^}]*\}/s);
     const mig = path.join(
       root,
-      'packages/database/prisma/migrations/20261029000100_store_template_souq/migration.sql'
+      'packages/database/prisma/migrations/20261029000400_store_template_souq/migration.sql'
     );
     expect(existsSync(mig)).toBe(true);
     const sql = readFileSync(mig, 'utf8');

@@ -581,7 +581,7 @@ export async function seedCatalogue(prisma, Prisma, storeId, base, spec = TEMPLA
       });
       return { productIdBySlug, variantCount, archived: archived.count };
     },
-    { timeout: 120_000, maxWait: 10_000 }
+    { timeout: 900_000, maxWait: 10_000 }
   );
 }
 
@@ -632,6 +632,9 @@ async function run() {
   const img = f => `${a.base}/${f}`;
 
   const prisma = createPrismaClient({ connectionString: url, role: 'owner' });
+  // Open the first pooled connection before any transaction: over the internet a Neon connect takes
+  // longer than Prisma's default 2 s transaction maxWait (P2028 on the first `$transaction`).
+  await prisma.$queryRaw`select 1`;
   const publishHome = async (storeId, ownerId, productIdBySlug) =>
     runInStoreScope(storeId, async () => {
       const state = await getPageState(storeId, 'home');

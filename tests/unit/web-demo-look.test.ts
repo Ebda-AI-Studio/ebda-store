@@ -145,6 +145,12 @@ describe('applyDemoLook', () => {
     );
   });
 
+  it('keeps the showNewBadge merchant switch through the recomposition', () => {
+    const on = baseStore({ theme: { showNewBadge: true } as ResolvedStore['theme'] });
+    expect(applyDemoLook(on, 'qamar.lookbook', built).theme.showNewBadge).toBe(true);
+    expect(applyDemoLook(baseStore(), 'qamar.lookbook', built).theme.showNewBadge).not.toBe(true);
+  });
+
   it('demo store + designed look: ignored (same object)', () => {
     const s = baseStore();
     expect(applyDemoLook(s, 'souq.night', designed)).toBe(s);

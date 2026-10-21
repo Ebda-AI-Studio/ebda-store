@@ -89,14 +89,17 @@ describe('ci.yml triggers', () => {
     expect(ci.concurrency['cancel-in-progress']).toBe("${{ github.event_name == 'pull_request' }}");
   });
 
-  it('uses Node 22 (wrangler >= 4.110) and caches npm in every setup-node that installs', () => {
+  it('uses Node 22 (wrangler >= 4.110) and caches npm (hosted runners only) in every setup-node that installs', () => {
     expect(ci.env.NODE_VERSION).toBe('22');
     const steps = raw.split('uses: actions/setup-node@').slice(1);
     expect(steps.length).toBeGreaterThan(8);
     // Exactly one setup-node skips the cache: the `changes` job, which only
     // runs the dependency-free scripts/ci-affected.mjs and installs nothing.
     const uncached = steps.filter(
-      b => !/^[^\n]*\n\s+with:[\s\S]*?cache: npm/.test(b.split('\n\n')[0] + '\n')
+      b =>
+        !/^[^\n]*\n\s+with:[\s\S]*?cache: \$\{\{ vars\.EBDA_RUNS_ON == '' && 'npm' \|\| '' \}\}/.test(
+          b.split('\n\n')[0] + '\n'
+        )
     );
     expect(uncached).toHaveLength(1);
   });

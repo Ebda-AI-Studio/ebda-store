@@ -5885,7 +5885,10 @@
       "serverError": "Server returned an invalid response. Please try again.",
       "accessDenied": "Access denied. Admin or staff privileges required.",
       "mfaVerifyFailed": "Verification failed",
-      "forgotPassword": "Forgot password?"
+      "forgotPassword": "Forgot password?",
+      "passkeySignIn": "Sign in with a passkey",
+      "passkeyOr": "or",
+      "passkeyFailed": "Passkey sign-in did not work. Try again, or use your password."
     },
     "forgot": {
       "title": "Reset your password",
@@ -7874,7 +7877,37 @@
       "continueButton": "Continue",
       "statusOn": "ON",
       "statusOff": "OFF",
-      "qrCodeAlt": "2FA QR code"
+      "qrCodeAlt": "2FA QR code",
+      "passkeys": {
+        "title": "Passkeys",
+        "description": "Sign in with Face ID, Touch ID, Windows Hello or a security key instead of a password. A passkey also counts as your second step, so you are not asked for a code. Check the list below: if you see a passkey you did not add, remove it and reset your password.",
+        "empty": "No passkeys yet.",
+        "loading": "Loading…",
+        "unsupported": "This browser does not support passkeys.",
+        "add": "Add a passkey",
+        "nameLabel": "Name",
+        "namePlaceholder": "e.g. Work laptop",
+        "addedOn": "Added {date}",
+        "lastUsed": "Last used {date}",
+        "neverUsed": "Never used",
+        "rename": "Rename",
+        "save": "Save",
+        "remove": "Remove",
+        "removeConfirm": "Remove this passkey? It will stop working, and you will be signed out on all your devices.",
+        "removeConfirmCta": "Yes, remove",
+        "stepUpTitle": "Confirm it is you",
+        "stepUpDescription": "Enter your password to manage passkeys.",
+        "stepUpDescriptionMfa": "Enter your password and a current 2FA code to manage passkeys.",
+        "passwordLabel": "Password",
+        "codeLabel": "2FA code",
+        "stepUpConfirm": "Confirm",
+        "stepUpFailed": "That did not match. Check your password and code and try again.",
+        "added": "Passkey added",
+        "renamed": "Passkey renamed",
+        "removed": "Passkey removed",
+        "errorLoad": "Could not load your passkeys",
+        "errorGeneric": "Something went wrong. Nothing was changed."
+      }
     }
   },
   "answerEngine": {

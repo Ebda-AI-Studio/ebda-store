@@ -6,6 +6,7 @@ import { redis } from '../services/redis.service';
 import { getUserState } from '../lib/definer';
 import logger from '../lib/logger';
 import { customerTokenMatchesRequestStore } from '../lib/customer-store-binding';
+import { isPlatformOrigin } from '../lib/cors-cache';
 
 export interface AuthPayload {
   userId: string;
@@ -341,4 +342,41 @@ export function rejectImpersonated(req: Request, res: Response, next: NextFuncti
     });
   }
   return next();
+}
+
+/**
+ * Admin-namespace identities (`store_admin`, `staff`, `super_admin`) are served account endpoints only to
+ * PLATFORM origins (review M4).
+ *
+ * CORS allowlists every verified merchant domain with `credentials: true` and the session cookie is
+ * `SameSite=None`, so a page the merchant controls can lure a signed-in admin and READ whatever an
+ * account endpoint answers (profile, MFA state, the data export, the passkey list). `csrfProtection` only
+ * guards writes and `restrictPlatformOnlyOrigins` is a path list that never covered `/auth/*`. Admin
+ * sessions are only ever used from the admin/orders apps, which are platform origins; the storefront carries
+ * `customer` tokens. A request with no Origin (server-to-server, no ambient cookie) passes.
+ * Mount AFTER `authenticate`.
+ */
+export function rejectAdminOnMerchantOrigin(req: Request, res: Response, next: NextFunction) {
+  const origin = req.headers.origin as string | undefined;
+  if (!origin || !req.user || req.user.role === 'customer') return next();
+  if (
+    isPlatformOrigin(origin, {
+      webUrl: config.webUrl,
+      adminUrl: config.adminUrl,
+      nodeEnv: config.nodeEnv,
+    })
+  ) {
+    return next();
+  }
+  logger.warn(
+    { origin, role: req.user.role, path: req.path },
+    '[SECURITY] admin credentials presented from a non-platform origin'
+  );
+  return res.status(403).json({
+    success: false,
+    error: {
+      code: 'ORIGIN_NOT_PERMITTED',
+      message: 'This endpoint is not available from this origin',
+    },
+  });
 }

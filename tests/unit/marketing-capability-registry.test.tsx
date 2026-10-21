@@ -18,6 +18,7 @@ import {
   CAPABILITIES,
   CAPABILITY_IDS,
   featuresFaq,
+  THEMES,
 } from '../../apps/marketing/src/lib/capabilities';
 import { REGISTRY, type CapabilityId } from '../../apps/marketing/src/lib/capability-registry';
 import { compareRows } from '../../apps/marketing/src/lib/compare';
@@ -32,16 +33,21 @@ const FLIP_ON_MERGE: Record<string, CapabilityId[]> = {
 
 const pub = (f: string) =>
   readFileSync(path.resolve(__dirname, '../../apps/marketing/public', f), 'utf8');
+/** `meaning` is a flag with no card of its own: it is the coming line of the search card. */
+const FLAG_IDS: CapabilityId[] = ['meaning'];
 const coming = CAPABILITY_IDS.filter(id => REGISTRY[id].status === 'coming');
 const live = CAPABILITY_IDS.filter(id => REGISTRY[id].status === 'live');
+const comingAll = (Object.keys(REGISTRY) as CapabilityId[]).filter(
+  id => REGISTRY[id].status === 'coming'
+);
 
 describe('capability registry', () => {
   it('covers every capability id exactly once', () => {
-    expect(Object.keys(REGISTRY).sort()).toEqual([...CAPABILITY_IDS].sort());
+    expect(Object.keys(REGISTRY).sort()).toEqual([...CAPABILITY_IDS, ...FLAG_IDS].sort());
   });
   it('the coming items and the flip-on-merge list agree, per branch', () => {
     const fromRegistry: Record<string, string[]> = {};
-    for (const id of coming) {
+    for (const id of comingAll) {
       const dep = REGISTRY[id].dependsOn;
       expect(dep, `${id} is coming, so it needs dependsOn`).toBeTruthy();
       (fromRegistry[dep!] ??= []).push(id);
@@ -81,6 +87,15 @@ describe('a coming item says so everywhere; a live item never does', () => {
   it('every coming capability is on /features', () => {
     for (const id of coming) expect(pages['features en']).toContain(`data-capability="${id}"`);
   });
+  it('meaning search is the coming line of the search card, never a live claim', () => {
+    expect(REGISTRY.meaning.status).toBe('coming');
+    for (const l of ['ar', 'en'] as const) {
+      const html = pages[`features ${l}`];
+      const card = html.match(/<li class="cap-card" data-capability="search"[^>]*>.*?<\/li>/s)!;
+      expect(card[0]).toContain('data-status="coming"');
+      expect(card[0]).toContain(l === 'ar' ? 'قريبًا' : 'Coming soon');
+    }
+  });
   it('FAQ answers follow the registry', () => {
     const faq = featuresFaq('en')
       .map(f => f.a)
@@ -90,7 +105,7 @@ describe('a coming item says so everywhere; a live item never does', () => {
   });
   it('compare: a coming item sits in the not-yet table with the badge, never as a strength', () => {
     const { strength, gap } = compareRows();
-    const comingNeeds = new Set(coming);
+    const comingNeeds = new Set(comingAll);
     for (const id of ['meaning', 'integrations', 'b2b', 'email']) {
       const needs = {
         meaning: 'meaning',
@@ -130,5 +145,54 @@ describe('a coming item says so everywhere; a live item never does', () => {
         if (line && f === 'llms.txt') expect(line).not.toMatch(/coming soon/);
       }
     }
+  });
+});
+
+describe('/features has no duplicated capability and keeps all the AI in one place', () => {
+  const norm = (t: string) =>
+    t
+      .toLowerCase()
+      .replace(/[^\p{L}\p{N} ]/gu, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+  /** Key concepts: a capability that mentions one of these as its own subject is the same capability. */
+  const CONCEPT: Record<string, RegExp> = {
+    search: /search|بحث/i,
+    'cart recovery': /abandoned|السلات المتروكة|السلة المتروكة/i,
+    assistant: /ai assistant|مساعد ذكاء/i,
+    'ai writing': /writes, translates|كتابة وترجمة/i,
+  };
+  for (const l of ['ar', 'en'] as const) {
+    it(`${l}: no two capabilities share a normalized title`, () => {
+      const titles = CAPABILITY_IDS.map(id => norm(CAPABILITIES[l][id].t));
+      expect(new Set(titles).size).toBe(titles.length);
+    });
+    it(`${l}: each key concept is the title of exactly one capability`, () => {
+      for (const [name, re] of Object.entries(CONCEPT)) {
+        const hits = CAPABILITY_IDS.filter(id => re.test(CAPABILITIES[l][id].t));
+        expect(hits, `${name}: ${hits.join(',')}`).toHaveLength(1);
+      }
+    });
+    it(`${l}: each capability id is listed once across all themes`, () => {
+      const all = THEMES.flatMap(t => [...t.ids]);
+      expect(new Set(all).size).toBe(all.length);
+    });
+  }
+  it('the AI theme contains every capability tagged ai, and only those', () => {
+    const tagged = (Object.keys(REGISTRY) as CapabilityId[]).filter(id => REGISTRY[id].ai).sort();
+    const aiTheme = THEMES.find(t => t.id === 'ai')!;
+    expect([...aiTheme.ids].sort()).toEqual(tagged);
+    for (const l of ['ar', 'en'] as const) {
+      const html = renderToStaticMarkup(<FeaturesPage locale={l} />);
+      const section = html.match(/<section[^>]*data-theme="ai".*?<\/section>/s)![0];
+      for (const id of tagged) expect(section).toContain(`data-capability="${id}"`);
+      for (const t of THEMES.filter(x => x.id !== 'ai'))
+        for (const id of t.ids) expect(section).not.toContain(`data-capability="${id}"`);
+    }
+  });
+  it('every capability card appears once on the rendered page', () => {
+    const html = renderToStaticMarkup(<FeaturesPage locale="ar" />);
+    for (const id of CAPABILITY_IDS)
+      expect(html.split(`data-capability="${id}"`).length - 1).toBe(1);
   });
 });

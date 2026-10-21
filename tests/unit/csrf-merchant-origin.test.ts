@@ -330,6 +330,12 @@ describe('csrfProtection — only the credential-less /auth/ routes are exempt (
     ['POST', '/api/v1/auth/mfa/enroll/begin'],
     ['POST', '/api/v1/auth/mfa/enroll/verify'],
     ['POST', '/api/v1/auth/mfa/disable'],
+    // Passkeys: registering/renaming/removing is an authenticated write (PASSKEY-1..6).
+    ['POST', '/api/v1/auth/passkeys/step-up'],
+    ['POST', '/api/v1/auth/passkeys/register/begin'],
+    ['POST', '/api/v1/auth/passkeys/register/finish'],
+    ['PATCH', '/api/v1/auth/passkeys/00000000-0000-4000-8000-000000000000'],
+    ['DELETE', '/api/v1/auth/passkeys/00000000-0000-4000-8000-000000000000'],
   ];
 
   it.each(AUTHENTICATED_WRITES)(
@@ -371,6 +377,9 @@ describe('csrfProtection — only the credential-less /auth/ routes are exempt (
     '/api/v1/auth/verify-email',
     '/api/v1/auth/resend-verification',
     '/api/v1/auth/mfa/verify',
+    // Passkey sign-in is credential-less like /login.
+    '/api/v1/auth/passkeys/authenticate/begin',
+    '/api/v1/auth/passkeys/authenticate/finish',
   ];
 
   it.each(EXEMPT)('keeps %s exempt, even with a cookie present', async path => {

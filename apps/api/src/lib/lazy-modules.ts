@@ -8,3 +8,6 @@
 export const loadExcelJS = async () => (await import('exceljs')).default;
 export const loadS3 = () => import('./s3-bundle.js');
 export const loadS3Presigner = loadS3;
+// WebAuthn verification pulls in the @peculiar X.509/ASN.1 stack (attestation formats): only the passkey
+// routes need it, so it is loaded on the first passkey request, not at Worker boot.
+export const loadSimpleWebAuthn = () => import('@simplewebauthn/server');
