@@ -181,7 +181,7 @@ export function renderBrandedShell(content: string, store: EmailStoreContext): s
   // sentence so every branded email has a canonical reachable contact.
   const contactBlock = store.email
     ? `<p class="contact-cta" style="margin:0 auto 14px;padding:12px 16px;max-width:460px;background-color:${c.bg};border:1px solid ${c.lineSoft};border-radius:10px;color:${c.inkSoft};font-size:13px;line-height:1.5;">${
-        isArabic ? 'لديك سؤال؟ راسلنا على' : 'Questions? Email us at'
+        isArabic ? 'عندك سؤال؟ ابعتلنا على' : 'Questions? Email us at'
       } <a href="mailto:${escapeHtml(store.email)}" style="color:${brand};text-decoration:none;font-weight:600;">${escapeHtml(
         store.email
       )}</a></p>`

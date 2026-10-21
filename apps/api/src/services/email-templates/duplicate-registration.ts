@@ -15,8 +15,8 @@ export const duplicateRegistrationTemplate = {
         : 'Account already exists',
     ar: (d: DuplicateRegistrationData, _storeName: string) =>
       d.storeName && d.storeName.length > 0
-        ? `لديك حساب مسبقاً في ${d.storeName}`
-        : 'لديك حساب مسبقاً',
+        ? `عندك حساب بالفعل في ${d.storeName}`
+        : 'عندك حساب بالفعل',
   },
 
   en: (d: DuplicateRegistrationData, _storeName: string, webUrl: string) => {
@@ -51,23 +51,23 @@ export const duplicateRegistrationTemplate = {
     const resetUrlEsc = escapeHtml(`${webUrl}/auth/forgot-password`);
     const storeRef = d.storeName ? ` في ${escapeHtml(d.storeName)}` : '';
     return `
-    <h2>لديك حساب مسبقاً</h2>
-    <p>مرحباً ${escapeHtml(d.name)}،</p>
+    <h2>عندك حساب بالفعل</h2>
+    <p>أهلاً ${escapeHtml(d.name)}،</p>
     <p>
-      حاول شخص ما (ربما أنت) التسجيل بحساب جديد${storeRef}
-      باستخدام هذا البريد الإلكتروني — غير أن لديك حساباً بالفعل هنا.
+      حد حاول (يمكن تكون إنت) يسجّل بحساب جديد${storeRef}
+      بالبريد الإلكتروني ده — بس عندك حساب بالفعل هنا.
     </p>
-    <p>إذا كنت أنت من طلب ذلك، يمكنك تسجيل الدخول مباشرة:</p>
+    <p>لو إنت اللي عملت كده، سجّل دخولك على طول:</p>
     <p style="text-align: center; margin: 24px 0;">
       <a href="${loginUrlEsc}" class="button">تسجيل الدخول</a>
     </p>
     <p>
-      إذا نسيت كلمة المرور، يمكنك
-      <a href="${resetUrlEsc}" style="color: ${BRAND.colors.gold};">طلب رابط إعادة التعيين</a>.
+      لو نسيت كلمة المرور،
+      <a href="${resetUrlEsc}" style="color: ${BRAND.colors.gold};">اطلب رابط إعادة التعيين</a>.
     </p>
     <p style="font-size: 14px; color: #666; margin-top: 24px;">
-      إذا لم تكن أنت من فعل ذلك، يمكنك تجاهل هذه الرسالة — لم يتم إجراء أي تغييرات
-      على حسابك. ننصحك بإعادة تعيين كلمة المرور إذا كنت تعتقد أن شخصاً آخر يعرف بريدك الإلكتروني.
+      لو إنت معملتش كده، تجاهل الرسالة دي — مفيش أي تغيير اتعمل
+      على حسابك. الأفضل تعيّن كلمة المرور من جديد لو فيه احتمال إن حد تاني عارف بريدك الإلكتروني.
     </p>
   `;
   },

@@ -59,6 +59,8 @@ Every shopper-facing full sentence is Egyptian Arabic. Labels and buttons use ne
   - "حضرتك" and "علشان".
 - The only exceptions are the named legal files and fenced regions.
 - `tests/unit/legal-formal-counts.test.ts` and `tests/unit/ai-arabic-register.test.ts` cover the legal counts and the AI prompts.
+- **Shopper messages outside the storefront bundle** go through the same gate (`shopper messages` block in the same test): every file in `apps/api/src/services/email-templates/` (shopper-facing by default; merchant emails are listed in `MERCHANT_EMAIL_TEMPLATES`), `packages/shared/src/notifications.ts` (SMS + web-push), `apps/api/src/lib/wa-templates/definitions.ts` (WhatsApp template bodies), the email footer and the newsletter footer. Merchant-facing messages (merchant emails, merchant push in `onesignal.service.ts`, the admin) and the tax-invoice document (`invoice.service.ts`, `fiscal-document-render.ts`, a legal record) are not scanned. Changing the Arabic body of a WhatsApp template needs a Meta re-approval; keep the template `name` and the `{{n}}` variables stable. Canonical names are `ebda_<purpose>_v<n>` (renamed from `force_*`); a store still approved under an old name keeps sending under it until the new name is approved (`lib/wa-templates/legacy-names.ts`). SMS and push follow the shopper's locale (order/customer locale, else the store default, else ar).
+- `tests/unit/toast-semantic-tokens.test.ts` keeps the toast and the added-to-cart state on semantic tokens (success / destructive / warning / info), never a palette colour.
 - The critique owns everything else: wording, tone and gender-safe toasts.
 
 ## 3. Accessibility

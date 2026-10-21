@@ -146,6 +146,7 @@ export async function handleOrderStatusChanged(
         total: order.total,
         storeId,
         storeName,
+        locale: orderLocale,
       })
     );
   } else if (status === 'confirmed') {
@@ -205,6 +206,7 @@ export async function handleOrderStatusChanged(
         total: order.total,
         storeId,
         storeName,
+        locale: orderLocale,
       })
     );
   } else if (status === 'cancelled') {
@@ -216,6 +218,7 @@ export async function handleOrderStatusChanged(
         total: order.total,
         storeId,
         storeName,
+        locale: orderLocale,
       })
     );
   } else if (status === 'refunded' && hadCapturedPayment) {
