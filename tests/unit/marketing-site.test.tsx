@@ -45,9 +45,15 @@ describe('marketing nav', () => {
   it('names the product (not the studio) in both marketing page titles', () => {
     expect(pageMetadata('ar', '').title).toContain('ابدأ ستور');
     expect(pageMetadata('en', '').title).toContain('Ebda Store');
-    expect(`${pageMetadata('ar', '').title}${pageMetadata('en', '').title}`).not.toMatch(
-      /Ebda AI Studio|ابدأ استوديو/
-    );
+    // the product leads; the studio appears only as the maker inside the one brand line
+    // (Ahmad 2026-10-21: "Ebda Store — ابدأ ستور, by Ebda AI Studio (ebda.app)" on every title)
+    for (const l of ['ar', 'en'] as const) {
+      const t = String(pageMetadata(l, '').title);
+      expect(t.startsWith('Ebda Store — ابدأ ستور, by Ebda AI Studio (ebda.app)')).toBe(true);
+      expect(t.replace('by Ebda AI Studio (ebda.app)', '')).not.toMatch(
+        /Ebda AI Studio|ابدأ استوديو/
+      );
+    }
   });
   it('has the five links in page order with correct targets (en)', () => {
     const nav = en.match(/<nav aria-label="Main navigation".*?<\/nav>/s)![0];
@@ -154,6 +160,7 @@ describe('marketing hero and structure', () => {
       'model3d',
       'payments',
       'features',
+      'capabilities',
       'pricing',
       'faq',
       'start',
@@ -491,6 +498,7 @@ describe('marketing SEO and trust surface', () => {
   it('JSON-LD has Organization, WebSite, SoftwareApplication, FAQPage and no ratings', () => {
     const g = jsonLd('en')['@graph'];
     expect(g.map(n => n['@type'])).toEqual([
+      'Organization',
       'Organization',
       'WebSite',
       'SoftwareApplication',

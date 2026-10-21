@@ -69,9 +69,21 @@ describe('JSON-LD', () => {
     it(`${locale}: round-trips through JSON and derives offers from PLANS`, () => {
       const g = JSON.parse(JSON.stringify(jsonLd(locale)))['@graph'];
       const byType = Object.fromEntries(g.map((n: { '@type': string }) => [n['@type'], n]));
+      const byId = Object.fromEntries(g.map((n: { '@id'?: string }) => [n['@id'], n]));
+      // the studio is the organization / publisher; "Ebda Store" is the product brand organization
+      // whose parent is the studio; the site and the app are the product
+      byType.Organization = byId['https://ebda.app/#organization'];
       expect(byType.Organization.sameAs).toEqual([]);
-      // the studio is the organization / publisher; the site and the app are the product
       expect(byType.Organization.name).toBe('Ebda AI Studio');
+      const brand = byId['https://ebda.app/#brand'];
+      expect(brand['@type']).toBe('Organization');
+      expect(brand.name).toBe('Ebda Store');
+      expect(brand.parentOrganization['@id']).toBe(byType.Organization['@id']);
+      expect(brand.alternateName).toContain('ابدأ ستور');
+      expect(brand.alternateName).toContain('Ebda Store — ابدأ ستور, by Ebda AI Studio (ebda.app)');
+      expect(brand.url).toBe('https://ebda.app');
+      expect(byType.SoftwareApplication.brand['@id']).toBe(brand['@id']);
+      expect(byType.SoftwareApplication.featureList.length).toBeGreaterThan(10);
       const product = locale === 'ar' ? 'ابدأ ستور' : 'Ebda Store';
       expect(byType.WebSite.name).toBe(product);
       expect(byType.SoftwareApplication.name).toBe(product);
@@ -99,7 +111,7 @@ describe('JSON-LD', () => {
 
 describe('every page exports metadata with a canonical', () => {
   const pages = walk(APP).filter(f => /[\\/]page\.tsx$/.test(f) && !f.includes('_not-found'));
-  it('finds all 8 pages', () => expect(pages).toHaveLength(SITE_PAGES.length * 2));
+  it('finds every page, once per locale', () => expect(pages).toHaveLength(SITE_PAGES.length * 2));
   for (const file of pages) {
     const rel = path.relative(APP, file);
     it(`${rel}`, async () => {
@@ -114,6 +126,8 @@ describe('every page exports metadata with a canonical', () => {
       expect(meta.title).toContain(isEn ? 'Ebda Store' : 'ابدأ ستور');
       expect(meta.openGraph.title).not.toMatch(/Ebda AI Studio\s*$/);
       expect(meta.openGraph.title).toBe(meta.title);
+      // brand disambiguation (not ebda3i.com or any other "Ebda"): every title carries the one brand line
+      expect(meta.title).toContain('Ebda Store — ابدأ ستور, by Ebda AI Studio (ebda.app)');
       expect(meta.twitter.title).toBe(meta.title);
       expect(meta.openGraph.siteName).toBe(isEn ? 'Ebda Store' : 'ابدأ ستور');
       expect(meta.description).toBeTruthy();
