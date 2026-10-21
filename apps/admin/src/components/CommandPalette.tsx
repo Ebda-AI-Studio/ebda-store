@@ -4,7 +4,11 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useLocale } from 'next-intl';
 import type { PaletteItem } from './admin-layout/buildPaletteItems';
-import { normalizeArabicSearch as normalize, type AdminSearchResponse } from '@ebda/shared';
+import {
+  normalizeArabicSearch as normalize,
+  searchQueryHeaders,
+  type AdminSearchResponse,
+} from '@ebda/shared';
 import { useT } from '@/i18n/useT';
 import { apiGet } from '../lib/api';
 
@@ -61,6 +65,7 @@ export function CommandPalette({ items }: { items: PaletteItem[] }) {
   const [active, setActive] = useState(0);
   const [records, setRecords] = useState<AdminSearchResponse | null>(null);
   const [searching, setSearching] = useState(false);
+  const [failure, setFailure] = useState<'rate' | 'error' | null>(null);
   const requestSeq = useRef(0);
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLUListElement>(null);
@@ -133,6 +138,7 @@ export function CommandPalette({ items }: { items: PaletteItem[] }) {
   useEffect(() => {
     const q = query.trim();
     setRecords(null);
+    setFailure(null);
     if (!open || !storeId || q.length < RECORD_MIN_CHARS) {
       setSearching(false);
       return;
@@ -140,12 +146,25 @@ export function CommandPalette({ items }: { items: PaletteItem[] }) {
     setSearching(true);
     const seq = ++requestSeq.current;
     const timer = setTimeout(() => {
-      apiGet<AdminSearchResponse>(`/api/v1/stores/${storeId}/search?q=${encodeURIComponent(q)}`)
-        .then(({ data }) => {
-          if (seq === requestSeq.current) setRecords(data ?? null);
+      // The term rides in a header, never the URL (Ruling SEARCH-P2-9): it is often a phone or email.
+      apiGet<AdminSearchResponse>(`/api/v1/stores/${storeId}/search`, searchQueryHeaders(q))
+        .then(({ data, error }) => {
+          if (seq !== requestSeq.current) return;
+          setRecords(data ?? null);
+          // 429 = the per-user limit; anything else is a failed lookup. Neither is "no results".
+          setFailure(
+            error
+              ? error.status === 429 || error.code === 'RATE_LIMITED'
+                ? 'rate'
+                : 'error'
+              : null
+          );
         })
         .catch(() => {
-          if (seq === requestSeq.current) setRecords(null);
+          if (seq === requestSeq.current) {
+            setRecords(null);
+            setFailure('error');
+          }
         })
         .finally(() => {
           if (seq === requestSeq.current) setSearching(false);
@@ -153,6 +172,8 @@ export function CommandPalette({ items }: { items: PaletteItem[] }) {
     }, RECORD_DEBOUNCE_MS);
     return () => clearTimeout(timer);
   }, [query, open, storeId]);
+
+  const failureText = failure ? t(failure === 'rate' ? 'rateLimited' : 'searchFailed') : null;
 
   const rows = useMemo<Row[]>(() => {
     const pages: Row[] = results.map(i => ({
@@ -277,7 +298,7 @@ export function CommandPalette({ items }: { items: PaletteItem[] }) {
         <ul ref={listRef} className="max-h-[60vh] overflow-y-auto p-2">
           {rows.length === 0 ? (
             <li className="px-3 py-6 text-center text-sm text-muted-foreground">
-              {searching ? t('searching') : t('empty')}
+              {searching ? t('searching') : (failureText ?? t('empty'))}
             </li>
           ) : (
             rows.map((item, idx) => (
@@ -322,6 +343,11 @@ export function CommandPalette({ items }: { items: PaletteItem[] }) {
                 </button>
               </li>
             ))
+          )}
+          {rows.length > 0 && failureText && (
+            <li role="alert" className="px-3 py-2 text-center text-xs text-destructive-ink">
+              {failureText}
+            </li>
           )}
           {rows.length > 0 && searching && (
             <li className="px-3 py-2 text-center text-xs text-muted-foreground">

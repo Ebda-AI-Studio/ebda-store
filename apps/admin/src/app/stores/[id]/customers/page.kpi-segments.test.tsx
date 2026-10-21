@@ -215,7 +215,12 @@ describe('Customers page table + filters', () => {
     await waitFor(
       () =>
         expect(
-          api.apiGet.mock.calls.some((call: unknown[]) => String(call[0]).includes('search=ahm'))
+          // the term rides in the X-Search-Query header, never the URL (Ruling SEARCH-P2-9)
+          api.apiGet.mock.calls.some(
+            (call: unknown[]) =>
+              (call[1] as Record<string, string> | undefined)?.['X-Search-Query'] === 'ahm' &&
+              !String(call[0]).includes('search=')
+          )
         ).toBe(true),
       { timeout: 2000 }
     );

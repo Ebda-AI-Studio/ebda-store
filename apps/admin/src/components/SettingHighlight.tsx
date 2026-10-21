@@ -3,6 +3,7 @@
 import { useEffect } from 'react';
 import { usePathname, useSearchParams } from 'next/navigation';
 import { locateAndHighlight } from '../lib/setting-highlight';
+import { isKnownSettingId } from '../lib/settings-search';
 
 /**
  * Renders nothing. When the URL carries `?setting=<id>` (a result of the ⌘K palette or the
@@ -17,7 +18,8 @@ export function SettingHighlight() {
   const tab = params.get('tab');
 
   useEffect(() => {
-    if (!id) return;
+    // `?setting=` is untrusted: only an id the registry knows is looked up (a crafted value does nothing).
+    if (!isKnownSettingId(id)) return;
     return locateAndHighlight(id);
     // `tab` and `pathname` re-run it when the same page switches tab for another result.
   }, [id, tab, pathname]);

@@ -11,6 +11,13 @@ import index from './settings-search-index.generated.json';
 
 const ENTRIES = index as IndexEntry[];
 
+const KNOWN_IDS = new Set(ENTRIES.map(e => e.id));
+
+/** True for an id the registry knows: `?setting=` is untrusted input and only these are acted on. */
+export function isKnownSettingId(id: string | null | undefined): id is string {
+  return typeof id === 'string' && KNOWN_IDS.has(id);
+}
+
 export type SearchLocale = 'ar' | 'en';
 
 export interface SearchContext {

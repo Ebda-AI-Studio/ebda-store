@@ -57,7 +57,11 @@ describe('CommandPalette record search (Task 18)', () => {
     await flush(199);
     expect(apiGet).not.toHaveBeenCalled();
     await flush(2);
-    expect(apiGet).toHaveBeenCalledWith('/api/v1/stores/store-1/search?q=%D8%A7%D8%AD%D9%85%D8%AF');
+    // the term rides in a header, NEVER the URL (Ruling SEARCH-P2-9)
+    expect(apiGet).toHaveBeenCalledWith('/api/v1/stores/store-1/search', {
+      'X-Search-Query': '%D8%A7%D8%AD%D9%85%D8%AF',
+    });
+    expect(String(apiGet.mock.calls[0][0])).not.toMatch(/[?&]q=|search=/);
     for (const h of ['products', 'orders', 'customers']) expect(screen.getByText(h)).toBeTruthy();
     expect(screen.getByText('أحذية')).toBeTruthy(); // Arabic name in the Arabic locale
     expect(screen.getByText('#EB-1')).toBeTruthy();
@@ -107,5 +111,44 @@ describe('CommandPalette record search (Task 18)', () => {
     type(input2, 'احمد');
     await flush(300);
     expect(apiGet).not.toHaveBeenCalled();
+  });
+
+  it('shows a rate-limited state, distinct from "no results", when the API answers 429', async () => {
+    apiGet.mockResolvedValue({
+      data: null,
+      error: { status: 429, code: 'RATE_LIMITED', message: 'x' },
+    });
+    const input = open();
+    type(input, 'سنيكرز');
+    await flush(250);
+    expect(screen.getByText('rateLimited')).toBeTruthy();
+    expect(screen.queryByText('empty')).toBeNull();
+  });
+
+  it('shows a failed-search state on a server error or a network failure', async () => {
+    apiGet.mockResolvedValueOnce({
+      data: null,
+      error: { status: 500, code: 'SERVER_ERROR', message: 'x' },
+    });
+    const input = open();
+    type(input, 'سنيكرز');
+    await flush(250);
+    expect(screen.getByText('searchFailed')).toBeTruthy();
+    apiGet.mockRejectedValueOnce(new Error('offline'));
+    type(input, 'منى');
+    await flush(250);
+    expect(screen.getByText('searchFailed')).toBeTruthy();
+  });
+
+  it('keeps showing the page results next to the failure notice', async () => {
+    apiGet.mockResolvedValue({
+      data: null,
+      error: { status: 429, code: 'RATE_LIMITED', message: 'x' },
+    });
+    const input = open();
+    type(input, 'orders');
+    await flush(250);
+    expect(screen.getByText('Orders')).toBeTruthy();
+    expect(screen.getByRole('alert').textContent).toBe('rateLimited');
   });
 });

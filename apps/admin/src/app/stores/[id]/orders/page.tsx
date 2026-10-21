@@ -12,7 +12,7 @@ import { ManualRefundModal } from '../../../../components/ManualRefundModal';
 import { useT } from '@/i18n/useT';
 import { useLatestRequest } from '@/hooks/useLatestRequest';
 import { useDebouncedValue } from '@/hooks/useDebouncedValue';
-import { exportFilename, orderListFilterParams } from '@ebda/shared';
+import { exportFilename, moveSearchToHeader, orderListFilterParams } from '@ebda/shared';
 import { OrdersFilters } from './_components/OrdersFilters';
 import { OrdersBulkBar } from './_components/OrdersBulkBar';
 import { OrdersTable } from './_components/OrdersTable';
@@ -115,7 +115,7 @@ export default function StoreOrdersPage() {
     setIsLoading(true);
     setError(null);
     try {
-      const qs = filterParams();
+      const { params: qs, headers } = moveSearchToHeader(filterParams());
       qs.set('page', pagination.page.toString());
       qs.set('limit', pagination.limit.toString());
 
@@ -128,7 +128,7 @@ export default function StoreOrdersPage() {
         orders: Order[];
         meta?: Pagination;
         pagination?: Pagination;
-      }>(`/api/v1/stores/${storeId}/orders?${qs}`);
+      }>(`/api/v1/stores/${storeId}/orders?${qs}`, headers);
       if (!isLatest()) return;
 
       if (apiError) {
@@ -163,9 +163,9 @@ export default function StoreOrdersPage() {
     try {
       // Same filters as the list on screen; tzOffset lets the file name the
       // range in the viewer's days.
-      const qs = filterParams();
+      const { params: qs, headers } = moveSearchToHeader(filterParams());
       qs.set('tzOffset', String(-new Date().getTimezoneOffset()));
-      const res = await apiFetch(`/api/v1/stores/${storeId}/orders/export.xlsx?${qs}`);
+      const res = await apiFetch(`/api/v1/stores/${storeId}/orders/export.xlsx?${qs}`, { headers });
       if (!res.ok) {
         showError(t('export.failed'));
         return;

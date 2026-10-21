@@ -82,4 +82,12 @@ describe('admin search deep link: locate + highlight the control', () => {
     expect(() => findSettingElement(document, 'a"],[x')).not.toThrow();
     expect(findSettingElement(document, 'a"],[x')).toBeNull();
   });
+
+  it('control characters, newlines and brackets in an id never throw and never match', () => {
+    document.body.innerHTML = `<p data-setting-id="a">x</p>`;
+    for (const bad of ['a\n', 'a\u0000', 'a]\\', '"', '\u2028', ']\n[data-setting-id']) {
+      expect(() => findSettingElement(document, bad)).not.toThrow();
+      expect(findSettingElement(document, bad)).toBeNull();
+    }
+  });
 });

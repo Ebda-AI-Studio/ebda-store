@@ -10,10 +10,18 @@ export const HIGHLIGHT_MS = 3200;
 export const LOCATE_TIMEOUT_MS = 8000;
 export const LOCATE_INTERVAL_MS = 150;
 
-const attr = (id: string) => `[data-setting-id="${id.replace(/["\\]/g, '\\$&')}"]`;
+const escapeId = (id: string): string =>
+  typeof CSS !== 'undefined' && typeof CSS.escape === 'function'
+    ? CSS.escape(id)
+    : id.replace(/[^a-zA-Z0-9_.-]/g, c => `\\${c.charCodeAt(0).toString(16)} `);
 
 export function findSettingElement(root: ParentNode, id: string): HTMLElement | null {
-  return root.querySelector<HTMLElement>(attr(id));
+  try {
+    return root.querySelector<HTMLElement>(`[data-setting-id="${escapeId(id)}"]`);
+  } catch {
+    // an id that still is not a valid selector can never match a control
+    return null;
+  }
 }
 
 /** Open every closed <details> around the control, so a setting inside one is visible. */
