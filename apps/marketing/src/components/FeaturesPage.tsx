@@ -4,7 +4,7 @@ import { COPY } from '../lib/content';
 import { COMPARE } from '../lib/compare';
 import { jsonLd } from '../lib/seo';
 import { COMPARE_PAGES, SIGNUP_URL, pagePath, type Locale } from '../lib/site';
-import { CapabilityGrid } from './Capabilities';
+import { CapabilityGrid, withHost } from './Capabilities';
 import { Footer } from './Footer';
 import { Header } from './Header';
 import { JsonLd } from './JsonLd';
@@ -47,7 +47,7 @@ export function FeaturesPage({ locale }: { locale: Locale }) {
             {faq.map(i => (
               <details key={i.q}>
                 <summary>{i.q}</summary>
-                <p>{i.a}</p>
+                <p>{withHost(i.a)}</p>
               </details>
             ))}
           </div>

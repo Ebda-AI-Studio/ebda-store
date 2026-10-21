@@ -70,12 +70,12 @@ export const CAPABILITIES: Record<Locale, Record<CapabilityId, CapabilityCopy>> 
     },
     domain: {
       t: 'لينك مجاني ودومين خاص بيك',
-      d: 'كل متجر بيطلع على لينك مجاني بالشكل ده: اسمك.ebda.app، وتقدر تربط دومينك الخاص من لوحة التحكم، وده متاح في كل الباقات.',
+      d: 'كل متجر بيطلع على لينك مجاني بالشكل ده: yourname.ebda.app، وتقدر تربط دومينك الخاص من لوحة التحكم، وده متاح في كل الباقات.',
     },
     ai: {
       t: 'الذكاء الاصطناعي بيكتب ويترجم ويحسّن',
       d: 'بيكتب وصف المنتجات ويترجمها عربي وإنجليزي، ويقترح كلمات بحث وتصنيفات ووسوم ونص بديل للصور، ويجهّز عناوين وأوصاف لمحركات البحث وأسئلة شائعة. إنت اللي بتراجع وتنشر.',
-      plan: 'مشمول في الباقات المدفوعة، ضمن حد استخدام شهري',
+      plan: 'مشمول في الباقات المدفوعة، ضمن حدود الاستخدام العادل',
     },
     search: {
       t: 'بحث بيفهم المصري والفرانكو',
@@ -83,7 +83,7 @@ export const CAPABILITIES: Record<Locale, Record<CapabilityId, CapabilityCopy>> 
     },
     seo: {
       t: 'SEO وظهور في إجابات الذكاء الاصطناعي',
-      d: 'عناوين وأوصاف لمحركات البحث، وتحويلات للينكات القديمة، وأسئلة شائعة منظّمة، وملف llms.txt لمتجرك، وفيد منتجات تقراه مساعدات الذكاء الاصطناعي. وكمان بتتابع هل ChatGPT وGemini وPerplexity بيذكروا متجرك.',
+      d: 'عناوين وأوصاف لمحركات البحث، وتحويلات للينكات القديمة، وأسئلة شائعة منظّمة، وملف llms.txt لمتجرك، وفيد منتجات تقراه مساعدات الذكاء الاصطناعي. وكمان تقدر تتابع هل مساعدات الذكاء الاصطناعي، زي ChatGPT وGemini وPerplexity، بتذكر متجرك.',
     },
     assistant: {
       t: 'شغّل متجرك من مساعد ذكاء اصطناعي',
@@ -138,7 +138,7 @@ export const CAPABILITIES: Record<Locale, Record<CapabilityId, CapabilityCopy>> 
     ai: {
       t: 'AI that writes, translates and optimises',
       d: 'It writes product descriptions and translates them between Arabic and English, suggests search words, categories, tags and image alt text, and drafts search-engine titles, descriptions and FAQs. You review and publish.',
-      plan: 'Included in the paid plans, within a monthly usage allowance',
+      plan: 'Included in the paid plans, within fair-use limits',
     },
     search: {
       t: 'Search that understands Egyptian Arabic and Franco',
@@ -146,7 +146,7 @@ export const CAPABILITIES: Record<Locale, Record<CapabilityId, CapabilityCopy>> 
     },
     seo: {
       t: 'SEO and visibility in AI answers',
-      d: 'Search-engine titles and descriptions, redirects for old links, structured FAQs, an llms.txt file for your store and a product feed that AI assistants can read. You can also track whether ChatGPT, Gemini and Perplexity mention your store.',
+      d: 'Search-engine titles and descriptions, redirects for old links, structured FAQs, an llms.txt file for your store and a product feed that AI assistants can read. You can also track whether AI assistants, such as ChatGPT, Gemini and Perplexity, mention your store.',
     },
     assistant: {
       t: 'Run your store from an AI assistant',
@@ -232,7 +232,7 @@ export const FEATURES_FAQ: Record<Locale, FeaturesFaqItem[]> = {
     },
     {
       q: 'أقدر أربط دومين خاص بيا؟',
-      a: 'أيوه، في كل الباقات. ولو مش عايز دلوقتي، متجرك بيشتغل على لينك مجاني اسمك.ebda.app.',
+      a: 'أيوه، في كل الباقات. ولو مش عايز دلوقتي، متجرك بيشتغل على لينك مجاني yourname.ebda.app.',
     },
     {
       q: 'فيه استرجاع للسلات المتروكة؟',
@@ -244,7 +244,7 @@ export const FEATURES_FAQ: Record<Locale, FeaturesFaqItem[]> = {
     },
     {
       q: 'فيه حملات إيميل لمشتركي النشرة؟',
-      a: 'الإيميلات التلقائية للطلبات شغالة في كل الباقات: تأكيد وشحن واسترجاع وطلب تقييم. أما حملات الإيميل التسويقية فمتبنية في لوحة التحكم، بس لسه مش جزء من الباقات، وبنفعّلها لكل متجر على حدة.',
+      a: 'الإيميلات التلقائية للطلبات شغالة في كل الباقات: تأكيد وشحن واسترجاع وطلب تقييم. أما حملات الإيميل التسويقية فمبنية في لوحة التحكم، بس لسه مش جزء من الباقات، وبنفعّلها لكل متجر على حدة.',
     },
     {
       q: 'البحث بيفهم العامية المصرية والفرانكو؟',
@@ -252,7 +252,7 @@ export const FEATURES_FAQ: Record<Locale, FeaturesFaqItem[]> = {
     },
     {
       q: 'الذكاء الاصطناعي مشمول في السعر؟',
-      a: 'أيوه، أدوات الذكاء الاصطناعي مشمولة في الباقات المدفوعة، ضمن حد استخدام شهري، ومن غير اشتراك منفصل.',
+      a: 'أيوه، أدوات الذكاء الاصطناعي مشمولة في الباقات المدفوعة، ضمن حدود الاستخدام العادل، ومن غير اشتراك منفصل.',
     },
     {
       q: 'فيه عمولة على الطلبات؟',
@@ -290,7 +290,7 @@ export const FEATURES_FAQ: Record<Locale, FeaturesFaqItem[]> = {
     },
     {
       q: 'Is AI included in the price?',
-      a: 'Yes. The AI tools are included in the paid plans, within a monthly usage allowance, with no separate subscription.',
+      a: 'Yes. The AI tools are included in the paid plans, within fair-use limits, with no separate subscription.',
     },
     {
       q: 'Is there a commission on orders?',
@@ -317,13 +317,14 @@ export const FEATURES_PAGE: Record<
     homeTitle: string;
     homeLead: string;
     homeAll: string;
+    navLabel: string;
   }
 > = {
   ar: {
     title: 'مميزات ابدأ ستور',
     desc: 'قوالب ومحرر صفحات، دومين خاص، ذكاء اصطناعي، بحث بالعامية والفرانكو، SEO، استرجاع سلات، نقاط ولاء، تقييمات، تحليلات، ودفع وشحن للسوق المصري. صفر عمولة.',
     h1: 'كل اللي ابدأ ستور بيعمله.',
-    lead: 'ده اللي موجود فعلًا النهاردة في ابدأ ستور من ابدأ استوديو للذكاء الاصطناعي. وعلى الجنب، الحاجات اللي لسه مش موجودة، قدام في صفحات المقارنة.',
+    lead: 'ده اللي موجود فعلًا النهاردة في ابدأ ستور من ابدأ استوديو للذكاء الاصطناعي. وكل حاجة لسه مش موجودة مكتوبة بصراحة في صفحات المقارنة.',
     planLabel: 'متاح في',
     faqTitle: 'أسئلة عن المميزات',
     compareTitle: 'قارن ابدأ ستور بغيره',
@@ -331,6 +332,7 @@ export const FEATURES_PAGE: Record<
     homeTitle: 'مش متجر بسيط وبس.',
     homeLead: 'قوالب، ذكاء اصطناعي، بحث بالمصري والفرانكو، استرجاع سلات ونقاط ولاء، وصفر عمولة.',
     homeAll: 'شوف كل المميزات',
+    navLabel: 'كل المميزات',
   },
   en: {
     title: 'Ebda Store features',
@@ -345,5 +347,6 @@ export const FEATURES_PAGE: Record<
     homeLead:
       'Templates, AI, Egyptian Arabic and Franco search, cart recovery, loyalty points and 0% commission.',
     homeAll: 'See all features',
+    navLabel: 'All features',
   },
 };

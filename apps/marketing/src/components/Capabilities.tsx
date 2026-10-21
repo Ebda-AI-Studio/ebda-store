@@ -7,6 +7,20 @@ import {
 } from '../lib/capabilities';
 import { pagePath, type Locale } from '../lib/site';
 
+/** Renders the free-address example in a left-to-right isolate so it never reverses inside Arabic text. */
+export function withHost(text: string) {
+  const parts = text.split(/(yourname\.ebda\.app)/);
+  return parts.map((t, i) =>
+    t === 'yourname.ebda.app' ? (
+      <bdi key={i} dir="ltr">
+        {t}
+      </bdi>
+    ) : (
+      t
+    )
+  );
+}
+
 /** One block per real capability: a title, full sentences, and the plans that have it when not all. */
 export function CapabilityGrid({
   locale,
@@ -26,7 +40,7 @@ export function CapabilityGrid({
         return (
           <li key={id} className="cap-card" data-capability={id}>
             <H>{cap.t}</H>
-            <p>{cap.d}</p>
+            <p>{withHost(cap.d)}</p>
             {cap.plan && (
               <p className="cap-plan">
                 <span>{label}</span> {cap.plan}
