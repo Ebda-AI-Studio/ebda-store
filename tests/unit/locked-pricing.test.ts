@@ -72,7 +72,11 @@ describe('locked pricing contract (docs/plans/2026-10-05-pricing-decisions.md)',
       const b = blocks[p.code];
       const values = b.slice(b.indexOf('VALUES'), b.indexOf('ON CONFLICT'));
       const json = values.match(/'(\{.*\})'::jsonb/)![1];
-      expect(planLimitsSchema.parse(JSON.parse(json)), p.code).toEqual(p.limits);
+      // `wholesalePricing` arrived later (20261028000200_b2b_product_columns_order_snapshots UPDATEs it onto the rows,
+      // pinned in tests/unit/b2b-plan-gate.test.ts); this migration predates it, so compare every OTHER lever.
+      const { wholesalePricing: _w, ...seedLimits } = p.limits;
+      const { wholesalePricing: _m, ...migrated } = planLimitsSchema.parse(JSON.parse(json));
+      expect(migrated, p.code).toEqual(seedLimits);
       const pm = p.priceMonthlyMinor === null ? 'NULL' : p.priceMonthlyMinor;
       const py = p.priceYearlyMinor === null ? 'NULL' : p.priceYearlyMinor;
       expect(values, p.code).toContain(

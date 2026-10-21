@@ -8783,6 +8783,7 @@
       "maxStores": "Stores per owner",
       "brandingRemoval": "Remove \"Powered by Ebda Store\"",
       "apiAccess": "API access",
+      "wholesalePricing": "Wholesale pricing",
       "analyticsTier": "Analytics tier",
       "supportTier": "Support tier"
     },
@@ -9016,6 +9017,7 @@
     "maxStores": "Your plan allows up to {limit} store(s). Upgrade to add more.",
     "brandingRemoval": "Removing the \"Powered by Ebda Store\" footer is not included in your plan. Upgrade to turn it off.",
     "apiAccess": "Merchant MCP (running your store from an AI assistant) is not included in your plan. Upgrade to Growth or Business to use it.",
+    "wholesalePricing": "Wholesale pricing (quantity tiers, group prices, wholesale accounts) is not included in your plan. Upgrade to Business to use it.",
     "analyticsTier": "This analytics view is not included in your plan. Upgrade to unlock it."
   },
   "onboarding": {
