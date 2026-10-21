@@ -322,6 +322,12 @@ export const PAGES: PageEntry[] = [
     feature: 'email_campaigns',
     syn: { en: 'email marketing send blast', ar: 'حملات بريد تسويق ارسال' },
   }),
+  page('/webhooks', 'webhooks.page.title', 'owner', {
+    syn: {
+      en: 'webhooks api events signed endpoint integration',
+      ar: 'ويب هوك ربط احداث تكامل',
+    },
+  }),
   page('/abandoned-carts', `${HUB}.abandonedCarts`, 'staff', {
     feature: 'abandoned_cart',
     syn: { en: 'cart recovery left behind', ar: 'سلة متروكة استرداد' },

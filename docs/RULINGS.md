@@ -6775,7 +6775,7 @@ Ruling SEARCH-P2-1 (Search P2 Task 16) — a GUEST row in the customers list or 
 
 Ruling SEARCH-P2-2 (Task 16) — the phone arm of the customer lookup is built only for a term made of digits and phone punctuation, and a token with no letter (digits, "+20") is never a name token. Evidence: the Task 14 planner suite's 10-hex-digit terms ("a3f09b1c4e") added a broad digits arm and took 6 s. Cost if wrong: "ahmed 0101" is a name search with the phone arm off; type the number alone to search by phone.
 
-Ruling SEARCH-P2-3 (Task 17) — a lone "%" or "_" in the ORDER list used to match every order: Prisma `contains` does not escape LIKE metacharacters, and an old test asserted that as "literal". A term holding a metacharacter now takes the escaped lookups at any length, and the test says it matches nothing. Cost if wrong: none (an order number that contains "%" is still found).
+Ruling SEARCH-P2-3 (Task 17) — a lone "%" or "\_" in the ORDER list used to match every order: Prisma `contains` does not escape LIKE metacharacters, and an old test asserted that as "literal". A term holding a metacharacter now takes the escaped lookups at any length, and the test says it matches nothing. Cost if wrong: none (an order number that contains "%" is still found).
 
 Ruling SEARCH-P2-4 (Task 17) — the order-number DIGITS arm ("#١٢٣٤" finds "EB-1234") applies only to a term made of digits, "#", spaces and dashes. A mixed term such as "Gwendolyn58123" must not become an order-number filter (it matched every order in order-search-guest-contact). Cost if wrong: an "EB 1234" style term relies on the plain ILIKE arm only.
 

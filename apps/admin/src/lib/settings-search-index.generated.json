@@ -662,6 +662,16 @@
     "feature": "email_campaigns"
   },
   {
+    "id": "page:/webhooks",
+    "kind": "page",
+    "route": "/webhooks",
+    "access": "owner",
+    "en": "Webhooks",
+    "ar": "ويب هوك",
+    "synEn": "webhooks api events signed endpoint integration",
+    "synAr": "ويب هوك ربط احداث تكامل"
+  },
+  {
     "id": "page:/abandoned-carts",
     "kind": "page",
     "route": "/abandoned-carts",
