@@ -122,7 +122,13 @@ vi.mock('../../apps/api/src/services/plan-entitlements', () => ({
 }));
 vi.mock('../../apps/api/src/lib/webhook-http', () => ({ postWebhook: db.post }));
 vi.mock('../../apps/api/src/services/encryption.service', () => ({
-  encryption: { decrypt: (s: string) => `dec(${s})`, encrypt: (s: string) => `enc(${s})` },
+  encryption: {
+    decrypt: (s: string) => {
+      if (s === 'BROKEN') throw new Error('bad cipher');
+      return `dec(${s})`;
+    },
+    encrypt: (s: string) => `enc(${s})`,
+  },
 }));
 
 import {
@@ -134,6 +140,7 @@ import {
   decideAfterAttempt,
   newWebhookSecret,
   webhookStoreEntitled,
+  markDeliveryFailed,
 } from '../../apps/api/src/services/webhook.service';
 
 const ep = (o: Row = {}) => ({
@@ -371,6 +378,29 @@ describe('attempts and auto-disable', () => {
       db.plan = plan;
       expect(await webhookStoreEntitled('s1')).toBe(want);
     }
+  });
+  it('M7: an error inside the attempt (e.g. a secret that cannot be decrypted) is a failed attempt on the retry schedule, not a stuck row', async () => {
+    db.endpoints = [ep({ secretEnc: 'BROKEN' })];
+    const [id] = await fanoutWebhookEvent('s1', ev);
+    const r = await runDeliveryAttempt('s1', id, 1);
+    expect(r.decision).toBe('retry');
+    expect(db.deliveries[0]).toMatchObject({ status: 'retrying', error: 'internal_error' });
+    const r6 = await runDeliveryAttempt('s1', id, 6);
+    expect(r6.decision).toBe('failed');
+    expect(db.deliveries[0].status).toBe('failed');
+    expect(db.post).not.toHaveBeenCalled();
+  });
+  it('M7: markDeliveryFailed (the onFailure backstop) fails a pending row and never touches a delivered one', async () => {
+    const [id] = await fanoutWebhookEvent('s1', ev);
+    await markDeliveryFailed('s1', id, 'run_failed');
+    expect(db.deliveries[0]).toMatchObject({
+      status: 'failed',
+      error: 'run_failed',
+      nextAttemptAt: null,
+    });
+    db.deliveries[0].status = 'success';
+    await markDeliveryFailed('s1', id, 'run_failed');
+    expect(db.deliveries[0].status).toBe('success');
   });
   it('an already-successful delivery is never re-sent (Inngest replay)', async () => {
     const [id] = await fanoutWebhookEvent('s1', ev);

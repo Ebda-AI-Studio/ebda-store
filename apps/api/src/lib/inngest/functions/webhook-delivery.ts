@@ -18,6 +18,7 @@ import {
 import {
   delayBeforeAttempt,
   fanoutWebhookEvent,
+  markDeliveryFailed,
   runDeliveryAttempt,
   webhookStoreEntitled,
 } from '../../../services/webhook.service';
@@ -173,6 +174,15 @@ export const webhookDeliver: InngestFunction.Any = inngest.createFunction(
     concurrency: { key: 'event.data.storeId', limit: 5 },
     retries: 3,
     triggers: [{ event: 'webhook/delivery.requested' as any }],
+    // The run itself failed (not just one attempt): never leave the row pending for ever (M7).
+    onFailure: async ({
+      event,
+    }: {
+      event: { data: { event: { data: { storeId: string; deliveryId: string } } } };
+    }) => {
+      const { storeId, deliveryId } = event.data.event.data;
+      await markDeliveryFailed(storeId, deliveryId, 'run_failed');
+    },
   },
   async ({ event, step }) => {
     const { storeId, deliveryId } = event.data as { storeId: string; deliveryId: string };

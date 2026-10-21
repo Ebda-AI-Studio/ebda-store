@@ -198,6 +198,23 @@ export async function createResend(storeId: string, deliveryId: string): Promise
   return row.id;
 }
 
+/**
+ * Backstop for the Inngest run itself failing (a DB error that outlives the step retries): the row
+ * must not stay `pending`/`retrying` for ever. A delivered row is never touched.
+ */
+export async function markDeliveryFailed(
+  storeId: string,
+  deliveryId: string,
+  reason: string
+): Promise<void> {
+  await runInTenantContext(storeId, () =>
+    prisma.webhookDelivery.updateMany({
+      where: { id: deliveryId, storeId, status: { in: ['pending', 'retrying'] } },
+      data: { status: 'failed', error: reason.slice(0, 200), nextAttemptAt: null },
+    })
+  );
+}
+
 // ---------------------------------------------------------------------------
 // One attempt
 // ---------------------------------------------------------------------------
@@ -257,15 +274,22 @@ export async function runDeliveryAttempt(
     return { decision: 'skipped', endpointDisabled: false, endpointId: ep.id };
   }
 
-  // The network call runs OUTSIDE any tenant transaction (10 s timeout vs the 30 s tx expiry).
-  const res = await postWebhook({
-    url: ep.url,
-    secret: encryption.decrypt(ep.secretEnc),
-    body: JSON.stringify(loaded.payload),
-    eventId: loaded.eventId,
-    deliveryId: loaded.id,
-    eventType: loaded.eventType as WebhookEventType,
-  });
+  // The network call runs OUTSIDE any tenant transaction (10 s timeout vs the 30 s tx expiry). An
+  // error anywhere before/around it (an undecryptable secret, a bad payload) is a FAILED ATTEMPT on
+  // the normal retry schedule, never an exception that leaves the row `pending` for good (M7).
+  let res: Awaited<ReturnType<typeof postWebhook>>;
+  try {
+    res = await postWebhook({
+      url: ep.url,
+      secret: encryption.decrypt(ep.secretEnc),
+      body: JSON.stringify(loaded.payload),
+      eventId: loaded.eventId,
+      deliveryId: loaded.id,
+      eventType: loaded.eventType as WebhookEventType,
+    });
+  } catch {
+    res = { ok: false, status: null, snippet: null, error: 'internal_error', durationMs: 0 };
+  }
   const decision = decideAfterAttempt({ ok: res.ok, attempt, isTest: loaded.isTest });
 
   return runInTenantContext(storeId, async () => {

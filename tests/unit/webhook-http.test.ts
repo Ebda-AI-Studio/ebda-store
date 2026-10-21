@@ -248,3 +248,20 @@ describe('M1 delivery function is idempotent on its request event', () => {
     expect(deliver).toMatch(/idempotency:\s*'event\.data\.deliveryId'/);
   });
 });
+
+describe('M7 the delivery function has a failure backstop', () => {
+  it('webhook-deliver wires onFailure to markDeliveryFailed', async () => {
+    const { readFileSync } = await import('node:fs');
+    const { resolve } = await import('node:path');
+    const src = readFileSync(
+      resolve(__dirname, '../../apps/api/src/lib/inngest/functions/webhook-delivery.ts'),
+      'utf8'
+    );
+    const deliver = src.slice(
+      src.indexOf("id: 'webhook-deliver'"),
+      src.indexOf("id: 'webhook-delivery-purge-daily'")
+    );
+    expect(deliver).toMatch(/onFailure/);
+    expect(deliver).toMatch(/markDeliveryFailed\(/);
+  });
+});
