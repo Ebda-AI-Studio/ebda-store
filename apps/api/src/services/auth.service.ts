@@ -13,6 +13,7 @@ import {
 } from '@ebda/database';
 import {
   deleteUserAddresses,
+  deleteUserPasskeys,
   deleteUserTokens,
   findUserIdByEmail,
   getUserState,
@@ -24,6 +25,8 @@ import {
 import { config } from '../config';
 import { AppError } from '../middleware/error-handler';
 import { EmailService } from './email.service';
+import { loginGate } from './login-gate';
+import { announcePasskeyPurge } from './passkey-purge';
 import { sendMerchantPasswordResetEmail, sendMerchantVerificationEmail } from './platform-mailer';
 import { accountLockout } from './account-lockout.service';
 import {
@@ -754,17 +757,8 @@ export class AuthService {
     // Case-folded so `Victim@x.com` / `VICTIM@x.com` share one counter: an
     // exact-case key let an attacker reset the 5-per-15-min budget by
     // re-casing the address (Ebda SP5 review).
-    const lockoutEmail = typeof email === 'string' ? email.trim().toLowerCase() : email;
-    const lockoutKey = storeId ? `${storeId}:${lockoutEmail}` : lockoutEmail;
-    const lockStatus = await accountLockout.isLocked(lockoutKey);
-    if (lockStatus.locked) {
-      const remainingMinutes = Math.ceil((lockStatus.remainingMs || 0) / 60000);
-      throw new AppError(
-        429,
-        'ACCOUNT_LOCKED',
-        `Account is temporarily locked due to too many failed attempts. Please try again in ${remainingMinutes} minutes.`
-      );
-    }
+    const lockoutKey = loginGate.lockoutKey(email, storeId);
+    await loginGate.assertNotLocked(lockoutKey);
 
     // Find user inside the requested scope (exclude soft-deleted).
     // passwordHash + mfaSecret are globally omitted (see packages/database);
@@ -781,14 +775,14 @@ export class AuthService {
       // previously a ~50ms timing oracle that let an attacker
       // enumerate registered emails by stopwatch.
       await bcrypt.compare(password, this.DUMMY_PASSWORD_HASH);
-      await accountLockout.recordFailedAttempt(lockoutKey, ip);
+      await loginGate.recordFailure(lockoutKey, ip);
       throw new AppError(401, 'INVALID_CREDENTIALS', 'Invalid email or password');
     }
 
     // Verify password
     const isValidPassword = await bcrypt.compare(password, user.passwordHash);
     if (!isValidPassword) {
-      const result = await accountLockout.recordFailedAttempt(lockoutKey, ip);
+      const result = await loginGate.recordFailure(lockoutKey, ip);
 
       if (result.locked) {
         const remainingMinutes = Math.ceil((result.lockoutDurationMs || 0) / 60000);
@@ -803,7 +797,7 @@ export class AuthService {
     }
 
     // Successful login - reset lockout
-    await accountLockout.recordSuccessfulLogin(lockoutKey, ip);
+    await loginGate.recordSuccess(lockoutKey, ip);
 
     // Reject non-active accounts. Checked AFTER the password is confirmed
     // correct (not before) — checking status before/instead of the password
@@ -813,9 +807,7 @@ export class AuthService {
     // close. S3-1, 2026-09-22 security audit: a super_admin who suspends a
     // compromised or departing account previously found the account could
     // still log in with its password — `status` was recorded but never read.
-    if (user.status !== 'active') {
-      throw new AppError(403, 'ACCOUNT_SUSPENDED', 'This account is not active');
-    }
+    loginGate.assertActive(user);
 
     // If MFA is enabled and a TOTP secret is configured, return a short-lived
     // challenge token instead of a full session. The client must verify the
@@ -1479,12 +1471,16 @@ export class AuthService {
     }
 
     const passwordHash = await bcrypt.hash(newPassword, this.SALT_ROUNDS);
-    await withUser(userId, tx =>
-      tx.user.update({
+    // Ruling PASSKEY-13: a password CHANGE removes every passkey, in the SAME transaction as the new
+    // hash (all or nothing). An attacker who held the old password and a session may have registered a
+    // passkey of their own; revoking their session alone would leave a key that satisfies MFA.
+    const purged = await withUser(userId, async tx => {
+      await tx.user.update({
         where: { id: userId },
         data: { passwordHash },
-      })
-    );
+      });
+      return tx.passkeyCredential.deleteMany({ where: { userId } });
+    });
 
     // ONE call, and it runs BEFORE anything else observes the change.
     //
@@ -1503,6 +1499,8 @@ export class AuthService {
     // 'reset:' } }` filter was already ineffective, since the unconditional
     // call on the next line revoked those rows anyway.
     await AuthService.revokeAllSessions(userId, 'password_changed');
+
+    await announcePasskeyPurge({ user, count: purged.count, reason: 'password_changed' });
   }
 
   /**
@@ -1764,13 +1762,20 @@ export class AuthService {
     }
 
     // Update user password (as that user: `users` is RLS-scoped to app.current_user_id)
-    const updated = await withUser(storedToken.userId, tx =>
-      tx.user.update({
+    // Ruling PASSKEY-10 / review M5: the new hash and the removal of EVERY passkey commit together. If the
+    // delete fails the password does not change either, so the owner simply retries the reset; there is no
+    // state where the password moved on and an attacker's passkey survived.
+    const { updated, purged } = await withUser(storedToken.userId, async tx => {
+      const updated = await tx.user.update({
         where: { id: storedToken.userId },
         data: { passwordHash },
-        select: { email: true, storeId: true },
-      })
-    );
+        select: { id: true, email: true, storeId: true, firstName: true, language: true },
+      });
+      const purged = await tx.passkeyCredential.deleteMany({
+        where: { userId: storedToken.userId },
+      });
+      return { updated, purged };
+    });
 
     // Revoke all sessions — same call, and the same ordering, as
     // changePassword. The reset-token row was already deleted above.
@@ -1785,6 +1790,10 @@ export class AuthService {
     // performs precisely because they believe someone else is holding their
     // credentials.
     await AuthService.revokeAllSessions(storedToken.userId, 'password_reset');
+
+    // Account recovery removed every passkey above (PASSKEY-10): record it and tell the owner, so a reset
+    // that silently drops their devices is never a surprise (review M5).
+    await announcePasskeyPurge({ user: updated, count: purged.count, reason: 'password_reset' });
 
     // A merchant who reset because they were locked out after too many wrong
     // passwords must be able to use the new one at once. The lockout exists to
@@ -1978,6 +1987,8 @@ export class AuthService {
       // User-keyed rows: like `addresses` above, deleted by the shopper's id through a
       // guarded definer INSIDE this transaction (the GUC may be the merchant's id).
       await deleteUserTokens(userId);
+      // Passkeys (Ruling PASSKEY-1): same shape, same guarded-definer reason as the tokens above.
+      await deleteUserPasskeys(userId);
       await tx.loyaltyTransaction.deleteMany({
         where: { customerId: userId, storeId: eraseStoreId },
       });
@@ -2370,6 +2381,7 @@ export class AuthService {
       walletTransactions,
       pushSubscriptions,
       onesignalSubscriptions,
+      passkeys,
       smsMarketingConsents,
       wholesaleApplications,
     ] = await Promise.all([
@@ -2418,6 +2430,23 @@ export class AuthService {
         tx.oneSignalSubscription.findMany({
           where: { userId },
           select: { id: true, playerId: true, createdAt: true },
+        })
+      ),
+      // Passkeys: metadata only. The public key is not personal data worth shipping and nothing in this
+      // bundle can be a secret (the private key never leaves the person's device).
+      withUser(userId, tx =>
+        tx.passkeyCredential.findMany({
+          where: { userId },
+          orderBy: { createdAt: 'asc' },
+          select: {
+            id: true,
+            name: true,
+            rpId: true,
+            deviceType: true,
+            backedUp: true,
+            createdAt: true,
+            lastUsedAt: true,
+          },
         })
       ),
       // SMS-marketing consent (issue 206): what was given, when, where, and
@@ -2471,6 +2500,7 @@ export class AuthService {
       walletTransactions,
       pushSubscriptions,
       onesignalSubscriptions,
+      passkeys,
       smsMarketingConsents,
       wholesaleApplications,
     };

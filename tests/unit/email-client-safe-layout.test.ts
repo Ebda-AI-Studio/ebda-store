@@ -62,6 +62,7 @@ import { webhookDisabledTemplate } from '@api/services/email-templates/webhook-d
 import { subscriptionBillingTemplate } from '@api/services/email-templates/subscription-billing';
 import { staffInviteTemplate } from '@api/services/email-templates/staff-invite';
 import { legalNoticeTemplate } from '@api/services/email-templates/legal-notice';
+import { passkeyNoticeTemplate } from '@api/services/email-templates/passkey-notice';
 import { wholesaleNotice } from '@api/services/email-templates/wholesale';
 import { cartRecoveryTemplate } from '@api/services/email-templates/cart-recovery';
 
@@ -103,6 +104,9 @@ const any = {
   email: 's@x.test',
   name: 'Sara',
   resetUrl: 'https://s.test/r',
+  kind: 'added',
+  passkeyName: 'Work laptop',
+  at: '2026-10-21T10:00:00.000Z',
   verificationUrl: 'https://s.test/v',
   expiresInMinutes: 15,
   expiresInHours: 24,
@@ -182,6 +186,7 @@ const TEMPLATES: Record<string, Tpl> = {
   webhookDisabled: webhookDisabledTemplate,
   subscriptionBilling: subscriptionBillingTemplate,
   staffInvite: staffInviteTemplate,
+  passkeyNotice: passkeyNoticeTemplate,
   // Recovery email takes a data object, not the (data, storeName, url) triple.
   cartRecovery: {
     en: () => cartRecoveryTemplate.en(CART_RECOVERY_SAMPLE),

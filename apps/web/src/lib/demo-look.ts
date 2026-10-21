@@ -18,8 +18,9 @@ export const defaultIsLookBuilt: IsLookBuilt = id => getLook(id)?.status === 'bu
  * look's skin as the template) and returns a new object, so neither the per-instance store cache
  * nor Next's data cache (both hold the base store) ever sees the previewed look.
  *
- * The theme is recomposed from skin + look with NO merchant overrides: the demo store has none by
- * design (the seed writes an empty theme), and a showroom must show the look itself.
+ * The theme is recomposed from skin + look with NO merchant design overrides: the demo store has
+ * none by design (the seed writes only the `showNewBadge` switch), and a showroom must show the
+ * look itself.
  */
 export function applyDemoLook(
   store: ResolvedStore,
@@ -34,6 +35,12 @@ export function applyDemoLook(
     ...store,
     template: look.skin,
     look: look.id,
-    theme: composeStoreTheme({ template: look.skin, look: look.id, theme: {} }),
+    theme: composeStoreTheme({
+      template: look.skin,
+      look: look.id,
+      // `showNewBadge` is a merchant SWITCH, not a design override: keep it so the showroom's
+      // NEW chips survive the recomposition (they would vanish under every ?look= otherwise).
+      theme: store.theme?.showNewBadge === true ? { showNewBadge: true } : {},
+    }),
   };
 }

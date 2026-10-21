@@ -109,6 +109,8 @@ export const USER_KEYED_MODELS: Readonly<Record<string, string>> = {
   LegalAcceptance: 'userId',
   LegalNoticeDelivery: 'userId',
   OneSignalSubscription: 'userId',
+  // Ruling PASSKEY-1: WebAuthn credentials, owned by one user.
+  PasskeyCredential: 'userId',
   RefreshToken: 'userId',
   VerificationToken: 'userId',
 };

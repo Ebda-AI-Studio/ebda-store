@@ -4,7 +4,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, statSync } from 'node:fs';
 import path from 'node:path';
 import { Home } from '../../apps/marketing/src/components/Home';
 import { LegalPage } from '../../apps/marketing/src/components/LegalPage';
@@ -62,10 +62,11 @@ describe('marketing nav', () => {
       'Pricing',
       'FAQ',
     ]);
-    expect(labels.map(m => m[1])).toEqual(['#story', '#looks', '#features', '#pricing', '#faq']);
+    expect(labels.map(m => m[1])).toEqual(['#story', '#looks', '/en/features', '#pricing', '#faq']);
     // every nav target exists on the page, in the same order as the sections
     const at = (id: string) => en.indexOf(`<section id="${id}"`);
-    const pos = labels.map(m => at(m[1].slice(1)));
+    // "Features" is the real /features page, not a home section
+    const pos = labels.filter(m => m[1].startsWith('#')).map(m => at(m[1].slice(1)));
     expect(pos.every(p => p > 0)).toBe(true);
     expect([...pos].sort((a, b) => a - b)).toEqual(pos);
   });
@@ -413,10 +414,10 @@ describe('marketing honesty', () => {
     expect(ar).toContain('>واتساب<');
     expect(en).toContain('>WhatsApp<');
   });
-  it('shows the looks picker: 5 template tabs, Qamar rendered, every phone labelled illustrative', () => {
-    for (const [html, badge] of [
-      [ar, 'صور توضيحية'],
-      [en, 'Illustrative'],
+  it('shows the looks picker: 5 template tabs, Qamar as real captures of the live demo, no provider names', () => {
+    for (const [html, lang, badge] of [
+      [ar, 'ar', 'صور توضيحية'],
+      [en, 'en', 'Illustrative'],
     ] as const) {
       const s = html.match(/<section id="looks".*?<section id="model3d"/s)![0];
       expect(s.match(/role="tab"/g)).toHaveLength(5);
@@ -424,12 +425,27 @@ describe('marketing honesty', () => {
       expect(s).toMatch(
         /aria-selected="true"[^>]*id="looks-tab-qamar"|id="looks-tab-qamar"[^>]*aria-selected="true"/
       );
-      expect(s.match(new RegExp(`<span class="look-badge">${badge}</span>`, 'g'))).toHaveLength(3);
-      for (const l of ['a', 'b', 'c']) expect(s).toContain(`id="ph-qamar-${l}"`);
-      // photos are files, never inlined
-      expect(s).toContain('/looks/img/qa__hero.webp');
+      // Qamar is live: real screenshots (avif + webp, sized, with alt) linking to the demo store
+      for (const l of ['atelier', 'lookbook', 'vitrine']) {
+        expect(s).toContain(`/looks/live/qamar-${l}-${lang}-780.avif`);
+        expect(s).toContain(`/looks/live/qamar-${l}-${lang}-780.webp`);
+        expect(s).toContain(`href="https://storedemo.ebda.app/?look=qamar.${l}"`);
+      }
+      expect(s.match(/<img [^>]*width="780" height="1688" alt="[^"]{20,}"/g)).toHaveLength(3);
+      expect(s).not.toContain('look-badge');
+      expect(s).not.toContain(`>${badge}<`);
+      expect(s).not.toContain('id="ph-qamar-');
       expect(s).not.toContain('base64');
     }
+    for (const l of ['atelier', 'lookbook', 'vitrine'])
+      for (const lang of ['ar', 'en'])
+        for (const ext of ['avif', 'webp']) {
+          const f = path.resolve(
+            __dirname,
+            `../../apps/marketing/public/looks/live/qamar-${l}-${lang}-780.${ext}`
+          );
+          expect(statSync(f).size).toBeLessThan(60_000);
+        }
     expect(en).toContain('Every template ships in Arabic and English');
     // the looks fetch is extensionless: Workers Static Assets 307-redirect /looks/x.html to /looks/x
     const showcase = readFileSync(

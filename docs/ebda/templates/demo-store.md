@@ -44,3 +44,13 @@ Local review: copy `scripts/qamar-demo/assets/*` into an untracked `apps/web/pub
 2. `DATABASE_URL=<owner url> npx tsx scripts/storedemo/seed.mjs --yes-production` (it prints the plan first; never touches an existing real store; sets the showroom to the Professional plan).
 3. Verify live: `https://storedemo.ebda.app/?look=qamar.lookbook` renders Lookbook, `robots.txt` disallows `/`, `Cache-Control: private, no-store`, a checkout ends at the demo notice.
    Phase S placeholder families stay archived, never deleted (Ruling B1-15).
+
+## Production deploy log (2026-10-21)
+
+Run by the controller after the Qamar merge (`dea5da268`), Ahmad pre-authorised (pre-launch).
+
+- **R2:** 49 files from `scripts/qamar-demo/assets/` uploaded to `ebda-media/demo/qamar/` (`Cache-Control: public, max-age=31536000, immutable`); every file answers 200 on `https://media.ebda.app/demo/qamar/`.
+- **Seed:** `seed.mjs --yes-production` created the showroom (`storedemo`, `is_demo`, `qamar` skin, `qamar.atelier`, Professional plan, `theme {"showNewBadge": true}`, Ahmad 2026-10-16), 18 products, 160 variants, the Qamar home (rev 1). Before: 1 store (`qa-walk-store-1010`, untouched), 0 products. After: 2 stores, 18 active products on `storedemo`, 0 orders. Scope: every write is keyed on the `storedemo` store id; the placeholder archive found 0 rows (none were ever seeded in production).
+- **Seeding over the internet:** the first pooled connection is opened before any transaction (a Neon connect is longer than Prisma's 2 s default `maxWait`), and the catalogue transaction allows 15 minutes (one round trip per statement is about 100 ms from a laptop, so 160 variants outlast the old 2 minutes). The seed must run against a client generated from the schema the production DB has: with a newer `schema.prisma` than the migrated DB (here the B2B `audience` column) it fails with `P2022`. Generate from the deployed commit's schema, or deploy the API first.
+- **`showNewBadge` under `?look=`:** `applyDemoLook` recomposes the theme with no merchant overrides; it now carries the `showNewBadge` switch through, so the NEW chips survive a look preview (test in `tests/unit/web-demo-look.test.ts`). It reaches the live demo with the next web deploy.
+- **Marketing captures (TPL-4):** `apps/marketing/scripts/looks/live-shots.mjs` captures the live demo (390x844 @2x, ar + en, Chrome, nothing clicked; the demo bar and the cookie banner are hidden by a display rule) into `apps/marketing/public/looks/live/` (AVIF 19-26 KB, WebP 29-40 KB each).

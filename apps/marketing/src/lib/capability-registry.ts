@@ -6,29 +6,37 @@
  * `status` to 'live' and `dependsOn` can stay as the record; tests/unit/marketing-capability-registry.test.ts
  * lists which ids flip with which branch and fails if the two disagree.
  */
-export type CapabilityId =
+/** A capability that renders as one card on /features. One card per capability, never two for the same thing. */
+export type CardId =
+  | 'ai'
+  | 'search'
+  | 'assistant'
+  | 'accounting'
+  | 'inventory'
+  | 'analytics'
+  | 'instapay'
+  | 'seo'
   | 'builder'
   | 'domain'
-  | 'ai'
-  | 'smartsearch'
-  | 'searchwords'
-  | 'meaning'
-  | 'insights'
-  | 'seo'
-  | 'assistant'
   | 'cart'
-  | 'cartemail'
   | 'emails'
   | 'campaigns'
-  | 'webhooks'
   | 'loyalty'
   | 'reviews'
-  | 'analytics'
+  | 'payments'
   | 'warehouse'
   | 'barcodes'
   | 'b2b'
-  | 'payments'
+  | 'webhooks'
   | 'commission';
+
+/**
+ * A status flag with no card of its own: it is a part of a card (meaning search is the "coming" line of the
+ * `search` card), so it must not be listed as a second search item.
+ */
+export type FlagId = 'meaning';
+
+export type CapabilityId = CardId | FlagId;
 
 export type CapabilityStatus = 'live' | 'coming';
 
@@ -36,33 +44,50 @@ export interface RegistryEntry {
   status: CapabilityStatus;
   /** For `coming`: the open branch / PR whose merge makes it live. */
   dependsOn?: string;
+  /** Tagged `ai`: it must appear in the AI theme of /features, exactly once. */
+  ai?: true;
 }
 
 export const REGISTRY: Record<CapabilityId, RegistryEntry> = {
+  ai: { status: 'live', ai: true },
+  search: { status: 'live', ai: true },
+  // Search PR4. Built, but SEARCH_SEMANTIC_ENABLED is OFF in production and stays off per store until the real
+  // catalogue passes the quality test, so it is `coming` and is only the "coming" line of the search card.
+  meaning: { status: 'coming', dependsOn: 'feat/search-p1c-hybrid (search PR4)' },
+  assistant: { status: 'live', ai: true },
+  accounting: { status: 'live', ai: true },
+  inventory: { status: 'live', ai: true },
+  analytics: { status: 'live', ai: true },
+  instapay: { status: 'live', ai: true },
+  seo: { status: 'live', ai: true },
   builder: { status: 'live' },
   domain: { status: 'live' },
-  ai: { status: 'live' },
-  smartsearch: { status: 'live' },
-  searchwords: { status: 'live' },
-  // Search PR4. Stays off per store until the real catalogue passes the quality test.
-  meaning: { status: 'coming', dependsOn: 'feat/search-p1c-hybrid (search PR4)' },
-  insights: { status: 'live' },
-  seo: { status: 'live' },
-  assistant: { status: 'live' },
   cart: { status: 'live' },
-  cartemail: { status: 'live' },
   emails: { status: 'live' },
   campaigns: { status: 'live' },
-  webhooks: { status: 'coming', dependsOn: 'feat/merchant-webhooks' },
   loyalty: { status: 'live' },
   reviews: { status: 'live' },
-  analytics: { status: 'live' },
+  payments: { status: 'live' },
   warehouse: { status: 'live' },
   barcodes: { status: 'live' },
   b2b: { status: 'coming', dependsOn: 'feat/b2b-wholesale' },
-  payments: { status: 'live' },
+  webhooks: { status: 'coming', dependsOn: 'feat/merchant-webhooks' },
   commission: { status: 'live' },
 };
+
+export type ThemeId = 'ai' | 'store' | 'sell' | 'ops' | 'pricing';
+
+/** The /features layout: themes in page order, the cards in each, each capability exactly once. */
+export const THEMES: readonly { id: ThemeId; ids: readonly CardId[] }[] = [
+  {
+    id: 'ai',
+    ids: ['ai', 'search', 'assistant', 'accounting', 'inventory', 'analytics', 'instapay', 'seo'],
+  },
+  { id: 'store', ids: ['builder', 'domain'] },
+  { id: 'sell', ids: ['cart', 'emails', 'campaigns', 'loyalty', 'reviews'] },
+  { id: 'ops', ids: ['payments', 'warehouse', 'barcodes', 'b2b', 'webhooks'] },
+  { id: 'pricing', ids: ['commission'] },
+];
 
 export const isLive = (id: CapabilityId) => REGISTRY[id].status === 'live';
 
