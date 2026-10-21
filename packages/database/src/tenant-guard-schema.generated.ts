@@ -93,6 +93,8 @@ export const TENANT_GUARD_SCHEMA: readonly TenantGuardModel[] = [
       wishlists: 'Wishlist',
       newsletters: 'NewsletterSubscriber',
       campaigns: 'Campaign',
+      webhookEndpoints: 'WebhookEndpoint',
+      webhookDeliveries: 'WebhookDelivery',
       campaignRecipients: 'CampaignRecipient',
       reviews: 'Review',
       returns: 'Return',
@@ -1439,5 +1441,23 @@ export const TENANT_GUARD_SCHEMA: readonly TenantGuardModel[] = [
     table: 'fiscal_document_counters',
     storeId: true,
     relations: {},
+  },
+  {
+    name: 'WebhookEndpoint',
+    table: 'webhook_endpoints',
+    storeId: true,
+    relations: {
+      store: 'Store',
+      deliveries: 'WebhookDelivery',
+    },
+  },
+  {
+    name: 'WebhookDelivery',
+    table: 'webhook_deliveries',
+    storeId: true,
+    relations: {
+      store: 'Store',
+      endpoint: 'WebhookEndpoint',
+    },
   },
 ];
