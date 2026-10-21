@@ -34,6 +34,7 @@ import {
   pageDensityStyle,
 } from '../../templates/shared/section-typography';
 import { ProductListItem } from './ProductListItem';
+import { getSortOptions } from './products-sort';
 import { ProductsFilterSidebar } from './ProductsFilterSidebar';
 import { ProductsPagination } from './ProductsPagination';
 import { recordLastListing, consumeFocusProduct } from '@/lib/last-listing';
@@ -51,34 +52,6 @@ const PRICE_SLIDER_STEP = 10;
 
 const PLP_DEFAULT_PER_PAGE = 96;
 const PLP_LEGACY_PER_PAGE_KEY = 'plp-per-page';
-
-/** Sort option labels are translated at render time via the t() helper */
-function getSortOptions(t: (en: string, ar: string) => string) {
-  return [
-    // Default = the merchant's curated per-category order. Sends NO sort/featured
-    // param so the API uses the ProductCategory.position path (all products in the
-    // store's chosen order). MUST stay first + be the default — a category browse
-    // should show the whole category, not a filtered collection.
-    {
-      value: 'default',
-      label: t('Recommended', 'المُوصى به'),
-    },
-    { value: 'featured', label: t('Featured', 'مميز') },
-    { value: 'newest', label: t('Newest', 'الأحدث') },
-    {
-      value: 'best_seller',
-      label: t('Best sellers', 'الأكثر مبيعاً'),
-    },
-    {
-      value: 'price-asc',
-      label: t('Price: Low to High', 'السعر: من الأقل للأعلى'),
-    },
-    {
-      value: 'price-desc',
-      label: t('Price: High to Low', 'السعر: من الأعلى للأقل'),
-    },
-  ];
-}
 
 function ProductSkeleton() {
   return (
@@ -195,7 +168,8 @@ export default function ProductsClient({
   const { store } = useStore();
   const storeUrl = useStoreUrl();
   const { templateId } = useTemplateComponents();
-  const sortOptions = getSortOptions(t);
+  // A search the server ranked (hybrid relevance, Task 12) labels the default "Most relevant".
+  const sortOptions = getSortOptions(t, meta?.ranked === true);
 
   // Resolve productCardDefaults typography zones for PLP cards. The global
   // zones are not accessible from this client component (they're emitted as

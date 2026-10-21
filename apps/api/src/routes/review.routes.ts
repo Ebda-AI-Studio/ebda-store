@@ -10,6 +10,7 @@ import logger from '../lib/logger';
 import { prisma } from '@ebda/database';
 import { auditLog, writeLimiter } from '../middleware/security';
 import { draftOwnerResponse, summarizeProductReviews } from '../lib/ai/review-tools';
+import { assertScalarQuery } from '../lib/query-params';
 
 // `mergeParams: true` so the child router's handlers see `:storeId` from
 // the parent mount path (`/stores/:storeId/reviews` in routes/index.ts).
@@ -53,6 +54,7 @@ router.get(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { productId } = req.params;
+      assertScalarQuery(req.query, ['page', 'limit', 'sortBy']);
       const { page, limit, sortBy } = req.query;
 
       const result = await ReviewService.listByProduct(req.storeId!, productId, {
@@ -200,6 +202,8 @@ router.get(
   requireFeature('reviews'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
+      // Scalars only: `status`/`productId` go into a Prisma where (an object would be an operator).
+      assertScalarQuery(req.query, ['page', 'limit', 'status', 'productId']);
       const { page, limit, status, productId } = req.query;
 
       const result = await ReviewService.listForStore(req.storeId!, {

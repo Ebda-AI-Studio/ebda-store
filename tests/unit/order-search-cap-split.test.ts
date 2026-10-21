@@ -9,17 +9,24 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-const h = vi.hoisted(() => ({ findMany: vi.fn(), queryRaw: vi.fn() }));
+const h = vi.hoisted(() => ({
+  customers: vi.fn(),
+  guests: vi.fn(),
+  numbers: vi.fn(),
+  queryRaw: vi.fn(),
+}));
 
 vi.mock('@ebda/database', async importOriginal => ({
   ...(await importOriginal<typeof import('@ebda/database')>()),
   prisma: {
-    // the customer lookup now reads THROUGH this store's orders (groupBy by customerId)
-    order: {
-      groupBy: async (...a: unknown[]) =>
-        ((await h.findMany(...a)) as { id: string }[]).map(r => ({ customerId: r.id })),
+    // every lookup is the store-scoped definer `ebda_order_search_ids(store, kind, pattern, limit)`;
+    // the second bound value of the statement is the kind
+    $queryRaw: async (sql: { values: unknown[] }) => {
+      const kind = sql.values[1];
+      h.queryRaw(kind);
+      const fn = kind === 'customers' ? h.customers : kind === 'guest' ? h.guests : h.numbers;
+      return fn();
     },
-    $queryRaw: h.queryRaw,
   },
 }));
 vi.mock('@api/lib/inngest/client', () => ({
@@ -32,12 +39,15 @@ const { orderSearchWhere, ORDER_SEARCH_CUSTOMER_ID_CAP } =
 const ids = (n: number, prefix: string) => Array.from({ length: n }, (_, i) => `${prefix}${i}`);
 const arms = async () => JSON.stringify(await orderSearchWhere('store-1', '+9655'));
 
-beforeEach(() => vi.clearAllMocks());
+beforeEach(() => {
+  vi.clearAllMocks();
+  h.numbers.mockResolvedValue([]);
+});
 
 describe('orderSearchWhere: each over-cap half degrades on its own (issue 2444)', () => {
   it('guest over the cap, customers under: customer_id IN arm survives, guest uses the JSON filter, no relation join', async () => {
-    h.findMany.mockResolvedValue([{ id: 'u1' }, { id: 'u2' }]);
-    h.queryRaw.mockResolvedValue(ids(ORDER_SEARCH_CUSTOMER_ID_CAP + 1, 'g').map(id => ({ id })));
+    h.customers.mockResolvedValue([{ id: 'u1' }, { id: 'u2' }]);
+    h.guests.mockResolvedValue(ids(ORDER_SEARCH_CUSTOMER_ID_CAP + 1, 'g').map(id => ({ id })));
     const out = await arms();
     expect(out).toContain('"customerId":{"in":["u1","u2"]}');
     expect(out).toContain('string_contains');
@@ -46,8 +56,8 @@ describe('orderSearchWhere: each over-cap half degrades on its own (issue 2444)'
   });
 
   it('customers over the cap, guests under: relation arm for customers, guest id IN arm survives', async () => {
-    h.findMany.mockResolvedValue(ids(ORDER_SEARCH_CUSTOMER_ID_CAP + 1, 'u').map(id => ({ id })));
-    h.queryRaw.mockResolvedValue([{ id: 'g1' }]);
+    h.customers.mockResolvedValue(ids(ORDER_SEARCH_CUSTOMER_ID_CAP + 1, 'u').map(id => ({ id })));
+    h.guests.mockResolvedValue([{ id: 'g1' }]);
     const out = await arms();
     expect(out).toContain('"customer":');
     expect(out).toContain('"id":{"in":["g1"]}');
@@ -56,16 +66,16 @@ describe('orderSearchWhere: each over-cap half degrades on its own (issue 2444)'
   });
 
   it('both over the cap: the full relation fallback (customer relation + JSON filter)', async () => {
-    h.findMany.mockResolvedValue(ids(ORDER_SEARCH_CUSTOMER_ID_CAP + 1, 'u').map(id => ({ id })));
-    h.queryRaw.mockResolvedValue(ids(ORDER_SEARCH_CUSTOMER_ID_CAP + 1, 'g').map(id => ({ id })));
+    h.customers.mockResolvedValue(ids(ORDER_SEARCH_CUSTOMER_ID_CAP + 1, 'u').map(id => ({ id })));
+    h.guests.mockResolvedValue(ids(ORDER_SEARCH_CUSTOMER_ID_CAP + 1, 'g').map(id => ({ id })));
     const out = await arms();
     expect(out).toContain('"customer":');
     expect(out).toContain('string_contains');
   });
 
   it('both under the cap: only indexed arms (order number, customer_id IN, id IN)', async () => {
-    h.findMany.mockResolvedValue([{ id: 'u1' }]);
-    h.queryRaw.mockResolvedValue([{ id: 'g1' }]);
+    h.customers.mockResolvedValue([{ id: 'u1' }]);
+    h.guests.mockResolvedValue([{ id: 'g1' }]);
     const out = await arms();
     expect(out).toContain('"customerId":{"in":["u1"]}');
     expect(out).toContain('"id":{"in":["g1"]}');
@@ -73,10 +83,18 @@ describe('orderSearchWhere: each over-cap half degrades on its own (issue 2444)'
     expect(out).not.toContain('"customer":');
   });
 
-  it('nothing matches: just the order-number arm', async () => {
-    h.findMany.mockResolvedValue([]);
-    h.queryRaw.mockResolvedValue([]);
+  it('nothing matches: one explicit match-nothing arm', async () => {
+    h.customers.mockResolvedValue([]);
+    h.guests.mockResolvedValue([]);
     const w = await orderSearchWhere('store-1', '+9655');
-    expect(w).toHaveLength(1);
+    expect(JSON.stringify(w)).toBe('[{"id":{"in":[]}}]');
+  });
+
+  it('a customer searching their own orders (indexed: false) never calls the store-wide lookup', async () => {
+    const w = await orderSearchWhere('store-1', '+9655', { indexed: false });
+    expect(h.queryRaw).not.toHaveBeenCalled();
+    const out = JSON.stringify(w);
+    expect(out).toContain('string_contains'); // the relation / JSON fallback, ANDed with their customerId
+    expect(out).not.toContain('"id":{"in"');
   });
 });

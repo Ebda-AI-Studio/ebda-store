@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { redis } from '../services/redis.service';
 import { BoundedMap } from './bounded-map';
 import { revalidateStorefront } from './revalidate-storefront';
@@ -112,7 +113,12 @@ async function bumpGeneration(name: string): Promise<void> {
 export async function getCached<T>(
   key: string,
   ttlSeconds: number,
-  fetchFn: () => Promise<T>
+  fetchFn: () => Promise<T>,
+  /**
+   * `cacheIf(data) === false` = return this value but store it in NO layer (a degraded answer,
+   * e.g. a keyword-only fallback of a hybrid search, must never stand in for the full one).
+   */
+  opts: { cacheIf?: (data: T) => boolean } = {}
 ): Promise<T> {
   // FIX-002: the in-memory layer is a fallback for a DOWN Redis only. While
   // Redis is healthy another replica's invalidation clears Redis but can never
@@ -156,7 +162,8 @@ export async function getCached<T>(
       label: `getCached:${key.split(':')[1] ?? key}`,
     });
 
-    if (sharedBefore !== null && (await readSharedGens(genNames)) === sharedBefore) {
+    const cacheable = opts.cacheIf ? opts.cacheIf(data) : true;
+    if (cacheable && sharedBefore !== null && (await readSharedGens(genNames)) === sharedBefore) {
       try {
         await redis.set(key, JSON.stringify(data), ttlSeconds);
         // An invalidation that bumped between the check above and this write
@@ -171,7 +178,12 @@ export async function getCached<T>(
     }
     // Memory only when the shared layer is down (FIX-002), and never with a
     // value a local invalidation has superseded since the fetch began.
-    if (!isWorkers && sharedBefore === null && readLocalGens(genNames) === localBefore) {
+    if (
+      cacheable &&
+      !isWorkers &&
+      sharedBefore === null &&
+      readLocalGens(genNames) === localBefore
+    ) {
       memoryCache.set(key, { data, expiresAt: Date.now() + ttlSeconds * 1000 });
     }
     return data;
@@ -444,4 +456,19 @@ export function customersCacheKey(storeId: string): string {
  */
 export async function invalidateCustomersCache(storeId: string): Promise<void> {
   await invalidateCached(customersCacheKey(storeId));
+}
+
+/**
+ * Workers KV refuses keys over 512 bytes, and the full KV key is `[namespace]cache:<key>`. A longer
+ * key made the get/put throw and the request silently went uncached (Task 12 review M7). Keys
+ * longer than this are hashed: `<prefix>sha256:<hex of the suffix>`. The prefix stays readable, so
+ * prefix invalidation (`invalidateCachedPrefix('public:products:<storeId>:')`) still covers them;
+ * sha-256 of the canonical suffix keeps distinct inputs distinct.
+ */
+export const CACHE_KEY_MAX_BYTES = 400;
+
+export function boundedCacheKey(prefix: string, suffix: string): string {
+  const full = prefix + suffix;
+  if (new TextEncoder().encode(full).length <= CACHE_KEY_MAX_BYTES) return full;
+  return `${prefix}sha256:${createHash('sha256').update(suffix).digest('hex')}`;
 }

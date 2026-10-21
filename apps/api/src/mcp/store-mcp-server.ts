@@ -14,9 +14,9 @@ import { registerOrderTools } from './tools/order.tools';
  * stateless Streamable HTTP transport requires a fresh server+transport pair
  * per request (see mcp.routes.ts).
  */
-export function buildStoreMcpServer(store: McpStore): McpServer {
+export function buildStoreMcpServer(store: McpStore, opts: { searcher?: string } = {}): McpServer {
   const server = new McpServer({ name: `force-store-${store.slug}`, version: '1.0.0' });
-  registerCatalogTools(server, store);
+  registerCatalogTools(server, store, { searcher: opts.searcher });
   registerCartTools(server, store);
   registerOrderTools(server, store);
   return server;

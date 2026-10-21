@@ -1301,12 +1301,16 @@ model SearchQueryDaily {
 // Ruling SEARCH-11); never used for price/stock/status, which are read live from products.
 // Viewer: the searches insights page header ("indexed N of M products", Task 12).
 model ProductEmbedding {
-  productId   String                       @id @map("product_id")
-  storeId     String                       @map("store_id")
-  model       String
-  contentHash String                       @map("content_hash")
-  embedding   Unsupported("halfvec(1024)")
-  embeddedAt  DateTime                     @default(now()) @map("embedded_at") @db.Timestamptz(6)
+  productId      String                        @id @map("product_id")
+  storeId        String                        @map("store_id")
+  model          String
+  contentHash    String                        @map("content_hash")
+  embedding      Unsupported("halfvec(1024)")
+  /// bge-m3 vector of the AI search words alone; NULL when the product has none (SEARCH-T13-7).
+  termsEmbedding Unsupported("halfvec(1024)")? @map("terms_embedding")
+  /// md5 of the words text termsEmbedding was built from (its own staleness); NULL with it.
+  termsHash      String?                       @map("terms_hash")
+  embeddedAt     DateTime                      @default(now()) @map("embedded_at") @db.Timestamptz(6)
 
   product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
   store   Store   @relation(fields: [storeId], references: [id], onDelete: Cascade)

@@ -1,0 +1,23 @@
+-- Keep the two embedding vectors inline in the heap (search program P1, Task 14 load-test finding;
+-- Ruling SEARCH-T14-2).
+--
+-- A halfvec(1024) is 2 056 bytes and a row carries two, so a row (~4.2 KB) is over Postgres' 2 KB
+-- TOAST threshold and both vectors are moved out to the TOAST relation. The exact per-store KNN
+-- (Ruling SEARCH-8) reads every vector of the store, and each TOASTed value costs a TOAST-index
+-- probe plus its chunk pages: measured at 20 000 products, one search read 120 000 buffers (~1 GB
+-- of memory traffic) for a 6 MB heap whose vectors sat in a 115 MB TOAST relation. Alone that was
+-- 74 ms; under 30 searches/s the vector query averaged 1.2 s and the storefront p95 was 4.0 s. With
+-- the vectors inline: 16 800 buffers, 30 ms alone, 26 ms mean under the same load, p95 310 ms.
+--
+-- `toast_tuple_target = 8160` (the maximum) makes Postgres leave any row up to a page alone: no
+-- TOAST, and no pglz attempt on incompressible floats at every write. (Column STORAGE MAIN was
+-- tried first and does not do it: a MAIN value is still moved out when the row passes the 2 KB
+-- target, measured.) The row size is fixed by the model's dimensions, so it always fits.
+--
+-- Catalog change only (brief SHARE UPDATE EXCLUSIVE); safe to deploy before or after the code.
+-- It applies to rows written from now on. Production holds 0 embeddings (STOP-4 backfill has not
+-- run), so nothing needs rewriting; a database that already holds rows keeps those vectors in
+-- TOAST until `VACUUM FULL product_embeddings` (offline, rewrites the table) re-inlines them.
+-- Rollback: rollback.sql.
+
+ALTER TABLE "product_embeddings" SET (toast_tuple_target = 8160);
