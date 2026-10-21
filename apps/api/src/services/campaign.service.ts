@@ -25,9 +25,27 @@ function positiveIntEnv(name: string, fallback: number): number {
  * platform's shared Resend sender reputation: one store blasting a stale list
  * degrades deliverability for every store on the platform-domain fallback
  * sender. Test sends do not count.
+ *
+ * Per plan (Ruling CAMP-PLAN-2): `store.plan` (the plan's feature tier) picks
+ * the default - Growth/professional 1000, Business/enterprise 5000, any other
+ * tier (reachable only via a super-admin override) 500. No plan = the old
+ * flat 1000. An explicit `CAMPAIGN_DAILY_SEND_CAP` is the ops override and
+ * applies to every plan.
  */
-export function campaignDailyCap(): number {
-  return positiveIntEnv('CAMPAIGN_DAILY_SEND_CAP', 1000);
+export const CAMPAIGN_DAILY_CAP_BY_PLAN: Record<string, number> = {
+  professional: 1000,
+  enterprise: 5000,
+};
+
+export function campaignDailyCap(plan?: string | null): number {
+  const fallback = plan ? (CAMPAIGN_DAILY_CAP_BY_PLAN[plan] ?? 500) : 1000;
+  return positiveIntEnv('CAMPAIGN_DAILY_SEND_CAP', fallback);
+}
+
+/** The cap for one store, reading its plan tier (call inside the store's tenant context). */
+export async function storeCampaignDailyCap(storeId: string): Promise<number> {
+  const store = await prisma.store.findUnique({ where: { id: storeId }, select: { plan: true } });
+  return campaignDailyCap(store?.plan);
 }
 
 /**

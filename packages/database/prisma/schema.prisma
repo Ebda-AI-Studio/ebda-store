@@ -3329,8 +3329,8 @@ model NewsletterSubscriber {
 // Email campaigns (D2, 2026-09-25)
 // ==========================================
 //
-// Gated by the per-store `email_campaigns` feature key, which is in NO plan
-// baseline — it resolves OFF for every store until a super-admin enables it.
+// Gated by the per-store `email_campaigns` feature key, which is in the Growth +
+// Business plan baselines (not Basic); a super-admin override still wins.
 // Nothing here sends by itself: a row only reaches Resend after a merchant
 // creates a campaign AND presses send (POST /stores/:id/campaigns/:id/send).
 // Plan: docs/plans/2026-09-25-email-campaigns.md.

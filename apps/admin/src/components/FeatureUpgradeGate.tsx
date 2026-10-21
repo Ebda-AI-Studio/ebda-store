@@ -25,6 +25,7 @@ import {
   BRAND,
   PLAN_LABELS,
   lowestPlanForFeature,
+  publicPlanLabelForFeature,
   type FeatureKey,
 } from '@ebda/shared';
 
@@ -61,11 +62,16 @@ export function FeatureUpgradeGate({ featureKey, storeId }: Props) {
 
   // Lowest plan that unlocks this feature.
   const unlockingPlan = def ? lowestPlanForFeature(featureKey as FeatureKey) : null;
-  const planLabel = unlockingPlan
+  const publicLabel = def ? publicPlanLabelForFeature(featureKey as FeatureKey) : null;
+  const planLabel = publicLabel
     ? isAr
-      ? PLAN_LABELS[unlockingPlan].ar
-      : PLAN_LABELS[unlockingPlan].en
-    : null;
+      ? publicLabel.ar
+      : publicLabel.en
+    : unlockingPlan
+      ? isAr
+        ? PLAN_LABELS[unlockingPlan].ar
+        : PLAN_LABELS[unlockingPlan].en
+      : null;
 
   const upgradeLink = buildUpgradeMailto(storeId, featureName);
 
