@@ -252,6 +252,10 @@ export async function seedCatalogue(prisma, Prisma, storeId, base) {
       // "New in" (`productSource: newest`) lists only products flagged `isNew`: flag the first
       // NEW_IN_COUNT products that have a photo (12 fills 2, 3 and 4 columns with no orphan row).
       const NEW_IN_COUNT = 12;
+      // TODO(decisions-1016, Ruling B1-117): the card "New" badge becomes a merchant toggle there
+      // (`theme.showNewBadge`, default OFF; `isProductNew` takes `theme`). That setting does not
+      // exist on this branch, so `theme` stays {} here. When decisions-1016 merges, the showroom
+      // seed MUST set `theme: { showNewBadge: true }` or every NEW chip on the showroom disappears.
       const newIn = new Set(
         QAMAR_PRODUCTS.filter(p => p.images.length > 0)
           .slice(0, NEW_IN_COUNT)
