@@ -22,9 +22,9 @@ Pricing (EGP per month): Basic 1,490, Growth 3,490, Business 9,990; yearly billi
 ## Capabilities (what exists today)
 - Page builder with five templates and three looks each: change colours, photos and section order, no developer needed.
 - Free yourname.ebda.app address on every store, and a custom domain on every plan.
-- AI tools (paid plans, monthly usage allowance): product descriptions, Arabic/English translation, search words, categories, tags, image alt text, SEO titles and descriptions, FAQs.
+- AI tools (paid plans, within fair-use limits): product descriptions, Arabic/English translation, search words, categories, tags, image alt text, SEO titles and descriptions, FAQs.
 - Search that understands Egyptian Arabic and Franco-Arabic: Arabic letter variants are unified, and AI adds dialect, Franco and English search words to each product.
-- SEO and AI-answer visibility: redirects for old links, structured FAQs, a store llms.txt, a product feed for AI agents, and tracking of whether ChatGPT, Gemini and Perplexity mention the store.
+- SEO and AI-answer visibility: redirects for old links, structured FAQs, a store llms.txt, a product feed for AI agents, and tracking of whether AI assistants such as ChatGPT, Gemini and Perplexity mention the store.
 - Run the store from an AI assistant over MCP (Growth and Business).
 - Abandoned-cart recovery in steps by notification, or SMS with the shopper's consent (Growth and Business). No cart reminder by email yet.
 - Automatic order emails: confirmation, shipping, refunds, payment status, review request.
