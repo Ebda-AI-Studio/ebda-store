@@ -85,7 +85,7 @@ Target: **14 tasks** (7 looks + 7 gold-rate pricing). Planned ≈ 14 implementer
   - **The materialised `price` column is the one source every reader uses** (Ruling B5-13). For a gold-priced row, only the repricer writes it, and a DB trigger enforces that.
   - **Price is NEVER-stale.** Every rate write path (manual, feed, confirm a pending rate, mode switch, spec edit, bulk switch) calls `invalidateStoreProductCaches(storeId)` after commit: the immediate purge, **never** the order-coalesced `…AfterOrder` variant. The full layer list is in Ruling B5-21.
   - **Fail closed.** A stale rate, a spec that cannot be priced, a drift between the materialised and the recomputed price, or a rate that moved after the shopper's quote throws a typed 409. Nothing ever charges a guessed price.
-  - **Provider anonymity.** The feed provider's name appears only in `apps/api/src/services/gold-rate/feed/**`, `docs/ENVIRONMENT.md` and `docs/RULINGS.md`. A unit gate greps `apps/web`, `apps/admin`, `apps/marketing`, `LanguageContext.tsx`, email templates and `packages/shared` and fails on a hit. Merchant copy says "السعر التلقائي" / "Automatic rate".
+  - **Provider anonymity.** A feed provider's name appears only in `apps/api/src/services/gold-rate/feed/**`, `docs/ENVIRONMENT.md`, `docs/RULINGS.md` and the one admin attribution component `apps/admin/src/app/stores/[id]/gold-rates/_components/RateAttribution.tsx` (licence attribution for the exchange-rate source). A unit gate greps `apps/web`, `apps/admin`, `apps/marketing`, `LanguageContext.tsx`, email templates and `packages/shared`, exempts exactly that one file, and fails on any other hit. Merchant copy says "السعر التلقائي" / "Automatic rate".
   - **Copy:** Egyptian Arabic for sentences ("السعر اتحدّث", "سعر الجرام النهارده"), neutral buttons ("متابعة", "حفظ السعر", "تأكيد"). The notice and the stale block use look tokens (`--muted`, `--accent`, `--foreground`), **never an amber/orange "warning" colour**. The no-orange gate covers the new components.
 
 ## Rulings made by this plan
@@ -119,19 +119,17 @@ Appended to `docs/RULINGS.md` under `## 2026-10-21 — Phase B5 Dahab (B5-*)`, e
   - **Range.** `final` must lie in `1..2 147 483 647` (Postgres `int4`). Otherwise `GOLD_PRICE_OUT_OF_RANGE`.
   - **Why half-up to the nearest pound.** It is neutral (neither side gains systematically) and matches how Cairo shops quote. Ceil-to-pound would hand the merchant up to 99 piastres per piece silently.
   - Cost if wrong: a merchant who wants ceil rounding cannot have it. That is one enum value later, with no data change.
-- **Ruling B5-15 — rate sources: (a) the merchant's manual daily rate is always available; (b) the optional automatic rate comes from MetalpriceAPI, Essential plan, behind a neutral adapter (Task 11).**
-  - **Source.** One global hourly fetch: `GET /v1/latest?base=EGP&currencies=XAU`, EGP is in its currency list (verified 2026-10-21 on metalpriceapi.com/currencies). Spot XAU per troy ounce in EGP becomes the per-gram 24k price: `÷ 31.1034768 × 100` piastres. 21k = 24k × 21/24, 18k = 24k × 18/24 (875 and 750 fineness are exactly those fractions). That value plus the store's `feed_premium_bps` (−1 000..+1 000, default 0, merchant label "تعديل على السعر التلقائي") becomes the store's candidate rate.
-  - **Cost.** **US$5/month** (Essential: 1 000 requests/month, 30-minute data; the hourly cron uses about 744/month), billed to Ebda once for all stores. Basic (US$12, 10 000 requests, 10-minute data) if Ahmad wants 30-minute refresh.
-  - **Terms.** Read 2026-10-21 at metalpriceapi.com/terms: the free plan is "solely for personal exploration and evaluation" (so it is **forbidden** here); subscribers may "display … data on their websites for both commercial and personal projects"; reselling the data is forbidden; data is "AS IS" with no accuracy warranty; no attribution requirement. We display a derived price, never resell the feed.
-  - **Merchant control.** The key is `GOLD_FEED_API_KEY` (a neutral name). With the key unset, the admin toggle is disabled with the reason "السعر التلقائي مش متاح دلوقتي" and the cron raises a P1 (fail loud, never a silent stub). The manual rate keeps working.
-  - **Alternatives considered:**
-    - iSagha: the Egyptian Sagha market price, the most accurate local number. No public API or data licence found, so scraping is out.
-    - goldpricez.com and livepriceofgold.com: websites with no licence, so scraping is out.
-    - GoldAPI.io: offers per-gram karat fields, but its pricing page renders client-side and its EGP support could not be verified.
-    - Metals-API: pricing not verified.
-    - APIVerve gold API: EGP support not confirmed.
-    - CBE official FX × USD spot: no official CBE API found, so it would mean two vendors and two failure points.
-  - Cost if wrong: the spot-derived rate differs from the Sagha market price by the local premium, which can be a few percent. Mitigated three ways: `feed_premium_bps`, feed rates passing the same jump gate as manual ones (B5-20), and the manual rate staying the default source. Switching vendor is one adapter file plus one env var.
+- **Ruling B5-15 — rate sources, amended by Ahmad 2026-10-21 ("no paid plan; free + commercial-use only"): (a) the merchant's manual daily rate is always available; (b) the optional automatic rate comes from free, keyless, commercial-use sources behind a neutral adapter (Task 11).**
+  - **Primary.** `api.gold-api.com/price/XAU` (XAU/USD, no key) × `open.er-api.com/v6/latest/USD` (USD/EGP, no key). gold-api.com Terms s.9 (effective 2026-09-10): "Commercial use of the API is always permitted, including use in web applications, mobile apps, and third-party websites that you operate or develop for clients." No attribution or redistribution clause; "as is", no SLA. open.er-api.com: "both Free Plan and paid ExchangeRate-API accounts are suitable for either commercial or personal use"; attribution link required; caching allowed; re-distribution of the data not allowed (we show a derived gold price, never the rate feed). Source: `/Users/ahmadsharaf/Desktop/projects/Ebda-AI-Studio/business/ebda/gold-rate-free-sources.md`, curl-verified 2026-10-21.
+  - **Fallback.** The fawazahmed0 currency-api, one file `…/v1/currencies/usd.json` on jsDelivr, then the `latest.currency-api.pages.dev` mirror. CC0 1.0, no rate limits; it carries `xau` and `egp`, so EGP per XAU is `egp ÷ xau` from a single file.
+  - **Last resort.** The last stored rate while it is inside the store's max age (B5-16), then the merchant's manual rate only, then the fail-closed block (unchanged).
+  - **Conversion.** 24k per gram = XAUUSD × USDEGP ÷ 31.1034768; 21k = 24k × 21/24, 18k = 24k × 18/24 (875 and 750 fineness are exactly those fractions); integer piastres, the single-rounding rule of B5-14. Plus the store's `feed_premium_bps` (−1 000..+1 000, default 0, merchant label "تعديل على السعر التلقائي"), which makes the store's candidate rate.
+  - **Cadence and cost.** Every 6 hours, about 240 requests a month across the hosts, well inside every limit. Cost: nothing.
+  - **Cross-check.** When the primary and the fallback both answer and differ by more than 2 % (200 bps), the run does not auto-apply: the rate goes to the existing `pending`/confirm path (B5-20) and the operator is alerted. One source down and one up applies without a cross-check and records the single source.
+  - **Attribution.** The ExchangeRate-API link appears in the merchant ADMIN rate editor next to the automatic rate, and nowhere shopper-facing. It is licence attribution, not marketing, so the never-name-providers marketing rule is not violated. The provider-name gate exempts exactly that one admin component and still blocks every storefront, email and marketing path.
+  - **Merchant control.** No key or secret exists. If both feeds are down and no stored rate is inside max age, the admin shows "السعر التلقائي مش متاح دلوقتي", the cron raises a P1 (fail loud, never a silent stub) and the manual rate keeps working.
+  - **Alternatives rejected.** The paid MetalpriceAPI plan: Ahmad refuses to pay for a gold feed, and its free plan forbids commercial use. Also: Metals.dev (commercial publishing tied to a subscription), GoldAPI.io (key needed, free-tier terms not retrievable), goldpricez.com (manual per-site registration, "applications" excluded from the free tier), Swissquote public quotes and the CBE site (no licence / blocked), iSagha (no API; scraping is out).
+  - Cost if wrong: the spot-derived rate differs from the Sagha market price by the local premium, which can be a few percent, and gold-api.com is a small operator with no SLA whose terms may change. Mitigated: `feed_premium_bps`, the jump gate (B5-20), the 2 % cross-check, the fallback source, and the manual rate staying the default source. Switching a source is one adapter file.
 - **Ruling B5-16 — max rate age is 26 hours by default and is a hard ceiling; the merchant may lower it to 1 hour (Task 10/12).**
   - **Why 26 h.** A daily rate typed at 10:00 must survive until the next morning's entry with a 2-hour grace.
   - **Past the ceiling, fail closed.** Checkout (all three order paths, B5-17) throws 409 `GOLD_RATE_STALE` with "مش هنقدر نكمّل الطلب دلوقتي لأن سعر الدهب ما اتحدّثش النهارده. جرّب تاني بعد شوية أو كلّم المحل." The PDP and cart disable add/checkout with the same sentence. The storefront decides display staleness client-side from `rateAppliedAt` + `maxAgeMinutes` in the payload, so time-based staleness needs no cache purge.
@@ -201,7 +199,7 @@ Appended to `docs/RULINGS.md` under `## 2026-10-21 — Phase B5 Dahab (B5-*)`, e
 | `packages/shared/src/commerce/gold-price.ts`, `packages/shared/src/schemas/gold-pricing.ts` (or the repo's existing schema home, found in Step 0), `packages/shared/src/commerce/index.ts`, `tests/unit/gold-price.test.ts`, `tests/unit/gold-pricing-schema.test.ts` | the one price formula + rounding; Zod for spec, rates, settings, snapshot | 8 |
 | `packages/database/prisma/migrations/20261101000100_gold_rate_pricing/migration.sql`, `schema.prisma`, `packages/database/src/tenant-guard-schema.generated.ts`, `tests/integration/gold-rate-rls.test.ts`, `tests/integration/gold-price-guard-trigger.test.ts` | 3 tables, product/variant/cart/order columns, RLS + FORCE, guard trigger | 9 |
 | `apps/api/src/services/gold-rate/{gold-rate.service.ts,repricer.ts,gate.ts}`, `apps/api/src/routes/gold-rate.routes.ts`, `tests/integration/gold-rate-apply.test.ts`, `tests/unit/gold-rate-cache-layers.test.ts` | rate writes, jump gate, repricer, audit, cache purge | 10 |
-| `apps/api/src/services/gold-rate/feed/{adapter.ts,metalprice.ts}`, `apps/api/src/lib/inngest/functions/{gold-rate-feed-fetch.ts,gold-rate-staleness-watch.ts}`, `email-templates/gold-rate-*.ts`, `tests/unit/gold-rate-feed.test.ts`, `tests/unit/gold-provider-name-gate.test.ts`, `docs/ENVIRONMENT.md` | automatic rate, staleness alerts, provider anonymity gate | 11 |
+| `apps/api/src/services/gold-rate/feed/{adapter.ts,gold-api.ts,er-api.ts,currency-api.ts}`, `apps/api/src/lib/inngest/functions/{gold-rate-feed-fetch.ts,gold-rate-staleness-watch.ts}`, `email-templates/gold-rate-*.ts`, `tests/unit/gold-rate-feed.test.ts`, `tests/unit/gold-provider-name-gate.test.ts`, `gold-rates/_components/RateAttribution.tsx`, `docs/ENVIRONMENT.md` | automatic rate, staleness alerts, provider anonymity gate | 11 |
 | `apps/api/src/services/{order.service.ts,cart.service.ts,return.service.ts,bundle.service.ts}`, `apps/api/src/routes/{payment-links.routes.ts,cart*.routes.ts}`, `apps/api/src/mcp/tools/{cart.tools.ts,order.tools.ts}`, `tests/integration/gold-checkout.test.ts`, `tests/unit/gold-gate-every-order-path.test.ts` | quote, 3-path gate, snapshot, refund/exchange/bundle guards | 12 |
 | `apps/admin/src/app/stores/[id]/gold-rates/page.tsx` (+ `_components/`), `apps/admin/src/app/stores/[id]/products/[productId]/edit/_components/GoldPricingCard.tsx`, `…/variants/_components/SimpleVariantsForm.tsx`, `apps/admin/src/app/stores/[id]/products/_components/MassEditModal.tsx`, `apps/admin/src/components/admin-layout/hubs.ts`, order detail line, import columns | rate editor + history, settings, mode toggle + preview, bulk switch | 13 |
 | `apps/web/src/components/product/GoldRateLine.tsx`, `apps/web/src/app/checkout/_components/PriceChangedNotice.tsx`, `CartContext.tsx`, `LanguageContext.tsx`, `templates/dahab/ProductDetail.tsx` + the default PDP, `tests/dahab/dahab-gold-price.spec.ts`, `docs/ebda/templates/platform-commerce.md` (§ Gold-rate pricing), `docs/architecture/gold-rate-pricing.md` | storefront line, notice, stale state, E2E, docs | 14 |
@@ -450,26 +448,32 @@ Every body is parsed with the Task 8 Zod schemas, and an unknown key is rejected
 - [ ] Implement: `applyRates` = Zod → `withMoneyTx` → `scopeTransaction` → `set_config('app.gold_reprice','on',true)` → `FOR UPDATE` on `gold_rates_current` for the karats → gate (bounds, jump, coherence) → insert history → upsert current → `repriceStore` (explicit select, `UPDATE … FROM (VALUES …)` in chunks of 500, `storeId` in every where for the tenant guard) → audit row (the store-scoped audit insert used elsewhere) → commit → `deferAfterTenantCommit('gold-rate-purge', () => invalidateStoreProductCaches(storeId))`. Writing the cache-staleness class at the call site as a comment is required (`STALENESS CLASS: price, NEVER-stale`).
 - [ ] **Verify:** the two new tests, `tests/unit/storefront-purge-on-write.test.ts`, the existing product/variant/bulk/import suites unchanged and green, typecheck, lint. Rulings B5-16, B5-20, B5-21 appended. Commit. `Cost: 1 · 1 · heavy stack: yes, ~15 min`.
 
-### Task 11: Automatic rate (feed adapter + hourly cron), staleness watch, merchant alerts, provider anonymity
+### Task 11: Automatic rate (free feed adapters + 6-hourly cron), staleness watch, merchant alerts, provider anonymity
 
-**Files:** `apps/api/src/services/gold-rate/feed/{adapter.ts,metalprice.ts}`, `apps/api/src/lib/inngest/functions/{gold-rate-feed-fetch.ts,gold-rate-staleness-watch.ts}` (+ register in `functions/index.ts` / `client.ts`), `apps/api/src/services/email-templates/gold-rate-{warning,blocked,pending}.ts`, `apps/api/src/config.ts` (`GOLD_FEED_API_KEY`), `apps/api/wrangler.jsonc` (secret name only), `docs/ENVIRONMENT.md`, `.env.example`, `tests/unit/gold-rate-feed.test.ts`, `tests/unit/gold-rate-staleness-watch.test.ts`, `tests/unit/gold-provider-name-gate.test.ts`, `docs/RULINGS.md` (B5-15).
+**Files:** `apps/api/src/services/gold-rate/feed/{adapter.ts,gold-api.ts,er-api.ts,currency-api.ts}` (each with recorded fixtures under `tests/fixtures/gold-feed/`), `apps/api/src/lib/inngest/functions/{gold-rate-feed-fetch.ts,gold-rate-staleness-watch.ts}` (+ register in `functions/index.ts` / `client.ts`), `apps/api/src/services/email-templates/gold-rate-{warning,blocked,pending}.ts`, `apps/admin/src/app/stores/[id]/gold-rates/_components/RateAttribution.tsx` (the single attribution link), `docs/ENVIRONMENT.md` (states that no key is needed), `tests/unit/gold-rate-feed.test.ts`, `tests/unit/gold-rate-staleness-watch.test.ts`, `tests/unit/gold-provider-name-gate.test.ts`, `docs/RULINGS.md` (B5-15).
 
 **Interfaces:**
 
 ```ts
 // adapter.ts — the only thing the rest of the code imports
-export interface GoldFeedQuote { per24kGramPiastres: number; fetchedAt: string; reference: { spotPerOzMinor: number } }
-export interface GoldFeedAdapter { available(): boolean; fetch(signal: AbortSignal): Promise<GoldFeedQuote> }
-export function goldFeed(): GoldFeedAdapter;           // returns the MetalpriceAPI adapter; vendor name never leaves feed/**
-export function storeCandidateRates(q: GoldFeedQuote, premiumBps: number): Map<GoldKarat, number>; // 24k × (10000+premium)/10000, 21k/18k by exact fraction, one half-up rounding each
+export interface GoldFeedQuote { per24kGramPiastres: number; fetchedAt: string; source: 'primary' | 'fallback'; reference: { xauUsdMinor?: number; usdEgpMicro?: number; egpPerXauMinor?: number } }
+export interface GoldFeedAdapter { fetch(signal: AbortSignal): Promise<GoldFeedResult> }
+export type GoldFeedResult =
+  | { kind: 'ok'; quote: GoldFeedQuote }              // one source answered, or both agreed within 2 %
+  | { kind: 'disagree'; primary: GoldFeedQuote; fallback: GoldFeedQuote; diffBps: number } // > 200 bps: never auto-applied
+  | { kind: 'down' };                                  // both feeds failed
+export function goldFeed(): GoldFeedAdapter;         // gold-api.ts × er-api.ts primary, currency-api.ts fallback; no provider name leaves feed/**
+export function storeCandidateRates(q: GoldFeedQuote, premiumBps: number): Map<GoldKarat, number>; // 24k × (10000+premium)/10000, 21k = ×21/24, 18k = ×18/24, one half-up rounding each, integer piastres
 ```
 
+- **Conversion (unchanged rule, new inputs).** 24k per gram = XAUUSD × USDEGP ÷ 31.1034768, computed in BigInt on integer minor units and rounded once to piastres by the plan's existing single-rounding rule; 21k = 24k × 21/24, 18k = 24k × 18/24 from the unrounded 24k value (never from an already-rounded one). The fallback file gives EGP per XAU directly (`egp ÷ xau` from the one `usd.json`), then the same ÷ 31.1034768.
 - **`gold-rate-feed-fetch`.**
-  - Trigger: cron `5 * * * *` (hourly), `concurrency: { limit: 1 }`, `retries: 2`.
-  - Step `fetch`: one HTTP call, 8 s timeout, Zod-parse the vendor JSON, reject non-finite / ≤ 0 / > 10× previous quote.
+  - Trigger: cron `5 */6 * * *` (every 6 hours, about 120 runs a month), `concurrency: { limit: 1 }`, `retries: 2`.
+  - Step `fetch`: primary = `api.gold-api.com/price/XAU` × `open.er-api.com/v6/latest/USD` (EGP leg); fallback = fawazahmed0 `currencies/usd.json` on jsDelivr, then the `latest.currency-api.pages.dev` mirror. 8 s timeout per call, Zod-parse every body, reject non-finite / ≤ 0 / > 10× previous quote. Both sources answered → cross-check; `|primary − fallback| / primary > 200 bps` → `disagree`.
+  - Order of trust: primary → fallback → the last stored rate within the store's max age (nothing written) → the merchant's manual rate only → the existing fail-closed block.
   - Step `list-stores`: `storeDirectory()`, filtered to stores whose settings have `feed_enabled` (read per store inside its scope).
-  - Per store, `step.run('apply-<id>')`: `runInStoreScope` → `applyRates(..., { feed })`. Over the jump gate → `pending` + email "سعر تلقائي جديد مستني تأكيدك"; otherwise applied + purge.
-  - **Throttle.** One vendor call per run regardless of store count. A 429/5xx → step retry, then P1 `cron.gold-rate-feed`. Measured request count goes in the report against the 1 000/month plan.
+  - Per store, `step.run('apply-<id>')`: `runInStoreScope` → `applyRates(..., { feed })`. Over the jump gate → `pending` + email "سعر تلقائي جديد مستني تأكيدك"; otherwise applied + purge. A `disagree` result is stored `pending` for every feed-enabled store (the existing pending/confirm path) with the two quotes in `feed_reference`, plus `sendAlert({ level: 'p1', scope: 'platform', source: 'cron.gold-rate-feed-disagree' })` to the operator; it is never auto-applied. A `down` result writes nothing and raises P1 `cron.gold-rate-feed` once per run.
+  - **Throttle.** Two calls per run on the primary path (about 240 requests a month across both hosts), one on the fallback; never per store. open.er-api.com updates daily, so its response is reused by `time_next_update_utc` and a 429 is not retried within the 20-minute block. A 429/5xx on gold-api.com → step retry, then fallback. Measured request count goes in the report.
 - **`gold-rate-staleness-watch`.**
   - Trigger: cron `*/30 * * * *`.
   - Per store with `enabled` and ≥ 1 gold product: age of each karat's current rate that has gold products.
@@ -478,20 +482,22 @@ export function storeCandidateRates(q: GoldFeedQuote, premiumBps: number): Map<G
   - The admin banner reads the same age from `GET /gold-rates`, so no extra state.
 - **Copy.**
   - Emails: bilingual, Egyptian Arabic first. Subject "حدّث سعر الدهب عشان المحل يفضل يبيع"; body "آخر سعر دهب اتسجّل من {hours} ساعة. لو عدّى {max} ساعة هنوقّف الطلبات على القطع اللي بتتسعّر بالدهب لحد ما تحدّثه."; button "تحديث السعر".
-  - **No provider name anywhere in the copy.**
+  - **No provider name anywhere in shopper, email or marketing copy.**
+  - **Attribution (admin only).** `RateAttribution.tsx` renders `<a href="https://www.exchangerate-api.com">Rates By Exchange Rate API</a>` in the merchant admin rate editor, next to the automatic rate, and nowhere shopper-facing. It is attribution the data licence requires, not marketing, so the never-name-providers marketing rule is not breached.
 
 - [ ] **Failing tests first:**
-  - `gold-rate-feed.test.ts` (vendor HTTP stubbed with recorded fixtures):
-    - 24k/21k/18k candidates from a fixture quote equal hand-computed values;
+  - `gold-rate-feed.test.ts` (all HTTP stubbed with recorded fixtures for gold-api, er-api and currency-api, each file captured from the live endpoint on 2026-10-21):
+    - 24k/21k/18k candidates from a fixture quote equal hand-computed values (worked check from the research: 4129.3 × 54.4889 ÷ 31.1035 ≈ 7234 EGP/g 24k, ≈ 6330 21k, ≈ 5426 18k), in integer piastres, one rounding;
     - the premium applies once;
-    - a malformed body, a zero, a 10× spike and a timeout each produce no write and a P1;
-    - `available()` false with the key unset → cron logs + P1, no store touched;
-    - a jump over the store's gate → `pending` row, prices unchanged, email queued;
-    - **negative control:** a fixture 4 % move with gate 5 % applies, 6 % does not.
+    - a malformed body, a zero, a 10× spike and a timeout each fall through to the next source in the order of trust;
+    - primary down → fallback quote used, `source: 'fallback'` recorded; jsDelivr down → pages.dev mirror used;
+    - **both feeds down** → `down`: no write, one P1, last stored rate still serves inside max age, then manual-only, then the fail-closed block;
+    - **feeds disagree** → `disagree`: negative control at 1.9 % applies, 2.1 % goes `pending` and alerts, nothing auto-applied;
+    - a jump over the store's gate → `pending` row, prices unchanged, email queued; **negative control:** a fixture 4 % move with gate 5 % applies, 6 % does not.
   - `gold-rate-staleness-watch.test.ts`: frozen clock at 21 h 59 / 22 h / 25 h 59 / 26 h → nothing / warn / nothing new / block + P1. A second run sends nothing (sentinel). A new rate resets. A store with gold enabled but zero gold products is skipped.
-  - `gold-provider-name-gate.test.ts`: greps `apps/web/src`, `apps/admin/src`, `apps/marketing`, `apps/api/src/services/email-templates`, `packages/shared/src` and `apps/web/src/contexts/LanguageContext.tsx` for `/metalprice|metal price api|lyker/i` → 0 hits. The pattern list is exported from `feed/metalprice.ts` so a vendor switch updates the gate. Negative control: a fixture string in a temp file under a scanned dir makes it fail.
-- [ ] **Step 0:** one call with the paid key confirms whether the plan accepts `base=EGP&currencies=XAU`. If not, use `base=XAU&currencies=EGP` (whichever the plan allows) and record which in B5-15. Without a key, the adapter is built and tested against the recorded fixtures, and the live call is listed under "could not verify".
-- [ ] Implement. Register both functions; `docs/ENVIRONMENT.md` gets `GOLD_FEED_API_KEY` (purpose, plan, "paid plan only: the free plan's terms forbid commercial use", where it is set: `wrangler secret put`, never in `wrangler.jsonc` values). The blast-radius sweep covers `GOLD_FEED_API_KEY` across `.env.example`, `docs/ENVIRONMENT.md`, the CI workflows, `cf-api-deploy.yml`'s pre-deploy smoke (boots with the key unset: the cron must not crash boot), and `apps/api/wrangler.jsonc`.
+  - `gold-provider-name-gate.test.ts`: greps `apps/web/src`, `apps/admin/src`, `apps/marketing`, `apps/api/src/services/email-templates`, `packages/shared/src` and `apps/web/src/contexts/LanguageContext.tsx` for the provider patterns (`gold-api`, `er-api`, `exchange ?rate`, `fawazahmed0`, `currency-api`, `jsdelivr`) → 0 hits, with **exactly one exemption: `apps/admin/src/app/stores/[id]/gold-rates/_components/RateAttribution.tsx`** (matched by exact path, not by directory or glob). The pattern list is exported from `feed/adapter.ts` so a source change updates the gate. Negative controls: a fixture string in a temp file under each scanned dir (storefront, email, marketing, and a sibling file next to the exempt one) makes it fail; the exempt file itself is asserted to contain the attribution link, so removing the exemption makes the gate fail too.
+- [ ] **Step 0:** capture the recorded fixtures with one keyless `curl` per endpoint (gold-api `/price/XAU`, er-api `/v6/latest/USD`, jsDelivr and pages.dev `usd.json`) and commit them. No key, no paid call. The live Worker-runtime call is listed under "could not verify".
+- [ ] Implement. Register both functions; `docs/ENVIRONMENT.md` states that the automatic rate needs no secret and lists the four hosts the Worker calls. The blast-radius sweep covers the four hosts and the removed key name across `.env.example`, `docs/ENVIRONMENT.md`, the CI workflows, `cf-api-deploy.yml`'s pre-deploy smoke (boots with the feeds unreachable: the cron must not crash boot) and `apps/api/wrangler.jsonc`.
 - [ ] **Verify:** the three tests, the Inngest registration test (whatever `functions/__tests__` uses to assert registration), typecheck. Ruling B5-15 appended with the measured request budget. Commit. `Cost: 1 · 1 · heavy stack: no`.
 
 ### Task 12: Checkout: quote, three-path gate, snapshot, refund/exchange/bundle guards, MCP
@@ -529,7 +535,7 @@ assertGoldLinesPriceable(db, storeId, lines: Array<{ productId; variantId: strin
 ### Task 13: Admin: rate editor + history, settings, per-product toggle + preview, bulk switch
 
 **Files:**
-- `apps/admin/src/app/stores/[id]/gold-rates/page.tsx` + `_components/{RateEditor,RateHistory,GoldSettingsCard,PendingRateBanner}.tsx`
+- `apps/admin/src/app/stores/[id]/gold-rates/page.tsx` + `_components/{RateEditor,RateHistory,GoldSettingsCard,PendingRateBanner,RateAttribution}.tsx` (`RateAttribution` is the one ExchangeRate-API link, beside the automatic rate in `RateEditor`, B5-15)
 - `apps/admin/src/components/admin-layout/hubs.ts` + `buildPaletteItems.ts` (entry under the catalogue/products group: standing rule 4, its own page)
 - the admin dashboard banner (stale/pending)
 - `apps/admin/src/app/stores/[id]/products/[productId]/edit/_components/GoldPricingCard.tsx` (+ wired in `edit/page.tsx` beside `FulfilmentCard`, in storefront order: price block)
@@ -617,17 +623,17 @@ assertGoldLinesPriceable(db, storeId, lines: Array<{ productId; variantId: strin
     8. **Stale case:** backdate the rate → the PDP button is disabled with the stale sentence and `POST /orders` (via the UI) shows the same sentence.
     9. Runs at 390-ar and 1280-en; axe: no serious/critical.
 - [ ] Implement. Add both new control files to `purchase-path.json`; the 44 px probe covers "متابعة".
-- [ ] **Blast-radius sweep for the whole gold change-set (Tasks 8–14), stated in the report:** `pricing_mode`, `gold_karat`, `gold_weight_mg`, `making_charge_*`, `gold_margin_bps`, `gold_rate_id`, `gold_snapshot`, `quoted_unit_price`, `gold_rates`, `gold_rates_current`, `gold_rate_settings`, `app.gold_reprice`, `GOLD_FEED_API_KEY`, `GOLD_PRICE_MANAGED`, `GOLD_RATE_STALE`, `PRICE_CHANGED`, `GOLD_PRICE_DRIFT`, `goldPricing` across `apps/`, `packages/`, `scripts/`, `tests/`, `docs/`, `.github/workflows`, `wrangler*.jsonc`, `.env.example`, `loadtests/`, plus the 8 card paths + Dahab + 4 mappers (each must still read the materialised price only, with no gold-specific branch).
+- [ ] **Blast-radius sweep for the whole gold change-set (Tasks 8–14), stated in the report:** `pricing_mode`, `gold_karat`, `gold_weight_mg`, `making_charge_*`, `gold_margin_bps`, `gold_rate_id`, `gold_snapshot`, `quoted_unit_price`, `gold_rates`, `gold_rates_current`, `gold_rate_settings`, `app.gold_reprice`, `GOLD_PRICE_MANAGED`, `GOLD_RATE_STALE`, `PRICE_CHANGED`, `GOLD_PRICE_DRIFT`, `goldPricing` across `apps/`, `packages/`, `scripts/`, `tests/`, `docs/`, `.github/workflows`, `wrangler*.jsonc`, `.env.example`, `loadtests/`, plus the 8 card paths + Dahab + 4 mappers (each must still read the materialised price only, with no gold-specific branch).
 - [ ] **Verify:** web vitest, the E2E file, `purchase-path-gates.test.ts`, the no-orange gate, typecheck, lint. Commit `feat(gold): storefront rate line, price-updated notice, e2e and docs`. `Cost: 1 · 1 · heavy stack: yes, ~20 min`.
 
 **Controller production steps for gold pricing (after merge, human-flagged, part of Task 7's list):**
 1. `cf-api-deploy.yml` applies migration `20261101000100` (the pre-deploy smoke boots with the new schema).
-2. `wrangler secret put GOLD_FEED_API_KEY` **only after Ahmad buys the paid plan**; until then the automatic toggle stays disabled with its reason.
+2. No secret to set: the automatic rate uses keyless free sources, so the toggle is available as soon as the API deploys. The pre-deploy smoke must still boot with the feeds unreachable (the cron fails loud at run time, never at boot).
 3. **Verify against production:**
    - read-only SQL `select count(*) from gold_rate_settings where enabled` (expected 0 at launch);
    - `\d+ gold_rates` shows `relforcerowsecurity`;
    - `curl` `/health` commit = tip of `main`;
-   - on `storedemo-dahab` (if gold-enabled per Task 5's decision) one gold PDP in Arabic shows the line.
+   - on `storedemo-dahab` (gold-enabled on the AUTOMATIC rate, per Ahmad's yes of 2026-10-21) one gold PDP in Arabic shows the line.
 4. **Not verifiable at launch:** a real merchant's rate cycle and a real stale block (zero gold merchants exist). It is proven by the integration and E2E tests only, and the report says so.
 
 ---
@@ -646,7 +652,8 @@ assertGoldLinesPriceable(db, storeId, lines: Array<{ productId; variantId: strin
 10. **Gold price is never trusted, never stale, never silent** — the server recomputes on all three order paths (the structural test lists them); `PRICE_CHANGED`, `GOLD_RATE_STALE` and `GOLD_PRICE_DRIFT` each have a negative control and a defence-mutation entry; the in-transaction `FOR SHARE` re-check closes the rate-write race; every rate write path purges every B5-21 layer through the immediate (not order-coalesced) invalidator; the stale state flips on the client clock without a purge.
 11. **Gold tenant and role safety** — the three tables are RLS + FORCE with the strict policy and pass the enumerating `rls-ebda-app` test with no allowlist entry; `gold_rates` is append-only for `ebda_app`; `app.gold_reprice` is transaction-local (`set_config(…, true)`) and proven not to leak across pooled connections; rate writes need `store:settings` (staff 403 tested); a jump over the gate needs `confirm` and a feed rate never self-confirms.
 12. **Gold snapshot and refunds** — the order line's `gold_snapshot` is complete and Zod-valid, refunds read `order_items.price` (unchanged by a later rate), exchange and bundles are refused for gold lines, and fixed-price checkout totals are byte-identical to before.
-13. **Provider anonymity and copy** — the provider-name gate is green and can fail; merchant/shopper copy says "السعر التلقائي"; sentences Egyptian Arabic, buttons neutral; the notice and stale block use look tokens, never amber/orange.
+13. **Provider anonymity and copy** — the provider-name gate is green, can fail, and exempts exactly one file (`apps/admin/src/app/stores/[id]/gold-rates/_components/RateAttribution.tsx`, the ExchangeRate-API attribution link in the admin rate editor); every storefront, email and marketing path stays blocked. Merchant/shopper copy says "السعر التلقائي"; sentences Egyptian Arabic, buttons neutral; the notice and stale block use look tokens, never amber/orange.
+14. **Both feeds down / feeds disagree** — both feeds down: the last stored rate serves until max age, then only the merchant's manual rate, then the fail-closed block, and a P1 fires once (never a stale or guessed price, never a silent stub). Feeds disagree (primary and fallback both answer, differ by more than 2%): the run does not auto-apply, the rate goes to `pending` for confirm, the operator is alerted; a 1.9% vs 2.1% pair pins the threshold, and one feed down plus one up applies with no cross-check but records the single source.
 
 ## Migration naming (summary)
 
@@ -681,8 +688,10 @@ assertGoldLinesPriceable(db, storeId, lines: Array<{ productId; variantId: strin
     - feed and `llms.txt` responses carry `s-maxage`/SWR outside the tag purge;
     - search docs hold no price.
   - **Self-caught defect.** The first draft of B5-14 rounded twice. It is fixed, and vector C pins it.
-  - **Not verified while planning:**
+- **Not verified while planning:**
     - whether cache generation counters live in the DO or KV (Task 10 Step 0);
-    - GoldAPI.io and Metals-API pricing (their pages did not render);
-    - whether MetalpriceAPI Essential allows `base=EGP` (Task 11 Step 0: one paid-key call, or switch to `base=XAU&currencies=EGP`);
+    - **gold-api.com is a small operator with no SLA**; its terms (s.9, effective 2026-09-10) can change. Action: email them for written confirmation of s.9 (owner's call, not blocking);
+    - the fawazahmed0 upstream-data licence (CC0 covers the repo, not what it aggregates; it is the fallback only);
+    - that the 21k-benchmark convention (Egyptian market quotes 21k as the headline; 24k and 18k derive by karat/24) comes from general knowledge, not a cited source;
+    - the live free-source responses from inside the Worker runtime (recorded fixtures only until the first deploy);
     - the spot-vs-Sagha premium in practice (measured once the merchant compares, hence `feed_premium_bps`).
