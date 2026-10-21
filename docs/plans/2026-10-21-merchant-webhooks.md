@@ -5,6 +5,7 @@ Finish line: a Growth/Business merchant registers an HTTPS endpoint, picks event
 **Must NOT change:** existing Inngest consumers of order/product events (webhooks only add a listener), SSRF behaviour of `safeFetch` for other callers (only gets more blocks).
 
 ## Design
+
 - Tables (`webhook_endpoints`, `webhook_deliveries`): `store_id`, strict RLS + FORCE, grants to `ebda_app`, FK CASCADE on store delete, tenant-guard snapshot regenerated. Migration `20261025000100_merchant_webhooks` (main newest 20261022*, open branches <= 20261024*).
 - Sources (no producer edits except low stock): one Inngest fan-out function listens to `order/created` (also yields `order.paid` when payment is completed), `order/status-changed` (shipped/delivered/cancelled), `order/refunded`, `product.upserted` (create/update), `product.deleted`. `inventory.low` hooks the existing 6-hourly low-stock scan (per product, already deduped by its sentinel).
 - Fan-out creates one `webhook_deliveries` row per subscribed active endpoint, UNIQUE (endpoint, dedupe key) = idempotent under Inngest replays, then sends `webhook/delivery.requested` through `sendEventAfterCommit` (deferAfterTenantCommit under the hood). Payload is built from the DB at fan-out, stored on the row (resend sends identical bytes, same event id).
@@ -16,6 +17,7 @@ Finish line: a Growth/Business merchant registers an HTTPS endpoint, picks event
 - Admin: `/stores/[id]/webhooks` page ar/en. Docs: `apps/docs/content/merchant-webhooks.mdx`.
 
 ## Rulings
+
 - WH-1 Plan gating Growth + Business (via `planIncludesWebhooks`). Cost if wrong: Basic merchants get a 402 they should not, or vice versa; one-constant change.
 - WH-2 Redirects never followed. Cost if wrong: receivers that 301 http->https paths need to register the final URL.
 - WH-3 Rotation is immediate (no dual-secret window). Cost if wrong: a receiver misses signatures until it deploys the new secret.
