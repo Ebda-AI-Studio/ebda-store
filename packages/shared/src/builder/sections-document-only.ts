@@ -66,7 +66,7 @@ export const newsletterSchema = z
  * stock never live in the document.
  */
 const productSource = z
-  .enum(['newest', 'best_seller', 'featured', 'category', 'manual'])
+  .enum(['newest', 'best_seller', 'featured', 'on_sale', 'category', 'manual'])
   .optional();
 const productRefs = {
   productSource,
@@ -106,6 +106,9 @@ export const productSpotlightSchema = z
     bodyAr: text(1000),
     ...productRefs,
     limit: z.number().int().min(1).max(4).optional(),
+    // `list` (default, absent) = the photograph beside a product list; `stage` = ONE product on a
+    // large object-contain tile (Souq Showroom, Phase B2).
+    layout: z.enum(['list', 'stage']).optional(),
     imagePosition: z.enum(['start', 'end']).optional(),
     buttonText: text(60),
     buttonTextAr: text(60),

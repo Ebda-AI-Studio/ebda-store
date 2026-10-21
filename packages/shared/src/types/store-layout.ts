@@ -244,7 +244,11 @@ export interface HeroSettings extends SectionBgOverride, SectionPaddingMaxWidthV
   dividers?: SectionDividers;
 }
 
-export type CategoriesLayout = 'grid' | 'horizontal' | 'chips';
+/**
+ * `rail` = a snap row of image tiles, `tiles` = square tiles (Souq, Phase B2); every skin renders
+ * them (look data, never forked commerce code).
+ */
+export type CategoriesLayout = 'grid' | 'horizontal' | 'chips' | 'rail' | 'tiles';
 export type CategoriesCaption = 'below' | 'overlay';
 
 /**
@@ -756,7 +760,17 @@ export interface BlogCarouselSettings extends SectionBgOverride, SectionPaddingM
  * v2 will add `'category:<id>'` (carousel filtered to a single category)
  * and `'manual:<id[]>'` (curated list of product ids).
  */
-export type ExtraCarouselSource = 'newest' | 'best_seller' | 'featured' | 'category' | 'manual';
+/**
+ * `on_sale` (Phase B2): products whose compare-at price exceeds their price (a variant product:
+ * any variant on sale), biggest drop first. BOUNDED-stale (rides the tagged public product caches).
+ */
+export type ExtraCarouselSource =
+  | 'newest'
+  | 'best_seller'
+  | 'featured'
+  | 'on_sale'
+  | 'category'
+  | 'manual';
 
 export interface ExtraCarouselSettings extends ProductCarouselSettings {
   /** Unique id (uuid). Required for stable ordering + admin keying. */

@@ -64,3 +64,55 @@ export const PUBLIC_PRODUCT_LIST_QUERY_KEYS = [
   'cursor',
   'ids',
 ] as const;
+
+/** The `sort` values of GET /public/products. */
+export const PUBLIC_PRODUCT_SORTS = [
+  'newest',
+  'price_asc',
+  'price_desc',
+  'best_seller',
+  'relevance',
+  'on_sale',
+] as const;
+export type PublicProductSort = (typeof PUBLIC_PRODUCT_SORTS)[number];
+const publicProductSortQuery = z.enum(PUBLIC_PRODUCT_SORTS).optional();
+
+/**
+ * Scalar enum query param (search PR4 rule): absent -> undefined, one known value -> itself,
+ * anything else (unknown value, repeated `?sort=a&sort=b` arrives as an array) -> ZodError -> 400
+ * VALIDATION_ERROR. It used to be silently dropped, serving the whole catalogue for a typo.
+ */
+export function parseOptionalSortQuery(
+  value: unknown,
+  name = 'sort'
+): PublicProductSort | undefined {
+  const result = publicProductSortQuery.safeParse(value);
+  if (!result.success) {
+    throw new z.ZodError(
+      result.error.issues.map(issue => ({ ...issue, path: [name, ...issue.path] }))
+    );
+  }
+  return result.data;
+}
+
+/**
+ * `sort=on_sale` is a short merchandising row: it cannot honour a text search, a price range,
+ * option facets or `featured`, so those are a 400 rather than silently ignored (page and cursor
+ * are ignored and kept out of the cache key; category and ids are honoured inside the SQL).
+ */
+export function assertOnSaleQuery(query: Record<string, unknown>): void {
+  const refused = Object.keys(query).filter(
+    k =>
+      ['search', 'minPrice', 'maxPrice', 'featured'].includes(k) ||
+      (k.startsWith('opt_') && query[k] !== undefined)
+  );
+  if (refused.length > 0) {
+    throw new z.ZodError(
+      refused.map(k => ({
+        code: 'custom' as const,
+        path: [k],
+        message: `'${k}' cannot be combined with sort=on_sale`,
+      }))
+    );
+  }
+}

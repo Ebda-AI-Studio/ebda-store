@@ -9,6 +9,7 @@ export const LOOK_TEMPLATES: readonly LookTemplate[] = [
 ];
 
 const L = (d: LookDefinition) => d;
+
 export const LOOKS: readonly LookDefinition[] = [
   L({
     id: 'qamar.atelier',
@@ -213,8 +214,41 @@ export const LOOKS: readonly LookDefinition[] = [
     id: 'souq.catalogue',
     template: 'souq',
     letter: 'A',
-    skin: 'minimal',
-    status: 'designed',
+    skin: 'souq',
+    status: 'built',
+    chrome: { header: { logoPlacement: 'start', search: 'prominent' }, plp: 'autoFill' },
+    // Ruling B2-16. Search first, no hero: the first screen is the search field and the category
+    // rail, then today's deals, a dense newest grid and the trust line. Carousel headings use the
+    // extra-carousel `title` keys; strings are Egyptian, controls neutral.
+    sections: [
+      {
+        type: 'category-grid',
+        design: {
+          layout: 'rail',
+          layoutMobile: 'rail',
+          paddingTop: 'tight',
+          paddingBottom: 'tight',
+        },
+      },
+      {
+        type: 'product-carousel',
+        // STOP-2 minor: ~150px of dead air between the rail and this row
+        design: { paddingTop: 'tight' },
+        preset: {
+          productSource: 'on_sale',
+          limit: 8,
+          title: 'Deals today',
+          titleAr: 'عروض النهاردة',
+        },
+      },
+      {
+        type: 'featured-collection',
+        design: { columns: 4, mobileColumns: 2 },
+        preset: { productSource: 'newest', limit: 12, heading: 'New in', headingAr: 'لسه واصل' },
+      },
+      { type: 'trust-strip' },
+      { type: 'newsletter' },
+    ],
     name: { ar: 'كتالوج', en: 'Catalogue' },
     forWhom: {
       ar: 'لمحل فيه أصناف كتير والزبون عارف عايز إيه.',
@@ -239,14 +273,67 @@ export const LOOKS: readonly LookDefinition[] = [
       density: 'compact',
       imageRatio: '1/1',
       motion: 'subtle',
+      // Ruling B2-1: the sale / new chips read the accent pair; the card keeps the skin's
+      // quick-add system (no cardCta), so a catalogue card has one action.
+      cardBadge: 'accent',
+      // T-01: the store name is a sized, untracked wordmark in the header and at checkout.
+      wordmarkSize: 'lg',
     },
   }),
   L({
     id: 'souq.night',
     template: 'souq',
     letter: 'B',
-    skin: 'minimal',
-    status: 'designed',
+    skin: 'souq',
+    status: 'built',
+    chrome: {
+      header: { logoPlacement: 'start', search: 'icon' },
+      plp: 'autoFill',
+      listing: 'ground',
+    },
+    // Ruling B2-16, amended by B2-24 (STOP-2 taste audit): a lit market that stays GREEN on every
+    // page. A full-bleed hero, bold square category tiles (four across, a brass hairline), the
+    // curated and deals rows and the dense grid all on the green ground; merchant photos shot on
+    // white sit on a cream matte (multiply, globals.css) so they never read as white rectangles
+    // (quality bar section 9 rule 1 is met by the matte, not by a light band).
+    sections: [
+      { type: 'hero', design: { presentation: 'full-bleed', textAnchor: 'bottom-start' } },
+      // STOP-2 taste audit: the lantern hero carries no product, so ONE featured product follows it
+      // as a stage (cut-out, two facts, price, add): the photo-led screen the brief asks for.
+      {
+        type: 'product-spotlight',
+        design: { layout: 'stage', paddingTop: 'tight', paddingBottom: 'tight' },
+        preset: { productSource: 'featured', limit: 1, heading: '', headingAr: '' },
+      },
+      {
+        type: 'category-grid',
+        design: {
+          layout: 'tiles',
+          layoutMobile: 'tiles',
+          captionPosition: 'below',
+          desktopColumns: 4,
+          mobileColumns: 2,
+          paddingBottom: 'tight',
+        },
+      },
+      {
+        type: 'product-carousel',
+        design: { paddingTop: 'tight', paddingBottom: 'tight' },
+        preset: { productSource: 'manual', limit: 8, title: 'From the souq', titleAr: 'من السوق' },
+      },
+      {
+        type: 'product-carousel',
+        design: { paddingTop: 'tight', paddingBottom: 'tight' },
+        preset: { productSource: 'on_sale', limit: 8, title: 'Deals', titleAr: 'عروض' },
+      },
+      {
+        type: 'featured-collection',
+        design: { columns: 4, mobileColumns: 2 },
+        preset: { productSource: 'newest', limit: 8, heading: 'New in', headingAr: 'جديد السوق' },
+      },
+      { type: 'trust-strip' },
+      { type: 'brand-story' },
+    ],
     name: { ar: 'سوق الليل', en: 'Night souq' },
     forWhom: {
       ar: 'لتاجر عايز دفا وشخصية.',
@@ -258,23 +345,87 @@ export const LOOKS: readonly LookDefinition[] = [
       surface: '#14503F',
       ink: '#F6F3EA',
       muted: '#B4CDC0',
+      // Ruling B2-18 (Ahmad, STOP-1, 2026-10-21): Night souq's CTAs are BRASS #C89B3C (4.87:1 on the
+      // page, 3.5+:1 on the card) with dark ink on it, the lantern-market warmth. This is the ONE
+      // scoped exception to the no-orange gate (B2-2): exactly this hex, only as `souq.night`'s
+      // primary CTA tokens (see tests/unit/souq-look-tokens.test.ts, BRASS_CTA_EXCEPTION). Everything
+      // else in Night stays out of the 12-50 degree band. Ruling B2-26 (controller, from Ahmad's taste
+      // profile: metal is the accent on deep grounds): the sale / new / custom chips and the PDP
+      // discount pill are ALSO brass, read through `--chip-bg` = the primary pair (globals.css), so
+      // the look has ONE accent and no coral. The `accent` token below (pomegranate) stays as the
+      // look's declared secondary fill for status UI, never painted on a chip.
       primary: '#C89B3C',
       onPrimary: '#10151C',
-      accent: '#E68245',
+      accent: '#F57A83',
+      onAccent: '#10151C',
       line: '#1E5A48',
       fonts: { display: 'Changa', body: 'Cairo', latin: 'Manrope' },
       radius: 'md',
       density: 'regular',
       imageRatio: '1/1',
       motion: 'expressive',
+      // Quality bar section 9: controls on a product photo take their own on-token.
+      overPhotoChrome: 'soft',
+      cardBadge: 'accent',
+      // T-01: the store name is a sized, untracked wordmark in the header and at checkout.
+      wordmarkSize: 'lg',
     },
   }),
   L({
     id: 'souq.showroom',
     template: 'souq',
     letter: 'C',
-    skin: 'minimal',
-    status: 'designed',
+    skin: 'souq',
+    status: 'built',
+    chrome: { header: { logoPlacement: 'start', search: 'icon' }, plp: 'autoFill' },
+    // Ruling B2-16. The product is the hero: categories as chips right under the header (the
+    // first screen shows categories), up to three one-product stages (the first reads the store's
+    // featured pool so a new store has a stage; the others are hand-picked and render NOTHING
+    // until filled), a hand-picked collection list of rectangles on the surface (the plan's second
+    // category-grid is impossible: category-grid has cardinality one), a 2-column grid, trust.
+    sections: [
+      {
+        type: 'category-grid',
+        design: {
+          layout: 'chips',
+          layoutMobile: 'chips',
+          paddingTop: 'tight',
+          paddingBottom: 'none',
+        },
+      },
+      {
+        type: 'product-spotlight',
+        design: { layout: 'stage', paddingTop: 'tight' },
+        // heading '' : the registry's first spotlight preset is "Gift ideas"; a stage has no kicker
+        preset: { productSource: 'featured', limit: 1, heading: '', headingAr: '' },
+      },
+      {
+        type: 'product-spotlight',
+        design: { layout: 'stage' },
+        preset: { productSource: 'manual', limit: 1, heading: '', headingAr: '' },
+      },
+      {
+        type: 'product-spotlight',
+        design: { layout: 'stage' },
+        preset: { productSource: 'manual', limit: 1, heading: '', headingAr: '' },
+      },
+      {
+        type: 'collection-list',
+        design: { tileShape: 'rectangle', bgColor: 'token:card' },
+        preset: { heading: 'Shop by category', headingAr: 'تسوّق حسب القسم' },
+      },
+      {
+        type: 'featured-collection',
+        design: { columns: 4, mobileColumns: 2 },
+        preset: {
+          productSource: 'newest',
+          limit: 8,
+          heading: 'All products',
+          headingAr: 'كل المنتجات',
+        },
+      },
+      { type: 'trust-strip' },
+    ],
     name: { ar: 'شو روم', en: 'Showroom' },
     forWhom: {
       ar: 'لمجموعة صغيرة فاخرة بتتباع قطعة قطعة.',
@@ -286,15 +437,22 @@ export const LOOKS: readonly LookDefinition[] = [
       surface: '#FFFFFF',
       ink: '#0B0C0E',
       muted: '#565B63',
-      primary: '#2A6BFF',
+      primary: '#1D5CE6',
       onPrimary: '#FFFFFF',
-      accent: '#1B61FF',
+      accent: '#1757E8',
       line: '#DFE2E7',
       fonts: { display: 'Alexandria', body: 'Readex Pro', latin: 'Inter Tight' },
       radius: 'lg',
       density: 'airy',
       imageRatio: '1/1',
       motion: 'subtle',
+      // The product is the hero: no accent slab under every card, one quiet action. NOT the
+      // `quiet` card-CTA mode (it hides the control on a sized product, so a variant card had no
+      // action at all, STOP-2 re-audit): every card keeps its View / Add control, restyled as an
+      // outline by the Showroom rule in globals.css.
+      cardBadge: 'accent',
+      // T-01: the store name is a sized, untracked wordmark in the header and at checkout.
+      wordmarkSize: 'lg',
     },
   }),
   L({

@@ -449,6 +449,9 @@ function personalisationWrite(v: PersonalisationConfig | null | undefined) {
   return { personalisation: v === null ? Prisma.DbNull : v };
 }
 
+/** Longest `sort=on_sale` row (a deals strip, not a catalogue page). */
+export const ON_SALE_MAX = 12;
+
 export class ProductService {
   static async list(storeId: string, options: ListProductsOptions = {}) {
     const { status, category, search, featured, ids, withSalesQuantity } = options;
@@ -1295,7 +1298,7 @@ export class ProductService {
     storeId: string,
     options: ListProductsOptions & {
       /** `relevance` = hybrid ranking for a search (Task 12); without a search it means no sort. */
-      sort?: 'newest' | 'price_asc' | 'price_desc' | 'best_seller' | 'relevance';
+      sort?: 'newest' | 'price_asc' | 'price_desc' | 'best_seller' | 'relevance' | 'on_sale';
       cursor?: string;
       /**
        * Who is searching (`searcherFromIp`): the identity the query-embed limit charges. Without it
@@ -1311,18 +1314,23 @@ export class ProductService {
       featured,
       minPrice,
       maxPrice,
-      cursor,
       ids,
       optionFilters,
     } = options;
     // `relevance` is the default order of a search, so it is the same request as no sort. With
     // SEARCH_SEMANTIC_ENABLED off (or no search) everything below is exactly the pre-Task-12 path.
     const sort = options.sort === 'relevance' ? undefined : options.sort;
+    // The deals row is one short first page: a cursor is meaningless there and ignored.
+    const cursor = sort === 'on_sale' ? undefined : options.cursor;
     // Hybrid relevance (Task 12): a search with no explicit sort, semantic search on. Ranks
     // keyword + vector hits (RRF) and pages through that order; every other filter still applies.
     const ranked = Boolean(search) && !sort && semanticSearchEnabled();
     const page = Math.max(1, options.page || 1);
-    const limit = Math.min(100, Math.max(1, options.limit || 20));
+    // `on_sale` is a short merchandising row, never a catalogue page (cap 12, first page only).
+    const limit = Math.min(
+      sort === 'on_sale' ? ON_SALE_MAX : 100,
+      Math.max(1, options.limit || 20)
+    );
 
     // Scaling-cliff guard (CLAUDE.md rule 3): offset pagination is O(n) at the
     // DB level — `?page=10000&limit=100` would force Postgres to scan the
@@ -1334,7 +1342,7 @@ export class ProductService {
     // `cursor` param below).
     const MAX_SKIP = 10_000;
     const requestedSkip = (page - 1) * limit;
-    const skip = cursor ? 0 : Math.min(requestedSkip, MAX_SKIP);
+    const skip = cursor || sort === 'on_sale' ? 0 : Math.min(requestedSkip, MAX_SKIP);
     const skipCapped = requestedSkip > MAX_SKIP;
 
     // NOTE: no per-call Redis cache here. `listPublic`'s only caller
@@ -1517,6 +1525,67 @@ export class ProductService {
       where.isNew = true;
     }
 
+    // `sort=on_sale` (Phase B2, the Souq deals row). ON SALE = a product with NO variants whose
+    // compare-at price exceeds its price, or a variant product with at least one ACTIVE variant
+    // whose own compare-at exceeds its own price (the parent's stale compare-at is ignored, the
+    // same rule as getProductPricing). Biggest relative drop first, id as the tiebreaker. The ids
+    // come from one store-keyed statement (explicit store_id, active + not deleted) capped at
+    // ON_SALE_MAX; the rows are then loaded through the normal storefront select and re-sorted
+    // into this order below. CACHE CLASS: BOUNDED-stale. The row reads prices, so it rides the
+    // same `public:products:<storeId>:...` Redis key + `products:<storeId>` storefront tag as
+    // every listing: a price edit reaches it through invalidateStoreProductCaches (every product
+    // write path calls it), residual window <= the 120 s route TTL / 60 s storefront revalidate
+    // on a missed purge; checkout reads the authoritative price, never this list.
+    // FILTERS ARE APPLIED INSIDE THE STATEMENT, BEFORE THE LIMIT, so `category` / `ids` return the
+    // top 12 of the filtered set (not the filtered subset of the store-wide top 12), and `ids`
+    // is intersected, never overwritten. The route rejects the params this path cannot honour
+    // (search, price range, option filters, featured).
+    // B2B visibility (Ruling B2B-7b, B2-28): `p.audience = 'public'` is IN the statement below,
+    // before the LIMIT, so a wholesale-only product never consumes one of the 12 slots nor shows in
+    // the row (a post-filter would shrink or empty it for retail shoppers).
+    let onSaleOrder: string[] | undefined;
+    if (sort === 'on_sale') {
+      const safeIds = ids?.slice(0, 50).filter(i => typeof i === 'string' && i.length > 0);
+      const categorySql = category
+        ? resolvedCategoryId
+          ? Prisma.sql`EXISTS (SELECT 1 FROM product_categories pc
+                                WHERE pc.product_id = p.id AND pc.category_id = ${resolvedCategoryId})`
+          : Prisma.sql`FALSE` // an unknown category slug has no products
+        : Prisma.sql`TRUE`;
+      const idsSql =
+        safeIds && safeIds.length > 0
+          ? Prisma.sql`p.id = ANY(${safeIds}::text[])`
+          : Prisma.sql`TRUE`;
+      const rows = await prisma.$queryRaw<Array<{ id: string }>>`
+        SELECT p.id
+          FROM products p
+         WHERE p.store_id = ${storeId}
+           AND p.status = 'active'
+           AND p.deleted_at IS NULL
+           AND p.audience = 'public'
+           AND ${categorySql}
+           AND ${idsSql}
+           AND (
+             (NOT EXISTS (SELECT 1 FROM product_variants v0 WHERE v0.product_id = p.id)
+               AND p.compare_at_price > p.price)
+             OR EXISTS (SELECT 1 FROM product_variants v1
+                         WHERE v1.product_id = p.id AND v1.is_active
+                           AND v1.compare_at_price > v1.price)
+           )
+         ORDER BY GREATEST(
+                    CASE WHEN NOT EXISTS (SELECT 1 FROM product_variants v2 WHERE v2.product_id = p.id)
+                              AND p.compare_at_price > p.price
+                         THEN (p.compare_at_price - p.price)::float8 / p.compare_at_price ELSE 0 END,
+                    COALESCE((SELECT MAX((v3.compare_at_price - v3.price)::float8 / v3.compare_at_price)
+                                FROM product_variants v3
+                               WHERE v3.product_id = p.id AND v3.is_active
+                                 AND v3.compare_at_price > v3.price), 0)
+                  ) DESC, p.id
+         LIMIT ${limit}`;
+      onSaleOrder = rows.map(r => r.id);
+      where.id = { in: onSaleOrder };
+    }
+
     let orderBy: Prisma.ProductOrderByWithRelationInput | Prisma.ProductOrderByWithRelationInput[] =
       {
         createdAt: 'desc',
@@ -1656,18 +1725,23 @@ export class ProductService {
       ? { ...baseFindManyArgs, cursor: { id: cursor }, skip: 1 }
       : { ...baseFindManyArgs, skip, take: limit };
 
+    // The deals strip has no filter sidebar: skip the facet query on this hot homepage path.
     const [productsRaw, total, facets] = await Promise.all([
       prisma.product.findMany(findManyArgs),
       prisma.product.count({ where }),
-      computeFacets(storeId, whereForFacets),
+      sort === 'on_sale'
+        ? Promise.resolve([] as ProductFacet[])
+        : computeFacets(storeId, whereForFacets),
     ]);
 
     // When using cursor we fetched limit+1; slice to limit + extract next cursor.
     // The next cursor is the LAST row returned, because the next request skips
     // the cursor row itself (`skip: 1`). It used to be the extra (limit+1)th
     // row, which the next request then skipped — one product lost per page.
-    const products =
-      cursor && productsRaw.length > limit ? productsRaw.slice(0, limit) : productsRaw;
+    const saleRank = onSaleOrder ? new Map(onSaleOrder.map((id, i) => [id, i])) : undefined;
+    const products = (
+      cursor && productsRaw.length > limit ? productsRaw.slice(0, limit) : productsRaw
+    ).sort((a, b) => (saleRank ? (saleRank.get(a.id) ?? 0) - (saleRank.get(b.id) ?? 0) : 0));
     const nextCursor =
       cursor && productsRaw.length > limit
         ? (productsRaw[limit - 1] as { id: string }).id

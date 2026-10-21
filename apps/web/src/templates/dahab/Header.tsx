@@ -85,7 +85,8 @@ export default function DahabHeader({
   );
 
   return (
-    <div
+    // The skin's own <header>: the page's one banner landmark (a11y re-audit R1).
+    <header
       className={cx(
         'border-b transition-[background-color,border-color] duration-300',
         scrolled
@@ -262,6 +263,6 @@ export default function DahabHeader({
       </DahabDrawer>
 
       <DahabCartDrawer open={bagOpen} onClose={() => setBagOpen(false)} urlPrefix={urlPrefix} />
-    </div>
+    </header>
   );
 }

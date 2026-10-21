@@ -1,4 +1,6 @@
 import { describe, it, expect } from 'vitest';
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
 import {
   guard,
   isLocalUrl,
@@ -8,6 +10,11 @@ import {
   variantSku,
   PHASE_S_PLACEHOLDERS,
   PLACEHOLDER_SLUGS,
+  TEMPLATE_SPECS,
+  templateFromArgv,
+  SOUQ_PROD_ASSET_BASE,
+  seedStoreClaim,
+  SHOWROOM_THEME,
   // @ts-expect-error plain .mjs script
 } from '../../scripts/storedemo/seed.mjs';
 // @ts-expect-error plain .mjs data module
@@ -91,5 +98,145 @@ describe('storedemo seed guard', () => {
     expect(variantSku('linen-abaya', ['Rose', 'M', '56'])).not.toBe(
       variantSku('linen-abaya', ['Rose', 'M', '58'])
     );
+  });
+});
+
+describe('storedemo seed: --template souq (Ruling B2-7)', () => {
+  const souq = TEMPLATE_SPECS.souq;
+  it('--template picks the spec, the default is Qamar, an unknown name is null (the run refuses it)', () => {
+    expect(templateFromArgv([])).toBe(TEMPLATE_SPECS.qamar);
+    expect(templateFromArgv(['--template', 'souq'])).toBe(souq);
+    expect(templateFromArgv(['--template', 'nope'])).toBeNull();
+    expect(templateFromArgv(['--template'])).toBeNull();
+  });
+  it('the second demo store: own slug, own owner without a mailbox, own default look', () => {
+    expect(souq.slug).toBe('storedemo-souq');
+    expect(souq.ownerEmail).toBe('storedemo-souq-owner@ebda.app');
+    expect(souq.defaultLook).toBe('souq.catalogue');
+    expect(souq.slug).not.toBe(TEMPLATE_SPECS.qamar.slug);
+    expect(souq.ownerEmail).not.toBe(TEMPLATE_SPECS.qamar.ownerEmail);
+  });
+  it('local look stores: souq-catalogue, souq-night, souq-showroom on their own looks', () => {
+    expect(souq.localLookStores).toEqual([
+      ['souq-catalogue', 'souq.catalogue'],
+      ['souq-night', 'souq.night'],
+      ['souq-showroom', 'souq.showroom'],
+    ]);
+  });
+  it('production run accepts only https://media.ebda.app/demo/souq for Souq, and never the Qamar base', () => {
+    expect(SOUQ_PROD_ASSET_BASE).toBe('https://media.ebda.app/demo/souq');
+    const ok = assetBase(
+      ['--yes-production'],
+      { SOUQ_DEMO_ASSET_BASE: SOUQ_PROD_ASSET_BASE },
+      souq
+    );
+    expect(ok.ok).toBe(true);
+    expect(assetBase(['--yes-production'], {}, souq).base).toBe(SOUQ_PROD_ASSET_BASE);
+    for (const bad of [
+      'http://localhost:9000',
+      'https://media.ebda.app/demo/qamar',
+      '/__souq-demo',
+    ])
+      expect(assetBase(['--yes-production'], { SOUQ_DEMO_ASSET_BASE: bad }, souq).ok, bad).toBe(
+        false
+      );
+    // local runs take a path or a localhost URL
+    expect(assetBase([], { SOUQ_DEMO_ASSET_BASE: '/__souq-demo' }, souq).base).toBe('/__souq-demo');
+    // the Qamar asset env var does not leak into a Souq run
+    expect(assetBase([], { QAMAR_DEMO_ASSET_BASE: '/__qamar-demo' }, souq).base).toBe(
+      SOUQ_PROD_ASSET_BASE
+    );
+  });
+  it('describePlan names the Souq catalogue, instalments and NO archived placeholder families', () => {
+    const plan = describePlan(pg('user:secretpw@localhost:5432/x'), souq);
+    expect(plan).toContain('souq: 20 products, 24 variants, 7 categories');
+    expect(plan).toContain('instalments enabled (no provider name)');
+    expect(plan).toContain('storedemo-souq');
+    expect(plan).not.toContain('archived:');
+    expect(plan).not.toContain('secretpw');
+  });
+  it('the Qamar plan is unchanged by the new parameter', () => {
+    expect(describePlan(pg('a:b@localhost/x'))).toContain('archived: fashion');
+  });
+  it('Qamar never gets the instalments key; Souq gets it with no provider name (B2-9)', () => {
+    expect(TEMPLATE_SPECS.qamar.instalments).toBeNull();
+    expect(souq.instalments).toEqual({ enabled: true, months: 12, markupPct: 0 });
+  });
+  it('the guard is the same for both templates: a remote host needs --yes-production', () => {
+    const remote = pg('a:b@ep-x.neon.tech/db');
+    expect(guard(remote, ['--template', 'souq']).ok).toBe(false);
+    expect(guard(remote, ['--template', 'souq', '--yes-production']).ok).toBe(true);
+  });
+});
+
+// Ruling B2-17 (security review): the seed never takes over a store that is not its own.
+describe('storedemo seed: slug ownership (never overwrite a merchant store)', () => {
+  const owner = { id: 'owner-seed' };
+  it('no store with the slug: the seed may create it', () => {
+    expect(seedStoreClaim(null, owner, { demo: true }).ok).toBe(true);
+    expect(seedStoreClaim(undefined, owner, { demo: false }).ok).toBe(true);
+  });
+  it('an existing demo store owned by the seed owner is re-seeded (idempotent)', () => {
+    expect(
+      seedStoreClaim({ id: 's', isDemo: true, ownerId: 'owner-seed' }, owner, { demo: true }).ok
+    ).toBe(true);
+  });
+  it('a NON-demo store with a demo slug is refused (a merchant registered it first)', () => {
+    const r = seedStoreClaim({ id: 's', isDemo: false, ownerId: 'owner-seed' }, owner, {
+      demo: true,
+    });
+    expect(r.ok).toBe(false);
+    expect(r.why).toMatch(/not a demo store/i);
+  });
+  it('a demo-flagged store owned by someone else is refused (squatted or hand-made)', () => {
+    const r = seedStoreClaim({ id: 's', isDemo: true, ownerId: 'a-merchant' }, owner, {
+      demo: true,
+    });
+    expect(r.ok).toBe(false);
+    expect(r.why).toMatch(/owner/i);
+  });
+  it('a store owned by a merchant is refused whether or not the seed owner exists yet', () => {
+    expect(
+      seedStoreClaim({ id: 's', isDemo: false, ownerId: 'a-merchant' }, null, { demo: true }).ok
+    ).toBe(false);
+    expect(
+      seedStoreClaim({ id: 's', isDemo: true, ownerId: 'a-merchant' }, null, { demo: true }).ok
+    ).toBe(false);
+  });
+  it('local look stores (non-demo) are only re-seeded when the seed owner owns them', () => {
+    expect(
+      seedStoreClaim({ id: 's', isDemo: false, ownerId: 'owner-seed' }, owner, { demo: false }).ok
+    ).toBe(true);
+    expect(
+      seedStoreClaim({ id: 's', isDemo: false, ownerId: 'a-merchant' }, owner, { demo: false }).ok
+    ).toBe(false);
+    // a local look store slug can never silently turn an official demo store into a review store
+    expect(
+      seedStoreClaim({ id: 's', isDemo: true, ownerId: 'owner-seed' }, owner, { demo: false }).ok
+    ).toBe(false);
+  });
+  it('the run checks every slug BEFORE any write (no partial seed): the claim check precedes the owner create', () => {
+    const src = readFileSync(path.resolve(__dirname, '../../scripts/storedemo/seed.mjs'), 'utf8');
+    const run = src.slice(src.indexOf('async function run()'));
+    const check = run.indexOf('assertSlugsClaimable');
+    expect(check).toBeGreaterThan(0);
+    expect(check).toBeLessThan(run.indexOf('tx.user.create'));
+    expect(check).toBeLessThan(run.indexOf('prisma.store.upsert'));
+    // and the production flag is still required for a non-loopback database
+    expect(run.indexOf('guard(url, argv)')).toBeLessThan(check);
+  });
+});
+
+describe('showroom stores seed the NEW-chip toggle ON (STOP-2 final review, P2-4)', () => {
+  it('SHOWROOM_THEME is exactly { showNewBadge: true }', () => {
+    expect(SHOWROOM_THEME).toEqual({ showNewBadge: true });
+  });
+  it('the demo store, the local look stores and the scenario stores all take it (never `theme: {}`)', () => {
+    const root = path.resolve(__dirname, '../..');
+    for (const f of ['scripts/storedemo/seed.mjs', 'scripts/storedemo/scenario-stores.mjs']) {
+      const src = readFileSync(path.join(root, f), 'utf8');
+      expect(src, f).not.toMatch(/\btheme:\s*\{\s*\}\s*,/);
+      expect(src, f).toContain('SHOWROOM_THEME');
+    }
   });
 });

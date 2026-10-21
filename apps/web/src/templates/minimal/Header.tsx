@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useId } from 'react';
 import Link from 'next/link';
 import { CartIcon } from '@ebda/ui';
 import { StoreLogo } from '../shared/StoreLogo';
@@ -10,7 +10,7 @@ import { WORDMARK_NAV_LINK_CLASS, wordmarkClass } from '../shared/wordmark';
 const HEADER_TARGET = 'inline-flex min-h-11 min-w-11 items-center justify-center';
 import type { HeaderProps } from '../types';
 import { useTabBarShown, HEADER_MENU_WITH_TAB_BAR } from '../shared/tab-bar-visibility';
-import { useLanguage } from '../../contexts/LanguageContext';
+import { useLanguage, translations } from '../../contexts/LanguageContext';
 import { LanguageSwitcher } from '../../components/LanguageSwitcher';
 import { SearchAutocomplete } from '../../components/SearchAutocomplete';
 import { countText, ITEMS } from '../../lib/plural';
@@ -26,6 +26,7 @@ export default function MinimalHeader({
   headerBgColor,
   logoPlacement,
   wordmarkSize,
+  searchPlacement,
 }: HeaderProps) {
   const { isRtl: ctxIsRtl, t } = useLanguage();
   const tabBarShown = useTabBarShown();
@@ -35,11 +36,21 @@ export default function MinimalHeader({
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isVisible, setIsVisible] = useState(true);
   const lastScrollY = useRef(0);
+  const headerRef = useRef<HTMLElement>(null);
+  const searchId = useId();
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
   // Hide on scroll down, show on scroll up
   useEffect(() => {
     const onScroll = () => {
       const current = window.scrollY;
+      // 2.4.11: never hide the header while keyboard focus is inside it (the focus scroll itself
+      // would otherwise hide it again).
+      if (headerRef.current?.contains(document.activeElement)) {
+        setIsVisible(true);
+        lastScrollY.current = current;
+        return;
+      }
       if (current <= 0) {
         setIsVisible(true);
       } else if (current > lastScrollY.current + 4) {
@@ -62,6 +73,22 @@ export default function MinimalHeader({
     }
   };
 
+  // Only the souq skin passes searchPlacement (Ruling B2-1); undefined or `icon` keeps the markup
+  // byte-identical (tests/unit/minimal-header-unchanged.test.tsx).
+  const isProminent = searchPlacement === 'prominent';
+  const handleProminentSearch = (e: React.FormEvent) => {
+    const q = searchQuery.trim();
+    // An empty query never navigates; with onSearch the client router takes over, without it the
+    // form's own GET to /search?q= does (progressive enhancement).
+    if (!q) {
+      e.preventDefault();
+      return;
+    }
+    if (onSearch) {
+      e.preventDefault();
+      onSearch(q);
+    }
+  };
   // Only the qamar skin passes logoPlacement; undefined keeps the markup byte-identical.
   const isCentre = logoPlacement === 'centre';
   // Only the qamar skin passes wordmarkSize (W2a T-01); undefined keeps the markup byte-identical.
@@ -71,22 +98,29 @@ export default function MinimalHeader({
       ' text-xs tracking-[0.18em] ui-caps-toggle font-normal text-muted-foreground hover:text-foreground transition-colors duration-200';
   const displayName = isRtl && branding.nameAr ? branding.nameAr : branding.name;
   const displayLogo = isRtl && branding.logoAr ? branding.logoAr : branding.logo;
+  // A name that cannot fit one line beside the actions wraps (two lines) and the row makes room.
+  const longName = isProminent && displayName.length > 16;
 
   return (
     <header
+      ref={headerRef}
       className={`sticky top-0 z-50 bg-background transition-transform duration-300 ease-in-out ${
         isVisible ? 'translate-y-0' : '-translate-y-full'
       }`}
       style={headerBgColor ? { backgroundColor: headerBgColor } : undefined}
       dir={isRtl ? 'rtl' : 'ltr'}
       data-logo-placement={logoPlacement}
+      // 2.4.11: focus moving into the header (Shift+Tab, a click-less walk) brings it back on screen.
+      onFocus={() => setIsVisible(true)}
     >
       <div className="container mx-auto px-6">
         <div
           className={
             isCentre
               ? 'relative grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center py-3'
-              : 'relative flex items-center justify-between py-3'
+              : isProminent
+                ? 'relative grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-2 gap-y-3 py-3 md:grid-cols-[auto_minmax(0,1fr)_auto] md:gap-x-4'
+                : 'relative flex items-center justify-between py-3'
           }
         >
           {/* Logo — absolute-centered on mobile (visual middle of the
@@ -98,7 +132,9 @@ export default function MinimalHeader({
             className={`absolute left-1/2 -translate-x-1/2 md:relative md:left-auto md:translate-x-0 flex min-h-11 min-w-11 items-center justify-center flex-shrink-0 ${
               isCentre
                 ? 'max-w-[calc(100%-13rem)] md:max-w-[40vw] md:col-start-2'
-                : 'max-w-[65%] md:max-w-none'
+                : isProminent
+                  ? 'top-3 max-w-[calc(100%-7rem)] md:top-auto md:col-start-1 md:row-start-1 md:max-w-[16rem]'
+                  : 'max-w-[65%] md:max-w-none'
             }`}
           >
             {displayLogo ? (
@@ -107,7 +143,13 @@ export default function MinimalHeader({
               <span
                 className={
                   wordmarkSize
-                    ? wordmarkClass(wordmarkSize)
+                    ? isProminent
+                      ? // STOP-2: a long store name wraps to two lines here instead of ending in "...".
+                        wordmarkClass(wordmarkSize).replace(
+                          'truncate',
+                          longName ? 'line-clamp-2 text-balance leading-snug' : 'truncate'
+                        )
+                      : wordmarkClass(wordmarkSize)
                     : isCentre
                       ? 'block max-w-full truncate text-2xl sm:text-3xl font-display text-foreground'
                       : 'text-xs tracking-[0.3em] ui-caps-toggle font-light text-foreground'
@@ -121,13 +163,89 @@ export default function MinimalHeader({
             )}
           </Link>
 
+          {/* a11y M3: the search follows the logo in the DOM, as on screen (grid placement is explicit, so this is a pure DOM move): Tab goes logo, search, nav, actions. */}
+          {isProminent && (
+            <form
+              role="search"
+              action={`${urlPrefix}/search`}
+              method="get"
+              onSubmit={handleProminentSearch}
+              className="relative col-span-2 row-start-2 md:col-span-1 md:col-start-2 md:row-start-1"
+              data-zone="souq-search"
+            >
+              <label htmlFor={searchId} className="sr-only">
+                {t('Search for a product or brand', translations['Search for a product or brand'])}
+              </label>
+              <svg
+                className="pointer-events-none absolute start-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+                strokeWidth={1.5}
+                aria-hidden="true"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                />
+              </svg>
+              <input
+                ref={searchInputRef}
+                id={searchId}
+                name="q"
+                type="search"
+                enterKeyHint="search"
+                autoComplete="off"
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                placeholder={t(
+                  'Search for a product or brand',
+                  translations['Search for a product or brand']
+                )}
+                dir={isRtl ? 'rtl' : 'ltr'}
+                className="h-11 w-full appearance-none rounded-[var(--radius)] border border-input bg-card ps-10 pe-11 text-base text-foreground placeholder:text-muted-foreground outline-none transition-colors duration-200 focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary [&::-webkit-search-cancel-button]:appearance-none"
+              />
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSearchQuery('');
+                    searchInputRef.current?.focus();
+                  }}
+                  aria-label={t('Clear search', translations['Clear search'])}
+                  className="absolute inset-y-0 end-0 inline-flex h-11 w-11 items-center justify-center rounded-[var(--radius)] text-muted-foreground transition-colors duration-200 hover:text-foreground outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                >
+                  <svg
+                    className="h-4 w-4"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                    strokeWidth={1.5}
+                    aria-hidden="true"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              )}
+              <SearchAutocomplete
+                query={searchQuery}
+                onSelect={() => {
+                  setSearchQuery('');
+                }}
+              />
+            </form>
+          )}
+
           {/* Desktop nav — centered absolutely */}
           <nav
             aria-label={t('Main', 'الرئيسية')}
             className={
               isCentre
                 ? 'hidden lg:flex items-center gap-8 col-start-1 justify-self-start'
-                : 'hidden lg:flex items-center gap-10 absolute left-1/2 -translate-x-1/2'
+                : isProminent
+                  ? 'hidden lg:flex items-center gap-8 lg:col-span-3 lg:row-start-2 lg:justify-self-center'
+                  : 'hidden lg:flex items-center gap-10 absolute left-1/2 -translate-x-1/2'
             }
           >
             {navigation.map(item => (
@@ -142,38 +260,42 @@ export default function MinimalHeader({
             className={
               isCentre
                 ? 'flex items-center gap-2 col-start-3 justify-self-end'
-                : 'flex items-center gap-2'
+                : isProminent
+                  ? `flex items-center gap-2 col-start-2 row-start-1 justify-self-end md:col-start-3 ${longName ? 'min-h-[4.5rem] md:min-h-0' : ''}`
+                  : 'flex items-center gap-2'
             }
           >
             {/* Desktop-only search toggle — mobile has a persistent search
                 bar below the logo row so a toggle here would be redundant. */}
-            <button
-              type="button"
-              onClick={() => setIsSearchOpen(!isSearchOpen)}
-              // P2-12: from md (the tab bar's search is gone there), not only lg.
-              className="hidden md:inline-flex h-11 w-11 items-center justify-center text-muted-foreground hover:text-foreground transition-colors duration-200 cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
-              aria-label={t('Search', 'بحث')}
-              aria-expanded={isSearchOpen}
-            >
-              <svg
-                className="w-4 h-4"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-                strokeWidth={1}
-                aria-hidden="true"
+            {!isProminent && (
+              <button
+                type="button"
+                onClick={() => setIsSearchOpen(!isSearchOpen)}
+                // P2-12: from md (the tab bar's search is gone there), not only lg.
+                className="hidden md:inline-flex h-11 w-11 items-center justify-center text-muted-foreground hover:text-foreground transition-colors duration-200 cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+                aria-label={t('Search', 'بحث')}
+                aria-expanded={isSearchOpen}
               >
-                {isSearchOpen ? (
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                ) : (
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-                  />
-                )}
-              </svg>
-            </button>
+                <svg
+                  className="w-4 h-4"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                  strokeWidth={1}
+                  aria-hidden="true"
+                >
+                  {isSearchOpen ? (
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                  ) : (
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                    />
+                  )}
+                </svg>
+              </button>
+            )}
 
             {/* Language toggle */}
             <LanguageSwitcher variant="compact" />
@@ -249,67 +371,71 @@ export default function MinimalHeader({
         {/* Mobile persistent search bar — always visible under the logo
             row on mobile (pecannbee target layout). Hidden on lg+ where
             the expandable search-toggle in the actions row handles it. */}
-        <div className="hidden pb-3" data-zone="mobile-search">
-          <form onSubmit={handleSearch} className="relative">
-            <svg
-              className="absolute top-1/2 -translate-y-1/2 start-3 w-4 h-4 text-muted-foreground pointer-events-none"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-              strokeWidth={1}
-              aria-hidden="true"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-              />
-            </svg>
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={e => setSearchQuery(e.target.value)}
-              placeholder={t('Search', 'بحث')}
-              className="min-h-11 w-full ps-10 pe-3 py-2.5 text-base sm:text-xs tracking-wide bg-transparent border border-input text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-foreground transition-colors duration-200 rounded"
-              dir={isRtl ? 'rtl' : 'ltr'}
-              aria-label={t('Search products', 'بحث عن المنتجات')}
-            />
-            <SearchAutocomplete
-              query={searchQuery}
-              onSelect={() => {
-                setSearchQuery('');
-              }}
-            />
-          </form>
-        </div>
+        {!isProminent && (
+          <>
+            <div className="hidden pb-3" data-zone="mobile-search">
+              <form onSubmit={handleSearch} className="relative">
+                <svg
+                  className="absolute top-1/2 -translate-y-1/2 start-3 w-4 h-4 text-muted-foreground pointer-events-none"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                  strokeWidth={1}
+                  aria-hidden="true"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                  />
+                </svg>
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={e => setSearchQuery(e.target.value)}
+                  placeholder={t('Search', 'بحث')}
+                  className="min-h-11 w-full ps-10 pe-3 py-2.5 text-base sm:text-xs tracking-wide bg-transparent border border-input text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-foreground transition-colors duration-200 rounded"
+                  dir={isRtl ? 'rtl' : 'ltr'}
+                  aria-label={t('Search products', 'بحث عن المنتجات')}
+                />
+                <SearchAutocomplete
+                  query={searchQuery}
+                  onSelect={() => {
+                    setSearchQuery('');
+                  }}
+                />
+              </form>
+            </div>
 
-        {/* Desktop search field — smooth expand toggled by the search icon
+            {/* Desktop search field — smooth expand toggled by the search icon
             in the actions row. lg+ only since mobile has its own row above. */}
-        <div
-          className={`hidden md:block overflow-visible transition-[max-height,opacity,padding] duration-300 ${
-            isSearchOpen ? 'max-h-16 opacity-100 pb-4' : 'max-h-0 opacity-0 pointer-events-none'
-          }`}
-        >
-          <form onSubmit={handleSearch} className="relative max-w-xs mx-auto">
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={e => setSearchQuery(e.target.value)}
-              placeholder={t('Search...', 'بحث...')}
-              className="w-full text-center text-base sm:text-xs tracking-wide bg-transparent border-b border-input text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-foreground min-h-11 pb-2 transition-colors duration-200"
-              dir={isRtl ? 'rtl' : 'ltr'}
-              autoFocus={isSearchOpen}
-              aria-label={t('Search products', 'بحث عن المنتجات')}
-            />
-            <SearchAutocomplete
-              query={searchQuery}
-              onSelect={() => {
-                setSearchQuery('');
-                setIsSearchOpen(false);
-              }}
-            />
-          </form>
-        </div>
+            <div
+              className={`hidden md:block overflow-visible transition-[max-height,opacity,padding] duration-300 ${
+                isSearchOpen ? 'max-h-16 opacity-100 pb-4' : 'max-h-0 opacity-0 pointer-events-none'
+              }`}
+            >
+              <form onSubmit={handleSearch} className="relative max-w-xs mx-auto">
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={e => setSearchQuery(e.target.value)}
+                  placeholder={t('Search...', 'بحث...')}
+                  className="w-full text-center text-base sm:text-xs tracking-wide bg-transparent border-b border-input text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-foreground min-h-11 pb-2 transition-colors duration-200"
+                  dir={isRtl ? 'rtl' : 'ltr'}
+                  autoFocus={isSearchOpen}
+                  aria-label={t('Search products', 'بحث عن المنتجات')}
+                />
+                <SearchAutocomplete
+                  query={searchQuery}
+                  onSelect={() => {
+                    setSearchQuery('');
+                    setIsSearchOpen(false);
+                  }}
+                />
+              </form>
+            </div>
+          </>
+        )}
 
         {/* Mobile menu — item 5 (2026-07-12): shared grid-rows enter/exit
             (220ms in / 160ms out, same axis both ways, motion-safe). Always

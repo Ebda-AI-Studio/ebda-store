@@ -1197,6 +1197,18 @@
     "pageAr": "إعدادات الدفع"
   },
   {
+    "id": "payment.instalments",
+    "kind": "setting",
+    "route": "/payment-settings",
+    "access": "owner",
+    "en": "Instalment line on product pages",
+    "ar": "سطر التقسيط في صفحة المنتج",
+    "synEn": "instalment installments monthly payment months estimate tagseet product page",
+    "synAr": "تقسيط قسط شهري شهور تقريبي صفحة المنتج",
+    "pageEn": "Payment Settings",
+    "pageAr": "إعدادات الدفع"
+  },
+  {
     "id": "tax.enable",
     "kind": "setting",
     "route": "/tax",

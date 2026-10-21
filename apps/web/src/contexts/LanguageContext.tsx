@@ -119,6 +119,9 @@ export const translations = {
   About: 'من نحن',
   Contact: 'اتصل بنا',
   'Search products...': 'البحث عن المنتجات...',
+  // Souq search-first header (Phase B2): the field's label / placeholder and its clear button.
+  'Search for a product or brand': 'دوّر على منتج أو ماركة',
+  'Clear search': 'مسح البحث',
   'Sign In': 'تسجيل الدخول',
   Cart: 'السلة',
   Wishlist: 'المفضلة',

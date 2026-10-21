@@ -13,16 +13,16 @@ Looks are **data**, not code: they live in `@ebda/shared` (`packages/shared/src/
 
 ## The 15 looks
 
-3 of the 15 are `status: 'built'` (the Qamar looks, flipped in Phase B1 Task 10 after Ahmad's STOP 2 approval, 2026-10-21); the other 12 are `designed`. The Qamar looks render on the `qamar` skin (Ruling B1-1); the twelve others still render on `skin: 'minimal'`. The showroom lists and previews only `built` looks, so today it offers exactly the three Qamar looks. The admin `LookPicker` shows all 15 and, with no look chosen, opens on the first template that has a built look (Qamar; Ruling B1-19).
+6 of the 15 are `status: 'built'` (the three Qamar looks, flipped in Phase B1 Task 10, and the three Souq looks, flipped in Phase B2 Task 7 after the independent audits; Ahmad's STOP rounds were withdrawn 2026-10-21); the other 9 are `designed`. The Qamar looks render on the `qamar` skin (Ruling B1-1); the Souq looks render on the `souq` skin (Ruling B2-1); the nine others still render on `skin: 'minimal'`. The showroom lists and previews only `built` looks, so today it offers the three Qamar and the three Souq looks (each template on its own demo host, Ruling B2-7). The admin `LookPicker` shows all 15 and, with no look chosen, opens on the first template that has a built look (Qamar; Ruling B1-19).
 
 | Id                   | Template | Name (ar)    | Name (en)        | Status   |
 | -------------------- | -------- | ------------ | ---------------- | -------- |
 | `qamar.atelier`      | qamar    | أتيليه       | Atelier          | built    |
 | `qamar.lookbook`     | qamar    | لوك بوك      | Lookbook         | built    |
 | `qamar.vitrine`      | qamar    | فاترينة      | Vitrine          | built    |
-| `souq.catalogue`     | souq     | كتالوج       | Catalogue        | designed |
-| `souq.night`         | souq     | سوق الليل    | Night souq       | designed |
-| `souq.showroom`      | souq     | شو روم       | Showroom         | designed |
+| `souq.catalogue`     | souq     | كتالوج       | Catalogue        | built    |
+| `souq.night`         | souq     | سوق الليل    | Night souq       | built    |
+| `souq.showroom`      | souq     | شو روم       | Showroom         | built    |
 | `jasmine.apothecary` | jasmine  | عطارة        | Apothecary       | designed |
 | `jasmine.bloom`      | jasmine  | بلوم         | Bloom            | designed |
 | `jasmine.clinic`     | jasmine  | عيادة        | Clinic           | designed |
@@ -84,7 +84,7 @@ A store with `look = null` (or an unknown look id) gets no `data-look` attribute
 
 - **Section mix (Ruling B1-3).** A look may carry `sections: [{ type, design?, preset? }]` (`LookDefinition.sections`). `applyTemplateFamily(current, family, look, { from, design, fromSkin, toSkin })` uses the mix's order; `preset` seeds only a section the store does not have; `design` keys (`LOOK_DESIGN_KEYS`: layout, variant, columns, background, spacing, never content; hero `mode` is content and no look sets it) apply to existing sections too. A key the OUTGOING look's mix set and the incoming look does not set returns to the section default, so no look's layout leaks into the next (plan amendment C6). With `design: 'keep'` a section field the merchant changed from what the outgoing look set (or, for a key it did not set, from the section default) stays as the merchant has it; with `reset` the incoming look applies whole (C8, TPL-1). The default of a layout-backed section is the skin's own layout baseline (`resolveLayoutSettings({}, skin, look)`), not the registry preset; page-only sections use their first preset. The outgoing look is the document's `appliedLook`, which every switch writes, else `stores.look`. Text, images, product refs and blocks are never touched. A section type the new mix does not use is dropped from the DRAFT only; the published page and revision history keep it.
 - **Look-tagged sections (C10).** A section with `lookTag: '<look id>'` renders only under that look when the look has a mix (`documentForLook`); untagged sections render under every look. One page can hold one hero per look (the demo showroom).
-- **Chrome (Ruling B1-4).** `LookDefinition.chrome.header.logoPlacement` (`'start' | 'centre'`) is look data the look's skin reads; it is not a merchant setting yet.
+- **Chrome (Ruling B1-4).** `LookDefinition.chrome.header.logoPlacement` (`'start' | 'centre'`) is look data the look's skin reads; it is not a merchant setting yet. Souq adds `header.search` (`'prominent' | 'icon'`, B2-1), `plp: 'autoFill'` (the listing grid fills its column, `repeat(auto-fill, minmax(11.5rem, 1fr))` from `lg`) and `listing: 'ground'` (the listing pages keep the look's ground instead of the dark-look inverse band; Night souq mattes its photos instead, B2-24).
 
 - **Content is always kept** (Ruling LOOKS-3). Switching never deletes products, text or images.
 - **`design: 'keep'`** leaves every key in `stores.theme`; the merchant's edited colours still win and show as overrides.

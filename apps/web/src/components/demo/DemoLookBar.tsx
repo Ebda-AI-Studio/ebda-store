@@ -5,6 +5,7 @@ import { LOOKS, type LookTemplate } from '@ebda/shared';
 import { usePathname, useSearchParams } from 'next/navigation';
 import { useLanguage, translations } from '../../contexts/LanguageContext';
 import { defaultIsLookBuilt, type IsLookBuilt } from '../../lib/demo-look';
+import { DEMO_HOSTS, demoHostFor } from '../../lib/demo-hosts';
 
 /** Template display names (the five looks families). */
 const TEMPLATE_NAMES: Record<LookTemplate, { en: string; ar: string }> = {
@@ -77,7 +78,8 @@ export function DemoLookBar({
   const built = LOOKS.filter(l => isBuilt(l.id));
   if (built.length === 0) return null;
 
-  const templates = [...new Set(built.map(l => l.template))];
+  // Only a template with a built look AND a demo store of its own is offered (Ruling B2-7).
+  const templates = [...new Set(built.map(l => l.template))].filter(tpl => tpl in DEMO_HOSTS);
   const current = built.find(l => l.id === activeLook);
   const activeTemplate = current?.template ?? templates[0];
   const looks = built.filter(l => l.template === activeTemplate);
@@ -89,6 +91,20 @@ export function DemoLookBar({
     // the page segment but NOT the root layout, which is where the look's data-look, CSS vars,
     // font link and StoreProvider initialStore are applied.
     window.location.assign(`${pathname}?${params.toString()}`);
+  };
+
+  // Choosing another template leaves this store for that template's demo store (its own catalogue,
+  // never a filter over this one), keeping `?look=` of the template's first built look. When the
+  // visitor is not on a demo host (a local look store), the look is applied on the same host.
+  const goTemplate = (tpl: LookTemplate) => {
+    const first = built.find(l => l.template === tpl);
+    if (!first) return;
+    const host = demoHostFor(tpl, window.location.host ?? '');
+    if (host && host !== window.location.host) {
+      window.location.assign(`${window.location.protocol}//${host}/?look=${first.id}`);
+      return;
+    }
+    go(first.id);
   };
 
   const label = 'flex items-center gap-2';
@@ -110,10 +126,7 @@ export function DemoLookBar({
             data-demo-template
             className={DEMO_BAR_SELECT_CLASS}
             value={activeTemplate}
-            onChange={e => {
-              const first = built.find(l => l.template === e.target.value);
-              if (first) go(first.id);
-            }}
+            onChange={e => goTemplate(e.target.value as LookTemplate)}
           >
             {templates.map(tpl => (
               <option key={tpl} value={tpl}>

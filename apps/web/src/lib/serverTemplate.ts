@@ -127,6 +127,13 @@ const homepageTemplates: Record<TemplateId, HomepageTemplateComponents> = {
     CategoryGrid: MinimalCategoryGrid,
     ...shared,
   },
+  // Souq re-uses the minimal statics plus the shared sections (Ruling B2-1).
+  souq: {
+    Hero: MinimalHero,
+    ProductGrid: MinimalProductGrid,
+    CategoryGrid: MinimalCategoryGrid,
+    ...shared,
+  },
 };
 
 /**

@@ -191,7 +191,7 @@ export function buildTemplateBaseline(identity: TemplateIdentity): StoreLayoutSe
 
 /** Per-template identities. elegant = the calibrated base (no delta). */
 export const TEMPLATE_IDENTITIES: Record<
-  Exclude<TemplateId, 'elegant' | 'dahab' | 'qamar'>,
+  Exclude<TemplateId, 'elegant' | 'dahab' | 'qamar' | 'souq'>,
   TemplateIdentity
 > = {
   // Modern — clean airy grid: rounded-square category tiles, caption below, framed.
@@ -314,6 +314,35 @@ function buildQamarBaseline(): StoreLayoutSettings {
   return b;
 }
 
+/**
+ * Souq (Phase B2, Ruling B2-1): the minimal identity with the footer on the section-alt surface
+ * for the same reason as Qamar (B1-25): the shared footer paints muted links, unreadable on Night
+ * souq's Night primary (brass). Cards keep their frame (a catalogue card is a framed tile).
+ */
+function buildSouqBaseline(): StoreLayoutSettings {
+  const b = buildTemplateBaseline(TEMPLATE_IDENTITIES.minimal);
+  b.footer = {};
+  // Ruling B2-22: a Souq look owns its section bands (Night's inverse band, the others sit on the
+  // page). The branded base paints whole sections in `token:primary` with `token:card` headings,
+  // which a fresh store that applies Catalogue or Showroom would show as a cobalt category band
+  // with ink captions at 3.2:1. Like Dahab, the base's section colours and typography colours are
+  // dropped here; the looks and the pack carry the colour.
+  delete b.hero.bgColor;
+  for (const section of [b.categories, b.newArrivals, b.bestSellers, b.testimonials]) {
+    delete section.bgColor;
+    delete section.typography;
+  }
+  // The listing / search / related card keeps its frame (B2-13) but in the neutral border token:
+  // a primary-coloured box round every card is a second loud accent (quality bar: one accent).
+  // design.md compact sizing: 'compact' padding so the photo fills the card (was 'spacious': a
+  // 110px thumb inside a 170px card, STOP-2 taste P1-1).
+  if (b.productCardDefaults) {
+    b.productCardDefaults.cardFrameColor = 'token:border';
+    b.productCardDefaults.cardFrameSize = 'compact';
+  }
+  return b;
+}
+
 /** The packaged per-template baselines. Stores with empty layout inherit by template. */
 export const TEMPLATE_LAYOUT_BASELINES: Record<TemplateId, StoreLayoutSettings> = {
   elegant: BASE_BRANDED_LAYOUT,
@@ -329,6 +358,7 @@ export const TEMPLATE_LAYOUT_BASELINES: Record<TemplateId, StoreLayoutSettings> 
   // reads productCardDefaults (PDP related row, PLP, search), as on the home sections - the
   // photo is the card (B1-1). STOP 1 critique, Ruling B1-25.
   qamar: buildQamarBaseline(),
+  souq: buildSouqBaseline(),
 };
 
 /** Safe lookup. Unknown id → the bare global default (back-compat behavior). */

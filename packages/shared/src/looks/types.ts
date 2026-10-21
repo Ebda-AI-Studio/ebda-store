@@ -92,7 +92,26 @@ export interface LookSectionSpec {
 
 /** Chrome choices a skin reads from the look (Ruling B1-4). */
 export interface LookChrome {
-  header: { logoPlacement: 'start' | 'centre' };
+  header: {
+    logoPlacement: 'start' | 'centre';
+    /**
+     * Search placement (Ruling B2-1): `prominent` = a full-width labelled search field in the
+     * header (the Souq skin, search-first); `icon` or absent = the skin's own icon search.
+     */
+    search?: 'prominent' | 'icon';
+  };
+  /**
+   * Listing grid (Phase B2 STOP-2, taste P1-1): `autoFill` lays the PLP out as
+   * `repeat(auto-fill, minmax(11.5rem, 1fr))` from `lg`, so the cards fill the whole column next to
+   * the filter rail instead of five narrow cells with a 110px photo. Absent = the skin's own grid.
+   */
+  plp?: 'autoFill';
+  /**
+   * `ground` keeps the listing pages (products, search, categories) on the look's own ground. Absent =
+   * a DARK look lists its photos on the inverse light band (B1 I-3). Night souq mattes its photos
+   * instead (cream matte + multiply, globals.css), so its green runs through every page (STOP-2).
+   */
+  listing?: 'ground';
 }
 
 /**

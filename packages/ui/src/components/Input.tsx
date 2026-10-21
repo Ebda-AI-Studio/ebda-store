@@ -40,9 +40,9 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
             'focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary',
             'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20 focus-visible:ring-offset-2 focus-visible:border-primary',
             'disabled:cursor-not-allowed disabled:opacity-50',
-            'data-[error=true]:border-destructive data-[error=true]:focus:ring-destructive/20 data-[error=true]:focus-visible:ring-destructive/20',
+            'data-[error=true]:border-destructive-ink data-[error=true]:focus:ring-destructive/20 data-[error=true]:focus-visible:ring-destructive/20',
             error &&
-              'border-destructive focus:ring-destructive/20 focus-visible:ring-destructive/20',
+              'border-destructive-ink focus:ring-destructive/20 focus-visible:ring-destructive/20',
             className
           )}
           ref={ref}

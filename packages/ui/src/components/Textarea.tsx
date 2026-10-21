@@ -29,7 +29,7 @@ const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(
             'placeholder:text-muted-foreground',
             'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
             'disabled:cursor-not-allowed disabled:opacity-50',
-            error && 'border-destructive focus-visible:ring-destructive',
+            error && 'border-destructive-ink focus-visible:ring-destructive',
             className
           )}
           ref={ref}

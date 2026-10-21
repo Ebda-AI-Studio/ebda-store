@@ -78,7 +78,10 @@ describe.each([
     it(`${l}/${n}`, () => {
       lang = l;
       numerals = n;
-      const fp = (a: number) => formatPriceBase(a, { locale: l, numerals: n });
+      // the storefront's formatter joins number and currency with a no-break space (B2-25 (1)); the
+      // sticky bar and the summary both read it, so the fixture builds the bar the same way
+      const fp = (a: number) =>
+        formatPriceBase(a, { locale: l, numerals: n }).replace(' ', '\u00A0');
       const { container } = render(
         <Summary
           subtotal={SUBTOTAL}

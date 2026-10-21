@@ -60,15 +60,16 @@ Appended to `docs/RULINGS.md` under `## 2026-10-21 — Old Force skin deletion (
 
 - **Ruling SKIN-DEL-1 — the mapping table (the migration's authority). APPROVED as written by the controller, including the `qamar.atelier` fallback.** Each old skin maps to the nearest built Ebda look by character (read from each skin's `DESIGN.md`), with a fixed fallback and a vertical override. Cost if wrong: a merchant lands on a look that is not their taste; they can switch back in one step (the dialog, with preview, from the editor pass) and the previous state is in revision history.
 
-  | Old skin | What it is (its DESIGN.md) | Maps to | Why | Fallback |
-  | --- | --- | --- | --- | --- |
-  | `modern` (the old default) | friendly general-purpose retail, rounded, conversion clarity | `souq.catalogue` | general retail, white, dense grid, search first | `qamar.atelier` |
-  | `elegant` | editorial fashion, whitespace, hairlines, quiet | `qamar.atelier` | white, ink, one accent, the clothes are the interface | none (Atelier is built) |
-  | `classic` | formal heritage, centred logo, hairline rules, square corners, gifting/jewellery | `dahab.worn` | restrained white, hairline, karat and scale visible | `qamar.atelier` |
-  | `minimal` (by `look = null`) | typography-first, no chrome, calm | `souq.showroom` | grey/ink, one object per screen, quiet | `qamar.atelier` |
-  | `bold` | high-energy, heavy borders, streetwear | `qamar.lookbook` | deep ink-indigo, collage, loud display type | `qamar.atelier` |
+  | Old skin                     | What it is (its DESIGN.md)                                                       | Maps to          | Why                                                   | Fallback                |
+  | ---------------------------- | -------------------------------------------------------------------------------- | ---------------- | ----------------------------------------------------- | ----------------------- |
+  | `modern` (the old default)   | friendly general-purpose retail, rounded, conversion clarity                     | `souq.catalogue` | general retail, white, dense grid, search first       | `qamar.atelier`         |
+  | `elegant`                    | editorial fashion, whitespace, hairlines, quiet                                  | `qamar.atelier`  | white, ink, one accent, the clothes are the interface | none (Atelier is built) |
+  | `classic`                    | formal heritage, centred logo, hairline rules, square corners, gifting/jewellery | `dahab.worn`     | restrained white, hairline, karat and scale visible   | `qamar.atelier`         |
+  | `minimal` (by `look = null`) | typography-first, no chrome, calm                                                | `souq.showroom`  | grey/ink, one object per screen, quiet                | `qamar.atelier`         |
+  | `bold`                       | high-energy, heavy borders, streetwear                                           | `qamar.lookbook` | deep ink-indigo, collage, loud display type           | `qamar.atelier`         |
 
   Rules: (a) a target look whose `status` is not `built` at run time uses its fallback; (b) if the store's onboarding vertical is recorded, a vertical-to-family override applies first (`TEMPLATE_FAMILIES` already pairs verticals with templates; beauty to `jasmine.*`, food to `lamma.*` only once those looks are `built`); (c) no mapping depends on the store slug.
+
 - **Ruling SKIN-DEL-6 — expand, migrate, contract, in that order, in three PRs.** Evidence: a Postgres enum cannot drop a value in use, and a deployed writer that still emits the old value after the contract fails. Cost if wrong: a window where the API accepts a value the database no longer has; closed by the guarded migration and the strict writer shipping first.
 - **Ruling SKIN-DEL-7 — `templates/minimal/*` is re-homed, not deleted.** It is the shared storefront base for Qamar and Souq (Ruling B1-1). It moves to `templates/base/` (a directory, not a skin id, not a `TemplateId`). Evidence: the import lines above and Review Focus 3. Cost if wrong: a rename diff on ~12 files; reverting is a `git mv`.
 - **Ruling SKIN-DEL-2 — Jasmine and Lamma ship first; their looks are retargeted to their own skins in their own builds.** The program order is Souq → Jasmine → Lamma → Dahab → delete the skins, so no look says `skin: 'minimal'` when this plan starts. Evidence: the program order, and 12 of 15 looks carrying `skin: 'minimal'` today (`packages/shared/src/looks/registry.ts`). `tests/unit/looks-skin-valid.test.ts` (every look's `skin` ∈ the new `TemplateId`) stays as the red guard and blocks PR B. Cost if wrong: if the order slips, PR B waits; nothing is retargeted to `qamar` as a stopgap.
@@ -80,20 +81,20 @@ Appended to `docs/RULINGS.md` under `## 2026-10-21 — Old Force skin deletion (
 
 ## File map
 
-| File | Responsibility | Task |
-| --- | --- | --- |
-| `scripts/skins/preflight.sql`, `scripts/skins/preflight.mjs` | read-only gate (counts and classification) | 1 |
-| `packages/shared/src/templates/legacy-skin-map.ts` (+ test) | ruling table as code, `normalizeLegacyTemplate`, `RETIRED_TEMPLATES` | 2, 3 |
-| `apps/api/src/services/{onboarding,store,provisioning}.service.ts`, `apps/api/src/routes/onboarding.routes.ts`, `apps/api/src/lib/store-brand-theme.ts` | strict writer, tolerant reader | 3 |
-| `apps/admin/src/app/stores/[id]/template/page.tsx`, onboarding `TemplateStep.tsx`, `apps/admin/messages/{ar,en}.json` | stop offering old skins, one-time notice | 3, 4 |
-| `scripts/skins/migrate-old-skins.mjs` (+ `scripts/skins/README` section in `docs/ROLLBACK.md`) | dry-run-first migration | 4 |
-| `apps/web/src/templates/base/*` (moved from `minimal/*`), `apps/web/src/templates/{qamar,souq}/index.ts` | shared base re-home | 5 |
-| `apps/web/src/templates/{modern,elegant,classic,minimal,bold}/` | deleted | 6 |
-| `packages/shared/src/types/{store-theme,template-baselines,image-standards}.ts`, `apps/web/src/{templates/index.ts,lib/serverTemplate.ts,templates/shared/pack-styles.ts}`, `apps/marketing/src/lib/demo-stores.ts`, `packages/shared/src/builder/template-families.ts`, `packages/shared/src/looks/registry.ts` | registry/union/maps | 6 |
-| `apps/web/src/styles/globals.css`, `apps/web/public/templates/*.png` | orphaned CSS and thumbnails | 6 |
-| `CLAUDE.md`, `docs/architecture/store-theme-flags.md`, `docs/ebda/templates/*.md`, `docs/RULINGS.md` | rules and docs | 7 |
-| `packages/database/prisma/{schema.prisma,migrations/<ts>_store_template_contract/migration.sql}`, `docs/ROLLBACK.md` | enum contract | 8 |
-| `scripts/skins/blast-radius.sh` | the grep plan as an executable gate | 9 |
+| File                                                                                                                                                                                                                                                                                                             | Responsibility                                                       | Task |
+| ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------- | ---- |
+| `scripts/skins/preflight.sql`, `scripts/skins/preflight.mjs`                                                                                                                                                                                                                                                     | read-only gate (counts and classification)                           | 1    |
+| `packages/shared/src/templates/legacy-skin-map.ts` (+ test)                                                                                                                                                                                                                                                      | ruling table as code, `normalizeLegacyTemplate`, `RETIRED_TEMPLATES` | 2, 3 |
+| `apps/api/src/services/{onboarding,store,provisioning}.service.ts`, `apps/api/src/routes/onboarding.routes.ts`, `apps/api/src/lib/store-brand-theme.ts`                                                                                                                                                          | strict writer, tolerant reader                                       | 3    |
+| `apps/admin/src/app/stores/[id]/template/page.tsx`, onboarding `TemplateStep.tsx`, `apps/admin/messages/{ar,en}.json`                                                                                                                                                                                            | stop offering old skins, one-time notice                             | 3, 4 |
+| `scripts/skins/migrate-old-skins.mjs` (+ `scripts/skins/README` section in `docs/ROLLBACK.md`)                                                                                                                                                                                                                   | dry-run-first migration                                              | 4    |
+| `apps/web/src/templates/base/*` (moved from `minimal/*`), `apps/web/src/templates/{qamar,souq}/index.ts`                                                                                                                                                                                                         | shared base re-home                                                  | 5    |
+| `apps/web/src/templates/{modern,elegant,classic,minimal,bold}/`                                                                                                                                                                                                                                                  | deleted                                                              | 6    |
+| `packages/shared/src/types/{store-theme,template-baselines,image-standards}.ts`, `apps/web/src/{templates/index.ts,lib/serverTemplate.ts,templates/shared/pack-styles.ts}`, `apps/marketing/src/lib/demo-stores.ts`, `packages/shared/src/builder/template-families.ts`, `packages/shared/src/looks/registry.ts` | registry/union/maps                                                  | 6    |
+| `apps/web/src/styles/globals.css`, `apps/web/public/templates/*.png`                                                                                                                                                                                                                                             | orphaned CSS and thumbnails                                          | 6    |
+| `CLAUDE.md`, `docs/architecture/store-theme-flags.md`, `docs/ebda/templates/*.md`, `docs/RULINGS.md`                                                                                                                                                                                                             | rules and docs                                                       | 7    |
+| `packages/database/prisma/{schema.prisma,migrations/<ts>_store_template_contract/migration.sql}`, `docs/ROLLBACK.md`                                                                                                                                                                                             | enum contract                                                        | 8    |
+| `scripts/skins/blast-radius.sh`                                                                                                                                                                                                                                                                                  | the grep plan as an executable gate                                  | 9    |
 
 ---
 
@@ -198,7 +199,8 @@ const noneBuilt = () => false;
 describe('legacy skin map (Ruling SKIN-DEL-1)', () => {
   it('maps every retired skin to a look that exists in the registry', () => {
     const ids = new Set(LOOKS.map(l => l.id));
-    for (const s of RETIRED_TEMPLATES) expect(ids.has(mapRetiredSkin(s, { isBuilt: allBuilt }))).toBe(true);
+    for (const s of RETIRED_TEMPLATES)
+      expect(ids.has(mapRetiredSkin(s, { isBuilt: allBuilt }))).toBe(true);
   });
   it('the table', () => {
     const m = (s: (typeof RETIRED_TEMPLATES)[number]) => mapRetiredSkin(s, { isBuilt: allBuilt });

@@ -20,9 +20,10 @@ describe('LookPicker (registry-driven: built templates and looks only)', () => {
     expect(screen.getByRole('tablist')).toBeTruthy();
     expect(tabs()).toHaveLength(builtLookTemplates().length);
     expect(tabs()[0]!.textContent).toBe('Qamar');
+    expect(tabs().map(t => t.textContent)).toContain('Souq');
     expect(activeTab()).toBe(tabs()[0]);
-    // The unbuilt templates (Souq, Jasmine, Lamma, Dahab) are not offered.
-    for (const name of ['Souq', 'Jasmine', 'Lamma', 'Dahab'])
+    // The unbuilt templates (Jasmine, Lamma, Dahab) are not offered.
+    for (const name of ['Jasmine', 'Lamma', 'Dahab'])
       expect(screen.queryByRole('tab', { name })).toBeNull();
   });
 
@@ -104,17 +105,17 @@ describe('LookPicker (registry-driven: built templates and looks only)', () => {
   // Mutation check: flip a designed template to built in the registry and the picker must grow a
   // tab for it with no component edit (this is what makes Souq/Jasmine/Lamma/Dahab appear on ship).
   it('MUTATION: flipping a template to built adds its tab; flipping a built one back removes it', () => {
-    const designed = LOOKS.filter(l => l.template === 'souq');
+    const designed = LOOKS.filter(l => l.template === 'jasmine');
     const before = designed.map(l => l.status);
     try {
       (designed[0] as { status: string }).status = 'built';
       render(<LookPicker value={null} onChange={() => {}} locale="en" />);
-      expect(screen.getByRole('tab', { name: 'Souq' })).toBeTruthy();
+      expect(screen.getByRole('tab', { name: 'Jasmine' })).toBeTruthy();
       expect(tabs()).toHaveLength(builtLookTemplates().length);
       cleanup();
       (designed[0] as { status: string }).status = 'designed';
       render(<LookPicker value={null} onChange={() => {}} locale="en" />);
-      expect(screen.queryByRole('tab', { name: 'Souq' })).toBeNull();
+      expect(screen.queryByRole('tab', { name: 'Jasmine' })).toBeNull();
     } finally {
       designed.forEach((l, i) => ((l as { status: string }).status = before[i]!));
     }

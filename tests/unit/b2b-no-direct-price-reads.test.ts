@@ -245,7 +245,7 @@ const ALLOW: Record<string, AllowEntry> = {
       getFilterOptions: 4,
       getSearchSuggestions: 1,
       getSuggestSuggestions: 2,
-      listPublic: 4,
+      listPublic: 5, // +1: the `sort=on_sale` raw SQL ranks by the retail compare-at drop (ordering only; the card price still goes through b2bPublicFields), B2-28
       reshapePublicProductDetail: 2,
       update: 4,
       b2bPublicFields: 3, // product price + variant.price ?? product.price: hides a stale variant tier (final review minor 2)

@@ -233,7 +233,7 @@ describe('store-resolver: x-demo-look', () => {
 
   it('demo + designed look (the real registry today): ignored', async () => {
     fetchMock.mockResolvedValue(apiStore(true));
-    headerBag.value.set('x-demo-look', 'souq.night');
+    headerBag.value.set('x-demo-look', 'jasmine.bloom');
     expect((await resolver.getStoreOrNotFound()).look).toBe('qamar.atelier');
   });
 

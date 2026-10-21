@@ -52,9 +52,11 @@ export function cardHoverCls(theme: Pick<StoreTheme, 'cardHover'> | null | undef
 /** Sale / new / custom chips on a look that asks for its accent: look radius, no glow. */
 export const LOOK_CHIP_CLS =
   'pointer-events-none absolute z-10 rounded-[var(--radius)] px-2.5 py-1 text-xs font-semibold';
+// `--chip-bg` / `--chip-fg` let a look re-derive the sale chip to its own metal or ink (Night souq:
+// brass, not a second coral accent, STOP-2 re-audit); unset they are the accent pair as before.
 export const LOOK_CHIP_STYLE = {
-  backgroundColor: 'hsl(var(--accent))',
-  color: 'hsl(var(--accent-foreground))',
+  backgroundColor: 'hsl(var(--chip-bg, var(--accent)))',
+  color: 'hsl(var(--chip-fg, var(--accent-foreground)))',
 } as const;
 
 /**

@@ -2,6 +2,18 @@
   "$comment": "Quality bar § 10 (W4, Ruling B1-71): the purchase path every template and look is judged on. `files` feeds the token gates (no unthemed form controls, no colours outside the token set, 44px targets). `screens` is the taste gate's screen manifest: every screen at every viewport is shot before a look is scored. Gate: tests/unit/purchase-path-gates.test.ts.",
   "viewports": ["390-ar", "1280-en"],
   "secondProductPath": "/products/silk-shawl",
+  "templates": {
+    "souq": {
+      "$comment": "Phase B2 (Ruling B2-7): the Souq demo catalogue. PDP = the Colour x Storage phone; the second cart line is an option-less, in-stock product. `--template souq` on the shoot script applies this set.",
+      "secondProductPath": "/products/power-bank-20000",
+      "paths": {
+        "category": "/products?category=phones",
+        "pdp": "/products/smartphone-6-7",
+        "pdp-add-missing-option": "/products/smartphone-6-7",
+        "pdp-added": "/products/smartphone-6-7"
+      }
+    }
+  },
   "screens": [
     { "id": "home", "path": "/" },
     { "id": "category", "path": "/products?category=abayas" },
@@ -51,6 +63,11 @@
     "components/commerce/StickyAddToCart.tsx",
     "components/commerce/TrustLine.tsx",
     "components/commerce/CartLineNote.tsx",
-    "templates/shared/BottomTabBar.tsx"
+    "templates/shared/BottomTabBar.tsx",
+    "templates/shared/CategoryRail.tsx",
+    "templates/shared/CategoryTiles.tsx",
+    "builder/sections/ProductSpotlightSection.tsx",
+    "components/commerce/InstalmentLine.tsx",
+    "templates/souq/Header.tsx"
   ]
 }

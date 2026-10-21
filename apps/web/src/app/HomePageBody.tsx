@@ -91,11 +91,14 @@ function documentSectionRefs(def: PageDefinition | undefined): {
   productIds: string[];
   newest: number;
   bestSellers: number;
+  /** A document section reads the `on_sale` source (Phase B2): load the deals row. */
+  onSale: boolean;
 } {
   const categories: Array<[string, number]> = [];
   const productIds: string[] = [];
   let newest = 0;
   let bestSellers = 0;
+  let onSale = false;
   for (const n of def?.sections ?? []) {
     if (n.hidden === true) continue;
     if (n.type === 'shop-the-look') {
@@ -120,8 +123,9 @@ function documentSectionRefs(def: PageDefinition | undefined): {
     // newest is also every section's empty-match fallback, so it is always loaded.
     newest = Math.max(newest, limit);
     if (s.productSource === 'best_seller') bestSellers = Math.max(bestSellers, limit);
+    if (s.productSource === 'on_sale') onSale = true;
   }
-  return { categories, productIds, newest, bestSellers };
+  return { categories, productIds, newest, bestSellers, onSale };
 }
 
 async function fetchHomepageData(
@@ -142,11 +146,13 @@ async function fetchHomepageData(
     productIds: string[];
     newest: number;
     bestSellers: number;
+    onSale: boolean;
   } = {
     categories: [],
     productIds: [],
     newest: 0,
     bestSellers: 0,
+    onSale: false,
   }
 ): Promise<{
   featuredProducts: Product[];
@@ -159,6 +165,11 @@ async function fetchHomepageData(
    *  the storefront filter pass; HomePageContent merges them into the
    *  product union for source resolution. */
   extraProducts: Product[];
+  /** The `sort=on_sale` response in the API's order (biggest drop first, disabled variants and
+   *  other stores' products already excluded in SQL). `undefined` = no deals row on this page. The
+   *  deals row reads THIS, never a client re-derivation: the listing payload does not carry
+   *  `isActive`, so a disabled variant's compare-at would count as a sale (STOP-2 final review). */
+  onSalePool?: Product[];
 }> {
   const storeHeaders: Record<string, string> = {
     'Content-Type': 'application/json',
@@ -224,6 +235,11 @@ async function fetchHomepageData(
     ])
   );
 
+  // The deals row (Phase B2): one capped request, only when a section or an extra carousel asks.
+  // CACHE CLASS: BOUNDED-stale, the same `products:<storeId>` storefront tag as every list here.
+  const wantsOnSale =
+    docRefs.onSale || extras.some(e => e.enabled !== false && e.productSource === 'on_sale');
+
   const [
     featuredResult,
     categoriesResult,
@@ -232,6 +248,7 @@ async function fetchHomepageData(
     testimonialsResult,
     categoryResults,
     manualResults,
+    onSaleResult,
   ] = await Promise.all([
     prefetched?.featured ?? fetchFeaturedProducts(storeHeaders, store.id),
     prefetched?.categories ?? fetchHomeCategories(storeHeaders, store.id),
@@ -283,6 +300,14 @@ async function fetchHomepageData(
           .catch(() => null)
       )
     ),
+    wantsOnSale
+      ? fetch(`${API_URL}/public/products?sort=on_sale&limit=12`, {
+          next: { revalidate: 60, tags: [`products:${store.id}`] },
+          headers: storeHeaders,
+        })
+          .then(r => (r.ok ? r.json() : null))
+          .catch(() => null)
+      : Promise.resolve(null),
   ]);
 
   let featuredProducts: Product[] = featuredResult?.data?.products ?? [];
@@ -305,7 +330,7 @@ async function fetchHomepageData(
   const testimonials: HomepageTestimonial[] = testimonialsResult?.data?.testimonials ?? [];
 
   const extraProductsMap = new Map<string, Product>();
-  for (const result of [...categoryResults, ...manualResults]) {
+  for (const result of [...categoryResults, ...manualResults, onSaleResult]) {
     const list: Product[] = result?.data?.products ?? [];
     for (const p of list) {
       if (p?.id) extraProductsMap.set(p.id, p);
@@ -313,7 +338,19 @@ async function fetchHomepageData(
   }
   const extraProducts: Product[] = Array.from(extraProductsMap.values());
 
-  return { featuredProducts, newArrivals, bestSellers, categories, testimonials, extraProducts };
+  const onSalePool: Product[] | undefined = wantsOnSale
+    ? ((onSaleResult?.data?.products as Product[] | undefined) ?? [])
+    : undefined;
+
+  return {
+    featuredProducts,
+    newArrivals,
+    bestSellers,
+    categories,
+    testimonials,
+    extraProducts,
+    onSalePool,
+  };
 }
 
 interface DraftBundle {
@@ -456,16 +493,23 @@ export async function HomePageBody({
     draftToken && draftBundle.typography
       ? emitZoneCss(draftBundle.typography as Parameters<typeof emitZoneCss>[0], store.theme)
       : '';
-  const { featuredProducts, newArrivals, bestSellers, categories, testimonials, extraProducts } =
-    await fetchHomepageData(
-      store,
-      layout,
-      {
-        featured: featuredPromise,
-        categories: categoriesPromise,
-      },
-      documentSectionRefs(builderDefinition ?? homeDefinition)
-    );
+  const {
+    featuredProducts,
+    newArrivals,
+    bestSellers,
+    categories,
+    testimonials,
+    extraProducts,
+    onSalePool,
+  } = await fetchHomepageData(
+    store,
+    layout,
+    {
+      featured: featuredPromise,
+      categories: categoriesPromise,
+    },
+    documentSectionRefs(builderDefinition ?? homeDefinition)
+  );
 
   const siteUrl = storeAbsoluteUrl(store, '');
   const socialUrls = store.socialLinks
@@ -539,6 +583,7 @@ export async function HomePageBody({
           categories={categories}
           testimonials={testimonials}
           extraProducts={extraProducts}
+          onSalePool={onSalePool}
           storeName={store.name}
           layout={layout}
           initialDefinition={builderDefinition}
@@ -553,6 +598,7 @@ export async function HomePageBody({
           categories={categories}
           testimonials={testimonials}
           extraProducts={extraProducts}
+          onSalePool={onSalePool}
           storeName={store.name}
           layout={layout}
           definition={homeDefinition}

@@ -52,8 +52,9 @@ import { DahabProductDetail } from '../../../templates/dahab/ProductDetail';
 import { REGION } from '@ebda/shared';
 import { FactsTable } from '../../../components/commerce/FactsTable';
 import { DeliveryChip } from '../../../components/commerce/DeliveryChip';
+import { InstalmentLine } from '../../../components/commerce/InstalmentLine';
 import { TrustLine } from '../../../components/commerce/TrustLine';
-import { relatedHeadingSize } from '../../../templates/shared/look-card';
+import { LOOK_CHIP_STYLE, relatedHeadingSize } from '../../../templates/shared/look-card';
 import type { CodOffer } from '../../../lib/cod-offer';
 import { Breadcrumbs } from '../../../components/Breadcrumbs';
 import { canBuyNow, inStockNow } from '../../../lib/can-buy-now';
@@ -679,12 +680,18 @@ export default function ProductDetailClient({
       : t('Cart', 'السلة');
   const priceText =
     pricing.mode === 'range' && minVariantPrice !== null && maxVariantPrice !== null
-      ? // Y-07: English reads a range in words; Arabic keeps the dash between the two prices.
+      ? // Y-07: English reads a range in words. Arabic reads "from" the lower price, like the cards:
+        // the old "A – B" broke at the dash on a phone and left it hanging at a line end (STOP-2).
         t(
           `${formatPrice(minVariantPrice)} to ${formatPrice(maxVariantPrice)}`,
-          `${formatPrice(minVariantPrice)} – ${formatPrice(maxVariantPrice)}`
+          `من ${formatPrice(minVariantPrice)}`
         )
       : formatPrice(displayPrice);
+  // The sticky bar is one line: a range shows only its lower price, "From EGP 32,000".
+  const stickyPriceText =
+    pricing.mode === 'range' && minVariantPrice !== null
+      ? t(`From ${formatPrice(minVariantPrice)}`, `من ${formatPrice(minVariantPrice)}`)
+      : priceText;
   // The WhatsApp order/ask button carries the typed note and follows the SAME
   // required-personalisation gate as add-to-cart.
   const personalisationCfg = activePersonalisation(product.personalisation);
@@ -1156,7 +1163,18 @@ export default function ProductDetailClient({
                   {/* Discount badge — BUG 1 fix: helper text (EGP or pct).
                     Waits for variant selection on variant products
                     (displayCompare is null until a variant is picked). */}
-                  {discountBadgeText && <Badge variant="destructive">{discountBadgeText}</Badge>}
+                  {discountBadgeText &&
+                    (getLook(store.look) ? (
+                      // a look's sale chip is its own accent / metal, never the error red (B2-25)
+                      <span
+                        className="inline-flex items-center rounded-[var(--radius)] px-2.5 py-1 text-xs font-semibold"
+                        style={LOOK_CHIP_STYLE}
+                      >
+                        {discountBadgeText}
+                      </span>
+                    ) : (
+                      <Badge variant="destructive">{discountBadgeText}</Badge>
+                    ))}
                   {product.status === 'draft' && (
                     <Badge variant="outline">{t('Draft', 'مسودة')}</Badge>
                   )}
@@ -1185,7 +1203,8 @@ export default function ProductDetailClient({
               {/* Price */}
               <div className="mt-4 flex items-baseline gap-3">
                 <span
-                  className="font-bold text-primary"
+                  // one price never splits from its currency; only an English "A to B" range may wrap
+                  className={`font-bold text-primary${pricing.mode !== 'range' || language === 'ar' ? ' whitespace-nowrap' : ''}`}
                   data-zone="productPrice"
                   style={zoneStyle(pdpPriceZone, pdpScale)}
                 >
@@ -1196,6 +1215,8 @@ export default function ProductDetailClient({
                     {formatPrice(displayCompare)}
                   </span>
                 )}
+                {/* B2-9: merchant-configured estimate, PDP only; renders nothing when off. */}
+                <InstalmentLine priceMinor={displayPrice} buyable={buyableNow} />
               </div>
               <TaxInclusiveLabel className="mt-1 block text-xs text-muted-foreground" />
               <B2bPdpPanel
@@ -1487,7 +1508,7 @@ export default function ProductDetailClient({
       <StickyAddToCart
         anchorRef={buyRef}
         title={displayName}
-        price={priceText}
+        price={stickyPriceText}
         label={addLabel}
         disabled={addDisabled || isAdding}
         onAdd={handleAddToCart}

@@ -110,7 +110,8 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-const EXPECTED = { ar: '1,490 ج.م', en: 'EGP 1,490' } as const;
+// The one space is a NO-BREAK space (STOP-2 re-audit: a price never splits from its currency).
+const EXPECTED = { ar: '1,490\u00A0ج.م', en: 'EGP\u00A01,490' } as const;
 const LANGS = ['ar', 'en'] as const;
 
 const cardProduct = {
@@ -139,7 +140,7 @@ function setStore(lang: 'en' | 'ar', template = 'minimal') {
 /** The price text node(s) a rendered tree carries. */
 function priceTexts(container: HTMLElement): string[] {
   return [...container.querySelectorAll('[data-zone="productPrice"]')].map(e =>
-    (e.textContent ?? '').replace(/\s+/g, ' ').trim()
+    (e.textContent ?? '').replace(/[ \t\r\n]+/g, ' ').trim()
   );
 }
 

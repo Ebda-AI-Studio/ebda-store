@@ -33,7 +33,11 @@ export function SectionHeader({
   // classes as SectionHeading's link, no chevron) over one hairline colour, so a Qamar page never
   // shows two link styles or two rule colours. Every other skin is unchanged.
   const { store } = useStore();
-  const qamar = store?.template === 'qamar';
+  // STOP-2 final review (P2-3): every pack skin that defines the heading + see-all voice (qamar,
+  // souq) speaks it here, so a Souq page never shows two heading or two link styles either.
+  const packSkin =
+    store?.template === 'qamar' || store?.template === 'souq' ? store.template : null;
+  const qamar = packSkin !== null;
   if (!title && !subtitle && !linkLabel) return null;
   return (
     <div className={center ? 'mb-8 text-center sm:mb-10' : 'mb-8 sm:mb-10'}>
@@ -46,7 +50,7 @@ export function SectionHeader({
           <h2
             className={
               qamar
-                ? `min-w-0 ${getPackStyles('qamar').sectionHeading}`
+                ? `min-w-0 ${getPackStyles(packSkin ?? 'qamar').sectionHeading}`
                 : 'min-w-0 font-display text-balance text-[clamp(1.5rem,1.1rem+1.4vw,2.35rem)] leading-tight text-foreground rtl:leading-[1.45]'
             }
             {...editTitle}
@@ -59,7 +63,7 @@ export function SectionHeader({
             href={linkHref}
             className={
               qamar
-                ? `inline-flex min-h-[44px] min-w-11 items-center justify-center rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${getPackStyles('qamar').sectionSeeAll}`
+                ? `inline-flex min-h-[44px] min-w-11 items-center justify-center rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${getPackStyles(packSkin ?? 'qamar').sectionSeeAll}`
                 : 'inline-flex min-h-[44px] items-center gap-1 text-sm text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm'
             }
             {...editLink}

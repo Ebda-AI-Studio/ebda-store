@@ -65,8 +65,14 @@ describe('look section mix', () => {
 
   it('every mix entry names a template-group registry section and only design keys', () => {
     for (const l of LOOKS) {
-      const types = (l.sections ?? []).map(s => s.type);
-      expect(new Set(types).size, `${l.id}: one spec per type`).toBe(types.length);
+      // a mix may repeat a type up to the registry's own maxCount (Souq: two carousels, three
+      // stages); a cardinality-one type (category-grid, hero...) appears at most once
+      for (const t of new Set((l.sections ?? []).map(x => x.type))) {
+        const n = (l.sections ?? []).filter(x => x.type === t).length;
+        expect(n, `${l.id}: ${t} x${n}`).toBeLessThanOrEqual(
+          getSectionDefinition(t)?.maxCount ?? 1
+        );
+      }
     }
     expect(LOOK_DESIGN_KEYS).not.toContain('mode'); // hero mode is content (slideshow vs single)
     for (const l of LOOKS)
@@ -119,7 +125,7 @@ describe('look section mix', () => {
 
   it('without a look (or a look with no mix) behaves exactly as before', () => {
     const a = applyTemplateFamily(base(), 'qamar');
-    const b = applyTemplateFamily(base(), 'qamar', getLook('souq.catalogue'));
+    const b = applyTemplateFamily(base(), 'qamar', getLook('jasmine.clinic'));
     expect(b).toEqual(a);
   });
 
@@ -557,7 +563,7 @@ describe('look section mix', () => {
 
     it('without a mix (or without a look) the document is unchanged', () => {
       const page = tagged();
-      expect(documentForLook(page, getLook('souq.catalogue'))).toBe(page);
+      expect(documentForLook(page, getLook('jasmine.clinic'))).toBe(page);
       expect(documentForLook(page, null)).toBe(page);
       const plain = base();
       expect(documentForLook(plain, getLook('qamar.atelier'))).toBe(plain);

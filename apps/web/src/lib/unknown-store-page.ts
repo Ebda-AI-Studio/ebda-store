@@ -1,5 +1,6 @@
 import { BRAND, BRAND_MARKETING_URL, whatsappUrl } from '@ebda/shared';
 import type { ResolvedStore } from './store-resolver';
+import { DEMO_HOSTS } from './demo-hosts';
 
 /**
  * Routing + link decisions for the generic Ebda 404 shown on a host that is
@@ -39,6 +40,8 @@ export function unknownHostLinks(
     createStoreUrl: BRAND_MARKETING_URL,
     whatsappHref: number ? whatsappUrl() : null,
     demoStoreHref:
-      env.SHOW_DEMO_STORE_LINK === 'true' ? `https://storedemo${BRAND.domains.storeSuffix}` : null,
+      env.SHOW_DEMO_STORE_LINK === 'true'
+        ? `https://${DEMO_HOSTS.qamar ?? 'storedemo'}${BRAND.domains.storeSuffix}`
+        : null,
   };
 }

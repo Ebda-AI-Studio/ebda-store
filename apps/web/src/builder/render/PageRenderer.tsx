@@ -40,9 +40,12 @@ import {
 import { TrustBadgesSection, type TrustBadgesSettings } from '../sections/TrustBadgesSection';
 import { ShopTheLookSection, type ShopTheLookSettings } from '../sections/ShopTheLookSection';
 import { HeroCollage } from '../../templates/shared/HeroCollage';
-import { resolveSectionProducts } from '../sections/section-products';
+import { resolveSectionProducts, onSaleProducts } from '../sections/section-products';
 import { sectionBgStyle } from '../../templates/shared/section-bg';
 import { CategoryChips } from '../../templates/shared/CategoryChips';
+import { CategoryRail } from '../../templates/shared/CategoryRail';
+import { CategoryTiles } from '../../templates/shared/CategoryTiles';
+import { CompactHeroBand } from '../../templates/shared/CompactHeroBand';
 import {
   sectionSpacingClasses,
   sectionVisibilityClass,
@@ -91,6 +94,9 @@ export interface PageRendererProps {
    *  (category-slug and manual-ids sources). Merged into the union the
    *  storefront filters against. */
   extraProducts?: Product[];
+  /** The API's `sort=on_sale` result in its own order; the deals row reads it as-is. Absent (the
+   *  editor canvas, a page that fetched none) = the client derivation over the loaded pools. */
+  onSalePool?: Product[];
   /**
    * Editor canvas only (token-gated preview): wrap each section in a
    * `display: contents` marker carrying its id so the overlay can select it,
@@ -123,6 +129,7 @@ export function PageRenderer({
   categories,
   testimonials,
   extraProducts,
+  onSalePool,
 }: PageRendererProps) {
   // The legacy-shaped view of the document: section props plus the
   // cross-section lookups the dividers and the featured fallback need.
@@ -380,6 +387,16 @@ export function PageRenderer({
     heroImage
   );
 
+  // a11y P2-2: a home with no hero section (Catalogue, Showroom) still opens with an h1, the
+  // store's name. A document hero (any presentation) emits its own.
+  const homeHasHero =
+    definition.sections.some(n => n.type === 'hero' && n.hidden !== true) &&
+    layout.hero.enabled &&
+    (collageEligible ||
+      sliderEligible ||
+      (bannerEligible && !!heroSlidesWithImage(layout.hero.slides)[0]) ||
+      legacyHeroHasContent);
+
   // Data-driven sections render nothing publicly when they have nothing to
   // show (never an empty shell, never a stray divider). In the editor canvas
   // they show a dashed hint instead, so the merchant can still see and select
@@ -403,7 +420,7 @@ export function PageRenderer({
   // A divider only separates two rendered sections.
   const dividerOk = (visible: boolean) => visible || editorMode;
 
-  return (
+  const body = (
     <>
       {/* Section titles. Each section settings type extends
           SectionTitleOverride, so the merchant can change the heading
@@ -479,7 +496,16 @@ export function PageRenderer({
               !collageEligible &&
               !sliderEligible &&
               !bannerEligible &&
-              legacyHeroHasContent && (
+              legacyHeroHasContent &&
+              (!heroImage && getLook(store.look) ? (
+                // A look store with no hero photo gets a compact title band, never an empty block.
+                <CompactHeroBand
+                  title={(isRtl ? heroTitleArVal : heroTitleEn) || heroTitleEn || heroTitleArVal}
+                  subtitle={isRtl ? heroSubtitleArVal || heroSubtitleEn : heroSubtitleEn}
+                  ctaText={isRtl ? heroCtaArVal : heroCtaEn}
+                  ctaLink={heroCtaLink}
+                />
+              ) : (
                 <T.Hero
                   title={heroTitleEn}
                   titleAr={heroTitleArVal}
@@ -492,7 +518,7 @@ export function PageRenderer({
                   isRtl={isRtl}
                   urlPrefix={storeUrl('')}
                 />
-              )}
+              ))}
           </div>
         );
 
@@ -587,8 +613,8 @@ export function PageRenderer({
                       renderGrid(caption, vis)
                     );
                   const kindFor = (lay: typeof layout.categories.layout) =>
-                    lay === 'chips'
-                      ? 'chips'
+                    lay === 'chips' || lay === 'rail' || lay === 'tiles'
+                      ? lay
                       : lay === 'horizontal' && T.CategoryStrip
                         ? 'strip'
                         : 'grid';
@@ -600,11 +626,25 @@ export function PageRenderer({
                   const mobileCaption =
                     layout.categories.captionPositionMobile ?? layout.categories.captionPosition;
                   const renderKind = (
-                    kind: 'strip' | 'grid' | 'chips',
+                    kind: 'strip' | 'grid' | 'chips' | 'rail' | 'tiles',
                     caption: Caption,
                     vis?: string
                   ) =>
-                    kind === 'chips' ? (
+                    kind === 'rail' ? (
+                      <div className={vis}>
+                        <CategoryRail {...common} captionPosition={caption} pack={templateId} />
+                      </div>
+                    ) : kind === 'tiles' ? (
+                      <div className={vis}>
+                        <CategoryTiles
+                          {...common}
+                          captionPosition={caption}
+                          pack={templateId}
+                          mobileColumns={layout.categories.mobileColumns}
+                          desktopColumns={layout.categories.desktopColumns}
+                        />
+                      </div>
+                    ) : kind === 'chips' ? (
                       <div className={vis}>
                         <CategoryChips
                           categories={common.categories}
@@ -1014,6 +1054,10 @@ export function PageRenderer({
             sourceProducts = templateBestSellers;
           } else if (extra.productSource === 'featured') {
             sourceProducts = templateProducts;
+          } else if (extra.productSource === 'on_sale') {
+            // Deals row: biggest drop first; an empty match renders nothing (below), never a
+            // fallback to unrelated products.
+            sourceProducts = (onSalePool ?? onSaleProducts(allRawProducts)).map(toTemplateProduct);
           } else if (extra.productSource === 'category' && extra.categorySlug) {
             const slug = extra.categorySlug.toLowerCase();
             const matched = allRawProducts.filter(p =>
@@ -1115,6 +1159,7 @@ export function PageRenderer({
           ) : (
             node
           );
+        let stagesSeen = 0;
         for (const section of renderableSections(definition).sections) {
           const def = getSectionDefinition(section.type);
           if (!def || def.group !== 'template') continue;
@@ -1127,7 +1172,12 @@ export function PageRenderer({
               bestSellers,
               featured: featuredProducts,
               extra: extraProducts ?? [],
+              onSale: onSalePool,
             };
+            const stagePriority =
+              def.type === 'product-spotlight' &&
+              (settings as ProductSpotlightSettings).layout === 'stage' &&
+              stagesSeen++ === 0;
             const node =
               def.type === 'featured-collection' ? (
                 <FeaturedCollectionSection
@@ -1154,9 +1204,13 @@ export function PageRenderer({
                   products={resolveSectionProducts(
                     settings as ProductSpotlightSettings,
                     pools,
-                    3
+                    // A stage shows exactly one product; the list shows up to three.
+                    (settings as ProductSpotlightSettings).layout === 'stage' ? 1 : 3
                   ).map(toTemplateProduct)}
                   editorMode={editorMode}
+                  onAddToCart={handleAddToCart}
+                  priority={stagePriority}
+                  showPrice={showCardPriceEff !== false}
                 />
               ) : def.type === 'shop-the-look' ? (
                 <ShopTheLookSection
@@ -1242,5 +1296,15 @@ export function PageRenderer({
           merchant content. Stores that want a closing CTA can use the
           AnnouncementBar or surface it through their hero / categories. */}
     </>
+  );
+  // a11y P2-2: a look home with no hero opens with an h1, the store's name. The wrapper exists only
+  // then, so every other tree (legacy stores, pinned fixtures) keeps its exact shape and ids.
+  return !editorMode && !homeHasHero && getLook(store.look) ? (
+    <>
+      <h1 className="sr-only">{(isRtl ? store.nameAr || store.name : store.name) || ''}</h1>
+      {body}
+    </>
+  ) : (
+    body
   );
 }

@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { isReservedSlug } from './reserved-slugs';
+import { isReservedSlug, isDemoShowroomSlug } from './reserved-slugs';
 import { isProtectedSlug } from '../abuse/protected-slugs';
 
 export const STORE_SLUG_MIN_LENGTH = 3;
@@ -66,7 +66,8 @@ export function validateStoreSlug(
 ): StoreSlugValidation {
   const format = validateStoreSlugFormat(raw);
   if (!format.ok) return format;
-  if (isReservedSlug(format.slug)) {
+  // The demo showroom family belongs to the seed (Ruling B2-17); never overridable.
+  if (isReservedSlug(format.slug) || isDemoShowroomSlug(format.slug)) {
     return { ok: false, code: 'SLUG_RESERVED', message: STORE_SLUG_ERROR_MESSAGES.SLUG_RESERVED };
   }
   if (!opts.allowProtected && isProtectedSlug(format.slug)) {

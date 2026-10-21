@@ -208,17 +208,17 @@ describe('shop-the-look', () => {
 
   it('prices print through the shared formatter; compare-at in full format, struck', () => {
     const html = render([look([PRODUCTS[0].id])]);
-    expect(html).toContain('250 ج.م');
-    expect(html).toMatch(/line-through[^>]*>300 ج.م/);
+    expect(html).toContain('250\u00A0ج.م');
+    expect(html).toMatch(/line-through[^>]*>300\u00A0ج.م/);
     setStore('qamar', 'en');
     const en = render([look([PRODUCTS[0].id])]);
-    expect(en).toContain('EGP 250');
+    expect(en).toContain('EGP\u00A0250');
     setStore();
   });
 
   it('a variant product shows its "from" price like every card path', () => {
     const html = render([look([PRODUCTS[2].id])]);
-    expect(html).toMatch(/من\s*(<!-- -->)?\s*420 ج.م/);
+    expect(html).toMatch(/من\s*(<!-- -->)?\s*420\u00A0ج.م/);
   });
 
   it('a sold-out item keeps its link and shows the shared sold-out label', () => {
@@ -232,7 +232,7 @@ describe('shop-the-look', () => {
     const html = render([look([PRODUCTS[0].id, PRODUCTS[2].id, PRODUCTS[1].id])]);
     // 250 + 420 (variant "from") — the sold-out Medjool is not in the total.
     expect(html).toMatch(/مجموع اللوك/);
-    expect(html).toMatch(/<bdi[^>]*>من 670 ج.م<\/bdi>|<bdi[^>]*>670 ج.م<\/bdi>/);
+    expect(html).toMatch(/<bdi[^>]*>من 670\u00A0ج.م<\/bdi>|<bdi[^>]*>670\u00A0ج.م<\/bdi>/);
   });
 
   it('a store that hides card prices hides row prices and the total', () => {

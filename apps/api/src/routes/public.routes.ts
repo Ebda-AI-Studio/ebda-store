@@ -63,6 +63,8 @@ import {
 import {
   assertScalarQuery,
   parseOptionalBooleanQuery,
+  parseOptionalSortQuery,
+  assertOnSaleQuery,
   PUBLIC_PRODUCT_LIST_QUERY_KEYS,
 } from '../lib/query-params';
 import { setEdgeCache, setBuyerPrivate } from '../lib/edge-cache';
@@ -258,15 +260,10 @@ router.get('/products', async (req: Request, res: Response, next: NextFunction) 
     const effectiveSearch = rawSearch.length >= 2 ? rawSearch.slice(0, 100) : undefined;
 
     // `relevance` (Task 12) = the hybrid order of a search; the service treats it as no sort
-    // whenever semantic search is off or there is no search term.
-    const sortValue =
-      sort === 'newest' ||
-      sort === 'price_asc' ||
-      sort === 'price_desc' ||
-      sort === 'best_seller' ||
-      sort === 'relevance'
-        ? sort
-        : undefined;
+    // whenever semantic search is off or there is no search term. An unknown value is a 400, and
+    // `on_sale` refuses the params it cannot honour (assertOnSaleQuery).
+    const sortValue = parseOptionalSortQuery(sort);
+    if (sortValue === 'on_sale') assertOnSaleQuery(req.query);
 
     // Cursor MUST be a v4 UUID — refuse anything else so a malformed cursor
     // can't bypass the offset cap or trigger a Prisma error path.
@@ -323,6 +320,14 @@ router.get('/products', async (req: Request, res: Response, next: NextFunction) 
       ids: idsParam?.sort(),
       optionFilters: hasOptionFilters ? optionFilters : undefined,
     };
+    // `on_sale` is a short merchandising row: it ignores page and cursor and caps the limit, so
+    // none of them is in its key (a crafted ?page=N, or a negative limit, cannot mint a fresh SQL
+    // run + cache entry per value); category and ids are honoured and stay in the key.
+    if (sortValue === 'on_sale') {
+      listOptions.page = undefined;
+      listOptions.cursor = undefined;
+      listOptions.limit = Math.min(Math.max(1, parseInt(limit as string, 10) || 12), 12);
+    }
     // Cache key (Ruling SEARCH-T12-7) = the store + a JSON encoding of exactly those options + the
     // semantic-search mode. JSON quotes every value, so no value can borrow a delimiter: the old
     // `a:b:…;name=v,v;` join let `?category=x:y&search=z` and `?category=x&search=y:z` (or

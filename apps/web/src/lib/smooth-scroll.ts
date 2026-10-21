@@ -9,9 +9,17 @@
  * instant `scrollLeft` assignment so the UI still moves (just without the
  * smooth animation) instead of throwing.
  */
+/** STOP-2 a11y M2: a user who asked for reduced motion gets an instant jump, never a glide. */
+const scrollBehavior = (): ScrollBehavior =>
+  typeof window !== 'undefined' &&
+  typeof window.matchMedia === 'function' &&
+  window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    ? 'auto'
+    : 'smooth';
+
 export function smoothScrollLeftTo(el: HTMLElement, left: number): void {
   if (typeof el.scrollTo === 'function') {
-    el.scrollTo({ left, behavior: 'smooth' });
+    el.scrollTo({ left, behavior: scrollBehavior() });
   } else {
     el.scrollLeft = left;
   }
@@ -19,7 +27,7 @@ export function smoothScrollLeftTo(el: HTMLElement, left: number): void {
 
 export function smoothScrollLeftBy(el: HTMLElement, left: number): void {
   if (typeof el.scrollBy === 'function') {
-    el.scrollBy({ left, behavior: 'smooth' });
+    el.scrollBy({ left, behavior: scrollBehavior() });
   } else {
     el.scrollLeft += left;
   }

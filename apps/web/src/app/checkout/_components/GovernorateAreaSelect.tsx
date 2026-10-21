@@ -144,7 +144,7 @@ function Combobox({
   };
 
   const borderClass = hasError
-    ? 'border-destructive focus-within:border-destructive focus-within:ring-destructive'
+    ? 'border-destructive-ink ring-1 ring-destructive-ink focus-within:border-destructive-ink focus-within:ring-2 focus-within:ring-destructive-ink'
     : 'border-input focus-within:border-primary focus-within:ring-primary/20';
 
   return (

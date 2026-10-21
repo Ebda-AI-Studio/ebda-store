@@ -1601,6 +1601,8 @@
           "layoutGrid": "Grid",
           "layoutHorizontal": "Horizontal scroll",
           "layoutChips": "Text chips",
+          "layoutRail": "Image rail",
+          "layoutTiles": "Square tiles",
           "captionBelow": "Caption below image",
           "captionOverlay": "Caption over image",
           "desktopColumns": "Desktop columns",
@@ -1973,6 +1975,7 @@
         "productSourceLabel": "Product source",
         "sourceNewest": "Newest (same as New Arrivals)",
         "sourceBestSellers": "Best sellers",
+        "sourceOnSale": "On sale",
         "sourceFeatured": "Featured",
         "sourceCategory": "Category",
         "sourceManual": "Manual product list",
@@ -5066,6 +5069,23 @@
     }
   },
   "paymentSettings": {
+    "instalments": {
+      "title": "Instalment line on product pages",
+      "honesty": "Turn it on only if you really offer instalments.",
+      "hint": "Shoppers see an estimate such as \"From EGP 1,290 / month for 12 months\" next to the price. It is arithmetic over the numbers below, not a payment method, and checkout totals never change.",
+      "enable": "Show the instalment estimate",
+      "months": "Number of months (3 to 60)",
+      "markup": "Added cost over the plan (%)",
+      "providerEn": "Provider name in English (optional, text only)",
+      "providerAr": "Provider name in Arabic (optional, text only)",
+      "minPrice": "Show only for prices from (EGP, optional)",
+      "save": "Save",
+      "remove": "Remove the setting",
+      "saved": "Saved.",
+      "removed": "Removed.",
+      "failed": "Could not save. Check the numbers and try again.",
+      "loadFailed": "Could not load the current setting."
+    },
     "page": {
       "title": "Payment Settings",
       "subtitle": "Configure payment providers for this store",
@@ -5406,7 +5426,8 @@
         "bold": "Bold",
         "elegant": "Elegant",
         "dahab": "Dahab",
-        "qamar": "Qamar"
+        "qamar": "Qamar",
+        "souq": "Souq"
       }
     }
   },

@@ -55,20 +55,20 @@ Appended to `docs/RULINGS.md` under `## 2026-10-21 — Template editor pass (EP-
 
 ## File map
 
-| File | Responsibility | Task |
-| --- | --- | --- |
-| `scripts/editor-audit/{gen-matrix.ts,probe.ts,classify.ts}`, `scripts/editor-audit/baseline.json` | audit method + matrix generator | 1 |
-| `docs/ebda/templates/editor-matrix.{md,json}` | committed matrix (generated) | 1, 4 |
-| `tests/unit/editor-matrix.test.ts` | matrix current + zero unaccepted no-op/missing | 1, 4 |
-| `apps/api/src/services/store.service.ts` (`previewLook`), `apps/api/src/routes/store.routes.ts`, `packages/shared/src/builder/template-families.ts` (change report) | look preview endpoint | 2 |
-| `apps/admin/src/components/looks/{LookSwitchDialog,LookPreviewPane}.tsx`, `apps/admin/src/app/stores/[id]/template/page.tsx` | preview before apply | 2 |
-| `packages/shared/src/builder/{settings-schema.ts,registry.ts}` | `shownFor` metadata, variant options | 3 |
-| `apps/admin/src/app/stores/[id]/builder/_components/{SettingsPanel,AddSectionDialog,SectionTree}.tsx` | template-aware controls and section picker | 3 |
-| `apps/admin/src/app/stores/[id]/branding/_components/ThemeTab.tsx`, `apps/admin/src/components/ThemeSettings*` | no-op removal, ceiling | 4 |
-| `apps/admin/src/app/stores/[id]/builder/_components/ThemeSettingsPanel.tsx`, `ChromeContentPanel.tsx` | storefront-order grouping, chrome overrides (EP-4) | 5 |
-| `apps/admin/src/lib/settings-registry.ts`, `apps/admin/src/lib/settings-search-index.generated.json`, `apps/admin/messages/{ar,en}.json` | ⌘K entries + deep link into builder | 6 |
-| `playwright.editor.config.ts`, `tests/editor/*.spec.ts` | RTL screenshot walk + axe | 7 |
-| `docs/architecture/{store-theme-flags,admin-search}.md`, `docs/ebda/templates/looks.md`, `docs/RULINGS.md` | docs | each task + 8 |
+| File                                                                                                                                                                | Responsibility                                     | Task          |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------- | ------------- |
+| `scripts/editor-audit/{gen-matrix.ts,probe.ts,classify.ts}`, `scripts/editor-audit/baseline.json`                                                                   | audit method + matrix generator                    | 1             |
+| `docs/ebda/templates/editor-matrix.{md,json}`                                                                                                                       | committed matrix (generated)                       | 1, 4          |
+| `tests/unit/editor-matrix.test.ts`                                                                                                                                  | matrix current + zero unaccepted no-op/missing     | 1, 4          |
+| `apps/api/src/services/store.service.ts` (`previewLook`), `apps/api/src/routes/store.routes.ts`, `packages/shared/src/builder/template-families.ts` (change report) | look preview endpoint                              | 2             |
+| `apps/admin/src/components/looks/{LookSwitchDialog,LookPreviewPane}.tsx`, `apps/admin/src/app/stores/[id]/template/page.tsx`                                        | preview before apply                               | 2             |
+| `packages/shared/src/builder/{settings-schema.ts,registry.ts}`                                                                                                      | `shownFor` metadata, variant options               | 3             |
+| `apps/admin/src/app/stores/[id]/builder/_components/{SettingsPanel,AddSectionDialog,SectionTree}.tsx`                                                               | template-aware controls and section picker         | 3             |
+| `apps/admin/src/app/stores/[id]/branding/_components/ThemeTab.tsx`, `apps/admin/src/components/ThemeSettings*`                                                      | no-op removal, ceiling                             | 4             |
+| `apps/admin/src/app/stores/[id]/builder/_components/ThemeSettingsPanel.tsx`, `ChromeContentPanel.tsx`                                                               | storefront-order grouping, chrome overrides (EP-4) | 5             |
+| `apps/admin/src/lib/settings-registry.ts`, `apps/admin/src/lib/settings-search-index.generated.json`, `apps/admin/messages/{ar,en}.json`                            | ⌘K entries + deep link into builder                | 6             |
+| `playwright.editor.config.ts`, `tests/editor/*.spec.ts`                                                                                                             | RTL screenshot walk + axe                          | 7             |
+| `docs/architecture/{store-theme-flags,admin-search}.md`, `docs/ebda/templates/looks.md`, `docs/RULINGS.md`                                                          | docs                                               | each task + 8 |
 
 Order: Task 1 (measure) → Task 2 (switch + preview, independent of Task 1's result) in parallel with Task 3 → Task 4 (needs 1 and 3) → Task 5 → Task 6 → Task 7 → Task 8. Per-template increments: Souq controls wait for the Souq PR to merge; Jasmine, Lamma and Dahab rows are generated as `pending-template` until their registry entries exist and flip to gated rows automatically.
 
@@ -140,7 +140,9 @@ describe('editor matrix', () => {
       readFileSync(path.join(root, 'scripts/editor-audit/baseline.json'), 'utf8')
     ) as { id: string; reason: string }[];
     const accepted = new Set(base.map(b => b.id));
-    const bad = live.rows.filter(r => (r.status === 'no-op' || r.status === 'missing') && !accepted.has(r.id));
+    const bad = live.rows.filter(
+      r => (r.status === 'no-op' || r.status === 'missing') && !accepted.has(r.id)
+    );
     expect(bad.map(r => r.id)).toEqual([]);
     for (const b of base) expect(b.reason.length).toBeGreaterThan(10);
   });
@@ -201,13 +203,13 @@ describe('editor matrix', () => {
 
 **The variant coverage table this task makes true** (authority is the Task 1 matrix; this table is the starting expectation, from the template docs):
 
-| Template | Section variants the editor must expose |
-| --- | --- |
-| Qamar (main) | hero `presentation: collage`; category-grid `layout: chips`; image-text `layout: full-bleed`; collection-list `tileShape: band` + block `tone`; testimonials `layout: single`; `shop-the-look` |
-| Souq (after merge) | category-grid `layout: rail \| tiles`; product-spotlight `layout: stage`; product-carousel/featured-collection `productSource: on_sale`; search placement (chrome); compare toggle on stage |
-| Jasmine | routine/steps (cleanse → treat → protect), ingredient lines, skin-type filter chips, concern tiles, shade dots density |
-| Lamma | menu tabs, dish rows with portion, maker-profile strip, pre-order calendar chips, reorder row, sticky cart bar total |
-| Dahab (redesign) | piece chips, journey steps (رسم ← صب ← تلميع), maker-profile strip, gift-finder (occasion × budget chips), packaging band, lead-time chips |
+| Template           | Section variants the editor must expose                                                                                                                                                        |
+| ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Qamar (main)       | hero `presentation: collage`; category-grid `layout: chips`; image-text `layout: full-bleed`; collection-list `tileShape: band` + block `tone`; testimonials `layout: single`; `shop-the-look` |
+| Souq (after merge) | category-grid `layout: rail \| tiles`; product-spotlight `layout: stage`; product-carousel/featured-collection `productSource: on_sale`; search placement (chrome); compare toggle on stage    |
+| Jasmine            | routine/steps (cleanse → treat → protect), ingredient lines, skin-type filter chips, concern tiles, shade dots density                                                                         |
+| Lamma              | menu tabs, dish rows with portion, maker-profile strip, pre-order calendar chips, reorder row, sticky cart bar total                                                                           |
+| Dahab (redesign)   | piece chips, journey steps (رسم ← صب ← تلميع), maker-profile strip, gift-finder (occasion × budget chips), packaging band, lead-time chips                                                     |
 
 Rows for Jasmine, Lamma and Dahab stay `pending-template` until each template's registry entries merge; the coverage test reads the registry, so it begins asserting the moment the entries exist.
 

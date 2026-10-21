@@ -154,7 +154,10 @@ export function OrderSummary({
 
   return (
     <div className="order-2 mt-8 lg:order-none lg:col-span-4 lg:mt-0">
-      <div className="sticky top-24 rounded-[var(--radius)] border bg-card p-6 shadow-sm">
+      <div
+        data-part="order-summary"
+        className="sticky top-24 rounded-[var(--radius)] border bg-card p-6 shadow-sm"
+      >
         <h2 className="text-lg font-bold text-foreground" style={typography?.heading}>
           {t('Order summary', translations['Order Summary'])}
         </h2>
@@ -176,7 +179,7 @@ export function OrderSummary({
           {items.map(item => (
             <div key={item.id} className="flex gap-4 py-4 first:pt-0">
               {/* IA-07: the badge sits outside the clipped thumbnail, logical, on the ink pair. */}
-              <div className="relative h-16 w-16 flex-shrink-0">
+              <div className="relative h-16 w-16 flex-shrink-0" data-part="summary-thumb">
                 <div className="relative h-full w-full overflow-hidden rounded-[var(--radius)] bg-muted">
                   {item.product.images?.[0] ? (
                     <Image

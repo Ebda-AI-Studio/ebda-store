@@ -15,7 +15,7 @@ import type {
   FilterSidebarSettings,
   ProductsPageSettings,
 } from '@ebda/shared';
-import { resolveColor, colorToHslTriplet } from '@ebda/shared';
+import { resolveColor, colorToHslTriplet, getLook } from '@ebda/shared';
 import { pageSurfaceStyle } from '@/lib/page-surface';
 import { useToast } from '@ebda/ui';
 import { useCart } from '../../contexts/CartContext';
@@ -166,6 +166,8 @@ export default function ProductsClient({
   const { language, t } = useLanguage();
   const { warning } = useToast();
   const { store } = useStore();
+  // STOP-2 taste P1-1: a look may ask for an auto-fill listing grid (cards fill the column).
+  const plpAutoFill = getLook(store.look)?.chrome?.plp === 'autoFill';
   const storeUrl = useStoreUrl();
   const { templateId } = useTemplateComponents();
   // A search the server ranked (hybrid relevance, Task 12) labels the default "Most relevant".
@@ -760,7 +762,9 @@ export default function ProductsClient({
                   className={
                     templateId === 'dahab'
                       ? `grid grid-cols-2 gap-x-3 gap-y-8 sm:gap-x-5 sm:gap-y-10 md:grid-cols-3 ${dahabCols === 4 ? 'lg:grid-cols-4' : 'lg:grid-cols-3'}`
-                      : `grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 ${productCardDefaults?.cardGap ? gridGapClass(productCardDefaults.cardGap) : 'gap-3 sm:gap-4 lg:gap-6'}`
+                      : plpAutoFill
+                        ? `grid grid-cols-2 md:grid-cols-3 lg:[grid-template-columns:repeat(auto-fill,minmax(11.5rem,1fr))] ${productCardDefaults?.cardGap ? gridGapClass(productCardDefaults.cardGap) : 'gap-3 sm:gap-4 lg:gap-6'}`
+                        : `grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 ${productCardDefaults?.cardGap ? gridGapClass(productCardDefaults.cardGap) : 'gap-3 sm:gap-4 lg:gap-6'}`
                   }
                   dir={language === 'ar' ? 'rtl' : 'ltr'}
                 >

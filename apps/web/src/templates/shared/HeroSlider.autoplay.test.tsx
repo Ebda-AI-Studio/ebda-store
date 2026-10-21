@@ -46,7 +46,9 @@ describe('HeroSlider autoplay toggle', () => {
     expect(btn).toBeTruthy();
     expect(btn.getAttribute('aria-label')).toBe('إيقاف العرض التلقائي');
     fireEvent.click(btn);
-    expect(btn.getAttribute('aria-pressed')).toBe('true');
+    // one pattern (a11y M1): the label flips to Play, no aria-pressed
+    expect(btn.hasAttribute('aria-pressed')).toBe(false);
+    expect(btn.getAttribute('aria-label')).not.toBe('إيقاف العرض التلقائي');
   });
   it('no autoplay (0 ms or one slide): no toggle', () => {
     const { container } = render(

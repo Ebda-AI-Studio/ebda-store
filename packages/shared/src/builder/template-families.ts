@@ -51,6 +51,8 @@ export const TEMPLATE_FAMILIES: readonly TemplateFamily[] = [
       'footer',
     ],
     pendingSectionTypes: [],
+    // Phase B2 (Ruling B2-1): Souq has its own chrome skin; the looks decide the mixes.
+    skin: 'souq',
   },
   {
     id: 'dahab',
@@ -260,16 +262,62 @@ export function applyTemplateFamily(
   const source = documentForLook(current, look);
   let doc: PageDefinition = { ...source, sections: [] };
   const pool = [...source.sections];
+  // ids of sections created in THIS application (never deduplicated against each other)
+  const fresh = new Set<string>();
   for (const spec of specs) {
     const d = getSectionDefinition(spec.type);
     if (!d || d.group !== 'template') continue; // header/footer stay as the store has them
     const incoming = spec.design ?? {};
-    const outgoing = opts.from?.sections?.find(o => o.type === spec.type)?.design ?? {};
-    const existing = pool.filter(n => n.type === spec.type);
+    // A mix may name a type more than once (Souq: two carousels, three stages). The nth spec of a
+    // type pairs with the nth outgoing spec of that type and with the nth existing section; the
+    // LAST spec of the type takes every section left over, so a mix with one spec per type
+    // behaves exactly as before.
+    const sameType = specs.filter(x => x.type === spec.type);
+    const nth = sameType.indexOf(spec);
+    const outgoing = opts.from?.sections?.filter(o => o.type === spec.type)[nth]?.design ?? {};
+    const all = pool.filter(n => n.type === spec.type);
+    // The last spec takes every section left over, EXCEPT a surplus section the outgoing look
+    // itself seeded (the outgoing mix had a spec for it that this mix has no spec for): that one
+    // leaves the draft unless `keep` finds the merchant edited it. Sections beyond the outgoing
+    // look's specs are the merchant's own and always stay (a store's extra carousels).
+    const outSpecs = opts.from?.sections?.filter(o => o.type === spec.type) ?? [];
+    const origIndex = (n: SectionNode) => source.sections.filter(x => x.type === n.type).indexOf(n);
+    let existing =
+      nth === sameType.length - 1
+        ? all.filter((n, i) => {
+            const idx = nth + i;
+            if (i === 0 || idx >= outSpecs.length) return true;
+            // a merchant-EDITED surplus section always stays (reset is design-only, like keep)
+            return editedSinceLook(n, opts, idx);
+          })
+        : all.slice(0, 1);
+    // When either mix repeats this type, "the nth section" is a position, not an identity: an
+    // UNTOUCHED section the outgoing look seeded (still its preset) would be re-labelled as the
+    // incoming look's nth section and keep the OLD preset (Night's curated carousel posing as
+    // Catalogue's deals row). Such a section is replaced by a fresh one from the incoming preset;
+    // an edited one stays and takes the incoming design. Single-spec types are untouched by this.
+    if ((sameType.length > 1 || outSpecs.length > 1) && opts.from) {
+      const stale = existing.filter(n => !editedSinceLook(n, opts, origIndex(n)));
+      for (const n of stale) pool.splice(pool.indexOf(n), 1);
+      existing = existing.filter(n => !stale.includes(n));
+    }
     if (existing.length === 0) {
-      const fresh = sectionFromPreset(spec.type, 0, uniqueSectionId(doc, spec.type));
-      fresh.settings = { ...fresh.settings, ...(spec.preset ?? {}), ...incoming };
-      doc = { ...doc, sections: [...doc.sections, fresh] };
+      // A section the switch already carried over with the SAME product source as this spec's
+      // preset (an edited deals carousel that took another slot by position) is not added twice.
+      const src = (spec.preset as { productSource?: unknown } | undefined)?.productSource;
+      if (
+        src !== undefined &&
+        src !== 'manual' && // hand-picked / category rows legitimately repeat
+        src !== 'category' &&
+        doc.sections.some(
+          x => !fresh.has(x.id) && x.type === spec.type && x.settings.productSource === src
+        )
+      )
+        continue;
+      const freshNode = sectionFromPreset(spec.type, 0, uniqueSectionId(doc, spec.type));
+      freshNode.settings = { ...freshNode.settings, ...(spec.preset ?? {}), ...incoming };
+      fresh.add(freshNode.id);
+      doc = { ...doc, sections: [...doc.sections, freshNode] };
       continue;
     }
     for (const n of existing) {
@@ -286,9 +334,14 @@ export function applyTemplateFamily(
     // A kept section takes the incoming look's design: the keys only the outgoing look set
     // return to the default (C6), and a design key the merchant changed stays (C8).
     const kept = pool
-      .filter(n => getSectionDefinition(n.type)?.group === 'template' && editedSinceLook(n, opts))
+      .filter(
+        n =>
+          getSectionDefinition(n.type)?.group === 'template' &&
+          editedSinceLook(n, opts, source.sections.filter(x => x.type === n.type).indexOf(n))
+      )
       .map(n => {
-        const outgoing = opts.from?.sections?.find(o => o.type === n.type)?.design ?? {};
+        const nth = source.sections.filter(x => x.type === n.type).indexOf(n);
+        const outgoing = opts.from?.sections?.filter(o => o.type === n.type)[nth]?.design ?? {};
         return { ...n, settings: applySectionDesign(n.type, n.settings, {}, outgoing, opts) };
       });
     if (kept.length) doc = { ...doc, sections: [...doc.sections, ...kept] };
@@ -354,8 +407,8 @@ function withoutSkinCardRatio(doc: PageDefinition, opts: ApplyLookOptions): Page
  * Whether a section holds anything beyond what the outgoing look (or the skin baseline) gave it:
  * a changed setting, or blocks other than its preset's.
  */
-function editedSinceLook(n: SectionNode, opts: ApplyLookOptions): boolean {
-  const spec = opts.from?.sections?.find(o => o.type === n.type);
+function editedSinceLook(n: SectionNode, opts: ApplyLookOptions, nth = 0): boolean {
+  const spec = opts.from?.sections?.filter(o => o.type === n.type)[nth];
   const design = spec?.design ?? {};
   const preset = sectionFromPreset(n.type, 0, n.id);
   const seeds = [

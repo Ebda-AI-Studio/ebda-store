@@ -1234,6 +1234,12 @@ html[dir='rtl'] [data-pack='dahab'] [data-section='newsletter'] h2 {
   max-width: 38rem;
 }
 
+/* 2.4.11 Focus Not Obscured: the sticky header's measured height (StickyHeaderOffset) keeps the
+ * browser's focus / scrollIntoView scroll clear of it, on every template. */
+html {
+  scroll-padding-top: calc(var(--header-h, 0px) + 0.75rem);
+}
+
 /* Sticky mobile bars (PDP add-to-cart, Dahab pinned bar, cart total). UI rule 6: space is
  * reserved on <body> (never the chrome wrapper). Body already carries pb-32 for the
  * BottomTabBar, so the bar (4.25rem) is added on top of that, not instead of it.
@@ -1369,6 +1375,165 @@ html[lang] [data-pack='qamar'] [data-zone='filters'] :is(h2, h3, h4, legend) {
    productName zone ([data-zone="productName"], emit-zone-css) and the page-level zone (inline)
    both still win (review I3). The title SIZE default is platform-wide (B1-29, below). */
 :where([data-pack='qamar']) :where(h1[data-zone='productName']) {
+  font-family: var(--font-display, inherit);
+  line-height: 1.3;
+  font-weight: 600;
+}
+
+/* Souq (Phase B2, Ruling B2-1): the type voice of a catalogue. Same rules as Qamar's: the look's
+   faces carry the voice, an Arabic display face is never letter-spaced and gets open leading, and
+   the minimal components' tracked-caps classes (kept for the legacy minimal skin) are reset under
+   the souq skin only (quality bar T-01/T-05). NO colour is set here: every Souq colour is a look
+   token, which is what keeps the no-orange gate (Ruling B2-2) true. */
+html[dir='rtl'] [data-pack='souq'] h1,
+html[dir='rtl'] [data-pack='souq'] h2,
+html[dir='rtl'] [data-pack='souq'] h3,
+html[dir='rtl'] [data-pack='souq'] .font-display {
+  line-height: 1.4;
+  letter-spacing: 0;
+}
+[data-pack='souq']
+  :is(
+    .ui-caps-toggle,
+    .uppercase,
+    .tracking-wide,
+    .tracking-wider,
+    .tracking-widest,
+    [class*='tracking-[0.'],
+    [class*='tracking-[.']
+  ) {
+  letter-spacing: normal;
+  text-transform: none;
+}
+/* Ruling B2-20: Night souq's brass is a CTA FILL (B2-18). As TEXT it is 3.65:1 on the card surface
+   (4.87:1 on the page), so a text-primary link inside a card reads as ink, underlined, there. */
+[data-look='souq.night'] .bg-card .text-primary {
+  color: hsl(var(--foreground));
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+/* Ruling B2-23 (STOP-2): Night souq stays green on every page. Merchant photos are shot on white,
+   so a card photo / category tile sits on a cream matte (the page ink) and the photo multiplies
+   into it: white vanishes into cream, a grey backdrop stays a soft grey. Tiles also get a brass
+   hairline (the CTA token, B2-18) so each reads as a lit window. */
+[data-look='souq.night'] [data-part='card-image'],
+[data-look='souq.night'] [data-part='tile'] {
+  background-color: hsl(var(--foreground));
+}
+[data-look='souq.night'] [data-part='card-image'] img,
+[data-look='souq.night'] [data-part='tile'] img {
+  mix-blend-mode: multiply;
+}
+[data-look='souq.night'] [data-part='tile'] {
+  border: 1px solid hsl(var(--primary) / 0.65);
+}
+/* B2-23: brass never dims on hover (a pressed Place order read as disabled next to the cart CTA). */
+[data-look='souq.night'] [class*='hover:bg-primary/90']:hover {
+  background-color: hsl(var(--primary));
+  filter: brightness(1.08);
+}
+/* B2-23: an invalid field on the card was 2.48:1 (red on green). The per-surface destructive ink
+   draws a 2px boundary there. */
+[data-look='souq.night'] :is(input, select, textarea)[aria-invalid='true'] {
+  border-color: hsl(var(--destructive-ink));
+  border-width: 2px;
+}
+/* B2-23: summary thumbnails tell the two blue looks apart: Catalogue is the dense receipt,
+   Showroom shows the object bigger. */
+[data-look='souq.catalogue'] [data-part='summary-thumb'] {
+  width: 3.25rem;
+  height: 3.25rem;
+}
+[data-look='souq.showroom'] [data-part='summary-thumb'] {
+  width: 6rem;
+  height: 6rem;
+}
+/* B2-25 (a11y re-audit R2): an invalid field's boundary is the per-surface destructive INK (>= 3:1
+   on the card of every look; the raw destructive red was 2.4:1 on Night's green), on every
+   field type and every template. The combobox wrapper carries the same colour in its classes. */
+:is(input, select, textarea)[aria-invalid='true'] {
+  border-color: hsl(var(--destructive-ink, var(--destructive)));
+}
+/* B2-25: one accent. Night's sale chip is the brass CTA metal (dark ink on it), never a second
+   coral accent; the same chip colours the PDP discount pill on every look (ink on the look's
+   accent pair elsewhere). Red stays for errors. */
+[data-look='souq.night'] {
+  --chip-bg: var(--primary);
+  --chip-fg: var(--primary-foreground);
+}
+/* B2-25: Showroom's card action is quiet: an outline, on EVERY card (a sized product shows "View",
+   so it never has no action). The control is the card's own, only its fill changes. */
+[data-look='souq.showroom'] article :is(a, button).mt-auto.w-full {
+  background-color: transparent;
+  color: hsl(var(--foreground));
+  border: 1px solid hsl(var(--input));
+}
+[data-look='souq.showroom'] article :is(a, button).mt-auto.w-full:hover {
+  background-color: hsl(var(--foreground) / 0.05);
+}
+/* B2-25 (STOP-2 re-audit): cart and checkout are look-specific. Catalogue is the dense receipt (a
+   dashed, flat, tabular summary and small thumbnails); Showroom is the gallery (large photos, a
+   borderless raised summary with a bigger title). Same markup, same controls. */
+[data-look='souq.catalogue'] [data-part='order-summary'] {
+  border-style: dashed;
+  box-shadow: none;
+  padding: 1rem;
+  font-variant-numeric: tabular-nums;
+}
+[data-look='souq.catalogue'] [data-part='order-summary'] .divide-y > :not(:first-child) {
+  border-top-style: dashed;
+}
+[data-look='souq.catalogue'] [data-part='cart-thumb'] {
+  width: 5rem;
+  height: 5rem;
+}
+[data-look='souq.showroom'] [data-part='order-summary'] {
+  border-color: transparent;
+  border-radius: 1.25rem;
+  padding: 1.75rem;
+  box-shadow: 0 22px 44px -26px hsl(var(--foreground) / 0.4);
+}
+[data-look='souq.showroom'] [data-part='order-summary'] h2 {
+  font-size: 1.375rem;
+}
+[data-look='souq.showroom'] [data-part='cart-thumb'] {
+  width: 8.5rem;
+  height: 8.5rem;
+  border-radius: 1rem;
+}
+
+/* B2-23: a deal's old price is struck by a line that draws itself once (Catalogue's playful
+   detail). Static when motion is reduced. */
+[data-look='souq.catalogue'] span.line-through {
+  text-decoration: none;
+  background: linear-gradient(currentColor, currentColor) no-repeat 0 55% / 100% 1.5px;
+}
+html[dir='rtl'] [data-look='souq.catalogue'] span.line-through {
+  background-position: 100% 55%;
+}
+@media (prefers-reduced-motion: no-preference) {
+  [data-look='souq.catalogue'] span.line-through {
+    animation: souq-strike 0.7s 0.25s both ease-out;
+  }
+}
+@keyframes souq-strike {
+  from {
+    background-size: 0 1.5px;
+  }
+  to {
+    background-size: 100% 1.5px;
+  }
+}
+[data-pack='souq'] [data-ui-uppercase='true'] .ui-caps-toggle {
+  text-transform: uppercase;
+}
+html[lang] [data-pack='souq'] [data-zone='filters'] :is(h2, h3, h4, legend) {
+  font-family: var(--font-body, inherit);
+}
+[data-pack='souq'] :is(h1, h2, h3, .font-display) {
+  font-size-adjust: none;
+}
+:where([data-pack='souq']) :where(h1[data-zone='productName']) {
   font-family: var(--font-display, inherit);
   line-height: 1.3;
   font-weight: 600;
