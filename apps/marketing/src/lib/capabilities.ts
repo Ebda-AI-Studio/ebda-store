@@ -1,5 +1,11 @@
 import type { Locale } from './site';
-import { isLive, THEMES as THEME_LIST, type CapabilityId, type CardId, type ThemeId } from './capability-registry';
+import {
+  isLive,
+  THEMES as THEME_LIST,
+  type CapabilityId,
+  type CardId,
+  type ThemeId,
+} from './capability-registry';
 
 /**
  * What Ebda Store can do, for /features and the home capabilities section. Every entry is

@@ -1,10 +1,5 @@
 import Link from 'next/link';
-import {
-  CAPABILITIES,
-  FEATURES_PAGE,
-  HOME_CAPABILITIES,
-  type CardId,
-} from '../lib/capabilities';
+import { CAPABILITIES, FEATURES_PAGE, HOME_CAPABILITIES, type CardId } from '../lib/capabilities';
 import { COMING_LABEL, REGISTRY } from '../lib/capability-registry';
 import { pagePath, type Locale } from '../lib/site';
 

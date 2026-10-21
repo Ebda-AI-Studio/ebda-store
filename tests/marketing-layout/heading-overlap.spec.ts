@@ -48,7 +48,9 @@ for (const locale of ['ar', 'en'] as const) {
             const xOverlap = Math.min(a.right, b.right) - Math.max(a.left, b.left);
             const yOverlap = Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top);
             if (xOverlap > 0 && yOverlap > 0.5)
-              out.push(`${h.tagName} "${(h.textContent ?? '').slice(0, 40)}" overlaps ${next.tagName}.${next.className} by ${yOverlap.toFixed(1)}px`);
+              out.push(
+                `${h.tagName} "${(h.textContent ?? '').slice(0, 40)}" overlaps ${next.tagName}.${next.className} by ${yOverlap.toFixed(1)}px`
+              );
           }
           return out;
         });

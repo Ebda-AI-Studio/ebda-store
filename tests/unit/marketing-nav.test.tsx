@@ -69,7 +69,10 @@ describe('header nav and footer links', () => {
             expect(homeIds.has(hash), `${href} id exists on the home`).toBe(true);
             continue;
           }
-          const rel = route.replace(/^\/en(\/|$)/, '').replace(/^\//, '').replace(/\/$/, '');
+          const rel = route
+            .replace(/^\/en(\/|$)/, '')
+            .replace(/^\//, '')
+            .replace(/\/$/, '');
           const toLocale = route === '/en' || route.startsWith('/en/') ? 'en' : 'ar';
           const file =
             toLocale === 'ar'

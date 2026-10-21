@@ -4,13 +4,7 @@
  * Run: npm run llms-full -w @ebda/marketing
  */
 import { readFileSync, writeFileSync } from 'node:fs';
-import {
-  CAPABILITIES,
-  MORE,
-  THEMES,
-  THEME_COPY,
-  featuresFaq,
-} from '../src/lib/capabilities';
+import { CAPABILITIES, MORE, THEMES, THEME_COPY, featuresFaq } from '../src/lib/capabilities';
 import { COMING_LABEL, REGISTRY } from '../src/lib/capability-registry';
 import { COMPARE, COMPARE_AS_OF, compareRows } from '../src/lib/compare';
 
@@ -24,9 +18,10 @@ for (const t of THEMES) {
   for (const id of t.ids) {
     const c = CAPABILITIES.en[id];
     const plan = c.plan ?? c.note;
-    brief.push(`- ${c.t}${plan ? ` (${plan})` : ''}${coming(id) ? ` — ${SOON}, not live yet` : ''}`);
-    if (c.soon)
-      brief.push(`  - ${c.soon.text}${coming(c.soon.needs) ? ` (${SOON})` : ''}`);
+    brief.push(
+      `- ${c.t}${plan ? ` (${plan})` : ''}${coming(id) ? ` — ${SOON}, not live yet` : ''}`
+    );
+    if (c.soon) brief.push(`  - ${c.soon.text}${coming(c.soon.needs) ? ` (${SOON})` : ''}`);
   }
 }
 brief.push('');
