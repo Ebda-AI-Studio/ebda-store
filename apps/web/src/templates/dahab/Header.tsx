@@ -13,6 +13,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import type { HeaderProps } from '../types';
+import { useTabBarShown, HEADER_MENU_WITH_TAB_BAR } from '../shared/tab-bar-visibility';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useNumerals } from '../../hooks/useNumerals';
 import { SearchAutocomplete } from '../../components/SearchAutocomplete';
@@ -35,6 +36,7 @@ export default function DahabHeader({
   headerBgColor,
 }: HeaderProps) {
   const { isRtl: ctxIsRtl, language, setLanguage, t } = useLanguage();
+  const tabBarShown = useTabBarShown();
   const { localize } = useNumerals();
   const isRtl = isRtlProp ?? ctxIsRtl;
   const [menuOpen, setMenuOpen] = useState(false);
@@ -72,7 +74,10 @@ export default function DahabHeader({
       {logo ? (
         <StoreLogo src={logo} alt={name} priority />
       ) : (
-        <span className="font-display whitespace-nowrap text-[26px] leading-none text-primary sm:text-[30px] rtl:text-[32px] rtl:sm:text-[36px]">
+        <span
+          translate="no"
+          className="font-display whitespace-nowrap text-[26px] leading-none text-primary sm:text-[30px] rtl:text-[32px] rtl:sm:text-[36px]"
+        >
           {name}
         </span>
       )}
@@ -100,7 +105,7 @@ export default function DahabHeader({
         <div className="flex items-center gap-1">
           <button
             type="button"
-            className={cx(ICON_BTN, '-ms-2.5 lg:hidden')}
+            className={cx(ICON_BTN, '-ms-2.5 lg:hidden', tabBarShown && HEADER_MENU_WITH_TAB_BAR)}
             onClick={() => setMenuOpen(true)}
             aria-label={t('Menu', 'القائمة')}
             aria-expanded={menuOpen}
@@ -113,7 +118,7 @@ export default function DahabHeader({
                 <li key={`${item.href}-${item.label}`}>
                   <Link
                     href={item.href}
-                    className="relative py-2 text-[15px] text-foreground/85 transition-colors hover:text-primary after:absolute after:inset-x-0 after:-bottom-0.5 after:h-px after:origin-left after:scale-x-0 after:bg-primary after:transition-transform after:duration-300 hover:after:scale-x-100 rtl:after:origin-right focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm"
+                    className="relative inline-flex min-h-11 items-center py-2 text-[15px] text-foreground/85 transition-colors hover:text-primary after:absolute after:inset-x-0 after:-bottom-0.5 after:h-px after:origin-left after:scale-x-0 after:bg-primary after:transition-transform after:duration-300 hover:after:scale-x-100 rtl:after:origin-right focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm"
                   >
                     {isRtl && item.labelAr ? item.labelAr : item.label}
                   </Link>
@@ -194,8 +199,8 @@ export default function DahabHeader({
               value={query}
               onChange={e => setQuery(e.target.value)}
               autoFocus={searchOpen}
-              placeholder={t('Rings, chains, 21K gold…', 'خواتم، سلاسل، ذهب عيار 21…')}
-              className="h-12 w-full border-0 border-b border-border bg-transparent ps-8 text-base text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none"
+              placeholder={t('Rings, chains, 21K gold…', 'خواتم، سلاسل، دهب عيار 21…')}
+              className="h-12 w-full border-0 border-b border-input bg-transparent ps-8 text-base text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none"
             />
             <SearchAutocomplete
               query={query}
@@ -227,7 +232,7 @@ export default function DahabHeader({
             <button
               type="button"
               onClick={() => setLanguage(language === 'ar' ? 'en' : 'ar')}
-              className="min-h-[44px] rounded-sm border border-border px-4 text-sm text-foreground/85 hover:border-primary hover:text-primary"
+              className="min-h-[44px] rounded-sm border border-input px-4 text-sm text-foreground/85 hover:border-primary hover:text-primary"
               lang={language === 'ar' ? 'en' : 'ar'}
             >
               {language === 'ar' ? 'English' : 'العربية'}
@@ -235,7 +240,7 @@ export default function DahabHeader({
           </div>
         }
       >
-        <nav aria-label={t('Main', 'الرئيسية')}>
+        <nav aria-label={t('Menu', 'القائمة')}>
           <ul className="px-5 py-3">
             {nav.map(item => (
               <li

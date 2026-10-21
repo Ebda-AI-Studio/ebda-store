@@ -15,6 +15,8 @@ import { emailVerificationTemplate } from './email-templates/email-verification'
 import { resendVerificationTemplate } from './email-templates/resend-verification';
 import { duplicateRegistrationTemplate } from './email-templates/duplicate-registration';
 import { orderConfirmationTemplate } from './email-templates/order-confirmation';
+import type { EmailBarcode } from './email-templates/_barcode';
+import { ensureEmailBarcode } from './barcode-image.service';
 import { buildOrderEmailWaMe } from './email-templates/_wa-me';
 import { emailMoney } from './email-templates/_util';
 import {
@@ -182,7 +184,7 @@ export function renderBrandedShell(content: string, store: EmailStoreContext): s
   // sentence so every branded email has a canonical reachable contact.
   const contactBlock = store.email
     ? `<p class="contact-cta" style="margin:0 auto 14px;padding:12px 16px;max-width:460px;background-color:${c.bg};border:1px solid ${c.lineSoft};border-radius:10px;color:${c.inkSoft};font-size:13px;line-height:1.5;">${
-        isArabic ? 'لديك سؤال؟ راسلنا على' : 'Questions? Email us at'
+        isArabic ? 'عندك سؤال؟ ابعتلنا على' : 'Questions? Email us at'
       } <a href="mailto:${escapeHtml(store.email)}" style="color:${brand};text-decoration:none;font-weight:600;">${escapeHtml(
         store.email
       )}</a></p>`
@@ -234,6 +236,8 @@ export function renderBrandedShell(content: string, store: EmailStoreContext): s
 
 export interface OrderEmailData {
   orderNumber: string;
+  /** The order barcode PNG (merchant's shape or plain); absent/null = the number stays text-only. */
+  barcode?: EmailBarcode | null;
   customerName: string;
   customerEmail: string;
   items: Array<{
@@ -519,7 +523,24 @@ export class EmailService {
         (store.settings as { defaultLanguage?: string } | null)?.defaultLanguage
       );
     // Free-tier wa.me link (no API): only when the store has a valid number.
-    const withWaMe: OrderEmailData = { ...data, waMe: buildOrderEmailWaMe(data, store, lang) };
+    // The barcode PNG (the merchant's shape; plain by default; `off` = none). The fanout that
+    // calls this runs after commit on Inngest; a missing/failed image NEVER blocks the email.
+    const shape =
+      (store.settings as { receiptBarcodeShape?: string } | null)?.receiptBarcodeShape ?? 'plain';
+    let barcode = data.barcode;
+    if (barcode === undefined && shape !== 'off') {
+      barcode = await ensureEmailBarcode({
+        storeId,
+        kind: 'order',
+        number: data.orderNumber,
+        shape,
+      }).catch(() => null);
+    }
+    const withWaMe: OrderEmailData = {
+      ...data,
+      barcode,
+      waMe: buildOrderEmailWaMe(data, store, lang),
+    };
     const subject = orderConfirmationTemplate.subject[lang](withWaMe, store.name);
     const content = orderConfirmationTemplate[lang](withWaMe, store.name);
     await this.sendForStore(

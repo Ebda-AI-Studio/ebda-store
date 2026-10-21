@@ -12,7 +12,7 @@ export interface OrderShippedData {
 export const orderShippedTemplate = {
   subject: {
     en: (d: OrderShippedData, _storeName: string) => `Your Order Has Shipped - #${d.orderNumber}`,
-    ar: (d: OrderShippedData, _storeName: string) => `تم شحن طلبك - رقم ${d.orderNumber}`,
+    ar: (d: OrderShippedData, _storeName: string) => `طلبك اتشحن - رقم ${d.orderNumber}`,
   },
 
   en: (d: OrderShippedData, _storeName: string) => `
@@ -32,9 +32,9 @@ export const orderShippedTemplate = {
   `,
 
   ar: (d: OrderShippedData, _storeName: string) => `
-    <h2>تم شحن طلبك!</h2>
-    <p>مرحباً ${escapeHtml(d.customerName)}،</p>
-    <p>أخبار رائعة! طلبك رقم ${escapeHtml(d.orderNumber)} في الطريق إليك.</p>
+    <h2>طلبك اتشحن!</h2>
+    <p>أهلاً ${escapeHtml(d.customerName)}،</p>
+    <p>خبر حلو! طلبك رقم ${escapeHtml(d.orderNumber)} في الطريق ليك.</p>
     ${d.carrier ? `<p><strong>شركة الشحن:</strong> ${escapeHtml(d.carrier)}</p>` : ''}
     ${d.trackingNumber ? `<p><strong>رقم التتبع:</strong> ${escapeHtml(d.trackingNumber)}</p>` : ''}
     ${
@@ -44,6 +44,6 @@ export const orderShippedTemplate = {
     </p>`
         : ''
     }
-    <p>شكراً لتسوقك معنا!</p>
+    <p>شكراً إنك اشتريت من عندنا!</p>
   `,
 };

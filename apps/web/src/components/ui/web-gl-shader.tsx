@@ -40,11 +40,11 @@ export function WebGLShader() {
       }
     `;
 
-    // Fragment shader: RGB-split sine field tinted Force orange.
+    // Fragment shader: RGB-split sine field tinted Ebda gold.
     // The original r/g/b channels each drive a separate sine filament.
-    // We weight the final color toward vec3(1.0, 0.45, 0.06) so
-    // bright peaks glow orange and dim areas fade to black — matching
-    // the Force orange brand (#ff6e01 ≈ rgb(1.0, 0.43, 0.0)).
+    // We weight the final color toward vec3(0.80, 0.66, 0.45) so bright
+    // peaks glow gold and dim areas fade to black — Ebda lift #CBA873
+    // (rgb 0.80, 0.66, 0.45), Ruling D1016-ORANGE-1.
     const fragmentShader = /* glsl */ `
       precision highp float;
       uniform vec2 resolution;
@@ -65,9 +65,8 @@ export function WebGLShader() {
         float g = 0.05 / abs(p.y + sin((gx + time) * xScale) * yScale);
         float b = 0.05 / abs(p.y + sin((bx + time) * xScale) * yScale);
 
-        // Tint: push red up, pull green to ~0.45 of itself, crush blue to ~0.06.
-        // This transforms the rainbow field into an orange light-field on black.
-        vec3 tint = vec3(1.0, 0.45, 0.06);
+        // Tint toward Ebda lift: a gold light-field on black.
+        vec3 tint = vec3(0.80, 0.66, 0.45);
         vec3 color = vec3(r, g, b) * tint;
 
         gl_FragColor = vec4(color, 1.0);

@@ -1,5 +1,6 @@
 'use client';
 
+import { BRAND } from '@ebda/shared';
 import * as React from 'react';
 import { useAnimation } from 'framer-motion';
 import { motion } from 'framer-motion';
@@ -15,7 +16,7 @@ export interface SparklesCoreProps {
   minSize?: number;
   maxSize?: number;
   speed?: number;
-  /** Default: Force orange #ff6e01 */
+  /** Default: Ebda gold (`BRAND.colors.gold`, Ruling D1016-ORANGE-1). */
   particleColor?: string;
   particleDensity?: number;
 }
@@ -27,7 +28,7 @@ export function SparklesCore({
   minSize = 0.6,
   maxSize = 1.4,
   speed = 1,
-  particleColor = '#ff6e01',
+  particleColor = BRAND.colors.gold,
   particleDensity = 120,
 }: SparklesCoreProps) {
   const [init, setInit] = React.useState(false);

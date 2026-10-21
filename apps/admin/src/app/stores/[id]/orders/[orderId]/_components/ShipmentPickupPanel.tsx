@@ -263,7 +263,7 @@ export function ShipmentPickupPanel({
               type="button"
               onClick={() => void submit()}
               disabled={busy !== null || !date || !windowValid}
-              className="px-4 py-2 text-sm font-medium rounded-lg bg-primary text-white hover:bg-primary/90 disabled:opacity-50"
+              className="px-4 py-2 text-sm font-medium rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
             >
               {t('submit')}
             </button>

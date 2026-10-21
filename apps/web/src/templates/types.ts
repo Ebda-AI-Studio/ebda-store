@@ -192,6 +192,17 @@ export interface HeaderProps {
    */
   headerBgColor?: string;
   /**
+   * Wordmark placement, set only by the Qamar skin from the look's chrome data
+   * (Ruling B1-4). Undefined = the theme's own layout, unchanged.
+   */
+  logoPlacement?: 'start' | 'centre';
+  /**
+   * Text wordmark size from the look (`wordmarkSize`, W2a T-01), passed only by the Qamar skin.
+   * With it the store name renders through `wordmarkClass` and the nav at 14px untracked;
+   * undefined = the theme's own wordmark and nav, unchanged.
+   */
+  wordmarkSize?: import('@ebda/shared').WordmarkSize;
+  /**
    * Resolved pre-header utility bar config. Only consumed by packs that
    * render a utility bar (Elegant + Classic). When undefined, the pack
    * falls back to its built-in defaults so legacy stores don't lose
@@ -399,6 +410,8 @@ export interface HeroProps {
  */
 export interface HeroBannerProps {
   image: string;
+  /** Image focus for the cropped hero (Ruling B1-32): `top` keeps a model's head in frame. */
+  focus?: import('@ebda/shared').HeroFocus;
   imageAr?: string;
   /**
    * Optional mobile-specific image. Recommended 1200×675 (16:9) per
@@ -456,6 +469,23 @@ export interface HeroBannerProps {
    */
   presentation?: 'full-bleed' | 'framed';
   /**
+   * Framed only: draw a hairline inside the frame in the line colour (`--border`), drawn in once
+   * (Ruling B1-7, Vitrine). The renderer turns it on for a look store only, so a legacy framed
+   * hero renders as before (Ruling B1-41).
+   */
+  frameLine?: boolean;
+  /**
+   * Hero section design key `textAnchor` (W2a, quality bar L-04). `'bottom-start'`: on a single
+   * banner the copy sits under the photo below `xl` and at the bottom-start corner from `xl`, on a
+   * scrim that covers the text block only (`HERO_TEXT_SCRIM`); in a slider it is always at the
+   * corner. Absent / `'center'` = the centred overlay as before.
+   */
+  textAnchor?: 'center' | 'bottom-start';
+  /** Set by HeroSlider: the slide has fixed geometry; its anchored copy shows on the photo from xl only. */
+  inSlider?: boolean;
+  /** Set by HeroSlider: render ONLY the anchored copy as page text (under the track, below xl). */
+  copyOnly?: boolean;
+  /**
    * Per-section typography zone override for the hero headline h1.
    * Resolved via resolveSectionZone() in HomePageContent and applied as
    * inline styles on the <h1> inside HeroBanner. Closes the wiring gap
@@ -484,6 +514,10 @@ export interface HeroSliderProps {
   pack?: import('@ebda/shared').TemplateId;
   /** See HeroBannerProps.presentation — same semantics, applies to every slide. */
   presentation?: 'full-bleed' | 'framed';
+  /** See HeroBannerProps.frameLine. */
+  frameLine?: boolean;
+  /** See HeroBannerProps.textAnchor — applies to every slide. */
+  textAnchor?: 'center' | 'bottom-start';
   /**
    * Per-section typography zone override for the hero headline h1.
    * Forwarded to each HeroBanner slide. Closes the wiring gap identified
@@ -630,6 +664,11 @@ export interface CategoryStripProps {
    *  'overlay' (label over the image bottom with a gradient scrim). Resolved
    *  per breakpoint by HomePageContent. Default 'below'. */
   captionPosition?: import('@ebda/shared').CategoriesCaption;
+  /**
+   * The section wrapper's background (`layout.categories.bgColor`), forwarded to SectionHeading so
+   * the heading contrasts with the band it sits on (W2a, LB-01), as CategoryGrid already does.
+   */
+  sectionBgColor?: string;
 }
 
 /**
@@ -641,7 +680,7 @@ export interface TestimonialItem {
   rating: number;
   title?: string | null;
   comment: string;
-  authorName: string;
+  authorName: string | null;
   authorCity?: string | null;
   createdAt: string;
 }
@@ -664,6 +703,11 @@ export interface TestimonialRowProps {
    * 2026-06-05). Pass the raw value (hex OR 'token:<name>').
    */
   sectionBgColor?: string;
+  /**
+   * `'single'` = one large customer quote, no cards (Ruling B1-2, Vitrine). Absent or `'row'` =
+   * the skin's usual row. Every skin's row honours it (platform variant).
+   */
+  layout?: 'row' | 'single';
 }
 
 /**

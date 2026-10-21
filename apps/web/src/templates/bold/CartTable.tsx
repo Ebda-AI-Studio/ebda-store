@@ -8,8 +8,10 @@ import { CartLineUnavailableNotice } from '../shared/CartLineUnavailable';
 import { CartLineNote } from '../../components/commerce/CartLineNote';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useNumerals } from '../../hooks/useNumerals';
+import { useLocalePrice } from '../../hooks/useLocalePrice';
+import { cartLineLabel } from '../shared/card-actions';
+import { MinusIcon, PlusIcon } from '../shared/icons';
 
-import { REGION } from '@ebda/shared';
 /**
  * Bold template — cart as heavy-blocked rows with strong borders,
  * uppercase labels, and sharp contrast. Matches Bold's ProductCard +
@@ -18,16 +20,16 @@ import { REGION } from '@ebda/shared';
 export default function BoldCartTable({
   items,
   isRtl: isRtlProp,
-  currency = REGION.currency,
   urlPrefix = '',
   onUpdateQuantity,
   onRemove,
   typography,
 }: CartTableProps) {
-  const { isRtl: ctxIsRtl, t } = useLanguage();
-  const { localize, money } = useNumerals();
+  const { isRtl: ctxIsRtl } = useLanguage();
+  const { localize } = useNumerals();
   const isRtl = isRtlProp ?? ctxIsRtl;
-  const format = (price: number) => `${money(price)} ${currency}`;
+  // The ONE storefront price format (Ruling B1-28).
+  const format = useLocalePrice();
 
   return (
     <div className="space-y-4" dir={isRtl ? 'rtl' : 'ltr'}>
@@ -55,7 +57,7 @@ export default function BoldCartTable({
                 <div>
                   <Link
                     href={`${urlPrefix}/products/${item.slug}`}
-                    className="font-black uppercase tracking-tight text-foreground hover:text-primary line-clamp-2"
+                    className="relative min-w-11 before:absolute before:-inset-y-3 before:inset-x-0 before:content-[''] font-black uppercase tracking-tight text-foreground hover:text-primary line-clamp-2"
                     style={typography?.name}
                   >
                     {displayName}
@@ -73,18 +75,21 @@ export default function BoldCartTable({
                   )}
                   <CartLineNote note={item.note} />
                   {item.unavailable && <CartLineUnavailableNotice />}
-                  <p
-                    className="mt-1 text-sm font-bold uppercase tracking-wider text-primary tabular-nums"
-                    style={typography?.price}
-                  >
-                    {format(item.price)}
-                  </p>
+                  {/* Taste re-audit P2-2: at quantity 1 the line total already says it. */}
+                  {item.quantity > 1 && (
+                    <p
+                      className="mt-1 text-sm font-bold uppercase tracking-wider text-primary tabular-nums"
+                      style={typography?.price}
+                    >
+                      {format(item.price)}
+                    </p>
+                  )}
                 </div>
                 <button
                   type="button"
                   onClick={() => onRemove?.(item.id)}
                   className="h-11 w-11 flex-shrink-0 border-2 border-foreground bg-background text-2xl font-black text-foreground hover:bg-destructive hover:text-destructive-foreground hover:border-destructive transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 cursor-pointer"
-                  aria-label={t('Remove', 'إزالة')}
+                  aria-label={cartLineLabel('remove', isRtl, displayName)}
                   style={typography?.cta}
                 >
                   ×
@@ -97,10 +102,10 @@ export default function BoldCartTable({
                     disabled={item.unavailable || item.quantity <= 1}
                     onClick={() => onUpdateQuantity?.(item.id, Math.max(1, item.quantity - 1))}
                     className="h-11 w-11 font-black text-foreground hover:bg-foreground hover:text-background disabled:opacity-30 transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-1 cursor-pointer"
-                    aria-label={t('Decrease', 'تقليل')}
+                    aria-label={cartLineLabel('decrease', isRtl, displayName)}
                     style={typography?.cta}
                   >
-                    −
+                    <MinusIcon />
                   </button>
                   <span
                     className="border-x-2 border-foreground w-10 text-center text-sm font-black"
@@ -113,10 +118,10 @@ export default function BoldCartTable({
                     disabled={item.unavailable}
                     onClick={() => onUpdateQuantity?.(item.id, item.quantity + 1)}
                     className="h-11 w-11 font-black text-foreground hover:bg-foreground hover:text-background transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-1 cursor-pointer disabled:opacity-40"
-                    aria-label={t('Increase', 'زيادة')}
+                    aria-label={cartLineLabel('increase', isRtl, displayName)}
                     style={typography?.cta}
                   >
-                    +
+                    <PlusIcon />
                   </button>
                 </div>
                 <p

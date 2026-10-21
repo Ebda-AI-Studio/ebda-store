@@ -3,8 +3,8 @@
 import Image from 'next/image';
 import { MINUS, SignedAmount } from '@/lib/bidi';
 import { useLocalePrice } from '../../hooks/useLocalePrice';
-import { Button, Input } from '@ebda/ui';
-import type { CSSProperties } from 'react';
+import { Button, Input, VariantText } from '@ebda/ui';
+import { useEffect, useId, useRef, type CSSProperties } from 'react';
 import { useLanguage, translations } from '../../contexts/LanguageContext';
 import { useNumerals } from '../../hooks/useNumerals';
 import { formatTaxRowLabel } from '../../lib/tax-display';
@@ -128,6 +128,12 @@ export function OrderSummary({
   const { t, isRtl } = useLanguage();
   const { localize } = useNumerals();
   const formatPrice = useLocalePrice();
+  // a11y re-audit P1-N1: a refused code returns focus to its field, which names the error.
+  const couponErrorId = useId();
+  const couponFieldRef = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    if (couponError) couponFieldRef.current?.focus();
+  }, [couponError]);
   const taxLabel = formatTaxRowLabel(tax, taxRatePercent, taxIncludedInPrice, isRtl, localize);
   const summaryLabelBold = summaryColors?.bold !== false;
   const summaryFontWeight = summaryLabelBold ? 'font-bold' : 'font-normal';
@@ -148,9 +154,9 @@ export function OrderSummary({
 
   return (
     <div className="order-2 mt-8 lg:order-none lg:col-span-4 lg:mt-0">
-      <div className="sticky top-24 rounded-xl border bg-card p-6 shadow-sm">
+      <div className="sticky top-24 rounded-[var(--radius)] border bg-card p-6 shadow-sm">
         <h2 className="text-lg font-bold text-foreground" style={typography?.heading}>
-          {t('Order Summary', translations['Order Summary'])}
+          {t('Order summary', translations['Order Summary'])}
         </h2>
 
         <div className="mt-6 divide-y">
@@ -169,32 +175,38 @@ export function OrderSummary({
           ))}
           {items.map(item => (
             <div key={item.id} className="flex gap-4 py-4 first:pt-0">
-              <div className="relative h-16 w-16 flex-shrink-0 overflow-hidden rounded-lg bg-muted">
-                {item.product.images?.[0] ? (
-                  <Image
-                    src={item.product.images[0].url}
-                    alt={productLabel(item.product)}
-                    fill
-                    className="object-cover"
-                  />
-                ) : (
-                  <div className="flex h-full items-center justify-center">
-                    <svg
-                      className="h-6 w-6 text-muted-foreground"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={1.5}
-                        d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"
-                      />
-                    </svg>
-                  </div>
-                )}
-                <span className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-muted-foreground text-xs text-white">
+              {/* IA-07: the badge sits outside the clipped thumbnail, logical, on the ink pair. */}
+              <div className="relative h-16 w-16 flex-shrink-0">
+                <div className="relative h-full w-full overflow-hidden rounded-[var(--radius)] bg-muted">
+                  {item.product.images?.[0] ? (
+                    <Image
+                      src={item.product.images[0].url}
+                      alt={productLabel(item.product)}
+                      fill
+                      className="object-cover"
+                    />
+                  ) : (
+                    <div className="flex h-full items-center justify-center">
+                      <svg
+                        className="h-6 w-6 text-muted-foreground"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={1.5}
+                          d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"
+                        />
+                      </svg>
+                    </div>
+                  )}
+                </div>
+                <span
+                  data-testid="line-qty-badge"
+                  className="absolute -end-1 -top-1 z-10 flex h-5 min-w-5 items-center justify-center rounded-full bg-foreground px-1 text-xs text-background"
+                >
                   {localize(item.quantity)}
                 </span>
               </div>
@@ -202,6 +214,18 @@ export function OrderSummary({
                 <h3 className="text-base font-semibold text-foreground">
                   {productLabel(item.product)}
                 </h3>
+                {/* IA-02: the variant, as the cart and the receipt print it. */}
+                {(item.variantTitle || item.variantTitleAr) && (
+                  <p className="mt-0.5 text-sm text-muted-foreground">
+                    <VariantText
+                      title={
+                        (isRtl && item.variantTitleAr
+                          ? item.variantTitleAr
+                          : item.variantTitle || item.variantTitleAr) ?? ''
+                      }
+                    />
+                  </p>
+                )}
                 <CartLineNote note={item.note} />
                 <p className="mt-auto text-sm font-medium text-muted-foreground">
                   {formatPrice(item.price * item.quantity)}
@@ -223,10 +247,10 @@ export function OrderSummary({
                 <span className="text-sm font-medium text-success-ink">{appliedCoupon.code}</span>
                 <span className="text-sm text-success-ink ml-2">
                   {appliedCoupon.type === 'percentage'
-                    ? `${localize(appliedCoupon.value)}% ${t('off', '\u062e\u0635\u0645')}`
+                    ? `${localize(appliedCoupon.value)}% ${t('off', 'خصم')}`
                     : appliedCoupon.type === 'free_shipping'
-                      ? t('Free shipping', '\u0634\u062d\u0646 \u0645\u062c\u0627\u0646\u064a')
-                      : `${formatPrice(appliedCoupon.value)} ${t('off', '\u062e\u0635\u0645')}`}
+                      ? t('Free shipping', 'شحن مجاني')
+                      : `${formatPrice(appliedCoupon.value)} ${t('off', 'خصم')}`}
                 </span>
               </div>
               <button
@@ -246,17 +270,33 @@ export function OrderSummary({
           ) : (
             <div className="flex gap-2">
               <Input
+                ref={couponFieldRef}
+                // P2-7 (W4): a placeholder is not a label.
+                aria-label={t('Coupon code', 'كود الخصم')}
                 placeholder={t('Coupon code', '\u0643\u0648\u062f \u0627\u0644\u062e\u0635\u0645')}
                 value={couponCode}
                 onChange={e => onCouponCodeChange(e.target.value.toUpperCase())}
-                className="flex-1"
+                // a11y re-audit P1-N1: Enter applies, the field says it is invalid and names its error.
+                onKeyDown={e => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    onApplyCoupon();
+                  }
+                }}
+                aria-invalid={couponError ? true : undefined}
+                aria-describedby={couponError ? couponErrorId : undefined}
+                className="flex-1 sm:h-11"
               />
               <Button type="button" variant="outline" onClick={onApplyCoupon}>
                 {t('Apply', translations['Apply'])}
               </Button>
             </div>
           )}
-          {couponError && <p className="mt-2 text-sm text-destructive-ink">{couponError}</p>}
+          {couponError && (
+            <p id={couponErrorId} role="alert" className="mt-2 text-sm text-destructive-ink">
+              {couponError}
+            </p>
+          )}
           {/* A coupon never discounts a bundle (the box price already is the
               discount), and the quote is computed against the loose items
               only — say so, or the customer reads a 10% coupon returning
@@ -289,7 +329,7 @@ export function OrderSummary({
                     loyalty.onPointsChange(loyalty.points);
                   }
                 }}
-                className="mt-1 h-4 w-4 rounded border-input text-primary focus:ring-primary"
+                className="mt-1 h-4 w-4 rounded border-input accent-primary focus-visible:ring-2 focus-visible:ring-ring"
               />
               <span className="flex-1">
                 <span className="text-sm font-medium text-foreground">
@@ -353,7 +393,7 @@ export function OrderSummary({
                 type="checkbox"
                 checked={wallet.enabled}
                 onChange={e => wallet.onToggle(e.target.checked)}
-                className="mt-1 h-4 w-4 rounded border-input text-primary focus:ring-primary"
+                className="mt-1 h-4 w-4 rounded border-input accent-primary focus-visible:ring-2 focus-visible:ring-ring"
               />
               <span className="flex-1">
                 <span className="text-sm font-medium text-foreground">
@@ -362,7 +402,7 @@ export function OrderSummary({
                 <span className="block text-xs text-muted-foreground">
                   {t(
                     'Your store credit is applied first; you pay the rest as usual.',
-                    'يُخصم رصيد المتجر أولاً، وتدفع الباقي بالطريقة المعتادة.'
+                    'رصيد المتجر بيتخصم الأول، والباقي تدفعه بالطريقة العادية.'
                   )}
                 </span>
               </span>
@@ -384,7 +424,7 @@ export function OrderSummary({
             </span>
           </div>
           {(() => {
-            // `discount` is coupon + promotion (best-of, never both \u2014 see
+            // `discount` is coupon + promotion (best-of, never both — see
             // CheckoutClient's primaryDiscount) + loyalty combined. Show each
             // portion as its own line so the customer sees exactly what
             // saved them what.
@@ -395,7 +435,7 @@ export function OrderSummary({
                 {couponPortion > 0 && (
                   <div className="flex justify-between text-sm">
                     <span className="text-success-ink" style={typography?.label}>
-                      {t('Discount', '\u0627\u0644\u062e\u0635\u0645')}
+                      {t('Discount', 'الخصم')}
                     </span>
                     <span
                       className="font-medium text-success-ink tabular-nums"
@@ -421,10 +461,7 @@ export function OrderSummary({
                 {loyaltyDiscount > 0 && (
                   <div className="flex justify-between text-sm">
                     <span className="text-success-ink" style={typography?.label}>
-                      {t(
-                        'Loyalty points',
-                        '\u0646\u0642\u0627\u0637 \u0627\u0644\u0648\u0644\u0627\u0621'
-                      )}
+                      {t('Loyalty points', 'نقاط الولاء')}
                     </span>
                     <span
                       className="font-medium text-success-ink tabular-nums"
@@ -452,10 +489,7 @@ export function OrderSummary({
                 ? t('Free', translations['Free'])
                 : shipping > 0
                   ? formatPrice(shipping)
-                  : t(
-                      'Select area',
-                      '\u0627\u062e\u062a\u0631 \u0627\u0644\u0645\u0646\u0637\u0642\u0629'
-                    )}
+                  : t('Select area', 'اختر المنطقة')}
             </span>
           </div>
           {codFee > 0 && (
@@ -504,7 +538,7 @@ export function OrderSummary({
               like an on-screen arithmetic error). */}
           {tax > 0 && taxLabel && taxIncludedInPrice && (
             <p className="text-xs text-muted-foreground">
-              {taxLabel} {'\u2014'} {formatPrice(tax)}
+              {taxLabel} {'—'} {formatPrice(tax)}
             </p>
           )}
           {wallet && wallet.enabled && wallet.applied > 0 && (

@@ -186,7 +186,7 @@ export function WaMeCodConfirmButton({
       <p className="mt-2 text-xs text-muted-foreground">
         {t(
           'Send us the prefilled message so we can confirm your order faster.',
-          'أرسل لنا الرسالة الجاهزة لنؤكد طلبك أسرع.'
+          'ابعتلنا الرسالة الجاهزة عشان نأكد طلبك أسرع.'
         )}
       </p>
     </div>
@@ -220,7 +220,7 @@ export function WaMeOrderQuestionButton({
       href={href}
       testId="wa-me-order-question"
       className={className}
-      label={t('Ask about this order', 'اسأل عن هذا الطلب')}
+      label={t('Ask about this order', 'اسأل عن الطلب ده')}
     />
   );
 }

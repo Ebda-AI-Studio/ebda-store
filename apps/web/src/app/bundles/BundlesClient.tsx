@@ -87,7 +87,7 @@ export default function BundlesClient({ bundles: initialBundles }: BundlesClient
             <p className="mt-2 text-muted-foreground">
               {t(
                 'Curated kits at a special price — buy the whole box in one click.',
-                'باقات مختارة بسعر خاص — اشترِ الصندوق كاملاً بنقرة واحدة.'
+                'باقات مختارة بسعر خاص — اشتري الصندوق كله بضغطة واحدة.'
               )}
             </p>
           </div>
@@ -110,7 +110,7 @@ export default function BundlesClient({ bundles: initialBundles }: BundlesClient
           ) : bundles.length === 0 ? (
             <div className="py-12 text-center">
               <p className="mb-4 text-muted-foreground">
-                {t('No bundles available right now.', 'لا توجد باقات متاحة حالياً.')}
+                {t('No bundles available right now.', 'مفيش باقات متاحة دلوقتي.')}
               </p>
               <Link href={storeUrl('/products')} className="text-primary hover:underline">
                 {t('Browse all products', 'تصفح جميع المنتجات')}

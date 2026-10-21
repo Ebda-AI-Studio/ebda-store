@@ -253,6 +253,17 @@ describe('scripts/ci-affected.mjs', () => {
     }
   });
 
+  it('the search eval (tests/search-eval) is typechecked when it or the API it imports changes', () => {
+    const EVAL = 'tests/search-eval/tsconfig.json';
+    expect(run('apps/api/src/services/product-search.service.ts').typecheck).toContain(EVAL);
+    expect(run('tests/search-eval/run.ts').typecheck).toEqual([EVAL]);
+    expect(run('packages/database/prisma/schema.prisma').typecheck).toContain(EVAL);
+    expect(run('apps/admin/src/app/page.tsx').typecheck).not.toContain(EVAL);
+    // and the full lane's `npm run typecheck`
+    const pkg = JSON.parse(readFileSync(path.join(ROOT, 'package.json'), 'utf8'));
+    expect(pkg.scripts.typecheck).toContain(`tsc --noEmit -p ${EVAL}`);
+  });
+
   it('only lists Worker apps that have a wrangler config', () => {
     const r = run('package.json');
     expect(r.workers.length).toBeGreaterThan(0);

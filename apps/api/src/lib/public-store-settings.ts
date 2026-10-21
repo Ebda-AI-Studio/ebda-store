@@ -44,6 +44,7 @@ export const PUBLIC_SETTINGS_KEYS = [
   'deliveryOffDays',
   'minimumOrderFils',
   'acceptedPaymentMethods',
+  'receiptBarcodeShape',
 ] as const;
 
 /**

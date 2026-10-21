@@ -1,5 +1,8 @@
 import type { Metadata } from 'next';
+import { localizedMetadata } from '@/lib/seo/localized-metadata';
+import { Suspense } from 'react';
 import CartClient from './CartClient';
+import CartRestoreHydrator from './CartRestoreHydrator';
 
 // Track-B (personalized, session-bound) — stays outside the new `tenant-store`
 // tree by design. Already dynamic today via the root layout's headers()/
@@ -8,12 +11,23 @@ import CartClient from './CartClient';
 // docs/plans/2026-07-12-tenant-cacheable-routing.md §3.3/§4/§9.
 export const dynamic = 'force-dynamic';
 
-export const metadata: Metadata = {
-  title: 'Cart',
-  description: 'Review items in your shopping cart.',
-  robots: { index: false, follow: false },
-};
+export function generateMetadata(): Promise<Metadata> {
+  return localizedMetadata({
+    title: ['Cart', 'سلة التسوق'],
+    description: ['Review items in your shopping cart.', 'راجع القطع في سلة التسوق.'],
+    robots: { index: false, follow: false },
+  });
+}
 
 export default function CartPage() {
-  return <CartClient />;
+  return (
+    <>
+      {/* The cart-recovery email lands on /cart?restore=<token>; the hydrator re-attaches that
+          cart to this browser, then renders null. Suspense because useSearchParams suspends. */}
+      <Suspense fallback={null}>
+        <CartRestoreHydrator />
+      </Suspense>
+      <CartClient />
+    </>
+  );
 }

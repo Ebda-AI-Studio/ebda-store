@@ -23,7 +23,9 @@ export interface AreaRateRow {
 
 interface ComboboxOption {
   value: string; // EN canonical
-  label: string; // display label (locale-aware)
+  label: string; // display label, in the page language only (a11y re-audit P2-N13)
+  /** Both languages, matched by the search box (an English query on the Arabic page still finds). */
+  search?: string;
 }
 
 interface ComboboxProps {
@@ -65,7 +67,7 @@ function Combobox({
   const displayValue = open ? query : (selectedOption?.label ?? '');
 
   const filteredOptions = query
-    ? options.filter(o => o.label.toLowerCase().includes(query.toLowerCase()))
+    ? options.filter(o => (o.search ?? o.label).toLowerCase().includes(query.toLowerCase()))
     : options;
 
   // Click outside → close
@@ -143,7 +145,7 @@ function Combobox({
 
   const borderClass = hasError
     ? 'border-destructive focus-within:border-destructive focus-within:ring-destructive'
-    : 'border-border focus-within:border-primary focus-within:ring-primary/20';
+    : 'border-input focus-within:border-primary focus-within:ring-primary/20';
 
   return (
     <div ref={containerRef} className="relative">
@@ -166,6 +168,9 @@ function Combobox({
           }
           aria-autocomplete="list"
           aria-required
+          // P2-8 (W4): the error text is announced with the field, and the field says it is invalid.
+          aria-invalid={hasError ? true : undefined}
+          aria-describedby={hasError ? `${id}-error` : undefined}
           type="text"
           disabled={disabled}
           placeholder={placeholder}
@@ -174,7 +179,7 @@ function Combobox({
           onFocus={handleInputFocus}
           onKeyDown={handleKeyDown}
           // text-base prevents iOS Safari auto-zoom on focus (any <16px triggers it)
-          className="min-w-0 flex-1 py-2 text-base sm:text-sm bg-transparent outline-none disabled:cursor-not-allowed placeholder:text-muted-foreground"
+          className="min-h-11 min-w-0 flex-1 py-2 text-base sm:text-sm bg-transparent outline-none disabled:cursor-not-allowed placeholder:text-muted-foreground"
           autoComplete="off"
         />
         {/* Clear button — shown when a value is selected */}
@@ -183,7 +188,7 @@ function Combobox({
             type="button"
             onClick={handleClear}
             aria-label={clearLabel}
-            className="ms-1 flex h-5 w-5 items-center justify-center rounded-full text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+            className="relative ms-1 flex h-5 w-5 items-center justify-center rounded-full text-muted-foreground before:absolute before:-inset-3 before:content-[''] hover:text-foreground hover:bg-muted transition-colors"
           >
             <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path
@@ -216,7 +221,7 @@ function Combobox({
         >
           {filteredOptions.length === 0 ? (
             <li className="px-3 py-2 text-sm text-muted-foreground">
-              {query ? 'لا توجد نتائج / No results' : 'لا توجد خيارات / No options'}
+              {query ? 'مفيش نتايج / No results' : 'مفيش اختيارات / No options'}
             </li>
           ) : (
             filteredOptions.map((option, idx) => (
@@ -294,7 +299,8 @@ export function GovernorateAreaSelect({
     if (seen.size <= 1) return []; // single-country: no dropdown needed
     return Array.from(seen.entries()).map(([en, ar]) => ({
       value: en,
-      label: locale === 'ar' ? `${ar} / ${en}` : `${en} / ${ar}`,
+      label: locale === 'ar' ? ar : en,
+      search: `${en} ${ar}`,
     }));
   }, [areaRates, locale]);
 
@@ -348,7 +354,8 @@ export function GovernorateAreaSelect({
       return true;
     }).map(gov => ({
       value: gov.en,
-      label: locale === 'ar' ? `${gov.ar} / ${gov.en}` : `${gov.en} / ${gov.ar}`,
+      label: locale === 'ar' ? gov.ar : gov.en,
+      search: `${gov.en} ${gov.ar}`,
     }));
 
     // (b) Custom govs: in areaRates but NOT in the static list.
@@ -363,10 +370,8 @@ export function GovernorateAreaSelect({
         seenCustom.add(r.governorate);
         customOptions.push({
           value: r.governorate,
-          label:
-            locale === 'ar'
-              ? `${r.governorateAr} / ${r.governorate}`
-              : `${r.governorate} / ${r.governorateAr}`,
+          label: locale === 'ar' ? r.governorateAr : r.governorate,
+          search: `${r.governorate} ${r.governorateAr}`,
         });
       }
     }
@@ -393,7 +398,8 @@ export function GovernorateAreaSelect({
       })
       .map(a => ({
         value: a.en,
-        label: locale === 'ar' ? `${a.ar} / ${a.en}` : `${a.en} / ${a.ar}`,
+        label: locale === 'ar' ? a.ar : a.en,
+        search: `${a.en} ${a.ar}`,
       }));
 
     // (b) Custom areas: rate rows for this gov whose area is NOT in the static list.
@@ -404,7 +410,8 @@ export function GovernorateAreaSelect({
         if (staticAreaNames.has(r.area)) continue;
         customAreaOptions.push({
           value: r.area,
-          label: locale === 'ar' ? `${r.areaAr} / ${r.area}` : `${r.area} / ${r.areaAr}`,
+          label: locale === 'ar' ? r.areaAr : r.area,
+          search: `${r.area} ${r.areaAr}`,
         });
       }
     }
@@ -442,12 +449,16 @@ export function GovernorateAreaSelect({
     onChange(governorate, '');
   };
 
-  const countryLabel = locale === 'ar' ? 'الدولة *' : 'Country *';
+  const countryLabel = locale === 'ar' ? 'الدولة' : 'Country';
   const countryPlaceholder = locale === 'ar' ? 'الدولة' : 'Country';
-  const govLabel = locale === 'ar' ? 'المحافظة *' : 'Governorate *';
-  const areaLabel = locale === 'ar' ? 'المنطقة *' : 'Area *';
+  const govLabel = locale === 'ar' ? 'المحافظة' : 'Governorate';
+  const areaLabel = locale === 'ar' ? 'المنطقة' : 'Area';
   const govPlaceholder = locale === 'ar' ? 'المحافظة' : 'Governorate';
   const areaPlaceholder = locale === 'ar' ? 'المنطقة' : 'Area';
+
+  // STOP-2 P2-3: the Area field is disabled until a governorate is chosen; an error the shopper
+  // cannot act on yet is noise, so it waits.
+  const shownAreaError = governorate ? areaError : undefined;
 
   return (
     <div className="space-y-4">
@@ -481,13 +492,13 @@ export function GovernorateAreaSelect({
             clearLabel={clearLabel}
           />
           {governorateError && (
-            <p role="alert" className="mt-1 text-sm text-destructive-ink">
+            <p id={`${govId}-error`} className="mt-1 text-sm text-destructive-ink">
               {governorateError}
             </p>
           )}
         </div>
 
-        <div data-error={!!areaError}>
+        <div data-error={!!shownAreaError}>
           <Combobox
             id={areaId}
             label={areaLabel}
@@ -495,14 +506,14 @@ export function GovernorateAreaSelect({
             value={area}
             options={areaOptions}
             disabled={!governorate}
-            hasError={!!areaError}
+            hasError={!!shownAreaError}
             onSelect={handleAreaSelect}
             onClear={handleAreaCleared}
             clearLabel={clearLabel}
           />
-          {areaError && (
-            <p role="alert" className="mt-1 text-sm text-destructive-ink">
-              {areaError}
+          {shownAreaError && (
+            <p id={`${areaId}-error`} className="mt-1 text-sm text-destructive-ink">
+              {shownAreaError}
             </p>
           )}
         </div>

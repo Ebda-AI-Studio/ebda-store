@@ -31,6 +31,10 @@ STORE_IDS=$(cat loadtests/.loadtest-store-ids.txt) \
 BASE_URL=https://<staging-host>/api/v1 \
 ./run.sh lens-n-medium-traffic
 
+# Storefront search p95 gate (LOCAL or a staging/preview Worker only —
+# refuses api.ebda.app; see "Storefront search" below):
+BASE_URL=http://localhost:4000/api/v1 STORE_ID=<uuid> ./run.sh storefront-search
+
 # Authenticated admin order-list cost curve (requires a dedicated
 # load-test admin/staff account — see section below):
 STORE_ID=<uuid> ADMIN_EMAIL=<email> ADMIN_PASSWORD=<password> \
@@ -47,6 +51,7 @@ STORE_ID=<uuid> ADMIN_EMAIL=<email> ADMIN_PASSWORD=<password> \
 | `multi-store-storm.js`       | Cross-tenant concurrent load across N stores                                        | Ramp 50 → 100 VUs over 4 min (see below)                  |
 | `lens-n-medium-traffic.js`   | Medium-traffic headroom across ~30-80 stores + `/health` + layout                   | Ramp to 200-400 VUs (default 300) over ~7 min (see below) |
 | `lens-scaling-admin-auth.js` | Authenticated admin order-list OFFSET-pagination cost curve (login once, reuse JWT) | Ramp 1 → 5 VUs over ~2 min (see below)                    |
+| `storefront-search.js`       | Storefront search: 70% full search (hybrid path), 30% typeahead; p95 gate           | 30 req/s constant for 2 min (see below)                   |
 
 ### Multi-store storm
 
@@ -161,6 +166,40 @@ A failing run at the documented 300-VU/80-store profile means the
 "reasoned, not measured" headroom claim doesn't hold — treat it the same
 as any other p95 regression against this scenario's own thresholds table
 above.
+
+### Storefront search (p95 < 500 ms)
+
+`storefront-search.js` drives `GET /public/products?search=` (70%) and the typeahead
+`GET /public/:storeId/search/suggest` (30%) at a constant arrival rate. Thresholds: search p95 < 500 ms,
+typeahead p95 < 300 ms, errors < 1%. It reports two extra rates read from the response meta:
+`search_ranked` (hybrid order) and `search_degraded` (the vector leg was wanted but unavailable).
+
+**Never against production**: a search writes the search log and a hybrid search spends the Workers AI
+query-embed budget. The script uses a host ALLOWLIST: `localhost`, or the exact hosts named in
+`LOADTEST_ALLOWED_HOSTS`; `ebda.app`, every `*.ebda.app` and the production Worker are refused even if listed.
+
+```bash
+# staging / preview (read-only GETs; add the token only if the host sets LOAD_TEST_BYPASS_TOKEN):
+LOADTEST_ALLOWED_HOSTS=<preview-host> BASE_URL=https://<preview-host>/api/v1 STORE_ID=<uuid> RATE=5 DURATION=2m \
+  LOAD_TEST_TOKEN=<token> k6 run loadtests/scenarios/storefront-search.js
+```
+
+| Env                 | Default           | Meaning                                                                                                                                       |
+| ------------------- | ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| `RATE` / `DURATION` | `30` / `2m`       | arrival rate (req/s) and length. From ONE client IP keep `RATE` low (see below).                                                              |
+| `SEARCH_SHARE`      | `0.7`             | share of full searches; `0` = typeahead only                                                                                                  |
+| `UNIQUE`            | `true`            | most terms get a numeric suffix, which defeats the 120 s `getCached` so the database path is measured; `false` repeats the terms (warm cache) |
+| `QUERIES_FILE`      | built-in 20 terms | absolute path of a JSON array of terms (e.g. the eval set)                                                                                    |
+| `LOAD_TEST_TOKEN`   | unset             | sent as `x-load-test-token`; lifts the 300/min public limiter (and nothing else)                                                              |
+
+Two limits stay on by design and shape what one machine can measure: the **per-searcher embed limit**
+(`SEARCH_EMBED_PER_SEARCHER_PER_MIN`, default 60 per client IP per minute; `0` means NO embeds, not
+unlimited) and the **daily embed caps** (`SEARCH_QUERY_EMBED_STORE_DAILY_CAP` default 1000). A
+single-IP run therefore falls back to keyword-only (`search_degraded` rises) after the first 60 embeds
+a minute; that is the real behaviour for one client, not a failure. Local harness: `loadtests/search-local/`
+(a seeder, and an API launcher with a fake embedder that injects Workers-AI-like latency; no real Workers AI).
+Numbers from a laptop to a remote Worker include your own network round trip: label them "not
+production-representative".
 
 ### Authenticated admin order-list cost curve
 

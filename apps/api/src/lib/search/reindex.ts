@@ -1,13 +1,17 @@
 import { sendEventAfterCommit } from '../inngest/send-after-commit';
 import { getEmbeddingProvider } from './embedding-provider';
 
-/** Product columns that feed `ebda_product_embed_doc` (Task 9). A write touching one makes the embedding stale. */
+/**
+ * Product columns that feed the product's vectors: the doc (`ebda_product_embed_doc`: names +
+ * descriptions, SEARCH-T13-5) and the words vector (`searchTerms` alone, SEARCH-T13-7). A write
+ * touching one makes a vector stale, so it asks for a reindex.
+ */
 export const EMBED_DOC_FIELDS = [
   'name',
   'nameAr',
-  'searchTerms',
   'description',
   'descriptionAr',
+  'searchTerms',
 ] as const;
 
 export function touchesEmbedDoc(fields: Iterable<string>): boolean {

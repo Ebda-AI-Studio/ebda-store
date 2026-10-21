@@ -31,7 +31,7 @@ import {
   STORE_PLAN_TO_PLAN_CODE,
   NEW_STORE_LAYOUT_SETTINGS,
   getLook,
-  LOOK_TOKEN_KEYS,
+  LOOK_OWNED_THEME_KEYS,
 } from '@ebda/shared';
 import { applyFamilyForLook } from './page-builder.service';
 import { deferAfterTenantCommit } from '../lib/after-tenant-commit';
@@ -988,8 +988,9 @@ export class StoreService {
       storeId,
       look.template,
       userId,
-      opts.design === 'reset' ? LOOK_TOKEN_KEYS : [],
-      look.id
+      opts.design === 'reset' ? LOOK_OWNED_THEME_KEYS : [],
+      look.id,
+      opts.design
     );
     // Re-read the theme in the same transaction as this write (not a stale copy from before the
     // builder step): a publish above may have merged a pending theme patch into it, and that
@@ -1000,7 +1001,7 @@ export class StoreService {
         select: { theme: true },
       });
       const theme = { ...((live?.theme as Record<string, unknown>) || {}) };
-      if (opts.design === 'reset') for (const k of LOOK_TOKEN_KEYS) delete theme[k];
+      if (opts.design === 'reset') for (const k of LOOK_OWNED_THEME_KEYS) delete theme[k];
       return tx.store.update({
         where: { id: storeId },
         data: {

@@ -36,7 +36,7 @@ export function Model3dToggle({
       type="button"
       onClick={onToggle}
       aria-pressed={active}
-      className="absolute top-3 end-3 z-10 inline-flex h-9 items-center gap-1.5 rounded-full border border-border bg-background/90 px-3 text-xs font-semibold text-foreground shadow-sm backdrop-blur hover:bg-background"
+      className="absolute top-3 end-3 z-10 inline-flex h-9 items-center gap-1.5 rounded-full border border-input bg-background/90 px-3 text-xs font-semibold text-foreground shadow-sm backdrop-blur hover:bg-background"
     >
       <svg
         aria-hidden="true"
@@ -97,11 +97,11 @@ export function ProductModel3dPanel({
       alt={alt}
       look={look}
       labels={{
-        loading: t('Loading 3D…', 'جاري تحميل الـ 3D…'),
-        error: t('3D view unavailable right now.', 'عرض الـ 3D غير متاح حالياً.'),
+        loading: t('Loading 3D…', 'بنحمّل الـ 3D…'),
+        error: t('3D view unavailable right now.', 'عرض الـ 3D مش متاح دلوقتي.'),
         hint: t(
           'Drag to rotate · pinch or +/− to zoom · arrow keys',
-          'اسحب للتدوير · قرّب بإصبعين أو +/− · الأسهم'
+          'اسحب عشان تلفّه · قرّب بإصبعين أو +/− · الأسهم'
         ),
         ar: t('View in your space', 'اعرضه في مكانك'),
       }}

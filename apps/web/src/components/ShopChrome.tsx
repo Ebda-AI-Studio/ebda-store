@@ -350,8 +350,9 @@ export function ShopChrome({ children, layout: layoutProp }: ShopChromeProps) {
           over the legacy store.announcementBar.bgColor. */}
       {(layout?.announcement?.enabled ?? store.announcementBar?.enabled) &&
         store.announcementBar?.text && (
-          <div
+          <aside
             data-zone="beforeHeader"
+            aria-label={isRtl ? 'إعلان المتجر' : 'Store announcement'}
             className={sectionVisibilityClass(layout?.announcement) ?? undefined}
           >
             <T.AnnouncementBar
@@ -370,10 +371,10 @@ export function ShopChrome({ children, layout: layoutProp }: ShopChromeProps) {
               isRtl={isRtl}
               urlPrefix={storeUrl('')}
             />
-          </div>
+          </aside>
         )}
-      <header
-        role="banner"
+      {/* Zone wrapper only: the skin's own header element is the one banner (a11y P2-1). */}
+      <div
         data-zone="header"
         className={
           [
@@ -398,7 +399,7 @@ export function ShopChrome({ children, layout: layoutProp }: ShopChromeProps) {
               : undefined
           }
         />
-      </header>
+      </div>
       <main role="main" className="flex-1">
         {children}
       </main>

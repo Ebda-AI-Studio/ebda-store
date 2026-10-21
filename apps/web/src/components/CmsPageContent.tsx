@@ -131,10 +131,7 @@ export function CmsPageContent({ slug, defaultTitle, fallback }: CmsPageContentP
             {t('Page unavailable', 'الصفحة غير متاحة')}
           </h1>
           <p className="mt-3 text-sm text-muted-foreground">
-            {t(
-              'This page is currently turned off by the store.',
-              'تم إيقاف هذه الصفحة حاليًا من قبل المتجر.'
-            )}
+            {t('This page is currently turned off by the store.', 'المتجر وقّف الصفحة دي دلوقتي.')}
           </p>
         </div>
       </div>

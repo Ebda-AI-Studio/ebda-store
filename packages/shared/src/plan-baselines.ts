@@ -92,6 +92,10 @@ const PROFESSIONAL_ADDITIONS: FeatureKey[] = [
   // Marketing + retention
   'loyalty',
   'push_notifications',
+  // Email campaigns (2026-10-21, Ahmad): Growth (professional) + Business (enterprise),
+  // not Basic (starter). Consent is the newsletter opt-in; per-plan daily send caps live in
+  // `campaignDailyCap` (apps/api campaign.service). A StoreFeature override still wins.
+  'email_campaigns',
   // 'upsell_crosssell' moved to STARTER_CORE (AI-first policy, 2026-07-21).
 ];
 
@@ -172,6 +176,19 @@ export function lowestPlanForFeature(key: FeatureKey): StorePlan | null {
     }
   }
   return null;
+}
+
+/**
+ * The PUBLIC plan name (Basic / Growth / Business) that unlocks a feature, where it differs
+ * from the legacy tier label `lowestPlanForFeature` returns ("Professional"). The upgrade gate
+ * prefers this so a Basic merchant is told "Growth", the name on the pricing page.
+ */
+const PUBLIC_PLAN_LABEL_FOR_FEATURE: Partial<Record<FeatureKey, { en: string; ar: string }>> = {
+  email_campaigns: { en: 'Growth', ar: 'النمو' },
+};
+
+export function publicPlanLabelForFeature(key: FeatureKey): { en: string; ar: string } | null {
+  return PUBLIC_PLAN_LABEL_FOR_FEATURE[key] ?? null;
 }
 
 /** Convenience: is `key` in the baseline for `plan`? */

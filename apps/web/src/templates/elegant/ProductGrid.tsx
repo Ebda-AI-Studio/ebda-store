@@ -73,7 +73,7 @@ export default function ElegantProductGrid({
         {products.length === 0 && (
           <div className="text-center py-20">
             <p className="text-sm text-muted-foreground tracking-wide">
-              {isRtl ? 'لا توجد منتجات متاحة حالياً' : 'No products available at this time'}
+              {isRtl ? 'مفيش منتجات متاحة دلوقتي' : 'No products available at this time'}
             </p>
           </div>
         )}

@@ -13,6 +13,7 @@
  */
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
+import { heroObjectPosition } from '@ebda/shared';
 import type { HeroBannerProps, HeroProps, HeroSliderProps } from '../types';
 import { resolveBannerLink } from '../shared/hero-banner-link-utils';
 import { HeroVideo } from '../../components/commerce/HeroVideo';
@@ -53,6 +54,11 @@ function Slide({
         fetchPriority={priority ? 'high' : 'auto'}
         decoding={priority ? 'sync' : 'async'}
         className="absolute inset-0 h-full w-full object-cover"
+        style={
+          heroObjectPosition(slide.focus)
+            ? { objectPosition: heroObjectPosition(slide.focus) }
+            : undefined
+        }
       />
     </picture>
   );
@@ -67,6 +73,7 @@ function Slide({
           srcMobile={slide.videoMobile}
           mobileQuery="(max-width: 1023px)"
           active={active}
+          position={heroObjectPosition(slide.focus)}
         >
           {posterPicture}
         </HeroVideo>

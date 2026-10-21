@@ -25,7 +25,7 @@ export function HeroSection() {
       <div
         aria-hidden
         className="pointer-events-none absolute -end-40 -top-40 z-0 h-[720px] w-[720px] rounded-full blur-[120px]"
-        style={{ background: 'radial-gradient(circle, rgba(255,106,26,0.16), transparent 60%)' }}
+        style={{ background: 'radial-gradient(circle, rgba(176,141,87,0.16), transparent 60%)' }}
       />
 
       <div className="relative z-10 mx-auto grid w-full max-w-6xl items-center gap-12 px-4 py-28 md:grid-cols-[0.92fr_1.08fr] md:gap-14">
@@ -60,7 +60,7 @@ export function HeroSection() {
 
         {/* Product frame — illustrative storefront */}
         <div className="relative">
-          <div className="overflow-hidden rounded-2xl border border-white/10 bg-[#100f0e] shadow-[0_40px_120px_rgba(0,0,0,0.7),0_30px_90px_rgba(255,106,26,0.13)]">
+          <div className="overflow-hidden rounded-2xl border border-white/10 bg-[#100f0e] shadow-[0_40px_120px_rgba(0,0,0,0.7),0_30px_90px_rgba(176,141,87,0.13)]">
             <div className="flex items-center gap-2 border-b border-white/[0.06] bg-[#0e0d0c] px-4 py-3">
               <span className="h-2.5 w-2.5 rounded-full bg-[#ff5f57]" />
               <span className="h-2.5 w-2.5 rounded-full bg-[#febc2e]" />

@@ -538,3 +538,35 @@ export function getSocialLinks(
     (a, b) => (rankMap.get(a.key) ?? Infinity) - (rankMap.get(b.key) ?? Infinity)
   );
 }
+
+/**
+ * Stepper signs (taste re-audit P2-11): drawn, so minus and plus share one stroke weight in every
+ * face (Noto Sans Arabic draws U+2212 at hyphen weight beside a full "+").
+ */
+export function MinusIcon({ className = 'h-4 w-4' }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      aria-hidden="true"
+    >
+      <path strokeLinecap="round" strokeWidth={1.75} d="M5 12h14" />
+    </svg>
+  );
+}
+
+export function PlusIcon({ className = 'h-4 w-4' }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      aria-hidden="true"
+    >
+      <path strokeLinecap="round" strokeWidth={1.75} d="M12 5v14M5 12h14" />
+    </svg>
+  );
+}

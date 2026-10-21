@@ -460,6 +460,49 @@ describe('tenant isolation (strict RLS on store_page_revisions)', { retry: 0 }, 
     expect(warned.map(w => w.code)).toEqual(['REF_NOT_FOUND']);
     expect(warned[0].path).toMatch(/manualProductIds\/1$/);
   });
+
+  it('a shop-the-look piece from another store gets the same REF_NOT_FOUND warning and is never served (C11)', async () => {
+    const { storeA, storeB, productA, productB } = ids;
+    const doc = docFor({});
+    doc.sections.push({
+      id: 'stl',
+      type: 'shop-the-look',
+      settings: { headingAr: 'تسوّق اللوك' },
+      blocks: [{ id: 'look-1', type: 'look', settings: { productIds: [productA, productB] } }],
+    });
+    const head = (await inStore(storeA, () => getPageState(storeA, HOME)))!.rev;
+    const r = await inStore(storeA, () =>
+      saveDraft({ storeId: storeA, pageKey: HOME, baseRev: head, definition: doc, userId: null })
+    );
+    expect(r.ok).toBe(true);
+    const warned = (r as { warnings: Array<{ code: string; path: string }> }).warnings;
+    expect(warned.map(w => [w.code, w.path])).toEqual([
+      ['REF_NOT_FOUND', `/sections/${doc.sections.length - 1}/blocks/0/settings/productIds/1`],
+    ]);
+    // The storefront loads look pieces with the store-scoped ids query: another store's active
+    // product never comes back, so it can never render in A's look.
+    const run = crypto.randomUUID().slice(0, 8);
+    const [a2, b2] = await Promise.all(
+      [storeA, storeB].map(storeId =>
+        owner.product.create({
+          data: {
+            storeId,
+            name: `stl-${run}`,
+            slug: `${PREFIX}stl-${run}`,
+            price: 100,
+            status: 'active',
+          },
+        })
+      )
+    );
+    const { ProductService } = await import('../../apps/api/src/services/product.service');
+    const listed = await inStore(storeA, () =>
+      ProductService.listPublic(storeA, { ids: [a2.id, b2.id], limit: 50 })
+    );
+    const got = (listed as { products: Array<{ id: string }> }).products.map(p => p.id);
+    expect(got).toContain(a2.id);
+    expect(got).not.toContain(b2.id);
+  });
 });
 
 describe('integrity guards', { retry: 0 }, () => {

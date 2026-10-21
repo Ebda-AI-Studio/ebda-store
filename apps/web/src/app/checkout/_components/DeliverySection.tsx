@@ -39,7 +39,7 @@ export function DeliverySection({
   if (!showNote && !showWindows) return null;
 
   return (
-    <div className="rounded-xl border bg-card p-4 shadow-sm space-y-3">
+    <div className="rounded-[var(--radius)] border bg-card p-4 shadow-sm space-y-3">
       {showNote && (
         <div className="rounded-lg bg-muted/50 p-3 text-sm text-foreground">
           {language === 'ar' ? settings.note.textAr || settings.note.text : settings.note.text}
@@ -79,8 +79,8 @@ export function DeliverySection({
                       selected
                         ? 'border-primary bg-primary/5 text-foreground'
                         : w.available
-                          ? 'border-border text-foreground hover:border-border/80'
-                          : 'cursor-not-allowed border-border/50 text-muted-foreground opacity-50'
+                          ? 'border-input text-foreground hover:border-input/80'
+                          : 'cursor-not-allowed border-input/50 text-muted-foreground opacity-50'
                     }`}
                   >
                     <span className="font-medium">{language === 'ar' ? w.labelAr : w.label}</span>
@@ -93,7 +93,7 @@ export function DeliverySection({
             </div>
           ) : (
             <p className="mt-2 text-sm text-muted-foreground">
-              {t('No delivery windows available today', 'لا توجد مواعيد توصيل متاحة اليوم')}
+              {t('No delivery windows available today', 'مفيش مواعيد توصيل متاحة النهارده')}
             </p>
           )}
 

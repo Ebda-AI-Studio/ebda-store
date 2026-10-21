@@ -13,7 +13,7 @@ Layout follows classic catalog conventions: a slim utility bar of italic copy ("
 - `font-serif` (Playfair Display) used everywhere for display, nav, prices, and even badge labels
 - Square corners as default — `rounded-none` borders, `border border-border` (no opacity softening)
 - Hairline accent rules: `w-12 h-px bg-foreground` or `bg-border` mark sections and CTAs
-- Underline-on-hover navigation: `after:w-0 after:h-px after:bg-foreground hover:after:w-full transition-all duration-300`
+- Underline-on-hover navigation: `after:w-0 after:h-px after:bg-foreground hover:after:w-full transition duration-300`
 - High-contrast solid CTAs: `border border-foreground bg-foreground text-background`, hover dampens to `bg-foreground/90`
 - Tracking-widest uppercase for badges, button labels, footer headings: `tracking-widest uppercase text-xs`
 - No card lift, no scale-105 on cards (only the image scales) — surfaces stay anchored
@@ -41,7 +41,7 @@ Classic consumes the shared CSS tokens from `globals.css`. Tenants override `--p
 
 ### Brand & Accent
 
-- **Primary** (`--primary` / Force Orange `#ff6e00` default): Used sparingly — `hover:text-primary` on product names and add-to-cart, focus rings (`focus-visible:ring-2 focus-visible:ring-primary`), the hairline `w-12 h-px bg-primary group-hover:w-12` underline animation under category names. Default-state primary appears only on the announcement bar (which uses `bg-primary` from `globals.css`'s shared `.product-badge` system, not in this template's bar — see Section 4).
+- **Primary** (`--primary` / Ebda night `#0A0B0C` default; Ruling D1016-ORANGE-1): Used sparingly — `hover:text-primary` on product names and add-to-cart, focus rings (`focus-visible:ring-2 focus-visible:ring-primary`), the hairline `w-12 h-px bg-primary group-hover:w-12` underline animation under category names. Default-state primary appears only on the announcement bar (which uses `bg-primary` from `globals.css`'s shared `.product-badge` system, not in this template's bar — see Section 4).
 - **Primary/20** in fallback states: `bg-primary/20` for letter-avatar in CategoryCard placeholder (`text-3xl font-light text-primary tracking-wide`).
 
 ### Status Colors
@@ -147,7 +147,7 @@ hover:text-primary hover:bg-transparent
 ```
 relative aspect-square overflow-hidden bg-muted
 border border-border group-hover:border-foreground/30 group-hover:shadow-md
-transition-all duration-300 mb-4
+transition duration-300 mb-4
 ```
 
 Below the image, content centers in a `text-center` column with the serif name and centered price.
@@ -206,7 +206,7 @@ Square corners (`rounded-none`) and serif uppercase — a crisp tag.
 - Top utility bar: `bg-foreground text-background py-2`, italic serif copy on the left, "Contact" / "About" links on the right.
 - Main header: `bg-background shadow-sm` with `py-5` for tall stature.
 - Logo centered: `mx-auto md:mx-0`, image height `h-14 max-h-14`, fallback wordmark `text-2xl font-serif font-bold tracking-wider`.
-- Desktop nav split left/right around the centered logo, each item: `text-sm font-serif tracking-widest uppercase text-foreground/70 hover:text-foreground` with a `after:w-0 after:h-px after:bg-foreground hover:after:w-full transition-all duration-300` underline.
+- Desktop nav split left/right around the centered logo, each item: `text-sm font-serif tracking-widest uppercase text-foreground/70 hover:text-foreground` with a `after:w-0 after:h-px after:bg-foreground hover:after:w-full transition duration-300` underline.
 - Action icons (search/account/cart): `text-foreground/70 hover:text-foreground` with thin-stroke (`strokeWidth={1.5}`) outline icons.
 - Cart count: `bg-foreground text-background text-[10px] font-serif w-4 h-4 rounded-full` — small circular counter, not the brand color.
 - Below-header search row: `border-t border-border/40 py-3` with the underlined input centered in a `max-w-md`.
@@ -273,7 +273,7 @@ No icons or pulse — just centered serif copy in white-on-near-black.
 - Use `tracking-widest uppercase` (or explicit `tracking-[0.2em]` / `tracking-[0.3em]`) for labels, buttons, badges, eyebrows.
 - Use `border border-border` (solid 1px) — don't soften with `/60` opacity.
 - Use square corners (`rounded-none` or omit `rounded-*` entirely) for cards, badges, buttons, inputs.
-- Use the underline-reveal hover on nav: `after:w-0 hover:after:w-full after:h-px after:bg-foreground transition-all duration-300`.
+- Use the underline-reveal hover on nav: `after:w-0 hover:after:w-full after:h-px after:bg-foreground transition duration-300`.
 - Use the outlined CTA → solid-fill-on-hover pattern: `border border-foreground hover:bg-foreground hover:text-background`.
 - Center logos and section headings — Classic is symmetric.
 - Pair section headings with `w-12 h-px bg-border` accent rules above and below.
@@ -333,10 +333,10 @@ When generating new components for the Classic template, treat `Header.tsx`, `He
 
 - Primary CTA (outlined): `border border-foreground px-8 py-3 font-serif text-sm tracking-widest uppercase text-foreground hover:bg-foreground hover:text-background transition-colors duration-300`
 - Solid CTA (summary, empty state): `border border-foreground bg-foreground px-4 text-xs font-semibold uppercase tracking-widest text-background h-12 hover:bg-foreground/90`
-- Card frame: `border border-border bg-background` (rest), `group-hover:border-foreground/30 group-hover:shadow-md transition-all duration-300`
+- Card frame: `border border-border bg-background` (rest), `group-hover:border-foreground/30 group-hover:shadow-md transition duration-300`
 - Heading text: `font-serif font-normal text-foreground tracking-tight leading-[1.1]` (display), `text-xs font-semibold uppercase tracking-widest text-muted-foreground` (eyebrows)
 - Body text: `text-foreground` (primary), `text-muted-foreground` (secondary), `text-foreground/70` (resting nav)
-- Underline reveal: `relative after:absolute after:bottom-0 after:left-0 after:w-0 after:h-px after:bg-foreground after:transition-all after:duration-300 hover:after:w-full`
+- Underline reveal: `relative after:absolute after:bottom-0 after:left-0 after:w-0 after:h-px after:bg-foreground after:transition-[width] after:duration-300 hover:after:w-full`
 - Section accent rule: `w-12 h-px bg-border mx-auto mb-6` (and same after the heading)
 
 ### Example Component Prompts

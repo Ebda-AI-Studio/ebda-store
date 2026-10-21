@@ -509,7 +509,7 @@ export default function StoreSeoPage() {
             type="button"
             onClick={() => handleGenerate('fill-empty')}
             disabled={isGenerating || isSaving}
-            className="inline-flex items-center gap-2 rounded-lg border border-[#fc6b02]/40 bg-[#fc6b02]/5 px-4 py-2 text-sm font-semibold text-[#fc6b02] transition-colors hover:bg-[#fc6b02]/10 disabled:cursor-not-allowed disabled:opacity-50"
+            className="inline-flex items-center gap-2 rounded-lg border border-primary/40 bg-primary/5 px-4 py-2 text-sm font-semibold text-primary-ink transition-colors hover:bg-primary/10 disabled:cursor-not-allowed disabled:opacity-50"
             title={t('aiGenerateTooltip')}
           >
             {isGenerating ? (
@@ -537,7 +537,7 @@ export default function StoreSeoPage() {
             type="button"
             onClick={handleSave}
             disabled={isSaving}
-            className="px-6 py-2 text-sm bg-primary text-white rounded-lg hover:bg-primary/90 disabled:opacity-50 font-medium"
+            className="px-6 py-2 text-sm bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50 font-medium"
           >
             {isSaving ? t('saving') : t('saveChanges')}
           </button>
@@ -903,7 +903,7 @@ export default function StoreSeoPage() {
                       type="button"
                       disabled={isSavingFaq}
                       onClick={handleSaveFaq}
-                      className="px-4 py-1.5 text-xs font-medium bg-primary text-white rounded-lg hover:bg-primary/90 disabled:opacity-50"
+                      className="px-4 py-1.5 text-xs font-medium bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50"
                     >
                       {isSavingFaq ? '…' : t('faqSave')}
                     </button>
@@ -1050,7 +1050,7 @@ export default function StoreSeoPage() {
                   type="button"
                   disabled={isSavingFaq || !faqDraft.question || !faqDraft.answer}
                   onClick={handleSaveFaq}
-                  className="px-4 py-1.5 text-xs font-medium bg-primary text-white rounded-lg hover:bg-primary/90 disabled:opacity-50"
+                  className="px-4 py-1.5 text-xs font-medium bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50"
                 >
                   {isSavingFaq ? '…' : t('faqSave')}
                 </button>
@@ -1196,7 +1196,7 @@ export default function StoreSeoPage() {
               type="button"
               onClick={handleSaveSocial}
               disabled={isSavingSocial}
-              className="px-4 py-1.5 text-xs font-medium bg-primary text-white rounded-lg hover:bg-primary/90 disabled:opacity-50"
+              className="px-4 py-1.5 text-xs font-medium bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50"
             >
               {isSavingSocial ? '…' : t('faqSave')}
             </button>
@@ -1476,7 +1476,7 @@ function HowtoForm({ draft, setDraft, t, isSaving, onSave, onCancel, autoFocus }
           type="button"
           disabled={isSaving || !canSave}
           onClick={onSave}
-          className="px-4 py-1.5 text-xs font-medium bg-primary text-white rounded-lg hover:bg-primary/90 disabled:opacity-50"
+          className="px-4 py-1.5 text-xs font-medium bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50"
         >
           {isSaving ? '…' : t('howtoSave')}
         </button>

@@ -22,6 +22,7 @@ import express from 'express';
 import request from 'supertest';
 import { prisma, withRlsBypass } from '@ebda/database';
 import publicRoutes from '@api/routes/public.routes';
+import { publicStoreContext } from '@api/middleware/tenant-context';
 import { searchTokens } from '@ebda/shared';
 
 const hasDb =
@@ -29,7 +30,9 @@ const hasDb =
 
 const app = express();
 app.use(express.json());
-app.use('/api/v1/public', publicRoutes);
+// As in app.ts: the public router runs under the store's tenant context (the search lookups are
+// SECURITY DEFINER and take the store from the scoped session; Task 14 security review).
+app.use('/api/v1/public', publicStoreContext, publicRoutes);
 
 describe.skipIf(!hasDb)('public product search floor', () => {
   const suffix = `${Date.now()}-${process.pid}-${Math.random().toString(36).substring(7)}`;

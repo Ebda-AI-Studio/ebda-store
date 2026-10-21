@@ -46,16 +46,16 @@ export default function ModernProductGrid({
       <div
         className="py-20 text-center"
         role="status"
-        aria-label={t('No products found', 'لا توجد منتجات')}
+        aria-label={t('No products found', 'مفيش منتجات')}
       >
         <div className="w-20 h-20 mx-auto mb-5 rounded-full bg-muted flex items-center justify-center text-muted-foreground">
           <NoProductsIcon className="w-9 h-9" />
         </div>
         <h3 className="text-base font-semibold text-foreground mb-1.5">
-          {isRtl ? 'لا توجد منتجات' : 'No products found'}
+          {isRtl ? 'مفيش منتجات' : 'No products found'}
         </h3>
         <p className="text-sm text-muted-foreground">
-          {isRtl ? 'لم نتمكن من العثور على أي منتجات' : "We couldn't find any products"}
+          {isRtl ? 'ملقيناش أي منتجات' : "We couldn't find any products"}
         </p>
       </div>
     );

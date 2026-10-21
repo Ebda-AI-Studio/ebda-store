@@ -2,7 +2,7 @@
 
 /**
  * One trust line under the PDP buy button (S-02, quality-bar § 8):
- * "الدفع عند الاستلام · إرجاع خلال ١٤ يومًا". Egyptian shoppers decide on COD and
+ * "الدفع عند الاستلام · إرجاع خلال ١٤ يوم". Egyptian shoppers decide on COD and
  * the return window, and neither was near the CTA.
  *
  * Both halves come from the store, nothing is hard-coded:
@@ -57,7 +57,7 @@ export function TrustLine({
         <a
           data-trust="returns"
           href={storeUrl('/returns')}
-          className="underline-offset-4 hover:text-foreground hover:underline"
+          className="relative underline underline-offset-4 before:absolute before:-inset-y-4 before:inset-x-0 before:content-[''] hover:text-foreground"
         >
           {returns}
         </a>

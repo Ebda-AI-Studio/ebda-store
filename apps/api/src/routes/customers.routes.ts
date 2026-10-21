@@ -10,6 +10,7 @@ import {
 import { prisma, type RfmSegment } from '@ebda/database';
 import { authenticate, authorize, rejectImpersonated } from '../middleware/auth';
 import { requireStoreAccess } from '../middleware/store-access';
+import { requirePermission } from '../middleware/rbac';
 import { AppError } from '../middleware/error-handler';
 import { writeLimiter, auditLog } from '../middleware/security';
 import { invalidateCustomersCache } from '../lib/public-cache';
@@ -26,6 +27,7 @@ import {
   type ShippingAddressShape,
 } from '../services/customer-aggregate.service';
 import { AuthService, eraseNeedsCrmReview } from '../services/auth.service';
+import { searchOrderCustomers } from '../services/customer-search.service';
 import { deferAfterTenantCommit } from '../lib/after-tenant-commit';
 import logger from '../lib/logger';
 import { BRAND } from '@ebda/shared';
@@ -605,110 +607,19 @@ router.get(
 router.get(
   '/customers/search',
   ...adminMiddleware,
+  requirePermission('orders:read'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId } = req.params;
-      const q = (req.query.q as string | undefined)?.trim();
+      // Bounded like the storefront suggest route: an unbounded ILIKE pattern would reach the
+      // SECURITY DEFINER lookup (review M-4).
+      const q = typeof req.query.q === 'string' ? req.query.q.trim().slice(0, 100) : undefined;
       if (!q || q.length < 2) {
         res.json({ success: true, data: { customers: [] } });
         return;
       }
 
-      // --- Registered customers (User table, joined via orders) ---
-      const registeredOrders = await prisma.order.findMany({
-        where: {
-          storeId,
-          customerId: { not: null },
-          customer: {
-            OR: [
-              { firstName: { contains: q, mode: 'insensitive' } },
-              { lastName: { contains: q, mode: 'insensitive' } },
-              { email: { contains: q, mode: 'insensitive' } },
-              { phone: { contains: q, mode: 'insensitive' } },
-            ],
-          },
-        },
-        select: {
-          customer: {
-            select: {
-              id: true,
-              firstName: true,
-              lastName: true,
-              email: true,
-              phone: true,
-            },
-          },
-        },
-        distinct: ['customerId'],
-        take: 10,
-      });
-
-      // Shape: { id (UUID), isGuest: false, firstName, lastName, email, phone }
-      const registered = registeredOrders
-        .map(o => o.customer)
-        .filter((c): c is NonNullable<(typeof registeredOrders)[number]['customer']> => c !== null)
-        .map(c => ({
-          id: c.id,
-          isGuest: false as const,
-          firstName: c.firstName ?? '',
-          lastName: c.lastName ?? '',
-          email: c.email ?? '',
-          phone: c.phone ?? '',
-        }));
-
-      // --- Guest customers (raw SQL: JSON ILIKE) ---
-      // Prisma's JSON filter doesn't support partial-match (`contains`),
-      // only exact `equals`. For guest typeahead we need ILIKE on
-      // JSONB-extracted scalar fields, which is a `$queryRaw` job. The
-      // result is deduped by lowercased email when present, falling
-      // back to phone, then to order.id (each guest-order without
-      // either becomes its own row — same as the customers list page).
-      const like = `%${q}%`;
-      const guestRows = await prisma.$queryRaw<
-        Array<{
-          first_name: string | null;
-          last_name: string | null;
-          email: string | null;
-          phone: string | null;
-          order_id: string;
-        }>
-      >`
-        SELECT DISTINCT ON (
-          COALESCE(LOWER(shipping_address->>'email'), shipping_address->>'phone', id::text)
-        )
-          shipping_address->>'firstName' AS first_name,
-          shipping_address->>'lastName'  AS last_name,
-          shipping_address->>'email'     AS email,
-          shipping_address->>'phone'     AS phone,
-          id::text AS order_id
-        FROM public.orders
-        WHERE store_id = ${storeId}
-          AND customer_id IS NULL
-          AND deleted_at IS NULL
-          AND (
-                shipping_address->>'firstName' ILIKE ${like}
-             OR shipping_address->>'lastName'  ILIKE ${like}
-             OR shipping_address->>'email'     ILIKE ${like}
-             OR shipping_address->>'phone'     ILIKE ${like}
-          )
-        LIMIT 10
-      `;
-
-      const guests = guestRows.map(g => ({
-        // Synthetic id — frontend treats this as guest (no customerId
-        // sent on order create), pre-fills form fields from these
-        // values. Matches the customer-detail polymorphic key pattern.
-        id: g.email ? `guest:${g.email.toLowerCase()}` : `guest:${g.order_id}`,
-        isGuest: true as const,
-        firstName: g.first_name ?? '',
-        lastName: g.last_name ?? '',
-        email: g.email ?? '',
-        phone: g.phone ?? '',
-      }));
-
-      // Merge + cap at 10. Registered customers ranked first because
-      // they're more useful for repeat-order attribution.
-      const customers = [...registered, ...guests].slice(0, 10);
+      const customers = await searchOrderCustomers(storeId, q);
 
       res.json({ success: true, data: { customers } });
     } catch (error) {

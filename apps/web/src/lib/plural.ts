@@ -3,104 +3,41 @@
  *
  * Arabic has six plural categories, and the noun changes with each:
  * 0 → zero, 1 → one, 2 → two, 3-10 → few, 11-99 → many, 100+ → other
- * ("قطعة واحدة / قطعتان / ٣ قطع / ١١ قطعة / ١٠٠ قطعة"). English has one and
+ * ("قطعة واحدة / قطعتين / ٣ قطع / ١١ قطعة / ١٠٠ قطعة"). English has one and
  * other. `Intl.PluralRules` picks the category; the caller supplies a form per
  * category, with `{n}` where the number goes. Concatenating "{count} {noun}"
  * ("1 منتجات", "1 items") is banned (`tests/unit/plural-counted-nouns.test.ts`).
  *
- * Register (Ruling FU46-Y02): Modern Standard Arabic on all generated copy, so
- * the dual is nominative ("قطعتان", "يومان", "يوما عمل") and, after a
- * preposition, oblique (`case: 'oblique'`: "خلال يومين").
+ * Register (Ruling FU46-Y02a, Ahmad 2026-10-16): storefront sentences are
+ * Egyptian Arabic, so the dual is the one Egyptian form in every position
+ * ("قطعتين", "يومين", "خلال يومين") and 11+ takes the bare singular ("١٤ يوم").
+ * There is no case argument: Egyptian does not decline the dual.
  *
  * Plain module (no 'use client'): components, server code and lib helpers all
  * call `countText(lang, n, NOUN, localize(n))` — the one API.
  */
-export type PluralLang = 'ar' | 'en';
-
-/** One string per category; `{n}` is replaced by the displayed number. */
-export interface PluralForms {
-  zero?: string;
-  one?: string;
-  two?: string;
-  /**
-   * The dual after a preposition or as an object ("خلال يومين", "في يومين"):
-   * MSA declines the dual by case (nominative "يومان", oblique "يومين"). Used
-   * when the caller passes `case: 'oblique'`; falls back to `two`.
-   */
-  twoOblique?: string;
-  few?: string;
-  many?: string;
-  other: string;
-}
-
-/** Both languages' forms for one counted noun. */
-export interface CountedNoun {
-  en: PluralForms;
-  ar: PluralForms;
-}
-
-const RULES: Record<PluralLang, Intl.PluralRules> = {
-  ar: new Intl.PluralRules('ar'),
-  en: new Intl.PluralRules('en'),
-};
-
-/**
- * `count` picks the form; `display` is what replaces `{n}` (the count in the
- * render's digits, or a range like "3–5"). A form that spells the number out
- * ("قطعة واحدة", "يومان") cannot show a range, so when `display` is a range the
- * one/two/zero forms without `{n}` give way to `few`, then `other`.
- */
-/** Grammatical case of the counted phrase (Arabic dual only; see `twoOblique`). */
-export type PluralCase = 'nominative' | 'oblique';
-
-export function plural(
-  lang: PluralLang,
-  count: number,
-  forms: PluralForms,
-  display: string = String(count),
-  grammaticalCase: PluralCase = 'nominative'
-): string {
-  const category = RULES[lang].select(count) as keyof PluralForms;
-  let form =
-    (category === 'two' && grammaticalCase === 'oblique' ? forms.twoOblique : undefined) ??
-    forms[category] ??
-    forms.other;
-  const isRange = /[–-]/.test(display);
-  if (isRange && !form.includes('{n}')) form = forms.few ?? forms.other;
-  return form.replace('{n}', display);
-}
-
-/** `plural` for a `CountedNoun`, in the given language. */
-export function countText(
-  lang: PluralLang,
-  count: number,
-  noun: CountedNoun,
-  display?: string,
-  grammaticalCase: PluralCase = 'nominative'
-): string {
-  return plural(lang, count, noun[lang], display, grammaticalCase);
-}
-
-/* ── The storefront's counted nouns ───────────────────────────────────── */
-
-/** Cart / order lines: "1 item" · "قطعة واحدة / قطعتان / ٣ قطع / ١١ قطعة". */
-export const ITEMS: CountedNoun = {
-  en: { one: '{n} item', other: '{n} items' },
-  ar: {
-    zero: '{n} قطعة',
-    one: 'قطعة واحدة',
-    two: 'قطعتان',
-    twoOblique: 'قطعتين',
-    few: '{n} قطع',
-    many: '{n} قطعة',
-    other: '{n} قطعة',
-  },
-};
+export { plural, countText, ITEMS } from '@ebda/shared';
+export type { PluralLang, PluralForms, CountedNoun } from '@ebda/shared';
+import { ITEMS } from '@ebda/shared';
+import type { CountedNoun } from '@ebda/shared';
 
 /** Category product counts: "4 pieces" · "٤ قطع". */
 export const PIECES: CountedNoun = {
   en: { one: '{n} piece', other: '{n} pieces' },
   ar: ITEMS.ar,
+};
+
+/** Swatch colours on a card (R-14, read by screen readers only). */
+export const COLOURS: CountedNoun = {
+  en: { one: '{n} colour', other: '{n} colours' },
+  ar: {
+    zero: '{n} لون',
+    one: 'لون واحد',
+    two: 'لونين',
+    few: '{n} ألوان',
+    many: '{n} لون',
+    other: '{n} لون',
+  },
 };
 
 /** Search results. */
@@ -109,8 +46,7 @@ export const RESULTS: CountedNoun = {
   ar: {
     zero: '{n} نتيجة',
     one: 'نتيجة واحدة',
-    two: 'نتيجتان',
-    twoOblique: 'نتيجتين',
+    two: 'نتيجتين',
     few: '{n} نتائج',
     many: '{n} نتيجة',
     other: '{n} نتيجة',
@@ -123,8 +59,7 @@ export const VERIFIED_REVIEWS: CountedNoun = {
   ar: {
     zero: '{n} مراجعة موثّقة',
     one: 'مراجعة موثّقة واحدة',
-    two: 'مراجعتان موثّقتان',
-    twoOblique: 'مراجعتين موثّقتين',
+    two: 'مراجعتين موثّقتين',
     few: '{n} مراجعات موثّقة',
     many: '{n} مراجعة موثّقة',
     other: '{n} مراجعة موثّقة',
@@ -137,12 +72,21 @@ export const DAYS: CountedNoun = {
   ar: {
     zero: '{n} يوم',
     one: 'يوم واحد',
-    two: 'يومان',
-    twoOblique: 'يومين',
+    two: 'يومين',
     few: '{n} أيام',
-    many: '{n} يومًا',
+    many: '{n} يوم',
     other: '{n} يوم',
   },
+};
+
+/**
+ * Calendar days in LEGAL text only (the returns-policy body and the terms sentence, inside a
+ * `legal-register` fence; Ruling FU46-Y02b, review I6): formal Arabic keeps the accusative
+ * tanween at 11–99 ("خلال ١٤ يومًا"). The dual follows a preposition there, so it is "يومين".
+ */
+export const DAYS_FORMAL: CountedNoun = {
+  en: DAYS.en,
+  ar: { ...DAYS.ar, many: '{n} يومًا' },
 };
 
 /** Business days (shipping-zone estimates). */
@@ -151,8 +95,7 @@ export const BUSINESS_DAYS: CountedNoun = {
   ar: {
     zero: '{n} يوم عمل',
     one: 'يوم عمل واحد',
-    two: 'يوما عمل',
-    twoOblique: 'يومي عمل',
+    two: 'يومين عمل',
     few: '{n} أيام عمل',
     many: '{n} يوم عمل',
     other: '{n} يوم عمل',
@@ -163,12 +106,12 @@ export const BUSINESS_DAYS: CountedNoun = {
 export const ITEMS_ADDED: CountedNoun = {
   en: { one: '{n} item added to your cart', other: '{n} items added to your cart' },
   ar: {
-    zero: 'لم تُضف أي قطعة إلى سلتك',
-    one: 'أُضيفت قطعة واحدة إلى سلتك',
-    two: 'أُضيفت قطعتان إلى سلتك',
-    few: 'أُضيفت {n} قطع إلى سلتك',
-    many: 'أُضيفت {n} قطعة إلى سلتك',
-    other: 'أُضيفت {n} قطعة إلى سلتك',
+    zero: 'متضافتش أي قطعة لسلتك',
+    one: 'اتضافت قطعة واحدة لسلتك',
+    two: 'اتضافت قطعتين لسلتك',
+    few: 'اتضافت {n} قطع لسلتك',
+    many: 'اتضافت {n} قطعة لسلتك',
+    other: 'اتضافت {n} قطعة لسلتك',
   },
 };
 
@@ -176,12 +119,12 @@ export const ITEMS_ADDED: CountedNoun = {
 export const ITEMS_NEED_OPTIONS: CountedNoun = {
   en: { one: '{n} item needs a variant', other: '{n} items need a variant' },
   ar: {
-    zero: 'لا توجد منتجات تحتاج إلى اختيار نوع',
-    one: 'منتج واحد يحتاج إلى اختيار نوع',
-    two: 'منتجان يحتاجان إلى اختيار نوع',
-    few: '{n} منتجات تحتاج إلى اختيار نوع',
-    many: '{n} منتجًا تحتاج إلى اختيار نوع',
-    other: '{n} منتج تحتاج إلى اختيار نوع',
+    zero: 'مفيش منتجات محتاجة تختار نوعها',
+    one: 'منتج واحد محتاج تختار نوعه',
+    two: 'منتجين محتاجين تختار نوعهم',
+    few: '{n} منتجات محتاجة تختار نوعها',
+    many: '{n} منتج محتاجين تختار نوعهم',
+    other: '{n} منتج محتاجين تختار نوعهم',
   },
 };
 
@@ -191,8 +134,7 @@ export const STARS: CountedNoun = {
   ar: {
     zero: '{n} نجمة',
     one: 'نجمة واحدة',
-    two: 'نجمتان',
-    twoOblique: 'نجمتين',
+    two: 'نجمتين',
     few: '{n} نجوم',
     many: '{n} نجمة',
     other: '{n} نجمة',

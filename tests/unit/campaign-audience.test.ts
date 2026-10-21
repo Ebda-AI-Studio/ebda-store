@@ -52,6 +52,15 @@ describe('buildCampaignAudience — consent only', () => {
     expect(audience.map(a => a.email)).toEqual(['yes@a.test']);
   });
 
+  it('excludes cart-reminder-only consent: "email me about my cart" is not a newsletter opt-in', async () => {
+    db.subscribers.push(
+      subscriberRow(STORE_A, 'news@a.test'),
+      subscriberRow(STORE_A, 'cart@a.test', { consentScope: 'cart_reminders', source: 'checkout' })
+    );
+    expect((await buildCampaignAudience(STORE_A)).map(a => a.email)).toEqual(['news@a.test']);
+    expect(await audienceCount(STORE_A)).toBe(1);
+  });
+
   it('excludes a row that is flagged active but carries an unsubscribedAt', async () => {
     db.subscribers.push(
       subscriberRow(STORE_A, 'half@a.test', { isActive: true, unsubscribedAt: new Date() })

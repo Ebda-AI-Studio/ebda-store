@@ -242,7 +242,7 @@ export default function CodReconciliationPage() {
               type="button"
               onClick={doImport}
               disabled={importing || !csv.trim()}
-              className="mt-3 px-4 py-2 text-sm font-medium rounded-lg bg-primary text-white hover:bg-primary/90 disabled:opacity-50"
+              className="mt-3 px-4 py-2 text-sm font-medium rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
             >
               {t('import')}
             </button>

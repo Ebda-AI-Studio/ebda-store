@@ -62,6 +62,7 @@ import { subscriptionBillingTemplate } from '@api/services/email-templates/subsc
 import { staffInviteTemplate } from '@api/services/email-templates/staff-invite';
 import { legalNoticeTemplate } from '@api/services/email-templates/legal-notice';
 import { passkeyNoticeTemplate } from '@api/services/email-templates/passkey-notice';
+import { cartRecoveryTemplate } from '@api/services/email-templates/cart-recovery';
 
 type Locale = 'en' | 'ar';
 
@@ -148,6 +149,14 @@ const LEGAL_NOTICE_SAMPLE = {
   url: { ar: 'https://ebda.app/terms/', en: 'https://ebda.app/en/terms/' },
 };
 
+const CART_RECOVERY_SAMPLE = {
+  storeName: 'Demo Store',
+  items: [{ productName: 'Linen shirt', price: 25000, quantity: 2 }],
+  total: 50000,
+  cartUrl: 'https://s.test/cart',
+  unsubscribeUrl: 'https://s.test/unsubscribe?token=t',
+};
+
 type Tpl = Record<Locale, (...a: never[]) => string>;
 const TEMPLATES: Record<string, Tpl> = {
   welcome: welcomeTemplate,
@@ -169,6 +178,11 @@ const TEMPLATES: Record<string, Tpl> = {
   subscriptionBilling: subscriptionBillingTemplate,
   staffInvite: staffInviteTemplate,
   passkeyNotice: passkeyNoticeTemplate,
+  // Recovery email takes a data object, not the (data, storeName, url) triple.
+  cartRecovery: {
+    en: () => cartRecoveryTemplate.en(CART_RECOVERY_SAMPLE),
+    ar: () => cartRecoveryTemplate.ar(CART_RECOVERY_SAMPLE),
+  },
   // One bilingual body for every recipient (Ruling LEGAL-6), so both locale keys render the same.
   legalNotice: {
     en: () => legalNoticeTemplate.body(LEGAL_NOTICE_SAMPLE),

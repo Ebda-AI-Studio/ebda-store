@@ -89,13 +89,13 @@ export function FooterLegalRow({
             {links.map((l, i) => (
               <li key={l.path} className="flex items-center gap-x-2">
                 {i > 0 && (
-                  <span aria-hidden="true" className="opacity-60">
+                  <span aria-hidden="true" className="text-muted-foreground">
                     ·
                   </span>
                 )}
                 <a
                   href={l.href}
-                  className="underline-offset-4 hover:underline focus-visible:underline focus-visible:outline-none"
+                  className="inline-flex min-h-11 min-w-11 items-center justify-center underline-offset-4 hover:underline focus-visible:underline focus-visible:outline-none"
                 >
                   {l.label}
                 </a>

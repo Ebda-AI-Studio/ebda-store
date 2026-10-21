@@ -99,7 +99,13 @@ describe('registry presets source their starter copy from the one constant', () 
     // Only image-text preset 0 is allowed to carry starter copy; every other
     // preset must be publishable as inserted (it is real, generic copy).
     const bad: string[] = [];
-    for (const type of ['newsletter', 'featured-collection', 'collection-list', 'trust-badges']) {
+    for (const type of [
+      'newsletter',
+      'featured-collection',
+      'collection-list',
+      'trust-badges',
+      'shop-the-look',
+    ]) {
       const d = getSectionDefinition(type);
       d?.presets.forEach((pr, i) => {
         for (const v of Object.values(pr.settings))

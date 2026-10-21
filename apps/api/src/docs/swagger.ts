@@ -445,7 +445,7 @@ export function setupSwagger(app: Express) {
       customCss: `
         .swagger-ui .topbar { display: none }
         .swagger-ui .info { margin-bottom: 30px }
-        .swagger-ui .info .title { color: #f97316 }
+        .swagger-ui .info .title { color: ${BRAND.colors.gold} }
       `,
       customSiteTitle: `${BRAND.product.nameEn} API Documentation`,
       customfavIcon: '/favicon.ico',

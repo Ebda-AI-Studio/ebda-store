@@ -18,6 +18,7 @@ import { storeLayoutSchema } from './layout-schema';
 import { allSections, sectionToLegacy } from './adapter';
 import { isPlaceholderCopy } from './placeholder-copy';
 import { getSectionDefinition, VIEWPORTS } from './registry';
+import { getLook } from '../looks/registry';
 import {
   BUILDER_LIMITS,
   pageDefinitionSchema,
@@ -266,7 +267,8 @@ export function validateDefinitionSync(input: unknown): ValidationResult {
     );
 
   const ids = new Set<string>();
-  const counts = new Map<string, number>();
+  /** Per type: untagged count, and per look tag the count of sections tagged with it. */
+  const counts = new Map<string, { untagged: number; tagged: Map<string, number> }>();
   const visit = (nodes: SectionNode[], base: string, group: SectionGroup) => {
     nodes.forEach((n, i) => {
       const path = `${base}/${i}`;
@@ -280,15 +282,30 @@ export function validateDefinitionSync(input: unknown): ValidationResult {
           )
         );
       ids.add(n.id);
-      counts.set(n.type, (counts.get(n.type) ?? 0) + 1);
+      const c = counts.get(n.type) ?? { untagged: 0, tagged: new Map<string, number>() };
+      if (n.lookTag === undefined) c.untagged++;
+      else c.tagged.set(n.lookTag, (c.tagged.get(n.lookTag) ?? 0) + 1);
+      counts.set(n.type, c);
+      if (n.lookTag !== undefined && !getLook(n.lookTag))
+        errors.push(
+          issue(
+            'SCHEMA',
+            `${path}/lookTag`,
+            `Unknown look "${n.lookTag}".`,
+            `مظهر غير معروف "${n.lookTag}".`
+          )
+        );
       validateSection(n, path, group, errors);
     });
   };
   visit(def.sectionGroups.header, '/sectionGroups/header', 'header');
   visit(def.sections, '/sections', 'template');
   visit(def.sectionGroups.footer, '/sectionGroups/footer', 'footer');
-  for (const [type, n] of counts) {
+  // What renders under any one look is the untagged sections plus that look's tagged ones
+  // (`documentForLook`), so the cap applies to that sum, never to tagged sections of other looks.
+  for (const [type, c] of counts) {
     const d = getSectionDefinition(type);
+    const n = c.untagged + Math.max(0, ...c.tagged.values());
     if (d && n > d.maxCount)
       errors.push(
         issue(
@@ -412,7 +429,15 @@ function scanPlaceholderCopy(
 /** Section types whose settings hold catalogue refs (`categorySlug` / `manualProductIds`). */
 const REF_SECTION_TYPES = new Set(['product-carousel', 'featured-collection', 'product-spotlight']);
 
-/** Collect catalogue refs held by product sections and collection tiles. */
+/** Block types whose settings hold product refs (`productIds`): shop-the-look looks (C11). */
+const REF_BLOCK_SECTION_TYPES = new Set(['shop-the-look']);
+
+/** The product ids a shop-the-look `look` block names, as stored. */
+function blockProductIds(settings: Record<string, unknown>): unknown[] {
+  return Array.isArray(settings.productIds) ? settings.productIds : [];
+}
+
+/** Collect catalogue refs held by product sections, collection tiles and shop-the-look looks. */
 export function collectRefs(def: PageDefinition): {
   categorySlugs: string[];
   productIds: string[];
@@ -424,6 +449,10 @@ export function collectRefs(def: PageDefinition): {
       for (const b of n.blocks ?? [])
         if (typeof b.settings.categorySlug === 'string' && b.settings.categorySlug)
           categorySlugs.add(b.settings.categorySlug);
+    if (REF_BLOCK_SECTION_TYPES.has(n.type))
+      for (const b of n.blocks ?? [])
+        for (const id of blockProductIds(b.settings))
+          if (typeof id === 'string') productIds.add(id);
     if (!REF_SECTION_TYPES.has(n.type)) continue;
     if (typeof n.settings.categorySlug === 'string' && n.settings.categorySlug)
       categorySlugs.add(n.settings.categorySlug);
@@ -456,6 +485,20 @@ export async function validateDefinition(
             )
           );
       });
+    if (REF_BLOCK_SECTION_TYPES.has(n.type))
+      (n.blocks ?? []).forEach((b, j) =>
+        blockProductIds(b.settings).forEach((id, k) => {
+          if (typeof id === 'string' && !found.productIds.has(id))
+            res.warnings.push(
+              issue(
+                'REF_NOT_FOUND',
+                `/sections/${i}/blocks/${j}/settings/productIds/${k}`,
+                `Product "${id}" is not in this store and will not show in the look.`,
+                `المنتج "${id}" غير موجود في هذا المتجر ولن يظهر في اللوك.`
+              )
+            );
+        })
+      );
     if (!REF_SECTION_TYPES.has(n.type)) return;
     const slug = n.settings.categorySlug;
     if (typeof slug === 'string' && slug && !found.categorySlugs.has(slug))
