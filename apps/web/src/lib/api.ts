@@ -574,6 +574,8 @@ const NO_REFRESH_AUTH_ROUTES = new Set([
   '/auth/verify-email',
   '/auth/resend-verification',
   '/auth/mfa/verify',
+  '/auth/passkeys/authenticate/begin',
+  '/auth/passkeys/authenticate/finish',
 ]);
 
 export function endpointMayRefresh(endpoint: string): boolean {
@@ -989,6 +991,15 @@ class ApiClient {
       csrfToken?: string;
     }>('/auth/login', { method: 'POST', body: JSON.stringify({ email, password, storeId }) });
 
+    return this.persistLoginSession(result);
+  }
+
+  /**
+   * Browser-side bookkeeping for a freshly minted session (password login AND passkey sign-in).
+   */
+  persistLoginSession<
+    R extends { success: boolean; data?: { refreshToken: string; csrfToken?: string } },
+  >(result: R): R {
     if (result.success && result.data) {
       // This browser now holds a session, so a later 401 on /auth/me is worth
       // a refresh (see SESSION_MARKER_KEY).
@@ -1018,6 +1029,28 @@ class ApiClient {
     }
 
     return result;
+  }
+
+  /** Passkey sign-in, step 1: discoverable-credential options for THIS host (Ruling PASSKEY-3). */
+  async passkeyBegin() {
+    return this.request<unknown>('/auth/passkeys/authenticate/begin', {
+      method: 'POST',
+      body: '{}',
+    });
+  }
+
+  /** Passkey sign-in, step 2: send the signed assertion; a full session comes back (PASSKEY-4). */
+  async passkeyFinish(response: unknown) {
+    const result = await this.request<{
+      user: User;
+      accessToken: string;
+      refreshToken: string;
+      csrfToken?: string;
+    }>('/auth/passkeys/authenticate/finish', {
+      method: 'POST',
+      body: JSON.stringify({ response }),
+    });
+    return this.persistLoginSession(result);
   }
 
   async logout() {
@@ -1520,6 +1553,13 @@ class ApiClient {
   async put<T>(endpoint: string, data: unknown) {
     return this.request<T>(endpoint, {
       method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async patch<T>(endpoint: string, data: unknown) {
+    return this.request<T>(endpoint, {
+      method: 'PATCH',
       body: JSON.stringify(data),
     });
   }

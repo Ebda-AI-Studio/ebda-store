@@ -62,6 +62,7 @@ const { sendMock, mockPrisma } = vi.hoisted(() => {
       findMany: vi.fn().mockResolvedValue([]),
       deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
     },
+    passkeyCredential: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
     order: {
       updateMany: vi.fn().mockResolvedValue({ count: 0 }),
       findMany: vi.fn().mockResolvedValue([]),
@@ -152,6 +153,10 @@ vi.mock('@api/lib/definer', () => ({
     await mockPrisma.verificationToken.deleteMany({ where: { userId } });
     return 0;
   },
+  deleteUserPasskeys: async (userId: string) => {
+    await mockPrisma.passkeyCredential.deleteMany({ where: { userId } });
+    return 0;
+  },
   insertAuditLog: (e: { action: string; storeId?: string | null; details?: unknown }) =>
     mockPrisma.auditLog.create({
       data: { action: e.action, storeId: e.storeId ?? null, details: e.details },
@@ -205,6 +210,13 @@ describe('AuthService.eraseAccount — third-party propagation', () => {
     expect(sendMock).toHaveBeenCalledWith({
       name: 'account/erased',
       data: { userId: CUSTOMER.id, oneSignalPlayerIds: ['player-a', 'player-b'] },
+    });
+  });
+
+  it('erases the shopper\u2019s passkeys in the same transaction (Ruling PASSKEY-1)', async () => {
+    await AuthService.eraseAccount(CUSTOMER.id);
+    expect(mockPrisma.passkeyCredential.deleteMany).toHaveBeenCalledWith({
+      where: { userId: CUSTOMER.id },
     });
   });
 
