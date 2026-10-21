@@ -202,6 +202,7 @@ export function createFakePrisma(db: FakeDb) {
       for (const s of db.subscribers) {
         if (s.storeId !== storeId) continue;
         if (s.isActive !== true) continue;
+        if (s.consentScope === 'cart_reminders') continue;
         if (s.unsubscribedAt !== null && s.unsubscribedAt !== undefined) continue;
         const email = String(s.email ?? '')
           .toLowerCase()

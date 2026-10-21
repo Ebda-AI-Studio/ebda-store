@@ -1405,13 +1405,18 @@ model ProductVariantOption {
 // ==========================================
 
 model Cart {
-  id             String   @id @default(uuid())
-  storeId        String   @map("store_id")
-  customerId     String?  @map("customer_id")
-  sessionId      String   @map("session_id")
-  lastActivityAt DateTime @default(now()) @map("last_activity_at")
-  createdAt      DateTime @default(now()) @map("created_at")
-  updatedAt      DateTime @updatedAt @map("updated_at")
+  id                  String    @id @default(uuid())
+  storeId             String    @map("store_id")
+  customerId          String?   @map("customer_id")
+  sessionId           String    @map("session_id")
+  lastActivityAt      DateTime  @default(now()) @map("last_activity_at")
+  /// Set ONLY when the shopper ticked the checkout box "email me about my cart" (consent), together
+  /// with `guestEmailConsentAt`; the store's newsletter_subscribers row (scope cart_reminders) is
+  /// upserted in the same action. Reaches guests; the reminder email is gated on the subscriber row.
+  guestEmail          String?   @map("guest_email")
+  guestEmailConsentAt DateTime? @map("guest_email_consent_at")
+  createdAt           DateTime  @default(now()) @map("created_at")
+  updatedAt           DateTime  @updatedAt @map("updated_at")
 
   // Relations
   store         Store          @relation(fields: [storeId], references: [id], onDelete: Cascade)
@@ -3326,6 +3331,11 @@ model NewsletterSubscriber {
   isActive       Boolean   @default(true) @map("is_active")
   subscribedAt   DateTime  @default(now()) @map("subscribed_at")
   unsubscribedAt DateTime? @map("unsubscribed_at")
+  /// What the address agreed to. 'newsletter' = the newsletter (footer/popup/section/manual; also
+  /// allows campaigns and cart reminders); 'cart_reminders' = ONLY the checkout box "email me about
+  /// my cart" - campaigns never go to it (Ruling CART-CONSENT-1). Drives the email footer wording.
+  consentScope   String    @default("newsletter") @map("consent_scope")
+  consentAt      DateTime? @map("consent_at")
 
   store              Store               @relation(fields: [storeId], references: [id], onDelete: Cascade)
   campaignRecipients CampaignRecipient[]

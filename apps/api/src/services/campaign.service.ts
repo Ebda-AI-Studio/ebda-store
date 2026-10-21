@@ -130,6 +130,7 @@ export async function audienceCount(storeId: string): Promise<number> {
     WHERE store_id = ${storeId}
       AND is_active = true
       AND unsubscribed_at IS NULL
+      AND consent_scope <> 'cart_reminders'
       AND email LIKE '%@%'
   `;
   return Number(rows[0]?.count ?? 0);
@@ -137,7 +138,13 @@ export async function audienceCount(storeId: string): Promise<number> {
 
 export async function buildCampaignAudience(storeId: string): Promise<AudienceMember[]> {
   const rows = await prisma.newsletterSubscriber.findMany({
-    where: { storeId, isActive: true, unsubscribedAt: null },
+    // 'cart_reminders' (the checkout box) is consent for cart reminders ONLY, never campaigns.
+    where: {
+      storeId,
+      isActive: true,
+      unsubscribedAt: null,
+      consentScope: { not: 'cart_reminders' },
+    },
     select: { id: true, email: true, language: true },
     orderBy: { subscribedAt: 'asc' },
   });
