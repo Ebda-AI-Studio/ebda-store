@@ -198,7 +198,7 @@ export function guard(url, argv) {
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 
 /** The catalogue, size charts, shipping zone and settings for ONE store (owner client, one tx). */
-async function seedCatalogue(prisma, Prisma, storeId, base) {
+export async function seedCatalogue(prisma, Prisma, storeId, base) {
   const url = f => `${base}/${f}`;
   return prisma.$transaction(
     async tx => {
@@ -356,6 +356,10 @@ async function seedCatalogue(prisma, Prisma, storeId, base) {
             titleAr: combo.map(v => v.valueAr).join(' / '),
             inventory: soldOut.has(values.join('|')) ? 0 : (p.stock ?? 8),
             allowBackorder: p.backorder === true,
+            // A sale on a variant product lives on its variants: the PDP shows the strike only
+            // when the picked variant carries both prices (product-pricing.ts); null clears it.
+            price: p.compareAtPrice ? p.price : null,
+            compareAtPrice: p.compareAtPrice ?? null,
             isActive: true,
             position: vPos,
           };
@@ -523,6 +527,9 @@ async function run() {
       isDemo: true,
       status: 'active',
       currency: 'EGP',
+      // The showroom runs the Professional plan so every feature the catalogue shows is live
+      // (the backorder pre-order is `inventory.backorder`, a Professional feature; Ruling B1-112).
+      plan: 'professional',
     };
     const store = await prisma.store.upsert({
       where: { slug: SLUG },
@@ -552,6 +559,7 @@ async function run() {
             nameAr: `قمر ${l.name.ar}`,
             isDemo: false,
             status: 'active',
+            plan: 'professional',
           },
           create: {
             slug,
@@ -563,6 +571,7 @@ async function run() {
             isDemo: false,
             status: 'active',
             currency: 'EGP',
+            plan: 'professional',
           },
         });
         const sSeeded = await runInStoreScope(s.id, () =>
