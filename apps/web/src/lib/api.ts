@@ -23,6 +23,7 @@
  * admin app uses a simpler 'authToken' approach.
  */
 import { isIosWebkit } from '@ebda/shared';
+import type { buildQuoteRequest, OrderQuote } from './checkout-quote';
 import type {
   PublicModel3d,
   ProductFact,
@@ -408,6 +409,9 @@ interface CreateOrderData {
   /** Pay from the customer wallet (D1). A request — the server spends
    *  min(balance, total) only when the store's wallet checkout is on. */
   useWallet?: boolean;
+  /** The total (piastres) the buyer confirmed, from the server's own quote (POST /public/orders/quote). The server compares and
+   *  never charges it: a mismatch is 409 PRICE_CHANGED. */
+  expectedTotal?: number;
   /** Explicit "Send me offers by SMS" tick (issue 206). Sent only when the
    *  box was rendered AND ticked; never a withdrawal. */
   smsOptIn?: boolean;
@@ -1302,6 +1306,17 @@ class ApiClient {
   // Orders (public endpoints)
   async createOrder(data: CreateOrderData) {
     return this.request<{ order: Order }>('/public/orders', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  /**
+   * The EXACT total the server would charge for the current cart and these inputs (B2B design review I-1). Sent back as
+   * `expectedTotal` on createOrder so a repricing between the two surfaces as 409 PRICE_CHANGED.
+   */
+  async quoteOrder(data: ReturnType<typeof buildQuoteRequest>) {
+    return this.request<{ quote: OrderQuote }>('/public/orders/quote', {
       method: 'POST',
       body: JSON.stringify(data),
     });

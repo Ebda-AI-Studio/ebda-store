@@ -61,3 +61,15 @@ export function priceSnapshot(r: Resolved): {
 export function eligibleForCoupon(r: Resolved): boolean {
   return r.source === 'base';
 }
+
+/**
+ * The goods value loyalty points may be redeemed against (Ruling B2B-M3): the order subtotal minus the lines priced by a tier
+ * or a group price (the same exclusion as coupons, B2B-5) minus the primary (coupon / promotion) discount, floored at 0.
+ */
+export function loyaltyRedeemableSubtotal(i: {
+  subtotal: number;
+  nonBaseSubtotal: number;
+  primaryDiscount: number;
+}): number {
+  return Math.max(0, i.subtotal - i.nonBaseSubtotal - i.primaryDiscount);
+}

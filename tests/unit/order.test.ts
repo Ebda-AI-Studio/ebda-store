@@ -118,7 +118,7 @@ vi.mock('@ebda/database', () => ({
       // findFirst backs createAdminOrder's customerId ownership check — an
       // attached customer must belong to THIS store (2026-09-02 audit).
       // Default: resolves, so tests that don't exercise it are unaffected.
-      findFirst: vi.fn().mockResolvedValue({ id: 'customer-1' }),
+      findFirst: vi.fn().mockResolvedValue({ id: 'customer-1', status: 'active', deletedAt: null }),
     },
     promotion: {
       findMany: vi.fn().mockResolvedValue([]),
@@ -533,10 +533,13 @@ describe('OrderService', () => {
       );
 
       expect(result.orderNumber).toBeDefined();
+      // priced below with the real buyer, so the cart service's own pricing pass is skipped (money review M-7)
       expect(CartService.getOrCreate).toHaveBeenCalledWith(
         mockStoreId,
         mockSessionId,
-        mockCustomerId
+        mockCustomerId,
+        expect.objectContaining({ kind: 'anonymous' }),
+        { skipPricing: true }
       );
     });
 

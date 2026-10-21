@@ -25,7 +25,10 @@
 import { describe, it, expect, vi } from 'vitest';
 import type { Request, Response, NextFunction } from 'express';
 
-vi.mock('@ebda/database', () => ({
+// The real module's exports are kept (the public / order / payment routers import enums and helpers from it); only the
+// `prisma` client is replaced, so nothing here can reach a database.
+vi.mock('@ebda/database', async importOriginal => ({
+  ...(await importOriginal<typeof import('@ebda/database')>()),
   prisma: {
     user: { findFirst: vi.fn(), findUnique: vi.fn(), update: vi.fn() },
     store: { findFirst: vi.fn() },
@@ -47,7 +50,8 @@ vi.mock('@api/services/auth.service', () => ({
   GENERIC_RESEND_VERIFICATION_RESULT: { success: true, message: '' },
 }));
 
-vi.mock('@api/middleware/security', () => ({
+vi.mock('@api/middleware/security', async importOriginal => ({
+  ...(await importOriginal<typeof import('@api/middleware/security')>()),
   authLimiter: (_req: unknown, _res: unknown, next: () => void) => next(),
   refreshLimiter: (_req: unknown, _res: unknown, next: () => void) => next(),
   refreshIpLimiter: (_req: unknown, _res: unknown, next: () => void) => next(),
@@ -72,6 +76,9 @@ import { rejectImpersonated } from '@api/middleware/auth';
 import authRoutes from '@api/routes/auth.routes';
 import mfaRoutes from '@api/routes/mfa.routes';
 import customersRoutes from '@api/routes/customers.routes';
+import publicRoutes from '@api/routes/public.routes';
+import orderRoutes from '@api/routes/order.routes';
+import paymentRoutes from '@api/routes/payment.routes';
 
 function makeRes() {
   const recorded: { status: number; body: unknown } = { status: 200, body: undefined };
@@ -165,6 +172,11 @@ const ROUTERS: Record<string, Router> = {
   // anonymization DELETE /auth/me uses), so it belongs in DESTRUCTIVE_ROUTES
   // below exactly like that route does (#1873).
   customers: customersRoutes as unknown as Router,
+  // The routes that CREATE A REAL ORDER or START A PAYMENT as the signed-in customer (B2B design review I5 / I-4): a platform
+  // impersonation session must not buy as the impersonated customer, least of all at that account's wholesale price.
+  public: publicRoutes as unknown as Router,
+  orders: orderRoutes as unknown as Router,
+  payments: paymentRoutes as unknown as Router,
 };
 
 function middlewareOn(
@@ -224,5 +236,46 @@ describe('rejectImpersonated — mounted on every account-destructive route', ()
     // `/auth/mfa/verify` is the pre-session challenge — there is no
     // `req.user` yet, so it is correctly excluded rather than overlooked.
     expect(middlewareOn('mfa', 'post', '/verify')).not.toContain(rejectImpersonated);
+  });
+});
+
+/** Money-creating routes: order creation and payment initiation (design review I5 / I-4). */
+const MONEY_ROUTES: Array<[string, string, string]> = [
+  ['public', 'post', '/orders'],
+  ['orders', 'post', '/'],
+  ['payments', 'post', '/create'],
+];
+
+describe('rejectImpersonated — mounted on every route that creates an order or starts a payment', () => {
+  it.each(MONEY_ROUTES)('%s: %s %s carries the guard', (router, method, path) => {
+    expect(middlewareOn(router, method, path)).toContain(rejectImpersonated);
+  });
+
+  it('runs AFTER the (optional) authentication that populates req.user', () => {
+    for (const [router, method, path] of MONEY_ROUTES) {
+      const stack = middlewareOn(router, method, path);
+      const guardAt = stack.indexOf(rejectImpersonated);
+      const authAt = stack.findIndex(
+        h => h.name === 'authenticate' || h.name === 'optionalAuthenticate'
+      );
+      const at = `${router}: ${method} ${path}`;
+      expect(authAt, `${at}: no authentication middleware found`).toBeGreaterThan(-1);
+      expect(authAt, `${at}: guard runs before authentication`).toBeLessThan(guardAt);
+    }
+  });
+
+  it('an impersonated customer session is refused with IMPERSONATION_FORBIDDEN before the handler runs', () => {
+    const { res, recorded } = makeRes();
+    const next = vi.fn() as unknown as NextFunction;
+    const req = {
+      user: { userId: 'wholesaler-1', role: 'customer', impersonatedBy: 'admin-9' },
+    } as unknown as Request;
+    rejectImpersonated(req, res, next);
+    expect(next).not.toHaveBeenCalled();
+    expect(recorded.status).toBe(403);
+  });
+
+  it('the read-only quote is NOT guarded (looking is what impersonation is for)', () => {
+    expect(middlewareOn('public', 'post', '/orders/quote')).not.toContain(rejectImpersonated);
   });
 });

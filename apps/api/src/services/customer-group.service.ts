@@ -209,9 +209,8 @@ export const CustomerGroupService = {
 
     // Ruling B2B-2e - this method NEVER rewrites an existing row's contact or name fields.
     //  * userId given (the merchant is on a REGISTERED shopper's profile): the identity is the `customers.user_id` link.
-    //    Match that row; else create the shopper's own row linked to the user. Contact fields are taken from the caller
-    //    only where they are FREE (a phone / email already held by another row is never stolen or duplicated), so a
-    //    shopper who set someone else's phone on their profile gets their own row, not the other person's.
+    //    Match that row; else create the shopper's own row linked to the user, with the account email where it is free
+    //    and NO phone, so a shopper who set someone else's phone on their profile gets their own row, not the other person's.
     //  * no userId (a guest key, or a CRM identity): match phone first then email, attach the group to that row, and
     //    change nothing else on it. Such a row has no user_id, so it grants no group PRICE or promotion benefit to anyone
     //    who types its phone; it is only ever used when the merchant explicitly picks it.
@@ -250,8 +249,10 @@ export const CustomerGroupService = {
             data: {
               storeId,
               userId: shopper.id,
-              phone: await free('phone', phone ?? shopper.phone ?? null),
-              email: await free('email', email ?? shopper.email ?? null),
+              // The phone is NEVER copied onto a linked row: a shopper's profile phone is self-edited and unverified, and a
+              // linked row that held a wholesaler's phone would be matched by that phone later (design review I-3).
+              phone: null,
+              email: await free('email', shopper.email ?? email ?? null),
               firstName: identity.firstName?.trim() || shopper.firstName || '',
               lastName: identity.lastName?.trim() || shopper.lastName || '',
               groupId,
@@ -277,14 +278,16 @@ export const CustomerGroupService = {
       }
     }
 
+    // Design review I-3: without a userId only UNLINKED rows (user_id NULL: CRM / guest rows) are candidates. A row linked to
+    // a registered shopper is that shopper's, and a typed phone / email must never steer a group onto it.
     const match: Prisma.CustomerWhereInput = phone
-      ? { storeId, phone }
-      : { storeId, email: { equals: email as string, mode: 'insensitive' } };
+      ? { storeId, userId: null, phone }
+      : { storeId, userId: null, email: { equals: email as string, mode: 'insensitive' } };
     const existing =
       (await prisma.customer.findFirst({ where: match, select: { id: true } })) ??
       (email && phone
         ? await prisma.customer.findFirst({
-            where: { storeId, email: { equals: email, mode: 'insensitive' } },
+            where: { storeId, userId: null, email: { equals: email, mode: 'insensitive' } },
             select: { id: true },
           })
         : null);
@@ -295,6 +298,27 @@ export const CustomerGroupService = {
         data: { groupId },
         select: assignReturnSelect,
       });
+    }
+
+    // Only a LINKED row matches this phone / email: refuse, loudly, rather than attach the group to someone else's account
+    // or trip the unique index with a 500. The merchant assigns the group from that shopper's profile instead.
+    const linkedOnly = await prisma.customer.findFirst({
+      where: {
+        storeId,
+        userId: { not: null },
+        OR: [
+          ...(phone ? [{ phone }] : []),
+          ...(email ? [{ email: { equals: email, mode: 'insensitive' as const } }] : []),
+        ],
+      },
+      select: { id: true },
+    });
+    if (linkedOnly) {
+      throw new AppError(
+        409,
+        'IDENTITY_LINKED_TO_ACCOUNT',
+        "This phone or email belongs to a registered shopper. Open that shopper's profile to assign their group."
+      );
     }
 
     try {

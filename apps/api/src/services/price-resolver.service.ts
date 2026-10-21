@@ -218,6 +218,21 @@ export async function loadBuyerGroup(
     });
   } else if (buyer.kind === 'merchant-selected') {
     if (!buyer.customerId && !buyer.shopperUserId) return null;
+    if (buyer.shopperUserId) {
+      // Same account tests as the session branch (design review M-5): a suspended / deleted account is never priced as a
+      // group member, even when a merchant picked it.
+      const shopper = await prisma.user.findFirst({
+        where: {
+          id: buyer.shopperUserId,
+          storeId,
+          role: 'customer',
+          status: 'active',
+          deletedAt: null,
+        },
+        select: { id: true },
+      });
+      if (!shopper) return null;
+    }
     customer = await prisma.customer.findFirst({
       where: {
         storeId,

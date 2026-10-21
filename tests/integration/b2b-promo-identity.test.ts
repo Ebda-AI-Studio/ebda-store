@@ -250,30 +250,99 @@ describe('assignByIdentity never clobbers an existing row (Ruling B2B-2e)', () =
     expect(mine?.email).toBe(attacker.email);
   });
 
-  it('a typed phone / email that only matches an existing row attaches the group but rewrites NO contact or name field', async () => {
+  it('I-3: a typed phone that only matches a row LINKED to a registered shopper is refused (409), and nothing on that row changes', async () => {
     const before = await vipRowNow();
+    await expect(
+      asApp(ids.store!, () =>
+        CustomerGroupService.assignByIdentity(
+          ids.store!,
+          {
+            phone: VIP_PHONE,
+            email: `${RUN}-someone-else@test.com`,
+            firstName: 'Evil',
+            lastName: 'Name',
+          },
+          ids.other!
+        )
+      )
+    ).rejects.toMatchObject({ statusCode: 409, code: 'IDENTITY_LINKED_TO_ACCOUNT' });
+    expect(await vipRowNow()).toMatchObject({
+      email: before.email,
+      phone: before.phone,
+      firstName: before.firstName,
+      lastName: before.lastName,
+      userId: before.userId,
+      groupId: ids.vip,
+    });
+  });
+
+  it('a typed phone that matches an UNLINKED CRM row attaches the group and rewrites NO contact or name field', async () => {
+    const crm = await owner.customer.create({
+      data: {
+        storeId: ids.store!,
+        phone: '+201066660001',
+        email: `${RUN}-guest@test.com`,
+        firstName: 'Guest',
+        lastName: 'One',
+      },
+    });
     await asApp(ids.store!, () =>
       CustomerGroupService.assignByIdentity(
         ids.store!,
         {
-          phone: VIP_PHONE,
-          email: `${RUN}-someone-else@test.com`,
+          phone: '+201066660001',
+          email: `${RUN}-other@test.com`,
           firstName: 'Evil',
           lastName: 'Name',
         },
         ids.other!
       )
     );
-    const after = await vipRowNow();
-    expect(after).toMatchObject({
-      email: before.email,
-      phone: before.phone,
-      firstName: before.firstName,
-      lastName: before.lastName,
-      userId: before.userId,
+    expect(await owner.customer.findUniqueOrThrow({ where: { id: crm.id } })).toMatchObject({
+      email: `${RUN}-guest@test.com`,
+      phone: '+201066660001',
+      firstName: 'Guest',
+      lastName: 'One',
+      userId: null,
       groupId: ids.other,
     });
-    await owner.customer.update({ where: { id: ids.vipRow! }, data: { groupId: ids.vip } });
+  });
+
+  it("I-3 (B2B-2c attack): the attacker puts a wholesaler's not-yet-known phone on their profile and gets a group; the merchant then assigns the REAL wholesaler by that guest phone: the attacker's row is untouched and the real one is a separate row", async () => {
+    const P = '+201066660099';
+    const evil = await owner.user.create({
+      data: {
+        email: `${RUN}-evil@test.com`,
+        passwordHash: 'x',
+        firstName: 'E',
+        lastName: 'V',
+        role: 'customer',
+        emailVerified: true,
+        storeId: ids.store!,
+        phone: P,
+      },
+    });
+    // merchant (or Task 5) gives the attacker's account a group: their linked row must NOT inherit the self-edited phone
+    await asApp(ids.store!, () =>
+      CustomerGroupService.assignByIdentity(ids.store!, { userId: evil.id, phone: P }, ids.other!)
+    );
+    const evilRow = await owner.customer.findFirstOrThrow({
+      where: { storeId: ids.store!, userId: evil.id },
+    });
+    expect(evilRow.phone).toBeNull();
+    // the real wholesaler is then approved from their guest profile (key = phone P)
+    const real = await asApp(ids.store!, () =>
+      CustomerGroupService.assignByIdentity(
+        ids.store!,
+        { phone: P, firstName: 'Real', lastName: 'Wholesaler' },
+        ids.vip!
+      )
+    );
+    expect(real.id).not.toBe(evilRow.id);
+    expect(await owner.customer.findUniqueOrThrow({ where: { id: evilRow.id } })).toMatchObject({
+      groupId: ids.other,
+      userId: evil.id,
+    });
   });
 
   it('a userId that is not a customer of this store is a 404, never a link', async () => {

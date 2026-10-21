@@ -176,7 +176,12 @@ vi.mock('@api/middleware/security', () => {
 });
 vi.mock('@api/middleware/auth', () => {
   const pass = (_req: unknown, _res: unknown, next: () => void) => next();
-  return { authenticate: pass, optionalAuthenticate: pass, customerUserId: vi.fn(() => null) };
+  return {
+    authenticate: pass,
+    optionalAuthenticate: pass,
+    rejectImpersonated: pass,
+    customerUserId: vi.fn(() => null),
+  };
 });
 vi.mock('@api/middleware/feature-gate', () => ({
   requireFeature: () => (_req: unknown, _res: unknown, next: () => void) => next(),

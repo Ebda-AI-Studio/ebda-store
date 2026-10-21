@@ -1,18 +1,22 @@
 /**
- * Architecture guard (design review section 7, docs/plans/2026-10-21-b2b-wholesale.md Task 3): after this change a charged
- * or customer-visible unit price is decided in ONE place, `PriceResolver` (and the pure `resolveUnitPrice` under it). Every
- * other read of a `price` / `unitPrice` in apps/api/src is either feeding the resolver, reading a PERSISTED order value,
- * a retail display, a catalogue read, an admin display, a writer, or a bundle base price - and must say so in the
- * allow-list below, with a reason. A new file that reads a price turns this red until someone classifies it.
+ * Architecture guard (design review section 7 + Task 3 money review M-4, docs/plans/2026-10-21-b2b-wholesale.md): after this
+ * change a charged or customer-visible unit price is decided in ONE place, `PriceResolver` (and the pure `resolveUnitPrice`
+ * under it). Every other read of a `price` / `unitPrice` in apps/api/src is either feeding the resolver, reading a PERSISTED
+ * order value, a retail display, a catalogue read, an admin display, a writer, or a bundle base price, and must say so in the
+ * allow-list below.
  *
- * The scan is AST based (TypeScript compiler API), so `p?.price`, destructuring `{ price }` and a Prisma `price: true`
- * select are all caught, not only the `x.price` regex shape.
+ * The allow-list is PER FILE AND PER SYMBOL, with an exact read count: `reads: { 'POST /': 6 }` means that route handler
+ * (Express handlers are reported as `METHOD /path`, not lumped into one `<module>` bucket) may contain exactly six price
+ * reads. A new read anywhere in an allow-listed file, in a new function or handler, or one more in an existing one, changes
+ * the picture and turns this red until a reviewer classifies it. The scan is AST based (TypeScript compiler API) and catches
+ * `p?.price`, destructuring `{ price }`, a Prisma `price: true` select, `x['price']` and raw SQL naming a price column.
+ * `evaluatePriceReads` is a pure function so each bypass is PLANTED below and shown to go red.
  */
 import { describe, it, expect } from 'vitest';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
-import { join, resolve, relative } from 'node:path';
+import { join, resolve, relative, dirname } from 'node:path';
 import ts from 'typescript';
-import { scanPriceReads, scanSource } from '../helpers/price-read-scan';
+import { scanPriceReads, scanSource, type PriceRead } from '../helpers/price-read-scan';
 
 const API_SRC = process.env.B2B_API_SRC ?? resolve(__dirname, '../../apps/api/src');
 
@@ -27,192 +31,315 @@ type Category =
   | 'bundle-base' // bundles are priced at base by design (Ruling B2B-8)
   | 'unrelated'; // not a product price (plan billing, carrier quote, AI eval)
 
-const ALLOW: Record<string, { category: Category; reason: string }> = {
-  // ── money paths: must route through PriceResolver (asserted below) ──
+interface AllowEntry {
+  category: Category;
+  reason: string;
+  /** Exact number of price reads per symbol (function / method / `METHOD /path` route handler). */
+  reads: Record<string, number>;
+}
+
+const ALLOW: Record<string, AllowEntry> = {
   'services/cart.service.ts': {
     category: 'resolver-input',
     reason: 'computeTotals feeds item/variant base prices to priceCart',
+    reads: { '<module>': 1, computeTotals: 4 },
   },
   'services/order.service.ts': {
     category: 'resolver-input',
     reason: 'create + createAdminOrder feed base prices to priceCart; persisted values elsewhere',
+    reads: { create: 7, createAdminOrder: 4 },
   },
   'routes/payment-links.routes.ts': {
     category: 'resolver-input',
     reason: 'link lines priced via priceCart as an anonymous buyer',
+    reads: { 'POST /': 6 },
   },
   'routes/promotion.routes.ts': {
     category: 'resolver-input',
     reason: 'preview lines priced via priceCart',
+    reads: { 'POST /public/:storeId/promotions/preview': 2 },
   },
   'routes/wa-bridge.routes.ts': {
     category: 'resolver-input',
     reason: 'WhatsApp cart total via priceCart (anonymous); catalogue lists show retail',
+    reads: {
+      'GET /products/by-category': 2,
+      'GET /products/search': 1,
+      'GET /store-catalog': 7,
+      'POST /cart/from-wa': 3,
+      bridgeProductSearchPage: 1,
+      buildCustomerHistory: 3,
+    },
   },
   'services/abandoned-cart.service.ts': {
     category: 'resolver-input',
     reason: 'recovery totals via priceCart for the cart owner',
+    reads: { detectNewAbandonments: 5 },
   },
-  'services/price-resolver.service.ts': { category: 'resolver-input', reason: 'the loader itself' },
+  'services/price-resolver.service.ts': {
+    category: 'resolver-input',
+    reason: 'the loader itself',
+    reads: { priceCart: 3 },
+  },
   'mcp/tools/cart.tools.ts': {
     category: 'resolver-output',
     reason:
       'cartView shows the service-resolved unitPrice (retail fallback for an unavailable line)',
+    reads: { cartView: 3 },
   },
-  // ── persisted order values (never re-resolved; RF11) ──
   'lib/payment-line-items.ts': {
     category: 'persisted',
     reason: 'payment-provider line items from OrderItem.price',
+    reads: { buildPaymentLineItems: 1 },
   },
   'services/invoice.service.ts': {
     category: 'persisted',
     reason: 'invoice lines from OrderItem snapshots',
+    reads: { generateInvoice: 2, renderInvoiceEmailContent: 1 },
   },
-  'services/fiscal-document-render.ts': { category: 'persisted', reason: 'fiscal document lines' },
+  'services/fiscal-document-render.ts': {
+    category: 'persisted',
+    reason: 'fiscal document lines',
+    reads: { renderFiscalDocumentHtml: 2 },
+  },
   'services/fiscal-document.service.ts': {
     category: 'persisted',
     reason: 'sale lines from persisted order items',
+    reads: { buildSaleLines: 1 },
   },
   'services/return.service.ts': {
     category: 'persisted',
     reason:
       'refund math uses OrderItem.price (RF11); Task 8b adds the tier adjustment from snapshots',
+    reads: { complete: 1, create: 1, refundPreview: 1 },
   },
   'services/accounting/backorder.service.ts': {
     category: 'persisted',
     reason: 'backorder lines of persisted orders',
+    reads: { cancelBackorder: 1, listOpenBackorders: 1 },
   },
   'services/accounting/posting/partial-return-allocation.ts': {
     category: 'persisted',
     reason: 'allocation over persisted lines',
+    reads: { allocatePartialReturn: 2 },
   },
   'services/email-templates/order-confirmation.ts': {
     category: 'persisted',
     reason: 'renders persisted order items',
+    reads: { ar: 1, en: 1 },
   },
   'routes/order.routes.ts': {
     category: 'persisted',
     reason: 'order detail / timeline reads of persisted items',
+    reads: { 'GET /export.xlsx': 2 },
   },
   'routes/payment-abandonments.routes.ts': {
     category: 'persisted',
     reason: 'reads the persisted order amount / items (verified: no re-pricing)',
+    reads: { 'GET /': 2 },
   },
   'routes/customers.routes.ts': {
     category: 'persisted',
     reason: 'customer export of persisted order items',
+    reads: { 'GET /customers/export.xlsx': 1 },
   },
   'services/customer-aggregate.service.ts': {
     category: 'persisted',
     reason: 'aggregates persisted orders',
+    reads: { aggregateCustomersUncached: 1, getCustomerProfile: 1 },
   },
   'lib/inngest/functions/order-created.ts': {
     category: 'persisted',
     reason: 'email fan-out from persisted items',
+    reads: { '<module>': 1 },
   },
   'lib/inngest/functions/order-status-changed.ts': {
     category: 'persisted',
     reason: 'fan-out from persisted items',
+    reads: { handleOrderStatusChanged: 1 },
   },
   'services/payment-providers/fawry.provider.ts': {
     category: 'persisted',
     reason: 'provider payload from persisted order lines',
+    reads: { createPayment: 3 },
   },
   'services/payment-providers/paymob.provider.ts': {
     category: 'persisted',
     reason: 'provider payload from persisted order lines',
+    reads: { createPayment: 3 },
   },
   'services/shipping-carrier.service.ts': {
     category: 'persisted',
     reason: 'declared value from persisted lines',
+    reads: { createShipmentForOrder: 1 },
   },
-  // ── anonymous retail display ──
   'lib/product-feed.ts': {
     category: 'retail-display',
     reason: 'public feed: retail price, anonymous-safe',
+    reads: { buildProductFeed: 6 },
   },
   'lib/wishlist-card.ts': {
     category: 'retail-display',
     reason: 'wishlist card: retail, B2B-9 cards unchanged',
+    reads: { '<module>': 1, wishlistCardProduct: 3 },
   },
   'mcp/tools/catalog.tools.ts': {
     category: 'retail-display',
     reason: 'MCP catalogue is anonymous',
+    reads: { registerCatalogTools: 2, toSummary: 1 },
   },
   'services/recommendation.service.ts': {
     category: 'retail-display',
     reason: 'recommendation select: retail',
+    reads: { '<module>': 2 },
   },
   'lib/inngest/functions/product-meta-sync.ts': {
     category: 'retail-display',
     reason: 'SEO/meta uses retail price',
+    reads: { productMetaSync: 1 },
   },
   'lib/inngest/functions/bulk-ai-geo.ts': {
     category: 'retail-display',
     reason: 'AI copy uses retail price',
+    reads: { '<module>': 1 },
   },
-  'routes/ai.routes.ts': { category: 'retail-display', reason: 'AI prompts use retail price' },
-  // ── catalogue / admin ──
+  'routes/ai.routes.ts': {
+    category: 'retail-display',
+    reason: 'AI prompts use retail price',
+    reads: { 'GET /results/recommendations': 1 },
+  },
   'services/product.service.ts': {
     category: 'catalog-read',
     reason: 'product CRUD + public payload; Task 4/6 add tiers and strip group prices',
+    reads: {
+      '<module>': 2,
+      advancedSearch: 9,
+      bulkUpdate: 5,
+      create: 1,
+      getById: 1,
+      getFilterOptions: 4,
+      getSearchSuggestions: 1,
+      getSuggestSuggestions: 2,
+      listPublic: 6,
+      reshapePublicProductDetail: 2,
+      update: 4,
+    },
   },
   'mcp/tools/admin-read.tools.ts': {
     category: 'admin-display',
     reason: 'merchant read of list price',
+    reads: { productSummary: 1, registerAdminReadTools: 2 },
   },
-  // ── writers ──
   'services/bulk.service.ts': {
     category: 'writer',
     reason: 'bulk price edits / import; Task 4 returns tier-above-base warnings',
+    reads: { createVariantsForProductTx: 1, exportProducts: 2, importProducts: 4 },
   },
-  'routes/bulk.routes.ts': { category: 'writer', reason: 'bulk edit route' },
-  'services/csv-import.ts': { category: 'writer', reason: 'CSV import' },
-  'services/import-preview.ts': { category: 'writer', reason: 'import preview' },
-  'services/variant.service.ts': { category: 'writer', reason: 'variant price edits' },
+  'routes/bulk.routes.ts': {
+    category: 'writer',
+    reason: 'bulk edit route',
+    reads: { 'GET /:storeId/bulk/export.xlsx': 1, 'POST /:storeId/bulk/import-preview': 2 },
+  },
+  'services/csv-import.ts': {
+    category: 'writer',
+    reason: 'CSV import',
+    reads: { shopifyRecordsToRows: 9 },
+  },
+  'services/import-preview.ts': {
+    category: 'writer',
+    reason: 'import preview',
+    reads: { buildImportPreview: 2 },
+  },
+  'services/variant.service.ts': {
+    category: 'writer',
+    reason: 'variant price edits',
+    reads: { createVariant: 1, getProductVariants: 1 },
+  },
   'routes/product.routes.ts': {
     category: 'writer',
     reason: 'fixed-discount refinement on product write',
+    reads: { refineFixedDiscount: 2 },
   },
-  // ── bundles at base (B2B-8) ──
   'services/bundle.service.ts': {
     category: 'bundle-base',
     reason: 'bundle components are priced at base',
+    reads: { resolveBundle: 4 },
   },
-  'routes/bundle.routes.ts': { category: 'bundle-base', reason: 'bundle admin lines at base' },
+  'routes/bundle.routes.ts': {
+    category: 'bundle-base',
+    reason: 'bundle admin lines at base',
+    reads: {
+      'GET /public/:storeId/bundles': 1,
+      'GET /public/:storeId/bundles/:slug': 1,
+      resolveBundleLines: 3,
+    },
+  },
   'lib/cart-pricing.ts': {
     category: 'bundle-base',
     reason: 'retailUnitPrice: the labelled retail helper',
+    reads: { retailUnitPrice: 2 },
   },
-  // ── not a product price ──
   'services/billing/subscription-billing.service.ts': {
     category: 'unrelated',
     reason: 'subscription plan price',
+    reads: { changePlan: 1, loadPayablePlan: 1, selectTrialPlan: 1, startCheckout: 1 },
   },
-  'services/carriers/bosta.carrier.ts': { category: 'unrelated', reason: 'carrier shipping quote' },
-  'lib/ai/eval/criteria.ts': { category: 'unrelated', reason: 'AI eval fixture' },
+  'services/carriers/bosta.carrier.ts': {
+    category: 'unrelated',
+    reason: 'carrier shipping quote',
+    reads: { quote: 2 },
+  },
+  'lib/ai/eval/criteria.ts': {
+    category: 'unrelated',
+    reason: 'AI eval fixture',
+    reads: { run: 2 },
+  },
+  'services/analytics.service.ts': {
+    category: 'persisted',
+    reason: 'revenue report over persisted order_items (raw SQL)',
+    reads: { getPeriodStats: 1 },
+  },
+  'services/store-closure.service.ts': {
+    category: 'persisted',
+    reason: 'fiscal archive over persisted order lines (raw SQL)',
+    reads: { archiveFiscalRecords: 1 },
+  },
 };
 
 const SELF = new Set(['services/price-resolver.service.ts']);
+/** Categories whose files must never be called FROM a money path for a price (except the named, pinned imports below). */
+const NON_MONEY: Category[] = ['retail-display', 'catalog-read', 'admin-display', 'writer'];
 
-/**
- * Hit budget per file#symbol for the money paths. These reads feed base prices to the resolver (or show retail in a WhatsApp
- * catalogue). Adding ANOTHER direct price read inside a money path changes the count and turns this red: a reviewer then
- * decides whether the new read belongs in the resolver instead (it almost always does).
- */
-const MONEY_PATH_BUDGET: Record<string, number> = {
-  'routes/payment-links.routes.ts#<module>': 6,
-  'routes/promotion.routes.ts#<module>': 2,
-  'routes/wa-bridge.routes.ts#<module>': 13,
-  'routes/wa-bridge.routes.ts#bridgeProductSearchPage': 1,
-  'routes/wa-bridge.routes.ts#buildCustomerHistory': 3,
-  'services/abandoned-cart.service.ts#detectNewAbandonments': 5,
-  'services/cart.service.ts#<module>': 1,
-  'services/cart.service.ts#computeTotals': 4,
-  'services/order.service.ts#create': 7,
-  'services/order.service.ts#createAdminOrder': 4,
-  'services/price-resolver.service.ts#priceCart': 3,
-};
+/** Pure evaluation of scanned reads against an allow-list: returns human-readable violations (empty = clean). */
+export function evaluatePriceReads(
+  hits: readonly PriceRead[],
+  allow: Record<string, AllowEntry>
+): string[] {
+  const out: string[] = [];
+  const counts = new Map<string, number>();
+  for (const h of hits) {
+    const k = `${h.file}#${h.symbol}`;
+    counts.set(k, (counts.get(k) ?? 0) + 1);
+    if (!allow[h.file])
+      out.push(`unlisted file ${h.file} reads ${h.name} (${h.kind}) in ${h.symbol}`);
+  }
+  for (const [k, n] of counts) {
+    const [file, symbol] = k.split('#');
+    const e = allow[file!];
+    if (!e) continue;
+    const want = e.reads[symbol!];
+    if (want === undefined)
+      out.push(`${file}: new symbol "${symbol}" reads a price (${n}x), not in the allow-list`);
+    else if (want !== n) out.push(`${file}#${symbol}: ${n} price reads, allow-list pins ${want}`);
+  }
+  for (const [file, e] of Object.entries(allow)) {
+    for (const symbol of Object.keys(e.reads)) {
+      if (!counts.has(`${file}#${symbol}`))
+        out.push(`${file}#${symbol}: allow-listed but no longer reads a price (remove it)`);
+    }
+  }
+  return out;
+}
 
 function walk(dir: string, out: string[] = []): string[] {
   for (const e of readdirSync(dir)) {
@@ -226,28 +353,18 @@ function walk(dir: string, out: string[] = []): string[] {
 }
 const read = (rel: string) => readFileSync(join(API_SRC, rel), 'utf8');
 
-describe('B2B: direct price reads are classified (AST scan of apps/api/src)', () => {
+describe('B2B: direct price reads are classified per file and per symbol (AST scan of apps/api/src)', () => {
   const hits = scanPriceReads(API_SRC);
-  const files = [...new Set(hits.map(h => h.file))].sort();
 
-  it('every file that reads a price / unitPrice is in the allow-list with a category and a reason', () => {
-    const unlisted = files.filter(f => !ALLOW[f]);
-    expect(
-      unlisted,
-      `Classify these in ALLOW (tests/unit/b2b-no-direct-price-reads.test.ts): ${unlisted.join(', ')}`
-    ).toEqual([]);
-  });
-
-  it('the allow-list has no stale entries (a file that no longer reads a price must leave the list)', () => {
-    const stale = Object.keys(ALLOW).filter(f => !files.includes(f));
-    expect(stale).toEqual([]);
+  it('every price / unitPrice read matches the allow-list exactly: file, symbol (route handler) and count', () => {
+    expect(evaluatePriceReads(hits, ALLOW)).toEqual([]);
   });
 
   it('every allow-list entry carries a reason', () => {
     for (const [f, v] of Object.entries(ALLOW)) expect(v.reason.length, f).toBeGreaterThan(8);
   });
 
-  it('every money-path file ("resolver-input") actually routes through PriceResolver', () => {
+  it('every money-path file ("resolver-input") actually routes through PriceResolver.forBuyer', () => {
     const notRouted = Object.entries(ALLOW)
       .filter(([f, v]) => v.category === 'resolver-input' && !SELF.has(f))
       .filter(
@@ -259,14 +376,36 @@ describe('B2B: direct price reads are classified (AST scan of apps/api/src)', ()
     expect(notRouted).toEqual([]);
   });
 
-  it('the money paths have exactly the pinned number of direct price reads (a new read must be reviewed)', () => {
-    const counts: Record<string, number> = {};
-    for (const h of hits) {
-      if (ALLOW[h.file]?.category !== 'resolver-input') continue;
-      const k = `${h.file}#${h.symbol}`;
-      counts[k] = (counts[k] ?? 0) + 1;
+  it('a money path imports NO price helper from a retail-display / catalog-read / admin-display / writer file, except the pinned ones', () => {
+    // Without this a helper exported from a "retail" file could be called from checkout and bypass the resolver (M-4).
+    const found: string[] = [];
+    for (const [file, e] of Object.entries(ALLOW)) {
+      if (e.category !== 'resolver-input' || SELF.has(file)) continue;
+      const sf = ts.createSourceFile(file, read(file), ts.ScriptTarget.Latest, true);
+      for (const st of sf.statements) {
+        if (!ts.isImportDeclaration(st) || !ts.isStringLiteral(st.moduleSpecifier)) continue;
+        const spec = st.moduleSpecifier.text;
+        if (!spec.startsWith('.')) continue;
+        const target =
+          relative(API_SRC, resolve(dirname(join(API_SRC, file)), spec)).replace(/\\/g, '/') +
+          '.ts';
+        const tEntry = ALLOW[target];
+        if (!tEntry || !NON_MONEY.includes(tEntry.category)) continue;
+        const names =
+          st.importClause?.namedBindings && ts.isNamedImports(st.importClause.namedBindings)
+            ? st.importClause.namedBindings.elements
+                .map(el => el.name.text)
+                .sort()
+                .join(',')
+            : '*';
+        found.push(`${file} -> ${target}: ${names}`);
+      }
     }
-    expect(counts).toEqual(MONEY_PATH_BUDGET);
+    expect(found.sort()).toEqual([
+      // STOREFRONT_PRODUCT_SELECT is a Prisma select constant (no price decision).
+      'services/cart.service.ts -> services/product.service.ts: STOREFRONT_PRODUCT_SELECT',
+      'services/order.service.ts -> services/product.service.ts: STOREFRONT_PRODUCT_SELECT',
+    ]);
   });
 
   it('only the bundle paths and the MCP cart view import the retail helper (lib/cart-pricing)', () => {
@@ -280,25 +419,97 @@ describe('B2B: direct price reads are classified (AST scan of apps/api/src)', ()
       'services/bundle.service.ts',
     ]);
   });
+});
 
-  it('the scanner itself can fail: it flags a direct product.price read in a fresh file', () => {
-    const found = scanSource(
-      'services/fake.ts',
-      'export const f = (item: any) => item.product?.price * item.quantity;'
-    );
-    expect(found.map(h => h.kind)).toEqual(['access']);
-    expect(scanSource('services/fake.ts', 'const { price } = product;').map(h => h.kind)).toEqual([
-      'destructure',
-    ]);
+describe('B2B (M-4): every known bypass is PLANTED and goes red', () => {
+  // Only the violations about the planted file (the other files are not part of the plant).
+  const planted = (file: string, code: string) =>
+    evaluatePriceReads(scanSource(file, code), ALLOW).filter(v => v.includes(file));
+
+  it('a new direct read in a brand-new file', () => {
     expect(
-      scanSource('services/fake.ts', 'prisma.product.findMany({ select: { price: true } });').map(
+      planted('services/fake.ts', 'export const f = (i: any) => i.product?.price * i.quantity;')
+    ).toEqual([expect.stringContaining('unlisted file services/fake.ts')]);
+  });
+
+  it('x["price"] element access (the bracket-notation bypass)', () => {
+    const v = planted('services/fake.ts', "export const f = (i: any) => i.product['price'] * 2;");
+    expect(v.join()).toMatch(/unlisted file services\/fake\.ts reads price \(element\)/);
+  });
+
+  it('x["unitPrice"] too', () => {
+    expect(scanSource('x.ts', "const a = b['unitPrice'];").map(h => h.kind)).toEqual(['element']);
+  });
+
+  it('raw SQL that names a price column ($queryRaw tagged template and $queryRawUnsafe call)', () => {
+    expect(
+      scanSource('x.ts', 'await prisma.$queryRaw`SELECT price FROM products`;').map(h => h.kind)
+    ).toEqual(['raw']);
+    expect(
+      scanSource('x.ts', "await prisma.$queryRawUnsafe('SELECT p.price FROM products p');").map(
         h => h.kind
       )
-    ).toEqual(['select']);
+    ).toEqual(['raw']);
+    expect(scanSource('x.ts', 'await prisma.$queryRaw`SELECT id FROM products`;')).toEqual([]);
+  });
+
+  it('a NEW function in an allow-listed file (per-symbol allow-list)', () => {
+    const v = planted(
+      'services/order.service.ts',
+      'export function sneaky(i: any) { return i.product.price; }\nexport function create(){ ' +
+        'const a = x.price; const b = x.price; const c = x.price; const d = x.price; const e = x.price; const f = x.price; const g = x.price; }'
+    );
+    expect(v.join('\n')).toMatch(/new symbol "sneaky" reads a price/);
+  });
+
+  it('ONE MORE read inside an existing allow-listed symbol (exact count)', () => {
+    const ok = Array.from(
+      { length: ALLOW['services/order.service.ts']!.reads.create! },
+      () => 'x.price;'
+    ).join(' ');
+    expect(
+      planted(
+        'services/order.service.ts',
+        `function create(){ ${ok} }\nfunction createAdminOrder(){ ${'x.price;'.repeat(ALLOW['services/order.service.ts']!.reads.createAdminOrder!)} }`
+      )
+    ).toEqual([]);
+    const v = planted(
+      'services/order.service.ts',
+      `function create(){ ${ok} y.price; }\nfunction createAdminOrder(){ ${'x.price;'.repeat(ALLOW['services/order.service.ts']!.reads.createAdminOrder!)} }`
+    );
+    expect(v.join()).toMatch(
+      /services\/order\.service\.ts#create: \d+ price reads, allow-list pins/
+    );
+  });
+
+  it('swapping a resolver-input read for a direct charge read INSIDE an anonymous route handler keeps the count only if it is the same handler; a different handler is a new symbol', () => {
+    // payment-links: all reads live in "POST /". A read added to a second handler is reported under ITS route, not hidden.
+    const v = planted(
+      'routes/payment-links.routes.ts',
+      "router.post('/', async () => { " +
+        'a.price;'.repeat(ALLOW['routes/payment-links.routes.ts']!.reads['POST /']!) +
+        " });\nrouter.get('/preview', async () => { b.price; });"
+    );
+    expect(v.join()).toMatch(/new symbol "GET \/preview" reads a price/);
+  });
+
+  it('route handlers are reported per route (METHOD /path), not as one <module> bucket', () => {
+    const hits = scanSource(
+      'routes/x.ts',
+      "router.post('/a', async () => { p.price; });\nrouter.get('/b', async () => { q.price; });"
+    );
+    expect(hits.map(h => h.symbol)).toEqual(['POST /a', 'GET /b']);
+  });
+
+  it('an allow-listed symbol that stops reading a price must be removed (no stale entries)', () => {
+    const v = evaluatePriceReads([], {
+      'services/x.ts': { category: 'writer', reason: 'a stale entry', reads: { f: 1 } },
+    });
+    expect(v.join()).toMatch(/allow-listed but no longer reads a price/);
   });
 });
 
-describe('B2B: PriceResolver.forBuyer receives a BuyerIdentity, never a literal or a string', () => {
+describe('B2B: the forBuyer argument is never a literal', () => {
   it('no forBuyer( call passes an object literal, string, template or null as the buyer', () => {
     const bad: string[] = [];
     for (const abs of walk(API_SRC)) {
@@ -332,9 +543,6 @@ describe('B2B: PriceResolver.forBuyer receives a BuyerIdentity, never a literal 
 
 describe('B2B (review I2): order-creating paths read the entitlement UNCACHED', () => {
   it('every PriceResolver.forBuyer( in order.service and payment-links passes uncachedEntitlement', () => {
-    // KV deletes are eventually consistent across colos, so a just-made downgrade must be read from the database at the
-    // moment an order / payment link / admin order is created. (In NODE_ENV=test the feature cache is bypassed, so this
-    // is pinned structurally; the behaviour is covered by the I2 case in tests/integration/b2b-price-parity.test.ts.)
     for (const f of ['services/order.service.ts', 'routes/payment-links.routes.ts']) {
       const sf = ts.createSourceFile(f, read(f), ts.ScriptTarget.Latest, true);
       const calls: ts.CallExpression[] = [];
@@ -348,6 +556,19 @@ describe('B2B (review I2): order-creating paths read the entitlement UNCACHED', 
       for (const c of calls)
         expect(c.arguments[2]?.getText() ?? '', f).toContain('uncachedEntitlement');
     }
+  });
+});
+
+describe('B2B (M-7, M-3): structural pins on OrderService.create', () => {
+  it("the cart is loaded WITHOUT the cart service's own pricing pass (the real buyer prices it once)", () => {
+    expect(read('services/order.service.ts')).toMatch(
+      /CartService\.getOrCreate\([^)]*skipPricing:\s*true/s
+    );
+  });
+  it('loyalty redemption is capped on the base-priced basis (loyaltyRedeemableSubtotal), not the whole subtotal', () => {
+    const src = read('services/order.service.ts');
+    expect(src).toMatch(/loyaltyRedeemableSubtotal\(\{/);
+    expect(src).not.toMatch(/Math\.max\(0, subtotal - primaryDiscount\)/);
   });
 });
 

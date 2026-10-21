@@ -11,7 +11,12 @@ import { prisma, SlugEntityType, withStore } from '@ebda/database';
 import { readInStoreContext } from '../lib/store-scoped-read';
 import { resolveSlugRedirectCached } from '../services/slug-redirect.service';
 import { AppError } from '../middleware/error-handler';
-import { authenticate, optionalAuthenticate, customerUserId } from '../middleware/auth';
+import {
+  authenticate,
+  optionalAuthenticate,
+  customerUserId,
+  rejectImpersonated,
+} from '../middleware/auth';
 import { buyerFromRequest } from '../lib/buyer-identity';
 import { requireFeature } from '../middleware/feature-gate';
 import {
@@ -921,6 +926,9 @@ router.delete(
 router.post(
   '/orders',
   optionalAuthenticate,
+  // Design review I5 / I-4: an impersonation session (support, platform super_admin) must not place a real order as the
+  // impersonated customer, least of all at that account's wholesale price.
+  rejectImpersonated,
   writeLimiter,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -959,6 +967,72 @@ router.post(
         success: true,
         data: { order },
       });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// POST /orders/quote - the EXACT total POST /orders would charge for this cart, buyer and inputs (design review I-1).
+// Computed by OrderService.create in dry-run mode, so pricing, MOQ, coupon / promotion eligibility, loyalty, shipping, COD
+// fee and VAT can never drift from the order. Nothing is written and no stock moves. The checkout displays `total` and sends
+// it back as `expectedTotal`, so a buyer who is repriced between this quote and the order (revoked approval, edited tier)
+// gets a 409 PRICE_CHANGED and confirms the new total instead of being charged a number they never saw.
+const quoteOrderSchema = z.object({
+  shippingAddress: z
+    .object({
+      area: z.string().max(120).optional(),
+      governorate: z.string().max(120).optional(),
+      city: z.string().max(120).optional(),
+      state: z.string().max(120).optional(),
+      country: z.string().max(60).optional(),
+      phone: z.string().max(40).optional(),
+      email: z.string().max(255).optional(),
+    })
+    .default({}),
+  paymentMethod: z.string().min(1),
+  couponCode: z.string().trim().min(1).max(50).optional(),
+  pointsToRedeem: z.number().int().min(0).max(100_000_000).optional(),
+});
+router.post(
+  '/orders/quote',
+  optionalAuthenticate,
+  cartLimiter,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const sessionId = req.headers['x-session-id'] as string;
+      if (!sessionId) {
+        res.status(400).json({
+          success: false,
+          error: { code: 'MISSING_SESSION', message: 'Session ID required' },
+        });
+        return;
+      }
+      const storeId = await getStoreIdFromRequest(req);
+      const body = quoteOrderSchema.parse(req.body);
+      const quote = await OrderService.quote(
+        storeId,
+        customerUserId(req),
+        sessionId,
+        {
+          shippingAddress: {
+            firstName: '',
+            lastName: '',
+            address1: '',
+            city: '',
+            state: '',
+            postalCode: '',
+            country: 'EG',
+            ...body.shippingAddress,
+          },
+          paymentMethod: body.paymentMethod,
+          couponCode: body.couponCode,
+          pointsToRedeem: body.pointsToRedeem,
+        } as never,
+        buyerFromRequest(req)
+      );
+      setBuyerPrivate(res);
+      res.json({ success: true, data: { quote } });
     } catch (error) {
       next(error);
     }

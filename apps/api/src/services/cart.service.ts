@@ -28,7 +28,7 @@ import { PriceResolver } from './price-resolver.service';
 import { ANONYMOUS_BUYER, type BuyerIdentity } from '../lib/buyer-identity';
 import { STOREFRONT_PRODUCT_SELECT } from './product.service';
 import { resolveBundle, type ResolvedBundle } from './bundle.service';
-import { activePersonalisation, cleanNote, stripNote } from '@ebda/shared';
+import { activePersonalisation, cleanNote, stripNote, type Resolved } from '@ebda/shared';
 
 // Bilingual VARIANT_REQUIRED copy lives with the other line writers' guard;
 // re-exported for the cart's tests.
@@ -198,7 +198,8 @@ export class CartService {
   private static async computeTotals(
     storeId: string,
     cart: CartWithIncludes,
-    buyer: BuyerIdentity = ANONYMOUS_BUYER
+    buyer: BuyerIdentity = ANONYMOUS_BUYER,
+    opts: { skipPricing?: boolean } = {}
   ) {
     // #1766 — a line whose product the merchant soft-deleted is flagged
     // `unavailable` and priced OUT of the subtotal. `OrderService.create`
@@ -216,8 +217,8 @@ export class CartService {
     // product's), then tiers / the buyer's group price / MOQ. Unavailable (soft-deleted) lines are NOT handed to the resolver,
     // so they cannot carry a cart over a tier (review I4); bundles are priced separately below and never count (B8b).
     // The cart stores quantity only; this price is derived on every read, so a tier edit or a revoked approval shows at once.
-    const resolver = await PriceResolver.forBuyer(storeId, buyer);
-    const priced = await resolver.priceCart(
+    const resolver = opts.skipPricing ? null : await PriceResolver.forBuyer(storeId, buyer);
+    const priced = await (resolver?.priceCart(
       items
         .filter(item => !item.unavailable)
         .map(item => ({
@@ -232,7 +233,7 @@ export class CartService {
             : null,
           qty: item.quantity,
         }))
-    );
+    ) ?? Promise.resolve(new Map<string, Resolved>()));
     const pricedItems = items.map(item => {
       const r = priced.get(item.id);
       if (!r) return item;
@@ -326,7 +327,12 @@ export class CartService {
     sessionId: string,
     customerId?: string,
     /** Who the prices are for (lib/buyer-identity.ts); default anonymous = retail + public tiers. */
-    buyer: BuyerIdentity = ANONYMOUS_BUYER
+    buyer: BuyerIdentity = ANONYMOUS_BUYER,
+    /**
+     * `skipPricing`: return the cart lines WITHOUT running the resolver. For a caller that prices the lines itself with
+     * the real buyer (OrderService.create), so no throw-away anonymous pricing pass (tier + feature queries) is run.
+     */
+    opts: { skipPricing?: boolean } = {}
   ) {
     // Try to find an existing cart for this session (or customer).
     //
@@ -401,7 +407,7 @@ export class CartService {
       }
     }
 
-    return this.computeTotals(storeId, cart, buyer);
+    return this.computeTotals(storeId, cart, buyer, opts);
   }
 
   static async addItem(

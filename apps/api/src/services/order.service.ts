@@ -31,7 +31,12 @@ import { loadCodFeeConfig } from './payment-providers/cod.provider';
 import { generateOrderNumber } from '../utils/order-number';
 import { PriceResolver, wholesaleEntitledUncached } from './price-resolver.service';
 import { ANONYMOUS_BUYER, type BuyerIdentity } from '../lib/buyer-identity';
-import { assertMoqSatisfied, priceSnapshot, eligibleForCoupon } from '../lib/order-pricing';
+import {
+  assertMoqSatisfied,
+  priceSnapshot,
+  eligibleForCoupon,
+  loyaltyRedeemableSubtotal,
+} from '../lib/order-pricing';
 import { pairBackorderedLines } from '../lib/backorder-pairing';
 import { restoreCartShape } from '../lib/order-cart-restore';
 import { AppError } from '../middleware/error-handler';
@@ -130,6 +135,27 @@ const ORDER_PAYMENT_SELECT = {
   paidAt: true,
   createdAt: true,
 } as const satisfies Prisma.PaymentSelect;
+
+export interface OrderQuote {
+  subtotal: number;
+  discount: number;
+  shipping: number;
+  codFee: number;
+  tax: number;
+  /** The amount the server will put on the order (piastres). `expectedTotal` is compared with this. */
+  total: number;
+  taxIncludedInPrice: boolean;
+  lines: Array<{
+    itemId: string;
+    productId: string;
+    quantity: number;
+    unitPrice: number;
+    lineTotal: number;
+    listPrice: number;
+    priceSource: 'base' | 'tier' | 'group';
+    priceTierMinQty: number | null;
+  }>;
+}
 
 interface CreateOrderData {
   /** The total (piastres) the shopper last saw. Compared, never charged: a mismatch is 409 PRICE_CHANGED (Ruling B2B-9). */
@@ -587,6 +613,23 @@ export class OrderService {
     return order;
   }
 
+  /**
+   * The exact amounts `create` would charge for this cart, buyer and inputs, computed by `create` itself in dry-run mode so
+   * the two can never drift (design review I-1). The checkout shows `total` and sends it back as `expectedTotal`.
+   */
+  static async quote(
+    storeId: string,
+    customerId: string | undefined,
+    sessionId: string,
+    data: CreateOrderData,
+    buyer: BuyerIdentity
+  ): Promise<OrderQuote> {
+    return (await OrderService.create(storeId, customerId, sessionId, data, undefined, {
+      buyer,
+      dryRun: true,
+    })) as unknown as OrderQuote;
+  }
+
   static async create(
     storeId: string,
     customerId: string | undefined,
@@ -608,6 +651,12 @@ export class OrderService {
        * `buyerFromRequest(req)`. Absent = anonymous (retail + public tiers), e.g. WhatsApp / MCP callers.
        */
       buyer?: BuyerIdentity;
+      /**
+       * Compute everything up to the final total with the REAL create logic (pricing, MOQ, coupon / promotion, loyalty,
+       * shipping, COD fee, VAT) and return it as an `OrderQuote` WITHOUT touching stock, wallet or the database. This is
+       * how the checkout learns the exact total the server will charge (`OrderService.quote`).
+       */
+      dryRun?: boolean;
     }
   ) {
     await assertOrderAllowed(storeId);
@@ -649,7 +698,11 @@ export class OrderService {
     };
 
     // Get cart
-    const cart = await CartService.getOrCreate(storeId, sessionId, customerId);
+    // The lines are priced below with the REAL buyer; skip the cart service's own (anonymous) pricing pass, whose result was
+    // thrown away (design review M-7).
+    const cart = await CartService.getOrCreate(storeId, sessionId, customerId, ANONYMOUS_BUYER, {
+      skipPricing: true,
+    });
     // Raw CartBundle rows ({ id, bundleId, quantity } — one per BOX type in
     // the cart). A cart holding ONLY bundles (no loose items) is valid, so
     // the empty-cart guard below must check both, not just `cart.items`.
@@ -1182,7 +1235,12 @@ export class OrderService {
       if (ctx) {
         // Cap against the goods value still payable after the primary discount
         // (the winning coupon-or-promotion). Loyalty stacks on the remainder.
-        const redeemableSubtotal = Math.max(0, subtotal - primaryDiscount);
+        // Ruling B2B-M3: points are not redeemable against tier / group priced lines (same exclusion as coupons).
+        const redeemableSubtotal = loyaltyRedeemableSubtotal({
+          subtotal,
+          nonBaseSubtotal: looseSubtotal - couponBasisSubtotal,
+          primaryDiscount,
+        });
         const quote = computeRedemption(
           ctx.settings,
           data.pointsToRedeem,
@@ -1215,6 +1273,29 @@ export class OrderService {
       ratePercent: activeTax.ratePercent,
       includedInPrice: activeTax.includedInPrice,
     });
+
+    if (requestContext?.dryRun) {
+      const quote: OrderQuote = {
+        subtotal,
+        discount,
+        shipping,
+        codFee,
+        tax,
+        total,
+        taxIncludedInPrice: activeTax.includedInPrice,
+        lines: cart.items.map(item => ({
+          itemId: item.id,
+          productId: item.productId,
+          quantity: item.quantity,
+          unitPrice: lineUnit(item).unitMinor,
+          lineTotal: lineUnit(item).unitMinor * item.quantity,
+          listPrice: lineUnit(item).listMinor,
+          priceSource: lineUnit(item).source,
+          priceTierMinQty: lineUnit(item).tierMinQty,
+        })),
+      };
+      return quote as never;
+    }
 
     // Ruling B2B-9: the shopper's `expectedTotal` is a QUOTE they saw, used ONLY to compare, never to charge. If the
     // server-resolved total differs (a tier edit, a revoked approval, a downgrade, a changed price since the cart was read),
@@ -2858,10 +2939,19 @@ export class OrderService {
     if (data.customerId) {
       const customer = await prisma.user.findFirst({
         where: { id: data.customerId, storeId, role: 'customer' },
-        select: { id: true },
+        select: { id: true, status: true, deletedAt: true },
       });
       if (!customer) {
         throw new AppError(404, 'NOT_FOUND', 'Customer not found for this store');
+      }
+      // Design review M-5: the selected shopper also drives their group price, so a suspended or deleted account is refused
+      // here (the price loader applies the same test) instead of silently pricing wholesale for a dead account.
+      if (customer.deletedAt || customer.status !== 'active') {
+        throw new AppError(
+          409,
+          'CUSTOMER_INACTIVE',
+          'This customer account is suspended or deleted. Choose another customer or create the order as a guest.'
+        );
       }
     }
 

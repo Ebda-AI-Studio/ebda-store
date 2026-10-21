@@ -536,4 +536,184 @@ describe.skipIf(!hasDb)('B2B price parity, order-time binding, MOQ, coupon exclu
       });
     }
   });
+
+  it('I-1: the quote is the exact total the order will charge, for the wholesaler and for a guest, with every figure equal', async () => {
+    for (const [buyer, userId, expectUnit] of [
+      [session(id.w), id.w, 8_500],
+      [ANONYMOUS_BUYER, undefined, 8_500],
+    ] as const) {
+      const sessionId = await cartFor(buyer, undefined, [
+        [id.p1, 10],
+        [id.p4, 3],
+      ]);
+      const data = { shippingAddress: { ...testShippingAddress() }, paymentMethod: 'cod' } as never;
+      const quote = await OrderService.quote(store.storeId, userId, sessionId, data, buyer);
+      expect(quote.lines.find(l => l.productId === id.p1)!.unitPrice).toBe(expectUnit);
+      const order = await OrderService.create(
+        store.storeId,
+        userId,
+        sessionId,
+        { ...(data as object), expectedTotal: quote.total } as never,
+        undefined,
+        { buyer }
+      );
+      expect([order.total, order.subtotal, order.discount, order.shipping]).toEqual([
+        quote.total,
+        quote.subtotal,
+        quote.discount,
+        quote.shipping,
+      ]);
+    }
+  });
+
+  it('I-1: approval revoked BETWEEN quote and order -> 409 PRICE_CHANGED carrying the new total; the buyer confirms the new total and is charged retail', async () => {
+    const sessionId = await cartFor(session(id.w), undefined, [[id.p1, 1]]);
+    const data = { shippingAddress: { ...testShippingAddress() }, paymentMethod: 'paymob' };
+    const quote = await OrderService.quote(
+      store.storeId,
+      undefined,
+      sessionId,
+      data as never,
+      session(id.w)
+    );
+    expect(quote.lines[0]!.unitPrice).toBe(9_000); // what the buyer saw and confirmed
+    await prisma.customer.updateMany({
+      where: { storeId: store.storeId, userId: id.w },
+      data: { groupId: null },
+    });
+    try {
+      const before = await prisma.order.count({ where: { storeId: store.storeId } });
+      const refused = await OrderService.create(
+        store.storeId,
+        id.w,
+        sessionId,
+        { ...data, expectedTotal: quote.total } as never,
+        undefined,
+        { buyer: session(id.w) }
+      ).catch(e => e);
+      expect(refused).toMatchObject({ statusCode: 409, code: 'PRICE_CHANGED' });
+      expect(refused.details.total).toBeGreaterThan(quote.total); // retail is dearer
+      expect(refused.details.lines[0]).toMatchObject({ unitPrice: 10_000, priceSource: 'base' });
+      expect(await prisma.order.count({ where: { storeId: store.storeId } })).toBe(before); // nothing charged
+      // the buyer sees the new total (a fresh quote equals it) and confirms it
+      const fresh = await OrderService.quote(
+        store.storeId,
+        undefined,
+        sessionId,
+        data as never,
+        session(id.w)
+      );
+      expect(fresh.total).toBe(refused.details.total);
+      const ok = await OrderService.create(
+        store.storeId,
+        id.w,
+        sessionId,
+        { ...data, expectedTotal: fresh.total } as never,
+        undefined,
+        { buyer: session(id.w) }
+      );
+      expect(ok.items[0]!.price).toBe(10_000);
+    } finally {
+      await prisma.customer.updateMany({
+        where: { storeId: store.storeId, userId: id.w },
+        data: { groupId: id.group },
+      });
+    }
+  });
+
+  it('M-3: loyalty points cannot be redeemed against tier / group priced lines (same exclusion as coupons)', async () => {
+    await prisma.store.update({ where: { id: store.storeId }, data: { loyaltyEnabled: true } });
+    await prisma.storeFeature.upsert({
+      where: { storeId_featureKey: { storeId: store.storeId, featureKey: 'loyalty' } },
+      update: { enabled: true },
+      create: { storeId: store.storeId, featureKey: 'loyalty', enabled: true },
+    });
+    await prisma.loyaltyPoints.upsert({
+      where: { storeId_customerId: { storeId: store.storeId, customerId: id.w } },
+      update: { points: 1_000_000 },
+      create: { storeId: store.storeId, customerId: id.w, points: 1_000_000 },
+    });
+    const data = {
+      shippingAddress: { ...testShippingAddress() },
+      paymentMethod: 'paymob',
+      pointsToRedeem: 1_000_000,
+    } as never;
+    // all tier / group priced: nothing to redeem against
+    const tierCart = await cartFor(session(id.w), undefined, [[id.p1, 10]]);
+    expect(
+      (await OrderService.quote(store.storeId, id.w, tierCart, data, session(id.w))).discount
+    ).toBe(0);
+    // mixed: with the group % off, P4 is base-priced and P1 x10 is the public tier. Only the base-priced 3 x 1000 line can
+    // absorb points, never the 85000 tier line.
+    await prisma.customerGroup.update({ where: { id: id.group }, data: { pricingMode: 'none' } });
+    try {
+      const mixed = await cartFor(session(id.w), undefined, [
+        [id.p1, 10],
+        [id.p4, 3],
+      ]);
+      const q = await OrderService.quote(store.storeId, id.w, mixed, data, session(id.w));
+      expect(q.subtotal).toBe(88_000);
+      // the store default caps redemption at 50% of the redeemable goods: 50% of 3000, not 50% of 88000
+      expect(q.discount).toBe(1_500);
+    } finally {
+      await prisma.customerGroup.update({
+        where: { id: id.group },
+        data: { pricingMode: 'percent_off' },
+      });
+    }
+  });
+
+  it('M-5: an admin order for a suspended or deleted shopper is refused (409 CUSTOMER_INACTIVE), and the price loader also ignores such an account', async () => {
+    const dead = await prisma.user.create({
+      data: {
+        email: `b2bpar-dead-${SUF}@test.com`,
+        passwordHash: 'x',
+        firstName: 'D',
+        lastName: 'D',
+        role: 'customer',
+        emailVerified: true,
+        storeId: store.storeId,
+        status: 'suspended',
+      },
+    });
+    await prisma.customer.create({
+      data: {
+        storeId: store.storeId,
+        email: dead.email,
+        firstName: 'D',
+        lastName: 'D',
+        groupId: id.group,
+        userId: dead.id,
+      },
+    });
+    const adminData = {
+      customerId: dead.id,
+      shippingAddress: { ...testShippingAddress() },
+      items: [{ productId: id.p1, quantity: 1 }],
+    };
+    await expect(
+      OrderService.createAdminOrder(
+        store.storeId,
+        store.ownerId,
+        adminData as never,
+        { role: 'store_admin' },
+        { buyer: merchantShopper(dead.id, store.ownerId) }
+      )
+    ).rejects.toMatchObject({ statusCode: 409, code: 'CUSTOMER_INACTIVE' });
+    const r = await PriceResolver.forBuyer(store.storeId, merchantShopper(dead.id, store.ownerId));
+    expect((await r.priceLine({ id: id.p1, price: 10_000 }, null, 1)).source).toBe('base');
+    await prisma.user.update({
+      where: { id: dead.id },
+      data: { status: 'active', deletedAt: new Date() },
+    });
+    await expect(
+      OrderService.createAdminOrder(
+        store.storeId,
+        store.ownerId,
+        adminData as never,
+        { role: 'store_admin' },
+        { buyer: merchantShopper(dead.id, store.ownerId) }
+      )
+    ).rejects.toMatchObject({ code: 'CUSTOMER_INACTIVE' });
+  });
 });

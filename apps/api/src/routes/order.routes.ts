@@ -9,7 +9,7 @@ import {
   describeRange,
   summarizeExportFilters,
 } from '../lib/exports/xlsx';
-import { authenticate, authorize, customerUserId } from '../middleware/auth';
+import { authenticate, authorize, customerUserId, rejectImpersonated } from '../middleware/auth';
 import {
   ANONYMOUS_BUYER,
   buyerFromRequest,
@@ -632,6 +632,7 @@ router.get('/:id', authenticate, async (req: Request, res: Response, next: NextF
 router.post(
   '/',
   authenticate,
+  rejectImpersonated,
   writeLimiter,
   async (req: Request, res: Response, next: NextFunction) => {
     try {

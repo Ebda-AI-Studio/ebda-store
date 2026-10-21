@@ -141,3 +141,40 @@ describe('#1766 — an unavailable (deleted-product) line is not part of the cou
     expect(lines.reduce((s, l) => s + l.lineTotal, 0)).toBe(couponQuoteBasis(items));
   });
 });
+
+/**
+ * B2B Ruling B2B-5 (design review I-2): a line priced by a quantity tier or a wholesale group price is excluded from the
+ * coupon basis, exactly as `OrderService.create` builds it. Real arithmetic, so the quote equals the charge.
+ */
+describe('couponQuoteBasis / couponQuoteCartItems exclude tier and group priced lines (display == charge)', () => {
+  const tier = { productId: 'p1', price: 8500, quantity: 10, priceSource: 'tier' as const };
+  const group = { productId: 'p2', price: 9000, quantity: 2, priceSource: 'group' as const };
+  const base = { productId: 'p3', price: 1000, quantity: 3, priceSource: 'base' as const };
+
+  it('an all-tier / group cart has basis 0 and no cart items: a 10% coupon is quoted 0, not 10% of the cart', () => {
+    expect(couponQuoteBasis([tier, group])).toBe(0);
+    expect(couponQuoteCartItems([tier, group])).toEqual([]);
+    expect(Math.round((couponQuoteBasis([tier, group]) * 10) / 100)).toBe(0);
+  });
+
+  it('a mixed cart quotes only the base-priced lines: 10% of 3000, not of 88000', () => {
+    expect(couponQuoteBasis([tier, base])).toBe(3000);
+    expect(couponQuoteCartItems([tier, base])).toEqual([
+      { productId: 'p3', quantity: 3, lineTotal: 3000 },
+    ]);
+    expect(Math.round((couponQuoteBasis([tier, base]) * 10) / 100)).toBe(300);
+  });
+
+  it('a minimum-order coupon is judged on the base basis, so an all-tier cart does NOT meet it', () => {
+    const minOrder = 5000;
+    expect(couponQuoteBasis([tier]) >= minOrder).toBe(false); // 85000 of tier goods, basis 0
+    expect(
+      couponQuoteBasis([tier, base, { ...base, productId: 'p4', quantity: 2 }]) >= minOrder
+    ).toBe(true); // 5000 base
+  });
+
+  it('a line with no priceSource (older API) or unavailable behaves as before: base / excluded', () => {
+    expect(couponQuoteBasis([{ price: 1000, quantity: 2 }])).toBe(2000);
+    expect(couponQuoteBasis([{ price: 1000, quantity: 2, unavailable: true }])).toBe(0);
+  });
+});

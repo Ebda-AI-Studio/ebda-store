@@ -366,7 +366,10 @@ describe('POST /public/:storeId/coupons/validate — storefront cart lines (#136
 
     expect(res.status).toBe(400);
     expect(res.body.error.code).toBe('COUPON_NOT_ELIGIBLE');
-    expect(mockLoadBuyerGroup).toHaveBeenCalledWith(STORE_ID, expect.objectContaining({ kind: 'anonymous' }));
+    expect(mockLoadBuyerGroup).toHaveBeenCalledWith(
+      STORE_ID,
+      expect.objectContaining({ kind: 'anonymous' })
+    );
   });
 
   it('still refuses a GUEST whose typed contact matches no Customer row — order-create would too', async () => {
@@ -380,6 +383,24 @@ describe('POST /public/:storeId/coupons/validate — storefront cart lines (#136
 
     expect(res.status).toBe(400);
     expect(res.body.error.code).toBe('COUPON_NOT_ELIGIBLE');
+  });
+
+  it('B2B-5 quote: an all-tier cart (basis 0, no cart items) is quoted a 0 discount for a 10% coupon', async () => {
+    mockPrisma.coupon.findFirst.mockResolvedValue(couponRow({ value: 10 }));
+    const res = await request(app)
+      .post(`/api/v1/stores/public/${STORE_ID}/coupons/validate`)
+      .send({ code: 'SAVE', orderTotal: 0, cartItems: [] });
+    expect(res.status).toBe(200);
+    expect(res.body.data.discount).toBe(0);
+  });
+
+  it('B2B-5 quote: a minimum-order coupon on an all-tier cart (basis 0) is reported as not applicable', async () => {
+    mockPrisma.coupon.findFirst.mockResolvedValue(couponRow({ value: 10, minOrderAmount: 5000 }));
+    const res = await request(app)
+      .post(`/api/v1/stores/public/${STORE_ID}/coupons/validate`)
+      .send({ code: 'SAVE', orderTotal: 0, cartItems: [] });
+    expect(res.status).toBe(400);
+    expect(res.body.error.code).toBe('MIN_ORDER_NOT_MET');
   });
 
   it('an unscoped code quotes the same discount as the whole-cart orderTotal path', async () => {

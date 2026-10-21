@@ -11,7 +11,7 @@ import { join, relative } from 'node:path';
 export interface PriceRead {
   file: string; // relative to apps/api/src
   symbol: string;
-  kind: 'access' | 'destructure' | 'select';
+  kind: 'access' | 'element' | 'destructure' | 'select' | 'raw';
   name: string;
   line: number;
 }
@@ -29,8 +29,30 @@ function walkFiles(dir: string, out: string[] = []): string[] {
   return out;
 }
 
+const ROUTE_METHODS = new Set(['get', 'post', 'put', 'patch', 'delete', 'all', 'use']);
+
+/**
+ * The enclosing symbol. Express handlers are anonymous arrows, so a named-function lookup alone lumps a whole routes file
+ * into one `<module>` bucket (design review M-4): a handler passed to `router.<method>('/path', ...)` is reported as
+ * `METHOD /path`, which makes the per-symbol budget per route handler.
+ */
 function enclosingSymbol(node: ts.Node): string {
   for (let n: ts.Node | undefined = node.parent; n; n = n.parent) {
+    if (
+      ts.isCallExpression(n) &&
+      ts.isPropertyAccessExpression(n.expression) &&
+      ROUTE_METHODS.has(n.expression.name.text) &&
+      n.arguments[0] &&
+      ts.isStringLiteralLike(n.arguments[0]) &&
+      n.arguments.some(
+        a =>
+          a !== n.arguments[0] &&
+          (ts.isArrowFunction(a) || ts.isFunctionExpression(a)) &&
+          contains(a, node)
+      )
+    ) {
+      return `${n.expression.name.text.toUpperCase()} ${n.arguments[0].text}`;
+    }
     if ((ts.isFunctionDeclaration(n) || ts.isMethodDeclaration(n)) && n.name)
       return n.name.getText();
     if (
@@ -44,6 +66,13 @@ function enclosingSymbol(node: ts.Node): string {
   }
   return '<module>';
 }
+
+function contains(outer: ts.Node, inner: ts.Node): boolean {
+  return inner.pos >= outer.pos && inner.end <= outer.end;
+}
+
+const RAW_CALL = /\$(query|execute)Raw(Unsafe)?$/;
+const RAW_PRICE = /\b(price|unit_price|price_minor|compare_at_price)\b/i;
 
 export function scanPriceReads(apiSrc: string): PriceRead[] {
   const hits: PriceRead[] = [];
@@ -78,6 +107,25 @@ export function scanSource(file: string, text: string): PriceRead[] {
         node.initializer.kind === ts.SyntaxKind.TrueKeyword
       ) {
         add(node, 'select', node.name.getText());
+      } else if (
+        ts.isElementAccessExpression(node) &&
+        ts.isStringLiteralLike(node.argumentExpression) &&
+        NAMES.has(node.argumentExpression.text)
+      ) {
+        // x['price'] / x["unitPrice"]
+        add(node, 'element', node.argumentExpression.text);
+      } else if (
+        (ts.isTaggedTemplateExpression(node) && RAW_CALL.test(node.tag.getText())) ||
+        (ts.isCallExpression(node) &&
+          RAW_CALL.test(node.expression.getText()) &&
+          node.arguments[0] &&
+          (ts.isStringLiteralLike(node.arguments[0]) || ts.isTemplateExpression(node.arguments[0])))
+      ) {
+        // raw SQL that names a price column
+        const text = ts.isTaggedTemplateExpression(node)
+          ? node.template.getText()
+          : (node as ts.CallExpression).arguments[0]!.getText();
+        if (RAW_PRICE.test(text)) add(node, 'raw', 'price');
       } else if (ts.isShorthandPropertyAssignment(node) && NAMES.has(node.name.text)) {
         // `{ price }` as a value read of a local named price
         add(node, 'access', node.name.text);

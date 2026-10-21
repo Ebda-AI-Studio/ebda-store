@@ -13,7 +13,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // vi.mock is hoisted above every top-level statement, so its factory cannot
 // close over ordinary consts. vi.hoisted lifts the mocks with it.
-const { mockGroup, mockCustomer } = vi.hoisted(() => ({
+const { mockGroup, mockCustomer, mockUser } = vi.hoisted(() => ({
   mockGroup: {
     findMany: vi.fn(),
     findFirst: vi.fn(),
@@ -23,12 +23,14 @@ const { mockGroup, mockCustomer } = vi.hoisted(() => ({
     delete: vi.fn(),
   },
   mockCustomer: { findFirst: vi.fn(), update: vi.fn(), create: vi.fn() },
+  mockUser: { findFirst: vi.fn() },
 }));
 
 vi.mock('@ebda/database', () => ({
   prisma: {
     customerGroup: mockGroup,
     customer: mockCustomer,
+    user: mockUser,
     // Run the callback against the same mocks — the service's transactional
     // branches must be exercised, not stubbed out.
     $transaction: (fn: (tx: unknown) => unknown) =>
@@ -182,7 +184,7 @@ describe('CustomerGroupService.assignByIdentity', () => {
     );
 
     expect(mockCustomer.findFirst).toHaveBeenCalledWith({
-      where: { storeId: STORE, phone: '+96599001234' },
+      where: { storeId: STORE, userId: null, phone: '+96599001234' },
       select: { id: true },
     });
     // The phone-first backfill used to overwrite the matched row's email / names with the typed values; that let one
@@ -196,6 +198,62 @@ describe('CustomerGroupService.assignByIdentity', () => {
     expect(mockCustomer.create).not.toHaveBeenCalled();
   });
 
+  it('I-3: without a userId a typed phone only ever matches UNLINKED rows; a row linked to a registered shopper is never a candidate', async () => {
+    mockGroup.findFirst.mockResolvedValue({ id: 'g1' });
+    mockCustomer.findFirst.mockResolvedValue(null);
+    mockCustomer.create.mockResolvedValue({ id: 'c9', groupId: 'g1', group: { id: 'g1' } });
+    await CustomerGroupService.assignByIdentity(
+      STORE,
+      { phone: '+96599001234', email: 'a@b.com' },
+      'g1'
+    );
+    const wheres = mockCustomer.findFirst.mock.calls.map(c => c[0].where);
+    // phone match, email fallback: both pinned to userId null
+    expect(wheres[0]).toEqual({ storeId: STORE, userId: null, phone: '+96599001234' });
+    expect(wheres[1]).toEqual({
+      storeId: STORE,
+      userId: null,
+      email: { equals: 'a@b.com', mode: 'insensitive' },
+    });
+  });
+
+  it('I-3 (B2B-2c attack): when ONLY a row linked to a registered shopper matches the typed phone, assignment is REFUSED with a merchant-visible 409 and nothing is written', async () => {
+    mockGroup.findFirst.mockResolvedValue({ id: 'g1' });
+    mockCustomer.findFirst
+      .mockResolvedValueOnce(null) // no unlinked match
+      .mockResolvedValueOnce({ id: 'linked-1' }); // the linked-only probe finds the attacker's row
+    await expect(
+      CustomerGroupService.assignByIdentity(STORE, { phone: '+96550000001' }, 'g1')
+    ).rejects.toMatchObject({ statusCode: 409, code: 'IDENTITY_LINKED_TO_ACCOUNT' });
+    expect(mockCustomer.update).not.toHaveBeenCalled();
+    expect(mockCustomer.create).not.toHaveBeenCalled();
+    const probe = mockCustomer.findFirst.mock.calls[1]![0].where;
+    expect(probe.userId).toEqual({ not: null });
+  });
+
+  it("with a userId, a new linked row never carries the shopper's self-edited phone (only a free account email)", async () => {
+    mockGroup.findFirst.mockResolvedValue({ id: 'g1' });
+    mockUser.findFirst.mockResolvedValue({
+      id: 'u1',
+      email: 's@x.com',
+      phone: '+96550000001',
+      firstName: 'S',
+      lastName: 'H',
+    });
+    mockCustomer.findFirst.mockResolvedValue(null);
+    mockCustomer.create.mockResolvedValue({ id: 'c10', groupId: 'g1', group: { id: 'g1' } });
+    await CustomerGroupService.assignByIdentity(
+      STORE,
+      { userId: 'u1', phone: '+96550000001' },
+      'g1'
+    );
+    expect(mockCustomer.create.mock.calls[0]![0].data).toMatchObject({
+      userId: 'u1',
+      phone: null,
+      email: 's@x.com',
+    });
+  });
+
   it('falls back to a case-insensitive email match when there is no phone', async () => {
     mockGroup.findFirst.mockResolvedValue({ id: 'g1' });
     mockCustomer.findFirst.mockResolvedValue(null);
@@ -204,7 +262,7 @@ describe('CustomerGroupService.assignByIdentity', () => {
     await CustomerGroupService.assignByIdentity(STORE, { email: 'Foo@X.com' }, 'g1');
 
     expect(mockCustomer.findFirst).toHaveBeenCalledWith({
-      where: { storeId: STORE, email: { equals: 'Foo@X.com', mode: 'insensitive' } },
+      where: { storeId: STORE, userId: null, email: { equals: 'Foo@X.com', mode: 'insensitive' } },
       select: { id: true },
     });
     // No existing row → materialize one, storing NULL phone (phone-less).
@@ -223,8 +281,9 @@ describe('CustomerGroupService.assignByIdentity', () => {
   it('recovers from a lost upsert race (P2002) by re-finding and updating', async () => {
     mockGroup.findFirst.mockResolvedValue({ id: 'g1' });
     mockCustomer.findFirst
-      .mockResolvedValueOnce(null) // initial match: none
-      .mockResolvedValueOnce({ id: 'c3' }); // the row the racing writer created
+      .mockResolvedValueOnce(null) // initial unlinked match: none
+      .mockResolvedValueOnce(null) // no LINKED row holds this identity either
+      .mockResolvedValueOnce({ id: 'c3' }); // the unlinked row the racing writer created
     mockCustomer.create.mockRejectedValue(Object.assign(new Error('dup'), { code: 'P2002' }));
     mockCustomer.update.mockResolvedValue({ id: 'c3', groupId: 'g1', group: { id: 'g1' } });
 

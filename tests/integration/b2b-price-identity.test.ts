@@ -231,17 +231,20 @@ describe('Ruling B2B-2: only the authenticated, verified account holder gets the
       source: 'base',
     });
     // 2. the merchant opens the attacker's profile (it shows "Wholesale", matched by phone) and re-selects Wholesale.
-    //    The admin page posts { phone, email } of the attacker to assignByIdentity: the pre-existing phone-first match
-    //    hits the WHOLESALER's CRM row and overwrites its email with the attacker's.
-    await runWithRequestDb(makeApp, () =>
-      runInTenantContext(ids.store!, () =>
-        CustomerGroupService.assignByIdentity(
-          ids.store!,
-          { phone: WHOLESALE_PHONE, email: attacker.email },
-          ids.group!
+    //    The admin page posts { phone, email } of the attacker to assignByIdentity. The old phone-first match hit the
+    //    WHOLESALER's CRM row and overwrote its email; now the only row matching that phone is LINKED to the real
+    //    wholesaler's account, so the merchant is refused (409) and nothing changes (design review I-3).
+    await expect(
+      runWithRequestDb(makeApp, () =>
+        runInTenantContext(ids.store!, () =>
+          CustomerGroupService.assignByIdentity(
+            ids.store!,
+            { phone: WHOLESALE_PHONE, email: attacker.email },
+            ids.group!
+          )
         )
       )
-    );
+    ).rejects.toMatchObject({ statusCode: 409, code: 'IDENTITY_LINKED_TO_ACCOUNT' });
     const hijacked = await owner.customer.findFirst({
       where: { storeId: ids.store!, userId: ids.wholesaler! },
     });

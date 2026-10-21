@@ -17,15 +17,33 @@
  * re-opening display≠charge for any loose line with quantity > 1. One
  * implementation, tested on real arithmetic, removes that hole.
  */
-export function couponQuoteBasis(
-  items: ReadonlyArray<{ price: number; quantity: number; unavailable?: boolean }>
-): number {
+export function couponQuoteBasis(items: ReadonlyArray<CouponQuoteLine>): number {
   // #1766: a line whose product was deleted is not in the cart total and can
   // never be ordered, so it is not part of what a coupon is quoted against.
   return items.reduce(
-    (sum, item) => (item.unavailable ? sum : sum + item.price * item.quantity),
+    (sum, item) => (couponEligible(item) ? sum + item.price * item.quantity : sum),
     0
   );
+}
+
+/** A cart line as the quote sees it. `priceSource` is the SERVER's provenance for the line's price (B2B). */
+export interface CouponQuoteLine {
+  price: number;
+  quantity: number;
+  unavailable?: boolean;
+  priceSource?: 'base' | 'tier' | 'group';
+}
+
+/**
+ * Ruling B2B-5, mirrored from the server so the quote equals the charge: a line priced by a quantity tier or a wholesale group
+ * price is excluded from every coupon basis (`OrderService.create` builds its coupon basis from base-priced lines only). A line
+ * with no `priceSource` (an older API response) is treated as base-priced.
+ */
+export function couponEligible(item: {
+  unavailable?: boolean;
+  priceSource?: 'base' | 'tier' | 'group';
+}): boolean {
+  return !item.unavailable && (item.priceSource === undefined || item.priceSource === 'base');
 }
 
 /**
@@ -39,18 +57,11 @@ export function couponQuoteBasis(
  * them. `Σ lineTotal === couponQuoteBasis(items)` by construction.
  */
 export function couponQuoteCartItems(
-  items: ReadonlyArray<{
-    productId: string;
-    price: number;
-    quantity: number;
-    unavailable?: boolean;
-  }>
+  items: ReadonlyArray<CouponQuoteLine & { productId: string }>
 ): Array<{ productId: string; quantity: number; lineTotal: number }> {
-  return items
-    .filter(item => !item.unavailable)
-    .map(item => ({
-      productId: item.productId,
-      quantity: item.quantity,
-      lineTotal: item.price * item.quantity,
-    }));
+  return items.filter(couponEligible).map(item => ({
+    productId: item.productId,
+    quantity: item.quantity,
+    lineTotal: item.price * item.quantity,
+  }));
 }

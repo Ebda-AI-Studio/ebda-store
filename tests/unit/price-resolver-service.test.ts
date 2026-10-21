@@ -197,18 +197,37 @@ describe('merchant shopper selection and cart owner identities', () => {
   const merchantReq = (role: string) => ({ user: { role, userId: 'staff-1' } }) as never;
 
   it('a merchant picking a REGISTERED shopper prices through customers.user_id of that shopper, in this store', async () => {
+    m.userFindFirst.mockResolvedValue({ id: 'shopper-7' });
     m.customerFindFirst.mockResolvedValue({ group: group() });
     const r = await PriceResolver.forBuyer(
       STORE,
       buyerFromMerchantShopperSelection(merchantReq('staff'), 'shopper-7')
     );
-    expect(m.userFindFirst).not.toHaveBeenCalled();
+    // the same account tests as a session (design review M-5): this store, customer role, active, not deleted
+    expect(m.userFindFirst.mock.calls[0]![0].where).toEqual({
+      id: 'shopper-7',
+      storeId: STORE,
+      role: 'customer',
+      status: 'active',
+      deletedAt: null,
+    });
     expect(m.customerFindFirst.mock.calls[0]![0].where).toEqual({
       storeId: STORE,
       groupId: { not: null },
       userId: 'shopper-7',
     });
     expect(await r.priceLine(P1, null, 1)).toMatchObject({ unitMinor: 8_000, source: 'group' });
+  });
+
+  it('M-5: a merchant-picked shopper who is suspended / deleted / foreign (no user row) is NOT priced as a group member', async () => {
+    m.userFindFirst.mockResolvedValue(null);
+    m.customerFindFirst.mockResolvedValue({ group: group() });
+    const r = await PriceResolver.forBuyer(
+      STORE,
+      buyerFromMerchantShopperSelection(merchantReq('staff'), 'dead-1')
+    );
+    expect(m.customerFindFirst).not.toHaveBeenCalled();
+    expect(await r.priceLine(P1, null, 1)).toMatchObject({ unitMinor: 10_000, source: 'base' });
   });
 
   it('only a merchant session can mint a merchant selection (a customer token throws)', () => {
