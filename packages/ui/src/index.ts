@@ -27,3 +27,4 @@ export * from './theme';
 
 // Utilities
 export { cn } from './utils/cn';
+export * from './components/ReceiptPrinterShell';
