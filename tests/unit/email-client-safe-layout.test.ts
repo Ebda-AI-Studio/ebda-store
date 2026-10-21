@@ -61,6 +61,7 @@ import { planLimitReachedTemplate } from '@api/services/email-templates/plan-lim
 import { subscriptionBillingTemplate } from '@api/services/email-templates/subscription-billing';
 import { staffInviteTemplate } from '@api/services/email-templates/staff-invite';
 import { legalNoticeTemplate } from '@api/services/email-templates/legal-notice';
+import { wholesaleNotice } from '@api/services/email-templates/wholesale';
 
 type Locale = 'en' | 'ar';
 
@@ -144,6 +145,13 @@ const LEGAL_NOTICE_SAMPLE = {
   url: { ar: 'https://ebda.app/terms/', en: 'https://ebda.app/en/terms/' },
 };
 
+const WS_SAMPLE = {
+  customerName: 'Sara',
+  storeName: 'Demo Store',
+  businessName: 'Sara Trading',
+  note: 'Not now',
+};
+
 type Tpl = Record<Locale, (...a: never[]) => string>;
 const TEMPLATES: Record<string, Tpl> = {
   welcome: welcomeTemplate,
@@ -165,6 +173,11 @@ const TEMPLATES: Record<string, Tpl> = {
   subscriptionBilling: subscriptionBillingTemplate,
   staffInvite: staffInviteTemplate,
   // One bilingual body for every recipient (Ruling LEGAL-6), so both locale keys render the same.
+  // One entry covers wholesale.ts (received / approved / rejected share a single layout).
+  wholesaleNotice: {
+    en: () => wholesaleNotice('rejected', 'en', WS_SAMPLE).content,
+    ar: () => wholesaleNotice('rejected', 'ar', WS_SAMPLE).content,
+  },
   legalNotice: {
     en: () => legalNoticeTemplate.body(LEGAL_NOTICE_SAMPLE),
     ar: () => legalNoticeTemplate.body(LEGAL_NOTICE_SAMPLE),

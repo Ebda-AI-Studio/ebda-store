@@ -58,6 +58,8 @@ const LEDGER: Array<[string, string, RegExp]> = [
   // existing writers that change a public price / MOQ / audience already funnel through the product-cache invalidator
   ['services/product.service.ts', 'update', /invalidateStoreProductCache\(/],
   ['services/product.service.ts', 'delete', /invalidateStoreProductCache\(/],
+  // any change to the resolved feature map (plan change, override) drops the cached public product payload (it lists tiers only while entitled)
+  ['services/feature.service.ts', 'invalidateCache', /invalidateStoreProductCaches\(/],
   // a plan-limit edit (wholesalePricing) busts every store on that plan
   ['services/plan.service.ts', 'updatePlan', /storeIdsOnPlan\(|invalidateCache\(/],
 ];

@@ -24,6 +24,7 @@
  */
 import { isIosWebkit } from '@ebda/shared';
 import type { buildQuoteRequest, OrderQuote } from './checkout-quote';
+import type { ResolvedPrice } from './b2b-tiers';
 import type {
   PublicModel3d,
   ProductFact,
@@ -107,6 +108,10 @@ interface ProductCategory {
 interface Product {
   id: string;
   name: string;
+  /** B2B minimum order quantity (public data), null / absent = none. */
+  moq?: number | null;
+  /** PUBLIC quantity price breaks only (group tiers are never in this payload). */
+  priceTiers?: Array<{ variantId: string | null; minQty: number; priceMinor: number }>;
   /**
    * Arabic-localized name. Templates render this when the storefront
    * language is `ar` (falling back to `name` when missing). Without it
@@ -1320,6 +1325,44 @@ class ApiClient {
       method: 'POST',
       body: JSON.stringify(data),
     });
+  }
+
+  /** The signed-in buyer's price for specific quantities (private, no-store). Never sends or accepts a client price. */
+  async resolvePrices(items: Array<{ productId: string; variantId?: string | null; qty: number }>) {
+    return this.request<{ prices: ResolvedPrice[] }>('/public/pricing/resolve', {
+      method: 'POST',
+      body: JSON.stringify({ items }),
+    });
+  }
+
+  /** Apply for a wholesale account (signed-in customer; the applicant is the session, never a body field). */
+  async applyForWholesale(data: {
+    businessName: string;
+    commercialRegNo?: string | null;
+    phone: string;
+    notes?: string | null;
+  }) {
+    return this.request<{ application: { id: string; status: string } }>(
+      '/public/wholesale/apply',
+      {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }
+    );
+  }
+
+  async getWholesaleStatus() {
+    return this.request<{
+      application: {
+        id: string;
+        status: 'pending' | 'approved' | 'rejected' | 'revoked';
+        businessName: string;
+        decisionNote: string | null;
+        createdAt: string;
+        decidedAt: string | null;
+      } | null;
+      isWholesale: boolean;
+    }>('/public/wholesale/status');
   }
 
   async getOrders() {

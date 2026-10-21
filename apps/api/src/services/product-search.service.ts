@@ -67,6 +67,10 @@ export function productSearchSql(
       : Prisma.sql`${doc} LIKE ${pattern}`;
   });
   const status = opts.scope === 'storefront' ? Prisma.sql`AND p.status = 'active'` : Prisma.empty;
+  // B2B-7b: the storefront search NEVER returns a wholesale-only product. The predicate sits in the WHERE, BEFORE the LIMIT
+  // below, so hidden products can never occupy result slots or change the truncation flag (raw-SQL visibility checklist).
+  const audience =
+    opts.scope === 'storefront' ? Prisma.sql`AND p.audience = 'public'` : Prisma.empty;
   const deleted = opts.includeDeleted ? Prisma.empty : Prisma.sql`AND p.deleted_at IS NULL`;
   const orderBy =
     opts.order === 'featured'
@@ -74,7 +78,7 @@ export function productSearchSql(
       : Prisma.sql`similarity(public.ebda_product_name_doc(p.name, p.name_ar, p.search_terms), ${normalizeArabicSearch(raw)}) DESC, p.id`;
   // limit + 1: the extra row only says "there were more" (truncated).
   return Prisma.sql`SELECT p.id FROM products p
-    WHERE p.store_id = ${storeId} ${deleted} ${status}
+    WHERE p.store_id = ${storeId} ${deleted} ${status} ${audience}
       AND ${Prisma.join(arms, ' AND ')}
     ORDER BY ${orderBy}
     LIMIT ${limit + 1}`;

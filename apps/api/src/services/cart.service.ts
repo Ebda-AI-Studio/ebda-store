@@ -25,6 +25,7 @@ import { featureService } from './feature.service';
 import { retryOnWriteConflict } from '../lib/db-retry';
 import { withSavepoint } from '../lib/savepoint';
 import { PriceResolver } from './price-resolver.service';
+import { canSeeWholesaleOnly } from '../lib/audience';
 import { ANONYMOUS_BUYER, type BuyerIdentity } from '../lib/buyer-identity';
 import { STOREFRONT_PRODUCT_SELECT } from './product.service';
 import { resolveBundle, type ResolvedBundle } from './bundle.service';
@@ -464,6 +465,10 @@ export class CartService {
       if (!product) {
         throw new AppError(404, 'NOT_FOUND', 'Product not found or unavailable');
       }
+      // B2B-7b: a wholesale-only product is a 404 for anyone who is not an approved wholesale buyer (no existence oracle).
+      if (product.audience === 'wholesale_only' && !(await canSeeWholesaleOnly(storeId, buyer))) {
+        throw new AppError(404, 'NOT_FOUND', 'Product not found or unavailable');
+      }
 
       // A product with variants is bought as ONE of its variants, never as the
       // bare parent (C-01, 2026-10-15). Without this gate a quick-add with no
@@ -806,9 +811,19 @@ export class CartService {
         trackInventory: true,
         allowBackorder: true,
         personalisation: true,
+        audience: true,
         _count: { select: { variants: true } },
       },
     });
+    if (
+      products.some(p => p.audience === 'wholesale_only') &&
+      !(await canSeeWholesaleOnly(storeId, buyer))
+    ) {
+      // B2B-7b: treat wholesale-only products as missing for a non-member (same 404 as an unknown product).
+      for (const p of products.filter(p => p.audience === 'wholesale_only')) {
+        products.splice(products.indexOf(p), 1);
+      }
+    }
     const productById = new Map(products.map(p => [p.id, p]));
 
     // Resolve any chosen variants up front (must belong to one of these products

@@ -378,3 +378,11 @@ Buyer TRN/B2B tax invoices and reverse charge, credit terms/net-N and invoicing-
 2. **Coupons on wholesale lines:** exclude (Ruling B2B-5, default) or allow stacking?
 3. **"Prices only to logged-in approved buyers":** is it per product (wholesale-only products, Ruling B2B-7) or do you also want a store-wide "login to see prices" mode for the whole catalogue? The second hides prices from Google/feeds and has SEO and ad-platform consequences, so it is NOT in this plan unless you say so.
 4. **Self-serve vs approval:** all wholesale groups require merchant approval (planned), or should a merchant be able to let anyone self-join a group (auto-approve)?
+
+## Execution notes: Tasks 4-6 (2026-10-21)
+
+- **Task 4 DONE** (e311c63a3): merchant tier + group price APIs, B2B-12 `TIER_VARIANT_ABOVE_PRODUCT`, `.strict()` Zod, NEVER-stale `invalidateB2bPricing` after every write, call-site ledger test.
+- **Task 5 DONE** (94f304b6f): application + approval through `linkApprovedBuyer` (never `assignByIdentity`), applicant export and erasure (erasure also severs `customers.user_id` and group).
+- **Task 6 DONE**: public tiers and MOQ in the cacheable payload (public tiers only, B2B-7b); wholesale-only excluded from list, detail, search SQL, suggestions, filters, recommendations, cart, order and wishlist paths; `private, no-store` `/pricing/resolve` for the signed-in buyer; PDP panel, cart MOQ block, `/account/wholesale`. Raw-SQL checklist test (`tests/unit/b2b-raw-product-sql-visibility.test.ts`) requires an `audience` predicate on every raw product query; the storefront search slot test proves it runs BEFORE the LIMIT (mutation-checked).
+- **Integration points on unmerged branches (must be applied when they merge):** (1) `feat/b2-souq` `on_sale` raw-SQL source: add `AND p.audience = 'public'` inside that SQL before its LIMIT, then register the file in the raw-SQL scan. (2) Any search definer/function that returns product ids (the search doc functions are IMMUTABLE helpers only; a future SECURITY DEFINER search must take an audience argument). The scan test fails on any new raw `products` query without the predicate, so a merge that forgets this goes red.
+- Residual: merchant notification event on a new application is not emitted (email to the applicant only). Not verified: real storefront render in a browser; web unit tests only.

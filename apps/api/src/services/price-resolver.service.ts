@@ -185,6 +185,7 @@ const GROUP_SELECT = {
     id: true,
     storeId: true,
     name: true,
+    isWholesale: true,
     pricingMode: true,
     discountBps: true,
     isActive: true,
@@ -198,7 +199,7 @@ const GROUP_SELECT = {
 export async function loadBuyerGroup(
   storeId: string,
   buyer: BuyerIdentity
-): Promise<(BuyerGroup & { name: string }) | null> {
+): Promise<(BuyerGroup & { name: string; isWholesale: boolean }) | null> {
   let customer: { group: GroupRow | null } | null = null;
   if (buyer.kind === 'session') {
     const user = await prisma.user.findFirst({
@@ -250,6 +251,7 @@ export async function loadBuyerGroup(
   return {
     id: g.id,
     name: g.name,
+    isWholesale: g.isWholesale,
     pricingMode: g.pricingMode,
     discountBps: g.discountBps,
     isActive: g.isActive,
@@ -259,6 +261,7 @@ export async function loadBuyerGroup(
 type GroupRow = {
   id: string;
   name: string;
+  isWholesale: boolean;
   storeId: string;
   pricingMode: string;
   discountBps: number;

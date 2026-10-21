@@ -19,6 +19,7 @@ import { CartLineUnavailableNotice } from '../../templates/shared/CartLineUnavai
 import { summaryMoneyFormatter } from '../../templates/shared/useOrderSummaryBase';
 import { pageSurfaceStyle } from '@/lib/page-surface';
 import { couponQuoteBasis, couponQuoteCartItems } from '@/lib/coupon-quote-basis';
+import { moqShortfalls, moqCartMessage } from '@/lib/b2b-moq';
 import { productUnavailableCopy } from '@/lib/product-cart-errors';
 import {
   resolveSectionZone,
@@ -421,7 +422,23 @@ export default function CartClient() {
   // "remove it to check out" is enforced here rather than left advisory —
   // otherwise the shopper fills the whole checkout form only to be refused.
   const hasUnavailableLines = unavailableItems.length > 0;
-  const checkoutBlocked = belowMinimumOrder || hasUnavailableLines;
+  // B2B minimum order quantity: the server flags each line (`belowMoq`); the order would be refused 422 BELOW_MOQ, so the cart
+  // says so inline and disables checkout instead of letting the buyer fill the form first.
+  const moqMessage = moqCartMessage(
+    moqShortfalls(
+      cartItems.map(i => ({
+        productId: i.productId,
+        name: i.name,
+        nameAr: i.nameAr,
+        quantity: i.quantity,
+        belowMoq: i.belowMoq,
+        moqRequired: i.moqRequired,
+        unavailable: i.unavailable,
+      }))
+    ),
+    language === 'ar' ? 'ar' : 'en'
+  );
+  const checkoutBlocked = belowMinimumOrder || hasUnavailableLines || !!moqMessage;
   const checkoutBlockedMessage =
     minimumOrderMessage ??
     (hasUnavailableLines
@@ -429,7 +446,7 @@ export default function CartClient() {
           'Remove the unavailable items to check out.',
           'شيل المنتجات اللي مش متوفرة عشان تكمّل الطلب.'
         )
-      : undefined);
+      : moqMessage);
 
   return (
     <ShopChrome>

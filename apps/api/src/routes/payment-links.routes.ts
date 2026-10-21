@@ -199,7 +199,14 @@ router.post(
       const productIds = items.map(i => i.productId);
       const products = productIds.length
         ? await prisma.product.findMany({
-            where: { id: { in: productIds }, storeId, status: 'active', deletedAt: null },
+            // B2B-7b: payment links are anonymous-priced; a wholesale-only product is PRODUCT_NOT_FOUND here
+            where: {
+              id: { in: productIds },
+              storeId,
+              status: 'active',
+              deletedAt: null,
+              audience: 'public',
+            },
             select: {
               id: true,
               name: true,

@@ -31,6 +31,7 @@ import { loadCodFeeConfig } from './payment-providers/cod.provider';
 import { generateOrderNumber } from '../utils/order-number';
 import { PriceResolver, wholesaleEntitledUncached } from './price-resolver.service';
 import { ANONYMOUS_BUYER, type BuyerIdentity } from '../lib/buyer-identity';
+import { canSeeWholesaleOnly } from '../lib/audience';
 import {
   assertMoqSatisfied,
   priceSnapshot,
@@ -751,6 +752,7 @@ export class OrderService {
         costPrice: true,
         // B2B minimum order quantity (Review Focus 7): judged below on the product total.
         moq: true,
+        audience: true,
         name: true,
         nameAr: true,
         // Every variant row (disabled included): the sizeless-line gate below.
@@ -791,6 +793,23 @@ export class OrderService {
         'PRODUCT_NO_LONGER_AVAILABLE',
         'A product in your cart is no longer available. Remove it and try again.',
         { productIds: missingProductIds }
+      );
+    }
+
+    // B2B-7b: a wholesale-only line in the cart (added before a revoke, or before the merchant changed the audience) cannot
+    // be ordered by a buyer who is not an approved wholesale member. Same 409 as a deleted product: the cart page removes it.
+    const wholesaleOnlyIds = cart.items
+      .filter(i => productInternalsById.get(i.productId)?.audience === 'wholesale_only')
+      .map(i => i.productId);
+    if (
+      wholesaleOnlyIds.length > 0 &&
+      !(await canSeeWholesaleOnly(storeId, requestContext?.buyer ?? ANONYMOUS_BUYER))
+    ) {
+      throw new AppError(
+        409,
+        'PRODUCT_NO_LONGER_AVAILABLE',
+        'A product in your cart is no longer available. Remove it and try again.',
+        { productIds: [...new Set(wholesaleOnlyIds)] }
       );
     }
 

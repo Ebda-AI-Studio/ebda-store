@@ -223,12 +223,18 @@ const ALLOW: Record<string, AllowEntry> = {
       listPublic: 6,
       reshapePublicProductDetail: 2,
       update: 4,
+      b2bPublicFields: 1,
     },
   },
   'mcp/tools/admin-read.tools.ts': {
     category: 'admin-display',
     reason: 'merchant read of list price',
     reads: { productSummary: 1, registerAdminReadTools: 2 },
+  },
+  'routes/wholesale.routes.ts': {
+    category: 'resolver-input',
+    reason: 'POST /public/pricing/resolve feeds base prices to priceLine for the signed-in buyer',
+    reads: { 'POST /pricing/resolve': 4 },
   },
   'services/price-tier.service.ts': {
     category: 'writer',
@@ -408,6 +414,7 @@ describe('B2B: direct price reads are classified per file and per symbol (AST sc
     }
     expect(found.sort()).toEqual([
       // STOREFRONT_PRODUCT_SELECT is a Prisma select constant (no price decision).
+      'routes/wholesale.routes.ts -> services/product.service.ts: ProductService', // the approved-buyer catalogue list / detail (no price decision)
       'services/cart.service.ts -> services/product.service.ts: STOREFRONT_PRODUCT_SELECT',
       'services/order.service.ts -> services/product.service.ts: STOREFRONT_PRODUCT_SELECT',
     ]);

@@ -33,6 +33,7 @@ import { useNumerals } from '../../../hooks/useNumerals';
 import { toTemplateProduct } from '../../../templates/adapters';
 import { ProductCarousel } from '../../../templates/shared/ProductCarousel';
 import { TaxInclusiveLabel } from '../../../templates/shared/tax-inclusive-label';
+import { B2bPdpPanel } from '../../../components/pricing/B2bPdpPanel';
 import { ShareProductRow } from '../../../templates/shared/ShareProductRow';
 import { WaMeProductButton } from '../../../templates/shared/WaMeButtons';
 import { SpecTable } from '../../../templates/shared/SpecTable';
@@ -736,6 +737,14 @@ export default function ProductDetailClient({
       <ShopChrome layout={resolvedLayout}>
         <div className="flex-1" style={pdpBgStyle}>
           <DahabProductDetail
+            b2bPanel={
+              <B2bPdpPanel
+                productId={product.id}
+                variantId={selectedVariant?.id ?? null}
+                moq={product.moq}
+                tiers={product.priceTiers}
+              />
+            }
             images={images}
             name={displayName}
             categoryName={categoryName ?? undefined}
@@ -1085,6 +1094,12 @@ export default function ProductDetailClient({
                 )}
               </div>
               <TaxInclusiveLabel className="mt-1 block text-xs text-muted-foreground" />
+              <B2bPdpPanel
+                productId={product.id}
+                variantId={selectedVariant?.id ?? null}
+                moq={product.moq}
+                tiers={product.priceTiers}
+              />
 
               {/* Variant Selector */}
               {hasVariants && hasOptions ? (

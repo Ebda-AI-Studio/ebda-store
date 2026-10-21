@@ -226,7 +226,8 @@ export async function bridgeProductSearchPage(
   const matchIds = await searchProductIds(storeId, q, { scope: 'storefront', withSku: true });
   // Fetch limit+1 to cheaply determine hasMore without a COUNT query.
   const products = await prisma.product.findMany({
-    where: { storeId, status: 'active', deletedAt: null, id: { in: matchIds } },
+    // B2B-7b: WhatsApp is an anonymous surface, wholesale-only products never appear
+    where: { storeId, status: 'active', deletedAt: null, audience: 'public', id: { in: matchIds } },
     select: {
       id: true,
       name: true,
@@ -287,6 +288,7 @@ router.get('/products/by-category', waBridgeAuth, async (req: Request, res: Resp
         storeId,
         status: 'active',
         deletedAt: null,
+        audience: 'public',
         categories: { some: { categoryId } },
       },
       select: {
@@ -653,6 +655,7 @@ router.get('/store-catalog', waBridgeAuth, async (req: Request, res: Response) =
         storeId: store.id,
         status: 'active',
         deletedAt: null,
+        audience: 'public',
       },
       select: {
         id: true,
@@ -896,7 +899,13 @@ router.post('/cart/from-wa', waBridgeAuth, async (req: Request, res: Response) =
     // Verify every product belongs to bridge store + still in stock.
     const productIds = items.map(i => i.productId);
     const products = await prisma.product.findMany({
-      where: { id: { in: productIds }, storeId: store.id, status: 'active', deletedAt: null },
+      where: {
+        id: { in: productIds },
+        storeId: store.id,
+        status: 'active',
+        deletedAt: null,
+        audience: 'public',
+      },
       select: {
         id: true,
         name: true,

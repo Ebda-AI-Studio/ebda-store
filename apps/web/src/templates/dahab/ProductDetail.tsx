@@ -46,6 +46,8 @@ import {
 } from './ui';
 
 export interface DahabProductDetailProps {
+  /** B2B wholesale panel (MOQ + public price breaks + the signed-in buyer's prices), rendered under the price. */
+  b2bPanel?: React.ReactNode;
   images: Array<{ id?: string; url: string; alt?: string | null }>;
   name: string;
   categoryName?: string;
@@ -398,6 +400,7 @@ export function DahabProductDetail(p: DahabProductDetailProps) {
               )}
             </div>
             <TaxInclusiveLabel className="mt-1 block text-xs text-muted-foreground" />
+            {p.b2bPanel}
             {p.excerpt && (
               <p className="mt-5 text-pretty text-[15px] leading-relaxed text-foreground/80">
                 {p.excerpt}

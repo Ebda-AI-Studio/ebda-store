@@ -223,6 +223,7 @@ class RecommendationService {
           storeId,
           status: 'active',
           deletedAt: null,
+          audience: 'public',
           id: { notIn: Array.from(alreadyReturnedIds) },
           categories: {
             some: { categoryId: { in: categoryIds } },
@@ -334,6 +335,7 @@ class RecommendationService {
         storeId,
         status: 'active',
         deletedAt: null,
+        audience: 'public',
       },
       select: productSelect,
     });

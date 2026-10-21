@@ -22,6 +22,12 @@ import { getStoreIdFromRequest, getAuthUser } from '../utils/store-helpers';
 import { setBuyerPrivate } from '../lib/edge-cache';
 import { WholesaleApplicationService } from '../services/wholesale-application.service';
 import { AppError } from '../middleware/error-handler';
+import { prisma } from '@ebda/database';
+import { cartLimiter } from '../middleware/security';
+import { buyerFromRequest } from '../lib/buyer-identity';
+import { canSeeWholesaleOnly } from '../lib/audience';
+import { PriceResolver } from '../services/price-resolver.service';
+import { ProductService } from '../services/product.service';
 
 export const publicWholesaleRouter = Router();
 export const merchantWholesaleRouter = Router();
@@ -73,6 +79,139 @@ publicWholesaleRouter.get('/wholesale/status', optionalAuthenticate, async (req,
     next(e);
   }
 });
+
+// ── POST /public/pricing/resolve: the signed-in buyer's price for specific quantities (PDP tier table, cart preview) ──
+// Buyer-specific, so it is `private, no-store` and never cached. Buyer = the SESSION only (buyerFromRequest). Items name a
+// product / variant / quantity and NOTHING ELSE: a price in the body is a 400 (strict). A wholesale-only product is resolved
+// only for an approved member; for anyone else it is simply absent from the answer (no existence oracle).
+const resolveSchema = z
+  .object({
+    items: z
+      .array(
+        z
+          .object({
+            productId: z.string().uuid(),
+            variantId: z.string().uuid().nullish(),
+            qty: z.number().int().min(1).max(100_000),
+          })
+          .strict()
+      )
+      .min(1)
+      .max(50),
+  })
+  .strict();
+
+publicWholesaleRouter.post(
+  '/pricing/resolve',
+  optionalAuthenticate,
+  cartLimiter,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const storeId = await getStoreIdFromRequest(req);
+      const { items } = resolveSchema.parse(req.body);
+      const buyer = buyerFromRequest(req);
+      setBuyerPrivate(res);
+      const member = await canSeeWholesaleOnly(storeId, buyer);
+      const products = await prisma.product.findMany({
+        where: {
+          id: { in: [...new Set(items.map(i => i.productId))] },
+          storeId,
+          status: 'active',
+          deletedAt: null,
+          ...(member ? {} : { audience: 'public' }),
+        },
+        select: {
+          id: true,
+          price: true,
+          moq: true,
+          variants: { select: { id: true, price: true } },
+        },
+      });
+      const byId = new Map(products.map(p => [p.id, p]));
+      const lines = items.flatMap((it, i) => {
+        const p = byId.get(it.productId);
+        if (!p) return [];
+        const v = it.variantId ? p.variants.find(x => x.id === it.variantId) : undefined;
+        if (it.variantId && !v) return [];
+        return [
+          {
+            key: String(i),
+            item: it,
+            product: { id: p.id, price: p.price, moq: p.moq },
+            variant: v ? { id: v.id, price: v.price } : null,
+          },
+        ];
+      });
+      // Each requested quantity is priced on its own (one resolver per call, no cross-item summing: these are quotes for a tier
+      // table, not a cart).
+      const resolver = await PriceResolver.forBuyer(storeId, buyer);
+      const out = [];
+      for (const l of lines) {
+        const r = await resolver.priceLine(l.product, l.variant, l.item.qty);
+        out.push({
+          productId: l.item.productId,
+          variantId: l.item.variantId ?? null,
+          qty: l.item.qty,
+          unitPrice: r.unitMinor,
+          listPrice: r.listMinor,
+          priceSource: r.source,
+          priceTierMinQty: r.tierMinQty,
+          belowMoq: r.belowMoq,
+          moqRequired: r.moqRequired,
+        });
+      }
+      res.json({ success: true, data: { prices: out } });
+    } catch (e) {
+      next(e);
+    }
+  }
+);
+
+// ── GET /public/wholesale/products[/:slug]: the approved buyer's extra catalogue (wholesale-only products) ──
+// Members only; everyone else gets a plain 404 (never a 403: no existence oracle). private, no-store.
+const catalogQuery = z.object({
+  page: z.coerce.number().int().min(1).max(500).optional(),
+  limit: z.coerce.number().int().min(1).max(50).optional(),
+});
+publicWholesaleRouter.get(
+  '/wholesale/products',
+  optionalAuthenticate,
+  cartLimiter,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const storeId = await getStoreIdFromRequest(req);
+      setBuyerPrivate(res);
+      if (!(await canSeeWholesaleOnly(storeId, buyerFromRequest(req)))) {
+        throw new AppError(404, 'NOT_FOUND', 'Not found');
+      }
+      const q = catalogQuery.parse(req.query);
+      const data = await ProductService.listPublic(storeId, { ...q, audience: 'wholesale_only' });
+      res.json({ success: true, data });
+    } catch (e) {
+      next(e);
+    }
+  }
+);
+publicWholesaleRouter.get(
+  '/wholesale/products/:slug',
+  optionalAuthenticate,
+  cartLimiter,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const storeId = await getStoreIdFromRequest(req);
+      setBuyerPrivate(res);
+      if (!(await canSeeWholesaleOnly(storeId, buyerFromRequest(req)))) {
+        throw new AppError(404, 'NOT_FOUND', 'Not found');
+      }
+      const product = await ProductService.getPublicBySlug(storeId, req.params.slug, {
+        audience: 'wholesale_only',
+      });
+      res.json({ success: true, data: { product } });
+    } catch (e) {
+      next(e);
+    }
+  }
+);
 
 const guard = [authenticate, authorize('store_admin', 'super_admin'), requireStoreAccess];
 const base = '/:storeId/wholesale-applications';
