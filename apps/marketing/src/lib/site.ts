@@ -60,6 +60,7 @@ export const absoluteUrl = (p: string) =>
 export const SECTION_ORDER = [
   'story',
   'looks',
+  'demo',
   'model3d',
   'payments',
   'features',

@@ -200,6 +200,8 @@ export interface Copy {
   model3d: Model3dCopy;
   /** The interactive template + look picker (5 templates x 3 looks, phone previews). */
   looks: LooksCopy;
+  /** MKT-15: the section that links to the live demo store. */
+  demo: { title: string; lead: string; cta: string };
   features: {
     title: string;
     hero: HeroFeatures;
@@ -369,6 +371,11 @@ export const COPY: Record<Locale, Copy> = {
       ],
       phoneLabel:
         'متجر مجوهرات (قالب دهب) بيتبني على الموبايل: اسم ولوجو، منتجات، ألوان وصور، وبعدين توصله الطلبات والإشعارات. صور توضيحية.',
+    },
+    demo: {
+      title: 'جرّب المتجر التجريبي بنفسك',
+      lead: 'متجر حقيقي على إبدأ بكتالوج أزياء توضيحي. غيّر القالب والشكل من الشريط اللي فوق، وافتح أي منتج، وجرّب السلة. الطلب مقفول، فمحدش هيتحاسب.',
+      cta: 'افتح المتجر التجريبي',
     },
     looks: {
       title: 'اختار قالب، وبعدين اختار شكله.',
@@ -757,6 +764,11 @@ export const COPY: Record<Locale, Copy> = {
       ],
       phoneLabel:
         'A jewellery store (the Dahab template) being built on a phone: name and logo, products, colours and photos, then orders and notifications. Illustrative.',
+    },
+    demo: {
+      title: 'Try the demo store yourself',
+      lead: 'A real Ebda store with an illustrative fashion catalogue. Switch the template and look from the bar at the top, open any product, try the cart. Ordering is closed, so nobody gets charged.',
+      cta: 'Open the demo store',
     },
     looks: {
       title: 'Pick a template, then pick its look.',
