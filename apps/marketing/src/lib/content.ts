@@ -598,7 +598,7 @@ export const COPY: Record<Locale, Copy> = {
       use: 'بيظهر في',
       photosH: 'صور القوالب',
       photosP:
-        'الصور في القوالب الخمسة وأشكالها الخمستاشر اتعملت بالذكاء الاصطناعي (Cloudflare Workers AI، موديل FLUX.1 schnell) علشان توضيح الفكرة. مش بتعرض أي محل أو منتج أو شخص حقيقي ومش محتاجة نسب.',
+        'الصور في القوالب الخمسة وأشكالها الخمستاشر اتعملت بالذكاء الاصطناعي علشان توضيح الفكرة. مش بتعرض أي محل أو منتج أو شخص حقيقي ومش محتاجة نسب.',
       modified: 'معدّل',
     },
     aboutPage: {
@@ -987,7 +987,7 @@ export const COPY: Record<Locale, Copy> = {
       use: 'Shown in',
       photosH: 'Template photos',
       photosP:
-        'The photos in the five templates and their fifteen looks are AI-generated (Cloudflare Workers AI, FLUX.1 schnell) to illustrate the idea. They show no real shop, product or person and need no attribution.',
+        'The photos in the five templates and their fifteen looks are AI-generated to illustrate the idea. They show no real shop, product or person and need no attribution.',
       modified: 'modified',
     },
     aboutPage: {
