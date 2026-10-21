@@ -32,8 +32,10 @@ describe('shape registry + schema', () => {
     expect(new Set(RECEIPT_BARCODE_SHAPES).size).toBe(24);
   });
   it('schema accepts plain/off/shapes and rejects anything else', () => {
-    for (const ok of ['plain', 'off', 'palm', 'ghost']) expect(receiptBarcodeShapeSchema.safeParse(ok).success).toBe(true);
-    for (const bad of ['', 'Palm', 'star', '<script>', 1]) expect(receiptBarcodeShapeSchema.safeParse(bad).success).toBe(false);
+    for (const ok of ['plain', 'off', 'palm', 'ghost'])
+      expect(receiptBarcodeShapeSchema.safeParse(ok).success).toBe(true);
+    for (const bad of ['', 'Palm', 'star', '<script>', 1])
+      expect(receiptBarcodeShapeSchema.safeParse(bad).success).toBe(false);
   });
 });
 
@@ -56,7 +58,10 @@ describe('renderBarcodeSvg', () => {
   });
 });
 
-import { billingPaymentNumber, EBDA_BILLING_BARCODE_SHAPE } from '../../packages/shared/src/barcode';
+import {
+  billingPaymentNumber,
+  EBDA_BILLING_BARCODE_SHAPE,
+} from '../../packages/shared/src/barcode';
 describe('ebda billing barcode', () => {
   it('uses palm and a full-entropy 16-digit payment number from ANY id shape', () => {
     expect(EBDA_BILLING_BARCODE_SHAPE).toBe('palm');
@@ -89,7 +94,9 @@ describe('renderBarcodeSvg: instance ids, ink, size rule', () => {
     const bad = renderBarcodeSvg({ value: 'ORD-1', shape: 'plain', ink: '"/><script>x</script>' });
     expect(bad).not.toContain('<script');
     expect(bad).toContain('fill="currentColor"');
-    expect(renderBarcodeSvg({ value: 'ORD-1', shape: 'plain', ink: '#141414' })).toContain('fill="#141414"');
+    expect(renderBarcodeSvg({ value: 'ORD-1', shape: 'plain', ink: '#141414' })).toContain(
+      'fill="#141414"'
+    );
   });
   it('a shape that cannot meet the module floor at displayPx renders plain', () => {
     const v = 'ORD-T5JK9Q-AB3XY';

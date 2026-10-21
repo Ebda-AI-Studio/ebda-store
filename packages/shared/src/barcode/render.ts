@@ -35,7 +35,10 @@ const esc = (s: string) =>
 function barsPath(mods: boolean[], x0: number, mw: number, y: number, h: number): string {
   let d = '';
   for (let i = 0; i < mods.length; ) {
-    if (!mods[i]) { i++; continue; }
+    if (!mods[i]) {
+      i++;
+      continue;
+    }
     let j = i;
     while (j < mods.length && mods[j]) j++;
     const x = +(x0 + i * mw).toFixed(3);
@@ -84,7 +87,12 @@ export function renderBarcodeSvg(opts: RenderBarcodeOptions): string {
   const id = `bcm-${shape}${opts.idSuffix ? `-${opts.idSuffix.replace(ID, '')}` : ''}`;
   const mask =
     `<mask id="${id}" maskUnits="userSpaceOnUse"><rect width="${w + PAD * 2}" height="${h + PAD * 2}" fill="black"/>` +
-    d.map(p => `<path d="${p}" fill="white" fill-rule="evenodd" transform="translate(${PAD},${PAD})"/>`).join('') +
+    d
+      .map(
+        p =>
+          `<path d="${p}" fill="white" fill-rule="evenodd" transform="translate(${PAD},${PAD})"/>`
+      )
+      .join('') +
     `<rect x="${PAD}" y="${zoneY}" width="${w}" height="${ZONE}" fill="white"/></mask>`;
   const deco = barsPath(mods, x0, mw, PAD, h - ZONE);
   const zone = barsPath(mods, x0, mw, zoneY, ZONE);

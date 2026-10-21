@@ -140,7 +140,9 @@ describe('packing slip sizes', () => {
       for (const shape of SHAPES) {
         for (const value of REAL) {
           const svg = renderBarcodeSvg({ value, shape, ink: '#111111', displayPx: px });
-          expect(await decode(zoneOnly(svg), px), `${name} ${shape} ${value}`).toContain(scanCodeFor(value));
+          expect(await decode(zoneOnly(svg), px), `${name} ${shape} ${value}`).toContain(
+            scanCodeFor(value)
+          );
         }
       }
     });

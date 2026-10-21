@@ -19,11 +19,19 @@ describe('pickReceiptCharge', () => {
     });
   });
   it('a manually opened receipt wins and never shows refunds or unpaid charges', () => {
-    expect(pickReceiptCharge(charges, { returnChargeId: null, openedId: 'old' }).charge).toBe(charges[0]);
+    expect(pickReceiptCharge(charges, { returnChargeId: null, openedId: 'old' }).charge).toBe(
+      charges[0]
+    );
     expect(pickReceiptCharge(charges, { returnChargeId: null, openedId: 'new' }).charge).toBeNull();
-    expect(pickReceiptCharge([c('r', 'succeeded', 'refund')], { returnChargeId: null, openedId: 'r' }).charge).toBeNull();
+    expect(
+      pickReceiptCharge([c('r', 'succeeded', 'refund')], { returnChargeId: null, openedId: 'r' })
+        .charge
+    ).toBeNull();
   });
   it('no return and nothing opened: nothing', () => {
-    expect(pickReceiptCharge(charges, { returnChargeId: null, openedId: null })).toEqual({ charge: null, processing: false });
+    expect(pickReceiptCharge(charges, { returnChargeId: null, openedId: null })).toEqual({
+      charge: null,
+      processing: false,
+    });
   });
 });

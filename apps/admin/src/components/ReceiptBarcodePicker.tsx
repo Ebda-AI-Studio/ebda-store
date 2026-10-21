@@ -110,7 +110,10 @@ export function ReceiptBarcodePicker({
           {t('saveShape')}
         </button>
         {msg && (
-          <span role="status" className={`text-xs ${msg.ok ? 'text-success-ink' : 'text-destructive-ink'}`}>
+          <span
+            role="status"
+            className={`text-xs ${msg.ok ? 'text-success-ink' : 'text-destructive-ink'}`}
+          >
             {msg.text}
           </span>
         )}

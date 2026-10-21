@@ -27,7 +27,8 @@ export function encodeCode128(value: string): number[] {
     codes.push(START_B);
     for (const ch of value) {
       const c = ch.codePointAt(0)!;
-      if (c < 32 || c > 126) throw new Error(`code128: unsupported character ${JSON.stringify(ch)}`);
+      if (c < 32 || c > 126)
+        throw new Error(`code128: unsupported character ${JSON.stringify(ch)}`);
       codes.push(c - 32);
     }
   }

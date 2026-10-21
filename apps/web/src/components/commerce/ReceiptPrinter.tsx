@@ -227,10 +227,7 @@ export function ReceiptPrinter({
                 rel="noopener noreferrer"
                 className={`${styles.ink} underline underline-offset-4`}
               >
-                {t(
-                  'Questions? Message the store on WhatsApp',
-                  'عندك سؤال؟ كلّم المتجر على واتساب'
-                )}
+                {t('Questions? Message the store on WhatsApp', 'عندك سؤال؟ كلّم المتجر على واتساب')}
               </a>
             </p>
           )}

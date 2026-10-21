@@ -39,7 +39,11 @@ describe('EbdaBillingReceipt', () => {
     expect(screen.getByRole('status').textContent).toBe('printing');
   });
   it('under reduced motion it is a static receipt, already paid', () => {
-    window.matchMedia = ((q: string) => ({ matches: q.includes('reduce'), addEventListener() {}, removeEventListener() {} })) as never;
+    window.matchMedia = ((q: string) => ({
+      matches: q.includes('reduce'),
+      addEventListener() {},
+      removeEventListener() {},
+    })) as never;
     render(<EbdaBillingReceipt charge={charge} locale="ar" />);
     expect(screen.getByTestId('ebda-receipt-paper').getAttribute('data-feeding')).toBeNull();
     expect(screen.getByRole('status').textContent).toBe('paid');
