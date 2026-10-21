@@ -24,7 +24,7 @@ import rateLimit, { ipKeyGenerator } from 'express-rate-limit';
 import { z } from 'zod';
 import jwt from 'jsonwebtoken';
 import { createHash } from 'node:crypto';
-import { prisma } from '@ebda/database';
+import { prisma, withStore } from '@ebda/database';
 import { groupOrderLinesForDisplay, BRAND_MARKETING_URL } from '@ebda/shared';
 import { config } from '../config';
 import { waBridgeAuth } from '../middleware/wa-bridge-auth';
@@ -111,6 +111,7 @@ router.use(bridgeRateLimit);
 // per request for latency diagnosis. Phase 0 instrumentation.
 router.use(waBridgeTiming(logger));
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const PAGE_SIZE = 10; // Meta interactive list cap
 const CHECKOUT_TOKEN_TTL_SECONDS = 30 * 60; // 30 minutes
 
@@ -1177,11 +1178,24 @@ router.post('/cart/redeem', async (req: Request, res: Response) => {
     // Cross-check the store still has the integration enabled. If a
     // merchant disconnected WBS between token issuance and redemption,
     // refuse — they don't want WA-originated traffic anymore.
-    const store = await prisma.store.findUnique({
-      where: { id: payload.storeId as string },
-      select: { id: true, slug: true, wbsEnabled: true },
-    });
-    if (!store?.wbsEnabled) {
+    // This route has no waBridgeAuth, so it opens its own store scope for the id the signed token
+    // names: a malformed id is a bad token, an unknown id is a 404 — never a default store.
+    const tokenStoreId = payload.storeId;
+    if (typeof tokenStoreId !== 'string' || !UUID_RE.test(tokenStoreId)) {
+      res.status(400).json({ success: false, error: 'TOKEN_INVALID' });
+      return;
+    }
+    const store = await withStore(tokenStoreId, tx =>
+      tx.store.findUnique({
+        where: { id: tokenStoreId },
+        select: { id: true, slug: true, wbsEnabled: true },
+      })
+    );
+    if (!store) {
+      res.status(404).json({ success: false, error: 'STORE_NOT_FOUND' });
+      return;
+    }
+    if (!store.wbsEnabled) {
       res.status(403).json({ success: false, error: 'STORE_WBS_DISABLED' });
       return;
     }

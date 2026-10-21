@@ -18,6 +18,7 @@ import { AppError } from '../middleware/error-handler';
 import logger from '../lib/logger';
 import { haversineKm } from '../lib/haversine';
 import { retryOnWriteConflict } from '../lib/db-retry';
+import { invalidateStoreProductCaches } from '../lib/public-cache';
 import { searchProductIdSet, searchVariantIdsBySku } from './product-search.service';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -521,6 +522,7 @@ export class WarehouseService {
     if (!product) throw new AppError(404, 'PRODUCT_NOT_FOUND', 'Product not found');
 
     const variantId = input.variantId ?? null;
+    await WarehouseService.assertNotVariantProductLevel(input.productId, variantId);
 
     await retryOnWriteConflict(
       () =>
@@ -538,6 +540,9 @@ export class WarehouseService {
         }),
       WAREHOUSE_WRITE_RETRY
     );
+
+    // The aggregate moved: bust the storefront product caches (variant writes included).
+    await invalidateStoreProductCaches(storeId);
   }
 
   /**
@@ -566,6 +571,7 @@ export class WarehouseService {
     if (!product) throw new AppError(404, 'PRODUCT_NOT_FOUND', 'Product not found');
 
     const variantId = input.variantId ?? null;
+    await WarehouseService.assertNotVariantProductLevel(input.productId, variantId);
 
     const newQty = await retryOnWriteConflict(
       () =>
@@ -617,12 +623,34 @@ export class WarehouseService {
       WAREHOUSE_WRITE_RETRY
     );
 
+    await invalidateStoreProductCaches(storeId);
+
     logger.info(
       { storeId, warehouseId, productId: input.productId, delta: input.delta, newQty },
       '[Warehouse] stock adjusted'
     );
 
     return { newQuantity: newQty };
+  }
+
+  /**
+   * A product-level warehouse write (no variantId) aimed at a product that has
+   * variants would write `products.inventory`, which must stay 0 for it. Fail
+   * loud, as InventoryService.adjustInventory does.
+   */
+  private static async assertNotVariantProductLevel(
+    productId: string,
+    variantId: string | null
+  ): Promise<void> {
+    if (variantId) return;
+    const variantCount = await prisma.productVariant.count({ where: { productId } });
+    if (variantCount > 0) {
+      throw new AppError(
+        400,
+        'VARIANT_PRODUCT',
+        'This product tracks stock on its variants. Set the warehouse stock per variant instead.'
+      );
+    }
   }
 
   /**
@@ -742,18 +770,10 @@ export class WarehouseService {
           AND EXISTS (SELECT 1 FROM "products" p WHERE p."id" = ${productId} AND p."store_id" = ${storeId})
       `;
 
-      // Also re-aggregate the parent product from all its variants — same
-      // lock-then-recompute pattern, one level up.
-      await tx.$queryRaw`SELECT "id" FROM "products" WHERE "id" = ${productId} AND "store_id" = ${storeId} FOR UPDATE`;
-
-      await tx.$executeRaw`
-        UPDATE "products"
-        SET inventory = (
-          SELECT COALESCE(SUM("inventory"), 0) FROM "product_variants"
-          WHERE "product_id" = ${productId}
-        )
-        WHERE "id" = ${productId} AND "store_id" = ${storeId}
-      `;
+      // The parent `products.inventory` is deliberately NOT touched: for a variant
+      // product it is unused and stays 0 (docs/architecture/inventory-model.md —
+      // one line writes the variant row XOR the product row). Stock is read as
+      // SUM(active variants) by effectiveInventory / ON_HAND_SQL.
     } else {
       // Base-product stock (no variant)
       await tx.$queryRaw`SELECT "id" FROM "products" WHERE "id" = ${productId} AND "store_id" = ${storeId} FOR UPDATE`;

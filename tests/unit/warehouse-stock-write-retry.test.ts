@@ -33,11 +33,13 @@ vi.mock('@ebda/database', () => ({
   prisma: {
     warehouse: { findFirst: h.warehouseFindFirst },
     product: { findFirst: h.productFindFirst },
+    productVariant: { count: vi.fn(async () => 0) },
   },
   Prisma: { sql: (strings: TemplateStringsArray, ...values: unknown[]) => ({ strings, values }) },
   withRlsBypass: vi.fn(),
   withMoneyTx: h.withMoneyTx,
 }));
+vi.mock('@api/lib/public-cache', () => ({ invalidateStoreProductCaches: vi.fn(async () => {}) }));
 vi.mock('@api/lib/logger', () => ({ default: { info: vi.fn(), warn: vi.fn(), error: vi.fn() } }));
 
 import { WarehouseService } from '@api/services/warehouse.service';

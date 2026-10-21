@@ -8,7 +8,8 @@
  * store).
  *
  * On success, attaches `req.bridgeStore` with the store row (only safe
- * fields — no decrypted credentials).
+ * fields — no decrypted credentials) and runs the rest of the request inside
+ * `runInStoreScope(store.id)`, so RLS and the tenant guard see that store.
  *
  * Refuses to match against stores where `wbsEnabled=false` or
  * `wbsClientId is null` (the merchant disconnected the integration).
@@ -22,7 +23,7 @@
 
 import { Request, Response, NextFunction } from 'express';
 import { createHash, timingSafeEqual } from 'node:crypto';
-import { withStore } from '@ebda/database';
+import { runInStoreScope, withStore } from '@ebda/database';
 import { wbsBridgeKeys } from '../lib/definer';
 import { encryption } from '../services/encryption.service';
 import { isWhatsappEnabled, FEATURE_DISABLED_BODY } from './wa-feature-gate';
@@ -112,7 +113,16 @@ export async function waBridgeAuth(req: Request, res: Response, next: NextFuncti
       currency: store.currency,
       wbsClientId: store.wbsClientId,
     };
-    next();
+    // Store context for every downstream handler. The key resolved exactly one store above (an
+    // unknown key is a 401, never "the first store"), and that store id is the ONLY id the
+    // handlers read or write under: strict RLS + the tenant guard need an ambient store, and the
+    // bridge handlers make slow third-party awaits (WBS-driven carts, Meta catalog), so this is
+    // `runInStoreScope` (every query its own short transaction), not a held request transaction —
+    // the same choice `storeScopeContext` makes. Without it every handler's read ran contextless
+    // and came back empty under `ebda_app`.
+    await runInStoreScope(store.id, async () => {
+      next();
+    });
   } catch (err) {
     logger.error({ err: (err as Error).message }, '[wa-bridge-auth] lookup failed');
     res.status(500).json({ success: false, error: 'BRIDGE_AUTH_FAILED' });

@@ -63,7 +63,7 @@ const CLASSIFIED: Record<
   },
   'services/analytics.service.ts': { statements: 2, kind: 'admin', reason: 'merchant analytics' },
   'services/warehouse.service.ts': {
-    statements: 5,
+    statements: 4,
     kind: 'admin',
     reason: 'warehouse stock sync / search (merchant)',
   },
