@@ -1601,6 +1601,7 @@ describe('stores and the user-keyed token tables are under strict RLS too (R-EBD
     'onesignal_subscriptions',
     'legal_acceptances',
     'legal_notice_deliveries',
+    'passkey_credentials',
   ];
 
   it('every forced table outside the global allowlist has at least one policy, ebda_app only', async () => {

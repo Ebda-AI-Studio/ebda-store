@@ -99,6 +99,7 @@ model User {
   triggeredOrderEvents     OrderEvent[]            @relation("OrderEventActor")
   staffMemberships         StoreStaff[]            @relation("StaffUser")
   legalAcceptances         LegalAcceptance[]
+  passkeyCredentials       PasskeyCredential[]
   legalNoticeDeliveries    LegalNoticeDelivery[]
 
   // Composite unique (storeId, email) — one customer account per email per
@@ -2265,6 +2266,29 @@ model LegalAcceptance {
 
   @@unique([userId, docKey, version])
   @@map("legal_acceptances")
+}
+
+/// A WebAuthn credential (passkey). User-keyed under strict RLS, PUBLIC key only (Ruling PASSKEY-1).
+/// `rpId` is the host it was minted for; sign-in refuses a credential whose rpId is not the request host.
+/// `credentialId` / `publicKey` are base64url.
+model PasskeyCredential {
+  id           String    @id @default(uuid())
+  userId       String    @map("user_id")
+  credentialId String    @unique @map("credential_id")
+  publicKey    String    @map("public_key")
+  counter      BigInt    @default(0)
+  transports   String[]  @default([])
+  deviceType   String    @map("device_type") // singleDevice | multiDevice
+  backedUp     Boolean   @default(false) @map("backed_up")
+  rpId         String    @map("rp_id")
+  name         String
+  createdAt    DateTime  @default(now()) @map("created_at")
+  lastUsedAt   DateTime? @map("last_used_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("passkey_credentials")
 }
 
 /// One row per announced (material) version: written by the super-admin "Send notice".
