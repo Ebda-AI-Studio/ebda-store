@@ -23,8 +23,7 @@ import { WhatsApp } from './WhatsApp';
 import { FeatureVisuals } from './FeatureVisuals';
 import { HomeCapabilities } from './Capabilities';
 import { AiNative } from './AiNative';
-import { AI_NATIVE } from '../lib/ai-native';
-import { FEATURES_PAGE } from '../lib/capabilities';
+import { FEATURES_PAGE, THEME_COPY } from '../lib/capabilities';
 
 function ProviderIcon({ kind }: { kind: 'cash' | 'truck' }) {
   return (
@@ -116,7 +115,7 @@ export function Home({ locale }: { locale: Locale }) {
       </Section>
     ),
     ainative: () => (
-      <Section id="ainative" title={AI_NATIVE[locale].title} className="ainative">
+      <Section id="ainative" title={THEME_COPY[locale].ai.title} className="ainative">
         <AiNative locale={locale} />
       </Section>
     ),
