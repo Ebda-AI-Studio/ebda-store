@@ -40,11 +40,11 @@ const CLASSIFIED: Record<
   { statements: number; kind: Kind; reason: string; publicStatements?: number }
 > = {
   'services/product-search.service.ts': {
-    statements: 2,
+    statements: 3,
     kind: 'public',
-    publicStatements: 1,
+    publicStatements: 2,
     reason:
-      'productSearchSql (storefront scope) carries p.audience = public before its LIMIT; the SKU variant lookup is warehouse-admin only',
+      'productSearchSql (storefront scope) and the vector leg of the hybrid ranking both carry p.audience = public in the WHERE, before their LIMIT (the SECURITY DEFINER id function only returns candidate ids; the outer statement filters); the SKU variant lookup is warehouse-admin only',
   },
   'lib/effective-inventory-sql.ts': {
     statements: 1,
@@ -68,7 +68,7 @@ const CLASSIFIED: Record<
     reason: 'warehouse stock sync / search (merchant)',
   },
   'services/product-index.service.ts': {
-    statements: 5,
+    statements: 7,
     kind: 'system',
     reason: 'embedding indexer (background); search results join products and filter at QUERY time',
   },
@@ -153,7 +153,9 @@ describe('B2B raw-SQL product visibility checklist', () => {
     expect(whereAt).toBeGreaterThan(-1);
     expect(audienceAt).toBeGreaterThan(whereAt);
     expect(audienceAt).toBeLessThan(limitAt);
-    expect(src).toMatch(/opts\.scope === 'storefront' \? Prisma\.sql`AND p\.audience = 'public'`/);
+    expect(src).toMatch(/storefront \? Prisma\.sql`AND p\.audience = 'public'`/);
+    // the vector leg of the hybrid ranking (storefront only) filters before ITS limit too
+    expect(src).toMatch(/AND p\.audience = 'public'\n\s+\) k/);
   });
 
   it('SQL functions in migrations that read products: all pre-date audience (exempt) or carry the predicate', () => {
@@ -228,13 +230,19 @@ describe('B2B raw-SQL product visibility checklist', () => {
         },
         {
           file: 'services/product-search.service.ts',
-          symbol: 'rows',
+          symbol: 'vectorLeg',
           line: 2,
+          hasAudiencePredicate: false,
+        },
+        {
+          file: 'services/product-search.service.ts',
+          symbol: 'rows',
+          line: 3,
           hasAudiencePredicate: false,
         },
       ];
       expect(evaluate(fake).join()).toMatch(
-        /0 statements carry the audience predicate, expected 1/
+        /0 statements carry the audience predicate, expected 2/
       );
     });
   });

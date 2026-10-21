@@ -65,9 +65,9 @@ const ALLOW: Record<string, { count: number; reason: string }> = {
       'merchant manual order (authenticated admin surface): the merchant may sell wholesale-only products',
   },
   'services/product.service.ts :: product.findMany': {
-    count: 5,
+    count: 7,
     reason:
-      'list + bulkUpdate (merchant) and listPublic x2 + advancedSearch (storefront: their `where` is built with audience, covered by b2b-storefront-visibility)',
+      'list + bulkUpdate (merchant) and listPublic x4 + advancedSearch (storefront: their `where` is built with audience, covered by b2b-storefront-visibility). The hybrid-ranked listPublic path adds two: an id-only read with the audited `where` (audience included) and the page read by ids that read already filtered, so a wholesale-only id can never reach it',
   },
   'services/product.service.ts :: product.count': {
     count: 4,

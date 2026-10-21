@@ -227,11 +227,17 @@ const ALLOW: Record<string, AllowEntry> = {
     reason: 'AI prompts use retail price',
     reads: { 'GET /results/recommendations': 1 },
   },
+  'services/webhook-payload.ts': {
+    category: 'admin-display',
+    reason:
+      "the merchant's own webhook event payload: order lines carry the price actually charged (snapshot), product events carry the merchant's list price; it goes to the merchant's endpoint, never to a shopper",
+    reads: { formatOrderParts: 1, loadOrderParts: 1, loadProductData: 2 },
+  },
   'services/product.service.ts': {
     category: 'catalog-read',
     reason: 'product CRUD + public payload; Task 4/6 add tiers and strip group prices',
     reads: {
-      '<module>': 2,
+      '<module>': 3,
       advancedSearch: 9,
       bulkUpdate: 5,
       create: 1,
@@ -239,7 +245,7 @@ const ALLOW: Record<string, AllowEntry> = {
       getFilterOptions: 4,
       getSearchSuggestions: 1,
       getSuggestSuggestions: 2,
-      listPublic: 6,
+      listPublic: 4,
       reshapePublicProductDetail: 2,
       update: 4,
       b2bPublicFields: 3, // product price + variant.price ?? product.price: hides a stale variant tier (final review minor 2)

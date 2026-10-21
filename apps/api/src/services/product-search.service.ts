@@ -395,6 +395,8 @@ async function vectorLeg(
             CROSS JOIN (SELECT ${q}::halfvec(1024) AS v) q
            WHERE e.store_id = ${storeId} AND e.model = ${EMBED_MODEL}
              AND p.status = 'active' AND p.deleted_at IS NULL
+             -- B2B-7b: the storefront (this leg is storefront-only) never ranks a wholesale-only product.
+             AND p.audience = 'public'
         ) k
         WHERE k.d <= ${vectorMaxDistance()}
         ORDER BY k.d, k.id
