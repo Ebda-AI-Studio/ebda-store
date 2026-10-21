@@ -97,6 +97,34 @@ describe.skipIf(!hasDb)('search definers are not an oracle (security review)', (
         >`SELECT public.ebda_order_search_ids(${ask}, ${kind}, ${pattern}, 100) AS id`
     );
 
+  // Search P2: ebda_customer_search_ids(store, name_patterns, digits, email, user_limit, guest_limit)
+  const C = (asScope: string | null, ask: string, names: string[], digits: string | null) =>
+    ids(
+      asScope,
+      () =>
+        prisma.$queryRaw<Row[]>`SELECT id FROM public.ebda_customer_search_ids(
+        ${ask}, ${names}::text[], ${digits}::text, NULL::text, 100, 100)`
+    );
+
+  it('ebda_customer_search_ids: scoped store only, refused without scope, soft-deleted and other-store rows hidden', async () => {
+    expect(await C(A, A, [`%${w('guesta')}%`], null)).toEqual([w('oa-live')]);
+    expect(await C(A, A, [], '%201111111111%')).toEqual([w('oa-live')]); // guest phone, any form
+    expect(await C(A, A, [`%${w('cust a')}%`], null)).toEqual([w('u-a')]);
+    // the other store's guest + customer: scoped to A asking A, scoped to A asking B, scoped to B asking A
+    expect(await C(A, A, [`%${w('guestb')}%`], null)).toEqual([]);
+    expect(await C(A, B, [`%${w('guestb')}%`], null)).toEqual([]);
+    expect(await C(B, A, [`%${w('guesta')}%`], null)).toEqual([]);
+    expect(await C(A, A, [`%${w('cust b')}%`], null)).toEqual([]); // users policy hides it
+    expect(await C(A, A, [`%${w('guestgone')}%`], null)).toEqual([]); // soft-deleted order
+    expect(await C(A, A, [], '%201222222222%')).toEqual(await C(A, A, [`%${w('nowhere')}%`], null));
+    await expect(C(null, A, [`%${w('guesta')}%`], null)).rejects.toThrow(
+      /store scope|42501|permission/i
+    );
+    await expect(
+      prisma.$queryRaw`SELECT * FROM public.ebda_customer_search_ids(${A}, ARRAY['%a%']::text[], NULL, NULL, 10, 10)`
+    ).rejects.toThrow(/store scope|42501|permission/i); // an owner session with no scope too
+  });
+
   it("positive control: each definer finds the scoped store's own rows", async () => {
     expect(await P(`%${w('alpha')}%`, A, A)).toEqual([w('pa-live')]);
     expect(await O('order_number', `%${w('ona-live')}%`, A, A)).toEqual([w('oa-live')]);
@@ -146,9 +174,13 @@ describe.skipIf(!hasDb)('search definers are not an oracle (security review)', (
       SELECT p.proname::text AS proname, p.prosecdef AS secdef, p.proconfig AS cfg,
              has_function_privilege('public', p.oid, 'EXECUTE') AS pub,
              has_function_privilege('ebda_app', p.oid, 'EXECUTE') AS app
-      FROM pg_proc p WHERE p.proname IN ('ebda_product_search_ids', 'ebda_order_search_ids')
+      FROM pg_proc p WHERE p.proname IN ('ebda_product_search_ids', 'ebda_order_search_ids', 'ebda_customer_search_ids')
       ORDER BY 1`;
-    expect(rows.map(r => r.proname)).toEqual(['ebda_order_search_ids', 'ebda_product_search_ids']);
+    expect(rows.map(r => r.proname)).toEqual([
+      'ebda_customer_search_ids',
+      'ebda_order_search_ids',
+      'ebda_product_search_ids',
+    ]);
     for (const r of rows) {
       expect(r.secdef).toBe(true);
       expect(r.pub).toBe(false);

@@ -18,6 +18,7 @@ import { customerKeyOf } from '../lib/customer-key';
 import { SmsConsentService } from '../services/sms-consent.service';
 import {
   aggregateCustomers,
+  aggregateCustomersMatching,
   MAX_ZERO_ORDER_CUSTOMERS,
   getCustomerProfile,
   filterCustomersBySegment,
@@ -60,8 +61,14 @@ const adminMiddleware = [
   writeLimiter,
 ];
 
+/** The `?search=` term: trimmed, bounded (it reaches a SECURITY DEFINER lookup), '' when absent. */
+function searchTerm(req: Request): string {
+  const raw = req.query.search;
+  return typeof raw === 'string' ? raw.trim().slice(0, 100) : '';
+}
+
 /**
- * The list's search + segment filters, applied the SAME way by the list and
+ * The list's segment filter (the text search is resolved in SQL by `aggregateCustomersMatching`), applied the SAME way by the list and
  * by the export (owner report 2026-09-30: the export button ignored the
  * filters on screen and always downloaded every customer). Segment filtering
  * is admin-only — staff get a 403, matching `rfm-batch`.
@@ -71,7 +78,6 @@ async function applyCustomerListFilters(
   storeId: string,
   customers: Awaited<ReturnType<typeof aggregateCustomers>>['customers']
 ) {
-  const search = (req.query.search as string | undefined)?.trim().toLowerCase() ?? '';
   const segment = parseSegmentFilter(req.query.segment);
 
   // RFM segments are analytics that `rfm-batch` serves to store_admin /
@@ -91,17 +97,10 @@ async function applyCustomerListFilters(
         ? await filterCustomersBySegment(storeId, customers, segment)
         : customers;
 
-  // Server-side so search is consistent across pages (the old client-only
-  // search only matched the fetched page).
-  return search
-    ? bySegment.filter(
-        c =>
-          c.firstName.toLowerCase().includes(search) ||
-          c.lastName.toLowerCase().includes(search) ||
-          c.email.toLowerCase().includes(search) ||
-          c.phone.toLowerCase().includes(search)
-      )
-    : bySegment;
+  // The text search is NOT applied here: it is resolved in SQL (`aggregateCustomersMatching`,
+  // Arabic-normalised names, any phone form, email), so it also finds customers beyond the
+  // aggregate's order-scan cap. This only narrows by segment.
+  return bySegment;
 }
 
 /**
@@ -124,7 +123,9 @@ router.get(
         throw new AppError(404, 'NOT_FOUND', 'Store not found');
       }
 
-      const aggregated = await aggregateCustomers(storeId);
+      const aggregated = searchTerm(req)
+        ? await aggregateCustomersMatching(storeId, searchTerm(req))
+        : await aggregateCustomers(storeId);
       const { ordersTruncated, zeroOrderTruncated, ordersScanned } = aggregated;
       const customers = await applyCustomerListFilters(req, storeId, aggregated.customers);
       // The Purchases / Summary sheets follow the same filter: only the orders
@@ -540,7 +541,13 @@ router.get(
       const page = Math.max(1, Number(req.query.page ?? 1) || 1);
       // Hard-cap perPage so a caller can't request an unbounded page.
       const perPage = Math.min(100, Math.max(1, Number(req.query.perPage ?? 20) || 20));
-      const { customers, truncated, summary } = await aggregateCustomers(storeId);
+      // The KPI strip and the truncation notice describe the whole store (cached aggregate); a
+      // search replaces only the rows (SQL match, see `aggregateCustomersMatching`).
+      const { customers: allCustomers, truncated, summary } = await aggregateCustomers(storeId);
+      const term = searchTerm(req);
+      const customers = term
+        ? (await aggregateCustomersMatching(storeId, term)).customers
+        : allCustomers;
 
       // A guest's snapshot is keyed by the HASH of the same key this list
       // groups by (`lib/customer-key.ts`), so guests resolve too — before,

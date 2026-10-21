@@ -1,53 +1,44 @@
 import { prisma } from '@ebda/database';
-import { orderSearchIds } from '../lib/order-search-ids';
+import { matchingCustomers } from './admin-search.service';
 
 /**
  * Typeahead behind GET /stores/:storeId/customers/search (admin "New order" form): REGISTERED
- * customers (users with at least one order at this store) AND GUEST customers (orders with
- * customerId = null whose shipping-address JSON contains the term), merged and capped at 10.
- * Extracted from the route so the planner/index test can call the real statements (Task 14).
+ * customers (users with an order at this store, or registered on it) AND GUEST customers (orders
+ * with customerId = null whose shipping contact matches), merged and capped at 10.
+ * The match is `matchingCustomers` (Arabic-normalised names, any phone form, email; one store-scoped
+ * SECURITY DEFINER lookup, Ruling SEARCH-T14-5 / migration 20261027000200). Extracted from the
+ * route so the planner/index tests can call the real statements.
  */
 export async function searchOrderCustomers(storeId: string, q: string) {
-  // --- Registered customers (User table, joined via orders) ---
-  // The matching customers come from the store-scoped SECURITY DEFINER lookup (Ruling
-  // SEARCH-T14-5): inline ILIKE on `users` / `orders` cannot use its trigram indexes as `ebda_app`.
-  // They are still read through this store's orders, as before.
-  const customerIds = await orderSearchIds(storeId, 'customers', q, 50);
-  const registeredOrders =
-    customerIds.length === 0
+  const matches = await matchingCustomers(storeId, q);
+
+  // --- Registered customers: read back as this store's users (tenant guard: top-level storeId) ---
+  const registeredRows =
+    matches.userIds.length === 0
       ? []
-      : await prisma.order.findMany({
-          where: { storeId, customerId: { in: customerIds } },
-          select: {
-            customer: {
-              select: { id: true, firstName: true, lastName: true, email: true, phone: true },
-            },
-          },
-          distinct: ['customerId'],
+      : await prisma.user.findMany({
+          where: { storeId, id: { in: matches.userIds.slice(0, 50) } },
+          select: { id: true, firstName: true, lastName: true, email: true, phone: true },
           take: 10,
         });
 
   // Shape: { id (UUID), isGuest: false, firstName, lastName, email, phone }
-  const registered = registeredOrders
-    .map(o => o.customer)
-    .filter((c): c is NonNullable<(typeof registeredOrders)[number]['customer']> => c !== null)
-    .map(c => ({
-      id: c.id,
-      isGuest: false as const,
-      firstName: c.firstName ?? '',
-      lastName: c.lastName ?? '',
-      email: c.email ?? '',
-      phone: c.phone ?? '',
-    }));
+  const registered = registeredRows.map(c => ({
+    id: c.id,
+    isGuest: false as const,
+    firstName: c.firstName ?? '',
+    lastName: c.lastName ?? '',
+    email: c.email ?? '',
+    phone: c.phone ?? '',
+  }));
 
-  // --- Guest customers (raw SQL: JSON ILIKE) ---
-  // Prisma's JSON filter doesn't support partial-match (`contains`),
-  // only exact `equals`. For guest typeahead we need ILIKE on
-  // JSONB-extracted scalar fields, which is a `$queryRaw` job. The
+  // --- Guest customers (raw SQL: JSON fields) ---
+  // The matching guest orders come from the definer above; Prisma cannot select/dedupe on JSONB
+  // fields, so the rows are read back with a `$queryRaw`. The
   // result is deduped by lowercased email when present, falling
   // back to phone, then to order.id (each guest-order without
   // either becomes its own row — same as the customers list page).
-  const guestIds = await orderSearchIds(storeId, 'guest', q);
+  const guestIds = matches.guestOrderIds.slice(0, 200);
   const guestRows =
     guestIds.length === 0
       ? []
