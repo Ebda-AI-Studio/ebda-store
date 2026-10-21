@@ -4,7 +4,9 @@
 -- and must be able to rebuild the indexes). The four indexes are expression trigram indexes; the
 -- store-scoped SECURITY DEFINER lookup of 20261027000200 is what lets ebda_app use them (RLS makes
 -- an inline predicate unable to; Ruling SEARCH-T14-1).
--- Index build time (measured, 100k-order scratch DB, local): see docs/DB-INDEX-MIGRATIONS.md.
+-- Index build time (measured locally, pgvector/pgvector:0.8.0-pg17, 1 GB, plain CREATE INDEX): 20k users: phone
+-- 41 ms, name 396 ms; 100k orders (all guests): guest phone 191 ms, guest name 1.98 s. Production sizes are
+-- far smaller today (pre-launch); re-measure before any post-launch CONCURRENTLY pre-build.
 -- PRODUCTION PREREQUISITE (STOP-5): `users` and `orders` are live tables. Post-launch, pre-build all
 -- four indexes with CREATE INDEX CONCURRENTLY IF NOT EXISTS on DIRECT_URL (autocommit, outside peak
 -- hours) and confirm no INVALID index before merge; this file is then a no-op there. Pre-launch the
