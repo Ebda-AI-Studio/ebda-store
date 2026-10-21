@@ -1749,13 +1749,20 @@ export class AuthService {
     }
 
     // Update user password (as that user: `users` is RLS-scoped to app.current_user_id)
-    const updated = await withUser(storedToken.userId, tx =>
-      tx.user.update({
+    // Ruling PASSKEY-10 / review M5: the new hash and the removal of EVERY passkey commit together. If the
+    // delete fails the password does not change either, so the owner simply retries the reset; there is no
+    // state where the password moved on and an attacker's passkey survived.
+    const { updated, purged } = await withUser(storedToken.userId, async tx => {
+      const updated = await tx.user.update({
         where: { id: storedToken.userId },
         data: { passwordHash },
-        select: { email: true, storeId: true },
-      })
-    );
+        select: { id: true, email: true, storeId: true, firstName: true, language: true },
+      });
+      const purged = await tx.passkeyCredential.deleteMany({
+        where: { userId: storedToken.userId },
+      });
+      return { updated, purged };
+    });
 
     // Revoke all sessions — same call, and the same ordering, as
     // changePassword. The reset-token row was already deleted above.
@@ -1771,13 +1778,9 @@ export class AuthService {
     // credentials.
     await AuthService.revokeAllSessions(storedToken.userId, 'password_reset');
 
-    // Ruling PASSKEY-10: account recovery REMOVES every passkey. Whoever could receive the reset mail may
-    // not be the person who registered those keys (an attacker's backdoor passkey must not survive the
-    // owner's recovery); the owner signs in with the new password and enrols again. Cost: a legitimate
-    // owner re-enrols their devices after a reset. As that user (RLS is user-keyed), same as the writes above.
-    await withUser(storedToken.userId, tx =>
-      tx.passkeyCredential.deleteMany({ where: { userId: storedToken.userId } })
-    );
+    // Account recovery removed every passkey above (PASSKEY-10): record it and tell the owner, so a reset
+    // that silently drops their devices is never a surprise (review M5).
+    await announcePasskeyPurge({ user: updated, count: purged.count, reason: 'password_reset' });
 
     // A merchant who reset because they were locked out after too many wrong
     // passwords must be able to use the new one at once. The lockout exists to

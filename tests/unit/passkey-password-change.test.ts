@@ -5,6 +5,7 @@
  * Real AuthService.changePassword + real PasskeyService; Redis, the database and the mailer are fakes.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import crypto from 'node:crypto';
 import bcrypt from 'bcryptjs';
 import { register, assert } from '../helpers/software-authenticator';
 
@@ -17,6 +18,8 @@ const h = vi.hoisted(() => ({
   mails: [] as Row[],
   audits: [] as Row[],
   hash: { v: '' },
+  failDelete: { v: false },
+  resetRows: [] as Row[],
 }));
 
 vi.mock('@api/services/redis.service', () => ({
@@ -36,6 +39,8 @@ vi.mock('@api/lib/definer', async importOriginal => {
     lookupStore: async () => null,
     passkeyLookup: async (id: string) => h.creds.find(c => c.credentialId === id) ?? null,
     insertAuditLog: async (e: Row) => void h.audits.push(e),
+    refreshTokenUser: async (stored: string) =>
+      h.resetRows.find(r => r.token === stored)?.userId ?? null,
   };
 });
 vi.mock('@ebda/database', async importOriginal => {
@@ -63,13 +68,34 @@ vi.mock('@ebda/database', async importOriginal => {
         return { count: hits.length };
       },
       deleteMany: async ({ where }: any) => {
+        if (h.failDelete.v) throw new Error('passkey delete failed');
         const before = h.creds.length;
         h.creds = h.creds.filter(c => c.userId !== where.userId);
         return { count: before - h.creds.length };
       },
     },
+    refreshToken: {
+      findFirst: async ({ where }: any) => h.resetRows.find(r => r.token === where.token) ?? null,
+      deleteMany: async ({ where }: any) => {
+        const n = h.resetRows.length;
+        h.resetRows = h.resetRows.filter(r => r.id !== where.id);
+        return { count: n - h.resetRows.length };
+      },
+    },
   };
-  return { ...actual, withUser: async (_i: string, fn: any) => fn(tx), prisma: {} };
+  // A transaction: if the callback throws, every write it made is rolled back.
+  const withUser = async (_i: string, fn: any) => {
+    const users = new Map([...h.users].map(([k, v]) => [k, { ...v }]));
+    const creds = h.creds.map(c => ({ ...c }));
+    try {
+      return await fn(tx);
+    } catch (e) {
+      h.users = users;
+      h.creds = creds;
+      throw e;
+    }
+  };
+  return { ...actual, withUser, prisma: {} };
 });
 vi.mock('@api/config', async importOriginal => {
   const actual = await importOriginal<typeof import('@api/config')>();
@@ -88,6 +114,7 @@ vi.mock('@api/services/account-lockout.service', () => ({
     isLocked: async () => ({ locked: false }),
     recordFailedAttempt: async () => ({ locked: false }),
     recordSuccessfulLogin: async () => undefined,
+    unlockAccount: async () => undefined,
   },
 }));
 vi.mock('@api/services/platform-mailer', async importOriginal => {
@@ -108,6 +135,8 @@ beforeEach(() => {
   h.creds = [];
   h.mails = [];
   h.audits = [];
+  h.failDelete.v = false;
+  h.resetRows = [];
   h.hash.v ||= bcrypt.hashSync(OLD, 4);
   h.users = new Map([
     [
@@ -190,6 +219,61 @@ describe('changePassword removes every passkey (PASSKEY-13)', () => {
       code: 'INVALID_PASSWORD',
     });
     expect(h.creds).toHaveLength(1);
+    expect(h.mails).toEqual([]);
+  });
+});
+
+describe('password RESET removes every passkey atomically (PASSKEY-10 / review M5)', () => {
+  const seedReset = () => {
+    const raw = 'reset-token-raw';
+    h.resetRows = [
+      {
+        id: 'rt-1',
+        userId: 'owner',
+        token: `reset:${crypto.createHash('sha256').update(raw).digest('hex')}`,
+        expiresAt: new Date(Date.now() + 3600_000),
+        revokedAt: null,
+      },
+    ];
+    return raw;
+  };
+
+  it('deletes the passkeys, audits it and tells the owner what happened', async () => {
+    await attackerRegisters();
+    h.mails = [];
+    await AuthService.resetPassword(seedReset(), NEW);
+    expect(h.creds).toHaveLength(0);
+    expect(h.audits).toEqual([
+      expect.objectContaining({
+        action: 'passkey.purged',
+        details: { count: 1, reason: 'password_reset' },
+      }),
+    ]);
+    expect(h.mails).toEqual([
+      expect.objectContaining({
+        kind: 'purged',
+        count: 1,
+        reason: 'password_reset',
+        email: 'o@x.com',
+      }),
+    ]);
+  });
+
+  it('is ATOMIC with the new password: if the passkey delete fails, the password does not change', async () => {
+    await attackerRegisters();
+    h.failDelete.v = true;
+    const before = h.users.get('owner')!.passwordHash;
+    await expect(AuthService.resetPassword(seedReset(), NEW)).rejects.toThrow(
+      /passkey delete failed/
+    );
+    expect(h.users.get('owner')!.passwordHash).toBe(before);
+    expect(h.creds).toHaveLength(1); // nothing half-done: the owner can simply retry the reset
+  });
+
+  it('no passkeys: no audit row, no email', async () => {
+    h.mails = [];
+    await AuthService.resetPassword(seedReset(), NEW);
+    expect(h.audits).toEqual([]);
     expect(h.mails).toEqual([]);
   });
 });
