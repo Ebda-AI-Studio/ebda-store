@@ -90,16 +90,16 @@ describe.skipIf(!hasDb)('listPublic sort=on_sale', () => {
       data: [
         {
           productId: id.varSale,
-          name: 'S',
+          title: 'S',
           price: 800,
           compareAtPrice: 1000,
           inventory: 5,
           isActive: true,
         },
-        { productId: id.varSale, name: 'M', price: 1000, inventory: 5, isActive: true },
+        { productId: id.varSale, title: 'M', price: 1000, inventory: 5, isActive: true },
         {
           productId: id.varSale,
-          name: 'XL',
+          title: 'XL',
           price: 100,
           compareAtPrice: 1000,
           inventory: 5,
@@ -111,7 +111,7 @@ describe.skipIf(!hasDb)('listPublic sort=on_sale', () => {
     await mkProduct(storeId, 'varStale', { price: 1000, compareAtPrice: 5000 });
     await prisma.productVariant.createMany({
       data: [
-        { productId: id.varStale, name: 'S', price: 1000, inventory: 5, isActive: true },
+        { productId: id.varStale, title: 'S', price: 1000, inventory: 5, isActive: true },
       ] as never,
     });
   });
@@ -170,11 +170,13 @@ describe.skipIf(!hasDb)('listPublic sort=on_sale', () => {
     expect(picked.products.map(p => p.id).sort()).toEqual([id.big, inCat[0]].sort());
     // no facet query for the strip, and a cursor is ignored
     expect(res.facets).toEqual([]);
+    const plain = await ProductService.listPublic(storeId, { sort: 'on_sale' });
     const withCursor = await ProductService.listPublic(storeId, {
       sort: 'on_sale',
-      cursor: id.big,
+      cursor: plain.products[0].id,
     });
-    expect(withCursor.products.map(p => p.id)).toContain(id.big);
+    expect(withCursor.products.map(p => p.id)).toEqual(plain.products.map(p => p.id));
+    expect(withCursor.meta.nextCursor).toBeUndefined();
   });
 
   it('a variant product whose variants are ALL inactive is not on sale', async () => {
@@ -183,7 +185,7 @@ describe.skipIf(!hasDb)('listPublic sort=on_sale', () => {
       data: [
         {
           productId: p.id,
-          name: 'S',
+          title: 'S',
           price: 100,
           compareAtPrice: 1000,
           inventory: 1,
