@@ -88,16 +88,18 @@ export function CategoryRail({
                         />
                       ) : (
                         <span
-                          aria-hidden="true"
-                          className="flex h-full w-full items-center justify-center font-display text-2xl text-foreground"
+                          data-part="typographic"
+                          className="flex h-full w-full items-center justify-center p-2 text-center font-display text-sm leading-snug text-foreground"
                         >
-                          {Array.from(name)[0]}
+                          <span className="line-clamp-3">{name}</span>
                         </span>
                       )}
                     </span>
-                    <span className="line-clamp-2 text-center text-sm font-medium leading-snug text-foreground">
-                      {name}
-                    </span>
+                    {c.image && (
+                      <span className="line-clamp-2 text-center text-sm font-medium leading-snug text-foreground">
+                        {name}
+                      </span>
+                    )}
                   </Link>
                 </li>
               );

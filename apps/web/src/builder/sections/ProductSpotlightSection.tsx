@@ -47,12 +47,15 @@ export function ProductSpotlightSection({
   products,
   editorMode = false,
   onAddToCart,
+  priority = false,
 }: {
   settings: ProductSpotlightSettings;
   products: TemplateProduct[];
   editorMode?: boolean;
   /** The stage's add control (the same handler every card path gets). Absent = view link only. */
   onAddToCart?: (productId: string) => Promise<void>;
+  /** Only the FIRST stage on a page is the LCP candidate; later ones load lazily. */
+  priority?: boolean;
 }) {
   if (settings.layout === 'stage') {
     return (
@@ -61,6 +64,7 @@ export function ProductSpotlightSection({
         product={products[0]}
         editorMode={editorMode}
         onAddToCart={onAddToCart}
+        priority={priority}
       />
     );
   }
@@ -80,11 +84,13 @@ function SpotlightStage({
   product,
   editorMode,
   onAddToCart,
+  priority,
 }: {
   settings: ProductSpotlightSettings;
   product: TemplateProduct | undefined;
   editorMode: boolean;
   onAddToCart?: (productId: string) => Promise<void>;
+  priority: boolean;
 }) {
   const { store } = useStore();
   const { language, t } = useLanguage();
@@ -128,12 +134,12 @@ function SpotlightStage({
       style={sectionBgStyle(settings.bgColor, store.theme)}
     >
       <div
-        className={`${spacing.innerContainerClass} grid max-h-[min(78svh,680px)] items-center gap-6 overflow-hidden md:grid-cols-2 md:gap-10`}
+        className={`${spacing.innerContainerClass} grid items-center gap-6 md:grid-cols-2 md:gap-10`}
       >
         <Link
           href={href}
           aria-label={name}
-          className="relative block aspect-square min-h-11 max-h-[min(78svh,680px)] w-full overflow-hidden rounded-[var(--radius)] bg-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+          className="relative mx-auto block aspect-square min-h-11 max-h-[min(78svh,680px)] w-full overflow-hidden rounded-[var(--radius)] bg-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
         >
           {image && (
             <Image
@@ -142,7 +148,7 @@ function SpotlightStage({
               fill
               sizes="(min-width: 768px) 50vw, 100vw"
               className="object-contain p-6"
-              priority
+              priority={priority}
             />
           )}
         </Link>

@@ -168,6 +168,13 @@ describe.each(SKINS)('category rail and tiles on %s', skin => {
     expect(container.querySelector('section')!.getAttribute('dir')).toBe('rtl');
     expect(container.innerHTML).not.toMatch(/\b(ml|mr|pl|pr)-\d/);
   });
+  it('rail: a category with no photo shows its NAME in the tile (not a lone letter), once', () => {
+    useSkin(skin);
+    const { container } = render(<CategoryRail categories={CATS} urlPrefix="" isRtl={false} />);
+    const typo = container.querySelector('[data-part="typographic"]')!;
+    expect(typo.textContent).toBe('Cables');
+    expect(container.textContent!.match(/Cables/g)).toHaveLength(1);
+  });
   it('tiles: square tiles, a category with no photo is a typographic tile, not blank', () => {
     useSkin(skin);
     const { container } = render(<CategoryTiles categories={CATS} urlPrefix="" isRtl={false} />);
@@ -236,8 +243,8 @@ describe.each(SKINS)('product-spotlight stage on %s', skin => {
     expect(Array.from(chips).map(c => c.textContent)).toEqual(['256GB', '8GB RAM']);
     // price once through the shared helper, compare-at struck
     expect(container.querySelector('s')).not.toBeNull();
-    // max height min(78svh, 680px)
-    expect(container.querySelector('[data-layout="stage"] > div')!.className).toContain(
+    // the height cap min(78svh, 680px) is on the photo tile (asserted in the clipping test below)
+    expect(container.querySelector('a[aria-label]')!.className).toContain(
       'max-h-[min(78svh,680px)]'
     );
   });
@@ -306,6 +313,41 @@ describe.each(SKINS)('product-spotlight stage on %s', skin => {
     expect(JSON.parse([...store.values()][0])[0].id).toBe('p1');
     fireEvent.click(btn);
     expect(btn.getAttribute('aria-pressed')).toBe('false');
+  });
+  it('the height cap is on the IMAGE only: the Add / Compare row is never inside a clipping region', () => {
+    useSkin(skin);
+    const { container, getByText } = render(
+      <ProductSpotlightSection
+        settings={{ layout: 'stage' }}
+        products={[PRODUCT]}
+        onAddToCart={async () => {}}
+      />
+    );
+    const section = container.querySelector('[data-layout="stage"]')!;
+    for (const control of [getByText('Add to cart'), getByText('Compare')]) {
+      let el: Element | null = control;
+      while (el && el !== section) {
+        expect(el.className, el.outerHTML.slice(0, 80)).not.toMatch(/overflow-hidden|max-h-/);
+        el = el.parentElement;
+      }
+    }
+    // the grid itself is not height-capped; the photo tile is, and keeps its square
+    expect(section.querySelector(':scope > div')!.className).not.toContain('max-h-');
+    const tile = container.querySelector('a[aria-label] ')!;
+    expect(tile.className).toContain('max-h-[min(78svh,680px)]');
+    expect(tile.className).toContain('aspect-square');
+  });
+  it('only a stage marked priority preloads its image', () => {
+    useSkin(skin);
+    const first = render(
+      <ProductSpotlightSection settings={{ layout: 'stage' }} products={[PRODUCT]} priority />
+    );
+    expect(first.container.querySelector('img')!.getAttribute('loading')).not.toBe('lazy');
+    cleanup();
+    const later = render(
+      <ProductSpotlightSection settings={{ layout: 'stage' }} products={[PRODUCT]} />
+    );
+    expect(later.container.querySelector('img')!.getAttribute('loading')).toBe('lazy');
   });
   it('no product for the ref renders nothing', () => {
     useSkin(skin);

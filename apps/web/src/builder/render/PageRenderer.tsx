@@ -1135,6 +1135,7 @@ export function PageRenderer({
           ) : (
             node
           );
+        let stagesSeen = 0;
         for (const section of renderableSections(definition).sections) {
           const def = getSectionDefinition(section.type);
           if (!def || def.group !== 'template') continue;
@@ -1148,6 +1149,10 @@ export function PageRenderer({
               featured: featuredProducts,
               extra: extraProducts ?? [],
             };
+            const stagePriority =
+              def.type === 'product-spotlight' &&
+              (settings as ProductSpotlightSettings).layout === 'stage' &&
+              stagesSeen++ === 0;
             const node =
               def.type === 'featured-collection' ? (
                 <FeaturedCollectionSection
@@ -1179,6 +1184,7 @@ export function PageRenderer({
                   ).map(toTemplateProduct)}
                   editorMode={editorMode}
                   onAddToCart={handleAddToCart}
+                  priority={stagePriority}
                 />
               ) : def.type === 'shop-the-look' ? (
                 <ShopTheLookSection
