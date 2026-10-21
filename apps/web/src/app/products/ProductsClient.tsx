@@ -49,7 +49,8 @@ import { darkLookListingBand } from '../../templates/shared/section-bg';
 const PRICE_SLIDER_MAX = 5000;
 const PRICE_SLIDER_STEP = 10;
 
-const PER_PAGE_OPTIONS: readonly number[] = [12, 24, 48, 96];
+const PLP_DEFAULT_PER_PAGE = 96;
+const PLP_LEGACY_PER_PAGE_KEY = 'plp-per-page';
 
 /** Sort option labels are translated at render time via the t() helper */
 function getSortOptions(t: (en: string, ar: string) => string) {
@@ -151,15 +152,16 @@ export default function ProductsClient({
   // Dahab skin: shopper-chosen grid density on wide screens (3 or 4 across).
   const [dahabCols, setDahabCols] = useState<3 | 4>(3);
   const [page, setPage] = useState(1);
-  // How many products to load per page. The user can pick from a small
-  // allow-list (12 / 24 / 48 / 96); we persist their choice to localStorage
-  // so it survives reloads but never trust it blindly — anything outside the
-  // allow-list falls back to 96 (default: show all items).
-  const [perPage] = useState<number>(() => {
-    if (typeof window === 'undefined') return 96;
-    const stored = Number(window.localStorage.getItem('plp-per-page'));
-    return PER_PAGE_OPTIONS.includes(stored) ? stored : 96;
-  });
+  // Products per page. The selector was removed (W3), so the size is fixed at the default (show
+  // all). A choice an old build saved to localStorage is never read again; the key is cleared once.
+  const [perPage] = useState<number>(PLP_DEFAULT_PER_PAGE);
+  useEffect(() => {
+    try {
+      window.localStorage.removeItem(PLP_LEGACY_PER_PAGE_KEY);
+    } catch {
+      /* storage blocked: nothing to clear */
+    }
+  }, []);
 
   // Price range in MAJOR units (EGP). 0–5000 EGP covers most catalogue SKUs;
   // see PRICE_SLIDER_MAX.

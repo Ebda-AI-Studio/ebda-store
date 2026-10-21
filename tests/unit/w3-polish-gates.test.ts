@@ -130,6 +130,11 @@ describe('L-07: one filter panel, one clear action, no page-size control', () =>
   it('the PLP does not hand the panel a per-page control (a page size is not a filter)', () => {
     expect(plp).not.toMatch(/onPerPageChange=/);
   });
+  it('M-1: a page size an old build saved to localStorage is never read, only cleared', () => {
+    expect(plp).not.toMatch(/getItem\(['"]plp-per-page['"]\)/);
+    expect(plp).toMatch(/localStorage\.removeItem\(PLP_LEGACY_PER_PAGE_KEY\)/);
+    expect(plp).toMatch(/useState<number>\(PLP_DEFAULT_PER_PAGE\)/);
+  });
   it('one clear action: the header link only, shown only with an active filter', () => {
     expect(side).not.toContain("'Clear All Filters'");
     expect(side).toMatch(/activeCount > 0 && \(\s*<button[\s\S]{0,200}onClick=\{onClearAll\}/);
