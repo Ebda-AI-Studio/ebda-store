@@ -70,8 +70,8 @@ export const REGISTRY: Record<CapabilityId, RegistryEntry> = {
   payments: { status: 'live' },
   warehouse: { status: 'live' },
   barcodes: { status: 'live' },
-  b2b: { status: 'coming', dependsOn: 'feat/b2b-wholesale' },
-  webhooks: { status: 'coming', dependsOn: 'feat/merchant-webhooks' },
+  b2b: { status: 'live' },
+  webhooks: { status: 'live' },
   commission: { status: 'live' },
 };
 
