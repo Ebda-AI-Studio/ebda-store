@@ -27,6 +27,7 @@ import {
   storeSlugSchema,
   storeSlugIssueCode,
   deliveryDaysSchema,
+  instalmentsSchema,
   deliveryOffDaysSchema,
   receiptBarcodeShapeSchema,
   footerBottomBarSchema,
@@ -133,11 +134,26 @@ function addPackingSlipNoteIssues(
   });
 }
 
+/** `settings.instalments` (PDP instalment estimate, B2-9): null clears; else the strict shared schema. */
+function addInstalmentsIssues(settings: Record<string, unknown> | undefined, ctx: z.RefinementCtx) {
+  const v = settings?.instalments;
+  if (v === undefined || v === null) return;
+  const parsed = instalmentsSchema.safeParse(v);
+  if (parsed.success) return;
+  for (const issue of parsed.error.issues) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['instalments', ...issue.path],
+      message: issue.message,
+    });
+  }
+}
+
 /**
  * Everything the open `settings` blob must satisfy, on EVERY route that writes it (create AND
  * update — a check on update only leaves POST /stores as the bypass):
  * - `contact.addressUrl` renders into `<a href>`: a `javascript:`/`data:` value is stored XSS;
- * - `deliveryDays` and `deliveryOffDays` (above);
+ * - `deliveryDays`, `deliveryOffDays` and `instalments` (above);
  * - `floatingWidget` button links render as `<a href>`; the dedicated route validates them, so
  *   this generic path must too (S2);
  * - `footerLinks.bottomBar` (the footer legal row's toggles + © override, S-01).
@@ -162,6 +178,7 @@ function addSettingsIssues(settings: Record<string, unknown> | undefined, ctx: z
   addDeliveryOffDaysIssues(settings, ctx);
   addReceiptBarcodeShapeIssues(settings, ctx);
   addPackingSlipNoteIssues(settings, ctx);
+  addInstalmentsIssues(settings, ctx);
   // The footer legal row's toggles + © override (S-01): typed, length-capped.
   const footerLinks = settings?.footerLinks;
   if (footerLinks && typeof footerLinks === 'object' && 'bottomBar' in footerLinks) {
