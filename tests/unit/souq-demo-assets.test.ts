@@ -17,6 +17,14 @@ const probe = path.resolve(__dirname, '../../scripts/souq-demo/orange-probe.py')
 const KB = 1024;
 const files = readdirSync(dir).filter(f => f.endsWith('.webp'));
 
+/**
+ * The probe decodes webp with `dwebp` (libwebp-tools). The self-hosted CI runner does not have it
+ * (Ruling SOUQ-CI-1), so on CI only the real-image sweep is skipped; everywhere else a missing
+ * `dwebp` fails the sweep (fail closed), and the pre-push gate on the Mac runs it.
+ */
+const dwebpMissing = spawnSync('dwebp', ['-version']).status !== 0;
+const skipSweepOnCi = dwebpMissing && Boolean(process.env.CI);
+
 const run = (args: string[]) =>
   spawnSync('python3', ['-I', probe, ...args], { encoding: 'utf8', timeout: 120_000 });
 
@@ -74,25 +82,29 @@ describe('orange-probe.py', () => {
     writeFileSync(bad, 'not a webp');
     expect(run([bad]).status).toBe(2);
   });
-  it('every committed image is within its orange limit (3 % images, 5 % heroes)', () => {
-    let out = '';
-    try {
-      out = execFileSync('python3', ['-I', probe, ...files.map(f => path.join(dir, f))], {
-        encoding: 'utf8',
-        timeout: 240_000,
-      });
-    } catch (e) {
-      out = (e as { stdout?: string }).stdout ?? '';
-      throw new Error(`orange probe failed:\n${out}`);
-    }
-    const rows = out
-      .trim()
-      .split('\n')
-      .map(l => JSON.parse(l) as { file: string; share: number; limit: number; ok: boolean });
-    expect(rows).toHaveLength(files.length);
-    for (const r of rows) {
-      expect(r.ok, `${r.file} ${r.share}`).toBe(true);
-      expect(r.limit).toBe(r.file.startsWith('hero') ? 0.05 : 0.03);
-    }
-  }, 300_000);
+  it.skipIf(skipSweepOnCi)(
+    'every committed image is within its orange limit (3 % images, 5 % heroes)',
+    () => {
+      let out = '';
+      try {
+        out = execFileSync('python3', ['-I', probe, ...files.map(f => path.join(dir, f))], {
+          encoding: 'utf8',
+          timeout: 240_000,
+        });
+      } catch (e) {
+        out = (e as { stdout?: string }).stdout ?? '';
+        throw new Error(`orange probe failed:\n${out}`);
+      }
+      const rows = out
+        .trim()
+        .split('\n')
+        .map(l => JSON.parse(l) as { file: string; share: number; limit: number; ok: boolean });
+      expect(rows).toHaveLength(files.length);
+      for (const r of rows) {
+        expect(r.ok, `${r.file} ${r.share}`).toBe(true);
+        expect(r.limit).toBe(r.file.startsWith('hero') ? 0.05 : 0.03);
+      }
+    },
+    300_000
+  );
 });
