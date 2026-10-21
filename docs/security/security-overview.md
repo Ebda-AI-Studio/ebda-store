@@ -162,8 +162,8 @@ specifically, it covers 7 such query-level guards; it does **not** cover the
 session-GUC mechanism itself (`runInTenantContext` / `app.current_store_id` /
 `app.current_user_id`, `apps/api/src/middleware/tenant-context.ts`) — that
 runs under a REAL the earlier app role login role in a separate, dedicated CI job
-(`test-rls-force-app` in `ci.yml`, driving `tests/integration/
-rls-force-app.test.ts`), not in this record. Both are real, CI-blocking
+(`test-rls-ebda-app` in `ci.yml`, driving `tests/integration/
+rls-ebda-app.test.ts`), not in this record. Both are real, CI-blocking
 proofs; they are just two different mechanisms; conflating them here would
 overstate what a green `defence-mutation-record.md` alone proves about RLS.
 

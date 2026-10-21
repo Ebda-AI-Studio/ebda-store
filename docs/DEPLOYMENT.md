@@ -359,7 +359,7 @@ When any of these fire, the path to real staging is:
 - Neon branch `staging` from `main` + seed fixtures script at `scripts/seed-staging.mjs`
 - Custom domain `api-staging.ebda.app` → CNAME → Railway service
 - Preview environment `NEXT_PUBLIC_API_URL` swap from `localhost:4000` → `https://api-staging.ebda.app`
-- Per-provider sandbox credentials: Paymob/Kashier/Fawry test mode, OneSignal separate "staging" app, Cloudflare R2 separate bucket `force-uploads-staging`, Sentry environment tag `staging`, Inngest separate `INNGEST_DEPLOY_ID`, Axiom dataset `force-api-railway-staging`
+- Per-provider sandbox credentials: Paymob/Kashier/Fawry test mode, OneSignal separate "staging" app, Cloudflare R2 separate bucket `force-uploads-staging`, Sentry environment tag `staging`, Inngest separate `INNGEST_DEPLOY_ID`, Axiom dataset `ebda-api-railway-staging`
 - Documentation in this section updated with the URLs + dashboards
 
 Estimated effort: ~4h focused session.
@@ -453,16 +453,16 @@ Railway's stdout buffer is ephemeral (~72h on the Pro plan, less on Hobby). With
 **Migration history**: Started on BetterStack 2026-05-14, migrated to Axiom 2026-05-15 because BetterStack's free tier retains only 3 days (violates CLAUDE.md rule 11). Axiom free tier retains 30 days at 500 GB/month, satisfying the rule at zero cost.
 
 - **Provider**: **Axiom** free tier — 500 GB ingest/month, **30-day retention** (verified 2026-05-15)
-- **Dataset**: `force-api-railway`
+- **Dataset**: `ebda-api-railway`
 - **Transport**: `@axiomhq/pino` in `apps/api/src/lib/logger.ts` — pino multi-transport sends every log line to stdout AND Axiom in parallel (Railway logs UI keeps working untouched)
 - **PII**: log lines ship off-platform, so recipient emails and phone numbers are logged only masked (`maskEmail` / `maskEmailList` / `maskPhone` from `apps/api/src/lib/pii-mask.ts`, issue 2390) — grep a support case by the masked form (`a***@gmail.com`, `****5678`) plus the email/SMS id, not the full address. `tests/unit/no-raw-pii-in-logs.test.ts` walks every app and package tree (apps/web, orders and admin server code log to Cloudflare Workers, also off-platform) and fails on a new raw field, a raw value interpolated into a message, a call through a bound / child / aliased logger, or a new `{ ...spread }` in a log object — or an opaque first argument such as `logger.info(result, 'x')`, which pino merges key by key — that has not been reviewed (issues 2392, 2394, 2396; Ruling LOG-PII-1).
 - **Env vars (Railway)**:
   - `AXIOM_TOKEN` — API token with **Ingest** scope, from `app.axiom.co` → Settings → API tokens
-  - `AXIOM_DATASET` — dataset name, currently `force-api-railway`
+  - `AXIOM_DATASET` — dataset name, currently `ebda-api-railway`
 - **Graceful no-op**: when either env var is missing the transport is omitted entirely; pino still writes to stdout
 - **Redaction**: same pino redact rules apply to Axiom — auth headers, cookies, passwords, tokens, card numbers all masked before leaving the process
 - **Setup** (one-time):
-  1. Sign up at https://app.axiom.co/register → create dataset `force-api-railway`
+  1. Sign up at https://app.axiom.co/register → create dataset `ebda-api-railway`
   2. Settings → API tokens → create token with **Ingest** scope (name: `Ebda Store API ingest`)
   3. Set `AXIOM_TOKEN` + `AXIOM_DATASET` env vars on Railway and redeploy
   4. Verify in Axiom Stream view within 30s — request log lines should land
@@ -536,7 +536,7 @@ Renewal verification: re-check these in the per-provider dashboard quarterly —
 | Sentry                 | ops@ebda.app | one org with four projects: `api`, `web`, `admin`, `orders`                                                    |
 | PostHog                | ops@ebda.app | EU region, single project covering web + admin                                                                 |
 | UptimeRobot            | ops@ebda.app | free tier, 2 monitors currently                                                                                |
-| Axiom                  | (Ahmad's account)      | free tier (500GB/30d) — dataset `force-api-railway`                                                            |
+| Axiom                  | (Ahmad's account)      | free tier (500GB/30d) — dataset `ebda-api-railway`                                                            |
 | Resend                 | platform-wide          | one account; per-merchant domains added under it                                                               |
 | @ebda1_bot Telegram | personal DM to Ahmad   | chat_id `1943728711`                                                                                           |
 

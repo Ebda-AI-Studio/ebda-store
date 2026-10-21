@@ -130,7 +130,7 @@ const TRANSIENT_CONNECTION_CODES = new Set(['P1001', 'P1002', 'P1017']);
 
 /**
  * The same failures arrive without a usable code when Prisma wraps them as a
- * `PrismaClientUnknownRequestError` (FORCE-API-2E surfaced as "Server has
+ * `PrismaClientUnknownRequestError` (EBDA-API-2E surfaced as "Server has
  * closed the connection."). Matched on the message as a fallback only.
  */
 const TRANSIENT_CONNECTION_MESSAGE =
@@ -138,7 +138,7 @@ const TRANSIENT_CONNECTION_MESSAGE =
 
 /**
  * Is `err` a connection that dropped or never opened — the Neon pooler idling
- * out a socket or a compute blip (FORCE-API-2D / 2E / 2F)? NOT a statement
+ * out a socket or a compute blip (EBDA-API-2D / 2E / 2F)? NOT a statement
  * error: nothing the query said was wrong, so re-running it is safe.
  */
 export function isTransientConnectionError(err: unknown): boolean {

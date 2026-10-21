@@ -13,7 +13,7 @@
 #                         or personal token locally). Skips silently if unset.
 #
 # Optional env:
-#   AXIOM_DATASET       — Axiom dataset to ingest into (default: force-api-railway)
+#   AXIOM_DATASET       — Axiom dataset to ingest into (default: ebda-api-railway)
 #   RESULTS_DIR         — directory containing summary-*.json files
 #                         (default: loadtests/results/ relative to repo root)
 #
@@ -23,15 +23,15 @@
 # tiny (~2 KB per run) while giving the long-term trend data we care about.
 #
 # Axiom chart setup (one-time, ~5 min):
-#   1. Open app.axiom.co → Datasets → force-api-railway
+#   1. Open app.axiom.co → Datasets → ebda-api-railway
 #   2. Dashboards → New dashboard → Add chart
-#   3. APL query: ["force-api-railway"] | where scenario != "" | summarize avg(p95_ms) by bin(_time, 1d), scenario
+#   3. APL query: ["ebda-api-railway"] | where scenario != "" | summarize avg(p95_ms) by bin(_time, 1d), scenario
 #   4. Repeat for rps and error_rate fields
 
 set -euo pipefail
 
 TOKEN="${AXIOM_INGEST_TOKEN:-}"
-DATASET="${AXIOM_DATASET:-force-api-railway}"
+DATASET="${AXIOM_DATASET:-ebda-api-railway}"
 HERE="$(cd "$(dirname "$0")" && pwd)"
 RESULTS_DIR="${RESULTS_DIR:-$HERE/results}"
 

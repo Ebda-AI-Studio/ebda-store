@@ -150,7 +150,7 @@ export async function getCached<T>(
     const localBefore = readLocalGens(genNames);
     const sharedBefore = await readSharedGens(genNames);
     // A cache fill is a read by construction, so a dropped pooler connection
-    // (Neon idling a socket — FORCE-API-2D/2E/2F) is re-run a bounded number of
+    // (Neon idling a socket — EBDA-API-2D/2E/2F) is re-run a bounded number of
     // times instead of 500ing the storefront. `fetchFn` MUST stay a pure read.
     const data = await retryTransientRead(fetchFn, {
       label: `getCached:${key.split(':')[1] ?? key}`,

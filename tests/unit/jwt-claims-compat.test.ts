@@ -1,5 +1,5 @@
 /**
- * JWT iss/aud rename (force-api/force-app -> ebda-api/ebda-app).
+ * JWT iss/aud rename (retired claim values -> ebda-api/ebda-app).
  *
  * New tokens carry the Ebda claims. For ONE release the verifiers also accept the
  * legacy claims so a deploy does not kill sessions mid-rollout (access tokens

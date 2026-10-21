@@ -8,7 +8,7 @@ This document covers both vertical and horizontal scaling for the Railway-hosted
 
 ## Vertical Scaling
 
-**Where:** Railway → force-api service → Settings → Resources
+**Where:** Railway → ebda-api service → Settings → Resources
 
 Drag the **CPU** and **RAM** sliders to increase the resources available to the single running
 container.
@@ -33,7 +33,7 @@ under normal load (baseline your k6 report first).
 
 ## Horizontal Scaling
 
-**Where:** Railway → force-api service → Settings → Replicas (or `numReplicas` in
+**Where:** Railway → ebda-api service → Settings → Replicas (or `numReplicas` in
 `railway.toml` / `railway.json`).
 
 Set `numReplicas: 2` (or higher) to run multiple containers behind Railway's built-in
@@ -53,7 +53,7 @@ load balancer. Railway distributes incoming HTTP/WebSocket connections across re
 
 Before setting `numReplicas > 1`, verify all of these:
 
-- [ ] **`REDIS_URL` is set** on the Railway force-api service environment. The Railway internal
+- [ ] **`REDIS_URL` is set** on the Railway ebda-api service environment. The Railway internal
       URL is `redis://redis.railway.internal:6379`. Without it the socket adapter and leader-election
       both fall back to in-process mode and replicas are NOT safe.
 - [ ] **`DATABASE_URL` uses the Neon pgbouncer pooled connection string** (port 6543, not 5432).

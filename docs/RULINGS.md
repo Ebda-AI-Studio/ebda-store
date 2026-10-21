@@ -30,7 +30,7 @@ Ruling R-EBDA-3D-3 — Draco (`KHR_draco_mesh_compression`) and KTX2 (`KHR_textu
 
 Ruling R-EBDA-3D-4 — finishes bind to OPTION VALUES (Metal: Gold), not to variants. Evidence: a ring with Size × Metal is 24 variants but 3 metals; a value binding covers every present and future variant carrying it, and the PDP can apply it on a PARTIAL pick (metal chosen, size not yet), which a variant binding cannot. Cost if wrong: a merchant who wants one specific size+metal combination to look different cannot express it in v1.
 
-Ruling R-EBDA-3D-5 — the two upload routes run with NO request transaction (mounted above every `/stores/:storeId` tenantContext mount, pinned by `tests/unit/product-model-routes-mount.test.ts`): validate bytes → R2 put → one short `runInTenantContext` write, and the R2 object is deleted when that write fails. Evidence: a 15 MB upload on a mobile uplink can outlive the 30 s request transaction (FORCE-API-2G class). Cost if wrong: an R2 delete that also fails leaves one orphan object for the weekly sweep (logged).
+Ruling R-EBDA-3D-5 — the two upload routes run with NO request transaction (mounted above every `/stores/:storeId` tenantContext mount, pinned by `tests/unit/product-model-routes-mount.test.ts`): validate bytes → R2 put → one short `runInTenantContext` write, and the R2 object is deleted when that write fails. Evidence: a 15 MB upload on a mobile uplink can outlive the 30 s request transaction (EBDA-API-2G class). Cost if wrong: an R2 delete that also fails leaves one orphan object for the weekly sweep (logged).
 
 Ruling R-EBDA-3D-6 — accepted residual: `https://media.ebda.app` sends no CORS headers (probed 2026-10-07: no `access-control-allow-origin` for ebda.app, admin.ebda.app or a custom domain; OPTIONS → 403), so the viewer's `fetch` of the GLB fails in production until the bucket gets a CORS rule. The viewer then keeps the poster and says "3D view unavailable" (and reports `product_3d_load_failed`); iOS AR with an uploaded USDZ and Android Scene Viewer do not need CORS. The one-time `wrangler r2 bucket cors set ebda-media` step is in the plan doc; it was NOT applied by this branch (production change, not asked). Cost if wrong: a merchant uploads a model and shoppers see only the poster until the rule is set.
 
@@ -728,12 +728,12 @@ Cost if wrong: a genuine recursion in an inline script of ours that happens to s
 of the document, seen only by Chrome/Firefox/Edge-for-iOS users, would go unreported — every other
 browser still reports it, and any frame in a shipped chunk or at a document-sized line keeps it.
 
-**Ruling SN-2 — FORCE-API-28 (cart P2003 `cart_items_cart_id_fkey`) needs no new change.** All 3
+**Ruling SN-2 — EBDA-API-28 (cart P2003 `cart_items_cart_id_fkey`) needs no new change.** All 3
 events are 2026-08-31 16:15-16:53 UTC; #1108 (2dd34917, 19:56 UTC the same day) moved addItem onto
 the ambient tenant transaction, and the issue has no event since. Cost if wrong: a first add-to-cart
 500 would reappear and re-open the issue on its own.
 
-**Ruling SN-3 — FORCE-API-29 (MyFatoorah `TimeoutError`) needs no code change.** The 8s
+**Ruling SN-3 — EBDA-API-29 (MyFatoorah `TimeoutError`) needs no code change.** The 8s
 `AbortSignal.timeout` fired on `/v2/InitiatePayment`, i.e. before any invoice existed; the
 `/payments/create` catch runs `rollbackForPaymentFailure` (order cancelled, inventory + cart restored,
 idempotent), and the storefront shows its generic "try again" copy. 8s per call (16s worst case for
@@ -2063,7 +2063,7 @@ in Ruling P2-B2-2.
 >    /auth/refresh into the shared anon + IP-wide refresh buckets, and the
 >    admin login page hid its form behind a ~21s spinner. Now `checkSession`
 >    (admin + orders) posts /auth/refresh only with session evidence (the
->    `hadSession` marker, a stored token, the `force-session` cookie) or one
+>    `hadSession` marker, a stored token, the `ebda-session` cookie) or one
 >    evidence-free probe per tab, an evidence-free throttle is `signed-out`
 >    (no ladder), and the admin form renders during the check.
 >
@@ -2290,7 +2290,7 @@ lifetime.** The JWT `exp` follows `REFRESH_TOKEN_EXPIRES_IN` (`.env.example`
 ships `30d`), while the DB row is written for 365 days, so gating the route on
 `exp` could sign out sessions that refresh today. The DB row's `expiresAt`
 stays the lifetime authority. Cost if wrong: a refresh token signed with a
-since-rotated `JWT_SECRET`, or before the `force-api`/`force-app` claims existed,
+since-rotated `JWT_SECRET`, or before the `ebda-api`/`ebda-app` claims existed,
 now fails at refresh instead of silently rotating, so a session idle since such
 a change has to log in again.
 
@@ -3666,7 +3666,7 @@ domain removal on this replica busts the entry and is never served stale.
 under `withRlsBypass`, and are gated in the the earlier app role suite (issue 2040,
 issue 2043).** `assertAiQuota`'s daily/monthly counts protect ONE Google project
 ceiling; the per-store slice stays ambient. The mirror of RLS-S1: the strict
-list names readers that NEED a context, and `rls-force-app.test.ts` now carries
+list names readers that NEED a context, and `rls-ebda-app.test.ts` now carries
 a "must NOT be scoped" block for readers that must not have one. Proven red on
 the pre-fix code under a real non-BYPASSRLS login (a role that is a member of
 the earlier app role). Cost if wrong: none on isolation — the two counts only read
@@ -3681,7 +3681,7 @@ only when `currentTenantGucs().storeId` matches the requested store; a
 store-less (`userContext`) or other-store transaction gets a fresh short
 `runInTenantContext` — correct for a read, which is all the helper does.
 Both are registered defence mutations (unit tier) and the second is also
-proven under a real non-BYPASSRLS login in `rls-force-app.test.ts`. Cost if
+proven under a real non-BYPASSRLS login in `rls-ebda-app.test.ts`. Cost if
 wrong: one extra short read transaction when a same-store caller arrives
 without its GUC recorded — none found.
 
@@ -3710,9 +3710,9 @@ response mapping is unchanged (issue 2005).** `clientErrorStatus` still decides
 the 4xx the client gets; the Sentry gate now uses the narrower
 `isExpectedClientError` (ZodError, body-parser SyntaxError, AppError 4xx, or a
 Prisma error the throw site passed through `markExpected`). This restores the
-safety net Ruling SN-2 relies on: a FORCE-API-28 recurrence (P2003) reaches
+safety net Ruling SN-2 relies on: a EBDA-API-28 recurrence (P2003) reaches
 Sentry instead of answering a silent 400, and a P2002 on a ledger row is no
-longer an invisible 409. Cost if wrong: FORCE-API-2A-style events (a merchant
+longer an invisible 409. Cost if wrong: EBDA-API-2A-style events (a merchant
 saving a duplicate SKU) come back as Sentry events — noise, not an outage; the
 fix for any such site that turns out to be loud is `markExpected` at that
 throw site, never widening the global gate again.
@@ -3941,7 +3941,7 @@ an outage, one isolated connection blip that a retry would have absorbed still 5
 
 **Ruling BS-5 — issue 1988: Prisma P2003 / P2025 reach Sentry again, at warning level; P2002 and
 input-validation errors stay suppressed.** SN-2's safety net ("a first add-to-cart 500 would reappear
-and re-open the issue on its own") had silently stopped existing: FORCE-API-28's class is answered 400
+and re-open the issue on its own") had silently stopped existing: EBDA-API-28's class is answered 400
 since the 2026-09-02 mapping, and #1982 then kept every 4xx out of Sentry. Warning level keeps them
 trackable (and able to reopen a resolved issue) without paging like a crash. P2002 is the merchant's
 duplicate SKU, a genuine client error. Cost if wrong: a merchant repeatedly deleting an already-deleted
@@ -4414,7 +4414,7 @@ gates: post-cutover the earlier app role does not own the STRICT tables, so the 
 with a WARNING, and a table that has never had a row is never auto-analyzed — a standing weekly p1
 and a sweep that never cleans. The guard now reads `current_setting('app.bypass_rls', true)` inside
 the SAME runner the collection used; every STRICT policy admits all rows under it (pinned by
-`rls-force-app.test.ts`), so with the bypass proven a 0 is a real 0 and UNKNOWN passes. Positive
+`rls-ebda-app.test.ts`), so with the bypass proven a 0 is a real 0 and UNKNOWN passes. Positive
 catalog evidence (`reltuples > 0` or `n_live_tup > 0`) still refuses, bypass or not; without the
 bypass proven, UNKNOWN still refuses. `scripts/r2-orphan-audit.ts --force-report` prints a refused
 dry-run list under a NOT-TRUSTWORTHY banner and is ignored with `--apply`. Verified against a real
@@ -5509,13 +5509,13 @@ Cost if wrong: during a runner outage, crons (incl. daily db-backup and both dri
 
 ## 2026-10-03 — Sentry backlog batch (branch `fix/followups13`, issues 2469–2473)
 
-Ruling F13-1 — the AI WRITES leave the request transaction; the AI READS stay in it. `POST /stores/:storeId/campaigns/ai-draft` runs under `storeScopeContext` (one short tenant transaction per query), and `/stores/:storeId/ai/*` picks its context per request via `aiRouteContext`: non-safe methods get `storeScopeContext`, GET/HEAD keep `tenantContext`. Evidence: FORCE-API-2G was the REQUEST transaction's COMMIT failing 66,772 ms after BEGIN against Prisma's 30,000 ms expiry, with `prisma.aiUsage.create()` as its last breadcrumb — and every Gemini call in `ai.routes.ts` is in a `router.post` handler, with `assertAiQuota` opening a second connection on top. The router's 16 GETs (`/usage/*`, `/results/*`, `/bulk*`) touch no third party, so moving them bought nothing and cost a connection per query: under a store scope each awaited query is its own `$transaction`, `GET /ai/results/seo` fans out 6, and the admin AI-tools page fires 9 such endpoints in one `Promise.allSettled` on mount — ~30 concurrent transactions against `connection_limit=15`/`pool_timeout=20`, i.e. re-creating the #2227/#2250/#2285 pool-pressure class on a new path. A second `tenantContext` mount for the read prefix was rejected: `use` is a PREFIX match, so it would open the transaction for the writes too and they would reach their own mount already inside it (#1602), which `storeScopeContext` cannot undo. Cost if wrong: an AI write handler is no longer ONE atomic unit across statements; none relied on it (they read, call the model, then record usage or enqueue a job), and a job row now commits before the Inngest event rather than after. A future GET that awaits the model would be back inside the transaction — `tests/unit/ai-routes-no-request-transaction.test.ts` fails if any GET block in `ai.routes.ts` references an AI-module import.
+Ruling F13-1 — the AI WRITES leave the request transaction; the AI READS stay in it. `POST /stores/:storeId/campaigns/ai-draft` runs under `storeScopeContext` (one short tenant transaction per query), and `/stores/:storeId/ai/*` picks its context per request via `aiRouteContext`: non-safe methods get `storeScopeContext`, GET/HEAD keep `tenantContext`. Evidence: EBDA-API-2G was the REQUEST transaction's COMMIT failing 66,772 ms after BEGIN against Prisma's 30,000 ms expiry, with `prisma.aiUsage.create()` as its last breadcrumb — and every Gemini call in `ai.routes.ts` is in a `router.post` handler, with `assertAiQuota` opening a second connection on top. The router's 16 GETs (`/usage/*`, `/results/*`, `/bulk*`) touch no third party, so moving them bought nothing and cost a connection per query: under a store scope each awaited query is its own `$transaction`, `GET /ai/results/seo` fans out 6, and the admin AI-tools page fires 9 such endpoints in one `Promise.allSettled` on mount — ~30 concurrent transactions against `connection_limit=15`/`pool_timeout=20`, i.e. re-creating the #2227/#2250/#2285 pool-pressure class on a new path. A second `tenantContext` mount for the read prefix was rejected: `use` is a PREFIX match, so it would open the transaction for the writes too and they would reach their own mount already inside it (#1602), which `storeScopeContext` cannot undo. Cost if wrong: an AI write handler is no longer ONE atomic unit across statements; none relied on it (they read, call the model, then record usage or enqueue a job), and a job row now commits before the Inngest event rather than after. A future GET that awaits the model would be back inside the transaction — `tests/unit/ai-routes-no-request-transaction.test.ts` fails if any GET block in `ai.routes.ts` references an AI-module import.
 
 Ruling F13-2 — no Gemini request timeout added. A bound would have turned a slow-but-successful call (the old behaviour past 30 s was a failed COMMIT anyway) into a 502; with the transaction gone, an unbounded call only holds the socket. Cost if wrong: a hung provider holds a request open until the platform request timeout.
 
 Ruling F13-3 — transient-connection retry lives in `getCached` (`retryTransientRead`, 2 retries, ~40–120 ms jittered), not in the Prisma proxy. A wrapper returning a plain promise from the proxy would break `prisma.$transaction([prisma.x.findMany()])` batches, which need real PrismaPromises. Cost if wrong: an UNCACHED public read still 500s on a pooler drop. FeatureService keeps its own retry (#2290, 2026-09-30), which post-dates the 2D/2E events (9/21, 9/24).
 
-Ruling F13-4 — no change for FORCE-API-2B (fixed by #1982, 2026-09-26; event 9/12) and 2C/1B/25 (same PR; last events 9/15–9/22). Added `tests/unit/zod-validation-http-no-sentry.test.ts` to pin the whole middleware chain. Zod-at-the-edge audit: MCP routes hand the body to the SDK transport (`JSONRPCMessageSchema.parse` → 400/-32700) and the two `req.body` reads at `mcp.routes.ts:65`/`mcp-admin.routes.ts:140` are typeof-guarded log fields; `mfa.routes.ts` safeParses all four handlers; `campaign-public.routes.ts` hands the token to `verifyUnsubscribeToken(unknown)` (type, length, UUID parts, HMAC). Cost if wrong: a future edit to those logging reads that trusts the shape without the guard.
+Ruling F13-4 — no change for EBDA-API-2B (fixed by #1982, 2026-09-26; event 9/12) and 2C/1B/25 (same PR; last events 9/15–9/22). Added `tests/unit/zod-validation-http-no-sentry.test.ts` to pin the whole middleware chain. Zod-at-the-edge audit: MCP routes hand the body to the SDK transport (`JSONRPCMessageSchema.parse` → 400/-32700) and the two `req.body` reads at `mcp.routes.ts:65`/`mcp-admin.routes.ts:140` are typeof-guarded log fields; `mfa.routes.ts` safeParses all four handlers; `campaign-public.routes.ts` hands the token to `verifyUnsubscribeToken(unknown)` (type, length, UUID parts, HMAC). Cost if wrong: a future edit to those logging reads that trusts the shape without the guard.
 
 ## Ruling DEP-WRANGLER-1 — wrangler 4.116.0 + miniflare undici override; no prerelease miniflare in the prod tree (2026-10-03)
 
@@ -6433,4 +6433,4 @@ Ruling SEARCH-T11-20 (PR3 final review minor 3) — `product.upserted` (ProductS
 
 Ruling SEARCH-T11-21 (PR3 final review minor 7; refines the outage clause of SEARCH-T11-10/15) — a Workers AI outage seen by the indexer (every product of a batch failed retryably, twice) no longer fails that store's run: the run ends `{ outage: true }` with nothing quarantined, and ONE platform P1 (`search-index.outage`) is raised per 6-hour window across all stores (`alertOutageOnce`, Redis `SET NX EX 21600` — the backstop's period; without Redis it alerts every time rather than stay silent). Before, each store's run threw `NonRetriableError`, so `alerts-failure-watch` raised one P1 per store per backstop tick during an outage. The stores are retried by their next event or the next backstop tick. Evidence: `tests/integration/product-index.test.ts` "PR3 minor 7" (two stores in an outage: both runs return `outage`, nothing quarantined, exactly one `search-index.outage` alert; red before: the run threw). Cost if wrong: a second, distinct outage inside the same 6 h window is not re-alerted.
 
-Ruling BRAND-ZERO-1 — the repository carries no inherited brand, tenant, domain, country or currency string, enforced over EVERY tracked file and file path by `tests/unit/no-force-branding.test.ts` (the old per-workstream exclusion list is gone). Only migration directories already on origin/main are skipped (immutable, Prisma checksums them; snapshot = sha1 prefixes in `tests/unit/applied-migrations.json`); any NEW migration is scanned (proved: a planted migration with the legacy role name goes red). Live wire/config values are allowed by name AND by exact file (`tests/unit/branding-allowlist.json`; regenerate by listing every tracked file with a line matching the pattern) because renaming them is a coordinated deploy, not an edit: the JWT `iss`/`aud` claim values and the third-party resource names `force-api` / `force-app` (Railway service, Sentry project, Axiom dataset, Inngest app id, OTEL service name), the `force-session` hint cookie, the Meta provisioner Railway env vars (FORCE_AI_META_BM_ID, FORCE_AI_META_ADMIN_TOKEN, FORCE_AI_META_PROVISIONER_USER_ID), the WhatsApp template names `force_*_v\d` (being renamed on fix/shopper-messages-egyptian; drop the allowance after it merges), and the WBS bridge fields `fwbStoreId` / `fwbOrderId` (+ `wa_carts` columns). Evidence: the guard fails on a re-introduced string and on a stale allowance (each allowance must still occur). Cost if wrong: if any allowed value turns out to be renamable without a coordinated deploy it stays visible in the code until someone drops its allowance; and the unused legacy DB login role still exists on production until `docs/runbooks/drop-legacy-app-role.md` is run.
+Ruling BRAND-ZERO-1 — the repository carries no inherited brand, tenant, domain, country or currency string, enforced over EVERY tracked file and file path by `tests/unit/no-force-branding.test.ts`. Only migration directories already on origin/main are skipped (immutable, Prisma checksums them; snapshot = sha1 prefixes in `tests/unit/applied-migrations.json`); any NEW migration is scanned (proved: a planted migration with the legacy role name goes red). The only allowed exceptions are DATED one-release fallbacks, each listed by exact file in `tests/unit/branding-allowlist.json` with a removal date of 2026-12-01: the pre-rename JWT iss/aud values (`packages/shared/src/auth/jwt-claims.ts`), the pre-rename session hint cookie name (`packages/shared/src/auth/session-hint-cookie.ts`), the pre-rename Meta provisioner env var names (`apps/api/src/services/meta-provisioner.service.ts`, `docs/ENVIRONMENT.md`), and the previous WBS bridge id field names (`apps/api/src/lib/wbs-wire.ts`, `apps/api/src/services/wbs-bridge.service.ts`), plus the WhatsApp template names, which are renamed on fix/shopper-messages-egyptian (drop that allowance after it merges). Cost if wrong: after 2026-12-01 any token or cookie minted before the rename stops verifying (a one-time re-login), and a WBS that has not adopted the new field names stops working; until then the old names stay accepted. The unused legacy DB login role still exists on production until `docs/runbooks/drop-legacy-app-role.md` is run.

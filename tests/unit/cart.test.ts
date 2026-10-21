@@ -438,7 +438,7 @@ describe('CartService', () => {
     });
   });
 
-  // FORCE-API-2B: `PUT /public/cart/items/:id` 500'd with P2025 when the line
+  // EBDA-API-2B: `PUT /public/cart/items/:id` 500'd with P2025 when the line
   // was deleted (a second stepper tap / a racing "remove") between the
   // cart-scoped findFirst and the by-id write.
   describe('concurrent removal of the line (P2025)', () => {

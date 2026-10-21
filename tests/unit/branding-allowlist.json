@@ -1,58 +1,17 @@
 {
  "forceApiApp": [
-  "apps/api/src/lib/db-retry.ts",
-  "apps/api/src/lib/inngest/client.ts",
-  "apps/api/src/lib/public-cache.ts",
-  "apps/api/src/middleware/error-handler.ts",
-  "apps/api/src/middleware/tenant-context.ts",
-  "apps/api/src/routes/alert-webhooks.routes.ts",
-  "apps/api/src/routes/campaign.routes.ts",
-  "apps/api/src/routes/index.ts",
-  "apps/api/src/services/cart.service.ts",
-  "apps/api/src/services/feature.service.ts",
-  "apps/api/src/services/sentry.service.ts",
-  "apps/api/src/tracing.ts",
-  "docker-compose.yml",
-  "docs/DEPLOYMENT.md",
-  "docs/ENVIRONMENT.md",
-  "docs/RULINGS.md",
-  "docs/SCALING.md",
-  "docs/audits/2026-07-15-rls-enforcement-audit.md",
-  "docs/observability/slo.md",
-  "docs/plans/2026-07-02-rls-cutover.md",
-  "docs/plans/2026-10-15-policy-change-notify.md",
-  "docs/security/defence-mutations.json",
-  "docs/security/security-overview.md",
-  "docs/superpowers/plans/2026-06-08-mfa-and-token-revocation.md",
-  "ecosystem.config.js",
-  "graphify-out/graph.json",
-  "loadtests/push-metrics.sh",
-  "packages/shared/src/auth/jwt-claims.ts",
-  "scripts/buy-flow-parity/run.mjs",
-  "tests/unit/ai-routes-no-request-transaction.test.ts",
-  "tests/unit/cart.test.ts",
-  "tests/unit/db-retry.test.ts",
-  "tests/unit/error-status-parity.test.ts",
-  "tests/unit/feature-service-transient-db.test.ts",
-  "tests/unit/jwt-claims-compat.test.ts",
-  "tests/unit/transient-read-retry.test.ts",
-  "tests/unit/zod-edge-routes.test.ts",
-  "tests/unit/zod-validation-http-no-sentry.test.ts"
+  "packages/shared/src/auth/jwt-claims.ts"
  ],
  "hintCookie": [
-  "docs/RULINGS.md",
-  "graphify-out/graph.json",
   "packages/shared/src/auth/session-hint-cookie.ts"
  ],
  "metaEnv": [
   "apps/api/src/services/meta-provisioner.service.ts",
-  "docs/ENVIRONMENT.md",
-  "docs/RULINGS.md"
+  "docs/ENVIRONMENT.md"
  ],
  "wbsBridge": [
   "apps/api/src/lib/wbs-wire.ts",
-  "apps/api/src/services/wbs-bridge.service.ts",
-  "docs/RULINGS.md"
+  "apps/api/src/services/wbs-bridge.service.ts"
  ],
  "waTemplateNames": [
   "apps/api/src/lib/wa-templates/definitions.ts",

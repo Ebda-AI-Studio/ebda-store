@@ -259267,18 +259267,18 @@
       "id": "docs_changelog_2026_06_01_backlog_completion_still_open_needs_ahmad"
     },
     {
-      "label": "CHANGELOG-force-session-2026-05-31.md",
+      "label": "CHANGELOG-ebda-session-2026-05-31.md",
       "file_type": "document",
-      "source_file": "docs/CHANGELOG-force-session-2026-05-31.md",
+      "source_file": "docs/CHANGELOG-ebda-session-2026-05-31.md",
       "source_location": "L1",
       "community": 743,
-      "norm_label": "changelog-force-session-2026-05-31.md",
+      "norm_label": "changelog-ebda-session-2026-05-31.md",
       "id": "docs_changelog_force_session_2026_05_31_md"
     },
     {
       "label": "Ebda AI Studio \u2014 Session Changelog (running)",
       "file_type": "document",
-      "source_file": "docs/CHANGELOG-force-session-2026-05-31.md",
+      "source_file": "docs/CHANGELOG-ebda-session-2026-05-31.md",
       "source_location": "L1",
       "community": 743,
       "norm_label": "ebda ai studio \u2014 session changelog (running)",
@@ -259287,7 +259287,7 @@
     {
       "label": "C1 REVERTED + WBS bot merged (2026-06-01)",
       "file_type": "document",
-      "source_file": "docs/CHANGELOG-force-session-2026-05-31.md",
+      "source_file": "docs/CHANGELOG-ebda-session-2026-05-31.md",
       "source_location": "L5",
       "community": 743,
       "norm_label": "c1 reverted + wbs bot merged (2026-06-01)",
@@ -259296,7 +259296,7 @@
     {
       "label": "WBS bot fixes MERGED to WBS main `d8e965a0` (2026-06-01)",
       "file_type": "document",
-      "source_file": "docs/CHANGELOG-force-session-2026-05-31.md",
+      "source_file": "docs/CHANGELOG-ebda-session-2026-05-31.md",
       "source_location": "L10",
       "community": 743,
       "norm_label": "wbs bot fixes merged to wbs main `d8e965a0` (2026-06-01)",
@@ -259305,7 +259305,7 @@
     {
       "label": "\u2705 TRULY VERIFIED FINAL @ main `8b5ad921` \u2014 full tsc 0 errors (api+admin+web)",
       "file_type": "document",
-      "source_file": "docs/CHANGELOG-force-session-2026-05-31.md",
+      "source_file": "docs/CHANGELOG-ebda-session-2026-05-31.md",
       "source_location": "L16",
       "community": 743,
       "norm_label": "\u2705 truly verified final @ main `8b5ad921` \u2014 full tsc 0 errors (api+admin+web)",
@@ -259314,7 +259314,7 @@
     {
       "label": "\u2705 VERIFIED FINAL @ main `4cbe0974` \u2014 build-clean (3 source sweeps pass)",
       "file_type": "document",
-      "source_file": "docs/CHANGELOG-force-session-2026-05-31.md",
+      "source_file": "docs/CHANGELOG-ebda-session-2026-05-31.md",
       "source_location": "L20",
       "community": 743,
       "norm_label": "\u2705 verified final @ main `4cbe0974` \u2014 build-clean (3 source sweeps pass)",
@@ -259323,7 +259323,7 @@
     {
       "label": "(earlier) FINAL @ main `b125c587` \u2014 build-clean for CI/deploy \u2705",
       "file_type": "document",
-      "source_file": "docs/CHANGELOG-force-session-2026-05-31.md",
+      "source_file": "docs/CHANGELOG-ebda-session-2026-05-31.md",
       "source_location": "L26",
       "community": 743,
       "norm_label": "(earlier) final @ main `b125c587` \u2014 build-clean for ci/deploy \u2705",
@@ -259332,7 +259332,7 @@
     {
       "label": "STATUS \u2014 ALL 3 FEATURE BATCHES LANDED \u2705",
       "file_type": "document",
-      "source_file": "docs/CHANGELOG-force-session-2026-05-31.md",
+      "source_file": "docs/CHANGELOG-ebda-session-2026-05-31.md",
       "source_location": "L42",
       "community": 743,
       "norm_label": "status \u2014 all 3 feature batches landed \u2705",
@@ -259341,7 +259341,7 @@
     {
       "label": "\u2705 ALL CLEAR \u2014 no open blockers as of last update",
       "file_type": "document",
-      "source_file": "docs/CHANGELOG-force-session-2026-05-31.md",
+      "source_file": "docs/CHANGELOG-ebda-session-2026-05-31.md",
       "source_location": "L54",
       "community": 743,
       "norm_label": "\u2705 all clear \u2014 no open blockers as of last update",
@@ -259350,7 +259350,7 @@
     {
       "label": "DONE + verified (landed on Ebda Store main)",
       "file_type": "document",
-      "source_file": "docs/CHANGELOG-force-session-2026-05-31.md",
+      "source_file": "docs/CHANGELOG-ebda-session-2026-05-31.md",
       "source_location": "L59",
       "community": 743,
       "norm_label": "done + verified (landed on ebda store main)",
@@ -259359,7 +259359,7 @@
     {
       "label": "DONE earlier this session",
       "file_type": "document",
-      "source_file": "docs/CHANGELOG-force-session-2026-05-31.md",
+      "source_file": "docs/CHANGELOG-ebda-session-2026-05-31.md",
       "source_location": "L67",
       "community": 743,
       "norm_label": "done earlier this session",
@@ -259368,7 +259368,7 @@
     {
       "label": "Infra answers (from code/infra inspection)",
       "file_type": "document",
-      "source_file": "docs/CHANGELOG-force-session-2026-05-31.md",
+      "source_file": "docs/CHANGELOG-ebda-session-2026-05-31.md",
       "source_location": "L75",
       "community": 743,
       "norm_label": "infra answers (from code/infra inspection)",
@@ -259377,7 +259377,7 @@
     {
       "label": "Backlog still open (Phase 2 \u2014 `docs/plans/2026-05-31-phase2-remediation.md`)",
       "file_type": "document",
-      "source_file": "docs/CHANGELOG-force-session-2026-05-31.md",
+      "source_file": "docs/CHANGELOG-ebda-session-2026-05-31.md",
       "source_location": "L81",
       "community": 743,
       "norm_label": "backlog still open (phase 2 \u2014 `docs/plans/2026-05-31-phase2-remediation.md`)",
@@ -346594,18 +346594,18 @@
       "id": "integration_rls_async_context_test_runasebdaapp"
     },
     {
-      "label": "rls-force-app.test.ts",
+      "label": "rls-ebda-app.test.ts",
       "file_type": "code",
-      "source_file": "tests/integration/rls-force-app.test.ts",
+      "source_file": "tests/integration/rls-ebda-app.test.ts",
       "source_location": "L1",
       "community": 108,
-      "norm_label": "rls-force-app.test.ts",
+      "norm_label": "rls-ebda-app.test.ts",
       "id": "tests_integration_rls_the earlier app role_test_ts"
     },
     {
       "label": "makeStoreWithOwner()",
       "file_type": "code",
-      "source_file": "tests/integration/rls-force-app.test.ts",
+      "source_file": "tests/integration/rls-ebda-app.test.ts",
       "source_location": "L71",
       "community": 108,
       "norm_label": "makestorewithowner()",
@@ -346614,7 +346614,7 @@
     {
       "label": "cleanup()",
       "file_type": "code",
-      "source_file": "tests/integration/rls-force-app.test.ts",
+      "source_file": "tests/integration/rls-ebda-app.test.ts",
       "source_location": "L89",
       "community": 108,
       "norm_label": "cleanup()",
@@ -346623,7 +346623,7 @@
     {
       "label": "seedLegacyShopperWithTwoWallets()",
       "file_type": "code",
-      "source_file": "tests/integration/rls-force-app.test.ts",
+      "source_file": "tests/integration/rls-ebda-app.test.ts",
       "source_location": "L453",
       "community": 108,
       "norm_label": "seedlegacyshopperwithtwowallets()",
@@ -346632,7 +346632,7 @@
     {
       "label": "readBack()",
       "file_type": "code",
-      "source_file": "tests/integration/rls-force-app.test.ts",
+      "source_file": "tests/integration/rls-ebda-app.test.ts",
       "source_location": "L489",
       "community": 108,
       "norm_label": "readback()",
@@ -346641,7 +346641,7 @@
     {
       "label": "STRICT_TABLES",
       "file_type": "code",
-      "source_file": "tests/integration/rls-force-app.test.ts",
+      "source_file": "tests/integration/rls-ebda-app.test.ts",
       "source_location": "L663",
       "community": 108,
       "norm_label": "strict_tables",
@@ -346650,7 +346650,7 @@
     {
       "label": "allowsContextless",
       "file_type": "code",
-      "source_file": "tests/integration/rls-force-app.test.ts",
+      "source_file": "tests/integration/rls-ebda-app.test.ts",
       "source_location": "L700",
       "community": 108,
       "norm_label": "allowscontextless",
@@ -346659,7 +346659,7 @@
     {
       "label": "policied",
       "file_type": "code",
-      "source_file": "tests/integration/rls-force-app.test.ts",
+      "source_file": "tests/integration/rls-ebda-app.test.ts",
       "source_location": "L701",
       "community": 108,
       "norm_label": "policied",
@@ -346668,7 +346668,7 @@
     {
       "label": "strict",
       "file_type": "code",
-      "source_file": "tests/integration/rls-force-app.test.ts",
+      "source_file": "tests/integration/rls-ebda-app.test.ts",
       "source_location": "L709",
       "community": 108,
       "norm_label": "strict",
@@ -827043,7 +827043,7 @@
       "relation": "imports_from",
       "context": "import",
       "confidence": "EXTRACTED",
-      "source_file": "tests/integration/rls-force-app.test.ts",
+      "source_file": "tests/integration/rls-ebda-app.test.ts",
       "source_location": "L54",
       "weight": 1.0,
       "confidence_score": 1.0,
@@ -827241,7 +827241,7 @@
       "relation": "imports",
       "context": "import",
       "confidence": "EXTRACTED",
-      "source_file": "tests/integration/rls-force-app.test.ts",
+      "source_file": "tests/integration/rls-ebda-app.test.ts",
       "source_location": "L54",
       "weight": 1.0,
       "confidence_score": 1.0,
@@ -949194,7 +949194,7 @@
     {
       "relation": "contains",
       "confidence": "EXTRACTED",
-      "source_file": "docs/CHANGELOG-force-session-2026-05-31.md",
+      "source_file": "docs/CHANGELOG-ebda-session-2026-05-31.md",
       "source_location": "L1",
       "weight": 1.0,
       "confidence_score": 1.0,
@@ -949204,7 +949204,7 @@
     {
       "relation": "contains",
       "confidence": "EXTRACTED",
-      "source_file": "docs/CHANGELOG-force-session-2026-05-31.md",
+      "source_file": "docs/CHANGELOG-ebda-session-2026-05-31.md",
       "source_location": "L5",
       "weight": 1.0,
       "confidence_score": 1.0,
@@ -949214,7 +949214,7 @@
     {
       "relation": "contains",
       "confidence": "EXTRACTED",
-      "source_file": "docs/CHANGELOG-force-session-2026-05-31.md",
+      "source_file": "docs/CHANGELOG-ebda-session-2026-05-31.md",
       "source_location": "L10",
       "weight": 1.0,
       "confidence_score": 1.0,
@@ -949224,7 +949224,7 @@
     {
       "relation": "contains",
       "confidence": "EXTRACTED",
-      "source_file": "docs/CHANGELOG-force-session-2026-05-31.md",
+      "source_file": "docs/CHANGELOG-ebda-session-2026-05-31.md",
       "source_location": "L16",
       "weight": 1.0,
       "confidence_score": 1.0,
@@ -949234,7 +949234,7 @@
     {
       "relation": "contains",
       "confidence": "EXTRACTED",
-      "source_file": "docs/CHANGELOG-force-session-2026-05-31.md",
+      "source_file": "docs/CHANGELOG-ebda-session-2026-05-31.md",
       "source_location": "L20",
       "weight": 1.0,
       "confidence_score": 1.0,
@@ -949244,7 +949244,7 @@
     {
       "relation": "contains",
       "confidence": "EXTRACTED",
-      "source_file": "docs/CHANGELOG-force-session-2026-05-31.md",
+      "source_file": "docs/CHANGELOG-ebda-session-2026-05-31.md",
       "source_location": "L26",
       "weight": 1.0,
       "confidence_score": 1.0,
@@ -949254,7 +949254,7 @@
     {
       "relation": "contains",
       "confidence": "EXTRACTED",
-      "source_file": "docs/CHANGELOG-force-session-2026-05-31.md",
+      "source_file": "docs/CHANGELOG-ebda-session-2026-05-31.md",
       "source_location": "L42",
       "weight": 1.0,
       "confidence_score": 1.0,
@@ -949264,7 +949264,7 @@
     {
       "relation": "contains",
       "confidence": "EXTRACTED",
-      "source_file": "docs/CHANGELOG-force-session-2026-05-31.md",
+      "source_file": "docs/CHANGELOG-ebda-session-2026-05-31.md",
       "source_location": "L54",
       "weight": 1.0,
       "confidence_score": 1.0,
@@ -949274,7 +949274,7 @@
     {
       "relation": "contains",
       "confidence": "EXTRACTED",
-      "source_file": "docs/CHANGELOG-force-session-2026-05-31.md",
+      "source_file": "docs/CHANGELOG-ebda-session-2026-05-31.md",
       "source_location": "L59",
       "weight": 1.0,
       "confidence_score": 1.0,
@@ -949284,7 +949284,7 @@
     {
       "relation": "contains",
       "confidence": "EXTRACTED",
-      "source_file": "docs/CHANGELOG-force-session-2026-05-31.md",
+      "source_file": "docs/CHANGELOG-ebda-session-2026-05-31.md",
       "source_location": "L67",
       "weight": 1.0,
       "confidence_score": 1.0,
@@ -949294,7 +949294,7 @@
     {
       "relation": "contains",
       "confidence": "EXTRACTED",
-      "source_file": "docs/CHANGELOG-force-session-2026-05-31.md",
+      "source_file": "docs/CHANGELOG-ebda-session-2026-05-31.md",
       "source_location": "L75",
       "weight": 1.0,
       "confidence_score": 1.0,
@@ -949304,7 +949304,7 @@
     {
       "relation": "contains",
       "confidence": "EXTRACTED",
-      "source_file": "docs/CHANGELOG-force-session-2026-05-31.md",
+      "source_file": "docs/CHANGELOG-ebda-session-2026-05-31.md",
       "source_location": "L81",
       "weight": 1.0,
       "confidence_score": 1.0,
@@ -1108058,7 +1108058,7 @@
     {
       "relation": "contains",
       "confidence": "EXTRACTED",
-      "source_file": "tests/integration/rls-force-app.test.ts",
+      "source_file": "tests/integration/rls-ebda-app.test.ts",
       "source_location": "L60",
       "weight": 1.0,
       "confidence_score": 1.0,
@@ -1108068,7 +1108068,7 @@
     {
       "relation": "contains",
       "confidence": "EXTRACTED",
-      "source_file": "tests/integration/rls-force-app.test.ts",
+      "source_file": "tests/integration/rls-ebda-app.test.ts",
       "source_location": "L78",
       "weight": 1.0,
       "confidence_score": 1.0,
@@ -1108078,7 +1108078,7 @@
     {
       "relation": "contains",
       "confidence": "EXTRACTED",
-      "source_file": "tests/integration/rls-force-app.test.ts",
+      "source_file": "tests/integration/rls-ebda-app.test.ts",
       "source_location": "L453",
       "weight": 1.0,
       "confidence_score": 1.0,
@@ -1108088,7 +1108088,7 @@
     {
       "relation": "contains",
       "confidence": "EXTRACTED",
-      "source_file": "tests/integration/rls-force-app.test.ts",
+      "source_file": "tests/integration/rls-ebda-app.test.ts",
       "source_location": "L489",
       "weight": 1.0,
       "confidence_score": 1.0,
@@ -1108098,7 +1108098,7 @@
     {
       "relation": "contains",
       "confidence": "EXTRACTED",
-      "source_file": "tests/integration/rls-force-app.test.ts",
+      "source_file": "tests/integration/rls-ebda-app.test.ts",
       "source_location": "L533",
       "weight": 1.0,
       "confidence_score": 1.0,
@@ -1108108,7 +1108108,7 @@
     {
       "relation": "contains",
       "confidence": "EXTRACTED",
-      "source_file": "tests/integration/rls-force-app.test.ts",
+      "source_file": "tests/integration/rls-ebda-app.test.ts",
       "source_location": "L570",
       "weight": 1.0,
       "confidence_score": 1.0,
@@ -1108118,7 +1108118,7 @@
     {
       "relation": "contains",
       "confidence": "EXTRACTED",
-      "source_file": "tests/integration/rls-force-app.test.ts",
+      "source_file": "tests/integration/rls-ebda-app.test.ts",
       "source_location": "L571",
       "weight": 1.0,
       "confidence_score": 1.0,
@@ -1108128,7 +1108128,7 @@
     {
       "relation": "contains",
       "confidence": "EXTRACTED",
-      "source_file": "tests/integration/rls-force-app.test.ts",
+      "source_file": "tests/integration/rls-ebda-app.test.ts",
       "source_location": "L579",
       "weight": 1.0,
       "confidence_score": 1.0,
@@ -1108140,7 +1108140,7 @@
       "context": "call",
       "confidence": "INFERRED",
       "confidence_score": 0.8,
-      "source_file": "tests/integration/rls-force-app.test.ts",
+      "source_file": "tests/integration/rls-ebda-app.test.ts",
       "source_location": "L61",
       "weight": 1.0,
       "source": "integration_rls_the earlier app role_test_makestorewithowner",
@@ -1108151,7 +1108151,7 @@
       "context": "call",
       "confidence": "INFERRED",
       "confidence_score": 0.8,
-      "source_file": "tests/integration/rls-force-app.test.ts",
+      "source_file": "tests/integration/rls-ebda-app.test.ts",
       "source_location": "L81",
       "weight": 1.0,
       "source": "integration_rls_the earlier app role_test_cleanup",
@@ -1108162,7 +1108162,7 @@
       "context": "call",
       "confidence": "INFERRED",
       "confidence_score": 0.8,
-      "source_file": "tests/integration/rls-force-app.test.ts",
+      "source_file": "tests/integration/rls-ebda-app.test.ts",
       "source_location": "L454",
       "weight": 1.0,
       "source": "integration_rls_the earlier app role_test_seedlegacyshopperwithtwowallets",
@@ -1108173,7 +1108173,7 @@
       "context": "call",
       "confidence": "INFERRED",
       "confidence_score": 0.8,
-      "source_file": "tests/integration/rls-force-app.test.ts",
+      "source_file": "tests/integration/rls-ebda-app.test.ts",
       "source_location": "L490",
       "weight": 1.0,
       "source": "integration_rls_the earlier app role_test_readback",

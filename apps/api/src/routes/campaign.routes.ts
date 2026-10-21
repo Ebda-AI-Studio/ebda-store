@@ -183,7 +183,7 @@ router.post('/', writeLimiter, async (req: Request, res: Response, next: NextFun
 });
 
 // POST /stores/:storeId/campaigns/ai-draft — moved to `campaignAiDraftRouter`
-// below (FORCE-API-2G): it awaits Gemini and must not hold the request
+// below (EBDA-API-2G): it awaits Gemini and must not hold the request
 // transaction (30s expiry) open while it does.
 
 // GET /stores/:storeId/campaigns/:campaignId — detail + live status counts.
@@ -572,7 +572,7 @@ campaignTestSendRouter.post(
  * slow third-party call inside the per-request interactive transaction. Prisma
  * expires that transaction 30s after BEGIN, and a Gemini call that ran long
  * made `recordUsage`'s `aiUsage.create` and the COMMIT fail on an expired
- * transaction (FORCE-API-2G, 66772ms against a 30000ms timeout). Here every
+ * transaction (EBDA-API-2G, 66772ms against a 30000ms timeout). Here every
  * query runs in its own short tenant transaction (`storeScopeContext`), so
  * nothing is held open across the model call — but ONLY if no earlier mount
  * already opened one: the prisma proxy prefers an open transaction over a

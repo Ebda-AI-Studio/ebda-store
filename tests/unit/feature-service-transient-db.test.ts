@@ -1,5 +1,5 @@
 /**
- * FORCE-API-2D ("Can't reach database server", P1001) and FORCE-API-2E
+ * EBDA-API-2D ("Can't reach database server", P1001) and EBDA-API-2E
  * ("Server has closed the connection.", P1017): one transient Neon
  * connection failure inside `FeatureService.readFromDb` 500'd
  * `GET /public/store/resolve`. The read now retries ONCE on a fresh

@@ -237,7 +237,7 @@ router.use('/stores', tenantContext, featureRoutes);
 router.use('/stores', tenantContext, storeRoutes);
 
 // D2 campaign routes that make a SLOW EXTERNAL CALL (Resend test send #1954,
-// Gemini ai-draft FORCE-API-2G) and therefore must run with NO request
+// Gemini ai-draft EBDA-API-2G) and therefore must run with NO request
 // transaction open.
 //
 // THEIR POSITION HERE IS LOAD-BEARING — they MUST stay above
@@ -271,7 +271,7 @@ router.use('/admin/stores/:storeId/builder', tenantContext, pageBuilderRoutes);
 router.use('/stores/:storeId/products', tenantContext, productRoutes);
 router.use('/stores/:storeId/categories', tenantContext, categoryRoutes);
 router.use('/stores/:storeId/size-charts', tenantContext, sizeChartRoutes);
-// Context chosen PER REQUEST, not per router (FORCE-API-2G): the WRITES here
+// Context chosen PER REQUEST, not per router (EBDA-API-2G): the WRITES here
 // await Gemini and the request transaction expires 30s after BEGIN — a slow
 // model call made the COMMIT fail on a request whose work was already done, so
 // they run under store scope (one short transaction per query). The GETs
@@ -434,7 +434,7 @@ router.use('/stores', tenantContext, newsletterRoutes);
 // route inside also requires the `email_campaigns` feature. The public router
 // is the login-free unsubscribe endpoint (store comes from the signed token).
 // The two campaign routers that await a third party (test send #1954, ai-draft
-// FORCE-API-2G) are mounted WITHOUT tenantContext, far above this line and
+// EBDA-API-2G) are mounted WITHOUT tenantContext, far above this line and
 // above the prefix-capturing '/stores/:storeId' mount — see the comment there
 // for why that position is load-bearing. They carry the full auth + feature
 // chain on the route; every other path falls through to this mount.

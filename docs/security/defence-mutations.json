@@ -1007,7 +1007,7 @@
       "tier": "unit",
       "why": "the refresh bucket keys on an UNVERIFIED `sub`, so the caller chooses its own partition — a loop signing a fresh random subject mints a new 120/15min bucket per request and is never throttled, while the route sha256s and hits Neon before any signature check",
       "source": "apps/api/src/middleware/security.ts",
-      "find": "    const verified = jwt.verify(presented, config.jwtSecret, {\n      algorithms: ['HS256'],\n      issuer: 'force-api',\n      audience: 'force-app',\n      ignoreExpiration: opts.ignoreExpiration === true,\n    });",
+      "find": "    const verified = jwt.verify(presented, config.jwtSecret, {\n      algorithms: ['HS256'],\n      issuer: JWT_ISSUERS_ACCEPTED,\n      audience: JWT_AUDIENCES_ACCEPTED,\n      ignoreExpiration: opts.ignoreExpiration === true,\n    });",
       "replace": "    const verified = jwt.decode(presented);",
       "test": "tests/unit/refresh-limiter-bucket.test.ts"
     },

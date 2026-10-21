@@ -444,13 +444,13 @@ async function runRef({ label, sha, dir, infra, args, stub, scenarios, logDir, e
       path.join(logDir, `${label}-migrate.log`)
     );
     // The API runs as the non-bypass RLS role, exactly like production and CI.
-    psqlExec(owner, `ALTER ROLE ${APP_ROLE} WITH PASSWORD 'bfp-parity-force-app' LOGIN;`);
+    psqlExec(owner, `ALTER ROLE ${APP_ROLE} WITH PASSWORD 'bfp-parity-app' LOGIN;`);
     await redisCmd(redisUrl, 'FLUSHALL');
   }
   const appUrl = (() => {
     const u = new URL(owner);
     u.username = APP_ROLE;
-    u.password = 'bfp-parity-force-app';
+    u.password = 'bfp-parity-app';
     return u.toString();
   })();
 
