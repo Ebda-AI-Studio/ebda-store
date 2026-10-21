@@ -1320,13 +1320,14 @@ export class ProductService {
       featured,
       minPrice,
       maxPrice,
-      cursor,
       ids,
       optionFilters,
     } = options;
     // `relevance` is the default order of a search, so it is the same request as no sort. With
     // SEARCH_SEMANTIC_ENABLED off (or no search) everything below is exactly the pre-Task-12 path.
     const sort = options.sort === 'relevance' ? undefined : options.sort;
+    // The deals row is one short first page: a cursor is meaningless there and ignored.
+    const cursor = sort === 'on_sale' ? undefined : options.cursor;
     // Hybrid relevance (Task 12): a search with no explicit sort, semantic search on. Ranks
     // keyword + vector hits (RRF) and pages through that order; every other filter still applies.
     const ranked = Boolean(search) && !sort && semanticSearchEnabled();
@@ -1541,14 +1542,38 @@ export class ProductService {
     // every listing: a price edit reaches it through invalidateStoreProductCaches (every product
     // write path calls it), residual window <= the 120 s route TTL / 60 s storefront revalidate
     // on a missed purge; checkout reads the authoritative price, never this list.
+    // FILTERS ARE APPLIED INSIDE THE STATEMENT, BEFORE THE LIMIT, so `category` / `ids` return the
+    // top 12 of the filtered set (not the filtered subset of the store-wide top 12), and `ids`
+    // is intersected, never overwritten. The route rejects the params this path cannot honour
+    // (search, price range, option filters, featured).
+    // B2B INTEGRATION POINT (ON_SALE_VISIBILITY_PREDICATE): TODO(feat/b2b-wholesale): when
+    // wholesale-only / audience-restricted products land, the viewer's visibility predicate MUST be
+    // put into `onSaleVisibility` below (inside the raw SQL, so hidden products never consume the
+    // 12 slots), and into the facet/count path; adding it only to the findMany `where` that
+    // follows would shrink or empty the row for retail shoppers.
     let onSaleOrder: string[] | undefined;
     if (sort === 'on_sale') {
+      const onSaleVisibility = Prisma.sql`TRUE`; // ON_SALE_VISIBILITY_PREDICATE (see TODO above)
+      const safeIds = ids?.slice(0, 50).filter(i => typeof i === 'string' && i.length > 0);
+      const categorySql = category
+        ? resolvedCategoryId
+          ? Prisma.sql`EXISTS (SELECT 1 FROM product_categories pc
+                                WHERE pc.product_id = p.id AND pc.category_id = ${resolvedCategoryId})`
+          : Prisma.sql`FALSE` // an unknown category slug has no products
+        : Prisma.sql`TRUE`;
+      const idsSql =
+        safeIds && safeIds.length > 0
+          ? Prisma.sql`p.id = ANY(${safeIds}::text[])`
+          : Prisma.sql`TRUE`;
       const rows = await prisma.$queryRaw<Array<{ id: string }>>`
         SELECT p.id
           FROM products p
          WHERE p.store_id = ${storeId}
            AND p.status = 'active'
            AND p.deleted_at IS NULL
+           AND ${onSaleVisibility}
+           AND ${categorySql}
+           AND ${idsSql}
            AND (
              (NOT EXISTS (SELECT 1 FROM product_variants v0 WHERE v0.product_id = p.id)
                AND p.compare_at_price > p.price)
@@ -1709,10 +1734,13 @@ export class ProductService {
       ? { ...baseFindManyArgs, cursor: { id: cursor }, skip: 1 }
       : { ...baseFindManyArgs, skip, take: limit };
 
+    // The deals strip has no filter sidebar: skip the facet query on this hot homepage path.
     const [productsRaw, total, facets] = await Promise.all([
       prisma.product.findMany(findManyArgs),
       prisma.product.count({ where }),
-      computeFacets(storeId, whereForFacets),
+      sort === 'on_sale'
+        ? Promise.resolve([] as ProductFacet[])
+        : computeFacets(storeId, whereForFacets),
     ]);
 
     // When using cursor we fetched limit+1; slice to limit + extract next cursor.

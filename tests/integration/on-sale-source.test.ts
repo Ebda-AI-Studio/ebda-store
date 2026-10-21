@@ -139,6 +139,64 @@ describe.skipIf(!hasDb)('listPublic sort=on_sale', () => {
     expect(res.meta.limit).toBe(12);
   });
 
+  it('category + on_sale returns the top 12 OF THAT CATEGORY (filter before the LIMIT), ids are intersected', async () => {
+    const slug = `deals-cat-${randomUUID().slice(0, 8)}`;
+    const cat = await prisma.category.create({ data: { storeId, name: 'Deals cat', slug } });
+    // 13 modest sales in the category, all SMALLER drops than the store-wide bulk/big ones
+    const inCat: string[] = [];
+    for (let i = 0; i < 13; i++) {
+      const p = await mkProduct(storeId, `cat${i}`, { price: 960 - i, compareAtPrice: 1000 });
+      await prisma.productCategory.create({ data: { productId: p.id, categoryId: cat.id } });
+      inCat.push(p.id);
+    }
+    const res = await ProductService.listPublic(storeId, {
+      sort: 'on_sale',
+      category: slug,
+      limit: 12,
+    });
+    expect(res.products).toHaveLength(12);
+    expect(res.products.every(p => inCat.includes(p.id))).toBe(true);
+    // biggest drop first within the category (cat12 has the lowest price)
+    expect(res.products[0].id).toBe(inCat[12]);
+    // an unknown category slug is empty, not the store-wide row
+    expect(
+      (await ProductService.listPublic(storeId, { sort: 'on_sale', category: 'no-such' })).products
+    ).toEqual([]);
+    // ids intersect, never replace: a non-sale id in the list does not appear, a sale id does
+    const picked = await ProductService.listPublic(storeId, {
+      sort: 'on_sale',
+      ids: [id.full, id.big, inCat[0]],
+    });
+    expect(picked.products.map(p => p.id).sort()).toEqual([id.big, inCat[0]].sort());
+    // no facet query for the strip, and a cursor is ignored
+    expect(res.facets).toEqual([]);
+    const withCursor = await ProductService.listPublic(storeId, {
+      sort: 'on_sale',
+      cursor: id.big,
+    });
+    expect(withCursor.products.map(p => p.id)).toContain(id.big);
+  });
+
+  it('a variant product whose variants are ALL inactive is not on sale', async () => {
+    const p = await mkProduct(storeId, 'allInactive', { price: 1000, compareAtPrice: 5000 });
+    await prisma.productVariant.createMany({
+      data: [
+        {
+          productId: p.id,
+          name: 'S',
+          price: 100,
+          compareAtPrice: 1000,
+          inventory: 1,
+          isActive: false,
+        },
+      ] as never,
+    });
+    const ids = (
+      await ProductService.listPublic(storeId, { sort: 'on_sale', limit: 12 })
+    ).products.map(x => x.id);
+    expect(ids).not.toContain(p.id);
+  });
+
   it('a price edit through ProductService.update reaches the list and fires the cache invalidator', async () => {
     invalidated.length = 0;
     await ProductService.update(storeId, id.small, { price: 100 }); // 10% -> 90%

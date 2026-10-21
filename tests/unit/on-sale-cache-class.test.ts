@@ -19,13 +19,20 @@ describe('on_sale: cache class and invalidation', () => {
   const cache = read('apps/api/src/lib/public-cache.ts');
 
   it('the public route allows the sort and keys the cache on it (a distinct entry per sort)', () => {
-    expect(route).toMatch(/sort === 'on_sale'/);
-    const key = route.slice(route.indexOf('const cacheKey = `public:products:'));
+    expect(route).toMatch(/sortValue === 'on_sale'/);
+    const key = route.slice(route.indexOf('const cacheKey ='));
     expect(key.slice(0, key.indexOf('`;', 10))).toContain('${sortValue || ');
   });
 
   it('the key sits under the prefix invalidateStoreProductCaches sweeps', () => {
-    expect(route).toContain('const cacheKey = `public:products:${storeId}:');
+    expect(route).toContain('`public:products:${storeId}:');
+    // the on_sale key: same prefix, no page / cursor in it (a crafted ?page=N mints nothing)
+    const onSaleKey = route.slice(
+      route.indexOf("sortValue === 'on_sale'\n        ?"),
+      route.indexOf(': `public:products:${storeId}:${page')
+    );
+    expect(onSaleKey).toContain('public:products:${storeId}:on_sale:');
+    expect(onSaleKey).not.toMatch(/page|cursor/i);
     expect(cache).toMatch(
       /export async function clearProductsRedis[\s\S]*invalidateCachedPrefix\(`public:products:\$\{storeId\}:`\)/
     );
@@ -39,7 +46,7 @@ describe('on_sale: cache class and invalidation', () => {
     expect(comment).toContain('CACHE CLASS: BOUNDED-stale');
     expect(comment).toContain('invalidateStoreProductCaches');
     expect(comment).toMatch(/residual window/);
-    const body = service.slice(at, at + 2200);
+    const body = service.slice(at, at + 3600);
     expect(body).not.toMatch(/getCached|redis|new Map\(/i);
   });
 
@@ -66,5 +73,34 @@ describe('on_sale: cache class and invalidation', () => {
     expect(sql).toContain('p.deleted_at IS NULL');
     expect(sql).not.toContain('SELECT *');
     expect(service).toMatch(/export const ON_SALE_MAX = 12;/);
+  });
+});
+
+describe('on_sale: scalar sort at the edge, filters inside the SQL, B2B hook', () => {
+  const service = read('apps/api/src/services/product.service.ts');
+  const route = read('apps/api/src/routes/public.routes.ts');
+  it('the route validates sort with Zod (no hand-rolled allow-list) and refuses unsupported combos', () => {
+    expect(route).toContain('parseOptionalSortQuery(sort)');
+    expect(route).toContain("if (sortValue === 'on_sale') assertOnSaleQuery(req.query);");
+    expect(route).not.toMatch(/sort === 'newest' \|\|/);
+  });
+  it('category and ids are predicates of the statement itself, before the LIMIT', () => {
+    const at = service.indexOf('SELECT p.id');
+    const sql = service.slice(at, service.indexOf('LIMIT ${limit}', at));
+    expect(sql).toContain('${categorySql}');
+    expect(sql).toContain('${idsSql}');
+    expect(service).toMatch(/pc\.category_id = \$\{resolvedCategoryId\}/);
+    expect(service).toMatch(/p\.id = ANY\(\$\{safeIds\}::text\[\]\)/);
+  });
+  it('names the B2B visibility hook inside the SQL and points at feat/b2b-wholesale', () => {
+    const at = service.indexOf('SELECT p.id');
+    const sql = service.slice(at, service.indexOf('LIMIT ${limit}', at));
+    expect(sql).toContain('${onSaleVisibility}');
+    expect(service).toContain('ON_SALE_VISIBILITY_PREDICATE');
+    expect(service).toContain('TODO(feat/b2b-wholesale)');
+  });
+  it('skips facets and ignores a cursor for on_sale', () => {
+    expect(service).toMatch(/sort === 'on_sale'\s*\? Promise\.resolve\(\[\] as ProductFacet\[\]\)/);
+    expect(service).toContain("const cursor = sort === 'on_sale' ? undefined : options.cursor;");
   });
 });
