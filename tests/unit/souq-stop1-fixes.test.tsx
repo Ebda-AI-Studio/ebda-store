@@ -48,3 +48,16 @@ describe('Night hero asset', () => {
     expect(hero).not.toMatch(/smartphone/);
   });
 });
+
+describe('Ruling B2-20: brass text on a card', () => {
+  it('Night souq re-inks text-primary inside a card (brass is 3.65:1 on the surface)', () => {
+    const css = readFileSync(
+      path.resolve(__dirname, '../../apps/web/src/styles/globals.css'),
+      'utf8'
+    );
+    const rule = /\[data-look='souq\.night'\] \.bg-card \.text-primary \{([^}]*)\}/.exec(css);
+    expect(rule, 'the Night rule exists').not.toBeNull();
+    expect(rule![1]).toMatch(/color:\s*hsl\(var\(--foreground\)\)/);
+    expect(rule![1]).toMatch(/text-decoration:\s*underline/);
+  });
+});

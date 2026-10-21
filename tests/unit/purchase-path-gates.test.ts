@@ -50,6 +50,40 @@ describe('purchase-path manifest', () => {
   it('every listed file exists', () => {
     for (const f of manifest.files) expect(existsSync(path.join(WEB, f)), f).toBe(true);
   });
+
+  it('lists the Souq-only controls (Phase B2): rail, tiles, stage, instalment line, header', () => {
+    for (const f of [
+      'templates/shared/CategoryRail.tsx',
+      'templates/shared/CategoryTiles.tsx',
+      'builder/sections/ProductSpotlightSection.tsx',
+      'components/commerce/InstalmentLine.tsx',
+      'templates/souq/Header.tsx',
+    ])
+      expect(manifest.files, f).toContain(f);
+  });
+
+  it('the Souq path set points at products the Souq demo catalogue really carries', async () => {
+    const t = (
+      manifest as unknown as {
+        templates: { souq: { secondProductPath: string; paths: Record<string, string> } };
+      }
+    ).templates.souq;
+    const { SOUQ_PRODUCTS, SOUQ_CATEGORIES } =
+      await import('../../scripts/souq-demo/catalogue.mjs');
+    const bySlug = new Map<string, { options?: unknown[] }>(
+      SOUQ_PRODUCTS.map((p: { slug: string; options?: unknown[] }) => [p.slug, p])
+    );
+    const slugOf = (u: string) => u.replace(/^\/products\//, '');
+    // The PDP screens use the Colour x Storage phone (the option-missing screen needs options).
+    for (const id of ['pdp', 'pdp-add-missing-option', 'pdp-added'])
+      expect(bySlug.get(slugOf(t.paths[id]))?.options?.length, id).toBeGreaterThan(0);
+    // The second cart line is option-less, so `two-lines` adds it without choosing anything.
+    const second = bySlug.get(slugOf(t.secondProductPath));
+    expect(second, 'second product exists').toBeDefined();
+    expect(second!.options ?? [], 'second product has no options').toHaveLength(0);
+    const cat = new URL(t.paths.category, 'http://x').searchParams.get('category');
+    expect(SOUQ_CATEGORIES.map((c: { slug: string }) => c.slug)).toContain(cat);
+  });
 });
 
 /**
@@ -159,12 +193,24 @@ describe('IA-04: the cart summary carries one trust line, not two generic cards'
 // a11y P1-9 (W4): an inline link told apart by colour alone (receipt "Contact support": 2.75:1
 // against its own sentence, no underline at rest) fails 1.4.1. On the purchase path a link or
 // text button that underlines on hover is underlined at rest too.
+// Ruling B2-21: the stage's product-name link is the section's h2, painted in the foreground ink
+// like its neighbours. 1.4.1 is about a link told apart from its sentence by COLOUR alone; a
+// heading is told apart by size and weight, so its hover underline is only a hint.
+const HEADING_LINK_FILES = new Set(['builder/sections/ProductSpotlightSection.tsx']);
 describe('1.4.1: purchase-path text links are underlined at rest', () => {
-  it.each([...manifest.files, 'app/checkout/success/SuccessClient.tsx'])('%s', f => {
+  it.each(
+    [...manifest.files, 'app/checkout/success/SuccessClient.tsx'].filter(
+      f => !HEADING_LINK_FILES.has(f)
+    )
+  )('%s', f => {
     const hits = (src(f).match(/className="[^"]*\bhover:underline\b[^"]*"/g) ?? []).filter(
       c => !/(?:^|[\s"])underline(?=[\s"])/.test(c.replace(/hover:underline/g, ''))
     );
     expect(hits).toEqual([]);
+  });
+  it('the exempt heading link really is the section h2 and uses the foreground ink', () => {
+    const s = src('builder/sections/ProductSpotlightSection.tsx');
+    expect(s).toMatch(/<h2[^>]*text-foreground[^>]*>\s*<Link[^>]*hover:underline/);
   });
 });
 

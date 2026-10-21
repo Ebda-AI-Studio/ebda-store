@@ -1399,6 +1399,13 @@ html[dir='rtl'] [data-pack='souq'] .font-display {
   letter-spacing: normal;
   text-transform: none;
 }
+/* Ruling B2-20: Night souq's brass is a CTA FILL (B2-18). As TEXT it is 3.65:1 on the card surface
+   (4.87:1 on the page), so a text-primary link inside a card reads as ink, underlined, there. */
+[data-look='souq.night'] .bg-card .text-primary {
+  color: hsl(var(--foreground));
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
 [data-pack='souq'] [data-ui-uppercase='true'] .ui-caps-toggle {
   text-transform: uppercase;
 }

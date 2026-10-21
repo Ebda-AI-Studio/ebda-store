@@ -204,7 +204,7 @@ async function main() {
   const prefix = arg('prefix') ?? store;
   if (!store || !out) {
     console.error(
-      'usage: --store <slug> --out <dir> [--base url] [--prefix name] [--screens a,b] [--viewports 390-ar,1280-en] [--path <screen>=<path>]... [--second-product <path>]'
+      'usage: --store <slug> --out <dir> [--base url] [--prefix name] [--screens a,b] [--viewports 390-ar,1280-en] [--template souq] [--path <screen>=<path>]... [--second-product <path>]'
     );
     process.exit(2);
   }
@@ -212,8 +212,15 @@ async function main() {
   // a subset of screens and viewports keeps a direction pack to the screens that decide it.
   const only = arg('screens')?.split(',');
   const onlyViewports = arg('viewports')?.split(',');
-  const pathOverride = Object.fromEntries(args('path').map(p => p.split(/=(.*)/s).slice(0, 2)));
-  SECOND_PRODUCT_PATH = arg('second-product') ?? MANIFEST.secondProductPath;
+  // --template <name>: that template's path set from the manifest (explicit flags still win).
+  const tpl = arg('template') ? MANIFEST.templates?.[arg('template')] : undefined;
+  if (arg('template') && !tpl) throw new Error(`no template "${arg('template')}" in the manifest`);
+  const pathOverride = {
+    ...(tpl?.paths ?? {}),
+    ...Object.fromEntries(args('path').map(p => p.split(/=(.*)/s).slice(0, 2))),
+  };
+  SECOND_PRODUCT_PATH =
+    arg('second-product') ?? tpl?.secondProductPath ?? MANIFEST.secondProductPath;
   const screens = MANIFEST.screens
     .filter(s => !only || only.includes(s.id))
     .map(s => ({ ...s, path: pathOverride[s.id] ?? s.path }));
