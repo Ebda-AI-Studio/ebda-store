@@ -23,7 +23,9 @@ const h = vi.hoisted(() => {
       subs: [] as Row[],
       cartItems: [] as Row[],
       cartBundles: [] as Row[],
+      recipients: [] as Row[],
     },
+    scanned: [] as string[],
     send: vi.fn(async (_p?: unknown) => ({ ids: ['evt'] })),
     sendMarketingEmail: vi.fn(async (..._a: unknown[]) => ({ id: 'msg_1' })),
     isFeatureEnabled: vi.fn(async (..._a: unknown[]) => true),
@@ -63,7 +65,17 @@ function table(rows: () => Row[]) {
 
 vi.mock('@ebda/database', () => {
   const prisma = {
-    abandonedCart: table(() => h.db.carts),
+    abandonedCart: (() => {
+      const t = table(() => h.db.carts);
+      return {
+        ...t,
+        findMany: async (a: { where?: Row; select?: Row }) => {
+          if (a.where?.emailStatus === null) h.scanned.push(String(a.where.storeId));
+          return t.findMany(a);
+        },
+      };
+    })(),
+    campaignRecipient: table(() => h.db.recipients),
     abandonedCartConfig: table(() => h.db.configs),
     store: table(() => h.db.stores),
     newsletterSubscriber: table(() => h.db.subs),
@@ -110,6 +122,7 @@ import {
   CART_EMAIL_MIN_DELAY_MINUTES,
   CART_EMAIL_MAX_DELAY_MINUTES,
 } from '@api/services/cart-recovery-email.service';
+import { sentInLast24h } from '@api/services/campaign.service';
 import { verifySubscriberUnsubscribeToken } from '@api/lib/campaign-unsubscribe-token';
 
 const MIN = 60_000;
@@ -185,6 +198,9 @@ beforeEach(() => {
   db.subs.length = 0;
   db.cartItems.length = 0;
   db.cartBundles.length = 0;
+  db.recipients.length = 0;
+  h.scanned.length = 0;
+  delete process.env.CART_EMAIL_DAILY_CAP;
   db.stores.push(store());
   h.send.mockReset().mockResolvedValue({ ids: ['evt'] });
   h.sendMarketingEmail.mockReset().mockResolvedValue({ id: 'msg_1' });
@@ -266,6 +282,27 @@ describe('sweepCartRecoveryEmails', () => {
     expect(old.emailStatus).toBe('skipped');
     expect(old.emailDetail).toBe('stale');
     expect(h.send).not.toHaveBeenCalled();
+  });
+
+  it('does not even scan the carts of a store whose email channel is off', async () => {
+    db.stores.push(store(STORE_B));
+    db.configs.push(config(), config({ storeId: STORE_B, emailEnabled: false }));
+    db.carts.push(cart({ storeId: STORE_B }));
+    await sweepCartRecoveryEmails(NOW);
+    expect(h.scanned).toContain(STORE_A);
+    expect(h.scanned).not.toContain(STORE_B);
+  });
+
+  it('re-emits the event for a row stuck in queued past 30 minutes (process died after the claim)', async () => {
+    db.configs.push(config());
+    const stuck = cart({ emailStatus: 'queued', updatedAt: ago(40) });
+    const fresh = cart({ emailStatus: 'queued', updatedAt: ago(5) });
+    db.carts.push(stuck, fresh);
+    const r = await sweepCartRecoveryEmails(NOW);
+    expect(r.requeued).toBe(1);
+    expect(h.send).toHaveBeenCalledTimes(1);
+    // same event id as the original emit: a live duplicate dedupes, a lost one is delivered
+    expect(h.send.mock.calls[0][0]).toMatchObject({ id: `cart-recovery-email/${stuck.id}` });
   });
 
   it('enqueue failure marks the row failed, never an orphan queued row', async () => {
@@ -456,6 +493,27 @@ describe('deliverCartRecoveryEmail', () => {
     }
   );
 
+  it("a store's own daily cap (default 200, CART_EMAIL_DAILY_CAP) skips further reminders", async () => {
+    process.env.CART_EMAIL_DAILY_CAP = '2';
+    db.subs.push(sub('sara@example.com'));
+    for (let i = 0; i < 2; i++) db.carts.push(cart({ emailStatus: 'sent', emailSentAt: ago(60) }));
+    db.carts.push(cart({ storeId: STORE_B, emailStatus: 'sent', emailSentAt: ago(60) }));
+    const c = queued();
+    const r = await deliverCartRecoveryEmail(STORE_A, c.id);
+    expect(r).toEqual({ outcome: 'skipped', detail: 'daily_cap' });
+    expect(h.sendMarketingEmail).not.toHaveBeenCalled();
+  });
+
+  it("another store's sends and sends older than 24h do not count against the cap", async () => {
+    process.env.CART_EMAIL_DAILY_CAP = '2';
+    db.subs.push(sub('sara@example.com'));
+    db.carts.push(cart({ emailStatus: 'sent', emailSentAt: ago(60 * 30) }));
+    db.carts.push(cart({ storeId: STORE_B, emailStatus: 'sent', emailSentAt: ago(60) }));
+    db.carts.push(cart({ storeId: STORE_B, emailStatus: 'sent', emailSentAt: ago(60) }));
+    const c = queued();
+    expect((await deliverCartRecoveryEmail(STORE_A, c.id)).outcome).toBe('sent');
+  });
+
   it('waits for a platform send slot and retries (throws) when none is free', async () => {
     const c = queued();
     db.subs.push(sub('sara@example.com'));
@@ -475,6 +533,16 @@ describe('deliverCartRecoveryEmail', () => {
   });
 });
 
+describe('campaign send budget', () => {
+  it('counts cart-recovery emails sent in the last 24h next to campaign recipients', async () => {
+    db.recipients.push({ id: uuid(), storeId: STORE_A, sentAt: new Date() });
+    db.carts.push(cart({ emailStatus: 'sent', emailSentAt: new Date() }));
+    db.carts.push(cart({ emailStatus: 'sent', emailSentAt: new Date(Date.now() - 48 * 3600e3) }));
+    db.carts.push(cart({ storeId: STORE_B, emailStatus: 'sent', emailSentAt: new Date() }));
+    expect(await sentInLast24h(STORE_A)).toBe(2);
+  });
+});
+
 describe('renderCartRecoveryEmail', () => {
   const base = {
     store: store() as any,
@@ -491,12 +559,35 @@ describe('renderCartRecoveryEmail', () => {
     const { subject, html } = renderCartRecoveryEmail({ ...base, locale: 'ar' });
     const text = `${subject} ${html.replace(/<[^>]+>/g, ' ')}`;
     expect(text).toContain('سلتك');
-    for (const banned of ['حضرتك', 'علشان', 'هذا', 'هذه', 'يرجى', 'لم ', 'تم ', 'سوف', 'يمكنك']) {
+    for (const banned of [
+      'مستنياك',
+      'تجاهل',
+      'مشترك',
+      'سيبت',
+      'كمّل',
+      'ضفت',
+      'حضرتك',
+      'علشان',
+      'هذا',
+      'هذه',
+      'يرجى',
+      'لم ',
+      'تم ',
+      'سوف',
+      'يمكنك',
+    ]) {
       expect(text).not.toContain(banned);
     }
     expect(text).not.toMatch(/ما\s+\S+ش\b/);
     expect(html).toContain('dir="rtl"');
     expect(html).toContain('نيل جودز');
+  });
+
+  it('says the prices are as of when they were added (snapshot, not live)', () => {
+    const ar = renderCartRecoveryEmail({ ...base, locale: 'ar' }).html;
+    const en = renderCartRecoveryEmail({ ...base, locale: 'en' }).html;
+    expect(ar).toContain('الأسعار المعروضة هي أسعار وقت الإضافة للسلة');
+    expect(en).toContain('Prices shown are as of when you added the items');
   });
 
   it('English renders the same facts', () => {

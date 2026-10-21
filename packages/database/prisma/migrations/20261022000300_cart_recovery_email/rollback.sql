@@ -1,6 +1,7 @@
 -- rollback.sql for 20261022000300_cart_recovery_email.
 -- Roll the CODE back first (the abandoned-cart service and the cart-recovery-email job read these).
 -- Loses only the email channel's per-cart state and the merchant's email toggle/delay.
+DROP INDEX IF EXISTS "abandoned_carts_store_id_email_sent_at_idx";
 ALTER TABLE "abandoned_carts" DROP COLUMN IF EXISTS "email_sent_at";
 ALTER TABLE "abandoned_carts" DROP COLUMN IF EXISTS "email_detail";
 ALTER TABLE "abandoned_carts" DROP COLUMN IF EXISTS "email_status";

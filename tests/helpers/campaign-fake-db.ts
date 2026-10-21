@@ -30,6 +30,10 @@ function matchValue(actual: unknown, cond: unknown): boolean {
         if (actual === null || actual === undefined) return false;
       } else if (actual === c.not) return false;
     }
+    if ('lt' in c) {
+      const l = c.lt as Date;
+      if (!(actual instanceof Date) || actual.getTime() >= l.getTime()) return false;
+    }
     if ('gte' in c) {
       const g = c.gte as Date;
       if (!(actual instanceof Date) || actual.getTime() < g.getTime()) return false;
@@ -83,6 +87,8 @@ export interface FakeDb {
   subscribers: Row[];
   customers: Row[];
   users?: Row[];
+  /** Cart-recovery emails count against the same 24h send budget (sentInLast24h). */
+  abandonedCarts?: Row[];
 }
 
 export function createFakePrisma(db: FakeDb) {
@@ -181,6 +187,7 @@ export function createFakePrisma(db: FakeDb) {
     newsletterSubscriber: table(() => db.subscribers),
     customer: table(() => db.customers),
     user: table(() => (db.users ??= [])),
+    abandonedCart: table(() => (db.abandonedCarts ??= [])),
     // #1953: `audienceCount` (campaign.service.ts) is the one raw-SQL query
     // the campaign code makes — mirrors `buildCampaignAudience`'s exact JS
     // filter/dedupe (normalized non-empty email, active, not unsubscribed) so

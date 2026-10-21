@@ -67,7 +67,7 @@ export function campaignThrottleMs(): number {
  *  can keep the rows this window still counts (see `sentInLast24h`). */
 export const SEND_CAP_WINDOW_MS = 24 * 60 * 60 * 1000;
 
-/** Campaign emails this store actually sent in the last 24h. `sentAt` is set
+/** Campaign + cart-recovery emails this store actually sent in the last 24h. `sentAt` is set
  *  only on a successful send and survives a later unsubscribe, so a recipient
  *  who unsubscribed still counts against the window it was sent in.
  *
@@ -77,9 +77,14 @@ export const SEND_CAP_WINDOW_MS = 24 * 60 * 60 * 1000;
  *  anonymizes those rows instead of deleting them (issue 2083,
  *  `AuthService.eraseAccount`). A new deleter must do the same. */
 export async function sentInLast24h(storeId: string, now: Date = new Date()): Promise<number> {
-  return prisma.campaignRecipient.count({
-    where: { storeId, sentAt: { gte: new Date(now.getTime() - SEND_CAP_WINDOW_MS) } },
-  });
+  const since = new Date(now.getTime() - SEND_CAP_WINDOW_MS);
+  // Cart-recovery emails go out through the same Resend key and sender reputation, so they spend
+  // the same rolling 24h budget (Ruling CART-EMAIL-6).
+  const [campaign, cart] = await Promise.all([
+    prisma.campaignRecipient.count({ where: { storeId, sentAt: { gte: since } } }),
+    prisma.abandonedCart.count({ where: { storeId, emailSentAt: { gte: since } } }),
+  ]);
+  return campaign + cart;
 }
 
 // ─── Audience (consent) ──────────────────────────────────────────────────────

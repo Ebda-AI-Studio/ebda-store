@@ -38,7 +38,7 @@ function rows(items: CartRecoveryItem[], locale: 'en' | 'ar'): string {
 export const cartRecoveryTemplate = {
   subject: {
     en: (d: CartRecoveryData) => `You left something in your cart at ${d.storeName}`,
-    ar: (d: CartRecoveryData) => `سلتك لسه مستنياك في ${d.storeName}`,
+    ar: (d: CartRecoveryData) => `سلتك لسه مستنية في ${d.storeName}`,
   },
 
   en: (d: CartRecoveryData) => {
@@ -50,20 +50,20 @@ export const cartRecoveryTemplate = {
       ${more > 0 ? `<p>and ${more} more</p>` : ''}
       <p><strong>Cart total: ${escapeHtml(emailMoney(d.total, null, 'en'))}</strong></p>
       <p style="margin:24px 0;"><a href="${escapeHtml(d.cartUrl)}" class="button">Complete your order</a></p>
-      <p style="color:#94a3b8;font-size:12px;">If you already ordered, ignore this email. This is a one-time reminder.</p>
+      <p style="color:#94a3b8;font-size:12px;">Prices shown are as of when you added the items and may have changed. If you already ordered, ignore this email. This is a one-time reminder.</p>
       <p style="margin-top:28px;font-size:12px;color:#94a3b8;text-align:center;">You are receiving this because you subscribed to ${escapeHtml(d.storeName)}'s newsletter. <a href="${escapeHtml(d.unsubscribeUrl)}" style="color:#94a3b8;">Unsubscribe</a></p>`;
   },
 
   ar: (d: CartRecoveryData) => {
     const more = d.items.length - MAX_LISTED;
     return `
-      <h2>سلتك لسه مستنياك</h2>
-      <p>إنت سيبت كام حاجة في سلتك على ${escapeHtml(d.storeName)}. لسه محفوظة ليك.</p>
+      <h2>سلتك لسه مستنية</h2>
+      <p>فيه حاجات لسه في سلتك على ${escapeHtml(d.storeName)}، ومحفوظة.</p>
       <table role="presentation" width="100%" style="border-collapse:collapse;margin:12px 0;">${rows(d.items, 'ar')}</table>
       ${more > 0 ? `<p>و${more} كمان</p>` : ''}
       <p><strong>إجمالي السلة: ${escapeHtml(emailMoney(d.total, null, 'ar'))}</strong></p>
-      <p style="margin:24px 0;"><a href="${escapeHtml(d.cartUrl)}" class="button">كمّل طلبك</a></p>
-      <p style="color:#94a3b8;font-size:12px;">لو طلبت خلاص، تجاهل الرسالة دي. دي رسالة تذكير مرة واحدة بس.</p>
-      <p style="margin-top:28px;font-size:12px;color:#94a3b8;text-align:center;">وصلتك الرسالة دي عشان إنت مشترك في نشرة ${escapeHtml(d.storeName)} البريدية. <a href="${escapeHtml(d.unsubscribeUrl)}" style="color:#94a3b8;">إلغاء الاشتراك</a></p>`;
+      <p style="margin:24px 0;"><a href="${escapeHtml(d.cartUrl)}" class="button">إتمام الطلب</a></p>
+      <p style="color:#94a3b8;font-size:12px;">الأسعار المعروضة هي أسعار وقت الإضافة للسلة، وممكن تتغير. لو الطلب اتسجّل خلاص، الرسالة دي مش محتاجة منك حاجة، وهي رسالة تذكير مرة واحدة بس.</p>
+      <p style="margin-top:28px;font-size:12px;color:#94a3b8;text-align:center;">وصلتك الرسالة دي عشان اشتراكك في نشرة ${escapeHtml(d.storeName)} البريدية. <a href="${escapeHtml(d.unsubscribeUrl)}" style="color:#94a3b8;">إلغاء الاشتراك</a></p>`;
   },
 };

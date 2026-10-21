@@ -48,7 +48,19 @@ const IDLE_BEFORE_RECORD_MINUTES = 60;
 const STALE_AFTER_MS = 6 * 60 * 60 * 1000;
 /** Carts recorded before this window are no longer swept at all. */
 const SWEEP_WINDOW_MS = (CART_EMAIL_MAX_DELAY_MINUTES + 60) * 60 * 1000 + STALE_AFTER_MS;
+/** A claimed row older than this with no outcome is re-emitted by the sweep. */
+const STUCK_QUEUED_MS = 30 * 60 * 1000;
 const ERROR_MAX = 300;
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * Cart reminders one store may send in any rolling 24 h (its own cap, on top of sharing the
+ * campaign budget via `sentInLast24h`). Bounded by cart volume anyway; this is the fuse.
+ */
+export function cartEmailDailyCap(): number {
+  const n = parseInt(process.env.CART_EMAIL_DAILY_CAP ?? '', 10);
+  return Number.isFinite(n) && n > 0 ? n : 200;
+}
 
 /**
  * Resend errors that are the REQUEST's fault (4xx): retrying cannot help, so the cart is marked
@@ -79,34 +91,40 @@ export function cartEmailDueAt(createdAt: Date, delayMinutes: number): Date {
 
 export async function sweepCartRecoveryEmails(
   now: Date = new Date()
-): Promise<{ claimed: number; failed: number; stale: number }> {
-  const result = { claimed: 0, failed: 0, stale: 0 };
+): Promise<{ claimed: number; failed: number; stale: number; requeued: number }> {
+  const result = { claimed: 0, failed: 0, stale: 0, requeued: 0 };
   const windowStart = new Date(now.getTime() - SWEEP_WINDOW_MS);
 
-  const candidates = await acrossStoresFlat(storeId =>
-    prisma.abandonedCart.findMany({
-      where: {
-        storeId,
-        emailStatus: null,
-        customerEmail: { not: null },
-        status: { not: 'recovered' },
-        createdAt: { gte: windowStart },
-      },
-      select: { id: true, storeId: true, createdAt: true },
+  // Only stores with the channel ON are scanned at all (one config read per store, then the
+  // cart queries only for the enabled ones).
+  const enabled = await acrossStoresFlat(storeId =>
+    prisma.abandonedCartConfig.findMany({
+      where: { storeId, emailEnabled: true },
+      select: { storeId: true, emailDelayMinutes: true },
     })
   );
-  if (candidates.length === 0) return result;
+  if (enabled.length === 0) return result;
 
-  const byStore = new Map<string, typeof candidates>();
-  for (const c of candidates) byStore.set(c.storeId, [...(byStore.get(c.storeId) ?? []), c]);
+  const emit = (id: string, storeId: string) =>
+    inngest.send({
+      id: `cart-recovery-email/${id}`,
+      name: CART_RECOVERY_EMAIL_EVENT,
+      data: { abandonedCartId: id, storeId },
+    });
 
-  for (const [storeId, carts] of byStore) {
+  for (const cfg of enabled) {
+    const { storeId } = cfg;
     await runInStoreScope(storeId, async () => {
-      const cfg = await prisma.abandonedCartConfig.findUnique({
-        where: { storeId },
-        select: { emailEnabled: true, emailDelayMinutes: true },
+      const carts = await prisma.abandonedCart.findMany({
+        where: {
+          storeId,
+          emailStatus: null,
+          customerEmail: { not: null },
+          status: { not: 'recovered' },
+          createdAt: { gte: windowStart },
+        },
+        select: { id: true, createdAt: true },
       });
-      if (!cfg?.emailEnabled) return;
       for (const c of carts) {
         const dueAt = cartEmailDueAt(c.createdAt, cfg.emailDelayMinutes);
         if (now.getTime() < dueAt.getTime()) continue;
@@ -125,11 +143,7 @@ export async function sweepCartRecoveryEmails(
         });
         if (claim.count !== 1) continue;
         try {
-          await inngest.send({
-            id: `cart-recovery-email/${c.id}`,
-            name: CART_RECOVERY_EMAIL_EVENT,
-            data: { abandonedCartId: c.id, storeId },
-          });
+          await emit(c.id, storeId);
           result.claimed++;
         } catch (err) {
           logger.error({ err, storeId, abandonedCartId: c.id }, '[CartEmail] enqueue failed');
@@ -138,6 +152,27 @@ export async function sweepCartRecoveryEmails(
             data: { emailStatus: 'failed', emailDetail: 'ENQUEUE_FAILED' },
           });
           result.failed++;
+        }
+      }
+
+      // A row claimed but never finished (the process died between the claim and the send, or the
+      // event was lost) is re-emitted with the SAME event id: a live duplicate dedupes in Inngest,
+      // a lost one runs. The job and the Resend key are idempotent either way.
+      const stuck = await prisma.abandonedCart.findMany({
+        where: {
+          storeId,
+          emailStatus: 'queued',
+          updatedAt: { lt: new Date(now.getTime() - STUCK_QUEUED_MS) },
+          createdAt: { gte: windowStart },
+        },
+        select: { id: true },
+      });
+      for (const c of stuck) {
+        try {
+          await emit(c.id, storeId);
+          result.requeued++;
+        } catch (err) {
+          logger.error({ err, storeId, abandonedCartId: c.id }, '[CartEmail] requeue failed');
         }
       }
     });
@@ -277,6 +312,13 @@ export async function deliverCartRecoveryEmail(
   if (subs.length === 0 || subs.some(s => !s.isActive || s.unsubscribedAt)) {
     return skip('no_consent');
   }
+  // The store's own fuse: past it the reminder is skipped, not queued for tomorrow (stale mail).
+  const sentToday = await runInTenantContext(storeId, () =>
+    prisma.abandonedCart.count({
+      where: { storeId, emailSentAt: { gte: new Date(Date.now() - DAY_MS) } },
+    })
+  );
+  if (sentToday >= cartEmailDailyCap()) return skip('daily_cap');
   const subscriber = subs[0];
   const locale: 'en' | 'ar' =
     subscriber.language === 'ar'

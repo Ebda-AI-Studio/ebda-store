@@ -19,3 +19,6 @@ ALTER TABLE "abandoned_cart_configs" ADD COLUMN IF NOT EXISTS "email_delay_minut
 ALTER TABLE "abandoned_carts" ADD COLUMN IF NOT EXISTS "email_status" TEXT;
 ALTER TABLE "abandoned_carts" ADD COLUMN IF NOT EXISTS "email_detail" TEXT;
 ALTER TABLE "abandoned_carts" ADD COLUMN IF NOT EXISTS "email_sent_at" TIMESTAMP(3);
+
+-- The per-store 24h cart-email cap and the shared send budget count by (store_id, email_sent_at).
+CREATE INDEX IF NOT EXISTS "abandoned_carts_store_id_email_sent_at_idx" ON "abandoned_carts"("store_id", "email_sent_at");

@@ -2468,6 +2468,7 @@ model AbandonedCart {
   @@index([nextStepAt])
   @@index([customerId])
   @@index([couponId])
+  @@index([storeId, emailSentAt])
   @@map("abandoned_carts")
 }
 
