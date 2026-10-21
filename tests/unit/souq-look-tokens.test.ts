@@ -4,7 +4,6 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync, existsSync, readdirSync } from 'node:fs';
 import path from 'node:path';
-import { SOUQ_NIGHT_ALT_BRASS } from '../../packages/shared/src/looks/stop-alternatives';
 import {
   LOOKS,
   contrastRatio,
@@ -126,10 +125,10 @@ describe('souq looks: shape', () => {
     expect(by('souq.showroom').cardCta).toBe('quiet');
     expect(by('souq.night').overPhotoChrome).toBe('soft');
   });
-  it('Night uses turquoise and pomegranate (Ruling B2-2), Showroom text blue is the darker one', () => {
+  it('Night uses brass CTAs and pomegranate chips (Rulings B2-2, B2-18), Showroom text blue is the darker one', () => {
     const night = souq.find(l => l.id === 'souq.night')!.tokens;
     expect(night.page).toBe('#0F3B2E');
-    expect(night.primary).toBe('#5FD3C0');
+    expect(night.primary).toBe('#C89B3C');
     expect(night.accent).toBe('#F57A83');
     const room = souq.find(l => l.id === 'souq.showroom')!.tokens;
     expect(room.primary).toBe('#1D5CE6');
@@ -173,6 +172,89 @@ describe('souq looks: skin-painted text pairs >= 4.5, UI pairs >= 3', () => {
   });
 });
 
+/**
+ * Ruling B2-18: the ONE scoped exception to the no-orange gate. Ahmad chose brass CTAs for Night
+ * souq at STOP-1. Exactly this hex, exactly `souq.night`, exactly the primary-CTA roles (the look
+ * token `primary` and the theme/CSS roles that carry it); nothing else of Night, no other look,
+ * no other hex (a real orange or amber stays banned, an off-by-one brass is not the allowlisted one).
+ */
+const BRASS = '#C89B3C';
+const BRASS_TRIPLET = hexToHsl(BRASS); // '41 56% 51%'
+const BRASS_CTA_EXCEPTION = {
+  look: 'souq.night',
+  hex: BRASS,
+  /** look-token key, composed-theme keys and CSS variables that ARE the primary CTA colour */
+  keys: ['primary', 'primaryColor', 'ringColor', '--primary', '--ring'],
+} as const;
+function brassCtaException(lookId: string, key: string, value: string): boolean {
+  return (
+    lookId === BRASS_CTA_EXCEPTION.look &&
+    (BRASS_CTA_EXCEPTION.keys as readonly string[]).includes(key) &&
+    (value.toUpperCase() === BRASS || value === BRASS_TRIPLET)
+  );
+}
+/** The gate: orange-family unless it is exactly the scoped brass CTA exception. */
+const forbiddenOrange = (lookId: string, key: string, value: string) =>
+  isOrangeFamily(value) && !brassCtaException(lookId, key, value);
+
+describe('Ruling B2-18: brass is allowed ONLY as souq.night CTA tokens', () => {
+  it('brass is orange-family (so the exception is a real exception, not a loosened gate)', () => {
+    expect(isOrangeFamily(BRASS)).toBe(true);
+    expect(isOrangeFamily(BRASS_TRIPLET)).toBe(true);
+  });
+  it('passes for souq.night primary CTA roles', () => {
+    for (const k of BRASS_CTA_EXCEPTION.keys)
+      expect(
+        forbiddenOrange(
+          'souq.night',
+          k,
+          k.includes('-') || /Color$/.test(k) ? BRASS_TRIPLET : BRASS
+        ),
+        k
+      ).toBe(false);
+  });
+  it('the same hex FAILS anywhere else: another look, another Night role, a theme key outside the list', () => {
+    for (const look of ['souq.catalogue', 'souq.showroom', 'qamar.vitrine'])
+      expect(forbiddenOrange(look, 'primary', BRASS), look).toBe(true);
+    for (const k of ['accent', 'page', 'surface', 'line', 'ink', 'muted', 'onPrimary', 'onAccent'])
+      expect(forbiddenOrange('souq.night', k, BRASS), k).toBe(true);
+    for (const k of [
+      'accentColor',
+      'borderColor',
+      '--accent',
+      '--warning',
+      '--warning-ink',
+      '--sale',
+    ])
+      expect(forbiddenOrange('souq.night', k, BRASS_TRIPLET), k).toBe(true);
+  });
+  it('real oranges and ambers stay banned, even on Night primary (exact hex only)', () => {
+    for (const hex of ['#E68245', '#FF6E01', '#E8A33D', '#C89B3D', '#C99B3C', '#D4A03C'])
+      expect(forbiddenOrange('souq.night', 'primary', hex), hex).toBe(true);
+    expect(forbiddenOrange('souq.night', 'primaryColor', '38 92% 50%')).toBe(true); // platform amber
+  });
+  it('the allowlist is exactly one hex and one look', () => {
+    expect(BRASS_CTA_EXCEPTION.hex).toBe('#C89B3C');
+    expect(BRASS_CTA_EXCEPTION.look).toBe('souq.night');
+  });
+  it('brass contrast holds: ink on the CTA >= 4.5, CTA as text on the page >= 4.5, as a UI boundary on page and card >= 3', () => {
+    const t = souq.find(l => l.id === 'souq.night')!.tokens;
+    expect(t.primary).toBe(BRASS);
+    expect(contrastRatio(t.primary, t.onPrimary)).toBeGreaterThanOrEqual(4.5); // 7.16
+    expect(contrastRatio(t.page, t.primary)).toBeGreaterThanOrEqual(4.5); // 4.87
+    expect(contrastRatio(t.page, t.primary)).toBeGreaterThanOrEqual(3);
+    expect(contrastRatio(t.surface, t.primary)).toBeGreaterThanOrEqual(3);
+  });
+  it('no other Souq look sets a token in the band: brass appears in exactly one look token', () => {
+    const withBrass = souq.flatMap(l =>
+      Object.entries(l.tokens)
+        .filter(([, v]) => typeof v === 'string' && v.toUpperCase() === BRASS)
+        .map(([k]) => `${l.id}.${k}`)
+    );
+    expect(withBrass).toEqual(['souq.night.primary']);
+  });
+});
+
 describe('Ruling B2-2: no orange anywhere in a Souq look', () => {
   for (const l of souq) {
     it(`${l.id}: no colour token is in the forbidden hue band`, () => {
@@ -187,7 +269,7 @@ describe('Ruling B2-2: no orange anywhere in a Souq look', () => {
         'accent',
         'line',
       ] as const) {
-        expect(isOrangeFamily(t[k]), `${l.id}.${k} ${t[k]}`).toBe(false);
+        expect(forbiddenOrange(l.id, k, t[k]), `${l.id}.${k} ${t[k]}`).toBe(false);
       }
       if (t.onAccent) expect(isOrangeFamily(t.onAccent), `${l.id}.onAccent`).toBe(false);
     });
@@ -204,7 +286,7 @@ describe('Ruling B2-2: no orange anywhere in a Souq look', () => {
       );
       expect(colourKeys.length).toBeGreaterThan(10);
       for (const k of colourKeys)
-        expect(isOrangeFamily(c[k] as string), `${l.id} ${k}=${c[k]}`).toBe(false);
+        expect(forbiddenOrange(l.id, k, c[k] as string), `${l.id} ${k}=${c[k]}`).toBe(false);
     });
     it(`${l.id}: the sale / new chips (cardBadge accent pair) are not orange`, () => {
       const c = composeStoreTheme({ template: 'souq', look: l.id, theme: null });
@@ -240,45 +322,14 @@ describe('Souq replaces the platform amber warning', () => {
   });
 });
 
-describe('the brass-for-CTAs alternative (STOP-1) is prepared but unwired', () => {
-  const night = souq.find(l => l.id === 'souq.night')!.tokens;
-  it('is not what the registry ships', () => {
-    expect(SOUQ_NIGHT_ALT_BRASS.primary).toBe('#C89B3C');
-    expect(night.primary).not.toBe(SOUQ_NIGHT_ALT_BRASS.primary);
-  });
-  it('keeps brass for CTAs only: accent stays pomegranate, brass CTA text is >= 4.5', () => {
-    expect(SOUQ_NIGHT_ALT_BRASS.accent).toBe(night.accent);
-    expect(
-      contrastRatio(SOUQ_NIGHT_ALT_BRASS.page, SOUQ_NIGHT_ALT_BRASS.primary)
-    ).toBeGreaterThanOrEqual(4.5);
-    expect(
-      contrastRatio(SOUQ_NIGHT_ALT_BRASS.primary, SOUQ_NIGHT_ALT_BRASS.onPrimary)
-    ).toBeGreaterThanOrEqual(4.5);
-  });
-  it('is not in the public barrel and no runtime source imports it', () => {
-    expect(readFileSync(path.join(root, 'packages/shared/src/looks/index.ts'), 'utf8')).not.toMatch(
-      /stop-alternatives/
+describe('the STOP-1 turquoise alternative path is gone (nothing used it)', () => {
+  it('no stop-alternatives module and no reference to it anywhere in runtime source', () => {
+    expect(existsSync(path.join(root, 'packages/shared/src/looks/stop-alternatives.ts'))).toBe(
+      false
     );
-    expect(readFileSync(path.join(root, 'packages/shared/src/index.ts'), 'utf8')).not.toMatch(
-      /stop-alternatives/
-    );
-    const offenders: string[] = [];
-    const walk = (d: string) => {
-      for (const f of readdirSync(d, { withFileTypes: true })) {
-        if (['node_modules', '.next', 'dist', '.open-next', '__tests__'].includes(f.name)) continue;
-        const full = path.join(d, f.name);
-        if (f.isDirectory()) walk(full);
-        else if (
-          /\.(ts|tsx|js|mjs)$/.test(f.name) &&
-          !/\.test\./.test(f.name) &&
-          f.name !== 'stop-alternatives.ts' &&
-          /SOUQ_NIGHT_ALT_BRASS|stop-alternatives/.test(readFileSync(full, 'utf8'))
-        )
-          offenders.push(path.relative(root, full));
-      }
-    };
-    for (const d of ['apps', 'packages']) walk(path.join(root, d));
-    expect(offenders).toEqual([]);
+    expect(
+      readFileSync(path.join(root, 'packages/shared/src/looks/registry.ts'), 'utf8')
+    ).not.toMatch(/SOUQ_NIGHT_ALT|stop-alternatives/);
   });
 });
 
@@ -445,7 +496,9 @@ describe('Ruling B2-2: every CSS variable a Souq theme emits is outside the oran
       expect(colourVars.length).toBeGreaterThan(20);
       // the derived status inks are among them: that is the leak path the review named
       expect(colourVars.map(([k]) => k)).toContain('--warning-ink');
-      const bad = colourVars.filter(([, v]) => isOrangeFamily(v)).map(([k, v]) => `${k}=${v}`);
+      const bad = colourVars
+        .filter(([k, v]) => forbiddenOrange(l.id, k, v))
+        .map(([k, v]) => `${k}=${v}`);
       expect(bad).toEqual([]);
     });
   it('negative control: a legacy skin emits an orange --warning-ink, so the check can fail', () => {

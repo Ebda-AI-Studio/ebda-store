@@ -6,13 +6,13 @@ Souq is the Egyptian general-retail and electronics template: phones, appliances
 
 ## The three looks
 
-|              | Catalogue (`souq.catalogue`)                | Night souq (`souq.night`)                                                   | Showroom (`souq.showroom`)                      |
-| ------------ | ------------------------------------------- | --------------------------------------------------------------------------- | ----------------------------------------------- |
-| Scene        | Many SKUs, shoppers who know what they want | A lit market after dark, warmth without clutter                             | A small premium range sold one object at a time |
-| Colour       | Ink on white, cobalt `#1F5FD6`              | Deep green `#0F3B2E`, cream ink, turquoise `#5FD3C0`, pomegranate `#F57A83` | Soft grey page, ink, electric blue `#1D5CE6`    |
-| Type         | IBM Plex Sans Arabic / IBM Plex Sans        | Changa / Cairo / Manrope                                                    | Alexandria / Readex Pro / Inter Tight           |
-| Radius, etc. | md, compact, 1/1, subtle                    | md, regular, 1/1, expressive                                                | lg, airy, 1/1, subtle                           |
-| Card action  | the skin's quick add                        | the skin's quick add                                                        | quiet outline add (`cardCta: 'quiet'`)          |
+|              | Catalogue (`souq.catalogue`)                | Night souq (`souq.night`)                                                          | Showroom (`souq.showroom`)                      |
+| ------------ | ------------------------------------------- | ---------------------------------------------------------------------------------- | ----------------------------------------------- |
+| Scene        | Many SKUs, shoppers who know what they want | A lit market after dark, warmth without clutter                                    | A small premium range sold one object at a time |
+| Colour       | Ink on white, cobalt `#1F5FD6`              | Deep green `#0F3B2E`, cream ink, brass CTAs `#C89B3C`, pomegranate chips `#F57A83` | Soft grey page, ink, electric blue `#1D5CE6`    |
+| Type         | IBM Plex Sans Arabic / IBM Plex Sans        | Changa / Cairo / Manrope                                                           | Alexandria / Readex Pro / Inter Tight           |
+| Radius, etc. | md, compact, 1/1, subtle                    | md, regular, 1/1, expressive                                                       | lg, airy, 1/1, subtle                           |
+| Card action  | the skin's quick add                        | the skin's quick add                                                               | quiet outline add (`cardCta: 'quiet'`)          |
 
 ### Tokens and measured contrast (computed 2026-10-21, asserted in `tests/unit/souq-look-tokens.test.ts`)
 
@@ -20,16 +20,16 @@ Souq is the Egyptian general-retail and electronics template: phones, appliances
 | ------------------------ | --------- | --------------- | -------- |
 | ink on page              | >= 4.5    | 11.23           | >= 4.5   |
 | muted on page            | >= 4.5    | 7.38            | >= 4.5   |
-| onPrimary on primary     | 5.73      | 10.09           | 5.64     |
+| onPrimary on primary     | 5.73      | 7.16 (brass)    | 5.64     |
 | onAccent on accent       | 5.73      | 6.98 (dark ink) | 5.89     |
 | chip fill on card / page | n/a       | 3.55 / 4.74     | n/a      |
-| primary as text on page  | 5.73      | 6.86            | 5.08     |
+| primary as text on page  | 5.73      | 4.87 (brass)    | 5.08     |
 
 Night's pomegranate is a FILL with dark ink for sale and new chips (>= 3:1 against the card and the page). Inputs read `--input` (the muted ink), so a field boundary is >= 3:1 on every look.
 
-## The STOP-1 alternative
+## Night souq's brass (Ruling B2-18)
 
-If Ahmad prefers a warmer Night souq, `SOUQ_NIGHT_ALT_BRASS` (`packages/shared/src/looks/stop-alternatives.ts`, in no barrel) keeps brass `#C89B3C` for CTAs only (4.87:1 on the page) with the same green room and pomegranate chips. It is unwired: only the STOP-1 shot script reads it, and it ships only if Ahmad picks it (Ruling B2-2).
+Ahmad chose brass CTAs for Night souq at STOP-1 (2026-10-21). Brass `#C89B3C` (hue 41) is in the forbidden hue band, so the no-orange gate carries ONE scoped exception: that exact hex, only as `souq.night`'s primary CTA tokens (look token `primary` and the theme / CSS roles that carry it: `primaryColor`, `ringColor`, `--primary`, `--ring`). Every other Night token, every other look and every other hex stay gated (`tests/unit/souq-look-tokens.test.ts`: brass passes only there, the same hex fails anywhere else, a real orange or an off-by-one brass fails even on Night primary). The turquoise alternative path was deleted.
 
 ## Chrome (Task 2)
 

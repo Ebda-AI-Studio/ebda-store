@@ -317,7 +317,7 @@ function buildQamarBaseline(): StoreLayoutSettings {
 /**
  * Souq (Phase B2, Ruling B2-1): the minimal identity with the footer on the section-alt surface
  * for the same reason as Qamar (B1-25): the shared footer paints muted links, unreadable on Night
- * souq's turquoise primary. Cards keep their frame (a catalogue card is a framed tile).
+ * souq's Night primary (brass). Cards keep their frame (a catalogue card is a framed tile).
  */
 function buildSouqBaseline(): StoreLayoutSettings {
   const b = buildTemplateBaseline(TEMPLATE_IDENTITIES.minimal);

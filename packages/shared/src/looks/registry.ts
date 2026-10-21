@@ -323,11 +323,13 @@ export const LOOKS: readonly LookDefinition[] = [
       surface: '#14503F',
       ink: '#F6F3EA',
       muted: '#B4CDC0',
-      // Ruling B2-2: no orange. Khan el-Khalili turquoise carries every primary action
-      // (6.86:1 on the page); pomegranate is a FILL for sale / new chips with dark ink (the
-      // accent is 3.75:1 on the page, so it never paints text there). The first design's
-      // brass (#C89B3C, 41 deg) and lantern orange (#E68245, 23 deg) are in the forbidden band.
-      primary: '#5FD3C0',
+      // Ruling B2-18 (Ahmad, STOP-1, 2026-10-21): Night souq's CTAs are BRASS #C89B3C (4.87:1 on the
+      // page, 3.5+:1 on the card) with dark ink on it, the lantern-market warmth. This is the ONE
+      // scoped exception to the no-orange gate (B2-2): exactly this hex, only as `souq.night`'s
+      // primary CTA tokens (see tests/unit/souq-look-tokens.test.ts, BRASS_CTA_EXCEPTION). Everything
+      // else in Night stays out of the 12-50 degree band: the sale / new chips are pomegranate, a
+      // FILL with dark ink (4.74:1 on the page, so never a text colour there).
+      primary: '#C89B3C',
       onPrimary: '#10151C',
       accent: '#F57A83',
       onAccent: '#10151C',
