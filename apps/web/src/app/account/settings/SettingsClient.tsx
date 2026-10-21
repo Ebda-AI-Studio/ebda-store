@@ -6,6 +6,7 @@ import { Button, Input, useToast } from '@ebda/ui';
 import { api, type SmsConsentResponse } from '@/lib/api';
 import { useLanguage, translations } from '../../../contexts/LanguageContext';
 import { useStoreUrl } from '../../../contexts/StoreContext';
+import PasskeysCard from '../../../components/PasskeysCard';
 
 interface User {
   id: string;
@@ -482,6 +483,9 @@ export default function SettingsClient() {
           </div>
         </form>
       </div>
+
+      {/* Passkeys: optional Face ID / passkey sign-in for this store */}
+      <PasskeysCard />
 
       {/* SMS offers (issue 206) */}
       {smsConsent && (smsConsent.available || smsConsent.consent.status === 'granted') && (
