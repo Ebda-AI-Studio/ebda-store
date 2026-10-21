@@ -117,7 +117,9 @@ const ALLOW: Record<string, AllowEntry> = {
     category: 'persisted',
     reason:
       'refund math uses OrderItem.price (RF11); Task 8b adds the tier adjustment from snapshots',
-    reads: { complete: 1, create: 2, refundPreview: 1, computeLineAdjustments: 2 }, // snapshots only; create's estimate also reads the paid price
+    // snapshots only: <module> = the ADJUSTMENT_LINE_SELECT column list; lineAdjustmentsFrom = paid price into the product-scope
+    // repricing (B2B-17) and the standard refund; create's estimate goes through the same helper (review P2-1)
+    reads: { '<module>': 1, complete: 1, create: 1, refundPreview: 1, lineAdjustmentsFrom: 3 },
   },
   'services/accounting/backorder.service.ts': {
     category: 'persisted',

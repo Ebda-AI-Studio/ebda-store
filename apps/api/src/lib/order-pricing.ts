@@ -2,7 +2,7 @@
  * Shared glue between the price resolver and the paths that CREATE money rows (checkout, admin manual order, payment
  * links, WhatsApp bridge). docs/plans/2026-10-21-b2b-wholesale.md Task 3, Rulings B2B-5 / B2B-9.
  */
-import type { Resolved } from '@ebda/shared';
+import type { Resolved, TierLadderSnapshot } from '@ebda/shared';
 import { AppError } from '../middleware/error-handler';
 
 export interface MoqLine {
@@ -81,14 +81,21 @@ export function priceSnapshot(r: Resolved): {
   listPrice: number;
   priceSource: Resolved['source'];
   priceTierMinQty: number | null;
-  /** The price breaks on offer at sale time (Task 8b); undefined when there were none, so the column stays NULL for plain lines. */
-  tierLadder: Array<{ minQty: number; priceMinor: number }> | undefined;
+  /**
+   * The buyer's entitlement at sale time (Task 8b, Rulings B2B-17 / B2B-18): the price breaks on offer with their scope and
+   * audience, plus the group-percent price. Read only by a later partial return. undefined when there were no breaks, so the
+   * column stays NULL for plain lines (a line with no break can never be repriced).
+   */
+  tierLadder: TierLadderSnapshot | undefined;
 } {
   return {
     listPrice: r.listMinor,
     priceSource: r.source,
     priceTierMinQty: r.tierMinQty,
-    tierLadder: r.ladder.length > 0 ? r.ladder : undefined,
+    tierLadder:
+      r.ladder.length > 0
+        ? { rungs: r.ladder.map(x => ({ ...x })), groupPercentMinor: r.groupPercentMinor }
+        : undefined,
   };
 }
 

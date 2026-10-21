@@ -82,8 +82,16 @@ export interface Resolved {
    * the line (variant tier for this variant; product tier only when base === the product's price) and below base, sorted by
    * minQty then price, whatever the current quantity. Persisted on the order line (Task 8b) so a later partial return
    * reprices the kept units from what was on offer at sale time, and read by the cart to know how high a stepper may go.
+   * `variant` = a variant-level tier (reached on the VARIANT quantity, else on the PRODUCT quantity); `group` = the buyer's
+   * group tier (else public). Both are needed to re-run the B2B-3b selection on a kept quantity (Ruling B2B-17).
    */
-  ladder: Array<{ minQty: number; priceMinor: number }>;
+  ladder: Array<{ minQty: number; priceMinor: number; variant: boolean; group: boolean }>;
+  /**
+   * The group-percent price (base minus the active group's percent_off), whether or not it won at this quantity; null when
+   * the buyer has no active percent_off group. Quantity-independent, so a partial return reprices kept units no higher than
+   * this (Ruling B2B-18).
+   */
+  groupPercentMinor: number | null;
 }
 
 const INT4_MAX = 2_147_483_647;
@@ -139,8 +147,17 @@ export function resolveUnitPrice(i: ResolveInput): Resolved {
       if (t.variantId !== null) return t.variantId === i.variantId;
       return base === productPriceForLadder;
     })
-    .map(t => ({ minQty: t.minQty, priceMinor: t.priceMinor }))
+    .map(t => ({
+      minQty: t.minQty,
+      priceMinor: t.priceMinor,
+      variant: t.variantId !== null,
+      group: t.groupId !== null,
+    }))
     .sort((a, b) => a.minQty - b.minQty || a.priceMinor - b.priceMinor);
+  const groupPercentMinor =
+    group !== null && group.isActive && group.pricingMode === 'percent_off' && group.discountBps > 0
+      ? Math.min(applyPercentOff(base, group.discountBps), base)
+      : null;
   const out = (
     unitMinor: number,
     source: PriceSource,
@@ -155,6 +172,7 @@ export function resolveUnitPrice(i: ResolveInput): Resolved {
     belowMoq,
     moqRequired,
     ladder,
+    groupPercentMinor,
   });
 
   const productPrice = i.productPriceMinor ?? base;
@@ -191,10 +209,7 @@ export function resolveUnitPrice(i: ResolveInput): Resolved {
 
   const pubTier = pick(null);
   const gTier = activeGroupId !== null ? pick(activeGroupId) : null;
-  const gPct =
-    group !== null && group.isActive && group.pricingMode === 'percent_off' && group.discountBps > 0
-      ? Math.min(applyPercentOff(base, group.discountBps), base)
-      : null;
+  const gPct = groupPercentMinor;
 
   // min across audiences; on a tie the order gTier -> gPct -> pub decides the provenance.
   let unit = base;

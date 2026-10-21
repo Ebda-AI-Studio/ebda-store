@@ -73,6 +73,7 @@ describe('RF4 tier boundary and quantity change', () => {
       belowMoq: false,
       moqRequired: null,
       ladder: expect.any(Array),
+      groupPercentMinor: null,
     });
     const miss = resolveUnitPrice(input({ qty: 3, tiers }));
     expect(miss).toMatchObject({ unitMinor: 10_000, source: 'base', tierMinQty: null });
@@ -636,16 +637,37 @@ describe('ladder: the price breaks this buyer could reach (Task 8b snapshot, car
     ];
     const r = resolveUnitPrice(input({ qty: 1, tiers, buyerGroup: group() }));
     expect(r.ladder).toEqual([
-      { minQty: 10, priceMinor: 9_500 },
-      { minQty: 20, priceMinor: 8_000 },
-      { minQty: 50, priceMinor: 9_000 },
+      { minQty: 10, priceMinor: 9_500, variant: false, group: false },
+      { minQty: 20, priceMinor: 8_000, variant: false, group: true },
+      { minQty: 50, priceMinor: 9_000, variant: false, group: false },
     ]);
     const anon = resolveUnitPrice(input({ qty: 1, tiers }));
     expect(anon.ladder).toEqual([
-      { minQty: 10, priceMinor: 9_500 },
-      { minQty: 50, priceMinor: 9_000 },
+      { minQty: 10, priceMinor: 9_500, variant: false, group: false },
+      { minQty: 50, priceMinor: 9_000, variant: false, group: false },
     ]);
     expect(resolveUnitPrice(input({ qty: 1 })).ladder).toEqual([]);
+  });
+  it('flags a variant-level rung; reports the group-percent price whether or not it won (Ruling B2B-18)', () => {
+    const r = resolveUnitPrice(
+      input({
+        qty: 20,
+        variantId: V1,
+        tiers: [tier(5, 9_000, { variantId: V1 }), tier(20, 7_000, { groupId: G })],
+        buyerGroup: group({ pricingMode: 'percent_off', discountBps: 1_000 }),
+      })
+    );
+    expect(r.ladder.find(x => x.minQty === 5)).toMatchObject({ variant: true, group: false });
+    expect(r.unitMinor).toBe(7_000); // the group tier beat the percent ...
+    expect(r.groupPercentMinor).toBe(9_000); // ... but the percent price is still reported
+    expect(resolveUnitPrice(input({ qty: 1 })).groupPercentMinor).toBeNull();
+    expect(
+      resolveUnitPrice(
+        input({
+          buyerGroup: group({ pricingMode: 'percent_off', discountBps: 1_000, isActive: false }),
+        })
+      ).groupPercentMinor
+    ).toBeNull();
   });
   it('an inactive group contributes no rungs; a product tier on a variant with its own price is not offered', () => {
     const t = [tier(20, 8_000, { groupId: G })];

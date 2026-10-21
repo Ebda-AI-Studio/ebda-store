@@ -1,32 +1,51 @@
 /**
- * returnAdjustment - the ONE pure place a partial return of a tier-priced line is repriced (Ruling B2B-10 / B2B-13, Task 8b).
- * No imports, no Date, no randomness, integers only (same purity contract as resolve-unit-price.ts).
+ * Partial-return repricing of tier-priced lines: the ONE pure place it is decided (Rulings B2B-13, B2B-14, B2B-17, B2B-18;
+ * Task 8b). No imports, no Date, no randomness, integers only (same purity contract as resolve-unit-price.ts).
  *
- * A buyer paid the tier price `b` for `N` units because the line reached the tier at `m` units. If a partial return drops the
- * units KEPT below `m`, the kept units no longer earned that price: they are repriced at the LOWEST price still on offer at
- * their quantity (the persisted ladder `T`, which is what the buyer could see at sale time; never a live table), else the list
- * price `L`, and the refund is reduced by the difference on the kept units.
+ * SCOPE (Ruling B2B-17). A tier was awarded on the quantity of the whole PRODUCT across every loose line of the order
+ * (variants and personalisation-split note-lines summed, Ruling B2B-4), and a variant-level tier on the quantity of that
+ * VARIANT across its lines. A return is judged the same way: `productReturnAdjustment` takes EVERY loose line of one product
+ * (those on this return and those not), re-runs the B2B-3b selection on the kept product / variant quantities, and reprices
+ * the kept units of every line. Splitting one variant into lines, or a size run into variants, can not escape it.
  *
- *   keptUnit(kept) = b                                   when kept >= m (the tier is still reached)
- *                    lowest t.priceMinor in T            with t.minQty <= kept and t.priceMinor >= b
- *                    else L
- *   clawback(kept) = (keptUnit(kept) - b) * kept         when source is 'tier', m, L and T are known and kept > 0, else 0
- *   adjustment     = clawback(kept) - clawback(keptBefore)      (cumulative: partial returns never double-charge)
- *   standard       = b * k
- *   adjusted       = max(0, standard - adjustment)       the buyer is never charged; when the floor bites the difference is
- *                                                        reported as `shortfall` for the merchant
+ * ENTITLEMENT (Ruling B2B-18, amends B2B-13). The kept units are repriced at what the buyer was entitled to at sale time
+ * for the kept quantity: min(list, the group-percent price, the best public tier reached, the best group tier reached), as
+ * the snapshot recorded them. Never bare list price when the buyer's group percent applies at every quantity.
  *
- * `adjustment` is NEGATIVE when this return lifts the kept quantity back over a threshold or returns the last units (the
- * earlier clawback is released), so over any sequence of returns the adjustments telescope to clawback(finalKept).
- * 'group' (percent), 'base', a missing snapshot and a missing ladder never adjust.
+ *   keptUnit(line)  = max(b, min(L, gPct, pub(kept), gTier(kept)))   b = paid unit, L = list, from the line's snapshot
+ *   clawback(state) = sum over tier lines of (keptUnit(line) - b) * keptOnLine
+ *   adjustment      = clawback(after this return) - clawback(before it)          cumulative: never double-charges
+ *
+ * The product-level adjustment is then bounded and spread over THIS return's lines of the product:
+ *   > 0  capped at their standard refund (the buyer is never charged; the excess is reported as `shortfall`)
+ *   < 0  a release (the kept quantity went back over a threshold, or the last units came back), never more than the
+ *        product's earlier returns actually retained (`retained`), so the sum of refunds can not exceed what was paid
+ *   allocated by each item's standard refund (paid unit x units returned), largest remainder, so the integers sum exactly.
+ *
+ * 'group', 'base', a missing snapshot and a missing ladder are never repriced (their kept units cost what they were paid).
  */
 
-export interface LadderRung {
+/** A type alias, not an interface, so it stays assignable to Prisma's Json input. */
+export type SnapshotRung = {
   minQty: number;
   priceMinor: number;
-}
+  /** A variant-level tier: reached on the VARIANT's kept quantity. Else product-level: reached on the PRODUCT's. */
+  variant: boolean;
+  /** The buyer's group tier. Else a public tier. */
+  group: boolean;
+};
 
-export interface ReturnAdjustmentInput {
+/** What `order_items.tier_ladder` holds (written by `priceSnapshot`). */
+export type TierLadderSnapshot = {
+  rungs: SnapshotRung[];
+  /** The buyer's group-percent unit price at sale time; null when they had no active percent_off group. */
+  groupPercentMinor: number | null;
+};
+
+export interface ReturnLineInput {
+  /** The caller's key for this order line. Unique within one call. */
+  key: string;
+  variantId: string | null;
   /** Units on the order line. */
   quantity: number;
   /** Paid unit price (OrderItem.price). */
@@ -36,26 +55,45 @@ export interface ReturnAdjustmentInput {
   priceSource: 'base' | 'tier' | 'group' | null;
   /** The tier threshold the line reached; null unless priceSource is 'tier'. */
   tierMinQty: number | null;
-  /** The ladder snapshotted at sale time; null = none persisted (never guessed). */
-  ladder: readonly LadderRung[] | null;
-  /** Units of this line already taken back by earlier returns. */
+  /** Snapshotted at sale time; null = none persisted (never guessed). */
+  ladder: TierLadderSnapshot | null;
+  /** Units of this line taken back before this return (earlier returns, backorder cancels). */
   returnedBefore: number;
-  /** Units being returned now. */
+  /** Units of this line on THIS return (0 for a line of the product that is not on it). */
   returning: number;
 }
 
-export interface ReturnAdjustment {
-  keptQty: number;
+export interface ReturnItemShare {
+  /** The caller's key for this RETURN item (several items may name one order line). */
+  key: string;
+  /** The order line's key (ReturnLineInput.key). */
+  lineKey: string;
+  /** Units this item returns, already clamped by the caller to what the line had left. */
+  returning: number;
+}
+
+export interface ReturnItemAdjustment {
+  key: string;
+  /** Paid unit price x units returned. */
   standardRefund: number;
-  /** Signed: positive reduces the refund. */
+  /** Signed: positive reduces the refund. This item's share of the product's applied adjustment. */
   adjustment: number;
   adjustedRefund: number;
-  /** What the floor at 0 swallowed; > 0 only when adjustment exceeds the standard refund. */
-  shortfall: number;
-  /** The unit price the kept units are repriced to (the paid price when nothing changes). */
+  /** The unit price this item's line keeps its units at after this return (the paid price when unchanged). */
   keptUnitMinor: number;
-  tierMinQty: number | null;
+}
+
+export interface ProductReturnAdjustment {
+  /** Units of the product the buyer keeps after this return (the quantity the tier is judged on). */
+  keptQty: number;
+  /** clawback(after) - clawback(before), before the floor and the release clamp. */
+  rawAdjustment: number;
+  /** What is actually applied across this return's items (sum of their `adjustment`). */
+  applied: number;
+  /** What the floor at 0 swallowed; > 0 only when the raw adjustment exceeds the items' standard refund. */
+  shortfall: number;
   reason: 'none' | 'kept_below_tier' | 'released';
+  items: ReturnItemAdjustment[];
 }
 
 const INT4_MAX = 2_147_483_647;
@@ -63,51 +101,153 @@ const INT4_MAX = 2_147_483_647;
 function assertInt(name: string, v: unknown, min: number): asserts v is number {
   if (typeof v !== 'number' || !Number.isInteger(v) || v < min || v > INT4_MAX) {
     throw new RangeError(
-      `returnAdjustment: ${name} must be an integer in [${min}, ${INT4_MAX}], got ${String(v)}`
+      `productReturnAdjustment: ${name} must be an integer in [${min}, ${INT4_MAX}], got ${String(v)}`
     );
   }
 }
 
-export function returnAdjustment(i: ReturnAdjustmentInput): ReturnAdjustment {
-  assertInt('quantity', i.quantity, 1);
-  assertInt('paidUnitMinor', i.paidUnitMinor, 0);
-  assertInt('returnedBefore', i.returnedBefore, 0);
-  assertInt('returning', i.returning, 0);
-  const keptBefore = i.quantity - i.returnedBefore;
-  if (keptBefore < 0 || i.returning > keptBefore) {
-    throw new RangeError('returnAdjustment: cannot return more units than are kept');
-  }
-  const b = i.paidUnitMinor;
-  const kept = keptBefore - i.returning;
-  const standardRefund = b * i.returning;
-
-  const applicable =
-    i.priceSource === 'tier' && i.tierMinQty !== null && i.listMinor !== null && i.ladder !== null;
-  const m = i.tierMinQty ?? 0;
-  const L = i.listMinor ?? 0;
-
-  const keptUnit = (n: number): number => {
-    if (!applicable || n >= m) return b;
-    let best: number | null = null;
-    for (const t of i.ladder!) {
-      if (t.minQty <= n && t.priceMinor >= b && (best === null || t.priceMinor < best))
-        best = t.priceMinor;
+/** Ruling B2B-3b on the snapshot: within one audience variant-level beats product-level, then the lowest price. */
+function bestRung(
+  rungs: readonly SnapshotRung[],
+  group: boolean,
+  productKept: number,
+  variantKept: number
+): number | null {
+  let best: SnapshotRung | null = null;
+  for (const r of rungs) {
+    if (r.group !== group) continue;
+    if (r.minQty > (r.variant ? variantKept : productKept)) continue;
+    if (
+      best === null ||
+      (r.variant && !best.variant) ||
+      (r.variant === best.variant && r.priceMinor < best.priceMinor)
+    ) {
+      best = r;
     }
-    return best ?? L;
-  };
-  const clawback = (n: number): number => (applicable && n > 0 ? (keptUnit(n) - b) * n : 0);
+  }
+  return best === null ? null : best.priceMinor;
+}
 
-  const adjustment = clawback(kept) - clawback(keptBefore);
-  const adjustedRefund = Math.max(0, standardRefund - adjustment);
-  const shortfall = Math.max(0, adjustment - standardRefund);
+/** Spread `amount` (any sign) over `weights` pro-rata, largest remainder, ties to the earlier index; sums exactly. */
+function allocate(amount: number, weights: readonly number[]): number[] {
+  const out = weights.map(() => 0);
+  if (amount === 0 || weights.length === 0) return out;
+  const sign = amount < 0 ? -1 : 1;
+  const abs = Math.abs(amount);
+  const total = weights.reduce((s, w) => s + w, 0);
+  const w = total > 0 ? weights : weights.map(() => 1);
+  const t = total > 0 ? total : weights.length;
+  let given = 0;
+  const rem = w.map((wi, i) => {
+    const exact = abs * wi; // <= 2^31 * 2^31 * k: kept exact below 2^53 for every real order (Int4 piastres x Int4 units)
+    out[i] = Math.floor(exact / t);
+    given += out[i]!;
+    return { i, r: exact % t };
+  });
+  rem.sort((a, b) => b.r - a.r || a.i - b.i);
+  for (let k = 0; k < abs - given; k++) out[rem[k % rem.length]!.i]! += 1;
+  return sign < 0 ? out.map(v => 0 - v) : out;
+}
+
+/**
+ * @param lines   EVERY loose (non-bundle) line of ONE product on the order.
+ * @param items   This return's items of that product (each names a line).
+ * @param retained What this product's earlier completed returns retained in total (signed sum of their persisted
+ *                 adjustments); bounds a release.
+ */
+export function productReturnAdjustment(
+  lines: readonly ReturnLineInput[],
+  items: readonly ReturnItemShare[],
+  retained: number
+): ProductReturnAdjustment {
+  const byKey = new Map<string, ReturnLineInput>();
+  for (const l of lines) {
+    if (byKey.has(l.key)) throw new RangeError(`productReturnAdjustment: duplicate line ${l.key}`);
+    assertInt('quantity', l.quantity, 1);
+    assertInt('paidUnitMinor', l.paidUnitMinor, 0);
+    assertInt('returnedBefore', l.returnedBefore, 0);
+    assertInt('returning', l.returning, 0);
+    if (l.returnedBefore + l.returning > l.quantity) {
+      throw new RangeError('productReturnAdjustment: cannot return more units than are kept');
+    }
+    if (l.ladder !== null) {
+      for (const r of l.ladder.rungs) {
+        assertInt('rung.minQty', r.minQty, 1);
+        assertInt('rung.priceMinor', r.priceMinor, 0);
+      }
+      if (l.ladder.groupPercentMinor !== null)
+        assertInt('groupPercentMinor', l.ladder.groupPercentMinor, 0);
+    }
+    byKey.set(l.key, l);
+  }
+  for (const it of items) {
+    if (!byKey.has(it.lineKey))
+      throw new RangeError(`productReturnAdjustment: unknown line ${it.lineKey}`);
+    assertInt('item.returning', it.returning, 0);
+  }
+
+  const keptOf = (l: ReturnLineInput, after: boolean) =>
+    l.quantity - l.returnedBefore - (after ? l.returning : 0);
+  const sums = (after: boolean) => {
+    let product = 0;
+    const variant = new Map<string | null, number>();
+    for (const l of lines) {
+      const k = keptOf(l, after);
+      product += k;
+      variant.set(l.variantId, (variant.get(l.variantId) ?? 0) + k);
+    }
+    return { product, variant };
+  };
+  const applicable = (l: ReturnLineInput) =>
+    l.priceSource === 'tier' && l.tierMinQty !== null && l.listMinor !== null && l.ladder !== null;
+  const keptUnit = (
+    l: ReturnLineInput,
+    s: { product: number; variant: Map<string | null, number> }
+  ): number => {
+    const b = l.paidUnitMinor;
+    if (!applicable(l)) return b;
+    const vKept = l.variantId === null ? s.product : (s.variant.get(l.variantId) ?? 0);
+    let unit = l.listMinor!;
+    for (const p of [
+      l.ladder!.groupPercentMinor,
+      bestRung(l.ladder!.rungs, false, s.product, vKept),
+      bestRung(l.ladder!.rungs, true, s.product, vKept),
+    ]) {
+      if (p !== null && p < unit) unit = p;
+    }
+    return Math.max(b, unit);
+  };
+  const clawback = (after: boolean) => {
+    const s = sums(after);
+    let c = 0;
+    for (const l of lines) c += (keptUnit(l, s) - l.paidUnitMinor) * keptOf(l, after);
+    return c;
+  };
+
+  const before = clawback(false);
+  const after = clawback(true);
+  const rawAdjustment = after - before;
+  const sAfter = sums(true);
+  const standards = items.map(it => byKey.get(it.lineKey)!.paidUnitMinor * it.returning);
+  const standardTotal = standards.reduce((a, b) => a + b, 0);
+  const applied =
+    rawAdjustment >= 0
+      ? Math.min(rawAdjustment, standardTotal)
+      : Math.max(rawAdjustment, 0 - Math.max(0, retained)); // `0 -`, not unary minus: never -0
+  const shares = allocate(applied, standards);
   return {
-    keptQty: kept,
-    standardRefund,
-    adjustment,
-    adjustedRefund,
-    shortfall,
-    keptUnitMinor: keptUnit(kept),
-    tierMinQty: applicable ? m : null,
-    reason: adjustment > 0 ? 'kept_below_tier' : adjustment < 0 ? 'released' : 'none',
+    keptQty: sAfter.product,
+    rawAdjustment,
+    applied,
+    shortfall: Math.max(0, rawAdjustment - standardTotal),
+    // From the APPLIED value: a release clamped to nothing is not a release (review minor 3).
+    reason: applied > 0 ? 'kept_below_tier' : applied < 0 ? 'released' : 'none',
+    items: items.map((it, i) => ({
+      key: it.key,
+      standardRefund: standards[i]!,
+      adjustment: shares[i]!,
+      adjustedRefund: standards[i]! - shares[i]!,
+      keptUnitMinor: keptUnit(byKey.get(it.lineKey)!, sAfter),
+    })),
   };
 }
