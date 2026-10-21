@@ -5,6 +5,7 @@ import {
   HOME_CAPABILITIES,
   type CapabilityId,
 } from '../lib/capabilities';
+import { COMING_LABEL, REGISTRY } from '../lib/capability-registry';
 import { pagePath, type Locale } from '../lib/site';
 
 /** Renders the free-address example in a left-to-right isolate so it never reverses inside Arabic text. */
@@ -37,8 +38,10 @@ export function CapabilityGrid({
     <ul className="cap-grid">
       {ids.map(id => {
         const cap = CAPABILITIES[locale][id];
+        const coming = REGISTRY[id].status === 'coming';
         return (
-          <li key={id} className="cap-card" data-capability={id}>
+          <li key={id} className="cap-card" data-capability={id} data-status={REGISTRY[id].status}>
+            {coming && <span className="cap-badge">{COMING_LABEL[locale]}</span>}
             <H>{cap.t}</H>
             <p>{withHost(cap.d)}</p>
             {cap.plan && (

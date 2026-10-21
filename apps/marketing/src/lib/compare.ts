@@ -1,3 +1,4 @@
+import { isLive, type CapabilityId } from './capability-registry';
 import type { CompareSlug, Locale } from './site';
 
 /**
@@ -18,14 +19,22 @@ export type Verdict = 'ebda' | 'them' | 'even';
 export interface RowDef {
   id: string;
   label: Pair;
+  /** Default table when nothing in the registry moves it. */
+  group: 'strength' | 'gap';
+  /** The registry capability this row is about: while it is `coming` the row sits in the "not yet" table. */
+  needs?: CapabilityId;
   /** What Ebda Store has (the same on all three pages). */
   ebda: Pair;
+  /** Shown instead of `ebda` while `needs` is coming. */
+  soon?: Pair;
+  /** Appended to `ebda` once `needs` is live (an addition to a row that is live without it). */
+  plus?: { needs: CapabilityId; text: Pair };
 }
 
-/** Rows where Ebda Store is stronger or comparable. */
-export const STRENGTH_ROWS: readonly RowDef[] = [
+const ROWS: readonly RowDef[] = [
   {
     id: 'market',
+    group: 'strength',
     label: { ar: 'السوق الأساسي', en: 'Home market' },
     ebda: {
       ar: 'مصر أولًا: جنيه مصري، وإنستا باي، وشركات شحن مصرية.',
@@ -34,6 +43,7 @@ export const STRENGTH_ROWS: readonly RowDef[] = [
   },
   {
     id: 'currency',
+    group: 'strength',
     label: { ar: 'عملة الاشتراك', en: 'Subscription currency' },
     ebda: {
       ar: 'بالجنيه: 1,490 و3,490 و9,990 ج.م في الشهر.',
@@ -42,6 +52,7 @@ export const STRENGTH_ROWS: readonly RowDef[] = [
   },
   {
     id: 'commission',
+    group: 'strength',
     label: { ar: 'عمولة على الطلبات', en: 'Commission on orders' },
     ebda: {
       ar: '0% على كل الطلبات في كل الباقات. رسوم بوابة الدفع منفصلة.',
@@ -50,6 +61,7 @@ export const STRENGTH_ROWS: readonly RowDef[] = [
   },
   {
     id: 'arabic',
+    group: 'strength',
     label: { ar: 'العربي', en: 'Arabic' },
     ebda: {
       ar: 'المتجر ولوحة التحكم بالعربي من الأساس، والنصوص بالمصري.',
@@ -58,22 +70,48 @@ export const STRENGTH_ROWS: readonly RowDef[] = [
   },
   {
     id: 'search',
+    group: 'strength',
     label: { ar: 'بحث بالمصري والفرانكو', en: 'Egyptian and Franco search' },
     ebda: {
-      ar: 'بحث بيوحّد أشكال الحروف العربية، والذكاء الاصطناعي بيضيف كلمات بحث بالعامية والفرانكو.',
-      en: 'Search unifies Arabic letter variants, and AI adds Egyptian-dialect and Franco search words.',
+      ar: 'بحث بيفهم المصري والفرانكو والإنجليزي وأشكال الحروف، وكل منتج بياخد كلمات بحث بالذكاء الاصطناعي تقدر تعدّلها.',
+      en: 'Search understands Egyptian Arabic, Franco, English and letter variants, and every product gets AI search words you can edit.',
+    },
+  },
+  {
+    id: 'meaning',
+    group: 'gap',
+    needs: 'meaning',
+    label: { ar: 'بحث بالمعنى', en: 'Search by meaning' },
+    ebda: {
+      ar: 'العميل يكتب اللي في دماغه والبحث يفهم قصده.',
+      en: 'Shoppers type what they have in mind and search understands what they mean.',
+    },
+    soon: {
+      ar: 'قريبًا: بنطرحه تدريجيًا، ومش بيتفعّل على متجرك غير لما نتأكد إن نتايجه ممتازة على منتجات حقيقية.',
+      en: 'Coming soon: rolling out gradually, and only switched on for your store once its results pass our quality check on a real catalogue.',
+    },
+  },
+  {
+    id: 'insights',
+    group: 'strength',
+    label: { ar: 'إحصائيات البحث', en: 'Search insights' },
+    ebda: {
+      ar: 'شوف عملاءك بحثوا عن إيه، وإيه اللي مالقوش له نتيجة.',
+      en: 'See what shoppers searched for, and what they searched for and found nothing.',
     },
   },
   {
     id: 'ai',
+    group: 'strength',
     label: { ar: 'الذكاء الاصطناعي', en: 'AI tools' },
     ebda: {
-      ar: 'وصف وترجمة وSEO وكلمات بحث، مشمولة في الباقات المدفوعة.',
-      en: 'Descriptions, translation, SEO and search words, included in the paid plans.',
+      ar: 'وصف وترجمة وSEO وكلمات بحث، وإيصالات المصروفات واقتراحات إعادة الطلب وشرح الأرقام، مشمولة في الباقات المدفوعة.',
+      en: 'Descriptions, translation, SEO and search words, plus receipt-to-expense drafts, reorder suggestions and plain-language explanations of your numbers, included in the paid plans.',
     },
   },
   {
     id: 'payments',
+    group: 'strength',
     label: { ar: 'الدفع والشحن في مصر', en: 'Payments and shipping in Egypt' },
     ebda: {
       ar: 'الدفع عند الاستلام، وإنستا باي، وPaymob وKashier وFawryPay، وشحن مع بوسطة وShipBlu ومايلرز وأرامكس.',
@@ -82,6 +120,7 @@ export const STRENGTH_ROWS: readonly RowDef[] = [
   },
   {
     id: 'builder',
+    group: 'strength',
     label: { ar: 'القوالب والتصميم', en: 'Templates and design' },
     ebda: {
       ar: 'خمس قوالب، في كل قالب ثلاث أشكال، ومحرر صفحات.',
@@ -90,23 +129,43 @@ export const STRENGTH_ROWS: readonly RowDef[] = [
   },
   {
     id: 'growth',
+    group: 'strength',
     label: { ar: 'سلات متروكة ونقاط ولاء', en: 'Cart recovery and loyalty' },
     ebda: {
-      ar: 'استرجاع السلات المتروكة ونقاط الولاء من باقة النمو.',
-      en: 'Abandoned-cart recovery and loyalty points from the Growth plan.',
+      ar: 'استرجاع السلات المتروكة بإشعار أو SMS، ونقاط الولاء، من باقة النمو.',
+      en: 'Abandoned-cart recovery by notification or SMS, and loyalty points, from the Growth plan.',
+    },
+    plus: {
+      needs: 'cartemail',
+      text: {
+        ar: ' وكمان بالإيميل لو العميل وافق وهو بيدفع، حتى كزائر.',
+        en: ' Plus reminder emails when the shopper opted in at checkout, guests included.',
+      },
     },
   },
-];
-
-/** Rows where Ebda Store is not there yet. */
-export const GAP_ROWS: readonly RowDef[] = [
+  {
+    id: 'integrations',
+    group: 'strength',
+    needs: 'webhooks',
+    label: { ar: 'ربط أدوات تانية (Webhooks)', en: 'Connecting other tools (webhooks)' },
+    ebda: {
+      ar: 'المتجر بيبعت إشعار للأداة اللي تحددها لما يحصل حاجة زي طلب جديد، في باقتي النمو والأعمال.',
+      en: 'The store notifies the tool you choose when something happens, such as a new order, on Growth and Business.',
+    },
+    soon: {
+      ar: 'قريبًا في باقتي النمو والأعمال: المتجر هيبعت إشعار للأداة اللي تحددها لما يحصل حاجة زي طلب جديد.',
+      en: 'Coming soon on Growth and Business: the store will notify the tool you choose when something happens, such as a new order.',
+    },
+  },
   {
     id: 'apps',
+    group: 'gap',
     label: { ar: 'متجر تطبيقات', en: 'App marketplace' },
     ebda: { ar: 'مفيش متجر تطبيقات.', en: 'There is no app marketplace.' },
   },
   {
     id: 'code',
+    group: 'gap',
     label: { ar: 'تخصيص بالأكواد', en: 'Custom code' },
     ebda: {
       ar: 'التعديل من محرر الصفحات من غير أكواد، ومفيش محرر أكواد مخصص.',
@@ -115,32 +174,47 @@ export const GAP_ROWS: readonly RowDef[] = [
   },
   {
     id: 'b2b',
+    group: 'gap',
+    needs: 'b2b',
     label: { ar: 'أسعار الجملة (B2B)', en: 'Wholesale (B2B) pricing' },
     ebda: {
-      ar: 'مفيش قوائم أسعار جملة. مجموعات العملاء بتستهدف الكوبونات والعروض بس.',
-      en: 'There are no wholesale price lists. Customer groups only target coupons and promotions.',
+      ar: 'أسعار بتقل مع الكمية، ومجموعات عملاء، وحد أدنى للطلب، وموافقة على تجار الجملة، في باقة الأعمال.',
+      en: 'Quantity price breaks, customer groups, minimum orders and wholesale-buyer approval, on the Business plan.',
+    },
+    soon: {
+      ar: 'قريبًا في باقة الأعمال: أسعار بتقل مع الكمية، ومجموعات عملاء، وحد أدنى للطلب، وموافقة على تجار الجملة. لحد ما ينزل مفيش قوائم أسعار جملة.',
+      en: 'Coming soon on the Business plan: quantity price breaks, customer groups, minimum orders and wholesale-buyer approval. Until it ships there are no wholesale price lists.',
     },
   },
   {
     id: 'pos',
+    group: 'gap',
     label: { ar: 'نقطة بيع (POS)', en: 'Point of sale (POS)' },
     ebda: { ar: 'مفيش نقطة بيع في الفروع.', en: 'There is no in-store point of sale.' },
   },
   {
     id: 'multicur',
+    group: 'gap',
     label: { ar: 'عملات متعددة', en: 'Multiple currencies' },
     ebda: { ar: 'المتجر بالجنيه المصري بس.', en: 'The store sells in Egyptian pounds only.' },
   },
   {
     id: 'email',
+    group: 'gap',
+    needs: 'campaigns',
     label: { ar: 'حملات الإيميل التسويقية', en: 'Marketing email campaigns' },
     ebda: {
-      ar: 'إيميلات الطلبات شغالة. حملات الإيميل التسويقية مبنية بس لسه مش في الباقات، وبنفعّلها لكل متجر على حدة.',
-      en: 'Order emails work. Marketing email campaigns are built but not in the plans yet; we switch them on store by store.',
+      ar: 'اكتب رسالة بالعربي والإنجليزي وابعتها لمشتركين وافقوا، في باقتي النمو والأعمال. وإيميلات الطلبات شغالة في كل الباقات.',
+      en: 'Write a message in Arabic and English and send it to subscribers who agreed, on Growth and Business. Order emails work on every plan.',
+    },
+    soon: {
+      ar: 'قريبًا في باقتي النمو والأعمال. إيميلات الطلبات شغالة دلوقتي في كل الباقات.',
+      en: 'Coming soon on Growth and Business. Order emails work today on every plan.',
     },
   },
   {
     id: 'ecosystem',
+    group: 'gap',
     label: { ar: 'حجم المنصة والمجتمع', en: 'Size of platform and community' },
     ebda: {
       ar: 'منصة جديدة، فعدد التكاملات والمجتمع أصغر.',
@@ -148,6 +222,36 @@ export const GAP_ROWS: readonly RowDef[] = [
     },
   },
 ];
+
+export interface ResolvedRow {
+  id: string;
+  label: Pair;
+  ebda: Pair;
+  /** True while the Ebda side of the row is a coming-soon item. */
+  soon: boolean;
+}
+
+/** Rows resolved against the capability registry: coming items go to the "not yet" table with their coming text. */
+export function compareRows(): { strength: ResolvedRow[]; gap: ResolvedRow[] } {
+  const strength: ResolvedRow[] = [];
+  const gap: ResolvedRow[] = [];
+  for (const r of ROWS) {
+    const coming = r.needs ? !isLive(r.needs) : false;
+    const ebda: Pair =
+      coming && r.soon
+        ? r.soon
+        : r.plus && isLive(r.plus.needs)
+          ? { ar: r.ebda.ar + r.plus.text.ar, en: r.ebda.en + r.plus.text.en }
+          : r.ebda;
+    const resolved = { id: r.id, label: r.label, ebda, soon: coming };
+    // a row about a capability follows the registry; other rows keep their default table
+    const g = r.needs ? (coming ? 'gap' : 'strength') : r.group;
+    (g === 'gap' ? gap : strength).push(resolved);
+  }
+  return { strength, gap };
+}
+
+export const ALL_ROW_IDS: readonly string[] = ROWS.map(r => r.id);
 
 interface Them {
   v: Verdict;
@@ -187,6 +291,18 @@ const vendorCells = (nameEn: string, nameAr: string) =>
     builder: same(
       `Check ${nameEn}'s site for its themes and editor.`,
       `راجع موقع ${nameAr} للقوالب والمحرر.`
+    ),
+    meaning: same(
+      `Check ${nameEn}'s site for how its search handles meaning.`,
+      `راجع موقع ${nameAr} لمعرفة هل البحث بيفهم المعنى.`
+    ),
+    insights: same(
+      `Check ${nameEn}'s site for its search reports.`,
+      `راجع موقع ${nameAr} لتقارير البحث.`
+    ),
+    integrations: same(
+      `Check ${nameEn}'s site for webhooks and integrations.`,
+      `راجع موقع ${nameAr} للتكاملات وإشعارات الأدوات.`
     ),
     growth: same(
       `Check ${nameEn}'s site for cart recovery and loyalty options.`,
@@ -359,6 +475,18 @@ export const COMPARE: Record<CompareSlug, CompareDef> = (() => {
       ),
       builder: same('A very large theme store and a theme editor.', 'متجر قوالب ضخم ومحرر قوالب.'),
       growth: same('Available, built in or through apps.', 'متاحة، جاهزة أو من خلال تطبيقات.'),
+      meaning: same(
+        "Check Shopify's site for how its search handles meaning.",
+        'راجع موقع شوبيفاي لمعرفة هل البحث بيفهم المعنى.'
+      ),
+      insights: same(
+        'Search reports are available; compare the detail.',
+        'فيه تقارير بحث، قارن مستوى التفاصيل.'
+      ),
+      integrations: same(
+        'Webhooks and a developer API are available, alongside the app store.',
+        'فيه Webhooks وواجهة للمطورين مع متجر التطبيقات.'
+      ),
       apps: same('A very large app store.', 'متجر تطبيقات ضخم.'),
       code: same('A theme code editor and developer tools.', 'محرر أكواد للقوالب وأدوات للمطورين.'),
       b2b: same(
@@ -410,7 +538,7 @@ export const COMPARE_PAGE: Record<
 > = {
   ar: {
     strongH: 'فين ابدأ ستور أقوى أو مساوي',
-    gapH: 'اللي لسه مش موجود في ابدأ ستور',
+    gapH: 'اللي لسه مش موجود في ابدأ ستور، واللي جاي قريبًا',
     colWhat: 'الموضوع',
     colEbda: 'ابدأ ستور',
     asOf: `المقارنة بتاريخ ${COMPARE_AS_OF_AR}.`,
@@ -426,7 +554,7 @@ export const COMPARE_PAGE: Record<
   },
   en: {
     strongH: 'Where Ebda Store is stronger or comparable',
-    gapH: 'What Ebda Store does not have yet',
+    gapH: 'What Ebda Store does not have yet, and what is coming soon',
     colWhat: 'Topic',
     colEbda: 'Ebda Store',
     asOf: `Comparison as of ${COMPARE_AS_OF}.`,

@@ -1,4 +1,5 @@
 import type { Locale } from './site';
+import { isLive, type CapabilityId } from './capability-registry';
 
 /**
  * What Ebda Store can do, for /features and the home capabilities section. Every entry is
@@ -16,36 +17,30 @@ export interface CapabilityCopy {
   plan?: string;
 }
 
-export type CapabilityId =
-  | 'builder'
-  | 'domain'
-  | 'ai'
-  | 'search'
-  | 'seo'
-  | 'assistant'
-  | 'cart'
-  | 'emails'
-  | 'loyalty'
-  | 'reviews'
-  | 'analytics'
-  | 'warehouse'
-  | 'payments'
-  | 'commission';
+export type { CapabilityId } from './capability-registry';
 
-/** Order = order on /features. The first `HOME_CAPABILITY_COUNT` also show on the home page. */
+/** Order = order on /features. */
 export const CAPABILITY_IDS: readonly CapabilityId[] = [
   'builder',
   'domain',
   'ai',
-  'search',
+  'smartsearch',
+  'searchwords',
+  'meaning',
+  'insights',
   'seo',
   'assistant',
   'cart',
+  'cartemail',
   'emails',
+  'campaigns',
+  'webhooks',
   'loyalty',
   'reviews',
   'analytics',
   'warehouse',
+  'barcodes',
+  'b2b',
   'payments',
   'commission',
 ] as const;
@@ -53,12 +48,13 @@ export const CAPABILITY_IDS: readonly CapabilityId[] = [
 /** Home cards, in order: the ones shoppers and AI assistants ask about most. */
 export const HOME_CAPABILITIES: readonly CapabilityId[] = [
   'builder',
-  'domain',
+  'smartsearch',
+  'searchwords',
+  'meaning',
   'ai',
-  'search',
-  'seo',
+  'insights',
   'cart',
-  'loyalty',
+  'webhooks',
   'commission',
 ] as const;
 
@@ -77,13 +73,25 @@ export const CAPABILITIES: Record<Locale, Record<CapabilityId, CapabilityCopy>> 
       d: 'بيكتب وصف المنتجات ويترجمها عربي وإنجليزي، ويقترح كلمات بحث وتصنيفات ووسوم ونص بديل للصور، ويجهّز عناوين وأوصاف لمحركات البحث وأسئلة شائعة. إنت اللي بتراجع وتنشر.',
       plan: 'مشمول في الباقات المدفوعة، ضمن حدود الاستخدام العادل',
     },
-    search: {
-      t: 'بحث بيفهم المصري والفرانكو',
-      d: 'البحث في متجرك بيعتبر الهمزة والألف حاجة واحدة، والتاء المربوطة والهاء، والياء والألف المقصورة، ويتجاهل التشكيل. والذكاء الاصطناعي بيضيف لكل منتج كلمات بالعامية المصرية وبالفرانكو وبالإنجليزي، فالعميل اللي يكتب "gazma" يلاقي الجزمة.',
+    smartsearch: {
+      t: 'بحث ذكي بيفهم المصري والفرانكو',
+      d: 'عميلك بيكتب زي ما بيتكلم: بالعامية المصرية، أو بالفرانكو زي "gazma" و"kotshy"، أو بالإنجليزي. والبحث بيفهم أشكال الحروف زي أ وا وه وة، وبيلاقي المنتج حتى لو الكتابة مش مظبوطة بالظبط.',
+    },
+    searchwords: {
+      t: 'كلمات بحث بالذكاء الاصطناعي لكل منتج',
+      d: 'كل منتج بياخد لوحده كلمات بحث بالمصري والفرانكو والإنجليزي وأشهر أخطاء الكتابة، من غير ما تكتبها إنت. وتقدر تعدّلها أو تضيف عليها في أي وقت.',
+    },
+    meaning: {
+      t: 'بحث بالمعنى',
+      d: 'العميل يكتب اللي في دماغه مش اسم المنتج بالظبط، والبحث يفهم قصده ويطلّعله المنتجات المناسبة. بنطرحه تدريجيًا، ومش بيتفعّل على متجرك غير لما نتأكد إن نتايجه ممتازة على منتجات حقيقية.',
+    },
+    insights: {
+      t: 'اعرف عملاءك بيدوّروا على إيه',
+      d: 'شوف إيه اللي عملاءك بحثوا عنه، وإيه اللي بحثوا عنه ومالقوش نتيجة، وبكده تعرف تضيف المنتج الناقص أو تظبّط كلمات البحث.',
     },
     seo: {
       t: 'SEO وظهور في إجابات الذكاء الاصطناعي',
-      d: 'عناوين وأوصاف لمحركات البحث، وتحويلات للينكات القديمة، وأسئلة شائعة منظّمة، وملف llms.txt لمتجرك، وفيد منتجات تقراه مساعدات الذكاء الاصطناعي. وكمان تقدر تتابع هل مساعدات الذكاء الاصطناعي، زي ChatGPT وGemini وPerplexity، بتذكر متجرك.',
+      d: 'عناوين وأوصاف لمحركات البحث، وتحويلات للينكات القديمة، وأسئلة شائعة منظّمة، وملف llms.txt لمتجرك، وفيد منتجات تقراه مساعدات الذكاء الاصطناعي. وكمان تقدر تتابع هل مساعدات الذكاء الاصطناعي بتذكر متجرك.',
     },
     assistant: {
       t: 'شغّل متجرك من مساعد ذكاء اصطناعي',
@@ -95,9 +103,24 @@ export const CAPABILITIES: Record<Locale, Record<CapabilityId, CapabilityCopy>> 
       d: 'لو عميل ساب منتجات في السلة، المتجر بيفكّره على خطوات ويرجّعه للسلة بلينك مباشر، بإشعار، أو برسالة SMS لو العميل وافق على استلامها.',
       plan: 'باقتا النمو والأعمال',
     },
+    cartemail: {
+      t: 'تذكير السلة المتروكة بالإيميل',
+      d: 'العميل بيوافق على استلام تذكير وهو بيدفع، حتى لو زائر من غير حساب، ولو سابك السلة بيوصله إيميل بلينك يرجّعه لسلته.',
+      plan: 'ضمن استرجاع السلات المتروكة',
+    },
     emails: {
       t: 'إيميلات الطلبات بتتبعت لوحدها',
       d: 'تأكيد الطلب، والشحن، والاسترجاع، ونجاح الدفع أو فشله، وطلب تقييم بعد الاستلام، كلها بتتبعت لعميلك بالعربي أو الإنجليزي بشكل متناسق مع شكل متجرك.',
+    },
+    campaigns: {
+      t: 'حملات إيميل لمشتركيك',
+      d: 'اكتب رسالة تسويقية بالعربي والإنجليزي وابعتها لمشتركي نشرتك اللي وافقوا على استلامها.',
+      plan: 'باقتا النمو والأعمال',
+    },
+    webhooks: {
+      t: 'اربط متجرك بأدواتك التانية',
+      d: 'لما يحصل حاجة في متجرك زي طلب جديد، المتجر بيبعت إشعار للأداة اللي تحددها، فتقدر توصّله بنظام المحاسبة أو الشحن أو أي أداة بتشتغل بيها.',
+      plan: 'باقتا النمو والأعمال',
     },
     loyalty: {
       t: 'نقاط ولاء ومكافآت إحالة وعمولة مسوّقين',
@@ -109,12 +132,21 @@ export const CAPABILITIES: Record<Locale, Record<CapabilityId, CapabilityCopy>> 
       d: 'العميل بيقيّم المنتج بعد ما يستلمه، وانت بتراجع التقييمات قبل ما تظهر في المتجر.',
     },
     analytics: {
-      t: 'تحليلات وإحصائيات بحث',
-      d: 'اعرف إيه اللي بيتباع، وإيه اللي العملاء بيدوّروا عليه ومش لاقيينه، وإيرادات متجرك. مستوى التفاصيل بيزيد مع الباقة.',
+      t: 'تحليلات متجرك',
+      d: 'اعرف إيه اللي بيتباع وإيراداتك. مستوى التفاصيل بيزيد مع الباقة.',
     },
     warehouse: {
       t: 'أكتر من مخزن وأوامر شراء',
       d: 'لو عندك أكتر من مخزن، تابع المخزون في كل واحد، واعمل أوامر شراء من الموردين، وامسح باركود المنتجات.',
+      plan: 'باقة الأعمال',
+    },
+    barcodes: {
+      t: 'باركود للطلبات وبوليصة تغليف',
+      d: 'كل طلب ليه باركود تمسحه فيفتح الطلب على طول، وبييجي في 23 شكل مبتكر. وفيه بوليصة تغليف عليها الباركود وطباعة بالجملة.',
+    },
+    b2b: {
+      t: 'بيع بالجملة (B2B)',
+      d: 'أسعار بتقل مع زيادة الكمية، ومجموعات عملاء، وحد أدنى للطلب، وموافقة منك على تاجر الجملة قبل ما يشتري.',
       plan: 'باقة الأعمال',
     },
     payments: {
@@ -140,13 +172,25 @@ export const CAPABILITIES: Record<Locale, Record<CapabilityId, CapabilityCopy>> 
       d: 'It writes product descriptions and translates them between Arabic and English, suggests search words, categories, tags and image alt text, and drafts search-engine titles, descriptions and FAQs. You review and publish.',
       plan: 'Included in the paid plans, within fair-use limits',
     },
-    search: {
-      t: 'Search that understands Egyptian Arabic and Franco',
-      d: 'Store search treats alef forms, taa marbuta and haa, and yaa and alef maqsura as the same letters, and ignores diacritics. AI also adds Egyptian-dialect, Franco-Arabic and English search words to each product, so a shopper typing "gazma" finds the shoes.',
+    smartsearch: {
+      t: 'Smart search that understands Egyptian Arabic and Franco',
+      d: 'Your shoppers type the way they talk: in Egyptian Arabic, in Franco like "gazma" or "kotshy", or in English. Search understands letter variants such as أ/ا and ه/ة, and still finds the product when the spelling is not exact.',
+    },
+    searchwords: {
+      t: 'AI search words for every product',
+      d: 'Every product gets its own search words in Egyptian Arabic, Franco and English, plus the common misspellings, without you typing them. You can edit or add to them at any time.',
+    },
+    meaning: {
+      t: 'Search by meaning',
+      d: 'Shoppers type what they have in mind, not the exact product name, and search understands what they mean. We are rolling it out gradually, and it only switches on for your store once its results pass our quality check on a real catalogue.',
+    },
+    insights: {
+      t: 'See what your shoppers search for',
+      d: 'See what shoppers searched for, and what they searched for and found nothing, so you can add the missing product or tune the search words.',
     },
     seo: {
       t: 'SEO and visibility in AI answers',
-      d: 'Search-engine titles and descriptions, redirects for old links, structured FAQs, an llms.txt file for your store and a product feed that AI assistants can read. You can also track whether AI assistants, such as ChatGPT, Gemini and Perplexity, mention your store.',
+      d: 'Search-engine titles and descriptions, redirects for old links, structured FAQs, an llms.txt file for your store and a product feed that AI assistants can read. You can also track whether AI assistants mention your store.',
     },
     assistant: {
       t: 'Run your store from an AI assistant',
@@ -158,9 +202,24 @@ export const CAPABILITIES: Record<Locale, Record<CapabilityId, CapabilityCopy>> 
       d: 'When a shopper leaves items in the cart, the store reminds them in steps and sends them back to the cart with a direct link, by notification or by SMS when the shopper agreed to receive it.',
       plan: 'Growth and Business plans',
     },
+    cartemail: {
+      t: 'Cart reminder emails',
+      d: 'Shoppers opt in to a reminder at checkout, guests included, and if they leave the cart an email brings them straight back to it.',
+      plan: 'Part of abandoned-cart recovery',
+    },
     emails: {
       t: 'Order emails that send themselves',
       d: 'Order confirmation, shipping, refunds, payment success or failure and a review request after delivery all go to your customer in Arabic or English, styled to match your store.',
+    },
+    campaigns: {
+      t: 'Email campaigns to your subscribers',
+      d: 'Write a marketing email in Arabic and English and send it to newsletter subscribers who agreed to receive it.',
+      plan: 'Growth and Business plans',
+    },
+    webhooks: {
+      t: 'Connect your store to your other tools',
+      d: 'When something happens in your store, such as a new order, it notifies the tool you choose, so you can connect it to your accounting, shipping or any other tool you work with.',
+      plan: 'Growth and Business plans',
     },
     loyalty: {
       t: 'Loyalty points, referral rewards and affiliates',
@@ -172,12 +231,21 @@ export const CAPABILITIES: Record<Locale, Record<CapabilityId, CapabilityCopy>> 
       d: 'Customers review a product after it arrives, and you moderate reviews before they appear on your store.',
     },
     analytics: {
-      t: 'Analytics and search insights',
-      d: 'See what sells, what shoppers search for and cannot find, and your store revenue. The level of detail grows with the plan.',
+      t: 'Store analytics',
+      d: 'See what sells and your revenue. The level of detail grows with the plan.',
     },
     warehouse: {
       t: 'Multiple warehouses and purchase orders',
       d: 'If you keep stock in more than one place, track inventory per warehouse, raise purchase orders to suppliers and scan product barcodes.',
+      plan: 'Business plan',
+    },
+    barcodes: {
+      t: 'Order barcodes and a packing slip',
+      d: 'Every order has a barcode you scan to open it straight away, in 23 fun shapes. A packing slip carries the barcode, and you can print slips in bulk.',
+    },
+    b2b: {
+      t: 'Wholesale selling (B2B)',
+      d: 'Prices that drop as quantity grows, customer groups, minimum orders, and your approval of a wholesale buyer before they can order.',
       plan: 'Business plan',
     },
     payments: {
@@ -221,10 +289,15 @@ export const MORE: Record<Locale, { title: string; items: string[] }> = {
 
 export interface FeaturesFaqItem {
   q: string;
+  /** Answer when the item is live (or has no `needs`). */
   a: string;
+  /** When set, the answer depends on this capability's status. */
+  needs?: CapabilityId;
+  /** Answer while `needs` is still coming. */
+  aSoon?: string;
 }
 
-export const FEATURES_FAQ: Record<Locale, FeaturesFaqItem[]> = {
+const FAQ_ITEMS: Record<Locale, FeaturesFaqItem[]> = {
   ar: [
     {
       q: 'هل ابدأ ستور فيه قوالب وتصميمات جاهزة؟',
@@ -235,8 +308,22 @@ export const FEATURES_FAQ: Record<Locale, FeaturesFaqItem[]> = {
       a: 'أيوه، في كل الباقات. ولو مش عايز دلوقتي، متجرك بيشتغل على لينك مجاني yourname.ebda.app.',
     },
     {
+      q: 'البحث بيفهم العامية المصرية والفرانكو؟',
+      a: 'أيوه. العميل يكتب "gazma" أو "كوتشي" أو بالإنجليزي، والبحث بيفهم أشكال الحروف، وكل منتج بياخد كلمات بحث بالذكاء الاصطناعي تقدر تعدّلها.',
+    },
+    {
+      q: 'فيه بحث بالمعنى؟',
+      needs: 'meaning',
+      a: 'أيوه. العميل يكتب اللي في دماغه والبحث يفهم قصده.',
+      aSoon:
+        'بنطرحه تدريجيًا وبيتفعّل قريبًا. مش هنفعّله على متجرك غير لما نتأكد إن نتايجه ممتازة على منتجات حقيقية.',
+    },
+    {
       q: 'فيه استرجاع للسلات المتروكة؟',
-      a: 'أيوه، في باقتي النمو والأعمال. المتجر بيفكّر العميل على خطوات بإشعار، أو برسالة SMS لو العميل وافق عليها. ولسه مفيش تذكير بالإيميل.',
+      needs: 'cartemail',
+      a: 'أيوه، في باقتي النمو والأعمال. المتجر بيفكّر العميل على خطوات بالإيميل (لو وافق وهو بيدفع، حتى كزائر)، وبإشعار، وبرسالة SMS لو العميل وافق عليها.',
+      aSoon:
+        'أيوه، في باقتي النمو والأعمال. المتجر بيفكّر العميل على خطوات بإشعار، وبرسالة SMS لو العميل وافق عليها. والتذكير بالإيميل جاي قريبًا.',
     },
     {
       q: 'فيه نقاط ولاء وبرنامج إحالة؟',
@@ -244,11 +331,31 @@ export const FEATURES_FAQ: Record<Locale, FeaturesFaqItem[]> = {
     },
     {
       q: 'فيه حملات إيميل لمشتركي النشرة؟',
-      a: 'الإيميلات التلقائية للطلبات شغالة في كل الباقات: تأكيد وشحن واسترجاع وطلب تقييم. أما حملات الإيميل التسويقية فمبنية في لوحة التحكم، بس لسه مش جزء من الباقات، وبنفعّلها لكل متجر على حدة.',
+      needs: 'campaigns',
+      a: 'أيوه، في باقتي النمو والأعمال. إيميلات الطلبات (تأكيد وشحن واسترجاع وطلب تقييم) شغالة في كل الباقات.',
+      aSoon:
+        'إيميلات الطلبات (تأكيد وشحن واسترجاع وطلب تقييم) شغالة في كل الباقات. وحملات الإيميل للمشتركين جاية قريبًا في باقتي النمو والأعمال.',
     },
     {
-      q: 'البحث بيفهم العامية المصرية والفرانكو؟',
-      a: 'أيوه. البحث بيوحّد أشكال الحروف العربية، والذكاء الاصطناعي بيضيف لكل منتج كلمات بحث بالعامية والفرانكو والإنجليزي.',
+      q: 'أقدر أربط متجري بأدوات تانية؟',
+      needs: 'webhooks',
+      a: 'أيوه، في باقتي النمو والأعمال. المتجر بيبعت إشعار للأداة اللي تحددها لما يحصل حاجة زي طلب جديد.',
+      aSoon:
+        'ده جاي قريبًا في باقتي النمو والأعمال. مفيش متجر تطبيقات، لكن هتقدر توصّل متجرك بأدواتك.',
+    },
+    {
+      q: 'فيه باركود للطلبات؟',
+      needs: 'barcodes',
+      a: 'أيوه. كل طلب ليه باركود في 23 شكل مبتكر، وبوليصة تغليف عليها الباركود وطباعة بالجملة.',
+      aSoon:
+        'جاي قريبًا: باركود لكل طلب في 23 شكل مبتكر، وبوليصة تغليف عليها الباركود وطباعة بالجملة.',
+    },
+    {
+      q: 'أقدر أبيع بالجملة لتجار؟',
+      needs: 'b2b',
+      a: 'أيوه، في باقة الأعمال: أسعار بتقل مع الكمية، ومجموعات عملاء، وحد أدنى للطلب، وموافقة منك على تاجر الجملة.',
+      aSoon:
+        'جاي قريبًا في باقة الأعمال: أسعار بتقل مع الكمية، ومجموعات عملاء، وحد أدنى للطلب، وموافقة منك على تاجر الجملة. لحد ما ينزل مفيش قوائم أسعار جملة.',
     },
     {
       q: 'الذكاء الاصطناعي مشمول في السعر؟',
@@ -260,7 +367,7 @@ export const FEATURES_FAQ: Record<Locale, FeaturesFaqItem[]> = {
     },
     {
       q: 'إيه اللي لسه مش موجود؟',
-      a: 'مفيش متجر تطبيقات، ولا محرر أكواد مخصص، ولا قوائم أسعار جملة لتجار الجملة، ولا نقطة بيع POS، ولا متجر بعملات متعددة. تفاصيل المقارنة مع سلة وزد وشوبيفاي في صفحات المقارنة.',
+      a: 'مفيش متجر تطبيقات، ولا محرر أكواد مخصص، ولا نقطة بيع POS، ولا متجر بعملات متعددة. وفي صفحات المقارنة مع سلة وزد وشوبيفاي هتلاقي التفاصيل، وإيه اللي جاي قريبًا.',
     },
   ],
   en: [
@@ -273,8 +380,22 @@ export const FEATURES_FAQ: Record<Locale, FeaturesFaqItem[]> = {
       a: 'Yes, on every plan. If you would rather wait, your store runs on a free yourname.ebda.app address.',
     },
     {
+      q: 'Does search understand Egyptian Arabic and Franco?',
+      a: 'Yes. A shopper can type "gazma", "كوتشي" or English, search understands letter variants, and every product gets AI search words that you can edit.',
+    },
+    {
+      q: 'Is there search by meaning?',
+      needs: 'meaning',
+      a: 'Yes. Shoppers type what they have in mind and search understands what they mean.',
+      aSoon:
+        'It is rolling out gradually and coming soon. We will not switch it on for your store until its results pass our quality check on a real catalogue.',
+    },
+    {
       q: 'Does it recover abandoned carts?',
-      a: 'Yes, on the Growth and Business plans. The store reminds the shopper in steps by notification, or by SMS if the shopper agreed to it. There is no cart reminder by email yet.',
+      needs: 'cartemail',
+      a: 'Yes, on the Growth and Business plans. The store reminds shoppers in steps by email (when they opted in at checkout, guests included), by notification, and by SMS when they agreed to it.',
+      aSoon:
+        'Yes, on the Growth and Business plans. The store reminds shoppers in steps by notification, and by SMS when they agreed to it. Reminder emails are coming soon.',
     },
     {
       q: 'Is there loyalty and a referral programme?',
@@ -282,11 +403,31 @@ export const FEATURES_FAQ: Record<Locale, FeaturesFaqItem[]> = {
     },
     {
       q: 'Can I send email campaigns to newsletter subscribers?',
-      a: 'Automatic order emails work on every plan: confirmation, shipping, refunds and a review request. Marketing email campaigns are built into the dashboard but are not part of the plans yet; we switch them on store by store.',
+      needs: 'campaigns',
+      a: 'Yes, on Growth and Business. Automatic order emails (confirmation, shipping, refunds, review request) work on every plan.',
+      aSoon:
+        'Automatic order emails (confirmation, shipping, refunds, review request) work on every plan. Email campaigns to subscribers are coming soon on Growth and Business.',
     },
     {
-      q: 'Does search understand Egyptian Arabic and Franco?',
-      a: 'Yes. Search unifies Arabic letter variants, and AI adds Egyptian-dialect, Franco-Arabic and English search words to each product.',
+      q: 'Can I connect my store to other tools?',
+      needs: 'webhooks',
+      a: 'Yes, on Growth and Business. The store notifies the tool you choose when something happens, such as a new order.',
+      aSoon:
+        'This is coming soon on Growth and Business. There is no app marketplace, but you will be able to connect your store to your tools.',
+    },
+    {
+      q: 'Are there order barcodes?',
+      needs: 'barcodes',
+      a: 'Yes. Every order has a barcode in 23 fun shapes, and a packing slip carries it, with bulk printing.',
+      aSoon:
+        'Coming soon: a barcode on every order in 23 fun shapes, and a packing slip that carries it, with bulk printing.',
+    },
+    {
+      q: 'Can I sell wholesale to businesses?',
+      needs: 'b2b',
+      a: 'Yes, on the Business plan: prices that drop with quantity, customer groups, minimum orders, and your approval of a wholesale buyer.',
+      aSoon:
+        'Coming soon on the Business plan: prices that drop with quantity, customer groups, minimum orders, and your approval of a wholesale buyer. Until it ships there are no wholesale price lists.',
     },
     {
       q: 'Is AI included in the price?',
@@ -298,10 +439,18 @@ export const FEATURES_FAQ: Record<Locale, FeaturesFaqItem[]> = {
     },
     {
       q: 'What is not there yet?',
-      a: 'There is no app marketplace, no custom code editor, no wholesale price lists for B2B, no point-of-sale and no multi-currency store. The comparison pages for Salla, Zid and Shopify go through the details.',
+      a: 'There is no app marketplace, no custom code editor, no point-of-sale and no multi-currency store. The comparison pages for Salla, Zid and Shopify go through the details, and what is coming soon.',
     },
   ],
 };
+
+/** The FAQ for a locale, with each answer resolved against the registry (live vs coming). */
+export function featuresFaq(locale: Locale): { q: string; a: string }[] {
+  return FAQ_ITEMS[locale].map(i => ({
+    q: i.q,
+    a: i.needs && !isLive(i.needs) && i.aSoon ? i.aSoon : i.a,
+  }));
+}
 
 export const FEATURES_PAGE: Record<
   Locale,

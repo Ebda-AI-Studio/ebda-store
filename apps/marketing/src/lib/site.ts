@@ -59,6 +59,7 @@ export const SECTION_ORDER = [
   'model3d',
   'payments',
   'features',
+  'ainative',
   'capabilities',
   'pricing',
   'faq',

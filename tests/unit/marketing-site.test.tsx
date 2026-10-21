@@ -157,6 +157,7 @@ describe('marketing hero and structure', () => {
       'model3d',
       'payments',
       'features',
+      'ainative',
       'capabilities',
       'pricing',
       'faq',
@@ -242,8 +243,17 @@ describe('marketing honesty', () => {
       expect(pay).toMatch(/Your own delivery|توصيل بنفسك/);
       expect(pay).toContain('mailto:ahlan@ebda.app');
     }
-    expect(en).not.toMatch(/coming soon/i);
-    expect(ar).not.toMatch(/>قريب</);
+    // "coming soon" now exists, honestly, for registry items (capability-registry.ts), but never in the
+    // payments or pricing sections, and never as the pricing placeholder
+    for (const [html, soon] of [
+      [en, /coming soon/i],
+      [ar, /قريبًا/],
+    ] as const)
+      for (const id of ['payments', 'pricing']) {
+        expect(html.match(new RegExp(`<section id="${id}".*?</section>`, 's'))![0]).not.toMatch(
+          soon
+        );
+      }
     expect(ar).not.toContain('السعر قريب');
   });
   it('the pricing table is built from the shared plan catalogue (every public limit)', () => {

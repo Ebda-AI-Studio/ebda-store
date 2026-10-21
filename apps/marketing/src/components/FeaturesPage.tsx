@@ -1,9 +1,11 @@
 import Link from 'next/link';
-import { CAPABILITY_IDS, FEATURES_FAQ, FEATURES_PAGE, MORE } from '../lib/capabilities';
+import { CAPABILITY_IDS, featuresFaq, FEATURES_PAGE, MORE } from '../lib/capabilities';
 import { COPY } from '../lib/content';
 import { COMPARE } from '../lib/compare';
 import { jsonLd } from '../lib/seo';
 import { COMPARE_PAGES, SIGNUP_URL, pagePath, type Locale } from '../lib/site';
+import { AI_NATIVE } from '../lib/ai-native';
+import { AiNative } from './AiNative';
 import { CapabilityGrid, withHost } from './Capabilities';
 import { Footer } from './Footer';
 import { Header } from './Header';
@@ -12,7 +14,7 @@ import { JsonLd } from './JsonLd';
 export function FeaturesPage({ locale }: { locale: Locale }) {
   const p = FEATURES_PAGE[locale];
   const more = MORE[locale];
-  const faq = FEATURES_FAQ[locale];
+  const faq = featuresFaq(locale);
   return (
     <>
       <a href="#main" className="skip">
@@ -30,7 +32,11 @@ export function FeaturesPage({ locale }: { locale: Locale }) {
             </a>
           </p>
         </header>
-        <section aria-label={p.title}>
+        <section className="page-sec" aria-labelledby="ainative-h">
+          <h2 id="ainative-h">{AI_NATIVE[locale].title}</h2>
+          <AiNative locale={locale} />
+        </section>
+        <section className="page-sec" aria-label={p.title}>
           <CapabilityGrid locale={locale} ids={CAPABILITY_IDS} />
         </section>
         <section className="page-sec" aria-labelledby="more-h">

@@ -1,5 +1,6 @@
 import Link from 'next/link';
-import { COMPARE, COMPARE_PAGE, GAP_ROWS, STRENGTH_ROWS, type RowDef } from '../lib/compare';
+import { COMPARE, COMPARE_PAGE, compareRows, type ResolvedRow } from '../lib/compare';
+import { COMING_LABEL } from '../lib/capability-registry';
 import { COPY } from '../lib/content';
 import { jsonLd } from '../lib/seo';
 import { SIGNUP_URL, pagePath, type CompareSlug, type Locale } from '../lib/site';
@@ -16,7 +17,7 @@ function Table({
 }: {
   locale: Locale;
   slug: CompareSlug;
-  rows: readonly RowDef[];
+  rows: readonly ResolvedRow[];
   heading: string;
   id: string;
 }) {
@@ -41,7 +42,10 @@ function Table({
               return (
                 <tr key={r.id} data-verdict={cell.v}>
                   <th scope="row">{r.label[locale]}</th>
-                  <td data-label={k.colEbda}>{r.ebda[locale]}</td>
+                  <td data-label={k.colEbda}>
+                    {r.soon && <span className="cap-badge">{COMING_LABEL[locale]}</span>}
+                    {r.ebda[locale]}
+                  </td>
                   <td data-label={def[locale].name}>
                     {cell.text[locale]}
                     <span className="cmp-verdict"> · {k.verdict[cell.v]}</span>
@@ -59,6 +63,7 @@ function Table({
 export function ComparePage({ locale, slug }: { locale: Locale; slug: CompareSlug }) {
   const d = COMPARE[slug][locale];
   const k = COMPARE_PAGE[locale];
+  const rows = compareRows();
   return (
     <>
       <a href="#main" className="skip">
@@ -90,8 +95,8 @@ export function ComparePage({ locale, slug }: { locale: Locale; slug: CompareSlu
             </ul>
           </div>
         </section>
-        <Table locale={locale} slug={slug} rows={STRENGTH_ROWS} heading={k.strongH} id="strong-h" />
-        <Table locale={locale} slug={slug} rows={GAP_ROWS} heading={k.gapH} id="gap-h" />
+        <Table locale={locale} slug={slug} rows={rows.strength} heading={k.strongH} id="strong-h" />
+        <Table locale={locale} slug={slug} rows={rows.gap} heading={k.gapH} id="gap-h" />
         <p className="muted small">{k.verify}</p>
         <p className="actions">
           <a href={SIGNUP_URL} className="btn btn-primary btn-lg">

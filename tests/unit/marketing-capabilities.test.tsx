@@ -17,9 +17,9 @@ import { Home } from '../../apps/marketing/src/components/Home';
 import {
   CAPABILITIES,
   CAPABILITY_IDS,
-  FEATURES_FAQ,
+  featuresFaq,
 } from '../../apps/marketing/src/lib/capabilities';
-import { COMPARE, GAP_ROWS, STRENGTH_ROWS } from '../../apps/marketing/src/lib/compare';
+import { ALL_ROW_IDS, COMPARE, compareRows } from '../../apps/marketing/src/lib/compare';
 import { COMPARE_SLUGS, LOCALES, pagePath } from '../../apps/marketing/src/lib/site';
 
 const APP = path.resolve(__dirname, '../../apps/marketing');
@@ -53,7 +53,7 @@ describe('/features', () => {
     it(`${locale}: one block per capability, FAQ, compare links, no forbidden strings`, () => {
       for (const id of CAPABILITY_IDS) expect(html).toContain(`data-capability="${id}"`);
       expect(html.match(/<h1/g)).toHaveLength(1);
-      for (const f of FEATURES_FAQ[locale]) expect(html).toContain(f.q);
+      for (const f of featuresFaq(locale)) expect(html).toContain(f.q);
       for (const s of COMPARE_SLUGS)
         expect(html).toContain(`href="${pagePath(locale, `compare/${s}` as never)}"`);
       expect(html).not.toMatch(BAD);
@@ -62,7 +62,7 @@ describe('/features', () => {
       const m = html.match(/<script type="application\/ld\+json">(.*?)<\/script>/s)!;
       const g = JSON.parse(m[1].replace(/\\u003c/g, '<'))['@graph'];
       const faq = g.find((n: { '@type': string }) => n['@type'] === 'FAQPage');
-      expect(faq.mainEntity).toHaveLength(FEATURES_FAQ[locale].length);
+      expect(faq.mainEntity).toHaveLength(featuresFaq(locale).length);
     });
   }
   it('home shows the capabilities section in both locales and links to /features', () => {
@@ -82,8 +82,8 @@ describe('/compare is balanced', () => {
         // verdicts of "stronger" either way only where the fact is firmly public: Shopify
         expect(html.includes('data-verdict="ebda"')).toBe(slug === 'shopify');
         expect(html.includes('data-verdict="them"')).toBe(slug === 'shopify');
-        for (const r of GAP_ROWS) expect(html).toContain(r.label[locale]);
-        for (const r of STRENGTH_ROWS) expect(html).toContain(r.label[locale]);
+        for (const r of [...compareRows().gap, ...compareRows().strength])
+          expect(html).toContain(r.label[locale]);
         expect(html).toContain(locale === 'en' ? 'October 2026' : 'أكتوبر 2026');
         expect(html).not.toMatch(BAD);
         // JSON-LD on a compare page carries no FAQPage
@@ -91,18 +91,17 @@ describe('/compare is balanced', () => {
       });
     }
   }
-  it('names exactly the not-yet items: apps, code, B2B, POS, multi-currency', () => {
-    const ids = GAP_ROWS.map(r => r.id);
-    for (const id of ['apps', 'code', 'b2b', 'pos', 'multicur']) expect(ids).toContain(id);
+  it('every row has a cell for every vendor, and the permanent gaps stay in the not-yet table', () => {
+    const gap = compareRows().gap.map(r => r.id);
+    for (const id of ['apps', 'code', 'pos', 'multicur']) expect(gap).toContain(id);
     for (const slug of COMPARE_SLUGS)
-      for (const r of [...STRENGTH_ROWS, ...GAP_ROWS])
-        expect(COMPARE[slug].cells[r.id]).toBeTruthy();
+      for (const id of ALL_ROW_IDS) expect(COMPARE[slug].cells[id]).toBeTruthy();
   });
   it('uses no invented numbers about competitors (digits only in the Ebda column)', () => {
     for (const slug of COMPARE_SLUGS)
-      for (const r of [...STRENGTH_ROWS, ...GAP_ROWS])
+      for (const id of ALL_ROW_IDS)
         for (const l of LOCALES)
-          expect(COMPARE[slug].cells[r.id].text[l].replace(/B2B/g, '')).not.toMatch(/\d/);
+          expect(COMPARE[slug].cells[id].text[l].replace(/B2B/g, '')).not.toMatch(/\d/);
   });
 });
 
@@ -123,7 +122,7 @@ describe('llms.txt and llms-full.txt', () => {
   });
   it('llms-full.txt carries every capability title (English), the FAQ and the comparisons', () => {
     for (const id of CAPABILITY_IDS) expect(full).toContain(CAPABILITIES.en[id].t);
-    for (const f of FEATURES_FAQ.en) expect(full).toContain(f.q);
+    for (const f of featuresFaq('en')) expect(full).toContain(f.q);
     for (const s of COMPARE_SLUGS) expect(full).toContain(`/en/compare/${s}/`);
     expect(full).not.toMatch(BAD);
   });

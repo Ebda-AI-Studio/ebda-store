@@ -22,6 +22,8 @@ import { Product3D } from './Product3D';
 import { WhatsApp } from './WhatsApp';
 import { FeatureVisuals } from './FeatureVisuals';
 import { HomeCapabilities } from './Capabilities';
+import { AiNative } from './AiNative';
+import { AI_NATIVE } from '../lib/ai-native';
 import { FEATURES_PAGE } from '../lib/capabilities';
 
 function ProviderIcon({ kind }: { kind: 'cash' | 'truck' }) {
@@ -104,6 +106,11 @@ export function Home({ locale }: { locale: Locale }) {
             </li>
           ))}
         </ul>
+      </Section>
+    ),
+    ainative: () => (
+      <Section id="ainative" title={AI_NATIVE[locale].title} className="ainative">
+        <AiNative locale={locale} />
       </Section>
     ),
     capabilities: () => (
