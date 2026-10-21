@@ -87,6 +87,34 @@ describe('consent gate', () => {
   });
 });
 
+describe('no Meta pixel on a URL that carries a token, a term, an email or a phone (PIXEL-CONSENT-1)', () => {
+  it.each(['?token=abc123', '?q=01012345678', '?email=a%40b.com', '?phone=01012345678'])(
+    'consented on %s: Meta never loads and no event reaches it',
+    search => {
+      window.history.replaceState(null, '', `/verify-email${search}`);
+      const t = createTracker(CFG, window);
+      t.pageView();
+      t.setConsent({ analytics: false, marketing: true });
+      t.track('registration_completed', { eventId: 'reg_1' });
+      expect(scripts()).toEqual([]);
+      expect((window as unknown as { fbq?: unknown }).fbq).toBeUndefined();
+    }
+  );
+
+  it('an already-loaded pixel is not fed an event on a blocked URL, and is again on a clean one', () => {
+    const t = createTracker(CFG, window);
+    t.setConsent({ analytics: false, marketing: true });
+    const fbq = (window as unknown as { fbq: { queue: unknown[][] } }).fbq;
+    const before = fbq.queue.length;
+    window.history.replaceState(null, '', '/verify-email?token=abc123');
+    t.track('registration_completed', { eventId: 'reg_1' });
+    expect(fbq.queue.length).toBe(before);
+    window.history.replaceState(null, '', '/onboarding?utm_source=meta');
+    t.track('store_created', { eventId: 'store_1' });
+    expect(fbq.queue.length).toBe(before + 1);
+  });
+});
+
 describe('unset env', () => {
   it('no pixel id and no PostHog key: consent granted, still no script and no error', () => {
     const t = createTracker({}, window);

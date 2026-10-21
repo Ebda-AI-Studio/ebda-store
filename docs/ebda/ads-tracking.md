@@ -4,6 +4,8 @@ Measures Ahmad's Meta ads for Ebda Store itself. Separate from the per-merchant 
 
 Everything is **consent-gated** and **optional**: with the env vars unset nothing loads and nothing errors.
 
+> Privacy gate (Ruling PIXEL-CONSENT-1): the Meta pixel neither loads nor fires on a URL whose query holds a typed term, an email, a phone or a one-time token (`SENSITIVE_QUERY_PARAMS` in `@ebda/shared`). Pixels read the page URL themselves, so on `/verify-email?token=...` the browser `CompleteRegistration` is skipped and only the server (Conversions API) event, same `event_id`, reaches Meta.
+
 ## What fires where
 
 | Step                                                            | Meta event                              | Where                                                                                                           | Browser | Server (CAPI) | Dedup `event_id`             |

@@ -23,7 +23,12 @@ vi.mock('../contexts/ConsentContext', () => ({
 async function load() {
   vi.resetModules();
   const guard = await import('./purchase-pixel-guard');
-  const { trackPurchase } = await import('../components/MarketingPixels');
+  const { trackPurchase, MarketingPixelsProvider } = await import('../components/MarketingPixels');
+  // trackPurchase fires only while the consented provider is mounted (Ruling PIXEL-CONSENT-1).
+  const React = await import('react');
+  const { render, cleanup } = await import('@testing-library/react');
+  cleanup();
+  render(React.createElement(MarketingPixelsProvider, { pixels: {} }));
   return { ...guard, trackPurchase };
 }
 

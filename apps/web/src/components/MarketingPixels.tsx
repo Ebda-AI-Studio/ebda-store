@@ -8,6 +8,7 @@ import { useFeatures } from '../contexts/FeatureContext';
 import { useConsent } from '../contexts/ConsentContext';
 
 import { REGION, isPersonalDataTerm } from '@ebda/shared';
+import { urlCarriesPixelBlockedQuery } from '../lib/pixel-url-guard';
 interface MarketingPixelsProps {
   pixels: MarketingPixels;
 }
@@ -31,6 +32,19 @@ function isValidPixelId(id: string | undefined): id is string {
 let googleAdsSendTo: string | null = null;
 
 /**
+ * Whether the mounted pixel component currently allows ANY pixel traffic (marketing consent +
+ * feature on + a URL with nothing a pixel must not see). Every `track*` helper checks it first
+ * (Ruling PIXEL-CONSENT-1): the provider scripts are also kept off the page without consent, but
+ * a helper must not depend on that alone, so a library that is present for any other reason
+ * (a merchant's GTM container, a stale tab) still receives nothing. Set during render, before
+ * any child effect can call a helper; browser-only (the helpers return early on the server).
+ */
+let pixelEventsArmed = false;
+function armPixelEvents(on: boolean) {
+  if (typeof window !== 'undefined') pixelEventsArmed = on;
+}
+
+/**
  * Marketing Pixels Component
  *
  * Injects all configured marketing pixels into the page.
@@ -48,7 +62,12 @@ function MarketingPixelsInner({ pixels }: MarketingPixelsProps) {
   // `consent.marketing === true` check here prevents pixels from firing
   // anyway. Belt-and-braces for the most sensitive surface in the app.
   const marketingConsentGranted = consent?.marketing === true;
-  const allowFire = featureEnabled && marketingConsentGranted;
+  // The pixels read the page URL themselves and send it to their network. A URL carrying a typed
+  // term, an email, a phone or a one-time token (`?q=`, `?token=`, ...) therefore gets no pixel
+  // at all: no library, no PageView, no event (Ruling PIXEL-CONSENT-1, launch blocker 32).
+  const urlSafeForPixels = !urlCarriesPixelBlockedQuery(searchParams);
+  const allowFire = featureEnabled && marketingConsentGranted && urlSafeForPixels;
+  armPixelEvents(allowFire);
 
   // Track page views on route change. The hook MUST be unconditional —
   // moving the early-return above this useEffect violates rules-of-hooks.
@@ -84,6 +103,8 @@ function MarketingPixelsInner({ pixels }: MarketingPixelsProps) {
       (window as { pintrk: (...args: string[]) => void }).pintrk('page');
     }
   }, [pathname, searchParams, pixels, allowFire]);
+
+  useEffect(() => () => armPixelEvents(false), []);
 
   const adsConversionId = pixels.googleAds?.conversionId;
   const adsConversionLabel = pixels.googleAds?.conversionLabel;
@@ -259,7 +280,7 @@ export function trackViewContent(params: {
   value?: number;
   currency?: string;
 }) {
-  if (typeof window === 'undefined') return;
+  if (typeof window === 'undefined' || !pixelEventsArmed) return;
   const w = window as TrackingWindow;
 
   w.fbq?.('track', 'ViewContent', {
@@ -303,7 +324,7 @@ export function trackAddToCart(params: {
   value?: number;
   currency?: string;
 }) {
-  if (typeof window === 'undefined') return;
+  if (typeof window === 'undefined' || !pixelEventsArmed) return;
   const w = window as TrackingWindow;
 
   w.fbq?.('track', 'AddToCart', {
@@ -347,7 +368,7 @@ export function trackInitiateCheckout(params: {
   value: number;
   currency?: string;
 }) {
-  if (typeof window === 'undefined') return;
+  if (typeof window === 'undefined' || !pixelEventsArmed) return;
   const w = window as TrackingWindow;
 
   w.fbq?.('track', 'InitiateCheckout', {
@@ -404,7 +425,7 @@ export function trackPurchase(params: {
   value: number;
   currency?: string;
 }): boolean {
-  if (typeof window === 'undefined') return false;
+  if (typeof window === 'undefined' || !pixelEventsArmed) return false;
   const w = window as TrackingWindow;
   const anyTrackerPresent = Boolean(w.fbq || w.ttq || w.snaptr || w.gtag || w.twq || w.pintrk);
 
@@ -472,7 +493,7 @@ export function trackPurchase(params: {
  * fires the Search event, just without the term.
  */
 export function trackSearch(params: { searchString: string }) {
-  if (typeof window === 'undefined') return;
+  if (typeof window === 'undefined' || !pixelEventsArmed) return;
   const w = window as TrackingWindow;
   const term = isPersonalDataTerm(params.searchString) ? undefined : params.searchString;
   const withTerm = <K extends string>(key: K) =>
@@ -495,7 +516,7 @@ export function trackAddToWishlist(params: {
   value?: number;
   currency?: string;
 }) {
-  if (typeof window === 'undefined') return;
+  if (typeof window === 'undefined' || !pixelEventsArmed) return;
   const w = window as TrackingWindow;
 
   w.fbq?.('track', 'AddToWishlist', {
@@ -522,7 +543,7 @@ export function trackAddToWishlist(params: {
  * Track Lead/Contact event
  */
 export function trackLead(params?: { contentName?: string; value?: number; currency?: string }) {
-  if (typeof window === 'undefined') return;
+  if (typeof window === 'undefined' || !pixelEventsArmed) return;
   const w = window as TrackingWindow;
 
   w.fbq?.('track', 'Lead', { content_name: params?.contentName, value: params?.value });
