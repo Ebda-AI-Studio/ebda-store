@@ -66,7 +66,7 @@ export interface ThemeProviderProps {
  * ```tsx
  * <ThemeProvider
  *   templateId="modern"
- *   theme={{ primaryColor: '26 100% 50%' }}
+ *   theme={{ primaryColor: '36 36% 52%' }}
  *   isRtl={false}
  * >
  *   <App />

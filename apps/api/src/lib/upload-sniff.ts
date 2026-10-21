@@ -75,17 +75,17 @@ export const UPLOAD_CONTENT_ERRORS = {
   image: {
     code: 'INVALID_IMAGE_CONTENT',
     en: 'The file is not a JPEG, PNG, GIF or WebP image',
-    ar: 'الملف ليس صورة JPEG أو PNG أو GIF أو WebP',
+    ar: 'الملف ده مش صورة JPEG أو PNG أو GIF أو WebP',
   },
   receipt: {
     code: 'INVALID_IMAGE_CONTENT',
     en: 'The receipt must be a JPEG, PNG or WebP image',
-    ar: 'يجب أن يكون الإيصال صورة JPEG أو PNG أو WebP',
+    ar: 'الإيصال لازم يكون صورة JPEG أو PNG أو WebP',
   },
   font: {
     code: 'INVALID_FONT_CONTENT',
     en: 'The file is not a WOFF2, WOFF, TTF or OTF font',
-    ar: 'الملف ليس خطًا بصيغة WOFF2 أو WOFF أو TTF أو OTF',
+    ar: 'الملف ده مش خط WOFF2 أو WOFF أو TTF أو OTF',
   },
 } as const;
 

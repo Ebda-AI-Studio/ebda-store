@@ -14,7 +14,9 @@ import { reconcileStoreAccess } from './account.service';
 import { instapayDetails } from './account.service';
 import { supportContact } from './manual-config';
 import { emitEbdaConversion } from '../ebda-ads-emit';
-import { purchaseEventId } from '@ebda/shared';
+import { purchaseEventId, billingPaymentNumber, EBDA_BILLING_BARCODE_SHAPE } from '@ebda/shared';
+import { ensureEmailBarcode } from '../barcode-image.service';
+import type { EmailBarcode } from '../email-templates/_barcode';
 
 export type BillingEffect =
   | { kind: 'plan_changed'; storeId: string }
@@ -37,7 +39,14 @@ export type BillingEffect =
       planCode: string;
     }
   /** The super-admin approved an InstaPay payment (audit #11). */
-  | { kind: 'payment_confirmed'; storeId: string; planCode: string; periodEnd: Date }
+  | {
+      kind: 'payment_confirmed';
+      storeId: string;
+      planCode: string;
+      periodEnd: Date;
+      /** The ledger row of this payment: its hashed id is the receipt's scannable number. */
+      billingEventId?: string;
+    }
   /** The super-admin rejected an InstaPay payment, with the reason. */
   | { kind: 'payment_rejected'; storeId: string; note: string }
   /** A billing suspension was lifted: the store is back. */
@@ -166,6 +175,18 @@ async function runOne(effect: BillingEffect): Promise<void> {
       data: { storeId: effect.storeId, url },
       createdAt: new Date(),
     });
+    // The receipt barcode (palm, Ebda's own billing shape): ready or not, the notice goes out.
+    let barcode: EmailBarcode | null = null;
+    let paymentNumber: string | undefined;
+    if (effect.kind === 'payment_confirmed' && effect.billingEventId) {
+      paymentNumber = billingPaymentNumber(effect.billingEventId);
+      barcode = await ensureEmailBarcode({
+        storeId: effect.storeId,
+        kind: 'billing',
+        number: paymentNumber,
+        shape: EBDA_BILLING_BARCODE_SHAPE,
+      }).catch(() => null);
+    }
     if (store.owner?.email) {
       await EmailService.sendSubscriptionBillingNotice(
         effect.storeId,
@@ -178,6 +199,8 @@ async function runOne(effect: BillingEffect): Promise<void> {
           billingUrl: `${config.adminUrl ?? ''}${url}`,
           paidUntil: until || undefined,
           reason: effect.kind === 'payment_rejected' ? effect.note : undefined,
+          barcode,
+          paymentNumber,
           whatsappUrl: supportContact(store.name).whatsappUrl,
           supportEmail: supportContact(store.name).email,
         },

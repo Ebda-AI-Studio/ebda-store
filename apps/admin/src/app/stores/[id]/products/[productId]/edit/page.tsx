@@ -1069,7 +1069,7 @@ export default function EditProductPage() {
                     type="button"
                     onClick={() => generateAiContent('fill-empty')}
                     disabled={seoGenerating}
-                    className="inline-flex items-center gap-2 rounded-lg border border-[#fc6b02]/40 bg-[#fc6b02]/5 px-3 py-1.5 text-xs font-semibold text-[#fc6b02] transition-colors hover:bg-[#fc6b02]/10 disabled:cursor-not-allowed disabled:opacity-50"
+                    className="inline-flex items-center gap-2 rounded-lg border border-primary/40 bg-primary/5 px-3 py-1.5 text-xs font-semibold text-primary-ink transition-colors hover:bg-primary/10 disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     <span aria-hidden>✨</span>
                     {seoGenerating ? tSeo('generating') : tSeo('aiFillEmpty')}
@@ -1078,7 +1078,7 @@ export default function EditProductPage() {
                     type="button"
                     onClick={() => generateAiContent('overwrite')}
                     disabled={seoGenerating}
-                    className="inline-flex items-center gap-2 rounded-lg border border-[#fc6b02] px-3 py-1.5 text-xs font-semibold text-[#fc6b02] transition-colors hover:bg-[#fc6b02]/5 disabled:cursor-not-allowed disabled:opacity-50"
+                    className="inline-flex items-center gap-2 rounded-lg border border-primary px-3 py-1.5 text-xs font-semibold text-primary-ink transition-colors hover:bg-primary/5 disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     {tSeo('aiRegenerateAll')}
                   </button>

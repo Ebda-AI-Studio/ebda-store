@@ -8,9 +8,9 @@
  * Variable placeholders are positional 1..N. When sending, the WBS bridge
  * passes a `variables` array matching {{1}}..{{N}} order.
  *
- * Template naming convention: `force_<purpose>_<version>` where version
+ * Template naming convention: `ebda_<purpose>_<version>` where version
  * lets us iterate template text without orphaning existing approvals
- * (e.g. `force_order_paid_v1` → `force_order_paid_v2` next iteration).
+ * (e.g. `ebda_order_paid_v1` → `ebda_order_paid_v2` next iteration).
  */
 import { BRAND } from '@ebda/shared';
 
@@ -74,7 +74,7 @@ export const TEMPLATES: TemplateDefinition[] = [
   // ───── orderPaid ─────
   {
     sourceKey: 'orderPaid',
-    name: 'force_order_paid_v1',
+    name: 'ebda_order_paid_v1',
     language: 'en',
     metaLanguage: 'en',
     category: 'UTILITY',
@@ -97,7 +97,7 @@ export const TEMPLATES: TemplateDefinition[] = [
   },
   {
     sourceKey: 'orderPaid',
-    name: 'force_order_paid_v1',
+    name: 'ebda_order_paid_v1',
     language: 'ar',
     metaLanguage: 'ar',
     category: 'UTILITY',
@@ -107,14 +107,14 @@ export const TEMPLATES: TemplateDefinition[] = [
     components: [
       {
         type: 'BODY',
-        text: 'مرحبًا {{1}}، تم استلام طلبك {{2}} بقيمة {{3}} من {{4}}. شكرًا لك!',
+        text: 'أهلاً {{1}}، استلمنا طلبك {{2}} بقيمة {{3}} من {{4}}. شكراً ليك!',
         example: {
           body_text: [['أحمد', 'ORD-1042', '55.00 ج.م', 'وادي الجوز']],
         },
       },
       {
         type: 'FOOTER',
-        text: 'سنرسل لك رسالة عند شحن الطلب.',
+        text: 'هنبعتلك رسالة أول ما الطلب يتشحن.',
       },
     ],
   },
@@ -122,7 +122,7 @@ export const TEMPLATES: TemplateDefinition[] = [
   // ───── orderShipped ─────
   {
     sourceKey: 'orderShipped',
-    name: 'force_order_shipped_v2',
+    name: 'ebda_order_shipped_v2',
     language: 'en',
     metaLanguage: 'en',
     category: 'UTILITY',
@@ -153,7 +153,7 @@ export const TEMPLATES: TemplateDefinition[] = [
   },
   {
     sourceKey: 'orderShipped',
-    name: 'force_order_shipped_v2',
+    name: 'ebda_order_shipped_v2',
     language: 'ar',
     metaLanguage: 'ar',
     category: 'UTILITY',
@@ -163,7 +163,7 @@ export const TEMPLATES: TemplateDefinition[] = [
     components: [
       {
         type: 'BODY',
-        text: 'مرحبًا {{1}}، طلبك {{2}} بقيمة {{3}} من {{4}} في الطريق. تتبّعه برقم {{5}} وسنُعلمك فور الوصول.',
+        text: 'أهلاً {{1}}، طلبك {{2}} بقيمة {{3}} من {{4}} في الطريق. تابعه برقم {{5}} وهنبلغك أول ما يوصل.',
         example: {
           body_text: [['أحمد', 'ORD-1042', '55.00 ج.م', 'وادي الجوز', 'TRK-12345']],
         },
@@ -174,7 +174,7 @@ export const TEMPLATES: TemplateDefinition[] = [
   // ───── orderDelivered ─────
   {
     sourceKey: 'orderDelivered',
-    name: 'force_order_delivered_v2',
+    name: 'ebda_order_delivered_v2',
     language: 'en',
     metaLanguage: 'en',
     category: 'UTILITY',
@@ -200,7 +200,7 @@ export const TEMPLATES: TemplateDefinition[] = [
   },
   {
     sourceKey: 'orderDelivered',
-    name: 'force_order_delivered_v2',
+    name: 'ebda_order_delivered_v2',
     language: 'ar',
     metaLanguage: 'ar',
     category: 'UTILITY',
@@ -210,14 +210,14 @@ export const TEMPLATES: TemplateDefinition[] = [
     components: [
       {
         type: 'BODY',
-        text: 'مرحبًا {{1}}، تم تسليم طلبك {{2}} بقيمة {{3}} من {{4}}. شكرًا لتسوقك معنا، ونأمل أن يعجبك.',
+        text: 'أهلاً {{1}}، طلبك {{2}} بقيمة {{3}} من {{4}} اتسلّم. شكراً إنك اشتريت من عندنا، ونتمنى يعجبك.',
         example: {
           body_text: [['أحمد', 'ORD-1042', '55.00 ج.م', 'وادي الجوز']],
         },
       },
       {
         type: 'FOOTER',
-        text: 'نأمل أن يعجبك.',
+        text: 'نتمنى يعجبك.',
       },
     ],
   },
@@ -225,7 +225,7 @@ export const TEMPLATES: TemplateDefinition[] = [
   // ───── welcomeBack ─────
   {
     sourceKey: 'welcomeBack',
-    name: 'force_welcome_back_v1',
+    name: 'ebda_welcome_back_v1',
     language: 'en',
     metaLanguage: 'en',
     category: 'MARKETING',
@@ -244,7 +244,7 @@ export const TEMPLATES: TemplateDefinition[] = [
   },
   {
     sourceKey: 'welcomeBack',
-    name: 'force_welcome_back_v1',
+    name: 'ebda_welcome_back_v1',
     language: 'ar',
     metaLanguage: 'ar',
     category: 'MARKETING',
@@ -254,7 +254,7 @@ export const TEMPLATES: TemplateDefinition[] = [
     components: [
       {
         type: 'BODY',
-        text: 'مرحبًا بعودتك {{1}}! وصلت منتجات جديدة إلى {{2}}. اكتب "قائمة" لتصفح أحدث المجموعة.',
+        text: 'أهلاً بعودتك {{1}}! وصلت منتجات جديدة في {{2}}. اكتب "قائمة" عشان تشوف أحدث التشكيلة.',
         example: {
           body_text: [['أحمد', 'وادي الجوز']],
         },
@@ -265,7 +265,7 @@ export const TEMPLATES: TemplateDefinition[] = [
   // ───── cartAbandoned ─────
   {
     sourceKey: 'cartAbandoned',
-    name: 'force_cart_abandoned_v1',
+    name: 'ebda_cart_abandoned_v1',
     language: 'en',
     metaLanguage: 'en',
     category: 'MARKETING',
@@ -284,7 +284,7 @@ export const TEMPLATES: TemplateDefinition[] = [
   },
   {
     sourceKey: 'cartAbandoned',
-    name: 'force_cart_abandoned_v1',
+    name: 'ebda_cart_abandoned_v1',
     language: 'ar',
     metaLanguage: 'ar',
     category: 'MARKETING',
@@ -294,7 +294,7 @@ export const TEMPLATES: TemplateDefinition[] = [
     components: [
       {
         type: 'BODY',
-        text: 'مرحبًا {{1}}، لديك منتجات بقيمة {{2}} في سلتك في {{3}}. اكتب "إتمام الطلب" لإكمال الشراء.',
+        text: 'أهلاً {{1}}، عندك منتجات بقيمة {{2}} في سلتك في {{3}}. اكتب "إتمام الطلب" عشان تكمّل الشراء.',
         example: {
           body_text: [['أحمد', '55.00 ج.م', 'وادي الجوز']],
         },
@@ -305,7 +305,7 @@ export const TEMPLATES: TemplateDefinition[] = [
   // ───── paymentLink ─────
   {
     sourceKey: 'paymentLink',
-    name: 'force_payment_link_v1',
+    name: 'ebda_payment_link_v1',
     language: 'en',
     metaLanguage: 'en',
     category: 'UTILITY',
@@ -336,7 +336,7 @@ export const TEMPLATES: TemplateDefinition[] = [
   },
   {
     sourceKey: 'paymentLink',
-    name: 'force_payment_link_v1',
+    name: 'ebda_payment_link_v1',
     language: 'ar',
     metaLanguage: 'ar',
     category: 'UTILITY',
@@ -346,7 +346,7 @@ export const TEMPLATES: TemplateDefinition[] = [
     components: [
       {
         type: 'BODY',
-        text: 'مرحبًا {{1}}، هذا رابط الدفع من {{4}} بقيمة {{2}} {{3}}: {{5}}. الرابط صالح لمدة 30 دقيقة.',
+        text: 'أهلاً {{1}}، ده رابط الدفع من {{4}} بقيمة {{2}} {{3}}: {{5}}. الرابط شغال لمدة 30 دقيقة.',
         example: {
           body_text: [
             [

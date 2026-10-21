@@ -64,10 +64,10 @@ const MESSAGES: Record<Exclude<GateVerdict, { ok: true }>['code'], string> = {
   STORE_LIMIT_REACHED: 'Your plan does not include another live store; upgrade to Business',
 };
 const MESSAGES_AR: Record<keyof typeof MESSAGES, string> = {
-  PAYMENT_METHOD_REQUIRED: 'أضف بطاقة دفع أو اختر إنستاباي قبل نشر متجرك',
-  TRIAL_EXPIRED: 'انتهت فترة التجربة؛ اختر باقة وادفع لنشر المتجر',
-  NO_SUBSCRIPTION: 'لا توجد باقة لهذا المتجر بعد',
-  STORE_LIMIT_REACHED: 'باقتك لا تشمل متجرًا منشورًا إضافيًا؛ قم بالترقية إلى الأعمال',
+  PAYMENT_METHOD_REQUIRED: 'ضيف كارت دفع أو اختار إنستاباي قبل ما تنشر متجرك',
+  TRIAL_EXPIRED: 'فترة التجربة خلصت؛ اختار باقة وادفع عشان تنشر المتجر',
+  NO_SUBSCRIPTION: 'المتجر ده لسه مالوش باقة',
+  STORE_LIMIT_REACHED: 'باقتك مفيهاش متجر منشور زيادة؛ اعمل ترقية لباقة الأعمال',
 };
 
 function gateError(code: keyof typeof MESSAGES): AppError {

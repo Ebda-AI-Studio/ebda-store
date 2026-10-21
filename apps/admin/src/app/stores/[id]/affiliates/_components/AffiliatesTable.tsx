@@ -185,7 +185,7 @@ export function AffiliatesTable({
             onClick={() => onStatusFilterChange(s)}
             className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
               statusFilter === s
-                ? 'bg-primary text-white'
+                ? 'bg-primary text-primary-foreground'
                 : 'bg-card text-foreground hover:bg-muted border border-border'
             }`}
           >

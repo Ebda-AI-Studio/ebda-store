@@ -180,25 +180,27 @@ function ToastItem({ toast, onClose }: { toast: Toast; onClose: () => void }) {
   };
 
   const styles: Record<ToastType, { container: string; icon: string; progress: string }> = {
+    // Semantic tokens only (success/destructive/warning/info, each with its `-ink` for text on a
+    // tint): a store's look can restyle them, and no palette colour is hard-coded here.
     success: {
-      container: 'bg-background border-green-200 dark:border-green-800',
-      icon: 'text-green-500 bg-green-50 dark:bg-green-900/30',
-      progress: 'bg-green-500',
+      container: 'bg-background border-success/30',
+      icon: 'text-success-ink bg-success/20',
+      progress: 'bg-success',
     },
     error: {
-      container: 'bg-background border-red-200 dark:border-red-800',
-      icon: 'text-red-500 bg-red-50 dark:bg-red-900/30',
-      progress: 'bg-red-500',
+      container: 'bg-background border-destructive/30',
+      icon: 'text-destructive-ink bg-destructive/20',
+      progress: 'bg-destructive',
     },
     warning: {
-      container: 'bg-background border-yellow-200 dark:border-yellow-800',
-      icon: 'text-yellow-500 bg-yellow-50 dark:bg-yellow-900/30',
-      progress: 'bg-yellow-500',
+      container: 'bg-background border-warning/30',
+      icon: 'text-warning-ink bg-warning/20',
+      progress: 'bg-warning',
     },
     info: {
-      container: 'bg-background border-blue-200 dark:border-blue-800',
-      icon: 'text-blue-500 bg-blue-50 dark:bg-blue-900/30',
-      progress: 'bg-blue-500',
+      container: 'bg-background border-info/30',
+      icon: 'text-info-ink bg-info/20',
+      progress: 'bg-info',
     },
   };
 

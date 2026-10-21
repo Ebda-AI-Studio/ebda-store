@@ -1,6 +1,7 @@
 'use client';
 
 import type { CSSProperties } from 'react';
+import { pickReadableForeground } from '@ebda/shared';
 import { useT } from '@/i18n/useT';
 import type { StoreTheme } from './types';
 
@@ -15,6 +16,8 @@ interface BrandPreviewProps {
  */
 export function BrandPreview({ theme }: BrandPreviewProps) {
   const t = useT('branding.preview');
+  // K-02 (review N2): the ink the storefront derives for this colour, not a fixed white.
+  const ink = pickReadableForeground(theme.primaryColor) ?? '#ffffff';
 
   return (
     <div className="mt-8 pt-6 border-t">
@@ -26,8 +29,8 @@ export function BrandPreview({ theme }: BrandPreviewProps) {
         <div className="flex items-center gap-4 mb-4">
           <button
             type="button"
-            className="px-4 py-2 text-white rounded-lg"
-            style={{ backgroundColor: `hsl(${theme.primaryColor})` }}
+            className="px-4 py-2 rounded-lg"
+            style={{ backgroundColor: `hsl(${theme.primaryColor})`, color: ink }}
           >
             {t('primaryButton')}
           </button>

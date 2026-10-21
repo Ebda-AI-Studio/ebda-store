@@ -75,7 +75,7 @@ describe.each(['card', 'row'] as const)('BundleLine stock note (%s)', variant =>
   it('localizes both cases in Arabic', () => {
     lang = 'ar';
     const partial = render(<BundleLine {...base} quantity={5} available={2} variant={variant} />);
-    expect(note(partial.container)).toBe('المتوفر 2 فقط');
+    expect(note(partial.container)).toBe('المتوفر 2 بس');
     cleanup();
     const none = render(<BundleLine {...base} quantity={1} available={0} variant={variant} />);
     expect(note(none.container)).toBe('غير متوفر');

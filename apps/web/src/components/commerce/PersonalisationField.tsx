@@ -103,7 +103,7 @@ export function PersonalisationField({
         className="mt-1.5 flex items-center justify-between gap-3 text-xs text-muted-foreground md:max-w-sm"
       >
         <span data-testid="personalisation-hint">
-          {missing && touched ? t(`Fill in “${label}” first`, `اكتب ${label} أولاً`) : ''}
+          {missing && touched ? t(`Fill in “${label}” first`, `اكتب ${label} الأول`) : ''}
         </span>
         <span className="tabular-nums" aria-label={t('Characters used', 'عدد الحروف')}>
           {localize(value.length)}/{localize(cfg.maxLength)}

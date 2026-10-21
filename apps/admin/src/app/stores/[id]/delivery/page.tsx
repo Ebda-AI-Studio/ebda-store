@@ -15,6 +15,8 @@ import {
   hasInvalidOffDays,
 } from '../../../../lib/checkout-delivery-payload';
 import { DeliveryOffDaysField } from '../../../../components/DeliveryOffDaysField';
+import { ReceiptBarcodePicker } from '../../../../components/ReceiptBarcodePicker';
+import { PackingSlipNoteField } from '../../../../components/orders/PackingSlipNoteField';
 import { useT } from '@/i18n/useT';
 import type { CheckoutDeliverySettings, CheckoutDeliveryWindow } from '@ebda/shared';
 
@@ -471,6 +473,22 @@ export default function CheckoutDeliveryPage() {
             />
           </label>
         </section>
+
+        {!isLoading && (
+          <ReceiptBarcodePicker
+            storeId={storeId}
+            value={existingSettings.receiptBarcodeShape as string | undefined}
+            onSaved={shape => setExistingSettings(s => ({ ...s, receiptBarcodeShape: shape }))}
+          />
+        )}
+
+        {!isLoading && (
+          <PackingSlipNoteField
+            storeId={storeId}
+            value={existingSettings.packingSlipNote as string | undefined}
+            onSaved={note => setExistingSettings(s => ({ ...s, packingSlipNote: note }))}
+          />
+        )}
 
         {message && (
           <div

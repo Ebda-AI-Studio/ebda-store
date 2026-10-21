@@ -254,6 +254,7 @@ export const orderCreated: InngestFunction.Any = inngest.createFunction(
           total: order.total,
           storeId,
           storeName: store?.name ?? storeId,
+          locale: emailLocale,
         });
       }),
       step.run('onesignal-admin-push', () => {

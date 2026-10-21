@@ -183,7 +183,7 @@ describe('pickProductName (#1805)', () => {
     const copy = productUnavailableCopy(tAr, 2, names);
     // Both names resolved (one Arabic, one English fallback) — the list is
     // COMPLETE, so the copy says "Remove:", not the weaker "Including:".
-    expect(copy).toMatch(/يرجى إزالة:/);
+    expect(copy).toMatch(/شيل:/);
     expect(copy).toContain('قفطان أزرق');
     expect(copy).toContain('Gold Abaya');
   });

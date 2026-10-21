@@ -40,7 +40,7 @@ describe('welcomeTemplate', () => {
   });
 
   it('ar subject includes store name in Arabic', () => {
-    expect(welcomeTemplate.subject.ar(data, STORE)).toContain('مرحباً بك في');
+    expect(welcomeTemplate.subject.ar(data, STORE)).toContain('أهلاً بيك في');
     expect(welcomeTemplate.subject.ar(data, STORE)).toContain(STORE);
   });
 
@@ -228,7 +228,7 @@ describe('duplicateRegistrationTemplate', () => {
   });
 
   it('ar subject includes store name in Arabic', () => {
-    expect(duplicateRegistrationTemplate.subject.ar(data, STORE)).toContain('حساب مسبقاً');
+    expect(duplicateRegistrationTemplate.subject.ar(data, STORE)).toContain('حساب بالفعل');
     expect(duplicateRegistrationTemplate.subject.ar(data, STORE)).toContain(STORE);
   });
 
@@ -240,7 +240,7 @@ describe('duplicateRegistrationTemplate', () => {
 
   it('ar subject without storeName', () => {
     expect(duplicateRegistrationTemplate.subject.ar({ ...data, storeName: undefined }, STORE)).toBe(
-      'لديك حساب مسبقاً'
+      'عندك حساب بالفعل'
     );
   });
 
@@ -252,7 +252,7 @@ describe('duplicateRegistrationTemplate', () => {
 
   it('ar body has Arabic text and sign-in link', () => {
     const html = duplicateRegistrationTemplate.ar(data, STORE, WEB_URL);
-    expect(html).toContain('لديك حساب');
+    expect(html).toContain('عندك حساب');
     expect(html).toContain('/auth/login');
   });
 
@@ -294,7 +294,7 @@ describe('orderConfirmationTemplate', () => {
 
   it('ar subject contains order number and Arabic text', () => {
     expect(orderConfirmationTemplate.subject.ar(orderData, STORE)).toContain('ORD-001');
-    expect(orderConfirmationTemplate.subject.ar(orderData, STORE)).toContain('تم تأكيد');
+    expect(orderConfirmationTemplate.subject.ar(orderData, STORE)).toContain('اتأكد');
   });
 
   it('en body uses EGP currency', () => {
@@ -374,7 +374,7 @@ describe('paymentSuccessTemplate', () => {
   });
 
   it('ar subject', () => {
-    expect(paymentSuccessTemplate.subject.ar(orderData, STORE)).toContain('تم استلام الدفعة');
+    expect(paymentSuccessTemplate.subject.ar(orderData, STORE)).toContain('الدفع وصلنا');
   });
 
   it('en body contains EGP total', () => {
@@ -411,7 +411,7 @@ describe('paymentFailedTemplate', () => {
   });
 
   it('ar subject', () => {
-    expect(paymentFailedTemplate.subject.ar(data, STORE)).toContain('فشلت عملية الدفع');
+    expect(paymentFailedTemplate.subject.ar(data, STORE)).toContain('الدفع منفعش');
   });
 
   it('en body shows reason', () => {
@@ -450,7 +450,7 @@ describe('orderShippedTemplate', () => {
   });
 
   it('ar subject', () => {
-    expect(orderShippedTemplate.subject.ar(data, STORE)).toContain('تم شحن');
+    expect(orderShippedTemplate.subject.ar(data, STORE)).toContain('اتشحن');
   });
 
   it('en body has tracking number and carrier', () => {
@@ -508,7 +508,7 @@ describe('returnConfirmationTemplate', () => {
 
   it('ar subject for refund type contains Arabic', () => {
     expect(returnConfirmationTemplate.subject.ar({ ...data, type: 'refund' }, STORE)).toContain(
-      'تم استلام طلب الاسترداد'
+      'استلمنا طلب الاسترداد'
     );
   });
 
@@ -520,7 +520,7 @@ describe('returnConfirmationTemplate', () => {
 
   it('ar body has Arabic text and return number', () => {
     const html = returnConfirmationTemplate.ar(data, STORE);
-    expect(html).toContain('شكراً لصبرك');
+    expect(html).toContain('شكراً على صبرك');
     expect(html).toContain('RET-001');
   });
 
@@ -559,7 +559,7 @@ describe('returnStatusUpdateTemplate', () => {
 
   it('ar body has Arabic approved message', () => {
     const html = returnStatusUpdateTemplate.ar(data, STORE);
-    expect(html).toContain('الموافقة');
+    expect(html).toContain('وافقنا');
     expect(html).toContain('RET-002');
   });
 
