@@ -16,6 +16,9 @@ export const BARCODE_DISPLAY_PX = {
   invoice: 360,
   billingReceipt: 344,
   email: 360,
+  /** Packing slip: A4 page content / 4x6in label content (the label is narrower, so more shapes fall back to plain). */
+  packingSlipA4: 360,
+  packingSlipLabel: 320,
 } as const;
 export type BarcodeSurface = keyof typeof BARCODE_DISPLAY_PX;
 

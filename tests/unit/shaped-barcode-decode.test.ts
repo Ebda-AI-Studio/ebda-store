@@ -130,3 +130,19 @@ describe('which shapes meet the floor', () => {
     expect(fb(BARCODE_DISPLAY_PX.storefrontReceipt)).not.toContain('palm');
   });
 });
+
+describe('packing slip sizes', () => {
+  for (const [name, px] of [
+    ['A4 slip', BARCODE_DISPLAY_PX.packingSlipA4],
+    ['4x6 label', BARCODE_DISPLAY_PX.packingSlipLabel],
+  ] as const) {
+    it(`${name} (${px}px): every shape (or its plain fallback) decodes, zone alone`, async () => {
+      for (const shape of SHAPES) {
+        for (const value of REAL) {
+          const svg = renderBarcodeSvg({ value, shape, ink: '#111111', displayPx: px });
+          expect(await decode(zoneOnly(svg), px), `${name} ${shape} ${value}`).toContain(scanCodeFor(value));
+        }
+      }
+    });
+  }
+});

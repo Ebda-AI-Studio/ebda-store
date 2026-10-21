@@ -37,7 +37,7 @@ describe('scan code (compact, reversible)', () => {
 describe('minimum module width rule', () => {
   it('defines the display sizes and a 2 css px floor', () => {
     expect(MIN_MODULE_CSS_PX).toBe(2);
-    expect(Object.keys(BARCODE_DISPLAY_PX).sort()).toEqual(['billingReceipt', 'email', 'invoice', 'storefrontReceipt']);
+    expect(Object.keys(BARCODE_DISPLAY_PX).sort()).toEqual(['billingReceipt', 'email', 'invoice', 'packingSlipA4', 'packingSlipLabel', 'storefrontReceipt']);
   });
   it('plain spans the width; a shape loses the padding share', () => {
     const v = 'ORD-T5JK9Q-AB3XY';
