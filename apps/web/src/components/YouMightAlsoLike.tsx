@@ -65,7 +65,7 @@ export function YouMightAlsoLike({ storeId, productId }: YouMightAlsoLikeProps) 
         <SectionRetryNotice
           onRetry={refetch}
           message="Couldn't load You Might Also Like."
-          messageAr="تعذّر تحميل قسم قد يعجبك أيضاً."
+          messageAr="معرفناش نحمّل قسم «ممكن يعجبك كمان»."
         />
       </div>
     );

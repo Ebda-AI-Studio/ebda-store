@@ -44,6 +44,7 @@ import { productMetaSyncFn, productMetaSyncDeleteFn } from './product-meta-sync'
 import { aiAutofillProduct } from './ai-autofill-product';
 import { aiAutofillCleanup } from './ai-autofill-cleanup';
 import { aiAutofillSweep } from './ai-autofill-sweep';
+import { searchProductIndex, searchIndexBackstop } from './search-product-index';
 import { orderCapiConversion } from './order-capi-conversion';
 import { ebdaAdsConversion } from './ebda-ads-conversion';
 import { orderAutoCancelUnpaid } from './order-auto-cancel-unpaid';
@@ -79,6 +80,7 @@ import {
 import { gscIngestCron, gscIngestOnDemand } from './gsc-ingest';
 import { contactFormSend } from './contact-form-send';
 import { campaignSend } from './campaign-send';
+import { cartRecoveryEmail } from './cart-recovery-email';
 import { legalNoticeSend } from './legal-notice-send';
 
 /**
@@ -143,6 +145,9 @@ const allInngestFunctions: InngestFunction.Any[] = [
   aiAutofillCleanup,
   // AI-first autofill: daily leader-locked catalogue sweep with order-driven recos
   aiAutofillSweep,
+  // Search (Task 11): embed stale products per store + 6-hourly stale-store backstop/backfill
+  searchProductIndex,
+  searchIndexBackstop,
   // Server-side conversion API: Meta CAPI + TikTok Events API on purchase
   orderCapiConversion,
   // Ebda's OWN acquisition funnel: Meta CAPI for registration / store created / first paid sub.
@@ -221,6 +226,9 @@ const allInngestFunctions: InngestFunction.Any[] = [
   // D2 email campaigns: event-triggered only (a merchant pressing send) —
   // no cron, so registering it sends nothing on its own.
   campaignSend,
+  // Abandoned-cart recovery email: event-triggered only (the 15-min cart sweep claims a due
+  // cart and emits one event); consent-gated and once per cart.
+  cartRecoveryEmail,
   // Material legal-policy change: one email per store owner (Ruling LEGAL-4). Event-triggered
   // only (a super admin pressing Send notice).
   legalNoticeSend,

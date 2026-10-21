@@ -116,7 +116,12 @@ const product = (k: Kind) =>
 function selectLook(look: string | null) {
   state.look = look;
   state.template = look ? 'qamar' : 'minimal';
-  state.theme = composeStoreTheme({ template: state.template as never, look, theme: {} });
+  // The "New" chip is a merchant switch, off by default (Ruling D1016-NEW-1): these cases test the
+  // chip's geometry and tone, so the switch is on.
+  state.theme = {
+    ...composeStoreTheme({ template: state.template as never, look, theme: {} }),
+    showNewBadge: true,
+  } as StoreTheme;
 }
 
 const PATHS: Array<[string, (k: Kind) => React.ReactElement]> = [

@@ -46,7 +46,7 @@ export function SectionRetryNotice({
         />
       </svg>
       <span className="flex-1 text-destructive-ink">
-        {t(message ?? "Couldn't load this section.", messageAr ?? 'تعذّر تحميل هذا القسم.')}
+        {t(message ?? "Couldn't load this section.", messageAr ?? 'معرفناش نحمّل القسم ده.')}
       </span>
       <button
         type="button"

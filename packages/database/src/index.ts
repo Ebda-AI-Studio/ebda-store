@@ -565,6 +565,26 @@ export { setTenantGucs, type TenantGucs } from './tenant-gucs';
  */
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+/** After-COMMIT callbacks of transactions opened by `runInTenantContext` (see `afterTenantTxCommit`). */
+const afterCommitHooks = new WeakMap<object, Array<() => unknown>>();
+
+/**
+ * Run `fn` after the ambient tenant transaction COMMITS — for side effects that must not see (or
+ * announce) uncommitted rows, e.g. an Inngest event, when there is no request deferral scope
+ * (`deferAfterTenantCommit` covers requests). Returns false — and registers nothing — when there is
+ * no ambient transaction, or it was not opened by `runInTenantContext` (a caller's own
+ * `$transaction` / `withMoneyTx` bound with `scopeTransaction`): the caller decides what to do then.
+ * Dropped on rollback. Callbacks run outside the closed transaction's context; a throw is swallowed
+ * (the transaction already committed; the callback owns its own error reporting).
+ */
+export function afterTenantTxCommit(fn: () => unknown): boolean {
+  const tx = tenantStorage.getStore() as object | undefined;
+  const hooks = tx ? afterCommitHooks.get(tx) : undefined;
+  if (!hooks) return false;
+  hooks.push(fn);
+  return true;
+}
+
 export async function runInTenantContext<T>(
   storeId: string | undefined,
   fn: () => Promise<T>,
@@ -573,8 +593,10 @@ export async function runInTenantContext<T>(
   if (storeId !== undefined && !UUID_RE.test(storeId)) {
     throw new Error('Invalid store ID format');
   }
-  return basePrisma().$transaction(
+  const hooks: Array<() => unknown> = [];
+  const result = await basePrisma().$transaction(
     async tx => {
+      afterCommitHooks.set(tx as object, hooks);
       await applyGucs(tx, { storeId, userId });
       txGucs.set(tx as object, { storeId, userId });
       try {
@@ -605,6 +627,15 @@ export async function runInTenantContext<T>(
     // at ~2050ms. 10s gives headroom without masking real saturation.
     { maxWait: 10000, timeout: 30000 }
   );
+  // COMMITTED (a rollback threw above and the hooks are dropped with it).
+  for (const hook of hooks.splice(0)) {
+    try {
+      await tenantStorage.exit(() => hook());
+    } catch {
+      // The transaction is committed; a failing callback reports its own error.
+    }
+  }
+  return result;
 }
 
 /**

@@ -301,7 +301,7 @@ describe.skipIf(!hasDb)('demo store refuses visitor PII writes (B1-13)', () => {
     expect(res.status, JSON.stringify(res.body)).toBe(403);
     expect(res.body.error.code).toBe('DEMO_STORE');
     expect(res.body.error.details).toMatchObject({
-      messageAr: 'هذا متجر تجريبي — هذه الخاصية مغلقة هنا',
+      messageAr: 'ده متجر تجريبي — الخاصية دي مقفولة هنا',
       messageEn: 'This is a demo store: this is turned off here',
     });
   };

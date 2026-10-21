@@ -57,34 +57,25 @@ function getSortOptions(t: (en: string, ar: string) => string) {
   return [
     // Default = the merchant's curated per-category order. Sends NO sort/featured
     // param so the API uses the ProductCategory.position path (all products in the
-    // store's chosen order). MUST stay first + be the default \u2014 a category browse
+    // store's chosen order). MUST stay first + be the default — a category browse
     // should show the whole category, not a filtered collection.
     {
       value: 'default',
-      label: t('Recommended', '\u0627\u0644\u0645\u064f\u0648\u0635\u0649 \u0628\u0647'),
+      label: t('Recommended', 'المُوصى به'),
     },
-    { value: 'featured', label: t('Featured', '\u0645\u0645\u064a\u0632') },
-    { value: 'newest', label: t('Newest', '\u0627\u0644\u0623\u062d\u062f\u062b') },
+    { value: 'featured', label: t('Featured', 'مميز') },
+    { value: 'newest', label: t('Newest', 'الأحدث') },
     {
       value: 'best_seller',
-      label: t(
-        'Best sellers',
-        '\u0627\u0644\u0623\u0643\u062b\u0631 \u0645\u0628\u064a\u0639\u0627\u064b'
-      ),
+      label: t('Best sellers', 'الأكثر مبيعاً'),
     },
     {
       value: 'price-asc',
-      label: t(
-        'Price: Low to High',
-        '\u0627\u0644\u0633\u0639\u0631: \u0645\u0646 \u0627\u0644\u0623\u0642\u0644 \u0644\u0644\u0623\u0639\u0644\u0649'
-      ),
+      label: t('Price: Low to High', 'السعر: من الأقل للأعلى'),
     },
     {
       value: 'price-desc',
-      label: t(
-        'Price: High to Low',
-        '\u0627\u0644\u0633\u0639\u0631: \u0645\u0646 \u0627\u0644\u0623\u0639\u0644\u0649 \u0644\u0644\u0623\u0642\u0644'
-      ),
+      label: t('Price: High to Low', 'السعر: من الأعلى للأقل'),
     },
   ];
 }
@@ -507,7 +498,7 @@ export default function ProductsClient({
         'Compare Limit',
         t(
           'You can compare up to 4 products at a time. Remove one to add another.',
-          '\u064a\u0645\u0643\u0646\u0643 \u0645\u0642\u0627\u0631\u0646\u0629 \u0645\u0627 \u064a\u0635\u0644 \u0625\u0644\u0649 4 \u0645\u0646\u062a\u062c\u0627\u062a. \u0623\u0632\u0644 \u0648\u0627\u062d\u062f\u064b\u0627 \u0644\u0625\u0636\u0627\u0641\u0629 \u0622\u062e\u0631.'
+          'تقدر تقارن لحد 4 منتجات. شيل واحد عشان تضيف غيره.'
         )
       );
       return;
@@ -683,9 +674,7 @@ export default function ProductsClient({
                         d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"
                       />
                     </svg>
-                    <span className="sr-only">
-                      {t('Grid view', '\u0639\u0631\u0636 \u0634\u0628\u0643\u064a')}
-                    </span>
+                    <span className="sr-only">{t('Grid view', 'عرض شبكي')}</span>
                   </button>
                   <button
                     type="button"
@@ -708,9 +697,7 @@ export default function ProductsClient({
                         d="M4 6h16M4 10h16M4 14h16M4 18h16"
                       />
                     </svg>
-                    <span className="sr-only">
-                      {t('List view', '\u0639\u0631\u0636 \u0642\u0627\u0626\u0645\u0629')}
-                    </span>
+                    <span className="sr-only">{t('List view', 'عرض قائمة')}</span>
                   </button>
                 </div>
               </div>
@@ -740,11 +727,11 @@ export default function ProductsClient({
                     </svg>
                     <p className="text-destructive-ink flex-1">
                       {error === 'LOAD_FAILED'
-                        ? t('Failed to load products', 'فشل في تحميل المنتجات')
+                        ? t('Failed to load products', 'معرفناش نحمّل المنتجات')
                         : error === 'CONNECTION_ERROR'
                           ? t(
                               'Unable to load products. Please check your connection.',
-                              'تعذر تحميل المنتجات. يرجى التحقق من اتصالك.'
+                              'معرفناش نحمّل المنتجات. اتأكد من اتصالك.'
                             )
                           : error}
                     </p>
@@ -900,15 +887,12 @@ export default function ProductsClient({
                     </svg>
                   </div>
                   <h3 className="text-lg font-semibold text-foreground">
-                    {t(
-                      'No products found',
-                      '\u0644\u0645 \u064a\u062a\u0645 \u0627\u0644\u0639\u062b\u0648\u0631 \u0639\u0644\u0649 \u0645\u0646\u062a\u062c\u0627\u062a'
-                    )}
+                    {t('No products found', 'ملقيناش منتجات')}
                   </h3>
                   <p className="mt-1 text-muted-foreground">
                     {t(
                       'Try adjusting your search or filter criteria',
-                      '\u062d\u0627\u0648\u0644 \u062a\u0639\u062f\u064a\u0644 \u0627\u0644\u0628\u062d\u062b \u0623\u0648 \u0645\u0639\u0627\u064a\u064a\u0631 \u0627\u0644\u062a\u0635\u0641\u064a\u0629'
+                      'جرّب تغيّر البحث أو الفلاتر'
                     )}
                   </p>
                   <button
@@ -916,10 +900,7 @@ export default function ProductsClient({
                     onClick={handleClearAll}
                     className="mt-4 rounded-xl bg-primary px-6 py-2.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
                   >
-                    {t(
-                      'Clear Filters',
-                      '\u0645\u0633\u062d \u0627\u0644\u0641\u0644\u0627\u062a\u0631'
-                    )}
+                    {t('Clear Filters', 'مسح الفلاتر')}
                   </button>
                 </div>
               )}

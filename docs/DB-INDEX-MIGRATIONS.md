@@ -150,6 +150,12 @@ arm of an OR indexed, so dropping any one of them returns its whole search to a 
 `pg_trgm` is installed in production. Its migrations run `CREATE EXTENSION IF NOT EXISTS pg_trgm`,
 and rollbacks never drop it.
 
+`vector` (pgvector) is created the same way by `20261022000100_product_embeddings` (production
+has 0.8.0 available; every CI/compose Postgres is `pgvector/pgvector:0.8.0-pg17`, production's major), and its rollback
+never drops it. `product_embeddings` has plain btree indexes only (`store_id`, `(store_id,
+embedded_at)`), declared in Prisma: the vector KNN is exact per store, with no HNSW/ivfflat index until
+a store passes ~20k products (Ruling SEARCH-8).
+
 ## Rollback
 
 Every index migration ships a `rollback.sql` next to it, with `DROP INDEX CONCURRENTLY IF EXISTS`

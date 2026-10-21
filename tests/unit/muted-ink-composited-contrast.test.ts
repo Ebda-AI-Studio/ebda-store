@@ -35,7 +35,14 @@ export function composite(fg: string, alpha: number, bg: string): string {
 
 describe('K-03: every receipt ink composites to >= 4.5:1 on the paper', () => {
   const css = readFileSync(join(WEB, 'components/commerce/ReceiptPrinter.module.css'), 'utf8');
-  const paperBg = css.match(/\.paper\s*{[^}]*background:\s*(#[0-9a-f]{3,6})/i)![1];
+  // The paper (white) moved into the shared printer shell with the feed; its ink classes stay here.
+  const shell = readFileSync(
+    join(ROOT, 'packages/ui/src/components/ReceiptPrinterShell.tsx'),
+    'utf8'
+  );
+  const rawPaper = shell.match(/\.rp-paper\{background:(#[0-9a-f]{3,6})/i)![1];
+  const paperBg =
+    rawPaper.length === 4 ? '#' + [...rawPaper.slice(1)].map(c => c + c).join('') : rawPaper;
   const inks = [...css.matchAll(/\.(ink\w*)\s*{\s*color:\s*([^;]+);/g)].map(m => ({
     name: m[1],
     value: m[2].trim(),

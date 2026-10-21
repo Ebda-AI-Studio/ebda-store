@@ -7,8 +7,8 @@ export const dynamic = 'force-dynamic';
 
 export function generateMetadata(): Promise<Metadata> {
   return localizedMetadata({
-    title: ['Order confirmed', 'تم تأكيد الطلب'],
-    description: ['Your order has been placed successfully.', 'تم استلام طلبك بنجاح.'],
+    title: ['Order confirmed', 'طلبك اتأكد'],
+    description: ['Your order has been placed successfully.', 'طلبك وصلنا.'],
     robots: { index: false, follow: false },
   });
 }

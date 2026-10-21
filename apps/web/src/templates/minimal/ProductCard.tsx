@@ -198,7 +198,9 @@ function MinimalProductCard({
     topEndReserved: Boolean(onRemoveFromWishlist),
     // Issue #2092 (#1997 sweep) — minimal's own NEW chip sits at logical
     // top-start; the SAME expression it renders on below.
-    newOrBrandBadgeReserved: Boolean(product.inStock !== false && isProductNew(product, renderNow)),
+    newOrBrandBadgeReserved: Boolean(
+      product.inStock !== false && isProductNew(product, renderNow, store.theme)
+    ),
     bottomOverlay: 'both',
   });
 
@@ -258,7 +260,7 @@ function MinimalProductCard({
               so it doesn't violate the chrome-free identity but still
               flags fresh inventory. Hides under OOS via isProductNew
               implicit gating in caller order. */}
-          {product.inStock !== false && isProductNew(product, renderNow) && (
+          {product.inStock !== false && isProductNew(product, renderNow, store.theme) && (
             <span
               className={
                 getLook(store.look)
@@ -410,7 +412,7 @@ function MinimalProductCard({
                 )}
                 labels={{
                   addToCart: isRtl ? 'أضف للسلة' : 'Add to cart',
-                  addedToCart: isRtl ? 'تمت الإضافة' : 'Added',
+                  addedToCart: isRtl ? 'اتضاف' : 'Added',
                   outOfStock: isRtl ? 'نفذت الكمية' : 'Sold Out',
                   adding: isRtl ? '...' : '...',
                   view: isRtl ? 'عرض' : 'View',
@@ -445,7 +447,9 @@ function MinimalProductCard({
             {/* P2-14: the chips are aria-hidden; their words follow the name. */}
             {(() => {
               const after = cardLinkLabel('', [
-                product.inStock !== false && isProductNew(product, renderNow) && t('New', 'جديد'),
+                product.inStock !== false &&
+                  isProductNew(product, renderNow, store.theme) &&
+                  t('New', 'جديد'),
                 customBadgeText,
               ]);
               return after ? <span className="sr-only">{after}</span> : null;

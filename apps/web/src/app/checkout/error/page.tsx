@@ -7,7 +7,7 @@ export const dynamic = 'force-dynamic';
 
 export function generateMetadata(): Promise<Metadata> {
   return localizedMetadata({
-    title: ['Payment Error', 'تعذّر الدفع'],
+    title: ['Payment Error', 'الدفع متمش'],
     description: ['There was an issue processing your payment.', 'حدثت مشكلة أثناء معالجة الدفع.'],
     robots: { index: false, follow: false },
   });

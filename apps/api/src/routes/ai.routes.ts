@@ -25,6 +25,7 @@ import {
   revertProductBalance,
 } from '../services/ai-autofill.service';
 import { withSavepoint } from '../lib/savepoint';
+import { requestStoreReindex, touchesEmbedDoc } from '../lib/search/reindex';
 
 const router = Router({ mergeParams: true });
 
@@ -2045,6 +2046,8 @@ router.post(
         where: { id: productId, storeId },
         data: { [field]: null, aiFieldSources: sources },
       });
+      // The cleared text changes the search embedding even if the regeneration below fails.
+      if (touchesEmbedDoc([field])) await requestStoreReindex(storeId, 'ai-handback');
 
       await fillProductFields(storeId, productId, { op: 'create', onlyFields: [field] });
 

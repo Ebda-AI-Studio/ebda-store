@@ -31,6 +31,7 @@ import { sanitizeJsonControlChars } from '../lib/ai/parse-ai-json';
 import { rethrowAsAppError } from '../lib/ai/gemini-errors';
 import { geminiInlineImage, GeminiImageUnsupported } from '../lib/ai/gemini-image';
 import { withSavepoint } from '../lib/savepoint';
+import { EGYPTIAN_ARABIC_REGISTER } from '../lib/ai/arabic-register';
 
 type Feature =
   | 'translate'
@@ -147,10 +148,66 @@ async function checkBudget(storeId: string): Promise<void> {
   }
 }
 
-function cacheKey(feature: Feature, payload: unknown): string {
-  const hash = createHash('sha256').update(JSON.stringify(payload)).digest('hex').slice(0, 32);
+/**
+ * The cache key carries the instruction that produced the answer (review I4): a prompt change —
+ * e.g. the Egyptian register, FU46-Y02d — must not be answered from a 7-day-old entry made with
+ * the old prompt. Pass the feature's module-level `*_INSTRUCTION`.
+ */
+export function cacheKey(feature: Feature, payload: unknown, instruction: string): string {
+  const hash = createHash('sha256')
+    .update(JSON.stringify({ instruction, payload }))
+    .digest('hex')
+    .slice(0, 32);
   return `ai:${feature}:${hash}`;
 }
+
+/* ── Instructions (module-level so the cache key can carry them) ───────── */
+
+const TRANSLATE_INSTRUCTION =
+  'You translate Egyptian e-commerce content between English and Arabic. ' +
+  'Preserve brand names, product codes, sizes, units, and numbers exactly. ' +
+  'Keep the same tone (formal/casual) as the source. ' +
+  'Output only the translation as plain text — no quotes, no labels, no commentary.';
+
+const SEO_INSTRUCTION =
+  'You write SEO meta for Egyptian e-commerce stores. Output only valid JSON ' +
+  'matching this shape exactly: {"title": string, "titleAr": string, ' +
+  '"description": string, "descriptionAr": string, "keywords": string[]}. ' +
+  `Title under ${META_TITLE_MAX} characters. Description under ${META_DESCRIPTION_MAX} characters. ` +
+  'Keywords: 5-10 short Egypt + GCC search phrases. Do not mention prices ' +
+  'or out-of-stock status. Match how Egyptian shoppers actually search. ' +
+  EGYPTIAN_ARABIC_REGISTER;
+
+const SECTION_INSTRUCTION =
+  'You write homepage section copy for Egyptian e-commerce stores. Output only ' +
+  'valid JSON matching this shape exactly: {"kicker": string, "kickerAr": string, ' +
+  '"subtitle": string, "subtitleAr": string}. ' +
+  'kicker: 1-2 short uppercase words, max 16 chars (e.g. "EXPLORE", "JUST IN", ' +
+  '"SHOP NOW"). Will render in a small colored chip above the title. ' +
+  'subtitle: one short tagline, max 80 chars, sentence case. Will render as a ' +
+  'muted line below the title. ' +
+  'Both fields must work alongside the merchant-chosen title without repeating it. ' +
+  'Match how Egyptian shoppers actually talk (informal but professional, no fake hype). ' +
+  EGYPTIAN_ARABIC_REGISTER;
+
+const CAMPAIGN_INSTRUCTION =
+  'You write short marketing emails for Egyptian e-commerce stores. Output only valid ' +
+  'JSON matching this shape exactly: {"subject": string, "subjectAr": string, ' +
+  '"bodyHtml": string, "bodyHtmlAr": string}. subject: max 70 chars, no emoji spam, ' +
+  'no ALL CAPS. bodyHtml: 2-4 short paragraphs using ONLY <p>, <h2>, <strong>, <em>, ' +
+  '<ul>, <li> and <a href="https://..."> tags — no <html>/<head>/<body>, no styles, no ' +
+  'images, no scripts. Do not invent prices, discounts, codes, dates or URLs that the ' +
+  'brief does not give; if the brief gives none, write copy that needs none. Do not add ' +
+  'an unsubscribe line (the platform adds one). The Arabic version is not a literal ' +
+  'translation; match how Egyptian shoppers actually talk: warm, professional, no fake hype. ' +
+  EGYPTIAN_ARABIC_REGISTER;
+
+const CATEGORIZE_INSTRUCTION =
+  'You categorise products for an Egyptian e-commerce store. Given a product ' +
+  'name + description and a list of available categories, pick the 1-3 best ' +
+  'matches. If none of the categories fit well, return an empty array. ' +
+  'Output only valid JSON matching: {"matches": [{"id": string, ' +
+  '"confidence": "high"|"medium"|"low"}]}. Use ONLY ids from the provided list.';
 
 /**
  * Provenance + costing for one AI call. All optional so the 28 existing
@@ -325,13 +382,17 @@ export class AIService {
     // matching suggestSeo/suggestSectionContent (which hash storeId-bearing
     // input) and suggestCategories (store-owned UUIDs). Without it two tenants
     // shared a cache entry keyed only on the submitted text.
-    const key = cacheKey('translate', {
-      storeId: input.storeId,
-      text: trimmed,
-      from: input.from,
-      to: input.to,
-      kind: input.kind,
-    });
+    const key = cacheKey(
+      'translate',
+      {
+        storeId: input.storeId,
+        text: trimmed,
+        from: input.from,
+        to: input.to,
+        kind: input.kind,
+      },
+      TRANSLATE_INSTRUCTION
+    );
     const hit = await redis.get(key);
     if (hit) {
       await recordUsage(input.storeId, 'translate', 0, 0, true);
@@ -348,11 +409,7 @@ export class AIService {
           ? ` Stay under ${META_DESCRIPTION_MAX} characters.`
           : '';
 
-    const systemInstruction =
-      'You translate Egyptian e-commerce content between English and Arabic. ' +
-      'Preserve brand names, product codes, sizes, units, and numbers exactly. ' +
-      'Keep the same tone (formal/casual) as the source. ' +
-      'Output only the translation as plain text — no quotes, no labels, no commentary.';
+    const systemInstruction = TRANSLATE_INSTRUCTION;
 
     const userPrompt = `Translate from ${input.from === 'en' ? 'English' : 'Arabic'} to ${
       input.to === 'en' ? 'English' : 'Arabic'
@@ -397,7 +454,7 @@ export class AIService {
   }): Promise<{ suggestion: SeoSuggestion; cached: boolean }> {
     ensureEnabled();
 
-    const key = cacheKey('seo', input);
+    const key = cacheKey('seo', input, SEO_INSTRUCTION);
     const hit = await redis.get(key);
     if (hit) {
       await recordUsage(input.storeId, 'seo', 0, 0, true);
@@ -407,13 +464,7 @@ export class AIService {
     await assertAiQuota({ storeId: input.storeId });
     await checkBudget(input.storeId);
 
-    const systemInstruction =
-      'You write SEO meta for Egyptian e-commerce stores. Output only valid JSON ' +
-      'matching this shape exactly: {"title": string, "titleAr": string, ' +
-      '"description": string, "descriptionAr": string, "keywords": string[]}. ' +
-      `Title under ${META_TITLE_MAX} characters. Description under ${META_DESCRIPTION_MAX} characters. ` +
-      'Keywords: 5-10 short Egypt + GCC search phrases. Do not mention prices ' +
-      'or out-of-stock status. Match how Egyptian shoppers actually search.';
+    const systemInstruction = SEO_INSTRUCTION;
 
     const detailLines = [
       `Store: ${input.storeName}${input.storeNameAr ? ` / ${input.storeNameAr}` : ''}`,
@@ -483,7 +534,7 @@ export class AIService {
   }> {
     ensureEnabled();
 
-    const key = cacheKey('section', input);
+    const key = cacheKey('section', input, SECTION_INSTRUCTION);
     const hit = await redis.get(key);
     if (hit) {
       await recordUsage(input.storeId, 'section', 0, 0, true);
@@ -501,16 +552,7 @@ export class AIService {
     await assertAiQuota({ storeId: input.storeId });
     await checkBudget(input.storeId);
 
-    const systemInstruction =
-      'You write homepage section copy for Egyptian e-commerce stores. Output only ' +
-      'valid JSON matching this shape exactly: {"kicker": string, "kickerAr": string, ' +
-      '"subtitle": string, "subtitleAr": string}. ' +
-      'kicker: 1-2 short uppercase words, max 16 chars (e.g. "EXPLORE", "JUST IN", ' +
-      '"SHOP NOW"). Will render in a small colored chip above the title. ' +
-      'subtitle: one short tagline, max 80 chars, sentence case. Will render as a ' +
-      'muted line below the title. ' +
-      'Both fields must work alongside the merchant-chosen title without repeating it. ' +
-      'Match how Egyptian shoppers actually talk (informal but professional, no fake hype).';
+    const systemInstruction = SECTION_INSTRUCTION;
 
     const detailLines = [
       `Store: ${input.storeName}${input.storeNameAr ? ` / ${input.storeNameAr}` : ''}`,
@@ -572,7 +614,7 @@ export class AIService {
   }): Promise<{ suggestion: z.infer<typeof campaignDraftAiSchema>; cached: boolean }> {
     ensureEnabled();
 
-    const key = cacheKey('campaign', input);
+    const key = cacheKey('campaign', input, CAMPAIGN_INSTRUCTION);
     const hit = await redis.get(key);
     if (hit) {
       await recordUsage(input.storeId, 'campaign', 0, 0, true);
@@ -582,17 +624,7 @@ export class AIService {
     await assertAiQuota({ storeId: input.storeId });
     await checkBudget(input.storeId);
 
-    const systemInstruction =
-      'You write short marketing emails for Egyptian e-commerce stores. Output only valid ' +
-      'JSON matching this shape exactly: {"subject": string, "subjectAr": string, ' +
-      '"bodyHtml": string, "bodyHtmlAr": string}. subject: max 70 chars, no emoji spam, ' +
-      'no ALL CAPS. bodyHtml: 2-4 short paragraphs using ONLY <p>, <h2>, <strong>, <em>, ' +
-      '<ul>, <li> and <a href="https://..."> tags — no <html>/<head>/<body>, no styles, no ' +
-      'images, no scripts. Do not invent prices, discounts, codes, dates or URLs that the ' +
-      'brief does not give; if the brief gives none, write copy that needs none. Do not add ' +
-      'an unsubscribe line (the platform adds one). The Arabic version is natural, ' +
-      'Egypt-friendly Modern Standard Arabic, not a literal translation. Match how Egyptian shoppers ' +
-      'actually talk: warm, professional, no fake hype.';
+    const systemInstruction = CAMPAIGN_INSTRUCTION;
 
     const detailLines = [
       `Store: ${input.storeName}${input.storeNameAr ? ` / ${input.storeNameAr}` : ''}`,
@@ -680,7 +712,7 @@ export class AIService {
         const messageEn =
           'The AI can read a PNG, JPEG or WebP logo. Upload the logo in one of those.';
         const messageAr =
-          'يقرأ الذكاء الاصطناعي الشعار بصيغة PNG أو JPEG أو WebP فقط. ارفع الشعار بإحداها.';
+          'الذكاء الاصطناعي بيقرا الشعار PNG أو JPEG أو WebP بس. ارفع الشعار بواحدة منهم.';
         throw new AppError(400, 'AI_LOGO_UNSUPPORTED_FORMAT', messageEn, { messageEn, messageAr });
       }
       logger.error({ err, rawMime, logoUrl }, 'Logo rasterization failed before Gemini call');
@@ -760,11 +792,15 @@ export class AIService {
       return { suggestions: [], cached: false };
     }
 
-    const key = cacheKey('categorize', {
-      name: input.productName,
-      desc: input.productDescription,
-      catIds: input.existingCategories.map(c => c.id).sort(),
-    });
+    const key = cacheKey(
+      'categorize',
+      {
+        name: input.productName,
+        desc: input.productDescription,
+        catIds: input.existingCategories.map(c => c.id).sort(),
+      },
+      CATEGORIZE_INSTRUCTION
+    );
     const hit = await redis.get(key);
     if (hit) {
       await recordUsage(input.storeId, 'categorize', 0, 0, true);
@@ -781,12 +817,7 @@ export class AIService {
       .map(c => `${c.id} :: ${c.name}${c.nameAr ? ` / ${c.nameAr}` : ''}`)
       .join('\n');
 
-    const systemInstruction =
-      'You categorise products for an Egyptian e-commerce store. Given a product ' +
-      'name + description and a list of available categories, pick the 1-3 best ' +
-      'matches. If none of the categories fit well, return an empty array. ' +
-      'Output only valid JSON matching: {"matches": [{"id": string, ' +
-      '"confidence": "high"|"medium"|"low"}]}. Use ONLY ids from the provided list.';
+    const systemInstruction = CATEGORIZE_INSTRUCTION;
 
     const userPrompt = `Available categories (id :: name [/ name_ar]):\n${catList}\n\nProduct name: ${input.productName}\nProduct description: ${input.productDescription || '(none)'}`;
 

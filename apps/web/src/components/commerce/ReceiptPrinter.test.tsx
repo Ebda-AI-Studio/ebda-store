@@ -155,7 +155,7 @@ describe('ReceiptPrinter', () => {
     render(<ReceiptPrinter order={order} paymentState="paid" store={store} />);
     finishFeed();
     expect(screen.getByText('المدفوع')).toBeTruthy();
-    expect(screen.getByRole('status').textContent).toContain('تم الدفع وتأكيد طلبك');
+    expect(screen.getByRole('status').textContent).toContain('اتدفع، طلبك اتأكد');
   });
 
   it('renders every line, bundle as one row, and the order number at the foot', () => {
@@ -170,6 +170,38 @@ describe('ReceiptPrinter', () => {
     expect(screen.getByTestId('receipt-order-number').textContent).toContain(
       orderWithBundle.orderNumber
     );
+  });
+
+  it('draws a real Code 128 barcode, in the store-chosen shape, always LTR', () => {
+    const { container, rerender } = render(
+      <ReceiptPrinter order={order} paymentState="paid" store={store} />
+    );
+    expect(container.querySelector('bdi[dir="ltr"] svg[aria-label="1043"]')).toBeTruthy();
+    expect(screen.getByTestId('receipt-barcode').dataset.shape).toBe('plain');
+    expect(container.querySelector('mask')).toBeNull();
+    rerender(
+      <ReceiptPrinter
+        order={order}
+        paymentState="paid"
+        store={{ ...store, settings: { receiptBarcodeShape: 'palm' } }}
+      />
+    );
+    expect(screen.getByTestId('receipt-barcode').dataset.shape).toBe('palm');
+    expect(container.querySelector('mask')).toBeTruthy();
+    // the printed caption is untouched by the shape
+    expect(screen.getByTestId('receipt-order-number').textContent).toBe('#1043');
+  });
+
+  it('shape "off" draws no barcode but keeps the caption', () => {
+    render(
+      <ReceiptPrinter
+        order={order}
+        paymentState="paid"
+        store={{ ...store, settings: { receiptBarcodeShape: 'off' } }}
+      />
+    );
+    expect(screen.queryByTestId('receipt-barcode')).toBeNull();
+    expect(screen.getByTestId('receipt-order-number').textContent).toBe('#1043');
   });
 
   it('shows the variant and personalisation under its line', () => {
@@ -187,7 +219,7 @@ describe('ReceiptPrinter', () => {
     render(<ReceiptPrinter order={order} paymentState="cod" store={store} />);
     expect(screen.getByTestId('receipt-paper').getAttribute('data-feeding')).toBe('true');
     expect(screen.getByTestId('receipt-status-icon').getAttribute('data-state')).toBe('printing');
-    expect(screen.getByRole('status').textContent).toContain('جارٍ طباعة فاتورتك…');
+    expect(screen.getByRole('status').textContent).toContain('بنطبع فاتورتك…');
     // The receipt is real text during the feed: nothing is hidden from screen readers.
     expect(screen.getByText('الإجمالي')).toBeTruthy();
     finishFeed();
@@ -290,10 +322,10 @@ describe('ReceiptPrinter', () => {
     const leaving = screen.getByTestId('receipt-status-leaving');
     expect(leaving.getAttribute('aria-hidden')).toBe('true');
     expect(leaving.className).toContain(styles.statusOut);
-    expect(leaving.textContent).toContain('جارٍ طباعة فاتورتك…');
+    expect(leaving.textContent).toContain('بنطبع فاتورتك…');
     const current = screen.getByTestId('receipt-status-current');
     expect(current.className).toContain(styles.statusIn);
-    expect(current.textContent).toContain('تم تسجيل طلبك، الدفع عند الاستلام');
+    expect(current.textContent).toContain('طلبك اتسجل، الدفع عند الاستلام');
     fireEvent(leaving, new Event('animationend', { bubbles: true }));
     fireEvent(leaving, new Event('webkitAnimationEnd', { bubbles: true }));
     expect(screen.queryByTestId('receipt-status-leaving')).toBeNull();
@@ -385,9 +417,12 @@ describe('ReceiptPrinter', () => {
 
 // W3 receipt polish (decision (d) supersedes B0-3; T-04, M-05, K-07).
 describe('receipt W3', () => {
-  it('S-04: no decorative barcode; one large human-readable order number', () => {
+  // Ruling B1-68b: supersedes the barcode half of B1-68. The barcode is a decode-gated Code 128
+  // (feat/shaped-barcodes), so S-04's "must work, or it is removed" is met; the large readable
+  // order number stays under it.
+  it('S-04: a real scannable barcode plus one large human-readable order number', () => {
     render(<ReceiptPrinter order={order} paymentState="cod" store={store} />);
-    expect(screen.queryByTestId('receipt-barcode')).toBeNull();
+    expect(screen.getByTestId('receipt-barcode')).toBeTruthy();
     const n = screen.getByTestId('receipt-order-number');
     expect(n.textContent).toBe('#1043');
     // IA-14: readable, not huge (text-2xl monospace was hard to read out to a courier)

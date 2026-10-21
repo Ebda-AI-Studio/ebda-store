@@ -64,7 +64,7 @@ interface ProductsFilterSidebarProps {
   /**
    * Merchant-controlled background color for the WHOLE filter UI — desktop
    * panel, mobile trigger, AND the mobile bottom-sheet. Passed as an HSL TRIPLET
-   * ("26 100% 50%", via `colorToHslTriplet(value, theme)`) and applied as a
+   * ("36 36% 52%", via `colorToHslTriplet(value, theme)`) and applied as a
    * local `--filter-bg` override on the <aside>, so it cascades to every
    * descendant — including the fixed-position mobile sheet. Undefined → the
    * quiet default from globals.css (`--filter-bg: var(--bg-page)`, Ruling B1-31);

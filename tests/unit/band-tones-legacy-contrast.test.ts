@@ -35,9 +35,13 @@ describe('band tone pairs on every skin baseline (>= 3:1, large text)', () => {
 
 describe('bandTextOverride changes only a pair that fails', () => {
   it('a stored white-on-orange primary (2.81:1) gets the readable ink', () => {
-    // Since main's #90 the modern SKIN derives its primary-foreground from luminance (dark ink on
-    // orange); a merchant theme saved before that still carries white, the pair this guards.
-    const t = { ...getTemplateTheme('modern'), primaryForeground: '0 0% 100%' };
+    // The shipped skins no longer carry orange (Ruling D1016-ORANGE-1), but a merchant theme saved
+    // before that still carries an orange primary with white ink, the pair this guards.
+    const t = {
+      ...getTemplateTheme('modern'),
+      primaryColor: '26 100% 50%',
+      primaryForeground: '0 0% 100%',
+    };
     expect(contrastRatio(hsl(t.primaryColor), hsl(t.primaryForeground))).toBeLessThan(3);
     expect(bandTextOverride('primary', t)).toBe('#000000');
   });

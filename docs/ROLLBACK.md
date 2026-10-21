@@ -238,3 +238,7 @@ git diff HEAD~1 HEAD --name-only -- packages/database/prisma/migrations/
 ## Tenant-isolation gotcha
 
 The RLS-via-AsyncLocalStorage pattern (`runInTenantContext`) sets `app.current_store_id` per request. If the migration changed RLS policy itself (added/removed policies, changed predicates), restoring the DB to a pre-policy state can leave the active code expecting NEW policy behavior. Always verify the RLS policy state after restore by impersonating a tenant and probing a controlled subset of rows.
+
+## Semantic search indexer — stop the Workers AI spend
+
+Flipping `SEARCH_SEMANTIC_ENABLED` to `false` (or rolling the API back to a version with it `false`) does **NOT** stop the indexer: `search-product-index` and `search-index-backstop` embed products whenever the `AI` binding exists (Ruling SEARCH-T11-8). The stop is `SEARCH_EMBED_STORE_DAILY_CAP=0` — see `docs/ENVIRONMENT.md` → "Semantic search — emergency stop" for the durable (wrangler `vars` + `cf-api-deploy.yml`) and emergency (dashboard variable, undone by the next deploy) routes. Rolling back to a version WITHOUT the `ai` binding (before PR 3) also stops it, at the cost of every other change since.

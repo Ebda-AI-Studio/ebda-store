@@ -30,27 +30,27 @@ interface Props {
 const ERROR_MESSAGES: Record<string, { en: string; ar: string }> = {
   INVALID_TOKEN: {
     en: 'This link is invalid or expired.',
-    ar: 'هذا الرابط غير صالح أو منتهي.',
+    ar: 'الرابط ده مش صالح أو انتهى.',
   },
   ORDER_NOT_DELIVERED: {
     en: 'Order is not eligible for review yet.',
-    ar: 'الطلب غير مؤهل للتقييم بعد.',
+    ar: 'الطلب لسه مينفعش يتقيّم.',
   },
   PRODUCT_NOT_IN_ORDER: {
     en: 'Product not found in this order.',
-    ar: 'المنتج غير موجود في هذا الطلب.',
+    ar: 'المنتج مش موجود في الطلب ده.',
   },
   ALREADY_REVIEWED: {
     en: 'You have already reviewed this product.',
-    ar: 'لقد قمت بتقييم هذا المنتج بالفعل.',
+    ar: 'إنت قيّمت المنتج ده قبل كده.',
   },
   NETWORK: {
     en: 'Network error. Please try again.',
-    ar: 'خطأ في الشبكة. يرجى المحاولة مرة أخرى.',
+    ar: 'مشكلة في الشبكة. جرّب تاني.',
   },
   UNKNOWN: {
     en: 'Something went wrong. Please try again.',
-    ar: 'حدث خطأ ما. يرجى المحاولة مرة أخرى.',
+    ar: 'حصل خطأ. جرّب تاني.',
   },
 };
 
@@ -84,7 +84,7 @@ export function ReviewForm({ orderId, productId, token, product, store }: Props)
     if (body.trim().length < 20) {
       setError(
         isAr
-          ? 'يرجى كتابة تعليق أطول (20 حرفًا على الأقل)'
+          ? 'اكتب تعليق أطول (20 حرف على الأقل)'
           : 'Please write a longer review (20 characters minimum)'
       );
       return;
@@ -136,7 +136,7 @@ export function ReviewForm({ orderId, productId, token, product, store }: Props)
         </h1>
         <p className="text-muted-foreground text-sm">
           {isAr
-            ? 'سيظهر تقييمك على المتجر بعد المراجعة.'
+            ? 'تقييمك هيظهر على المتجر بعد المراجعة.'
             : 'Your review will appear on the store after a quick review.'}
         </p>
       </main>
@@ -225,7 +225,7 @@ export function ReviewForm({ orderId, productId, token, product, store }: Props)
             className="w-full border border-input rounded-lg px-3 py-2 text-base bg-background focus:outline-none focus:ring-2 focus:ring-primary resize-y sm:text-sm"
             placeholder={
               isAr
-                ? 'شارك تجربتك مع هذا المنتج... (20 حرفًا كحد أدنى)'
+                ? 'احكي تجربتك مع المنتج ده... (20 حرف على الأقل)'
                 : 'Share your experience with this product... (minimum 20 characters)'
             }
           />
@@ -245,7 +245,7 @@ export function ReviewForm({ orderId, productId, token, product, store }: Props)
         >
           {submitting
             ? isAr
-              ? 'جاري الإرسال...'
+              ? 'بنبعت...'
               : 'Submitting...'
             : isAr
               ? 'إرسال التقييم'

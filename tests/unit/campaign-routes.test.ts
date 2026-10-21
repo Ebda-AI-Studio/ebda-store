@@ -37,6 +37,8 @@ vi.mock('@ebda/database', () => ({
   get prisma() {
     return holder.prisma;
   },
+  // storeCampaignDailyCap reads the plan tier in the store's scope.
+  withStore: (_storeId: string, fn: (tx: unknown) => unknown) => fn(holder.prisma),
   // errorHandler does `instanceof Prisma.PrismaClient*Error`; distinct empty
   // classes keep those checks false instead of throwing on `undefined`.
   Prisma: {

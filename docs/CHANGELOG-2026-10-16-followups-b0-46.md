@@ -17,8 +17,8 @@ Deploy order: web + admin first (they still accept the old API answers), then `g
 - **Product page trust line** under add-to-cart: Cash on delivery (when the store accepts it) · Returns within N days (when declared) (S-02).
 - **Receipt** shows the delivery window of the order's own zone, or none, and an "ask about this order" WhatsApp link (S-02, FU46-W1c-10).
 - **Shipping zones** match the shopper's area or governorate by the whole name: an area no longer picks up another zone's fee because its name contains the zone's (FU46-13, help: shipping).
-- **Cart** checkout is one filled 48px button with one label (C-03); counted nouns read in Modern Standard Arabic ("قطعتان") (Y-01).
-- **Arabic copy** across the storefront is Modern Standard Arabic: receipt status lines, delivery chip "يصلك", InstaPay receipt upload, contact form, 3D viewer, unknown-store page, demo notices, Dahab bag and product page (FU46-Y02, help: instapay, 3d-models).
+- **Cart** checkout is one filled 48px button with one label (C-03); counted nouns read in Modern Standard Arabic ("قطعتان") (Y-01) — superseded 2026-10-16: Egyptian forms ("قطعتين"), see `CHANGELOG-2026-10-16-ahmad-decisions.md`.
+- **Arabic copy** (superseded 2026-10-16 by FU46-Y02a: full sentences are Egyptian again) across the storefront is Modern Standard Arabic: receipt status lines, delivery chip "يصلك", InstaPay receipt upload, contact form, 3D viewer, unknown-store page, demo notices, Dahab bag and product page (FU46-Y02, help: instapay, 3d-models).
 - **Contrast**: default-orange buttons carry dark ink (any merchant primary is checked for 4.5:1), the sale badge and muted text read at AA (K-01..K-04, FU46-W1c-9).
 - **"New" badge** shows on products from the last 14 days on every card (FU46-W1c-8).
 - **Accessibility and RTL**: every accessible name is in the page's language, direction comes from `dir`, no text under 12px, all drawers and sheets share one primitive (R-01..R-06).

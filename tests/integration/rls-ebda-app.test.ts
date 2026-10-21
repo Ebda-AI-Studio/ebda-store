@@ -824,8 +824,8 @@ describe('users / addresses / store_staff: identity-keyed policies', () => {
 // The SECURITY DEFINER functions
 // ---------------------------------------------------------------------------
 /**
- * Pure text helpers that index EXPRESSIONS call (search normalisation, migration
- * 20261019000100). They read no table, so they are deliberately NOT definers: they run with the
+ * Pure text helpers that index EXPRESSIONS or the embedder call (search normalisation, migration
+ * 20261019000100; embed doc, 20261022000100). They read no table, so they are deliberately NOT definers: they run with the
  * caller's rights, and a SET search_path clause would stop the planner inlining them. Being on
  * this list is not an exemption from checks: each must be non-definer, IMMUTABLE, LANGUAGE sql,
  * and ebda_app must be able to execute it, and it must carry NO `SET search_path` in proconfig
@@ -838,6 +838,7 @@ const PURE_IMMUTABLE_EBDA_FNS = new Set([
   'ebda_ar_norm',
   'ebda_product_search_doc',
   'ebda_product_name_doc',
+  'ebda_product_embed_doc', // search P1 Task 9 (migration 20261022000100): the embedding input
 ]);
 
 describe('SECURITY DEFINER functions: hygiene', () => {

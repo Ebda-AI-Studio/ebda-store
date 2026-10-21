@@ -41,7 +41,7 @@ Classic consumes the shared CSS tokens from `globals.css`. Tenants override `--p
 
 ### Brand & Accent
 
-- **Primary** (`--primary` / Force Orange `#ff6e00` default): Used sparingly — `hover:text-primary` on product names and add-to-cart, focus rings (`focus-visible:ring-2 focus-visible:ring-primary`), the hairline `w-12 h-px bg-primary group-hover:w-12` underline animation under category names. Default-state primary appears only on the announcement bar (which uses `bg-primary` from `globals.css`'s shared `.product-badge` system, not in this template's bar — see Section 4).
+- **Primary** (`--primary` / Ebda night `#0A0B0C` default; Ruling D1016-ORANGE-1): Used sparingly — `hover:text-primary` on product names and add-to-cart, focus rings (`focus-visible:ring-2 focus-visible:ring-primary`), the hairline `w-12 h-px bg-primary group-hover:w-12` underline animation under category names. Default-state primary appears only on the announcement bar (which uses `bg-primary` from `globals.css`'s shared `.product-badge` system, not in this template's bar — see Section 4).
 - **Primary/20** in fallback states: `bg-primary/20` for letter-avatar in CategoryCard placeholder (`text-3xl font-light text-primary tracking-wide`).
 
 ### Status Colors

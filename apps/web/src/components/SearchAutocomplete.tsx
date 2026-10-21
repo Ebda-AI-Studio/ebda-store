@@ -243,14 +243,14 @@ export function SearchAutocomplete({ query, onSelect, committedQuery }: SearchAu
               d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
             />
           </svg>
-          {t('Searching...', 'جارٍ البحث...')}
+          {t('Searching...', 'بندوّر...')}
         </div>
       )}
 
       {/* Empty state — "No products found" per spec */}
       {isEmpty && (
         <div className="px-4 py-3 text-sm text-muted-foreground">
-          {t('No products found', 'لا توجد منتجات')}
+          {t('No products found', 'مفيش منتجات')}
         </div>
       )}
 

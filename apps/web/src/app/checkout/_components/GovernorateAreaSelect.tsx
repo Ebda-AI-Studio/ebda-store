@@ -221,7 +221,7 @@ function Combobox({
         >
           {filteredOptions.length === 0 ? (
             <li className="px-3 py-2 text-sm text-muted-foreground">
-              {query ? 'لا توجد نتائج / No results' : 'لا توجد خيارات / No options'}
+              {query ? 'مفيش نتايج / No results' : 'مفيش اختيارات / No options'}
             </li>
           ) : (
             filteredOptions.map((option, idx) => (

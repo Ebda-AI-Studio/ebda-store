@@ -48,7 +48,12 @@ const customDomains = hosts =>
   ]);
 
 if (app === 'api') {
-  const base = JSON5.parse(readFileSync(new URL('apps/api/wrangler.jsonc', root), 'utf8'));
+  // No Workers AI binding on preview (Ruling SEARCH-T10-6): preview has no Inngest keys, so the
+  // indexer never runs, and the semantic flag stays "false"; a binding would only let a preview
+  // embed bill the production account.
+  const { ai: _noAiOnPreview, ...base } = JSON5.parse(
+    readFileSync(new URL('apps/api/wrangler.jsonc', root), 'utf8')
+  );
   const cfg = {
     ...base,
     name: 'ebda-api-preview',

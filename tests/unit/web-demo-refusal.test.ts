@@ -11,7 +11,7 @@ const en = (e: string) => e;
 describe('demoRefusalText', () => {
   it('DEMO_STORE reads as the demo sentence, Arabic first', () => {
     expect(demoRefusalText({ code: 'DEMO_STORE' }, ar)).toBe(
-      'هذا متجر تجريبي — هذه الخاصية مغلقة هنا'
+      'ده متجر تجريبي — الخاصية دي مقفولة هنا'
     );
     expect(demoRefusalText({ code: 'DEMO_STORE' }, en)).toBe(
       'This is a demo store: this is turned off here'

@@ -55,16 +55,14 @@ export default function WishlistClient() {
       } else if (response.error?.code === 'UNAUTHORIZED') {
         setIsLoggedIn(false);
       } else {
-        setError(
-          response.error?.message || t('Failed to load wishlist', 'فشل تحميل قائمة الأمنيات')
-        );
+        setError(response.error?.message || t('Failed to load wishlist', 'معرفناش نحمّل المفضلة'));
       }
     } catch (err) {
       console.error('Failed to load wishlist:', err);
       setError(
         t(
           'Unable to load wishlist. Please check your connection.',
-          'تعذر تحميل قائمة الأمنيات. يرجى التحقق من اتصالك بالإنترنت.'
+          'معرفناش نحمّل المفضلة. اتأكد من اتصالك بالإنترنت.'
         )
       );
     }
@@ -184,12 +182,7 @@ export default function WishlistClient() {
     return (
       <ShopChrome>
         <div className="container mx-auto px-4 py-8 flex-1">
-          <h1 className="text-3xl font-bold mb-8">
-            {t(
-              'My Wishlist',
-              '\u0642\u0627\u0626\u0645\u0629 \u0627\u0644\u0645\u0641\u0636\u0644\u0629'
-            )}
-          </h1>
+          <h1 className="text-3xl font-bold mb-8">{t('My Wishlist', 'قائمة المفضلة')}</h1>
           <div className="space-y-4">
             {[...Array(3)].map((_, i) => (
               <div key={i} className="bg-muted animate-pulse h-24 rounded-lg"></div>
@@ -204,12 +197,7 @@ export default function WishlistClient() {
     return (
       <ShopChrome>
         <div className="container mx-auto px-4 py-8 flex-1">
-          <h1 className="text-3xl font-bold mb-8">
-            {t(
-              'My Wishlist',
-              '\u0642\u0627\u0626\u0645\u0629 \u0627\u0644\u0645\u0641\u0636\u0644\u0629'
-            )}
-          </h1>
+          <h1 className="text-3xl font-bold mb-8">{t('My Wishlist', 'قائمة المفضلة')}</h1>
           <div className="text-center py-12 bg-muted rounded-xl">
             <svg
               className="w-16 h-16 text-muted-foreground mx-auto mb-4"
@@ -225,16 +213,10 @@ export default function WishlistClient() {
               />
             </svg>
             <h2 className="text-xl font-semibold mb-2">
-              {t(
-                'Sign in to view your wishlist',
-                '\u0633\u062c\u0644 \u062f\u062e\u0648\u0644\u0643 \u0644\u0639\u0631\u0636 \u0642\u0627\u0626\u0645\u0629 \u0627\u0644\u0645\u0641\u0636\u0644\u0629'
-              )}
+              {t('Sign in to view your wishlist', 'سجّل دخول عشان تشوف المفضلة')}
             </h2>
             <p className="text-muted-foreground mb-4">
-              {t(
-                'Save your favorite items for later',
-                '\u0627\u062d\u0641\u0638 \u0645\u0646\u062a\u062c\u0627\u062a\u0643 \u0627\u0644\u0645\u0641\u0636\u0644\u0629 \u0644\u0648\u0642\u062a \u0644\u0627\u062d\u0642'
-              )}
+              {t('Save your favorite items for later', 'احفظ المنتجات اللي عاجباك لبعدين')}
             </p>
             <Link
               href={storeUrl('/auth/login?redirect=/wishlist')}
@@ -265,12 +247,7 @@ export default function WishlistClient() {
     <ShopChrome>
       <div className="container mx-auto px-4 py-8 flex-1">
         <div className="flex flex-wrap items-center justify-between gap-4 mb-8">
-          <h1 className="text-3xl font-bold">
-            {t(
-              'My Wishlist',
-              '\u0642\u0627\u0626\u0645\u0629 \u0627\u0644\u0645\u0641\u0636\u0644\u0629'
-            )}
-          </h1>
+          <h1 className="text-3xl font-bold">{t('My Wishlist', 'قائمة المفضلة')}</h1>
 
           {/* Visibility toggle */}
           <button
@@ -343,7 +320,7 @@ export default function WishlistClient() {
                   className="flex-shrink-0 text-sm text-primary hover:text-primary/80 font-medium"
                   aria-label={t('Copy link', 'نسخ الرابط')}
                 >
-                  {copied ? t('Copied!', 'تم النسخ!') : t('Copy', 'نسخ')}
+                  {copied ? t('Copied!', 'اتنسخ!') : t('Copy', 'نسخ')}
                 </button>
               </div>
 
@@ -426,7 +403,7 @@ export default function WishlistClient() {
               <button
                 onClick={() => setActionError(null)}
                 className="p-1 text-warning-ink hover:text-warning-ink/80"
-                aria-label={t('Dismiss', '\u0625\u063a\u0644\u0627\u0642')}
+                aria-label={t('Dismiss', 'إغلاق')}
               >
                 <svg
                   className="h-4 w-4"
@@ -442,7 +419,7 @@ export default function WishlistClient() {
                     d="M6 18L18 6M6 6l12 12"
                   />
                 </svg>
-                <span className="sr-only">{t('Dismiss', '\u0625\u063a\u0644\u0627\u0642')}</span>
+                <span className="sr-only">{t('Dismiss', 'إغلاق')}</span>
               </button>
             </div>
           </div>
@@ -464,25 +441,16 @@ export default function WishlistClient() {
               />
             </svg>
             <h2 className="text-xl font-semibold mb-2">
-              {t(
-                'Your wishlist is empty',
-                '\u0642\u0627\u0626\u0645\u0629 \u0627\u0644\u0645\u0641\u0636\u0644\u0629 \u0641\u0627\u0631\u063a\u0629'
-              )}
+              {t('Your wishlist is empty', 'المفضلة فاضية')}
             </h2>
             <p className="text-muted-foreground mb-4">
-              {t(
-                'Start adding products you love!',
-                '\u0627\u0628\u062f\u0623 \u0628\u0625\u0636\u0627\u0641\u0629 \u0627\u0644\u0645\u0646\u062a\u062c\u0627\u062a \u0627\u0644\u062a\u064a \u062a\u062d\u0628\u0647\u0627!'
-              )}
+              {t('Start adding products you love!', 'ابدأ ضيف المنتجات اللي بتحبها!')}
             </p>
             <Link
               href={storeUrl('/products')}
               className="inline-flex items-center px-6 py-3 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90"
             >
-              {t(
-                'Browse Products',
-                '\u062a\u0635\u0641\u062d \u0627\u0644\u0645\u0646\u062a\u062c\u0627\u062a'
-              )}
+              {t('Browse Products', 'تصفح المنتجات')}
             </Link>
           </div>
         ) : T && !templateLoading ? (

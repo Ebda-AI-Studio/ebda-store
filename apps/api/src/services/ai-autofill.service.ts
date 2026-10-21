@@ -9,6 +9,7 @@ import { deferAfterTenantCommit } from '../lib/after-tenant-commit';
 import { withSavepoint } from '../lib/savepoint';
 import { config } from '../config';
 import { generateProductSearchTerms } from '../lib/ai/product-search-terms-generator';
+import { requestStoreReindex, touchesEmbedDoc } from '../lib/search/reindex';
 
 /**
  * Diff incoming admin-form values against the stored values and update the
@@ -353,6 +354,11 @@ export async function generateFill(plan: FillPlan): Promise<FillGeneration> {
  * the value the generation read AND its owner has not become 'human' since. The provenance map
  * is rebuilt from the FRESH map (a concurrent 'human' stamp on any other field is kept).
  * `extra` runs inside the same transaction, after the write, with the fresh row.
+ * When a written field feeds the search embedding (name, nameAr, description, descriptionAr, searchTerms), the
+ * indexer is asked to look at the store (Task 11). The event is sent only after the writes commit:
+ * the request's COMMIT, the caller's `runInTenantContext` COMMIT when this joined one (review M7,
+ * `requestStoreReindex`), or this function's own short transaction, which has returned by then.
+ * `reindexReason` labels that event (default 'ai-autofill').
  */
 export async function writeAiFieldsGuarded(
   storeId: string,
@@ -362,12 +368,13 @@ export async function writeAiFieldsGuarded(
   opts: {
     extraData?: Record<string, unknown>;
     extra?: (fresh: { categoryCount: number }) => Promise<void>;
+    reindexReason?: string;
   } = {}
 ): Promise<{ written: string[]; stale: string[] }> {
   const run = <T>(fn: () => Promise<T>): Promise<T> =>
     // Inside a caller's transaction, join it (its atomicity); otherwise open a short one.
     hasTenantContext() ? fn() : runInTenantContext(storeId, fn);
-  return run(async () => {
+  const result = await run(async () => {
     // Row lock: a merchant save that starts after this waits for our COMMIT, and one that
     // committed before it is in the re-read below. store_id keeps the raw query tenant-keyed.
     await prisma.$queryRaw`SELECT id FROM products WHERE id = ${productId} AND store_id = ${storeId} FOR UPDATE`;
@@ -406,6 +413,9 @@ export async function writeAiFieldsGuarded(
     if (opts.extra) await opts.extra({ categoryCount: fresh.categories.length });
     return { written, stale };
   });
+  if (touchesEmbedDoc(result.written))
+    await requestStoreReindex(storeId, opts.reindexReason ?? 'ai-autofill');
+  return result;
 }
 
 /** Phase 3 — WRITE (short transaction, guarded per field). Idempotent: a retry re-checks. */
@@ -701,7 +711,7 @@ export async function balanceProductLanguages(
       descriptionAr: product.descriptionAr,
     },
     writes as Record<string, string | null>,
-    { extraData: { aiBalanceBackup: backup as object } }
+    { extraData: { aiBalanceBackup: backup as object }, reindexReason: 'ai-balance' }
   );
   if (written.length === 0) return { balanced: false, changed: {}, sides: {}, calls };
   const wrote = (a: string, b: string) => written.includes(a) || written.includes(b);
@@ -777,6 +787,7 @@ export async function revertProductBalance(
     },
   });
 
+  await requestStoreReindex(storeId, 'ai-balance-revert');
   logger.info({ storeId, productId }, '[ai-balance] language balance reverted');
   return { reverted: true };
 }

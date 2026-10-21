@@ -91,7 +91,7 @@ export default function CategoriesClient({
                 {t('Shop by Category', 'تسوق حسب الفئة')}
               </h1>
               <p className="text-muted-foreground mb-4">
-                {t('No categories available yet.', 'لا توجد فئات متاحة حالياً')}
+                {t('No categories available yet.', 'مفيش فئات متاحة دلوقتي')}
               </p>
               <Link href={storeUrl('/products')} className="text-primary hover:underline">
                 {t('Browse all products', 'تصفح جميع المنتجات')}

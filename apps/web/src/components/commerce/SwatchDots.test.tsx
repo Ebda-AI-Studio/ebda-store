@@ -128,7 +128,7 @@ describe('SwatchDots colour count for assistive tech', () => {
   it('ar: the counted noun takes its Arabic plural form', () => {
     lang.value = 'ar';
     const two = render(<SwatchDots product={p(2)} max={5} />).container;
-    expect(two.querySelector('.sr-only')?.textContent).toBe('لونان');
+    expect(two.querySelector('.sr-only')?.textContent).toBe('لونين');
     cleanup();
     const three = render(<SwatchDots product={p(3)} max={5} />).container;
     expect(three.querySelector('.sr-only')?.textContent).toBe('3 ألوان');

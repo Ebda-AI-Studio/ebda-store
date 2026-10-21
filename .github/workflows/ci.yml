@@ -402,10 +402,10 @@ jobs:
     name: API Worker boots on workerd
     if: github.event_name == 'pull_request'
     runs-on: ${{ fromJSON(vars.EBDA_RUNS_ON || '"ubuntu-latest"') }}
-    timeout-minutes: 20
+    timeout-minutes: 25
     services:
       postgres:
-        image: postgres:16-alpine
+        image: pgvector/pgvector:0.8.0-pg17
         env:
           POSTGRES_USER: test
           POSTGRES_PASSWORD: test
@@ -433,6 +433,12 @@ jobs:
         env:
           SMOKE_PG_PORT: ${{ job.services.postgres.ports['5432'] }}
         run: bash scripts/ci/workerd-smoke.sh
+      # Search Task 11 review M8: embed() inside workerd with SEARCH_SEMANTIC_ENABLED=true and a fake
+      # `AI` binding (AbortSignal.any, the binding call shape, error mapping). The smoke above strips
+      # the binding, so nothing else runs this path on workerd before production does. No database.
+      - name: Embedding provider on workerd (fake AI binding)
+        timeout-minutes: 10
+        run: npm run cf:test -w apps/api -- workers-test/embedding-provider.test.ts
 
   # ---------------------------------------------------------------------------
   # Scheduled / manual lanes. Never on a pull request or a push.
@@ -679,7 +685,7 @@ jobs:
     needs: [build]
     services:
       postgres:
-        image: postgres:16-alpine
+        image: pgvector/pgvector:0.8.0-pg17
         env:
           POSTGRES_USER: test
           POSTGRES_PASSWORD: test
@@ -876,7 +882,7 @@ jobs:
     timeout-minutes: 15
     services:
       postgres:
-        image: postgres:16-alpine
+        image: pgvector/pgvector:0.8.0-pg17
         env:
           POSTGRES_USER: test
           POSTGRES_PASSWORD: test
@@ -978,7 +984,7 @@ jobs:
     needs: [build]
     services:
       postgres:
-        image: postgres:16-alpine
+        image: pgvector/pgvector:0.8.0-pg17
         env:
           POSTGRES_USER: test
           POSTGRES_PASSWORD: test
@@ -1047,7 +1053,7 @@ jobs:
     needs: [build]
     services:
       postgres:
-        image: postgres:16-alpine
+        image: pgvector/pgvector:0.8.0-pg17
         env:
           POSTGRES_USER: test
           POSTGRES_PASSWORD: test

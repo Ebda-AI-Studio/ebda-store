@@ -31,23 +31,20 @@ function ResetPasswordForm() {
       setError(
         t(
           'Invalid or missing reset token. Please request a new password reset link.',
-          'رمز إعادة التعيين غير صالح أو مفقود. يرجى طلب رابط جديد لإعادة تعيين كلمة المرور.'
+          'رمز تغيير كلمة المرور مش صالح أو مش موجود. اطلب رابط جديد.'
         )
       );
       return;
     }
 
     if (formData.newPassword !== formData.confirmPassword) {
-      setError(t('Passwords do not match.', 'كلمتا المرور غير متطابقتين.'));
+      setError(t('Passwords do not match.', 'كلمة المرور وتأكيدها مش زي بعض.'));
       return;
     }
 
     if (formData.newPassword.length < 8) {
       setError(
-        t(
-          'Password must be at least 8 characters.',
-          'يجب أن تتكون كلمة المرور من 8 أحرف على الأقل.'
-        )
+        t('Password must be at least 8 characters.', 'كلمة المرور لازم تكون 8 حروف على الأقل.')
       );
       return;
     }
@@ -65,19 +62,16 @@ function ResetPasswordForm() {
             throw new Error(
               t(
                 'Too many attempts. Please wait a few minutes, then try again.',
-                'محاولات كثيرة جدًا. يرجى الانتظار بضع دقائق ثم المحاولة مرة أخرى.'
+                'محاولات كتير. استنى كام دقيقة وجرّب تاني.'
               )
             );
           }
           throw new Error(
-            result.error?.message || t('Failed to reset password', 'فشلت إعادة تعيين كلمة المرور')
+            result.error?.message || t('Failed to reset password', 'تغيير كلمة المرور منفعش')
           );
         }
       },
-      t(
-        'Failed to reset password. Please try again.',
-        'فشلت إعادة تعيين كلمة المرور. يرجى المحاولة مرة أخرى.'
-      )
+      t('Failed to reset password. Please try again.', 'تغيير كلمة المرور منفعش. جرّب تاني.')
     );
     if (ok) setSuccess(true);
   };
@@ -89,16 +83,10 @@ function ResetPasswordForm() {
           {/* Header — logo lives in MinimalChrome; keep only the page heading. */}
           <div className="text-center">
             <h2 className="text-3xl font-bold tracking-tight text-foreground">
-              {t(
-                'Reset your password',
-                '\u0625\u0639\u0627\u062f\u0629 \u062a\u0639\u064a\u064a\u0646 \u0643\u0644\u0645\u0629 \u0627\u0644\u0645\u0631\u0648\u0631'
-              )}
+              {t('Reset your password', 'إعادة تعيين كلمة المرور')}
             </h2>
             <p className="mt-2 text-sm text-muted-foreground">
-              {t(
-                'Enter your new password below.',
-                '\u0623\u062f\u062e\u0644 \u0643\u0644\u0645\u0629 \u0627\u0644\u0645\u0631\u0648\u0631 \u0627\u0644\u062c\u062f\u064a\u062f\u0629 \u0623\u062f\u0646\u0627\u0647.'
-              )}
+              {t('Enter your new password below.', 'اكتب كلمة المرور الجديدة تحت.')}
             </p>
           </div>
 
@@ -122,25 +110,19 @@ function ResetPasswordForm() {
                   </svg>
                 </div>
                 <h3 className="text-lg font-semibold text-foreground">
-                  {t(
-                    'Password reset successfully',
-                    '\u062a\u0645 \u0625\u0639\u0627\u062f\u0629 \u062a\u0639\u064a\u064a\u0646 \u0643\u0644\u0645\u0629 \u0627\u0644\u0645\u0631\u0648\u0631 \u0628\u0646\u062c\u0627\u062d'
-                  )}
+                  {t('Password reset successfully', 'كلمة المرور اتغيّرت')}
                 </h3>
                 <p className="text-sm text-muted-foreground">
                   {t(
                     'Your password has been updated. You can now sign in with your new password.',
-                    '\u062a\u0645 \u062a\u062d\u062f\u064a\u062b \u0643\u0644\u0645\u0629 \u0627\u0644\u0645\u0631\u0648\u0631. \u064a\u0645\u0643\u0646\u0643 \u0627\u0644\u0622\u0646 \u062a\u0633\u062c\u064a\u0644 \u0627\u0644\u062f\u062e\u0648\u0644 \u0628\u0643\u0644\u0645\u0629 \u0627\u0644\u0645\u0631\u0648\u0631 \u0627\u0644\u062c\u062f\u064a\u062f\u0629.'
+                    'كلمة المرور اتحدّثت. تقدر تسجّل دخول دلوقتي بالكلمة الجديدة.'
                   )}
                 </p>
                 <Link
                   href={storeUrl('/auth/login')}
                   className="mt-4 inline-block font-medium text-primary hover:underline"
                 >
-                  {t(
-                    'Back to sign in',
-                    '\u0627\u0644\u0639\u0648\u062f\u0629 \u0644\u062a\u0633\u062c\u064a\u0644 \u0627\u0644\u062f\u062e\u0648\u0644'
-                  )}
+                  {t('Back to sign in', 'العودة لتسجيل الدخول')}
                 </Link>
               </div>
             ) : (
@@ -155,17 +137,14 @@ function ResetPasswordForm() {
                   <div className="mb-4 rounded-lg bg-warning/10 p-3 text-sm text-warning-ink">
                     {t(
                       'No reset token found. Please use the link from your password reset email.',
-                      '\u0644\u0645 \u064a\u062a\u0645 \u0627\u0644\u0639\u062b\u0648\u0631 \u0639\u0644\u0649 \u0631\u0645\u0632 \u0625\u0639\u0627\u062f\u0629 \u0627\u0644\u062a\u0639\u064a\u064a\u0646. \u064a\u0631\u062c\u0649 \u0627\u0633\u062a\u062e\u062f\u0627\u0645 \u0627\u0644\u0631\u0627\u0628\u0637 \u0645\u0646 \u0628\u0631\u064a\u062f \u0625\u0639\u0627\u062f\u0629 \u062a\u0639\u064a\u064a\u0646 \u0643\u0644\u0645\u0629 \u0627\u0644\u0645\u0631\u0648\u0631.'
+                      'ملقيناش رمز تغيير كلمة المرور. استخدم الرابط اللي في بريد تغيير كلمة المرور.'
                     )}
                   </div>
                 )}
 
                 <form onSubmit={handleSubmit} className="space-y-6">
                   <Input
-                    label={t(
-                      'New Password',
-                      '\u0643\u0644\u0645\u0629 \u0627\u0644\u0645\u0631\u0648\u0631 \u0627\u0644\u062c\u062f\u064a\u062f\u0629'
-                    )}
+                    label={t('New Password', 'كلمة المرور الجديدة')}
                     type="password"
                     autoComplete="new-password"
                     value={formData.newPassword}
@@ -175,10 +154,7 @@ function ResetPasswordForm() {
                   />
 
                   <Input
-                    label={t(
-                      'Confirm New Password',
-                      '\u062a\u0623\u0643\u064a\u062f \u0643\u0644\u0645\u0629 \u0627\u0644\u0645\u0631\u0648\u0631 \u0627\u0644\u062c\u062f\u064a\u062f\u0629'
-                    )}
+                    label={t('Confirm New Password', 'تأكيد كلمة المرور الجديدة')}
                     type="password"
                     autoComplete="new-password"
                     value={formData.confirmPassword}
@@ -194,10 +170,7 @@ function ResetPasswordForm() {
                     isLoading={isLoading}
                     disabled={!token}
                   >
-                    {t(
-                      'Reset Password',
-                      '\u0625\u0639\u0627\u062f\u0629 \u062a\u0639\u064a\u064a\u0646 \u0643\u0644\u0645\u0629 \u0627\u0644\u0645\u0631\u0648\u0631'
-                    )}
+                    {t('Reset Password', 'إعادة تعيين كلمة المرور')}
                   </Button>
                 </form>
 
@@ -206,10 +179,7 @@ function ResetPasswordForm() {
                     href={storeUrl('/auth/login')}
                     className="text-sm text-primary hover:underline"
                   >
-                    {t(
-                      'Back to sign in',
-                      '\u0627\u0644\u0639\u0648\u062f\u0629 \u0644\u062a\u0633\u062c\u064a\u0644 \u0627\u0644\u062f\u062e\u0648\u0644'
-                    )}
+                    {t('Back to sign in', 'العودة لتسجيل الدخول')}
                   </Link>
                 </div>
               </>
@@ -217,18 +187,12 @@ function ResetPasswordForm() {
           </div>
 
           <p className="text-center text-xs text-muted-foreground">
-            {t(
-              'Need a new reset link?',
-              '\u062a\u062d\u062a\u0627\u062c \u0631\u0627\u0628\u0637 \u0625\u0639\u0627\u062f\u0629 \u062a\u0639\u064a\u064a\u0646 \u062c\u062f\u064a\u062f\u061f'
-            )}{' '}
+            {t('Need a new reset link?', 'محتاج رابط جديد؟')}{' '}
             <Link
               href={storeUrl('/auth/forgot-password')}
               className="text-primary underline underline-offset-2"
             >
-              {t(
-                'Request password reset',
-                '\u0637\u0644\u0628 \u0625\u0639\u0627\u062f\u0629 \u062a\u0639\u064a\u064a\u0646 \u0643\u0644\u0645\u0629 \u0627\u0644\u0645\u0631\u0648\u0631'
-              )}
+              {t('Request password reset', 'طلب إعادة تعيين كلمة المرور')}
             </Link>
           </p>
         </div>

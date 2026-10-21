@@ -27,7 +27,7 @@
  *
  *   --seed     insert two realistic fixture stores first (FAQs, howtos,
  *              locations, bundles, blog posts, pages, product FAQs, AI
- *              recommendations, shipping zones, loyalty). Idempotent: an
+ *              recommendations, product search vectors, shipping zones, loyalty). Idempotent: an
  *              existing fixture store is reused, never duplicated.
  *   --report   write the full per-endpoint result as JSON.
  *
@@ -135,7 +135,7 @@ async function seedFixtures(db) {
         plan: 'enterprise',
         currency: 'KWD',
         template: 'modern',
-        theme: { primaryColor: '26 100% 50%', showBranchesInFooter: true },
+        theme: { primaryColor: '36 36% 52%', showBranchesInFooter: true },
         marketingPixels: {},
         blogEnabled: true,
         locationsEnabled: true,
@@ -278,6 +278,11 @@ async function seedFixtures(db) {
       await db.productFaq.create({
         data: { productId: p.id, question: `Is ${i} fresh?`, answer: 'Yes' },
       });
+      // Search P1: one vector per product (`product_embeddings`, strict RLS; Prisma cannot write
+      // halfvec, so raw SQL) so the storefront search's vector leg is in the owner-vs-ebda_app diff.
+      const vec = `[${Array.from({ length: 1024 }, (_, d) => (d === i ? 1 : 0)).join(',')}]`;
+      await db.$executeRaw`INSERT INTO product_embeddings (product_id, store_id, model, content_hash, embedding)
+        VALUES (${p.id}, ${storeId}, 'parity-fixture', md5(${p.id}), ${vec}::halfvec(1024))`;
     }
     await db.aiRecommendation.createMany({
       data: [

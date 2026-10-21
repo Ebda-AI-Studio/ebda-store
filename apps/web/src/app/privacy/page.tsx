@@ -7,7 +7,7 @@ export function generateMetadata(): Promise<Metadata> {
     title: ['Privacy Policy', 'سياسة الخصوصية'],
     description: [
       'Read our privacy policy to understand how we collect, use, and protect your data.',
-      'اقرأ سياسة الخصوصية لتعرف كيف نجمع بياناتك ونستخدمها ونحميها.',
+      'اقرأ سياسة الخصوصية عشان تعرف إزاي بنجمع بياناتك وبنستخدمها وبنحميها.',
     ],
   });
 }

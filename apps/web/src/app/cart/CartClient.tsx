@@ -165,8 +165,8 @@ export default function CartClient() {
   // silent/misleading-failure trap. Surface a specific error instead.
   const cartErrorToast = () =>
     errorToast(
-      t('Unable to update cart', 'تعذّر تحديث السلة'),
-      t('Please check your connection and try again.', 'يرجى التحقق من اتصالك والمحاولة مرة أخرى.')
+      t('Unable to update cart', 'معرفناش نحدّث السلة'),
+      t('Please check your connection and try again.', 'اتأكد من اتصالك وجرّب تاني.')
     );
 
   const handleUpdateQuantity = async (itemId: string, newQuantity: number) => {
@@ -180,8 +180,8 @@ export default function CartClient() {
       }
     } else if (newQuantity > 10) {
       info(
-        t('Limit reached', 'تم الوصول للحد'),
-        t('Maximum 10 items per product', 'الحد الأقصى 10 قطع لكل منتج')
+        t('Limit reached', 'وصلت للحد'),
+        t('Maximum 10 items per product', 'تقدر تطلب لحد 10 قطع من كل منتج')
       );
     } else {
       try {
@@ -206,8 +206,8 @@ export default function CartClient() {
     try {
       await removeCartBundle(cartBundleId);
       success(
-        t('Item removed', 'تمت الإزالة'),
-        t(`${name} has been removed from your cart`, `تمت إزالة ${name} من سلة التسوق`)
+        t('Item removed', 'اتشال'),
+        t(`${name} has been removed from your cart`, `شيلنا ${name} من السلة`)
       );
     } catch {
       cartErrorToast();
@@ -255,10 +255,10 @@ export default function CartClient() {
           }
         }
         success(
-          t('Promo applied', 'تم تطبيق الخصم'),
+          t('Promo applied', 'الخصم اتطبّق'),
           t(
             `${result.data.coupon.name} discount has been applied`,
-            `تم تطبيق خصم ${result.data.coupon.name}`
+            `اتطبّق خصم ${result.data.coupon.name}`
           )
         );
       } else {
@@ -271,7 +271,7 @@ export default function CartClient() {
         t('Error', 'خطأ'),
         t(
           'Failed to validate promo code. Please try again.',
-          'فشل التحقق من كود الخصم. يرجى المحاولة مرة أخرى.'
+          'معرفناش نتأكد من كود الخصم. جرّب تاني.'
         )
       );
     } finally {
@@ -410,7 +410,7 @@ export default function CartClient() {
   const minimumOrderMessage = belowMinimumOrder
     ? t(
         `Minimum order is ${formatPrice(minimumOrderFils as number)} — add ${formatPrice(minimumOrderCheck.shortfallFils)} more`,
-        `الحد الأدنى للطلب ${formatPrice(minimumOrderFils as number)} — أضف ${formatPrice(minimumOrderCheck.shortfallFils)} أخرى`
+        `الحد الأدنى للطلب ${formatPrice(minimumOrderFils as number)} — ضيف ${formatPrice(minimumOrderCheck.shortfallFils)} كمان`
       )
     : undefined;
   // #2117: a line whose product was deleted blocks the order server-side
@@ -422,7 +422,10 @@ export default function CartClient() {
   const checkoutBlockedMessage =
     minimumOrderMessage ??
     (hasUnavailableLines
-      ? t('Remove the unavailable items to check out.', 'أزل المنتجات غير المتوفرة لإتمام الطلب.')
+      ? t(
+          'Remove the unavailable items to check out.',
+          'شيل المنتجات اللي مش متوفرة عشان تكمّل الطلب.'
+        )
       : undefined);
 
   return (
@@ -456,7 +459,7 @@ export default function CartClient() {
           {(cartItems.length > 0 || cartBundles.length > 0) && (
             <p className="mt-2 text-muted-foreground" style={cartZoneStyle(cartLabelZone)}>
               {countText(lang, cartCount, ITEMS, localize(cartCount))}{' '}
-              {t('in your cart', '\u0641\u064a \u0633\u0644\u062a\u0643')}
+              {t('in your cart', 'في سلتك')}
             </p>
           )}
           {unavailableItems.length > 0 && (
@@ -480,7 +483,7 @@ export default function CartClient() {
                   title="Your cart is empty"
                   titleAr="سلتك فاضية"
                   description="Looks like you haven't added any items yet."
-                  descriptionAr="لسه ما ضفتش أي منتج."
+                  descriptionAr="لسه مضفتش أي منتج."
                   ctaLabel="Start shopping"
                   ctaLabelAr="ابدأ التسوق"
                   ctaHref={storeUrl('/products')}
@@ -493,10 +496,10 @@ export default function CartClient() {
                   <CartIcon className="h-16 w-16 text-muted-foreground" strokeWidth={1} />
                 </div>
                 <h2 className="text-2xl font-bold text-foreground">
-                  {t('Your cart is empty', 'سلتك فاضية')}
+                  {t('Your cart is empty', 'سلة التسوق فاضية')}
                 </h2>
                 <p className="mt-2 text-muted-foreground">
-                  {t("Looks like you haven't added any items yet.", 'لسه ما ضفتش أي منتج.')}
+                  {t("Looks like you haven't added any items yet.", 'شكلك لسه مضفتش أي منتجات.')}
                 </p>
                 <Link href={storeUrl('/products')} className="inline-block">
                   <Button className="mt-8 gap-2 rounded-[var(--radius)]" size="lg">
@@ -865,7 +868,7 @@ export default function CartClient() {
                                 disabled={promoApplied || isValidating}
                               >
                                 {promoApplied
-                                  ? t('Applied', 'تم')
+                                  ? t('Applied', 'اتطبّق')
                                   : isValidating
                                     ? '…'
                                     : t('Apply', 'تطبيق')}
@@ -961,15 +964,9 @@ export default function CartClient() {
                                   disabled={promoApplied || isValidating}
                                 >
                                   {promoApplied
-                                    ? t(
-                                        'Applied',
-                                        '\u062a\u0645 \u0627\u0644\u062a\u0637\u0628\u064a\u0642'
-                                      )
+                                    ? t('Applied', 'اتطبّق')
                                     : isValidating
-                                      ? t(
-                                          'Validating...',
-                                          '\u062c\u0627\u0631\u064a \u0627\u0644\u062a\u062d\u0642\u0642...'
-                                        )
+                                      ? t('Validating...', 'بنتأكد...')
                                       : t('Apply', '\u062a\u0637\u0628\u064a\u0642')}
                                 </Button>
                               </div>
@@ -1034,7 +1031,7 @@ export default function CartClient() {
                             {promoApplied && (
                               <div className="flex justify-between text-sm">
                                 <span className="text-success-ink">
-                                  {t('Discount', '\u0627\u0644\u062e\u0635\u0645')} (
+                                  {t('Discount', 'الخصم')} (
                                   {promoType === 'percentage' ? `${promoValue}%` : promoName})
                                 </span>
                                 <span className="font-medium text-success-ink">
@@ -1050,10 +1047,10 @@ export default function CartClient() {
                                   ...summaryLabelStyle,
                                 }}
                               >
-                                {t('Shipping', '\u0627\u0644\u0634\u062d\u0646')}
+                                {t('Shipping', 'الشحن')}
                               </span>
                               {/* Shipping is resolved at checkout (per delivery
-                                  area), not on the cart \u2014 show a neutral
+                                  area), not on the cart — show a neutral
                                   "Calculated at checkout" label rather than a
                                   premature "Free". */}
                               <span
@@ -1097,7 +1094,7 @@ export default function CartClient() {
                                     ...summaryTotalStyle,
                                   }}
                                 >
-                                  {t('Total', '\u0627\u0644\u0625\u062c\u0645\u0627\u0644\u064a')}
+                                  {t('Total', 'الإجمالي')}
                                 </span>
                                 <span
                                   className={`text-xl ${summaryFontWeight} text-primary`}
@@ -1111,7 +1108,7 @@ export default function CartClient() {
                               </div>
                             </div>
                             {/* Tax already inside the listed price is
-                                informational only \u2014 a muted caption below
+                                informational only — a muted caption below
                                 Total, never a row in the summed amount
                                 column (scoped-audit follow-up: an inclusive
                                 amount printed there implied it was added
@@ -1186,8 +1183,8 @@ export default function CartClient() {
                         className="inline-flex min-h-11 items-center underline underline-offset-4 hover:text-foreground"
                       >
                         {store.phone
-                          ? `${t('Questions? Call', 'لديك سؤال؟ اتصل على')} ${store.phone}`
-                          : t('Questions? Contact the store', 'لديك سؤال؟ تواصل مع المتجر')}
+                          ? `${t('Questions? Call', 'عندك سؤال؟ كلّمنا على')} ${store.phone}`
+                          : t('Questions? Contact the store', 'عندك سؤال؟ كلّم المتجر')}
                       </Link>
                     </p>
                   </div>

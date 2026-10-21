@@ -86,11 +86,11 @@ export default function ModernFooter({
       } else {
         setErrorMsg(
           demoRefusalText(result.error, (en, ar) => (isRtl ? ar : en)) ||
-            (isRtl ? 'تعذر الاشتراك، حاول لاحقاً' : 'Could not subscribe, please try again')
+            (isRtl ? 'الاشتراك منفعش، جرّب بعدين' : 'Could not subscribe, please try again')
         );
       }
     } catch {
-      setErrorMsg(isRtl ? 'تعذر الاشتراك، حاول لاحقاً' : 'Could not subscribe, please try again');
+      setErrorMsg(isRtl ? 'الاشتراك منفعش، جرّب بعدين' : 'Could not subscribe, please try again');
     } finally {
       setSubmitting(false);
     }
@@ -386,7 +386,7 @@ export default function ModernFooter({
                   >
                     {submitting
                       ? isRtl
-                        ? 'جاري الاشتراك...'
+                        ? 'بنسجّل اشتراكك...'
                         : 'Subscribing...'
                       : isRtl
                         ? 'اشتراك'

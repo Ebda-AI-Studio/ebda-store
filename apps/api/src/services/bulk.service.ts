@@ -12,6 +12,7 @@ import { recordSlugRedirect } from './slug-redirect.service';
 import { stampHumanEdits } from './ai-autofill.service';
 import { assertWithinLimit } from './plan-limit.service';
 import { PRODUCT_SEARCH_MAX_LIMIT, searchProductIds } from './product-search.service';
+import { requestStoreReindex } from '../lib/search/reindex';
 import {
   bundleFkViolationKind,
   planBundlePinnedVariantSkips,
@@ -1320,6 +1321,10 @@ export class BulkService {
       }
     }
 
+    // Imported rows changed product text: ask the search indexer to look at this store once
+    // (Task 11). Each batch above already committed; inside a request this waits for its COMMIT.
+    if (result.created + result.updated > 0) await requestStoreReindex(storeId, 'bulk-import');
+
     return result;
   }
 
@@ -1377,6 +1382,8 @@ export class BulkService {
       where: { id: { in: productIds }, storeId },
       data: { deletedAt: new Date() },
     });
+    // Deleted products leave the search index (vectors pruned; review M5). A hard delete cascades.
+    if (result.count > 0) await requestStoreReindex(storeId, 'bulk-delete');
 
     return { deleted: result.count, failed: productIds.length - result.count, errors: [] };
   }
@@ -1398,6 +1405,8 @@ export class BulkService {
       where: { id: { in: productIds }, storeId, deletedAt: null },
       data: { status },
     });
+    // Only active products are indexed: publish adds vectors, unpublish removes them (review M5).
+    if (result.count > 0) await requestStoreReindex(storeId, 'bulk-status');
 
     return { updated: result.count, failed: productIds.length - result.count, errors: [] };
   }

@@ -128,7 +128,7 @@ export default function BundleDetailClient({ initialBundle }: BundleDetailClient
           <p className="mt-2 text-muted-foreground">
             {t(
               "The bundle you're looking for may have been removed or doesn't exist.",
-              'الباقة التي تبحث عنها ربما تم إزالتها أو غير موجودة.'
+              'الباقة اللي بتدوّر عليها ممكن تكون اتشالت أو مش موجودة.'
             )}
           </p>
           <Link href={storeUrl('/products')}>

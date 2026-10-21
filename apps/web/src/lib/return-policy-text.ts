@@ -4,7 +4,7 @@
  * `0` means returns are not accepted, and null/undefined means the merchant
  * declared nothing (so no number is printed).
  */
-import { countText, DAYS } from './plural';
+import { countText, DAYS, DAYS_FORMAL } from './plural';
 export type PolicyLang = 'ar' | 'en';
 
 export type ReturnPolicyKind = 'window' | 'none' | 'undeclared';
@@ -15,8 +15,8 @@ export function returnPolicyKind(days: number | null | undefined): ReturnPolicyK
 }
 
 /**
- * "14 days" / "١٤ يومًا" after a preposition (every caller says "خلال …" /
- * "لمدة …"), through the one plural helper in the oblique case ("خلال يومين").
+ * "14 days" / "١٤ يوم" after a preposition (every caller says "خلال …"), through
+ * the one plural helper (Egyptian forms: "خلال يومين", Ruling FU46-Y02a).
  * `localize` puts the number in the store's digits (review M8: the PDP trust
  * line and /returns must agree); default Western.
  */
@@ -25,7 +25,7 @@ export function daysPhrase(
   lang: PolicyLang,
   localize: (v: number) => string = String
 ): string {
-  return countText(lang, n, DAYS, localize(n), 'oblique');
+  return countText(lang, n, DAYS, localize(n));
 }
 
 export interface ReturnPolicyCopy {
@@ -33,6 +33,16 @@ export interface ReturnPolicyCopy {
   body: string;
 }
 
+/** `daysPhrase` for the formal legal text below ("خلال ١٤ يومًا"): only inside the legal fence. */
+export function formalDaysPhrase(
+  n: number,
+  lang: PolicyLang,
+  localize: (v: number) => string = String
+): string {
+  return countText(lang, n, lang === 'ar' ? DAYS_FORMAL : DAYS, localize(n));
+}
+
+// legal-register:start — the returns-policy body and the terms sentence stay formal (Ruling FU46-Y02b).
 export function returnPolicyCopy(
   days: number | null | undefined,
   lang: PolicyLang,
@@ -43,12 +53,12 @@ export function returnPolicyCopy(
     const n = days as number;
     return lang === 'ar'
       ? {
-          title: `سياسة الإرجاع خلال ${daysPhrase(n, 'ar', localize)}`,
-          body: `نتمنى أن تكون راضياً تماماً عن مشترياتك. إذا لم يناسبك الطلب، يمكنك إرجاعه خلال ${daysPhrase(n, 'ar', localize)} من تاريخ التوصيل.`,
+          title: `سياسة الإرجاع خلال ${formalDaysPhrase(n, 'ar', localize)}`,
+          body: `نتمنى أن تكون راضياً تماماً عن مشترياتك. إذا لم يناسبك الطلب، يمكنك إرجاعه خلال ${formalDaysPhrase(n, 'ar', localize)} من تاريخ التوصيل.`,
         }
       : {
           title: `${n}-Day Return Policy`,
-          body: `We want you to be completely satisfied with your purchase. If you're not happy with your order, you can request a return within ${daysPhrase(n, 'en')} of delivery.`,
+          body: `We want you to be completely satisfied with your purchase. If you're not happy with your order, you can request a return within ${formalDaysPhrase(n, 'en')} of delivery.`,
         };
   }
   if (kind === 'none') {
@@ -83,8 +93,8 @@ export function termsReturnSentence(
   if (kind === 'window') {
     const n = days as number;
     return lang === 'ar'
-      ? `تسمح سياسة الإرجاع لدينا بالإرجاع خلال ${daysPhrase(n, 'ar', localize)} من التوصيل. يرجى الرجوع إلى صفحة المرتجعات لمعرفة التفاصيل الكاملة حول الأهلية والإجراءات.`
-      : `Our return policy allows returns within ${daysPhrase(n, 'en')} of delivery. Please refer to our Returns page for complete details on eligibility and process.`;
+      ? `تسمح سياسة الإرجاع لدينا بالإرجاع خلال ${formalDaysPhrase(n, 'ar', localize)} من التوصيل. يرجى الرجوع إلى صفحة المرتجعات لمعرفة التفاصيل الكاملة حول الأهلية والإجراءات.`
+      : `Our return policy allows returns within ${formalDaysPhrase(n, 'en')} of delivery. Please refer to our Returns page for complete details on eligibility and process.`;
   }
   if (kind === 'none') {
     return lang === 'ar'
@@ -96,6 +106,8 @@ export function termsReturnSentence(
     : 'The return period is set by the store. Please refer to our Returns page or contact us for complete details on eligibility and process.';
 }
 
+// legal-register:end
+
 /** Generic-FAQ answer for "What is your return policy?" (no number unless the store declared one). */
 export function faqReturnAnswer(
   days: number | null | undefined,
@@ -106,15 +118,15 @@ export function faqReturnAnswer(
   if (kind === 'window') {
     const n = days as number;
     return lang === 'ar'
-      ? `نقدم سياسة إرجاع لمدة ${daysPhrase(n, 'ar', localize)} للعناصر غير المستخدمة في عبوتها الأصلية. يرجى زيارة صفحة المرتجعات لمزيد من التفاصيل.`
+      ? `بنقبل الإرجاع خلال ${daysPhrase(n, 'ar', localize)} للمنتجات اللي متستعملتش وفي علبتها الأصلية. شوف صفحة المرتجعات لتفاصيل أكتر.`
       : `We offer a ${n}-day return policy for unused items in original packaging. Please visit our Returns page for more details.`;
   }
   if (kind === 'none') {
     return lang === 'ar'
-      ? 'هذا المتجر لا يقبل طلبات الإرجاع. يرجى زيارة صفحة المرتجعات لمزيد من التفاصيل.'
+      ? 'المتجر ده مش بيقبل الإرجاع. شوف صفحة المرتجعات لتفاصيل أكتر.'
       : 'This store does not accept returns. Please visit our Returns page for more details.';
   }
   return lang === 'ar'
-    ? 'تختلف مدة الإرجاع حسب المتجر. يرجى زيارة صفحة المرتجعات أو التواصل معنا لمزيد من التفاصيل.'
+    ? 'مدة الإرجاع بيحددها المتجر. شوف صفحة المرتجعات أو كلّمنا لتفاصيل أكتر.'
     : 'The return period is set by the store. Please visit our Returns page or contact us for more details.';
 }

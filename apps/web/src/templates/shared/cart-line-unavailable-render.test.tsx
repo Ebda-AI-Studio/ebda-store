@@ -77,7 +77,7 @@ describe.each(Object.entries(themes))('%s CartTable — #1766 unavailable line',
   it('shows the Arabic notice on the Arabic storefront', () => {
     lang.current = 'ar';
     const html = render(Table, [line({ unavailable: true })]);
-    expect(html).toContain('لم يعد متوفراً');
+    expect(html).toContain('مبقاش متوفر');
     lang.current = 'en';
   });
 

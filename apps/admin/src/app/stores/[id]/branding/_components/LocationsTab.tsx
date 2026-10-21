@@ -404,7 +404,7 @@ export function LocationsTab({ storeId, branding, onChange }: LocationsTabProps)
           <button
             type="button"
             onClick={openNew}
-            className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary/90"
+            className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
           >
             {t('addButton')}
           </button>
@@ -619,7 +619,7 @@ export function LocationsTab({ storeId, branding, onChange }: LocationsTabProps)
               type="button"
               disabled={isSaving}
               onClick={handleSave}
-              className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white hover:bg-primary/90 disabled:opacity-60"
+              className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-60"
             >
               {isSaving ? t('saving') : formMode === 'new' ? t('create') : t('save')}
             </button>

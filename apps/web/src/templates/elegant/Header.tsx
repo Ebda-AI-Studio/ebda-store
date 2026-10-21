@@ -275,7 +275,7 @@ export default function ElegantHeader({
               type="text"
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
-              placeholder={t('What are you looking for?', 'ما الذي تبحث عنه؟')}
+              placeholder={t('What are you looking for?', 'بتدوّر على إيه؟')}
               className="w-full px-0 py-3 bg-transparent border-0 border-b border-input focus:outline-none focus:border-foreground text-center text-base sm:text-sm tracking-[0.1em] placeholder:text-muted-foreground transition-colors duration-500"
               dir={isRtl ? 'rtl' : 'ltr'}
               autoFocus={isSearchOpen}

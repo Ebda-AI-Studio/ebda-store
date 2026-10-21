@@ -32,8 +32,8 @@ export function cartRemovalToast(
   const name = pickLocalizedName(item, ctx.isRtl) ?? item.name;
   return {
     type: 'success' as const,
-    title: ctx.t('Item removed', 'تمت الإزالة'),
-    message: ctx.t(`${name} removed from your cart`, `تمت إزالة ${name} من السلة`),
+    title: ctx.t('Item removed', 'اتشال'),
+    message: ctx.t(`${name} removed from your cart`, `شيلنا ${name} من السلة`),
     duration: 6000,
     action: {
       label: ctx.t('Undo', 'تراجع'),

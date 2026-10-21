@@ -52,12 +52,12 @@ export function UnknownHostNotFound({ links }: { links: UnknownHostLinks }) {
       </svg>
 
       <h1 className="mt-8 max-w-md text-balance text-2xl font-bold leading-snug sm:text-3xl">
-        {t('This store doesn’t exist or hasn’t opened yet', 'هذا المتجر غير موجود أو لم يُفتح بعد')}
+        {t('This store doesn’t exist or hasn’t opened yet', 'المتجر ده مش موجود أو لسه مفتحش')}
       </h1>
       <p className="mt-3 max-w-sm text-[15px] leading-relaxed" style={{ color: MUTED }}>
         {t(
           'Check the link, or start your own store on Ebda in minutes.',
-          'تأكد من الرابط، أو ابدأ متجرك الخاص على إبدأ في دقائق.'
+          'اتأكد من الرابط، أو ابدأ متجرك الخاص على إبدأ في دقايق.'
         )}
       </p>
 

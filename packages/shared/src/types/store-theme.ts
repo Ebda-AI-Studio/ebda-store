@@ -106,7 +106,7 @@ export const DEFAULT_DIVIDER_SETTINGS: DividerSettings = {
  * Store theme configuration - colors stored as HSL values
  */
 export interface StoreTheme {
-  // Core colors (HSL format: "26 100% 50%")
+  // Core colors (HSL format: "36 36% 52%")
   primaryColor: string;
   primaryForeground: string;
   secondaryColor: string;
@@ -173,6 +173,12 @@ export interface StoreTheme {
   // pill adds visual noise that's only useful for brand-recall on
   // share/screenshot contexts.
   showBrandBadge?: boolean;
+
+  // Opt-in "New / جديد" badge on product cards (Ahmad 2026-10-16, Ruling
+  // D1016-NEW-1: the merchant's choice). When true, a product the merchant
+  // flagged `isNew` or created in the last 14 days shows the badge on every
+  // card path (`isProductNew`). Default false (new visual features default OFF).
+  showNewBadge?: boolean;
 
   // Opt-in quick-add (+) circle overlay on ProductCarousel cards (Bucket
   // E3, shipped 2026-05-17). When true, in-stock non-variant products
@@ -581,13 +587,15 @@ export interface TemplateInfo {
  */
 export const DEFAULT_THEME: StoreTheme = {
   // Core colors
-  primaryColor: '26 100% 50%', // Orange
-  // Black, not white: white on this orange is 2.79:1, black 7.5:1 (K-02, AA).
-  primaryForeground: '0 0% 0%',
+  // Ebda's palette (Ruling D1016-ORANGE-1, BRAND.colors): primary = night #0A0B0C with white
+  // ink (19.7:1, K-02), accent = a gold #B08D57 tint with dark-gold ink (8.3:1), ring = gold
+  // (3.08:1 on white, the ≥3:1 non-text bar). Never the inherited Force orange.
+  primaryColor: '210 9% 4%',
+  primaryForeground: '0 0% 100%',
   secondaryColor: '220 14% 96%',
   secondaryForeground: '220 9% 46%',
-  accentColor: '26 100% 95%',
-  accentForeground: '26 100% 25%',
+  accentColor: '36 36% 95%',
+  accentForeground: '36 40% 25%',
   backgroundColor: '0 0% 100%',
   foregroundColor: '224 71% 4%',
   mutedColor: '220 14% 96%',
@@ -604,7 +612,7 @@ export const DEFAULT_THEME: StoreTheme = {
 
   // Input colors
   inputColor: '220 13% 91%',
-  ringColor: '26 100% 50%',
+  ringColor: '36 36% 52%',
 
   // Status colors
   destructiveColor: '0 84% 60%',
@@ -619,6 +627,7 @@ export const DEFAULT_THEME: StoreTheme = {
   borderRadius: 'md',
   backgroundPreset: 'none',
   showBrandBadge: false,
+  showNewBadge: false,
   showQuickAdd: false,
   dividers: DEFAULT_DIVIDER_SETTINGS,
   showBrandStory: true,
@@ -632,7 +641,7 @@ export const DEFAULT_THEME: StoreTheme = {
  */
 export const TEMPLATE_THEMES: Record<TemplateId, Partial<StoreTheme>> = {
   modern: {
-    primaryColor: '26 100% 50%', // Vibrant orange
+    primaryColor: '36 36% 52%', // Ebda gold (was the inherited orange; D1016-ORANGE-1)
     fontFamily: 'modern',
     borderRadius: 'lg',
   },

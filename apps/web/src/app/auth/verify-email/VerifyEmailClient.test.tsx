@@ -83,8 +83,8 @@ describe('VerifyEmailClient', () => {
 
     await mount();
 
-    expect(screen.getByText('محاولات كثيرة جدًا')).toBeTruthy();
-    expect(screen.getByRole('button', { name: 'حاول مرة أخرى' })).toBeTruthy();
+    expect(screen.getByText('محاولات كتير')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'جرّب تاني' })).toBeTruthy();
   });
 
   it('a network failure is retryable too, not an invalid link', async () => {

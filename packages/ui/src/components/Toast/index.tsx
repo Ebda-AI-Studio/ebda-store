@@ -206,10 +206,12 @@ function ToastItem({
   // IA-03 (W4): the theme's tokens, never palette hues (a mint toast is in none of the looks).
   // Success and info speak in the store's ink; error and warning keep their semantic inks.
   const styles: Record<ToastType, { container: string; icon: string; progress: string }> = {
+    // Semantic tokens only (success/destructive/warning/info, each with its `-ink` for text on a
+    // tint): a store's look can restyle them, and no palette colour is hard-coded here.
     success: {
-      container: 'bg-background border-border',
-      icon: 'text-foreground bg-foreground/5',
-      progress: 'bg-foreground/40',
+      container: 'bg-background border-success/30',
+      icon: 'text-success-ink bg-success/20',
+      progress: 'bg-success',
     },
     error: {
       container: 'bg-background border-destructive/40',
@@ -222,9 +224,9 @@ function ToastItem({
       progress: 'bg-warning',
     },
     info: {
-      container: 'bg-background border-border',
-      icon: 'text-foreground bg-foreground/5',
-      progress: 'bg-foreground/40',
+      container: 'bg-background border-info/30',
+      icon: 'text-info-ink bg-info/20',
+      progress: 'bg-info',
     },
   };
 

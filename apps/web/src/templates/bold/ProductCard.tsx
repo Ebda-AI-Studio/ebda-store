@@ -181,7 +181,7 @@ function BoldProductCard({
     // Issue #1997 — the NEW badge below renders at logical top-start under
     // this exact condition; a discount/custom badge avoiding a reserved
     // heart corner must not land on top of it.
-    newOrBrandBadgeReserved: Boolean(orderable && isProductNew(product, renderNow)),
+    newOrBrandBadgeReserved: Boolean(orderable && isProductNew(product, renderNow, store.theme)),
     // The mobile quick-add CTA band below is an unconditional full-width
     // overlay (hidden only via a `lg:` desktop hover state, never removed
     // from the DOM), so it reserves the whole bottom edge.
@@ -303,7 +303,7 @@ function BoldProductCard({
 
           {/* NEW badge — BUG 2 fix: no inStock gate removed from the group;
               NEW stays top corner, only shown when orderable (unchanged). */}
-          {orderable && isProductNew(product, renderNow) && (
+          {orderable && isProductNew(product, renderNow, store.theme) && (
             <ProductBadgeGroup absolute position={isRtl ? 'top-right' : 'top-left'} isRtl={isRtl}>
               <ProductBadge
                 variant="new"
@@ -370,7 +370,7 @@ function BoldProductCard({
               )}
               labels={{
                 addToCart: isRtl ? 'أضف إلى السلة' : 'Add to cart',
-                addedToCart: isRtl ? 'تمت الإضافة' : 'Added to cart',
+                addedToCart: isRtl ? 'اتضاف' : 'Added to cart',
                 outOfStock: isRtl ? 'نفد المخزون' : 'Out of stock',
                 adding: isRtl ? '...' : '...',
                 view: isRtl ? 'عرض' : 'View',

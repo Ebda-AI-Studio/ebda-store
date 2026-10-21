@@ -4,7 +4,7 @@ import type { OrderEmailData } from '../email.service';
 export const paymentSuccessTemplate = {
   subject: {
     en: (d: OrderEmailData, _storeName: string) => `Payment Received - Order #${d.orderNumber}`,
-    ar: (d: OrderEmailData, _storeName: string) => `تم استلام الدفعة - طلب رقم ${d.orderNumber}`,
+    ar: (d: OrderEmailData, _storeName: string) => `الدفع وصلنا - طلب رقم ${d.orderNumber}`,
   },
 
   en: (d: OrderEmailData, _storeName: string) => `
@@ -16,10 +16,10 @@ export const paymentSuccessTemplate = {
   `,
 
   ar: (d: OrderEmailData, _storeName: string) => `
-    <h2>تم استلام الدفعة</h2>
-    <p>مرحباً ${escapeHtml(d.customerName)}،</p>
-    <p>تمت معالجة دفعتك بنجاح بمبلغ <strong>${emailMoney(d.total, d.currency, 'ar')}</strong> للطلب رقم ${escapeHtml(d.orderNumber)}.</p>
-    <p>يجري الآن تجهيز طلبك للشحن.</p>
-    <p>شكراً لتسوقك معنا!</p>
+    <h2>الدفع وصلنا</h2>
+    <p>أهلاً ${escapeHtml(d.customerName)}،</p>
+    <p>استلمنا دفعتك بمبلغ <strong>${emailMoney(d.total, d.currency, 'ar')}</strong> للطلب رقم ${escapeHtml(d.orderNumber)}.</p>
+    <p>بنجهّز طلبك للشحن دلوقتي.</p>
+    <p>شكراً إنك اشتريت من عندنا!</p>
   `,
 };

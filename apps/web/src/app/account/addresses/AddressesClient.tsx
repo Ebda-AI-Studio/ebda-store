@@ -123,23 +123,21 @@ export default function AddressesClient() {
 
       if (result.success) {
         success(
+          editingId ? t('Address updated', 'العنوان اتحدّث') : t('Address added', 'العنوان اتضاف'),
           editingId
-            ? t('Address updated', 'تم تحديث العنوان')
-            : t('Address added', 'تمت إضافة العنوان'),
-          editingId
-            ? t('Your address has been updated.', 'تم تحديث عنوانك.')
-            : t('New address has been saved.', 'تم حفظ العنوان الجديد.')
+            ? t('Your address has been updated.', 'عنوانك اتحدّث.')
+            : t('New address has been saved.', 'العنوان الجديد اتحفظ.')
         );
         fetchAddresses();
         resetForm();
       } else {
         toastError(
           t('Error', 'خطأ'),
-          result.error?.message || t('Failed to save address', 'تعذر حفظ العنوان')
+          result.error?.message || t('Failed to save address', 'معرفناش نحفظ العنوان')
         );
       }
     } catch {
-      toastError(t('Error', 'خطأ'), t('An unexpected error occurred.', 'حدث خطأ غير متوقع.'));
+      toastError(t('Error', 'خطأ'), t('An unexpected error occurred.', 'حصل خطأ مش متوقع.'));
     } finally {
       setIsSaving(false);
     }
@@ -153,14 +151,14 @@ export default function AddressesClient() {
       if (result.success) {
         setAddresses(prev => prev.filter(a => a.id !== deleteTargetId));
         success(
-          t('Address deleted', 'تم حذف العنوان'),
-          t('The address has been removed.', 'تمت إزالة العنوان.')
+          t('Address deleted', 'العنوان اتمسح'),
+          t('The address has been removed.', 'العنوان اتشال.')
         );
       } else {
-        toastError(t('Error', 'خطأ'), t('Failed to delete address', 'تعذر حذف العنوان'));
+        toastError(t('Error', 'خطأ'), t('Failed to delete address', 'معرفناش نمسح العنوان'));
       }
     } catch {
-      toastError(t('Error', 'خطأ'), t('An unexpected error occurred.', 'حدث خطأ غير متوقع.'));
+      toastError(t('Error', 'خطأ'), t('An unexpected error occurred.', 'حصل خطأ مش متوقع.'));
     } finally {
       setIsDeleting(false);
       setDeleteTargetId(null);
@@ -173,14 +171,14 @@ export default function AddressesClient() {
       if (result.success) {
         setAddresses(prev => prev.map(a => ({ ...a, isDefault: a.id === id })));
         success(
-          t('Default updated', 'تم تحديث العنوان الافتراضي'),
-          t('Default address has been changed.', 'تم تغيير العنوان الافتراضي.')
+          t('Default updated', 'العنوان الافتراضي اتحدّث'),
+          t('Default address has been changed.', 'العنوان الافتراضي اتغيّر.')
         );
       }
     } catch {
       toastError(
         t('Error', 'خطأ'),
-        t('Failed to update default address', 'تعذر تحديث العنوان الافتراضي')
+        t('Failed to update default address', 'معرفناش نحدّث العنوان الافتراضي')
       );
     }
   }
@@ -224,10 +222,7 @@ export default function AddressesClient() {
     return (
       <div className="space-y-6">
         <h1 className="text-2xl font-bold text-foreground">
-          {t(
-            'Saved Addresses',
-            '\u0627\u0644\u0639\u0646\u0627\u0648\u064a\u0646 \u0627\u0644\u0645\u062d\u0641\u0648\u0638\u0629'
-          )}
+          {t('Saved Addresses', 'العناوين المحفوظة')}
         </h1>
         <div className="flex justify-center py-12">
           <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
@@ -241,16 +236,10 @@ export default function AddressesClient() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-foreground">
-            {t(
-              'Saved Addresses',
-              '\u0627\u0644\u0639\u0646\u0627\u0648\u064a\u0646 \u0627\u0644\u0645\u062d\u0641\u0648\u0638\u0629'
-            )}
+            {t('Saved Addresses', 'العناوين المحفوظة')}
           </h1>
           <p className="mt-1 text-muted-foreground">
-            {t(
-              'Manage your delivery addresses',
-              '\u0625\u062f\u0627\u0631\u0629 \u0639\u0646\u0627\u0648\u064a\u0646 \u0627\u0644\u062a\u0648\u0635\u064a\u0644'
-            )}
+            {t('Manage your delivery addresses', 'إدارة عناوين التوصيل')}
           </p>
         </div>
         {!isAdding && (
@@ -263,7 +252,7 @@ export default function AddressesClient() {
                 d="M12 4v16m8-8H4"
               />
             </svg>
-            {t('Add Address', '\u0625\u0636\u0627\u0641\u0629 \u0639\u0646\u0648\u0627\u0646')}
+            {t('Add Address', 'إضافة عنوان')}
           </Button>
         )}
       </div>
@@ -272,31 +261,19 @@ export default function AddressesClient() {
         <div className="rounded-xl border bg-card p-6 shadow-sm">
           <h2 className="mb-4 text-lg font-semibold text-foreground">
             {editingId
-              ? t(
-                  'Edit Address',
-                  '\u062a\u0639\u062f\u064a\u0644 \u0627\u0644\u0639\u0646\u0648\u0627\u0646'
-                )
-              : t(
-                  'Add New Address',
-                  '\u0625\u0636\u0627\u0641\u0629 \u0639\u0646\u0648\u0627\u0646 \u062c\u062f\u064a\u062f'
-                )}
+              ? t('Edit Address', 'تعديل العنوان')
+              : t('Add New Address', 'إضافة عنوان جديد')}
           </h2>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="grid gap-4 sm:grid-cols-2">
               <Input
-                label={t(
-                  'First Name',
-                  '\u0627\u0644\u0627\u0633\u0645 \u0627\u0644\u0623\u0648\u0644'
-                )}
+                label={t('First Name', 'الاسم الأول')}
                 value={formData.firstName}
                 onChange={e => setFormData({ ...formData, firstName: e.target.value })}
                 required
               />
               <Input
-                label={t(
-                  'Last Name',
-                  '\u0627\u0644\u0627\u0633\u0645 \u0627\u0644\u0623\u062e\u064a\u0631'
-                )}
+                label={t('Last Name', 'الاسم الأخير')}
                 value={formData.lastName}
                 onChange={e => setFormData({ ...formData, lastName: e.target.value })}
                 required
@@ -304,7 +281,7 @@ export default function AddressesClient() {
             </div>
 
             <Input
-              label={t('Phone Number', '\u0631\u0642\u0645 \u0627\u0644\u0647\u0627\u062a\u0641')}
+              label={t('Phone Number', 'رقم الموبايل')}
               type="tel"
               value={formData.phone}
               onChange={e => setFormData({ ...formData, phone: e.target.value })}
@@ -394,7 +371,7 @@ export default function AddressesClient() {
               label={t('Landmark (optional)', 'علامة مميزة (اختياري)')}
               value={formData.address2}
               onChange={e => setFormData({ ...formData, address2: e.target.value })}
-              placeholder={t('Next to the pharmacy…', 'بجوار الصيدلية…')}
+              placeholder={t('Next to the pharmacy…', 'جنب الصيدلية…')}
             />
 
             <label className="flex items-center gap-2">
@@ -405,27 +382,18 @@ export default function AddressesClient() {
                 className="h-4 w-4 rounded border-input text-primary focus:ring-primary"
               />
               <span className="text-sm text-foreground">
-                {t(
-                  'Set as default address',
-                  '\u062a\u0639\u064a\u064a\u0646 \u0643\u0639\u0646\u0648\u0627\u0646 \u0627\u0641\u062a\u0631\u0627\u0636\u064a'
-                )}
+                {t('Set as default address', 'تعيين كعنوان افتراضي')}
               </span>
             </label>
 
             <div className="flex gap-2 pt-4">
               <Button type="submit" isLoading={isSaving}>
                 {editingId
-                  ? t(
-                      'Update Address',
-                      '\u062a\u062d\u062f\u064a\u062b \u0627\u0644\u0639\u0646\u0648\u0627\u0646'
-                    )
-                  : t(
-                      'Save Address',
-                      '\u062d\u0641\u0638 \u0627\u0644\u0639\u0646\u0648\u0627\u0646'
-                    )}
+                  ? t('Update Address', 'تحديث العنوان')
+                  : t('Save Address', 'حفظ العنوان')}
               </Button>
               <Button type="button" variant="outline" onClick={resetForm}>
-                {t('Cancel', '\u0625\u0644\u063a\u0627\u0621')}
+                {t('Cancel', 'إلغاء')}
               </Button>
             </div>
           </form>
@@ -443,7 +411,7 @@ export default function AddressesClient() {
             >
               {address.isDefault && (
                 <span className="absolute right-4 top-4 rounded-full bg-primary/10 px-2 py-1 text-xs font-medium text-primary">
-                  {t('Default', '\u0627\u0644\u0627\u0641\u062a\u0631\u0627\u0636\u064a')}
+                  {t('Default', 'الافتراضي')}
                 </span>
               )}
               <p className="font-medium text-foreground">
@@ -465,24 +433,21 @@ export default function AddressesClient() {
                   onClick={() => startEdit(address)}
                   className="text-sm text-primary hover:underline"
                 >
-                  {t('Edit', '\u062a\u0639\u062f\u064a\u0644')}
+                  {t('Edit', 'تعديل')}
                 </button>
                 {!address.isDefault && (
                   <button
                     onClick={() => handleSetDefault(address.id)}
                     className="text-sm text-primary hover:underline"
                   >
-                    {t(
-                      'Set as Default',
-                      '\u062a\u0639\u064a\u064a\u0646 \u0643\u0627\u0641\u062a\u0631\u0627\u0636\u064a'
-                    )}
+                    {t('Set as Default', 'تعيين كافتراضي')}
                   </button>
                 )}
                 <button
                   onClick={() => setDeleteTargetId(address.id)}
                   className="text-sm text-destructive-ink hover:underline"
                 >
-                  {t('Delete', '\u062d\u0630\u0641')}
+                  {t('Delete', 'حذف')}
                 </button>
               </div>
             </div>
@@ -510,22 +475,13 @@ export default function AddressesClient() {
             />
           </svg>
           <h3 className="mt-4 text-lg font-medium text-foreground">
-            {t(
-              'No addresses saved',
-              '\u0644\u0627 \u062a\u0648\u062c\u062f \u0639\u0646\u0627\u0648\u064a\u0646 \u0645\u062d\u0641\u0648\u0638\u0629'
-            )}
+            {t('No addresses saved', 'مفيش عناوين محفوظة')}
           </h3>
           <p className="mt-2 text-muted-foreground">
-            {t(
-              'Add an address for faster checkout.',
-              '\u0623\u0636\u0641 \u0639\u0646\u0648\u0627\u0646\u0627\u064b \u0644\u0625\u062a\u0645\u0627\u0645 \u0627\u0644\u0634\u0631\u0627\u0621 \u0628\u0634\u0643\u0644 \u0623\u0633\u0631\u0639.'
-            )}
+            {t('Add an address for faster checkout.', 'ضيف عنوان عشان تكمّل الشراء أسرع.')}
           </p>
           <Button onClick={() => setIsAdding(true)} className="mt-6">
-            {t(
-              'Add Your First Address',
-              '\u0623\u0636\u0641 \u0639\u0646\u0648\u0627\u0646\u0643 \u0627\u0644\u0623\u0648\u0644'
-            )}
+            {t('Add Your First Address', 'أضف عنوانك الأول')}
           </Button>
         </div>
       ) : null}
@@ -543,7 +499,7 @@ export default function AddressesClient() {
         <p className="text-sm text-muted-foreground">
           {t(
             'This address will be removed permanently. You can add a new one anytime.',
-            'سيتم حذف هذا العنوان نهائيًا. يمكنك إضافة عنوان جديد في أي وقت.'
+            'العنوان ده هيتمسح نهائي. تقدر تضيف عنوان جديد في أي وقت.'
           )}
         </p>
         <div className="mt-6 flex justify-end gap-3">
@@ -551,7 +507,7 @@ export default function AddressesClient() {
             {t('Cancel', 'إلغاء')}
           </Button>
           <Button variant="destructive" onClick={confirmDelete} disabled={isDeleting}>
-            {isDeleting ? t('Deleting…', 'جاري الحذف…') : t('Delete', 'حذف')}
+            {isDeleting ? t('Deleting…', 'بنمسح…') : t('Delete', 'حذف')}
           </Button>
         </div>
       </Sheet>

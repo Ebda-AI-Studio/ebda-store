@@ -15,3 +15,7 @@ CREATE INDEX CONCURRENTLY IF NOT EXISTS "products_store_id_idx" ON "products" US
 CREATE INDEX CONCURRENTLY IF NOT EXISTS "payment_events_event_type_idx" ON "payment_events" USING btree ("event_type");
 CREATE INDEX CONCURRENTLY IF NOT EXISTS "inventory_history_store_id_idx" ON "inventory_history" USING btree ("store_id");
 CREATE INDEX CONCURRENTLY IF NOT EXISTS "cart_bundles_cart_id_idx" ON "cart_bundles" USING btree ("cart_id");
+
+-- After running this, delete the migration's row too, or a later `prisma migrate deploy` treats it
+-- as applied and never recreates what was rolled back:
+--   DELETE FROM _prisma_migrations WHERE migration_name = '20261003110100_drop_redundant_prefix_indexes';

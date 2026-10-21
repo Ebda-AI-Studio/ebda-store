@@ -35,6 +35,8 @@ import {
   fmtDate as fmtBillingDate,
   planLabel,
 } from '../../../../components/billing/format';
+import { EbdaBillingReceipt } from '../../../../components/billing/EbdaBillingReceipt';
+import { pickReceiptCharge } from '../../../../components/billing/receipt-charge';
 import { billingNotice, noticeText } from '../../../../components/billing/notice';
 import { startCardSetup, useCardReturn } from '../../../../components/billing/useCardReturn';
 import type {
@@ -168,6 +170,8 @@ export default function StoreBillingPage() {
   const [charges, setCharges] = useState<Charge[]>([]);
   const [interval, setInterval] = useState<'monthly' | 'yearly'>('monthly');
   const [busy, setBusy] = useState<string | null>(null);
+  const [receiptFor, setReceiptFor] = useState<string | null>(null);
+  const [returnChargeId, setReturnChargeId] = useState<string | null>(null);
   const [returnState, setReturnState] = useState<'idle' | 'pending' | 'ok' | 'failed' | 'later'>(
     'idle'
   );
@@ -244,10 +248,13 @@ export default function StoreBillingPage() {
     setReturnState('pending');
     (async () => {
       for (let i = 0; i < 6 && !cancelled; i++) {
-        const { data: r } = await apiGet<{ hint: string; status: string | null }>(
-          `/api/v1/stores/${storeId}/billing/checkout/return?${qs.toString()}`
-        );
+        const { data: r } = await apiGet<{
+          hint: string;
+          status: string | null;
+          chargeId?: string | null;
+        }>(`/api/v1/stores/${storeId}/billing/checkout/return?${qs.toString()}`);
         if (r?.status === 'succeeded') {
+          setReturnChargeId(r.chargeId ?? null);
           setReturnState('ok');
           await Promise.all([load(), loadCharges()]);
           return;
@@ -632,6 +639,34 @@ export default function StoreBillingPage() {
               {returnState === 'later' && t('checkoutReturnLater')}
             </div>
           )}
+
+          {/* Paid: the receipt prints out (reused storefront printer, Ebda palette, palm barcode).
+              Any earlier succeeded charge can be re-opened from the invoices table. */}
+          {(() => {
+            const { charge: paidCharge, processing } = pickReceiptCharge(charges, {
+              returnChargeId: returnState === 'ok' ? returnChargeId : null,
+              openedId: receiptFor,
+            });
+            if (!paidCharge) {
+              return processing ? (
+                <p role="status" className="rounded-xl border bg-card p-4 text-sm">
+                  {t('receiptProcessing')}
+                </p>
+              ) : null;
+            }
+            return (
+              <EbdaBillingReceipt
+                key={paidCharge.id}
+                charge={paidCharge}
+                planName={
+                  paidCharge.planCode === data.plan.subscribedPlanCode
+                    ? planLabel(data.plan, paidCharge.planCode ?? '', locale)
+                    : undefined
+                }
+                locale={locale}
+              />
+            );
+          })()}
 
           {data.subscription.status === 'past_due' &&
             data.billing?.billingMethod !== 'instapay' && (
@@ -1180,7 +1215,17 @@ export default function StoreBillingPage() {
                           </Badge>
                         </td>
                         <td className="hidden py-2 text-muted-foreground sm:table-cell">
-                          {c.failureReason ?? '—'}
+                          {c.status === 'succeeded' && c.type !== 'refund' ? (
+                            <button
+                              type="button"
+                              onClick={() => setReceiptFor(receiptFor === c.id ? null : c.id)}
+                              className="text-xs font-medium text-primary-ink underline"
+                            >
+                              {t('viewReceipt')}
+                            </button>
+                          ) : (
+                            (c.failureReason ?? '—')
+                          )}
                         </td>
                       </tr>
                     ))}

@@ -114,7 +114,7 @@ export function PersonalisationField({
         className="mt-1.5 flex items-center justify-between gap-3 text-xs text-muted-foreground"
       >
         <span data-testid="personalisation-hint">
-          {missing && touched ? t(`Fill in “${label}” first`, `اكتب ${label} أولاً`) : ''}
+          {missing && touched ? t(`Fill in “${label}” first`, `اكتب ${label} الأول`) : ''}
         </span>
         {(focused || value.length > 0) && (
           <span className="tabular-nums" aria-label={t('Characters used', 'عدد الحروف')}>

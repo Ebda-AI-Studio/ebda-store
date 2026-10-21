@@ -19,7 +19,7 @@ export const dynamic = 'force-dynamic';
 export function generateMetadata(): Promise<Metadata> {
   return localizedMetadata({
     title: ['Wishlist', 'المفضلة'],
-    description: ['Your saved products and wishlist items.', 'المنتجات التي حفظتها في المفضلة.'],
+    description: ['Your saved products and wishlist items.', 'المنتجات اللي حفظتها في المفضلة.'],
     robots: { index: false, follow: false },
   });
 }

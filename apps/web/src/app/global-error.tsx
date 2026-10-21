@@ -17,10 +17,7 @@ export default function GlobalError({
         <div className="flex min-h-screen flex-col items-center justify-center p-4 text-center">
           <h2 className="mb-2 text-2xl font-semibold">{t('Something went wrong', 'حدث خطأ ما')}</h2>
           <p className="mb-8 max-w-md text-muted-foreground">
-            {t(
-              'An unexpected error occurred. Please try again.',
-              'حدث خطأ غير متوقع. يرجى المحاولة مرة أخرى.'
-            )}
+            {t('An unexpected error occurred. Please try again.', 'حصل خطأ مش متوقع. جرّب تاني.')}
           </p>
           <button
             onClick={reset}
@@ -29,7 +26,7 @@ export default function GlobalError({
             // the 44px floor are inline (no orange, Ahmad 2026-10-16; rule (d)).
             style={{ minHeight: 44, background: '#141414', color: '#ffffff' }}
           >
-            {t('Try Again', 'حاول مرة أخرى')}
+            {t('Try Again', 'جرّب تاني')}
           </button>
         </div>
       </body>

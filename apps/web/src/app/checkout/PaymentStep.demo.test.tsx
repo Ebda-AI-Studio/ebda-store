@@ -31,7 +31,7 @@ const props = {
 describe('PaymentStep on a demo store', () => {
   it('shows the notice and no submit button', () => {
     const { container, getByText } = render(<PaymentStep {...props} isDemo />);
-    expect(getByText('هذا متجر تجريبي — الطلبات مغلقة')).toBeTruthy();
+    expect(getByText('ده متجر تجريبي — الطلبات مقفولة')).toBeTruthy();
     expect(container.querySelector('button[type="submit"]')).toBeNull();
     // No payment-method card (nothing to choose) and no "contact the owner" alert: the demo
     // notice is the answer.
@@ -44,10 +44,10 @@ describe('PaymentStep on a demo store', () => {
       <PaymentStep {...props} isDemo paymentConfigError onRetryPaymentConfig={() => {}} />
     );
     expect(container.querySelector('[role="alert"]')?.textContent).toContain(
-      'تعذّر تحميل طرق الدفع'
+      'معرفناش نحمّل طرق الدفع'
     );
     expect(getByText('إعادة المحاولة')).toBeTruthy();
-    expect(getByText('هذا متجر تجريبي — الطلبات مغلقة')).toBeTruthy();
+    expect(getByText('ده متجر تجريبي — الطلبات مقفولة')).toBeTruthy();
   });
   it('a normal store keeps the pay button and no notice', () => {
     const { container } = render(<PaymentStep {...props} />);

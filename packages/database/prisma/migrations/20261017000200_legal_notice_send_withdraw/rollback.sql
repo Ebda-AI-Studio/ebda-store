@@ -3,3 +3,7 @@
 -- admin) and redeploy before running either: the send route calls this function.
 -- Rollback of 20261017000200_legal_notice_send_withdraw. Revert the service change first.
 DROP FUNCTION IF EXISTS public.ebda_withdraw_legal_notice_send(text);
+
+-- After running this, delete the migration's row too, or a later `prisma migrate deploy` treats it
+-- as applied and never recreates what was rolled back:
+--   DELETE FROM _prisma_migrations WHERE migration_name = '20261017000200_legal_notice_send_withdraw';

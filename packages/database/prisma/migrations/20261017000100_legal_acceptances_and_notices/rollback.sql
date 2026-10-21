@@ -9,3 +9,7 @@
 DROP TABLE IF EXISTS "legal_notice_deliveries";
 DROP TABLE IF EXISTS "legal_notice_sends";
 DROP TABLE IF EXISTS "legal_acceptances";
+
+-- After running this, delete the migration's row too, or a later `prisma migrate deploy` treats it
+-- as applied and never recreates what was rolled back:
+--   DELETE FROM _prisma_migrations WHERE migration_name = '20261017000100_legal_acceptances_and_notices';

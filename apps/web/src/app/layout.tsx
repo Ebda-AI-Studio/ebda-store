@@ -240,7 +240,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   // JSON-LD's `description` can never disagree with the page it's on.
   const orgJsonLd = organizationJsonLd(store, resolvedLanguage);
 
-  // Build a <style> tag that overrides the default orange theme in globals.css
+  // Build a <style> tag that overrides the default (Ebda night) theme in globals.css
   // Inline styles on <html> don't beat `:root {}` in @layer base, so we inject a :root rule instead.
   // When an unsaved page-builder PREVIEW draft is active, merge its pending theme
   // over the committed theme so the preview iframe paints EXACTLY what the
@@ -653,7 +653,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                   {/* No store resolved (unknown/inactive host, platform host, transient
                   fallback): the page is the generic Ebda 404 / retry body. It sets no
                   tracking, so there is nothing to consent to, and the banner's default-
-                  theme orange must not be the only colour on an Ebda-branded page
+                  theme primary must not be the only colour on an Ebda-branded page
                   (Ruling SUBDOMAIN-404-1). */}
                   {store.id !== 'demo' && (
                     <>

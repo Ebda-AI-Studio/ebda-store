@@ -130,7 +130,7 @@ export default function HowToGuidesClient({ storeHowtos = [] }: HowToGuidesClien
             <p className="text-muted-foreground">
               {t(
                 'No how-to guides yet. Check the FAQ for quick answers.',
-                'لا توجد أدلة بعد. تحقق من الأسئلة الشائعة للحصول على إجابات سريعة.'
+                'مفيش أدلة لسه. شوف الأسئلة الشائعة لإجابات سريعة.'
               )}
             </p>
             <Link
@@ -148,7 +148,7 @@ export default function HowToGuidesClient({ storeHowtos = [] }: HowToGuidesClien
         {howtos.length > 0 && (
           <div className="mt-12 rounded-xl border bg-muted/30 p-6 text-center">
             <p className="text-sm text-muted-foreground">
-              {t('Looking for quick answers?', 'تبحث عن إجابات سريعة؟')}
+              {t('Looking for quick answers?', 'بتدوّر على إجابات سريعة؟')}
             </p>
             <Link
               href={storeUrl('/faq')}

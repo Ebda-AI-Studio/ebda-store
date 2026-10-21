@@ -27,7 +27,7 @@ export const reviewRequestTemplate = {
     en: (_d: ReviewRequestData, storeName: string) =>
       `How was your order from ${storeName}? Share a quick review`,
     ar: (_d: ReviewRequestData, storeName: string) =>
-      `كيف كانت تجربتك مع طلبك من ${storeName}؟ شاركنا تقييمك`,
+      `إزاي كانت تجربتك مع طلبك من ${storeName}؟ شاركنا تقييمك`,
   },
 
   en: (d: ReviewRequestData, _storeName: string) => {
@@ -117,9 +117,9 @@ export const reviewRequestTemplate = {
         : '';
 
     return `
-      <h2>كيف كانت تجربتك يا ${escapeHtml(d.customerName)}؟</h2>
-      <p>وصلك طلبك قبل أسبوع تقريباً. هل تشاركنا تقييمك القصير؟
-         يساعد العملاء الآخرين ويساعدنا على التحسين.</p>
+      <h2>إزاي كانت تجربتك يا ${escapeHtml(d.customerName)}؟</h2>
+      <p>طلبك وصلك من حوالي أسبوع. تشاركنا تقييمك القصير؟
+         بيساعد العملاء التانيين وبيساعدنا نتحسّن.</p>
       ${headlineImg}
       <p style="margin:24px 0;">
         <a href="${escapeHtml(headline.reviewLink)}" class="button">
@@ -128,7 +128,7 @@ export const reviewRequestTemplate = {
       </p>
       ${additionalItems}
       <p style="color:var(--ink-mute);font-size:12px;margin-top:28px;">
-        يستغرق 30 ثانية لكل منتج. فقط المشترون الموثقون يمكنهم التقييم.
+        بياخد 30 ثانية لكل منتج. التقييم للمشترين الموثّقين بس.
       </p>
     `;
   },

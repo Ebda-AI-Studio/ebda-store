@@ -146,7 +146,7 @@ export function PushNotificationPrompt() {
         {storeName || t('Push notifications', 'الإشعارات')}
       </span>
       <span className="text-xs text-muted-foreground leading-snug">
-        {t('Enable notifications to get order updates', 'فعّل الإشعارات لتلقي تحديثات الطلبات')}
+        {t('Enable notifications to get order updates', 'فعّل الإشعارات عشان توصلك تحديثات طلباتك')}
       </span>
 
       {/* Action buttons */}
@@ -164,7 +164,7 @@ export function PushNotificationPrompt() {
           aria-label={t('Dismiss notification prompt', 'تجاهل إشعار التنبيه')}
           className="rounded-lg border border-input px-3 py-1.5 text-xs text-muted-foreground hover:bg-muted"
         >
-          {t('Dismiss', 'ليس الآن')}
+          {t('Dismiss', 'بعدين')}
         </button>
       </div>
     </div>

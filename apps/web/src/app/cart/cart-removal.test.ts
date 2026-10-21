@@ -1,6 +1,6 @@
 /**
  * IA-06 (independent audit P1): removing a line had no undo, and the Arabic toast named the product
- * in English ("تمت إزالة Silk shawl ...") because the remove path read `name`, not the localized one.
+ * in English ("شيلنا Silk shawl ...") because the remove path read `name`, not the localized one.
  */
 import { describe, it, expect, vi } from 'vitest';
 import { cartRemovalToast } from './cart-removal';
@@ -21,7 +21,7 @@ const item = {
 describe('cartRemovalToast', () => {
   it('names the product in the page language', () => {
     const toast = cartRemovalToast(item, { isRtl: true, t, addItem: vi.fn() });
-    expect(toast.message).toBe('تمت إزالة شال حرير من السلة');
+    expect(toast.message).toBe('شيلنا شال حرير من السلة');
     expect(toast.message).not.toContain('Silk');
   });
   it('English page: the English name', () => {

@@ -93,7 +93,7 @@ export function DeliverySection({
             </div>
           ) : (
             <p className="mt-2 text-sm text-muted-foreground">
-              {t('No delivery windows available today', 'لا توجد مواعيد توصيل متاحة اليوم')}
+              {t('No delivery windows available today', 'مفيش مواعيد توصيل متاحة النهارده')}
             </p>
           )}
 

@@ -44,7 +44,7 @@ Bold consumes `globals.css` tokens and adds two intentional hardcoded surfaces: 
 
 ### Brand & Accent
 
-- **Primary** (`--primary` / Force Orange `#ff6e00` default): A LOAD-BEARING color in Bold:
+- **Primary** (`--primary` / Ebda night `#0A0B0C` default; Ruling D1016-ORANGE-1): A LOAD-BEARING color in Bold:
   - Hero CTA fill (`bg-primary text-primary-foreground`) with `shadow-2xl shadow-primary/30`
   - Order summary CTA fill (`bg-primary text-primary-foreground`)
   - Announcement bar fill (`bg-primary text-primary-foreground`)
