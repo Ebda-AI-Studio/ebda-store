@@ -39,7 +39,7 @@ router.get(
     try {
       const orderId = z.string().uuid().parse(req.params.orderId);
       const q = z.object(options).strict().parse(req.query);
-      send(res, await PackingSlipService.generate(req.params.storeId, [orderId], q));
+      send(res, (await PackingSlipService.generateDetailed(req.params.storeId, [orderId], q)).html);
     } catch (error) {
       next(error);
     }
@@ -56,7 +56,17 @@ router.post('/packing-slips', ...guard, async (req: Request, res: Response, next
       })
       .strict()
       .parse(req.body);
-    send(res, await PackingSlipService.generate(req.params.storeId, orderIds, q));
+    const { html, skippedIds } = await PackingSlipService.generateDetailed(
+      req.params.storeId,
+      orderIds,
+      q
+    );
+    // Ids that printed nothing (not in this store / deleted): the viewer says "N orders skipped".
+    if (skippedIds.length > 0) {
+      res.setHeader('X-Packing-Slips-Skipped', skippedIds.join(','));
+      res.setHeader('Access-Control-Expose-Headers', 'X-Packing-Slips-Skipped');
+    }
+    send(res, html);
   } catch (error) {
     next(error);
   }

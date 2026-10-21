@@ -7,10 +7,16 @@ import express from 'express';
 import request from 'supertest';
 
 const generate = vi.fn();
+const skipped: string[] = [];
 const perms: string[] = [];
 vi.mock('@api/services/packing-slip.service', () => ({
   PACKING_SLIP_MAX_ORDERS: 100,
-  PackingSlipService: { generate: (...a: unknown[]) => generate(...a) },
+  PackingSlipService: {
+    generateDetailed: async (...a: unknown[]) => ({
+      html: await generate(...a),
+      skippedIds: skipped.slice(),
+    }),
+  },
 }));
 vi.mock('@api/middleware/auth', () => ({
   authenticate: (req: any, res: any, next: any) => {
@@ -51,6 +57,7 @@ let app: express.Express;
 
 beforeEach(async () => {
   generate.mockReset().mockResolvedValue('<html>slip</html>');
+  skipped.length = 0;
   accessStores.length = 0;
   if (!app) {
     const { default: router } = await import('@api/routes/packing-slip.routes');
@@ -155,12 +162,37 @@ describe('POST /packing-slips (bulk)', () => {
   });
 });
 
+describe('skipped ids header (M4)', () => {
+  it('bulk reports the ids that printed nothing; none = no header', async () => {
+    const url = `/stores/${STORE}/orders/packing-slips`;
+    const none = await request(app)
+      .post(url)
+      .set('x-role', 'staff')
+      .send({ orderIds: [O1] });
+    expect(none.headers['x-packing-slips-skipped']).toBeUndefined();
+    skipped.push(O1);
+    const res = await request(app)
+      .post(url)
+      .set('x-role', 'staff')
+      .send({ orderIds: [O1] });
+    expect(res.headers['x-packing-slips-skipped']).toBe(O1);
+    expect(res.headers['access-control-expose-headers']).toContain('X-Packing-Slips-Skipped');
+  });
+});
+
 describe('mounting', () => {
   it('is mounted under the orders path, behind the same orderRouteContext, before the order router', async () => {
     const { readFileSync } = await import('node:fs');
-    const src = readFileSync(new URL('../../apps/api/src/routes/index.ts', import.meta.url), 'utf8');
-    const slip = src.indexOf("router.use('/stores/:storeId/orders', orderRouteContext, packingSlipRoutes)");
-    const orders = src.indexOf("router.use('/stores/:storeId/orders', orderRouteContext, orderRoutes)");
+    const src = readFileSync(
+      new URL('../../apps/api/src/routes/index.ts', import.meta.url),
+      'utf8'
+    );
+    const slip = src.indexOf(
+      "router.use('/stores/:storeId/orders', orderRouteContext, packingSlipRoutes)"
+    );
+    const orders = src.indexOf(
+      "router.use('/stores/:storeId/orders', orderRouteContext, orderRoutes)"
+    );
     expect(slip).toBeGreaterThan(0);
     expect(slip).toBeLessThan(orders);
   });

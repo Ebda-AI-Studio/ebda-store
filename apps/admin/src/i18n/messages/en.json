@@ -10385,6 +10385,7 @@
     "notePlaceholder": "Thanks for shopping with us!",
     "noteSave": "Save note",
     "noteSaved": "Saved",
-    "noteFailed": "Couldn't save. Try again."
+    "noteFailed": "Couldn't save. Try again.",
+    "skipped": "{count} orders skipped (not in this store or deleted)."
   }
 }

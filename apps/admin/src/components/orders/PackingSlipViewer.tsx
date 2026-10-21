@@ -21,6 +21,7 @@ export function PackingSlipViewer({ storeId, orderIds }: { storeId: string; orde
   const [size, setSize] = useState<Size>('a4');
   const [html, setHtml] = useState<string | null>(null);
   const [failed, setFailed] = useState(false);
+  const [skipped, setSkipped] = useState(0);
   const frame = useRef<HTMLIFrameElement>(null);
   const tooMany = orderIds.length > PACKING_SLIP_MAX;
   const key = orderIds.join(',');
@@ -30,6 +31,7 @@ export function PackingSlipViewer({ storeId, orderIds }: { storeId: string; orde
     let cancelled = false;
     setHtml(null);
     setFailed(false);
+    setSkipped(0);
     (async () => {
       try {
         const res =
@@ -44,7 +46,11 @@ export function PackingSlipViewer({ storeId, orderIds }: { storeId: string; orde
               });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const text = await res.text();
-        if (!cancelled) setHtml(text);
+        const skippedHeader = res.headers?.get('X-Packing-Slips-Skipped');
+        if (!cancelled) {
+          setSkipped(skippedHeader ? skippedHeader.split(',').filter(Boolean).length : 0);
+          setHtml(text);
+        }
       } catch {
         if (!cancelled) setFailed(true);
       }
@@ -94,6 +100,11 @@ export function PackingSlipViewer({ storeId, orderIds }: { storeId: string; orde
       {tooMany && (
         <p role="alert" className="text-sm text-destructive-ink">
           {t('tooMany')}
+        </p>
+      )}
+      {skipped > 0 && (
+        <p role="status" className="text-sm text-muted-foreground">
+          {t('skipped', { count: skipped })}
         </p>
       )}
       {failed && (

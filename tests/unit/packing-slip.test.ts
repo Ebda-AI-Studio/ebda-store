@@ -214,3 +214,16 @@ describe('tenant scoping and caps', () => {
     expect(findMany.mock.calls.at(-1)![0].where.id.in).toEqual([O1]);
   });
 });
+
+describe('skipped ids (M4)', () => {
+  it('generateDetailed reports requested ids that printed nothing (other store, deleted)', async () => {
+    findMany.mockResolvedValue([order(O1, 'ORD-T5JK9Q-AB3XY')]);
+    const r = await PackingSlipService.generateDetailed(STORE, [O1, O2], { size: 'a4' });
+    expect(r.skippedIds).toEqual([O2]);
+    expect(r.html).toContain('ORD-T5JK9Q-AB3XY');
+    findMany.mockResolvedValue([order(O1, 'N-1'), order(O2, 'N-2')]);
+    expect(
+      (await PackingSlipService.generateDetailed(STORE, [O1, O2], { size: 'a4' })).skippedIds
+    ).toEqual([]);
+  });
+});

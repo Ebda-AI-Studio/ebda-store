@@ -216,6 +216,15 @@ function slipHtml(order: SlipOrder, ar: boolean, size: PackingSlipSize): string 
 }
 
 export class PackingSlipService {
+  /** Same as `generate`, but also lists the requested ids that printed nothing (other store, deleted). */
+  static async generateDetailed(
+    storeId: string,
+    orderIds: string[],
+    opts: { size?: PackingSlipSize; locale?: string } = {}
+  ): Promise<{ html: string; skippedIds: string[] }> {
+    return PackingSlipService.build(storeId, orderIds, opts);
+  }
+
   /**
    * Printable packing slip(s): one page per order, no prices or totals.
    * Tenant-scoped (`storeId` + the ids; other stores' ids print nothing),
@@ -228,6 +237,14 @@ export class PackingSlipService {
     orderIds: string[],
     opts: { size?: PackingSlipSize; locale?: string } = {}
   ): Promise<string> {
+    return (await PackingSlipService.build(storeId, orderIds, opts)).html;
+  }
+
+  private static async build(
+    storeId: string,
+    orderIds: string[],
+    opts: { size?: PackingSlipSize; locale?: string }
+  ): Promise<{ html: string; skippedIds: string[] }> {
     const ids = [...new Set(orderIds)];
     if (ids.length === 0) throw new AppError(400, 'NO_ORDERS', 'Select at least one order');
     if (ids.length > PACKING_SLIP_MAX_ORDERS) {
@@ -249,7 +266,8 @@ export class PackingSlipService {
           ? 'ar'
           : 'en';
     const ar = locale === 'ar';
-    return `<!doctype html>
+    const printed = new Set(orders.map(o => o.id));
+    const html = `<!doctype html>
 <html lang="${locale}" dir="${ar ? 'rtl' : 'ltr'}">
 <head>
 <meta charset="utf-8" />
@@ -261,5 +279,6 @@ export class PackingSlipService {
 ${orders.map(o => slipHtml(o, ar, size)).join('\n')}
 </body>
 </html>`;
+    return { html, skippedIds: ids.filter(id => !printed.has(id)) };
   }
 }

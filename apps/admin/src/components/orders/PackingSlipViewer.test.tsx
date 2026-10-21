@@ -2,14 +2,23 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 
-vi.mock('@/i18n/useT', () => ({ useT: () => (key: string) => key }));
+vi.mock('@/i18n/useT', () => ({
+  useT: () => (key: string, v?: Record<string, unknown>) =>
+    v ? `${key}:${Object.values(v).join(',')}` : key,
+}));
 vi.mock('next-intl', () => ({ useLocale: () => 'ar' }));
 const apiFetch = vi.fn();
 vi.mock('../../lib/api', () => ({ apiFetch: (...a: unknown[]) => apiFetch(...a) }));
 
 import { PackingSlipViewer } from './PackingSlipViewer';
 
-const ok = (html: string) => ({ ok: true, text: async () => html });
+const ok = (html: string, skipped = '') => ({
+  ok: true,
+  text: async () => html,
+  headers: {
+    get: (h: string) => (h.toLowerCase() === 'x-packing-slips-skipped' && skipped ? skipped : null),
+  },
+});
 const O1 = '11111111-1111-4111-8111-111111111111';
 const O2 = '22222222-2222-4222-8222-222222222222';
 
@@ -46,6 +55,17 @@ describe('PackingSlipViewer', () => {
     expect(url).toBe('/api/v1/stores/s1/orders/packing-slips');
     expect(init.method).toBe('POST');
     expect(JSON.parse(init.body)).toEqual({ orderIds: [O1, O2], size: 'a4', locale: 'ar' });
+  });
+  it('bulk: tells how many orders were skipped (not in this store / deleted)', async () => {
+    apiFetch.mockResolvedValue(ok('<html>x</html>', `${O2}`));
+    render(<PackingSlipViewer storeId="s1" orderIds={[O1, O2]} />);
+    await waitFor(() => expect(screen.getByRole('status').textContent).toBe('skipped:1'));
+  });
+  it('no skipped orders: no notice', async () => {
+    apiFetch.mockResolvedValue(ok('<html>x</html>'));
+    const { container } = render(<PackingSlipViewer storeId="s1" orderIds={[O1, O2]} />);
+    await waitFor(() => expect(container.querySelector('iframe')).toBeTruthy());
+    expect(screen.queryByRole('status')).toBeNull();
   });
   it('more than 100 orders is refused before any request', () => {
     const many = Array.from(
