@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { authenticate, rejectImpersonated } from '../middleware/auth';
 import {
   auditLog,
+  authLimiter,
   generateCsrfToken,
   passkeyBeginLimiter,
   passkeyFinishLimiter,
@@ -19,7 +20,8 @@ import { setSessionCookies } from './auth.routes';
  *   POST /authenticate/begin    public   discoverable-credential options (takes NO account input)
  *   POST /authenticate/finish   public   verify the assertion, mint the session (satisfies MFA, PASSKEY-4)
  *   GET    /                    session  list my passkeys
- *   POST   /register/begin      session  creation options (a TOTP code is required when TOTP is on)
+ *   POST   /step-up             session  password (+ TOTP) -> 5-minute window for the writes below (PASSKEY-7)
+ *   POST   /register/begin      session  creation options (needs the step-up window)
  *   POST   /register/finish     session  verify + store the public key
  *   PATCH  /:id, DELETE /:id    session  rename / remove
  *
@@ -92,6 +94,7 @@ router.post(
   passkeyFinishLimiter,
   async (req: Request, res: Response, next: NextFunction) => {
     let reason = 'malformed';
+    let failedUserId: string | undefined;
     try {
       const parsed = z.object({ response: authenticationResponseSchema }).safeParse(req.body);
       // Same answer as every other failure: a malformed body must not be distinguishable.
@@ -100,9 +103,11 @@ router.post(
       const verified = await PasskeyService.finishAuthentication(
         originOf(req),
         parsed.data.response as never,
-        r => {
+        (r, uid) => {
           reason = r;
-        }
+          failedUserId = uid;
+        },
+        { ip: req.ip }
       );
       const result = await AuthService.issueSessionFor(verified.user);
 
@@ -124,6 +129,7 @@ router.post(
     } catch (error) {
       await auditLog({
         action: 'passkey.login.failed',
+        userId: failedUserId,
         resourceType: 'passkey',
         details: { reason },
         ip: req.ip,
@@ -147,6 +153,45 @@ router.get('/', authenticate, async (req: Request, res: Response, next: NextFunc
   }
 });
 
+// Step-up (Ruling PASSKEY-7): password (+ TOTP code when TOTP is on) opens a 5-minute window in which
+// this account may add, rename or remove passkeys. Same IP+email limiter and SAME lockout counter as login.
+router.post(
+  '/step-up',
+  authenticate,
+  rejectImpersonated,
+  authLimiter,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const parsed = z
+        .object({
+          password: z.string().min(1).max(256),
+          code: z.string().trim().min(6).max(20).optional(),
+        })
+        .safeParse(req.body);
+      if (!parsed.success)
+        throw new AppError(401, 'STEP_UP_FAILED', 'Could not confirm your identity');
+      const out = await PasskeyService.stepUp(req.user!.userId, parsed.data, req.ip);
+      await auditLog({
+        action: 'passkey.stepup',
+        userId: req.user!.userId,
+        resourceType: 'passkey',
+        ip: req.ip,
+        userAgent: req.headers['user-agent'],
+      });
+      res.json({ success: true, data: out });
+    } catch (error) {
+      await auditLog({
+        action: 'passkey.stepup.failed',
+        userId: req.user?.userId,
+        resourceType: 'passkey',
+        ip: req.ip,
+        userAgent: req.headers['user-agent'],
+      });
+      next(error);
+    }
+  }
+);
+
 router.post(
   '/register/begin',
   authenticate,
@@ -154,20 +199,9 @@ router.post(
   writeLimiter,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const parsed = z
-        .object({
-          code: z
-            .string()
-            .trim()
-            .regex(/^\d{6}$/)
-            .optional(),
-        })
-        .safeParse(req.body ?? {});
-      if (!parsed.success) throw new AppError(400, 'VALIDATION_ERROR', 'Invalid 2FA code');
       const options = await PasskeyService.beginRegistration(
         { userId: req.user!.userId },
-        originOf(req),
-        parsed.data
+        originOf(req)
       );
       res.json({ success: true, data: options });
     } catch (error) {

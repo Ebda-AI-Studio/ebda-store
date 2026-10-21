@@ -4,6 +4,8 @@
  * in-memory fakes. Rulings PASSKEY-1..6 (docs/plans/2026-10-21-passkeys.md).
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import bcrypt from 'bcryptjs';
+import { authenticator } from 'otplib';
 import { register, assert, type SoftCredential } from '../helpers/software-authenticator';
 
 const ADMIN_ORIGIN = 'https://admin.ebda.app';
@@ -20,6 +22,10 @@ const h = vi.hoisted(() => {
     users: new Map<string, Row>(),
     creds: [] as Row[],
     stores: new Map<string, string>(), // host-ish key -> store id
+    fails: new Map<string, number>(), // shared login lockout counters
+    mails: [] as any[],
+    mailFails: false,
+    revoked: [] as string[],
   };
   return { state };
 });
@@ -38,6 +44,30 @@ vi.mock('@api/services/redis.service', () => ({
             del: async (k: string) => (h.state.redis.delete(k) ? 1 : 0),
           }
         : null,
+  },
+}));
+
+vi.mock('@api/services/account-lockout.service', () => ({
+  accountLockout: {
+    isLocked: async (k: string) => ({
+      locked: (h.state.fails.get(k) ?? 0) >= 5,
+      remainingMs: 60000,
+    }),
+    recordFailedAttempt: async (k: string) => {
+      const n = (h.state.fails.get(k) ?? 0) + 1;
+      h.state.fails.set(k, n);
+      return { locked: n >= 5, attemptsRemaining: Math.max(0, 5 - n), lockoutDurationMs: 60000 };
+    },
+    recordSuccessfulLogin: async (k: string) => void h.state.fails.delete(k),
+  },
+}));
+vi.mock('@api/services/auth.service', () => ({
+  AuthService: { revokeAllSessions: async (id: string) => void h.state.revoked.push(id) },
+}));
+vi.mock('@api/services/platform-mailer', () => ({
+  sendPasskeyNoticeEmail: async (d: any) => {
+    if (h.state.mailFails) throw new Error('resend down');
+    h.state.mails.push(d);
   },
 }));
 
@@ -116,8 +146,14 @@ vi.mock('@api/services/encryption.service', () => ({
 
 import { PasskeyService, resolvePasskeyContext } from '@api/services/passkey.service';
 
+const PASSWORD = 'Correct-pw-1';
+const TOTP_SECRET = 'JBSWY3DPEHPK3PXP';
+const PASSWORD_HASH = bcrypt.hashSync(PASSWORD, 4);
+
 const user = (over: Row = {}): Row => ({
   id: 'user-1',
+  passwordHash: PASSWORD_HASH,
+  language: 'en',
   email: 'm@x.com',
   firstName: 'Mona',
   lastName: 'S',
@@ -138,6 +174,10 @@ beforeEach(() => {
   h.state.setexCalls = [];
   h.state.users = new Map();
   h.state.creds = [];
+  h.state.fails = new Map();
+  h.state.mails = [];
+  h.state.mailFails = false;
+  h.state.revoked = [];
   h.state.stores = new Map([
     ['shop-a', 'store-a'],
     ['shop-b', 'store-b'],
@@ -158,6 +198,7 @@ beforeEach(() => {
 
 /** Register a passkey for `userId` from `origin` and return the software credential. */
 async function enrol(userId: string, origin: string, name = 'My phone'): Promise<SoftCredential> {
+  await PasskeyService.markStepUp(userId);
   const options = await PasskeyService.beginRegistration({ userId }, origin, {});
   const { credential, response } = register(options as any, origin);
   await PasskeyService.finishRegistration({ userId }, origin, { response, name });
@@ -218,6 +259,11 @@ describe('resolvePasskeyContext (RP ID strategy, PASSKEY-3)', () => {
 });
 
 describe('registration', () => {
+  beforeEach(async () => {
+    for (const id of ['user-1', 'user-2', 'cust-a', 'cust-b', 'root'])
+      await PasskeyService.markStepUp(id);
+  });
+
   it('registers a merchant passkey: UV required, discoverable, challenge stored single-use with TTL >= 120s', async () => {
     const options: any = await PasskeyService.beginRegistration(
       { userId: 'user-1' },
@@ -230,10 +276,11 @@ describe('registration', () => {
       userVerification: 'required',
     });
     expect(options.attestation).toBe('none');
-    expect(h.state.setexCalls).toHaveLength(1);
-    expect(h.state.setexCalls[0].ttl).toBeGreaterThanOrEqual(120);
+    const chal = h.state.setexCalls.filter(c => c.key.startsWith('passkey:ch:'));
+    expect(chal).toHaveLength(1);
+    expect(chal[0].ttl).toBeGreaterThanOrEqual(120);
     // The stored key is a hash, never the raw challenge.
-    expect(h.state.setexCalls[0].key).not.toContain(options.challenge);
+    expect(chal[0].key).not.toContain(options.challenge);
 
     const { response } = register(options, ADMIN_ORIGIN);
     const item = await PasskeyService.finishRegistration({ userId: 'user-1' }, ADMIN_ORIGIN, {
@@ -347,18 +394,6 @@ describe('registration', () => {
     ).rejects.toMatchObject({
       code: 'PASSKEY_NOT_ALLOWED',
     });
-  });
-
-  it('a user with TOTP enabled must present a current code to add a passkey', async () => {
-    h.state.users.set('user-1', user({ mfaEnabled: true, mfaSecret: 'enc:JBSWY3DPEHPK3PXP' }));
-    await expect(
-      PasskeyService.beginRegistration({ userId: 'user-1' }, ADMIN_ORIGIN, {})
-    ).rejects.toMatchObject({
-      code: 'MFA_REAUTH_REQUIRED',
-    });
-    await expect(
-      PasskeyService.beginRegistration({ userId: 'user-1' }, ADMIN_ORIGIN, { code: '000000' })
-    ).rejects.toMatchObject({ code: 'MFA_REAUTH_REQUIRED' });
   });
 
   it('caps passkeys per account', async () => {
@@ -626,6 +661,10 @@ describe('authentication (discoverable, no email)', () => {
 });
 
 describe('management', () => {
+  beforeEach(async () => {
+    for (const id of ['user-1', 'cust-a', 'cust-b']) await PasskeyService.markStepUp(id);
+  });
+
   it('lists, renames and removes only the caller’s own passkeys; flags a host change as needing re-enrol', async () => {
     await enrol('cust-a', STORE_A, 'iPhone');
     const items = await PasskeyService.list('cust-a', STORE_A);
@@ -644,5 +683,262 @@ describe('management', () => {
     expect(h.state.creds[0].name).toBe('Face ID');
     await PasskeyService.remove('cust-a', items[0].id);
     expect(h.state.creds).toHaveLength(0);
+  });
+});
+
+describe('step-up: register, rename and remove need a recent re-auth (PASSKEY-7)', () => {
+  const stepupTtls = () => h.state.setexCalls.filter(c => c.key.startsWith('passkey:stepup:'));
+
+  it('refuses to add, rename or remove on a bare session', async () => {
+    await expect(
+      PasskeyService.beginRegistration({ userId: 'user-1' }, ADMIN_ORIGIN, {})
+    ).rejects.toMatchObject({
+      statusCode: 403,
+      code: 'STEP_UP_REQUIRED',
+    });
+    h.state.creds.push({
+      id: 'p1',
+      userId: 'user-1',
+      credentialId: 'c1',
+      rpId: 'admin.ebda.app',
+      transports: [],
+      name: 'mine',
+    });
+    await expect(PasskeyService.rename('user-1', 'p1', 'x')).rejects.toMatchObject({
+      code: 'STEP_UP_REQUIRED',
+    });
+    await expect(PasskeyService.remove('user-1', 'p1')).rejects.toMatchObject({
+      code: 'STEP_UP_REQUIRED',
+    });
+    expect(h.state.creds).toHaveLength(1);
+    expect(h.state.revoked).toEqual([]);
+  });
+
+  it('a wrong password does not unlock anything', async () => {
+    await expect(PasskeyService.stepUp('user-1', { password: 'nope' })).rejects.toMatchObject({
+      statusCode: 401,
+      code: 'STEP_UP_FAILED',
+    });
+    await expect(
+      PasskeyService.beginRegistration({ userId: 'user-1' }, ADMIN_ORIGIN, {})
+    ).rejects.toMatchObject({
+      code: 'STEP_UP_REQUIRED',
+    });
+  });
+
+  it('the right password unlocks it for a short, server-held window (120s..300s)', async () => {
+    await PasskeyService.stepUp('user-1', { password: PASSWORD });
+    expect(stepupTtls()).toHaveLength(1);
+    expect(stepupTtls()[0].ttl).toBeGreaterThanOrEqual(120);
+    expect(stepupTtls()[0].ttl).toBeLessThanOrEqual(300);
+    await expect(
+      PasskeyService.beginRegistration({ userId: 'user-1' }, ADMIN_ORIGIN, {})
+    ).resolves.toBeTruthy();
+  });
+
+  it('with TOTP on, the password alone is not enough; password + a current code is', async () => {
+    h.state.users.set('user-1', user({ mfaEnabled: true, mfaSecret: `enc:${TOTP_SECRET}` }));
+    await expect(PasskeyService.stepUp('user-1', { password: PASSWORD })).rejects.toMatchObject({
+      code: 'STEP_UP_FAILED',
+    });
+    await expect(
+      PasskeyService.stepUp('user-1', { password: PASSWORD, code: '000000' })
+    ).rejects.toMatchObject({
+      code: 'STEP_UP_FAILED',
+    });
+    await PasskeyService.stepUp('user-1', {
+      password: PASSWORD,
+      code: authenticator.generate(TOTP_SECRET),
+    });
+    await expect(
+      PasskeyService.beginRegistration({ userId: 'user-1' }, ADMIN_ORIGIN, {})
+    ).resolves.toBeTruthy();
+  });
+
+  it('expiry is enforced server-side, including between begin and finish', async () => {
+    await PasskeyService.stepUp('user-1', { password: PASSWORD });
+    const options: any = await PasskeyService.beginRegistration(
+      { userId: 'user-1' },
+      ADMIN_ORIGIN,
+      {}
+    );
+    for (const k of [...h.state.redis.keys()])
+      if (k.startsWith('passkey:stepup:')) h.state.redis.delete(k);
+    const { response } = register(options, ADMIN_ORIGIN);
+    await expect(
+      PasskeyService.finishRegistration({ userId: 'user-1' }, ADMIN_ORIGIN, { response, name: 'x' })
+    ).rejects.toMatchObject({ code: 'STEP_UP_REQUIRED' });
+    expect(h.state.creds).toHaveLength(0);
+  });
+
+  it('a step-up is per user', async () => {
+    await PasskeyService.stepUp('user-1', { password: PASSWORD });
+    h.state.users.set('user-2', user({ id: 'user-2', email: 'two@x.com' }));
+    await expect(
+      PasskeyService.beginRegistration({ userId: 'user-2' }, ADMIN_ORIGIN, {})
+    ).rejects.toMatchObject({
+      code: 'STEP_UP_REQUIRED',
+    });
+  });
+
+  it('a passkey sign-in counts as a fresh authentication', async () => {
+    const cred = await enrol('user-1', ADMIN_ORIGIN);
+    for (const k of [...h.state.redis.keys()])
+      if (k.startsWith('passkey:stepup:')) h.state.redis.delete(k);
+    await expect(
+      PasskeyService.beginRegistration({ userId: 'user-1' }, ADMIN_ORIGIN, {})
+    ).rejects.toMatchObject({
+      code: 'STEP_UP_REQUIRED',
+    });
+    await (
+      await signIn(ADMIN_ORIGIN, cred)
+    ).result;
+    await expect(
+      PasskeyService.beginRegistration({ userId: 'user-1' }, ADMIN_ORIGIN, {})
+    ).resolves.toBeTruthy();
+  });
+
+  it('wrong step-up guesses feed the SAME lockout counter as password login', async () => {
+    for (let i = 0; i < 5; i++) {
+      await expect(PasskeyService.stepUp('user-1', { password: 'bad' })).rejects.toBeTruthy();
+    }
+    expect(h.state.fails.get('m@x.com')).toBe(5);
+    await expect(PasskeyService.stepUp('user-1', { password: PASSWORD })).rejects.toMatchObject({
+      statusCode: 429,
+      code: 'ACCOUNT_LOCKED',
+    });
+  });
+});
+
+describe('login gate parity with password login (PASSKEY-8)', () => {
+  it('failed passkey attempts for an identified account feed the shared lockout counter, then a VALID assertion is refused', async () => {
+    const cred = await enrol('user-1', ADMIN_ORIGIN);
+    for (let i = 0; i < 5; i++) {
+      const o: any = await PasskeyService.beginAuthentication(ADMIN_ORIGIN);
+      const bad: any = assert(cred, o, ADMIN_ORIGIN);
+      bad.response.signature = Buffer.alloc(70, 1).toString('base64url');
+      await expect(
+        PasskeyService.finishAuthentication(ADMIN_ORIGIN, bad, undefined, { ip: '1.2.3.4' })
+      ).rejects.toMatchObject({
+        code: 'PASSKEY_AUTH_FAILED',
+      });
+    }
+    expect(h.state.fails.get('m@x.com')).toBe(5);
+    const { result } = await signIn(ADMIN_ORIGIN, cred);
+    await expect(result).rejects.toMatchObject({ code: 'PASSKEY_AUTH_FAILED' });
+  });
+
+  it('password-side failures lock passkey sign-in too (no alternating methods to dodge lockout)', async () => {
+    const cred = await enrol('user-1', ADMIN_ORIGIN);
+    h.state.fails.set('m@x.com', 5);
+    const reasons: string[] = [];
+    const o: any = await PasskeyService.beginAuthentication(ADMIN_ORIGIN);
+    await expect(
+      PasskeyService.finishAuthentication(ADMIN_ORIGIN, assert(cred, o, ADMIN_ORIGIN) as any, r =>
+        reasons.push(r)
+      )
+    ).rejects.toMatchObject({ statusCode: 401, code: 'PASSKEY_AUTH_FAILED' });
+    expect(reasons).toEqual(['locked']);
+  });
+
+  it('a shopper lockout key is store-scoped exactly like password login', async () => {
+    const cred = await enrol('cust-a', STORE_A);
+    const o: any = await PasskeyService.beginAuthentication(STORE_A);
+    const bad: any = assert(cred, o, STORE_A);
+    bad.response.signature = Buffer.alloc(70, 2).toString('base64url');
+    await expect(PasskeyService.finishAuthentication(STORE_A, bad)).rejects.toBeTruthy();
+    expect(h.state.fails.get('store-a:c@a.com')).toBe(1);
+    expect(h.state.fails.get('c@a.com')).toBeUndefined();
+  });
+
+  it('a successful passkey sign-in clears the counter, like a successful password login', async () => {
+    const cred = await enrol('user-1', ADMIN_ORIGIN);
+    h.state.fails.set('m@x.com', 3);
+    await (
+      await signIn(ADMIN_ORIGIN, cred)
+    ).result;
+    expect(h.state.fails.get('m@x.com')).toBeUndefined();
+  });
+
+  it('the failure callback learns who it was (for the audit row) without telling the client', async () => {
+    const cred = await enrol('user-1', ADMIN_ORIGIN);
+    h.state.users.set('user-1', user({ status: 'suspended' }));
+    const seen: Array<[string, string | undefined]> = [];
+    const o: any = await PasskeyService.beginAuthentication(ADMIN_ORIGIN);
+    await expect(
+      PasskeyService.finishAuthentication(
+        ADMIN_ORIGIN,
+        assert(cred, o, ADMIN_ORIGIN) as any,
+        (r, uid) => seen.push([r, uid])
+      )
+    ).rejects.toMatchObject({ code: 'PASSKEY_AUTH_FAILED' });
+    expect(seen).toEqual([['account', 'user-1']]);
+  });
+});
+
+describe('notices and revocation (PASSKEY-9)', () => {
+  beforeEach(async () => {
+    await PasskeyService.markStepUp('user-1');
+  });
+
+  it('emails the account on every passkey added and removed', async () => {
+    await enrol('user-1', ADMIN_ORIGIN, 'Work laptop');
+    expect(h.state.mails).toHaveLength(1);
+    expect(h.state.mails[0]).toMatchObject({
+      kind: 'added',
+      email: 'm@x.com',
+      passkeyName: 'Work laptop',
+    });
+    const [row] = await PasskeyService.list('user-1', ADMIN_ORIGIN);
+    await PasskeyService.remove('user-1', row.id);
+    expect(h.state.mails).toHaveLength(2);
+    expect(h.state.mails[1]).toMatchObject({
+      kind: 'removed',
+      email: 'm@x.com',
+      passkeyName: 'Work laptop',
+    });
+  });
+
+  it('a mail outage never fails or rolls back the change', async () => {
+    h.state.mailFails = true;
+    await enrol('user-1', ADMIN_ORIGIN);
+    expect(h.state.creds).toHaveLength(1);
+    await PasskeyService.remove('user-1', h.state.creds[0].id);
+    expect(h.state.creds).toHaveLength(0);
+  });
+
+  it('removing a passkey signs the account out everywhere (sessions and refresh tokens)', async () => {
+    await enrol('user-1', ADMIN_ORIGIN);
+    await PasskeyService.remove('user-1', h.state.creds[0].id);
+    expect(h.state.revoked).toEqual(['user-1']);
+  });
+
+  it('a failed removal (not yours) revokes nothing and mails nothing', async () => {
+    await enrol('user-1', ADMIN_ORIGIN);
+    h.state.mails = [];
+    await PasskeyService.markStepUp('user-2');
+    await expect(PasskeyService.remove('user-2', h.state.creds[0].id)).rejects.toMatchObject({
+      statusCode: 404,
+    });
+    expect(h.state.revoked).toEqual([]);
+    expect(h.state.mails).toEqual([]);
+  });
+
+  it('deleting a credential blocks an assertion whose challenge was issued BEFORE the delete', async () => {
+    const cred = await enrol('user-1', ADMIN_ORIGIN);
+    const o: any = await PasskeyService.beginAuthentication(ADMIN_ORIGIN);
+    const response = assert(cred, o, ADMIN_ORIGIN);
+    await PasskeyService.remove('user-1', h.state.creds[0].id);
+    await expect(
+      PasskeyService.finishAuthentication(ADMIN_ORIGIN, response as any)
+    ).rejects.toMatchObject({
+      code: 'PASSKEY_AUTH_FAILED',
+    });
+  });
+
+  it('a passkey session is minted at the CURRENT token version, so every tv bump (password change, suspend, sign-out-all) kills it', async () => {
+    const cred = await enrol('user-1', ADMIN_ORIGIN);
+    h.state.users.set('user-1', user({ tokenVersion: 7 }));
+    expect((await (await signIn(ADMIN_ORIGIN, cred)).result).user.tokenVersion).toBe(7);
   });
 });

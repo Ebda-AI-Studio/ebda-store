@@ -331,6 +331,7 @@ describe('csrfProtection — only the credential-less /auth/ routes are exempt (
     ['POST', '/api/v1/auth/mfa/enroll/verify'],
     ['POST', '/api/v1/auth/mfa/disable'],
     // Passkeys: registering/renaming/removing is an authenticated write (PASSKEY-1..6).
+    ['POST', '/api/v1/auth/passkeys/step-up'],
     ['POST', '/api/v1/auth/passkeys/register/begin'],
     ['POST', '/api/v1/auth/passkeys/register/finish'],
     ['PATCH', '/api/v1/auth/passkeys/00000000-0000-4000-8000-000000000000'],

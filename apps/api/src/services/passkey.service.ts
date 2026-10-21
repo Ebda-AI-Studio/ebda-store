@@ -1,4 +1,5 @@
 import crypto from 'crypto';
+import bcrypt from 'bcryptjs';
 import type { AuthenticationResponseJSON, RegistrationResponseJSON } from '@simplewebauthn/server';
 import { withUser } from '@ebda/database';
 import { BRAND } from '@ebda/shared';
@@ -8,8 +9,12 @@ import { lookupStore, passkeyLookup } from '../lib/definer';
 import { loadSimpleWebAuthn } from '../lib/lazy-modules';
 import { storeLookupForHost } from '../lib/store-host';
 import { isP2002 } from '../lib/prisma-errors';
+import logger from '../lib/logger';
 import { encryption } from './encryption.service';
 import { MfaService } from './mfa.service';
+import { AuthService } from './auth.service';
+import { loginGate } from './login-gate';
+import { sendPasskeyNoticeEmail } from './platform-mailer';
 import { redis } from './redis.service';
 
 /**
@@ -26,12 +31,20 @@ import { redis } from './redis.service';
  *             so it mints the session directly and skips the TOTP challenge.
  *  PASSKEY-5  super_admin is excluded: their MFA enforcement is the TOTP flag, which a passkey does not set.
  *  PASSKEY-6  Every sign-in failure is the same 401 PASSKEY_AUTH_FAILED; sign-in begin takes no account input.
+ *  PASSKEY-7  Register, rename and remove need a step-up (password, plus a TOTP code when TOTP is on, or a
+ *             passkey sign-in) within 5 minutes, held in Redis and checked on the server. A stolen session
+ *             can neither add a backdoor passkey nor delete the owner's.
+ *  PASSKEY-8  Sign-in gates are shared with password login through `loginGate` (one lockout counter per
+ *             account, one active-account check). Failures for an identified account count toward it.
+ *  PASSKEY-9  Add/remove emails the account (best-effort); removing signs the account out everywhere.
  */
 
 export const PASSKEY_CHALLENGE_TTL_SECONDS = 300;
 export const PASSKEY_MAX_PER_USER = 10;
 const CEREMONY_TIMEOUT_MS = 60_000;
 const NAME_MAX = 60;
+/** Step-up window. Above the 120s Redis TTL floor, short enough that a stolen session cannot sit on it. */
+export const PASSKEY_STEP_UP_TTL_SECONDS = 300;
 
 const ADMIN_ROLES = new Set(['store_admin', 'staff']);
 
@@ -179,7 +192,91 @@ function accountFitsContext(
 
 const userIdBytes = (id: string) => new TextEncoder().encode(id);
 
+const stepUpKey = (userId: string) => `passkey:stepup:${userId}`;
+
+async function requireStepUp(userId: string): Promise<void> {
+  const fresh = await challengeClient().get(stepUpKey(userId));
+  if (!fresh) {
+    throw new AppError(403, 'STEP_UP_REQUIRED', 'Confirm your password to manage passkeys');
+  }
+}
+
+/** Account-security notice. Best-effort: a mail outage must not undo or block the change. */
+async function notifyPasskeyChange(
+  userId: string,
+  kind: 'added' | 'removed',
+  passkeyName: string
+): Promise<void> {
+  try {
+    const u = await withUser(userId, tx =>
+      tx.user.findUnique({
+        where: { id: userId },
+        select: { email: true, firstName: true, language: true },
+      })
+    );
+    if (!u) return;
+    await sendPasskeyNoticeEmail(
+      { email: u.email, name: u.firstName, kind, passkeyName, at: new Date().toISOString() },
+      u.language === 'ar' ? 'ar' : 'en'
+    );
+  } catch (err) {
+    logger.error({ err, userId, kind }, '[passkey] notice email failed');
+  }
+}
+
 export class PasskeyService {
+  // -------------------------------------------------------------------------------------------
+  // Step-up (PASSKEY-7)
+  // -------------------------------------------------------------------------------------------
+
+  /** Prove who is holding the session: password, plus a current TOTP code when TOTP is on. */
+  static async stepUp(
+    userId: string,
+    input: { password: string; code?: string },
+    ip?: string
+  ): Promise<{ expiresInSeconds: number }> {
+    const failed = () => new AppError(401, 'STEP_UP_FAILED', 'Could not confirm your identity');
+    const user = await withUser(userId, tx =>
+      tx.user.findUnique({
+        where: { id: userId },
+        select: {
+          email: true,
+          storeId: true,
+          status: true,
+          deletedAt: true,
+          passwordHash: true,
+          mfaEnabled: true,
+          mfaSecret: true,
+        },
+      })
+    );
+    if (!user || user.status !== 'active' || user.deletedAt) throw failed();
+
+    // Same counter as password login: guessing the password here is guessing it there.
+    const key = loginGate.lockoutKey(user.email, user.storeId);
+    await loginGate.assertNotLocked(key);
+
+    let ok =
+      typeof input.password === 'string' &&
+      (await bcrypt.compare(input.password, user.passwordHash));
+    if (ok && user.mfaEnabled && user.mfaSecret) {
+      ok =
+        typeof input.code === 'string' &&
+        MfaService.verifyCode(encryption.decrypt(user.mfaSecret), input.code);
+    }
+    if (!ok) {
+      await loginGate.recordFailure(key, ip);
+      throw failed();
+    }
+    await PasskeyService.markStepUp(userId);
+    return { expiresInSeconds: PASSKEY_STEP_UP_TTL_SECONDS };
+  }
+
+  /** Record a fresh authentication for this user (also called after a passkey sign-in). */
+  static async markStepUp(userId: string): Promise<void> {
+    await challengeClient().setex(stepUpKey(userId), PASSKEY_STEP_UP_TTL_SECONDS, '1');
+  }
+
   // -------------------------------------------------------------------------------------------
   // Registration (authenticated)
   // -------------------------------------------------------------------------------------------
@@ -187,9 +284,10 @@ export class PasskeyService {
   static async beginRegistration(
     actor: { userId: string },
     origin: string | undefined,
-    input: { code?: string }
+    _input?: unknown
   ) {
     const ctx = await resolvePasskeyContext(origin);
+    await requireStepUp(actor.userId);
     const user = await withUser(actor.userId, tx =>
       tx.user.findUnique({
         where: { id: actor.userId },
@@ -201,22 +299,10 @@ export class PasskeyService {
           role: true,
           storeId: true,
           status: true,
-          mfaEnabled: true,
-          mfaSecret: true,
         },
       })
     );
     if (!user || user.status !== 'active' || !accountFitsContext(user, ctx)) throw notAllowed();
-
-    // A hijacked session must not silently add an authenticator (same rule as TOTP re-enrol).
-    if (user.mfaEnabled && user.mfaSecret) {
-      const ok =
-        typeof input.code === 'string' &&
-        MfaService.verifyCode(encryption.decrypt(user.mfaSecret), input.code);
-      if (!ok) {
-        throw new AppError(400, 'MFA_REAUTH_REQUIRED', 'Provide current 2FA code to add a passkey');
-      }
-    }
 
     const existing = await withUser(actor.userId, tx =>
       tx.passkeyCredential.findMany({
@@ -258,6 +344,7 @@ export class PasskeyService {
     origin: string | undefined,
     body: { response: RegistrationResponseJSON; name?: string }
   ): Promise<PasskeyListItem> {
+    await requireStepUp(actor.userId);
     const challenge = challengeOf(body.response as never);
     // Consumed even when a later check fails: one begin, one attempt.
     const record = challenge ? await takeChallenge(challenge) : null;
@@ -303,6 +390,7 @@ export class PasskeyService {
           },
         })
       );
+      await notifyPasskeyChange(actor.userId, 'added', row.name);
       return toItem(row, record.rpId);
     } catch (e) {
       if (isP2002(e)) throw registrationFailed();
@@ -334,17 +422,29 @@ export class PasskeyService {
 
   /**
    * Verify an assertion. Resolves to the account (for `AuthService.issueSessionFor`) and the credential
-   * row; EVERY failure is the same `PASSKEY_AUTH_FAILED` (the reason goes to `onFailure` for the audit
-   * log, never to the client).
+   * row; EVERY failure is the same `PASSKEY_AUTH_FAILED` (the reason, and the account once identified,
+   * go to `onFailure` for the audit log, never to the client).
+   *
+   * Gates are the password login's (PASSKEY-8): the shared lockout counter is checked once the account is
+   * known and every failure after that point feeds it, an inactive account gets nothing, and success
+   * clears it. The IP bucket is the route's `passkeyFinishLimiter`.
    */
   static async finishAuthentication(
     origin: string | undefined,
     response: AuthenticationResponseJSON,
-    onFailure?: (reason: string) => void
+    onFailure?: (reason: string, userId?: string) => void,
+    meta: { ip?: string } = {}
   ) {
-    const fail = (reason: string): never => {
-      onFailure?.(reason);
+    let knownUserId: string | undefined;
+    let lockoutKey: string | undefined;
+    const fail = async (reason: string): Promise<never> => {
+      onFailure?.(reason, knownUserId);
       throw authFailed();
+    };
+    // After the account is identified, a failure also counts against its (shared) lockout budget.
+    const failKnown = async (reason: string): Promise<never> => {
+      if (lockoutKey) await loginGate.recordFailure(lockoutKey, meta.ip).catch(() => undefined);
+      return fail(reason);
     };
 
     const challenge = challengeOf(response as never);
@@ -363,6 +463,7 @@ export class PasskeyService {
 
     const stored = typeof response.id === 'string' ? await passkeyLookup(response.id) : null;
     if (!stored) return fail('unknown_credential');
+    knownUserId = stored.userId;
     if (stored.rpId !== record.rpId) return fail('rp_mismatch');
 
     const user = await withUser(stored.userId, tx =>
@@ -382,12 +483,23 @@ export class PasskeyService {
         },
       })
     );
-    if (!user || user.status !== 'active' || user.deletedAt) return fail('account');
+    if (!user) return fail('account');
+    lockoutKey = loginGate.lockoutKey(user.email, user.storeId);
+    try {
+      await loginGate.assertNotLocked(lockoutKey);
+    } catch {
+      return fail('locked');
+    }
+    try {
+      loginGate.assertActive(user);
+    } catch {
+      return fail('account');
+    }
     if (!accountFitsContext(user, ctx)) return fail('surface');
 
     const handle = response.response?.userHandle;
     if (handle && Buffer.from(handle, 'base64url').toString('utf8') !== user.id) {
-      return fail('user_handle');
+      return failKnown('user_handle');
     }
 
     const { verifyAuthenticationResponse } = await loadSimpleWebAuthn();
@@ -409,9 +521,9 @@ export class PasskeyService {
     } catch (e) {
       // The library throws on a sign count that did not advance: a cloned authenticator looks like this.
       const msg = e instanceof Error ? e.message : '';
-      return fail(/counter/i.test(msg) ? 'counter_regression' : 'verification');
+      return failKnown(/counter/i.test(msg) ? 'counter_regression' : 'verification');
     }
-    if (!verified.verified) return fail('verification');
+    if (!verified.verified) return failKnown('verification');
 
     const next = verified.authenticationInfo.newCounter;
     const touched = await withUser(user.id, tx =>
@@ -428,7 +540,13 @@ export class PasskeyService {
         },
       })
     );
-    if (touched.count !== 1) return fail('counter_race');
+    if (touched.count !== 1) return failKnown('counter_race');
+
+    await loginGate.recordSuccess(lockoutKey, meta.ip).catch(() => undefined);
+    // A passkey sign-in is a fresh, phishing-resistant authentication: it also opens the step-up window.
+    await PasskeyService.markStepUp(user.id).catch(err =>
+      logger.warn({ err, userId: user.id }, '[passkey] could not record step-up after sign-in')
+    );
 
     return { user, credentialRowId: stored.id };
   }
@@ -463,6 +581,7 @@ export class PasskeyService {
   }
 
   static async rename(userId: string, id: string, name: string): Promise<void> {
+    await requireStepUp(userId);
     const res = await withUser(userId, tx =>
       tx.passkeyCredential.updateMany({
         where: { id, userId },
@@ -473,10 +592,19 @@ export class PasskeyService {
   }
 
   static async remove(userId: string, id: string): Promise<void> {
+    await requireStepUp(userId);
+    const row = await withUser(userId, tx =>
+      tx.passkeyCredential.findMany({ where: { userId }, select: { id: true, name: true } })
+    ).then(rows => rows.find(r => r.id === id));
     const res = await withUser(userId, tx =>
       tx.passkeyCredential.deleteMany({ where: { id, userId } })
     );
     if (res.count !== 1) throw new AppError(404, 'PASSKEY_NOT_FOUND', 'Passkey not found');
+    // Sessions and refresh tokens minted through this passkey must die with it. They are not tagged with
+    // the credential they came from, so the whole account signs out (token-version bump + every refresh
+    // token revoked): a superset, and the one mechanism every other revocation path already uses.
+    await AuthService.revokeAllSessions(userId);
+    await notifyPasskeyChange(userId, 'removed', row?.name ?? 'Passkey');
   }
 }
 

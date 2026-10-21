@@ -24,6 +24,7 @@ import {
 import { config } from '../config';
 import { AppError } from '../middleware/error-handler';
 import { EmailService } from './email.service';
+import { loginGate } from './login-gate';
 import { sendMerchantPasswordResetEmail, sendMerchantVerificationEmail } from './platform-mailer';
 import { accountLockout } from './account-lockout.service';
 import {
@@ -742,17 +743,8 @@ export class AuthService {
     // Case-folded so `Victim@x.com` / `VICTIM@x.com` share one counter: an
     // exact-case key let an attacker reset the 5-per-15-min budget by
     // re-casing the address (Ebda SP5 review).
-    const lockoutEmail = typeof email === 'string' ? email.trim().toLowerCase() : email;
-    const lockoutKey = storeId ? `${storeId}:${lockoutEmail}` : lockoutEmail;
-    const lockStatus = await accountLockout.isLocked(lockoutKey);
-    if (lockStatus.locked) {
-      const remainingMinutes = Math.ceil((lockStatus.remainingMs || 0) / 60000);
-      throw new AppError(
-        429,
-        'ACCOUNT_LOCKED',
-        `Account is temporarily locked due to too many failed attempts. Please try again in ${remainingMinutes} minutes.`
-      );
-    }
+    const lockoutKey = loginGate.lockoutKey(email, storeId);
+    await loginGate.assertNotLocked(lockoutKey);
 
     // Find user inside the requested scope (exclude soft-deleted).
     // passwordHash + mfaSecret are globally omitted (see packages/database);
@@ -769,14 +761,14 @@ export class AuthService {
       // previously a ~50ms timing oracle that let an attacker
       // enumerate registered emails by stopwatch.
       await bcrypt.compare(password, this.DUMMY_PASSWORD_HASH);
-      await accountLockout.recordFailedAttempt(lockoutKey, ip);
+      await loginGate.recordFailure(lockoutKey, ip);
       throw new AppError(401, 'INVALID_CREDENTIALS', 'Invalid email or password');
     }
 
     // Verify password
     const isValidPassword = await bcrypt.compare(password, user.passwordHash);
     if (!isValidPassword) {
-      const result = await accountLockout.recordFailedAttempt(lockoutKey, ip);
+      const result = await loginGate.recordFailure(lockoutKey, ip);
 
       if (result.locked) {
         const remainingMinutes = Math.ceil((result.lockoutDurationMs || 0) / 60000);
@@ -791,7 +783,7 @@ export class AuthService {
     }
 
     // Successful login - reset lockout
-    await accountLockout.recordSuccessfulLogin(lockoutKey, ip);
+    await loginGate.recordSuccess(lockoutKey, ip);
 
     // Reject non-active accounts. Checked AFTER the password is confirmed
     // correct (not before) — checking status before/instead of the password
@@ -801,9 +793,7 @@ export class AuthService {
     // close. S3-1, 2026-09-22 security audit: a super_admin who suspends a
     // compromised or departing account previously found the account could
     // still log in with its password — `status` was recorded but never read.
-    if (user.status !== 'active') {
-      throw new AppError(403, 'ACCOUNT_SUSPENDED', 'This account is not active');
-    }
+    loginGate.assertActive(user);
 
     // If MFA is enabled and a TOTP secret is configured, return a short-lived
     // challenge token instead of a full session. The client must verify the
@@ -1773,6 +1763,14 @@ export class AuthService {
     // performs precisely because they believe someone else is holding their
     // credentials.
     await AuthService.revokeAllSessions(storedToken.userId, 'password_reset');
+
+    // Ruling PASSKEY-10: account recovery REMOVES every passkey. Whoever could receive the reset mail may
+    // not be the person who registered those keys (an attacker's backdoor passkey must not survive the
+    // owner's recovery); the owner signs in with the new password and enrols again. Cost: a legitimate
+    // owner re-enrols their devices after a reset. As that user (RLS is user-keyed), same as the writes above.
+    await withUser(storedToken.userId, tx =>
+      tx.passkeyCredential.deleteMany({ where: { userId: storedToken.userId } })
+    );
 
     // A merchant who reset because they were locked out after too many wrong
     // passwords must be able to use the new one at once. The lockout exists to

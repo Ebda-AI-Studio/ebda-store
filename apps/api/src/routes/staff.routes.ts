@@ -252,6 +252,11 @@ router.delete(
         throw new AppError(404, 'NOT_FOUND', 'Staff member not found in this store.');
       }
 
+      // Ruling PASSKEY-11: a removed staff member is signed out everywhere (token version + refresh
+      // tokens), so no session minted through one of their passkeys outlives the membership. Runs BEFORE
+      // the delete: the revoke definer authorises this store's admin through the membership row.
+      await AuthService.revokeAllSessions(userId);
+
       await withStore(storeId, tx =>
         tx.storeStaff.delete({
           where: { userId_storeId: { userId, storeId } },

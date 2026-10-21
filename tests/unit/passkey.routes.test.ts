@@ -8,7 +8,10 @@
 import { describe, it, expect, vi, beforeAll, beforeEach } from 'vitest';
 import express, { type Express } from 'express';
 import request from 'supertest';
+import bcrypt from 'bcryptjs';
 import { register, assert } from '../helpers/software-authenticator';
+
+const PASSWORD = 'Correct-pw-1';
 
 const ADMIN = 'https://admin.ebda.app';
 type Row = Record<string, any>;
@@ -93,9 +96,18 @@ vi.mock('@api/middleware/security', () => ({
   auditLog: async (e: Row) => void h.audit.push(e),
   generateCsrfToken: async () => 'csrf-token',
 }));
+vi.mock('@api/services/account-lockout.service', () => ({
+  accountLockout: {
+    isLocked: async () => ({ locked: false }),
+    recordFailedAttempt: async () => ({ locked: false, attemptsRemaining: 4 }),
+    recordSuccessfulLogin: async () => undefined,
+  },
+}));
+vi.mock('@api/services/platform-mailer', () => ({ sendPasskeyNoticeEmail: async () => undefined }));
 vi.mock('@api/lib/cors-cache', () => ({ isPlatformOrigin: vi.fn(() => true) }));
 vi.mock('@api/services/auth.service', () => ({
   AuthService: {
+    revokeAllSessions: async () => undefined,
     issueSessionFor: async (u: Row) => ({
       user: { id: u.id, email: u.email, storeId: u.storeId, role: u.role },
       accessToken: 'access',
@@ -136,6 +148,8 @@ beforeEach(() => {
         tokenVersion: 0,
         mfaEnabled: false,
         mfaSecret: null,
+        passwordHash: bcrypt.hashSync(PASSWORD, 4),
+        language: 'en',
       },
     ],
   ]);
@@ -144,7 +158,13 @@ beforeEach(() => {
 const P = '/api/v1/auth/passkeys';
 const post = (path: string) => request(app).post(`${P}${path}`).set('Origin', ADMIN);
 
+async function stepUp() {
+  const r = await post('/step-up').send({ password: PASSWORD });
+  expect(r.status).toBe(200);
+}
+
 async function enrolOverHttp() {
+  await stepUp();
   const begin = await post('/register/begin').send({});
   expect(begin.status).toBe(200);
   const { credential, response } = register(begin.body.data, ADMIN);
@@ -173,7 +193,11 @@ describe('passkey routes', () => {
       refreshToken: 'refresh',
       csrfToken: 'csrf-token',
     });
-    expect(h.audit.map(a => a.action)).toEqual(['passkey.added', 'passkey.login']);
+    expect(h.audit.map(a => a.action)).toEqual([
+      'passkey.stepup',
+      'passkey.added',
+      'passkey.login',
+    ]);
   });
 
   it('every sign-in failure is byte-identical and audited with an internal reason only', async () => {
@@ -246,13 +270,15 @@ describe('passkey routes', () => {
       ).status
     ).toBe(200);
     expect(h.creds[0].name).toBe('Renamed');
+    h.users.set('someone-else', { ...h.users.get('user-1'), id: 'someone-else', email: 's@x.com' });
     h.caller.userId = 'someone-else';
+    await stepUp();
     expect((await request(app).delete(`${P}/${passkey.id}`).set('Origin', ADMIN)).status).toBe(404);
     expect(h.creds).toHaveLength(1);
     h.caller.userId = 'user-1';
     expect((await request(app).delete(`${P}/${passkey.id}`).set('Origin', ADMIN)).status).toBe(200);
     expect(h.creds).toHaveLength(0);
-    expect(h.audit.map(a => a.action)).toEqual([
+    expect(h.audit.map(a => a.action).filter(a => a !== 'passkey.stepup')).toEqual([
       'passkey.added',
       'passkey.renamed',
       'passkey.removed',
@@ -269,5 +295,28 @@ describe('passkey routes', () => {
           .send({ name: 'x'.repeat(61) })
       ).status
     ).toBe(400);
+  });
+
+  it('registration, rename and remove are refused without a step-up; a wrong password does not open one', async () => {
+    const id = '8f14e45f-ceea-467f-a8d1-1f0a5b6d3c11';
+    expect((await post('/register/begin').send({})).body.error.code).toBe('STEP_UP_REQUIRED');
+    expect(
+      (await request(app).patch(`${P}/${id}`).set('Origin', ADMIN).send({ name: 'x' })).body.error
+        .code
+    ).toBe('STEP_UP_REQUIRED');
+    expect((await request(app).delete(`${P}/${id}`).set('Origin', ADMIN)).body.error.code).toBe(
+      'STEP_UP_REQUIRED'
+    );
+    const bad = await post('/step-up').send({ password: 'wrong' });
+    expect(bad.status).toBe(401);
+    expect(bad.body.error.code).toBe('STEP_UP_FAILED');
+    expect((await post('/step-up').send({})).body.error.code).toBe('STEP_UP_FAILED');
+    expect((await post('/register/begin').send({})).status).toBe(403);
+    expect(h.audit.filter(a => a.action === 'passkey.stepup.failed')).toHaveLength(2);
+  });
+
+  it('step-up itself is refused for an impersonation session', async () => {
+    h.caller.impersonatedBy = 'admin-9';
+    expect((await post('/step-up').send({ password: PASSWORD })).status).toBe(403);
   });
 });
