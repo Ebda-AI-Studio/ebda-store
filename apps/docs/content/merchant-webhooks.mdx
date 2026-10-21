@@ -94,7 +94,7 @@ Payloads carry no customer details by default. If you turn on **Include customer
 1. Read the **raw** body bytes before any JSON parsing.
 2. Recompute the HMAC and compare in constant time.
 3. Reject if `t` is more than **5 minutes** from your clock (replay window).
-4. Use `id` (also the `X-Ebda-Event-Id` header) as your idempotency key: a retry or a resend carries the **same** event id.
+4. Use `id` (also the `X-Ebda-Event-Id` header) as your idempotency key: a retry, a resend, or an internal re-send of the same event (for example after a delayed payment callback) carries the **same** event id, so deduplicating on it is safe.
 
 ```js
 import { createHmac, timingSafeEqual } from 'node:crypto';
