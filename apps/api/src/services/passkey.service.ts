@@ -192,6 +192,22 @@ function accountFitsContext(
   return user.role === 'customer' && user.storeId !== null && user.storeId === ctx.storeId;
 }
 
+/**
+ * Every authenticated passkey endpoint runs this (review M4): the browser origin must be the surface this
+ * account belongs on (admin namespace <-> admin app; a shopper <-> their own store host). It is what keeps
+ * a merchant-controlled page from reading or changing an admin's, or another store's shopper's, passkeys.
+ */
+export async function assertPasskeyOrigin(
+  user: { role: string; storeId?: string | null },
+  origin: string | undefined
+): Promise<PasskeyContext> {
+  const ctx = await resolvePasskeyContext(origin);
+  if (!accountFitsContext({ role: user.role, storeId: user.storeId ?? null }, ctx)) {
+    throw notAllowed();
+  }
+  return ctx;
+}
+
 const userIdBytes = (id: string) => new TextEncoder().encode(id);
 
 /** Who is acting: the user AND the specific session (access-token jti) presenting the request. */

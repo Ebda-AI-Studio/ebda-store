@@ -38,7 +38,8 @@ vi.mock('@api/services/redis.service', () => ({
   },
 }));
 vi.mock('@api/lib/definer', () => ({
-  lookupStore: async () => null,
+  lookupStore: async (m: { slug?: string }) =>
+    m.slug === 'shop-x' ? { id: 'store-x', status: 'active' } : null,
   passkeyLookup: async (id: string) => h.creds.find(c => c.credentialId === id) ?? null,
 }));
 vi.mock('@ebda/database', () => {
@@ -78,6 +79,7 @@ vi.mock('@api/middleware/auth', async importOriginal => {
       req.user = {
         userId: h.caller.userId,
         role: h.caller.role,
+        storeId: (h.caller as { storeId?: string }).storeId ?? null,
         ...(h.caller.impersonatedBy ? { impersonatedBy: h.caller.impersonatedBy } : {}),
       };
       next();
@@ -347,5 +349,49 @@ describe('passkey routes', () => {
     expect((await post('/register/begin').send({})).status).toBe(200);
     h.caller.jti = 'sess-unrelated';
     expect((await post('/register/begin').send({})).body.error.code).toBe('STEP_UP_REQUIRED');
+  });
+
+  describe('origin binding on the authenticated endpoints (review M4)', () => {
+    const STORE_X = 'https://shop-x.ebda.app';
+    const as = (method: 'get' | 'post' | 'patch' | 'delete', path: string, origin?: string) => {
+      const r = request(app)[method](`${P}${path}`);
+      return origin ? r.set('Origin', origin) : r;
+    };
+    const ID = '8f14e45f-ceea-467f-a8d1-1f0a5b6d3c11';
+
+    it('an admin session presented from a store host is refused on every endpoint (no list leak)', async () => {
+      await stepUp();
+      for (const [m, path] of [
+        ['get', ''],
+        ['post', '/step-up'],
+        ['post', '/register/begin'],
+        ['post', '/register/finish'],
+        ['patch', `/${ID}`],
+        ['delete', `/${ID}`],
+      ] as const) {
+        const r = await as(m, path, STORE_X).send({ password: PASSWORD, name: 'x', response: {} });
+        expect(r.status, `${m} ${path}`).toBe(403);
+        expect(r.body.error.code).toBe('PASSKEY_NOT_ALLOWED');
+      }
+    });
+
+    it('an unknown or missing Origin gets nothing either', async () => {
+      expect((await as('get', '', 'https://unknown.example')).status).toBe(404);
+      expect((await as('get', '')).status).toBe(404);
+    });
+
+    it('a shopper of ANOTHER store is refused on this store host', async () => {
+      h.users.set('cust-y', {
+        ...h.users.get('user-1'),
+        id: 'cust-y',
+        role: 'customer',
+        storeId: 'store-y',
+      });
+      h.caller.userId = 'cust-y';
+      h.caller.role = 'customer';
+      (h.caller as any).storeId = 'store-y';
+      const r = await as('get', '', STORE_X);
+      expect(r.status).toBe(403);
+    });
   });
 });

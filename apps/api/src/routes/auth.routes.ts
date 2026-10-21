@@ -3,7 +3,7 @@ import { z } from 'zod';
 import jwt from 'jsonwebtoken';
 import { withUser } from '@ebda/database';
 import { config } from '../config';
-import { authenticate, rejectImpersonated } from '../middleware/auth';
+import { authenticate, rejectAdminOnMerchantOrigin, rejectImpersonated } from '../middleware/auth';
 import {
   AuthService,
   GENERIC_RESEND_VERIFICATION_RESULT,
@@ -740,6 +740,7 @@ router.post('/logout', async (req: Request, res: Response, next: NextFunction) =
 router.post(
   '/logout-all',
   authenticate,
+  rejectAdminOnMerchantOrigin,
   rejectImpersonated,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -756,18 +757,23 @@ router.post(
 );
 
 // GET /auth/me
-router.get('/me', authenticate, async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const user = await AuthService.getProfile(req.user!.userId);
+router.get(
+  '/me',
+  authenticate,
+  rejectAdminOnMerchantOrigin,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const user = await AuthService.getProfile(req.user!.userId);
 
-    res.json({
-      success: true,
-      data: { user },
-    });
-  } catch (error) {
-    next(error);
+      res.json({
+        success: true,
+        data: { user },
+      });
+    } catch (error) {
+      next(error);
+    }
   }
-});
+);
 
 // DELETE /auth/me - Soft-delete (deactivate) the authenticated user's account
 // `rejectImpersonated`: deactivating the account is irreversible from the
@@ -776,6 +782,7 @@ router.get('/me', authenticate, async (req: Request, res: Response, next: NextFu
 router.delete(
   '/me',
   authenticate,
+  rejectAdminOnMerchantOrigin,
   rejectImpersonated,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -820,6 +827,7 @@ router.post(
   '/me/erase',
   authLimiter,
   authenticate,
+  rejectAdminOnMerchantOrigin,
   rejectImpersonated,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -869,62 +877,78 @@ router.post(
 // that decision: `impersonatedBy` is written into the audit row whenever the
 // session is impersonated, so the download is at least ATTRIBUTABLE rather
 // than indistinguishable from the account owner's own export.
-router.get('/me/export', authenticate, async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const userId = req.user!.userId;
-    const bundle = await AuthService.exportAccount(userId);
+router.get(
+  '/me/export',
+  authenticate,
+  rejectAdminOnMerchantOrigin,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const userId = req.user!.userId;
+      const bundle = await AuthService.exportAccount(userId);
 
-    await auditLog({
-      action: 'user.data.exported',
-      userId,
-      resourceType: 'user',
-      resourceId: userId,
-      details: req.user!.impersonatedBy ? { impersonatedBy: req.user!.impersonatedBy } : undefined,
-      ip: req.ip,
-      userAgent: req.headers['user-agent'],
-    });
+      await auditLog({
+        action: 'user.data.exported',
+        userId,
+        resourceType: 'user',
+        resourceId: userId,
+        details: req.user!.impersonatedBy
+          ? { impersonatedBy: req.user!.impersonatedBy }
+          : undefined,
+        ip: req.ip,
+        userAgent: req.headers['user-agent'],
+      });
 
-    const today = new Date().toISOString().slice(0, 10);
-    res.setHeader('Content-Type', 'application/json');
-    res.setHeader('Content-Disposition', `attachment; filename="my-data-${userId}-${today}.json"`);
-    res.send(JSON.stringify(bundle, null, 2));
-  } catch (error) {
-    next(error);
+      const today = new Date().toISOString().slice(0, 10);
+      res.setHeader('Content-Type', 'application/json');
+      res.setHeader(
+        'Content-Disposition',
+        `attachment; filename="my-data-${userId}-${today}.json"`
+      );
+      res.send(JSON.stringify(bundle, null, 2));
+    } catch (error) {
+      next(error);
+    }
   }
-});
+);
 
 // PUT /auth/me - Update profile
-router.put('/me', authenticate, async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const updateSchema = z.object({
-      // ProfileClient.tsx always sends firstName from the form — even when
-      // the user clears the field it sends ''. Coerce '' → undefined so that
-      // a deliberate clear is treated as "don't update" rather than a 400.
-      firstName: z.preprocess(
-        v => (typeof v === 'string' && v.trim() === '' ? undefined : v),
-        z.string().min(1, 'First name is required').optional()
-      ),
-      lastName: z.string().optional(),
-      phone: z.string().optional(),
-    });
+router.put(
+  '/me',
+  authenticate,
+  rejectAdminOnMerchantOrigin,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const updateSchema = z.object({
+        // ProfileClient.tsx always sends firstName from the form — even when
+        // the user clears the field it sends ''. Coerce '' → undefined so that
+        // a deliberate clear is treated as "don't update" rather than a 400.
+        firstName: z.preprocess(
+          v => (typeof v === 'string' && v.trim() === '' ? undefined : v),
+          z.string().min(1, 'First name is required').optional()
+        ),
+        lastName: z.string().optional(),
+        phone: z.string().optional(),
+      });
 
-    const data = updateSchema.parse(req.body);
-    const user = await AuthService.updateProfile(req.user!.userId, data);
+      const data = updateSchema.parse(req.body);
+      const user = await AuthService.updateProfile(req.user!.userId, data);
 
-    res.json({
-      success: true,
-      data: { user },
-    });
-  } catch (error) {
-    next(error);
+      res.json({
+        success: true,
+        data: { user },
+      });
+    } catch (error) {
+      next(error);
+    }
   }
-});
+);
 
 // POST /auth/change-password
 router.post(
   '/change-password',
   authLimiter,
   authenticate,
+  rejectAdminOnMerchantOrigin,
   rejectImpersonated,
   async (req: Request, res: Response, next: NextFunction) => {
     try {

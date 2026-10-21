@@ -1,7 +1,7 @@
 import { Router, type NextFunction, type Request, type Response } from 'express';
 import { z } from 'zod';
 import jwt from 'jsonwebtoken';
-import { authenticate, rejectImpersonated } from '../middleware/auth';
+import { authenticate, rejectAdminOnMerchantOrigin, rejectImpersonated } from '../middleware/auth';
 import {
   auditLog,
   generateCsrfToken,
@@ -13,7 +13,7 @@ import {
 import { config } from '../config';
 import { AppError } from '../middleware/error-handler';
 import { AuthService } from '../services/auth.service';
-import { PasskeyService } from '../services/passkey.service';
+import { PasskeyService, assertPasskeyOrigin } from '../services/passkey.service';
 import { setSessionCookies } from './auth.routes';
 
 /**
@@ -78,6 +78,16 @@ const actorOf = (req: Request) => ({
   userId: req.user!.userId,
   sessionId: (req as unknown as { tokenJti?: string }).tokenJti,
 });
+
+/** After `authenticate`: the request must come from the surface this account lives on (review M4). */
+async function passkeyOriginGuard(req: Request, _res: Response, next: NextFunction) {
+  try {
+    await assertPasskeyOrigin(req.user!, originOf(req));
+    next();
+  } catch (error) {
+    next(error);
+  }
+}
 
 // ---------------------------------------------------------------------------------------------
 // Sign in (public)
@@ -166,20 +176,28 @@ router.post(
 // Manage (session)
 // ---------------------------------------------------------------------------------------------
 
-router.get('/', authenticate, async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const items = await PasskeyService.list(req.user!.userId, originOf(req));
-    res.json({ success: true, data: { passkeys: items } });
-  } catch (error) {
-    next(error);
+router.get(
+  '/',
+  authenticate,
+  rejectAdminOnMerchantOrigin,
+  passkeyOriginGuard,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const items = await PasskeyService.list(req.user!.userId, originOf(req));
+      res.json({ success: true, data: { passkeys: items } });
+    } catch (error) {
+      next(error);
+    }
   }
-});
+);
 
 // Step-up (Ruling PASSKEY-7): password (+ TOTP code when TOTP is on) opens a 5-minute window in which
 // this account may add, rename or remove passkeys. Per-user limiter and the SAME lockout counter as login.
 router.post(
   '/step-up',
   authenticate,
+  rejectAdminOnMerchantOrigin,
+  passkeyOriginGuard,
   rejectImpersonated,
   passkeyStepUpLimiter,
   async (req: Request, res: Response, next: NextFunction) => {
@@ -222,6 +240,8 @@ router.post(
 router.post(
   '/register/begin',
   authenticate,
+  rejectAdminOnMerchantOrigin,
+  passkeyOriginGuard,
   rejectImpersonated,
   writeLimiter,
   async (req: Request, res: Response, next: NextFunction) => {
@@ -237,6 +257,8 @@ router.post(
 router.post(
   '/register/finish',
   authenticate,
+  rejectAdminOnMerchantOrigin,
+  passkeyOriginGuard,
   rejectImpersonated,
   writeLimiter,
   async (req: Request, res: Response, next: NextFunction) => {
@@ -270,6 +292,8 @@ router.post(
 router.patch(
   '/:id',
   authenticate,
+  rejectAdminOnMerchantOrigin,
+  passkeyOriginGuard,
   rejectImpersonated,
   writeLimiter,
   async (req: Request, res: Response, next: NextFunction) => {
@@ -297,6 +321,8 @@ router.patch(
 router.delete(
   '/:id',
   authenticate,
+  rejectAdminOnMerchantOrigin,
+  passkeyOriginGuard,
   rejectImpersonated,
   writeLimiter,
   async (req: Request, res: Response, next: NextFunction) => {
