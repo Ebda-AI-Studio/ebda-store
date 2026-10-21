@@ -29,7 +29,7 @@ describe('ReceiptBarcodePicker', () => {
     apiPut.mockResolvedValue({ error: null });
     const onSaved = vi.fn();
     render(<ReceiptBarcodePicker storeId="s1" value="plain" onSaved={onSaved} />);
-    const save = screen.getByText('save') as HTMLButtonElement;
+    const save = screen.getByText('saveShape') as HTMLButtonElement;
     expect(save.disabled).toBe(true);
     fireEvent.click(screen.getByText('shape.palm'));
     fireEvent.click(save);
@@ -42,7 +42,7 @@ describe('ReceiptBarcodePicker', () => {
     const onSaved = vi.fn();
     render(<ReceiptBarcodePicker storeId="s1" value="plain" onSaved={onSaved} />);
     fireEvent.click(screen.getByText('shape.off'));
-    fireEvent.click(screen.getByText('save'));
+    fireEvent.click(screen.getByText('saveShape'));
     await waitFor(() => expect(screen.getByRole('status').textContent).toBe('nope'));
     expect(onSaved).not.toHaveBeenCalled();
   });

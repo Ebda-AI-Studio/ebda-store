@@ -10325,7 +10325,7 @@
   "receiptBarcode": {
     "title": "Order barcode",
     "hint": "A real scannable barcode of the order number on receipts, packing slips and invoices. Pick a plain strip, a fun shape, or turn it off.",
-    "save": "Save",
+    "saveShape": "Save",
     "saved": "Saved",
     "failed": "Couldn't save. Try again.",
     "shape": {
