@@ -12,6 +12,7 @@ import {
 } from '@ebda/database';
 import {
   deleteUserAddresses,
+  deleteUserPasskeys,
   deleteUserTokens,
   findUserIdByEmail,
   getUserState,
@@ -1952,6 +1953,8 @@ export class AuthService {
       // User-keyed rows: like `addresses` above, deleted by the shopper's id through a
       // guarded definer INSIDE this transaction (the GUC may be the merchant's id).
       await deleteUserTokens(userId);
+      // Passkeys (Ruling PASSKEY-1): same shape, same guarded-definer reason as the tokens above.
+      await deleteUserPasskeys(userId);
       await tx.loyaltyTransaction.deleteMany({
         where: { customerId: userId, storeId: eraseStoreId },
       });
@@ -2336,6 +2339,7 @@ export class AuthService {
       walletTransactions,
       pushSubscriptions,
       onesignalSubscriptions,
+      passkeys,
       smsMarketingConsents,
     ] = await Promise.all([
       // Same user-scoped RLS policy as the erase path above: on the
@@ -2385,6 +2389,23 @@ export class AuthService {
           select: { id: true, playerId: true, createdAt: true },
         })
       ),
+      // Passkeys: metadata only. The public key is not personal data worth shipping and nothing in this
+      // bundle can be a secret (the private key never leaves the person's device).
+      withUser(userId, tx =>
+        tx.passkeyCredential.findMany({
+          where: { userId },
+          orderBy: { createdAt: 'asc' },
+          select: {
+            id: true,
+            name: true,
+            rpId: true,
+            deviceType: true,
+            backedUp: true,
+            createdAt: true,
+            lastUsedAt: true,
+          },
+        })
+      ),
       // SMS-marketing consent (issue 206): what was given, when, where, and
       // any withdrawal. Keyed by the user id (the shopper's own rows).
       prisma.smsMarketingConsent.findMany({
@@ -2418,6 +2439,7 @@ export class AuthService {
       walletTransactions,
       pushSubscriptions,
       onesignalSubscriptions,
+      passkeys,
       smsMarketingConsents,
     };
   }
