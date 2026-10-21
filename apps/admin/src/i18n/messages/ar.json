@@ -9002,7 +9002,8 @@
     "instapayPlanNote": "الباقة الجديدة بتشتغل أول ما فريق ابدأ استوديو للذكاء الاصطناعي يأكد الدفع.",
     "instapayPlanFailed": "معرفناش نبدأ دفع إنستاباي للباقة دي.",
     "instapayQuoteTitle": "ادفع ثمن {plan} ({interval})",
-    "viewReceipt": "شوف الإيصال"
+    "viewReceipt": "شوف الإيصال",
+    "receiptProcessing": "الدفع تم. الإيصال هيطلع هنا حالاً."
   },
   "planLimit": {
     "maxProducts": "باقتك تسمح بحد أقصى {limit} منتج. قم بالترقية لإضافة المزيد.",

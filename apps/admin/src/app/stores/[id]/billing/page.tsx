@@ -36,6 +36,7 @@ import {
   planLabel,
 } from '../../../../components/billing/format';
 import { EbdaBillingReceipt } from '../../../../components/billing/EbdaBillingReceipt';
+import { pickReceiptCharge } from '../../../../components/billing/receipt-charge';
 import { billingNotice, noticeText } from '../../../../components/billing/notice';
 import { startCardSetup, useCardReturn } from '../../../../components/billing/useCardReturn';
 import type {
@@ -170,6 +171,7 @@ export default function StoreBillingPage() {
   const [interval, setInterval] = useState<'monthly' | 'yearly'>('monthly');
   const [busy, setBusy] = useState<string | null>(null);
   const [receiptFor, setReceiptFor] = useState<string | null>(null);
+  const [returnChargeId, setReturnChargeId] = useState<string | null>(null);
   const [returnState, setReturnState] = useState<'idle' | 'pending' | 'ok' | 'failed' | 'later'>(
     'idle'
   );
@@ -246,10 +248,13 @@ export default function StoreBillingPage() {
     setReturnState('pending');
     (async () => {
       for (let i = 0; i < 6 && !cancelled; i++) {
-        const { data: r } = await apiGet<{ hint: string; status: string | null }>(
-          `/api/v1/stores/${storeId}/billing/checkout/return?${qs.toString()}`
-        );
+        const { data: r } = await apiGet<{
+          hint: string;
+          status: string | null;
+          chargeId?: string | null;
+        }>(`/api/v1/stores/${storeId}/billing/checkout/return?${qs.toString()}`);
         if (r?.status === 'succeeded') {
+          setReturnChargeId(r.chargeId ?? null);
           setReturnState('ok');
           await Promise.all([load(), loadCharges()]);
           return;
@@ -638,13 +643,18 @@ export default function StoreBillingPage() {
           {/* Paid: the receipt prints out (reused storefront printer, Ebda palette, palm barcode).
               Any earlier succeeded charge can be re-opened from the invoices table. */}
           {(() => {
-            const paidCharge =
-              receiptFor !== null
-                ? charges.find(c => c.id === receiptFor)
-                : returnState === 'ok'
-                  ? charges.find(c => c.status === 'succeeded' && c.type !== 'refund')
-                  : undefined;
-            return paidCharge ? (
+            const { charge: paidCharge, processing } = pickReceiptCharge(charges, {
+              returnChargeId: returnState === 'ok' ? returnChargeId : null,
+              openedId: receiptFor,
+            });
+            if (!paidCharge) {
+              return processing ? (
+                <p role="status" className="rounded-xl border bg-card p-4 text-sm">
+                  {t('receiptProcessing')}
+                </p>
+              ) : null;
+            }
+            return (
               <EbdaBillingReceipt
                 key={paidCharge.id}
                 charge={paidCharge}
@@ -655,7 +665,7 @@ export default function StoreBillingPage() {
                 }
                 locale={locale}
               />
-            ) : null;
+            );
           })()}
 
           {data.subscription.status === 'past_due' &&

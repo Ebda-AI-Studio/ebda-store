@@ -9002,7 +9002,8 @@
     "instapayPlanNote": "The new plan applies when Ebda Store confirms your payment.",
     "instapayPlanFailed": "We could not start the InstaPay payment for this plan.",
     "instapayQuoteTitle": "Pay for {plan} ({interval})",
-    "viewReceipt": "View receipt"
+    "viewReceipt": "View receipt",
+    "receiptProcessing": "Your payment went through. Your receipt will print here in a moment."
   },
   "planLimit": {
     "maxProducts": "Your plan allows up to {limit} products. Upgrade to add more.",

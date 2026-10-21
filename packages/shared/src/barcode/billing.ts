@@ -1,10 +1,11 @@
 /** Ebda's own billing receipts always print this shape (Ahmad, 2026-10-21). */
 export const EBDA_BILLING_BARCODE_SHAPE = 'palm';
 
-const FNV_OFFSET = 0xcbf29ce484222325n;
-const FNV_PRIME = 0x100000001b3n;
-const MASK64 = 0xffffffffffffffffn;
-const TEN_16 = 10n ** 16n;
+// BigInt() calls, not literals: the shared package targets < ES2020.
+const FNV_OFFSET = BigInt('0xcbf29ce484222325');
+const FNV_PRIME = BigInt('0x100000001b3');
+const MASK64 = BigInt('0xffffffffffffffff');
+const TEN_16 = BigInt('10000000000000000');
 
 /**
  * The scannable payment number of an Ebda subscription charge: `EBD-` + 16
