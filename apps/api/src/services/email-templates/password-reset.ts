@@ -40,6 +40,6 @@ export const passwordResetTemplate = {
       <a href="${escapeHtml(d.resetUrl)}" class="button">إعادة تعيين كلمة المرور</a>
     </p>
     <p>الرابط ينتهي خلال ${d.expiresInMinutes} دقيقة.</p>
-    <p>لو إنت مطلبتش ده، تجاهل الرسالة دي وماتقلقش.</p>
+    <p>لو إنت مطلبتش ده، تجاهل الرسالة دي ومتقلقش.</p>
   `,
 };

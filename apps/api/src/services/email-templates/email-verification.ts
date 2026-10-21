@@ -47,7 +47,7 @@ export const emailVerificationTemplate = {
       <a href="${urlEsc}" class="button">تأكيد البريد الإلكتروني</a>
     </p>
     <p>الرابط ينتهي خلال ${d.expiresInHours} ساعة.</p>
-    <p style="font-size: 14px; color: #666;">لو إنت معملتش حساب، تجاهل الرسالة دي وماتقلقش.</p>
+    <p style="font-size: 14px; color: #666;">لو إنت معملتش حساب، تجاهل الرسالة دي ومتقلقش.</p>
     <p style="font-size: 12px; color: #999; margin-top: 24px;">
       لو الزرار اللي فوق مشتغلش، انسخ الرابط ده والصقه في المتصفح:<br>
       <a href="${urlEsc}" style="color: ${BRAND.colors.gold}; word-break: break-all;">${urlEsc}</a>

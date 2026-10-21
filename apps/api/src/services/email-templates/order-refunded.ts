@@ -4,7 +4,7 @@ import type { OrderRefundEmailData } from '../email.service';
 export const orderRefundedTemplate = {
   subject: {
     en: (d: OrderRefundEmailData) => `Refund Requested — Order #${d.orderNumber}`,
-    ar: (d: OrderRefundEmailData) => `بنرجّعلك فلوسك — طلب رقم ${d.orderNumber}`,
+    ar: (d: OrderRefundEmailData) => `رجعنالك فلوسك — طلب رقم ${d.orderNumber}`,
   },
 
   en: (d: OrderRefundEmailData) => `
@@ -40,10 +40,10 @@ export const orderRefundedTemplate = {
   `,
 
   ar: (d: OrderRefundEmailData) => `
-    <h2>بنرجّعلك مبلغ طلبك</h2>
+    <h2>رجعنالك مبلغ طلبك</h2>
     <p>أهلاً ${escapeHtml(d.customerName)}،</p>
     <p>
-      بعتنا طلب استرداد بقيمة <strong>${emailMoney(d.refundAmount, d.currency, 'ar')}</strong>
+      رجعنالك <strong>${emailMoney(d.refundAmount, d.currency, 'ar')}</strong>
       للطلب رقم <strong>${escapeHtml(d.orderNumber)}</strong>. المبلغ هيظهر في طريقة الدفع
       الأصلية خلال 5–10 أيام عمل حسب بنكك.
     </p>

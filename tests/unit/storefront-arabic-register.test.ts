@@ -109,6 +109,10 @@ export const STYLE: Array<[string, RegExp]> = [
     'join the negation (مـ…ش, not ما …ش)',
     new RegExp(`(?:^|[^${AR}])(ما [${AR}]+ش)(?=$|[^${AR}])`, 'g'),
   ],
+  [
+    'join the negation (متقلقش, not ماتقلقش / مافيش: م + verb + ش)',
+    new RegExp(`(?:^|[^${AR}])(و?ما(?:[تينأ][${AR}]+|في[${AR}]*)ش)(?=$|[^${AR}])`, 'g'),
+  ],
   ['no حضرتك: masculine-singular address', new RegExp(`(?:^|[^${AR}])(حضرتك)(?=$|[^${AR}])`, 'g')],
   ['عشان, not علشان', new RegExp(`(?:^|[^${AR}])(علشان)(?=$|[^${AR}])`, 'g')],
 ];
@@ -149,7 +153,7 @@ const EGYPTIAN: Array<[string, string]> = [
     'apps/web/src/app/checkout/success/SuccessClient.tsx',
     'طلبك اتسجل. جهّز المبلغ لما الطلب يوصلك.',
   ],
-  ['apps/web/src/lib/plural.ts', "two: 'قطعتين'"],
+  ['packages/shared/src/utils/plural.ts', "two: 'قطعتين'"],
   ['apps/web/src/lib/plural.ts', "two: 'يومين'"],
   ['apps/api/src/routes/public.routes.ts', 'ده متجر تجريبي — الرسائل مقفولة'],
 ];
@@ -457,9 +461,24 @@ describe('storefront Arabic register (Ruling FU46-Y02a: Egyptian sentences, neut
       'الإيصال ما اتبعتش',
       'حضرتك',
       'علشان كده',
+      'ماتقلقش',
+      'وماتقلقش',
+      'ماينفعش',
+      'مافيش',
     ])
       expect(style(t), t).toBe(true);
-    for (const t of ['وإنت بتعمل', 'إنت مشترك', 'منفعش', 'الإيصال متبعتش', 'عشان كده', 'انتظار'])
+    for (const t of [
+      'وإنت بتعمل',
+      'إنت مشترك',
+      'منفعش',
+      'الإيصال متبعتش',
+      'عشان كده',
+      'انتظار',
+      'متقلقش',
+      'ومتقلقش',
+      'مفيش',
+      'ماتش',
+    ])
       expect(style(t), t).toBe(false);
   });
 

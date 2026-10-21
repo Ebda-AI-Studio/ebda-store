@@ -1,5 +1,7 @@
 // Communication Hub — Notification Types and Templates
 
+import { countText, ITEMS } from './utils/plural';
+
 // ─── Channels ────────────────────────────────────────────────────────────────
 
 export type NotificationChannel = 'whatsapp' | 'sms' | 'push';
@@ -46,7 +48,8 @@ export interface NotificationData {
    */
   dedupeKey?: string;
   /**
-   * The shopper's stored locale ('en' | 'ar'): the order's, else the customer's. Absent → the
+   * The shopper's stored locale ('en' | 'ar'): the order's `locale` (their choice at checkout).
+   * Senders with no stored locale (wishlist back-in-stock, web abandoned carts) omit it, and the
    * dispatcher falls back to the store's default language, then the region default (ar).
    */
   locale?: string | null;
@@ -66,7 +69,7 @@ export const SMS_TEMPLATES: Record<NotificationEvent, SmsTemplate> = {
   },
   payment_success: {
     en: 'Hi {name}, payment of {amount} for order #{number} was successful. Thank you!',
-    ar: 'أهلاً {name}، استلمنا دفعتك {amount} للطلب رقم #{number}. شكراً!',
+    ar: 'أهلاً {name}، استلمنا دفعتك {amount} للطلب #{number}. شكراً!',
   },
   order_shipped: {
     en: 'Hi {name}, your order #{number} has been shipped. Track your package with: {tracking}',
@@ -82,11 +85,11 @@ export const SMS_TEMPLATES: Record<NotificationEvent, SmsTemplate> = {
   },
   refund_processed: {
     en: 'Hi {name}, a refund of {amount} for order #{number} has been processed. It may take 5–10 business days.',
-    ar: 'أهلاً {name}، بنرجّعلك {amount} من الطلب رقم #{number}. ممكن ياخد 5–10 أيام عمل.',
+    ar: 'أهلاً {name}، رجعنالك {amount} من الطلب رقم #{number}. ممكن ياخد 5–10 أيام عمل.',
   },
   cart_abandoned_step1: {
-    en: 'Hi {name}, you left {cartItemCount} items ({cartTotal} EGP) in your cart at {storeName}. Complete your order: {cartUrl}',
-    ar: 'أهلاً {name}، سيبت {cartItemCount} عناصر ({cartTotal} ج.م) في سلتك في {storeName}. كمّل طلبك: {cartUrl}',
+    en: 'Hi {name}, you left {cartItems} ({cartTotal} EGP) in your cart at {storeName}. Complete your order: {cartUrl}',
+    ar: 'أهلاً {name}، سيبت {cartItems} ({cartTotal} ج.م) في سلتك في {storeName}. كمّل طلبك: {cartUrl}',
   },
   cart_abandoned_step2: {
     en: 'Hi {name}, your items are still waiting! Complete your order now: {cartUrl}',
@@ -98,12 +101,24 @@ export const SMS_TEMPLATES: Record<NotificationEvent, SmsTemplate> = {
   },
   back_in_stock: {
     en: 'Hi {name}, great news! "{productName}" is back in stock at {storeName}. Shop now: {productUrl}',
-    ar: 'أهلاً {name}، خبر حلو! "{productName}" رجع في {storeName}. اطلبه دلوقتي: {productUrl}',
+    ar: 'أهلاً {name}، خبر حلو! رجّعنا "{productName}" في {storeName}. اطلب دلوقتي: {productUrl}',
   },
 };
 
-export function renderSmsTemplate(template: string, data: NotificationData): string {
+/**
+ * Fills a template. `{cartItems}` is the counted noun in the template's language (never
+ * "1 عناصر"); `locale` picks it (default ar, the Egyptian region default).
+ */
+export function renderSmsTemplate(
+  template: string,
+  data: NotificationData,
+  locale: 'en' | 'ar' = 'ar'
+): string {
   return template
+    .replace(
+      '{cartItems}',
+      data.cartItemCount !== undefined ? countText(locale, data.cartItemCount, ITEMS) : ''
+    )
     .replace('{name}', data.customerName)
     .replace('{number}', data.orderNumber)
     .replace('{total}', data.total !== undefined ? data.total.toFixed(2) : '')
@@ -180,11 +195,11 @@ export const PUSH_TEMPLATES: Record<NotificationEvent, PushTemplate> = {
   refund_processed: {
     title: {
       en: 'Refund Processed',
-      ar: 'بنرجّعلك فلوسك',
+      ar: 'رجعنالك فلوسك',
     },
     body: {
       en: 'A refund of {amount} for order #{number} has been processed.',
-      ar: 'بنرجّعلك {amount} من الطلب رقم #{number}.',
+      ar: 'رجعنالك {amount} من الطلب رقم #{number}.',
     },
   },
   cart_abandoned_step1: {
@@ -193,8 +208,8 @@ export const PUSH_TEMPLATES: Record<NotificationEvent, PushTemplate> = {
       ar: 'سيبت حاجة في السلة!',
     },
     body: {
-      en: 'Hi {name}, you have {cartItemCount} items worth {cartTotal} EGP waiting in your cart.',
-      ar: 'أهلاً {name}، عندك {cartItemCount} عناصر بقيمة {cartTotal} ج.م مستنياك في سلتك.',
+      en: 'Hi {name}, you have {cartItems} worth {cartTotal} EGP waiting in your cart.',
+      ar: 'أهلاً {name}، في سلتك {cartItems} بقيمة {cartTotal} ج.م.',
     },
   },
   cart_abandoned_step2: {
@@ -220,11 +235,11 @@ export const PUSH_TEMPLATES: Record<NotificationEvent, PushTemplate> = {
   back_in_stock: {
     title: {
       en: 'Back in Stock!',
-      ar: 'رجع تاني!',
+      ar: 'رجّعنا المنتج تاني!',
     },
     body: {
       en: 'Hi {name}, "{productName}" is now available again at {storeName}.',
-      ar: 'أهلاً {name}، "{productName}" رجع تاني في {storeName}.',
+      ar: 'أهلاً {name}، رجّعنا "{productName}" تاني في {storeName}.',
     },
   },
 };

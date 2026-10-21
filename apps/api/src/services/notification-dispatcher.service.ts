@@ -269,7 +269,7 @@ class NotificationDispatcherService {
       try {
         const smsTemplate = SMS_TEMPLATES[event];
         const locale = await resolveShopperLocale(storeId, data.locale);
-        let messageText = renderSmsTemplate(smsTemplate[locale], data);
+        let messageText = renderSmsTemplate(smsTemplate[locale], data, locale);
         // Every promotional SMS carries its own opt-out link (issue 206).
         if (consentId) {
           messageText += ` ${SMS_OPT_OUT_LABEL[locale]}: ${await smsOptOutUrl(storeId, consentId)}`;
@@ -311,7 +311,7 @@ class NotificationDispatcherService {
         const pushTemplate = PUSH_TEMPLATES[event];
         const locale = await resolveShopperLocale(storeId, data.locale);
         const title = pushTemplate.title[locale];
-        const body = renderPushBody(pushTemplate.body[locale], data);
+        const body = renderPushBody(pushTemplate.body[locale], data, locale);
 
         await pushService.sendToStore(storeId, title, body, {
           event,
@@ -335,10 +335,7 @@ class NotificationDispatcherService {
  * (`data.locale`), else the store's `settings.defaultLanguage`, else the region default (`ar`
  * for Egypt). Never throws: a failed store read falls back to the region default.
  */
-export async function resolveShopperLocale(
-  storeId: string,
-  stored: unknown
-): Promise<'en' | 'ar'> {
+export async function resolveShopperLocale(storeId: string, stored: unknown): Promise<'en' | 'ar'> {
   if (stored === 'en' || stored === 'ar') return stored;
   try {
     const store = await withStore(storeId, tx =>
@@ -429,15 +426,9 @@ async function smsOptOutUrl(storeId: string, consentId: string): Promise<string>
 /**
  * Renders a push body template with the same variable substitution used by SMS.
  */
-function renderPushBody(template: string, data: NotificationData): string {
-  return template
-    .replace('{name}', data.customerName)
-    .replace('#{number}', `#${data.orderNumber}`)
-    .replace('{number}', data.orderNumber)
-    .replace('{total}', data.total !== undefined ? data.total.toFixed(2) : '')
-    .replace('{tracking}', data.trackingNumber ?? '')
-    .replace('{reason}', data.reason ?? '')
-    .replace('{amount}', data.amount !== undefined ? data.amount.toFixed(2) : '');
+function renderPushBody(template: string, data: NotificationData, locale: 'en' | 'ar'): string {
+  // Same placeholder set as SMS ({productName}, {storeName}, {cartTotal}, {cartItems}, ...).
+  return renderSmsTemplate(template, data, locale);
 }
 
 // Singleton instance
