@@ -289,3 +289,13 @@ describe('no Tailwind orange in the storefront (Ahmad 2026-10-16)', () => {
     expect(hits.map(f => path.relative(WEB, f))).toEqual([]);
   });
 });
+
+describe('(P2) STOP-2 cart and checkout copy and states', () => {
+  it('an empty cart says "your cart is empty" once: the h1 is screen-reader only, Egyptian copy', () => {
+    const c = src('app/cart/CartClient.tsx');
+    expect(c).toMatch(/cartBundles\.length === 0 \? ' sr-only'/);
+    expect(c).toContain('سلتك فاضية');
+    expect(c).not.toContain('سلة التسوق فارغة');
+    expect(c).not.toContain('يبدو أنك لم تضف');
+  });
+});

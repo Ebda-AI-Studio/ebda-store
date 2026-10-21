@@ -443,8 +443,12 @@ export default function CartClient() {
             ]}
           />
 
+          {/* STOP-2 P2-2: an empty cart says "your cart is empty" once. The page still has its h1
+              (for screen readers); the visible heading is the empty state's own. */}
           <h1
-            className="text-3xl font-bold tracking-tight text-foreground"
+            className={`text-3xl font-bold tracking-tight text-foreground${
+              cartItems.length === 0 && cartBundles.length === 0 ? ' sr-only' : ''
+            }`}
             style={cartZoneStyle(cartHeadingZone)}
           >
             {t('Shopping cart', '\u0633\u0644\u0629 \u0627\u0644\u062a\u0633\u0648\u0642')}
@@ -474,9 +478,9 @@ export default function CartClient() {
               <div className="mt-16">
                 <T.EmptyState
                   title="Your cart is empty"
-                  titleAr="سلة التسوق فارغة"
+                  titleAr="سلتك فاضية"
                   description="Looks like you haven't added any items yet."
-                  descriptionAr="يبدو أنك لم تضف أي منتجات بعد."
+                  descriptionAr="لسه ما ضفتش أي منتج."
                   ctaLabel="Start shopping"
                   ctaLabelAr="ابدأ التسوق"
                   ctaHref={storeUrl('/products')}
@@ -489,16 +493,10 @@ export default function CartClient() {
                   <CartIcon className="h-16 w-16 text-muted-foreground" strokeWidth={1} />
                 </div>
                 <h2 className="text-2xl font-bold text-foreground">
-                  {t(
-                    'Your cart is empty',
-                    '\u0633\u0644\u0629 \u0627\u0644\u062a\u0633\u0648\u0642 \u0641\u0627\u0631\u063a\u0629'
-                  )}
+                  {t('Your cart is empty', 'سلتك فاضية')}
                 </h2>
                 <p className="mt-2 text-muted-foreground">
-                  {t(
-                    "Looks like you haven't added any items yet.",
-                    '\u064a\u0628\u062f\u0648 \u0623\u0646\u0643 \u0644\u0645 \u062a\u0636\u0641 \u0623\u064a \u0645\u0646\u062a\u062c\u0627\u062a \u0628\u0639\u062f.'
-                  )}
+                  {t("Looks like you haven't added any items yet.", 'لسه ما ضفتش أي منتج.')}
                 </p>
                 <Link href={storeUrl('/products')} className="inline-block">
                   <Button className="mt-8 gap-2 rounded-[var(--radius)]" size="lg">
