@@ -455,15 +455,17 @@ export class PasskeyService {
     onFailure?: (reason: string, userId?: string) => void,
     meta: { ip?: string } = {}
   ) {
-    let knownUserId: string | undefined;
-    let lockoutKey: string | undefined;
+    // Filled in as the account becomes known; read by the failure helpers below.
+    const known: { userId?: string; lockoutKey?: string } = {};
     const fail = async (reason: string): Promise<never> => {
-      onFailure?.(reason, knownUserId);
+      onFailure?.(reason, known.userId);
       throw authFailed();
     };
     // After the account is identified, a failure also counts against its (shared) lockout budget.
     const failKnown = async (reason: string): Promise<never> => {
-      if (lockoutKey) await loginGate.recordFailure(lockoutKey, meta.ip).catch(() => undefined);
+      if (known.lockoutKey) {
+        await loginGate.recordFailure(known.lockoutKey, meta.ip).catch(() => undefined);
+      }
       return fail(reason);
     };
 
@@ -483,7 +485,7 @@ export class PasskeyService {
 
     const stored = typeof response.id === 'string' ? await passkeyLookup(response.id) : null;
     if (!stored) return fail('unknown_credential');
-    knownUserId = stored.userId;
+    known.userId = stored.userId;
     if (stored.rpId !== record.rpId) return fail('rp_mismatch');
 
     const user = await withUser(stored.userId, tx =>
@@ -504,7 +506,8 @@ export class PasskeyService {
       })
     );
     if (!user) return fail('account');
-    lockoutKey = loginGate.lockoutKey(user.email, user.storeId);
+    const lockoutKey = loginGate.lockoutKey(user.email, user.storeId);
+    known.lockoutKey = lockoutKey;
     try {
       await loginGate.assertNotLocked(lockoutKey);
     } catch {
