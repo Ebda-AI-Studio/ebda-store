@@ -2,7 +2,15 @@ import Link from 'next/link';
 import { BRAND } from '@ebda/shared/brand';
 import { COPY } from '../lib/content';
 import { CookieSettingsButton } from './CookieSettingsButton';
-import { SECURITY_EMAIL, pagePath, type Locale } from '../lib/site';
+import { COMPARE } from '../lib/compare';
+import { FEATURES_PAGE } from '../lib/capabilities';
+import {
+  COMPARE_PAGES,
+  SECURITY_EMAIL,
+  pagePath,
+  type CompareSlug,
+  type Locale,
+} from '../lib/site';
 
 export function Footer({ locale }: { locale: Locale }) {
   const c = COPY[locale].footer;
@@ -34,6 +42,16 @@ export function Footer({ locale }: { locale: Locale }) {
         </div>
         <nav aria-label={c.legalNav}>
           <ul className="footer-links">
+            <li>
+              <Link href={pagePath(locale, 'features')}>{FEATURES_PAGE[locale].title}</Link>
+            </li>
+            {COMPARE_PAGES.map(page => (
+              <li key={page}>
+                <Link href={pagePath(locale, page)}>
+                  {COMPARE[page.split('/')[1] as CompareSlug][locale].linkText}
+                </Link>
+              </li>
+            ))}
             <li>
               <Link href={pagePath(locale, 'about')}>{c.about}</Link>
             </li>
