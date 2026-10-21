@@ -131,7 +131,7 @@ export default function WebhooksPage() {
     setFormError(null);
     const body = {
       url: form.url.trim(),
-      description: form.description.trim() || (editing ? null : undefined),
+      description: form.description.trim() || null,
       events: form.events,
       includeCustomer: form.includeCustomer,
     };
@@ -465,7 +465,7 @@ export default function WebhooksPage() {
             </span>
           </label>
           {formError ? (
-            <p className="text-xs text-destructive" role="alert" dir="auto">
+            <p className="text-xs text-foreground" role="alert" dir="auto">
               {formError}
             </p>
           ) : null}
@@ -622,7 +622,7 @@ export default function WebhooksPage() {
                       d.status === 'success'
                         ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300'
                         : d.status === 'failed'
-                          ? 'bg-destructive/10 text-destructive'
+                          ? 'border border-destructive/40 bg-destructive/5 text-foreground'
                           : 'bg-muted text-muted-foreground'
                     }`}
                     dir="auto"

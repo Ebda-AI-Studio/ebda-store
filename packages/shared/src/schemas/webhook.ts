@@ -90,7 +90,7 @@ const eventsSchema = z
 export const webhookEndpointCreateSchema = z
   .object({
     url: urlSchema,
-    description: z.string().trim().max(120).optional(),
+    description: z.string().trim().max(120).nullable().optional(),
     events: eventsSchema,
     includeCustomer: z.boolean().default(false),
   })
