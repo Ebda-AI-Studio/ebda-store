@@ -836,6 +836,7 @@ describe('users / addresses / store_staff: identity-keyed policies', () => {
  */
 const PURE_IMMUTABLE_EBDA_FNS = new Set([
   'ebda_ar_norm',
+  'ebda_digits', // search P2 Task 15 (migration 20261027000100): digit-only phone fold
   'ebda_product_search_doc',
   'ebda_product_name_doc',
   'ebda_product_embed_doc', // search P1 Task 9 (migration 20261022000100): the embedding input
