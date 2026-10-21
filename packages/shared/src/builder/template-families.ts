@@ -262,6 +262,8 @@ export function applyTemplateFamily(
   const source = documentForLook(current, look);
   let doc: PageDefinition = { ...source, sections: [] };
   const pool = [...source.sections];
+  // ids of sections created in THIS application (never deduplicated against each other)
+  const fresh = new Set<string>();
   for (const spec of specs) {
     const d = getSectionDefinition(spec.type);
     if (!d || d.group !== 'template') continue; // header/footer stay as the store has them
@@ -285,7 +287,8 @@ export function applyTemplateFamily(
         ? all.filter((n, i) => {
             const idx = nth + i;
             if (i === 0 || idx >= outSpecs.length) return true;
-            return opts.design === 'keep' && editedSinceLook(n, opts, idx);
+            // a merchant-EDITED surplus section always stays (reset is design-only, like keep)
+            return editedSinceLook(n, opts, idx);
           })
         : all.slice(0, 1);
     // When either mix repeats this type, "the nth section" is a position, not an identity: an
@@ -299,9 +302,22 @@ export function applyTemplateFamily(
       existing = existing.filter(n => !stale.includes(n));
     }
     if (existing.length === 0) {
-      const fresh = sectionFromPreset(spec.type, 0, uniqueSectionId(doc, spec.type));
-      fresh.settings = { ...fresh.settings, ...(spec.preset ?? {}), ...incoming };
-      doc = { ...doc, sections: [...doc.sections, fresh] };
+      // A section the switch already carried over with the SAME product source as this spec's
+      // preset (an edited deals carousel that took another slot by position) is not added twice.
+      const src = (spec.preset as { productSource?: unknown } | undefined)?.productSource;
+      if (
+        src !== undefined &&
+        src !== 'manual' && // hand-picked / category rows legitimately repeat
+        src !== 'category' &&
+        doc.sections.some(
+          x => !fresh.has(x.id) && x.type === spec.type && x.settings.productSource === src
+        )
+      )
+        continue;
+      const freshNode = sectionFromPreset(spec.type, 0, uniqueSectionId(doc, spec.type));
+      freshNode.settings = { ...freshNode.settings, ...(spec.preset ?? {}), ...incoming };
+      fresh.add(freshNode.id);
+      doc = { ...doc, sections: [...doc.sections, freshNode] };
       continue;
     }
     for (const n of existing) {

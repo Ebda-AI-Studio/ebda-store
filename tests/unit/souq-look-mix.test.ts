@@ -349,6 +349,41 @@ describe('look switch keeps content and does not leak design (TPL-1)', () => {
   });
 });
 
+describe('merchant-edited surplus sections (B2-16)', () => {
+  const editDeals = (doc: PageDefinition) => ({
+    ...doc,
+    sections: doc.sections.map(n =>
+      n.type === 'product-carousel' && n.settings.productSource === 'on_sale'
+        ? {
+            ...n,
+            settings: { ...n.settings, title: 'عروض الجمعة', titleAr: 'عروض الجمعة', limit: 5 },
+          }
+        : n
+    ),
+  });
+  for (const design of ['keep', 'reset'] as const)
+    it(`Night -> Catalogue (${design}): an edited extra carousel keeps its title and limit`, () => {
+      const onNight = editDeals(applyTemplateFamily(merchantBase(), 'souq', night));
+      const doc = applyTemplateFamily(onNight, 'souq', catalogue, { from: night, design });
+      const carousels = all(doc, 'product-carousel');
+      expect(
+        carousels.some(c => c.settings.titleAr === 'عروض الجمعة' && c.settings.limit === 5)
+      ).toBe(true);
+      // the untouched curated seed (Night-only) leaves; the edited one stays exactly once
+      expect(carousels).toHaveLength(1);
+      expect(validateDefinitionSync(doc).ok).toBe(true);
+    });
+  it('round trip Night -> Catalogue -> Night never ends with two on_sale rows', () => {
+    const onNight = editDeals(applyTemplateFamily(merchantBase(), 'souq', night));
+    const toCat = applyTemplateFamily(onNight, 'souq', catalogue, { from: night, design: 'keep' });
+    const back = applyTemplateFamily(toCat, 'souq', night, { from: catalogue, design: 'keep' });
+    const sale = all(back, 'product-carousel').filter(c => c.settings.productSource === 'on_sale');
+    expect(sale).toHaveLength(1);
+    expect(sale[0].settings.titleAr).toBe('عروض الجمعة');
+    expect(sale[0].settings.limit).toBe(5);
+  });
+});
+
 describe('lookTag selects only its own look at render', () => {
   it('a hero / stage tagged for another Souq look is left out; untagged always stay', () => {
     const doc = applyTemplateFamily(merchantBase(), 'souq', night);
