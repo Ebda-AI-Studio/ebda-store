@@ -2,9 +2,9 @@
 
 import { ModeButton } from './ModeButton';
 
-export type CategoryLayoutValue = 'grid' | 'horizontal' | 'chips';
+export type CategoryLayoutValue = 'grid' | 'horizontal' | 'chips' | 'rail' | 'tiles';
 
-/** Grid / scrolling row / text chips: one button per layout, the stored value selected. */
+/** Grid / scrolling row / text chips / image rail / square tiles: one button per layout (3 per row). */
 export function CategoryLayoutButtons({
   value,
   onChange,
@@ -30,6 +30,16 @@ export function CategoryLayoutButtons({
         active={value === 'chips'}
         onClick={() => onChange('chips')}
         label={t('sections.categories.layoutChips')}
+      />
+      <ModeButton
+        active={value === 'rail'}
+        onClick={() => onChange('rail')}
+        label={t('sections.categories.layoutRail')}
+      />
+      <ModeButton
+        active={value === 'tiles'}
+        onClick={() => onChange('tiles')}
+        label={t('sections.categories.layoutTiles')}
       />
     </div>
   );

@@ -5,7 +5,7 @@
  * photograph beside a short list of products ("Gift ideas"). The image side
  * is logical (start = right in Arabic). Products resolve like the grids.
  */
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import type { SectionPaddingMaxWidthVisibility } from '@ebda/shared';
@@ -16,6 +16,10 @@ import { useLocalePrice } from '../../hooks/useLocalePrice';
 import { sectionBgStyle } from '../../templates/shared/section-bg';
 import { sectionSpacingClasses } from '../../templates/shared/section-spacing';
 import { getProductPricing } from '../../lib/product-pricing';
+import { canBuyNow } from '../../lib/can-buy-now';
+import { isInCompareList, toggleCompare } from '../../lib/compare';
+import { FactChips } from '../../components/commerce/FactChips';
+import { soldOutLabel } from '../../templates/shared/ProductCardCta';
 import type { TemplateProduct } from '../../templates/types';
 import type { SectionProductRefs } from './section-products';
 
@@ -30,6 +34,8 @@ export interface ProductSpotlightSettings
   body?: string;
   bodyAr?: string;
   imagePosition?: 'start' | 'end';
+  /** `stage` = ONE product on a large object-contain tile (Phase B2); absent/`list` = photo + list. */
+  layout?: 'list' | 'stage';
   buttonText?: string;
   buttonTextAr?: string;
   buttonLink?: string;
@@ -37,6 +43,183 @@ export interface ProductSpotlightSettings
 }
 
 export function ProductSpotlightSection({
+  settings,
+  products,
+  editorMode = false,
+  onAddToCart,
+}: {
+  settings: ProductSpotlightSettings;
+  products: TemplateProduct[];
+  editorMode?: boolean;
+  /** The stage's add control (the same handler every card path gets). Absent = view link only. */
+  onAddToCart?: (productId: string) => Promise<void>;
+}) {
+  if (settings.layout === 'stage') {
+    return (
+      <SpotlightStage
+        settings={settings}
+        product={products[0]}
+        editorMode={editorMode}
+        onAddToCart={onAddToCart}
+      />
+    );
+  }
+  return <SpotlightList settings={settings} products={products} editorMode={editorMode} />;
+}
+
+/**
+ * `layout: 'stage'` (Phase B2, Souq Showroom): ONE product per screen. A large `object-contain`
+ * image on the surface token (a cut-out is never cropped), the name, at most the product's two
+ * `onCard` facts as one line, the price through the shared helper with a struck compare-at, and
+ * the add control reading `canBuyNow` (a variant product routes to its PDP for options, the
+ * card-CTA rule). The compare toggle lives here and on the PLP/compare page only (Ruling B2-6).
+ * Sold out shows the shared label and stays linkable. No product for the ref renders NOTHING.
+ */
+function SpotlightStage({
+  settings,
+  product,
+  editorMode,
+  onAddToCart,
+}: {
+  settings: ProductSpotlightSettings;
+  product: TemplateProduct | undefined;
+  editorMode: boolean;
+  onAddToCart?: (productId: string) => Promise<void>;
+}) {
+  const { store } = useStore();
+  const { language, t } = useLanguage();
+  const storeUrl = useStoreUrl();
+  const formatPrice = useLocalePrice();
+  const ar = language === 'ar';
+  const spacing = sectionSpacingClasses(settings, store.look);
+  const [inCompare, setInCompare] = useState(false);
+  const [adding, setAdding] = useState(false);
+  useEffect(() => {
+    if (product) setInCompare(isInCompareList(product.id));
+  }, [product]);
+  if (!product) return null;
+  const heading =
+    (ar ? settings.headingAr || settings.heading : settings.heading || settings.headingAr) || '';
+  const name = (ar && product.nameAr ? product.nameAr : product.name) || '';
+  const pricing = getProductPricing(product, undefined, 'card');
+  const hasVariants = (product.variants?.length ?? 0) > 0;
+  const buyable = canBuyNow(product);
+  const href = storeUrl(`/products/${product.slug}`);
+  const image = product.images?.[0]?.url;
+  const edit = (key: string): Record<string, string> | undefined =>
+    editorMode ? { 'data-builder-setting': ar ? `${key}Ar` : key } : undefined;
+  const onCompare = () => {
+    const r = toggleCompare({
+      id: product.id,
+      name: product.name,
+      slug: product.slug,
+      price: product.price,
+      compareAtPrice: product.compareAtPrice ?? undefined,
+      images: product.images?.map(i => i.url) ?? [],
+      facts: product.facts,
+    });
+    if (r !== 'max_reached') setInCompare(r === 'added');
+  };
+  return (
+    <section
+      data-section="product-spotlight"
+      data-layout="stage"
+      className={`bg-[hsl(var(--bg-section-alt))] ${spacing.wrapperClass}`}
+      style={sectionBgStyle(settings.bgColor, store.theme)}
+    >
+      <div
+        className={`${spacing.innerContainerClass} grid max-h-[min(78svh,680px)] items-center gap-6 overflow-hidden md:grid-cols-2 md:gap-10`}
+      >
+        <Link
+          href={href}
+          aria-label={name}
+          className="relative block aspect-square min-h-11 max-h-[min(78svh,680px)] w-full overflow-hidden rounded-[var(--radius)] bg-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+        >
+          {image && (
+            <Image
+              src={image}
+              alt=""
+              fill
+              sizes="(min-width: 768px) 50vw, 100vw"
+              className="object-contain p-6"
+              priority
+            />
+          )}
+        </Link>
+        <div className="min-w-0">
+          {heading && (
+            <p className="text-sm font-medium text-muted-foreground" {...edit('heading')}>
+              {heading}
+            </p>
+          )}
+          <h2 className="mt-1 font-display text-[clamp(1.5rem,1.1rem+1.4vw,2.25rem)] leading-tight text-foreground rtl:leading-[1.45]">
+            <Link
+              href={href}
+              className="inline-flex min-h-11 items-center hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+            >
+              {name}
+            </Link>
+          </h2>
+          <FactChips product={product} className="mt-3" />
+          <p className="mt-4 flex flex-wrap items-baseline gap-x-3 text-xl font-semibold tabular-nums text-foreground">
+            <span>
+              {pricing.mode === 'fromMin' ? `${t('From', 'من')} ` : ''}
+              {formatPrice(pricing.displayPrice)}
+            </span>
+            {pricing.displayCompare !== null && (
+              <s className="text-base font-normal text-muted-foreground">
+                {formatPrice(pricing.displayCompare)}
+              </s>
+            )}
+          </p>
+          {!buyable && (
+            <p className="mt-2 text-sm font-medium text-muted-foreground">{soldOutLabel(ar)}</p>
+          )}
+          <div className="mt-6 flex flex-wrap items-center gap-3">
+            {buyable && !hasVariants && onAddToCart ? (
+              <button
+                type="button"
+                disabled={adding}
+                onClick={async () => {
+                  setAdding(true);
+                  try {
+                    await onAddToCart(product.id);
+                  } finally {
+                    setAdding(false);
+                  }
+                }}
+                className="inline-flex min-h-11 items-center justify-center rounded-[var(--radius)] bg-primary px-6 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              >
+                {t('Add to cart', 'إضافة للسلة')}
+              </button>
+            ) : (
+              <Link
+                href={href}
+                className="inline-flex min-h-11 items-center justify-center rounded-[var(--radius)] bg-primary px-6 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              >
+                {hasVariants && buyable ? t('Choose options', 'اختيار الخيارات') : t('View', 'عرض')}
+              </Link>
+            )}
+            <button
+              type="button"
+              aria-pressed={inCompare}
+              onClick={onCompare}
+              className={`inline-flex min-h-11 min-w-11 items-center justify-center rounded-[var(--radius)] border px-4 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
+                inCompare
+                  ? 'border-primary bg-primary text-primary-foreground'
+                  : 'border-input text-foreground hover:border-primary'
+              }`}
+            >
+              {t('Compare', 'قارن')}
+            </button>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function SpotlightList({
   settings,
   products,
   editorMode = false,

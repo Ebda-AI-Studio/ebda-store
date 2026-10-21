@@ -40,9 +40,11 @@ import {
 import { TrustBadgesSection, type TrustBadgesSettings } from '../sections/TrustBadgesSection';
 import { ShopTheLookSection, type ShopTheLookSettings } from '../sections/ShopTheLookSection';
 import { HeroCollage } from '../../templates/shared/HeroCollage';
-import { resolveSectionProducts } from '../sections/section-products';
+import { resolveSectionProducts, onSaleProducts } from '../sections/section-products';
 import { sectionBgStyle } from '../../templates/shared/section-bg';
 import { CategoryChips } from '../../templates/shared/CategoryChips';
+import { CategoryRail } from '../../templates/shared/CategoryRail';
+import { CategoryTiles } from '../../templates/shared/CategoryTiles';
 import {
   sectionSpacingClasses,
   sectionVisibilityClass,
@@ -587,8 +589,8 @@ export function PageRenderer({
                       renderGrid(caption, vis)
                     );
                   const kindFor = (lay: typeof layout.categories.layout) =>
-                    lay === 'chips'
-                      ? 'chips'
+                    lay === 'chips' || lay === 'rail' || lay === 'tiles'
+                      ? lay
                       : lay === 'horizontal' && T.CategoryStrip
                         ? 'strip'
                         : 'grid';
@@ -600,11 +602,25 @@ export function PageRenderer({
                   const mobileCaption =
                     layout.categories.captionPositionMobile ?? layout.categories.captionPosition;
                   const renderKind = (
-                    kind: 'strip' | 'grid' | 'chips',
+                    kind: 'strip' | 'grid' | 'chips' | 'rail' | 'tiles',
                     caption: Caption,
                     vis?: string
                   ) =>
-                    kind === 'chips' ? (
+                    kind === 'rail' ? (
+                      <div className={vis}>
+                        <CategoryRail {...common} captionPosition={caption} pack={templateId} />
+                      </div>
+                    ) : kind === 'tiles' ? (
+                      <div className={vis}>
+                        <CategoryTiles
+                          {...common}
+                          captionPosition={caption}
+                          pack={templateId}
+                          mobileColumns={layout.categories.mobileColumns}
+                          desktopColumns={layout.categories.desktopColumns}
+                        />
+                      </div>
+                    ) : kind === 'chips' ? (
                       <div className={vis}>
                         <CategoryChips
                           categories={common.categories}
@@ -1014,6 +1030,10 @@ export function PageRenderer({
             sourceProducts = templateBestSellers;
           } else if (extra.productSource === 'featured') {
             sourceProducts = templateProducts;
+          } else if (extra.productSource === 'on_sale') {
+            // Deals row: biggest drop first; an empty match renders nothing (below), never a
+            // fallback to unrelated products.
+            sourceProducts = onSaleProducts(allRawProducts).map(toTemplateProduct);
           } else if (extra.productSource === 'category' && extra.categorySlug) {
             const slug = extra.categorySlug.toLowerCase();
             const matched = allRawProducts.filter(p =>
@@ -1154,9 +1174,11 @@ export function PageRenderer({
                   products={resolveSectionProducts(
                     settings as ProductSpotlightSettings,
                     pools,
-                    3
+                    // A stage shows exactly one product; the list shows up to three.
+                    (settings as ProductSpotlightSettings).layout === 'stage' ? 1 : 3
                   ).map(toTemplateProduct)}
                   editorMode={editorMode}
+                  onAddToCart={handleAddToCart}
                 />
               ) : def.type === 'shop-the-look' ? (
                 <ShopTheLookSection

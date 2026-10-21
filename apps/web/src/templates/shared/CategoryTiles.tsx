@@ -1,0 +1,133 @@
+'use client';
+import Image from 'next/image';
+import Link from 'next/link';
+import { useStore } from '../../contexts/StoreContext';
+import { SectionHeading } from './SectionHeading';
+import { pickLocalizedName } from './display-helpers';
+import type { CategoryStripProps } from '../types';
+
+const MOBILE_COLS: Record<number, string> = {
+  1: 'grid-cols-1',
+  2: 'grid-cols-2',
+  3: 'grid-cols-3',
+};
+const DESKTOP_COLS: Record<number, string> = {
+  2: 'md:grid-cols-2',
+  3: 'md:grid-cols-3',
+  4: 'md:grid-cols-4',
+};
+
+/**
+ * Category tiles (`category-grid` layout `tiles`, Phase B2, Souq Night souq): bold SQUARE tiles.
+ * A category photo is shown whole (`object-contain` cut-out on the surface token); a category
+ * with no photo renders a typographic tile (its name in the display face) instead of a blank
+ * square. `captionPosition` is honoured: `below` puts the name under the tile, `overlay` on a
+ * solid page-colour band at the tile's bottom edge (token colours only, always readable).
+ */
+export function CategoryTiles({
+  categories,
+  title,
+  titleAr,
+  kicker,
+  kickerAr,
+  subtitle,
+  subtitleAr,
+  showKickerLines,
+  showSubtitleLines,
+  dividers,
+  seeAllHref,
+  isRtl,
+  urlPrefix = '',
+  pack,
+  headingZone,
+  kickerZone,
+  subtitleZone,
+  seeAllZone,
+  sectionBgColor,
+  captionPosition = 'below',
+  mobileColumns = 2,
+  desktopColumns = 4,
+}: CategoryStripProps & { mobileColumns?: number; desktopColumns?: number }) {
+  const { store } = useStore();
+  if (!categories || categories.length === 0) return null;
+  const overlay = captionPosition === 'overlay';
+  return (
+    <section
+      className="px-4 sm:px-6 lg:px-8"
+      dir={isRtl ? 'rtl' : 'ltr'}
+      data-zone="categories"
+      data-section="category-tiles"
+    >
+      <div className="mx-auto max-w-7xl">
+        <SectionHeading
+          title={title}
+          titleAr={titleAr}
+          kicker={kicker}
+          kickerAr={kickerAr}
+          subtitle={subtitle}
+          subtitleAr={subtitleAr}
+          showKickerLines={showKickerLines}
+          showSubtitleLines={showSubtitleLines}
+          dividers={dividers}
+          isRtl={isRtl}
+          seeAllHref={seeAllHref}
+          pack={pack}
+          headingZone={headingZone}
+          kickerZone={kickerZone}
+          subtitleZone={subtitleZone}
+          seeAllZone={seeAllZone}
+          sectionBgColor={store?.look ? sectionBgColor : undefined}
+        />
+        <nav aria-label={isRtl ? 'الأقسام' : 'Categories'}>
+          <ul
+            className={`grid gap-3 ${MOBILE_COLS[mobileColumns] ?? 'grid-cols-2'} ${DESKTOP_COLS[desktopColumns] ?? 'md:grid-cols-4'}`}
+          >
+            {categories.map(c => {
+              const name = pickLocalizedName(c, Boolean(isRtl)) ?? c.name;
+              return (
+                <li key={c.id}>
+                  <Link
+                    href={`${urlPrefix}/products?category=${encodeURIComponent(c.slug ?? c.id)}`}
+                    className="group flex min-h-11 flex-col gap-2 rounded-[var(--radius)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                  >
+                    <span
+                      className="relative block aspect-square w-full overflow-hidden rounded-[var(--radius)] bg-card"
+                      data-part="tile"
+                    >
+                      {c.image ? (
+                        <Image
+                          src={c.image}
+                          alt=""
+                          fill
+                          sizes="(min-width: 768px) 25vw, 50vw"
+                          className="object-contain p-3"
+                        />
+                      ) : (
+                        <span
+                          data-part="typographic"
+                          className="flex h-full w-full items-center justify-center p-3 text-center font-display text-xl leading-snug text-foreground sm:text-2xl"
+                        >
+                          {name}
+                        </span>
+                      )}
+                      {overlay && c.image && (
+                        <span className="absolute inset-x-0 bottom-0 bg-background px-3 py-2 text-sm font-medium leading-snug text-foreground">
+                          {name}
+                        </span>
+                      )}
+                    </span>
+                    {!overlay && c.image && (
+                      <span className="line-clamp-2 text-sm font-medium leading-snug text-foreground">
+                        {name}
+                      </span>
+                    )}
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+        </nav>
+      </div>
+    </section>
+  );
+}
