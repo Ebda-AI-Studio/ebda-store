@@ -214,6 +214,18 @@ describe('fan-out', () => {
     );
     expect(by('e2').customer).toEqual({ name: 'A', email: 'a@x.co', phone: '1' });
   });
+  it('I2: the event id is derived from the stable source key: the same event gets the same id on every endpoint and every re-fan-out', async () => {
+    db.endpoints = [ep(), ep({ id: 'e2' })];
+    await fanoutWebhookEvent('s1', ev);
+    const ids = db.deliveries.map(d => d.eventId);
+    expect(new Set(ids).size).toBe(1);
+    db.deliveries = [];
+    await fanoutWebhookEvent('s1', ev);
+    expect(db.deliveries.map(d => d.eventId)).toEqual([ids[0], ids[0]]);
+    await fanoutWebhookEvent('s1', { ...ev, dedupeKey: 'order.created:o2' });
+    expect(db.deliveries.at(-1)!.eventId).not.toBe(ids[0]);
+    expect(ids[0]).toMatch(/^evt_[0-9a-f]{32}$/);
+  });
   it('envelope is versioned with an evt_ id', async () => {
     await fanoutWebhookEvent('s1', ev);
     expect(db.deliveries[0].payload).toMatchObject({

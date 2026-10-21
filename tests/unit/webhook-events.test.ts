@@ -73,19 +73,52 @@ describe('source event -> webhook events', () => {
     );
     expect(e.type).toBe('order.status_changed');
   });
-  it('order/refunded carries partial and is keyed by the source event', async () => {
+  it('order/refunded carries partial and is keyed by the refund, not the source event', async () => {
     loaders.order.mockResolvedValue(order('refunded'));
     const [e] = await buildFanoutEvents(
       's1',
       'order/refunded',
-      { orderId: 'o1', partial: true },
+      { orderId: 'o1', partial: { items: [], refundKey: 'r9' } },
       'ev9'
     );
     expect(e).toMatchObject({
       type: 'order.refunded',
-      dedupeKey: 'order.refunded:o1:ev9',
+      dedupeKey: 'order.refunded:o1:partial:r9',
       data: { refund: { partial: true } },
     });
+  });
+  it('I2: a plumbing re-send of the same refund (new source event id, notify:false) gets the SAME dedupe key', async () => {
+    loaders.order.mockResolvedValue(order('refunded', 'refunded'));
+    const first = await buildFanoutEvents(
+      's1',
+      'order/refunded',
+      { orderId: 'o1', notify: true },
+      'ev-a'
+    );
+    const sweep = await buildFanoutEvents(
+      's1',
+      'order/refunded',
+      { orderId: 'o1', notify: false, restoreInventory: true },
+      'ev-b'
+    );
+    expect(sweep[0].dedupeKey).toBe(first[0].dedupeKey);
+    expect(first[0].dedupeKey).toBe('order.refunded:o1:full');
+  });
+  it('I2: partial refunds are keyed by their refundKey, so each distinct partial is its own event and a re-send is not', async () => {
+    loaders.order.mockResolvedValue(order('paid', 'delivered'));
+    const p = (refundKey: string, id: string) =>
+      buildFanoutEvents(
+        's1',
+        'order/refunded',
+        { orderId: 'o1', notify: false, partial: { items: [], refundKey } },
+        id
+      );
+    const [a1] = await p('ret-1', 'e1');
+    const [a2] = await p('ret-1', 'e2');
+    const [b] = await p('ret-2', 'e3');
+    expect(a1.dedupeKey).toBe(a2.dedupeKey);
+    expect(b.dedupeKey).not.toBe(a1.dedupeKey);
+    expect(a1.data.refund).toEqual({ partial: true });
   });
   it('product.upserted create/update and product.deleted', async () => {
     loaders.product.mockResolvedValue({ product: { id: 'p1' } });

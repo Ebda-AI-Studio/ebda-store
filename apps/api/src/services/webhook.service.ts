@@ -3,7 +3,7 @@
  * Plan: docs/plans/2026-10-21-merchant-webhooks.md. Every function runs in the AMBIENT tenant
  * (`runInTenantContext` / a request) and carries `storeId` at the top level of every where/data.
  */
-import { randomBytes, randomUUID } from 'node:crypto';
+import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { Prisma, prisma, runInTenantContext } from '@ebda/database';
 import {
   WEBHOOK_CONSECUTIVE_FAILURE_LIMIT,
@@ -48,6 +48,11 @@ export function shouldDisableEndpoint(consecutiveFailures: number): boolean {
 export function newWebhookSecret(): { secret: string; hint: string } {
   const secret = `${WEBHOOK_SECRET_PREFIX}${randomBytes(24).toString('hex')}`;
   return { secret, hint: secret.slice(-4) };
+}
+
+/** Same logical event, same id: on every endpoint, every re-fan-out, every plumbing re-send. */
+export function stableEventId(storeId: string, dedupeKey: string): string {
+  return `evt_${createHash('sha256').update(`${storeId}:${dedupeKey}`).digest('hex').slice(0, 32)}`;
 }
 
 export function buildEnvelope(a: {
@@ -106,7 +111,7 @@ export async function fanoutWebhookEvent(storeId: string, ev: FanoutEvent): Prom
   const created: string[] = [];
   for (const ep of endpoints) {
     if (existing.has(ep.id)) continue;
-    const eventId = `evt_${randomUUID()}`;
+    const eventId = stableEventId(storeId, ev.dedupeKey);
     const data =
       ep.includeCustomer && ev.customer ? { ...ev.data, customer: ev.customer } : ev.data;
     try {

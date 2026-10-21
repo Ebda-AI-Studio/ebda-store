@@ -21,6 +21,11 @@ export type SourceEventName =
  * not a property this consumer may assume (review I1). The caller waits and retries a bounded number
  * of times, then drops the event.
  */
+function refundIdentity(partial: unknown): string {
+  const key = (partial as { refundKey?: unknown } | null | undefined)?.refundKey;
+  return typeof key === 'string' && key ? `partial:${key}` : 'full';
+}
+
 export class SourceNotReadyError extends Error {
   constructor(what: string) {
     super(`webhook source not ready: ${what}`);
@@ -80,8 +85,11 @@ export async function buildFanoutEvents(
       return [
         {
           type: 'order.refunded',
-          dedupeKey: `order.refunded:${o.row.id}:${sourceEventId}`,
-          data: { ...o.data, refund: { partial: data.partial === true } },
+          // The refund's own identity, never the source event id: the stuck sweep re-sends
+          // `order/refunded` (notify:false) with a new event id, and the merchant must not see a
+          // second refund (review I2). A full refund is once per order; a partial carries a refundKey.
+          dedupeKey: `order.refunded:${o.row.id}:${refundIdentity(data.partial)}`,
+          data: { ...o.data, refund: { partial: !!data.partial } },
           customer: o.customer,
         },
       ];
