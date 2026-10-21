@@ -128,7 +128,7 @@ const ep = (o: Row = {}) => ({
 });
 
 beforeAll(async () => {
-  const { default: routes } = await import('@api/routes/webhook.routes');
+  const { default: routes } = await import('@api/routes/merchant-webhooks.routes');
   const { errorHandler } = await import('@api/middleware/error-handler');
   const server = express();
   server.use(express.json());

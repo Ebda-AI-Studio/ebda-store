@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 /**
  * Merchant OUTGOING webhooks: the contracts shared by the API
- * (`apps/api/src/routes/webhook.routes.ts`) and the admin page
+ * (`apps/api/src/routes/merchant-webhooks.routes.ts`) and the admin page
  * (`apps/admin/src/app/stores/[id]/webhooks`). Plan: docs/plans/2026-10-21-merchant-webhooks.md.
  * Receiver documentation: docs/developers/webhooks.md.
  */
@@ -58,9 +58,16 @@ export function webhookUrlShapeError(raw: string): string | null {
   }
   if (u.protocol !== 'https:') return 'https_required';
   if (u.username || u.password) return 'credentials_not_allowed';
-  const host = u.hostname.replace(/^\[|\]$/g, '');
-  if (host.includes(':') || /^\d+(\.\d+){0,3}$/.test(host)) return 'ip_literal_not_allowed';
+  // HTTPS on 443 only (the parser drops an explicit :443, so any remaining port is another one).
+  if (u.port) return 'port_not_allowed';
+  // `new URL` has already normalised numeric, octal and hex spellings (0x7f000001, 0177.0.0.1,
+  // 2130706433, 127.1 all become 127.0.0.1), so a plain dotted-quad test catches every IPv4 trick.
+  const host = u.hostname.replace(/^\[|\]$/g, '').replace(/\.$/, '');
+  if (host.includes(':') || /^\d+(\.\d+){0,3}$/.test(host) || /^0x[0-9a-f]+$/i.test(host))
+    return 'ip_literal_not_allowed';
   if (!host.includes('.')) return 'public_hostname_required';
+  if (/(^|\.)(localhost|local|internal|localdomain|home\.arpa)$/.test(host.toLowerCase()))
+    return 'internal_hostname_not_allowed';
   return null;
 }
 

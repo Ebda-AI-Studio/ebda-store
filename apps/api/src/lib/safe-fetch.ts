@@ -128,7 +128,14 @@ function isBlockedV4(ip: string): boolean {
 }
 
 function isBlockedV6(ip: string): boolean {
-  const s = ip.toLowerCase();
+  // Canonicalise first (the WHATWG parser compresses and lower-cases), so an expanded or oddly
+  // cased spelling of a blocked address cannot slip past the prefix checks below.
+  let s = ip.toLowerCase();
+  try {
+    s = new URL(`http://[${s}]/`).hostname.replace(/^\[|\]$/g, '');
+  } catch {
+    return true; // not a parseable IPv6 literal: block
+  }
   if (s === '::' || s === '::1') return true; // unspecified, loopback
   // IPv4-mapped, dotted form (::ffff:127.0.0.1)
   const dotted = s.match(/^::ffff:(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})$/);
@@ -144,6 +151,8 @@ function isBlockedV6(ip: string): boolean {
   if (/^fe[89ab]/.test(s)) return true;
   // fc00::/7 unique-local
   if (s.startsWith('fc') || s.startsWith('fd')) return true;
+  // ::/96 IPv4-compatible (::7f00:1 is 127.0.0.1), 100::/64 discard, 2001::/32 Teredo
+  if (s.startsWith('::') || s.startsWith('100::') || s.startsWith('2001:0:')) return true;
   // fec0::/10 site-local (deprecated, still routable on some networks), ff00::/8 multicast
   if (/^fe[c-f]/.test(s) || s.startsWith('ff')) return true;
   // NAT64 (64:ff9b::/96) and 6to4 (2002::/16) embed an IPv4 address: block rather than decode.

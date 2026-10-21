@@ -82,7 +82,17 @@ describe('SSRF guard (registration and send time)', () => {
     'fd00::1',
     'fe80::1',
     '::ffff:10.0.0.1',
+    '::ffff:a00:1',
     '64:ff9b::7f00:1',
+    'FD00::1',
+    '::7f00:1',
+    '0:0:0:0:0:0:0:1',
+    '2002:7f00:1::',
+    '100::1',
+    'fec0::1',
+    'ff02::1',
+    '0.0.0.0',
+    '2001:db8::1',
   ])('refuses a hostname that resolves to %s', async addr => {
     useResolver(async () => [{ address: addr }]);
     await expect(assertWebhookUrl('https://hooks.example.com/x')).rejects.toThrow(/SSRF_BLOCKED/);
@@ -159,5 +169,63 @@ describe('postWebhook', () => {
     });
     const r = await postWebhook({ ...base, fetchImpl: fetchImpl as unknown as typeof fetch });
     expect(r).toMatchObject({ ok: false, error: 'timeout' });
+  });
+});
+
+describe('every send goes through the guarded transport', () => {
+  it('no other network call exists in the webhook service or the Inngest functions', async () => {
+    const { readFileSync } = await import('node:fs');
+    const { resolve } = await import('node:path');
+    const root = resolve(__dirname, '../../apps/api/src');
+    for (const f of ['services/webhook.service.ts', 'lib/inngest/functions/webhook-delivery.ts']) {
+      const src = readFileSync(resolve(root, f), 'utf8');
+      expect(src, f).not.toMatch(/\bfetch\(|axios|undici|http\.request|https\.request/);
+    }
+    expect(readFileSync(resolve(root, 'services/webhook.service.ts'), 'utf8')).toContain(
+      'postWebhook('
+    );
+  });
+
+  it('a host that now resolves to a private address makes no connection (test-send and normal send share the path)', async () => {
+    useResolver(async () => [{ address: '::ffff:7f00:1' }]);
+    const fetchImpl = vi.fn();
+    const r = await postWebhook({ ...base, fetchImpl: fetchImpl as unknown as typeof fetch });
+    expect(r.ok).toBe(false);
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it('a redirect to a private literal, another port or a protocol-relative private host is never requested', async () => {
+    useResolver(pub);
+    for (const location of [
+      'http://169.254.169.254/',
+      'https://127.0.0.1/',
+      'https://hooks.example.com:8443/',
+      '//10.0.0.1/',
+    ]) {
+      const fetchImpl = vi.fn(
+        async () => new Response(null, { status: 307, headers: { location } })
+      );
+      const r = await postWebhook({ ...base, fetchImpl: fetchImpl as unknown as typeof fetch });
+      expect(r.error).toBe('redirect_not_followed');
+      expect(fetchImpl).toHaveBeenCalledTimes(1);
+    }
+  });
+
+  it('refuses a stored URL with credentials, a non-443 port or a hex IP at send time too', async () => {
+    useResolver(pub);
+    const fetchImpl = vi.fn();
+    for (const url of [
+      'https://u:p@hooks.example.com/x',
+      'https://hooks.example.com:8443/x',
+      'https://0x7f000001/',
+    ]) {
+      const r = await postWebhook({
+        ...base,
+        url,
+        fetchImpl: fetchImpl as unknown as typeof fetch,
+      });
+      expect(r.ok).toBe(false);
+    }
+    expect(fetchImpl).not.toHaveBeenCalled();
   });
 });
