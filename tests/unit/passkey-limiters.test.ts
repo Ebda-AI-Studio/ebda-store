@@ -8,6 +8,7 @@ import request from 'supertest';
 import {
   createPasskeyLimiter,
   createPasskeyStepUpLimiter,
+  passkeyBeginLimiterKey,
   passkeyLimiterKey,
   passkeyStepUpLimiterKey,
 } from '@api/middleware/security';
@@ -53,18 +54,41 @@ describe('passkey limiters', () => {
     }
   });
 
-  it('begin: 60 per 15 minutes per IP', async () => {
-    const a = appFor('begin');
-    for (let i = 0; i < 60; i++) {
-      expect(
-        (await request(a).post('/x').set('X-Forwarded-For', '198.51.100.30').send({ ok: true }))
-          .status
-      ).toBe(200);
-    }
-    expect(
-      (await request(a).post('/x').set('X-Forwarded-For', '198.51.100.30').send({ ok: true }))
-        .status
-    ).toBe(429);
+  describe('begin limiter (review M3): per store host + IP, 300 per 15 minutes', () => {
+    const req = (origin: string | undefined, ip = '203.0.113.9') =>
+      ({ ip, headers: { origin }, body: {} }) as never;
+
+    it('the same IP gets a separate bucket per store host', () => {
+      expect(passkeyBeginLimiterKey(req('https://a.ebda.app'))).not.toBe(
+        passkeyBeginLimiterKey(req('https://b.ebda.app'))
+      );
+      expect(passkeyBeginLimiterKey(req('https://a.ebda.app', '198.51.100.1'))).not.toBe(
+        passkeyBeginLimiterKey(req('https://a.ebda.app', '198.51.100.2'))
+      );
+      expect(passkeyBeginLimiterKey(req('https://a.ebda.app'))).toBe(
+        passkeyBeginLimiterKey(req('https://a.ebda.app'))
+      );
+    });
+
+    it('a missing or junk Origin does not break the key or open a new bucket per value length', () => {
+      expect(passkeyBeginLimiterKey(req(undefined))).toBe(passkeyBeginLimiterKey(req('not a url')));
+      expect(passkeyBeginLimiterKey(req('x'.repeat(5000))).length).toBeLessThan(200);
+    });
+
+    it('301st request from one IP to one store host is 429; another store host is untouched', async () => {
+      const a = express();
+      a.set('trust proxy', true);
+      a.post(
+        '/x',
+        createPasskeyLimiter('begin', { skip: () => false }),
+        (_q, r) => void r.json({})
+      );
+      const hit = (origin: string) =>
+        request(a).post('/x').set('X-Forwarded-For', '198.51.100.30').set('Origin', origin);
+      for (let i = 0; i < 300; i++) expect((await hit('https://a.ebda.app')).status).toBe(200);
+      expect((await hit('https://a.ebda.app')).status).toBe(429);
+      expect((await hit('https://b.ebda.app')).status).toBe(200);
+    });
   });
 
   describe('step-up limiter (review M2): keyed on the authenticated user, never on a body field', () => {

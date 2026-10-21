@@ -929,6 +929,21 @@ export function passkeyLimiterKey(req: Request): string {
   return `${ipKeyGenerator(req.ip ?? '')}-passkey`;
 }
 
+/**
+ * Sign-in start is cheap (one Redis write) and the real brute-force guard is the account lockout, so its
+ * bucket is generous and is split by store host (review M3): a mobile-carrier NAT full of shoppers of one
+ * store cannot lock out another store's shoppers, nor the admin.
+ */
+export function passkeyBeginLimiterKey(req: Request): string {
+  let host = 'none';
+  try {
+    host = new URL(String(req.headers?.origin ?? '')).host.toLowerCase().slice(0, 100) || 'none';
+  } catch {
+    host = 'none';
+  }
+  return `${ipKeyGenerator(req.ip ?? '')}-${host}-passkey-begin`;
+}
+
 export function createPasskeyLimiter(
   kind: 'begin' | 'finish',
   opts?: { skip?: (req: Request) => boolean }
@@ -936,7 +951,7 @@ export function createPasskeyLimiter(
   return rateLimit({
     store: makeRateLimitStore(rateLimitRedisClient, `passkey-${kind}`),
     windowMs: 15 * 60 * 1000,
-    max: kind === 'begin' ? 60 : 20,
+    max: kind === 'begin' ? 300 : 20,
     skipSuccessfulRequests: kind === 'finish',
     message: {
       success: false,
@@ -947,7 +962,7 @@ export function createPasskeyLimiter(
     // Same availability-over-strictness posture as authLimiter.
     passOnStoreError: true,
     skip: opts?.skip ?? skipForLoadTestOrTests,
-    keyGenerator: passkeyLimiterKey,
+    keyGenerator: kind === 'begin' ? passkeyBeginLimiterKey : passkeyLimiterKey,
   });
 }
 /**

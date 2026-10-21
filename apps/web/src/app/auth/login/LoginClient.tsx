@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useAuthFormSubmit } from '../../../hooks/useAuthFormSubmit';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
@@ -48,25 +48,27 @@ export default function LoginClient() {
     router.push(storeUrl(safeInternalPath(searchParams.get('redirect'), '/')));
   };
 
+  // Capability check only on load; the ceremony - and its /begin request - starts ON DEMAND (review M3),
+  // so merely opening this page costs the passkey limiter nothing.
   useEffect(() => {
-    if (!passkeysSupported()) return;
-    setCanUsePasskey(true);
-    // Conditional UI: the saved passkey shows up in the email field's autofill list; this settles only if
-    // the shopper picks it. The button below starts a normal prompt and replaces this one.
-    let live = true;
+    setCanUsePasskey(passkeysSupported());
+  }, []);
+
+  // Conditional UI: on the first focus of the email field the saved passkey is offered in the browser's
+  // autofill list; this settles only if the shopper picks it. The button below starts a normal prompt.
+  const conditionalStarted = useRef(false);
+  const startConditionalPasskey = () => {
+    if (conditionalStarted.current || !canUsePasskey) return;
+    conditionalStarted.current = true;
     void passkeyAutofillSupported().then(ok => {
-      if (!ok || !live) return;
+      if (!ok) return;
       loginWithPasskey(true)
-        .then(r => (r.success && live ? finishPasskeyLogin() : undefined))
+        .then(r => (r.success ? finishPasskeyLogin() : undefined))
         .catch(() => {
           /* cancelled or replaced: the password form is right there */
         });
     });
-    return () => {
-      live = false;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  };
 
   const handlePasskey = async () => {
     setPasskeyError('');
@@ -150,6 +152,7 @@ export default function LoginClient() {
                 )}
                 type="email"
                 autoComplete="username webauthn"
+                onFocus={startConditionalPasskey}
                 value={formData.email}
                 onChange={e => setFormData({ ...formData, email: e.target.value })}
                 required

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -55,24 +55,26 @@ export default function LoginPage() {
   }, [authLoading, isAuthenticated, router]);
 
   // Passkeys (Ruling PASSKEY-4: a passkey satisfies MFA, so there is no code step after it).
+  // Capability check only on load; the ceremony - and its /begin request - starts ON DEMAND (review M3),
+  // so a page load costs the passkey limiter nothing.
   const [canUsePasskey, setCanUsePasskey] = useState(false);
+  const conditionalStarted = useRef(false);
   useEffect(() => {
-    if (!passkeysSupported()) return;
-    setCanUsePasskey(true);
-    // Conditional UI: the browser offers the saved passkey in the email field's autofill list and this
-    // promise settles only if the person picks one. A newer ceremony (the button below) replaces it.
-    let live = true;
+    setCanUsePasskey(passkeysSupported());
+  }, []);
+
+  // Conditional UI: on the first focus of the email field the browser offers the saved passkey in its
+  // autofill list; the promise settles only if the person picks one. The button below replaces it.
+  function startConditionalPasskey() {
+    if (conditionalStarted.current || !canUsePasskey) return;
+    conditionalStarted.current = true;
     void passkeyAutofillSupported().then(ok => {
-      if (!ok || !live) return;
+      if (!ok) return;
       loginWithPasskey('conditional').catch(() => {
         /* cancelled, replaced, or not chosen: the password form is still right there */
       });
     });
-    return () => {
-      live = false;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }
 
   async function handlePasskey() {
     setError('');
@@ -323,6 +325,7 @@ export default function LoginPage() {
                 name="email"
                 type="email"
                 autoComplete="username webauthn"
+                onFocus={startConditionalPasskey}
                 required
                 value={email}
                 onChange={e => setEmail(e.target.value)}
