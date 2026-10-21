@@ -4,7 +4,6 @@ export {
   ORDER_SEARCH_CUSTOMER_ID_CAP,
   orderSearchIds,
   orderSearchIdsSql,
-  guestOrderIdsMatching,
 } from '../lib/order-search-ids';
 import { randomUUID } from 'node:crypto';
 import {
@@ -321,7 +320,7 @@ export async function orderSearchWhere(
   // GUEST orders (no `customer_id`) carry the buyer's contact only in the
   // `shipping_address` JSON snapshot — the same place `customerKeyOf` reads
   // email/phone from. 174 of 188 production orders are guest orders. The JSON
-  // path filter is the unindexed twin of `guestOrderIdsMatching` below.
+  // path filter is the unindexed guest lookup (the indexed `guest` definer kind was dropped, SEARCH-P2-5).
   const guestJsonMatch: Prisma.OrderWhereInput = {
     customerId: null,
     OR: GUEST_CONTACT_FIELDS.map(field => ({

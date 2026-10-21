@@ -861,12 +861,12 @@ describe('SECURITY DEFINER functions: hygiene', () => {
              p.proconfig AS cfg
       FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace JOIN pg_language l ON l.oid = p.prolang
       WHERE n.nspname = 'public' AND p.proname = ANY(${[...PURE_IMMUTABLE_EBDA_FNS]})`;
-    // Every name exists; overloads (ebda_product_embed_doc has a 4- and, until the SEARCH-T13-8
-    // contract migration, a 5-argument form) are each checked below.
+    // Every name exists; overloads are each checked below (the 5-argument ebda_product_embed_doc
+    // was dropped by the SEARCH-T13-8 contract migration 20261029000100).
     expect([...new Set(fns.map(f => f.proname))].sort()).toEqual(
       [...PURE_IMMUTABLE_EBDA_FNS].sort()
     );
-    expect(fns.filter(f => f.proname === 'ebda_product_embed_doc')).toHaveLength(2);
+    expect(fns.filter(f => f.proname === 'ebda_product_embed_doc')).toHaveLength(1);
     for (const f of fns) {
       expect({
         fn: f.proname,

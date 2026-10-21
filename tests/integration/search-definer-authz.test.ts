@@ -128,24 +128,24 @@ describe.skipIf(!hasDb)('search definers are not an oracle (security review)', (
   it("positive control: each definer finds the scoped store's own rows", async () => {
     expect(await P(`%${w('alpha')}%`, A, A)).toEqual([w('pa-live')]);
     expect(await O('order_number', `%${w('ona-live')}%`, A, A)).toEqual([w('oa-live')]);
-    expect(await O('guest', `%${w('guesta')}%`, A, A)).toEqual([w('oa-live')]);
   });
 
   it('cross-store probe returns nothing and looks exactly like "no match"', async () => {
     // scoped to A, naming B's id
     expect(await P(`%${w('bravo')}%`, A, B)).toEqual([]);
-    expect(await O('guest', `%${w('guestb')}%`, A, B)).toEqual([]);
+    expect(await O('order_number', `%${w('onb-live')}%`, A, B)).toEqual([]);
     // scoped to A, naming A, but the term exists only in B: identical to a term that exists nowhere
     const nowhere = `%${w('nowhere')}%`;
     expect(await P(`%${w('bravo')}%`, A, A)).toEqual(await P(nowhere, A, A));
-    expect(await O('guest', '%201222222222%', A, A)).toEqual(await O('guest', nowhere, A, A));
-    expect(await O('order_number', `%${w('onb-live')}%`, A, A)).toEqual([]);
-    expect(await O('customers', `%${w('cust b')}%`, B, A)).toEqual([]); // scoped to B asking A
+    expect(await O('order_number', `%${w('onb-live')}%`, A, A)).toEqual(
+      await O('order_number', nowhere, A, A)
+    );
+    expect(await O('order_number', `%${w('onb-live')}%`, B, A)).toEqual([]); // scoped to B asking A
   });
 
   it('no store scope: refused (not an empty answer)', async () => {
     await expect(P(`%${w('alpha')}%`, null, A)).rejects.toThrow(/store scope|42501|permission/i);
-    await expect(O('guest', `%${w('guesta')}%`, null, A)).rejects.toThrow(
+    await expect(O('order_number', `%${w('ona-live')}%`, null, A)).rejects.toThrow(
       /store scope|42501|permission/i
     );
   });
@@ -159,12 +159,13 @@ describe.skipIf(!hasDb)('search definers are not an oracle (security review)', (
   it('soft-deleted rows are not returned', async () => {
     expect(await P(`%${w('alpha')}%`, A, A, false)).toEqual([w('pa-live')]);
     expect(await O('order_number', `%${w('ona-gone')}%`, A, A)).toEqual([]);
-    expect(await O('guest', `%${w('guestgone')}%`, A, A)).toEqual([]);
   });
 
-  it('a customer the users policy hides (registered on another store) is not returned, even with an order here', async () => {
-    expect(await O('customers', `%${w('cust a')}%`, A, A)).toEqual([w('u-a')]);
-    expect(await O('customers', `%${w('cust b')}%`, A, A)).toEqual([]);
+  it("the dropped 'guest' and 'customers' kinds (migration 20261029000100) answer nothing", async () => {
+    // Their callers moved to ebda_customer_search_ids (covered above); a stale caller gets the
+    // empty set, never a row.
+    expect(await O('guest', `%${w('guesta')}%`, A, A)).toEqual([]);
+    expect(await O('customers', `%${w('cust a')}%`, A, A)).toEqual([]);
   });
 
   it('EXECUTE is for ebda_app only and the search_path is pinned', async () => {
