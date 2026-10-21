@@ -55,3 +55,13 @@ describe('renderBarcodeSvg', () => {
     expect(svg).toContain('A&amp;B');
   });
 });
+
+import { billingPaymentNumber, EBDA_BILLING_BARCODE_SHAPE } from '../../packages/shared/src/barcode';
+describe('ebda billing barcode', () => {
+  it('uses palm and a deterministic Code 128 safe payment number', () => {
+    expect(EBDA_BILLING_BARCODE_SHAPE).toBe('palm');
+    expect(RECEIPT_BARCODE_SHAPES).toContain(EBDA_BILLING_BARCODE_SHAPE);
+    expect(billingPaymentNumber('3f2a91c4-7b1e-4d0a-9c55-0e8a1f2b3c4d')).toBe('EBD-3F2A91C47B');
+    expect(() => billingPaymentNumber('x')).toThrow();
+  });
+});

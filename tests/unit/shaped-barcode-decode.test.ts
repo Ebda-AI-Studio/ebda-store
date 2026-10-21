@@ -6,7 +6,7 @@
 import { describe, it, expect } from 'vitest';
 import { Resvg } from '@resvg/resvg-js';
 import { readBarcodes } from 'zxing-wasm/reader';
-import { renderBarcodeSvg, RECEIPT_BARCODE_SHAPES } from '../../packages/shared/src/barcode';
+import { renderBarcodeSvg, RECEIPT_BARCODE_SHAPES, billingPaymentNumber, EBDA_BILLING_BARCODE_SHAPE } from '../../packages/shared/src/barcode';
 
 const VALUES = ['ORD-MJ4K9L2A-AB3XY', '1234567890', 'ORD-1', 'ORD-MJ4K9L2A-AB3XY-0042-LONGTEST'];
 
@@ -51,6 +51,15 @@ describe('decode gate negative controls (the gate can fail)', () => {
   it('still decodes at a phone-camera-ish 700px wide', async () => {
     for (const shape of ['palm', 'ghost', 'cloud']) {
       expect(await decode(renderBarcodeSvg({ value: 'ORD-MJ4K9L2A-AB3XY', shape, ink: '#111' }), 700)).toContain('ORD-MJ4K9L2A-AB3XY');
+    }
+  });
+});
+
+describe('ebda billing receipt number in the palm', () => {
+  it('decodes at receipt size', async () => {
+    const value = billingPaymentNumber('3f2a91c4-7b1e-4d0a-9c55-0e8a1f2b3c4d');
+    for (const w of [1600, 700]) {
+      expect(await decode(renderBarcodeSvg({ value, shape: EBDA_BILLING_BARCODE_SHAPE, ink: '#141414' }), w)).toContain(value);
     }
   });
 });

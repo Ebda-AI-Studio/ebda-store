@@ -35,6 +35,7 @@ import {
   fmtDate as fmtBillingDate,
   planLabel,
 } from '../../../../components/billing/format';
+import { EbdaBillingReceipt } from '../../../../components/billing/EbdaBillingReceipt';
 import { billingNotice, noticeText } from '../../../../components/billing/notice';
 import { startCardSetup, useCardReturn } from '../../../../components/billing/useCardReturn';
 import type {
@@ -168,6 +169,7 @@ export default function StoreBillingPage() {
   const [charges, setCharges] = useState<Charge[]>([]);
   const [interval, setInterval] = useState<'monthly' | 'yearly'>('monthly');
   const [busy, setBusy] = useState<string | null>(null);
+  const [receiptFor, setReceiptFor] = useState<string | null>(null);
   const [returnState, setReturnState] = useState<'idle' | 'pending' | 'ok' | 'failed' | 'later'>(
     'idle'
   );
@@ -632,6 +634,29 @@ export default function StoreBillingPage() {
               {returnState === 'later' && t('checkoutReturnLater')}
             </div>
           )}
+
+          {/* Paid: the receipt prints out (reused storefront printer, Ebda palette, palm barcode).
+              Any earlier succeeded charge can be re-opened from the invoices table. */}
+          {(() => {
+            const paidCharge =
+              receiptFor !== null
+                ? charges.find(c => c.id === receiptFor)
+                : returnState === 'ok'
+                  ? charges.find(c => c.status === 'succeeded' && c.type !== 'refund')
+                  : undefined;
+            return paidCharge ? (
+              <EbdaBillingReceipt
+                key={paidCharge.id}
+                charge={paidCharge}
+                planName={
+                  paidCharge.planCode === data.plan.subscribedPlanCode
+                    ? planLabel(data.plan, paidCharge.planCode ?? '', locale)
+                    : undefined
+                }
+                locale={locale}
+              />
+            ) : null;
+          })()}
 
           {data.subscription.status === 'past_due' &&
             data.billing?.billingMethod !== 'instapay' && (
@@ -1180,7 +1205,17 @@ export default function StoreBillingPage() {
                           </Badge>
                         </td>
                         <td className="hidden py-2 text-muted-foreground sm:table-cell">
-                          {c.failureReason ?? '—'}
+                          {c.status === 'succeeded' && c.type !== 'refund' ? (
+                            <button
+                              type="button"
+                              onClick={() => setReceiptFor(receiptFor === c.id ? null : c.id)}
+                              className="text-xs font-medium text-primary-ink underline"
+                            >
+                              {t('viewReceipt')}
+                            </button>
+                          ) : (
+                            (c.failureReason ?? '—')
+                          )}
                         </td>
                       </tr>
                     ))}

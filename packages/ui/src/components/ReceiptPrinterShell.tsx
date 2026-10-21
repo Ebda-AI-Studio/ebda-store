@@ -99,7 +99,7 @@ export function ReceiptPrinterShell({
       <style>{CSS}</style>
       <div className="rp-housing relative z-10 p-1.5 shadow-lg">
         <div className="rp-screen px-4 pb-3.5 pt-4">{screen({ feedDone })}</div>
-        <div className="rp-slit mx-2.5 mb-0.5 mt-2 h-1.5 rounded-[var(--radius)]" />
+        <div className="rp-slit mx-2.5 mb-0.5 mt-2 h-1.5 rounded-[var(--radius,.5rem)]" />
       </div>
       {/* The slot is empty but holds a typical receipt's height while loading; once the key
           is known the paper is in the flow at its final height before the feed starts. */}
@@ -122,8 +122,8 @@ export function ReceiptPrinterShell({
 }
 
 const CSS = `
-.rp-housing{background:var(--rp-housing,color-mix(in oklab,hsl(var(--foreground)) 84%,hsl(var(--background))));border-radius:var(--radius)}
-.rp-screen{background:var(--rp-screen-bg,hsl(var(--foreground)));color:var(--rp-screen-fg,hsl(var(--background)));border-radius:max(0px,calc(var(--radius) - 4px))}
+.rp-housing{background:var(--rp-housing,color-mix(in oklab,hsl(var(--foreground)) 84%,hsl(var(--background))));border-radius:var(--radius,.5rem)}
+.rp-screen{background:var(--rp-screen-bg,hsl(var(--foreground)));color:var(--rp-screen-fg,hsl(var(--background)));border-radius:max(0px,calc(var(--radius,.5rem) - 4px))}
 .rp-slit{background:var(--rp-slit,color-mix(in oklab,hsl(var(--foreground)) 30%,#000));box-shadow:inset 0 1px 2px rgb(0 0 0/.7)}
 .rp-window{position:relative;overflow:hidden;padding-bottom:14px}
 .rp-window::before{content:'';position:absolute;inset-inline:0;top:0;height:8px;z-index:1;pointer-events:none;background:linear-gradient(rgb(0 0 0/.14),rgb(0 0 0/0))}

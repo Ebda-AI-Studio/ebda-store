@@ -9001,7 +9001,8 @@
     "chooseThisPlan": "Choose this plan",
     "instapayPlanNote": "The new plan applies when Ebda Store confirms your payment.",
     "instapayPlanFailed": "We could not start the InstaPay payment for this plan.",
-    "instapayQuoteTitle": "Pay for {plan} ({interval})"
+    "instapayQuoteTitle": "Pay for {plan} ({interval})",
+    "viewReceipt": "View receipt"
   },
   "planLimit": {
     "maxProducts": "Your plan allows up to {limit} products. Upgrade to add more.",
@@ -10356,5 +10357,16 @@
       "hot-dog": "Hot dog",
       "cookie": "Cookie"
     }
+  },
+  "ebdaReceipt": {
+    "aria": "Ebda payment receipt",
+    "subtitle": "Payment receipt",
+    "total": "Total",
+    "paid": "Payment received. Thank you.",
+    "printing": "Printing your receipt...",
+    "plan": "Plan",
+    "date": "Date",
+    "vat": "VAT ({rate}%)",
+    "print": "Print receipt"
   }
 }

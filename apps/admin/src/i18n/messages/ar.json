@@ -9001,7 +9001,8 @@
     "chooseThisPlan": "اختار الباقة دي",
     "instapayPlanNote": "الباقة الجديدة بتشتغل أول ما فريق ابدأ استوديو للذكاء الاصطناعي يأكد الدفع.",
     "instapayPlanFailed": "معرفناش نبدأ دفع إنستاباي للباقة دي.",
-    "instapayQuoteTitle": "ادفع ثمن {plan} ({interval})"
+    "instapayQuoteTitle": "ادفع ثمن {plan} ({interval})",
+    "viewReceipt": "شوف الإيصال"
   },
   "planLimit": {
     "maxProducts": "باقتك تسمح بحد أقصى {limit} منتج. قم بالترقية لإضافة المزيد.",
@@ -10356,5 +10357,16 @@
       "hot-dog": "هوت دوج",
       "cookie": "كوكيز"
     }
+  },
+  "ebdaReceipt": {
+    "aria": "إيصال الدفع من ابدأ",
+    "subtitle": "إيصال دفع",
+    "total": "الإجمالي",
+    "paid": "الدفع وصلنا. شكراً ليك.",
+    "printing": "بنطبع الإيصال بتاعك...",
+    "plan": "الباقة",
+    "date": "التاريخ",
+    "vat": "ضريبة القيمة المضافة ({rate}%)",
+    "print": "اطبع الإيصال"
   }
 }
