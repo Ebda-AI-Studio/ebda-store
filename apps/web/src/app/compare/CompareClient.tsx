@@ -8,7 +8,7 @@ import { ShopChrome } from '../../components';
 import { useCart } from '../../contexts/CartContext';
 import { useStoreUrl } from '../../contexts/StoreContext';
 import { useLanguage } from '../../contexts/LanguageContext';
-import { useNumerals } from '../../hooks/useNumerals';
+import { useLocalePrice } from '../../hooks/useLocalePrice';
 import { compareStorageKey } from '../../lib/compare';
 import type { ProductFact } from '@ebda/shared';
 import { compareFactRows } from '../../lib/compare-facts';
@@ -45,7 +45,7 @@ export default function CompareClient() {
   const { addItem } = useCart();
   const storeUrl = useStoreUrl();
   const { t, language } = useLanguage();
-  const { money } = useNumerals();
+  const money = useLocalePrice();
 
   function handleAddToCart(product: CompareProduct) {
     addItem({
@@ -214,10 +214,10 @@ export default function CompareClient() {
                 <td className="p-4 font-medium text-muted-foreground">{t('Price', 'السعر')}</td>
                 {products.map(product => (
                   <td key={product.id} className="p-4 text-center">
-                    <span className="font-bold text-lg">{money(product.price)} EGP</span>
+                    <span className="font-bold text-lg">{money(product.price)}</span>
                     {isOnSale(product) && (
                       <span className="block text-muted-foreground line-through text-sm">
-                        {money(product.compareAtPrice)} EGP
+                        {money(product.compareAtPrice)}
                       </span>
                     )}
                   </td>

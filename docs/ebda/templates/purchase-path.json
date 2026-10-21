@@ -1,0 +1,56 @@
+{
+  "$comment": "Quality bar § 10 (W4, Ruling B1-71): the purchase path every template and look is judged on. `files` feeds the token gates (no unthemed form controls, no colours outside the token set, 44px targets). `screens` is the taste gate's screen manifest: every screen at every viewport is shot before a look is scored. Gate: tests/unit/purchase-path-gates.test.ts.",
+  "viewports": ["390-ar", "1280-en"],
+  "secondProductPath": "/products/silk-shawl",
+  "screens": [
+    { "id": "home", "path": "/" },
+    { "id": "category", "path": "/products?category=abayas" },
+    { "id": "pdp", "path": "/products/linen-abaya" },
+    {
+      "id": "pdp-add-missing-option",
+      "path": "/products/linen-abaya",
+      "action": "tap-add-without-options"
+    },
+    { "id": "pdp-added", "path": "/products/linen-abaya", "action": "pick-options-and-add" },
+    { "id": "cart", "path": "/cart", "action": "two-lines" },
+    { "id": "cart-edit", "path": "/cart", "action": "increase-quantity" },
+    { "id": "cart-remove", "path": "/cart", "action": "remove-line-with-undo" },
+    { "id": "checkout-shipping", "path": "/checkout", "action": "empty" },
+    { "id": "checkout-shipping-errors", "path": "/checkout", "action": "submit-empty" },
+    { "id": "checkout-shipping-filled", "path": "/checkout", "action": "fill-shipping" },
+    {
+      "id": "checkout-shipping-error",
+      "path": "/checkout",
+      "action": "fill-shipping-calc-fails"
+    },
+    { "id": "checkout-payment", "path": "/checkout", "action": "fill-and-continue" },
+    {
+      "id": "checkout-coupon-failed",
+      "path": "/checkout",
+      "action": "apply-bad-coupon",
+      "probe": ["contrast"]
+    },
+    { "id": "receipt", "path": "/checkout/success", "action": "place-cod-order" },
+    { "id": "cart-empty", "path": "/cart", "probe": ["contrast"] },
+    { "id": "footer", "path": "/", "action": "scroll-to-footer" }
+  ],
+  "files": [
+    "app/cart/CartClient.tsx",
+    "app/checkout/CheckoutClient.tsx",
+    "app/checkout/PaymentStep.tsx",
+    "app/checkout/OrderSummary.tsx",
+    "app/checkout/CheckoutErrorAlert.tsx",
+    "app/checkout/_components/DeliverySection.tsx",
+    "app/checkout/_components/GovernorateAreaSelect.tsx",
+    "app/checkout/success/SuccessClient.tsx",
+    "components/BundleLine.tsx",
+    "components/AcceptedPaymentBadges.tsx",
+    "components/PaymentIcons.tsx",
+    "components/commerce/ReceiptPrinter.tsx",
+    "components/commerce/StickyCartTotal.tsx",
+    "components/commerce/StickyAddToCart.tsx",
+    "components/commerce/TrustLine.tsx",
+    "components/commerce/CartLineNote.tsx",
+    "templates/shared/BottomTabBar.tsx"
+  ]
+}

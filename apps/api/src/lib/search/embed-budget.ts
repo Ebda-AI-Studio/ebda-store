@@ -7,7 +7,9 @@
 // `SEARCH_EMBED_GLOBAL_DAILY_CAP` (default 20 000 calls ≈ ≤ 500 000 products ≈ ≤ ~300 M input
 // tokens ≈ ≤ ~$3.5/day at bge-m3's $0.0118/M). Fails CLOSED: with no Redis there is no proof of
 // budget, so the indexer does not spend (it stays lexical-only and logs why).
-import { regionDayStart } from '@ebda/shared';
+import { regionDayStart, regionDayStartOffset } from '@ebda/shared';
+import { BoundedMap } from '../bounded-map';
+import { ipKeyGenerator } from 'express-rate-limit';
 import { redis } from '../../services/redis.service';
 import { sendAlert } from '../../services/alerts.service';
 import logger from '../logger';
@@ -52,6 +54,189 @@ export async function takeEmbedCalls(n: number): Promise<boolean> {
     logger.warn({ err }, '[search-index] global embed budget check failed, not spending');
     return false;
   }
+}
+
+// ---- Storefront query embeds (Task 12, Rulings SEARCH-T12-3, SEARCH-T12-6) -------------------
+// THE gate for every query-time Workers AI call. `takeQueryEmbed` is called exactly once per
+// actual provider call, immediately before it, and never on a query-vector cache hit (which costs
+// nothing). It INCRs four counters (atomic INCR, then compare) and grants only when ALL have room:
+//   1. the account-wide total above (shared with the indexer: one daily spend ceiling for both);
+//   2. a query-wide Cairo-day cap set BELOW it (shoppers can never use up the indexer's share);
+//   3. a per-store Cairo-day cap (traffic aimed at one store cannot spend every store's);
+//   4. a per-SEARCHER per-minute cap (one client, by normalised IP, whatever URL shape, query
+//      string or entry point — storefront list or MCP `search_products` — it arrives through).
+// No searcher = no embed (default deny: a new caller must opt in with an identity). Refused =
+// keyword-only search, never an error. No Redis = refused (fails closed, like the indexer). Unique
+// queries defeat the cache, so these counters, not the cache, are what bound the spend.
+export const DEFAULT_QUERY_GLOBAL_DAILY_CAP = 10_000;
+export const DEFAULT_QUERY_STORE_DAILY_CAP = 1_000;
+/**
+ * Default query embeds per searcher (normalised IP) per fixed minute. Sized for carrier-grade NAT:
+ * Egyptian mobile networks put many shoppers behind one public IPv4, so a tight per-IP limit would
+ * turn legitimate shoppers keyword-only at scale (review M5). This limit only slows ONE client
+ * draining the shared budgets; the daily budgets are what bound spend. Ruling SEARCH-T12-11.
+ */
+export const SEARCH_EMBED_PER_SEARCHER_PER_MIN = 60;
+
+/** `SEARCH_EMBED_PER_SEARCHER_PER_MIN` (docs/ENVIRONMENT.md); a bad value falls back; 0 = none. */
+export const searcherPerMinuteCap = () =>
+  capFromEnv('SEARCH_EMBED_PER_SEARCHER_PER_MIN', SEARCH_EMBED_PER_SEARCHER_PER_MIN);
+/** The per-minute searcher key lives two windows (Redis/KV TTL floor 120 s). */
+const SEARCHER_KEY_TTL_SECONDS = 120;
+
+/**
+ * The searcher identity for the query-embed limit: the client IP, IPv6 grouped by its /64 (one
+ * subscriber prefix; passed explicitly, the library default is /56). No IP = no identity =
+ * `undefined`, so the gate refuses the embed (keyword-only) instead of putting every IP-less request
+ * in one shared bucket (review M4).
+ */
+export function searcherFromIp(ip: string | undefined): string | undefined {
+  if (!ip) return undefined;
+  const key = ipKeyGenerator(ip, 64);
+  return key ? `ip:${key}` : undefined;
+}
+export function searcherEmbedKey(searcher: string, now: Date): string {
+  return `search:embed:searcher:${searcher}:${Math.floor(now.getTime() / 60_000)}`;
+}
+
+function capFromEnv(name: string, fallback: number): number {
+  const n = Number.parseInt(process.env[name] ?? '', 10);
+  return Number.isFinite(n) && n >= 0 ? n : fallback;
+}
+/** `SEARCH_QUERY_EMBED_GLOBAL_DAILY_CAP`: storefront query embeds per Cairo day, all stores. */
+export const queryEmbedGlobalDailyCap = () =>
+  capFromEnv('SEARCH_QUERY_EMBED_GLOBAL_DAILY_CAP', DEFAULT_QUERY_GLOBAL_DAILY_CAP);
+/** `SEARCH_QUERY_EMBED_STORE_DAILY_CAP`: storefront query embeds per Cairo day, per store. */
+export const queryEmbedStoreDailyCap = () =>
+  capFromEnv('SEARCH_QUERY_EMBED_STORE_DAILY_CAP', DEFAULT_QUERY_STORE_DAILY_CAP);
+
+export function queryEmbedGlobalKey(now: Date): string {
+  return `search:embed:query:${regionDayStart(now).toISOString()}`;
+}
+export function queryEmbedStoreKey(storeId: string, now: Date): string {
+  return `search:embed:query:${storeId}:${regionDayStart(now).toISOString()}`;
+}
+
+/**
+ * Charge ONE query-time provider call to every budget; false = do not call the provider.
+ * Call it once per real call, right before it (never on a cache hit).
+ */
+/**
+ * Why a query embed was refused. `budget-store` / `budget-platform` = a DAILY cap is spent: a stable
+ * state until the next Cairo day, so keyword-only results are a full answer of that mode and may be
+ * cached under a key that says so (Ruling SEARCH-T12-10). Every other reason is per client or
+ * transient and its results are never cached.
+ */
+export type QueryEmbedRefusal =
+  | 'no-searcher'
+  | 'searcher-limit'
+  | 'budget-store'
+  | 'budget-platform'
+  | 'no-redis'
+  | 'error';
+
+/**
+ * In-isolate "daily budget spent until <next Cairo day start, ms>" marks, keyed by store id or
+ * PLATFORM. Set by the refusal that discovers it; while set, `takeQueryEmbed` refuses without any
+ * Redis round trip. Staleness: BOUNDED by the Cairo day (the mark expires at the day start the
+ * counters roll over); an isolate that never saw the refusal learns it on its own first refusal.
+ */
+const PLATFORM = '*';
+const spentUntil = new BoundedMap<string, number>(1000);
+
+/** Test seam. */
+export function clearQueryBudgetSpentForTests(): void {
+  spentUntil.clear();
+}
+
+function nextCairoDayStart(now: Date): number {
+  return regionDayStartOffset(now, 1).getTime();
+}
+
+/** End (ms) of the spent state for this store, or 0 when its query budget is not known spent. */
+export function queryBudgetSpentUntil(storeId: string, now: Date = new Date()): number {
+  // A configured cap of 0 is "spent" by definition, with no round trip.
+  if (
+    embedGlobalDailyCap() <= 0 ||
+    queryEmbedGlobalDailyCap() <= 0 ||
+    queryEmbedStoreDailyCap() <= 0
+  )
+    return nextCairoDayStart(now);
+  const t = now.getTime();
+  const until = Math.max(spentUntil.get(storeId) ?? 0, spentUntil.get(PLATFORM) ?? 0);
+  return until > t ? until : 0;
+}
+
+/** True while this store's (or the platform's) daily query-embed budget is known to be spent. */
+export function queryBudgetSpent(storeId: string, now: Date = new Date()): boolean {
+  return queryBudgetSpentUntil(storeId, now) > 0;
+}
+
+/**
+ * Charge ONE query-time provider call to every budget; `ok: false` = do not call the provider, with
+ * the reason. Call it once per real call, right before it (never on a cache hit).
+ */
+export async function takeQueryEmbedResult(
+  storeId: string,
+  searcher: string | undefined
+): Promise<{ ok: true } | { ok: false; reason: QueryEmbedRefusal }> {
+  const now = new Date();
+  if (queryBudgetSpent(storeId, now)) {
+    const platform =
+      (spentUntil.get(PLATFORM) ?? 0) > now.getTime() ||
+      embedGlobalDailyCap() <= 0 ||
+      queryEmbedGlobalDailyCap() <= 0;
+    return { ok: false, reason: platform ? 'budget-platform' : 'budget-store' };
+  }
+  if (!searcher) return { ok: false, reason: 'no-searcher' };
+  const daily = [embedGlobalDailyCap(), queryEmbedGlobalDailyCap(), queryEmbedStoreDailyCap()];
+  const client = redis.getClient();
+  if (!client || !redis.isAvailable()) return { ok: false, reason: 'no-redis' };
+  try {
+    // 1. The searcher's per-minute limit FIRST, and alone: a client over its limit never touches
+    //    the shared daily budgets, so it cannot burn the store's or the platform's day.
+    const sKey = searcherEmbedKey(searcher, now);
+    const sUsed = await client.incr(sKey);
+    if (sUsed === 1) await client.expire(sKey, SEARCHER_KEY_TTL_SECONDS);
+    if (sUsed > searcherPerMinuteCap()) return { ok: false, reason: 'searcher-limit' };
+    // 2. The daily budgets (INCR, then compare). A refusal by ANY of them refunds all three, so each
+    //    daily counter equals the provider calls actually made (a crash between the two steps
+    //    over-counts by one; it can never under-count).
+    const keys = [
+      embedCallBudgetKey(now),
+      queryEmbedGlobalKey(now),
+      queryEmbedStoreKey(storeId, now),
+    ];
+    const used = await Promise.all(keys.map(k => client.incr(k)));
+    await Promise.all(
+      used.map((u, i) => (u === 1 ? client.expire(keys[i], DAY_TTL_SECONDS) : undefined))
+    );
+    if (used.every((u, i) => u <= daily[i])) return { ok: true };
+    await Promise.all(keys.map(k => client.decr(k)));
+    // Mark the spent scope until the next Cairo day (no more round trips in this isolate).
+    const platformSpent = used[0] > daily[0] || used[1] > daily[1];
+    spentUntil.set(platformSpent ? PLATFORM : storeId, nextCairoDayStart(now));
+    // Log the FIRST refusal per counter per day only (u === cap + 1), never every request.
+    used.forEach((u, i) => {
+      if (u === daily[i] + 1)
+        logger.warn(
+          { storeId, budget: ['account', 'query', 'store'][i], cap: daily[i] },
+          '[search] query embed budget reached; keyword-only search until the next Cairo day'
+        );
+    });
+    return { ok: false, reason: platformSpent ? 'budget-platform' : 'budget-store' };
+  } catch (err) {
+    logger.warn({ err }, '[search] query embed budget check failed, not spending');
+    return { ok: false, reason: 'error' };
+  }
+}
+
+/** Boolean form of `takeQueryEmbedResult`. */
+export async function takeQueryEmbed(
+  storeId: string,
+  searcher: string | undefined
+): Promise<boolean> {
+  return (await takeQueryEmbedResult(storeId, searcher)).ok;
 }
 
 /** One P1 per Cairo day when the account-wide ceiling is reached. */

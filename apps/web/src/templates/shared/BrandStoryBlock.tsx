@@ -39,7 +39,7 @@ export function BrandStoryBlock({
   image,
   body,
   bodyAr,
-  headingEn = 'Our Story',
+  headingEn = 'Our story',
   headingAr = 'قصتنا',
   ctaHref,
   ctaTextEn = 'Read More',

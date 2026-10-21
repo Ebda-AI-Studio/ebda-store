@@ -151,6 +151,10 @@ const NOT_R2_REFERENCES: Record<string, string> = {
   'AnswerEngineCheck.competitorUrls': 'third-party competitor URLs',
   'ProductModel.materials': 'material names + indexes extracted from the GLB, no URLs',
   'ProductModel.gltfVariants': 'KHR_materials_variants names, no URLs',
+  'WebhookEndpoint.url':
+    "the merchant's own https webhook receiver address (a third-party server), never an R2 upload",
+  'WebhookDelivery.payload':
+    'the signed webhook event JSON (ids, totals, status), no media URLs of ours',
   'ProductModel.stats': 'vertex/mesh/texture counts and extension names, no URLs',
 };
 

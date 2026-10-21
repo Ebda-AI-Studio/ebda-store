@@ -58,6 +58,12 @@ export const UNIT_PATHS = {
   'apps/admin': ['apps/admin/src'],
   'apps/orders': ['apps/orders'],
 };
+/**
+ * The search eval harness (tests/search-eval) imports API internals, so it is typechecked whenever
+ * it or the API changes (a signature change must fail CI, not the next manual eval run).
+ */
+export const SEARCH_EVAL_TSCONFIG = 'tests/search-eval/tsconfig.json';
+
 /** Always part of the unit lane when any code changed: cross-app source pins. */
 export const BASE_UNIT_PATHS = ['tests/unit'];
 
@@ -113,6 +119,7 @@ export function classify(files, workspaces) {
   let infra = false;
   let tests = false;
   let code = false;
+  let searchEval = false;
   const codeFiles = [];
 
   for (const f of files.filter(Boolean)) {
@@ -124,6 +131,7 @@ export function classify(files, workspaces) {
       direct.add(`${m[1]}/${m[2]}`);
     } else if (f.startsWith('tests/')) {
       tests = true;
+      if (f.startsWith('tests/search-eval/')) searchEval = true;
     } else if (f.startsWith('.github/') || f.startsWith('scripts/')) {
       infra = true;
     } else {
@@ -170,7 +178,10 @@ export function classify(files, workspaces) {
     all,
     workspaces: ws.map(w => w.dir),
     lint: ws.filter(w => w.hasLint).map(w => `-w ${w.dir}`),
-    typecheck: ws.filter(w => w.hasTsconfig).map(w => `${w.dir}/tsconfig.json`),
+    typecheck: [
+      ...ws.filter(w => w.hasTsconfig).map(w => `${w.dir}/tsconfig.json`),
+      ...(searchEval || affected.has('apps/api') ? [SEARCH_EVAL_TSCONFIG] : []),
+    ],
     unit: [...unit],
     // status runs on workerd, outside the root vitest config (npm run test:status)
     statusTests: all || direct.has('apps/status'),

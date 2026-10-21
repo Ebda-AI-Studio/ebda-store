@@ -1,3 +1,14 @@
+import {
+  orderSearchIds,
+  ORDER_SEARCH_CUSTOMER_ID_CAP,
+  guestOrderIdsMatching,
+} from '../lib/order-search-ids';
+export {
+  ORDER_SEARCH_CUSTOMER_ID_CAP,
+  orderSearchIds,
+  orderSearchIdsSql,
+  guestOrderIdsMatching,
+} from '../lib/order-search-ids';
 import { randomUUID } from 'node:crypto';
 import {
   prisma,
@@ -241,14 +252,6 @@ export interface OrderListWhere {
   confirmedOnly?: boolean;
 }
 
-/**
- * Most customer ids the order search resolves up front. Above this the term
- * is too broad for an id list to be worth binding, and the search falls back
- * to the relation filter (same rows, unindexed plan). 1000 bind parameters is
- * nowhere near Postgres' 65535 ceiling.
- */
-export const ORDER_SEARCH_CUSTOMER_ID_CAP = 1000;
-
 /** The `shipping_address` keys a guest's contact lives under (see `contactOf`, lib/customer-key.ts). */
 const GUEST_CONTACT_FIELDS = ['firstName', 'lastName', 'email', 'phone'] as const;
 
@@ -256,23 +259,22 @@ const GUEST_CONTACT_FIELDS = ['firstName', 'lastName', 'email', 'phone'] as cons
  * The OR arms of the order-list search: order number, or the registered
  * customer's first name / last name / email / phone (issue 2405).
  *
- * WHY two steps. The obvious shape — `customer: { is: { firstName: contains } }`
- * per field — is compiled by Prisma into four LEFT JOINs onto `users` with an
- * OR spanning both tables. No index can serve an OR whose arms live on
- * different sides of a join, so every keystroke walked the store's whole
- * order history (measured: 150-270 ms per query at 50k orders, twice per
- * search because the list also counts). Resolving the matching customers
- * first turns every arm into a predicate on `orders` itself —
- * `order_number ILIKE` (trigram GIN) OR `customer_id IN (...)` (btree) —
- * which Postgres answers with a BitmapOr (measured: under 1 ms). The customer
- * lookup is itself a BitmapOr over the four `users` trigram indexes. Both
- * sets of indexes: migration 20261002090000_order_search_trgm_and_fk_indexes.
+ * WHY lookups first. The obvious shape — `customer: { is: { firstName: contains } }` per
+ * field — is compiled by Prisma into four LEFT JOINs onto `users` with an OR spanning both
+ * tables, which no index can serve (measured: 150-270 ms per query at 50k orders). Resolving the
+ * matching ids first turns every arm into a predicate on `orders` itself: `id IN (...)` for the
+ * order number and the guests, `customer_id IN (...)` (btree) for registered customers.
  *
- * Same rows as the relation filter, by construction: an order matches iff its
- * number matches or its customer matches on one of the four fields. The
- * customer lookup is restricted to users with an order in THIS store (a
- * semi-join, bounded by the store's own customers), not by `users.store_id` —
- * a registered customer's `store_id` is not necessarily the order's store.
+ * The lookups run in the store-scoped SECURITY DEFINER `ebda_order_search_ids` (Ruling
+ * SEARCH-T14-5/-7), because as `ebda_app` the RLS barrier forbids every ILIKE trigram index when
+ * the predicate is written inline. It takes the store only from the session scope and returns ids
+ * only; this function then re-reads orders through RLS.
+ *
+ * Which customers match: users WITH AN ORDER in this store (soft-deleted orders do not count)
+ * whom the `users` RLS policy would show a store scope — registered on THIS store (`users.store_id`),
+ * the caller, the store's owner/staff, or a super admin. A customer with `users.store_id` NULL or
+ * registered on another store is NOT matched, exactly as the relation join already behaved under
+ * `ebda_app` (the old comment here claimed the opposite; that was true only for an owner role).
  *
  * GUEST orders (`customer_id IS NULL`, contact only in the `shipping_address`
  * JSON) are matched by the same term on first name, last name, email and phone
@@ -281,7 +283,7 @@ const GUEST_CONTACT_FIELDS = ['firstName', 'lastName', 'email', 'phone'] as cons
  *
  * Falls back to the relation filter when the term is shorter than a trigram
  * (3 chars — the indexes cannot serve it, so the lookup would only add a
- * scan). A term matching more than `ORDER_SEARCH_CUSTOMER_ID_CAP` customers
+ * scan), and for a customer searching their own orders (`indexed: false`). A term matching more than `ORDER_SEARCH_CUSTOMER_ID_CAP` customers
  * or guest orders degrades ONLY that half to its relation/JSON arm; the other
  * half keeps its indexed `IN (...)` arm (issue 2444).
  */
@@ -297,7 +299,8 @@ export function orderNumberFromScan(input: string): string | null {
 
 export async function orderSearchWhere(
   storeId: string,
-  search: string
+  search: string,
+  opts: { indexed?: boolean } = {}
 ): Promise<Prisma.OrderWhereInput[]> {
   // A scanned receipt/slip/email barcode opens that order: one exact arm, no customer fan-out.
   // Still store-scoped: callers AND this with their own `storeId`.
@@ -325,26 +328,24 @@ export async function orderSearchWhere(
     { customer: { is: { OR: customerMatch } } },
     guestJsonMatch,
   ];
-  if (search.length < 3) return relationFallback;
+  // A customer searching THEIR OWN orders (`indexed: false`) never calls the store-wide id lookup:
+  // the lookup answers for the whole store, and only a store viewer may ask the store a question.
+  // The relation fallback is ANDed with their customerId by the caller.
+  if (search.length < 3 || opts.indexed === false) return relationFallback;
 
-  // The matching customers are read THROUGH this store's orders (keyed by `storeId`, which is
-  // what the tenant guard requires), not from `users` directly. That is also the exact
-  // relation-join semantics: a customer with users.store_id NULL, or registered on another
-  // store, matches when they ordered here. Filtering `users.store_id = storeId` would drop them.
-  const [customerRows, guestOrderIds] = await Promise.all([
-    prisma.order.groupBy({
-      by: ['customerId'],
-      where: { storeId, customerId: { not: null }, customer: { is: { OR: customerMatch } } },
-      orderBy: { customerId: 'asc' },
-      take: ORDER_SEARCH_CUSTOMER_ID_CAP + 1,
-    }),
+  // Three store-scoped id lookups (see the docblock): order number, customers, guest orders.
+  const [numberIds, customerIds, guestOrderIds] = await Promise.all([
+    orderSearchIds(storeId, 'order_number', search),
+    orderSearchIds(storeId, 'customers', search),
     guestOrderIdsMatching(storeId, search),
   ]);
-  const customers = customerRows.map(r => ({ id: r.customerId as string }));
+  const customers = customerIds.map(id => ({ id }));
   // Each half degrades on its OWN: a broad guest term (every Egyptian guest phone starts `+20`)
   // must not cost the registered half its indexed `customer_id IN (...)` arm, nor the reverse
   // (issue 2444). Both over the cap is exactly `relationFallback`.
-  const arms: Prisma.OrderWhereInput[] = [{ orderNumber: contains }];
+  const arms: Prisma.OrderWhereInput[] = [];
+  if (numberIds.length > ORDER_SEARCH_CUSTOMER_ID_CAP) arms.push({ orderNumber: contains });
+  else if (numberIds.length > 0) arms.push({ id: { in: numberIds } });
   if (customers.length > ORDER_SEARCH_CUSTOMER_ID_CAP) {
     arms.push({ customer: { is: { OR: customerMatch } } });
   } else if (customers.length > 0) {
@@ -355,54 +356,9 @@ export async function orderSearchWhere(
   } else if (guestOrderIds.length > 0) {
     arms.push({ id: { in: guestOrderIds } });
   }
+  // Nothing matched anywhere: an explicit match-nothing arm (an empty OR is easy to misread).
+  if (arms.length === 0) arms.push({ id: { in: [] } });
   return arms;
-}
-
-/** `%term%` with LIKE metacharacters escaped, so the term is matched literally. */
-function likeContains(term: string): string {
-  return `%${term.replace(/[\\%_]/g, '\\$&')}%`;
-}
-
-/**
- * Ids of this store's live GUEST orders whose shipping contact (first name,
- * last name, email or phone) contains `search`, capped at
- * `ORDER_SEARCH_CUSTOMER_ID_CAP + 1` so the caller can tell "too many".
- *
- * The WHERE is shaped to match the partial expression GIN indexes of
- * migration 20261003100000_order_search_guest_contact_trgm_idx exactly:
- * `customer_id IS NULL` is the index predicate and each ILIKE reads the same
- * `shipping_address ->> '<key>'` expression the index was built on, so
- * Postgres answers the four-way OR with a BitmapOr of the four trigram
- * indexes (then `store_id` filters the few hits) instead of walking every
- * order. Do not rewrite these to `#>>`, `jsonb_extract_path_text` or
- * `LOWER(...) LIKE` — a different expression cannot use the index.
- *
- * Registered customers' orders are excluded on purpose (`customer_id IS NULL`):
- * they keep matching through the customer's own account fields, exactly as
- * before, so a registered customer's results do not change. The search term is
- * PII (a phone or an email): it is only ever a bound parameter, never logged.
- */
-export async function guestOrderIdsMatching(storeId: string, search: string): Promise<string[]> {
-  const rows = await prisma.$queryRaw<Array<{ id: string }>>(guestOrderIdsSql(storeId, search));
-  return rows.map(r => r.id);
-}
-
-/** The statement behind `guestOrderIdsMatching`; exported so the plan test EXPLAINs the real SQL. */
-export function guestOrderIdsSql(storeId: string, search: string): Prisma.Sql {
-  const like = likeContains(search);
-  return Prisma.sql`
-    SELECT id FROM public.orders
-    WHERE store_id = ${storeId}
-      AND customer_id IS NULL
-      AND deleted_at IS NULL
-      AND (
-            shipping_address ->> 'firstName' ILIKE ${like}
-         OR shipping_address ->> 'lastName'  ILIKE ${like}
-         OR shipping_address ->> 'email'     ILIKE ${like}
-         OR shipping_address ->> 'phone'     ILIKE ${like}
-      )
-    LIMIT ${ORDER_SEARCH_CUSTOMER_ID_CAP + 1}
-  `;
 }
 
 export class OrderService {
@@ -445,7 +401,7 @@ export class OrderService {
       if (to) (where.createdAt as any).lte = to;
     }
     const search = filters.search?.trim();
-    if (search) where.OR = await orderSearchWhere(storeId, search);
+    if (search) where.OR = await orderSearchWhere(storeId, search, { indexed: !customerId });
     return where;
   }
 

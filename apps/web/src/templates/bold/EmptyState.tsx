@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import type { EmptyStateProps } from '../types';
 import { useRtlText } from '../shared/useRtlText';
+import { ArrowIcon } from '../shared/icons';
 
 export default function BoldEmptyState({
   title,
@@ -55,18 +56,20 @@ export default function BoldEmptyState({
           <Link
             href={ctaHref}
             data-cta="button"
-            className="mt-8 inline-flex h-12 items-center bg-primary px-8 text-sm font-black uppercase tracking-widest text-primary-foreground hover:bg-primary/90 focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2"
+            className="mt-8 inline-flex h-12 items-center gap-2 bg-primary px-8 text-sm font-black uppercase tracking-widest text-primary-foreground hover:bg-primary/90 focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2"
           >
-            {displayCta} {isRtl ? '←' : '→'}
+            {displayCta}
+            <ArrowIcon className="h-4 w-4 shrink-0" isRtl={isRtl} />
           </Link>
         ) : (
           <button
             type="button"
             onClick={onCtaClick}
             data-cta="button"
-            className="mt-8 inline-flex h-12 items-center bg-primary px-8 text-sm font-black uppercase tracking-widest text-primary-foreground hover:bg-primary/90 focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2"
+            className="mt-8 inline-flex h-12 items-center gap-2 bg-primary px-8 text-sm font-black uppercase tracking-widest text-primary-foreground hover:bg-primary/90 focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2"
           >
-            {displayCta} {isRtl ? '←' : '→'}
+            {displayCta}
+            <ArrowIcon className="h-4 w-4 shrink-0" isRtl={isRtl} />
           </button>
         ))}
     </div>

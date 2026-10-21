@@ -59,6 +59,13 @@ describe('root layout generateMetadata', () => {
     expect(meta.robots).toEqual({ index: false, follow: false });
   });
 
+  it('B1-14: the demo showroom (isDemo) is noindex, nofollow in the head', async () => {
+    state.store = { ...BASE, isDemo: true };
+    const { generateMetadata } = await import('../../apps/web/src/app/layout');
+    const meta = await generateMetadata();
+    expect(meta.robots).toEqual({ index: false, follow: false });
+  });
+
   it('#1844: an active store is not noindexed', async () => {
     const { generateMetadata } = await import('../../apps/web/src/app/layout');
     const meta = await generateMetadata();

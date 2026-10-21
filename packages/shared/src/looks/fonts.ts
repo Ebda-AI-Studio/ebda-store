@@ -7,7 +7,9 @@ export const LOOK_FONT_SPECS: Record<string, string> = {
   'Cormorant Garamond': 'wght@600',
   Lalezar: '',
   Tajawal: 'wght@400;500;700',
-  Archivo: 'wght@500;700',
+  // LB-03 (W2a): Archivo is only Lookbook's Latin DISPLAY; one heavy weight matches Lalezar's poster
+  // voice (every heading weight resolves to 800 under CSS font matching).
+  Archivo: 'wght@800',
   'Aref Ruqaa': 'wght@400;700',
   'Noto Sans Arabic': 'wght@400;500;600;700',
   'Playfair Display': 'wght@600',

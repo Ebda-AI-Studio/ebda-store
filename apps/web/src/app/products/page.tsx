@@ -1,13 +1,18 @@
 import type { Metadata } from 'next';
+import { localizedMetadata } from '@/lib/seo/localized-metadata';
 import { getStoreOrNotFound } from '../../lib/store-resolver';
 import { getPreviewDraftToken } from '../../lib/preview-draft';
 import { ProductsPageBody } from './ProductsPageBody';
 
-export const metadata: Metadata = {
-  title: 'Products',
-  description:
-    'Browse our full catalog of products. Find the best deals with fast delivery in Egypt.',
-};
+export function generateMetadata(): Promise<Metadata> {
+  return localizedMetadata({
+    title: ['Products', 'المنتجات'],
+    description: [
+      'Browse our full catalog of products. Find the best deals with fast delivery in Egypt.',
+      'تصفح كل منتجاتنا، مع توصيل سريع في مصر.',
+    ],
+  });
+}
 
 export default async function ProductsPage({
   searchParams,

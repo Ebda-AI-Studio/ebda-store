@@ -22,6 +22,7 @@ import { groupOrderLinesForDisplay, orderTaxPlacement, orderLineVariantTitle } f
 import type { Order } from '@/lib/api';
 import { MINUS, signedText } from '@/lib/bidi';
 import type { StoreData } from '@/contexts/StoreContext';
+import type { StoreTheme } from '@ebda/shared';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useLocalePrice } from '@/hooks/useLocalePrice';
 import { useNumerals } from '@/hooks/useNumerals';
@@ -31,7 +32,6 @@ import { pickLocalizedName } from '@/templates/shared/display-helpers';
 import { CartLineNote } from './CartLineNote';
 import { Barcode } from './Barcode';
 import styles from './ReceiptPrinter.module.css';
-import { countText, ITEMS } from '@/lib/plural';
 
 /** The success page's verified payment outcome (SuccessClient owns it). */
 export type PaymentState =
@@ -46,7 +46,10 @@ export type PaymentState =
 type ReceiptStore = Pick<
   StoreData,
   'name' | 'nameAr' | 'logo' | 'logoAr' | 'timezone' | 'settings'
->;
+> & {
+  /** K-07: a look's `receiptStyle` (`framed` = paper in the page ink, no device slab). */
+  theme?: Pick<StoreTheme, 'receiptStyle'> | null;
+};
 
 export interface ReceiptPrinterProps {
   order: Order | null;
@@ -79,7 +82,8 @@ function Num({ children }: { children: string }) {
     <span className="tabular-nums">
       {children.split(LATIN_NUMBER).map((part, i) =>
         i % 2 === 1 ? (
-          <span key={i} className={styles.mono}>
+          // T-04: digit runs stay in the body face (tabular figures above); mono is the code only.
+          <span key={i} dir="ltr">
             {part}
           </span>
         ) : (
@@ -91,6 +95,17 @@ function Num({ children }: { children: string }) {
 }
 
 type StatusKind = 'printing' | PaymentState;
+
+/**
+ * IA-14: an order number read out to a courier, in groups. "ORD-TMZRB9-IR5JY" prints as
+ * "TMZRB9 · IR5JY" (the ORD prefix says nothing the label does not); a plain "1043" is
+ * unchanged. The full value stays the element's accessible name.
+ */
+export function groupOrderNumber(orderNumber: string): string {
+  const parts = orderNumber.split('-').filter(Boolean);
+  if (parts.length > 1 && /^ord$/i.test(parts[0])) parts.shift();
+  return parts.join(' · ');
+}
 
 export function ReceiptPrinter({
   order,
@@ -108,16 +123,13 @@ export function ReceiptPrinter({
   const storeName = pickLocalizedName(store, ar) ?? '';
   const logo = language === 'ar' && store.logoAr ? store.logoAr : store.logo;
   const rows = order ? groupOrderLinesForDisplay(order.items) : [];
-  // A bundle box counts once, as the customer bought it.
-  const itemCount = rows.reduce(
-    (n, r) => n + (r.kind === 'bundle' ? r.quantity : r.item.quantity),
-    0
-  );
   const paid = paymentState === 'paid';
   const payment = order ? paymentLabel(order, paymentState, language) : null;
+  const framed = store.theme?.receiptStyle === 'framed';
 
   return (
     <ReceiptPrinterShell
+      framed={framed}
       feedKey={order?.id ?? null}
       ariaLabel={t('Order receipt', 'فاتورة الطلب')}
       loadingReserve={LOADING_RESERVE}
@@ -128,8 +140,6 @@ export function ReceiptPrinter({
           loading={loading}
           paymentState={paymentState}
           feedDone={feedDone}
-          storeName={storeName}
-          itemCount={itemCount}
         />
       )}
     >
@@ -158,7 +168,7 @@ export function ReceiptPrinter({
                 <li key={row.key} data-testid="receipt-line" className="flex gap-3">
                   <div className="min-w-0 flex-1">
                     <p className="font-medium">
-                      <span className="opacity-60">
+                      <span className="opacity-80">
                         <Num>{localize(qty)}</Num>×
                       </span>{' '}
                       {name}
@@ -238,12 +248,21 @@ export function ReceiptPrinter({
               shape={store.settings?.receiptBarcodeShape as string | undefined}
               className={`block w-full ${styles.ink}`}
             />
+            <p className={`text-xs ${styles.inkSoft}`}>{t('Order number', 'رقم الطلب')}</p>
             <p
-              data-testid="receipt-barcode-caption"
+              data-testid="receipt-order-number"
               dir="ltr"
-              className={`${styles.mono} text-xs tracking-[0.3em] ${styles.inkSoft}`}
+              className={`${styles.mono} text-xl font-semibold ${styles.ink}`}
             >
-              #{order.orderNumber}
+              {groupOrderNumber(order.orderNumber) === order.orderNumber ? (
+                `#${order.orderNumber}`
+              ) : (
+                // a11y re-audit P2-N7: no aria-label on a <p>; read the full value instead.
+                <>
+                  <span aria-hidden="true">#{groupOrderNumber(order.orderNumber)}</span>
+                  <span className="sr-only">{order.orderNumber}</span>
+                </>
+              )}
             </p>
           </div>
         </>
@@ -258,19 +277,13 @@ function PrinterScreen({
   loading,
   paymentState,
   feedDone,
-  storeName,
-  itemCount,
 }: {
   order: Order | null;
   loading: boolean;
   paymentState: PaymentState;
   feedDone: boolean;
-  storeName: string;
-  itemCount: number;
 }) {
   const { t } = useLanguage();
-  const formatPrice = useLocalePrice();
-  const { localize } = useNumerals();
   const status: StatusKind = loading || (order && !feedDone) ? 'printing' : paymentState;
 
   // Crossfade: when the status changes, the old line stays for one 150ms
@@ -288,41 +301,11 @@ function PrinterScreen({
     return () => window.clearTimeout(timer);
   }, [leaving]);
 
+  // Taste re-audit P2-5 (Y-05): the head carries the live payment status only; the page
+  // headline names the order and the paper lists its items (IA-14 moved the number and total there).
   return (
     <>
-      <div className="flex items-start justify-between gap-4">
-        <div className="min-w-0">
-          <p className="truncate text-sm font-semibold">
-            {order ? (
-              <>
-                {t('Order', 'طلب')}{' '}
-                <span className={styles.mono} dir="ltr">
-                  #{order.orderNumber}
-                </span>
-              </>
-            ) : (
-              t('Your order', 'طلبك')
-            )}
-          </p>
-          <p className="mt-0.5 truncate text-xs opacity-60">
-            {order
-              ? t(
-                  countText('en', itemCount, ITEMS),
-                  countText('ar', itemCount, ITEMS, localize(itemCount))
-                )
-              : storeName}
-          </p>
-        </div>
-        {order && (
-          <div className="shrink-0 text-end">
-            <p className="text-xs opacity-60">{t('Order total', 'إجمالي الطلب')}</p>
-            <p className="text-base font-semibold">
-              <Num>{formatPrice(order.total)}</Num>
-            </p>
-          </div>
-        )}
-      </div>
-      <div className="mt-3 grid min-h-5 text-xs" aria-live="polite" role="status">
+      <div className="grid min-h-5 text-xs" aria-live="polite" role="status">
         {leaving && (
           <span
             key={`out-${leaving}`}
@@ -398,9 +381,7 @@ function Totals({
         </MoneyRow>
       )}
       <div className="flex items-baseline justify-between gap-3 pt-2">
-        <dt
-          className={`font-bold ${ar ? 'text-sm' : `${styles.mono} text-xs uppercase tracking-[0.08em]`}`}
-        >
+        <dt className="font-bold text-sm">
           {paid ? t('Total paid', 'المدفوع') : t('Total', 'الإجمالي')}
         </dt>
         <dd className="text-lg font-bold" data-testid="receipt-total">
@@ -430,19 +411,11 @@ function Totals({
   );
 }
 
-/** Label at the start, value at the end. English labels are Latin mono small
- *  caps (the receipt voice); Arabic labels and every value stay in the body
- *  font, with only Western digit runs in mono via `Num`. */
-function MoneyRow({ label, ar, children }: { label: string; ar: boolean; children: ReactNode }) {
+/** Label at the start, value at the end, both in the body face (T-04: no tracked mono caps). */
+function MoneyRow({ label, children }: { label: string; ar?: boolean; children: ReactNode }) {
   return (
     <div className="flex items-baseline justify-between gap-3 text-xs">
-      <dt
-        className={
-          ar ? styles.inkSoft : `${styles.mono} uppercase tracking-[0.08em] ${styles.inkSoft}`
-        }
-      >
-        {label}
-      </dt>
+      <dt className={styles.inkSoft}>{label}</dt>
       <dd>{children}</dd>
     </div>
   );

@@ -1,8 +1,16 @@
 'use client';
 
-import { memo } from 'react';
+import { memo, useId } from 'react';
 import { canBuyNow } from '@/lib/can-buy-now';
 import { resolveProductCardCtaOosDefaults } from '../shared/product-card-defaults';
+import {
+  lookCardCta,
+  lookCtaVisible,
+  lookChip,
+  LOOK_CHIP_CLS,
+  LOOK_CHIP_STYLE,
+  LOOK_NEW_CHIP_STYLE,
+} from '../shared/look-card';
 import Link from 'next/link';
 import Image from 'next/image';
 import type { ProductCardProps } from '../types';
@@ -25,8 +33,9 @@ import {
   fromMinor,
   REGION,
   storeNumerals,
+  getLook,
 } from '@ebda/shared';
-import { CompareButton, RemoveFromWishlistButton } from '../shared/card-actions';
+import { CompareButton, RemoveFromWishlistButton, cardLinkLabel } from '../shared/card-actions';
 import { Price } from '@ebda/ui';
 import { TaxInclusiveLabel } from '../shared/tax-inclusive-label';
 import { productCardPropsEqual } from '../shared/product-card-memo';
@@ -85,6 +94,8 @@ function MinimalProductCard({
   showCardPrice,
   showHover,
 }: ProductCardProps) {
+  // One id per card INSTANCE: a product can render in a grid and a carousel on the same page.
+  const nameId = `prod-${useId()}-name`;
   const { isRtl: ctxIsRtl, t } = useLanguage();
   const { store, layout } = useStore();
   const renderNow = useRenderNow();
@@ -147,6 +158,9 @@ function MinimalProductCard({
     nameCase,
     viewOnly,
   } = resolveProductCardCtaOosDefaults(layout);
+  // Look card action (W2b, L-01): undefined on a store with no look.
+  const lookCta = lookCardCta(store.theme, layout);
+  const chip = lookChip(store.theme);
   // Discount/sale badge — minimal's badge is inline text below the price
   // (no corner overlay by design, "minimal pack stays chrome-free"), so
   // only the merchant-configurable COLOR applies here; the position field
@@ -194,8 +208,11 @@ function MinimalProductCard({
     <article
       itemScope
       itemType="https://schema.org/Product"
-      aria-labelledby={`prod-${product.id}-name`}
-      className={`w-full mx-auto ${productSizeClass(cardSize)} ${frameCls}`.trim()}
+      aria-labelledby={nameId}
+      // IA-05 (W4): a look store's card fills its grid column; no look keeps the centred cap.
+      className={`w-full ${getLook(store.look) ? '' : `mx-auto ${productSizeClass(cardSize)}`} ${frameCls}`
+        .replace(/\s+/g, ' ')
+        .trim()}
       style={
         showCardFrame && cardFrameColor && store.theme
           ? { borderColor: resolveColor(cardFrameColor, store.theme) }
@@ -210,13 +227,14 @@ function MinimalProductCard({
         {/* Image — PC-3: aspect driven by cardShape/cardAspect; falls back to
             mobile-square / desktop-portrait theme default. */}
         <div
-          className={`relative overflow-hidden bg-muted/30 mb-3 ${imgRadiusCls || shape.radius} ${imgAspectCls || aspectOverride || lookImageAspectClass(store.look) || 'aspect-square sm:aspect-[3/4]'}`}
+          className={`relative overflow-hidden bg-muted/30 mb-3 ${imgRadiusCls || (getLook(store.look) ? 'rounded-[var(--radius)]' : shape.radius)} ${imgAspectCls || aspectOverride || lookImageAspectClass(store.look) || 'aspect-square sm:aspect-[3/4]'}`}
         >
           {/* Platform-level OOS ribbon — minimal pack stays chrome-free
               elsewhere, but the OOS state needs unambiguous communication
               regardless of pack philosophy (2026-05-16).
               Task 3 B4: OOS badge customization via productCardDefaults. */}
           <OutOfStockRibbon
+            flat={!!getLook(store.look)}
             inStock={orderable}
             isRtl={isRtl}
             oosLabel={resolvedOosLabel}
@@ -244,8 +262,15 @@ function MinimalProductCard({
               implicit gating in caller order. */}
           {product.inStock !== false && isProductNew(product, renderNow, store.theme) && (
             <span
-              className="absolute top-2 start-2 z-10 px-2 py-0.5 text-xs font-medium uppercase tracking-[0.18em] text-[hsl(var(--primary))] bg-background"
-              aria-label={t('New product', 'منتج جديد')}
+              className={
+                getLook(store.look)
+                  ? cn(LOOK_CHIP_CLS, 'top-2 start-2')
+                  : 'absolute top-2 start-2 z-10 px-2 py-0.5 text-xs font-medium uppercase tracking-[0.18em] text-[hsl(var(--primary))] bg-background'
+              }
+              // VT-b: neutral on every look; the accent is the sale chip's alone.
+              style={getLook(store.look) ? LOOK_NEW_CHIP_STYLE : undefined}
+              aria-hidden="true"
+              data-badge="new"
             >
               {isRtl ? 'جديد' : 'NEW'}
             </span>
@@ -262,10 +287,17 @@ function MinimalProductCard({
           {customBadgeText && (
             <span
               className={cn(
-                'pointer-events-none absolute z-10 px-2 py-0.5 text-xs font-medium uppercase tracking-[0.18em] text-white',
+                chip
+                  ? LOOK_CHIP_CLS
+                  : 'pointer-events-none absolute z-10 px-2 py-0.5 text-xs font-medium uppercase tracking-[0.18em] text-white',
                 customBadgePositionCls
               )}
-              style={{ backgroundColor: customBadgeColor, color: customBadgeTextColor }}
+              style={
+                chip && !defaults?.customBadge?.color
+                  ? LOOK_CHIP_STYLE
+                  : { backgroundColor: customBadgeColor, color: customBadgeTextColor }
+              }
+              aria-hidden="true"
             >
               {customBadgeText}
             </span>
@@ -273,6 +305,7 @@ function MinimalProductCard({
           {onToggleCompare && (
             <CompareButton
               productId={product.id}
+              productName={isRtl && product.nameAr ? product.nameAr : product.name}
               isInCompare={isInCompare}
               onToggle={onToggleCompare}
               isRtl={isRtl}
@@ -281,6 +314,7 @@ function MinimalProductCard({
           {onRemoveFromWishlist && (
             <RemoveFromWishlistButton
               productId={product.id}
+              productName={isRtl && product.nameAr ? product.nameAr : product.name}
               onRemove={onRemoveFromWishlist}
               isRtl={isRtl}
             />
@@ -345,51 +379,56 @@ function MinimalProductCard({
               faster, mobile stays pure'. Text-only underlined link
               vocabulary matches minimal's font-light tracking-[0.2em]
               language. */}
-          <div
-            className={cn(
-              'flex absolute bottom-0 inset-x-0 items-center justify-center px-3 pb-4 pt-12',
-              'bg-gradient-to-t from-background/95 via-background/70 to-transparent',
-              // Mobile: the underlined add-link is always tappable (no hover to
-              // reveal). Desktop: keep the on-hover reveal — "mobile stays pure"
-              // still holds visually, mobile just gains a tap-to-add affordance.
-              'opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity duration-500 ease-out'
-            )}
-            onClick={e => e.preventDefault()}
-          >
-            {/* Task 3 B2: thread CTA customization props. */}
-            <ProductCardCta
-              productId={product.id}
-              inStock={orderable}
-              hasVariants={!!product.variants && product.variants.length > 0}
-              viewHref={`${urlPrefix}/products/${product.slug}`}
-              quantityInCart={quantityInCart}
-              isRtl={isRtl}
-              onAddToCart={handleAddToCart}
-              variant="ghost"
+          {lookCtaVisible(lookCta, {
+            hasVariants: (!!product.variants && product.variants.length > 0) || viewOnly,
+            orderable,
+          }) && (
+            <div
               className={cn(
-                'max-w-full overflow-hidden text-ellipsis bg-transparent text-xs tracking-[0.14em] uppercase font-normal text-foreground',
-                'underline underline-offset-4 decoration-foreground/30 hover:decoration-foreground',
-                'hover:bg-transparent hover:text-foreground transition-colors duration-300',
-                'py-1 h-auto cursor-pointer'
+                'flex absolute bottom-0 inset-x-0 items-center justify-center px-3 pb-4 pt-12',
+                'bg-gradient-to-t from-background/95 via-background/70 to-transparent',
+                // Mobile: the underlined add-link is always tappable (no hover to
+                // reveal). Desktop: keep the on-hover reveal — "mobile stays pure"
+                // still holds visually, mobile just gains a tap-to-add affordance.
+                'opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity duration-500 ease-out'
               )}
-              labels={{
-                addToCart: isRtl ? 'أضف للسلة' : 'Add to Cart',
-                addedToCart: isRtl ? 'اتضاف' : 'Added',
-                outOfStock: isRtl ? 'نفذت الكمية' : 'Sold Out',
-                adding: isRtl ? '...' : '...',
-                view: isRtl ? 'عرض' : 'View',
-              }}
-              ctaShape={resolvedCtaShape}
-              ctaSize={resolvedCtaSize}
-              ctaColor={resolvedCtaColor}
-              ctaTextColor={resolvedCtaTextColor}
-              ctaLabelTextEn={resolvedCtaLabelTextEn}
-              ctaLabelTextAr={resolvedCtaLabelTextAr}
-              oosDimColor={resolvedOosDimColor}
-              theme={store.theme}
-              viewOnly={viewOnly}
-            />
-          </div>
+              onClick={e => e.preventDefault()}
+            >
+              {/* Task 3 B2: thread CTA customization props. */}
+              <ProductCardCta
+                productId={product.id}
+                inStock={orderable}
+                hasVariants={!!product.variants && product.variants.length > 0}
+                viewHref={`${urlPrefix}/products/${product.slug}`}
+                quantityInCart={quantityInCart}
+                isRtl={isRtl}
+                onAddToCart={handleAddToCart}
+                variant="ghost"
+                className={cn(
+                  'max-w-full overflow-hidden text-ellipsis bg-transparent text-xs tracking-[0.14em] uppercase font-normal text-foreground',
+                  'underline underline-offset-4 decoration-foreground/30 hover:decoration-foreground',
+                  'hover:bg-transparent hover:text-foreground transition-colors duration-300',
+                  'py-1 h-auto cursor-pointer'
+                )}
+                labels={{
+                  addToCart: isRtl ? 'أضف للسلة' : 'Add to cart',
+                  addedToCart: isRtl ? 'اتضاف' : 'Added',
+                  outOfStock: isRtl ? 'نفذت الكمية' : 'Sold Out',
+                  adding: isRtl ? '...' : '...',
+                  view: isRtl ? 'عرض' : 'View',
+                }}
+                ctaShape={resolvedCtaShape}
+                ctaSize={resolvedCtaSize}
+                ctaColor={resolvedCtaColor}
+                ctaTextColor={resolvedCtaTextColor}
+                ctaLabelTextEn={resolvedCtaLabelTextEn}
+                ctaLabelTextAr={resolvedCtaLabelTextAr}
+                oosDimColor={resolvedOosDimColor}
+                theme={store.theme}
+                viewOnly={viewOnly}
+              />
+            </div>
+          )}
         </div>
 
         {/* Text — PC-1: name/price sizes from textSizes; PC-2: pad from textSizes.pad. */}
@@ -397,7 +436,7 @@ function MinimalProductCard({
           <div className={`flex flex-col gap-2 ${textSizes.pad} text-start`}>
             {nameVisible && (
               <h3
-                id={`prod-${product.id}-name`}
+                id={nameId}
                 data-zone="productName"
                 className={`${textSizes.name} tracking-normal sm:tracking-[0.18em] ${nameCase === 'uppercase' ? 'uppercase' : ''} font-light text-muted-foreground group-hover:text-foreground transition-colors duration-500 ease-out leading-snug [overflow-wrap:anywhere] line-clamp-2 min-h-[2.5em]`}
                 itemProp="name"
@@ -405,6 +444,16 @@ function MinimalProductCard({
                 {isRtl && product.nameAr ? product.nameAr : product.name}
               </h3>
             )}
+            {/* P2-14: the chips are aria-hidden; their words follow the name. */}
+            {(() => {
+              const after = cardLinkLabel('', [
+                product.inStock !== false &&
+                  isProductNew(product, renderNow, store.theme) &&
+                  t('New', 'جديد'),
+                customBadgeText,
+              ]);
+              return after ? <span className="sr-only">{after}</span> : null;
+            })()}
             {/* schema meta always rendered for SEO */}
             <span itemProp="offers" itemScope itemType="https://schema.org/Offer">
               <meta itemProp="priceCurrency" content={currency} />

@@ -9,6 +9,7 @@ import { CartProvider } from '../contexts/CartContext';
 import { AuthProvider } from '../contexts/AuthContext';
 import { FeatureProvider } from '../contexts/FeatureContext';
 import { getStore } from '../lib/store-resolver';
+import { storeThemeColor } from '../lib/theme-color';
 import { isPlatformFromHeader } from '../lib/platform-host';
 import { API_URL } from '../lib/api';
 import { organizationJsonLd } from '../lib/structured-data';
@@ -71,16 +72,20 @@ const dahabLatin = Marcellus({
   preload: false,
 });
 
-export const viewport: Viewport = {
-  width: 'device-width',
-  initialScale: 1,
-  maximumScale: 5,
-  // viewport-fit=cover so iPhone safe-area-inset env vars resolve to
-  // real pixel values; lets a future bottom utility / floating add-to-cart
-  // bar sit above the home indicator instead of overlapping it.
-  viewportFit: 'cover',
-  themeColor: BRAND.colors.night,
-};
+export async function generateViewport(): Promise<Viewport> {
+  const store = await getStore();
+  return {
+    width: 'device-width',
+    initialScale: 1,
+    maximumScale: 5,
+    // viewport-fit=cover so iPhone safe-area-inset env vars resolve to
+    // real pixel values; lets a future bottom utility / floating add-to-cart
+    // bar sit above the home indicator instead of overlapping it.
+    viewportFit: 'cover',
+    // K-08: the store's page colour (platform pages keep Ebda's night).
+    themeColor: storeThemeColor(store?.theme),
+  };
+}
 
 export async function generateMetadata(): Promise<Metadata> {
   const store = await getStore();
@@ -557,7 +562,9 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         // server-rendered body so the first paint already has it (the chrome
         // itself loads on the client). Only Dahab sets it: other stores' markup
         // is unchanged.
-        data-pack={store.template === 'dahab' ? 'dahab' : undefined}
+        data-pack={
+          store.template === 'dahab' || store.template === 'qamar' ? store.template : undefined
+        }
         // Looks (Phase S): scopes every look rule in globals.css; absent for legacy stores.
         data-look={look?.dataLook}
       >
@@ -601,7 +608,9 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                   ) : (
                     <FeatureProvider>
                       <AuthProvider>
-                        <ToastProvider>
+                        <ToastProvider
+                          dismissLabel={lang === 'ar' ? 'إغلاق الإشعار' : 'Dismiss notification'}
+                        >
                           <CartProvider>
                             {store.isDemo && <DemoLookBar activeLook={store.look} />}
                             <div id="main-content">{children}</div>
@@ -665,7 +674,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                         className="border-t border-border/30 bg-background [body:has([data-loading])_&]:hidden"
                       >
                         <div className="container mx-auto px-4 py-3 text-center">
-                          <CookiePreferencesLink className="text-xs text-muted-foreground hover:text-foreground transition-colors duration-200 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2" />
+                          <CookiePreferencesLink className="inline-flex min-h-11 min-w-11 items-center justify-center text-xs text-muted-foreground hover:text-foreground transition-colors duration-200 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2" />
                         </div>
                       </div>
                     </>

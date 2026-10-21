@@ -234,7 +234,7 @@ export class OnboardingService {
           growthTrial: ownedNow === 0,
           trialChoice,
           status: 'inactive',
-          template: look ? (look.skin as SelfServeTemplate) : input.template,
+          template: look ? look.skin : input.template,
           ownerEmail: user.email,
           ownerName: `${user.firstName} ${user.lastName}`.trim() || user.email,
           settings: { defaultLanguage: input.language ?? 'ar' },

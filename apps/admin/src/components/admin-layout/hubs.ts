@@ -248,6 +248,7 @@ export const HUBS: HubDefinition[] = [
       '/integrations',
       '/agent-key',
       '/merchant-keys',
+      '/webhooks',
       '/whatsapp',
       '/wa-bot',
       '/wa-templates',

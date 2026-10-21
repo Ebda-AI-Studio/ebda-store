@@ -79,3 +79,15 @@ export function soldOutCorner({
     otherHReserved: topEndReserved,
   });
 }
+
+/**
+ * The NEW chip's corner (W2b, X-01 class; IA-08 W4): ONE fixed corner, top-end (the shared card's
+ * heart owns top-start), so its position means something. When the sale chip also sits at top-end,
+ * NEW stacks directly under it (sale over new) instead of jumping to another corner.
+ */
+export function newBadgeCornerCls(reserved: {
+  topStartReserved?: boolean;
+  topEndReserved?: boolean;
+}): string {
+  return reserved.topEndReserved ? 'top-12 end-3' : 'top-3 end-3';
+}

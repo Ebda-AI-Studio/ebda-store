@@ -39,3 +39,22 @@ describe('sectionSpacingClasses: --space-unit marker', () => {
     expect(sectionSpacingClasses(undefined).wrapperClass).toBe('py-12 sm:py-16 lg:py-20');
   });
 });
+
+// AT-1 (independent audit): on Atelier (airy) the gap between home sections measured
+// 120-150px at 390, so the page read unfinished rather than airy. On a phone the default
+// section rhythm caps at 80px between sections for the airiest density.
+describe('look section rhythm on a phone (AT-1)', () => {
+  it('top + bottom default padding at the airiest density stays at or under 80px', async () => {
+    const { readFileSync } = await import('node:fs');
+    const { join } = await import('node:path');
+    const { LOOK_SPACE_UNIT } = await import('@ebda/shared');
+    const css = readFileSync(join(__dirname, '../../apps/web/src/styles/globals.css'), 'utf8');
+    const base = (sel: string) => {
+      const i = css.indexOf(`[data-look] ${sel} {`);
+      const m = /calc\(([\d.]+)rem \* var\(--space-unit, 1\)\)/.exec(css.slice(i, i + 120));
+      return Number(m![1]) * 16;
+    };
+    const airy = Math.max(...Object.values(LOOK_SPACE_UNIT).map(Number));
+    expect((base('.sp-top-default') + base('.sp-bottom-default')) * airy).toBeLessThanOrEqual(80);
+  });
+});

@@ -200,6 +200,8 @@ export const translations = {
   'Low to High': 'من الأقل للأعلى',
   'High to Low': 'من الأعلى للأقل',
   Search: 'بحث',
+  // Search results sort: the hybrid relevance order (shown only when the server ranked the list).
+  'Most relevant': 'الأكثر صلة',
   'No results found': 'ملقيناش نتايج',
   'Loading...': 'بنحمّل...',
   Error: 'خطأ',
@@ -302,8 +304,34 @@ export const translations = {
     'اكتب نقاط الثقة بتاعتك (التوصيل، الدفع، الاسترجاع) وهتظهر هنا.',
   'Customer reviews appear here once customers leave them.':
     'آراء العملاء هتظهر هنا أول ما العملاء يكتبوها.',
+  'Add a look with a photo and its pieces and it will appear here.':
+    'أضف لوك بصورته وقطعه وهيظهر هنا.',
   'Only you see this in the editor. Visitors do not see an empty section.':
     'إنت بس اللي بتشوف ده في المحرر. الزوار مش بيشوفوا قسم فاضي.',
+
+  // Testimonial attribution when the review has no customer name (API sends null). Neutral noun.
+  Customer: 'عميل',
+
+  // Accessible name of a whole-slide hero link with no headline or alt (HeroBanner, HeroCollage).
+  'View more': 'عرض المزيد',
+
+  // Shop-the-look section (Phase B1 Lookbook). Neutral noun forms, never a gendered imperative.
+  'Shop the look': 'تسوّق اللوك',
+  'Items in this look': 'قطع اللوك',
+  'Look total': 'مجموع اللوك',
+  // W2a "Shop this look" page (amends Ruling B1-6); neutral noun forms (decision (e)).
+  'Shop this look': 'تسوّق اللوك',
+  'Choose a size for each piece and add the ones you want.':
+    'اختيار المقاس لكل قطعة وإضافة القطع المطلوبة.',
+  'Choose the options above first': 'اختيار الخيارات أولًا',
+  'Personalise on the product page': 'التخصيص من صفحة المنتج',
+
+  // Demo showroom bar (Rulings B1-11/B1-12) and its refusals (B1-13).
+  'Demo store': 'متجر تجريبي',
+  Template: 'القالب',
+  Look: 'الشكل',
+  'Choose a look': 'اختر شكلاً',
+  'This is a demo store: this is turned off here': 'ده متجر تجريبي — الخاصية دي مقفولة هنا',
 
   // Route error fallback — Try Again while the refresh is in flight.
   'Retrying…': 'بنجرّب تاني…',

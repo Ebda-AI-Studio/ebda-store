@@ -7,6 +7,7 @@ import { useStore, useStoreUrl } from '../../contexts/StoreContext';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { faqReturnAnswer } from '../../lib/return-policy-text';
 import { useNumerals } from '../../hooks/useNumerals';
+import { pickLocalizedName } from '../../templates/shared/display-helpers';
 
 // Generic fallback FAQs — shown only when the store hasn't authored any
 // store-specific FAQs via the admin FAQ manager.
@@ -148,7 +149,7 @@ export default function FAQClient({ storeFaqs = [], storeHowtos = [] }: FAQClien
           <p className="mt-2 text-muted-foreground">
             {t(
               `Find answers to common questions about ${store.name || 'our store'}`,
-              `اعثر على إجابات للأسئلة الشائعة حول ${store.name || 'متجرنا'}`
+              `اعثر على إجابات للأسئلة الشائعة حول ${pickLocalizedName(store, true) || 'متجرنا'}`
             )}
           </p>
         </div>

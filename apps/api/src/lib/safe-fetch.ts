@@ -105,7 +105,11 @@ const V4_BLOCKS: Array<[string, number]> = [
   ['172.16.0.0', 12],
   ['192.0.0.0', 24],
   ['192.168.0.0', 16],
+  ['192.0.2.0', 24], // TEST-NET-1
+  ['192.88.99.0', 24], // 6to4 relay anycast (deprecated)
   ['198.18.0.0', 15],
+  ['198.51.100.0', 24], // TEST-NET-2
+  ['203.0.113.0', 24], // TEST-NET-3
   ['224.0.0.0', 4],
   ['240.0.0.0', 4],
 ];
@@ -125,7 +129,14 @@ function isBlockedV4(ip: string): boolean {
 }
 
 function isBlockedV6(ip: string): boolean {
-  const s = ip.toLowerCase();
+  // Canonicalise first (the WHATWG parser compresses and lower-cases), so an expanded or oddly
+  // cased spelling of a blocked address cannot slip past the prefix checks below.
+  let s = ip.toLowerCase();
+  try {
+    s = new URL(`http://[${s}]/`).hostname.replace(/^\[|\]$/g, '');
+  } catch {
+    return true; // not a parseable IPv6 literal: block
+  }
   if (s === '::' || s === '::1') return true; // unspecified, loopback
   // IPv4-mapped, dotted form (::ffff:127.0.0.1)
   const dotted = s.match(/^::ffff:(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})$/);
@@ -141,6 +152,14 @@ function isBlockedV6(ip: string): boolean {
   if (/^fe[89ab]/.test(s)) return true;
   // fc00::/7 unique-local
   if (s.startsWith('fc') || s.startsWith('fd')) return true;
+  // ::/96 IPv4-compatible (::7f00:1 is 127.0.0.1), 100::/64 discard, 2001::/32 Teredo
+  if (s.startsWith('::') || s.startsWith('100::') || /^2001:(0{1,4})?:/.test(s)) return true;
+  // fec0::/10 site-local (deprecated, still routable on some networks), ff00::/8 multicast
+  if (/^fe[c-f]/.test(s) || s.startsWith('ff')) return true;
+  // NAT64 (64:ff9b::/96) and 6to4 (2002::/16) embed an IPv4 address: block rather than decode.
+  if (s.startsWith('64:ff9b:') || s.startsWith('2002:')) return true;
+  // 2001:db8::/32 documentation range
+  if (s.startsWith('2001:db8:')) return true;
   return false;
 }
 

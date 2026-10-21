@@ -23,7 +23,7 @@ export function FactChips({
         <span
           key={i}
           data-testid="fact-chip"
-          className="rounded-[var(--radius)] border border-foreground/15 px-1.5 py-0.5 text-xs leading-none text-muted-foreground"
+          className="rounded-[var(--radius)] border border-foreground/15 px-1.5 py-0.5 text-xs leading-normal text-muted-foreground"
         >
           {factText(f, lang).value}
         </span>

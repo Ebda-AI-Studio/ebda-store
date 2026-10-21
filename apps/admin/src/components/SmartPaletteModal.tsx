@@ -42,6 +42,8 @@ export interface ThemeUpdates {
   cardColor?: string;
   mutedColor?: string;
   borderColor?: string;
+  /** Written with borderColor by deriveCoreBrandTokens (Ruling B1-43). */
+  inputColor?: string;
   primaryForeground?: string;
   secondaryForeground?: string;
   accentForeground?: string;

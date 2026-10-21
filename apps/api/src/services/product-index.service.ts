@@ -1,9 +1,13 @@
 // Product embedding indexer (search program P1, Task 11; Rulings SEARCH-9, SEARCH-11, SEARCH-T11-*).
 //
-// What is embedded: `public.ebda_product_embed_doc(...)` (Task 9). A row in product_embeddings is
-// STALE when it is missing, from another model, or its content_hash is not md5(current doc), so a
-// missed writer is found in pure SQL (the backstop cron). A NULL doc (every text part empty) is
-// never embedded; an existing row for it is deleted (SEARCH-T9-1).
+// What is embedded, per product, as TWO vectors on one row (Ruling SEARCH-T13-7):
+//  - the doc, `public.ebda_product_embed_doc(...)` (names + descriptions, SEARCH-T13-5), in
+//    `embedding` / `content_hash`;
+//  - the AI search words alone (`products.search_terms`, trimmed), in `terms_embedding` /
+//    `terms_hash`; NULL when the product has no words (no provider call for them).
+// Each vector has its own md5, so a words-only edit re-embeds only the words vector, and a missed
+// writer is found in pure SQL (the backstop cron). A NULL doc (every text part empty) is never
+// embedded; an existing row for it is deleted (SEARCH-T9-1); emptied words clear the words vector.
 //
 // Transaction rule (Task 8 lesson): never hold a database transaction across the Workers AI call.
 // Callers run these under `runInStoreScope` (each statement is its own short transaction): read the
@@ -15,6 +19,7 @@
 import { Prisma, prisma } from '@ebda/database';
 import { regionDayStart } from '@ebda/shared';
 import {
+  EMBED_MAX_BATCH,
   EMBED_MODEL,
   EmbeddingError,
   getEmbeddingProvider,
@@ -27,8 +32,22 @@ import { takeEmbedCalls } from '../lib/search/embed-budget';
 
 /** Must stay byte-identical across every query below: the hash is md5 of exactly this. */
 // A value-less Prisma.sql fragment (constant SQL, no Prisma.raw escape hatch).
-const DOC = Prisma.sql`public.ebda_product_embed_doc(p.name, p.name_ar, p.search_terms, p.description, p.description_ar)`;
-const STALE = Prisma.sql`(e.product_id IS NULL OR e.model <> ${EMBED_MODEL} OR e.content_hash <> md5(${DOC}))`;
+// Names + descriptions, NOT the AI search words (Ruling SEARCH-T13-5, migration 20261024000100):
+// the words stay in the keyword leg; in the vector they diluted paraphrase matches.
+const DOC = Prisma.sql`public.ebda_product_embed_doc(p.name, p.name_ar, p.description, p.description_ar)`;
+/** The words text, as embedded and hashed: trimmed of all whitespace, NULL when empty. */
+const WORDS = Prisma.sql`nullif(regexp_replace(p.search_terms, '^\\s+|\\s+$', '', 'g'), '')`;
+const DOC_STALE = Prisma.sql`(e.product_id IS NULL OR e.model <> ${EMBED_MODEL} OR e.content_hash <> md5(${DOC}))`;
+/** Words vector out of date: missing for present words, built from other words or another model, or left for emptied words. */
+const WORDS_STALE = Prisma.sql`(e.product_id IS NULL OR e.model <> ${EMBED_MODEL} OR e.terms_hash IS DISTINCT FROM md5(${WORDS}))`;
+const STALE = Prisma.sql`(${DOC_STALE} OR ${WORDS_STALE})`;
+/** Needs a provider call (an emptied-words row only needs clearing, done by the prune). */
+const NEEDS_EMBED = Prisma.sql`(${DOC_STALE} OR (${WORDS} IS NOT NULL AND ${WORDS_STALE}))`;
+/**
+ * The quarantine key: md5 of the product's whole text SET (doc + words). A text the model rejects
+ * keeps the product out until either text changes (SEARCH-T13-7, extends SEARCH-T11-10).
+ */
+const TEXT_KEY = Prisma.sql`md5(coalesce(${DOC}, '') || chr(31) || coalesce(${WORDS}, ''))`;
 /**
  * A product the index should hold a vector for: what storefront search can return (active, not
  * deleted, `product-search.service.ts` storefront scope) and has text. Any other product's vector
@@ -42,7 +61,7 @@ const INDEXABLE = Prisma.sql`(p.deleted_at IS NULL AND p.status = 'active' AND $
  */
 const quarantined = (storeId: string) =>
   Prisma.sql`EXISTS (SELECT 1 FROM product_embed_failures f
-                      WHERE f.product_id = p.id AND f.store_id = ${storeId} AND f.content_hash = md5(${DOC})
+                      WHERE f.product_id = p.id AND f.store_id = ${storeId} AND f.content_hash = ${TEXT_KEY}
                         AND f.model = ${EMBED_MODEL}
                         AND (f.expires_at IS NULL OR f.expires_at > now()))`;
 
@@ -67,15 +86,28 @@ export function embedThrottleMs(): number {
 export interface StaleDoc {
   id: string;
   doc: string;
+  /** md5(doc). */
   hash: string;
+  /** The words text (trimmed), or null when the product has none. */
+  words: string | null;
+  wordsHash: string | null;
+  /** Quarantine key: md5 of doc + words (TEXT_KEY). */
+  key: string;
+  needDoc: boolean;
+  needWords: boolean;
 }
 
-/** Non-deleted products with a non-NULL doc whose embedding is missing, from another model, or for older text. */
+/**
+ * Indexable products that need a provider call: the doc vector is missing, from another model or
+ * for older text, and/or the words vector is (for present words). Quarantined text sets are skipped.
+ */
 export async function findStaleProducts(storeId: string, limit: number): Promise<StaleDoc[]> {
   return prisma.$queryRaw<StaleDoc[]>`
-    SELECT p.id, ${DOC} AS doc, md5(${DOC}) AS hash
+    SELECT p.id, ${DOC} AS doc, md5(${DOC}) AS hash, ${WORDS} AS words, md5(${WORDS}) AS "wordsHash",
+           ${TEXT_KEY} AS key, ${DOC_STALE} AS "needDoc",
+           (${WORDS} IS NOT NULL AND ${WORDS_STALE}) AS "needWords"
       FROM products p LEFT JOIN product_embeddings e ON e.product_id = p.id AND e.store_id = ${storeId}
-     WHERE p.store_id = ${storeId} AND ${INDEXABLE} AND ${STALE} AND NOT ${quarantined(storeId)}
+     WHERE p.store_id = ${storeId} AND ${INDEXABLE} AND ${NEEDS_EMBED} AND NOT ${quarantined(storeId)}
      ORDER BY p.updated_at DESC, p.id
      LIMIT ${limit}`;
 }
@@ -100,16 +132,17 @@ export async function hasStaleProducts(storeId: string): Promise<boolean> {
 /**
  * The viewer's numbers (Task 12, searches page: "{indexed} of {products} products ready").
  * `products` = active, non-deleted products that HAVE text to embed (INDEXABLE); `indexed` = those
- * whose embedding is current (same model, same text); `failed` = quarantined (this text could not be
- * embedded, SEARCH-T11-10); `stale` = the rest. A stale-but-present row is not "ready".
+ * whose DOC vector is current (same model, same text) — the words vector is optional for "ready"
+ * (SEARCH-T13-7); `failed` = quarantined (this text set could not be embedded, SEARCH-T11-10);
+ * `stale` = the rest. A stale-but-present row is not "ready".
  */
 export async function storeIndexStatus(
   storeId: string
 ): Promise<{ products: number; indexed: number; stale: number; failed: number }> {
   const [r] = await prisma.$queryRaw<Array<{ products: bigint; stale: bigint; failed: bigint }>>`
     SELECT count(*) AS products,
-           count(*) FILTER (WHERE ${STALE} AND NOT ${quarantined(storeId)}) AS stale,
-           count(*) FILTER (WHERE ${STALE} AND ${quarantined(storeId)}) AS failed
+           count(*) FILTER (WHERE ${DOC_STALE} AND NOT ${quarantined(storeId)}) AS stale,
+           count(*) FILTER (WHERE ${DOC_STALE} AND ${quarantined(storeId)}) AS failed
       FROM products p LEFT JOIN product_embeddings e ON e.product_id = p.id AND e.store_id = ${storeId}
      WHERE p.store_id = ${storeId} AND ${INDEXABLE}`;
   const products = Number(r?.products ?? 0);
@@ -124,6 +157,12 @@ export async function pruneUnindexableEmbeddings(storeId: string): Promise<numbe
     DELETE FROM product_embeddings e USING products p
      WHERE e.product_id = p.id AND e.store_id = ${storeId} AND p.store_id = ${storeId}
        AND NOT ${INDEXABLE}`;
+  // SEARCH-T13-7: words emptied → the words vector must stop matching (no provider call needed).
+  await prisma.$executeRaw`
+    UPDATE product_embeddings e SET terms_embedding = NULL, terms_hash = NULL
+      FROM products p
+     WHERE e.product_id = p.id AND e.store_id = ${storeId} AND p.store_id = ${storeId}
+       AND e.terms_hash IS NOT NULL AND ${WORDS} IS NULL`;
   // PR3 minor 5: a quarantine row for a product that left the index is dead data; a product that
   // comes back (republished, text restored) is retried from scratch.
   await prisma.$executeRaw`
@@ -186,36 +225,99 @@ export async function embedDocs(
   return vectors.map(v => toHalfvecLiteral(v.map(x => Number(x.toPrecision(5)))));
 }
 
+/** One product's new vectors (halfvec literals); a missing one is not being (re)written. */
+export interface ItemVectors {
+  id: string;
+  hash: string;
+  wordsHash: string | null;
+  doc?: string;
+  words?: string;
+}
+
+const textsOf = (it: StaleDoc): string[] => [
+  ...(it.needDoc ? [it.doc] : []),
+  ...(it.needWords && it.words ? [it.words] : []),
+];
+
+/** Provider calls `embedItems` makes for these items (texts are sent EMBED_MAX_BATCH per call). */
+export function providerCallsFor(items: StaleDoc[]): number {
+  return Math.ceil(items.reduce((n, it) => n + textsOf(it).length, 0) / EMBED_MAX_BATCH);
+}
+
 /**
- * Step 3 (WRITE, ONE statement): upsert the vectors. A row is written only if the product still
- * exists, is still INDEXABLE (not deleted, active — PR3 minor 4), and its CURRENT doc still hashes
- * to what was embedded — a product edited
- * between read and write is left stale (the next run re-embeds the new text), never stamped with
- * the old vector. Returns rows written.
+ * Step 2 for both vectors (SEARCH-T13-7): every text the items need (doc and/or words) goes to the
+ * provider together, so a batch of up to 50 products is ONE call (bge-m3 takes 100 texts a call).
  */
-export async function writeEmbeddings(
-  storeId: string,
-  items: Array<{ id: string; hash: string }>,
-  literals: string[]
-): Promise<number> {
-  if (items.length === 0) return 0;
-  if (literals.length !== items.length)
-    throw new Error('writeEmbeddings: one vector per item expected');
-  const written = await prisma.$executeRaw`
-    INSERT INTO product_embeddings (product_id, store_id, model, content_hash, embedding, embedded_at)
-    SELECT p.id, p.store_id, ${EMBED_MODEL}, v.hash, v.emb::halfvec(1024), now()
-      FROM unnest(${items.map(i => i.id)}::text[], ${items.map(i => i.hash)}::text[], ${literals}::text[])
-           AS v(id, hash, emb)
-      JOIN products p ON p.id = v.id
-     WHERE p.store_id = ${storeId} AND ${INDEXABLE} AND md5(${DOC}) = v.hash
-    ON CONFLICT (product_id) DO UPDATE
-      SET model = EXCLUDED.model, content_hash = EXCLUDED.content_hash,
-          embedding = EXCLUDED.embedding, embedded_at = EXCLUDED.embedded_at`;
+export async function embedItems(
+  provider: EmbeddingProvider,
+  items: StaleDoc[],
+  signal?: AbortSignal
+): Promise<ItemVectors[]> {
+  const texts: string[] = [];
+  const slots: Array<[number, 'doc' | 'words']> = [];
+  items.forEach((it, i) => {
+    if (it.needDoc) slots.push([i, 'doc']);
+    if (it.needWords && it.words) slots.push([i, 'words']);
+    texts.push(...textsOf(it));
+  });
+  const lits = texts.length ? await embedDocs(provider, texts, signal) : [];
+  const out: ItemVectors[] = items.map(it => ({
+    id: it.id,
+    hash: it.hash,
+    wordsHash: it.wordsHash,
+  }));
+  slots.forEach(([i, k], j) => (out[i][k] = lits[j]));
+  return out;
+}
+
+/**
+ * Step 3 (WRITE): upsert the vectors. A vector is written only if the product still exists, is still
+ * INDEXABLE (not deleted, active — PR3 minor 4), and its CURRENT text still hashes to what was
+ * embedded — a product edited between read and write is left stale (the next run re-embeds the new
+ * text), never stamped with the old vector. The doc vector upserts the row (a model change also
+ * drops the old model's words vector); the words vector then updates the same row. Returns how
+ * many products got at least one vector.
+ */
+export async function writeEmbeddings(storeId: string, vecs: ItemVectors[]): Promise<number> {
+  const docs = vecs.filter(v => v.doc);
+  const words = vecs.filter(v => v.words && v.wordsHash);
+  const touched = new Set<string>();
+  if (docs.length > 0) {
+    const rows = await prisma.$queryRaw<Array<{ product_id: string }>>`
+      INSERT INTO product_embeddings (product_id, store_id, model, content_hash, embedding, embedded_at)
+      SELECT p.id, p.store_id, ${EMBED_MODEL}, v.hash, v.emb::halfvec(1024), now()
+        FROM unnest(${docs.map(i => i.id)}::text[], ${docs.map(i => i.hash)}::text[], ${docs.map(i => i.doc!)}::text[])
+             AS v(id, hash, emb)
+        JOIN products p ON p.id = v.id
+       WHERE p.store_id = ${storeId} AND ${INDEXABLE} AND md5(${DOC}) = v.hash
+      ON CONFLICT (product_id) DO UPDATE
+        SET model = EXCLUDED.model, content_hash = EXCLUDED.content_hash,
+            embedding = EXCLUDED.embedding, embedded_at = EXCLUDED.embedded_at,
+            terms_embedding = CASE WHEN product_embeddings.model = EXCLUDED.model
+                                   THEN product_embeddings.terms_embedding END,
+            terms_hash = CASE WHEN product_embeddings.model = EXCLUDED.model
+                              THEN product_embeddings.terms_hash END
+      RETURNING product_id`;
+    rows.forEach(r => touched.add(r.product_id));
+  }
+  if (words.length > 0) {
+    const rows = await prisma.$queryRaw<Array<{ product_id: string }>>`
+      UPDATE product_embeddings e
+         SET terms_embedding = v.emb::halfvec(1024), terms_hash = v.hash, embedded_at = now()
+        FROM unnest(${words.map(i => i.id)}::text[], ${words.map(i => i.wordsHash!)}::text[], ${words.map(i => i.words!)}::text[])
+             AS v(id, hash, emb)
+        JOIN products p ON p.id = v.id
+       WHERE e.product_id = v.id AND e.store_id = ${storeId} AND p.store_id = ${storeId}
+         AND e.model = ${EMBED_MODEL} AND ${INDEXABLE} AND md5(${WORDS}) = v.hash
+      RETURNING e.product_id`;
+    rows.forEach(r => touched.add(r.product_id));
+  }
   // A product that embedded is no longer quarantined (its text changed, or the provider recovered).
-  await prisma.$executeRaw`
-    DELETE FROM product_embed_failures
-     WHERE store_id = ${storeId} AND product_id = ANY(${items.map(i => i.id)}::text[])`;
-  return written;
+  if (touched.size > 0)
+    await prisma.$executeRaw`
+      DELETE FROM product_embed_failures
+       WHERE store_id = ${storeId} AND product_id = ANY(${[...touched]}::text[])`;
+  return touched.size;
 }
 
 export interface EmbedFailure {
@@ -226,9 +328,9 @@ export interface EmbedFailure {
   retryable: boolean;
 }
 
-/** One product's single-call outcome: its literal, or why it failed. */
+/** One product's single-call outcome: its vectors, or why it failed. `hash` = its quarantine key. */
 export type SingleResult =
-  | { id: string; hash: string; lit: string }
+  | { id: string; hash: string; vec: ItemVectors }
   | { id: string; hash: string; kind: string; retryable: boolean };
 
 /** Quarantine for a product that failed retryably twice (review N-I1); then it is re-admitted. */
@@ -249,12 +351,12 @@ export async function embedSingles(
   const out: SingleResult[] = [];
   for (const item of items) {
     try {
-      const [lit] = await embedDocs(provider, [item.doc]);
-      out.push({ id: item.id, hash: item.hash, lit });
+      const [vec] = await embedItems(provider, [item]);
+      out.push({ id: item.id, hash: item.key, vec });
       if (throttleMs > 0) await sleep(throttleMs);
     } catch (err) {
       if (!(err instanceof EmbeddingError)) throw err;
-      out.push({ id: item.id, hash: item.hash, kind: err.kind, retryable: err.retryable });
+      out.push({ id: item.id, hash: item.key, kind: err.kind, retryable: err.retryable });
     }
   }
   return out;
@@ -270,16 +372,16 @@ export function settleSingles(
   first: SingleResult[],
   retried: SingleResult[]
 ): {
-  ok: Array<{ id: string; hash: string; lit: string }>;
+  ok: Array<{ id: string; hash: string; vec: ItemVectors }>;
   failures: EmbedFailure[];
   outage: boolean;
 } {
   const second = new Map(retried.map(r => [r.id, r]));
-  const ok: Array<{ id: string; hash: string; lit: string }> = [];
+  const ok: Array<{ id: string; hash: string; vec: ItemVectors }> = [];
   const failures: EmbedFailure[] = [];
   for (const r of first) {
-    const final = 'lit' in r || !r.retryable ? r : (second.get(r.id) ?? r);
-    if ('lit' in final) ok.push(final);
+    const final = 'vec' in r || !r.retryable ? r : (second.get(r.id) ?? r);
+    if ('vec' in final) ok.push(final);
     else if (!final.retryable) failures.push({ ...final, retryable: false });
     else if (second.has(r.id)) failures.push({ ...final, retryable: true });
   }
@@ -289,7 +391,7 @@ export function settleSingles(
 
 /** The products of `results` that failed retryably (they get one single retry). */
 export function retryableFailures(items: StaleDoc[], results: SingleResult[]): StaleDoc[] {
-  const ids = new Set(results.filter(r => !('lit' in r) && r.retryable).map(r => r.id));
+  const ids = new Set(results.filter(r => !('vec' in r) && r.retryable).map(r => r.id));
   return items.filter(i => ids.has(i.id));
 }
 
@@ -383,17 +485,16 @@ export async function indexStore(
     const plan = await planEmbedBatch(storeId, Math.min(batchSize, maxDocs - attempted));
     if (plan.capped) return finish({ embedded, remaining: true, capped: true });
     if (plan.items.length === 0) return finish({ embedded, remaining: false, capped: false });
-    let ok: Array<{ id: string; hash: string; lit: string }>;
+    let ok: Array<{ id: string; hash: string; vec: ItemVectors }>;
     let failures: EmbedFailure[] = [];
-    // Account-wide ceiling on provider calls (SEARCH-T11-19): one call per batch, one per single.
-    if (!(await takeEmbedCalls(1))) return finish({ embedded, remaining: true, capped: true });
+    // Account-wide ceiling on provider calls (SEARCH-T11-19): charged per real call — a batch's doc
+    // AND words texts share one call (SEARCH-T13-7), one per single.
+    if (!(await takeEmbedCalls(providerCallsFor(plan.items))))
+      return finish({ embedded, remaining: true, capped: true });
     try {
-      const literals = await embedDocs(
-        provider,
-        plan.items.map(i => i.doc)
-      );
+      const vectors = await embedItems(provider, plan.items);
       await sleep(embedThrottleMs());
-      ok = plan.items.map((it, i) => ({ id: it.id, hash: it.hash, lit: literals[i] }));
+      ok = vectors.map((vec, i) => ({ id: vec.id, hash: plan.items[i].key, vec }));
     } catch (err) {
       // In-process there is no Inngest retry: go straight to the single pass + one retry.
       if (!(err instanceof EmbeddingError)) throw err;
@@ -414,8 +515,7 @@ export async function indexStore(
     }
     const written = await writeEmbeddings(
       storeId,
-      ok.map(({ id, hash }) => ({ id, hash })),
-      ok.map(o => o.lit)
+      ok.map(o => o.vec)
     );
     const q = await quarantineEmbedFailures(storeId, failures);
     counts.permanent += q.permanent;

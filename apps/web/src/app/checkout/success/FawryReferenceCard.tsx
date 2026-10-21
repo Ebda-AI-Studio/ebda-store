@@ -49,7 +49,7 @@ export function FawryReferenceCard({ code }: { code: string }) {
         <button
           type="button"
           onClick={copy}
-          className="rounded-md border border-border px-3 py-1.5 text-sm font-medium text-foreground hover:bg-muted"
+          className="rounded-md border border-input px-3 py-1.5 text-sm font-medium text-foreground hover:bg-muted"
         >
           {copied ? t('Copied', 'اتنسخ') : t('Copy', 'نسخ')}
         </button>

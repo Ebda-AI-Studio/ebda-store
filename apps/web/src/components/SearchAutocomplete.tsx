@@ -11,7 +11,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { useStoreUrl } from '../contexts/StoreContext';
 import { useLanguage } from '../contexts/LanguageContext';
-import { useNumerals } from '../hooks/useNumerals';
+import { useLocalePrice } from '../hooks/useLocalePrice';
 import { api, type SearchSuggestion } from '../lib/api';
 
 // ─── Props ────────────────────────────────────────────────────────────────────
@@ -55,7 +55,7 @@ function cacheSet(key: string, value: SearchSuggestion[]) {
 export function SearchAutocomplete({ query, onSelect, committedQuery }: SearchAutocompleteProps) {
   const storeUrl = useStoreUrl();
   const { language, t } = useLanguage();
-  const { money } = useNumerals();
+  const money = useLocalePrice();
   const isAr = language === 'ar';
 
   const [suggestions, setSuggestions] = useState<SearchSuggestion[] | null>(null);
@@ -142,7 +142,7 @@ export function SearchAutocomplete({ query, onSelect, committedQuery }: SearchAu
     if (trimmed !== mountedQueryRef.current) editedRef.current = true;
     if (!editedRef.current) return;
 
-    if (trimmed.length < 2) {
+    if (trimmed.length < 1) {
       setSuggestions(null);
       setIsOpen(false);
       setActiveIndex(-1);
@@ -260,7 +260,6 @@ export function SearchAutocomplete({ query, onSelect, committedQuery }: SearchAu
           {suggestions.map((product, idx) => {
             const isActive = activeIndex === idx;
             const displayName = isAr && product.nameAr ? product.nameAr : product.name;
-            // Prices stored in piastres — divide by 1000 for EGP.
             const priceMajor = money(product.price);
 
             return (
@@ -309,7 +308,7 @@ export function SearchAutocomplete({ query, onSelect, committedQuery }: SearchAu
                 {/* Name + price */}
                 <div className="min-w-0 flex-1">
                   <p className="truncate font-medium text-foreground">{displayName}</p>
-                  <p className="text-xs text-muted-foreground">{priceMajor} EGP</p>
+                  <p className="text-xs text-muted-foreground">{priceMajor}</p>
                 </div>
               </Link>
             );

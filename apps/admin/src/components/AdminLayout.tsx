@@ -311,6 +311,7 @@ export function AdminLayout({
     announcement: tcp('pages.announcement'),
     agentKey: tcp('pages.agentKey'),
     merchantKeys: tcp('pages.merchantKeys'),
+    webhooks: tcp('pages.webhooks'),
     billing: tcp('pages.billing'),
   };
   const paletteItems: PaletteItem[] =

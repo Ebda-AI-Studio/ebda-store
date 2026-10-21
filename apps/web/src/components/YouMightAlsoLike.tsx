@@ -1,5 +1,6 @@
 'use client';
 
+import { relatedHeadingSize } from '../templates/shared/look-card';
 import {
   useProductRecommendations,
   selectMergedRecommendations,
@@ -89,16 +90,16 @@ export function YouMightAlsoLike({ storeId, productId }: YouMightAlsoLikeProps) 
   };
 
   return (
-    <div className="mt-16">
+    <div className="mt-16 -mx-4 sm:-mx-6 lg:-mx-8">
       {/* Compact horizontal carousel (was a 4-col grid of full-size cards).
           A "you might also like" strip sits BELOW the homepage section scale:
           heading capped at 20px, cards forced compact (xs). Reuses the canonical
           ProductCarousel so per-store frame/shape settings still apply. */}
       <ProductCarousel
         products={products.map(recommendedToTemplateProduct)}
-        title="You Might Also Like"
+        title="You might also like"
         titleAr="قد يعجبك أيضاً"
-        headingZone={{ fontSize: '20px' }}
+        headingZone={{ fontSize: relatedHeadingSize(store.look) }}
         isRtl={isRtl}
         currency={store.currency}
         pack={templateId}

@@ -161,6 +161,7 @@ interface ShippingAddressShape {
 router.get(
   '/export.xlsx',
   ...adminMiddleware,
+  requirePermission('orders:read'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId } = req.params;
@@ -549,6 +550,15 @@ router.get('/', authenticate, async (req: Request, res: Response, next: NextFunc
         res
           .status(access.status)
           .json({ success: false, error: { code: access.code, message: access.message } });
+        return;
+      }
+      // The store-wide order/customer search lookups answer for the whole store: only a role that
+      // may read orders asks them (Ruling SEARCH-T14-7).
+      if (!hasPermission(role as Role, 'orders:read')) {
+        res.status(403).json({
+          success: false,
+          error: { code: 'FORBIDDEN', message: 'Missing required permission: orders:read' },
+        });
         return;
       }
     }

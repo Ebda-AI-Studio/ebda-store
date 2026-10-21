@@ -1,4 +1,5 @@
-import { Metadata } from 'next';
+import type { Metadata } from 'next';
+import { localizedMetadata } from '@/lib/seo/localized-metadata';
 import { Suspense } from 'react';
 import CheckoutClient from './CheckoutClient';
 import WaTokenHydrator from './WaTokenHydrator';
@@ -6,11 +7,13 @@ import WaTokenHydrator from './WaTokenHydrator';
 // Track-B — see cart/page.tsx sibling comment; same rationale.
 export const dynamic = 'force-dynamic';
 
-export const metadata: Metadata = {
-  title: 'Checkout',
-  description: 'Complete your purchase.',
-  robots: { index: false, follow: false },
-};
+export function generateMetadata(): Promise<Metadata> {
+  return localizedMetadata({
+    title: ['Checkout', 'إتمام الطلب'],
+    description: ['Complete your purchase.', 'أكمل طلبك.'],
+    robots: { index: false, follow: false },
+  });
+}
 
 export default function CheckoutPage() {
   return (

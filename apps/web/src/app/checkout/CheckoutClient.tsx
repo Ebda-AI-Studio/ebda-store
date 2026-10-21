@@ -1,5 +1,6 @@
 'use client';
 
+import { focusFirstError } from '@/lib/focus-first-error';
 import { signedText } from '@/lib/bidi';
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useLocalePrice } from '../../hooks/useLocalePrice';
@@ -74,6 +75,7 @@ import {
   pageDensityStyle,
 } from '../../templates/shared/section-typography';
 import { OrderSummary } from './OrderSummary';
+import { couponErrorCopy } from '../../lib/coupon-errors';
 import { estimateLoyaltyRedemption } from './_lib/loyaltyEstimate';
 import { repriceAfterCouponRemoval, isShippingSettled } from './_lib/repriceAfterCouponRemoval';
 import { useLastListing } from '../../hooks/useLastListing';
@@ -84,8 +86,8 @@ import { useWallet } from '../../hooks/useWallet';
 const PaymentStep = dynamic(() => import('./PaymentStep'), {
   loading: () => (
     <div className="animate-pulse space-y-4">
-      <div className="h-32 bg-muted rounded-xl" />
-      <div className="h-48 bg-muted rounded-xl" />
+      <div className="h-32 bg-muted rounded-[var(--radius)]" />
+      <div className="h-48 bg-muted rounded-[var(--radius)]" />
     </div>
   ),
 });
@@ -122,6 +124,9 @@ interface AreaRate {
   deliveryFee: number;
   freeShippingThreshold: number | null;
 }
+
+/** P2-6 (W4): checkout fields stay 44px on desktop too (the shared Input drops to 40 at sm). */
+const CHECKOUT_FIELD = 'sm:h-11';
 
 export default function CheckoutClient() {
   const router = useRouter();
@@ -172,7 +177,7 @@ export default function CheckoutClient() {
   // owners can rename or clear the "Secure Checkout" text via
   // store.settings.checkoutLabel / .checkoutLabelAr without code changes.
   const checkoutLabelEn =
-    (store?.settings?.checkoutLabel as string | undefined) ?? 'Secure Checkout';
+    (store?.settings?.checkoutLabel as string | undefined) ?? 'Secure checkout';
   const checkoutLabelAr = (store?.settings?.checkoutLabelAr as string | undefined) ?? 'دفع آمن';
   const storeUrl = useStoreUrl();
   const continueShoppingHref = useLastListing();
@@ -305,6 +310,10 @@ export default function CheckoutClient() {
           quantity: item.quantity,
           price: item.price,
           note: item.note,
+          // Taste re-audit P1-1: the summary's variant line reads these; dropping them here
+          // left colour, size and length off the irreversible step (Ruling B1-87).
+          variantTitle: item.variantTitle,
+          variantTitleAr: item.variantTitleAr,
           product: {
             id: item.productId,
             name: item.name,
@@ -426,13 +435,13 @@ export default function CheckoutClient() {
   // "Send me offers by SMS" (issue 206): unticked by default, rendered only
   // when the store can actually send promotional SMS (store.smsMarketingOptIn).
   const [smsOptIn, setSmsOptIn] = useState(false);
-  const showSmsOptIn = store?.smsMarketingOptIn === true;
   // "Email me if I forget something in my cart": unticked by default, rendered only when the store
   // can actually send the reminder (store.cartEmailOptIn). Ticking records consent for that address
   // (reaches guests); unticking withdraws it. Ruling CART-CONSENT-1.
   const [cartEmailOptIn, setCartEmailOptIn] = useState(false);
   const showCartEmailOptIn = store?.cartEmailOptIn === true;
   const cartEmailRecorded = useRef(false);
+  const showSmsOptIn = store?.smsMarketingOptIn === true;
 
   // Payment
   const [selectedProvider, setSelectedProvider] = useState('');
@@ -463,6 +472,19 @@ export default function CheckoutClient() {
     // kept for back-compat with sessionStorage / PaymentStep display
     address: '',
   });
+
+  // IA-01: the review card shows the area / governorate in the page language.
+  const reviewGov = EGYPT_GOVERNORATES.find(g => g.en === formData.governorate);
+  const reviewArea =
+    reviewGov?.areas.find(a => a.en === formData.area) ??
+    findGovernorateByArea(formData.area)?.areas.find(a => a.en === formData.area);
+  const reviewPlaceNames = {
+    // Custom (non-static) areas take the rate row's Arabic names, as the order does.
+    area: formData.area
+      ? { en: formData.area, ar: reviewArea?.ar ?? rateByArea.get(formData.area)?.areaAr }
+      : undefined,
+    governorate: formData.governorate ? { en: formData.governorate, ar: reviewGov?.ar } : undefined,
+  };
 
   const checkoutStorageKey = store?.id ? `force-checkout-form-${store.id}` : null;
   const promoStorageKey = store?.id ? `force-promo-${store.id}` : null;
@@ -574,6 +596,8 @@ export default function CheckoutClient() {
   }, [store?.id]);
 
   // Form validation errors
+  // a11y re-audit P2-N8: one announcement for a failed submit; field errors are described, not alerts.
+  const [submitTried, setSubmitTried] = useState(false);
   const [formErrors, setFormErrors] = useState<{
     email?: string;
     firstName?: string;
@@ -825,11 +849,11 @@ export default function CheckoutClient() {
 
     // Last name validation
     if (!formData.lastName.trim()) {
-      errors.lastName = t('Last name is required', 'الاسم الأخير مطلوب');
+      errors.lastName = t('Last name is required', 'اسم العائلة مطلوب');
     } else if (formData.lastName.trim().length < 2) {
       errors.lastName = t(
         'Last name must be at least 2 characters',
-        'الاسم الأخير لازم يكون حرفين على الأقل'
+        'اسم العائلة لازم يكون حرفين على الأقل'
       );
     }
 
@@ -857,7 +881,7 @@ export default function CheckoutClient() {
 
     // Street validation (required)
     if (!formData.street.trim()) {
-      errors.street = t('Street is required', 'الشارع مطلوب');
+      errors.street = t('Street is required', 'اسم الشارع مطلوب');
     }
 
     // Building validation (required)
@@ -914,14 +938,8 @@ export default function CheckoutClient() {
             }
           }
         } else {
-          setCouponError(
-            result.error?.code === 'COUPON_NOT_ELIGIBLE'
-              ? t(
-                  'This coupon does not apply to the items in your cart.',
-                  'الكوبون ده مش بيتطبق على المنتجات اللي في سلتك.'
-                )
-              : result.error?.message || t('Invalid coupon', 'كوبون غير صالح')
-          );
+          // a11y re-audit P1-N1: copy from the error code, in the page language.
+          setCouponError(couponErrorCopy(result.error?.code, t));
           // Stored code is no longer valid -- drop it so we don't auto-apply again.
           if (codeOverride && promoStorageKey && typeof window !== 'undefined') {
             try {
@@ -995,6 +1013,24 @@ export default function CheckoutClient() {
   // Auto-apply a promo that the user entered on /cart. Runs once after the
   // cart hydrates so the discount is re-validated server-side with the
   // authoritative subtotal.
+  // Record / withdraw the cart-email consent. Debounced; waits for a valid address when ticking;
+  // only calls to withdraw if a tick was actually recorded.
+  useEffect(() => {
+    if (!showCartEmailOptIn) return;
+    const email = formData.email.trim();
+    if (cartEmailOptIn && !isValidEmail(email)) return;
+    if (!cartEmailOptIn && !cartEmailRecorded.current) return;
+    const timeoutId = setTimeout(() => {
+      api
+        .post('/public/cart/email-optin', { email, consent: cartEmailOptIn, language })
+        .then(res => {
+          if (res.success) cartEmailRecorded.current = cartEmailOptIn;
+        })
+        .catch(() => {});
+    }, 600);
+    return () => clearTimeout(timeoutId);
+  }, [showCartEmailOptIn, cartEmailOptIn, formData.email, language]);
+
   const autoAppliedPromoRef = useRef(false);
   useEffect(() => {
     if (autoAppliedPromoRef.current) return;
@@ -1087,24 +1123,6 @@ export default function CheckoutClient() {
     }, 400);
     return () => clearTimeout(timeoutId);
   }, [store?.id, cart, formData.phone, formData.email]);
-
-  // Record / withdraw the cart-email consent. Debounced; waits for a valid address when ticking;
-  // only calls to withdraw if a tick was actually recorded.
-  useEffect(() => {
-    if (!showCartEmailOptIn) return;
-    const email = formData.email.trim();
-    if (cartEmailOptIn && !isValidEmail(email)) return;
-    if (!cartEmailOptIn && !cartEmailRecorded.current) return;
-    const timeoutId = setTimeout(() => {
-      api
-        .post('/public/cart/email-optin', { email, consent: cartEmailOptIn, language })
-        .then(res => {
-          if (res.success) cartEmailRecorded.current = cartEmailOptIn;
-        })
-        .catch(() => {});
-    }, 600);
-    return () => clearTimeout(timeoutId);
-  }, [showCartEmailOptIn, cartEmailOptIn, formData.email, language]);
 
   // Calculate totals
   const subtotal = cart?.subtotal || 0;
@@ -1280,9 +1298,9 @@ export default function CheckoutClient() {
     if (step === 1) {
       // Validate before proceeding to payment
       if (!validateForm()) {
-        // Scroll to first error
-        const firstError = document.querySelector('[data-error="true"]');
-        firstError?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        setSubmitTried(true);
+        // R-13: focus the first error once the errors have rendered.
+        requestAnimationFrame(() => focusFirstError());
         return;
       }
       // The ONLY shipping condition that blocks checkout: the store configured
@@ -1329,8 +1347,7 @@ export default function CheckoutClient() {
       setSelectedDeliveryWindowId(null);
       setSelectedDeliveryDay(null);
       setDeliveryWindowError(lapsedWindowMessage);
-      const firstError = document.querySelector('[data-error="true"]');
-      firstError?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      requestAnimationFrame(() => focusFirstError());
       return;
     }
 
@@ -1340,8 +1357,7 @@ export default function CheckoutClient() {
     // (per the platform rule: never hard-block checkout on this).
     if (checkoutDelivery?.windows?.enabled && freshAnyWindowAvailable && !freshSelectedWindow) {
       setDeliveryWindowError(t('Please select a delivery window', 'اختار موعد التوصيل'));
-      const firstError = document.querySelector('[data-error="true"]');
-      firstError?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      requestAnimationFrame(() => focusFirstError());
       return;
     }
     setDeliveryWindowError(null);
@@ -1618,10 +1634,7 @@ export default function CheckoutClient() {
           setFormErrors(prev => ({ ...prev, ...inlineErrors }));
           setStep(1);
           // Scroll the first inline error into view on the shipping step.
-          setTimeout(() => {
-            const firstError = document.querySelector('[data-error="true"]');
-            firstError?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-          }, 50);
+          setTimeout(() => focusFirstError(), 50);
           setCheckoutError(
             t(
               'Please fix the highlighted fields and try again.',
@@ -1976,7 +1989,7 @@ export default function CheckoutClient() {
           <p role="alert" className="mt-2 text-muted-foreground">
             {unavailableLinesNotice}
           </p>
-          <Link href={storeUrl('/cart')}>
+          <Link href={storeUrl('/cart')} className="inline-block">
             <Button className="mt-6">{t('Go to cart', 'الذهاب إلى السلة')}</Button>
           </Link>
         </div>
@@ -1994,9 +2007,9 @@ export default function CheckoutClient() {
           <p className="mt-2 text-muted-foreground">
             {t('Add some products before checking out.', 'ضيف شوية منتجات قبل ما تدفع.')}
           </p>
-          <Link href={continueShoppingHref}>
+          <Link href={continueShoppingHref} className="inline-block">
             <Button className="mt-6">
-              {t('Continue Shopping', translations['Continue Shopping'])}
+              {t('Continue shopping', translations['Continue Shopping'])}
             </Button>
           </Link>
         </div>
@@ -2018,8 +2031,20 @@ export default function CheckoutClient() {
 
   return (
     <MinimalChrome label={checkoutLabelEn} labelAr={checkoutLabelAr}>
-      <div className="flex-1" style={checkoutBgStyle}>
+      <div className="flex-1" style={checkoutBgStyle} data-transactional>
         <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8" style={checkoutDensity}>
+          {/* P2-2 (W4): the page names itself (the chrome label above is not a heading). */}
+          <h1 data-checkout-title className="sr-only">
+            {t('Checkout', 'إتمام الطلب')}
+          </h1>
+          {submitTried && Object.values(formErrors).some(Boolean) && (
+            <p role="alert" className="sr-only" data-checkout-error-summary>
+              {t(
+                'Some details need fixing before you continue.',
+                'في بيانات محتاجة تتصلح قبل ما تكمل.'
+              )}
+            </p>
+          )}
           {/* Progress Steps */}
           <div className="mb-8">
             <div className="flex items-center justify-center">
@@ -2030,7 +2055,7 @@ export default function CheckoutClient() {
                   if (step > 1) setStep(1);
                 }}
                 disabled={step <= 1}
-                className={`flex items-center ${
+                className={`flex min-h-11 items-center ${
                   step > 1 ? 'cursor-pointer group' : 'cursor-default'
                 }`}
               >
@@ -2114,53 +2139,46 @@ export default function CheckoutClient() {
                   }
                 />
                 {step === 1 && (
-                  <div className="rounded-xl border bg-card p-6 shadow-sm">
+                  <div className="rounded-[var(--radius)] border bg-card p-6 shadow-sm">
                     <h2
                       className="text-lg font-semibold text-foreground"
                       style={zoneStyle(checkoutHeadingZone, checkoutScale)}
                     >
-                      {t('Shipping Information', 'معلومات الشحن')}
+                      {t(
+                        'Shipping information',
+                        '\u0645\u0639\u0644\u0648\u0645\u0627\u062a \u0627\u0644\u0634\u062d\u0646'
+                      )}
                     </h2>
 
                     <div className="mt-6 space-y-4">
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div data-error={!!formErrors.firstName}>
                           <Input
-                            label={t('First name', 'الاسم الأول')}
+                            label={t(
+                              'First name',
+                              '\u0627\u0644\u0627\u0633\u0645 \u0627\u0644\u0623\u0648\u0644'
+                            )}
+                            placeholder={t('e.g. Mona', 'مثال: منى')}
                             autoComplete="given-name"
                             value={formData.firstName}
                             onChange={e => updateField('firstName', e.target.value)}
-                            aria-invalid={formErrors.firstName ? true : undefined}
-                            className={
-                              formErrors.firstName
-                                ? 'border-destructive focus:border-destructive focus:ring-destructive'
-                                : ''
-                            }
+                            error={formErrors.firstName}
+                            className={CHECKOUT_FIELD}
                           />
-                          {formErrors.firstName && (
-                            <p role="alert" className="mt-1 text-sm text-destructive-ink">
-                              {formErrors.firstName}
-                            </p>
-                          )}
                         </div>
                         <div data-error={!!formErrors.lastName}>
                           <Input
-                            label={t('Last name', 'اسم العائلة')}
+                            label={t(
+                              'Last name',
+                              '\u0627\u0633\u0645 \u0627\u0644\u0639\u0627\u0626\u0644\u0629'
+                            )}
+                            placeholder={t('e.g. Adel', 'مثال: عادل')}
                             autoComplete="family-name"
                             value={formData.lastName}
                             onChange={e => updateField('lastName', e.target.value)}
-                            aria-invalid={formErrors.lastName ? true : undefined}
-                            className={
-                              formErrors.lastName
-                                ? 'border-destructive focus:border-destructive focus:ring-destructive'
-                                : ''
-                            }
+                            error={formErrors.lastName}
+                            className={CHECKOUT_FIELD}
                           />
-                          {formErrors.lastName && (
-                            <p role="alert" className="mt-1 text-sm text-destructive-ink">
-                              {formErrors.lastName}
-                            </p>
-                          )}
                         </div>
                       </div>
 
@@ -2170,31 +2188,22 @@ export default function CheckoutClient() {
                           type="tel"
                           autoComplete="tel"
                           inputMode="tel"
-                          placeholder={REGION.phone.placeholderIntl}
+                          placeholder={REGION.phone.placeholder}
                           value={formData.phone}
                           onChange={e => updateField('phone', e.target.value)}
-                          aria-invalid={formErrors.phone ? true : undefined}
-                          className={
-                            formErrors.phone
-                              ? 'border-destructive focus:border-destructive focus:ring-destructive'
-                              : ''
-                          }
+                          error={formErrors.phone}
+                          className={CHECKOUT_FIELD}
                         />
-                        {formErrors.phone && (
-                          <p role="alert" className="mt-1 text-sm text-destructive-ink">
-                            {formErrors.phone}
-                          </p>
-                        )}
                         {showSmsOptIn && (
                           <label
                             data-sms-marketing-optin
-                            className="mt-2 flex cursor-pointer items-start gap-2"
+                            className="mt-2 flex min-h-11 cursor-pointer items-start gap-2"
                           >
                             <input
                               type="checkbox"
                               checked={smsOptIn}
                               onChange={e => setSmsOptIn(e.target.checked)}
-                              className="mt-0.5 h-4 w-4 shrink-0 rounded border-border text-primary accent-primary focus:ring-2 focus:ring-primary/20"
+                              className="mt-0.5 h-4 w-4 shrink-0 rounded border-input text-primary accent-primary focus:ring-2 focus:ring-primary"
                             />
                             <span className="flex flex-col gap-0.5">
                               <span className="text-sm text-foreground">
@@ -2215,34 +2224,28 @@ export default function CheckoutClient() {
 
                       <div data-error={!!formErrors.email}>
                         <Input
-                          label={t('Email (optional)', 'البريد الإلكتروني (اختياري)')}
+                          label={t(
+                            'Email (optional)',
+                            '\u0627\u0644\u0628\u0631\u064a\u062f \u0627\u0644\u0625\u0644\u0643\u062a\u0631\u0648\u0646\u064a (\u0627\u062e\u062a\u064a\u0627\u0631\u064a)'
+                          )}
                           type="email"
                           autoComplete="email"
                           inputMode="email"
                           value={formData.email}
                           onChange={e => updateField('email', e.target.value)}
-                          aria-invalid={formErrors.email ? true : undefined}
-                          className={
-                            formErrors.email
-                              ? 'border-destructive focus:border-destructive focus:ring-destructive'
-                              : ''
-                          }
+                          error={formErrors.email}
+                          className={CHECKOUT_FIELD}
                         />
-                        {formErrors.email && (
-                          <p role="alert" className="mt-1 text-sm text-destructive-ink">
-                            {formErrors.email}
-                          </p>
-                        )}
                         {showCartEmailOptIn && (
                           <label
                             data-cart-email-optin
-                            className="mt-2 flex cursor-pointer items-start gap-2"
+                            className="mt-2 flex min-h-11 cursor-pointer items-start gap-2"
                           >
                             <input
                               type="checkbox"
                               checked={cartEmailOptIn}
                               onChange={e => setCartEmailOptIn(e.target.checked)}
-                              className="mt-0.5 h-4 w-4 shrink-0 rounded border-border text-primary accent-primary focus:ring-2 focus:ring-primary/20"
+                              className="mt-0.5 h-4 w-4 shrink-0 rounded border-input text-primary accent-primary focus:ring-2 focus:ring-primary"
                             />
                             <span className="flex flex-col gap-0.5">
                               <span className="text-sm text-foreground">
@@ -2262,14 +2265,9 @@ export default function CheckoutClient() {
                       {/* Country row — fixed display for single-country stores.
                           Multi-country stores get an interactive selector inside GovernorateAreaSelect. */}
                       {isSingleCountryStore && (
-                        <div>
-                          <label className="block text-sm font-medium text-foreground mb-1">
-                            {t('Country', 'البلد')}
-                          </label>
-                          <div className="flex items-center rounded-lg border border-border bg-muted/40 px-3 py-2 text-sm text-foreground">
-                            {t(singleCountryEn, singleCountryAr)}
-                          </div>
-                        </div>
+                        <p className="text-sm text-muted-foreground">
+                          {t(`Shipping within ${singleCountryEn}`, `الشحن جوّه ${singleCountryAr}`)}
+                        </p>
                       )}
 
                       {/* Governorate \u2192 Area typeahead cascade (+ optional country selector for multi-country stores) */}
@@ -2290,7 +2288,10 @@ export default function CheckoutClient() {
                       {/* Delivery method panel */}
                       <div className="rounded-lg border border-border bg-muted/30 p-4">
                         <p className="text-sm font-medium text-foreground mb-2">
-                          {t('Delivery method', 'طريقة التوصيل')}
+                          {t(
+                            'Delivery method',
+                            '\u0637\u0631\u064a\u0642\u0629 \u0627\u0644\u062a\u0648\u0635\u064a\u0644'
+                          )}
                         </p>
                         {!formData.area ? (
                           <p className="text-sm text-muted-foreground">
@@ -2314,25 +2315,31 @@ export default function CheckoutClient() {
                             <button
                               type="button"
                               onClick={() => calculateShipping()}
-                              className="text-sm font-medium text-primary underline"
+                              className="inline-flex min-h-11 min-w-11 items-center justify-center text-sm font-medium text-primary underline"
                             >
-                              {t('Retry', 'إعادة المحاولة')}
+                              {t(
+                                'Retry',
+                                '\u0625\u0639\u0627\u062f\u0629 \u0627\u0644\u0645\u062d\u0627\u0648\u0644\u0629'
+                              )}
                             </button>
                           </div>
                         ) : (
                           <div className="flex items-center justify-between">
                             <span className="text-sm text-foreground">
-                              {t('Standard delivery', 'توصيل عادي')}
+                              {t(
+                                'Standard delivery',
+                                '\u062a\u0648\u0635\u064a\u0644 \u0639\u0627\u062f\u064a'
+                              )}
                             </span>
                             <span className="text-sm font-medium text-foreground">
                               {freeShipping
-                                ? t('Free', 'مجاني')
+                                ? t('Free', '\u0645\u062c\u0627\u0646\u064a')
                                 : shippingCost > 0
                                   ? formatPrice(shippingCost)
                                   : rateByArea.has(formData.area)
                                     ? formatPrice(rateByArea.get(formData.area)!.deliveryFee)
                                     : !storeHasAreaRates
-                                      ? t('Free', 'مجاني')
+                                      ? t('Free', '\u0645\u062c\u0627\u0646\u064a')
                                       : t('Calculating...', 'بنحسب...')}
                             </span>
                           </div>
@@ -2342,51 +2349,37 @@ export default function CheckoutClient() {
                       {/* Structured Egyptian address fields */}
                       <div data-error={!!formErrors.street}>
                         <Input
-                          label={t('Street *', 'اسم الشارع *')}
+                          label={t('Street', 'اسم الشارع')}
+                          placeholder={t('e.g. Abbas El Akkad St.', 'مثال: شارع عباس العقاد')}
                           autoComplete="address-line1"
                           value={formData.street}
                           onChange={e => updateField('street', e.target.value)}
-                          aria-invalid={formErrors.street ? true : undefined}
-                          className={
-                            formErrors.street
-                              ? 'border-destructive focus:border-destructive focus:ring-destructive'
-                              : ''
-                          }
+                          error={formErrors.street}
+                          className={CHECKOUT_FIELD}
                         />
-                        {formErrors.street && (
-                          <p role="alert" className="mt-1 text-sm text-destructive-ink">
-                            {formErrors.street}
-                          </p>
-                        )}
                       </div>
 
                       <div className="grid grid-cols-3 gap-4">
                         <div data-error={!!formErrors.building}>
                           <Input
-                            label={t('Building no. *', 'رقم المبنى *')}
+                            label={t('Building no.', 'رقم المبنى')}
+                            placeholder={t('e.g. 12', 'مثال: 12')}
                             value={formData.building}
                             onChange={e => updateField('building', e.target.value)}
-                            aria-invalid={formErrors.building ? true : undefined}
-                            className={
-                              formErrors.building
-                                ? 'border-destructive focus:border-destructive focus:ring-destructive'
-                                : ''
-                            }
+                            error={formErrors.building}
+                            className={CHECKOUT_FIELD}
                           />
-                          {formErrors.building && (
-                            <p role="alert" className="mt-1 text-sm text-destructive-ink">
-                              {formErrors.building}
-                            </p>
-                          )}
                         </div>
                         <Input
                           label={t('Floor (optional)', 'الدور (اختياري)')}
                           value={formData.floor}
                           onChange={e => updateField('floor', e.target.value)}
+                          className={CHECKOUT_FIELD}
                         />
                         <Input
                           label={t('Apartment (optional)', 'الشقة (اختياري)')}
                           autoComplete="address-line2"
+                          className={CHECKOUT_FIELD}
                           value={formData.apartment}
                           onChange={e => updateField('apartment', e.target.value)}
                         />
@@ -2396,6 +2389,7 @@ export default function CheckoutClient() {
                         label={t('Landmark (optional)', 'علامة مميزة (اختياري)')}
                         value={formData.landmark}
                         onChange={e => updateField('landmark', e.target.value)}
+                        className={CHECKOUT_FIELD}
                       />
 
                       <div>
@@ -2403,7 +2397,10 @@ export default function CheckoutClient() {
                           htmlFor="order-notes"
                           className="block text-sm font-medium text-foreground mb-1"
                         >
-                          {t('Order Notes (optional)', 'ملاحظات الطلب (اختياري)')}
+                          {t(
+                            'Order notes (optional)',
+                            '\u0645\u0644\u0627\u062d\u0638\u0627\u062a \u0627\u0644\u0637\u0644\u0628 (\u0627\u062e\u062a\u064a\u0627\u0631\u064a)'
+                          )}
                         </label>
                         <textarea
                           id="order-notes"
@@ -2414,7 +2411,7 @@ export default function CheckoutClient() {
                           // auto-zooming when this textarea receives focus
                           // (any field <16px triggers it, won't auto-unzoom).
                           // sm:text-sm restores the denser desktop appearance.
-                          className="min-h-24 w-full rounded-lg border border-border bg-background px-4 py-2 text-base sm:text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                          className="min-h-24 w-full rounded-lg border border-input bg-background px-4 py-2 text-base sm:text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary"
                           placeholder={t(
                             'Any special delivery instructions...',
                             'أي تعليمات خاصة بالتوصيل...'
@@ -2426,12 +2423,12 @@ export default function CheckoutClient() {
                     {/* Save my info — device-local localStorage persistence.
                         NO payment data stored. Store-scoped key. */}
                     <div className="pt-3 border-t border-border">
-                      <label className="flex items-start gap-3 cursor-pointer group">
+                      <label className="flex min-h-11 items-start gap-3 cursor-pointer group">
                         <input
                           type="checkbox"
                           checked={saveInfo}
                           onChange={e => setSaveInfo(e.target.checked)}
-                          className="mt-0.5 h-4 w-4 shrink-0 rounded border-border text-primary accent-primary focus:ring-2 focus:ring-primary/20"
+                          className="mt-0.5 h-4 w-4 shrink-0 rounded border-input text-primary accent-primary focus:ring-2 focus:ring-primary"
                         />
                         <span className="flex flex-col gap-0.5">
                           <span className="text-sm font-medium text-foreground group-hover:text-primary transition-colors">
@@ -2452,9 +2449,12 @@ export default function CheckoutClient() {
                         <button
                           type="button"
                           onClick={handleClearSavedData}
-                          className="mt-2 ms-7 text-xs text-destructive-ink hover:underline"
+                          className="mt-2 ms-7 text-xs text-destructive-ink underline underline-offset-4"
                         >
-                          {t('Clear saved data', 'حذف البيانات المحفوظة')}
+                          {t(
+                            'Clear saved data',
+                            '\u062d\u0630\u0641 \u0627\u0644\u0628\u064a\u0627\u0646\u0627\u062a \u0627\u0644\u0645\u062d\u0641\u0648\u0638\u0629'
+                          )}
                         </button>
                       )}
                     </div>
@@ -2476,9 +2476,26 @@ export default function CheckoutClient() {
                     <div className="hidden lg:flex mt-6 flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
                       <Link
                         href={storeUrl('/cart')}
-                        className="inline-flex min-h-11 items-center text-sm text-primary hover:underline"
+                        className="inline-flex min-h-11 items-center text-sm text-primary underline underline-offset-4"
                       >
-                        {language === 'ar' ? 'العودة إلى السلة \u2192' : '\u2190 Return to cart'}
+                        {/* P2-9 (W4): the one mirrored back icon, at the inline start. */}
+                        <span className="inline-flex items-center gap-1.5">
+                          <svg
+                            className="h-4 w-4 shrink-0 rtl:-scale-x-100"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                            aria-hidden="true"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M10 19l-7-7m0 0l7-7m-7 7h18"
+                            />
+                          </svg>
+                          {t('Return to cart', 'العودة إلى السلة')}
+                        </span>
                       </Link>
                       <Button
                         type="submit"
@@ -2486,7 +2503,10 @@ export default function CheckoutClient() {
                         size="lg"
                         disabled={shippingUnavailable || belowMinimumOrder || !shippingSettled}
                       >
-                        {t('Continue to Payment', 'المتابعة للدفع')}
+                        {t(
+                          'Continue to payment',
+                          '\u0627\u0644\u0645\u062a\u0627\u0628\u0639\u0629 \u0644\u0644\u062f\u0641\u0639'
+                        )}
                       </Button>
                     </div>
                   </div>
@@ -2495,6 +2515,7 @@ export default function CheckoutClient() {
                 {step === 2 && (
                   <PaymentStep
                     formData={formData}
+                    shippingNames={reviewPlaceNames}
                     onEditShipping={() => setStep(1)}
                     paymentProviders={paymentProviders}
                     paymentConfigError={paymentConfigError}
@@ -2597,9 +2618,25 @@ export default function CheckoutClient() {
               <div className="order-3 lg:hidden mt-4 flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
                 <Link
                   href={storeUrl('/cart')}
-                  className="inline-flex min-h-11 items-center text-sm text-primary hover:underline"
+                  className="inline-flex min-h-11 items-center text-sm text-primary underline underline-offset-4"
                 >
-                  {language === 'ar' ? 'العودة إلى السلة →' : '← Return to cart'}
+                  <span className="inline-flex items-center gap-1.5">
+                    <svg
+                      className="h-4 w-4 shrink-0 rtl:-scale-x-100"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                      aria-hidden="true"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M10 19l-7-7m0 0l7-7m-7 7h18"
+                      />
+                    </svg>
+                    {t('Return to cart', 'العودة إلى السلة')}
+                  </span>
                 </Link>
                 <Button
                   type="submit"
@@ -2608,7 +2645,7 @@ export default function CheckoutClient() {
                   size="lg"
                   disabled={shippingUnavailable || belowMinimumOrder || !shippingSettled}
                 >
-                  {t('Continue to Payment', 'المتابعة للدفع')}
+                  {t('Continue to payment', 'المتابعة للدفع')}
                 </Button>
               </div>
             )}

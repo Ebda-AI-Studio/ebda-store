@@ -179,6 +179,7 @@ interface Category {
   nameAr?: string;
   slug: string;
   description?: string;
+  descriptionAr?: string | null;
   image?: string;
   productCount?: number;
   /** When false, hidden from the homepage category strip only (the collection
@@ -326,6 +327,8 @@ interface PaginationMeta {
   limit: number;
   total: number;
   totalPages: number;
+  /** The list is in hybrid relevance order (search with semantic search on, Task 12). */
+  ranked?: boolean;
 }
 
 /**
@@ -1461,7 +1464,7 @@ class ApiClient {
         error: { code: 'NO_STORE', message: 'Store context not set' },
       } as ApiResponse<{ suggestions: SearchSuggestion[] }>;
     }
-    if (trimmed.length < 2) {
+    if (trimmed.length < 1) {
       return {
         success: true,
         data: { suggestions: [] as SearchSuggestion[] },

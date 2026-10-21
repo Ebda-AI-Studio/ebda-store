@@ -161,13 +161,13 @@ export function FrequentlyBoughtTogether({ storeId, productId }: FrequentlyBough
           shrink-0 on the button keeps it from squishing. LTR unaffected. */}
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
         <h2 className="text-2xl font-bold text-foreground">
-          {t('Frequently Bought Together', 'يُشترى معاً في الغالب')}
+          {t('Frequently bought together', 'يُشترى معاً في الغالب')}
         </h2>
         <button
           onClick={handleAddAllToCart}
           className="shrink-0 rounded-xl border border-primary px-4 py-2 text-sm font-medium text-primary transition-colors hover:bg-primary hover:text-primary-foreground"
         >
-          {t('Add All to Cart', 'أضف الكل إلى السلة')}
+          {t('Add all to cart', 'أضف الكل إلى السلة')}
         </button>
       </div>
       {/* Issue 2 fix (2026-05-28): PecannbeeProductCard honours per-store

@@ -203,7 +203,7 @@ export function ReviewForm({ orderId, productId, token, product, store }: Props)
             maxLength={200}
             autoComplete="off"
             inputMode="text"
-            className="w-full border border-border rounded-lg px-3 py-2 text-base bg-background focus:outline-none focus:ring-2 focus:ring-primary sm:text-sm"
+            className="w-full border border-input rounded-lg px-3 py-2 text-base bg-background focus:outline-none focus:ring-2 focus:ring-primary sm:text-sm"
             placeholder={isAr ? 'مثال: منتج رائع!' : 'e.g. Great product!'}
           />
         </div>
@@ -222,7 +222,7 @@ export function ReviewForm({ orderId, productId, token, product, store }: Props)
             maxLength={5000}
             rows={6}
             inputMode="text"
-            className="w-full border border-border rounded-lg px-3 py-2 text-base bg-background focus:outline-none focus:ring-2 focus:ring-primary resize-y sm:text-sm"
+            className="w-full border border-input rounded-lg px-3 py-2 text-base bg-background focus:outline-none focus:ring-2 focus:ring-primary resize-y sm:text-sm"
             placeholder={
               isAr
                 ? 'احكي تجربتك مع المنتج ده... (20 حرف على الأقل)'

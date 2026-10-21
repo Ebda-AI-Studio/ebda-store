@@ -253,7 +253,7 @@ export default function OrderDetailClient() {
   const paymentStatusColors: Record<string, string> = {
     unpaid: 'bg-warning/20 text-warning-ink',
     paid: 'bg-success/20 text-success-ink',
-    partially_paid: 'bg-orange-100 text-orange-800',
+    partially_paid: 'bg-muted text-foreground',
     refunded: 'bg-muted text-foreground',
     failed: 'bg-destructive/20 text-destructive-ink',
   };

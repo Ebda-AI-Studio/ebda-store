@@ -1,5 +1,18 @@
 import { prisma, Prisma } from '@ebda/database';
-import { searchTokens, escapeLike, normalizeArabicSearch } from '@ebda/shared';
+import { searchTokens, escapeLike, normalizeArabicSearch, isPersonalDataTerm } from '@ebda/shared';
+import { BoundedMap } from '../lib/bounded-map';
+import {
+  EMBED_DIMS,
+  EMBED_MODEL,
+  EmbeddingError,
+  getEmbeddingProvider,
+  semanticSearchEnabled,
+  toHalfvecLiteral,
+} from '../lib/search/embedding-provider';
+import { hybridOrder } from '../lib/search/rrf';
+import { queryBudgetSpent, takeQueryEmbed } from '../lib/search/embed-budget';
+import { withSavepoint } from '../lib/savepoint';
+import logger from '../lib/logger';
 
 /** Most ids a lexical search binds into the follow-up Prisma query (list, typeahead, admin). */
 export const PRODUCT_SEARCH_ID_CAP = 1000;
@@ -39,8 +52,10 @@ function clampLimit(limit: number | undefined): number {
 
 /**
  * The lexical search statement (selects `p.id`), or null when the query has no tokens. Exported so
- * the planner test EXPLAINs the exact SQL production runs. Each predicate is written exactly as
- * its index expression (migrations 20261019000100 + 20261019000200) or the planner cannot use it:
+ * the planner tests inspect the exact SQL production runs. The match itself is
+ * `public.ebda_product_search_ids` (migration 20261024000300, Ruling SEARCH-T14-1), whose inner
+ * statement writes each predicate exactly as its index expression (migrations 20261019000100 +
+ * 20261019000200) or the planner cannot use it:
  *   public.ebda_product_search_doc(p.name, p.name_ar, p.search_terms, p.description, p.description_ar)
  *   public.ebda_product_name_doc(p.name, p.name_ar, p.search_terms)
  *   public.ebda_ar_norm(coalesce(p.sku, ''))
@@ -55,31 +70,33 @@ export function productSearchSql(
   const tokens = searchTokens(raw);
   if (tokens.length === 0) return null;
   const limit = clampLimit(opts.limit);
-  const doc =
-    opts.field === 'name'
-      ? Prisma.sql`public.ebda_product_name_doc(p.name, p.name_ar, p.search_terms)`
-      : Prisma.sql`public.ebda_product_search_doc(p.name, p.name_ar, p.search_terms, p.description, p.description_ar)`;
   const withSku = opts.withSku ?? opts.scope === 'admin';
-  const arms = tokens.map(t => {
-    const pattern = `%${escapeLike(t)}%`;
-    return withSku
-      ? Prisma.sql`(${doc} LIKE ${pattern} OR public.ebda_ar_norm(coalesce(p.sku, '')) LIKE ${pattern})`
-      : Prisma.sql`${doc} LIKE ${pattern}`;
-  });
-  const status = opts.scope === 'storefront' ? Prisma.sql`AND p.status = 'active'` : Prisma.empty;
+  const storefront = opts.scope === 'storefront';
+  const status = storefront ? Prisma.sql`AND p.status = 'active'` : Prisma.empty;
   // B2B-7b: the storefront search NEVER returns a wholesale-only product. The predicate sits in the WHERE, BEFORE the LIMIT
   // below, so hidden products can never occupy result slots or change the truncation flag (raw-SQL visibility checklist).
-  const audience =
-    opts.scope === 'storefront' ? Prisma.sql`AND p.audience = 'public'` : Prisma.empty;
+  const audience = storefront ? Prisma.sql`AND p.audience = 'public'` : Prisma.empty;
   const deleted = opts.includeDeleted ? Prisma.empty : Prisma.sql`AND p.deleted_at IS NULL`;
   const orderBy =
     opts.order === 'featured'
       ? Prisma.sql`p.featured DESC, p.name ASC, p.id`
       : Prisma.sql`similarity(public.ebda_product_name_doc(p.name, p.name_ar, p.search_terms), ${normalizeArabicSearch(raw)}) DESC, p.id`;
+  // The word-AND match runs inside public.ebda_product_search_ids (SECURITY DEFINER, Ruling
+  // SEARCH-T14-1): as `ebda_app` the tenant policy is a security barrier and none of the
+  // normalising functions is LEAKPROOF, so an inline `doc LIKE ...` can never be an index condition
+  // and scanned (and normalised) every row of the store. The function finds the candidate ids of
+  // THIS store (it refuses any other) with the trigram indexes; this statement still reads
+  // `products` as ebda_app, so RLS, status, soft-delete and ordering apply to the final rows.
+  // A query made ONLY of words under 3 characters has no trigram to look up as a substring, so it
+  // matches the START of a word instead (SEARCH-T14-3); anything with a longer word is unchanged.
+  const wordStart = tokens.every(t => t.length < 3);
+  const patterns = tokens.map(t => (wordStart ? `${escapeLike(t)}%` : `%${escapeLike(t)}%`));
   // limit + 1: the extra row only says "there were more" (truncated).
   return Prisma.sql`SELECT p.id FROM products p
     WHERE p.store_id = ${storeId} ${deleted} ${status} ${audience}
-      AND ${Prisma.join(arms, ' AND ')}
+      AND p.id IN (SELECT public.ebda_product_search_ids(
+        ${storeId}, ${opts.field === 'name' ? 'name' : 'all'}, ${withSku}, ${storefront},
+        ${opts.includeDeleted === true}, ${wordStart}, ${patterns}::text[]))
     ORDER BY ${orderBy}
     LIMIT ${limit + 1}`;
 }
@@ -200,4 +217,222 @@ export async function searchVariantIdsBySku(
     ids: rows.slice(0, PRODUCT_SEARCH_ID_CAP).map(r => r.id),
     truncated: rows.length > PRODUCT_SEARCH_ID_CAP,
   };
+}
+
+// ---------------------------------------------------------------------------------------------
+// Hybrid storefront search (search program P1, Task 12; plan amendments E10, E11).
+// ---------------------------------------------------------------------------------------------
+
+/** Vector-leg depth, and how many keyword ids are fused with it (the rest is appended, E10). */
+export const HYBRID_LEG = 50;
+/**
+ * The query embed races this budget (E11). It is the ONE synchronous third-party call allowed in a
+ * storefront GET (Ruling SEARCH-T12-1): losing the race aborts the call and the list is keyword-only.
+ */
+export const QUERY_EMBED_BUDGET_MS = 400;
+/** Queries shorter than this (letters/digits, spaces ignored) are keyword-only. */
+export const QUERY_EMBED_MIN_CHARS = 3;
+/** Most characters of a query that are embedded (the same 100 the route caps the term at). */
+export const QUERY_EMBED_MAX_CHARS = 100;
+/**
+ * The keyword leg is "strong" at this many matches: the query is then NOT embedded and the list is
+ * keyword-ranked. Equal to HYBRID_LEG, so every keyword list the fused head can hold gets semantic
+ * re-ranking and E10's appended tail is live for 20-49 hits (Ruling SEARCH-T12-3, amended). The ONE
+ * constant Task 13 tunes: its eval measures lift at 20, 50 and no threshold. Spend is bounded by the
+ * budgets (`takeQueryEmbed`), not by this. Counted store-wide BEFORE the category, price and option
+ * filters (documented residual: a filtered search with few in-filter hits but >= 50 store-wide is
+ * keyword-only).
+ */
+export const KEYWORD_STRONG_AT = HYBRID_LEG;
+const DEFAULT_VECTOR_MAX_DISTANCE = 0.55;
+
+/**
+ * Query-vector cache (in-isolate BoundedMap: the Redis/KV TTL floor rule sends anything this
+ * small and hot here, and a vector does not belong in KV).
+ * Staleness class: BOUNDED-stale by model version, 10 minutes. The key is (store, model id, the
+ * EXACT embedded text = `queryEmbedText(raw)`), so two spellings that fold to the same text share a
+ * vector by design and nothing else does. No product write affects a query vector; what can change
+ * under an unchanged key is the provider's model behind the same id (a Workers AI model update),
+ * and the TTL bounds that window. A model-id change changes the key. Per store (not global) so one
+ * store's shoppers cannot learn from response timing what was searched in another store. Failures
+ * are not cached. The key holds at most QUERY_EMBED_MAX_CHARS characters of the query.
+ * Float32Array: 4 KB per entry (the column is halfvec, so nothing is lost); 500 entries ≈ 2 MB.
+ */
+const QUERY_VECTOR_TTL_MS = 10 * 60 * 1000;
+const qCache = new BoundedMap<string, { v: Float32Array; exp: number }>(500);
+
+/** Test seam: forget every cached query vector. */
+export function clearQueryVectorCacheForTests(): void {
+  qCache.clear();
+}
+
+/** `SEARCH_VECTOR_MAX_DISTANCE` (docs/ENVIRONMENT.md): cosine distance in (0, 2]; else the default. */
+export function vectorMaxDistance(): number {
+  const n = Number(process.env.SEARCH_VECTOR_MAX_DISTANCE);
+  return process.env.SEARCH_VECTOR_MAX_DISTANCE && Number.isFinite(n) && n > 0 && n <= 2
+    ? n
+    : DEFAULT_VECTOR_MAX_DISTANCE;
+}
+
+/** One token of ASCII letters/digits/`-._/#` with a digit: a SKU or model code (keyword only). */
+const SKU_LIKE = /^[a-z0-9][a-z0-9._/#-]*$/;
+
+/**
+ * Should this query be embedded at all? No for very short queries, SKU/model-code-shaped queries
+ * (the keyword leg answers those exactly) and personal-data-shaped ones (a phone or email typed into
+ * the box is never sent to a third party; same `isPersonalDataTerm` as the search log).
+ */
+export function shouldEmbedQuery(raw: string): boolean {
+  const norm = normalizeArabicSearch(raw);
+  if (norm.replace(/ /g, '').length < QUERY_EMBED_MIN_CHARS) return false;
+  if (isPersonalDataTerm(raw)) return false;
+  if (!norm.includes(' ') && /\d/.test(norm) && SKU_LIKE.test(norm)) return false;
+  return true;
+}
+
+/** The query's vector (cached), raced against QUERY_EMBED_BUDGET_MS; the loser is aborted. */
+/** The exact text embedded for a query (and its cache key part): normalised, at most 100 chars. */
+export function queryEmbedText(raw: string): string {
+  return normalizeArabicSearch(raw).slice(0, QUERY_EMBED_MAX_CHARS).trim();
+}
+
+async function queryVector(
+  storeId: string,
+  raw: string,
+  searcher: string | undefined
+): Promise<number[] | null> {
+  const provider = getEmbeddingProvider();
+  if (!provider) return null;
+  const text = queryEmbedText(raw);
+  const key = `${storeId}\u0000${provider.model}\u0000${text}`;
+  const hit = qCache.get(key);
+  if (hit) {
+    if (hit.exp > Date.now()) return Array.from(hit.v);
+    qCache.delete(key);
+  }
+  // ONE timer bounds the whole step (E11 + review M3): the budget round trips (AuthState DO on the
+  // Worker) AND the provider call. Losing it aborts the provider call; a budget answer that lands
+  // after the race was lost never reaches the provider (it may have charged one call: over-count,
+  // never overspend).
+  const ctl = new AbortController();
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const lost = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => {
+      ctl.abort();
+      reject(
+        new EmbeddingError('timeout', `query embed lost the ${QUERY_EMBED_BUDGET_MS} ms race`)
+      );
+    }, QUERY_EMBED_BUDGET_MS);
+  });
+  const work = (async (): Promise<number[] | null> => {
+    // The ONE charge point (SEARCH-T12-6): once per real provider call, right before it, never on
+    // a cache hit. Budgets + per-searcher limit; no searcher = no call (default deny); fails closed.
+    if (!(await takeQueryEmbed(storeId, searcher))) return null;
+    if (ctl.signal.aborted) return null;
+    const [v] = await provider.embed([text], { signal: ctl.signal });
+    return v;
+  })();
+  work.catch(() => undefined); // the race's loser may reject later (aborted): never unhandled
+  try {
+    const v = await Promise.race([work, lost]);
+    if (v === null) return null;
+    if (!Array.isArray(v) || v.length !== EMBED_DIMS)
+      throw new EmbeddingError('shape', `embedding: expected ${EMBED_DIMS} dims`);
+    qCache.set(key, { v: Float32Array.from(v), exp: Date.now() + QUERY_VECTOR_TTL_MS });
+    return v;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/**
+ * Vector leg: up to `limit` product ids of THIS store nearest to the query by the nearer of each
+ * product's two vectors, doc and AI words (SEARCH-T13-7) (exact KNN per store,
+ * Ruling SEARCH-8), within SEARCH_VECTOR_MAX_DISTANCE, storefront-visible only (active, not
+ * deleted, read live in the same SQL: Ruling SEARCH-11). `[]` when semantic search is off, the
+ * query is not embeddable, no `searcher` is given or a budget refuses (`takeQueryEmbed`), the
+ * provider fails or loses the race, or the SQL fails (inside a
+ * savepoint so the request transaction survives). Never throws. Runs in the caller's tenant scope
+ * (RLS) AND names store_id on both tables (R-EBDA-004). Logs carry the store and the failure
+ * kind, never the query text.
+ */
+export async function semanticProductIds(
+  storeId: string,
+  raw: string,
+  opts: { searcher?: string; limit?: number } = {}
+): Promise<string[]> {
+  return (await vectorLeg(storeId, raw, opts)).ids;
+}
+
+/**
+ * The vector leg with its mode. `degraded` = the leg was WANTED (semantic on, an embeddable query)
+ * but did not answer: no searcher, a budget or the searcher's limit refused, the race was lost, the
+ * provider or the SQL failed. Skipped by design (off, not embeddable) is not degraded, and a cached
+ * query vector is a full answer. A degraded list must never be cached as the full one (SEARCH-T12-7).
+ */
+async function vectorLeg(
+  storeId: string,
+  raw: string,
+  opts: { searcher?: string; limit?: number }
+): Promise<{ ids: string[]; degraded: boolean }> {
+  const limit = opts.limit ?? HYBRID_LEG;
+  if (!semanticSearchEnabled() || !shouldEmbedQuery(raw)) return { ids: [], degraded: false };
+  // Budget-spent MODE (SEARCH-T12-10): keyword-only is the full answer until the next Cairo day,
+  // with no Redis round trip and no cached-vector exception, so every list of this mode agrees.
+  if (queryBudgetSpent(storeId)) return { ids: [], degraded: false };
+  try {
+    const v = await queryVector(storeId, raw, opts.searcher);
+    if (!v) return { ids: [], degraded: true };
+    const q = toHalfvecLiteral(v);
+    const rows = await withSavepoint(
+      () => prisma.$queryRaw<Array<{ id: string }>>`
+        SELECT k.id FROM (
+          -- The nearer of the product's two vectors (SEARCH-T13-7): the doc and, when it has
+          -- any, the AI search words alone. LEAST ignores the NULL words vector.
+          SELECT e.product_id AS id, LEAST(e.embedding <=> q.v, e.terms_embedding <=> q.v) AS d
+            FROM product_embeddings e
+            JOIN products p ON p.id = e.product_id AND p.store_id = ${storeId}
+            CROSS JOIN (SELECT ${q}::halfvec(1024) AS v) q
+           WHERE e.store_id = ${storeId} AND e.model = ${EMBED_MODEL}
+             AND p.status = 'active' AND p.deleted_at IS NULL
+        ) k
+        WHERE k.d <= ${vectorMaxDistance()}
+        ORDER BY k.d, k.id
+        LIMIT ${Math.max(1, Math.floor(limit))}`
+    );
+    return { ids: rows.map(r => r.id), degraded: false };
+  } catch (err) {
+    const kind = err instanceof EmbeddingError ? err.kind : 'sql';
+    const log = kind === 'timeout' || kind === 'aborted' ? logger.info : logger.warn;
+    log.call(logger, { storeId, kind }, '[search] vector leg unavailable; keyword results only');
+    return { ids: [], degraded: true };
+  }
+}
+
+/**
+ * Storefront relevance order: the keyword leg (up to PRODUCT_SEARCH_ID_CAP, E10) with its first
+ * HYBRID_LEG ids fused (RRF) with the vector leg, then the keyword tail in its own order. With the
+ * vector leg off, failing, over budget or the searcher's limit, without a `searcher`, or skipped because the
+ * keyword leg is strong (>= KEYWORD_STRONG_AT), this is exactly the keyword (name-similarity)
+ * order. The keyword leg runs first (it decides whether to embed). At most
+ * PRODUCT_SEARCH_ID_CAP + HYBRID_LEG ids.
+ */
+export async function rankedSearch(
+  storeId: string,
+  raw: string,
+  opts: { searcher?: string } = {}
+): Promise<string[]> {
+  return (await rankedSearchWithMode(storeId, raw, opts)).ids;
+}
+
+/** `rankedSearch` plus whether the vector leg was wanted but unavailable (see `vectorLeg`). */
+export async function rankedSearchWithMode(
+  storeId: string,
+  raw: string,
+  opts: { searcher?: string } = {}
+): Promise<{ ids: string[]; degraded: boolean }> {
+  const lexical = await searchProductIds(storeId, raw, { scope: 'storefront' });
+  if (lexical.length >= KEYWORD_STRONG_AT) return { ids: lexical, degraded: false };
+  const vector = await vectorLeg(storeId, raw, { searcher: opts.searcher });
+  return { ids: hybridOrder(lexical, vector.ids, HYBRID_LEG), degraded: vector.degraded };
 }

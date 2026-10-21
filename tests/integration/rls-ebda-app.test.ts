@@ -459,6 +459,8 @@ describe('every table with a store_id column is under STRICT, FORCED RLS (auto-e
     expect(tables).toContain('size_charts');
     // Storefront search log (search program P0 Task 5, 2026-10-15) — same automatic coverage.
     expect(tables).toContain('search_query_daily');
+    // Merchant outgoing webhooks (2026-10-21) — same automatic coverage.
+    expect(tables).toEqual(expect.arrayContaining(['webhook_endpoints', 'webhook_deliveries']));
     const [{ n }] = await owner.$queryRaw<Array<{ n: bigint }>>`
       SELECT count(*) AS n FROM public.store_page_revisions`;
     expect(Number(n)).toBeGreaterThanOrEqual(2); // not vacuously empty for the 0-row assertion below
@@ -858,7 +860,12 @@ describe('SECURITY DEFINER functions: hygiene', () => {
              p.proconfig AS cfg
       FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace JOIN pg_language l ON l.oid = p.prolang
       WHERE n.nspname = 'public' AND p.proname = ANY(${[...PURE_IMMUTABLE_EBDA_FNS]})`;
-    expect(fns.map(f => f.proname).sort()).toEqual([...PURE_IMMUTABLE_EBDA_FNS].sort());
+    // Every name exists; overloads (ebda_product_embed_doc has a 4- and, until the SEARCH-T13-8
+    // contract migration, a 5-argument form) are each checked below.
+    expect([...new Set(fns.map(f => f.proname))].sort()).toEqual(
+      [...PURE_IMMUTABLE_EBDA_FNS].sort()
+    );
+    expect(fns.filter(f => f.proname === 'ebda_product_embed_doc')).toHaveLength(2);
     for (const f of fns) {
       expect({
         fn: f.proname,

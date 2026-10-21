@@ -140,6 +140,18 @@ sort/category changes and retries count once: a salted, daily-rotated IP+UA hash
 30-minute Redis key, never in the table or a log), and every row ages out after 90 days. A store
 deletion removes it (FK `ON DELETE CASCADE`, proven in `tests/integration/search-log.test.ts`).
 
+**Merchant webhook delivery log (`webhook_deliveries`).** One row per event per merchant endpoint,
+holding the exact JSON that was signed and sent. By default the payload has no customer identity
+(order id/number, totals, status, line items); only an endpoint the merchant switched
+`includeCustomer` on carries the customer's name, email and phone, and then the merchant is the
+controller of what their own server receives. The last 50 rows per endpoint are kept, every row ages
+out after 30 days (`webhook-delivery-purge-daily`, each store in its own tenant transaction), the
+response body is kept only as a 200-character snippet, and a store deletion removes it (FK `ON DELETE
+CASCADE`). A customer erasure strips `data.customer` from the stored payloads of that shopper's orders and
+email (`redactWebhookCustomerData`, Ruling WH-7); payloads already delivered to the merchant's own
+server cannot be recalled, and the 30-day purge bounds our copy. `webhook_endpoints` holds the endpoint URL and the signing secret encrypted at rest
+(`encryption.encrypt`); it is deleted with the endpoint or the store.
+
 ## Export path
 
 `GET /auth/me/export`, authenticated. Returns the full JSON bundle

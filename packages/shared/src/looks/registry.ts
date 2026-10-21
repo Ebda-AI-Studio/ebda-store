@@ -14,8 +14,34 @@ export const LOOKS: readonly LookDefinition[] = [
     id: 'qamar.atelier',
     template: 'qamar',
     letter: 'A',
-    skin: 'minimal',
-    status: 'designed',
+    skin: 'qamar',
+    status: 'built',
+    chrome: { header: { logoPlacement: 'start' } },
+    // Ruling B1-3. Category row as text chips, image break full-bleed (plan amendment C1).
+    // The carousel preset is `newest`, never a demo category slug (C7).
+    sections: [
+      // L-04: the copy sits at the bottom-start corner, off the model (W2a).
+      { type: 'hero', design: { presentation: 'full-bleed', textAnchor: 'bottom-start' } },
+      // A chip row is navigation, not a showcase: tight above, no padding below, so it sits
+      // right under the hero instead of in 200px of air (STOP 1 critique).
+      {
+        type: 'category-grid',
+        design: {
+          layout: 'chips',
+          layoutMobile: 'chips',
+          paddingTop: 'tight',
+          paddingBottom: 'none',
+        },
+      },
+      {
+        type: 'featured-collection',
+        design: { columns: 4, mobileColumns: 2 },
+        preset: { productSource: 'newest', limit: 8, heading: 'New in', headingAr: 'وصل حديثًا' },
+      },
+      { type: 'image-text', design: { layout: 'full-bleed' } },
+      { type: 'product-carousel', preset: { productSource: 'newest', limit: 12 } },
+      { type: 'brand-story' },
+    ],
     name: { ar: 'أتيليه', en: 'Atelier' },
     forWhom: { ar: 'لبوتيك هدومه بتتكلم لوحدها.', en: 'For a boutique whose clothes speak alone.' },
     idea: {
@@ -40,42 +66,119 @@ export const LOOKS: readonly LookDefinition[] = [
       density: 'airy',
       imageRatio: '3/4',
       motion: 'subtle',
+      // W2a token plumbing (fix-waves W2 #1): a wordmark that leads the header (T-01), over-photo
+      // controls as a bare glyph (L-12, read by the card in W2b) and the receipt as framed paper
+      // in the page ink (K-07, W3).
+      wordmarkSize: 'lg',
+      overPhotoChrome: 'bare',
+      receiptStyle: 'framed',
+      // W2b: the photo is the card (L-01: no control, the card is the link), no hover lift (M-03),
+      // sale/new chips in the oxblood accent on the square radius (K-01).
+      cardCta: 'none',
+      cardHover: 'none',
+      cardBadge: 'accent',
     },
   }),
   L({
     id: 'qamar.lookbook',
     template: 'qamar',
     letter: 'B',
-    skin: 'minimal',
-    status: 'designed',
+    skin: 'qamar',
+    status: 'built',
+    chrome: { header: { logoPlacement: 'start' } },
+    // Ruling B1-3 / B1-2: the collage hero and shop-the-look lead; categories scroll as a photo
+    // row. No hero `mode` (slideshow vs single is the merchant's content): a collage needs three
+    // slide photos and falls back to the banner/slider below that.
+    sections: [
+      { type: 'hero', design: { presentation: 'collage' } },
+      { type: 'shop-the-look', design: { bgColor: 'token:card' } },
+      {
+        type: 'category-grid',
+        // A scrolling photo row at every width; when the catalogue is short the platform strip
+        // centres itself instead of leaving an empty tail (CategoryStrip, quality bar L-05).
+        // LB-01 (W2a): merchant photos are shot on white, so the categories and the new-in grid
+        // sit on ONE light band (the inverse surface: the page ink as ground, indigo text);
+        // indigo keeps the header, hero, looks, reviews and footer.
+        design: {
+          layout: 'horizontal',
+          layoutMobile: 'horizontal',
+          captionPosition: 'below',
+          bgColor: 'token:inverse',
+          // LB-06: the row and the new-in grid share one band; no dead band under the captions.
+          paddingBottom: 'tight',
+        },
+      },
+      {
+        type: 'featured-collection',
+        design: { columns: 4, mobileColumns: 2, bgColor: 'token:inverse' },
+        preset: { productSource: 'newest', limit: 8, heading: 'New in', headingAr: 'وصل حديثًا' },
+      },
+      { type: 'testimonials' },
+    ],
     name: { ar: 'لوك بوك', en: 'Lookbook' },
     forWhom: {
       ar: 'للستايلست والمحلات اللي بتبيع لوك كامل.',
       en: 'For stylists who sell whole outfits.',
     },
-    idea: { ar: 'اشتري اللوك كله بضغطة.', en: 'Shop the whole outfit in one tap.' },
+    // Each piece is a link to its PDP (Ruling B1-6): the copy promises no one-tap "add the look".
+    idea: { ar: 'كل لوك وقطعه في مكان واحد.', en: 'Each outfit and its pieces in one place.' },
     tokens: {
       page: '#1E2340',
       surface: '#2A3158',
       ink: '#F4F1FA',
       muted: '#C3C0D8',
-      primary: '#E8A33D',
+      primary: '#D9DCEB',
       onPrimary: '#1E2340',
-      accent: '#E8A33D',
+      accent: '#D9DCEB',
       line: '#3B4270',
       fonts: { display: 'Lalezar', body: 'Tajawal', latin: 'Archivo' },
       radius: 'md',
       density: 'regular',
       imageRatio: '4/5',
       motion: 'expressive',
+      // T-01: the wordmark leads the header (it was 12px tracked caps).
+      wordmarkSize: 'lg',
+      // W2b: no accent slab under every card (L-01: only a simple in-stock piece gets an outline
+      // add); the heart is a white disc with FIXED ink, never the page's light foreground (LB-02,
+      // 1.12:1 before); chips in moon silver with indigo ink (K-01, B1-102). The hover lift stays (expressive).
+      cardCta: 'quiet',
+      overPhotoChrome: 'soft',
+      cardBadge: 'accent',
     },
   }),
   L({
     id: 'qamar.vitrine',
     template: 'qamar',
     letter: 'C',
-    skin: 'minimal',
-    status: 'designed',
+    skin: 'qamar',
+    status: 'built',
+    chrome: { header: { logoPlacement: 'centre' } },
+    // Occasion first (Ruling B1-2/B1-5): a framed hero whose hairline draws in once, occasion
+    // bands, the window of new pieces, one customer line. No hero `mode` (plan amendment C6): the
+    // merchant's slider/single choice is content and survives a look switch.
+    sections: [
+      // VT-02: the copy leaves the window display (the dress) clear (W2a).
+      {
+        type: 'hero',
+        design: { presentation: 'framed', frame: 'line', textAnchor: 'bottom-start' },
+      },
+      {
+        type: 'collection-list',
+        design: { tileShape: 'band' },
+        preset: { heading: 'Shop by occasion', headingAr: 'تسوّق حسب المناسبة' },
+      },
+      {
+        type: 'featured-collection',
+        design: { columns: 4, mobileColumns: 2 },
+        preset: {
+          productSource: 'newest',
+          limit: 8,
+          heading: 'In the window',
+          headingAr: 'في الفاترينة',
+        },
+      },
+      { type: 'testimonials', design: { layout: 'single' } },
+    ],
     name: { ar: 'فاترينة', en: 'Vitrine' },
     forWhom: { ar: 'لهدوم المناسبات: فرح وخطوبة وسهرة.', en: 'For occasion wear.' },
     idea: { ar: 'تسوّق حسب المناسبة.', en: 'Occasion-first navigation.' },
@@ -86,13 +189,24 @@ export const LOOKS: readonly LookDefinition[] = [
       muted: '#55555E',
       primary: '#1F4E54',
       onPrimary: '#FFFFFF',
-      accent: '#9E5E5E',
-      line: '#E0E0E5',
+      // VT-03 (W2a): the brief's dusty rose, carrying ink (6.23:1), not a darkened brick under white.
+      accent: '#C98B8B',
+      onAccent: '#1A1A1F',
+      // Champagne as the line role (Ruling B1-5): hairlines, the hero frame, the third band.
+      line: '#D8B96A',
       fonts: { display: 'Aref Ruqaa', body: 'Noto Sans Arabic', latin: 'Playfair Display' },
       radius: 'sm',
       density: 'regular',
       imageRatio: '3/4',
       motion: 'subtle',
+      // The centred Ruqaa wordmark at its current size (24/30px), now also on checkout/success.
+      wordmarkSize: 'xl',
+      // W2b: one label system in a row (L-01: no "View" next to "Add to cart"), a still card
+      // (motion subtle, M-03), the heart on a disc with fixed ink, rose chips with ink (K-01).
+      cardCta: 'quiet',
+      cardHover: 'none',
+      overPhotoChrome: 'soft',
+      cardBadge: 'accent',
     },
   }),
   L({

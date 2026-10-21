@@ -1,3 +1,4 @@
+import { redactWebhookCustomerData } from './webhook-erasure';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
@@ -109,6 +110,18 @@ function authScope(email: string, storeId: string | null) {
     throw new AppError(400, 'VALIDATION_ERROR', 'Email is required');
   }
   return storeId === null ? { email, storeId: null as null } : { email, storeId };
+}
+
+/**
+ * Ruling B1-13: the demo showroom's seeded owner (`storedemo-owner@ebda.app`) has no mailbox and
+ * no login. Account mail for it is never sent (a bounce hurts the sender's reputation); callers
+ * answer exactly as for an unknown address, so nothing about the account is revealed.
+ */
+async function ownsDemoStore(userId: string): Promise<boolean> {
+  const row = await withUser(userId, tx =>
+    tx.store.findFirst({ where: { ownerId: userId, isDemo: true }, select: { id: true } })
+  );
+  return row !== null;
 }
 
 /**
@@ -693,8 +706,8 @@ export class AuthService {
       { includeDeleted: true }
     );
 
-    if (!user) {
-      // Don't reveal if user exists
+    if (!user || (await ownsDemoStore(user.id))) {
+      // Don't reveal if user exists (and never mail the demo owner, B1-13)
       return { ...GENERIC_RESEND_VERIFICATION_RESULT };
     }
 
@@ -1644,8 +1657,8 @@ export class AuthService {
       { includeDeleted: true }
     );
 
-    if (!user) {
-      // Silently return to prevent email enumeration
+    if (!user || (await ownsDemoStore(user.id))) {
+      // Silently return to prevent email enumeration (and never mail the demo owner, B1-13)
       return null;
     }
 
@@ -1906,6 +1919,19 @@ export class AuthService {
       // The ambient store of this erasure: the shopper's own store (self-service,
       // retention cron) or the merchant route's store (== user.storeId, checked above).
       const eraseStoreId = user.storeId ?? currentStoreId();
+      // Webhook delivery log: strip the shopper's contact data from stored payloads (Ruling WH-7).
+      // Must run before the orders lose their customer link below. Already-delivered payloads on
+      // the merchant's own server cannot be recalled.
+      await redactWebhookCustomerData(tx, {
+        storeId: eraseStoreId,
+        orderIds: (
+          await tx.order.findMany({
+            where: { customerId: userId, storeId: eraseStoreId },
+            select: { id: true },
+          })
+        ).map(o => o.id),
+        email: user.email,
+      });
       // Orders: preserve for tax records (Egypt MOF ≥5y), drop the PII.
       // The customer FK is already `onDelete: SetNull` but we explicitly
       // null it so the row's history loses the back-reference even before
