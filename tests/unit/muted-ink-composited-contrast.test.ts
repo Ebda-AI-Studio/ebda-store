@@ -183,7 +183,8 @@ describe('K-04: foreground text never drops under 70% alpha', () => {
 // least 3:1 (WCAG 1.4.11) against every look's page and surface.
 describe('swatch dot ring is a visible boundary on every look (LB-b)', () => {
   const src = readFileSync(join(WEB, 'components/commerce/SwatchDots.tsx'), 'utf8');
-  const alpha = Number(/border-foreground\/(\d+)/.exec(src)![1]) / 100;
+  // B1-107: the ring is now solid (no alpha suffix); an alpha suffix, if one returns, is measured.
+  const alpha = Number(/border-foreground\/(\d+)/.exec(src)?.[1] ?? 100) / 100;
   it.each(
     LOOKS.flatMap(l => [
       [`${l.id} page`, l.tokens.ink, l.tokens.page] as [string, string, string],

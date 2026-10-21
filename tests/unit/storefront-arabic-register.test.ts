@@ -25,7 +25,11 @@ const ROOT = join(__dirname, '../..');
  * sentences W5 wrote in the new voice are listed here by file (Ruling B1-91). Take main's gate on
  * rebase and drop this list.
  */
-const EGYPTIAN_BY_DECISION_1016 = new Set(['apps/web/src/lib/coupon-errors.ts']);
+const EGYPTIAN_BY_DECISION_1016 = new Set([
+  'apps/web/src/lib/coupon-errors.ts',
+  // STOP-2 P2-2 (Ruling B1-109): the empty-cart sentences (سلتك فاضية / لسه ما ضفتش أي منتج).
+  'apps/web/src/app/cart/CartClient.tsx',
+]);
 
 const COLLOQUIAL = [
   'ده',
