@@ -6,6 +6,8 @@ import {
   orderTaxPlacement,
   REGION,
   taxInvoiceInfo,
+  renderBarcodeSvg,
+  BARCODE_DISPLAY_PX,
 } from '@ebda/shared';
 import { emailMoney } from './email-templates/_util';
 import {
@@ -149,6 +151,29 @@ function isArabic(locale: string): locale is 'ar' {
  * The one order read both invoice renderers share (the printable page and the
  * email body), so the two can never disagree about what an invoice contains.
  */
+/**
+ * The order barcode: a real, scannable Code 128 of the order number in the
+ * store's chosen shape (`settings.receiptBarcodeShape`, default plain, `off`
+ * hides it). Shape drawings: BARKOD studio (barkod.studio), used with permission.
+ * An un-encodable number or an unknown shape degrades to plain / nothing, never
+ * a broken invoice.
+ */
+function orderBarcodeBlock(orderNumber: string, rawShape: unknown): string {
+  const shape = typeof rawShape === 'string' ? rawShape : 'plain';
+  if (shape === 'off') return '';
+  try {
+    const svg = renderBarcodeSvg({
+      value: orderNumber,
+      shape,
+      label: false,
+      displayPx: BARCODE_DISPLAY_PX.invoice,
+    });
+    return `<div class="doc-barcode"><bdi dir="ltr">${svg}</bdi><div class="doc-barcode-num" dir="ltr">${escapeHtml(orderNumber)}</div></div>`;
+  } catch {
+    return '';
+  }
+}
+
 function loadInvoiceOrder(storeId: string, orderId: string) {
   return prisma.order.findFirst({
     where: { id: orderId, storeId },
@@ -165,6 +190,7 @@ function loadInvoiceOrder(storeId: string, orderId: string) {
           template: true,
           currency: true,
           timezone: true,
+          settings: true,
         },
       },
       customer: { select: { email: true, firstName: true, lastName: true } },
@@ -614,6 +640,11 @@ export class InvoiceService {
     .notes .label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.1em; color: var(--ink-mute); margin-bottom: 6px; }
     .notes .body { font-size: 13px; color: var(--ink); line-height: 1.55; white-space: pre-wrap; }
 
+    /* Order barcode: ink on paper, always LTR, kept together when printing */
+    .doc-barcode { margin-top: 28px; text-align: center; color: var(--ink); break-inside: avoid; }
+    .doc-barcode svg { width: 100%; max-width: 360px; height: auto; }
+    .doc-barcode-num { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12px; letter-spacing: 0.2em; color: var(--ink-soft); margin-top: 4px; }
+
     /* Footer */
     .footer { margin-top: 36px; padding-top: 24px; border-top: 1px solid var(--line); display: flex; justify-content: space-between; align-items: flex-start; gap: 24px; flex-wrap: wrap; }
     .footer-text { font-size: 12px; color: var(--ink-mute); line-height: 1.6; flex: 1; min-width: 200px; }
@@ -810,6 +841,8 @@ export class InvoiceService {
       </section>`
           : ''
       }
+
+      ${orderBarcodeBlock(order.orderNumber, (order.store.settings as Record<string, unknown> | null)?.receiptBarcodeShape)}
 
       <footer class="footer">
         <div class="footer-text">

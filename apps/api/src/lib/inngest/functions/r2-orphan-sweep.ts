@@ -7,7 +7,12 @@ import { inngest } from '../client';
 import { sendAlert } from '../../../services/alerts.service';
 import { config } from '../../../config';
 import { urlToR2Key } from '../../../services/r2-cleanup.service';
-import { assertStrictTablesVisible, collectReferencedR2Keys } from '../../r2-references';
+import {
+  assertStrictTablesVisible,
+  collectReferencedR2Keys,
+  isDerivedR2Key,
+  isExpiredDerivedKey,
+} from '../../r2-references';
 
 /**
  * Weekly R2 orphan sweep — cron 0 4 * * 0 (Sunday 04:00 UTC).
@@ -204,6 +209,15 @@ export const r2OrphanSweep: InngestFunction.Any = inngest.createFunction(
     for (const obj of objects) {
       totalBytes += obj.size;
       if (referenced.has(obj.key)) continue;
+      // Derived objects (email barcode PNGs) have no DB column: never orphans. They are
+      // re-renderable, so they are removed only once past their retention window.
+      if (isDerivedR2Key(obj.key)) {
+        if (isExpiredDerivedKey(obj.key, obj.lastModified, now)) {
+          orphans.push(obj.key);
+          orphanBytes += obj.size;
+        }
+        continue;
+      }
       // Skip objects younger than 24 h — the DB row may not have landed yet
       // (upload-to-DB write is not atomic; protecting against that race).
       const ageMs = obj.lastModified ? now - obj.lastModified.getTime() : Infinity;
