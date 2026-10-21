@@ -35,11 +35,11 @@ export function StoreNotFound({ store }: { store: ResolvedStore }) {
       <div className="space-y-3">
         <p className="text-6xl font-bold text-primary">404</p>
         <h1 className="text-xl font-semibold" dir="rtl">
-          الصفحة غير متوفرة
+          الصفحة مش موجودة
         </h1>
         <p className="text-base font-medium text-foreground/70">This page isn’t available</p>
         <p className="mx-auto max-w-md text-sm text-foreground/70" dir="rtl">
-          عذرًا، الصفحة التي تبحث عنها غير موجودة أو تم نقلها.
+          معلش، الصفحة اللي بتدوّر عليها مش موجودة أو اتنقلت.
         </p>
       </div>
 
@@ -47,7 +47,7 @@ export function StoreNotFound({ store }: { store: ResolvedStore }) {
         href={homeHref}
         className="inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-primary px-8 text-base font-semibold text-primary-foreground transition active:opacity-90"
       >
-        <span dir="rtl">العودة إلى المتجر</span>
+        <span dir="rtl">ارجع للمتجر</span>
         <span aria-hidden>·</span>
         <span>Back to store</span>
       </Link>

@@ -213,7 +213,7 @@ router.post(
         if (!built) continue;
         const bodyComp = built.components.find(c => c.type === 'BODY');
         // ALSO refresh metaName from canonical. When the canonical name
-        // bumps versions (e.g. force_order_shipped_v1 → _v2 after a
+        // bumps versions (e.g. ebda_order_shipped_v1 → _v2 after a
         // policy-related rewording) the row needs to track the new
         // name so /sync submits under it AND Meta cooldown on the OLD
         // name+language pair doesn't block us. The body refresh + name

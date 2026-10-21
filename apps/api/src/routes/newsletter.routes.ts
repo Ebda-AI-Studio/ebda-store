@@ -236,7 +236,12 @@ router.post(
       }
 
       // Fetch all active subscribers (optionally filtered by language)
-      const where: Record<string, unknown> = { storeId, isActive: true };
+      // 'cart_reminders' consent (checkout box) never receives a newsletter broadcast.
+      const where: Record<string, unknown> = {
+        storeId,
+        isActive: true,
+        consentScope: { not: 'cart_reminders' },
+      };
       if (body.language) where.language = body.language;
 
       const subscribers = await prisma.newsletterSubscriber.findMany({

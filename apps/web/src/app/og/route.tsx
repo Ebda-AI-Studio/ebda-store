@@ -13,7 +13,7 @@
  * stores resolve by Host header) it falls back to the request-context store.
  *
  * Design (unchanged from the previous card):
- *   - Background: store's primary brand color (theme.primaryColor HSL or orange)
+ *   - Background: store's primary brand color (theme.primaryColor HSL or Ebda night)
  *   - Centered: store logo (store.ogImage / store.logo) up to 420×220, raster or
  *     SVG-rasterized-via-sharp; falls back to the store name in large text
  *   - Store name badge at the bottom
@@ -88,20 +88,20 @@ function isAllowedAssetUrl(raw: string): boolean {
   }
 }
 
-/** "H S% L%" → "hsl(H, S%, L%)"; pass-through for "#hex"; orange fallback. */
+/** "H S% L%" → "hsl(H, S%, L%)"; pass-through for "#hex"; Ebda night fallback (D1016-ORANGE-1). */
 function hslComponentsToCss(hslComponents: string | undefined): string {
-  if (!hslComponents) return 'hsl(26, 100%, 50%)';
+  if (!hslComponents) return 'hsl(210, 9%, 4%)';
   if (hslComponents.startsWith('#')) return hslComponents;
   const match = hslComponents.match(/^([\d.]+)\s+([\d.]+%)\s+([\d.]+%)/);
   if (match) return `hsl(${match[1]}, ${match[2]}, ${match[3]})`;
-  return 'hsl(26, 100%, 50%)';
+  return 'hsl(210, 9%, 4%)';
 }
 
 /** Lighten an HSL component string toward white for the background gradient. */
 function lightenHsl(hslComponents: string | undefined, lightenBy = 15): string {
-  if (!hslComponents || hslComponents.startsWith('#')) return 'hsl(26, 100%, 65%)';
+  if (!hslComponents || hslComponents.startsWith('#')) return 'hsl(210, 9%, 19%)';
   const match = hslComponents.match(/^([\d.]+)\s+([\d.]+)%\s+([\d.]+)%/);
-  if (!match) return 'hsl(26, 100%, 65%)';
+  if (!match) return 'hsl(210, 9%, 19%)';
   const h = match[1];
   const s = match[2];
   const l = Math.min(95, parseFloat(match[3]) + lightenBy);

@@ -59,3 +59,15 @@ describe('FactChips', () => {
     expect(render(<FactChips product={{}} />).container.innerHTML).toBe('');
   });
 });
+
+// IA-15 (independent audit): a closing rule after the last fact, then the next
+// block's own top rule 24px below, read as an empty extra row (a double rule).
+describe('FactsTable rules (IA-15)', () => {
+  it('rules sit between rows and above the first, never after the last', () => {
+    const { container } = render(<FactsTable facts={[both, both]} />);
+    const dl = container.querySelector('dl')!;
+    expect(dl.className).toMatch(/\bdivide-y\b/);
+    expect(dl.className).toMatch(/\bborder-t\b/);
+    expect(dl.className).not.toMatch(/\bborder-(y|b)\b/);
+  });
+});

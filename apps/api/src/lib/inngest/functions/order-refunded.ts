@@ -934,6 +934,7 @@ export async function handleOrderRefunded(
               amount: fromMinor(refundAmount),
               storeId,
               storeName: store?.name ?? storeId,
+              locale: orderLocale,
             })
           ),
       ],

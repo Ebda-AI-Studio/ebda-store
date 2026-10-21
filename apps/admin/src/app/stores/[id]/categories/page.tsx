@@ -428,7 +428,7 @@ export default function StoreCategoriesPage() {
           <button
             type="button"
             onClick={openAddForm}
-            className="px-4 py-2 text-sm bg-primary text-white rounded-lg hover:bg-primary/90 font-medium"
+            className="px-4 py-2 text-sm bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 font-medium"
           >
             {t('addCategory')}
           </button>

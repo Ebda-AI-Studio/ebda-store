@@ -8,7 +8,8 @@ const PAIRS: [string, (t: any) => [string, string]][] = [
   ['muted on page', t => [t.page, t.muted]],
   ['muted on surface', t => [t.surface, t.muted]],
   ['onPrimary on primary', t => [t.primary, t.onPrimary]],
-  ['accent text on page', t => [t.page, t.accent]],
+  // A look with `onAccent` uses its accent as a fill only (VT-03); its pair is onAccent on accent.
+  ['accent text on page', t => (t.onAccent ? [t.accent, t.onAccent] : [t.page, t.accent])],
 ];
 
 function hexToOklchLC(hex: string): { L: number; C: number; h: number } {

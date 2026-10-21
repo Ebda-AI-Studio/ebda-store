@@ -9,6 +9,7 @@ export * from './minimum-order';
 export * from './accounting';
 export * from './image';
 export * from './csv';
+export * from './plural';
 export { TEMPLATE_PRESETS, getTemplatePresets } from './template-presets';
 export type { TemplateSeeds } from './template-presets';
 export { VIBE_PRESETS, getVibePreset } from './vibe-presets';
@@ -21,6 +22,7 @@ export {
   parseColorToRgb,
   relativeLuminance,
   COLOR_TOKENS,
+  INVERSE_SURFACE,
   footerLogoContrastFilter,
   colorToHslTriplet,
   rgbToHslTriplet,
@@ -28,7 +30,13 @@ export {
   hslToHex,
 } from './color';
 export type { ColorValue, ColorToken, Rgb } from './color';
-export { lightenColor, darkenColor, generateSectionPalette, deriveCoreBrandTokens } from './color';
+export {
+  lightenColor,
+  darkenColor,
+  generateSectionPalette,
+  deriveCoreBrandTokens,
+  boundaryColorFloor,
+} from './color';
 export type {
   PaletteSeeds,
   SectionPaletteEntry,

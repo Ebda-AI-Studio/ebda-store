@@ -107,7 +107,7 @@ describe('new store: no trust strip until the merchant writes items', () => {
 
   it('Egyptian Arabic hint', () => {
     const ed = render(NEW_STORE_LAYOUT_SETTINGS, { editorMode: true, language: 'ar' });
-    expect(ed).toContain('اكتب نقاط الثقة الخاصة بك');
+    expect(ed).toContain('اكتب نقاط الثقة بتاعتك');
   });
 
   it('is what provisioning and StoreService.create write to stores.layout_settings', () => {

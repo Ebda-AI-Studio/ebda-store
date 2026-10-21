@@ -4,9 +4,10 @@
  * /stores/[id]/campaigns — email campaign list (D2).
  *
  * Feature-gated via `useRequireFeature('email_campaigns')` — the key is in
- * no plan baseline, so every route in `campaign.routes.ts` 403s
- * (`FEATURE_DISABLED`) until a super-admin turns it on for this store; the
- * page renders the upsell gate instead, same pattern as `bundles/page.tsx`.
+ * the Growth + Business baselines (not Basic), so on Basic every route in
+ * `campaign.routes.ts` 403s (`FEATURE_DISABLED`) until the store upgrades or a
+ * super-admin turns it on; the page renders the upsell gate ("Available on the
+ * Growth plan") instead, same pattern as `bundles/page.tsx`.
  *
  * Audience is always "active newsletter subscribers who opted in" — there is
  * no other source (Ruling EC-1, docs/plans/2026-09-25-email-campaigns.md) —

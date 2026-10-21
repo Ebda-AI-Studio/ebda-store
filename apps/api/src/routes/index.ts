@@ -80,6 +80,7 @@ import searchInsightsRoutes from './search-insights.routes';
 import adminSearchRoutes from './admin-search.routes';
 import suppliersRoutes from './suppliers.routes';
 import purchaseOrdersRoutes from './purchase-orders.routes';
+import packingSlipRoutes from './packing-slip.routes';
 import stockAdjustmentsRoutes from './stock-adjustments.routes';
 import warehouseRoutes from './warehouse.routes';
 import expensesRoutes from './expenses.routes';
@@ -287,6 +288,7 @@ router.use('/stores/:storeId/cart', tenantContext, cartRoutes);
 // Context per request (SP6b): the admin payment link calls a payment gateway, so it runs
 // under store scope (no long transaction held across the call); every other order route
 // keeps its one request transaction. See `orderRouteContext`.
+router.use('/stores/:storeId/orders', orderRouteContext, packingSlipRoutes);
 router.use('/stores/:storeId/orders', orderRouteContext, orderRoutes);
 // Customers export (.xlsx). Mounted at /stores/:storeId so the route
 // has access to storeId via mergeParams.

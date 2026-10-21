@@ -155,10 +155,10 @@ describe('ReceiptPrinter', () => {
     render(<ReceiptPrinter order={order} paymentState="paid" store={store} />);
     finishFeed();
     expect(screen.getByText('المدفوع')).toBeTruthy();
-    expect(screen.getByRole('status').textContent).toContain('تم الدفع وتأكيد طلبك');
+    expect(screen.getByRole('status').textContent).toContain('اتدفع، طلبك اتأكد');
   });
 
-  it('renders every line, bundle as one row, and the order number under the barcode', () => {
+  it('renders every line, bundle as one row, and the order number at the foot', () => {
     render(<ReceiptPrinter order={orderWithBundle} paymentState="paid" store={store} />);
     expect(screen.getAllByTestId('receipt-line')).toHaveLength(
       groupOrderLinesForDisplay(orderWithBundle.items).length
@@ -167,10 +167,41 @@ describe('ReceiptPrinter', () => {
     expect(screen.getByText(/علبة هدية/)).toBeTruthy();
     // bundle = one row priced at the box total (100 + 80), never its components
     expect(screen.getAllByTestId('receipt-line')[2].textContent).toMatch(/180/);
-    expect(screen.getByTestId('receipt-barcode-caption').textContent).toContain(
+    expect(screen.getByTestId('receipt-order-number').textContent).toContain(
       orderWithBundle.orderNumber
     );
-    expect(screen.getByTestId('receipt-barcode').getAttribute('aria-hidden')).toBe('true');
+  });
+
+  it('draws a real Code 128 barcode, in the store-chosen shape, always LTR', () => {
+    const { container, rerender } = render(
+      <ReceiptPrinter order={order} paymentState="paid" store={store} />
+    );
+    expect(container.querySelector('bdi[dir="ltr"] svg[aria-label="1043"]')).toBeTruthy();
+    expect(screen.getByTestId('receipt-barcode').dataset.shape).toBe('plain');
+    expect(container.querySelector('mask')).toBeNull();
+    rerender(
+      <ReceiptPrinter
+        order={order}
+        paymentState="paid"
+        store={{ ...store, settings: { receiptBarcodeShape: 'palm' } }}
+      />
+    );
+    expect(screen.getByTestId('receipt-barcode').dataset.shape).toBe('palm');
+    expect(container.querySelector('mask')).toBeTruthy();
+    // the printed caption is untouched by the shape
+    expect(screen.getByTestId('receipt-order-number').textContent).toBe('#1043');
+  });
+
+  it('shape "off" draws no barcode but keeps the caption', () => {
+    render(
+      <ReceiptPrinter
+        order={order}
+        paymentState="paid"
+        store={{ ...store, settings: { receiptBarcodeShape: 'off' } }}
+      />
+    );
+    expect(screen.queryByTestId('receipt-barcode')).toBeNull();
+    expect(screen.getByTestId('receipt-order-number').textContent).toBe('#1043');
   });
 
   it('shows the variant and personalisation under its line', () => {
@@ -188,7 +219,7 @@ describe('ReceiptPrinter', () => {
     render(<ReceiptPrinter order={order} paymentState="cod" store={store} />);
     expect(screen.getByTestId('receipt-paper').getAttribute('data-feeding')).toBe('true');
     expect(screen.getByTestId('receipt-status-icon').getAttribute('data-state')).toBe('printing');
-    expect(screen.getByRole('status').textContent).toContain('جارٍ طباعة فاتورتك…');
+    expect(screen.getByRole('status').textContent).toContain('بنطبع فاتورتك…');
     // The receipt is real text during the feed: nothing is hidden from screen readers.
     expect(screen.getByText('الإجمالي')).toBeTruthy();
     finishFeed();
@@ -211,10 +242,8 @@ describe('ReceiptPrinter', () => {
     }
   });
 
-  it('counts a bundle box as one item on the printer', () => {
-    render(<ReceiptPrinter order={orderWithBundle} paymentState="paid" store={store} />);
-    expect(screen.getByText('4 قطع')).toBeTruthy(); // 1 abaya + 2 scarves + 1 box, not its 2 lines
-  });
+  // (The printer's item count, and its bundle-counts-once rule, left with P2-5: the head carries
+  // the payment status only; see "printer head carries the status only".)
 
   it('keeps the spinner after the feed while payment is still verifying', () => {
     const { rerender } = render(
@@ -293,10 +322,10 @@ describe('ReceiptPrinter', () => {
     const leaving = screen.getByTestId('receipt-status-leaving');
     expect(leaving.getAttribute('aria-hidden')).toBe('true');
     expect(leaving.className).toContain(styles.statusOut);
-    expect(leaving.textContent).toContain('جارٍ طباعة فاتورتك…');
+    expect(leaving.textContent).toContain('بنطبع فاتورتك…');
     const current = screen.getByTestId('receipt-status-current');
     expect(current.className).toContain(styles.statusIn);
-    expect(current.textContent).toContain('تم تسجيل طلبك، الدفع عند الاستلام');
+    expect(current.textContent).toContain('طلبك اتسجل، الدفع عند الاستلام');
     fireEvent(leaving, new Event('animationend', { bubbles: true }));
     fireEvent(leaving, new Event('webkitAnimationEnd', { bubbles: true }));
     expect(screen.queryByTestId('receipt-status-leaving')).toBeNull();
@@ -352,7 +381,7 @@ describe('ReceiptPrinter', () => {
     const total = screen.getByTestId('receipt-total').textContent ?? '';
     expect(total).toMatch(/٩٥٠/);
     expect(total).not.toMatch(/[0-9]/);
-    expect(screen.getByTestId('receipt-barcode-caption').textContent).toBe('#1043');
+    expect(screen.getByTestId('receipt-order-number').textContent).toBe('#1043');
   });
 
   it('english: canonical variant title, and the date reads day month year', () => {
@@ -364,11 +393,12 @@ describe('ReceiptPrinter', () => {
     expect(document.body.textContent).not.toContain('10/15/2026');
   });
 
-  it('prints the order number once on the paper (barcode caption), no duplicate row', () => {
+  it('prints the order number once on the paper (the foot), no duplicate meta row', () => {
     render(<ReceiptPrinter order={order} paymentState="cod" store={store} />);
-    expect(screen.queryByTestId('receipt-order-number')).toBeNull();
-    expect(screen.queryByText('رقم الطلب')).toBeNull();
-    expect(screen.getByTestId('receipt-barcode-caption').textContent).toBe('#1043');
+    const paper = screen.getByTestId('receipt-paper');
+    expect(within(paper).getAllByText('#1043')).toHaveLength(1);
+    expect(within(paper).getAllByText('رقم الطلب')).toHaveLength(1);
+    expect(screen.getByTestId('receipt-order-number').textContent).toBe('#1043');
   });
 
   it('a bubbling animationend from inside the leaving status line does not end the crossfade', () => {
@@ -382,5 +412,94 @@ describe('ReceiptPrinter', () => {
     fireEvent(leaving, new Event('animationend', { bubbles: true }));
     fireEvent(leaving, new Event('webkitAnimationEnd', { bubbles: true }));
     expect(screen.queryByTestId('receipt-status-leaving')).toBeNull();
+  });
+});
+
+// W3 receipt polish (decision (d) supersedes B0-3; T-04, M-05, K-07).
+describe('receipt W3', () => {
+  // Ruling B1-68b: supersedes the barcode half of B1-68. The barcode is a decode-gated Code 128
+  // (feat/shaped-barcodes), so S-04's "must work, or it is removed" is met; the large readable
+  // order number stays under it.
+  it('S-04: a real scannable barcode plus one large human-readable order number', () => {
+    render(<ReceiptPrinter order={order} paymentState="cod" store={store} />);
+    expect(screen.getByTestId('receipt-barcode')).toBeTruthy();
+    const n = screen.getByTestId('receipt-order-number');
+    expect(n.textContent).toBe('#1043');
+    // IA-14: readable, not huge (text-2xl monospace was hard to read out to a courier)
+    expect(n.className).toContain('text-xl');
+    expect(n.className).not.toMatch(/tracking-\[/);
+  });
+  it('T-04: money is the body face with tabular figures; mono is only the order number', () => {
+    render(<ReceiptPrinter order={order} paymentState="paid" store={store} />);
+    for (const el of document.querySelectorAll(`.${styles.mono}`))
+      expect(el.textContent).toMatch(/^#?1043$/);
+    expect(document.querySelector('[class*="uppercase"]')).toBeNull();
+  });
+  it('M-05: a tap on the paper ends the feed at once', () => {
+    render(
+      <ReceiptPrinter order={{ ...order, id: 'order-tap' }} paymentState="cod" store={store} />
+    );
+    expect(screen.getByTestId('receipt-paper').getAttribute('data-feeding')).toBe('true');
+    fireEvent.click(screen.getByTestId('receipt-paper'));
+    expect(screen.getByTestId('receipt-paper').getAttribute('data-feeding')).toBeNull();
+  });
+  it('K-07: receiptStyle framed drops the device slab (no shadow, framed housing)', () => {
+    const { container } = render(
+      <ReceiptPrinter
+        order={order}
+        paymentState="cod"
+        store={{ ...store, theme: { receiptStyle: 'framed' } } as never}
+      />
+    );
+    const section = container.querySelector('section')!;
+    expect(section.getAttribute('data-receipt')).toBe('framed');
+    expect(container.innerHTML).not.toContain('shadow-lg');
+  });
+  it('K-07: without the token the device housing is unchanged', () => {
+    const { container } = render(<ReceiptPrinter order={order} paymentState="cod" store={store} />);
+    expect(container.querySelector('section')!.hasAttribute('data-receipt')).toBe(false);
+    expect(container.innerHTML).toContain('shadow-lg');
+  });
+});
+
+// IA-14 (independent audit): the number and the total each printed twice (printer
+// head and paper); the number set huge in one unbroken monospace run.
+describe('receipt IA-14', () => {
+  it('groups a prefixed order number for reading out, keeps the full value for readers', async () => {
+    const { groupOrderNumber } = await import('./ReceiptPrinter');
+    expect(groupOrderNumber('ORD-TMZRB9-IR5JY')).toBe('TMZRB9 · IR5JY');
+    expect(groupOrderNumber('1043')).toBe('1043');
+    render(
+      <ReceiptPrinter
+        order={{ ...order, orderNumber: 'ORD-TMZRB9-IR5JY' }}
+        paymentState="cod"
+        store={store}
+      />
+    );
+    const n = screen.getByTestId('receipt-order-number');
+    // a11y re-audit P2-N7: aria-label is prohibited on a <p>; the grouped form is shown
+    // (aria-hidden) and the full value is read from an sr-only span.
+    expect(n.hasAttribute('aria-label')).toBe(false);
+    expect(n.querySelector('[aria-hidden="true"]')!.textContent).toBe('#TMZRB9 · IR5JY');
+    expect(n.querySelector('.sr-only')!.textContent).toBe('ORD-TMZRB9-IR5JY');
+  });
+
+  it('the order number and the total appear once on the page', () => {
+    render(<ReceiptPrinter order={order} paymentState="cod" store={store} />);
+    expect(screen.getAllByText('#1043')).toHaveLength(1);
+    expect(screen.queryByText('Order total')).toBeNull();
+    expect(screen.queryByText('إجمالي الطلب')).toBeNull();
+  });
+});
+
+// Taste re-audit P2-5 (Y-05): the printer head repeated the page headline ("your order") and the
+// paper's item count. It carries only the live payment status now; the paper holds the rest.
+describe('printer head carries the status only (P2-5)', () => {
+  it('no "your order" title and no item count above the paper', () => {
+    render(<ReceiptPrinter order={order} paymentState="cod" store={store} />);
+    const paper = screen.getByTestId('receipt-paper');
+    const head = paper.closest('section')!.textContent!.split(paper.textContent!)[0];
+    expect(head).not.toMatch(/طلبك(?! )|Your order/);
+    expect(head).not.toMatch(/قطعة|قطعتان|قطع|items?\b/);
   });
 });

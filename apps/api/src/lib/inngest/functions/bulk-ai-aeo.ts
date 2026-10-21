@@ -15,6 +15,7 @@ import { buildMetaAeoPrompt, generateProductMetaAeo } from '../../ai/product-met
 import { invalidateStoreProductCaches } from '../../public-cache';
 import { bustStoreCachesById } from '../../../services/store.service';
 import { isPlaceholderText } from '../../ai/placeholder-guard';
+import { EGYPTIAN_ARABIC_REGISTER } from '../../ai/arabic-register';
 
 const AI_UNAVAILABLE_MESSAGE = 'AI request failed — please try again shortly.';
 
@@ -401,7 +402,7 @@ Draft exactly ${count} FAQs that real customers in Egypt would ask. Cover:
 - Sizing or specs (if relevant)
 - Loyalty programs or discount codes
 
-Each FAQ: a clear, specific question + a concise 2-3 sentence answer. Both in English AND in Arabic (formal Modern Standard Arabic — not Egyptian or Levantine dialect).
+Each FAQ: a clear, specific question + a concise 2-3 sentence answer. Both in English AND in Arabic. ${EGYPTIAN_ARABIC_REGISTER}
 
 Return ONLY a JSON array. Each element must have exactly these keys:
   question, questionAr, answer, answerAr
@@ -706,7 +707,7 @@ Write exactly ${count} HowTo guides that help customers understand this store's 
 
 For each guide:
 - title: short, action-oriented (e.g. "How to Return an Item")
-- titleAr: same in Arabic (formal MSA)
+- titleAr: same in Arabic (${EGYPTIAN_ARABIC_REGISTER})
 - description: 1-2 sentence overview
 - descriptionAr: same in Arabic
 - steps: 3-6 steps, each with "name" (short label) and "text" (1-2 sentence instruction)

@@ -140,10 +140,10 @@ export const translations = {
   Reviews: 'التقييمات',
 
   // Cart
-  'Added to cart': 'تمت الإضافة للسلة',
+  'Added to cart': 'اتضاف للسلة',
   'View cart': 'عرض السلة',
   'Shopping Cart': 'سلة التسوق',
-  'Your cart is empty': 'سلة التسوق فارغة',
+  'Your cart is empty': 'سلة التسوق فاضية',
   'Continue Shopping': 'متابعة التسوق',
   Subtotal: 'المجموع الفرعي',
   Shipping: 'الشحن',
@@ -162,7 +162,7 @@ export const translations = {
   // customer otherwise sees a discount much smaller than the coupon's
   // headline percentage with no explanation.
   'Coupon applies to items outside your bundles — a bundle is already discounted.':
-    'يُطبَّق الكوبون على المنتجات خارج الباقات فقط — سعر الباقة مخفَّض بالفعل.',
+    'الكوبون بيتطبق على المنتجات اللي برّه الباقات بس — سعر الباقة مخفّض أصلاً.',
 
   // Checkout
   Checkout: 'الدفع',
@@ -183,7 +183,7 @@ export const translations = {
   Company: 'الشركة',
   FAQ: 'الأسئلة الشائعة',
   'Shipping Info': 'معلومات الشحن',
-  'Returns & Refunds': 'المرتجعات والاستبدال',
+  'Returns & Refunds': 'المرتجعات واسترداد الفلوس',
   'Privacy Policy': 'سياسة الخصوصية',
   'Terms of Service': 'الشروط والأحكام',
   'About Us': 'من نحن',
@@ -202,19 +202,19 @@ export const translations = {
   Search: 'بحث',
   // Search results sort: the hybrid relevance order (shown only when the server ranked the list).
   'Most relevant': 'الأكثر صلة',
-  'No results found': 'لم يتم العثور على نتائج',
-  'Loading...': 'جاري التحميل...',
+  'No results found': 'ملقيناش نتايج',
+  'Loading...': 'بنحمّل...',
   Error: 'خطأ',
-  Success: 'تم بنجاح',
+  Success: 'تمام',
   EGP: 'ج.م',
   Retry: 'إعادة المحاولة',
   'Something went wrong': 'حدث خطأ ما',
-  'Try Again': 'حاول مرة أخرى',
+  'Try Again': 'جرّب تاني',
   'Go Home': 'العودة للرئيسية',
 
   // Shipping
   'Free delivery on orders over 20 EGP': 'توصيل مجاني للطلبات فوق 20 ج.م',
-  'Same-day delivery across Egypt': 'توصيل في نفس اليوم في جميع أنحاء مصر',
+  'Same-day delivery across Egypt': 'توصيل في نفس اليوم في كل مصر',
 
   // Auth
   Login: 'دخول',
@@ -224,7 +224,7 @@ export const translations = {
   Password: 'كلمة المرور',
   'Confirm Password': 'تأكيد كلمة المرور',
   'Full Name': 'الاسم الكامل',
-  Phone: 'الهاتف',
+  Phone: 'رقم الموبايل',
 
   // Locations page
   Locations: 'الفروع',
@@ -233,7 +233,7 @@ export const translations = {
   // per store via Branding → Locations → "Show branches in footer".
   Branches: 'فروعنا',
   'Visit a store — tap a branch for directions, to call, or to message us.':
-    'زر أحد فروعنا — اضغط على الفرع للاتجاهات أو الاتصال أو المراسلة.',
+    'زور فرع من فروعنا — دوس على الفرع للاتجاهات أو الاتصال أو المراسلة.',
   'Open in Maps': 'افتح في الخرائط',
   Call: 'اتصال',
   WhatsApp: 'واتساب',
@@ -247,69 +247,94 @@ export const translations = {
   // than broken.
   "We'll be back soon": 'سنعود قريباً',
   'is currently undergoing maintenance. Please check back later.':
-    'يخضع حالياً لأعمال الصيانة. يرجى المحاولة مرة أخرى لاحقاً.',
+    'عليه صيانة دلوقتي. جرّب تاني بعدين.',
   'Need to reach us?': 'تحتاج للتواصل معنا؟',
   'Powered by Ebda': `مدعوم من ${BRAND.product.nameAr}`,
 
   // Campaign unsubscribe page (/unsubscribe, D2 email campaigns).
   'Email preferences': 'تفضيلات البريد الإلكتروني',
   'Stop receiving marketing emails at': 'إيقاف استلام الرسائل التسويقية على',
-  'Order and account emails are not affected.': 'لن تتأثر رسائل الطلبات والحساب.',
+  'Order and account emails are not affected.': 'رسايل الطلبات والحساب مش هتتأثر.',
   Unsubscribe: 'إلغاء الاشتراك',
-  'Unsubscribing…': 'جارٍ إلغاء الاشتراك…',
+  'Unsubscribing…': 'بنلغي الاشتراك…',
   'You have been unsubscribed. You will not receive marketing emails from us.':
-    'تم إلغاء اشتراكك. لن تصلك رسائل تسويقية منا بعد الآن.',
-  'This unsubscribe link is invalid.': 'رابط إلغاء الاشتراك هذا غير صالح.',
-  'Something went wrong. Please try again later.': 'حدث خطأ ما. يرجى المحاولة مرة أخرى لاحقاً.',
+    'اشتراكك اتلغى. مش هتوصلك رسايل تسويقية مننا تاني.',
+  'This unsubscribe link is invalid.': 'رابط إلغاء الاشتراك ده مش صالح.',
+  'Something went wrong. Please try again later.': 'حصل خطأ. جرّب تاني بعدين.',
 
   // SMS-marketing consent (issue 206) — checkout opt-in, account settings, opt-out page.
-  'Send me offers by SMS': 'أرسلوا لي العروض عبر الرسائل القصيرة',
-  'Promotional messages only. You can stop them anytime.':
-    'رسائل ترويجية فقط. يمكنك إيقافها في أي وقت.',
+  'Send me offers by SMS': 'ابعتولي العروض في رسايل SMS',
+  'Promotional messages only. You can stop them anytime.': 'رسايل عروض بس. تقدر توقفها في أي وقت.',
   'SMS offers': 'عروض الرسائل القصيرة',
   'Get offers and reminders from this store by SMS.':
-    'استلم العروض والتذكيرات من هذا المتجر عبر الرسائل القصيرة.',
-  'Order updates are not affected.': 'لن تتأثر تحديثات الطلبات.',
-  'Offers will be sent to': 'ستُرسل العروض إلى',
+    'ابعتولي العروض والتذكيرات من المتجر ده في رسايل SMS.',
+  'Order updates are not affected.': 'تحديثات الطلبات مش هتتأثر.',
+  'Offers will be sent to': 'العروض هتتبعت على',
   'Add a phone number to your profile to get SMS offers.':
-    'أضف رقم هاتف إلى ملفك الشخصي لاستلام عروض الرسائل القصيرة.',
-  'You are receiving SMS offers.': 'أنت مشترك في عروض الرسائل القصيرة.',
+    'ضيف رقم تليفون لملفك الشخصي عشان توصلك عروض الـ SMS.',
+  'You are receiving SMS offers.': 'إنت مشترك في عروض الـ SMS.',
   'Stop SMS offers': 'إيقاف عروض الرسائل القصيرة',
   'SMS preferences': 'تفضيلات الرسائل القصيرة',
   'Stop receiving SMS offers at': 'إيقاف استلام عروض الرسائل القصيرة على',
-  'Order and delivery messages are not affected.': 'لن تتأثر رسائل الطلبات والتوصيل.',
-  'You will not receive SMS offers from us.': 'لن تصلك عروض عبر الرسائل القصيرة منا بعد الآن.',
-  'This link is invalid.': 'هذا الرابط غير صالح.',
+  'Order and delivery messages are not affected.': 'رسايل الطلبات والتوصيل مش هتتأثر.',
+  'You will not receive SMS offers from us.': 'مش هتوصلك عروض SMS مننا تاني.',
+  'This link is invalid.': 'الرابط ده مش صالح.',
 
   // Visual builder newsletter section (Phase 2). The consent line is platform
   // copy, not merchant-editable, so every signup form carries it.
   'Your email': 'بريدك الإلكتروني',
   Subscribe: 'اشترك',
-  'Subscribing…': 'جارٍ الاشتراك…',
-  'Thanks — you are subscribed.': 'شكراً — تم اشتراكك.',
-  'Please enter a valid email.': 'من فضلك أدخل بريداً إلكترونياً صحيحاً.',
+  'Subscribing…': 'بنسجّل اشتراكك…',
+  'Thanks — you are subscribed.': 'شكرًا — اشتراكك اتسجّل.',
+  'Please enter a valid email.': 'اكتب بريد إلكتروني صحيح.',
   'By subscribing you agree to receive marketing emails from this store.':
-    'بالاشتراك توافق على استلام رسائل تسويقية من هذا المتجر.',
+    'لما تشترك، إنت موافق إنك تستلم رسايل تسويقية من المتجر ده.',
   'Privacy policy': 'سياسة الخصوصية',
 
   // Editor canvas hints for sections with nothing to show yet (EmptySectionHint).
   // Never shown on the public storefront, which hides these sections instead.
-  'Add categories and they will appear here.': 'أضف أقساماً وستظهر هنا.',
-  'Add products and your newest ones will appear here.': 'أضف منتجات وستظهر أحدث منتجاتك هنا.',
+  'Add categories and they will appear here.': 'ضيف أقسام وهتظهر هنا.',
+  'Add products and your newest ones will appear here.': 'ضيف منتجات وأحدث منتجاتك هتظهر هنا.',
   'Best sellers appear here once your products start selling.':
-    'ستظهر المنتجات الأكثر مبيعاً هنا بمجرد أن تبدأ منتجاتك في البيع.',
+    'الأكثر مبيعاً هيظهر هنا أول ما منتجاتك تبدأ تتباع.',
   'Add a store description or image in store settings to show your story here.':
-    'أضف وصفاً أو صورة للمتجر من إعدادات المتجر وستظهر قصتك هنا.',
-  'Publish a blog post to show it here.': 'انشر مقالاً في المدونة وسيظهر هنا.',
+    'ضيف وصف أو صورة للمتجر من إعدادات المتجر وحكايتك هتظهر هنا.',
+  'Publish a blog post to show it here.': 'انشر مقال في المدونة وهيظهر هنا.',
   'Write your own trust items (delivery, payment, returns) and they will show here.':
-    'اكتب نقاط الثقة الخاصة بك (التوصيل، الدفع، الاسترجاع) وستظهر هنا.',
+    'اكتب نقاط الثقة بتاعتك (التوصيل، الدفع، الاسترجاع) وهتظهر هنا.',
   'Customer reviews appear here once customers leave them.':
-    'ستظهر آراء العملاء هنا بمجرد أن يكتبوها.',
+    'آراء العملاء هتظهر هنا أول ما العملاء يكتبوها.',
+  'Add a look with a photo and its pieces and it will appear here.':
+    'أضف لوك بصورته وقطعه وهيظهر هنا.',
   'Only you see this in the editor. Visitors do not see an empty section.':
-    'أنت وحدك ترى هذا في المحرر. لا يرى الزوار قسماً فارغاً.',
+    'إنت بس اللي بتشوف ده في المحرر. الزوار مش بيشوفوا قسم فاضي.',
+
+  // Testimonial attribution when the review has no customer name (API sends null). Neutral noun.
+  Customer: 'عميل',
+
+  // Accessible name of a whole-slide hero link with no headline or alt (HeroBanner, HeroCollage).
+  'View more': 'عرض المزيد',
+
+  // Shop-the-look section (Phase B1 Lookbook). Neutral noun forms, never a gendered imperative.
+  'Shop the look': 'تسوّق اللوك',
+  'Items in this look': 'قطع اللوك',
+  'Look total': 'مجموع اللوك',
+  // W2a "Shop this look" page (amends Ruling B1-6); neutral noun forms (decision (e)).
+  'Shop this look': 'تسوّق اللوك',
+  'Choose a size for each piece and add the ones you want.':
+    'اختيار المقاس لكل قطعة وإضافة القطع المطلوبة.',
+  'Choose the options above first': 'اختيار الخيارات أولًا',
+  'Personalise on the product page': 'التخصيص من صفحة المنتج',
+
+  // Demo showroom bar (Rulings B1-11/B1-12) and its refusals (B1-13).
+  'Demo store': 'متجر تجريبي',
+  Template: 'القالب',
+  Look: 'الشكل',
+  'Choose a look': 'اختر شكلاً',
+  'This is a demo store: this is turned off here': 'ده متجر تجريبي — الخاصية دي مقفولة هنا',
 
   // Route error fallback — Try Again while the refresh is in flight.
-  'Retrying…': 'جارٍ إعادة المحاولة…',
+  'Retrying…': 'بنجرّب تاني…',
 } as const;
 
 export type TranslationKey = keyof typeof translations;

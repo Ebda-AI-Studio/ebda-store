@@ -10,7 +10,7 @@ export interface PaymentFailedData {
 export const paymentFailedTemplate = {
   subject: {
     en: (d: PaymentFailedData, _storeName: string) => `Payment Failed - Order #${d.orderNumber}`,
-    ar: (d: PaymentFailedData, _storeName: string) => `فشلت عملية الدفع - طلب رقم ${d.orderNumber}`,
+    ar: (d: PaymentFailedData, _storeName: string) => `الدفع منفعش - طلب رقم ${d.orderNumber}`,
   },
 
   en: (d: PaymentFailedData, _storeName: string, webUrl: string) => `
@@ -25,13 +25,13 @@ export const paymentFailedTemplate = {
   `,
 
   ar: (d: PaymentFailedData, _storeName: string, webUrl: string) => `
-    <h2>فشلت عملية الدفع</h2>
-    <p>مرحباً ${escapeHtml(d.customerName)}،</p>
-    <p>للأسف، تعذّر علينا معالجة دفعتك للطلب رقم ${escapeHtml(d.orderNumber)}.</p>
+    <h2>الدفع منفعش</h2>
+    <p>أهلاً ${escapeHtml(d.customerName)}،</p>
+    <p>للأسف، معرفناش نكمّل دفعتك للطلب رقم ${escapeHtml(d.orderNumber)}.</p>
     ${d.reason ? `<p><strong>السبب:</strong> ${escapeHtml(d.reason)}</p>` : ''}
-    <p>حاول مرة أخرى أو تواصل مع الدعم.</p>
+    <p>جرّب تاني أو كلّم الدعم.</p>
     <p style="text-align: center; margin: 24px 0;">
-      <a href="${escapeHtml(webUrl)}/checkout" class="button">إعادة المحاولة</a>
+      <a href="${escapeHtml(webUrl)}/checkout" class="button">جرّب تاني</a>
     </p>
   `,
 };

@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { CartIcon } from '@ebda/ui';
 import { StoreLogo } from '../shared/StoreLogo';
 import type { HeaderProps, ResolvedUtilityBar } from '../types';
+import { useTabBarShown, HEADER_MENU_WITH_TAB_BAR_KEEP_SLOT } from '../shared/tab-bar-visibility';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { LanguageSwitcher } from '../../components/LanguageSwitcher';
 import { SearchAutocomplete } from '../../components/SearchAutocomplete';
@@ -21,6 +22,7 @@ export default function ElegantHeader({
   headerBgColor,
 }: HeaderProps) {
   const { isRtl: ctxIsRtl, t } = useLanguage();
+  const tabBarShown = useTabBarShown();
   const isRtl = isRtlProp ?? ctxIsRtl;
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -100,7 +102,7 @@ export default function ElegantHeader({
           <button
             type="button"
             onClick={() => setIsMenuOpen(!isMenuOpen)}
-            className="md:hidden inline-flex h-11 w-11 items-center justify-center text-foreground/70 hover:text-foreground transition-colors duration-500 ease-out cursor-pointer"
+            className={`md:hidden inline-flex h-11 w-11 items-center justify-center text-foreground/70 hover:text-foreground transition-colors duration-500 ease-out cursor-pointer ${tabBarShown ? HEADER_MENU_WITH_TAB_BAR_KEEP_SLOT : ''}`}
             aria-label={t('Menu', 'القائمة')}
             aria-expanded={isMenuOpen}
           >
@@ -134,6 +136,7 @@ export default function ElegantHeader({
               <span
                 className="text-3xl font-light tracking-[0.25em] text-foreground"
                 data-zone="storeName"
+                translate="no"
               >
                 {displayName}
               </span>
@@ -211,12 +214,15 @@ export default function ElegantHeader({
         </div>
 
         {/* Desktop navigation — below logo */}
-        <nav className="hidden md:flex items-center justify-center gap-10 pb-5">
+        <nav
+          aria-label={t('Main', 'الرئيسية')}
+          className="hidden md:flex items-center justify-center gap-10 pb-5"
+        >
           {navigation.map(item => (
             <Link
               key={item.href}
               href={item.href}
-              className="text-lg tracking-[0.18em] ui-caps-toggle text-muted-foreground hover:text-foreground transition-colors duration-500 ease-out cursor-pointer"
+              className="inline-flex min-h-11 items-center text-lg tracking-[0.18em] ui-caps-toggle text-muted-foreground hover:text-foreground transition-colors duration-500 ease-out cursor-pointer"
             >
               {isRtl && item.labelAr ? item.labelAr : item.label}
             </Link>
@@ -247,7 +253,7 @@ export default function ElegantHeader({
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
               placeholder={t('Search', 'بحث')}
-              className="w-full ps-11 pe-4 py-3 bg-transparent border-b border-border focus:outline-none focus:border-foreground text-base sm:text-sm tracking-[0.08em] placeholder:text-muted-foreground transition-colors duration-500"
+              className="w-full ps-11 pe-4 py-3 bg-transparent border-b border-input focus:outline-none focus:border-foreground text-base sm:text-sm tracking-[0.08em] placeholder:text-muted-foreground transition-colors duration-500"
               dir={isRtl ? 'rtl' : 'ltr'}
               aria-label={t('Search products', 'بحث عن المنتجات')}
             />
@@ -269,8 +275,8 @@ export default function ElegantHeader({
               type="text"
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
-              placeholder={t('What are you looking for?', 'ما الذي تبحث عنه؟')}
-              className="w-full px-0 py-3 bg-transparent border-0 border-b border-border focus:outline-none focus:border-foreground text-center text-base sm:text-sm tracking-[0.1em] placeholder:text-muted-foreground transition-colors duration-500"
+              placeholder={t('What are you looking for?', 'بتدوّر على إيه؟')}
+              className="w-full px-0 py-3 bg-transparent border-0 border-b border-input focus:outline-none focus:border-foreground text-center text-base sm:text-sm tracking-[0.1em] placeholder:text-muted-foreground transition-colors duration-500"
               dir={isRtl ? 'rtl' : 'ltr'}
               autoFocus={isSearchOpen}
               aria-label={t('Search products', 'بحث عن المنتجات')}
@@ -300,7 +306,7 @@ export default function ElegantHeader({
             ? ({ inert: true } as unknown as React.HTMLAttributes<HTMLDivElement>)
             : {})}
         >
-          <nav className="min-h-0 overflow-hidden">
+          <nav aria-label={t('Menu', 'القائمة')} className="min-h-0 overflow-hidden">
             <ul className="space-y-5 py-6 text-center">
               {navigation.map(item => (
                 <li key={item.href}>

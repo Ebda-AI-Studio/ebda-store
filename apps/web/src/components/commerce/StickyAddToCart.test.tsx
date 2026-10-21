@@ -230,3 +230,38 @@ describe('StickyCartTotal', () => {
     expect(btn.disabled).toBe(true);
   });
 });
+
+// Taste re-audit P2-3 (Y-05): at 390 the sticky cart total sat on screen while the summary's
+// own total and checkout button were visible, and in the full page it covered the coupon field.
+// Like the PDP buy bar, the cart bar shows only once the summary's checkout button leaves view.
+function CartHarness() {
+  const ref = useRef<HTMLDivElement>(null);
+  return (
+    <div>
+      <div ref={ref}>
+        <a href="/checkout" data-cta="button">
+          Checkout
+        </a>
+      </div>
+      <StickyCartTotal
+        anchorRef={ref}
+        totalLabel="Total"
+        total="EGP 100"
+        itemCount={1}
+        itemCountLabel="1 item"
+        href="/checkout"
+        label="Checkout"
+      />
+    </div>
+  );
+}
+describe('StickyCartTotal follows the summary checkout button (P2-3)', () => {
+  it('hidden while the summary CTA is in view, shown once it leaves', () => {
+    vi.stubGlobal('IntersectionObserver', IO);
+    render(<CartHarness />);
+    act(() => ioCallback([{ isIntersecting: true }]));
+    expect(screen.queryByTestId('sticky-cart-total')).toBeNull();
+    act(() => ioCallback([{ isIntersecting: false }]));
+    expect(screen.getByTestId('sticky-cart-total')).toBeTruthy();
+  });
+});

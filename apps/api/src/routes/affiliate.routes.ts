@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { authenticate, authorize } from '../middleware/auth';
 import { requireStoreAccess } from '../middleware/store-access';
 import { requireFeature } from '../middleware/feature-gate';
+import { refuseDemoStore } from '../middleware/demo-store';
 import { affiliateService } from '../services/affiliate.service';
 import { listAffiliateEvents } from '../services/affiliate-event.service';
 import { prisma } from '@ebda/database';
@@ -462,6 +463,7 @@ router.get(
 // POST /public/:storeId/affiliates/apply
 publicRouter.post(
   '/:storeId/affiliates/apply',
+  refuseDemoStore,
   // affiliate is an Enterprise-only feature. Without this gate the public
   // signup accepted applications for ANY-tier store (affiliateService.getConfig
   // defaults publicSignupEnabled:true) — a billing leak. requireFeature reads

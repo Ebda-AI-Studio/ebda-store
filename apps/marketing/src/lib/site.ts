@@ -19,10 +19,25 @@ export const LEGAL_SLUGS = [
   'acceptable-use',
 ] as const;
 export type LegalSlug = (typeof LEGAL_SLUGS)[number];
-export type PageSlug = '' | 'about' | 'credits' | LegalSlug;
+export const COMPARE_SLUGS = ['salla', 'zid', 'shopify'] as const;
+export type CompareSlug = (typeof COMPARE_SLUGS)[number];
+export type ComparePage = `compare/${CompareSlug}`;
+export type PageSlug = '' | 'about' | 'credits' | 'features' | ComparePage | LegalSlug;
+
+/** The comparison pages (/compare/salla, /compare/zid, /compare/shopify), as page slugs. */
+export const COMPARE_PAGES: readonly ComparePage[] = COMPARE_SLUGS.map(
+  s => `compare/${s}` as const
+);
 
 /** Every public marketing page (same set in both locales). The sitemap is generated from this. */
-export const SITE_PAGES = ['', 'about', 'credits', ...LEGAL_SLUGS] as const;
+export const SITE_PAGES = [
+  '',
+  'features',
+  ...COMPARE_PAGES,
+  'about',
+  'credits',
+  ...LEGAL_SLUGS,
+] as const satisfies readonly PageSlug[];
 
 /** Page path (no trailing slash except root) for a locale, e.g. pagePath('en','privacy') -> /en/privacy */
 export function pagePath(locale: Locale, page: PageSlug): string {
@@ -44,6 +59,8 @@ export const SECTION_ORDER = [
   'model3d',
   'payments',
   'features',
+  'ainative',
+  'capabilities',
   'pricing',
   'faq',
   'start',

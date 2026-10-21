@@ -16,12 +16,13 @@
  * the feed, so nothing below jumps when it ends; the receipt is real text the
  * whole time, so screen readers never wait for the animation.
  */
-import { VariantText } from '@ebda/ui';
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { VariantText, ReceiptPrinterShell } from '@ebda/ui';
+import { useEffect, useState, type ReactNode } from 'react';
 import { groupOrderLinesForDisplay, orderTaxPlacement, orderLineVariantTitle } from '@ebda/shared';
 import type { Order } from '@/lib/api';
 import { MINUS, signedText } from '@/lib/bidi';
 import type { StoreData } from '@/contexts/StoreContext';
+import type { StoreTheme } from '@ebda/shared';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useLocalePrice } from '@/hooks/useLocalePrice';
 import { useNumerals } from '@/hooks/useNumerals';
@@ -31,7 +32,6 @@ import { pickLocalizedName } from '@/templates/shared/display-helpers';
 import { CartLineNote } from './CartLineNote';
 import { Barcode } from './Barcode';
 import styles from './ReceiptPrinter.module.css';
-import { countText, ITEMS } from '@/lib/plural';
 
 /** The success page's verified payment outcome (SuccessClient owns it). */
 export type PaymentState =
@@ -43,7 +43,13 @@ export type PaymentState =
   | 'awaiting'
   | 'unknown';
 
-type ReceiptStore = Pick<StoreData, 'name' | 'nameAr' | 'logo' | 'logoAr' | 'timezone'>;
+type ReceiptStore = Pick<
+  StoreData,
+  'name' | 'nameAr' | 'logo' | 'logoAr' | 'timezone' | 'settings'
+> & {
+  /** K-07: a look's `receiptStyle` (`framed` = paper in the page ink, no device slab). */
+  theme?: Pick<StoreTheme, 'receiptStyle'> | null;
+};
 
 export interface ReceiptPrinterProps {
   order: Order | null;
@@ -60,17 +66,12 @@ export interface ReceiptPrinterProps {
   whatsappHref?: string | null;
 }
 
-const REDUCED = '(prefers-reduced-motion: reduce)';
-/** Mirror the `.feeding` animation in ReceiptPrinter.module.css. */
-const FEED_DELAY_MS = 250;
-const FEED_MS = 1600;
 /** Status crossfade length; mirrors `.statusIn` / `.statusOut` in the CSS module. */
 const SWAP_MS = 150;
 /** Before the order arrives the empty slot holds about a two-line receipt (the
  *  common Egyptian basket), so the one jump at load is a line or two at most.
  *  Measured on the local stack: see task-10-report.md, fix round 1. */
 const LOADING_RESERVE = 'min-h-[32rem]';
-const printedKey = (orderId: string) => `receipt-printed:${orderId}`;
 
 /** Western digit runs ("4,310", "2026/10/15") in the mono face; everything else
  *  (Arabic-Indic digits, "ج.م", "EGP", spaces) stays in the body font, so no
@@ -81,7 +82,8 @@ function Num({ children }: { children: string }) {
     <span className="tabular-nums">
       {children.split(LATIN_NUMBER).map((part, i) =>
         i % 2 === 1 ? (
-          <span key={i} className={styles.mono}>
+          // T-04: digit runs stay in the body face (tabular figures above); mono is the code only.
+          <span key={i} dir="ltr">
             {part}
           </span>
         ) : (
@@ -92,22 +94,18 @@ function Num({ children }: { children: string }) {
   );
 }
 
-/** Feed only on the first view of this order in this tab, and never under reduced motion. */
-function shouldFeed(orderId: string): boolean {
-  if (typeof window === 'undefined') return false;
-  try {
-    if (window.matchMedia?.(REDUCED).matches) return false;
-  } catch {
-    /* no matchMedia: feed */
-  }
-  try {
-    return window.sessionStorage.getItem(printedKey(orderId)) === null;
-  } catch {
-    return true;
-  }
-}
-
 type StatusKind = 'printing' | PaymentState;
+
+/**
+ * IA-14: an order number read out to a courier, in groups. "ORD-TMZRB9-IR5JY" prints as
+ * "TMZRB9 · IR5JY" (the ORD prefix says nothing the label does not); a plain "1043" is
+ * unchanged. The full value stays the element's accessible name.
+ */
+export function groupOrderNumber(orderNumber: string): string {
+  const parts = orderNumber.split('-').filter(Boolean);
+  if (parts.length > 1 && /^ord$/i.test(parts[0])) parts.shift();
+  return parts.join(' · ');
+}
 
 export function ReceiptPrinter({
   order,
@@ -121,30 +119,171 @@ export function ReceiptPrinter({
   const formatPrice = useLocalePrice();
   const { localize, numerals } = useNumerals();
 
-  // Decided ONCE per order id, before the first paint that shows the paper:
-  // deciding in an effect would flash the finished receipt, then snap it up.
-  const decision = useRef<{ id: string; feed: boolean } | null>(null);
-  if (order && decision.current?.id !== order.id) {
-    decision.current = { id: order.id, feed: shouldFeed(order.id) };
-  }
-  const feed = !!order && decision.current?.feed === true;
-  const [fedId, setFedId] = useState<string | null>(null);
-  const feedDone = !feed || fedId === order?.id;
+  const ar = language === 'ar';
+  const storeName = pickLocalizedName(store, ar) ?? '';
+  const logo = language === 'ar' && store.logoAr ? store.logoAr : store.logo;
+  const rows = order ? groupOrderLinesForDisplay(order.items) : [];
+  const paid = paymentState === 'paid';
+  const payment = order ? paymentLabel(order, paymentState, language) : null;
+  const framed = store.theme?.receiptStyle === 'framed';
 
-  useEffect(() => {
-    if (!order || !feed) return;
-    try {
-      window.sessionStorage.setItem(printedKey(order.id), '1');
-    } catch {
-      /* storage blocked: the receipt simply prints again next time */
-    }
-    // Backstop: if `animationend` never arrives (animation cancelled or
-    // suppressed), the status must not stay on "printing" forever.
-    const id = order.id;
-    const timer = window.setTimeout(() => setFedId(id), FEED_DELAY_MS + FEED_MS + 400);
-    return () => window.clearTimeout(timer);
-  }, [order, feed]);
+  return (
+    <ReceiptPrinterShell
+      framed={framed}
+      feedKey={order?.id ?? null}
+      ariaLabel={t('Order receipt', 'فاتورة الطلب')}
+      loadingReserve={LOADING_RESERVE}
+      paperClassName="px-5 pt-6 text-sm leading-snug"
+      screen={({ feedDone }) => (
+        <PrinterScreen
+          order={order}
+          loading={loading}
+          paymentState={paymentState}
+          feedDone={feedDone}
+        />
+      )}
+    >
+      {order && (
+        <>
+          <h2 className="flex justify-center">
+            {logo ? (
+              <img src={logo} alt={storeName} className="h-9 w-auto max-w-[60%] object-contain" />
+            ) : (
+              <span className="font-display text-lg font-semibold">{storeName}</span>
+            )}
+          </h2>
 
+          <hr className={`${styles.rule} my-4 border-0`} />
+
+          <ul className="space-y-3">
+            {rows.map(row => {
+              const qty = row.kind === 'bundle' ? row.quantity : row.item.quantity;
+              const name =
+                row.kind === 'bundle'
+                  ? (pickLocalizedName(row, ar) ?? t('Bundle', 'باقة'))
+                  : (pickLocalizedName(row.item.product, isRtl) ?? t('Product', 'منتج'));
+              const amount = row.kind === 'bundle' ? row.total : row.item.price * row.item.quantity;
+              const variant = row.kind === 'item' ? orderLineVariantTitle(row.item, ar) : null;
+              return (
+                <li key={row.key} data-testid="receipt-line" className="flex gap-3">
+                  <div className="min-w-0 flex-1">
+                    <p className="font-medium">
+                      <span className="opacity-80">
+                        <Num>{localize(qty)}</Num>×
+                      </span>{' '}
+                      {name}
+                    </p>
+                    {variant && (
+                      <p className={`mt-0.5 text-xs ${styles.inkMuted}`}>
+                        <VariantText title={variant} />
+                      </p>
+                    )}
+                    {row.kind === 'item' && (
+                      <CartLineNote
+                        note={row.item.personalisation}
+                        className={`mt-0.5 text-xs ${styles.inkMuted}`}
+                      />
+                    )}
+                  </div>
+                  <p className="shrink-0">
+                    <Num>{formatPrice(amount)}</Num>
+                  </p>
+                </li>
+              );
+            })}
+          </ul>
+
+          <hr className={`${styles.rule} my-4 border-0`} />
+
+          <Totals order={order} paid={paid} formatPrice={formatPrice} t={t} ar={ar} />
+
+          <hr className={`${styles.rule} my-4 border-0`} />
+
+          <dl className="space-y-1.5 text-xs">
+            {payment && (
+              <MetaRow label={t('Payment', 'طريقة الدفع')} ar={ar}>
+                <span data-testid="receipt-payment-label">{payment}</span>
+              </MetaRow>
+            )}
+            <MetaRow label={t('Date', 'التاريخ')} ar={ar}>
+              <Num>
+                {formatDate(order.createdAt, {
+                  timezone: store.timezone,
+                  language,
+                  numerals,
+                  style: 'medium',
+                })}
+              </Num>
+            </MetaRow>
+            {/* S-02: when it arrives, from the store's own zones/settings. A
+                    failed payment is not on its way, so it gets no window. */}
+            {deliveryWindow && paymentState !== 'failed' && (
+              <MetaRow label={t('Arrives', 'موعد الوصول')} ar={ar}>
+                <span data-testid="receipt-delivery-window">
+                  {deliveryWindow.from === deliveryWindow.to
+                    ? deliveryWindow.from
+                    : `${deliveryWindow.from} – ${deliveryWindow.to}`}
+                </span>
+              </MetaRow>
+            )}
+          </dl>
+
+          {whatsappHref && (
+            <p className="mt-4 text-center text-xs">
+              <a
+                data-testid="receipt-whatsapp"
+                href={whatsappHref}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={`${styles.ink} underline underline-offset-4`}
+              >
+                {t('Questions? Message the store on WhatsApp', 'عندك سؤال؟ كلّم المتجر على واتساب')}
+              </a>
+            </p>
+          )}
+
+          <div className="mt-6 flex flex-col items-center gap-1.5 pb-4">
+            <Barcode
+              value={order.orderNumber}
+              shape={store.settings?.receiptBarcodeShape as string | undefined}
+              className={`block w-full ${styles.ink}`}
+            />
+            <p className={`text-xs ${styles.inkSoft}`}>{t('Order number', 'رقم الطلب')}</p>
+            <p
+              data-testid="receipt-order-number"
+              dir="ltr"
+              className={`${styles.mono} text-xl font-semibold ${styles.ink}`}
+            >
+              {groupOrderNumber(order.orderNumber) === order.orderNumber ? (
+                `#${order.orderNumber}`
+              ) : (
+                // a11y re-audit P2-N7: no aria-label on a <p>; read the full value instead.
+                <>
+                  <span aria-hidden="true">#{groupOrderNumber(order.orderNumber)}</span>
+                  <span className="sr-only">{order.orderNumber}</span>
+                </>
+              )}
+            </p>
+          </div>
+        </>
+      )}
+    </ReceiptPrinterShell>
+  );
+}
+
+/** The printer's screen: order line, total and the crossfading status line. */
+function PrinterScreen({
+  order,
+  loading,
+  paymentState,
+  feedDone,
+}: {
+  order: Order | null;
+  loading: boolean;
+  paymentState: PaymentState;
+  feedDone: boolean;
+}) {
+  const { t } = useLanguage();
   const status: StatusKind = loading || (order && !feedDone) ? 'printing' : paymentState;
 
   // Crossfade: when the status changes, the old line stays for one 150ms
@@ -162,223 +301,37 @@ export function ReceiptPrinter({
     return () => window.clearTimeout(timer);
   }, [leaving]);
 
-  const ar = language === 'ar';
-  const storeName = pickLocalizedName(store, ar) ?? '';
-  const logo = language === 'ar' && store.logoAr ? store.logoAr : store.logo;
-  const rows = order ? groupOrderLinesForDisplay(order.items) : [];
-  // A bundle box counts once, as the customer bought it.
-  const itemCount = rows.reduce(
-    (n, r) => n + (r.kind === 'bundle' ? r.quantity : r.item.quantity),
-    0
-  );
-  const paid = paymentState === 'paid';
-  const payment = order ? paymentLabel(order, paymentState, language) : null;
-
+  // Taste re-audit P2-5 (Y-05): the head carries the live payment status only; the page
+  // headline names the order and the paper lists its items (IA-14 moved the number and total there).
   return (
-    <section
-      className="mx-auto mt-8 w-full max-w-[24rem] text-start"
-      aria-label={t('Order receipt', 'فاتورة الطلب')}
-    >
-      {/* Printer */}
-      <div className={`${styles.housing} relative z-10 p-1.5 shadow-lg`}>
-        <div className={`${styles.screen} px-4 pb-3.5 pt-4`}>
-          <div className="flex items-start justify-between gap-4">
-            <div className="min-w-0">
-              <p className="truncate text-sm font-semibold">
-                {order ? (
-                  <>
-                    {t('Order', 'طلب')}{' '}
-                    <span className={styles.mono} dir="ltr">
-                      #{order.orderNumber}
-                    </span>
-                  </>
-                ) : (
-                  t('Your order', 'طلبك')
-                )}
-              </p>
-              <p className="mt-0.5 truncate text-xs opacity-60">
-                {order
-                  ? t(
-                      countText('en', itemCount, ITEMS),
-                      countText('ar', itemCount, ITEMS, localize(itemCount))
-                    )
-                  : storeName}
-              </p>
-            </div>
-            {order && (
-              <div className="shrink-0 text-end">
-                <p className="text-xs opacity-60">{t('Order total', 'إجمالي الطلب')}</p>
-                <p className="text-base font-semibold">
-                  <Num>{formatPrice(order.total)}</Num>
-                </p>
-              </div>
-            )}
-          </div>
-          <div className="mt-3 grid min-h-5 text-xs" aria-live="polite" role="status">
-            {leaving && (
-              <span
-                key={`out-${leaving}`}
-                aria-hidden="true"
-                data-testid="receipt-status-leaving"
-                className={`${styles.statusOut} col-start-1 row-start-1 flex items-center gap-2`}
-                onAnimationEnd={e => {
-                  // Only this line's own fade: a bubbling animationend from a child
-                  // (the spinner icon) must not cut the crossfade short.
-                  if (e.target === e.currentTarget) setLeaving(null);
-                }}
-              >
-                <StatusIcon kind={leaving} />
-                <span>{statusCopy(leaving, t)}</span>
-              </span>
-            )}
-            <span
-              key={shown}
-              data-testid="receipt-status-current"
-              className={`${leaving ? styles.statusIn : ''} col-start-1 row-start-1 flex items-center gap-2`}
-            >
-              <StatusIcon kind={shown} current />
-              <span>{statusCopy(shown, t)}</span>
-            </span>
-          </div>
-        </div>
-        <div className={`${styles.slit} mx-2.5 mb-0.5 mt-2 h-1.5 rounded-[var(--radius)]`} />
-      </div>
-
-      {/* Paper. While the order loads the slot is empty but holds a typical
-          receipt's height; once the order is known the paper is in the flow at
-          its final height before the feed starts (the feed is transform-only),
-          so the page moves at most once, at load, and never when the feed ends. */}
-      <div className={`${styles.window} mx-4 sm:mx-5 ${order ? '' : LOADING_RESERVE}`}>
-        {order && (
-          <div
-            className={`${styles.feeder} ${feed && !feedDone ? styles.feeding : ''}`}
-            data-feeding={feed && !feedDone ? 'true' : undefined}
-            data-testid="receipt-paper"
+    <>
+      <div className="grid min-h-5 text-xs" aria-live="polite" role="status">
+        {leaving && (
+          <span
+            key={`out-${leaving}`}
+            aria-hidden="true"
+            data-testid="receipt-status-leaving"
+            className={`${styles.statusOut} col-start-1 row-start-1 flex items-center gap-2`}
             onAnimationEnd={e => {
-              if (e.target === e.currentTarget) setFedId(order.id);
+              // Only this line's own fade: a bubbling animationend from a child
+              // (the spinner icon) must not cut the crossfade short.
+              if (e.target === e.currentTarget) setLeaving(null);
             }}
           >
-            <article className={`${styles.paper} px-5 pt-6 text-sm leading-snug`}>
-              <h2 className="flex justify-center">
-                {logo ? (
-                  <img
-                    src={logo}
-                    alt={storeName}
-                    className="h-9 w-auto max-w-[60%] object-contain"
-                  />
-                ) : (
-                  <span className="font-display text-lg font-semibold">{storeName}</span>
-                )}
-              </h2>
-
-              <hr className={`${styles.rule} my-4 border-0`} />
-
-              <ul className="space-y-3">
-                {rows.map(row => {
-                  const qty = row.kind === 'bundle' ? row.quantity : row.item.quantity;
-                  const name =
-                    row.kind === 'bundle'
-                      ? (pickLocalizedName(row, ar) ?? t('Bundle', 'باقة'))
-                      : (pickLocalizedName(row.item.product, isRtl) ?? t('Product', 'منتج'));
-                  const amount =
-                    row.kind === 'bundle' ? row.total : row.item.price * row.item.quantity;
-                  const variant = row.kind === 'item' ? orderLineVariantTitle(row.item, ar) : null;
-                  return (
-                    <li key={row.key} data-testid="receipt-line" className="flex gap-3">
-                      <div className="min-w-0 flex-1">
-                        <p className="font-medium">
-                          <span className="opacity-60">
-                            <Num>{localize(qty)}</Num>×
-                          </span>{' '}
-                          {name}
-                        </p>
-                        {variant && (
-                          <p className={`mt-0.5 text-xs ${styles.inkMuted}`}>
-                            <VariantText title={variant} />
-                          </p>
-                        )}
-                        {row.kind === 'item' && (
-                          <CartLineNote
-                            note={row.item.personalisation}
-                            className={`mt-0.5 text-xs ${styles.inkMuted}`}
-                          />
-                        )}
-                      </div>
-                      <p className="shrink-0">
-                        <Num>{formatPrice(amount)}</Num>
-                      </p>
-                    </li>
-                  );
-                })}
-              </ul>
-
-              <hr className={`${styles.rule} my-4 border-0`} />
-
-              <Totals order={order} paid={paid} formatPrice={formatPrice} t={t} ar={ar} />
-
-              <hr className={`${styles.rule} my-4 border-0`} />
-
-              <dl className="space-y-1.5 text-xs">
-                {payment && (
-                  <MetaRow label={t('Payment', 'طريقة الدفع')} ar={ar}>
-                    <span data-testid="receipt-payment-label">{payment}</span>
-                  </MetaRow>
-                )}
-                <MetaRow label={t('Date', 'التاريخ')} ar={ar}>
-                  <Num>
-                    {formatDate(order.createdAt, {
-                      timezone: store.timezone,
-                      language,
-                      numerals,
-                      style: 'medium',
-                    })}
-                  </Num>
-                </MetaRow>
-                {/* S-02: when it arrives, from the store's own zones/settings. A
-                    failed payment is not on its way, so it gets no window. */}
-                {deliveryWindow && paymentState !== 'failed' && (
-                  <MetaRow label={t('Arrives', 'يصلك')} ar={ar}>
-                    <span data-testid="receipt-delivery-window">
-                      {deliveryWindow.from === deliveryWindow.to
-                        ? deliveryWindow.from
-                        : `${deliveryWindow.from} – ${deliveryWindow.to}`}
-                    </span>
-                  </MetaRow>
-                )}
-              </dl>
-
-              {whatsappHref && (
-                <p className="mt-4 text-center text-xs">
-                  <a
-                    data-testid="receipt-whatsapp"
-                    href={whatsappHref}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className={`${styles.ink} underline underline-offset-4`}
-                  >
-                    {t(
-                      'Questions? Message the store on WhatsApp',
-                      'هل لديك سؤال؟ راسل المتجر على واتساب'
-                    )}
-                  </a>
-                </p>
-              )}
-
-              <div className="mt-6 flex flex-col items-center gap-1.5 pb-4">
-                <Barcode value={order.orderNumber} className={`h-11 w-[78%] ${styles.ink}`} />
-                <p
-                  data-testid="receipt-barcode-caption"
-                  dir="ltr"
-                  className={`${styles.mono} text-xs tracking-[0.3em] ${styles.inkSoft}`}
-                >
-                  #{order.orderNumber}
-                </p>
-              </div>
-            </article>
-          </div>
+            <StatusIcon kind={leaving} />
+            <span>{statusCopy(leaving, t)}</span>
+          </span>
         )}
+        <span
+          key={shown}
+          data-testid="receipt-status-current"
+          className={`${leaving ? styles.statusIn : ''} col-start-1 row-start-1 flex items-center gap-2`}
+        >
+          <StatusIcon kind={shown} current />
+          <span>{statusCopy(shown, t)}</span>
+        </span>
       </div>
-    </section>
+    </>
   );
 }
 
@@ -428,9 +381,7 @@ function Totals({
         </MoneyRow>
       )}
       <div className="flex items-baseline justify-between gap-3 pt-2">
-        <dt
-          className={`font-bold ${ar ? 'text-sm' : `${styles.mono} text-xs uppercase tracking-[0.08em]`}`}
-        >
+        <dt className="font-bold text-sm">
           {paid ? t('Total paid', 'المدفوع') : t('Total', 'الإجمالي')}
         </dt>
         <dd className="text-lg font-bold" data-testid="receipt-total">
@@ -460,19 +411,11 @@ function Totals({
   );
 }
 
-/** Label at the start, value at the end. English labels are Latin mono small
- *  caps (the receipt voice); Arabic labels and every value stay in the body
- *  font, with only Western digit runs in mono via `Num`. */
-function MoneyRow({ label, ar, children }: { label: string; ar: boolean; children: ReactNode }) {
+/** Label at the start, value at the end, both in the body face (T-04: no tracked mono caps). */
+function MoneyRow({ label, children }: { label: string; ar?: boolean; children: ReactNode }) {
   return (
     <div className="flex items-baseline justify-between gap-3 text-xs">
-      <dt
-        className={
-          ar ? styles.inkSoft : `${styles.mono} uppercase tracking-[0.08em] ${styles.inkSoft}`
-        }
-      >
-        {label}
-      </dt>
+      <dt className={styles.inkSoft}>{label}</dt>
       <dd>{children}</dd>
     </div>
   );
@@ -497,20 +440,20 @@ function statusCopy(kind: StatusKind, t: (en: string, ar: string) => string): st
   switch (kind) {
     case 'printing':
     case 'verifying':
-      return t('Printing your receipt…', 'جارٍ طباعة فاتورتك…');
+      return t('Printing your receipt…', 'بنطبع فاتورتك…');
     case 'paid':
-      return t('Paid, order confirmed', 'تم الدفع وتأكيد طلبك');
+      return t('Paid, order confirmed', 'اتدفع، طلبك اتأكد');
     case 'cod':
-      return t('Order placed, pay on delivery', 'تم تسجيل طلبك، الدفع عند الاستلام');
+      return t('Order placed, pay on delivery', 'طلبك اتسجل، الدفع عند الاستلام');
     case 'awaiting':
-      return t('Order placed, awaiting payment', 'تم تسجيل طلبك، في انتظار الدفع');
+      return t('Order placed, awaiting payment', 'طلبك اتسجل، في انتظار الدفع');
     case 'pending':
-      return t('Order placed, confirming payment', 'تم تسجيل طلبك، جارٍ تأكيد الدفع');
+      return t('Order placed, confirming payment', 'طلبك اتسجل، بنأكد الدفع');
     case 'failed':
-      return t('Payment failed', 'لم يكتمل الدفع');
+      return t('Payment failed', 'الدفع متمش');
     case 'unknown':
     default:
-      return t('Order received', 'تم استلام طلبك');
+      return t('Order received', 'طلبك وصل');
   }
 }
 

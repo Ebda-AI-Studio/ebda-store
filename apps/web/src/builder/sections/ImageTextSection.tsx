@@ -29,10 +29,22 @@ export interface ImageTextSettings extends SectionPaddingMaxWidthVisibility {
   buttonText?: string;
   buttonTextAr?: string;
   buttonLink?: string;
+  layout?: 'split' | 'full-bleed';
   imagePosition?: 'start' | 'end';
   imageAspect?: 'square' | 'portrait' | 'landscape';
   bgColor?: string;
 }
+
+/**
+ * The solid panel behind full-bleed TEXT (Ruling B1-2, amendment C15). The photo stays
+ * unwashed; only the text block sits on this near-opaque Atelier-ink panel (no blur, border or
+ * shadow), so contrast does not depend on the photo. Worst case (a pure-white pixel behind it)
+ * is #303030 and white text on that is about 13:1. Task 4's contrast test imports these.
+ */
+export const FULL_BLEED_SCRIM = { color: '#141414', opacity: 0.88 } as const;
+export const FULL_BLEED_TEXT = '#FFFFFF';
+
+const hexRgb = (hex: string) => [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16)).join(' ');
 
 const ASPECT: Record<NonNullable<ImageTextSettings['imageAspect']>, string> = {
   square: 'aspect-square',
@@ -72,6 +84,55 @@ export function ImageTextSection({
   const textColumnClass = showImageColumn
     ? `${imageFirst ? 'md:order-2' : 'md:order-1'} text-start`
     : 'text-start md:col-span-2';
+
+  if ((settings.layout ?? 'split') === 'full-bleed' && image) {
+    return (
+      <section
+        data-section="image-text"
+        data-layout="full-bleed"
+        className="relative w-full overflow-hidden"
+        style={sectionBgStyle(settings.bgColor, store.theme)}
+      >
+        <img
+          src={image}
+          alt={alt}
+          loading="lazy"
+          className="absolute inset-0 h-full w-full object-cover"
+        />
+        <div className="relative flex min-h-[60svh] w-full items-end justify-start">
+          <div
+            data-part="full-bleed-panel"
+            className="m-4 w-full max-w-md p-5 text-start sm:m-8 sm:p-6"
+            style={{
+              backgroundColor: `rgb(${hexRgb(FULL_BLEED_SCRIM.color)} / ${FULL_BLEED_SCRIM.opacity})`,
+              color: FULL_BLEED_TEXT,
+              borderRadius: 'var(--radius)',
+            }}
+          >
+            {heading && (
+              <h2 className="font-display text-3xl sm:text-4xl" {...edit('heading')}>
+                {heading}
+              </h2>
+            )}
+            {body && (
+              <p className="mt-2 text-base leading-relaxed" {...edit('body')}>
+                {body}
+              </p>
+            )}
+            {button && (
+              <a
+                href={storeUrl(sanitizeUrl(settings.buttonLink, '/products'))}
+                className="mt-5 inline-flex min-h-[44px] items-center rounded-[var(--radius)] bg-white px-5 text-sm font-medium text-black"
+                {...edit('buttonText')}
+              >
+                {button}
+              </a>
+            )}
+          </div>
+        </div>
+      </section>
+    );
+  }
 
   return (
     <section

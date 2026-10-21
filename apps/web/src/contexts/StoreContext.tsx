@@ -168,6 +168,8 @@ export interface StoreData {
   taxRatePercent?: number;
   /** Issue 206 — see `ResolvedStore.smsMarketingOptIn` in lib/store-resolver.ts. */
   smsMarketingOptIn?: boolean;
+  /** See `ResolvedStore.cartEmailOptIn` in lib/store-resolver.ts. */
+  cartEmailOptIn?: boolean;
   enabledFeatures?: string[];
   /**
    * Slugs of CMS pages the merchant has explicitly disabled

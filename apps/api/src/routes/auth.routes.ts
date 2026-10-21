@@ -25,6 +25,7 @@ import { redis } from '../services/redis.service';
 import { AppError } from '../middleware/error-handler';
 import { maskEmail } from '../lib/pii-mask';
 import { passwordSchema } from '../services/merchant-signup.service';
+import { assertNotDemoStore } from '../services/plan-limit.service';
 
 const router = Router();
 
@@ -209,6 +210,8 @@ const emailLookupSchema = z.object({
 router.post('/register', authLimiter, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const data = registerSchema.parse(req.body);
+    // Ruling B1-13: no customer accounts on the demo showroom.
+    if (data.storeId) await assertNotDemoStore(data.storeId);
     const result = await AuthService.register({
       ...data,
       storeId: data.storeId ?? null,
@@ -962,7 +965,26 @@ router.post(
   // multiply the mails one inbox receives.
   authEmailAddressLimiter,
   resetEmailLimiter,
-  async (req: Request, res: Response, _next: NextFunction) => {
+  async (req: Request, res: Response, next: NextFunction) => {
+    // Ruling B1-13: no account mail from the demo showroom (its storeId is refused outright;
+    // the answer does not depend on the email, so it reveals nothing about any account).
+    try {
+      const demoScope = (req.body ?? {}).storeId;
+      if (typeof demoScope === 'string') await assertNotDemoStore(demoScope);
+    } catch (error) {
+      // Only the demo refusal itself is a 403. Any other failure of the guard (a store lookup
+      // that errors) answers like every other failure on this route: the generic 200 below
+      // (enumeration defence), never a 500 that differs by storeId (T9 review minor).
+      if (error instanceof AppError && error.code === 'DEMO_STORE') {
+        next(error);
+        return;
+      }
+      res.json({
+        success: true,
+        data: { message: 'If an account exists with this email, a reset link has been sent.' },
+      });
+      return;
+    }
     try {
       const { email, storeId } = req.body ?? {};
 
@@ -1139,6 +1161,21 @@ router.post(
   // also takes a caller-supplied storeId and sends one mail per account.
   authEmailAddressLimiter,
   async (req: Request, res: Response, next: NextFunction) => {
+    // Ruling B1-13: no account mail from the demo showroom (its storeId is refused outright;
+    // the answer does not depend on the email, so it reveals nothing about any account).
+    try {
+      const demoScope = (req.body ?? {}).storeId;
+      if (typeof demoScope === 'string') await assertNotDemoStore(demoScope);
+    } catch (error) {
+      // Only the demo refusal itself is a 403. Any other guard failure answers the generic 200
+      // (enumeration defence), as on /forgot-password, never a 500 that differs by storeId.
+      if (error instanceof AppError && error.code === 'DEMO_STORE') {
+        next(error);
+        return;
+      }
+      res.json({ success: true, data: { ...GENERIC_RESEND_VERIFICATION_RESULT } });
+      return;
+    }
     try {
       const { email, storeId } = req.body ?? {};
 

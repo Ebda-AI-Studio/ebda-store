@@ -1,14 +1,17 @@
 import type { Metadata } from 'next';
+import { localizedMetadata } from '@/lib/seo/localized-metadata';
 import { notFound } from 'next/navigation';
 import { toPublicSizeChart, type PublicSizeChart } from '@ebda/shared';
 import { getStoreOrNotFound } from '../../lib/store-resolver';
 import { API_URL } from '../../lib/api';
 import SizeGuideClient from './SizeGuideClient';
 
-export const metadata: Metadata = {
-  title: 'Size guide',
-  description: 'Size charts for our products.',
-};
+export function generateMetadata(): Promise<Metadata> {
+  return localizedMetadata({
+    title: ['Size guide', 'دليل المقاسات'],
+    description: ['Size charts for our products.', 'جداول مقاسات منتجاتنا.'],
+  });
+}
 
 /**
  * /size-guide (B0 Task 9): every size chart of the store on one page, so a merchant can link it

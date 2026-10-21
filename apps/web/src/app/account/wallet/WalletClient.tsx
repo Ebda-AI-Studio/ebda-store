@@ -111,7 +111,7 @@ export default function WalletClient() {
       <p className="mt-1 text-muted-foreground">
         {t(
           'Store credit you can spend on your next orders.',
-          'رصيد المتجر الذي يمكنك استخدامه في طلباتك القادمة.'
+          'رصيد المتجر اللي تقدر تستخدمه في طلباتك الجاية.'
         )}
       </p>
     </div>
@@ -134,7 +134,7 @@ export default function WalletClient() {
         {header}
         <div className="rounded-xl border bg-card p-8 text-center shadow-sm">
           <p className="text-muted-foreground">
-            {t('This store does not offer a wallet.', 'هذا المتجر لا يوفر خدمة المحفظة.')}
+            {t('This store does not offer a wallet.', 'المتجر ده مش بيقدم خدمة المحفظة.')}
           </p>
         </div>
       </div>
@@ -154,11 +154,11 @@ export default function WalletClient() {
           {wallet.checkoutAvailable
             ? t(
                 'You can use it at checkout — choose “Use wallet balance”.',
-                'يمكنك استخدامه عند الدفع — اختر «استخدام رصيد المحفظة».'
+                'تقدر تستخدمه وقت الدفع — اختار «استخدام رصيد المحفظة».'
               )
             : t(
                 'Refunds issued as store credit are added here.',
-                'تُضاف هنا المبالغ المستردة كرصيد متجر.'
+                'المبالغ المستردة بتتضاف هنا كرصيد متجر.'
               )}
         </p>
       </div>
@@ -175,12 +175,12 @@ export default function WalletClient() {
           <p className="px-5 py-6 text-sm text-destructive-ink">
             {t(
               'Could not load your wallet history. Please try again.',
-              'تعذّر تحميل سجل المحفظة. يرجى المحاولة مرة أخرى.'
+              'معرفناش نحمّل سجل المحفظة. جرّب تاني.'
             )}
           </p>
         ) : rows.length === 0 ? (
           <p className="px-5 py-6 text-sm text-muted-foreground">
-            {t('No wallet activity yet.', 'لا توجد حركات في المحفظة بعد.')}
+            {t('No wallet activity yet.', 'مفيش حركات في المحفظة لسه.')}
           </p>
         ) : (
           <ul className="divide-y">
@@ -231,7 +231,7 @@ export default function WalletClient() {
               disabled={loadingMore}
               className="rounded-lg border px-4 py-2 text-sm font-medium text-foreground hover:bg-muted disabled:opacity-50"
             >
-              {loadingMore ? t('Loading…', 'جارٍ التحميل…') : t('Load more', 'تحميل المزيد')}
+              {loadingMore ? t('Loading…', 'بنحمّل…') : t('Load more', 'تحميل المزيد')}
             </button>
           </div>
         )}

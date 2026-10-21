@@ -16,13 +16,15 @@ import {
 } from '../../../../components/looks/LookSwitchDialog';
 
 const SKIN_IDS = ['modern', 'classic', 'minimal', 'bold', 'elegant', 'dahab'];
+// Qamar is reached only through a look (Ruling B1-17): labelled, never a bare skin choice.
+const SKIN_LABEL_IDS = [...SKIN_IDS, 'qamar'];
 
 export default function StoreTemplatePage() {
   const params = useParams();
   const storeId = params?.id as string;
   const t = useT('template.page');
 
-  const skinName = (id: string) => (SKIN_IDS.includes(id) ? t(`skins.${id}`) : id);
+  const skinName = (id: string) => (SKIN_LABEL_IDS.includes(id) ? t(`skins.${id}`) : id);
   const locale = useLocale() === 'ar' ? 'ar' : 'en';
   const [store, setStore] = useState<{
     name: string;

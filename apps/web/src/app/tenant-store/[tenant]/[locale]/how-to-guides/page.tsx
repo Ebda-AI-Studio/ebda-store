@@ -1,12 +1,8 @@
-import type { Metadata } from 'next';
 import { getStoreByTenantParam } from '@/lib/store-resolver';
 import { HowToGuidesPageBody } from '@/app/how-to-guides/HowToGuidesPageBody';
 
-export const metadata: Metadata = {
-  title: 'How-To Guides',
-  description:
-    'Step-by-step guides for ordering, returns, payments, and product care. Quick answers in plain language.',
-};
+// Rule (f): the same page-language title as the legacy twin (metadata parity, issue 2418).
+export { generateMetadata } from '@/app/how-to-guides/page';
 
 export default async function StoreHowToGuidesPage({
   params,

@@ -1,8 +1,13 @@
 'use client';
 
+import Link from 'next/link';
 import { useT } from '@/i18n/useT';
+import { PACKING_SLIP_MAX } from '../../../../../components/orders/PackingSlipViewer';
 
 interface OrdersBulkBarProps {
+  /** With `selectedIds`, enables "print packing slips" for the selection. */
+  storeId?: string;
+  selectedIds?: string[];
   selectedCount: number;
   isProcessing: boolean;
   onMarkPaid: () => void;
@@ -10,12 +15,15 @@ interface OrdersBulkBarProps {
 }
 
 export function OrdersBulkBar({
+  storeId,
+  selectedIds = [],
   selectedCount,
   isProcessing,
   onMarkPaid,
   onClearSelection,
 }: OrdersBulkBarProps) {
   const t = useT('orders.list.bulk');
+  const tSlip = useT('packingSlip');
 
   if (selectedCount === 0) return null;
 
@@ -32,6 +40,22 @@ export function OrdersBulkBar({
       >
         {isProcessing ? t('processing') : t('markPaid')}
       </button>
+      {storeId && selectedIds.length > 0 && (
+        <span className="inline-flex items-center gap-2">
+          {selectedIds.length > PACKING_SLIP_MAX ? (
+            <span role="note" className="text-xs text-muted-foreground">
+              {tSlip('tooMany')}
+            </span>
+          ) : (
+            <Link
+              href={`/stores/${storeId}/orders/packing-slips?ids=${selectedIds.join(',')}`}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-background px-3 py-1.5 text-xs font-medium text-foreground hover:bg-muted"
+            >
+              {tSlip('printBulk', { count: selectedIds.length })}
+            </Link>
+          )}
+        </span>
+      )}
       <button
         type="button"
         onClick={onClearSelection}

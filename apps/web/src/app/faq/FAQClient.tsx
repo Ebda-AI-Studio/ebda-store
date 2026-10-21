@@ -7,25 +7,26 @@ import { useStore, useStoreUrl } from '../../contexts/StoreContext';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { faqReturnAnswer } from '../../lib/return-policy-text';
 import { useNumerals } from '../../hooks/useNumerals';
+import { pickLocalizedName } from '../../templates/shared/display-helpers';
 
 // Generic fallback FAQs — shown only when the store hasn't authored any
 // store-specific FAQs via the admin FAQ manager.
 const GENERIC_FAQS = [
   {
     question: 'How do I place an order?',
-    questionAr: 'كيف أقوم بتقديم طلب؟',
+    questionAr: 'إزاي أعمل طلب؟',
     answer:
       'Simply browse our products, add items to your cart, and proceed to checkout. You can pay securely using your preferred payment method.',
     answerAr:
-      'ما عليك سوى تصفح منتجاتنا وإضافة العناصر إلى سلتك والمتابعة إلى الدفع. يمكنك الدفع بأمان باستخدام طريقة الدفع المفضلة لديك.',
+      'سهلة: تصفّح منتجاتنا، ضيف اللي عاجبك للسلة، وكمّل للدفع. تقدر تدفع بأمان بالطريقة اللي تريحك.',
   },
   {
     question: 'What payment methods do you accept?',
-    questionAr: 'ما هي طرق الدفع المقبولة؟',
+    questionAr: 'إيه طرق الدفع المتاحة؟',
     answer:
       'We accept a variety of payment methods including debit and credit cards and Cash on Delivery. All online payments are processed through a secure payment gateway.',
     answerAr:
-      'نقبل مجموعة متنوعة من طرق الدفع بما في ذلك بطاقات الخصم والائتمان والدفع عند الاستلام. تتم معالجة جميع المدفوعات عبر الإنترنت من خلال بوابة دفع آمنة.',
+      'بنقبل طرق دفع كتير منها كروت الخصم والائتمان والدفع عند الاستلام. كل المدفوعات أونلاين بتتم من خلال بوابة دفع آمنة.',
   },
   {
     question: 'How long does shipping take?',
@@ -33,47 +34,45 @@ const GENERIC_FAQS = [
     answer:
       'Delivery times depend on your location and the shipping option selected at checkout. Please visit our Shipping page for full details.',
     answerAr:
-      'تعتمد أوقات التوصيل على موقعك وخيار الشحن المحدد عند الدفع. يرجى زيارة صفحة الشحن لمزيد من التفاصيل.',
+      'مواعيد التوصيل بتختلف حسب مكانك وطريقة الشحن اللي بتختارها وقت الدفع. شوف صفحة الشحن لتفاصيل أكتر.',
   },
   {
     question: 'What is your return policy?',
-    questionAr: 'ما هي سياسة الإرجاع لديكم؟',
+    questionAr: 'إيه سياسة الإرجاع عندكم؟',
     answer:
       'We offer a 30-day return policy for all unused items in original packaging. Please visit our Returns page for more details.',
     answerAr:
-      'نقدم سياسة إرجاع لمدة 30 يوماً لجميع العناصر غير المستخدمة في عبوتها الأصلية. يرجى زيارة صفحة المرتجعات لمزيد من التفاصيل.',
+      'بنقبل الإرجاع خلال 30 يوم لكل المنتجات اللي متستعملتش وفي علبتها الأصلية. شوف صفحة المرتجعات لتفاصيل أكتر.',
   },
   {
     question: 'How can I track my order?',
-    questionAr: 'كيف يمكنني تتبع طلبي؟',
+    questionAr: 'إزاي أتابع طلبي؟',
     answer:
       "Once your order ships, you'll receive an email with a tracking number. You can use this to track your package on the carrier's website or through your account order history.",
     answerAr:
-      'بمجرد شحن طلبك، ستتلقى بريداً إلكترونياً يحتوي على رقم التتبع. يمكنك استخدامه لتتبع طردك على موقع شركة الشحن أو من خلال سجل طلباتك.',
+      'أول ما طلبك يتشحن، هيوصلك إيميل فيه رقم التتبع. تقدر تتابع بيه شحنتك على موقع شركة الشحن أو من سجل طلباتك.',
   },
   {
     question: 'Can I cancel or modify my order?',
-    questionAr: 'هل يمكنني إلغاء أو تعديل طلبي؟',
+    questionAr: 'أقدر ألغي أو أعدّل طلبي؟',
     answer:
       'Orders can be cancelled or modified within 1 hour of placement. After that, please contact our support team for assistance.',
     answerAr:
-      'يمكن إلغاء أو تعديل الطلبات خلال ساعة واحدة من تقديمها. بعد ذلك، يرجى التواصل مع فريق الدعم للمساعدة.',
+      'تقدر تلغي أو تعدّل الطلب خلال ساعة من وقت ما تعمله. بعد كده، كلّم فريق الدعم وهيساعدك.',
   },
   {
     question: 'Do you offer gift wrapping?',
-    questionAr: 'هل تقدمون خدمة تغليف الهدايا؟',
+    questionAr: 'بتقدموا تغليف هدايا؟',
     answer:
       'Gift wrapping may be available at checkout for a small additional fee. You can also include a personalized message.',
-    answerAr:
-      'قد يكون تغليف الهدايا متاحاً عند الدفع مقابل رسوم إضافية بسيطة. يمكنك أيضاً تضمين رسالة شخصية.',
+    answerAr: 'ممكن يكون في تغليف هدايا وقت الدفع برسوم إضافية بسيطة. وتقدر كمان تكتب رسالة شخصية.',
   },
   {
     question: 'How do I contact customer support?',
-    questionAr: 'كيف أتواصل مع خدمة العملاء؟',
+    questionAr: 'إزاي أكلّم خدمة العملاء؟',
     answer:
       'You can reach us through the Contact page on our website. We aim to respond to all enquiries as quickly as possible.',
-    answerAr:
-      'يمكنك التواصل معنا من خلال صفحة اتصل بنا على موقعنا. نسعى للرد على جميع الاستفسارات في أسرع وقت ممكن.',
+    answerAr: 'تقدر تكلّمنا من صفحة اتصل بنا على موقعنا. بنحاول نرد على كل الأسئلة في أسرع وقت.',
   },
 ];
 
@@ -150,7 +149,7 @@ export default function FAQClient({ storeFaqs = [], storeHowtos = [] }: FAQClien
           <p className="mt-2 text-muted-foreground">
             {t(
               `Find answers to common questions about ${store.name || 'our store'}`,
-              `اعثر على إجابات للأسئلة الشائعة حول ${store.name || 'متجرنا'}`
+              `اعثر على إجابات للأسئلة الشائعة حول ${pickLocalizedName(store, true) || 'متجرنا'}`
             )}
           </p>
         </div>
@@ -265,12 +264,12 @@ export default function FAQClient({ storeFaqs = [], storeHowtos = [] }: FAQClien
 
         <div className="mt-12 rounded-xl border bg-card p-8 text-center shadow-sm">
           <h2 className="text-xl font-semibold text-foreground">
-            {t('Still have questions?', 'لا تزال لديك أسئلة؟')}
+            {t('Still have questions?', 'لسه عندك أسئلة؟')}
           </h2>
           <p className="mt-2 text-muted-foreground">
             {t(
               "Can't find the answer you're looking for? Please contact our support team.",
-              'لم تجد الإجابة التي تبحث عنها؟ يرجى التواصل مع فريق الدعم.'
+              'ملقيتش الإجابة اللي بتدوّر عليها؟ كلّم فريق الدعم.'
             )}
           </p>
           <Link

@@ -51,7 +51,13 @@ export function SizeChartTable({ chart }: { chart: PublicSizeChart }) {
       : t('Measurements in cm', 'القياسات بالسنتيمتر');
   return (
     <div>
-      <div className="overflow-x-auto overscroll-x-contain">
+      {/* A scrollable region must be keyboard-focusable (axe scrollable-region-focusable). */}
+      <div
+        className="overflow-x-auto overscroll-x-contain focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground"
+        role="region"
+        aria-label={unit}
+        tabIndex={0}
+      >
         <table className="w-full border-collapse text-sm">
           <caption className="caption-bottom pt-3 text-start text-xs text-muted-foreground">
             {unit}

@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { type Category } from '@/lib/api';
 import { useStore, useStoreUrl } from '@/contexts/StoreContext';
 import { pageSurfaceStyle } from '@/lib/page-surface';
+import { darkLookListingBand } from '../../templates/shared/section-bg';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { ShopChrome } from '../../components';
 import { useTemplateComponents } from '../../hooks/useTemplateComponents';
@@ -53,7 +54,10 @@ export default function CategoriesClient({
     undefined,
     store.theme
   );
-  const catBgStyle = pageSurfaceStyle(catPage?.bgColor, store.theme, catPage?.colorScheme);
+  // A dark look lists its (white-ground) category photos on the inverse band (W2b, rule 1).
+  const catBgStyle =
+    darkLookListingBand(store.theme, store.look, !!catPage?.bgColor) ??
+    pageSurfaceStyle(catPage?.bgColor, store.theme, catPage?.colorScheme);
   const catScale = pageTextScale(catPage?.textScale);
   const catDensity = pageDensityStyle(catPage?.density);
 
@@ -87,7 +91,7 @@ export default function CategoriesClient({
                 {t('Shop by Category', 'تسوق حسب الفئة')}
               </h1>
               <p className="text-muted-foreground mb-4">
-                {t('No categories available yet.', 'لا توجد فئات متاحة حالياً')}
+                {t('No categories available yet.', 'مفيش فئات متاحة دلوقتي')}
               </p>
               <Link href={storeUrl('/products')} className="text-primary hover:underline">
                 {t('Browse all products', 'تصفح جميع المنتجات')}

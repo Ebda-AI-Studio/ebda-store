@@ -429,7 +429,7 @@ export function DahabProductDetail(p: DahabProductDetailProps) {
             )}
 
             <div ref={buyRef} className="mt-8 flex items-stretch gap-3">
-              <div className="flex items-center rounded-[var(--radius)] border border-border">
+              <div className="flex items-center rounded-[var(--radius)] border border-input">
                 <button
                   type="button"
                   onClick={() => p.setQuantity(Math.max(1, p.quantity - 1))}
@@ -457,7 +457,7 @@ export function DahabProductDetail(p: DahabProductDetailProps) {
                 disabled={p.addDisabled || p.isAdding}
                 className={cx(DAHAB_BTN_PRIMARY, 'flex-1')}
               >
-                {p.isAdding ? t('Adding…', 'جاري الإضافة…') : p.addLabel}
+                {p.isAdding ? t('Adding…', 'بنضيف…') : p.addLabel}
               </button>
               <button
                 type="button"
@@ -468,7 +468,7 @@ export function DahabProductDetail(p: DahabProductDetailProps) {
                     ? t('Remove from wishlist', 'إزالة من المفضلة')
                     : t('Add to wishlist', 'إضافة للمفضلة')
                 }
-                className="flex w-12 items-center justify-center rounded-[var(--radius)] border border-border text-foreground/80 hover:border-primary hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                className="flex w-12 items-center justify-center rounded-[var(--radius)] border border-input text-foreground/80 hover:border-primary hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
                 <HeartIcon className="h-5 w-5" filled={p.isWishlisted} />
               </button>
@@ -500,7 +500,7 @@ export function DahabProductDetail(p: DahabProductDetailProps) {
                 <p>
                   {t(
                     'Delivery times and fees for your area are shown at checkout.',
-                    'مواعيد التوصيل ورسومه لمنطقتك تظهر في خطوة إتمام الطلب.'
+                    'مواعيد ومصاريف التوصيل لمنطقتك بتظهر في خطوة إتمام الطلب.'
                   )}{' '}
                   <Link
                     href={p.shippingHref}
@@ -514,7 +514,7 @@ export function DahabProductDetail(p: DahabProductDetailProps) {
                 <p>
                   {t(
                     'Read how returns and exchanges work for this store.',
-                    'اعرف طريقة الاسترجاع والاستبدال في هذا المتجر.'
+                    'اعرف إزاي الاسترجاع والاستبدال في المتجر ده.'
                   )}{' '}
                   <Link
                     href={p.returnsHref}
@@ -550,7 +550,7 @@ export function DahabProductDetail(p: DahabProductDetailProps) {
               href={p.cartHref}
               aria-label={p.cartLabel}
               data-testid="dahab-pinned-cart"
-              className="relative inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-[var(--radius)] border border-border text-foreground"
+              className="relative inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-[var(--radius)] border border-input text-foreground"
             >
               <BagIcon className="h-[22px] w-[22px]" aria-hidden="true" />
               {(p.cartCount ?? 0) > 0 && (
@@ -573,7 +573,7 @@ export function DahabProductDetail(p: DahabProductDetailProps) {
             disabled={p.addDisabled || p.isAdding}
             className={cx(DAHAB_BTN_PRIMARY, 'px-6')}
           >
-            {p.isAdding ? t('Adding…', 'جاري الإضافة…') : p.addLabel}
+            {p.isAdding ? t('Adding…', 'بنضيف…') : p.addLabel}
           </button>
         </div>
       </div>

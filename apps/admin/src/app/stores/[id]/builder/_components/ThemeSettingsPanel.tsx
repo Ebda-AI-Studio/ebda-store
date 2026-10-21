@@ -23,6 +23,7 @@ import { useT } from '@/i18n/useT';
 import { ColorField } from '../../../../../components/ColorField';
 import { Toggle } from '../../../../../components/Toggle';
 import { apiPut } from '../../../../../lib/api';
+import { borderEditPatch } from './border-input-pairing';
 
 export function ThemeSettingsPanel({
   theme,
@@ -86,7 +87,9 @@ export function ThemeSettingsPanel({
     }
   };
   const set = (key: keyof StoreTheme, value: unknown) => {
-    setPatch(p => ({ ...p, [key]: value }));
+    // A paired input colour follows a Borders edit (B1-43 follow-up, border-input-pairing.ts).
+    const edit = borderEditPatch(current, key, value);
+    setPatch(p => ({ ...p, ...edit }));
     setState('idle');
   };
   const save = async () => {

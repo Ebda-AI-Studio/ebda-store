@@ -80,7 +80,7 @@ describe('SuccessClient hero vs receipt', () => {
     expect(screen.queryByTestId('success-hero-icon')).toBeNull();
     expect(screen.queryByTestId('success-cod-banner')).toBeNull();
     expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('شكراً لطلبك!');
-    expect(screen.getByText('تم تقديم طلبك. يرجى تجهيز المبلغ عند استلام الطلب.')).toBeTruthy();
+    expect(screen.getByText('طلبك اتسجل. جهّز المبلغ لما الطلب يوصلك.')).toBeTruthy();
   });
 
   it('while the order loads the printer is up and the hero stays hidden', () => {
@@ -97,6 +97,21 @@ describe('SuccessClient hero vs receipt', () => {
     await waitFor(() => expect(screen.getByTestId('success-hero-icon')).toBeTruthy());
     expect(screen.queryByTestId('receipt')).toBeNull();
     expect(screen.getByTestId('success-cod-banner')).toBeTruthy();
-    expect(screen.getByText('تم استلام طلبك. يمكنك متابعة حالته في أي وقت من حسابك.')).toBeTruthy();
+    expect(screen.getByText('طلبك وصلنا. تقدر تتابع حالته في أي وقت من حسابك.')).toBeTruthy();
+  });
+});
+
+// IA-14: the two stacked actions measured 280 and 320px wide. They share one width.
+describe('success actions share one width (IA-14)', () => {
+  it('each action link and its button fill a fixed-width slot', async () => {
+    const { readFileSync } = await import('node:fs');
+    const { join } = await import('node:path');
+    const src = readFileSync(join(__dirname, 'SuccessClient.tsx'), 'utf8');
+    const actions = src.slice(src.indexOf('data-success-actions'));
+    const links = [...actions.slice(0, actions.indexOf('</div>')).matchAll(/<Link\b[^>]*>/g)];
+    expect(links.length).toBe(3);
+    for (const l of links) expect(l[0]).toMatch(/className="w-full sm:w-64"/);
+    const buttons = [...actions.slice(0, actions.indexOf('</div>')).matchAll(/<Button\b[^>]*>/g)];
+    for (const b of buttons) expect(b[0]).toMatch(/className="w-full"/);
   });
 });

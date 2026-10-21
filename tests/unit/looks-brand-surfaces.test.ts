@@ -122,7 +122,7 @@ describe('invoices follow the look', () => {
     expect(await InvoiceService.generateInvoice('s1', 'o1', 'en')).toContain(`hsl(${MERCHANT})`);
     state.order = order('legacy');
     const legacy = await InvoiceService.generateInvoice('s1', 'o1', 'en');
-    expect(legacy).toContain('hsl(26 100% 50%)');
+    expect(legacy).toContain('hsl(210 9% 4%)');
     expect(legacy).not.toContain(`hsl(${lookPrimary})`);
   });
   it("invoice email uses the look's primary", () => {

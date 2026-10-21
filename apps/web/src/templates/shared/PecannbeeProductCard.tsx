@@ -3,16 +3,17 @@
 import type React from 'react';
 import { canBuyNow } from '@/lib/can-buy-now';
 import { resolveProductCardCtaOosDefaults } from './product-card-defaults';
-import { memo, useState } from 'react';
+import { memo, useState, useId } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import type { ProductCardProps } from '../types';
 import type { TemplateId, ProductCardSize } from '@ebda/shared';
-import { getProductCardTextSizes, resolveColor } from '@ebda/shared';
+import { getLook, getProductCardTextSizes, resolveColor } from '@ebda/shared';
 import { cn } from '@ebda/ui';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useStore } from '../../contexts/StoreContext';
 import { useNumerals } from '../../hooks/useNumerals';
+import { useLocalePrice } from '../../hooks/useLocalePrice';
 import { getPackStyles } from './pack-styles';
 import {
   cardFrameClass,
@@ -35,7 +36,21 @@ import { TaxInclusiveLabel } from './tax-inclusive-label';
 import { AdaptiveAddButton, OosImageDim, OutOfStockRibbon, isProductNew } from './ProductCardCta';
 import { BrandPill } from './BrandPill';
 import { getDiscountBadgeColor } from './discount-badge';
+import { newBadgeCornerCls } from './badge-collision';
+import { cardActionLabel, cardLinkLabel } from './card-actions';
 import { getCustomBadgeColor, getCustomBadgeTextColor, resolveCardBadges } from './custom-badge';
+import {
+  lookCardCta,
+  lookCtaVisible,
+  QUIET_CARD_CTA_CLS,
+  cardHoverCls,
+  lookChip,
+  LOOK_CHIP_CLS,
+  LOOK_CHIP_STYLE,
+  LOOK_NEW_CHIP_STYLE,
+  overPhotoMaterial,
+  overPhotoHeartCls,
+} from './look-card';
 
 import { fromMinor } from '@ebda/shared';
 import { REGION } from '@ebda/shared';
@@ -101,10 +116,14 @@ function PecannbeeProductCardImpl({
   showCardName,
   showCardPrice,
 }: PecannbeeProductCardProps) {
+  // One id per card INSTANCE: a product can render in a grid and a carousel on the same page.
+  const nameId = `prod-${useId()}-name`;
   const { isRtl: ctxIsRtl, t } = useLanguage();
   const { store, layout } = useStore();
   const renderNow = useRenderNow();
-  const { money, numerals } = useNumerals();
+  const { numerals } = useNumerals();
+  // The ONE storefront price format ("1,490 ج.م" / "EGP 1,490", Ruling B1-28).
+  const price = useLocalePrice();
   const isRtl = isRtlProp ?? ctxIsRtl;
   const styles = getPackStyles(pack);
   const textSizes = getProductCardTextSizes(cardSize);
@@ -173,7 +192,7 @@ function PecannbeeProductCardImpl({
     }
   };
 
-  const showNewBadge = inStock && isProductNew(product, renderNow);
+  const showNewBadge = inStock && isProductNew(product, renderNow, store.theme);
 
   // Task 3 B: read CTA + OOS defaults from productCardDefaults.
   const defaults = layout?.productCardDefaults;
@@ -240,6 +259,25 @@ function PecannbeeProductCardImpl({
       ? resolveColor(resolvedCtaTextColor, store.theme)
       : undefined;
 
+  // Look card tokens (W2b). Every one is undefined / legacy on a store with no look.
+  const hasVariants = !!product.variants && product.variants.length > 0;
+  const lookCta = lookCardCta(store.theme, layout);
+  const ctaShown = lookCtaVisible(lookCta, { hasVariants: hasVariants || viewOnly, orderable });
+  const ctaCls = lookCta === 'quiet' ? QUIET_CARD_CTA_CLS : styles.productCardCta;
+  const chip = lookChip(store.theme);
+  // A merchant badge colour beats the look accent (merchant > look).
+  const discountChipStyle =
+    chip && !defaults?.discountBadge?.color
+      ? LOOK_CHIP_STYLE
+      : { backgroundColor: discountBadgeColor };
+  const heartMaterial = overPhotoMaterial(store.theme, store.look);
+  const onLook = !!getLook(store.look);
+  // The heart holds top-start on this card; the sale chip may hold top-end (X-01 class).
+  const newCorner = newBadgeCornerCls({
+    topStartReserved: true,
+    topEndReserved: onSale && discountBadgeAllowed && discountTopCorner === 'end',
+  });
+
   return (
     <article
       // max-w cap on desktop so product cards in a 4-col grid don't
@@ -259,8 +297,12 @@ function PecannbeeProductCardImpl({
       // verified zero rendered-output change for the `showCardFrame` +
       // pack-style combination (see design-sweep PR).
       className={cn(
-        'group relative flex flex-col w-full mx-auto transition-[transform,box-shadow] duration-[var(--duration-slow)] ease-[var(--ease-out)] md:hover:scale-[1.02] md:hover:shadow-[0_20px_40px_-20px_hsl(var(--foreground)/0.18)]',
-        sizeCap || 'md:max-w-[200px]',
+        'group relative flex flex-col w-full transition-[transform,box-shadow] duration-[var(--duration-slow)] ease-[var(--ease-out)]',
+        // IA-05 (W4): on a look store the card fills its grid column, so the first card starts at
+        // the section edge like the carousels; a store with no look keeps the compact, centred cap.
+        onLook ? '' : 'mx-auto',
+        cardHoverCls(store.theme),
+        onLook ? '' : sizeCap || 'md:max-w-[200px]',
         frameCls,
         styles.card,
         // LAST so the merchant's explicit cardShape radius beats the pack's
@@ -275,7 +317,7 @@ function PecannbeeProductCardImpl({
       dir={isRtl ? 'rtl' : 'ltr'}
       itemScope
       itemType="https://schema.org/Product"
-      aria-labelledby={`prod-${product.id}-name`}
+      aria-labelledby={nameId}
     >
       {/* Wishlist heart — lifted OUT of the image div (Part A fix).
           Now a direct child of <article> which has no overflow-hidden,
@@ -285,14 +327,18 @@ function PecannbeeProductCardImpl({
       <button
         type="button"
         onClick={handleWishlist}
-        aria-label={t('Add to wishlist', 'إضافة للمفضلة')}
+        aria-label={cardActionLabel('wishlist-add', isRtl, name)}
         aria-pressed={isWishlisted}
         // Touch hitbox: the visual circle stays 40px (h-10 w-10, unchanged),
         // but before:-inset-1.5 grows the actual tap target to ~52px so it
         // clears the 44px a11y floor without changing the rendered size.
-        className={`before:absolute before:-inset-1.5 before:content-[''] absolute top-3 start-3 z-20 inline-flex h-10 w-10 items-center justify-center rounded-full bg-white/95 backdrop-blur-sm shadow-[0_8px_20px_-8px_hsl(var(--foreground)/0.30)] transition-[transform,background-color,color] duration-[var(--duration-base)] ease-[var(--ease-out)] hover:scale-[1.05] hover:bg-white active:scale-95 cursor-pointer ${
-          isWishlisted ? 'text-destructive' : 'text-foreground/70 hover:text-foreground'
-        }`}
+        className={
+          heartMaterial
+            ? overPhotoHeartCls(heartMaterial, isWishlisted)
+            : `before:absolute before:-inset-1.5 before:content-[''] absolute top-3 start-3 z-20 inline-flex h-10 w-10 items-center justify-center rounded-full bg-white/95 backdrop-blur-sm shadow-[0_8px_20px_-8px_hsl(var(--foreground)/0.30)] transition-[transform,background-color,color] duration-[var(--duration-base)] ease-[var(--ease-out)] hover:scale-[1.05] hover:bg-white active:scale-95 cursor-pointer ${
+                isWishlisted ? 'text-destructive' : 'text-foreground/70 hover:text-foreground'
+              }`
+        }
       >
         <svg
           className="h-5 w-5"
@@ -313,6 +359,14 @@ function PecannbeeProductCardImpl({
       <Link
         href={href}
         prefetch={false}
+        aria-label={cardLinkLabel(name, [
+          showNewBadge && t('New', 'جديد'),
+          onSale && discountBadgeAllowed && discountBadgeText,
+          customBadgeText,
+          !orderable &&
+            ((isRtl ? resolvedOosLabelTextAr : resolvedOosLabelTextEn) ||
+              t('Out of stock', 'نفد المخزون')),
+        ])}
         className="group/img block focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
       >
         {/* Image: item 8 — aspect+radius driven by per-store cardImageAspect/cardImageRadius;
@@ -320,7 +374,7 @@ function PecannbeeProductCardImpl({
             when normalizeImages is on, object-fill bg ensures transparent PNGs read cleanly.
             overflow-hidden STAYS on the image div so images still clip to the shape. */}
         <div
-          className={`relative overflow-hidden bg-muted ${imgRadiusCls || shape.radius} ${imgAspectCls || aspectOverride || lookImageAspectClass(store.look) || 'aspect-square sm:aspect-[3/4]'}`}
+          className={`relative overflow-hidden bg-muted ${imgRadiusCls || (getLook(store.look) ? 'rounded-[var(--radius)]' : shape.radius)} ${imgAspectCls || aspectOverride || lookImageAspectClass(store.look) || 'aspect-square sm:aspect-[3/4]'}`}
         >
           {img ? (
             <>
@@ -372,6 +426,7 @@ function PecannbeeProductCardImpl({
               flagged new OR was created in the last 14 days.
               Task 3 B4: OOS badge customization via productCardDefaults. */}
           <OutOfStockRibbon
+            flat={onLook}
             inStock={orderable}
             isRtl={isRtl}
             oosLabel={resolvedOosLabel}
@@ -397,8 +452,15 @@ function PecannbeeProductCardImpl({
           />
           {showNewBadge && (
             <span
-              className="absolute top-3 start-3 z-10 rounded-full bg-[hsl(var(--primary))] px-2.5 py-1 text-xs font-bold uppercase tracking-wider text-[hsl(var(--primary-foreground))] shadow-[0_6px_14px_-6px_hsl(var(--primary)/0.5)]"
-              aria-label={t('New product', 'منتج جديد')}
+              className={
+                onLook
+                  ? cn(LOOK_CHIP_CLS, newCorner)
+                  : `absolute ${newCorner} z-10 rounded-full bg-[hsl(var(--primary))] px-2.5 py-1 text-xs font-bold uppercase tracking-wider text-[hsl(var(--primary-foreground))] shadow-[0_6px_14px_-6px_hsl(var(--primary)/0.5)]`
+              }
+              // VT-b: neutral on every look; the accent is the sale chip's alone.
+              style={onLook ? LOOK_NEW_CHIP_STYLE : undefined}
+              aria-hidden="true"
+              data-badge="new"
             >
               {isRtl ? 'جديد' : 'NEW'}
             </span>
@@ -413,11 +475,19 @@ function PecannbeeProductCardImpl({
               or bottom-left when theme.saleBadgeLegacyCorner, #1998). */}
           {onSale && discountBadgeAllowed && discountBadgeText && (
             <span
-              className={cn(
-                'pointer-events-none absolute z-10 rounded-full px-2.5 py-1 text-xs font-semibold tracking-wide text-white shadow-[0_8px_20px_-8px_rgba(220,38,38,0.45)]',
-                discountBadgePositionCls
-              )}
-              style={{ backgroundColor: discountBadgeColor }}
+              className={
+                chip
+                  ? cn(
+                      LOOK_CHIP_CLS,
+                      defaults?.discountBadge?.color && 'text-white',
+                      discountBadgePositionCls
+                    )
+                  : cn(
+                      'pointer-events-none absolute z-10 rounded-full px-2.5 py-1 text-xs font-semibold tracking-wide text-white shadow-[0_8px_20px_-8px_rgba(220,38,38,0.45)]',
+                      discountBadgePositionCls
+                    )
+              }
+              style={discountChipStyle}
             >
               {discountBadgeText}
             </span>
@@ -429,10 +499,16 @@ function PecannbeeProductCardImpl({
           {customBadgeText && (
             <span
               className={cn(
-                'pointer-events-none absolute z-10 rounded-full px-2.5 py-1 text-xs font-semibold tracking-wide text-white shadow-[0_8px_20px_-8px_rgba(0,0,0,0.35)]',
+                chip
+                  ? LOOK_CHIP_CLS
+                  : 'pointer-events-none absolute z-10 rounded-full px-2.5 py-1 text-xs font-semibold tracking-wide text-white shadow-[0_8px_20px_-8px_rgba(0,0,0,0.35)]',
                 customBadgePositionCls
               )}
-              style={{ backgroundColor: customBadgeColor, color: customBadgeTextColor }}
+              style={
+                chip && !defaults?.customBadge?.color
+                  ? LOOK_CHIP_STYLE
+                  : { backgroundColor: customBadgeColor, color: customBadgeTextColor }
+              }
             >
               {customBadgeText}
             </span>
@@ -456,13 +532,15 @@ function PecannbeeProductCardImpl({
         {showLabel !== false && (nameVisible || priceVisible) && (
           <>
             {nameVisible && (
+              // R-12: the photo link is the card's tab stop; the name repeats it for the pointer.
               <Link
                 href={href}
                 prefetch={false}
-                className="focus:outline-none focus-visible:underline"
+                tabIndex={-1}
+                className="block min-h-11 focus:outline-none focus-visible:underline"
               >
                 <p
-                  id={`prod-${product.id}-name`}
+                  id={nameId}
                   data-zone="productName"
                   className={`[overflow-wrap:anywhere] line-clamp-2 min-h-[2.5em] font-semibold ${textSizes.name} ${styles.productCardName}${nameCase === 'uppercase' ? ' uppercase' : ''}`}
                   style={{
@@ -484,7 +562,7 @@ function PecannbeeProductCardImpl({
             )}
             {priceVisible && (
               <div
-                className={`flex items-baseline gap-2 ${styles.productCardBody ? 'justify-center' : ''}`}
+                className={`flex flex-wrap items-baseline gap-x-2 ${styles.productCardBody ? 'justify-center' : ''}`}
               >
                 <span
                   itemProp="offers"
@@ -496,7 +574,7 @@ function PecannbeeProductCardImpl({
                   <meta itemProp="price" content={String(fromMinor(pricing.displayPrice))} />
                   <span
                     data-zone="productPrice"
-                    className={`font-bold tabular-nums ${textSizes.price} ${styles.productCardPrice}`}
+                    className={`whitespace-nowrap font-bold tabular-nums ${textSizes.price} ${styles.productCardPrice}`}
                     style={{
                       fontFamily: productPriceZone?.fontFamily,
                       fontSize: responsiveFontSize(productPriceZone?.fontSize),
@@ -509,12 +587,12 @@ function PecannbeeProductCardImpl({
                     }}
                   >
                     {pricing.mode === 'fromMin' ? `${isRtl ? 'من ' : 'From '}` : ''}
-                    {money(pricing.displayPrice)} {currency}
+                    {price(pricing.displayPrice)}
                   </span>
                 </span>
                 {pricing.displayCompare && (
-                  <span className="text-sm text-muted-foreground line-through">
-                    {money(pricing.displayCompare)}
+                  <span className="whitespace-nowrap text-sm text-muted-foreground line-through">
+                    {price(pricing.displayCompare)}
                   </span>
                 )}
               </div>
@@ -532,7 +610,7 @@ function PecannbeeProductCardImpl({
             variants add to cart directly. Matches pecannbee target IMG_7994
             where two adjacent cards show different button texts based on
             inventory state. */}
-        {(product.variants && product.variants.length > 0) || viewOnly ? (
+        {!ctaShown ? null : (product.variants && product.variants.length > 0) || viewOnly ? (
           <Link
             href={href}
             prefetch={false}
@@ -541,6 +619,7 @@ function PecannbeeProductCardImpl({
               ctaExtraCls
             )}
             data-cta="button"
+            aria-label={`${(isRtl ? resolvedCtaLabelTextAr : resolvedCtaLabelTextEn) ?? (isRtl ? 'عرض' : 'View')} ${name}`}
             style={{
               fontFamily: productCtaZone?.fontFamily,
               fontSize: responsiveFontSize(productCtaZone?.fontSize),
@@ -562,7 +641,7 @@ function PecannbeeProductCardImpl({
             disabled
             data-cta="button"
             className={cn(
-              `mt-auto inline-flex w-full items-center justify-center gap-2 min-h-[44px] ${styles.productCardCta} disabled:cursor-not-allowed disabled:opacity-60`,
+              `mt-auto inline-flex w-full items-center justify-center gap-2 min-h-[44px] ${ctaCls} disabled:cursor-not-allowed disabled:opacity-60`,
               ctaExtraCls
             )}
             style={{
@@ -590,10 +669,10 @@ function PecannbeeProductCardImpl({
             onClick={handleAdd}
             label={
               (isRtl ? resolvedCtaLabelTextAr : resolvedCtaLabelTextEn) ??
-              (isRtl ? 'إضافة للسلة' : 'Add to Cart')
+              (isRtl ? 'إضافة للسلة' : 'Add to cart')
             }
             className={cn(
-              `mt-auto inline-flex w-full items-center justify-center gap-2 min-h-[44px] ${styles.productCardCta} disabled:cursor-not-allowed disabled:opacity-60`,
+              `mt-auto inline-flex w-full items-center justify-center gap-2 min-h-[44px] ${ctaCls} disabled:cursor-not-allowed disabled:opacity-60`,
               ctaExtraCls
             )}
             style={{

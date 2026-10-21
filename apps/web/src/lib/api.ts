@@ -173,6 +173,7 @@ interface Category {
   nameAr?: string;
   slug: string;
   description?: string;
+  descriptionAr?: string | null;
   image?: string;
   productCount?: number;
   /** When false, hidden from the homepage category strip only (the collection

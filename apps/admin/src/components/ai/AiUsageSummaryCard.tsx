@@ -124,7 +124,7 @@ function Sparkline({ data, height = 60, ariaLabel }: SparklineProps) {
       <polyline
         points={points.join(' ')}
         fill="none"
-        stroke="var(--primary, #ff6e00)"
+        stroke="hsl(var(--primary))"
         strokeWidth={2}
         strokeLinecap="round"
         strokeLinejoin="round"

@@ -135,7 +135,7 @@ export function TaxRatesTable({
         <button
           type="button"
           onClick={onAdd}
-          className="px-4 py-2 min-h-11 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors"
+          className="px-4 py-2 min-h-11 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors"
         >
           {t('empty.createFirst')}
         </button>
@@ -156,7 +156,7 @@ export function TaxRatesTable({
           <button
             type="button"
             onClick={onAdd}
-            className="px-4 py-2 min-h-11 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors flex items-center gap-2 disabled:opacity-50"
+            className="px-4 py-2 min-h-11 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors flex items-center gap-2 disabled:opacity-50"
             disabled={!taxEnabled}
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -179,7 +179,7 @@ export function TaxRatesTable({
               onClick={() => onFilterChange(f)}
               className={`px-4 py-2 min-h-9 rounded-lg text-sm font-medium transition-colors ${
                 filter === f
-                  ? 'bg-primary text-white'
+                  ? 'bg-primary text-primary-foreground'
                   : 'bg-card text-foreground hover:bg-muted border border-border'
               }`}
             >

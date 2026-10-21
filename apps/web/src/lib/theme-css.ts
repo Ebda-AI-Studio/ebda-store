@@ -12,8 +12,8 @@ import { LEGACY_STATUS_INK_VALUE, themeToCssVars, type StoreTheme } from '@ebda/
 /**
  * Sanitize a theme color value to prevent CSS injection.
  *
- * Theme colors from the database are HSL component strings (e.g. "26 100% 50%")
- * or hex colors (e.g. "#ff6e00"). This function validates the value matches one
+ * Theme colors from the database are HSL component strings (e.g. "36 36% 52%")
+ * or hex colors (e.g. "#b08d57"). This function validates the value matches one
  * of those safe formats and strips any dangerous CSS content that could escape
  * the declaration context.
  *
@@ -36,8 +36,8 @@ export function sanitizeThemeColor(value: string, fallback = '0 0% 0%'): string 
     return value;
   }
 
-  // HSL components: e.g. "26 100% 50%", "0 0% 100%", "220 14% 96%"
-  // Allows optional decimal points and the slash syntax for alpha (e.g. "26 100% 50% / 0.5")
+  // HSL components: e.g. "36 36% 52%", "0 0% 100%", "220 14% 96%"
+  // Allows optional decimal points and the slash syntax for alpha (e.g. "36 36% 52% / 0.5")
   const hslPattern =
     /^[0-9]+(?:\.[0-9]+)?\s+[0-9]+(?:\.[0-9]+)?%\s+[0-9]+(?:\.[0-9]+)?%(?:\s*\/\s*[0-9]+(?:\.[0-9]+)?%?)?$/;
   if (hslPattern.test(value)) {

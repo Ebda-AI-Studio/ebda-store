@@ -11,7 +11,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { useStoreUrl } from '../contexts/StoreContext';
 import { useLanguage } from '../contexts/LanguageContext';
-import { useNumerals } from '../hooks/useNumerals';
+import { useLocalePrice } from '../hooks/useLocalePrice';
 import { api, type SearchSuggestion } from '../lib/api';
 
 // ─── Props ────────────────────────────────────────────────────────────────────
@@ -55,7 +55,7 @@ function cacheSet(key: string, value: SearchSuggestion[]) {
 export function SearchAutocomplete({ query, onSelect, committedQuery }: SearchAutocompleteProps) {
   const storeUrl = useStoreUrl();
   const { language, t } = useLanguage();
-  const { money } = useNumerals();
+  const money = useLocalePrice();
   const isAr = language === 'ar';
 
   const [suggestions, setSuggestions] = useState<SearchSuggestion[] | null>(null);
@@ -243,14 +243,14 @@ export function SearchAutocomplete({ query, onSelect, committedQuery }: SearchAu
               d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
             />
           </svg>
-          {t('Searching...', 'جارٍ البحث...')}
+          {t('Searching...', 'بندوّر...')}
         </div>
       )}
 
       {/* Empty state — "No products found" per spec */}
       {isEmpty && (
         <div className="px-4 py-3 text-sm text-muted-foreground">
-          {t('No products found', 'لا توجد منتجات')}
+          {t('No products found', 'مفيش منتجات')}
         </div>
       )}
 
@@ -260,7 +260,6 @@ export function SearchAutocomplete({ query, onSelect, committedQuery }: SearchAu
           {suggestions.map((product, idx) => {
             const isActive = activeIndex === idx;
             const displayName = isAr && product.nameAr ? product.nameAr : product.name;
-            // Prices stored in piastres — divide by 1000 for EGP.
             const priceMajor = money(product.price);
 
             return (
@@ -309,7 +308,7 @@ export function SearchAutocomplete({ query, onSelect, committedQuery }: SearchAu
                 {/* Name + price */}
                 <div className="min-w-0 flex-1">
                   <p className="truncate font-medium text-foreground">{displayName}</p>
-                  <p className="text-xs text-muted-foreground">{priceMajor} EGP</p>
+                  <p className="text-xs text-muted-foreground">{priceMajor}</p>
                 </div>
               </Link>
             );

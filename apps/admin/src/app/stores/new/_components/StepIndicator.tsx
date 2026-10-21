@@ -40,7 +40,7 @@ export function StepIndicator({ currentStep, onJumpTo }: StepIndicatorProps) {
               <span
                 className={`flex h-10 w-10 items-center justify-center rounded-full border-2 text-sm font-medium ${
                   index < currentIndex
-                    ? 'border-primary bg-primary text-white'
+                    ? 'border-primary bg-primary text-primary-foreground'
                     : index === currentIndex
                       ? 'border-primary text-primary'
                       : 'border-border text-muted-foreground'

@@ -2130,6 +2130,56 @@
       "find": "      if (sniffedAll.some(kind => kind === null)) {",
       "replace": "      if (false) {",
       "test": "tests/unit/upload-routes.test.ts"
+    },
+    {
+      "id": "demo-store-refuses-orders",
+      "domain": "money / payment / refund",
+      "tier": "integration",
+      "why": "the demo showroom (stores.is_demo) takes a real order: checkout, an admin/phone order or a WhatsApp payment link writes an order row and moves stock on a store nobody runs (Ruling B1-13, MKT-3)",
+      "source": "apps/api/src/services/plan-limit.service.ts",
+      "find": "  if (row.isDemo) {\n    throw new AppError(403, 'DEMO_STORE', 'This is a demo store; orders are disabled', {",
+      "replace": "  if (false) {\n    throw new AppError(403, 'DEMO_STORE', 'This is a demo store; orders are disabled', {",
+      "test": "tests/integration/demo-store.test.ts"
+    },
+    {
+      "id": "demo-store-every-order-path-gated",
+      "domain": "money / payment / refund",
+      "tier": "unit",
+      "why": "an order-creating path stops calling assertOrderAllowed (here the WhatsApp payment link), so the demo store (and the plan order cap) can be bypassed through it; the static owner/guard scan must catch it (Ruling B1-13, plan amendment C12)",
+      "source": "apps/api/src/routes/payment-links.routes.ts",
+      "find": "      await assertOrderAllowed(storeId);",
+      "replace": "",
+      "test": "tests/unit/demo-order-guard-coverage.test.ts"
+    },
+    {
+      "id": "demo-store-collects-no-visitor-pii",
+      "domain": "consent",
+      "tier": "integration",
+      "why": "the demo showroom collects visitor PII nobody will ever act on: customer register, newsletter subscribe, contact form, affiliate apply and push subscribe all succeed on a store nobody runs (Ruling B1-13, C13)",
+      "source": "apps/api/src/services/plan-limit.service.ts",
+      "find": "  if (row?.isDemo) {",
+      "replace": "  if (false) {",
+      "test": "tests/integration/demo-store.test.ts"
+    },
+    {
+      "id": "demo-owner-never-mailed",
+      "domain": "consent",
+      "tier": "integration",
+      "why": "a password reset for the demo store's seeded owner (storedemo-owner@ebda.app, no mailbox) issues a reset token and mails a dead address, a bounce on the platform sender's reputation on demand (Ruling B1-13)",
+      "source": "apps/api/src/services/auth.service.ts",
+      "find": "    if (!user || (await ownsDemoStore(user.id))) {\n      // Silently return",
+      "replace": "    if (!user) {\n      // Silently return",
+      "test": "tests/integration/demo-store.test.ts"
+    },
+    {
+      "id": "demo-owner-never-mailed-resend",
+      "domain": "consent",
+      "tier": "integration",
+      "why": "a verification resend for the demo store's seeded owner (storedemo-owner@ebda.app, no mailbox) issues a verification token and mails a dead address, the resend twin of demo-owner-never-mailed (Ruling B1-13, T9 review minor)",
+      "source": "apps/api/src/services/auth.service.ts",
+      "find": "    if (!user || (await ownsDemoStore(user.id))) {\n      // Don't reveal",
+      "replace": "    if (!user) {\n      // Don't reveal",
+      "test": "tests/integration/demo-store.test.ts"
     }
   ]
 }

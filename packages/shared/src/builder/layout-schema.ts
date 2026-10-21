@@ -55,6 +55,9 @@ export const heroSlideSchema = z.object({
   // sweep (scans layoutSettings + revision documents) sees the URL.
   video: safeVideoUrl,
   videoMobile: safeVideoUrl,
+  // Where a cropped (object-cover) hero keeps its subject: top keeps a model's head in frame on
+  // the wide desktop crop (Ruling B1-32). MUST be listed or the parse step silently strips it.
+  focus: z.enum(['top', 'center', 'bottom']).optional(),
   alt: z.string().optional(),
   headline: z.string().optional(),
   headlineAr: z.string().optional(),
@@ -88,7 +91,9 @@ export const heroSlideSchema = z.object({
 export const colorValue = z
   .string()
   .regex(
-    /^(#([0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})|token:(primary|secondary|accent|card|muted|foreground|border)|)$/,
+    // `token:inverse` (W2a, LB-01): a section band in the page ink with the page colour as its
+    // text; set by a look's mix, never offered in a colour picker (sectionBgStyle re-scopes ink).
+    /^(#([0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})|token:(primary|secondary|accent|card|muted|foreground|border|inverse)|)$/,
     'Must be a hex color or token:<brand-color>'
   )
   .optional();
@@ -179,7 +184,13 @@ const layoutSchemaInternal = z
       // 2026-05-18: framed vs full-bleed presentation. Without this listed
       // Zod silently strips the field on PUT — same trap as
       // the zod silent-strip trap (layout-schema-parity.test.ts). Keep in sync with HeroSettings.
-      presentation: z.enum(['full-bleed', 'framed']).optional(),
+      // 'collage' (Phase B1, Ruling B1-2): three overlapping photos + one headline, any skin.
+      presentation: z.enum(['full-bleed', 'framed', 'collage']).optional(),
+      // Ruling B1-41: an opt-in hairline drawn inside a FRAMED hero (Vitrine's mix sets 'line');
+      // with it the photo fills the frame. Absent / 'none' = the framed hero as before.
+      frame: z.enum(['none', 'line']).optional(),
+      // W2a (L-04): copy at the bottom-start corner on a text-block scrim. Absent = centred.
+      textAnchor: z.enum(['center', 'bottom-start']).optional(),
       // 2026-05-18 Sprint 3: per-section bg color. Must be listed or Zod
       // silently strips it on every PUT — same trap class as imageMobile.
       bgColor: colorValue,
@@ -192,11 +203,11 @@ const layoutSchemaInternal = z
     }),
     categories: z.object({
       enabled: z.boolean(),
-      layout: z.enum(['grid', 'horizontal']),
+      layout: z.enum(['grid', 'horizontal', 'chips']),
       // 2026-05-16: split into per-breakpoint settings (see store-layout.ts
       // CategoriesSettings). Mobile overrides are optional — fall back to
       // the legacy single field when unset.
-      layoutMobile: z.enum(['grid', 'horizontal']).optional(),
+      layoutMobile: z.enum(['grid', 'horizontal', 'chips']).optional(),
       captionPosition: z.enum(['below', 'overlay']),
       captionPositionMobile: z.enum(['below', 'overlay']).optional(),
       desktopColumns: z.union([z.literal(2), z.literal(3), z.literal(4)]),
@@ -371,6 +382,8 @@ const layoutSchemaInternal = z
       enabled: z.boolean(),
       minRating: z.number().min(1).max(5),
       verifiedOnly: z.boolean(),
+      // Ruling B1-2: 'single' = one large customer quote (Vitrine); absent = the row.
+      layout: z.enum(['row', 'single']).optional(),
       // SectionTitleOverride fields — must be listed or Zod silently strips
       // them on PUT (same trap class as imageMobile 2026-05-16).
       title: z.string().optional(),

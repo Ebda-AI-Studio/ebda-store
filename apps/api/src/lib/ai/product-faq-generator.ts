@@ -8,7 +8,7 @@
  * is exactly ONE prompt + parse path for product FAQs.
  *
  * Bilingual by contract: every FAQ has an EN + AR question and answer
- * (formal MSA). The Arabic fields are optional in the parsed shape only so a
+ * (Egyptian Arabic, FU46-Y02d). The Arabic fields are optional in the parsed shape only so a
  * malformed Gemini row degrades gracefully rather than throwing.
  */
 import { GeminiFailoverClient } from './gemini-keys';
@@ -17,6 +17,7 @@ import { rethrowAsAppError } from './gemini-errors';
 import { validateFaqGrounding } from './faq-grounding-validator';
 import { recordUsage } from '../../services/ai.service';
 import logger from '../logger';
+import { EGYPTIAN_ARABIC_REGISTER } from './arabic-register';
 
 export interface GeneratedProductFaq {
   question: string;
@@ -100,7 +101,7 @@ ACCURACY RULES — follow strictly:
 - Do NOT restate information that is already in the description. Each FAQ must add NEW, useful information the description does not already cover — never paraphrase the description back to the customer.
 - Keep answers concise (1-2 sentences), concrete, and honest. No marketing fluff, no guesses hedged as facts.
 
-Each FAQ must have a question AND answer in BOTH English AND Arabic (formal MSA, not dialect).
+Each FAQ must have a question AND answer in BOTH English AND Arabic. ${EGYPTIAN_ARABIC_REGISTER}
 
 Return ONLY valid JSON — no markdown, no explanation:
 [

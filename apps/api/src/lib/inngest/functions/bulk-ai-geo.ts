@@ -16,6 +16,7 @@ import { invalidateStoreProductCaches } from '../../public-cache';
 import { bustStoreCachesById } from '../../../services/store.service';
 import { storeOrigin } from '@ebda/shared';
 import { isPlaceholderText } from '../../ai/placeholder-guard';
+import { EGYPTIAN_ARABIC_REGISTER } from '../../ai/arabic-register';
 
 const AI_UNAVAILABLE_MESSAGE = 'AI request failed — please try again shortly.';
 
@@ -499,7 +500,7 @@ Write a citation-optimised product description:
 1. First sentence: definitional ("${p.name} is a...") — 1 clear factual sentence
 2. Key specs/attributes block: 2-4 bullet points of the most citable facts
 
-Return ONLY a JSON object with keys "en" and "ar". Both fields are plain text (no markdown). Under 300 chars each.
+Return ONLY a JSON object with keys "en" and "ar". Both fields are plain text (no markdown). Under 300 chars each. ${EGYPTIAN_ARABIC_REGISTER}
 Example: {"en": "Product X is a...\n• Spec 1\n• Spec 2", "ar": "المنتج X هو...\n• المعيار 1"}`;
 
               const genResult = await callWithRetry(
