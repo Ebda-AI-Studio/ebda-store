@@ -15,6 +15,8 @@ const h = vi.hoisted(() => ({
   userFindMany: vi.fn(),
   rfmFindMany: vi.fn(),
   rfmGroupBy: vi.fn(),
+  // the SQL customer match behind `?search=` (Search P2: matchingCustomers, a store-scoped definer)
+  matching: vi.fn(),
   // The store's snapshot rows; the two mocks below query them faithfully.
   rfmRows: [] as Array<{ customerId: string; segment: string }>,
   caller: { role: 'store_admin' as string, userId: 'admin-a' },
@@ -33,6 +35,9 @@ vi.mock('@ebda/database', async importOriginal => {
     },
   };
 });
+vi.mock('@api/services/admin-search.service', () => ({
+  matchingCustomers: (...a: unknown[]) => h.matching(...a),
+}));
 vi.mock('@api/middleware/auth', async importOriginal => {
   const actual = await importOriginal<typeof import('@api/middleware/auth')>();
   return {
@@ -101,8 +106,27 @@ beforeAll(async () => {
   app.use(errorHandler);
 });
 
+/** An order mock that honours the search scope (`where.OR` of customer ids / order ids). */
+function scopedOrders(rows: any[]) {
+  return async (args?: { where?: { OR?: any[] } }) => {
+    const or = args?.where?.OR;
+    if (!or) return rows;
+    const users: string[] = or[0]?.customerId?.in ?? [];
+    const orders: string[] = or[1]?.id?.in ?? [];
+    return rows.filter(o => users.includes(o.customer?.id) || orders.includes(o.id));
+  };
+}
+const noMatches = {
+  userIds: [] as string[],
+  guestOrderIds: [] as string[],
+  truncated: false,
+  usersTruncated: false,
+  guestsTruncated: false,
+};
+
 beforeEach(() => {
   vi.clearAllMocks();
+  h.matching.mockResolvedValue(noMatches);
   h.caller = { role: 'store_admin', userId: 'admin-a' };
   // u1: 3 orders (one cancelled → 2 counted, still a repeat buyer)
   // u2: 1 order · u3: only a refunded order (not a buyer) · guest: 1 order
@@ -170,6 +194,7 @@ describe('GET /customers — KPI summary', () => {
   });
 
   it('is unaffected by search, segment and page', async () => {
+    h.orderFindMany.mockImplementation(scopedOrders(await h.orderFindMany({})));
     const res = await request(app).get(
       `/api/v1/stores/${STORE}/customers?search=nomatch&segment=vip&page=3`
     );
@@ -303,7 +328,10 @@ describe('zero-order union (issue 2051)', () => {
     h.userFindMany.mockResolvedValue([
       { id: 'z1', email: 'z1@x.test', firstName: 'Z', lastName: '1', phone: null },
     ]);
+    h.orderFindMany.mockImplementation(scopedOrders(await h.orderFindMany({})));
+    h.matching.mockResolvedValue({ ...noMatches, userIds: ['z1'] });
     const res = await request(app).get(`/api/v1/stores/${STORE}/customers?search=z1@x.test`);
+    expect(h.matching).toHaveBeenCalledWith(STORE, 'z1@x.test');
     expect(res.body.data.meta.truncated).toBe(true);
     expect(res.body.data.data.map((c: { id: string }) => c.id)).toContain('z1');
   });
