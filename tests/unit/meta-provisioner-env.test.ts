@@ -1,5 +1,5 @@
 /**
- * Meta provisioner env vars were renamed FORCE_AI_META_* -> EBDA_META_*.
+ * Meta provisioner env vars were renamed to EBDA_META_*.
  * The new name wins; the old name is a one-release fallback (TODO 2026-12-01).
  */
 import { describe, it, expect } from 'vitest';

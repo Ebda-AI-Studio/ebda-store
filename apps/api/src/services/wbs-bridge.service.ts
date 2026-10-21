@@ -20,6 +20,7 @@ import { config } from '../config';
 import { encryption } from './encryption.service';
 import logger from '../lib/logger';
 
+import { orderIdFields } from '../lib/wbs-wire';
 // ─── Typed error classes ────────────────────────────────────────────────────
 
 export class WbsUnauthorizedError extends Error {
@@ -59,10 +60,10 @@ export interface WbsSendParams {
   idempotencyKey: string;
   /**
    * Phase 6 final-loop. Optional: when this template send corresponds to a
-   * Ebda order, pass the order id so WBS can stamp wa_carts.fwb_order_id
+   * Ebda order, pass the order id so WBS can stamp its cart order-id column
    * during the auto-completion side-effect. Closes the analytics join.
    */
-  fwbOrderId?: string;
+  ebdaOrderId?: string;
 }
 
 export interface WbsSendResult {
@@ -99,7 +100,9 @@ export interface AbandonedWaCartItem {
 
 export interface AbandonedWaCart {
   waCartId: string;
-  fwbStoreId: string | null;
+  /** Store the cart is bound to. WBS sends `ebdaStoreId`; the previous name is read via cartStoreId(). */
+  ebdaStoreId?: string | null;
+  fwbStoreId?: string | null;
   customerPhone: string; // E.164 (e.g. +201012345678)
   customerName: string | null;
   items: AbandonedWaCartItem[];
@@ -140,7 +143,7 @@ export class WbsBridgeService {
       languageCode,
       variables,
       idempotencyKey,
-      fwbOrderId,
+      ebdaOrderId,
     } = params;
 
     // Decrypt the API key before sending
@@ -167,7 +170,7 @@ export class WbsBridgeService {
           languageCode,
           variables,
           idempotencyKey,
-          ...(fwbOrderId ? { fwbOrderId } : {}),
+          ...orderIdFields(ebdaOrderId),
         }),
         // 15s timeout — generous for a synchronous template send
         signal: AbortSignal.timeout(15_000),

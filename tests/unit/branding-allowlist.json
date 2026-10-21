@@ -50,11 +50,7 @@
   "docs/RULINGS.md"
  ],
  "wbsBridge": [
-  "apps/api/src/lib/inngest/functions/order-whatsapp-notify.ts",
-  "apps/api/src/routes/wa-bridge.routes.ts",
-  "apps/api/src/routes/wa-templates.routes.ts",
-  "apps/api/src/routes/wbs-integration.routes.ts",
-  "apps/api/src/services/abandoned-cart.service.ts",
+  "apps/api/src/lib/wbs-wire.ts",
   "apps/api/src/services/wbs-bridge.service.ts",
   "docs/RULINGS.md"
  ],

@@ -31,6 +31,7 @@ import crypto from 'crypto';
 import { config } from '../config';
 import type { NotificationData, NotificationEvent } from '@ebda/shared';
 
+import { cartStoreId } from '../lib/wbs-wire';
 // ==========================================
 // Constants / Types
 // ==========================================
@@ -511,9 +512,9 @@ class AbandonedCartService {
       return;
     }
 
-    // Filter to carts that belong to this store (fwb_store_id match or null as fallback)
+    // Filter to carts that belong to this store (store id match or null as fallback)
     const relevantCarts = waCarts.filter(
-      cart => cart.fwbStoreId === store.id || cart.fwbStoreId === null
+      cart => cartStoreId(cart) === store.id || cartStoreId(cart) === null
     );
 
     logger.info(

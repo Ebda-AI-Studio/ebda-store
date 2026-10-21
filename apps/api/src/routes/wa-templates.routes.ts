@@ -29,6 +29,7 @@ import {
 import { buildTemplatesForStore } from '../lib/wa-templates/buildForStore';
 import { resolveHeaderHandle } from '../lib/wa-templates/resolveHeaderHandle';
 
+import { storeIdFields } from '../lib/wbs-wire';
 const router = Router({ mergeParams: true });
 
 // ─── GET /stores/:id/wa-templates ────────────────────────────────────────────
@@ -377,7 +378,7 @@ router.post(
           'Content-Type': 'application/json',
           'x-wbs-api-key': apiKey,
         },
-        body: JSON.stringify({ fwbStoreId: storeId, definitions }),
+        body: JSON.stringify({ ...storeIdFields(storeId), definitions }),
         signal: AbortSignal.timeout(30_000),
       });
 

@@ -33,6 +33,7 @@ import { getAuthUser } from '../utils/store-helpers';
 import { sendAlert } from '../services/alerts.service';
 import logger from '../lib/logger';
 
+import { storeIdFields } from '../lib/wbs-wire';
 const router = Router({ mergeParams: true });
 
 // ─── Validation ──────────────────────────────────────────────────────────────
@@ -629,7 +630,7 @@ router.put(
                   'Content-Type': 'application/json',
                   'x-wbs-api-key': input.wbsApiKey,
                 },
-                body: JSON.stringify({ fwbStoreId: storeId, definitions }),
+                body: JSON.stringify({ ...storeIdFields(storeId), definitions }),
                 signal: AbortSignal.timeout(30_000),
               }
             );

@@ -249,3 +249,28 @@ describe('PUT /stores/:id/integrations/wbs — auto-populate clientId on key con
     expect(err).not.toBeInstanceOf(WbsUnauthorizedError);
   });
 });
+
+describe('WbsBridgeService.sendOrderNotification order id fields', () => {
+  it('sends the new order id field and the previous one (one-release fallback)', async () => {
+    mockState.fetchMock.mockReset();
+    mockState.fetchMock.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({ success: true, messageId: 'm-1' }),
+    });
+    await new WbsBridgeService().sendOrderNotification({
+      encryptedApiKey: 'enc:k',
+      recipientPhone: '+201000000001',
+      templateName: 't',
+      languageCode: 'en',
+      variables: [],
+      idempotencyKey: 'i-1',
+      ebdaOrderId: 'o-1',
+    } as never);
+    const body = JSON.parse(
+      (mockState.fetchMock.mock.calls[0] as [string, RequestInit])[1].body as string
+    );
+    expect(body.ebdaOrderId).toBe('o-1');
+    expect(body['fw' + 'bOrderId']).toBe('o-1');
+  });
+});
