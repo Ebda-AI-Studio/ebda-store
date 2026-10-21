@@ -865,7 +865,7 @@ describe('full-bleed scrim keeps white text legible over a white photo', () => {
 });
 ```
 
-Note: `primary text on page` fails for Lookbook (`#E8A33D` saffron on `#1E2340` = 7.11, passes) — run it; if any pair fails, adjust only that look's token and record the ratio in `qamar.md` (Task 10).
+Note: `primary text on page` fails for Lookbook (`#E8A33D` saffron on `#1E2340` = 7.11, passes (superseded by moon silver `#D9DCEB`, 11.2 on the page, Ruling B1-102)) — run it; if any pair fails, adjust only that look's token and record the ratio in `qamar.md` (Task 10).
 
 - [ ] **Step 2: Run test**
 

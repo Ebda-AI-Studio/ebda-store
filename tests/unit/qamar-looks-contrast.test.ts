@@ -173,3 +173,35 @@ describe('vitrine band text', () => {
     expect(theme.primaryForeground).toBe(h(t.onPrimary));
   });
 });
+
+// Ruling B1-102: Ahmad chose MOON SILVER #D9DCEB for Lookbook's accent at STOP 2 (saffron out).
+// Text pairs are covered above; here the non-text pairs on the surfaces the accent really sits on.
+describe('lookbook moon-silver accent (B1-102)', () => {
+  const t = qamar.find(l => l.id === 'qamar.lookbook')!.tokens;
+  it('primary and accent are moon silver, and no saffron is left in the look', () => {
+    expect(t.primary).toBe('#D9DCEB');
+    expect(t.accent).toBe('#D9DCEB');
+    expect(JSON.stringify(t).toLowerCase()).not.toContain('e8a33d');
+  });
+  it.each([
+    ['page', t.page],
+    ['surface', t.surface],
+  ])('as UI (button fill, radio, selected chip, total) on the %s it is >= 3:1', (_n, bg) => {
+    expect(contrastRatio(bg, t.primary)).toBeGreaterThanOrEqual(3);
+    expect(contrastRatio(bg, t.accent)).toBeGreaterThanOrEqual(3);
+  });
+  it('as text (prices, links) on the page and the surface it is >= 4.5:1', () => {
+    expect(contrastRatio(t.page, t.primary)).toBeGreaterThanOrEqual(4.5);
+    expect(contrastRatio(t.surface, t.primary)).toBeGreaterThanOrEqual(4.5);
+    expect(contrastRatio(t.surface, t.accent)).toBeGreaterThanOrEqual(4.5);
+  });
+  it('page ink on the accent fill (buttons, chips) is >= 4.5:1', () => {
+    expect(contrastRatio(t.accent, t.onPrimary)).toBeGreaterThanOrEqual(4.5);
+  });
+  it('on the light band the silver would be 1.2:1, so the band swaps accent to the ink pair', () => {
+    expect(contrastRatio(t.ink, t.accent)).toBeLessThan(3);
+    // the swap pair (indigo fill, light text) reads on the band
+    expect(contrastRatio(t.ink, t.page)).toBeGreaterThanOrEqual(3);
+    expect(contrastRatio(t.page, t.ink)).toBeGreaterThanOrEqual(4.5);
+  });
+});

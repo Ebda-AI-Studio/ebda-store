@@ -52,11 +52,13 @@ function inverseBandStyle(theme: StoreTheme): CSSProperties | undefined {
     '--secondary-foreground': page,
     '--border': hairline,
     '--input': page,
-    // A light look primary (Lookbook saffron) is unreadable as TEXT on the band (1.9:1): primary
-    // takes the band's ink pair, so `text-primary` prices and `bg-primary` fills both read. The
-    // accent (chips) keeps its own pair.
+    // A light look primary (Lookbook moon silver) is unreadable as TEXT on the band (1.2:1):
+    // primary takes the band's ink pair, so `text-primary` prices and `bg-primary` fills both read.
+    // The accent (chips) takes the same pair for the same reason (B1-102).
     '--primary': page,
     '--primary-foreground': ink,
+    '--accent': page,
+    '--accent-foreground': ink,
     '--ring': page,
     '--bg-page': ink,
   } as CSSProperties;

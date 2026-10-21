@@ -88,8 +88,10 @@ describe('LB-01 inverse band', () => {
     expect(style['--primary']).toBe(theme.backgroundColor);
     expect(style['--primary-foreground']).toBe(theme.foregroundColor);
     expect(style['--ring']).toBe(theme.backgroundColor);
-    // the accent (sale / new chips) keeps saffron on indigo ink, 7.11:1
-    expect(style['--accent']).toBeUndefined();
+    // B1-102: moon silver is 1.2:1 against the light band, so the accent (sale / new chips) takes
+    // the same indigo-fill / light-text pair as the primary inside the band.
+    expect(style['--accent']).toBe(theme.backgroundColor);
+    expect(style['--accent-foreground']).toBe(theme.foregroundColor);
   });
 
   it('every text pair on the band is >= 4.5:1 (ink, prices, the 70% link), the button keeps its pair', () => {

@@ -127,9 +127,9 @@ export const LOOKS: readonly LookDefinition[] = [
       surface: '#2A3158',
       ink: '#F4F1FA',
       muted: '#C3C0D8',
-      primary: '#E8A33D',
+      primary: '#D9DCEB',
       onPrimary: '#1E2340',
-      accent: '#E8A33D',
+      accent: '#D9DCEB',
       line: '#3B4270',
       fonts: { display: 'Lalezar', body: 'Tajawal', latin: 'Archivo' },
       radius: 'md',
@@ -138,9 +138,9 @@ export const LOOKS: readonly LookDefinition[] = [
       motion: 'expressive',
       // T-01: the wordmark leads the header (it was 12px tracked caps).
       wordmarkSize: 'lg',
-      // W2b: no saffron slab under every card (L-01: only a simple in-stock piece gets an outline
+      // W2b: no accent slab under every card (L-01: only a simple in-stock piece gets an outline
       // add); the heart is a white disc with FIXED ink, never the page's light foreground (LB-02,
-      // 1.12:1 before); chips in saffron with indigo ink (K-01). The hover lift stays (expressive).
+      // 1.12:1 before); chips in moon silver with indigo ink (K-01, B1-102). The hover lift stays (expressive).
       cardCta: 'quiet',
       overPhotoChrome: 'soft',
       cardBadge: 'accent',

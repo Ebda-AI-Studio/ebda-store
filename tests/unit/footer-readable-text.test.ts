@@ -26,7 +26,7 @@ const SURFACES = [
   '#0A0A0A', // minimal preset primary
   '#1F4E54', // Vitrine teal
   '#7C2D12', // burgundy
-  '#E8A33D', // Lookbook saffron (light-medium: black text)
+  '#D9DCEB', // Lookbook moon silver (light: black text)
   '#FF6E00', // orange, the flip-point case
   '#808080', // mid grey, the hardest surface
 ];

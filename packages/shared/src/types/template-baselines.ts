@@ -325,7 +325,7 @@ export const TEMPLATE_LAYOUT_BASELINES: Record<TemplateId, StoreLayoutSettings> 
   // The look owns the card ratio on a look store (LOOKS-15); minimal is the fallback.
   // Footer: the section-alt surface, not `token:primary`. The shared minimal footer paints
   // `text-muted-foreground` links, which are unreadable on every Qamar look's primary
-  // (Atelier ink 2.6:1, Vitrine teal, Lookbook saffron). Cards: no frame on any surface that
+  // (Atelier ink 2.6:1, Vitrine teal, Lookbook moon silver). Cards: no frame on any surface that
   // reads productCardDefaults (PDP related row, PLP, search), as on the home sections - the
   // photo is the card (B1-1). STOP 1 critique, Ruling B1-25.
   qamar: buildQamarBaseline(),
