@@ -54,7 +54,7 @@ import { FactsTable } from '../../../components/commerce/FactsTable';
 import { DeliveryChip } from '../../../components/commerce/DeliveryChip';
 import { InstalmentLine } from '../../../components/commerce/InstalmentLine';
 import { TrustLine } from '../../../components/commerce/TrustLine';
-import { relatedHeadingSize } from '../../../templates/shared/look-card';
+import { LOOK_CHIP_STYLE, relatedHeadingSize } from '../../../templates/shared/look-card';
 import type { CodOffer } from '../../../lib/cod-offer';
 import { Breadcrumbs } from '../../../components/Breadcrumbs';
 import { canBuyNow, inStockNow } from '../../../lib/can-buy-now';
@@ -1163,7 +1163,18 @@ export default function ProductDetailClient({
                   {/* Discount badge — BUG 1 fix: helper text (EGP or pct).
                     Waits for variant selection on variant products
                     (displayCompare is null until a variant is picked). */}
-                  {discountBadgeText && <Badge variant="destructive">{discountBadgeText}</Badge>}
+                  {discountBadgeText &&
+                    (getLook(store.look) ? (
+                      // a look's sale chip is its own accent / metal, never the error red (B2-25)
+                      <span
+                        className="inline-flex items-center rounded-[var(--radius)] px-2.5 py-1 text-xs font-semibold"
+                        style={LOOK_CHIP_STYLE}
+                      >
+                        {discountBadgeText}
+                      </span>
+                    ) : (
+                      <Badge variant="destructive">{discountBadgeText}</Badge>
+                    ))}
                   {product.status === 'draft' && (
                     <Badge variant="outline">{t('Draft', 'مسودة')}</Badge>
                   )}

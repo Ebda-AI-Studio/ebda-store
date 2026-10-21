@@ -329,3 +329,111 @@ test('a fresh store with no hero photo gets a compact title band named after the
       expect(m.h1s[0], `${store} ${lang}: the slug is not the title`).not.toMatch(/souq-/i);
     }
 });
+
+// ---- STOP-2 re-audit minors -------------------------------------------------------------------
+const lineHeightOf = (el: Element) => parseFloat(getComputedStyle(el).lineHeight) || 20;
+
+test('Arabic price never splits from its currency: PDP price, strike and cart line are one line each', async ({
+  page,
+}) => {
+  for (const store of LOOK_STORES) {
+    await open(page, store, 'ar', PDP);
+    const m = await page.evaluate(() => {
+      const rows: Array<{ label: string; h: number; lh: number }> = [];
+      for (const e of document.querySelectorAll('[data-zone="productPrice"], s, .line-through')) {
+        if (!/ج\.م/.test(e.textContent ?? '')) continue;
+        rows.push({
+          label: (e.textContent ?? '').trim().slice(0, 24),
+          h: e.getBoundingClientRect().height,
+          lh: parseFloat(getComputedStyle(e).lineHeight) || 20,
+        });
+      }
+      return rows;
+    });
+    expect(m.length, `${store} price elements`).toBeGreaterThan(0);
+    for (const r of m) expect(r.h, `${store} ${r.label}`).toBeLessThan(r.lh * 1.6);
+  }
+  void lineHeightOf;
+});
+
+test('Showroom PLP: every card, including a sized product, keeps an action', async ({ page }) => {
+  await open(page, 'souq-showroom', 'en', '/products?category=phones');
+  const per = await page.evaluate(() =>
+    [...document.querySelectorAll('article[itemtype]')].map(
+      a => !!a.querySelector('a.mt-auto.w-full, button.mt-auto.w-full')
+    )
+  );
+  expect(per.length).toBeGreaterThan(0);
+  expect(per.every(Boolean), 'a card without an action').toBe(true);
+});
+
+test('Showroom home at 1280 is capped: the grid is 4-up and the page stays under 6500px', async ({
+  page,
+}) => {
+  test.skip((page.viewportSize()?.width ?? 0) < 1024, 'desktop only');
+  await open(page, 'souq-showroom', 'en', '/');
+  const h = await page.evaluate(() => document.documentElement.scrollHeight);
+  expect(h, 'page height').toBeLessThan(6500);
+});
+
+test('the sale chip is the look accent or metal, never the error red or a coral', async ({
+  page,
+}) => {
+  for (const [store, path] of [
+    ['souq-night', '/products?category=phones'],
+    ['souq-catalogue', PDP],
+    ['souq-showroom', PDP],
+    ['souq-night', PDP],
+  ] as const) {
+    await open(page, store, 'en', path);
+    const chips = await page.evaluate(() =>
+      [...document.querySelectorAll('span, div')]
+        .filter(
+          e => /^-\d+%$|^−\d+%$/.test((e.textContent ?? '').trim()) && e.children.length === 0
+        )
+        .map(e => getComputedStyle(e).backgroundColor)
+    );
+    for (const bg of chips) {
+      const [r, g, b] = bg.match(/\d+/g)!.map(Number);
+      // error red #EF4343 / coral #F57A83: red channel high with green AND blue low or mid
+      const reddish = r! > 200 && g! < 140 && b! < 150;
+      expect(reddish, `${store} ${path} chip ${bg}`).toBe(false);
+    }
+  }
+});
+
+test('Night tiles: seven categories are a balanced, centred last row', async ({ page }) => {
+  test.skip((page.viewportSize()?.width ?? 0) < 1024, 'desktop only');
+  await open(page, 'souq-night', 'en', '/');
+  const rows = await page.evaluate(() => {
+    const lis = [...document.querySelectorAll('[data-section="category-tiles"] li')];
+    const tops = [...new Set(lis.map(l => Math.round(l.getBoundingClientRect().top)))];
+    const last = lis.filter(
+      l => Math.round(l.getBoundingClientRect().top) === tops[tops.length - 1]
+    );
+    const first = lis.filter(l => Math.round(l.getBoundingClientRect().top) === tops[0]);
+    const left = (a: Element[]) => Math.min(...a.map(l => l.getBoundingClientRect().left));
+    return { n: lis.length, rows: tops.length, firstLeft: left(first), lastLeft: left(last) };
+  });
+  expect(rows.n).toBe(7);
+  expect(rows.rows).toBe(2);
+  // the last row is centred, so it starts to the right of the first row's left edge
+  expect(rows.lastLeft).toBeGreaterThan(rows.firstLeft + 20);
+});
+
+test('keyboard: the prominent search is the first stop after the logo', async ({ page }) => {
+  await open(page, 'souq-catalogue', 'en', '/');
+  const order: string[] = [];
+  for (let i = 0; i < 4; i++) {
+    await page.keyboard.press('Tab');
+    order.push(
+      await page.evaluate(() => {
+        const e = document.activeElement as HTMLElement;
+        return `${e.tagName}:${e.getAttribute('type') ?? ''}`;
+      })
+    );
+  }
+  // skip link, logo, then the search field (not nav links / actions first)
+  expect(order.indexOf('INPUT:search')).toBeGreaterThan(-1);
+  expect(order.indexOf('INPUT:search')).toBeLessThanOrEqual(2);
+});

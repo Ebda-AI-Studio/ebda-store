@@ -1448,6 +1448,60 @@ html[dir='rtl'] [data-pack='souq'] .font-display {
   width: 6rem;
   height: 6rem;
 }
+/* B2-25 (a11y re-audit R2): an invalid field's boundary is the per-surface destructive INK (>= 3:1
+   on the card of every look; the raw destructive red was 2.4:1 on Night's green), on every
+   field type and every template. The combobox wrapper carries the same colour in its classes. */
+:is(input, select, textarea)[aria-invalid='true'] {
+  border-color: hsl(var(--destructive-ink, var(--destructive)));
+}
+/* B2-25: one accent. Night's sale chip is the brass CTA metal (dark ink on it), never a second
+   coral accent; the same chip colours the PDP discount pill on every look (ink on the look's
+   accent pair elsewhere). Red stays for errors. */
+[data-look='souq.night'] {
+  --chip-bg: var(--primary);
+  --chip-fg: var(--primary-foreground);
+}
+/* B2-25: Showroom's card action is quiet: an outline, on EVERY card (a sized product shows "View",
+   so it never has no action). The control is the card's own, only its fill changes. */
+[data-look='souq.showroom'] article :is(a, button).mt-auto.w-full {
+  background-color: transparent;
+  color: hsl(var(--foreground));
+  border: 1px solid hsl(var(--input));
+}
+[data-look='souq.showroom'] article :is(a, button).mt-auto.w-full:hover {
+  background-color: hsl(var(--foreground) / 0.05);
+}
+/* B2-25 (STOP-2 re-audit): cart and checkout are look-specific. Catalogue is the dense receipt (a
+   dashed, flat, tabular summary and small thumbnails); Showroom is the gallery (large photos, a
+   borderless raised summary with a bigger title). Same markup, same controls. */
+[data-look='souq.catalogue'] [data-part='order-summary'] {
+  border-style: dashed;
+  box-shadow: none;
+  padding: 1rem;
+  font-variant-numeric: tabular-nums;
+}
+[data-look='souq.catalogue'] [data-part='order-summary'] .divide-y > :not(:first-child) {
+  border-top-style: dashed;
+}
+[data-look='souq.catalogue'] [data-part='cart-thumb'] {
+  width: 5rem;
+  height: 5rem;
+}
+[data-look='souq.showroom'] [data-part='order-summary'] {
+  border-color: transparent;
+  border-radius: 1.25rem;
+  padding: 1.75rem;
+  box-shadow: 0 22px 44px -26px hsl(var(--foreground) / 0.4);
+}
+[data-look='souq.showroom'] [data-part='order-summary'] h2 {
+  font-size: 1.375rem;
+}
+[data-look='souq.showroom'] [data-part='cart-thumb'] {
+  width: 8.5rem;
+  height: 8.5rem;
+  border-radius: 1rem;
+}
+
 /* B2-23: a deal's old price is struck by a line that draws itself once (Catalogue's playful
    detail). Static when motion is reduced. */
 [data-look='souq.catalogue'] span.line-through {

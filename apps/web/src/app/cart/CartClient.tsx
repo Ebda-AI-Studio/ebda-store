@@ -653,7 +653,10 @@ export default function CartClient() {
                           style={{ animationDelay: `${index * 100}ms` }}
                         >
                           {/* Product Image */}
-                          <div className="h-28 w-28 flex-shrink-0 overflow-hidden rounded-[var(--radius)] bg-gradient-to-br from-primary/5 to-primary/10 sm:h-32 sm:w-32">
+                          <div
+                            data-part="cart-thumb"
+                            className="h-28 w-28 flex-shrink-0 overflow-hidden rounded-[var(--radius)] bg-gradient-to-br from-primary/5 to-primary/10 sm:h-32 sm:w-32"
+                          >
                             {item.image ? (
                               <Image
                                 src={item.image}

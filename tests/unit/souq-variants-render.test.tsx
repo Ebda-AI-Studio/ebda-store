@@ -473,3 +473,22 @@ describe('on_sale source (resolution, price-drop order)', () => {
     ).toEqual(['v']);
   });
 });
+
+describe('STOP-2 re-audit: stage and tiles', () => {
+  it('a stage whose product has no photo renders nothing (no empty matte)', () => {
+    useSkin('souq');
+    const noPhoto = { ...(PRODUCT as object), images: [] } as never;
+    const { container } = render(
+      <ProductSpotlightSection settings={{ layout: 'stage' }} products={[noPhoto]} />
+    );
+    expect(container.innerHTML).toBe('');
+  });
+  it('category tiles wrap in a centred row, so seven categories never leave a left-hugging orphan', () => {
+    useSkin('souq');
+    const { container } = render(<CategoryTiles categories={CATS} urlPrefix="" isRtl={false} />);
+    const ul = container.querySelector('ul')!;
+    expect(ul.className).toContain('flex-wrap');
+    expect(ul.className).toContain('justify-center');
+    expect(container.querySelector('li')!.className).toContain('md:w-[calc(25%-0.5625rem)]');
+  });
+});

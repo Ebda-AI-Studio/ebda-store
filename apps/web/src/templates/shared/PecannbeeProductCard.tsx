@@ -376,7 +376,7 @@ function PecannbeeProductCardImpl({
         <div
           // a look store only: legacy stores keep byte-identical card markup
           {...(getLook(store.look) ? { 'data-part': 'card-image' } : {})}
-          className={`relative overflow-hidden bg-muted ${imgRadiusCls || (getLook(store.look) ? 'rounded-[var(--radius)]' : shape.radius)} ${imgAspectCls || aspectOverride || lookImageAspectClass(store.look) || 'aspect-square sm:aspect-[3/4]'}`}
+          className={`relative overflow-hidden bg-muted ${imgRadiusCls || (getLook(store.look) ? 'rounded-[var(--radius)]' : shape.radius)} ${imgAspectCls || aspectOverride || lookImageAspectClass(store.look) || 'aspect-square sm:aspect-[3/4]'}${!img && getLook(store.look) ? ' !aspect-[2/1]' : ''}`}
         >
           {img ? (
             <>

@@ -6,15 +6,17 @@ import { SectionHeading } from './SectionHeading';
 import { pickLocalizedName } from './display-helpers';
 import type { CategoryStripProps } from '../types';
 
-const MOBILE_COLS: Record<number, string> = {
-  1: 'grid-cols-1',
-  2: 'grid-cols-2',
-  3: 'grid-cols-3',
+// Tile widths for a wrapping, CENTRED row (STOP-2 re-audit): seven categories at four across end
+// in a centred row of three instead of a left-hugging orphan. gap-3 = 0.75rem.
+const MOBILE_W: Record<number, string> = {
+  1: 'w-full',
+  2: 'w-[calc(50%-0.375rem)]',
+  3: 'w-[calc(33.333%-0.5rem)]',
 };
-const DESKTOP_COLS: Record<number, string> = {
-  2: 'md:grid-cols-2',
-  3: 'md:grid-cols-3',
-  4: 'md:grid-cols-4',
+const DESKTOP_W: Record<number, string> = {
+  2: 'md:w-[calc(50%-0.375rem)]',
+  3: 'md:w-[calc(33.333%-0.5rem)]',
+  4: 'md:w-[calc(25%-0.5625rem)]',
 };
 
 /**
@@ -79,13 +81,14 @@ export function CategoryTiles({
           sectionBgColor={store?.look ? sectionBgColor : undefined}
         />
         <nav aria-label={isRtl ? 'الأقسام' : 'Categories'}>
-          <ul
-            className={`grid gap-3 ${MOBILE_COLS[mobileColumns] ?? 'grid-cols-2'} ${DESKTOP_COLS[desktopColumns] ?? 'md:grid-cols-4'}`}
-          >
+          <ul className="flex flex-wrap justify-center gap-3">
             {categories.map(c => {
               const name = pickLocalizedName(c, Boolean(isRtl)) ?? c.name;
               return (
-                <li key={c.id}>
+                <li
+                  key={c.id}
+                  className={`${MOBILE_W[mobileColumns] ?? MOBILE_W[2]} ${DESKTOP_W[desktopColumns] ?? DESKTOP_W[4]}`}
+                >
                   <Link
                     href={`${urlPrefix}/products?category=${encodeURIComponent(c.slug ?? c.id)}`}
                     className="group flex min-h-11 flex-col gap-2 rounded-[var(--radius)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"

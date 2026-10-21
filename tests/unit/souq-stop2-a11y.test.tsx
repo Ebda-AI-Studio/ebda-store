@@ -75,3 +75,95 @@ describe('P1-1: the sticky header offset', () => {
     expect(chrome).toContain('<StickyHeaderOffset />');
   });
 });
+
+describe('STOP-2 re-audit minors (R1, R2, M3, price, chip, stage)', () => {
+  const root = path.resolve(__dirname, '../..');
+  const read = (f: string) => readFileSync(path.join(root, f), 'utf8');
+
+  it('R1: Dahab renders its own <header> (the one banner) and the offset measures the wrapper or the header', () => {
+    const dahab = read('apps/web/src/templates/dahab/Header.tsx');
+    expect(dahab).toMatch(/\n\s*<header\b/);
+    expect(dahab).not.toMatch(/return \(\s*<div\s+className=\{cx\(\s*'border-b transition/);
+    const off = read('apps/web/src/components/StickyHeaderOffset.tsx');
+    expect(off).toContain('[data-zone="header"]');
+  });
+
+  it('R1: --header-h follows a sticky ShopChrome wrapper even when the skin header is not sticky', () => {
+    class RO {
+      observe() {}
+      disconnect() {}
+    }
+    vi.stubGlobal('ResizeObserver', RO);
+    const wrap = document.createElement('div');
+    wrap.setAttribute('data-zone', 'header');
+    wrap.style.position = 'sticky';
+    Object.defineProperty(wrap, 'offsetHeight', { value: 96, configurable: true });
+    const header = document.createElement('header'); // static: not sticky by itself
+    wrap.appendChild(header);
+    document.body.appendChild(wrap);
+    render(<StickyHeaderOffset />);
+    expect(document.documentElement.style.getPropertyValue('--header-h')).toBe('96px');
+    cleanup();
+    wrap.remove();
+  });
+
+  it('R2: every field type draws its error boundary in the destructive ink', () => {
+    for (const f of ['Input', 'Select', 'Textarea'])
+      expect(read(`packages/ui/src/components/${f}.tsx`), f).toMatch(/border-destructive-ink/);
+    const gov = read('apps/web/src/app/checkout/_components/GovernorateAreaSelect.tsx');
+    expect(gov).toMatch(/border-destructive-ink/);
+    expect(gov).toMatch(/aria-invalid=\{hasError \? true : undefined\}/);
+    const css = read('apps/web/src/styles/globals.css');
+    expect(css).toMatch(
+      /:is\(input, select, textarea\)\[aria-invalid='true'\]\s*\{\s*border-color: hsl\(var\(--destructive-ink/
+    );
+  });
+
+  it('price: the storefront formatter joins number and currency with a no-break space, both locales', async () => {
+    const { renderHook } = await import('@testing-library/react');
+    vi.doMock('../../apps/web/src/contexts/LanguageContext', () => ({
+      useLanguage: () => ({ language: 'ar' }),
+    }));
+    vi.doMock('../../apps/web/src/hooks/useNumerals', () => ({ useStoreNumerals: () => 'latn' }));
+    vi.resetModules();
+    const { useLocalePrice } = await import('../../apps/web/src/hooks/useLocalePrice');
+    const { result } = renderHook(() => useLocalePrice());
+    const out = result.current(3200000);
+    expect(out).toBe('32,000 ج.م');
+    expect(out).not.toContain(' ');
+    vi.doUnmock('../../apps/web/src/contexts/LanguageContext');
+    vi.doUnmock('../../apps/web/src/hooks/useNumerals');
+  });
+
+  it('chip: the sale chip reads --chip-bg (Night: brass) and the PDP discount pill is not the error red on a look', () => {
+    expect(read('apps/web/src/templates/shared/look-card.ts')).toContain(
+      'var(--chip-bg, var(--accent))'
+    );
+    expect(read('apps/web/src/styles/globals.css')).toMatch(
+      /\[data-look='souq\.night'\]\s*\{\s*--chip-bg: var\(--primary\)/
+    );
+    const pdp = read('apps/web/src/app/products/[slug]/ProductDetailClient.tsx');
+    expect(pdp).toContain('style={LOOK_CHIP_STYLE}');
+  });
+
+  it('Showroom keeps a card action on every card (no `quiet` mode that hides it on a sized product)', () => {
+    const reg = read('packages/shared/src/looks/registry.ts');
+    const showroom = reg.slice(reg.indexOf("id: 'souq.showroom'"));
+    expect(showroom).not.toMatch(/cardCta:\s*'quiet'/);
+    expect(read('apps/web/src/styles/globals.css')).toContain(
+      "[data-look='souq.showroom'] article :is(a, button).mt-auto.w-full"
+    );
+  });
+
+  it('M3: the prominent search form follows the logo link in the DOM, before the nav and the actions', () => {
+    const src = read('apps/web/src/templates/minimal/Header.tsx');
+    const logo = src.indexOf('data-zone="storeName"');
+    const form = src.indexOf('data-zone="souq-search"');
+    const nav = src.indexOf('Desktop nav');
+    const actions = src.indexOf('{/* Actions */}');
+    expect(logo).toBeGreaterThan(0);
+    expect(form).toBeGreaterThan(logo);
+    expect(form).toBeLessThan(nav);
+    expect(form).toBeLessThan(actions);
+  });
+});

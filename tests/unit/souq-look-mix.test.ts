@@ -113,7 +113,7 @@ describe('the mixes, exactly as designed', () => {
       expect(JSON.stringify(sec.design ?? {}), sec.type).not.toContain('token:inverse');
   });
 
-  it('Showroom: chips under the header, up to three stages, tiles on the surface, 2-col grid', () => {
+  it('Showroom: chips under the header, up to three stages, tiles on the surface, 4-up grid', () => {
     expect(showroom.chrome?.header.search).toBe('icon');
     expect(showroom.sections!.map(s => s.type)).toEqual([
       'category-grid',
@@ -135,7 +135,7 @@ describe('the mixes, exactly as designed', () => {
       tileShape: 'rectangle',
       bgColor: 'token:card',
     });
-    expect(showroom.sections![5].design).toMatchObject({ columns: 2, mobileColumns: 2 });
+    expect(showroom.sections![5].design).toMatchObject({ columns: 4, mobileColumns: 2 });
   });
 });
 
@@ -314,10 +314,10 @@ describe('look switch keeps content and does not leak design (TPL-1)', () => {
       expect(all(doc, 'product-carousel')[0].settings.productSource).toBe('on_sale');
     });
 
-    it(`no leakage (${design}): Showroom → Night swaps chips for tiles on the band, 2-col back to 4`, () => {
+    it(`no leakage (${design}): Showroom → Night swaps chips for tiles on the band, 4-up back to 4`, () => {
       const onShowroom = applyTemplateFamily(merchantBase(), 'souq', showroom);
       expect(one(onShowroom, 'category-grid').settings.layout).toBe('chips');
-      expect(one(onShowroom, 'featured-collection').settings.columns).toBe(2);
+      expect(one(onShowroom, 'featured-collection').settings.columns).toBe(4);
       const doc = applyTemplateFamily(onShowroom, 'souq', night, { from: showroom, design });
       const grid = one(doc, 'category-grid').settings;
       expect(grid.layout).toBe('tiles');

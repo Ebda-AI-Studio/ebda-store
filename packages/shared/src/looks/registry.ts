@@ -413,7 +413,7 @@ export const LOOKS: readonly LookDefinition[] = [
       },
       {
         type: 'featured-collection',
-        design: { columns: 2, mobileColumns: 2 },
+        design: { columns: 4, mobileColumns: 2 },
         preset: {
           productSource: 'newest',
           limit: 8,
@@ -443,8 +443,10 @@ export const LOOKS: readonly LookDefinition[] = [
       density: 'airy',
       imageRatio: '1/1',
       motion: 'subtle',
-      // The product is the hero: no accent slab under every card, one quiet action.
-      cardCta: 'quiet',
+      // The product is the hero: no accent slab under every card, one quiet action. NOT the
+      // `quiet` card-CTA mode (it hides the control on a sized product, so a variant card had no
+      // action at all, STOP-2 re-audit): every card keeps its View / Add control, restyled as an
+      // outline by the Showroom rule in globals.css.
       cardBadge: 'accent',
       // T-01: the store name is a sized, untracked wordmark in the header and at checkout.
       wordmarkSize: 'lg',

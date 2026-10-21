@@ -103,7 +103,9 @@ function SpotlightStage({
   useEffect(() => {
     if (product) setInCompare(isInCompareList(product.id));
   }, [product]);
-  if (!product) return null;
+  // No product, or a product with no photo: a stage is a photo-led screen, so it renders nothing
+  // rather than an empty matte (STOP-2 re-audit). The product still shows in every grid.
+  if (!product || !product.images?.[0]?.url) return null;
   const heading =
     (ar ? settings.headingAr || settings.heading : settings.heading || settings.headingAr) || '';
   const name = (ar && product.nameAr ? product.nameAr : product.name) || '';
@@ -143,7 +145,7 @@ function SpotlightStage({
           tabIndex={-1}
           aria-hidden="true"
           data-part="card-image"
-          className="relative mx-auto block aspect-square min-h-11 max-h-[min(78svh,680px)] w-full overflow-hidden rounded-[var(--radius)] bg-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+          className="relative mx-auto block aspect-square min-h-11 max-h-[min(78svh,680px)] md:max-h-[min(62svh,520px)] w-full overflow-hidden rounded-[var(--radius)] bg-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
         >
           {image && (
             <Image

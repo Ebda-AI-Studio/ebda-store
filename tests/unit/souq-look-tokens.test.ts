@@ -122,7 +122,8 @@ describe('souq looks: shape', () => {
     const by = (id: string) => souq.find(l => l.id === id)!.tokens;
     expect(by('souq.catalogue').cardCta).toBeUndefined();
     expect(by('souq.night').cardCta).toBeUndefined();
-    expect(by('souq.showroom').cardCta).toBe('quiet');
+    // Showroom keeps the card's own View / Add control (outline via CSS), not the hiding `quiet` mode
+    expect(by('souq.showroom').cardCta).toBeUndefined();
     expect(by('souq.night').overPhotoChrome).toBe('soft');
   });
   it('Night uses brass CTAs and pomegranate chips (Rulings B2-2, B2-18), Showroom text blue is the darker one', () => {
