@@ -21,6 +21,8 @@ import { Reveal, StoryScroll } from './Motion';
 import { Product3D } from './Product3D';
 import { WhatsApp } from './WhatsApp';
 import { FeatureVisuals } from './FeatureVisuals';
+import { HomeCapabilities } from './Capabilities';
+import { FEATURES_PAGE } from '../lib/capabilities';
 
 function ProviderIcon({ kind }: { kind: 'cash' | 'truck' }) {
   return (
@@ -102,6 +104,11 @@ export function Home({ locale }: { locale: Locale }) {
             </li>
           ))}
         </ul>
+      </Section>
+    ),
+    capabilities: () => (
+      <Section id="capabilities" title={FEATURES_PAGE[locale].homeTitle} className="capabilities">
+        <HomeCapabilities locale={locale} />
       </Section>
     ),
     payments: () => (
