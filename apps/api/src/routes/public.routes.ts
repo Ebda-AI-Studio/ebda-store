@@ -264,7 +264,8 @@ router.get('/products', async (req: Request, res: Response, next: NextFunction) 
       sort === 'price_asc' ||
       sort === 'price_desc' ||
       sort === 'best_seller' ||
-      sort === 'relevance'
+      sort === 'relevance' ||
+      sort === 'on_sale'
         ? sort
         : undefined;
 

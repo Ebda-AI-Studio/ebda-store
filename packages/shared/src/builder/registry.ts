@@ -292,6 +292,8 @@ export const SECTION_REGISTRY: readonly SectionDefinition[] = [
           opt('grid', 'Grid', 'شبكة'),
           opt('horizontal', 'Scrolling row', 'صف متحرك'),
           opt('chips', 'Text chips', 'أزرار نصية'),
+          opt('rail', 'Image rail', 'شريط'),
+          opt('tiles', 'Square tiles', 'مربعات'),
         ],
         {
           responsive: ['mobile'],
@@ -453,6 +455,7 @@ export const SECTION_REGISTRY: readonly SectionDefinition[] = [
           opt('best_seller', 'Best sellers', 'الأكثر مبيعاً'),
           opt('featured', 'Featured', 'المميزة'),
           opt('category', 'From a category', 'من فئة'),
+          opt('on_sale', 'On sale', 'المنتجات المخفّضة'),
           opt('manual', 'Hand-picked', 'مختارة يدوياً'),
         ],
         { group: 'content' }
@@ -619,6 +622,7 @@ export const SECTION_REGISTRY: readonly SectionDefinition[] = [
           opt('best_seller', 'Best sellers', 'الأكثر مبيعاً'),
           opt('featured', 'Featured', 'المميزة'),
           opt('category', 'From a category', 'من فئة'),
+          opt('on_sale', 'On sale', 'المنتجات المخفّضة'),
           opt('manual', 'Hand-picked', 'مختارة يدوياً'),
         ],
         { group: 'content' }
@@ -753,6 +757,7 @@ export const SECTION_REGISTRY: readonly SectionDefinition[] = [
           opt('best_seller', 'Best sellers', 'الأكثر مبيعاً'),
           opt('featured', 'Featured', 'المميزة'),
           opt('category', 'From a category', 'من فئة'),
+          opt('on_sale', 'On sale', 'المنتجات المخفّضة'),
           opt('manual', 'Hand-picked', 'مختارة يدوياً'),
         ],
         { group: 'content' }
@@ -773,6 +778,10 @@ export const SECTION_REGISTRY: readonly SectionDefinition[] = [
         max: 4,
       },
       s.range('limit', 'Products to show', 'عدد المنتجات', 1, 4),
+      s.select('layout', 'Layout', 'التخطيط', [
+        opt('list', 'Photo and list', 'صورة وقائمة'),
+        opt('stage', 'One product', 'عرض منتج واحد'),
+      ]),
       s.select('imagePosition', 'Image side', 'جهة الصورة', [
         opt('start', 'Start (right in Arabic)', 'البداية (يمين في العربية)'),
         opt('end', 'End (left in Arabic)', 'النهاية (يسار في العربية)'),

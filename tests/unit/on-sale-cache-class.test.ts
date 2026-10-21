@@ -1,0 +1,70 @@
+/**
+ * Phase B2 Task 3, the cache rule (CLAUDE.md rule 3): the `on_sale` deals row reads PRICES, so it
+ * declares a staleness class and rides an existing invalidation path. BOUNDED-stale: the same
+ * `public:products:<storeId>:...` Redis key and `products:<storeId>` storefront tag as every other
+ * listing, swept by invalidateStoreProductCaches on every product write path; class and residual
+ * window are written at the resolver. Structural pins (the behavioural proof is
+ * tests/integration/on-sale-source.test.ts, which needs the DB).
+ */
+import { describe, it, expect } from 'vitest';
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
+
+const root = path.resolve(__dirname, '../..');
+const read = (p: string) => readFileSync(path.join(root, p), 'utf8');
+
+describe('on_sale: cache class and invalidation', () => {
+  const route = read('apps/api/src/routes/public.routes.ts');
+  const service = read('apps/api/src/services/product.service.ts');
+  const cache = read('apps/api/src/lib/public-cache.ts');
+
+  it('the public route allows the sort and keys the cache on it (a distinct entry per sort)', () => {
+    expect(route).toMatch(/sort === 'on_sale'/);
+    const key = route.slice(route.indexOf('const cacheKey = `public:products:'));
+    expect(key.slice(0, key.indexOf('`;', 10))).toContain('${sortValue || ');
+  });
+
+  it('the key sits under the prefix invalidateStoreProductCaches sweeps', () => {
+    expect(route).toContain('const cacheKey = `public:products:${storeId}:');
+    expect(cache).toMatch(
+      /export async function clearProductsRedis[\s\S]*invalidateCachedPrefix\(`public:products:\$\{storeId\}:`\)/
+    );
+    expect(cache).toMatch(/revalidateStorefront\(\{\s*tags: \[`products:\$\{storeId\}`/);
+  });
+
+  it('the resolver states its class and residual window, and adds no cache layer', () => {
+    const at = service.indexOf("if (sort === 'on_sale') {");
+    expect(at).toBeGreaterThan(0);
+    const comment = service.slice(service.lastIndexOf('// `sort=on_sale`'), at);
+    expect(comment).toContain('CACHE CLASS: BOUNDED-stale');
+    expect(comment).toContain('invalidateStoreProductCaches');
+    expect(comment).toMatch(/residual window/);
+    const body = service.slice(at, at + 2200);
+    expect(body).not.toMatch(/getCached|redis|new Map\(/i);
+  });
+
+  it('every product write path the deals row depends on funnels through the invalidator', () => {
+    // the private wrapper calls the shared invalidator; the writers call the wrapper
+    expect(service).toMatch(
+      /private static async invalidateStoreProductCache[\s\S]*await invalidateStoreProductCaches\(storeId\)/
+    );
+    for (const fn of ['static async update(', 'static async create(', 'static async delete(']) {
+      const start = service.indexOf(fn);
+      expect(start, fn).toBeGreaterThan(0);
+      const next = service.indexOf('\n  static async ', start + 10);
+      expect(service.slice(start, next > 0 ? next : undefined), fn).toMatch(
+        /invalidateStoreProductCache\(/
+      );
+    }
+  });
+
+  it('the source is store-keyed, active only, not deleted, capped, explicit columns', () => {
+    const at = service.indexOf('SELECT p.id');
+    const sql = service.slice(at, service.indexOf('LIMIT ${limit}', at) + 20);
+    expect(sql).toContain('p.store_id = ${storeId}');
+    expect(sql).toContain("p.status = 'active'");
+    expect(sql).toContain('p.deleted_at IS NULL');
+    expect(sql).not.toContain('SELECT *');
+    expect(service).toMatch(/export const ON_SALE_MAX = 12;/);
+  });
+});
