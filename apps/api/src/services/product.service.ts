@@ -19,6 +19,7 @@ import {
 } from '@ebda/shared';
 import { redis } from './redis.service';
 import { invalidateStoreProductCaches } from '../lib/public-cache';
+import { assertWholesaleEntitled } from '../lib/b2b-invalidate';
 import logger from '../lib/logger';
 import { requestStoreReindex } from '../lib/search/reindex';
 import { sendEventAfterCommit } from '../lib/inngest/send-after-commit';
@@ -133,6 +134,9 @@ interface CreateProductData {
   compareAtPrice?: number | null;
   /** Cost-of-goods in piastres. Used for profit reporting. */
   costPrice?: number | null;
+  /** B2B minimum order quantity (null = none) and audience (Task 4). */
+  moq?: number | null;
+  audience?: 'public' | 'wholesale_only';
   /** Admin-authored discount type — 'percentage' | 'fixed'. null clears. */
   discountType?: 'percentage' | 'fixed' | null;
   /**
@@ -186,6 +190,13 @@ interface CreateProductData {
 }
 
 type UpdateProductData = Partial<CreateProductData>;
+
+/** Setting a MOQ or a wholesale-only audience needs b2b.wholesale; clearing / resetting to public never does (B2B-1b). */
+async function assertB2bProductFields(storeId: string, data: UpdateProductData): Promise<void> {
+  if ((data.moq != null && data.moq > 0) || data.audience === 'wholesale_only') {
+    await assertWholesaleEntitled(storeId);
+  }
+}
 
 interface ListProductsOptions {
   page?: number;
@@ -636,6 +647,7 @@ export class ProductService {
   }
 
   static async create(storeId: string, data: CreateProductData) {
+    await assertB2bProductFields(storeId, data);
     // Plan ceiling (SP5): one more product must fit the store's maxProducts.
     await assertWithinLimit(storeId, 'maxProducts');
     await this.assertCategoriesInStore(storeId, data.categories);
@@ -679,6 +691,8 @@ export class ProductService {
         price: data.price,
         compareAtPrice: data.compareAtPrice ?? null,
         costPrice: data.costPrice ?? null,
+        moq: data.moq ?? null,
+        audience: data.audience ?? 'public',
         // Discount input columns — stored verbatim; the admin form pre-derives
         // price/compareAtPrice before sending, so the service just persists.
         discountType: data.discountType ?? null,
@@ -751,6 +765,7 @@ export class ProductService {
   }
 
   static async update(storeId: string, productId: string, data: UpdateProductData) {
+    await assertB2bProductFields(storeId, data);
     await this.assertCategoriesInStore(storeId, data.categories);
     await assertSizeChartInStore(storeId, data.sizeChartId);
     const product = await this.getById(storeId, productId);
@@ -897,6 +912,8 @@ export class ProductService {
           // as the curated flags below.
           ...(data.compareAtPrice !== undefined ? { compareAtPrice: data.compareAtPrice } : {}),
           ...(data.costPrice !== undefined ? { costPrice: data.costPrice } : {}),
+          ...(data.moq !== undefined ? { moq: data.moq } : {}),
+          ...(data.audience !== undefined ? { audience: data.audience } : {}),
           // Discount input columns — same undefined/null convention.
           ...(data.discountType !== undefined ? { discountType: data.discountType } : {}),
           ...(data.discountValue !== undefined ? { discountValue: data.discountValue } : {}),

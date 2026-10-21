@@ -15,12 +15,18 @@
 import { prisma, Prisma } from '@ebda/database';
 import { AppError } from '../middleware/error-handler';
 import { withSavepoint } from '../lib/savepoint';
+import { invalidateB2bPricing } from '../lib/b2b-invalidate';
 
 export interface CustomerGroupInput {
   name: string;
   nameAr?: string | null;
   isActive?: boolean;
   isDefault?: boolean;
+  /** B2B pricing (needs the b2b.wholesale entitlement to turn on; the route checks it). */
+  pricingMode?: 'none' | 'percent_off';
+  discountBps?: number;
+  requiresApproval?: boolean;
+  isWholesale?: boolean;
 }
 
 const groupSelect = {
@@ -29,31 +35,49 @@ const groupSelect = {
   nameAr: true,
   isActive: true,
   isDefault: true,
+  pricingMode: true,
+  discountBps: true,
+  requiresApproval: true,
+  isWholesale: true,
   createdAt: true,
   updatedAt: true,
 } as const;
+
+export interface AssignIdentity {
+  /** The REGISTERED shopper (users.id) whose profile the merchant is on. When set it is the identity. */
+  userId?: string | null;
+  phone?: string | null;
+  email?: string | null;
+  firstName?: string | null;
+  lastName?: string | null;
+}
 
 export const CustomerGroupService = {
   async list(storeId: string) {
     const groups = await prisma.customerGroup.findMany({
       where: { storeId },
-      select: { ...groupSelect, _count: { select: { customers: true } } },
+      select: { ...groupSelect, _count: { select: { customers: true, priceTiers: true } } },
       orderBy: [{ isDefault: 'desc' }, { name: 'asc' }],
     });
 
     // Flatten the Prisma _count shape so the client sees a plain number.
-    return groups.map(({ _count, ...g }) => ({ ...g, customerCount: _count.customers }));
+    return groups.map(({ _count, ...g }) => ({
+      ...g,
+      customerCount: _count.customers,
+      // Shown in the delete confirmation: deleting a group deletes its price tiers.
+      tierCount: _count.priceTiers,
+    }));
   },
 
   async get(storeId: string, id: string) {
     const group = await prisma.customerGroup.findFirst({
       where: { id, storeId },
-      select: { ...groupSelect, _count: { select: { customers: true } } },
+      select: { ...groupSelect, _count: { select: { customers: true, priceTiers: true } } },
     });
     if (!group) throw new AppError(404, 'NOT_FOUND', 'Customer group not found');
 
     const { _count, ...rest } = group;
-    return { ...rest, customerCount: _count.customers };
+    return { ...rest, customerCount: _count.customers, tierCount: _count.priceTiers };
   },
 
   async create(storeId: string, input: CustomerGroupInput) {
@@ -73,6 +97,10 @@ export const CustomerGroupService = {
             nameAr: input.nameAr ?? null,
             isActive: input.isActive ?? true,
             isDefault: input.isDefault ?? false,
+            pricingMode: input.pricingMode ?? 'none',
+            discountBps: input.discountBps ?? 0,
+            requiresApproval: input.requiresApproval ?? false,
+            isWholesale: input.isWholesale ?? false,
           },
           select: groupSelect,
         });
@@ -108,6 +136,7 @@ export const CustomerGroupService = {
       }
 
       try {
+        invalidateB2bPricing(storeId); // pricing mode / %, isActive and isWholesale change what members pay (deferred to commit)
         return await tx.customerGroup.update({
           where: { id, storeId },
           data: {
@@ -115,6 +144,12 @@ export const CustomerGroupService = {
             ...(input.nameAr !== undefined ? { nameAr: input.nameAr } : {}),
             ...(input.isActive !== undefined ? { isActive: input.isActive } : {}),
             ...(input.isDefault !== undefined ? { isDefault: input.isDefault } : {}),
+            ...(input.pricingMode !== undefined ? { pricingMode: input.pricingMode } : {}),
+            ...(input.discountBps !== undefined ? { discountBps: input.discountBps } : {}),
+            ...(input.requiresApproval !== undefined
+              ? { requiresApproval: input.requiresApproval }
+              : {}),
+            ...(input.isWholesale !== undefined ? { isWholesale: input.isWholesale } : {}),
           },
           select: groupSelect,
         });
@@ -136,6 +171,7 @@ export const CustomerGroupService = {
     if (!existing) throw new AppError(404, 'NOT_FOUND', 'Customer group not found');
 
     await prisma.customerGroup.delete({ where: { id, storeId } });
+    invalidateB2bPricing(storeId); // members return to retail; the group's tiers cascade away
   },
 
   /** Assign a customer to a group, or clear it when `groupId` is null. */
@@ -155,11 +191,13 @@ export const CustomerGroupService = {
       if (!group) throw new AppError(404, 'NOT_FOUND', 'Customer group not found');
     }
 
-    return prisma.customer.update({
+    const updated = await prisma.customer.update({
       where: { id: customerId, storeId },
       data: { groupId },
       select: { id: true, groupId: true },
     });
+    invalidateB2bPricing(storeId); // membership changes what this customer pays
+    return updated;
   },
 
   /**
@@ -175,18 +213,7 @@ export const CustomerGroupService = {
    * (case-insensitive). At least one is required — an anonymous guest with no
    * contact detail has no stable identity to group.
    */
-  async assignByIdentity(
-    storeId: string,
-    identity: {
-      /** The REGISTERED shopper (users.id) whose profile the merchant is on. When set it is the identity. */
-      userId?: string | null;
-      phone?: string | null;
-      email?: string | null;
-      firstName?: string | null;
-      lastName?: string | null;
-    },
-    groupId: string | null
-  ) {
+  async assignByIdentityImpl(storeId: string, identity: AssignIdentity, groupId: string | null) {
     const phone = identity.phone?.trim() || null;
     const email = identity.email?.trim() || null;
     const userId = identity.userId || null;
@@ -351,6 +378,13 @@ export const CustomerGroupService = {
       }
       throw err;
     }
+  },
+
+  /** See `assignByIdentityImpl`. Wrapper so every return path invalidates the cached public payload after the write. */
+  async assignByIdentity(storeId: string, identity: AssignIdentity, groupId: string | null) {
+    const row = await CustomerGroupService.assignByIdentityImpl(storeId, identity, groupId);
+    invalidateB2bPricing(storeId); // membership changes what this customer pays
+    return row;
   },
 };
 

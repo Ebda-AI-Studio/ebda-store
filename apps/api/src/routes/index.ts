@@ -35,6 +35,7 @@ import shippingRoutes from './shipping.routes';
 import taxRoutes from './tax.routes';
 import { fiscalArchiveRoutes, fiscalDocumentRoutes } from './fiscal-document.routes';
 import customerGroupRoutes from './customer-groups.routes';
+import priceTierRoutes from './price-tier.routes';
 import promotionRoutes from './promotion.routes';
 import bundleRoutes from './bundle.routes';
 import loyaltyRoutes, { publicLoyaltyRoutes } from './loyalty.routes';
@@ -328,6 +329,7 @@ router.use('/stores', tenantContext, shippingRoutes);
 router.use('/stores', tenantContext, taxRoutes);
 router.use('/stores', tenantContext, fiscalDocumentRoutes);
 router.use('/stores', tenantContext, customerGroupRoutes);
+router.use('/stores', tenantContext, priceTierRoutes);
 router.use('/stores', tenantContext, promotionRoutes);
 router.use('/stores', tenantContext, bundleRoutes);
 // Customer wallet (store credit) — every route behind requireFeature('customer_wallet').
