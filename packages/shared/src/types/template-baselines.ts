@@ -191,7 +191,7 @@ export function buildTemplateBaseline(identity: TemplateIdentity): StoreLayoutSe
 
 /** Per-template identities. elegant = the calibrated base (no delta). */
 export const TEMPLATE_IDENTITIES: Record<
-  Exclude<TemplateId, 'elegant' | 'dahab' | 'qamar' | 'souq'>,
+  Exclude<TemplateId, 'elegant' | 'dahab' | 'qamar' | 'souq' | 'jasmine'>,
   TemplateIdentity
 > = {
   // Modern — clean airy grid: rounded-square category tiles, caption below, framed.
@@ -359,6 +359,8 @@ export const TEMPLATE_LAYOUT_BASELINES: Record<TemplateId, StoreLayoutSettings> 
   // photo is the card (B1-1). STOP 1 critique, Ruling B1-25.
   qamar: buildQamarBaseline(),
   souq: buildSouqBaseline(),
+  // Ruling B3-1: Jasmine owns chrome only, same shape as Souq (looks own the section bands).
+  jasmine: buildSouqBaseline(),
 };
 
 /** Safe lookup. Unknown id → the bare global default (back-compat behavior). */

@@ -297,6 +297,33 @@ const PACK_STYLES: Record<TemplateId, PackStyles> = {
     testimonialCard: 'rounded-[var(--radius)] border border-border bg-card p-5',
     testimonialAuthor: 'text-sm font-medium text-muted-foreground',
   },
+  jasmine: {
+    // Phase B3 (Ruling B3-1): a rounded, photo-led card in the look's own radius (Apothecary 6,
+    // Bloom 12, Clinic 8 via var(--radius)), one always-visible >= 44px quick add, the shade dots
+    // and the two fact chips come from the shared card. Token colours only (the orange gate).
+    // h-full: cards in a row share one height and the CTA (mt-auto) sits on the same baseline.
+    card: 'h-full rounded-[var(--radius)] border border-border bg-card',
+    categoryFrame: 'rounded-[var(--radius)] bg-muted',
+    categoryCaption: 'text-sm font-medium text-foreground',
+    // hyphens-none: a title never breaks inside a word unless one word is wider than the card.
+    productCardName: 'line-clamp-2 font-medium text-foreground leading-snug [hyphens:none]',
+    productCardPrice: 'font-semibold text-foreground',
+    productCardBody: 'text-start',
+    productCardCta:
+      'whitespace-nowrap rounded-[var(--radius)] bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground hover:bg-primary/90 transition-colors duration-[var(--motion-duration,150ms)] min-h-[44px]',
+    sectionHeading:
+      'font-display text-xl sm:text-2xl md:text-3xl font-semibold text-foreground leading-[1.25] text-balance',
+    // Ink text with a primary underline: the literal primary is only ~5:1 on a light page.
+    sectionSeeAll:
+      'text-sm font-medium text-foreground underline decoration-primary underline-offset-4 hover:decoration-2',
+    sectionHeadingAlign: 'start',
+    heroOverlay: 'bg-gradient-to-b from-foreground/0 via-foreground/0 to-foreground/35',
+    heroHeadline: 'font-display text-3xl sm:text-5xl md:text-6xl font-bold leading-[1.2]',
+    heroCta:
+      'rounded-[var(--radius)] bg-background px-8 py-3.5 text-sm font-medium text-foreground hover:bg-background/90 min-h-[44px]',
+    testimonialCard: 'rounded-[var(--radius)] border border-border bg-card p-5',
+    testimonialAuthor: 'text-sm font-medium text-muted-foreground',
+  },
 };
 
 /** The qamar hero scrim, as painted by `PACK_STYLES.qamar.heroOverlay` (centre = under the text). */

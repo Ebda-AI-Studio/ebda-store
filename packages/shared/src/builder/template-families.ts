@@ -131,6 +131,8 @@ export const TEMPLATE_FAMILIES: readonly TemplateFamily[] = [
       'footer',
     ],
     pendingSectionTypes: [],
+    // Phase B3 (Ruling B3-1): Jasmine has its own chrome skin; the looks decide the mixes.
+    skin: 'jasmine',
   },
 ];
 

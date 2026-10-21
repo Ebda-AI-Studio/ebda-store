@@ -459,7 +459,7 @@ export const LOOKS: readonly LookDefinition[] = [
     id: 'jasmine.apothecary',
     template: 'jasmine',
     letter: 'A',
-    skin: 'minimal',
+    skin: 'jasmine',
     status: 'designed',
     name: { ar: 'عطارة', en: 'Apothecary' },
     forWhom: {
@@ -468,26 +468,36 @@ export const LOOKS: readonly LookDefinition[] = [
     },
     idea: { ar: 'المكونات الأول، وبعدين المنتج.', en: 'Ingredients first.' },
     tokens: {
-      page: '#2E2A22',
-      surface: '#3A352B',
+      // Ruling B3-2: the plan's brown ground (#2E2A22, 41 deg, HSV sat 26%) is inside the
+      // no-orange band by the B2 gate's measurement, so the ground is re-derived to a true olive
+      // (82 deg); text stays the paper cream (5% chroma). The CTA is the Night-souq brass
+      // (B2-18), the ONE scoped exception, with olive-black ink on it (7.0:1). The accent is a
+      // jade for status UI; the sale / new chips read the brass (--chip-bg, globals.css).
+      page: '#24291C',
+      surface: '#2E3425',
       ink: '#F3EFE6',
-      muted: '#CFC7B6',
-      primary: '#C9822B',
-      onPrimary: '#1E1B16',
-      accent: '#D9984A',
-      line: '#4A4438',
+      muted: '#C9CDB8',
+      primary: '#C89B3C',
+      onPrimary: '#14180F',
+      accent: '#8FC9AE',
+      onAccent: '#14180F',
+      line: '#4A5240',
       fonts: { display: 'Amiri', body: 'Noto Sans Arabic', latin: 'Fraunces' },
       radius: 'sm',
       density: 'regular',
       imageRatio: '4/5',
       motion: 'subtle',
+      // Quality bar section 9: controls on a product photo take their own on-token.
+      overPhotoChrome: 'soft',
+      cardBadge: 'accent',
+      wordmarkSize: 'lg',
     },
   }),
   L({
     id: 'jasmine.bloom',
     template: 'jasmine',
     letter: 'B',
-    skin: 'minimal',
+    skin: 'jasmine',
     status: 'designed',
     name: { ar: 'بلوم', en: 'Bloom' },
     forWhom: {
@@ -509,13 +519,17 @@ export const LOOKS: readonly LookDefinition[] = [
       density: 'regular',
       imageRatio: '1/1',
       motion: 'expressive',
+      // Ruling B3-3: raspberry is the fill (white on it 6.8:1) and, at #B0154F, also the text
+      // role on the blush page (5.1:1; the plan's #C2185B measured 4.3).
+      cardBadge: 'accent',
+      wordmarkSize: 'lg',
     },
   }),
   L({
     id: 'jasmine.clinic',
     template: 'jasmine',
     letter: 'C',
-    skin: 'minimal',
+    skin: 'jasmine',
     status: 'designed',
     name: { ar: 'عيادة', en: 'Clinic' },
     forWhom: {
@@ -528,15 +542,20 @@ export const LOOKS: readonly LookDefinition[] = [
       surface: '#E6F5F2',
       ink: '#13212B',
       muted: '#4A5862',
-      primary: '#1F7F6C',
+      primary: '#1B7A67',
       onPrimary: '#FFFFFF',
-      accent: '#1F7F6C',
+      accent: '#1B7A67',
       line: '#D3E8E3',
       fonts: { display: 'Readex Pro', body: 'Readex Pro', latin: 'Figtree' },
       radius: 'md',
       density: 'airy',
       imageRatio: '1/1',
       motion: 'subtle',
+      // Ruling B3-3: the mint green is darkened to #1B7A67 so it reads as text on the aqua band
+      // (4.65:1; the plan's #1E7F6B measured 4.35) and as the primary button (5.2:1 with white).
+      cardCta: 'quiet',
+      cardBadge: 'accent',
+      wordmarkSize: 'lg',
     },
   }),
   L({
