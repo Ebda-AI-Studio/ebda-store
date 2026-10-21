@@ -26,6 +26,10 @@ import { notificationDispatcher } from './notification-dispatcher.service';
 import { resolveBundle } from './bundle.service';
 import { wbsBridgeService, WbsUnauthorizedError, type AbandonedWaCart } from './wbs-bridge.service';
 import { encryption } from './encryption.service';
+import {
+  sweepCartRecoveryEmails,
+  CART_EMAIL_DEFAULT_DELAY_MINUTES,
+} from './cart-recovery-email.service';
 import logger from '../lib/logger';
 import crypto from 'crypto';
 import { config } from '../config';
@@ -72,6 +76,9 @@ interface AbandonedCartConfigDefaults {
   couponDiscountPercent: number;
   couponMaxDiscount: number | null;
   couponExpiryHours: number;
+  /** Recovery email channel (cart-recovery-email.service). OFF until the merchant opts in. */
+  emailEnabled: boolean;
+  emailDelayMinutes: number;
 }
 
 const DEFAULT_CONFIG: AbandonedCartConfigDefaults = {
@@ -85,6 +92,8 @@ const DEFAULT_CONFIG: AbandonedCartConfigDefaults = {
   couponDiscountPercent: 10,
   couponMaxDiscount: null,
   couponExpiryHours: 48,
+  emailEnabled: false,
+  emailDelayMinutes: CART_EMAIL_DEFAULT_DELAY_MINUTES,
 };
 
 interface CartItemSnapshot {
@@ -164,6 +173,14 @@ class AbandonedCartService {
       ]);
 
       await this.processReminders(correlationId);
+
+      // Email channel (own state in email_status, independent of the push/SMS steps). A failure
+      // here must not fail the sweep that already ran the other channels.
+      try {
+        await sweepCartRecoveryEmails();
+      } catch (err) {
+        logger.error({ err, correlationId }, '[AbandonedCart] Email sweep failed');
+      }
 
       logger.info({ correlationId }, '[AbandonedCart] Processing completed');
     } catch (err) {
@@ -924,6 +941,8 @@ class AbandonedCartService {
       couponDiscountPercent: row.couponDiscountPercent,
       couponMaxDiscount: row.couponMaxDiscount,
       couponExpiryHours: row.couponExpiryHours,
+      emailEnabled: row.emailEnabled,
+      emailDelayMinutes: row.emailDelayMinutes,
     };
   }
 
@@ -957,6 +976,8 @@ class AbandonedCartService {
       couponDiscountPercent: row.couponDiscountPercent,
       couponMaxDiscount: row.couponMaxDiscount,
       couponExpiryHours: row.couponExpiryHours,
+      emailEnabled: row.emailEnabled,
+      emailDelayMinutes: row.emailDelayMinutes,
     };
   }
 

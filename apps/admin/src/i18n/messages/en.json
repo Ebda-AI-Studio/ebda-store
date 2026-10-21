@@ -4238,6 +4238,14 @@
         "noLimit": "No limit",
         "major": "EGP",
         "hours": "hours"
+      },
+      "email": {
+        "title": "Reminder email",
+        "description": "One email per cart, sent from your store to shoppers who subscribed to your newsletter. Shoppers who unsubscribed are never emailed.",
+        "enable": "Send a reminder email",
+        "sendAfter": "Send after",
+        "minutes": "min of inactivity",
+        "hint": "Between 60 and 1440 minutes. Default 120."
       }
     },
     "list": {
@@ -4258,7 +4266,8 @@
         "total": "Total",
         "items": "Items",
         "status": "Status",
-        "date": "Date"
+        "date": "Date",
+        "email": "Email"
       }
     },
     "messages": {
@@ -4266,6 +4275,13 @@
       "saveSuccessBody": "Abandoned cart settings saved.",
       "saveErrorTitle": "Error",
       "saveErrorBody": "Failed to save settings. Please try again."
+    },
+    "emailStatus": {
+      "none": "Not sent",
+      "queued": "Queued",
+      "sent": "Sent",
+      "skipped": "Skipped",
+      "failed": "Failed"
     }
   },
   "returns": {
