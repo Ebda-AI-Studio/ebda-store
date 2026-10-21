@@ -1,11 +1,8 @@
-import type { Metadata } from 'next';
 import { getStoreByTenantParam } from '@/lib/store-resolver';
 import { AboutPageBody } from '@/app/about/AboutPageBody';
 
-export const metadata: Metadata = {
-  title: 'About Us',
-  description: 'Learn more about our store',
-};
+// Rule (f): the same page-language title as the legacy twin (metadata parity, issue 2418).
+export { generateMetadata } from '@/app/about/page';
 
 export default async function StoreAboutPage({
   params,

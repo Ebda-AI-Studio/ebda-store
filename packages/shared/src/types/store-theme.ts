@@ -6,14 +6,24 @@
 import { deriveBrandRoles } from '../utils/brand-roles';
 import { statusInkVars } from '../utils/status-ink';
 import { colorToHslTriplet } from '../utils/color';
-import type { Density, ImageRatio, Motion } from '../looks/types';
+import type {
+  Density,
+  ImageRatio,
+  Motion,
+  OverPhotoChrome,
+  ReceiptStyle,
+  WordmarkSize,
+  CardCta,
+  CardHover,
+  CardBadge,
+} from '../looks/types';
 import { getLook } from '../looks/registry';
 import { resolveLookFonts } from '../looks/fonts';
 
 /**
  * Available store templates
  */
-export type TemplateId = 'modern' | 'classic' | 'minimal' | 'bold' | 'elegant' | 'dahab';
+export type TemplateId = 'modern' | 'classic' | 'minimal' | 'bold' | 'elegant' | 'dahab' | 'qamar';
 
 /**
  * Font family options for store themes
@@ -141,6 +151,14 @@ export interface StoreTheme {
   density?: Density;
   imageRatio?: ImageRatio;
   motion?: Motion;
+  // Optional look UI tokens (W2a): absent on legacy stores and on looks that do not set them, so
+  // every consumer keeps its current rendering unless the composed theme carries a value.
+  wordmarkSize?: WordmarkSize;
+  overPhotoChrome?: OverPhotoChrome;
+  receiptStyle?: ReceiptStyle;
+  cardCta?: CardCta;
+  cardHover?: CardHover;
+  cardBadge?: CardBadge;
 
   // Per-store homepage section background preset — see BackgroundPreset
   // for behavior. Optional; missing or 'none' means flat-surface (no
@@ -355,9 +373,10 @@ export interface StoreTheme {
    * when the merchant hasn't opted into the full `oosLabel*` badge
    * customization system (`productCardDefaults`). Accepts a `token:<name>`
    * reference (see `COLOR_TOKENS`) or a raw hex/hsl string, resolved via
-   * `resolveColor`. Default (undefined): renders the platform's original
-   * hardcoded terracotta `hsl(15 60% 33%)` — zero visual change for every
-   * EXISTING store (incl. demo-shop + Demo Store), no backfill. Seeded to a
+   * `resolveColor`. Default (undefined): the store's own ink and paper tokens
+   * (`hsl(var(--foreground))` on `hsl(var(--background))`); the old hardcoded
+   * terracotta default was retired on 2026-10-16 (Ebda has no orange, Ruling B1-88).
+   * On a store with a look the label is a flat chip on the look radius, not a sash. Seeded to a
    * neutral slate (`#6b7280`, matching `DEFAULT_THEME.mutedForeground`'s hue)
    * at store-creation time for NEW stores only (`StoreService.create`) and
    * for demo clones — same seeding path as
@@ -651,6 +670,22 @@ export const TEMPLATE_THEMES: Record<TemplateId, Partial<StoreTheme>> = {
   // Egyptian goldsmith's own pairing — so it reads as night, not as a
   // generic near-black. Every pair below is checked for WCAG AA in
   // tests/unit/dahab-theme-contrast.test.ts.
+  // Qamar (fashion & boutiques, Phase B1): a neutral base. Every Qamar store has a
+  // look, and the look's tokens (packages/shared/src/looks/registry.ts) own colour,
+  // type, radius, density, image ratio and motion. Dividers off: the looks separate
+  // sections by space and bands, never hairline-flanked labels on every section.
+  qamar: {
+    primaryColor: '0 0% 8%',
+    primaryForeground: '0 0% 100%',
+    backgroundColor: '0 0% 100%',
+    foregroundColor: '0 0% 8%',
+    fontFamily: 'default',
+    borderRadius: 'none',
+    backgroundPreset: 'none',
+    showBrandStory: false,
+    showTrustStrip: false,
+    dividers: { ...DEFAULT_DIVIDER_SETTINGS, enabled: false },
+  },
   dahab: {
     primaryColor: '39 49% 58%', // gold #C9A35E
     primaryForeground: '222 29% 8%', // night
@@ -751,6 +786,16 @@ export const TEMPLATES: TemplateInfo[] = [
     thumbnail: '/templates/dahab.png',
     tags: ['jewellery', 'handmade', 'gifts'],
     bestFor: 'Jewellery, handmade and premium gifts',
+  },
+  {
+    id: 'qamar',
+    name: 'Qamar',
+    nameAr: 'قمر',
+    description: 'Fashion and boutiques: Atelier, Lookbook and Vitrine looks',
+    descriptionAr: 'أزياء وبوتيكات: أتيليه ولوك بوك وفاترينة',
+    thumbnail: '/looks/qamar.atelier.webp',
+    tags: ['fashion', 'abayas', 'boutique'],
+    bestFor: 'Fashion, abayas and boutiques',
   },
 ];
 

@@ -61,11 +61,11 @@ def qa():
 
 # ====================== QAMAR B · LOOKBOOK ======================
 def qb():
-    IND, IND2, TX, SAF = '#1e2340', '#2a3158', '#f4f1fa', '#e8a33d'
+    IND, IND2, TX, SAF = '#1e2340', '#2a3158', '#f4f1fa', '#D9DCEB'
     MUT = fix('#b9b6cf', IND2, 4.5, 'QB muted')
-    chk('QB text', TX, IND); chk('QB saffron on indigo', SAF, IND); chk('QB btn', IND, SAF)
-    cwl = [('#3b3f6b', '#1e2340', '#e8a33d', '#c6841c', '#f4f1fa'), ('#4a3760', '#241a38', '#f4f1fa', '#cdbfe0', '#e8a33d'),
-           ('#2d4a5a', '#1b2e3a', '#1e2340', '#0f1730', '#e8a33d'), ('#533a52', '#2a1c2c', '#e8a33d', '#a8711a', '#f4f1fa')]
+    chk('QB text', TX, IND); chk('QB moon silver on indigo', SAF, IND); chk('QB btn', IND, SAF)
+    cwl = [('#3b3f6b', '#1e2340', '#D9DCEB', '#a9adc4', '#f4f1fa'), ('#4a3760', '#241a38', '#f4f1fa', '#cdbfe0', '#D9DCEB'),
+           ('#2d4a5a', '#1b2e3a', '#1e2340', '#0f1730', '#D9DCEB'), ('#533a52', '#2a1c2c', '#D9DCEB', '#a9adc4', '#f4f1fa')]
     collage = (f'<div class="cl c1 ph">{img("figure", cwl[0], "إطلالة سطوح", 1.6)}</div>'
                f'<div class="cl c2 ph">{img("dress", cwl[3], "فستان زعفراني", 1.3)}</div>'
                f'<div class="cl c3 ph">{img("sneaker", cwl[2], "سنيكرز", 1.2)}</div>')
@@ -90,7 +90,7 @@ def qb():
     cards = ''.join(f'<article {pd(n, p, o, k, **meta[n])}><div class="ph" style="aspect-ratio:1/1.15">{img(k, cwl[c], n)}</div><h3 class="nm" style="margin-top:8px">{n}</h3>'
                     f'<div class="pr">{price(p, o)}<button class="qa" type="button" aria-label="إضافة {n}" data-add>{I("plus", 18)}</button></div></article>' for n, p, o, k, c in prods)
     css = """
-&{--bg:#1e2340;--ink:#f4f1fa;--mut:""" + MUT + """;--ac:#e8a33d;--btn:#e8a33d;--btnfg:#1e2340;--r:10px;--rb:999px;--ga:4/4.6;--fd:'Lalezar';--fb:'Tajawal';--fl:'Archivo'}
+&{--bg:#1e2340;--ink:#f4f1fa;--mut:""" + MUT + """;--ac:#D9DCEB;--btn:#D9DCEB;--btnfg:#1e2340;--r:10px;--rb:999px;--ga:4/4.6;--fd:'Lalezar';--fb:'Tajawal';--fl:'Archivo'}
 & .hd{display:flex;align-items:center;justify-content:space-between;padding:0 8px;height:68px;background:#1e2340;position:sticky;top:0;z-index:3}
 & .logo{font-family:var(--fd),sans-serif;font-size:38px;line-height:1;display:flex;align-items:baseline;gap:8px}
 & .logo i{font-family:var(--fl),sans-serif;font-style:normal;font-size:13px;letter-spacing:.3em;color:var(--mut);font-weight:500}
@@ -111,12 +111,12 @@ def qb():
 & .lb{padding:12px 14px 16px}
 & .lb h3{font-family:var(--fd),sans-serif;font-weight:400;font-size:22px}
 & .lb li{display:flex;justify-content:space-between;font-size:13px;padding:5px 0;border-bottom:1px solid #ffffff22}
-& .btn{margin-top:12px;width:100%;min-height:44px;border:0;border-radius:999px;background:#e8a33d;color:#1e2340;font-weight:700;font-size:14px;display:flex;align-items:center;justify-content:center;gap:6px}
+& .btn{margin-top:12px;width:100%;min-height:44px;border:0;border-radius:999px;background:#D9DCEB;color:#1e2340;font-weight:700;font-size:14px;display:flex;align-items:center;justify-content:center;gap:6px}
 & .g2{display:grid;grid-template-columns:1fr 1fr;gap:20px 12px}
 & .g2 img{border-radius:10px}
 & .g2 .price{color:var(--ac)}
 & .pr{display:flex;align-items:center;justify-content:space-between;margin-top:2px}
-& .qa{width:40px;height:40px;border-radius:50%;border:0;background:#e8a33d;color:#1e2340;display:grid;place-items:center;padding:0}
+& .qa{width:40px;height:40px;border-radius:50%;border:0;background:#D9DCEB;color:#1e2340;display:grid;place-items:center;padding:0}
 """
     html = f"""<header class="hd"><button class="ib" type="button" aria-label="القائمة" data-open-menu>{I('menu')}</button>
 <div class="logo">قمر <i>QAMAR</i></div><button class="ib" type="button" aria-label="السلة" data-open-cart>{I('bag')}</button></header>

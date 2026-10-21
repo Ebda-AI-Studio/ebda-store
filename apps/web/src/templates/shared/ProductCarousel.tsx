@@ -16,6 +16,7 @@ import {
   cardFrameWidthClass,
   cardShapeClasses,
   gridGapClass,
+  lookCarouselLgWidth,
   productSizeClass,
   cardImageAspectClass,
   lookImageAspectClass,
@@ -24,11 +25,22 @@ import {
   ctaSizeClass,
 } from './card-size';
 import { AdaptiveAddButton, OosImageDim, OutOfStockRibbon, isProductNew } from './ProductCardCta';
+import { PecannbeeProductCard } from './PecannbeeProductCard';
+import {
+  lookCardCta,
+  lookCtaVisible,
+  QUIET_CARD_CTA_CLS,
+  cardHoverCls,
+  lookChip,
+  LOOK_CHIP_CLS,
+  LOOK_CHIP_STYLE,
+} from './look-card';
 import { smoothScrollLeftTo, smoothScrollLeftBy } from '@/lib/smooth-scroll';
 import { BrandPill } from './BrandPill';
 import { useStore } from '../../contexts/StoreContext';
 import { useNumerals } from '../../hooks/useNumerals';
-import { getProductCardTextSizes, resolveColor, REGION } from '@ebda/shared';
+import { useLocalePrice } from '../../hooks/useLocalePrice';
+import { getLook, getProductCardTextSizes, resolveColor } from '@ebda/shared';
 import { cn } from '@ebda/ui';
 import type { ProductCarouselProps } from '../types';
 import { DahabProductCarousel } from '../dahab/ProductCarousel';
@@ -67,7 +79,6 @@ function SharedProductCarousel({
   showSubtitleLines,
   seeAllHref,
   isRtl,
-  currency = REGION.currency,
   onAddToCart,
   urlPrefix = '',
   pack,
@@ -104,7 +115,9 @@ function SharedProductCarousel({
   // products get the overlay button; otherwise it's hidden.
   const { store, layout } = useStore();
   const renderNow = useRenderNow();
-  const { money, numerals } = useNumerals();
+  const { numerals } = useNumerals();
+  // The ONE storefront price format ("1,490 ج.م" / "EGP 1,490", Ruling B1-28).
+  const price = useLocalePrice();
   const showQuickAdd = store.theme?.showQuickAdd === true;
   // Item 4 (2026-07-12): when the merchant already has the outer showCardFrame
   // frame on AND opts into frameChromeDedup, suppress the inner pack-style
@@ -143,6 +156,11 @@ function SharedProductCarousel({
   // whether quick-add will actually render for THIS product.
   const discountBadgeColor = getDiscountBadgeColor(cardDefaults?.discountBadge?.color, store.theme);
   const customBadgeColor = getCustomBadgeColor(cardDefaults?.customBadge?.color, store.theme);
+  // Look card tokens (W2b); all legacy on a store with no look.
+  const lookCta = lookCardCta(store.theme, layout);
+  const onLook = !!getLook(store.look);
+  const ctaCls = lookCta === 'quiet' ? QUIET_CARD_CTA_CLS : styles.productCardCta;
+  const chip = lookChip(store.theme);
   const customBadgeTextColor = getCustomBadgeTextColor(
     cardDefaults?.customBadge?.color,
     store.theme
@@ -178,6 +196,19 @@ function SharedProductCarousel({
   const [canScrollPrev, setCanScrollPrev] = useState(false);
   const [canScrollNext, setCanScrollNext] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
+  // Rule (e) (W4, a11y P1-6): autoplay stops while focus is inside the strip and on a visible
+  // toggle, not only on hover/touch. `canAutoplay` is read after mount (reduced motion is a
+  // client fact), so the server markup and the first client render agree.
+  const [focusPaused, setFocusPaused] = useState(false);
+  const [userPaused, setUserPaused] = useState(false);
+  const [canAutoplay, setCanAutoplay] = useState(false);
+  useEffect(() => {
+    const reduced =
+      typeof window !== 'undefined' &&
+      window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+    setCanAutoplay(products.length > 1 && !reduced);
+  }, [products.length]);
+  const autoplayHeld = isPaused || focusPaused || userPaused;
 
   // Update arrow visibility based on current scroll position. Uses scroll
   // events so we don't have to know card widths up front.
@@ -206,12 +237,7 @@ function SharedProductCarousel({
   // when prefers-reduced-motion is on.
   useEffect(() => {
     const el = scrollRef.current;
-    if (!el || products.length <= 1 || isPaused) return;
-
-    const reduced =
-      typeof window !== 'undefined' &&
-      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    if (reduced) return;
+    if (!el || !canAutoplay || autoplayHeld) return;
 
     const id = window.setInterval(() => {
       const max = el.scrollWidth - el.clientWidth;
@@ -225,7 +251,7 @@ function SharedProductCarousel({
       }
     }, 4000);
     return () => window.clearInterval(id);
-  }, [products.length, isPaused, isRtl]);
+  }, [canAutoplay, autoplayHeld, isRtl]);
 
   const scrollByOneCard = (direction: 'prev' | 'next') => {
     const el = scrollRef.current;
@@ -269,11 +295,38 @@ function SharedProductCarousel({
         />
         <div
           className="relative"
+          data-autoplay={!canAutoplay ? 'off' : autoplayHeld ? 'paused' : 'running'}
           onMouseEnter={() => setIsPaused(true)}
           onMouseLeave={() => setIsPaused(false)}
           onTouchStart={() => setIsPaused(true)}
           onTouchEnd={() => setIsPaused(false)}
+          onFocus={() => setFocusPaused(true)}
+          onBlur={e => {
+            if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setFocusPaused(false);
+          }}
         >
+          {canAutoplay && (
+            <button
+              type="button"
+              data-autoplay-toggle
+              aria-pressed={userPaused}
+              onClick={() => setUserPaused(p => !p)}
+              className="absolute -top-12 end-0 z-10 inline-flex h-11 w-11 items-center justify-center rounded-[var(--radius)] text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              aria-label={
+                userPaused
+                  ? isRtl
+                    ? 'تشغيل التمرير التلقائي'
+                    : 'Play automatic scrolling'
+                  : isRtl
+                    ? 'إيقاف التمرير التلقائي'
+                    : 'Pause automatic scrolling'
+              }
+            >
+              <svg className="h-4 w-4" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                {userPaused ? <path d="M8 5v14l11-7z" /> : <path d="M7 5h4v14H7zM13 5h4v14h-4z" />}
+              </svg>
+            </button>
+          )}
           {/* Prev arrow — sits at the leading edge (left in LTR, right in
               RTL). Hidden on small screens where touch-scroll is the primary
               affordance, hidden when there's nothing to scroll back to. */}
@@ -336,10 +389,34 @@ function SharedProductCarousel({
             // 2026-05-17: gap is now driven by the per-store cardGap
             // setting on newArrivals + bestSellers; the previous hard-
             // coded gap-4/6/8 ignored merchant saves entirely.
-            className={`-mx-4 flex snap-x snap-mandatory ${gridGapClass(cardGap)} overflow-x-auto overscroll-x-contain touch-pan-x px-4 pb-4 scroll-smooth`}
+            className={`-mx-4 flex justify-[safe_center] snap-x snap-mandatory ${gridGapClass(cardGap)} overflow-x-auto overscroll-x-contain touch-pan-x px-4 pb-4 scroll-smooth`}
             style={{ scrollbarWidth: 'thin' }}
           >
             {products.map((product, i) => {
+              // IA-08 (W4): on a look store the strip renders the SAME shared card as the grid
+              // (heart, name slot, chips, CTA token), so a page never shows two card dialects.
+              if (onLook)
+                return (
+                  <li
+                    key={product.id}
+                    className={`snap-start shrink-0 w-[44vw] sm:w-[28vw] md:w-[22vw] ${lookCarouselLgWidth(cardGap)}`}
+                  >
+                    <PecannbeeProductCard
+                      product={product}
+                      isRtl={isRtl}
+                      pack={pack}
+                      onAddToCart={onAddToCart}
+                      urlPrefix={urlPrefix}
+                      priority={i < 4}
+                      cardImageAspect={cardImageAspect}
+                      cardImageRadius={cardImageRadius}
+                      showCardName={showCardName}
+                      showCardPrice={showCardPrice}
+                      productNameZone={productNameZone}
+                      productPriceZone={productPriceZone}
+                    />
+                  </li>
+                );
               const name = pickLocalizedName(product, Boolean(isRtl)) ?? product.name;
               const href = `${urlPrefix}/products/${product.slug}`;
               const img = product.images?.[0]?.url;
@@ -430,7 +507,8 @@ function SharedProductCarousel({
                       verified zero rendered-output change. */}
                   <div
                     className={cn(
-                      'flex flex-col h-full overflow-hidden transition-[transform,box-shadow] duration-[var(--duration-slow)] ease-[var(--ease-out)] md:hover:scale-[1.02] md:hover:shadow-[0_20px_40px_-20px_hsl(var(--foreground)/0.18)]',
+                      'flex flex-col h-full overflow-hidden transition-[transform,box-shadow] duration-[var(--duration-slow)] ease-[var(--ease-out)]',
+                      cardHoverCls(store.theme),
                       dedupInnerFrame ? '' : styles.card,
                       // LAST: the merchant's cardShape radius must beat the
                       // pack's rounded-* under tailwind-merge (#665).
@@ -447,6 +525,7 @@ function SharedProductCarousel({
                       >
                         {/* Task 3 B4: OOS badge customization via productCardDefaults. */}
                         <OutOfStockRibbon
+                          flat={onLook}
                           inStock={orderable}
                           isRtl={isRtl}
                           oosLabel={resolvedOosLabel}
@@ -472,7 +551,12 @@ function SharedProductCarousel({
                             because OOS hides NEW (see isProductNew gate). */}
                         {showNewBadge && (
                           <span
-                            className="absolute top-3 start-3 z-10 rounded-full bg-[hsl(var(--primary))] px-2.5 py-1 text-xs font-bold uppercase tracking-wider text-[hsl(var(--primary-foreground))] shadow-[0_6px_14px_-6px_hsl(var(--primary)/0.5)]"
+                            className={
+                              chip
+                                ? cn(LOOK_CHIP_CLS, 'top-3 start-3')
+                                : 'absolute top-3 start-3 z-10 rounded-full bg-[hsl(var(--primary))] px-2.5 py-1 text-xs font-bold uppercase tracking-wider text-[hsl(var(--primary-foreground))] shadow-[0_6px_14px_-6px_hsl(var(--primary)/0.5)]'
+                            }
+                            style={chip ? LOOK_CHIP_STYLE : undefined}
                             aria-label={isRtl ? 'منتج جديد' : 'New product'}
                           >
                             {isRtl ? 'جديد' : 'NEW'}
@@ -538,10 +622,19 @@ function SharedProductCarousel({
                         {onSale && discountBadgeAllowed && discountBadgeText && (
                           <span
                             className={cn(
-                              'pointer-events-none absolute z-10 rounded-full px-2.5 py-1 text-xs font-semibold tracking-wide text-white shadow-[0_6px_16px_-6px_rgba(220,38,38,0.45)]',
+                              chip
+                                ? cn(
+                                    LOOK_CHIP_CLS,
+                                    cardDefaults?.discountBadge?.color && 'text-white'
+                                  )
+                                : 'pointer-events-none absolute z-10 rounded-full px-2.5 py-1 text-xs font-semibold tracking-wide text-white shadow-[0_6px_16px_-6px_rgba(220,38,38,0.45)]',
                               discountBadgePositionCls
                             )}
-                            style={{ backgroundColor: discountBadgeColor }}
+                            style={
+                              chip && !cardDefaults?.discountBadge?.color
+                                ? LOOK_CHIP_STYLE
+                                : { backgroundColor: discountBadgeColor }
+                            }
                           >
                             {discountBadgeText}
                           </span>
@@ -552,13 +645,19 @@ function SharedProductCarousel({
                         {customBadgeText && (
                           <span
                             className={cn(
-                              'pointer-events-none absolute z-10 rounded-full px-2.5 py-1 text-xs font-semibold tracking-wide text-white shadow-[0_6px_16px_-6px_rgba(0,0,0,0.35)]',
+                              chip
+                                ? LOOK_CHIP_CLS
+                                : 'pointer-events-none absolute z-10 rounded-full px-2.5 py-1 text-xs font-semibold tracking-wide text-white shadow-[0_6px_16px_-6px_rgba(0,0,0,0.35)]',
                               customBadgePositionCls
                             )}
-                            style={{
-                              backgroundColor: customBadgeColor,
-                              color: customBadgeTextColor,
-                            }}
+                            style={
+                              chip && !cardDefaults?.customBadge?.color
+                                ? LOOK_CHIP_STYLE
+                                : {
+                                    backgroundColor: customBadgeColor,
+                                    color: customBadgeTextColor,
+                                  }
+                            }
                           >
                             {customBadgeText}
                           </span>
@@ -659,10 +758,10 @@ function SharedProductCarousel({
                               )}
                               {priceVisible && (
                                 <div
-                                  className={`flex items-baseline gap-2 ${styles.productCardBody ? 'justify-center' : ''}`}
+                                  className={`flex flex-wrap items-baseline gap-x-2 ${styles.productCardBody ? 'justify-center' : ''}`}
                                 >
                                   <span
-                                    className={`${textSizes.price} ${styles.productCardPrice}`}
+                                    className={`whitespace-nowrap ${textSizes.price} ${styles.productCardPrice}`}
                                     data-zone="productPrice"
                                     style={{
                                       fontFamily: productPriceZone?.fontFamily,
@@ -678,11 +777,11 @@ function SharedProductCarousel({
                                     {carouselPricing.mode === 'fromMin'
                                       ? `${isRtl ? 'من ' : 'From '}`
                                       : ''}
-                                    {money(carouselPricing.displayPrice)} {currency}
+                                    {price(carouselPricing.displayPrice)}
                                   </span>
                                   {carouselPricing.displayCompare && (
-                                    <span className="text-sm text-muted-foreground line-through">
-                                      {money(carouselPricing.displayCompare)}
+                                    <span className="whitespace-nowrap text-sm text-muted-foreground line-through">
+                                      {price(carouselPricing.displayCompare)}
                                     </span>
                                   )}
                                 </div>
@@ -756,12 +855,19 @@ function SharedProductCarousel({
                         const ctaAddLabel =
                           (isRtl ? resolvedCtaLabelTextAr : resolvedCtaLabelTextEn) ??
                           (isRtl ? 'إضافة للسلة' : 'Add to cart');
+                        if (
+                          !lookCtaVisible(lookCta, {
+                            hasVariants: hasVariants || viewOnly,
+                            orderable,
+                          })
+                        )
+                          return null;
                         return hasVariants || viewOnly ? (
                           <Link
                             href={href}
                             prefetch={false}
                             className={cn(
-                              `block w-full text-center cursor-pointer ${styles.productCardCta}`,
+                              `block w-full text-center cursor-pointer ${ctaCls}`,
                               ctaExtraCls
                             )}
                             data-zone="productCta"
@@ -775,7 +881,7 @@ function SharedProductCarousel({
                             type="button"
                             disabled
                             className={cn(
-                              `block w-full text-center opacity-60 cursor-not-allowed ${styles.productCardCta}`,
+                              `block w-full text-center opacity-60 cursor-not-allowed ${ctaCls}`,
                               ctaExtraCls
                             )}
                             data-zone="productCta"
@@ -789,7 +895,7 @@ function SharedProductCarousel({
                             <AdaptiveAddButton
                               onClick={() => onAddToCart(product.id)}
                               className={cn(
-                                `block w-full text-center cursor-pointer ${styles.productCardCta}`,
+                                `block w-full text-center cursor-pointer ${ctaCls}`,
                                 ctaExtraCls
                               )}
                               dataZone="productCta"

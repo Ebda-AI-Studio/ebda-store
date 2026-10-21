@@ -188,7 +188,10 @@ function ResetPasswordForm() {
 
           <p className="text-center text-xs text-muted-foreground">
             {t('Need a new reset link?', 'محتاج رابط جديد؟')}{' '}
-            <Link href={storeUrl('/auth/forgot-password')} className="text-primary hover:underline">
+            <Link
+              href={storeUrl('/auth/forgot-password')}
+              className="text-primary underline underline-offset-2"
+            >
               {t('Request password reset', 'طلب إعادة تعيين كلمة المرور')}
             </Link>
           </p>

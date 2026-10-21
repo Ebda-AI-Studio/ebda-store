@@ -156,7 +156,7 @@ export function BundleLine({
         data-testid={testId}
         data-bundle-line="true"
         dir={isRtl ? 'rtl' : 'ltr'}
-        className="flex gap-4 rounded-xl border border-border/60 bg-card p-4 sm:p-5"
+        className="flex gap-4 rounded-[var(--radius)] border border-border/60 bg-card p-4 sm:p-5"
       >
         <div className="h-24 w-24 flex-shrink-0 overflow-hidden rounded-lg bg-muted sm:h-28 sm:w-28">
           {image ? (
@@ -219,13 +219,19 @@ export function BundleLine({
       dir={isRtl ? 'rtl' : 'ltr'}
       className="flex gap-4 py-4 first:pt-0"
     >
-      <div className="relative h-16 w-16 flex-shrink-0 overflow-hidden rounded-lg bg-muted">
-        {image ? (
-          <Image src={image} alt={displayName} fill className="object-cover" />
-        ) : (
-          <BundlePlaceholderIcon />
-        )}
-        <span className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-muted-foreground text-xs text-white">
+      {/* IA-07: the badge sits outside the clipped thumbnail, logical, on the ink pair. */}
+      <div className="relative h-16 w-16 flex-shrink-0">
+        <div className="relative h-full w-full overflow-hidden rounded-[var(--radius)] bg-muted">
+          {image ? (
+            <Image src={image} alt={displayName} fill className="object-cover" />
+          ) : (
+            <BundlePlaceholderIcon />
+          )}
+        </div>
+        <span
+          data-testid="line-qty-badge"
+          className="absolute -end-1 -top-1 z-10 flex h-5 min-w-5 items-center justify-center rounded-full bg-foreground px-1 text-xs text-background"
+        >
           {localize(quantity)}
         </span>
       </div>

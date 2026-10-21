@@ -13,14 +13,14 @@ describe('buildSidebarVars', () => {
   });
 
   it('overrides only the token the merchant actually set', () => {
-    expect(buildSidebarVars('10 20 30', undefined)).toEqual({ '--primary': '10 20 30' });
-    expect(buildSidebarVars(undefined, '0 0 0')).toEqual({ '--primary-foreground': '0 0 0' });
+    expect(buildSidebarVars('10 20 30', undefined)).toEqual({ '--filter-bg': '10 20 30' });
+    expect(buildSidebarVars(undefined, '0 0 0')).toEqual({ '--filter-fg': '0 0 0' });
   });
 
   it('overrides both when both are set', () => {
     expect(buildSidebarVars('10 20 30', '0 0 0')).toEqual({
-      '--primary': '10 20 30',
-      '--primary-foreground': '0 0 0',
+      '--filter-bg': '10 20 30',
+      '--filter-fg': '0 0 0',
     });
   });
 });
@@ -44,11 +44,106 @@ describe('countActiveFilters', () => {
     expect(countActiveFilters('', '', { size: [], color: ['red'] })).toBe(1);
   });
 
-  it('sums search, category and options', () => {
-    expect(countActiveFilters('shirt', 'tops', { size: ['m'], color: ['red'] })).toBe(4);
+  it('sums search and options', () => {
+    expect(countActiveFilters('shirt', 'tops', { size: ['m'], color: ['red'] })).toBe(3);
+  });
+
+  it('never counts the category the page is about (IA-11)', () => {
+    // The shopper reached /products?category=abayas by tapping a category; the
+    // h1 already names it, so the badge showing "1" reads as a filter they never set.
+    expect(countActiveFilters('', 'abayas', {})).toBe(0);
   });
 
   it('defaults optionFilters so an omitted argument does not throw', () => {
     expect(countActiveFilters('shirt', '')).toBe(1);
+  });
+});
+
+describe('filter panel is a quiet surface on every skin (Ruling B1-31)', () => {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { readFileSync } = require('node:fs') as typeof import('node:fs');
+  const root = `${__dirname}/../..`;
+  const src = readFileSync(`${root}/apps/web/src/app/products/ProductsFilterSidebar.tsx`, 'utf8');
+  const css = readFileSync(`${root}/apps/web/src/styles/globals.css`, 'utf8');
+  it('the panel, sheet and trigger paint the page surface + hairline, never a primary slab', () => {
+    expect(src).not.toMatch(/bg-\[hsl\(var\(--primary\)\)\]/);
+    expect(src).not.toMatch(/--primary-foreground\)/);
+    // VT-05 (W2a): the frame is an interactive boundary, so it reads --input (B1-43)
+    expect(src).toMatch(/lg:border lg:border-input lg:bg-\[hsl\(var\(--filter-bg\)\)\]/);
+    expect(css).toMatch(
+      /\[data-zone='filters'\] \{\s*--filter-bg: var\(--bg-page\);\s*--filter-fg: var\(--foreground\);/
+    );
+  });
+  it('the accent (primary) marks only the active state', () => {
+    expect(
+      src.match(/'filter-active bg-primary text-primary-foreground font-semibold'/g)
+    ).toHaveLength(3);
+  });
+  it('on a merchant-coloured panel the active chip keeps an ink ring (N3)', () => {
+    expect(src).toMatch(/data-filter-custom=\{sidebarVars \? '' : undefined\}/);
+    expect(css).toMatch(
+      /\[data-zone='filters'\]\[data-filter-custom\] \.filter-active \{\s*box-shadow: inset 0 0 0 2px hsl\(var\(--filter-fg\)\);/
+    );
+  });
+});
+
+describe('filter sidebar heading order (a11y P2-3)', () => {
+  it('the Filters title is an h2 so it follows the page h1 without a skip', async () => {
+    const { readFileSync } = await import('node:fs');
+    const src = readFileSync(
+      new URL('../../apps/web/src/app/products/ProductsFilterSidebar.tsx', import.meta.url),
+      'utf8'
+    );
+    expect(src).toMatch(/<h2\b[^>]*>\s*\{t\('Filters', 'الفلاتر'\)\}\s*<\/h2>/);
+  });
+});
+
+describe('mobile filter row shows the item count and a sort (IA-11)', () => {
+  it('renders the result count with the counted noun and a sort select beside the trigger', async () => {
+    const { readFileSync } = await import('node:fs');
+    const src = readFileSync(
+      new URL('../../apps/web/src/app/products/ProductsFilterSidebar.tsx', import.meta.url),
+      'utf8'
+    );
+    expect(src).toMatch(/data-filter-result-count/);
+    expect(src).toMatch(/countText\([^)]*ITEMS/);
+    expect(src).toMatch(/id="products-sort-bar"/);
+  });
+});
+
+describe('price sliders are 44px targets (a11y P2-10)', () => {
+  it('both range inputs carry a 44px box', async () => {
+    const { readFileSync } = await import('node:fs');
+    const src = readFileSync(
+      new URL('../../apps/web/src/app/products/ProductsFilterSidebar.tsx', import.meta.url),
+      'utf8'
+    );
+    const ranges = [...src.matchAll(/<input\s+type="range"[\s\S]*?\/>/g)].map(m => m[0]);
+    expect(ranges).toHaveLength(2);
+    for (const r of ranges) expect(r).toMatch(/className="[^"]*\bh-11\b/);
+  });
+});
+
+// a11y re-audit P2-N9 / P2-N10 (rule (d)): at 1280 the Filters toggle measured 222x20, the
+// search field 156x20, the grid/list toggles 28x28, the Lookbook sort select 38px; in the 390
+// sheet the search field 284x20 inside its pill and the sort select 40px.
+describe('filter panel controls are 44px (P2-N9/N10)', () => {
+  it('selects, the panel toggle, the search field and the view toggles', async () => {
+    const { readFileSync } = await import('node:fs');
+    const read = (f: string) =>
+      readFileSync(new URL(`../../apps/web/src/${f}`, import.meta.url), 'utf8');
+    const side = read('app/products/ProductsFilterSidebar.tsx');
+    const selects = [...side.matchAll(/<select[\s\S]*?className="([^"]*)"/g)].map(m => m[1]);
+    expect(selects.length).toBeGreaterThanOrEqual(3);
+    for (const c of selects) expect(c).toMatch(/\b(min-h-11|h-11)\b/);
+    expect(side).toMatch(/className="mb-4 flex min-h-11 w-full items-center justify-between/);
+    const css = read('styles/globals.css');
+    expect(css).toMatch(/\.search-input \{\s*@apply [^;]*\bmin-h-11\b[^;]*\btext-base\b/);
+    const list = read('app/products/ProductsClient.tsx');
+    const toggles = [
+      ...list.matchAll(/className=\{`rounded-md ([^`]*?) transition-colors \$\{viewMode/g),
+    ];
+    expect(toggles.length).toBe(2);
+    for (const t of toggles) expect(t[1]).toMatch(/\bh-11 w-11\b/);
   });
 });

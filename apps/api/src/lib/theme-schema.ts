@@ -4,7 +4,17 @@
  * tested without the router (Ruling D1016-NEW-2).
  */
 import { z } from 'zod';
-import { LOOK_DENSITIES, LOOK_IMAGE_RATIOS, LOOK_MOTIONS } from '@ebda/shared';
+import {
+  LOOK_DENSITIES,
+  LOOK_IMAGE_RATIOS,
+  LOOK_MOTIONS,
+  LOOK_OVER_PHOTO_CHROMES,
+  LOOK_RECEIPT_STYLES,
+  LOOK_WORDMARK_SIZES,
+  LOOK_CARD_CTAS,
+  LOOK_CARD_HOVERS,
+  LOOK_CARD_BADGES,
+} from '@ebda/shared';
 
 /**
  * Theme keys that are merchant switches. `showNewBadge` (Ruling D1016-NEW-1) gates the
@@ -49,6 +59,12 @@ export const themeSchema = z
       density: LOOK_DENSITIES,
       imageRatio: LOOK_IMAGE_RATIOS,
       motion: LOOK_MOTIONS,
+      wordmarkSize: LOOK_WORDMARK_SIZES,
+      overPhotoChrome: LOOK_OVER_PHOTO_CHROMES,
+      receiptStyle: LOOK_RECEIPT_STYLES,
+      cardCta: LOOK_CARD_CTAS,
+      cardHover: LOOK_CARD_HOVERS,
+      cardBadge: LOOK_CARD_BADGES,
     };
     for (const [key, values] of Object.entries(allowed)) {
       if (!(key in data) || data[key] === null) continue;

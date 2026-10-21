@@ -400,7 +400,7 @@ test.describe('commerce b0 flow @local-stack', () => {
     // 8. The admin order (API the admin order page calls; the admin UI is not driven here).
     // Never trust an id that is not provably this run's: verify the buyer email before using it,
     // and before afterAll may cancel it. Nothing is cancelled unless this passes.
-    const num = (await page.getByTestId('receipt-barcode-caption').innerText()).replace('#', '');
+    const num = (await page.getByTestId('receipt-order-number').innerText()).replace('#', '');
     const candidates: string[] = [];
     if (urlOrderId) candidates.push(urlOrderId);
     const list = await adminFetch(

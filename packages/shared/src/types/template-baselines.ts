@@ -191,7 +191,7 @@ export function buildTemplateBaseline(identity: TemplateIdentity): StoreLayoutSe
 
 /** Per-template identities. elegant = the calibrated base (no delta). */
 export const TEMPLATE_IDENTITIES: Record<
-  Exclude<TemplateId, 'elegant' | 'dahab'>,
+  Exclude<TemplateId, 'elegant' | 'dahab' | 'qamar'>,
   TemplateIdentity
 > = {
   // Modern — clean airy grid: rounded-square category tiles, caption below, framed.
@@ -307,6 +307,13 @@ export function buildDahabBaseline(): StoreLayoutSettings {
   return b;
 }
 
+function buildQamarBaseline(): StoreLayoutSettings {
+  const b = buildTemplateBaseline(TEMPLATE_IDENTITIES.minimal);
+  b.footer = {};
+  b.productCardDefaults = { ...b.productCardDefaults, showCardFrame: false };
+  return b;
+}
+
 /** The packaged per-template baselines. Stores with empty layout inherit by template. */
 export const TEMPLATE_LAYOUT_BASELINES: Record<TemplateId, StoreLayoutSettings> = {
   elegant: BASE_BRANDED_LAYOUT,
@@ -315,6 +322,13 @@ export const TEMPLATE_LAYOUT_BASELINES: Record<TemplateId, StoreLayoutSettings> 
   minimal: buildTemplateBaseline(TEMPLATE_IDENTITIES.minimal),
   bold: buildTemplateBaseline(TEMPLATE_IDENTITIES.bold),
   dahab: buildDahabBaseline(),
+  // The look owns the card ratio on a look store (LOOKS-15); minimal is the fallback.
+  // Footer: the section-alt surface, not `token:primary`. The shared minimal footer paints
+  // `text-muted-foreground` links, which are unreadable on every Qamar look's primary
+  // (Atelier ink 2.6:1, Vitrine teal, Lookbook moon silver). Cards: no frame on any surface that
+  // reads productCardDefaults (PDP related row, PLP, search), as on the home sections - the
+  // photo is the card (B1-1). STOP 1 critique, Ruling B1-25.
+  qamar: buildQamarBaseline(),
 };
 
 /** Safe lookup. Unknown id → the bare global default (back-compat behavior). */

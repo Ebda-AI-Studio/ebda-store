@@ -58,7 +58,7 @@ export default function LoginClient() {
               {t("Don't have an account?", 'معندكش حساب؟')}{' '}
               <Link
                 href={storeUrl('/auth/register')}
-                className="font-medium text-primary hover:underline"
+                className="font-medium text-primary underline underline-offset-2"
               >
                 {t('Sign up', 'إنشاء حساب')}
               </Link>
@@ -113,11 +113,11 @@ export default function LoginClient() {
 
           <p className="text-center text-xs text-muted-foreground">
             {t('By signing in, you agree to our', 'لما تسجّل دخول، إنت موافق على')}{' '}
-            <Link href={storeUrl('/terms')} className="text-primary hover:underline">
+            <Link href={storeUrl('/terms')} className="text-primary underline underline-offset-2">
               {t('Terms of Service', 'الشروط والأحكام')}
             </Link>{' '}
             {t('and', 'و')}{' '}
-            <Link href={storeUrl('/privacy')} className="text-primary hover:underline">
+            <Link href={storeUrl('/privacy')} className="text-primary underline underline-offset-2">
               {t('Privacy Policy', 'سياسة الخصوصية')}
             </Link>
           </p>

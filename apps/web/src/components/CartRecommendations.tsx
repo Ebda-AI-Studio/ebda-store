@@ -92,7 +92,7 @@ export function CartRecommendations({ storeId, productIds }: CartRecommendations
       data-zone="products"
     >
       <h2 className="text-lg font-bold text-foreground">
-        {t('You Might Also Need', 'قد تحتاج أيضاً')}
+        {t('You might also need', 'قد تحتاج أيضاً')}
       </h2>
       <p className="mt-1 mb-4 text-sm text-muted-foreground">
         {t('Recommended based on your cart', 'موصى به بناءً على سلتك')}

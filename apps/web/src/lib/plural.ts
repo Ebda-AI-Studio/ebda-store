@@ -27,6 +27,19 @@ export const PIECES: CountedNoun = {
   ar: ITEMS.ar,
 };
 
+/** Swatch colours on a card (R-14, read by screen readers only). */
+export const COLOURS: CountedNoun = {
+  en: { one: '{n} colour', other: '{n} colours' },
+  ar: {
+    zero: '{n} لون',
+    one: 'لون واحد',
+    two: 'لونين',
+    few: '{n} ألوان',
+    many: '{n} لون',
+    other: '{n} لون',
+  },
+};
+
 /** Search results. */
 export const RESULTS: CountedNoun = {
   en: { one: '{n} result', other: '{n} results' },

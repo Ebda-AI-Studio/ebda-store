@@ -14,6 +14,8 @@ export interface Toast {
   title: string;
   message?: string;
   duration?: number;
+  /** One inline action (e.g. "Undo" after removing a cart line). Runs, then closes the toast. */
+  action?: { label: string; onClick: () => void };
 }
 
 interface ToastContextValue {
@@ -36,7 +38,14 @@ export function useToast() {
   return context;
 }
 
-export function ToastProvider({ children }: { children: React.ReactNode }) {
+export function ToastProvider({
+  children,
+  dismissLabel = 'Dismiss notification',
+}: {
+  children: React.ReactNode;
+  /** The close button's name, in the page language (the storefront passes the Arabic one). */
+  dismissLabel?: string;
+}) {
   const [toasts, setToasts] = useState<Toast[]>([]);
 
   const removeToast = useCallback((id: string) => {
@@ -84,7 +93,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   return (
     <ToastContext.Provider value={{ toasts, addToast, removeToast, success, error, warning, info }}>
       {children}
-      <ToastContainer toasts={toasts} removeToast={removeToast} />
+      <ToastContainer toasts={toasts} removeToast={removeToast} dismissLabel={dismissLabel} />
     </ToastContext.Provider>
   );
 }
@@ -93,9 +102,11 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
 function ToastContainer({
   toasts,
   removeToast,
+  dismissLabel,
 }: {
   toasts: Toast[];
   removeToast: (id: string) => void;
+  dismissLabel: string;
 }) {
   return (
     <div
@@ -106,14 +117,27 @@ function ToastContainer({
       aria-relevant="additions removals"
     >
       {toasts.map(toast => (
-        <ToastItem key={toast.id} toast={toast} onClose={() => removeToast(toast.id)} />
+        <ToastItem
+          key={toast.id}
+          toast={toast}
+          onClose={() => removeToast(toast.id)}
+          dismissLabel={dismissLabel}
+        />
       ))}
     </div>
   );
 }
 
 // Individual Toast Component
-function ToastItem({ toast, onClose }: { toast: Toast; onClose: () => void }) {
+function ToastItem({
+  toast,
+  onClose,
+  dismissLabel,
+}: {
+  toast: Toast;
+  onClose: () => void;
+  dismissLabel: string;
+}) {
   const duration = toast.duration && toast.duration > 0 ? toast.duration : 0;
 
   useEffect(() => {
@@ -179,6 +203,8 @@ function ToastItem({ toast, onClose }: { toast: Toast; onClose: () => void }) {
     ),
   };
 
+  // IA-03 (W4): the theme's tokens, never palette hues (a mint toast is in none of the looks).
+  // Success and info speak in the store's ink; error and warning keep their semantic inks.
   const styles: Record<ToastType, { container: string; icon: string; progress: string }> = {
     // Semantic tokens only (success/destructive/warning/info, each with its `-ink` for text on a
     // tint): a store's look can restyle them, and no palette colour is hard-coded here.
@@ -188,13 +214,13 @@ function ToastItem({ toast, onClose }: { toast: Toast; onClose: () => void }) {
       progress: 'bg-success',
     },
     error: {
-      container: 'bg-background border-destructive/30',
-      icon: 'text-destructive-ink bg-destructive/20',
+      container: 'bg-background border-destructive/40',
+      icon: 'text-destructive-ink bg-destructive/10',
       progress: 'bg-destructive',
     },
     warning: {
-      container: 'bg-background border-warning/30',
-      icon: 'text-warning-ink bg-warning/20',
+      container: 'bg-background border-warning/40',
+      icon: 'text-warning-ink bg-warning/10',
       progress: 'bg-warning',
     },
     info: {
@@ -211,7 +237,7 @@ function ToastItem({ toast, onClose }: { toast: Toast; onClose: () => void }) {
       className={`
         pointer-events-auto relative overflow-hidden
         ${s.container}
-        border rounded-xl shadow-lg
+        border rounded-[var(--radius,0.75rem)] shadow-lg
         flex items-start gap-2.5 p-3 sm:gap-3 sm:p-4
         animate-toast-in
       `}
@@ -228,11 +254,25 @@ function ToastItem({ toast, onClose }: { toast: Toast; onClose: () => void }) {
         )}
       </div>
 
+      {toast.action && (
+        <button
+          type="button"
+          onClick={() => {
+            toast.action?.onClick();
+            onClose();
+          }}
+          className="flex-shrink-0 min-h-11 px-2 text-sm font-semibold text-foreground underline underline-offset-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          {toast.action.label}
+        </button>
+      )}
+
       {/* Close button */}
       <button
         onClick={onClose}
-        aria-label="Dismiss notification"
-        className="flex-shrink-0 cursor-pointer text-muted-foreground hover:text-foreground transition-colors duration-150 rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        aria-label={dismissLabel}
+        // a11y re-audit (stop4 probe): 16x16 was below rule (d); the -m-3 keeps the toast's size.
+        className="-m-3 inline-flex h-11 w-11 flex-shrink-0 items-center justify-center cursor-pointer text-muted-foreground hover:text-foreground transition-colors duration-150 rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
       >
         <svg
           className="w-4 h-4"

@@ -71,6 +71,9 @@ const responsiveSchema = z
   })
   .strict();
 
+/** Look id shape, the same as the `stores_look_format` CHECK. */
+export const LOOK_TAG_RE = /^(qamar|souq|jasmine|lamma|dahab)\.[a-z]+$/;
+
 export const blockNodeSchema = z
   .object({
     id: z.string().regex(SECTION_ID_RE, 'Block id must be lowercase letters, digits or dashes'),
@@ -88,6 +91,12 @@ export const sectionNodeSchema = z
     blocks: z.array(blockNodeSchema).max(BUILDER_LIMITS.maxBlocksPerSection).optional(),
     hidden: z.boolean().optional(),
     responsive: responsiveSchema.optional(),
+    /**
+     * A look id (`qamar.atelier`): when the active look has a section mix, this section renders
+     * ONLY under that look (one hero per look on a showroom page, plan amendment C10).
+     * Untagged sections render under every look, exactly as before.
+     */
+    lookTag: z.string().regex(LOOK_TAG_RE).optional(),
   })
   .strict();
 
@@ -107,6 +116,9 @@ export const pageDefinitionSchema = z
     theme: draftThemeSchema.optional(),
     /** Draft/published header-menu + footer-links PATCH (see `chrome-draft.ts`). */
     chrome: draftChromeSchema.optional(),
+    /** The look whose mix last composed this document (`applyFamilyForLook`): the outgoing look of
+     *  the next switch, so a discarded draft never leaves a wrong baseline (Ruling B1-3). */
+    appliedLook: z.string().regex(LOOK_TAG_RE).optional(),
     legacy: z
       .object({
         /** The raw saved `sectionOrder` (kept so an unedited round trip is byte-identical). */

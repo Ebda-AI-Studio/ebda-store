@@ -58,7 +58,7 @@ export default function ModernCategoryCard({
         {category.image ? (
           <img
             src={category.image}
-            alt={displayName}
+            alt={showLabel === false ? displayName : ''}
             className={`absolute inset-0 w-full h-full object-cover ${hoverScale} transition-transform duration-500 ease-out`}
             loading="lazy"
           />

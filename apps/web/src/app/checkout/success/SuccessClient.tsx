@@ -201,7 +201,7 @@ function SuccessContent() {
 
   return (
     <MinimalChrome>
-      <div className="mx-auto max-w-2xl px-4 py-16 sm:px-6 lg:px-8">
+      <div className="mx-auto max-w-2xl px-4 py-16 sm:px-6 lg:px-8" data-transactional>
         <div className="text-center">
           {/* Status icon \u2014 reflects the VERIFIED payment state, not an
               unconditional checkmark. */}
@@ -266,7 +266,7 @@ function SuccessContent() {
             >
               <p className="text-sm font-medium text-warning-ink">
                 {t(
-                  'Cash on Delivery — Pay when your order arrives',
+                  'Cash on delivery — pay when your order arrives',
                   'الدفع عند الاستلام — ادفع لما طلبك يوصلك'
                 )}
               </p>
@@ -306,10 +306,13 @@ function SuccessContent() {
             </p>
           )}
 
-          <div className="mt-8 flex flex-col gap-4 sm:flex-row sm:justify-center">
+          <div
+            data-success-actions
+            className="mt-8 flex flex-col items-center gap-4 sm:flex-row sm:justify-center"
+          >
             {paymentState === 'failed' && orderId ? (
-              <Link href={storeUrl(`/checkout?orderId=${orderId}`)}>
-                <Button size="lg">
+              <Link href={storeUrl(`/checkout?orderId=${orderId}`)} className="w-full sm:w-64">
+                <Button size="lg" className="w-full">
                   {t(
                     'Try payment again',
                     '\u0625\u0639\u0627\u062f\u0629 \u0645\u062d\u0627\u0648\u0644\u0629 \u0627\u0644\u062f\u0641\u0639'
@@ -317,19 +320,19 @@ function SuccessContent() {
                 </Button>
               </Link>
             ) : (
-              <Link href={continueShoppingHref}>
-                <Button size="lg">
+              <Link href={continueShoppingHref} className="w-full sm:w-64">
+                <Button size="lg" className="w-full">
                   {t(
-                    'Continue Shopping',
+                    'Continue shopping',
                     '\u0645\u062a\u0627\u0628\u0639\u0629 \u0627\u0644\u062a\u0633\u0648\u0642'
                   )}
                 </Button>
               </Link>
             )}
-            <Link href={storeUrl('/account/orders')}>
-              <Button size="lg" variant="outline">
+            <Link href={storeUrl('/account/orders')} className="w-full sm:w-64">
+              <Button size="lg" variant="outline" className="w-full">
                 {t(
-                  'View Order Status',
+                  'View order status',
                   '\u0639\u0631\u0636 \u062d\u0627\u0644\u0629 \u0627\u0644\u0637\u0644\u0628'
                 )}
               </Button>
@@ -338,9 +341,12 @@ function SuccessContent() {
 
           <p className="mt-8 text-sm text-muted-foreground">
             {t('Questions about your order?', 'عندك سؤال عن طلبك؟')}{' '}
-            <Link href={storeUrl('/contact')} className="text-primary hover:underline">
+            <Link
+              href={storeUrl('/contact')}
+              className="relative text-primary underline underline-offset-4 before:absolute before:-inset-y-4 before:inset-x-0 before:content-['']"
+            >
               {t(
-                'Contact Support',
+                'Contact support',
                 '\u062a\u0648\u0627\u0635\u0644 \u0645\u0639 \u0627\u0644\u062f\u0639\u0645'
               )}
             </Link>

@@ -17,6 +17,7 @@ import {
   getPreviewDefinition,
   previewTokenKey,
 } from '../services/page-builder.service';
+import { testimonialAuthorName } from '../lib/testimonial-author';
 
 const router = Router();
 
@@ -205,9 +206,9 @@ router.get(
         rating: r.rating,
         title: r.title,
         comment: r.body,
-        authorName: r.customer
-          ? `${r.customer.firstName ?? ''} ${(r.customer.lastName ?? '').slice(0, 1).toUpperCase()}.`.trim()
-          : 'Customer',
+        // null when there is no usable name: the storefront renders its own localized label
+        // (an English 'Customer' or a bare '.' read wrong on every Arabic page).
+        authorName: testimonialAuthorName(r.customer),
         authorCity: null as string | null,
         createdAt: r.createdAt.toISOString(),
       }));

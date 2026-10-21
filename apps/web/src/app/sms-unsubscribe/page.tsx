@@ -1,14 +1,17 @@
 import type { Metadata } from 'next';
+import { localizedMetadata } from '@/lib/seo/localized-metadata';
 import { API_URL } from '../../lib/api';
 import SmsUnsubscribeClient, { type SmsUnsubscribeInfo } from './SmsUnsubscribeClient';
 
 // Token-specific and never cacheable — same rationale as /unsubscribe.
 export const dynamic = 'force-dynamic';
 
-export const metadata: Metadata = {
-  title: 'SMS preferences',
-  robots: { index: false, follow: false },
-};
+export function generateMetadata(): Promise<Metadata> {
+  return localizedMetadata({
+    title: ['SMS preferences', 'تفضيلات الرسائل'],
+    robots: { index: false, follow: false },
+  });
+}
 
 interface PageProps {
   searchParams: Promise<{ t?: string }>;

@@ -40,7 +40,7 @@ export function LanguageSwitcher({ variant = 'default', className = '' }: Langua
     <div
       role="group"
       aria-label={t('Language', 'اللغة')}
-      className={`flex items-center gap-1 rounded-xl border border-border bg-background p-1 ${className}`}
+      className={`flex items-center gap-1 rounded-xl border border-input bg-background p-1 ${className}`}
     >
       <button
         type="button"

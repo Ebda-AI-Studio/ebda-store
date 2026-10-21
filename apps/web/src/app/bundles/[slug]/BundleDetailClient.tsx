@@ -22,6 +22,7 @@ import {
 
 import { fromMinor, REGION } from '@ebda/shared';
 import { Breadcrumbs } from '../../../components/Breadcrumbs';
+import { MinusIcon, PlusIcon } from '../../../templates/shared/icons';
 function BundleSkeleton() {
   return (
     <div className="grid gap-8 lg:grid-cols-2 animate-pulse">
@@ -283,7 +284,7 @@ export default function BundleDetailClient({ initialBundle }: BundleDetailClient
                   <span className="text-sm font-medium text-foreground">
                     {t('Quantity', 'الكمية')}:
                   </span>
-                  <div className="flex items-center rounded-lg border border-border">
+                  <div className="flex items-center rounded-lg border border-input">
                     <button
                       type="button"
                       onClick={() => setQuantity(Math.max(1, quantity - 1))}
@@ -291,7 +292,7 @@ export default function BundleDetailClient({ initialBundle }: BundleDetailClient
                       disabled={!isPurchasable}
                       className="flex h-11 min-w-11 items-center justify-center px-4 text-muted-foreground hover:bg-muted cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
                     >
-                      -
+                      <MinusIcon />
                     </button>
                     <span aria-live="polite" className="w-12 text-center font-medium">
                       {localize(quantity)}
@@ -306,7 +307,7 @@ export default function BundleDetailClient({ initialBundle }: BundleDetailClient
                       disabled={!isPurchasable}
                       className="flex h-11 min-w-11 items-center justify-center px-4 text-muted-foreground hover:bg-muted cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
                     >
-                      +
+                      <PlusIcon />
                     </button>
                   </div>
                   <span className="text-sm text-muted-foreground">

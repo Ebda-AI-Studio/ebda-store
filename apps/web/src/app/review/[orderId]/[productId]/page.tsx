@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { localizedMetadata } from '@/lib/seo/localized-metadata';
 import { notFound } from 'next/navigation';
 import { ReviewForm } from './ReviewForm';
 import { ReviewErrorView } from './ReviewErrorView';
@@ -23,10 +24,12 @@ interface ReviewStore {
 // app/cart/page.tsx sibling comment; same rationale.
 export const dynamic = 'force-dynamic';
 
-export const metadata: Metadata = {
-  title: 'Submit Review',
-  robots: { index: false, follow: false },
-};
+export function generateMetadata(): Promise<Metadata> {
+  return localizedMetadata({
+    title: ['Submit Review', 'إضافة تقييم'],
+    robots: { index: false, follow: false },
+  });
+}
 
 interface PageProps {
   params: Promise<{ orderId: string; productId: string }>;

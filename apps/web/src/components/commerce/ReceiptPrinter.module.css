@@ -14,10 +14,10 @@
   color: #141414;
 }
 .inkMuted {
-  color: rgb(20 20 20 / 0.62);
+  color: rgb(20 20 20 / 0.72);
 }
 .inkSoft {
-  color: rgb(20 20 20 / 0.6);
+  color: rgb(20 20 20 / 0.72);
 }
 
 .rule {
@@ -58,6 +58,21 @@
   to {
     stroke-dashoffset: 0;
   }
+}
+
+/* K-07 `receiptStyle: framed` (a look token): the printer is a quiet frame in the page's own
+   colours, not a near-black device slab; the paper and its ink are unchanged. */
+.framed .housing {
+  background: transparent;
+  border: 1px solid hsl(var(--input));
+}
+.framed .screen {
+  background: transparent;
+  color: hsl(var(--foreground));
+}
+.framed .slit {
+  background: hsl(var(--input));
+  box-shadow: none;
 }
 
 @media (prefers-reduced-motion: reduce) {

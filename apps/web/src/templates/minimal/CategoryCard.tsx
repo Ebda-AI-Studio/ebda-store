@@ -39,7 +39,7 @@ export default function MinimalCategoryCard({
         {category.image ? (
           <img
             src={category.image}
-            alt={displayName}
+            alt=""
             className="w-full h-full object-cover group-hover:opacity-85 transition-opacity duration-700 ease-out"
             loading="lazy"
           />

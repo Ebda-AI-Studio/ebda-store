@@ -120,6 +120,13 @@ const homepageTemplates: Record<TemplateId, HomepageTemplateComponents> = {
     CategoryStrip: DahabCategoryStrip,
     TestimonialRow: DahabTestimonialRow,
   },
+  // Qamar re-uses the minimal statics plus the shared sections (Ruling B1-1).
+  qamar: {
+    Hero: MinimalHero,
+    ProductGrid: MinimalProductGrid,
+    CategoryGrid: MinimalCategoryGrid,
+    ...shared,
+  },
 };
 
 /**

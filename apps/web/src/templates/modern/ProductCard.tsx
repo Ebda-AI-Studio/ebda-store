@@ -1,8 +1,9 @@
 'use client';
 
-import { memo, useState } from 'react';
+import { memo, useState, useId } from 'react';
 import { canBuyNow } from '@/lib/can-buy-now';
 import { resolveProductCardCtaOosDefaults } from '../shared/product-card-defaults';
+import { lookCardCta } from '../shared/look-card';
 import Link from 'next/link';
 import Image from 'next/image';
 import type { ProductCardProps } from '../types';
@@ -35,7 +36,7 @@ import {
   resolveCardBadges,
 } from '../shared/custom-badge';
 import { PlaceholderImageIcon } from '../shared/icons';
-import { CompareButton, RemoveFromWishlistButton } from '../shared/card-actions';
+import { CompareButton, RemoveFromWishlistButton, cardActionLabel } from '../shared/card-actions';
 import { TaxInclusiveLabel } from '../shared/tax-inclusive-label';
 import { productCardPropsEqual } from '../shared/product-card-memo';
 import {
@@ -85,7 +86,9 @@ function ModernProductCard({
   showCardName,
   showCardPrice,
 }: ProductCardProps) {
-  const { isRtl: ctxIsRtl, t } = useLanguage();
+  // One id per card INSTANCE: a product can render in a grid and a carousel on the same page.
+  const nameId = `prod-${useId()}-name`;
+  const { isRtl: ctxIsRtl } = useLanguage();
   const { store, layout } = useStore();
   const renderNow = useRenderNow();
   // Ruling NUMERALS-1: Western digits unless the store opted in (Arabic only).
@@ -208,7 +211,7 @@ function ModernProductCard({
     <article
       itemScope
       itemType="https://schema.org/Product"
-      aria-labelledby={`prod-${product.id}-name`}
+      aria-labelledby={nameId}
       // max-w cap matches PecannbeeProductCard so theme grids (PDP related
       // products, category pages) render at the same size as the main
       // listings. Ahmad 2026-05-16 design.md baseline.
@@ -243,7 +246,7 @@ function ModernProductCard({
                 ? 'bg-destructive text-destructive-foreground scale-[1.05]'
                 : 'bg-white/95 text-foreground hover:bg-white hover:scale-[1.05]'
             )}
-            aria-label={t('Add to wishlist', 'إضافة للمفضلة')}
+            aria-label={cardActionLabel('wishlist-add', isRtl, displayName)}
             aria-pressed={isWishlisted}
           >
             <svg
@@ -267,6 +270,7 @@ function ModernProductCard({
       <Link
         href={`${urlPrefix}/products/${product.slug}`}
         prefetch={false}
+        /* boundary: card-frame (decoration, not a control) */
         className="group relative bg-background rounded-xl overflow-hidden border border-border/60 hover:border-foreground/15 hover:shadow-[0_24px_48px_-20px_hsl(var(--foreground)/0.12)] hover:-translate-y-0.5 transition-[border-color,box-shadow,transform] duration-500 ease-out flex flex-col cursor-pointer"
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
@@ -380,6 +384,7 @@ function ModernProductCard({
           {onToggleCompare && (
             <CompareButton
               productId={product.id}
+              productName={displayName}
               isInCompare={isInCompare}
               onToggle={onToggleCompare}
               isRtl={isRtl}
@@ -388,6 +393,7 @@ function ModernProductCard({
           {onRemoveFromWishlist && (
             <RemoveFromWishlistButton
               productId={product.id}
+              productName={displayName}
               onRemove={onRemoveFromWishlist}
               isRtl={isRtl}
             />
@@ -427,6 +433,7 @@ function ModernProductCard({
                 oosDimColor={resolvedOosDimColor}
                 theme={store.theme}
                 viewOnly={viewOnly}
+                lookCta={lookCardCta(store.theme, layout)}
               />
             </div>
           </div>
@@ -449,7 +456,7 @@ function ModernProductCard({
             <>
               {nameVisible && (
                 <h3
-                  id={`prod-${product.id}-name`}
+                  id={nameId}
                   data-zone="productName"
                   className={`font-semibold ${textSizes.name} text-foreground group-hover:text-primary transition-colors duration-300 ease-out [overflow-wrap:anywhere] line-clamp-2 min-h-[2.5em] leading-snug tracking-tight${nameCase === 'uppercase' ? ' uppercase' : ''}`}
                   itemProp="name"

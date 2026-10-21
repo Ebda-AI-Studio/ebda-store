@@ -1,11 +1,8 @@
-import type { Metadata } from 'next';
 import { getStoreByTenantParam } from '@/lib/store-resolver';
 import { LocationsPageBody } from '@/app/locations/LocationsPageBody';
 
-export const metadata: Metadata = {
-  title: 'Locations',
-  description: 'Find our store branches — addresses, hours, and directions.',
-};
+// Rule (f): the same page-language title as the legacy twin (metadata parity, issue 2418).
+export { generateMetadata } from '@/app/locations/page';
 
 export default async function StoreLocationsPage({
   params,

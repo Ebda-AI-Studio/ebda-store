@@ -57,7 +57,7 @@ export function TrustLine({
         <a
           data-trust="returns"
           href={storeUrl('/returns')}
-          className="underline-offset-4 hover:text-foreground hover:underline"
+          className="relative underline underline-offset-4 before:absolute before:-inset-y-4 before:inset-x-0 before:content-[''] hover:text-foreground"
         >
           {returns}
         </a>

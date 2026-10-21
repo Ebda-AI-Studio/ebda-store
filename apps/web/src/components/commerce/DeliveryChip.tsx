@@ -122,7 +122,7 @@ export function useDeliveryWindow({
 }
 
 /**
- * "Arrives Sun 19 Oct – Tue 21 Oct" under the add-to-cart button, plus one muted line when
+ * "Arrives between Sun 19 Oct and Tue 21 Oct" under the add-to-cart button, plus one muted line when
  * the product is made to order (`useDeliveryWindow`). Hides itself when the store has no
  * numbers. Ink/muted tokens only: the accent belongs to the CTA.
  */
@@ -136,7 +136,7 @@ export function DeliveryChip({ leadTimeDays }: { leadTimeDays?: number | null })
   const text =
     from === to
       ? t(`Arrives ${from}`, `يوصلك ${from}`)
-      : t(`Arrives ${from} – ${to}`, `يوصلك بين ${from} و${to}`);
+      : t(`Arrives between ${from} and ${to}`, `يوصلك بين ${from} و${to}`);
 
   return (
     <div data-testid="delivery-chip" className="mt-3 flex items-start gap-2 text-foreground">

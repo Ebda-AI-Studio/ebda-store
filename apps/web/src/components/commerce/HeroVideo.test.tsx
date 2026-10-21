@@ -157,3 +157,23 @@ describe('HeroVideo', () => {
     expect(HTMLMediaElement.prototype.play).toHaveBeenCalled();
   });
 });
+
+// a11y P1-6 / rule (e) (W4): the looping hero video had no way to stop it (2.2.2).
+describe('HeroVideo pause control', () => {
+  it('a 44px pause button stops the video and turns into play', () => {
+    mockEnv();
+    render(<HeroVideo src={SRC} poster={POSTER} alt="Hero" />);
+    const btn = document.querySelector('button[data-autoplay-toggle]') as HTMLButtonElement;
+    expect(btn).toBeTruthy();
+    expect(btn.getAttribute('aria-pressed')).toBe('false');
+    expect(btn.className).toContain('h-11');
+    fireEvent.click(btn);
+    expect(HTMLMediaElement.prototype.pause).toHaveBeenCalled();
+    expect(btn.getAttribute('aria-pressed')).toBe('true');
+  });
+  it('no video (reduced motion): no button', () => {
+    mockEnv({ reduced: true });
+    render(<HeroVideo src={SRC} poster={POSTER} alt="Hero" />);
+    expect(document.querySelector('button[data-autoplay-toggle]')).toBeNull();
+  });
+});

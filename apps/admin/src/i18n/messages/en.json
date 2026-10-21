@@ -1535,11 +1535,20 @@
           "modeSlider": "Slider (rotating images)",
           "modeSingleHint": "Shows the first slide only. Best when you have one strong campaign image.",
           "modeSliderHint": "Cycles through every slide automatically. Best for showcasing multiple campaigns or collections.",
-          "fitLabel": "Image fit",
+          "fitLabel": "Presentation",
           "fitFill": "Fill (crop to edges)",
           "fitFit": "Fit (show whole image)",
           "fitFillHint": "The image fills the banner edge-to-edge and is cropped to fit. Best for wide 1920×700 images.",
           "fitFitHint": "The whole image is shown inside the banner without cropping (it may have side bars). Best when your image is smaller or a different shape than recommended.",
+          "fitCollage": "Collage (3 photos)",
+          "fitCollageHint": "Three slide photos overlap with one headline and button beside them. Needs at least 3 slides with images; with fewer it shows as a full banner.",
+          "frameLabel": "Frame line",
+          "frameNone": "None",
+          "frameLine": "Hairline",
+          "textAnchorLabel": "Text position",
+          "textAnchorCenter": "Centre",
+          "textAnchorBottomStart": "Bottom corner",
+          "textAnchorHint": "On phones and tablets the text sits under the photo in the page colours, so the headline colour applies only on large screens.",
           "autoplay": "Autoplay interval (ms)",
           "slides": {
             "title": "Slides",
@@ -1573,7 +1582,11 @@
             "ctaHrefPlaceholder": "/products or /products?category=shoes",
             "link": "Banner link (optional)",
             "linkPlaceholder": "https://… or /products — leave empty for a non-clickable banner",
-            "slideLabel": "Slide {index}"
+            "slideLabel": "Slide {index}",
+            "focus": "Image focus",
+            "focusCenter": "Centre",
+            "focusTop": "Top (keeps heads in frame)",
+            "focusBottom": "Bottom"
           }
         },
         "categories": {
@@ -1583,6 +1596,7 @@
           "mobileLabel": "Mobile",
           "layoutGrid": "Grid",
           "layoutHorizontal": "Horizontal scroll",
+          "layoutChips": "Text chips",
           "captionBelow": "Caption below image",
           "captionOverlay": "Caption over image",
           "desktopColumns": "Desktop columns",
@@ -5342,7 +5356,8 @@
         "minimal": "Minimal",
         "bold": "Bold",
         "elegant": "Elegant",
-        "dahab": "Dahab"
+        "dahab": "Dahab",
+        "qamar": "Qamar"
       }
     }
   },

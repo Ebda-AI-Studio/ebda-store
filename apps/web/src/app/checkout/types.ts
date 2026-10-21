@@ -7,6 +7,9 @@ export interface CheckoutCartItem {
   price: number;
   /** Personalisation text shown under the line name. */
   note?: string;
+  /** The chosen variant ("Rose / S / 52"), as the cart and receipt show it (IA-02). */
+  variantTitle?: string;
+  variantTitleAr?: string;
   product: {
     id: string;
     name: string;
