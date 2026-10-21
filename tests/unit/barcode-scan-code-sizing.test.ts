@@ -21,9 +21,9 @@ describe('scan code (compact, reversible)', () => {
       expect(orderNumberFromScanCode(scanCodeFor(x))).toBe(x);
     }
   });
-  it('is shorter than the raw number: 134 modules (+20 quiet) vs 233', () => {
+  it('is shorter than the raw number: 134 modules (+20 quiet) vs 211', () => {
     expect(code128Modules(scanCodeFor('ORD-T5JK9Q-AB3XY')).length).toBe(134); // +20 quiet = 154
-    expect(code128Modules('ORD-T5JK9Q-AB3XY').length).toBeGreaterThan(220);
+    expect(code128Modules('ORD-T5JK9Q-AB3XY').length).toBe(211);
   });
   it('EBD- payment numbers carry their 16 digits; other formats pass through', () => {
     expect(scanCodeFor('EBD-1234567890123456')).toBe('1234567890123456');
