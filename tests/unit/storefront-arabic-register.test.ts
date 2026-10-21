@@ -310,6 +310,70 @@ const storefrontPaths = () => [
   ...files(join(ROOT, 'packages/ui/src')),
 ];
 
+/**
+ * SHOPPER-facing messages outside the storefront bundle (Ahmad 2026-10-16: the Egyptian rule
+ * extends to the shopper's voice): order/account emails, the SMS + web-push templates, the
+ * WhatsApp template bodies sent to shoppers, and the newsletter footer.
+ *
+ * Merchant-facing messages (merchant emails, merchant push in onesignal.service.ts, the admin)
+ * are NOT scanned. The tax-invoice document (`invoice.service.ts`, `fiscal-document-render.ts`)
+ * is a legal record and stays formal, so it is not scanned either. A new file in
+ * `email-templates/` is scanned by default: it is shopper-facing unless listed in
+ * MERCHANT_EMAIL_TEMPLATES.
+ */
+const MERCHANT_EMAIL_TEMPLATES = [
+  '_layout.ts',
+  '_util.ts',
+  'legal-notice.ts',
+  'low-stock-alert.ts',
+  'plan-limit-reached.ts',
+  'staff-invite.ts',
+  'subscription-billing.ts',
+];
+const SHOPPER_MESSAGE_FILES = [
+  'packages/shared/src/notifications.ts',
+  'apps/api/src/lib/wa-templates/definitions.ts',
+  'apps/api/src/lib/newsletter-broadcast.ts',
+  'apps/api/src/services/campaign.service.ts',
+  'apps/api/src/services/email.service.ts',
+];
+/** Files that may carry a `legal-register` fence inside the shopper-message set. */
+const MESSAGE_LEGAL_REGION_FILES: string[] = [];
+
+const shopperMessagePaths = () => [
+  ...readdirSync(join(ROOT, 'apps/api/src/services/email-templates'))
+    .filter(n => n.endsWith('.ts') && !MERCHANT_EMAIL_TEMPLATES.includes(n))
+    .map(n => join(ROOT, 'apps/api/src/services/email-templates', n)),
+  ...SHOPPER_MESSAGE_FILES.map(f => join(ROOT, f)),
+];
+
+describe('shopper messages: email, SMS, web push, WhatsApp templates (Ruling FU46-Y02a, shopper voice)', () => {
+  it('no MSA sentence in any shopper-facing message source', () => {
+    const paths = shopperMessagePaths();
+    expect(paths.length).toBeGreaterThan(12);
+    expect(Object.values(msaHits(paths, { honourRegions: true })).flat()).toEqual([]);
+  });
+
+  it('a legal-register fence sits only in a named shopper-message file', () => {
+    const stray = shopperMessagePaths()
+      .filter(p => REGION_START.test(readFileSync(p, 'utf8')))
+      .map(p => relative(ROOT, p))
+      .filter(f => !MESSAGE_LEGAL_REGION_FILES.includes(f));
+    expect(stray).toEqual([]);
+  });
+
+  it('the Egyptian message sentences are pinned', () => {
+    const PINNED: Array<[string, string]> = [
+      ['apps/api/src/services/email-templates/order-confirmation.ts', 'طلبك اتسجل'],
+      ['apps/api/src/services/email-templates/order-shipped.ts', 'طلبك اتشحن'],
+      ['packages/shared/src/notifications.ts', 'طلبك رقم #{number} اتأكد'],
+      ['apps/api/src/lib/wa-templates/definitions.ts', 'اتسلّم. شكراً إنك اشتريت من عندنا'],
+    ];
+    const missing = PINNED.filter(([f, s]) => !readFileSync(join(ROOT, f), 'utf8').includes(s));
+    expect(missing).toEqual([]);
+  });
+});
+
 describe('storefront Arabic register (Ruling FU46-Y02a: Egyptian sentences, neutral labels)', () => {
   it('no MSA sentence in any storefront string outside the named legal text', () => {
     const paths = storefrontPaths();
