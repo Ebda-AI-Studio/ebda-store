@@ -363,9 +363,14 @@ describe('FK delete rules (Task 1 step 5): nothing references the new tables, pa
       product_price_tiers_product_id_fkey: 'c',
       product_price_tiers_variant_id_fkey: 'c',
       product_price_tiers_group_id_fkey: 'c',
+      product_price_tiers_store_product_fkey: 'c',
+      product_price_tiers_product_variant_fkey: 'c',
+      product_price_tiers_store_group_fkey: 'c',
       wholesale_applications_store_id_fkey: 'c',
       wholesale_applications_user_id_fkey: 'c',
       wholesale_applications_group_id_fkey: 'n',
+      wholesale_applications_store_user_fkey: 'c',
+      wholesale_applications_store_group_fkey: 'n',
     };
     expect(Object.fromEntries(rows.map(r => [r.name, r.del]))).toEqual(want);
   });
@@ -462,5 +467,222 @@ describe('FK delete rules (Task 1 step 5): nothing references the new tables, pa
       `SELECT count(*)::bigint AS n FROM public.wholesale_applications WHERE store_id = '${s.id}'`
     );
     expect([Number(t!.n), Number(a!.n)]).toEqual([0, 0]);
+  });
+});
+
+describe('C3 ownership composite FKs and C1 customers.user_id (design review, migration 20261028000300)', () => {
+  const code = async (p: Promise<unknown>) => {
+    try {
+      await p;
+      return 'ok';
+    } catch (e) {
+      const m = e as {
+        code?: string;
+        meta?: { driverAdapterError?: { cause?: { originalCode?: string } } };
+        message?: string;
+      };
+      return m.meta?.driverAdapterError?.cause?.originalCode ?? m.code ?? m.message ?? 'error';
+    }
+  };
+  const FK = '23503';
+  const UNIQUE = '23505';
+
+  it('pre-flight: no existing row violates any composite FK or the user link (expected 0 each)', async () => {
+    const counts = await q<{ n: bigint }>(
+      `SELECT (SELECT count(*) FROM product_price_tiers t JOIN products p ON p.id = t.product_id WHERE p.store_id <> t.store_id)::bigint AS n
+       UNION ALL SELECT count(*)::bigint FROM product_price_tiers t JOIN product_variants v ON v.id = t.variant_id WHERE v.product_id <> t.product_id
+       UNION ALL SELECT count(*)::bigint FROM product_price_tiers t JOIN customer_groups g ON g.id = t.group_id WHERE g.store_id <> t.store_id
+       UNION ALL SELECT count(*)::bigint FROM customers c JOIN customer_groups g ON g.id = c.group_id WHERE g.store_id <> c.store_id
+       UNION ALL SELECT count(*)::bigint FROM wholesale_applications a JOIN users u ON u.id = a.user_id WHERE u.store_id IS DISTINCT FROM a.store_id`
+    );
+    expect(counts.map(c => Number(c.n))).toEqual([0, 0, 0, 0, 0]);
+  });
+
+  it("a tier cannot reference another store's product, another product's variant, or another store's group (as owner, RLS off)", async () => {
+    const other = await owner.product.create({
+      data: { storeId: ids.sA!, name: 'o', slug: `${RUN}-o`, price: 100 },
+    });
+    const otherVariant = await owner.productVariant.create({
+      data: { productId: other.id, title: 'ov' },
+    });
+    const base = { priceMinor: 50 };
+    expect(
+      await code(
+        owner.productPriceTier.create({
+          data: { ...base, storeId: ids.sA!, productId: ids.pB!, minQty: 31 },
+        })
+      )
+    ).toBe(FK);
+    expect(
+      await code(
+        owner.productPriceTier.create({
+          data: {
+            ...base,
+            storeId: ids.sA!,
+            productId: ids.pA!,
+            variantId: otherVariant.id,
+            minQty: 32,
+          },
+        })
+      )
+    ).toBe(FK);
+    expect(
+      await code(
+        owner.productPriceTier.create({
+          data: { ...base, storeId: ids.sA!, productId: ids.pA!, groupId: ids.gB!, minQty: 33 },
+        })
+      )
+    ).toBe(FK);
+    // the legitimate shapes still work
+    await owner.productPriceTier.create({
+      data: {
+        ...base,
+        storeId: ids.sA!,
+        productId: other.id,
+        variantId: otherVariant.id,
+        minQty: 34,
+      },
+    });
+  });
+
+  it("an application cannot reference another store's user or group", async () => {
+    expect(
+      await code(
+        owner.wholesaleApplication.create({
+          data: {
+            storeId: ids.sA!,
+            userId: ids.uB!,
+            businessName: 'x',
+            phone: '1',
+            status: 'rejected',
+          },
+        })
+      )
+    ).toBe(FK);
+    expect(
+      await code(
+        owner.wholesaleApplication.create({
+          data: {
+            storeId: ids.sA!,
+            userId: ids.uA!,
+            businessName: 'x',
+            phone: '1',
+            status: 'rejected',
+            groupId: ids.gB!,
+          },
+        })
+      )
+    ).toBe(FK);
+  });
+
+  it("a customer cannot reference another store's group or user", async () => {
+    expect(
+      await code(
+        owner.customer.create({
+          data: {
+            storeId: ids.sA!,
+            email: `${RUN}-cg@test.com`,
+            firstName: 'x',
+            lastName: 'y',
+            groupId: ids.gB!,
+          },
+        })
+      )
+    ).toBe(FK);
+    expect(
+      await code(
+        owner.customer.create({
+          data: {
+            storeId: ids.sA!,
+            email: `${RUN}-cu@test.com`,
+            firstName: 'x',
+            lastName: 'y',
+            userId: ids.uB!,
+          },
+        })
+      )
+    ).toBe(FK);
+  });
+
+  it('customers.user_id is unique per store (one CRM row per user); many NULLs are fine', async () => {
+    const mk = (tag: string, userId: string | null) =>
+      owner.customer.create({
+        data: {
+          storeId: ids.sA!,
+          email: `${RUN}-u${tag}@test.com`,
+          firstName: 'x',
+          lastName: 'y',
+          userId,
+        },
+      });
+    await mk('1', ids.uA!);
+    expect(await code(mk('2', ids.uA!))).toBe(UNIQUE);
+    await mk('3', null);
+    await mk('4', null);
+  });
+
+  it('the composite SET NULL clauses name only the dependent column (store_id is never nulled)', async () => {
+    const defs = await q<{ name: string; def: string }>(
+      `SELECT conname AS name, pg_get_constraintdef(oid) AS def FROM pg_constraint
+        WHERE conname IN ('customers_store_id_user_id_fkey','customers_store_group_fkey','wholesale_applications_store_group_fkey')`
+    );
+    expect(defs).toHaveLength(3);
+    for (const d of defs)
+      expect(d.def, d.name).toMatch(/ON DELETE SET NULL \((user_id|group_id)\)/);
+  });
+
+  it('deleting a group NULLs customers.group_id but keeps store_id (no tenant escape)', async () => {
+    const g = await owner.customerGroup.create({ data: { storeId: ids.sA!, name: `${RUN}-del` } });
+    const c = await owner.customer.create({
+      data: {
+        storeId: ids.sA!,
+        email: `${RUN}-dg@test.com`,
+        firstName: 'x',
+        lastName: 'y',
+        groupId: g.id,
+      },
+    });
+    await owner.customerGroup.delete({ where: { id: g.id } });
+    expect(await owner.customer.findUnique({ where: { id: c.id } })).toMatchObject({
+      groupId: null,
+      storeId: ids.sA!,
+    });
+  });
+
+  it('the migration backfill links ONLY an unambiguous verified same-store customer-role email match', async () => {
+    const fs = await import('node:fs');
+    const sql = fs.readFileSync(
+      'packages/database/prisma/migrations/20261028000300_b2b_identity_link_ownership_fks/migration.sql',
+      'utf8'
+    );
+    const backfill = sql.slice(sql.indexOf('WITH ranked AS'), sql.indexOf('-- ── C3'));
+    const mkU = (tag: string, o: Record<string, unknown>) =>
+      owner.user.create({
+        data: {
+          email: `${RUN}-bf${tag}@test.com`,
+          passwordHash: 'x',
+          firstName: tag,
+          lastName: 'T',
+          role: 'customer',
+          storeId: ids.sA!,
+          ...o,
+        } as never,
+      });
+    const verified = await mkU('v', { emailVerified: true });
+    const unverified = await mkU('u', { emailVerified: false });
+    const crmV = await owner.customer.create({
+      data: {
+        storeId: ids.sA!,
+        email: verified.email.toUpperCase(),
+        firstName: 'v',
+        lastName: 'T',
+      },
+    });
+    const crmU = await owner.customer.create({
+      data: { storeId: ids.sA!, email: unverified.email, firstName: 'u', lastName: 'T' },
+    });
+    await owner.$executeRawUnsafe(backfill);
+    expect((await owner.customer.findUnique({ where: { id: crmV.id } }))?.userId).toBe(verified.id);
+    expect((await owner.customer.findUnique({ where: { id: crmU.id } }))?.userId).toBeNull();
   });
 });

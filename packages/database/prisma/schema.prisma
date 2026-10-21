@@ -746,6 +746,13 @@ model Customer {
   /// group must never delete customers.
   groupId String? @map("group_id")
 
+  /// B2B price identity (Ruling B2B-2c): the registered shopper (users.id) this CRM row belongs to. A wholesale price is
+  /// granted ONLY through this link, never through an email / phone match. NULL = CRM or guest row (grants no price).
+  /// Set only by wholesale approval or the merchant's group dropdown on a registered shopper's profile. The composite FK
+  /// (store_id, user_id) -> users(store_id, id) ON DELETE SET NULL (user_id) and the partial unique index
+  /// (store_id, user_id) WHERE user_id IS NOT NULL live in migration 20261028000300 (Prisma cannot express them).
+  userId String? @map("user_id")
+
   store              Store               @relation(fields: [storeId], references: [id], onDelete: Cascade)
   addresses          CustomerAddress[]
   group              CustomerGroup?      @relation(fields: [groupId], references: [id], onDelete: SetNull)
