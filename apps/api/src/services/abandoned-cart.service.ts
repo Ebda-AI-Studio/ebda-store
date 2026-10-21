@@ -10,6 +10,7 @@
  *     └─ processReminders()       — send scheduled reminder steps
  */
 
+import { resolveSendTemplateName } from '../lib/wa-templates/legacy-names';
 import {
   prisma,
   acrossStores,
@@ -549,7 +550,7 @@ class AbandonedCartService {
    *   (a) step N sentinel does NOT yet exist (not already sent)
    *   (b) for N>1: step N-1 sentinel EXISTS and its stored timestamp is ≥ step-N delay ago
    *
-   * All 3 steps use the same Meta-approved template (force_cart_abandoned_v1).
+   * All 3 steps use the same Meta-approved template (ebda_cart_abandoned_v1).
    * Variables are identical across steps; messaging variation is a future enhancement.
    *
    * Sentinel expiry ensures re-abandoned carts (recovered then abandoned again) get
@@ -618,11 +619,11 @@ class AbandonedCartService {
       return;
     }
 
-    const templateName = template.name!;
+    const templateName = await resolveSendTemplateName(store.id, template.name!);
     const languageCode = template.languageCode || (cart.language === 'ar' ? 'ar' : 'en');
     const idempotencyKey = `wa-cart-${cart.waCartId}-step${stepToFire}`;
 
-    // Build variables for force_cart_abandoned_v1:
+    // Build variables for ebda_cart_abandoned_v1:
     //   {{1}} customer name, {{2}} cart total, {{3}} store name
     const cartTotalMajor = (cart.totalFils / 1000).toFixed(3);
     const totalDisplay = `${cartTotalMajor} ${cart.currency}`;
@@ -686,15 +687,7 @@ class AbandonedCartService {
         },
         include: {
           store: { select: { id: true, name: true, domain: true, slug: true } },
-          customer: {
-            select: {
-              firstName: true,
-              lastName: true,
-              email: true,
-              phone: true,
-              preferredLocale: true,
-            },
-          },
+          customer: { select: { firstName: true, lastName: true, email: true, phone: true } },
         },
       })
     );
@@ -788,7 +781,6 @@ class AbandonedCartService {
       cartTotal: cartTotalFormatted,
       cartItemCount: abandonedCart.cartItemCount,
       couponCode: couponCode ?? undefined,
-      locale: abandonedCart.customer?.preferredLocale,
     };
 
     const event: NotificationEvent = `cart_abandoned_step${stepNumber}` as NotificationEvent;

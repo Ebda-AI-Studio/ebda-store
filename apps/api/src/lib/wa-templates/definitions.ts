@@ -8,9 +8,9 @@
  * Variable placeholders are positional 1..N. When sending, the WBS bridge
  * passes a `variables` array matching {{1}}..{{N}} order.
  *
- * Template naming convention: `force_<purpose>_<version>` where version
+ * Template naming convention: `ebda_<purpose>_<version>` where version
  * lets us iterate template text without orphaning existing approvals
- * (e.g. `force_order_paid_v1` → `force_order_paid_v2` next iteration).
+ * (e.g. `ebda_order_paid_v1` → `ebda_order_paid_v2` next iteration).
  */
 import { BRAND } from '@ebda/shared';
 
@@ -74,7 +74,7 @@ export const TEMPLATES: TemplateDefinition[] = [
   // ───── orderPaid ─────
   {
     sourceKey: 'orderPaid',
-    name: 'force_order_paid_v1',
+    name: 'ebda_order_paid_v1',
     language: 'en',
     metaLanguage: 'en',
     category: 'UTILITY',
@@ -97,7 +97,7 @@ export const TEMPLATES: TemplateDefinition[] = [
   },
   {
     sourceKey: 'orderPaid',
-    name: 'force_order_paid_v1',
+    name: 'ebda_order_paid_v1',
     language: 'ar',
     metaLanguage: 'ar',
     category: 'UTILITY',
@@ -122,7 +122,7 @@ export const TEMPLATES: TemplateDefinition[] = [
   // ───── orderShipped ─────
   {
     sourceKey: 'orderShipped',
-    name: 'force_order_shipped_v2',
+    name: 'ebda_order_shipped_v2',
     language: 'en',
     metaLanguage: 'en',
     category: 'UTILITY',
@@ -153,7 +153,7 @@ export const TEMPLATES: TemplateDefinition[] = [
   },
   {
     sourceKey: 'orderShipped',
-    name: 'force_order_shipped_v2',
+    name: 'ebda_order_shipped_v2',
     language: 'ar',
     metaLanguage: 'ar',
     category: 'UTILITY',
@@ -174,7 +174,7 @@ export const TEMPLATES: TemplateDefinition[] = [
   // ───── orderDelivered ─────
   {
     sourceKey: 'orderDelivered',
-    name: 'force_order_delivered_v2',
+    name: 'ebda_order_delivered_v2',
     language: 'en',
     metaLanguage: 'en',
     category: 'UTILITY',
@@ -200,7 +200,7 @@ export const TEMPLATES: TemplateDefinition[] = [
   },
   {
     sourceKey: 'orderDelivered',
-    name: 'force_order_delivered_v2',
+    name: 'ebda_order_delivered_v2',
     language: 'ar',
     metaLanguage: 'ar',
     category: 'UTILITY',
@@ -225,7 +225,7 @@ export const TEMPLATES: TemplateDefinition[] = [
   // ───── welcomeBack ─────
   {
     sourceKey: 'welcomeBack',
-    name: 'force_welcome_back_v1',
+    name: 'ebda_welcome_back_v1',
     language: 'en',
     metaLanguage: 'en',
     category: 'MARKETING',
@@ -244,7 +244,7 @@ export const TEMPLATES: TemplateDefinition[] = [
   },
   {
     sourceKey: 'welcomeBack',
-    name: 'force_welcome_back_v1',
+    name: 'ebda_welcome_back_v1',
     language: 'ar',
     metaLanguage: 'ar',
     category: 'MARKETING',
@@ -265,7 +265,7 @@ export const TEMPLATES: TemplateDefinition[] = [
   // ───── cartAbandoned ─────
   {
     sourceKey: 'cartAbandoned',
-    name: 'force_cart_abandoned_v1',
+    name: 'ebda_cart_abandoned_v1',
     language: 'en',
     metaLanguage: 'en',
     category: 'MARKETING',
@@ -284,7 +284,7 @@ export const TEMPLATES: TemplateDefinition[] = [
   },
   {
     sourceKey: 'cartAbandoned',
-    name: 'force_cart_abandoned_v1',
+    name: 'ebda_cart_abandoned_v1',
     language: 'ar',
     metaLanguage: 'ar',
     category: 'MARKETING',
@@ -305,7 +305,7 @@ export const TEMPLATES: TemplateDefinition[] = [
   // ───── paymentLink ─────
   {
     sourceKey: 'paymentLink',
-    name: 'force_payment_link_v1',
+    name: 'ebda_payment_link_v1',
     language: 'en',
     metaLanguage: 'en',
     category: 'UTILITY',
@@ -336,7 +336,7 @@ export const TEMPLATES: TemplateDefinition[] = [
   },
   {
     sourceKey: 'paymentLink',
-    name: 'force_payment_link_v1',
+    name: 'ebda_payment_link_v1',
     language: 'ar',
     metaLanguage: 'ar',
     category: 'UTILITY',
