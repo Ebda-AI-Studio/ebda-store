@@ -71,6 +71,17 @@ const ALLOW: Record<string, AllowEntry> = {
       buildCustomerHistory: 3,
     },
   },
+  'services/cart-recovery-email.service.ts': {
+    category: 'resolver-output',
+    reason:
+      'parses the abandonment snapshot, whose prices abandoned-cart.service already took from the resolver',
+    reads: { parseItems: 2 },
+  },
+  'services/email-templates/cart-recovery.ts': {
+    category: 'resolver-output',
+    reason: 'renders snapshot line prices that came from the resolver',
+    reads: { rows: 1 },
+  },
   'services/abandoned-cart.service.ts': {
     category: 'resolver-input',
     reason: 'recovery totals via priceCart for the cart owner',
