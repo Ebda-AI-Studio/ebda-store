@@ -188,7 +188,7 @@ function Combobox({
             type="button"
             onClick={handleClear}
             aria-label={clearLabel}
-            className="ms-1 flex h-5 w-5 items-center justify-center rounded-full text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+            className="relative ms-1 flex h-5 w-5 items-center justify-center rounded-full text-muted-foreground before:absolute before:-inset-3 before:content-[''] hover:text-foreground hover:bg-muted transition-colors"
           >
             <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path

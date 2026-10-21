@@ -74,6 +74,8 @@ async function fillShipping(page) {
   if (await building.count()) await building.first().fill('12');
 }
 
+const SHIPPING_CALC = '**/shipping/calculate';
+
 const continueToPayment = page =>
   page
     .getByRole('button', { name: /Continue to payment|المتابعة للدفع/ })
@@ -137,7 +139,22 @@ export const ACTIONS = {
     await continueToPayment(page);
     await page.waitForTimeout(800);
   },
+  async 'fill-shipping'(page, url) {
+    // The form after the shopper picked a governorate and an area: the combobox clear buttons
+    // exist only now (STOP-2 P1-1: they measured 20x20 and no earlier screen showed them).
+    await page.goto(url, { waitUntil: 'networkidle', timeout: 180000 });
+    await fillShipping(page);
+    await page.waitForTimeout(1500);
+  },
+  async 'fill-shipping-calc-fails'(page, url) {
+    // The "couldn't calculate shipping" panel with its Retry button (STOP-2 P1-1).
+    await page.route(SHIPPING_CALC, route => route.fulfill({ status: 500, body: '{}' }));
+    await page.goto(url, { waitUntil: 'networkidle', timeout: 180000 });
+    await fillShipping(page);
+    await page.waitForTimeout(2500);
+  },
   async 'fill-and-continue'(page, url) {
+    await page.unroute(SHIPPING_CALC).catch(() => {});
     await page.goto(url, { waitUntil: 'networkidle', timeout: 180000 });
     await fillShipping(page);
     await continueToPayment(page);

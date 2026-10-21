@@ -17,6 +17,12 @@
     { "id": "cart-remove", "path": "/cart", "action": "remove-line-with-undo" },
     { "id": "checkout-shipping", "path": "/checkout", "action": "empty" },
     { "id": "checkout-shipping-errors", "path": "/checkout", "action": "submit-empty" },
+    { "id": "checkout-shipping-filled", "path": "/checkout", "action": "fill-shipping" },
+    {
+      "id": "checkout-shipping-error",
+      "path": "/checkout",
+      "action": "fill-shipping-calc-fails"
+    },
     { "id": "checkout-payment", "path": "/checkout", "action": "fill-and-continue" },
     {
       "id": "checkout-coupon-failed",

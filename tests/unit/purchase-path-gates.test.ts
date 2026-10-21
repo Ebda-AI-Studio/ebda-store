@@ -69,6 +69,8 @@ describe('(a) the screen manifest covers the whole purchase path', () => {
     'cart-remove',
     'checkout-shipping',
     'checkout-shipping-errors',
+    'checkout-shipping-filled',
+    'checkout-shipping-error',
     'checkout-payment',
     'checkout-coupon-failed',
     'receipt',
@@ -191,6 +193,24 @@ describe('(d) inline purchase-path links carry a 44px hit inset', () => {
  *    around a block button measures its line, not the button;
  *  - retry buttons (section and product list): 98-104 x 28.
  */
+describe('(d) STOP-2 P1: the shipping clear and retry controls are 44px', () => {
+  it('the combobox clear button keeps its 20px glyph and grows a 44px hit area', () => {
+    const s = src('app/checkout/_components/GovernorateAreaSelect.tsx');
+    const i = s.indexOf('onClick={handleClear}');
+    const tag = s.slice(s.lastIndexOf('<button', i), s.indexOf('>', s.indexOf('className=', i)));
+    expect(tag).toMatch(/\brelative\b/);
+    expect(tag).toMatch(/\bbefore:absolute\b/);
+    expect(tag).toMatch(/\bbefore:-inset-3\b/);
+  });
+  it('the shipping-error Retry button is 44px', () => {
+    const s = src('app/checkout/CheckoutClient.tsx');
+    const i = s.indexOf('onClick={() => calculateShipping()}');
+    const tag = s.slice(s.lastIndexOf('<button', i), s.indexOf('>', s.indexOf('className=', i)));
+    expect(tag).toMatch(/\bmin-h-11\b/);
+    expect(tag).toMatch(/\bmin-w-11\b/);
+  });
+});
+
 describe('(d) rendered-probe findings stay fixed', () => {
   it('checkout checkbox rows are 44px', () => {
     const s = src('app/checkout/CheckoutClient.tsx');
