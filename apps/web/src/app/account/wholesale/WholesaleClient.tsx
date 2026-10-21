@@ -57,29 +57,29 @@ export default function WholesaleClient() {
       case 'ALREADY_PENDING':
         return t(
           'You already have an application waiting for review.',
-          'لديك طلب قيد المراجعة بالفعل.'
+          'عندك طلب لسه بيتراجع.'
         );
       case 'ALREADY_APPROVED':
-        return t('Your account already has wholesale access.', 'حسابك لديه صلاحية الجملة بالفعل.');
+        return t('Your account already has wholesale access.', 'حسابك فيه صلاحية الجملة أصلًا.');
       case 'REAPPLY_COOLDOWN':
         return t(
           'You can apply again 30 days after the decision on your last application.',
-          'يمكنك التقديم مرة أخرى بعد 30 يومًا من صدور القرار في طلبك الأخير.'
+          'تقدر تقدّم تاني بعد 30 يوم من قرار طلبك الأخير.'
         );
       case 'EMAIL_NOT_VERIFIED':
         return t(
           'Verify your email address before applying.',
-          'يرجى تأكيد بريدك الإلكتروني قبل التقديم.'
+          'أكّد بريدك الإلكتروني الأول وبعدها قدّم.'
         );
       case 'FEATURE_DISABLED':
         return t(
           'This store does not offer wholesale accounts.',
-          'هذا المتجر لا يقدّم حسابات الجملة.'
+          'المتجر ده مش بيقدّم حسابات جملة.'
         );
       default:
         return (
           fallback ||
-          t('Something went wrong. Please try again.', 'حدث خطأ ما. يرجى المحاولة مرة أخرى.')
+          t('Something went wrong. Please try again.', 'حصلت مشكلة. جرّب تاني.')
         );
     }
   };
@@ -104,7 +104,7 @@ export default function WholesaleClient() {
     return (
       <div
         role="status"
-        aria-label={t('Loading', 'جارٍ التحميل')}
+        aria-label={t('Loading', 'بيحمّل')}
         className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent"
       />
     );
@@ -121,7 +121,7 @@ export default function WholesaleClient() {
         <p className="rounded-lg bg-primary/10 p-3 text-sm">
           {t(
             'Your account has wholesale access. Your wholesale prices appear on products, in your cart and at checkout.',
-            'حسابك لديه صلاحية الجملة. تظهر أسعار الجملة على المنتجات وفي السلة وعند إتمام الطلب.'
+            'حسابك فيه صلاحية الجملة. أسعار الجملة بتظهر على المنتجات وفي السلة وعند إتمام الطلب.'
           )}
         </p>
       ) : null}
@@ -130,7 +130,7 @@ export default function WholesaleClient() {
         <p className="rounded-lg bg-muted p-3 text-sm">
           {t(
             'Your application was approved, but wholesale access is paused on this account right now. Contact the store.',
-            'تمت الموافقة على طلبك، لكن صلاحية الجملة متوقفة على حسابك حاليًا. يرجى التواصل مع المتجر.'
+            'طلبك اتوافق عليه، بس صلاحية الجملة موقوفة على حسابك دلوقتي. كلّم المتجر.'
           )}
         </p>
       ) : null}
@@ -138,7 +138,7 @@ export default function WholesaleClient() {
         <p className="rounded-lg bg-muted p-3 text-sm">
           {t(
             'Your wholesale access was ended by the store.',
-            'أنهى المتجر صلاحية الجملة على حسابك.'
+            'المتجر أنهى صلاحية الجملة على حسابك.'
           )}{' '}
           {app.decisionNote ? <bdi>{app.decisionNote}</bdi> : null}
         </p>
@@ -147,12 +147,12 @@ export default function WholesaleClient() {
       {app?.status === 'pending' ? (
         <p className="rounded-lg bg-muted p-3 text-sm">
           {t('Your application for', 'طلبك الخاص بـ')} <bdi>{app.businessName}</bdi>{' '}
-          {t('is waiting for the store to review it.', 'قيد مراجعة المتجر.')}
+          {t('is waiting for the store to review it.', 'لسه المتجر بيراجعه.')}
         </p>
       ) : null}
       {app?.status === 'rejected' ? (
         <p className="rounded-lg bg-destructive/10 p-3 text-sm">
-          {t('Your last application was not approved.', 'لم تتم الموافقة على طلبك الأخير.')}{' '}
+          {t('Your last application was not approved.', 'طلبك الأخير اتّرفض.')}{' '}
           {app.decisionNote ? <bdi>{app.decisionNote}</bdi> : null}
         </p>
       ) : null}
@@ -227,7 +227,7 @@ export default function WholesaleClient() {
           ) : null}
           <Button type="submit" disabled={busy || !consent} className="min-h-11">
             {busy
-              ? t('Sending...', 'جارٍ الإرسال...')
+              ? t('Sending...', 'بيتبعت...')
               : t('Apply for a wholesale account', 'التقديم على حساب جملة')}
           </Button>
         </form>
@@ -235,7 +235,7 @@ export default function WholesaleClient() {
       {status?.isWholesale && catalog.length > 0 ? (
         <section aria-labelledby="wholesale-catalog-title" data-testid="wholesale-catalog">
           <h2 id="wholesale-catalog-title" className="mt-6 text-lg font-semibold">
-            {t('Wholesale-only products', 'منتجات الجملة فقط')}
+            {t('Wholesale-only products', 'منتجات للجملة بس')}
           </h2>
           <ul className="mt-3 grid gap-3 sm:grid-cols-2">
             {catalog.map(p => (

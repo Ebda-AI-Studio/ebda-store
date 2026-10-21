@@ -56,7 +56,7 @@ export function B2bPdpPanel({
       ) : null}
       {yours !== undefined ? (
         <p className="mt-1 font-semibold text-primary">
-          {t('Your wholesale price', 'سعر الجملة الخاص بك')}: {formatPrice(yours)}
+          {t('Your wholesale price', 'سعر الجملة بتاعك')}: {formatPrice(yours)}
         </p>
       ) : null}
       {rows.length > 0 ? (

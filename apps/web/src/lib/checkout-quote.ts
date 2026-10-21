@@ -96,12 +96,12 @@ export function priceChangedCopy(
   if (total === null) {
     return t(
       'Prices changed since you last saw your cart. Please review the new total and confirm your order.',
-      'تغيّرت الأسعار منذ آخر مرة شاهدت فيها سلتك. يرجى مراجعة الإجمالي الجديد وتأكيد طلبك.'
+      'الأسعار اتغيّرت من آخر مرة شفت فيها سلتك. راجع الإجمالي الجديد وأكّد طلبك.'
     );
   }
   const shown = formatPrice(total);
   return t(
     `Prices changed since you last saw your cart. Your new total is ${shown}. Press Place order again to confirm it.`,
-    `تغيّرت الأسعار منذ آخر مرة شاهدت فيها سلتك. إجمالي طلبك الجديد ${shown}. اضغط «تأكيد الطلب» مرة أخرى لتأكيده.`
+    `الأسعار اتغيّرت من آخر مرة شفت فيها سلتك. إجمالي طلبك الجديد ${shown}. دوس «تأكيد الطلب» تاني عشان تأكّده.`
   );
 }

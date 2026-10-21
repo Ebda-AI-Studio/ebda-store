@@ -35,20 +35,20 @@ const COPY = {
     received: {
       subject: (d: WholesaleNoticeData) => `استلمنا طلب حساب الجملة - ${d.storeName}`,
       body: (d: WholesaleNoticeData) =>
-        `<p>شكرًا لك. استلمنا طلب حساب الجملة الخاص بـ <strong>${escapeHtml(d.businessName)}</strong> وسيراجعه المتجر قريبًا. سنرسل لك رسالة عند صدور القرار.</p>`,
+        `<p>شكرًا ليك. استلمنا طلب حساب الجملة بتاع <strong>${escapeHtml(d.businessName)}</strong> والمتجر هيراجعه قريب. هنبعتلك رسالة أول ما القرار يطلع.</p>`,
     },
     approved: {
-      subject: (d: WholesaleNoticeData) => `تمت الموافقة على حساب الجملة - ${d.storeName}`,
+      subject: (d: WholesaleNoticeData) => `حساب الجملة اتوافق عليه - ${d.storeName}`,
       body: (d: WholesaleNoticeData) =>
-        `<p>أخبار سارة: تمت الموافقة على حساب الجملة الخاص بـ <strong>${escapeHtml(d.businessName)}</strong>. سجّل الدخول لترى أسعار الجملة على المنتجات وفي السلة وعند إتمام الطلب.</p>`,
+        `<p>أخبار حلوة: حساب الجملة بتاع <strong>${escapeHtml(d.businessName)}</strong> اتوافق عليه. سجّل دخولك وهتشوف أسعار الجملة على المنتجات وفي السلة وعند إتمام الطلب.</p>`,
     },
     rejected: {
       subject: (d: WholesaleNoticeData) => `بخصوص طلب حساب الجملة - ${d.storeName}`,
       body: (d: WholesaleNoticeData) =>
-        `<p>للأسف لم تتم الموافقة على طلب حساب الجملة الخاص بـ <strong>${escapeHtml(d.businessName)}</strong>.</p>${d.note ? `<p><strong>ملاحظة من المتجر:</strong> ${escapeHtml(d.note)}</p>` : ''}<p>يمكنك التقديم مرة أخرى بعد 30 يومًا.</p>`,
+        `<p>للأسف مقدرناش نوافق على طلب حساب الجملة بتاع <strong>${escapeHtml(d.businessName)}</strong>.</p>${d.note ? `<p><strong>ملاحظة من المتجر:</strong> ${escapeHtml(d.note)}</p>` : ''}<p>تقدر تقدّم تاني بعد 30 يوم.</p>`,
     },
-    hi: (d: WholesaleNoticeData) => `<p>مرحبًا ${escapeHtml(d.customerName)}،</p>`,
-    bye: (d: WholesaleNoticeData) => `<p>مع أطيب التحيات،<br>فريق ${escapeHtml(d.storeName)}</p>`,
+    hi: (d: WholesaleNoticeData) => `<p>أهلًا ${escapeHtml(d.customerName)}،</p>`,
+    bye: (d: WholesaleNoticeData) => `<p>تحياتنا،<br>فريق ${escapeHtml(d.storeName)}</p>`,
   },
 } as const;
 

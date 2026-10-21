@@ -46,7 +46,7 @@ export function moqCartMessage(
     .map(s => `${lang === 'ar' ? s.nameAr || s.name : s.name} (${s.current}/${s.required})`)
     .join(lang === 'ar' ? '، ' : ', ');
   return lang === 'ar'
-    ? `بعض المنتجات أقل من الحد الأدنى للكمية: ${list}. زد الكمية لإتمام الطلب.`
+    ? `فيه منتجات أقل من الحد الأدنى للكمية: ${list}. زوّد الكمية عشان تكمّل الطلب.`
     : `Some items are below their minimum order quantity: ${list}. Increase the quantity to check out.`;
 }
 

@@ -1841,11 +1841,11 @@ export default function CheckoutClient() {
           friendly = names
             ? t(
                 `Some items are below their minimum order quantity: ${names}. Please increase the quantity to continue.`,
-                `بعض المنتجات أقل من الحد الأدنى للكمية: ${names}. يرجى زيادة الكمية للمتابعة.`
+                `فيه منتجات أقل من الحد الأدنى للكمية: ${names}. زوّد الكمية عشان تكمّل.`
               )
             : t(
                 'Some items are below their minimum order quantity. Please increase the quantity to continue.',
-                'بعض المنتجات أقل من الحد الأدنى للكمية. يرجى زيادة الكمية للمتابعة.'
+                'فيه منتجات أقل من الحد الأدنى للكمية. زوّد الكمية عشان تكمّل.'
               );
           break;
         }
