@@ -552,3 +552,35 @@ export function getLook(id: string | null | undefined): LookDefinition | undefin
 export function looksForTemplate(t: LookTemplate): LookDefinition[] {
   return LOOKS.filter(l => l.template === t);
 }
+
+/**
+ * What a NEW store may be created on. Driven entirely by `status: 'built'` above: flipping a
+ * look to 'built' makes its template appear in signup, onboarding and the admin switcher, and
+ * makes its skin acceptable to the API, with no second list to edit. The five legacy Force
+ * skins (modern, elegant, classic, minimal, bold) have no look, so they are never offered.
+ */
+export function builtLooks(): LookDefinition[] {
+  return LOOKS.filter(l => l.status === 'built');
+}
+/** Templates with at least one built look, in registry order. */
+export function builtLookTemplates(): LookTemplate[] {
+  return LOOK_TEMPLATES.filter(t => LOOKS.some(l => l.template === t && l.status === 'built'));
+}
+/** The component skins a built look renders with (the only skins a new store may start on). */
+export function builtSkins(): string[] {
+  return [...new Set(builtLooks().map(l => l.skin as string))];
+}
+export function isBuiltSkin(skin: unknown): skin is LookDefinition['skin'] {
+  return typeof skin === 'string' && builtSkins().includes(skin);
+}
+export function isBuiltLook(id: string | null | undefined): boolean {
+  return getLook(id)?.status === 'built';
+}
+/** The look a new store gets when none is asked for: the first built look of the first built template. */
+export function defaultNewStoreLook(): LookDefinition {
+  const first = builtLookTemplates()[0];
+  const look = first ? looksForTemplate(first).find(l => l.status === 'built') : undefined;
+  if (!look)
+    throw new Error('looks registry has no built look: a new store has nothing to start on');
+  return look;
+}

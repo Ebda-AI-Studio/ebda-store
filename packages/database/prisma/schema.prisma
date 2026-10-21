@@ -253,7 +253,7 @@ model Store {
   deletedAt              DateTime?   @map("deleted_at") // Soft delete support
 
   // Template & Theme
-  template       StoreTemplate @default(modern)
+  template       StoreTemplate @default(qamar)
   look           String?       @map("look") // "<template>.<slug>" from the shared looks registry; NULL = template default
   isDemo         Boolean       @default(false) @map("is_demo")
   theme          Json          @default("{}") // StoreTheme JSON
