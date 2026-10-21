@@ -1,6 +1,6 @@
 'use client';
 
-import { memo, useState } from 'react';
+import { memo, useState, useId } from 'react';
 import { canBuyNow } from '@/lib/can-buy-now';
 import { resolveProductCardCtaOosDefaults } from '../shared/product-card-defaults';
 import { lookCardCta } from '../shared/look-card';
@@ -86,6 +86,8 @@ function ModernProductCard({
   showCardName,
   showCardPrice,
 }: ProductCardProps) {
+  // One id per card INSTANCE: a product can render in a grid and a carousel on the same page.
+  const nameId = `prod-${useId()}-name`;
   const { isRtl: ctxIsRtl } = useLanguage();
   const { store, layout } = useStore();
   const renderNow = useRenderNow();
@@ -209,7 +211,7 @@ function ModernProductCard({
     <article
       itemScope
       itemType="https://schema.org/Product"
-      aria-labelledby={`prod-${product.id}-name`}
+      aria-labelledby={nameId}
       // max-w cap matches PecannbeeProductCard so theme grids (PDP related
       // products, category pages) render at the same size as the main
       // listings. Ahmad 2026-05-16 design.md baseline.
@@ -454,7 +456,7 @@ function ModernProductCard({
             <>
               {nameVisible && (
                 <h3
-                  id={`prod-${product.id}-name`}
+                  id={nameId}
                   data-zone="productName"
                   className={`font-semibold ${textSizes.name} text-foreground group-hover:text-primary transition-colors duration-300 ease-out [overflow-wrap:anywhere] line-clamp-2 min-h-[2.5em] leading-snug tracking-tight${nameCase === 'uppercase' ? ' uppercase' : ''}`}
                   itemProp="name"

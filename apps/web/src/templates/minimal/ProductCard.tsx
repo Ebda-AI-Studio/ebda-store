@@ -1,6 +1,6 @@
 'use client';
 
-import { memo } from 'react';
+import { memo, useId } from 'react';
 import { canBuyNow } from '@/lib/can-buy-now';
 import { resolveProductCardCtaOosDefaults } from '../shared/product-card-defaults';
 import {
@@ -94,6 +94,8 @@ function MinimalProductCard({
   showCardPrice,
   showHover,
 }: ProductCardProps) {
+  // One id per card INSTANCE: a product can render in a grid and a carousel on the same page.
+  const nameId = `prod-${useId()}-name`;
   const { isRtl: ctxIsRtl, t } = useLanguage();
   const { store, layout } = useStore();
   const renderNow = useRenderNow();
@@ -204,7 +206,7 @@ function MinimalProductCard({
     <article
       itemScope
       itemType="https://schema.org/Product"
-      aria-labelledby={`prod-${product.id}-name`}
+      aria-labelledby={nameId}
       // IA-05 (W4): a look store's card fills its grid column; no look keeps the centred cap.
       className={`w-full ${getLook(store.look) ? '' : `mx-auto ${productSizeClass(cardSize)}`} ${frameCls}`
         .replace(/\s+/g, ' ')
@@ -432,7 +434,7 @@ function MinimalProductCard({
           <div className={`flex flex-col gap-2 ${textSizes.pad} text-start`}>
             {nameVisible && (
               <h3
-                id={`prod-${product.id}-name`}
+                id={nameId}
                 data-zone="productName"
                 className={`${textSizes.name} tracking-normal sm:tracking-[0.18em] ${nameCase === 'uppercase' ? 'uppercase' : ''} font-light text-muted-foreground group-hover:text-foreground transition-colors duration-500 ease-out leading-snug [overflow-wrap:anywhere] line-clamp-2 min-h-[2.5em]`}
                 itemProp="name"

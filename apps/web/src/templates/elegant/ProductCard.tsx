@@ -1,6 +1,6 @@
 'use client';
 
-import { memo, useState } from 'react';
+import { memo, useState, useId } from 'react';
 import { canBuyNow } from '@/lib/can-buy-now';
 import { resolveProductCardCtaOosDefaults } from '../shared/product-card-defaults';
 import { lookCardCta } from '../shared/look-card';
@@ -86,6 +86,8 @@ function ElegantProductCard({
   showCardName,
   showCardPrice,
 }: ProductCardProps) {
+  // One id per card INSTANCE: a product can render in a grid and a carousel on the same page.
+  const nameId = `prod-${useId()}-name`;
   const { isRtl: ctxIsRtl } = useLanguage();
   const { store, layout } = useStore();
   const renderNow = useRenderNow();
@@ -206,7 +208,7 @@ function ElegantProductCard({
     <article
       itemScope
       itemType="https://schema.org/Product"
-      aria-labelledby={`prod-${product.id}-name`}
+      aria-labelledby={nameId}
       // Task 3 Part A: article is relative so the absolute wishlist button
       // positioned here is never clipped by the image div's overflow-hidden.
       className={`relative w-full mx-auto ${productSizeClass(cardSize)} ${frameCls}`.trim()}
@@ -453,7 +455,7 @@ function ElegantProductCard({
           <div className={`text-center flex flex-col gap-2 ${textSizes.pad}`}>
             {nameVisible && (
               <h3
-                id={`prod-${product.id}-name`}
+                id={nameId}
                 data-zone="productName"
                 className={`${textSizes.name} tracking-normal sm:tracking-[0.15em] ${nameCase === 'uppercase' ? 'uppercase' : ''} text-foreground/80 group-hover:text-foreground transition-colors duration-300 [overflow-wrap:anywhere] line-clamp-1 min-h-[1.5em]`}
                 itemProp="name"

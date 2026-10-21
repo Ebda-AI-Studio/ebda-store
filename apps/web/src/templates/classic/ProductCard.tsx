@@ -1,6 +1,6 @@
 'use client';
 
-import { memo } from 'react';
+import { memo, useId } from 'react';
 import { canBuyNow } from '@/lib/can-buy-now';
 import { resolveProductCardCtaOosDefaults } from '../shared/product-card-defaults';
 import { lookCardCta } from '../shared/look-card';
@@ -86,6 +86,8 @@ function ClassicProductCard({
   showCardPrice,
   showHover,
 }: ProductCardProps) {
+  // One id per card INSTANCE: a product can render in a grid and a carousel on the same page.
+  const nameId = `prod-${useId()}-name`;
   const { isRtl: ctxIsRtl } = useLanguage();
   const { store, layout } = useStore();
   const renderNow = useRenderNow();
@@ -193,7 +195,7 @@ function ClassicProductCard({
     <article
       itemScope
       itemType="https://schema.org/Product"
-      aria-labelledby={`prod-${product.id}-name`}
+      aria-labelledby={nameId}
       className={`w-full mx-auto ${productSizeClass(cardSize)} ${frameCls}`.trim()}
       style={
         showCardFrame && cardFrameColor && store.theme
@@ -385,7 +387,7 @@ function ClassicProductCard({
           >
             {nameVisible && (
               <h3
-                id={`prod-${product.id}-name`}
+                id={nameId}
                 data-zone="productName"
                 className={`font-serif ${textSizes.name} text-foreground mb-2 group-hover:text-primary transition-colors duration-500 leading-snug tracking-tight [overflow-wrap:anywhere] line-clamp-2 min-h-[2.5em]${nameCase === 'uppercase' ? ' uppercase' : ''}`}
                 itemProp="name"

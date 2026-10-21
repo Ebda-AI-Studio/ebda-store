@@ -562,7 +562,23 @@ describe('one card anatomy on a look store: grid and carousel', () => {
     const li = c.querySelector('li')!;
     expect(li.querySelector('article[itemtype="https://schema.org/Product"]')).toBeTruthy();
     expect(li.querySelector('button[aria-pressed]')).toBeTruthy();
-    expect(li.querySelector('#prod-p-sale-name')).toBeTruthy();
+    const labelled = li.querySelector('article')!.getAttribute('aria-labelledby')!;
+    expect(labelled).toMatch(/^prod-.+-name$/);
+    expect(li.querySelector(`[id="${labelled}"]`)).toBeTruthy();
+  });
+  it('the same product twice on one page gets two distinct name ids (STOP-2 P2-1)', () => {
+    selectLook('qamar.lookbook');
+    const el = () =>
+      React.createElement(
+        ProductCarousel as never,
+        { products: [product('sale')], isRtl: true, pack: state.template } as never
+      );
+    const { container } = render(React.createElement('div', null, el(), el()));
+    const ids = [...container.querySelectorAll('article')].map(a =>
+      a.getAttribute('aria-labelledby')
+    );
+    expect(ids).toHaveLength(2);
+    expect(new Set(ids).size).toBe(2);
   });
   it('no look: the carousel keeps its own card (no heart)', () => {
     selectLook(null);

@@ -3,7 +3,7 @@
 import type React from 'react';
 import { canBuyNow } from '@/lib/can-buy-now';
 import { resolveProductCardCtaOosDefaults } from './product-card-defaults';
-import { memo, useState } from 'react';
+import { memo, useState, useId } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import type { ProductCardProps } from '../types';
@@ -116,6 +116,8 @@ function PecannbeeProductCardImpl({
   showCardName,
   showCardPrice,
 }: PecannbeeProductCardProps) {
+  // One id per card INSTANCE: a product can render in a grid and a carousel on the same page.
+  const nameId = `prod-${useId()}-name`;
   const { isRtl: ctxIsRtl, t } = useLanguage();
   const { store, layout } = useStore();
   const renderNow = useRenderNow();
@@ -315,7 +317,7 @@ function PecannbeeProductCardImpl({
       dir={isRtl ? 'rtl' : 'ltr'}
       itemScope
       itemType="https://schema.org/Product"
-      aria-labelledby={`prod-${product.id}-name`}
+      aria-labelledby={nameId}
     >
       {/* Wishlist heart — lifted OUT of the image div (Part A fix).
           Now a direct child of <article> which has no overflow-hidden,
@@ -538,7 +540,7 @@ function PecannbeeProductCardImpl({
                 className="block min-h-11 focus:outline-none focus-visible:underline"
               >
                 <p
-                  id={`prod-${product.id}-name`}
+                  id={nameId}
                   data-zone="productName"
                   className={`[overflow-wrap:anywhere] line-clamp-2 min-h-[2.5em] font-semibold ${textSizes.name} ${styles.productCardName}${nameCase === 'uppercase' ? ' uppercase' : ''}`}
                   style={{
