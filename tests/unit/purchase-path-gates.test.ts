@@ -311,4 +311,13 @@ describe('(P2) STOP-2 cart and checkout copy and states', () => {
     expect(block).not.toMatch(/\bborder\b|\brounded-lg\b|<label/);
     expect(block).toMatch(/<p /);
   });
+  it('cart and checkout share ONE Apply button style (outline Button), no hand-rolled filled one', () => {
+    const cart = src('app/cart/CartClient.tsx');
+    const checkout = src('app/checkout/OrderSummary.tsx');
+    expect(checkout).toMatch(/<Button type="button" variant="outline" onClick=\{onApplyCoupon\}>/);
+    const apply = openTags(cart, 'Button').filter(t => /onClick=\{applyPromoCode\}/.test(t));
+    expect(apply.length).toBeGreaterThan(0);
+    for (const t of apply) expect(t).toMatch(/variant="outline"/);
+    expect(cart).not.toMatch(/<button[^>]*onClick=\{applyPromoCode\}/);
+  });
 });

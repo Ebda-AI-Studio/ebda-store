@@ -858,17 +858,18 @@ export default function CartClient() {
                                 disabled={promoApplied}
                                 className="h-11 min-w-0 flex-1 rounded-lg border border-input bg-background px-3 text-base focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:opacity-50 sm:text-sm"
                               />
-                              <button
+                              <Button
+                                type="button"
+                                variant="outline"
                                 onClick={applyPromoCode}
                                 disabled={promoApplied || isValidating}
-                                className="h-11 rounded-lg bg-muted px-4 text-sm font-medium text-foreground transition-colors hover:bg-muted/80 disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer"
                               >
                                 {promoApplied
                                   ? t('Applied', 'تم')
                                   : isValidating
                                     ? '…'
                                     : t('Apply', 'تطبيق')}
-                              </button>
+                              </Button>
                             </div>
                             {promoApplied && (
                               <p
@@ -953,11 +954,11 @@ export default function CartClient() {
                                   disabled={promoApplied}
                                   className="h-11 min-w-0 flex-1 rounded-lg border border-input bg-background px-3 text-base focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:opacity-50 sm:h-10 sm:text-sm"
                                 />
-                                <button
+                                <Button
                                   type="button"
+                                  variant="outline"
                                   onClick={applyPromoCode}
                                   disabled={promoApplied || isValidating}
-                                  className="h-11 min-w-[88px] rounded-lg bg-muted px-4 text-sm font-medium text-foreground transition-colors hover:bg-muted/80 disabled:cursor-not-allowed disabled:opacity-50"
                                 >
                                   {promoApplied
                                     ? t(
@@ -970,7 +971,7 @@ export default function CartClient() {
                                           '\u062c\u0627\u0631\u064a \u0627\u0644\u062a\u062d\u0642\u0642...'
                                         )
                                       : t('Apply', '\u062a\u0637\u0628\u064a\u0642')}
-                                </button>
+                                </Button>
                               </div>
                               {promoApplied && (
                                 <p
