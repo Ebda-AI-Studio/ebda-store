@@ -1,5 +1,7 @@
 import { code128Modules } from './code128';
 import { barcodeShapeData } from './shapes';
+import { scanCodeFor } from './scan-code';
+import { BARCODE_PAD, BARCODE_ZONE, BARCODE_QUIET, resolveBarcodeShape } from './sizing';
 
 export interface RenderBarcodeOptions {
   value: string;
@@ -7,13 +9,23 @@ export interface RenderBarcodeOptions {
   shape?: string;
   /** Show the human-readable number under the bars (default true). */
   label?: boolean;
-  /** Bar colour. Default `currentColor` so the page's ink token decides. */
+  /** Bar colour: `currentColor` (default) or a hex colour; anything else is dropped to `currentColor`. */
   ink?: string;
+  /** Unique per instance on a page (React `useId`); keeps mask ids from colliding. */
+  idSuffix?: string;
+  /**
+   * Width in CSS px the SVG will be shown at. When set, a shape that would put
+   * a module under `MIN_MODULE_CSS_PX` renders plain instead (Ruling BARCODE-4).
+   */
+  displayPx?: number;
 }
 
-const PAD = 12; // breathing room around the shape
-const ZONE = 48; // scan-zone height in shape units
-const QUIET = 10; // Code 128 quiet zone, in modules
+const INK = /^(currentColor|#[0-9a-fA-F]{3,8})$/;
+const ID = /[^A-Za-z0-9_-]/g;
+
+const PAD = BARCODE_PAD;
+const ZONE = BARCODE_ZONE;
+const QUIET = BARCODE_QUIET;
 const LABEL_H = 22;
 
 const esc = (s: string) =>
@@ -40,8 +52,15 @@ function barsPath(mods: boolean[], x0: number, mw: number, y: number, h: number)
  * the bars above are the same bars, masked to the silhouette.
  * Returns an SVG string (value is escaped); colour is `currentColor` by default.
  */
-export function renderBarcodeSvg({ value, shape = 'plain', label = true, ink = 'currentColor' }: RenderBarcodeOptions): string {
-  const mods = code128Modules(value);
+export function renderBarcodeSvg(opts: RenderBarcodeOptions): string {
+  const { value, label = true } = opts;
+  const ink = opts.ink && INK.test(opts.ink) ? opts.ink : 'currentColor';
+  const shape =
+    opts.displayPx !== undefined
+      ? resolveBarcodeShape(opts.shape ?? 'plain', value, opts.displayPx)
+      : (opts.shape ?? 'plain');
+  // The compact reversible scan code is what the bars carry; the number is the label.
+  const mods = code128Modules(scanCodeFor(value));
   const data = shape === 'plain' ? undefined : barcodeShapeData(shape);
   const text = (cx: number, y: number) =>
     label
@@ -62,7 +81,7 @@ export function renderBarcodeSvg({ value, shape = 'plain', label = true, ink = '
   const mw = w / (mods.length + QUIET * 2);
   const x0 = PAD + QUIET * mw;
   const zoneY = PAD + h - ZONE;
-  const id = `bcm-${shape}`;
+  const id = `bcm-${shape}${opts.idSuffix ? `-${opts.idSuffix.replace(ID, '')}` : ''}`;
   const mask =
     `<mask id="${id}" maskUnits="userSpaceOnUse"><rect width="${w + PAD * 2}" height="${h + PAD * 2}" fill="black"/>` +
     d.map(p => `<path d="${p}" fill="white" fill-rule="evenodd" transform="translate(${PAD},${PAD})"/>`).join('') +

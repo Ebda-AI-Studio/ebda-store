@@ -3,6 +3,7 @@
 import { useMemo } from 'react';
 import {
   BRAND,
+  BARCODE_DISPLAY_PX,
   EBDA_BILLING_BARCODE_SHAPE,
   billingPaymentNumber,
   formatMoney,
@@ -50,7 +51,13 @@ export function EbdaBillingReceipt({
   const t = useT('ebdaReceipt');
   const number = useMemo(() => billingPaymentNumber(charge.id), [charge.id]);
   const svg = useMemo(
-    () => renderBarcodeSvg({ value: number, shape: EBDA_BILLING_BARCODE_SHAPE, label: false }),
+    () =>
+      renderBarcodeSvg({
+        value: number,
+        shape: EBDA_BILLING_BARCODE_SHAPE,
+        label: false,
+        displayPx: BARCODE_DISPLAY_PX.billingReceipt,
+      }),
     [number]
   );
   const money = (n: number) => formatMoney(n, locale, { fixedDecimals: true });
@@ -104,7 +111,7 @@ export function EbdaBillingReceipt({
         </dl>
         <hr className="my-4 border-0 border-t border-dashed border-black/30" />
         <div className="flex flex-col items-center gap-1.5 pb-4">
-          <bdi dir="ltr" className="block w-[78%] max-w-[16rem]">
+          <bdi dir="ltr" className="block w-full">
             <span
               aria-hidden="true"
               data-testid="ebda-receipt-barcode"

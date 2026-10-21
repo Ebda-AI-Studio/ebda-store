@@ -1,14 +1,25 @@
 /** Ebda's own billing receipts always print this shape (Ahmad, 2026-10-21). */
 export const EBDA_BILLING_BARCODE_SHAPE = 'palm';
 
+const FNV_OFFSET = 0xcbf29ce484222325n;
+const FNV_PRIME = 0x100000001b3n;
+const MASK64 = 0xffffffffffffffffn;
+const TEN_16 = 10n ** 16n;
+
 /**
- * The scannable payment number of an Ebda subscription charge: `EBD-` + the
- * first 10 hex digits of the charge id, uppercased. Deterministic, Code 128 B
- * safe, short enough to stay scannable inside the palm. (There is no separate
- * invoice-number sequence for subscription charges today.)
+ * The scannable payment number of an Ebda subscription charge: `EBD-` + 16
+ * digits (Code 128 C, so it stays wide enough to scan), the 64-bit FNV-1a hash
+ * of the WHOLE charge id mod 10^16. Works for any id shape (uuid, cuid) and
+ * keeps all of its entropy, unlike a hex prefix. There is no billing invoice
+ * sequence for subscription charges today (Ruling BARCODE-3); a display
+ * number, not a secret or a key.
  */
 export function billingPaymentNumber(chargeId: string): string {
-  const hex = chargeId.replace(/[^0-9a-fA-F]/g, '').slice(0, 10).toUpperCase();
-  if (hex.length < 6) throw new Error('billingPaymentNumber: not a charge id');
-  return `EBD-${hex}`;
+  if (!chargeId) throw new Error('billingPaymentNumber: empty charge id');
+  let h = FNV_OFFSET;
+  for (let i = 0; i < chargeId.length; i++) {
+    h ^= BigInt(chargeId.charCodeAt(i));
+    h = (h * FNV_PRIME) & MASK64;
+  }
+  return `EBD-${(h % TEN_16).toString().padStart(16, '0')}`;
 }

@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, render, screen } from '@testing-library/react';
-import { BRAND } from '@ebda/shared';
+import { BRAND, billingPaymentNumber } from '@ebda/shared';
 
 vi.mock('../../i18n/useT', () => ({
   useT: () => (key: string, v?: Record<string, unknown>) =>
@@ -10,12 +10,15 @@ vi.mock('../../i18n/useT', () => ({
 
 import { EbdaBillingReceipt } from './EbdaBillingReceipt';
 
-const charge = {
+const charge0 = {
   id: '3f2a91c4-7b1e-4d0a-9c55-0e8a1f2b3c4d',
   planCode: 'growth',
   amountMinor: 49900,
   createdAt: '2026-10-21T10:00:00Z',
 };
+
+const charge = charge0;
+const NUMBER = billingPaymentNumber(charge0.id);
 
 beforeEach(() => window.sessionStorage.clear());
 afterEach(cleanup);
@@ -23,8 +26,8 @@ afterEach(cleanup);
 describe('EbdaBillingReceipt', () => {
   it('prints the palm-shaped Code 128 of the payment number, LTR, in Ebda colours', () => {
     const { container } = render(<EbdaBillingReceipt charge={charge} locale="en" />);
-    expect(screen.getByTestId('ebda-receipt-number').textContent).toBe('EBD-3F2A91C47B');
-    expect(container.querySelector('bdi[dir="ltr"] svg[aria-label="EBD-3F2A91C47B"]')).toBeTruthy();
+    expect(screen.getByTestId('ebda-receipt-number').textContent).toBe(NUMBER);
+    expect(container.querySelector(`bdi[dir="ltr"] svg[aria-label="${NUMBER}"]`)).toBeTruthy();
     expect(container.querySelector('mask#bcm-palm')).toBeTruthy();
     const html = container.innerHTML.toLowerCase();
     expect(html).not.toContain('#ff6e01');

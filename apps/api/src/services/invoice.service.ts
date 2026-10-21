@@ -7,6 +7,7 @@ import {
   REGION,
   taxInvoiceInfo,
   renderBarcodeSvg,
+  BARCODE_DISPLAY_PX,
 } from '@ebda/shared';
 import { emailMoney } from './email-templates/_util';
 import {
@@ -161,7 +162,12 @@ function orderBarcodeBlock(orderNumber: string, rawShape: unknown): string {
   const shape = typeof rawShape === 'string' ? rawShape : 'plain';
   if (shape === 'off') return '';
   try {
-    const svg = renderBarcodeSvg({ value: orderNumber, shape, label: false });
+    const svg = renderBarcodeSvg({
+      value: orderNumber,
+      shape,
+      label: false,
+      displayPx: BARCODE_DISPLAY_PX.invoice,
+    });
     return `<div class="doc-barcode"><bdi dir="ltr">${svg}</bdi><div class="doc-barcode-num" dir="ltr">${escapeHtml(orderNumber)}</div></div>`;
   } catch {
     return '';
@@ -636,7 +642,7 @@ export class InvoiceService {
 
     /* Order barcode: ink on paper, always LTR, kept together when printing */
     .doc-barcode { margin-top: 28px; text-align: center; color: var(--ink); break-inside: avoid; }
-    .doc-barcode svg { width: 100%; max-width: 280px; height: auto; }
+    .doc-barcode svg { width: 100%; max-width: 360px; height: auto; }
     .doc-barcode-num { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12px; letter-spacing: 0.2em; color: var(--ink-soft); margin-top: 4px; }
 
     /* Footer */

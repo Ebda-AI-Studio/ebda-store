@@ -239,7 +239,7 @@ export function ReceiptPrinter({
             <Barcode
               value={order.orderNumber}
               shape={store.settings?.receiptBarcodeShape as string | undefined}
-              className={`block w-[78%] max-w-[16rem] ${styles.ink}`}
+              className={`block w-full ${styles.ink}`}
             />
             <p
               data-testid="receipt-barcode-caption"

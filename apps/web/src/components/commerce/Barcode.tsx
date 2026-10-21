@@ -1,5 +1,5 @@
-import { useMemo } from 'react';
-import { renderBarcodeSvg } from '@ebda/shared';
+import { useId, useMemo } from 'react';
+import { BARCODE_DISPLAY_PX, renderBarcodeSvg } from '@ebda/shared';
 
 /**
  * The order receipt's barcode: a REAL, scannable Code 128 of the order number
@@ -21,14 +21,22 @@ export function Barcode({
   shape?: string | null;
   className?: string;
 }) {
+  const uid = useId();
   const svg = useMemo(() => {
     if (shape === 'off') return null;
     try {
-      return renderBarcodeSvg({ value, shape: shape ?? 'plain', label: false });
+      return renderBarcodeSvg({
+        value,
+        shape: shape ?? 'plain',
+        label: false,
+        idSuffix: uid,
+        // Shapes that would put a module under 2 css px at the receipt width print plain.
+        displayPx: BARCODE_DISPLAY_PX.storefrontReceipt,
+      });
     } catch {
       return null; // a number Code 128 cannot carry: caption only
     }
-  }, [value, shape]);
+  }, [value, shape, uid]);
   if (!svg) return null;
   return (
     <bdi dir="ltr" className={className}>

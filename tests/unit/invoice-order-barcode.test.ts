@@ -16,7 +16,7 @@ const { InvoiceService } = await import('@api/services/invoice.service');
 
 function order(settings: unknown) {
   return {
-    id: 'o1', orderNumber: 'ORD-MJ4K9L2A-AB3XY', locale: 'ar', currency: 'EGP', status: 'delivered',
+    id: 'o1', orderNumber: 'ORD-T5JK9Q-AB3XY', locale: 'ar', currency: 'EGP', status: 'delivered',
     paymentStatus: 'paid', createdAt: new Date('2026-10-07T10:00:00Z'), subtotal: 10000, discount: 0,
     couponCode: null, couponDiscount: 0, promotionDiscount: 0, loyaltyDiscount: 0, loyaltyPointsRedeemed: null,
     tax: 0, taxIncludedInPrice: false, sellerTaxRegistrationNumber: null, sellerTaxLegalName: null,
@@ -38,7 +38,7 @@ describe('invoice order barcode', () => {
     expect(h).toContain('class="doc-barcode"');
     expect(h).toContain('<bdi dir="ltr"><svg');
     expect(h).not.toContain('<mask');
-    expect(h).toContain('aria-label="ORD-MJ4K9L2A-AB3XY"');
+    expect(h).toContain('aria-label="ORD-T5JK9Q-AB3XY"');
   });
   it('renders the chosen shape', async () => {
     expect(await html({ receiptBarcodeShape: 'palm' })).toContain('<mask id="bcm-palm"');

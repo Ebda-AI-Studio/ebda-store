@@ -58,10 +58,55 @@ describe('renderBarcodeSvg', () => {
 
 import { billingPaymentNumber, EBDA_BILLING_BARCODE_SHAPE } from '../../packages/shared/src/barcode';
 describe('ebda billing barcode', () => {
-  it('uses palm and a deterministic Code 128 safe payment number', () => {
+  it('uses palm and a full-entropy 16-digit payment number from ANY id shape', () => {
     expect(EBDA_BILLING_BARCODE_SHAPE).toBe('palm');
     expect(RECEIPT_BARCODE_SHAPES).toContain(EBDA_BILLING_BARCODE_SHAPE);
-    expect(billingPaymentNumber('3f2a91c4-7b1e-4d0a-9c55-0e8a1f2b3c4d')).toBe('EBD-3F2A91C47B');
-    expect(() => billingPaymentNumber('x')).toThrow();
+    const uuid = '3f2a91c4-7b1e-4d0a-9c55-0e8a1f2b3c4d';
+    const n = billingPaymentNumber(uuid);
+    expect(n).toMatch(/^EBD-\d{16}$/);
+    expect(billingPaymentNumber(uuid)).toBe(n); // deterministic
+    expect(billingPaymentNumber('clx9k2m4p0000abcd1234efgh')).toMatch(/^EBD-\d{16}$/); // cuid
+    expect(billingPaymentNumber(uuid.replace('3f2a', '3f2b'))).not.toBe(n);
+    expect(() => billingPaymentNumber('')).toThrow();
+  });
+  it('does not collide across 20k ids (64-bit hash, 16 digits)', () => {
+    const seen = new Set<string>();
+    for (let i = 0; i < 20000; i++) seen.add(billingPaymentNumber(`charge-${i}`));
+    expect(seen.size).toBe(20000);
+  });
+});
+
+describe('renderBarcodeSvg: instance ids, ink, size rule', () => {
+  it('mask ids are unique per instance (idSuffix) and referenced consistently', () => {
+    const a = renderBarcodeSvg({ value: 'ORD-T5JK9Q-AB3XY', shape: 'heart', idSuffix: 'a1' });
+    const b = renderBarcodeSvg({ value: 'ORD-T5JK9Q-AB3XY', shape: 'heart', idSuffix: 'b2' });
+    expect(a).toContain('id="bcm-heart-a1"');
+    expect(a).toContain('url(#bcm-heart-a1)');
+    expect(b).toContain('id="bcm-heart-b2"');
+    expect(a).not.toContain('b2');
+  });
+  it('ink is a token or hex only; anything else is dropped to currentColor', () => {
+    const bad = renderBarcodeSvg({ value: 'ORD-1', shape: 'plain', ink: '"/><script>x</script>' });
+    expect(bad).not.toContain('<script');
+    expect(bad).toContain('fill="currentColor"');
+    expect(renderBarcodeSvg({ value: 'ORD-1', shape: 'plain', ink: '#141414' })).toContain('fill="#141414"');
+  });
+  it('a shape that cannot meet the module floor at displayPx renders plain', () => {
+    const v = 'ORD-T5JK9Q-AB3XY';
+    expect(renderBarcodeSvg({ value: v, shape: 'palm', displayPx: 250 })).not.toContain('<mask');
+    expect(renderBarcodeSvg({ value: v, shape: 'palm', displayPx: 400 })).toContain('<mask');
+  });
+  it('labels with the order number but encodes the compact scan code', () => {
+    const svg = renderBarcodeSvg({ value: 'ORD-T5JK9Q-AB3XY', shape: 'plain', label: true });
+    expect(svg).toContain('ORD-T5JK9Q-AB3XY');
+    expect(svg).toContain('aria-label="ORD-T5JK9Q-AB3XY"');
+  });
+  it('keeps a separate unmasked scan-zone path in every shape', () => {
+    for (const shape of RECEIPT_BARCODE_SHAPES) {
+      const svg = renderBarcodeSvg({ value: 'ORD-T5JK9Q-AB3XY', shape });
+      const paths = [...svg.matchAll(/<path d="M[^"]*" fill="[^"]+"( mask="[^"]+")?\/>/g)];
+      expect(paths.filter(p => p[1]).length, shape).toBe(1); // masked decoration
+      expect(paths.filter(p => !p[1]).length, shape).toBe(1); // the scan zone
+    }
   });
 });
