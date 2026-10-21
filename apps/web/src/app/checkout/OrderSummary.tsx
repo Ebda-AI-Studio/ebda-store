@@ -176,7 +176,7 @@ export function OrderSummary({
           {items.map(item => (
             <div key={item.id} className="flex gap-4 py-4 first:pt-0">
               {/* IA-07: the badge sits outside the clipped thumbnail, logical, on the ink pair. */}
-              <div className="relative h-16 w-16 flex-shrink-0">
+              <div className="relative h-16 w-16 flex-shrink-0" data-part="summary-thumb">
                 <div className="relative h-full w-full overflow-hidden rounded-[var(--radius)] bg-muted">
                   {item.product.images?.[0] ? (
                     <Image

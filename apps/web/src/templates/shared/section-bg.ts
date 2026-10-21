@@ -89,6 +89,8 @@ export function darkLookListingBand(
   hasMerchantBg: boolean
 ): CSSProperties | undefined {
   if (hasMerchantBg || !theme || !getLook(lookId) || !theme.backgroundColor) return undefined;
+  // A look that mattes its own photos keeps the page ground (chrome.listing, Night souq).
+  if (getLook(lookId)?.chrome?.listing === 'ground') return undefined;
   const page = theme.backgroundColor.trim();
   const css = /^\d/.test(page) ? `hsl(${page})` : page;
   if (pickReadableForeground(css) !== '#ffffff') return undefined;

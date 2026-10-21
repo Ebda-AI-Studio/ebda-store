@@ -274,10 +274,12 @@ const PACK_STYLES: Record<TemplateId, PackStyles> = {
     // add (a >= 44px target; the card keeps its single action, never a second control).
     // Everything is a look token, so the orange gate stays true; compact spacing comes from the
     // look's density, the square photo from its image ratio.
-    card: 'rounded-[var(--radius)] border border-border bg-card',
+    // h-full: cards in a row share one height and the CTA (mt-auto) sits on the same baseline.
+    card: 'h-full rounded-[var(--radius)] border border-border bg-card',
     categoryFrame: 'rounded-[var(--radius)] bg-muted',
     categoryCaption: 'text-sm font-medium text-foreground',
-    productCardName: 'line-clamp-2 font-medium text-foreground leading-snug',
+    // hyphens-none: a title never breaks inside a word unless one word is wider than the card.
+    productCardName: 'line-clamp-2 font-medium text-foreground leading-snug [hyphens:none]',
     productCardPrice: 'font-semibold text-foreground',
     productCardBody: 'text-start',
     productCardCta:

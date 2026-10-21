@@ -45,6 +45,7 @@ import { sectionBgStyle } from '../../templates/shared/section-bg';
 import { CategoryChips } from '../../templates/shared/CategoryChips';
 import { CategoryRail } from '../../templates/shared/CategoryRail';
 import { CategoryTiles } from '../../templates/shared/CategoryTiles';
+import { CompactHeroBand } from '../../templates/shared/CompactHeroBand';
 import {
   sectionSpacingClasses,
   sectionVisibilityClass,
@@ -382,6 +383,16 @@ export function PageRenderer({
     heroImage
   );
 
+  // a11y P2-2: a home with no hero section (Catalogue, Showroom) still opens with an h1, the
+  // store's name. A document hero (any presentation) emits its own.
+  const homeHasHero =
+    definition.sections.some(n => n.type === 'hero' && n.hidden !== true) &&
+    layout.hero.enabled &&
+    (collageEligible ||
+      sliderEligible ||
+      (bannerEligible && !!heroSlidesWithImage(layout.hero.slides)[0]) ||
+      legacyHeroHasContent);
+
   // Data-driven sections render nothing publicly when they have nothing to
   // show (never an empty shell, never a stray divider). In the editor canvas
   // they show a dashed hint instead, so the merchant can still see and select
@@ -407,6 +418,9 @@ export function PageRenderer({
 
   return (
     <>
+      {!editorMode && !homeHasHero && !!getLook(store.look) && (
+        <h1 className="sr-only">{(isRtl ? store.nameAr || store.name : store.name) || ''}</h1>
+      )}
       {/* Section titles. Each section settings type extends
           SectionTitleOverride, so the merchant can change the heading
           via the admin Layout page. Empty / unset falls back to the
@@ -481,7 +495,16 @@ export function PageRenderer({
               !collageEligible &&
               !sliderEligible &&
               !bannerEligible &&
-              legacyHeroHasContent && (
+              legacyHeroHasContent &&
+              (!heroImage && getLook(store.look) ? (
+                // A look store with no hero photo gets a compact title band, never an empty block.
+                <CompactHeroBand
+                  title={(isRtl ? heroTitleArVal : heroTitleEn) || heroTitleEn || heroTitleArVal}
+                  subtitle={isRtl ? heroSubtitleArVal || heroSubtitleEn : heroSubtitleEn}
+                  ctaText={isRtl ? heroCtaArVal : heroCtaEn}
+                  ctaLink={heroCtaLink}
+                />
+              ) : (
                 <T.Hero
                   title={heroTitleEn}
                   titleAr={heroTitleArVal}
@@ -494,7 +517,7 @@ export function PageRenderer({
                   isRtl={isRtl}
                   urlPrefix={storeUrl('')}
                 />
-              )}
+              ))}
           </div>
         );
 

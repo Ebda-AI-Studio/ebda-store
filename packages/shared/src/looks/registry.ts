@@ -216,17 +216,24 @@ export const LOOKS: readonly LookDefinition[] = [
     letter: 'A',
     skin: 'souq',
     status: 'built',
-    chrome: { header: { logoPlacement: 'start', search: 'prominent' } },
+    chrome: { header: { logoPlacement: 'start', search: 'prominent' }, plp: 'autoFill' },
     // Ruling B2-16. Search first, no hero: the first screen is the search field and the category
     // rail, then today's deals, a dense newest grid and the trust line. Carousel headings use the
     // extra-carousel `title` keys; strings are Egyptian, controls neutral.
     sections: [
       {
         type: 'category-grid',
-        design: { layout: 'rail', layoutMobile: 'rail', paddingTop: 'tight' },
+        design: {
+          layout: 'rail',
+          layoutMobile: 'rail',
+          paddingTop: 'tight',
+          paddingBottom: 'tight',
+        },
       },
       {
         type: 'product-carousel',
+        // STOP-2 minor: ~150px of dead air between the rail and this row
+        design: { paddingTop: 'tight' },
         preset: {
           productSource: 'on_sale',
           limit: 8,
@@ -279,38 +286,49 @@ export const LOOKS: readonly LookDefinition[] = [
     letter: 'B',
     skin: 'souq',
     status: 'built',
-    chrome: { header: { logoPlacement: 'start', search: 'icon' } },
-    // Ruling B2-16. A lit market: a full-bleed hero, bold square category tiles and the dense grid
-    // on ONE light band (quality bar section 9 rule 1: merchant photos shot on white never sit
-    // as white rectangles on the green; tiles + grid share the inverse band, like Lookbook), a
-    // curated row and the deals row on the page, then trust and the brand story.
+    chrome: {
+      header: { logoPlacement: 'start', search: 'icon' },
+      plp: 'autoFill',
+      listing: 'ground',
+    },
+    // Ruling B2-16, amended by B2-24 (STOP-2 taste audit): a lit market that stays GREEN on every
+    // page. A full-bleed hero, bold square category tiles (four across, a brass hairline), the
+    // curated and deals rows and the dense grid all on the green ground; merchant photos shot on
+    // white sit on a cream matte (multiply, globals.css) so they never read as white rectangles
+    // (quality bar section 9 rule 1 is met by the matte, not by a light band).
     sections: [
       { type: 'hero', design: { presentation: 'full-bleed', textAnchor: 'bottom-start' } },
+      // STOP-2 taste audit: the lantern hero carries no product, so ONE featured product follows it
+      // as a stage (cut-out, two facts, price, add): the photo-led screen the brief asks for.
+      {
+        type: 'product-spotlight',
+        design: { layout: 'stage', paddingTop: 'tight', paddingBottom: 'tight' },
+        preset: { productSource: 'featured', limit: 1, heading: '', headingAr: '' },
+      },
       {
         type: 'category-grid',
         design: {
           layout: 'tiles',
           layoutMobile: 'tiles',
           captionPosition: 'below',
-          bgColor: 'token:inverse',
+          desktopColumns: 4,
+          mobileColumns: 2,
           paddingBottom: 'tight',
         },
       },
-      // STOP-1 finding (Ruling B2-19): merchant photos shot on white sit on the light band here
-      // too, never as white squares on the green (quality bar section 9 rule 1).
       {
         type: 'product-carousel',
-        design: { bgColor: 'token:inverse', paddingTop: 'tight', paddingBottom: 'tight' },
+        design: { paddingTop: 'tight', paddingBottom: 'tight' },
         preset: { productSource: 'manual', limit: 8, title: 'From the souq', titleAr: 'من السوق' },
       },
       {
         type: 'product-carousel',
-        design: { bgColor: 'token:inverse', paddingTop: 'tight', paddingBottom: 'tight' },
+        design: { paddingTop: 'tight', paddingBottom: 'tight' },
         preset: { productSource: 'on_sale', limit: 8, title: 'Deals', titleAr: 'عروض' },
       },
       {
         type: 'featured-collection',
-        design: { columns: 4, mobileColumns: 2, bgColor: 'token:inverse' },
+        design: { columns: 4, mobileColumns: 2 },
         preset: { productSource: 'newest', limit: 8, heading: 'New in', headingAr: 'جديد السوق' },
       },
       { type: 'trust-strip' },
@@ -356,7 +374,7 @@ export const LOOKS: readonly LookDefinition[] = [
     letter: 'C',
     skin: 'souq',
     status: 'built',
-    chrome: { header: { logoPlacement: 'start', search: 'icon' } },
+    chrome: { header: { logoPlacement: 'start', search: 'icon' }, plp: 'autoFill' },
     // Ruling B2-16. The product is the hero: categories as chips right under the header (the
     // first screen shows categories), up to three one-product stages (the first reads the store's
     // featured pool so a new store has a stage; the others are hand-picked and render NOTHING
@@ -374,7 +392,7 @@ export const LOOKS: readonly LookDefinition[] = [
       },
       {
         type: 'product-spotlight',
-        design: { layout: 'stage' },
+        design: { layout: 'stage', paddingTop: 'tight' },
         // heading '' : the registry's first spotlight preset is "Gift ideas"; a stage has no kicker
         preset: { productSource: 'featured', limit: 1, heading: '', headingAr: '' },
       },

@@ -87,7 +87,7 @@ export default function ElegantOrderSummary({
           <dd className="tracking-wide text-foreground tabular-nums" style={typography?.price}>
             {shippingPending ? (
               <span className="text-muted-foreground">
-                {isRtl ? 'يحسب عند الدفع' : 'Calculated at checkout'}
+                {isRtl ? 'بيتحسب عند الدفع' : 'Calculated at checkout'}
               </span>
             ) : freeShipping ? (
               <span className="text-success-ink uppercase tracking-[0.2em] text-xs">

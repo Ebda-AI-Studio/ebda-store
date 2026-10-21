@@ -87,7 +87,7 @@ export default function BoldOrderSummary({
           <dd className="font-black text-foreground tabular-nums" style={typography?.price}>
             {shippingPending ? (
               <span className="text-muted-foreground">
-                {isRtl ? 'يحسب عند الدفع' : 'Calculated at checkout'}
+                {isRtl ? 'بيتحسب عند الدفع' : 'Calculated at checkout'}
               </span>
             ) : freeShipping ? (
               <span className="text-success-ink">{isRtl ? 'مجاني' : 'FREE'}</span>

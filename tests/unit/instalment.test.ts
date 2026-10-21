@@ -78,11 +78,11 @@ describe('instalmentText', () => {
   });
   it('Arabic: "تقريبي", the month count through the plural helper', () => {
     expect(instalmentText('ar', { monthly: 1290, months: 12 }, moneyAr)).toBe(
-      'تقسيط يبدأ من 1,290 ج.م / شهر على 12 شهرًا · تقريبي'
+      'تقسيط من 1,290 ج.م في الشهر على 12 شهرًا · تقريبي'
     );
     expect(instalmentText('ar', { monthly: 1, months: 6 }, moneyAr)).toContain('على 6 أشهر');
     expect(instalmentText('ar', { monthly: 1, months: 6, providerAr: 'اسم' }, moneyAr)).toContain(
-      'تقسيط عبر اسم يبدأ من'
+      'تقسيط عبر اسم من'
     );
   });
   it('never claims an approval, a rate name or a logo', () => {

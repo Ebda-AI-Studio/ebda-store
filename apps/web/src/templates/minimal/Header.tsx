@@ -36,6 +36,7 @@ export default function MinimalHeader({
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isVisible, setIsVisible] = useState(true);
   const lastScrollY = useRef(0);
+  const headerRef = useRef<HTMLElement>(null);
   const searchId = useId();
   const searchInputRef = useRef<HTMLInputElement>(null);
 
@@ -43,6 +44,13 @@ export default function MinimalHeader({
   useEffect(() => {
     const onScroll = () => {
       const current = window.scrollY;
+      // 2.4.11: never hide the header while keyboard focus is inside it (the focus scroll itself
+      // would otherwise hide it again).
+      if (headerRef.current?.contains(document.activeElement)) {
+        setIsVisible(true);
+        lastScrollY.current = current;
+        return;
+      }
       if (current <= 0) {
         setIsVisible(true);
       } else if (current > lastScrollY.current + 4) {
@@ -90,15 +98,20 @@ export default function MinimalHeader({
       ' text-xs tracking-[0.18em] ui-caps-toggle font-normal text-muted-foreground hover:text-foreground transition-colors duration-200';
   const displayName = isRtl && branding.nameAr ? branding.nameAr : branding.name;
   const displayLogo = isRtl && branding.logoAr ? branding.logoAr : branding.logo;
+  // A name that cannot fit one line beside the actions wraps (two lines) and the row makes room.
+  const longName = isProminent && displayName.length > 16;
 
   return (
     <header
+      ref={headerRef}
       className={`sticky top-0 z-50 bg-background transition-transform duration-300 ease-in-out ${
         isVisible ? 'translate-y-0' : '-translate-y-full'
       }`}
       style={headerBgColor ? { backgroundColor: headerBgColor } : undefined}
       dir={isRtl ? 'rtl' : 'ltr'}
       data-logo-placement={logoPlacement}
+      // 2.4.11: focus moving into the header (Shift+Tab, a click-less walk) brings it back on screen.
+      onFocus={() => setIsVisible(true)}
     >
       <div className="container mx-auto px-6">
         <div
@@ -120,7 +133,7 @@ export default function MinimalHeader({
               isCentre
                 ? 'max-w-[calc(100%-13rem)] md:max-w-[40vw] md:col-start-2'
                 : isProminent
-                  ? 'top-3 max-w-[calc(100%-13rem)] md:top-auto md:col-start-1 md:row-start-1 md:max-w-[16rem]'
+                  ? 'top-3 max-w-[calc(100%-7rem)] md:top-auto md:col-start-1 md:row-start-1 md:max-w-[16rem]'
                   : 'max-w-[65%] md:max-w-none'
             }`}
           >
@@ -130,7 +143,13 @@ export default function MinimalHeader({
               <span
                 className={
                   wordmarkSize
-                    ? wordmarkClass(wordmarkSize)
+                    ? isProminent
+                      ? // STOP-2: a long store name wraps to two lines here instead of ending in "...".
+                        wordmarkClass(wordmarkSize).replace(
+                          'truncate',
+                          longName ? 'line-clamp-2 text-balance leading-snug' : 'truncate'
+                        )
+                      : wordmarkClass(wordmarkSize)
                     : isCentre
                       ? 'block max-w-full truncate text-2xl sm:text-3xl font-display text-foreground'
                       : 'text-xs tracking-[0.3em] ui-caps-toggle font-light text-foreground'
@@ -168,7 +187,7 @@ export default function MinimalHeader({
               isCentre
                 ? 'flex items-center gap-2 col-start-3 justify-self-end'
                 : isProminent
-                  ? 'flex items-center gap-2 col-start-2 row-start-1 justify-self-end md:col-start-3'
+                  ? `flex items-center gap-2 col-start-2 row-start-1 justify-self-end md:col-start-3 ${longName ? 'min-h-[4.5rem] md:min-h-0' : ''}`
                   : 'flex items-center gap-2'
             }
           >

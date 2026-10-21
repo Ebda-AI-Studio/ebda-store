@@ -79,10 +79,12 @@ describe('the mixes, exactly as designed', () => {
     expect(grid.preset).toMatchObject({ productSource: 'newest', limit: 12 });
   });
 
-  it('Night souq: hero, tiles + grid on the LIGHT band, curated row, deals row, trust, story', () => {
+  it('Night souq: hero, one stage, 4-up tiles, curated row, deals row, grid, trust, story, all on the green', () => {
     expect(night.chrome?.header.search).toBe('icon');
+    expect(night.chrome).toMatchObject({ plp: 'autoFill', listing: 'ground' });
     expect(night.sections!.map(s => s.type)).toEqual([
       'hero',
+      'product-spotlight',
       'category-grid',
       'product-carousel',
       'product-carousel',
@@ -91,23 +93,24 @@ describe('the mixes, exactly as designed', () => {
       'brand-story',
     ]);
     expect(night.sections![0].design).toMatchObject({ presentation: 'full-bleed' });
-    const tiles = night.sections![1].design!;
+    // STOP-2: the lantern hero carries no product, so one featured product follows it (a stage)
+    expect(night.sections![1].design).toMatchObject({ layout: 'stage' });
+    expect(night.sections![1].preset).toMatchObject({ productSource: 'featured', limit: 1 });
+    const tiles = night.sections![2].design!;
     expect(tiles).toMatchObject({
       layout: 'tiles',
       layoutMobile: 'tiles',
-      bgColor: 'token:inverse',
+      desktopColumns: 4,
+      mobileColumns: 2,
     });
-    const [curated, deals] = [night.sections![2], night.sections![3]];
+    const [curated, deals] = [night.sections![3], night.sections![4]];
     expect(curated.preset).toMatchObject({ productSource: 'manual', titleAr: 'من السوق' });
     expect(deals.preset).toMatchObject({ productSource: 'on_sale', titleAr: 'عروض' });
-    // quality bar section 9 rule 1: the merchant-photo grid sits on the light band, never on green
-    expect(night.sections![4].design).toMatchObject({ bgColor: 'token:inverse', columns: 4 });
-    // B2-19: the curated and the deals carousel sit on the light band as well (merchant photos
-    // shot on white never show as white squares on the green)
-    for (const i of [2, 3])
-      expect(night.sections![i].design, `carousel ${i}`).toMatchObject({
-        bgColor: 'token:inverse',
-      });
+    // B2-23/24 (amends B2-19): no light band anywhere; photos sit on a cream matte (CSS), so the
+    // page stays green from the hero to the footer
+    expect(night.sections![5].design).toMatchObject({ columns: 4 });
+    for (const sec of night.sections!)
+      expect(JSON.stringify(sec.design ?? {}), sec.type).not.toContain('token:inverse');
   });
 
   it('Showroom: chips under the header, up to three stages, tiles on the surface, 2-col grid', () => {
@@ -123,7 +126,7 @@ describe('the mixes, exactly as designed', () => {
     ]);
     expect(showroom.sections![0].design).toMatchObject({ layout: 'chips', paddingBottom: 'none' });
     for (const s of showroom.sections!.slice(1, 4)) {
-      expect(s.design).toEqual({ layout: 'stage' });
+      expect(s.design).toMatchObject({ layout: 'stage' });
       expect(s.preset).toMatchObject({ limit: 1 });
       // STOP-1: no "Gift ideas" kicker (the registry's first spotlight preset) on a stage
       expect(s.preset).toMatchObject({ heading: '', headingAr: '' });
@@ -271,7 +274,9 @@ describe('look switch keeps content and does not leak design (TPL-1)', () => {
       from: showroom,
       design: 'keep',
     });
-    expect(all(onNight, 'product-spotlight')).toHaveLength(0);
+    // Night keeps ONE stage of its own (the featured product under the hero); Showroom's other two
+    // untouched stages leave the draft
+    expect(all(onNight, 'product-spotlight')).toHaveLength(1);
     expect(all(onNight, 'collection-list')).toHaveLength(0);
   });
 
@@ -279,15 +284,19 @@ describe('look switch keeps content and does not leak design (TPL-1)', () => {
     it(`no leakage (${design}): Night → Catalogue resets Night-only design keys to the section default`, () => {
       const onNight = applyTemplateFamily(merchantBase(), 'souq', night);
       expect(one(onNight, 'category-grid').settings.layout).toBe('tiles');
-      expect(one(onNight, 'featured-collection').settings.bgColor).toBe('token:inverse');
+      expect(one(onNight, 'category-grid').settings.desktopColumns).toBe(4);
       const doc = applyTemplateFamily(onNight, 'souq', catalogue, { from: night, design });
       const grid = one(doc, 'category-grid').settings;
       expect(grid.layout).toBe('rail');
       expect(grid.bgColor).toBe(defaultsOf('category-grid').bgColor);
+      // Night's 4-up tiles are Night-owned: they return to the section default
+      expect(grid.desktopColumns).toBe(defaultsOf('category-grid').desktopColumns);
       expect(grid.captionPosition).toBe(defaultsOf('category-grid').captionPosition);
       const fc = one(doc, 'featured-collection').settings;
       expect(fc.bgColor).toBe(defaultsOf('featured-collection').bgColor);
       expect(fc.columns).toBe(4);
+      // Night's untouched stage leaves with it
+      expect(all(doc, 'product-spotlight')).toHaveLength(0);
       if (design === 'keep') {
         // the hero (content) stays on the draft; its Night-only design resets
         expect(hero(doc)?.blocks).toEqual(hero(onNight)?.blocks);
@@ -313,7 +322,8 @@ describe('look switch keeps content and does not leak design (TPL-1)', () => {
       const grid = one(doc, 'category-grid').settings;
       expect(grid.layout).toBe('tiles');
       expect(grid.layoutMobile).toBe('tiles');
-      expect(grid.bgColor).toBe('token:inverse');
+      expect(grid.desktopColumns).toBe(4);
+      expect(grid.bgColor).toBe(defaultsOf('category-grid').bgColor);
       // Showroom's paddingTop 'tight' is Showroom-owned; Night sets only paddingBottom
       expect(grid.paddingTop).toBe(defaultsOf('category-grid').paddingTop);
       expect(one(doc, 'featured-collection').settings.columns).toBe(4);
@@ -331,7 +341,6 @@ describe('look switch keeps content and does not leak design (TPL-1)', () => {
     const kept = applyTemplateFamily(edited, 'souq', night, { from: catalogue, design: 'keep' });
     const fc = one(kept, 'featured-collection').settings;
     expect(fc.columns).toBe(3); // the merchant's pick
-    expect(fc.bgColor).toBe('token:inverse'); // untouched keys follow Night
     const reset = applyTemplateFamily(edited, 'souq', night, { from: catalogue, design: 'reset' });
     expect(one(reset, 'featured-collection').settings.columns).toBe(4);
   });
@@ -405,9 +414,10 @@ describe('STOP-1 fixes on the composed documents', () => {
       expect(JSON.stringify(st.settings)).not.toMatch(/Gift ideas|أفكار للهدايا/);
     }
   });
-  it('both Night carousels compose on the light band and validate', () => {
+  it('Night composes with no light band at all and validates (B2-24 amends B2-19)', () => {
     const doc = applyTemplateFamily(merchantBase(), 'souq', night);
-    for (const c of all(doc, 'product-carousel')) expect(c.settings.bgColor).toBe('token:inverse');
+    for (const sec of doc.sections)
+      expect(JSON.stringify(sec.settings), sec.type).not.toContain('token:inverse');
     expect(validateDefinitionSync(doc).ok).toBe(true);
   });
 });

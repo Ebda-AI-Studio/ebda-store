@@ -1234,6 +1234,12 @@ html[dir='rtl'] [data-pack='dahab'] [data-section='newsletter'] h2 {
   max-width: 38rem;
 }
 
+/* 2.4.11 Focus Not Obscured: the sticky header's measured height (StickyHeaderOffset) keeps the
+ * browser's focus / scrollIntoView scroll clear of it, on every template. */
+html {
+  scroll-padding-top: calc(var(--header-h, 0px) + 0.75rem);
+}
+
 /* Sticky mobile bars (PDP add-to-cart, Dahab pinned bar, cart total). UI rule 6: space is
  * reserved on <body> (never the chrome wrapper). Body already carries pb-32 for the
  * BottomTabBar, so the bar (4.25rem) is added on top of that, not instead of it.
@@ -1405,6 +1411,64 @@ html[dir='rtl'] [data-pack='souq'] .font-display {
   color: hsl(var(--foreground));
   text-decoration: underline;
   text-underline-offset: 4px;
+}
+/* Ruling B2-23 (STOP-2): Night souq stays green on every page. Merchant photos are shot on white,
+   so a card photo / category tile sits on a cream matte (the page ink) and the photo multiplies
+   into it: white vanishes into cream, a grey backdrop stays a soft grey. Tiles also get a brass
+   hairline (the CTA token, B2-18) so each reads as a lit window. */
+[data-look='souq.night'] [data-part='card-image'],
+[data-look='souq.night'] [data-part='tile'] {
+  background-color: hsl(var(--foreground));
+}
+[data-look='souq.night'] [data-part='card-image'] img,
+[data-look='souq.night'] [data-part='tile'] img {
+  mix-blend-mode: multiply;
+}
+[data-look='souq.night'] [data-part='tile'] {
+  border: 1px solid hsl(var(--primary) / 0.65);
+}
+/* B2-23: brass never dims on hover (a pressed Place order read as disabled next to the cart CTA). */
+[data-look='souq.night'] [class*='hover:bg-primary/90']:hover {
+  background-color: hsl(var(--primary));
+  filter: brightness(1.08);
+}
+/* B2-23: an invalid field on the card was 2.48:1 (red on green). The per-surface destructive ink
+   draws a 2px boundary there. */
+[data-look='souq.night'] :is(input, select, textarea)[aria-invalid='true'] {
+  border-color: hsl(var(--destructive-ink));
+  border-width: 2px;
+}
+/* B2-23: summary thumbnails tell the two blue looks apart: Catalogue is the dense receipt,
+   Showroom shows the object bigger. */
+[data-look='souq.catalogue'] [data-part='summary-thumb'] {
+  width: 3.25rem;
+  height: 3.25rem;
+}
+[data-look='souq.showroom'] [data-part='summary-thumb'] {
+  width: 6rem;
+  height: 6rem;
+}
+/* B2-23: a deal's old price is struck by a line that draws itself once (Catalogue's playful
+   detail). Static when motion is reduced. */
+[data-look='souq.catalogue'] .line-through {
+  text-decoration: none;
+  background: linear-gradient(currentColor, currentColor) no-repeat 0 55% / 100% 1.5px;
+}
+html[dir='rtl'] [data-look='souq.catalogue'] .line-through {
+  background-position: 100% 55%;
+}
+@media (prefers-reduced-motion: no-preference) {
+  [data-look='souq.catalogue'] .line-through {
+    animation: souq-strike 0.7s 0.25s both ease-out;
+  }
+}
+@keyframes souq-strike {
+  from {
+    background-size: 0 1.5px;
+  }
+  to {
+    background-size: 100% 1.5px;
+  }
 }
 [data-pack='souq'] [data-ui-uppercase='true'] .ui-caps-toggle {
   text-transform: uppercase;

@@ -240,3 +240,88 @@ test('prominent search: the wordmark never sits under the search field (390 and 
     expect(overlap, `${lang}: wordmark overlaps the search field`).toBe(false);
   }
 });
+
+test('every look home opens with one h1 and a sane heading order (a11y P2-2)', async ({ page }) => {
+  for (const store of LOOK_STORES)
+    for (const lang of ['ar', 'en'] as const) {
+      await open(page, store, lang, '/');
+      expect(await page.locator('h1').count(), `${store} ${lang} h1 count`).toBe(1);
+      const axe = await runAxe(page);
+      expect(
+        axe.filter(v => ['page-has-heading-one', 'heading-order', 'empty-heading'].includes(v.id)),
+        `${store} ${lang}`
+      ).toEqual([]);
+    }
+});
+
+test('Night keeps its green ground on the listing and mattes white photos (STOP-2 P2)', async ({
+  page,
+}) => {
+  await open(page, 'souq-white-photos', 'en', '/products');
+  const g = await page.evaluate(() => {
+    const bg = (e: Element | null) => (e ? getComputedStyle(e).backgroundColor : '');
+    const wrap = document.querySelector('[data-part="card-image"]');
+    const img = wrap?.querySelector('img');
+    return {
+      main: bg(document.querySelector('main')?.firstElementChild ?? null),
+      body: bg(document.body),
+      matte: bg(wrap ?? null),
+      blend: img ? getComputedStyle(img).mixBlendMode : '',
+    };
+  });
+  // dark ground (page green #0F3B2E = rgb(15, 59, 46)), cream matte, multiply blend
+  const near = (got: string, want: number[]) =>
+    got
+      .match(/\d+/g)!
+      .slice(0, 3)
+      .every((v, i) => Math.abs(Number(v) - want[i]!) <= 2);
+  expect(near(g.body, [15, 59, 46]), `body ${g.body}`).toBe(true);
+  expect(near(g.matte, [246, 243, 234]), `matte ${g.matte}`).toBe(true);
+  expect(g.blend).toBe('multiply');
+});
+
+test('PLP fills the column: at 1280 the grid holds 4 cards of 200px or more, photo fills the card', async ({
+  page,
+}) => {
+  for (const store of LOOK_STORES) {
+    await open(page, store, 'en', '/products');
+    const m = await page.evaluate(() => {
+      const w = [...document.querySelectorAll('article[itemtype]')].map(a => {
+        const r = a.getBoundingClientRect();
+        const im = a.querySelector('[data-part="card-image"]')?.getBoundingClientRect();
+        return { w: r.width, img: im?.width ?? 0, top: r.top, h: r.height };
+      });
+      return w;
+    });
+    test.skip(m.length === 0, 'no cards');
+    const vw = page.viewportSize()!.width;
+    if (vw >= 1024) {
+      for (const c of m) {
+        expect(c.w, `${store} card width`).toBeGreaterThanOrEqual(190);
+        expect(c.img / c.w, `${store} photo fills the card`).toBeGreaterThan(0.85);
+      }
+      // one row of cards shares one height (the CTA sits on the same baseline)
+      const firstRow = m.filter(c => Math.abs(c.top - m[0]!.top) < 2);
+      expect(new Set(firstRow.map(c => Math.round(c.h))).size, `${store} row heights`).toBe(1);
+    }
+  }
+});
+
+test('a fresh store with no hero photo gets a compact title band named after the store, never its slug', async ({
+  page,
+}) => {
+  for (const store of ['souq-noimg', 'souq-cod', 'souq-one'])
+    for (const lang of ['ar', 'en'] as const) {
+      await open(page, store, lang, '/');
+      const m = await page.evaluate(() => {
+        const band = document.querySelector('[data-hero="compact"]');
+        const h1s = [...document.querySelectorAll('h1')].map(h => h.textContent ?? '');
+        return { band: band ? Math.round(band.getBoundingClientRect().height) : null, h1s };
+      });
+      // Night's hero section and the home of the other looks: either a compact band (<= 260px)
+      // or no hero at all (Catalogue, Showroom open with the sr-only store-name h1)
+      if (m.band !== null) expect(m.band, `${store} ${lang} band height`).toBeLessThanOrEqual(260);
+      expect(m.h1s.length, `${store} ${lang} h1`).toBe(1);
+      expect(m.h1s[0], `${store} ${lang}: the slug is not the title`).not.toMatch(/souq-/i);
+    }
+});

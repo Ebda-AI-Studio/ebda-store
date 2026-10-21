@@ -180,7 +180,7 @@ describe('souq header: targets, landmarks, long names, focus', () => {
     for (const n of Array.from(container.querySelectorAll('nav')))
       expect(n.getAttribute('aria-label'), n.outerHTML.slice(0, 60)).toBeTruthy();
   });
-  it('a 30+ character store name truncates in a capped slot and cannot reach the actions', () => {
+  it('a 30+ character store name wraps to two lines in a capped slot and cannot reach the actions', () => {
     setLook('souq.catalogue', 'ar');
     const longName = 'متجر سوق للإلكترونيات والأجهزة المنزلية الكبيرة جدا';
     const { container } = render(
@@ -190,10 +190,12 @@ describe('souq header: targets, landmarks, long names, focus', () => {
     expect(row.getAttribute('class')).toContain('grid-cols-[minmax(0,1fr)_auto]');
     expect(row.getAttribute('class')).toContain('md:grid-cols-[auto_minmax(0,1fr)_auto]');
     const logo = container.querySelector('a[href="/"]')!;
-    expect(logo.getAttribute('class')).toContain('max-w-[calc(100%-13rem)]');
+    expect(logo.getAttribute('class')).toContain('max-w-[calc(100%-7rem)]');
     expect(logo.getAttribute('class')).toContain('md:max-w-[16rem]');
     const mark = container.querySelector('[data-zone="storeName"]')!;
-    expect(mark.getAttribute('class')).toMatch(/\btruncate\b/);
+    // STOP-2: wraps (2 lines, balanced) instead of ending in an ellipsis; the title keeps the full name.
+    expect(mark.getAttribute('class')).toMatch(/\bline-clamp-2\b/);
+    expect(mark.getAttribute('class')).not.toMatch(/\btruncate\b/);
     expect(mark.getAttribute('title')).toBe(longName);
   });
   it('the wordmark is the sized, untracked display one; nav links are 14px untracked', () => {

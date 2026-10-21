@@ -51,7 +51,7 @@ describe('InstalmentLine', () => {
     ctx.language = 'ar';
     const { getByTestId } = render(<InstalmentLine priceMinor={15_480_000} buyable />);
     const el = getByTestId('instalment-line');
-    expect(el.textContent).toBe('تقسيط يبدأ من EGP 1,290,000 / شهر على 12 شهرًا · تقريبي');
+    expect(el.textContent).toBe('تقسيط من EGP 1,290,000 في الشهر على 12 شهرًا · تقريبي');
     expect(el.className).toContain('text-xs');
     expect(el.className).toContain('text-muted-foreground');
     expect(el.tagName).toBe('SPAN'); // inline in the price row

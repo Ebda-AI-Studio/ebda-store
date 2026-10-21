@@ -334,7 +334,12 @@ function buildSouqBaseline(): StoreLayoutSettings {
   }
   // The listing / search / related card keeps its frame (B2-13) but in the neutral border token:
   // a primary-coloured box round every card is a second loud accent (quality bar: one accent).
-  if (b.productCardDefaults) b.productCardDefaults.cardFrameColor = 'token:border';
+  // design.md compact sizing: 'compact' padding so the photo fills the card (was 'spacious': a
+  // 110px thumb inside a 170px card, STOP-2 taste P1-1).
+  if (b.productCardDefaults) {
+    b.productCardDefaults.cardFrameColor = 'token:border';
+    b.productCardDefaults.cardFrameSize = 'compact';
+  }
   return b;
 }
 
