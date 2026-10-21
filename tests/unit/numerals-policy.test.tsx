@@ -42,8 +42,8 @@ describe('the default is Western digits in both languages', () => {
 
   it('<Price isRtl> on a store that did not opt in renders Western digits', () => {
     const html = renderToStaticMarkup(<Price price={45_000} compareAtPrice={54_000} isRtl />);
-    expect(html).toContain('450 ج.م');
-    expect(html).toContain('540 ج.م');
+    expect(html).toContain('450\u00A0ج.م');
+    expect(html).toContain('540\u00A0ج.م');
     expect(html).not.toMatch(ARAB);
   });
 
@@ -64,7 +64,7 @@ describe('the default is Western digits in both languages', () => {
     const product = { price: 45_000, compareAtPrice: 54_000 };
     expect(getDiscountBadgeText(product, true)).toBe('\u2066\u221217%\u2069');
     const fixed = { ...product, discountType: 'fixed', discountValue: 90 };
-    expect(getDiscountBadgeText(fixed as never, true)).toBe('وفّر 90 ج.م');
+    expect(getDiscountBadgeText(fixed as never, true)).toBe('وفّر 90\u00A0ج.م');
   });
 });
 
@@ -73,7 +73,7 @@ describe('the opt-in: Arabic-Indic only for Arabic readers of an opted-in store'
     expect(formatPrice(45_000, { locale: 'ar', numerals: 'arab' })).toBe('٤٥٠ ج.م');
     expect(formatPrice(45_000, { locale: 'en', numerals: 'arab' })).toBe('EGP 450');
     const html = renderToStaticMarkup(<Price price={45_000} isRtl numerals="arab" />);
-    expect(html).toContain('٤٥٠ ج.م');
+    expect(html).toContain('٤٥٠\u00A0ج.م');
     const en = renderToStaticMarkup(<Price price={45_000} numerals="arab" />);
     expect(en).not.toMatch(ARAB);
   });
