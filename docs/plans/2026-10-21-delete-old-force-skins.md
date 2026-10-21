@@ -6,12 +6,12 @@
 
 **Architecture:** Three PRs in a fixed order, with a data gate and an Ahmad-approved production step between them, because a Postgres enum cannot lose a value while a row uses it and a deployed reader must already tolerate the old value before the writer stops producing it (expand, migrate, contract):
 
-1. **PR A (safe, additive):** a read-only preflight SQL gate; the ruling table that maps each old skin to the nearest Ebda template + look; a tolerant reader (`normalizeLegacyTemplate`) so old values still parse everywhere; a strict writer (the API refuses to set an old skin; signup and the admin picker stop offering them); a dry-run-first migration script that moves any remaining old-skin store to its mapped Ebda look, keeping its content.
+1. **PR A (safe, additive):** a read-only preflight SQL gate; the ruling table that maps each old skin to the nearest Ebda template + look; a tolerant reader (`normalizeLegacyTemplate`) so old values still parse everywhere; a strict writer limited to `updateTemplate` and the admin picker (signup and the default template are fixed in a separate PR, see Precondition); a dry-run-first migration script that moves any remaining old-skin store to its mapped Ebda look, keeping its content.
 2. **STOP 1 (Ahmad):** the preflight shows zero old-skin stores (after the script ran on the approved list). The production run of the migration script is Ahmad's approval, not an agent action.
 3. **PR B (deletion):** re-home the shared storefront components that Qamar and Souq still import from `templates/minimal/*` into a skin-less `templates/base/`, delete the five skin directories and everything keyed on them, rewrite the CLAUDE.md platform-level rules and `store-theme-flags.md` in the same PR.
 4. **PR C (enum contract):** after PR B is deployed and the preflight is still zero, a migration replaces the `StoreTemplate` enum without the five values and moves the column default.
 
-**Order constraint:** this plan starts after the Dahab redesign ships (the old `templates/dahab` night skin and its own old-skin handover code are retired by that work, and the card-path list below depends on what Dahab leaves behind), and after Souq has merged (Souq imports `../minimal/*`, exactly as Qamar does).
+**Order constraint:** the program order is Souq → Jasmine → Lamma → Dahab → this plan. It starts after the Dahab redesign ships (the old `templates/dahab` night skin and its own old-skin handover code are retired by that work, and the card-path list below depends on what Dahab leaves behind), and after Souq has merged (Souq imports `../minimal/*`, exactly as Qamar does).
 
 **Tech Stack:** Prisma + Neon (Postgres 17, strict RLS, tenant guard), Zod in `@ebda/shared`, Next.js 16 (apps/web, apps/admin, apps/marketing), Express on Cloudflare Workers (apps/api), Vitest, `tsx`/Node scripts.
 
@@ -19,9 +19,9 @@
 
 ## What the code says today (measured on `origin/main` at `ab6417fce`, 2026-10-21)
 
-- `StoreTemplate` enum = `modern classic minimal bold elegant dahab qamar`; `stores.template` is the ONLY column using it, and its default is **`modern`** (`schema.prisma:256`). The Prisma default and `store-brand-theme.ts:22` (`?? 'modern'`) both name an old skin.
+- `StoreTemplate` enum = `modern classic minimal bold elegant dahab qamar`; `stores.template` is the ONLY column using it.
 - `TemplateId` (`packages/shared/src/types/store-theme.ts:26`) is the same union; it is the key of six exhaustive `Record<TemplateId, …>` maps (`TEMPLATE_THEMES`, `TEMPLATE_LAYOUT_BASELINES`, `image-standards`, web `templates/index.ts`, `serverTemplate.ts`, `pack-styles.ts`) plus `apps/marketing/src/lib/demo-stores.ts` (`DEMO_STORES`).
-- **Self-serve signup still offers the old five:** `SELF_SERVE_TEMPLATES = ['modern','classic','minimal','bold','elegant']` (`apps/api/src/services/onboarding.service.ts:42`, used by a `z.enum` in `onboarding.routes.ts:60`). `StoreService.updateTemplate` accepts `['modern','classic','minimal','bold','elegant','dahab']` (`store.service.ts:944`). The admin template page lists `SKIN_IDS` of the legacy six (`apps/admin/src/app/stores/[id]/template/page.tsx:18`). `ProvisioningService` types the union (`provisioning.service.ts:57`).
+- **Precondition, owned by another PR:** self-serve signup offering the old five (`SELF_SERVE_TEMPLATES`) and the `modern` column/brand-theme default are being fixed NOW in their own PR. This plan only references it: PR A starts after that PR merges, and Task 1's gate re-checks that no new store appears on an old skin. This plan does not touch `onboarding.service.ts`, `onboarding.routes.ts`, `TemplateStep.tsx` or the default.
 - **`minimal` is not only an old skin; it is today's shared base.** `templates/qamar/index.ts` and `templates/souq/index.ts` re-export `../minimal/{Footer,Hero,ProductCard,ProductGrid,CategoryCard,CategoryGrid,AnnouncementBar,CartTable,OrderSummary,EmptyState,FormCard}` (Ruling B1-1: cards, PDP, cart and checkout stay shared/minimal). And **12 of the 15 looks** in `packages/shared/src/looks/registry.ts` carry `skin: 'minimal'` (souq ×3 until Souq flips them, jasmine ×3, lamma ×3, dahab ×3 until the Dahab redesign sets its skin); `applyLook` writes `stores.template = look.skin`. So a store on `jasmine.bloom` has `template = 'minimal'` in the database and is NOT an old-skin store. The gate and the migration therefore classify by `look`, never by `template` alone.
 - Old-skin identifiers also live in: 5 `DESIGN.md` files, `TEMPLATES` entries with `/templates/<id>.png` thumbnails, `TemplateFamily` mapping, `skins.*` i18n keys (`template.page.skins.*`), demo clone scripts, `docs/architecture/store-theme-flags.md` (flag rows that only one old skin reads: `rtlPolish` for elegant's `EmptyState`, `personaChromeV2` for bold's header/footer), `CLAUDE.md` rules 1 and 2. `FontFamily` also has a `'modern'` value (`store-theme.ts:31`, `settings-schema.ts:339`): it is a different enum and is a known false positive for every grep below.
 - ~143 files mention one of the five names as a quoted string; ~35 reference `templates/<old>/`; 6 files use snapshot assertions (`git grep -E "toMatchSnapshot|toMatchInlineSnapshot"`), none is a committed `.snap` file for an old skin by name (verify in Task 6).
@@ -50,7 +50,7 @@
 4. **Something still names an old skin and silently falls back** (a `Record<TemplateId>` indexed with a stale value returns `undefined`, a CSS `[data-pack='elegant']` rule is orphaned, `getTemplateComponents('bold')` throws at render). Pinned by Task 9's blast-radius grep plan, whose final grep must return zero outside the allowlisted legacy-reader file, and by a typecheck that fails when the union loses a member.
 5. **The enum migration under load:** no row holds a removed value at apply time, the default is moved before the old type is dropped, and nothing else references the type. Pinned by Task 8's migration test (a throwaway Postgres with a seeded old-value row must make the migration abort; with the row migrated it must apply) and by a `pg_depend` check in the plan's runbook.
 6. **CLAUDE.md still says "8 card paths" after the deletion** and the next card change is audited against a list that names files that no longer exist. Pinned by Task 7's doc test (`tests/unit/claude-md-card-paths.test.ts` asserts every path named in the platform-level rule exists on disk).
-7. **Signup after PR A:** a new merchant can pick an old skin from a stale client or a cached page and the API accepts it. Pinned by Task 3 (the API returns 400 `TEMPLATE_RETIRED` for every retired value on onboarding and on `updateTemplate`).
+7. **A new store lands on an old skin after the migration ran** (signup default, owned by the separate fix PR). Pinned by Task 1's gate, re-run before PR B and PR C, which reports any new old-skin store.
 
 ---
 
@@ -58,7 +58,7 @@
 
 Appended to `docs/RULINGS.md` under `## 2026-10-21 — Old Force skin deletion (SKIN-DEL-*)` as each task lands.
 
-- **Ruling SKIN-DEL-1 — the mapping table (the migration's authority).** Each old skin maps to the nearest built Ebda look by character (read from each skin's `DESIGN.md`), with a fixed fallback and a vertical override. Cost if wrong: a merchant lands on a look that is not their taste; they can switch back in one step (the dialog, with preview, from the editor pass) and the previous state is in revision history.
+- **Ruling SKIN-DEL-1 — the mapping table (the migration's authority). APPROVED as written by the controller, including the `qamar.atelier` fallback.** Each old skin maps to the nearest built Ebda look by character (read from each skin's `DESIGN.md`), with a fixed fallback and a vertical override. Cost if wrong: a merchant lands on a look that is not their taste; they can switch back in one step (the dialog, with preview, from the editor pass) and the previous state is in revision history.
 
   | Old skin | What it is (its DESIGN.md) | Maps to | Why | Fallback |
   | --- | --- | --- | --- | --- |
@@ -69,11 +69,12 @@ Appended to `docs/RULINGS.md` under `## 2026-10-21 — Old Force skin deletion (
   | `bold` | high-energy, heavy borders, streetwear | `qamar.lookbook` | deep ink-indigo, collage, loud display type | `qamar.atelier` |
 
   Rules: (a) a target look whose `status` is not `built` at run time uses its fallback; (b) if the store's onboarding vertical is recorded, a vertical-to-family override applies first (`TEMPLATE_FAMILIES` already pairs verticals with templates; beauty to `jasmine.*`, food to `lamma.*` only once those looks are `built`); (c) no mapping depends on the store slug.
-- **Ruling SKIN-DEL-2 — expand, migrate, contract, in that order, in three PRs.** Evidence: a Postgres enum cannot drop a value in use, and a deployed writer that still emits the old value after the contract fails. Cost if wrong: a window where the API accepts a value the database no longer has; closed by the guarded migration and the strict writer shipping first.
-- **Ruling SKIN-DEL-3 — `templates/minimal/*` is re-homed, not deleted.** It is the shared storefront base for Qamar and Souq (Ruling B1-1). It moves to `templates/base/` (a directory, not a skin id, not a `TemplateId`). Evidence: the import lines above and Review Focus 3. Cost if wrong: a rename diff on ~12 files; reverting is a `git mv`.
-- **Ruling SKIN-DEL-4 — looks that still say `skin: 'minimal'` need a valid skin before the enum loses `minimal`.** Decision for Ahmad (see the report): recommended default is that Jasmine and Lamma ship (or are retargeted in PR B to `skin: 'qamar'`, the chrome-only skin, with their own skin id taking over when they are built) so `applyLook` never writes a removed enum value. Until Ahmad decides, PR B is blocked on a failing test (`tests/unit/looks-skin-valid.test.ts`) that asserts every look's `skin` is a member of the new `TemplateId`. Cost if wrong: designed, unbuilt looks render on Qamar's chrome until their own skin ships; they are not selectable in the demo bar either way.
+- **Ruling SKIN-DEL-6 — expand, migrate, contract, in that order, in three PRs.** Evidence: a Postgres enum cannot drop a value in use, and a deployed writer that still emits the old value after the contract fails. Cost if wrong: a window where the API accepts a value the database no longer has; closed by the guarded migration and the strict writer shipping first.
+- **Ruling SKIN-DEL-7 — `templates/minimal/*` is re-homed, not deleted.** It is the shared storefront base for Qamar and Souq (Ruling B1-1). It moves to `templates/base/` (a directory, not a skin id, not a `TemplateId`). Evidence: the import lines above and Review Focus 3. Cost if wrong: a rename diff on ~12 files; reverting is a `git mv`.
+- **Ruling SKIN-DEL-2 — Jasmine and Lamma ship first; their looks are retargeted to their own skins in their own builds.** The program order is Souq → Jasmine → Lamma → Dahab → delete the skins, so no look says `skin: 'minimal'` when this plan starts. Evidence: the program order, and 12 of 15 looks carrying `skin: 'minimal'` today (`packages/shared/src/looks/registry.ts`). `tests/unit/looks-skin-valid.test.ts` (every look's `skin` ∈ the new `TemplateId`) stays as the red guard and blocks PR B. Cost if wrong: if the order slips, PR B waits; nothing is retargeted to `qamar` as a stopgap.
 - **Ruling SKIN-DEL-5 — flags that only a deleted skin read are retired from the editor but never stripped from stored themes.** `rtlPolish` (elegant `EmptyState` arrow) and the bold-only parts of `personaChromeV2` stop being read; their keys stay in the theme Zod schema as accepted-and-ignored (same stance as Ruling EP-5 in the editor-pass plan). Cost if wrong: dead keys sit in JSON; no render changes.
-- **Ruling SKIN-DEL-6 — the migration publishes.** An old-skin store's live storefront must not depend on code that is about to be deleted, so the script applies the look and publishes in one step (a revision row is written first, so it is one-click restorable), and the merchant sees a one-time notice in the admin. Evidence: leaving the change as a draft would leave the live store on code that PR B removes. Cost if wrong: a live look changes without the merchant's click; mitigated by SKIN-DEL-1's fallback to the nearest look, `design:'keep'`, and the revision.
+- **Ruling SKIN-DEL-3 — the migration publishes, with the revision kept and a one-click undo. APPROVED (the program is pre-launch).** An old-skin store's live storefront must not depend on code that is about to be deleted, so the script applies the look and publishes in one step, writing a revision first. Evidence: leaving it as a draft would leave the live store on code PR B removes; pre-launch status. Cost if wrong: a live look changes without the merchant's click; mitigated by SKIN-DEL-1's nearest-look mapping, `design:'keep'`, and the revision.
+- **Ruling SKIN-DEL-4 — the production migration run EXCLUDES `qa-walk-store-1010` (standing rule: never touch it) and any store the gate cannot classify (`class = 'UNKNOWN'`).** Those stores are listed for Ahmad instead of migrated. The preflight therefore reports "all stores migrated except the excluded list", and PR B is BLOCKED until that list is empty or Ahmad rules on each entry. The enum contract deploy (PR C) happens only after that. Evidence: controller ruling 2026-10-21 and the standing rule. Cost if wrong: PR B and C wait on Ahmad's ruling; no excluded store is touched.
 
 ---
 
@@ -129,11 +130,17 @@ FROM classified
 GROUP BY class, template, look
 ORDER BY class DESC, template, look;
 
--- The gate: must return 0 before the migration is "done" and again before PRs B and C.
+-- The gate: reports "all stores migrated except the excluded list" (Ruling SKIN-DEL-4). Excluded: slug 'qa-walk-store-1010' and any UNKNOWN-class store; they are listed for Ahmad, never migrated. PRs B and C are blocked until the excluded list is empty or ruled on.
 SELECT count(*) AS old_skin_stores
 FROM stores
-WHERE template::text IN ('modern','classic','minimal','bold','elegant')
+WHERE slug <> 'qa-walk-store-1010'
+  AND template::text IN ('modern','classic','minimal','bold','elegant')
   AND (look IS NULL OR look !~ '^(qamar|souq|jasmine|lamma|dahab)\.');
+
+-- The excluded list, for Ahmad (never migrated by the script):
+SELECT id, slug, template::text AS template, look FROM stores
+WHERE slug = 'qa-walk-store-1010'
+   OR NOT (template::text IN ('modern','classic','minimal','bold','elegant','dahab','qamar') OR look ~ '^(qamar|souq|jasmine|lamma|dahab)\.');
 
 -- Persisted places that may carry an old skin name (they must still parse; see Task 3).
 SELECT 'store_page_revisions' AS surface, count(*) AS rows_naming_old_skin
@@ -216,11 +223,11 @@ describe('legacy skin map (Ruling SKIN-DEL-1)', () => {
 });
 ```
 
-The last test fails until SKIN-DEL-4 is decided (Souq/Dahab looks still say `skin: 'minimal'`), which is intended: it makes the open decision a red test, not a note.
+The last test fails until SKIN-DEL-2 is decided (Souq/Dahab looks still say `skin: 'minimal'`), which is intended: it makes the open decision a red test, not a note.
 
 - [ ] **Step 2: Run** `npx vitest run packages/shared/src/templates/legacy-skin-map.test.ts; echo "exit=$?"` → FAIL.
 - [ ] **Step 3: Implement** the pure table. `isBuilt` defaults to `getLook(id).status === 'built'`.
-- [ ] **Step 4: Run** → the first three PASS; the fourth passes once Souq and Dahab have flipped their looks' `skin` (it is the Task 6 precondition and is allowed to be red in PR A only if marked `it.fails` with a TODO naming SKIN-DEL-4; remove `.fails` in PR B).
+- [ ] **Step 4: Run** → the first three PASS; the fourth passes once Souq and Dahab have flipped their looks' `skin` (it is the Task 6 precondition and is allowed to be red in PR A only if marked `it.fails` with a TODO naming SKIN-DEL-2; remove `.fails` in PR B).
 - [ ] **Step 5: Commit** → `feat(skins): add the retired-skin to ebda-look mapping`.
 
 ---
@@ -230,15 +237,14 @@ The last test fails until SKIN-DEL-4 is decided (Souq/Dahab looks still say `ski
 **Files:**
 
 - Modify: `packages/shared/src/types/store-theme.ts` (keep `TemplateId` unchanged in PR A; add `normalizeLegacyTemplate(v: unknown): TemplateId`: a retired value returns the template of its mapped look, an unknown value returns the default Ebda template)
-- Modify (writers): `apps/api/src/services/onboarding.service.ts:42` (`SELF_SERVE_TEMPLATES` becomes the Ebda templates only, or is removed if signup is look-first, decided here from `TemplateStep.tsx`), `apps/api/src/routes/onboarding.routes.ts:60`, `apps/api/src/services/store.service.ts:944` (`updateTemplate` refuses retired values with 400 `TEMPLATE_RETIRED`), `apps/api/src/services/provisioning.service.ts:57`
+- Modify (writers): `apps/api/src/services/store.service.ts:944` (`updateTemplate` refuses retired values with 400 `TEMPLATE_RETIRED`), `apps/api/src/services/provisioning.service.ts:57` (type union only). Signup is out of scope (Precondition).
 - Modify (readers): `apps/api/src/lib/store-brand-theme.ts:22` (`normalizeLegacyTemplate(store.template)`), every site that reads a template out of a saved document or theme (found by Task 9's grep; at minimum `apps/web/src/lib/serverTemplate.ts`, `apps/web/src/templates/index.ts`, `StoreContext.tsx`, `page-builder.service.ts`, the revision restore path)
-- Modify: `apps/admin/src/app/stores/[id]/template/page.tsx` (`SKIN_IDS` loses the five; a store still on one shows its mapped look as "current" with the notice of Task 4), onboarding `TemplateStep.tsx`, `apps/admin/messages/{ar,en}.json`
-- Modify: `packages/database/prisma/schema.prisma` default: `@default(modern)` stays in PR A (a column default change is a schema change; it moves with the contract in PR C), but `StoreService.create` and `ProvisioningService` pass an explicit Ebda template + look so no new row ever takes the default (Task 3 test)
+- Modify: `apps/admin/src/app/stores/[id]/template/page.tsx` (`SKIN_IDS` loses the five; a store still on one shows its mapped look as "current" with the notice of Task 4), `apps/admin/messages/{ar,en}.json`
 - Test: `tests/unit/normalize-legacy-template.test.ts`, `tests/integration/retired-template-writes.test.ts`, `tests/unit/revision-restore-legacy.test.ts`
 
 - [ ] **Step 1: Write the failing tests**
   - `normalize-legacy-template.test.ts`: each retired value normalizes to its mapped look's template; `qamar`, `dahab`, `souq` pass through; `null`, `undefined`, `''` and an unknown string return the default Ebda template and never throw.
-  - `retired-template-writes.test.ts` (HTTP, owner and staff): `PUT /stores/:id/template` and the onboarding template field with each retired value return 400 `TEMPLATE_RETIRED`, write no row, change no cache; an Ebda value still works; a new store created through `StoreService.create` has `template` ≠ the DB default and a non-null `look`.
+  - `retired-template-writes.test.ts` (HTTP, owner and staff): `PUT /stores/:id/template` with each retired value returns 400 `TEMPLATE_RETIRED`, writes no row, changes no cache; an Ebda value still works.
   - `revision-restore-legacy.test.ts`: a revision fixture whose document and theme contain `"template":"elegant"` restores successfully, the stored result contains the mapped template, and no old value is written back (Review Focus 2).
 - [ ] **Step 2: Run** the three files → FAIL.
 - [ ] **Step 3: Implement.** Zod at every edge: the response and request schemas use `z.enum(EBDA_TEMPLATES)` for writes and `z.string().transform(normalizeLegacyTemplate)` for reads of persisted values. Cache: a template change already busts the store caches in `applyLook`; confirm `updateTemplate`'s retired-value branch does not reach the cache bust (it throws first).
@@ -258,9 +264,9 @@ The last test fails until SKIN-DEL-4 is decided (Souq/Dahab looks still say `ski
 **Behaviour:**
 
 1. Default is `--dry-run`: lists every old-skin store (same predicate as the preflight), the look it would get (`mapRetiredSkin` with the store's vertical and the registry's `built` flags), and what the keep/reset report would be (`diffTemplateFamily` if the editor-pass plan has landed, else `applyTemplateFamily` run in memory).
-2. `--apply --store <id>[,<id>…]` or `--apply --all` runs per store, each in its own tenant scope and transaction: `StoreService.applyLook(storeId, mappedLook, { design: 'keep' }, actingOwnerId)`, then publish the resulting draft (Ruling SKIN-DEL-6), then record `{ storeId, from, to, revisionId, at }` to `docs/ops-ledger` equivalent (a JSONL file the script prints and the operator commits only if Ahmad asks; never into git automatically).
+2. `--apply --store <id>[,<id>…]` or `--apply --all` runs per store, each in its own tenant scope and transaction: `StoreService.applyLook(storeId, mappedLook, { design: 'keep' }, actingOwnerId)`, then publish the resulting draft (Ruling SKIN-DEL-3), then record `{ storeId, from, to, revisionId, at }` to `docs/ops-ledger` equivalent (a JSONL file the script prints and the operator commits only if Ahmad asks; never into git automatically).
 3. Idempotent and resumable: a store that is no longer old-skin is skipped; a second run changes nothing; a failure on store N stops that store (its transaction rolls back), logs it, continues, and exits non-zero at the end.
-4. Refuses a non-loopback database without `--yes-production`; with it, also requires `--expect <N>` equal to the live old-skin count so a drifted set aborts. Refuses the `ebda_app` role (must see all stores). Prints the plan first, then asks no questions (non-interactive), because the STOP is Ahmad running or approving the command.
+4. Always skips `slug = 'qa-walk-store-1010'` and any store `mapRetiredSkin` cannot classify, and prints them as the excluded list (Ruling SKIN-DEL-4). Refuses a non-loopback database without `--yes-production`; with it, also requires `--expect <N>` equal to the live old-skin count so a drifted set aborts. Refuses the `ebda_app` role (must see all stores). Prints the plan first, then asks no questions (non-interactive), because the STOP is Ahmad running or approving the command.
 5. Rollback per store: the revision written before the apply is restorable from the editor (revision history) and by `scripts/skins/migrate-old-skins.mjs --undo <storeId>` which restores that revision and sets `template`/`look` back; after PR C this is no longer possible for the removed enum values (documented; the undo is only valid before PR C).
 
 - [ ] **Step 1: Write the failing integration test** (throwaway Postgres, owner fixtures, real `StoreService`): seed (a) a `modern` store with 2 hero slides, 3 products and an image-text block, (b) a `bold` store, (c) a `minimal`+`jasmine.bloom` store, (d) a `qamar.atelier` store. Dry run changes nothing (row hashes equal before/after). `--apply --all` migrates (a) to `souq.catalogue` and (b) to `qamar.lookbook`; (a)'s hero slides, products and image-text copy are byte-equal after (content kept); its colours equal before (`keep`); (c) and (d) are untouched; a second run is a no-op; `--undo` restores (a). Per-store failure injection: make (b) throw inside `applyLook`; (a) stays migrated, (b) is unchanged, exit code non-zero. The script refuses `ebda_app` and refuses a production-shaped DSN without both flags.
@@ -278,7 +284,7 @@ The last test fails until SKIN-DEL-4 is decided (Souq/Dahab looks still say `ski
 
 - Move (git mv): `apps/web/src/templates/minimal/{Footer,Hero,ProductCard,ProductGrid,CategoryCard,CategoryGrid,AnnouncementBar,CartTable,OrderSummary,EmptyState,FormCard,Header}.tsx` → `apps/web/src/templates/base/`; `minimal/DESIGN.md` is deleted in Task 6 (a skin design doc), `minimal/index.ts` is replaced by `base/index.ts`
 - Modify: `apps/web/src/templates/{qamar,souq}/index.ts` and `templates/qamar/Header.tsx`, `templates/souq/Header.tsx` (imports `../minimal/…` → `../base/…`), every other importer found by `git grep -n "templates/minimal\|\.\./minimal" -- apps packages tests`
-- Modify: `packages/shared/src/looks/registry.ts` (12 looks: `skin: 'minimal'` retargeted per SKIN-DEL-4)
+- Modify: `packages/shared/src/looks/registry.ts` (12 looks: `skin: 'minimal'` retargeted per SKIN-DEL-2)
 - Test: `tests/unit/templates-base-rehome.test.ts`, the existing Qamar/Souq characterization tests unchanged
 
 - [ ] **Step 1: Write the failing tests:** `templates-base-rehome.test.ts` asserts `templates/base/` exists and `templates/minimal/` does not; no file under `apps/` or `packages/` imports a path containing `/minimal/`; `getTemplateComponents('qamar')` and `('souq')` resolve the same component identities as before (compare function names and a render of each of the eleven pieces over a fixed fixture to the committed pre-move HTML captured in Step 2).
@@ -303,8 +309,8 @@ The last test fails until SKIN-DEL-4 is decided (Souq/Dahab looks still say `ski
 - `packages/shared/src/types/store-theme.ts`: `TemplateId` loses the five; `TEMPLATE_THEMES`, `TEMPLATES`, the five thumbnail paths; `packages/shared/src/types/template-baselines.ts` (`Exclude<…>` at `:193-195` and `TEMPLATE_LAYOUT_BASELINES`); `packages/shared/src/types/image-standards.ts`
 - `apps/web/src/templates/index.ts`, `apps/web/src/lib/serverTemplate.ts`, `apps/web/src/templates/shared/pack-styles.ts` (`PACK_STYLES` loses five keys), `apps/web/src/app/layout.tsx` (`data-pack`)
 - `apps/web/src/styles/globals.css`: every `[data-pack='modern'|'elegant'|'classic'|'minimal'|'bold']` rule (Task 9 lists them); `tests/unit/looks-fonts.test.ts` stays satisfied (the "Looks (Phase S)" block remains `[data-look]`-scoped)
-- `apps/marketing/src/lib/demo-stores.ts` (`DEMO_STORES: Record<TemplateId, …>` loses five entries), `packages/shared/src/builder/template-families.ts` (any old-skin id), `packages/shared/src/looks/registry.ts` (`skin` values, SKIN-DEL-4)
-- `apps/api/src/services/{onboarding,store,provisioning}.service.ts`, `apps/api/src/lib/store-brand-theme.ts` (default `'qamar'` or the chosen default Ebda template, written down as Ruling SKIN-DEL-7 if it differs from Task 8's column default), demo clone scripts (`scripts/storedemo/*`, `clone-demo-stores.ts` equivalents found by grep)
+- `apps/marketing/src/lib/demo-stores.ts` (`DEMO_STORES: Record<TemplateId, …>` loses five entries), `packages/shared/src/builder/template-families.ts` (any old-skin id), `packages/shared/src/looks/registry.ts` (`skin` values, SKIN-DEL-2)
+- `apps/api/src/services/{store,provisioning}.service.ts`, `apps/api/src/lib/store-brand-theme.ts` (fallback uses `normalizeLegacyTemplate`; the default itself comes from the separate fix PR), demo clone scripts (`scripts/storedemo/*`, `clone-demo-stores.ts` equivalents found by grep)
 - `legacy-skin-map.ts` remains and becomes the ONLY file in the repo allowed to contain the five names as strings (the allowlist of Task 9's final grep)
 - Flags per Ruling SKIN-DEL-5: remove the reads in deleted code (they go with the files); keep the keys in the theme Zod schema as accepted-and-ignored; delete the flags' rows from `store-theme-flags.md` or rewrite them (Task 7)
 
@@ -425,7 +431,7 @@ Final gate (also `tests/unit/no-retired-skin-strings.test.ts`): command 1 and 2 
 1. **Dahab redesign ships** and **Souq merges** (hard preconditions for the whole plan).
 2. PR A: Tasks 1, 2, 3, 4 (merge, deploy). Task 4's script is run only at **STOP 1**.
 3. Preflight on production = 0 (Ahmad's output).
-4. PR B: Tasks 5, 6, 7, 9 (one PR, several commits). Needs **SKIN-DEL-4 decided** (Jasmine/Lamma ship, or their looks retarget).
+4. PR B: Tasks 5, 6, 7, 9 (one PR, several commits). Needs Jasmine and Lamma shipped (SKIN-DEL-2) and the excluded-store list empty or ruled on by Ahmad (SKIN-DEL-4).
 5. Deploy B, re-verify `/health` commit and the storefronts.
 6. PR C: Task 8, **STOP 2** (the API deploy that runs the migration).
 
