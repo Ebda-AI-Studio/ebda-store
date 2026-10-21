@@ -21,10 +21,18 @@ const MANIFEST = JSON.parse(
   readFileSync(join(ROOT, 'docs/ebda/templates/purchase-path.json'), 'utf8')
 );
 
+/** The option-less second line of the `two-lines` cart action; `--second-product` overrides it. */
+let SECOND_PRODUCT_PATH = MANIFEST.secondProductPath;
+
 const arg = name => {
   const i = process.argv.indexOf(`--${name}`);
   return i > -1 ? process.argv[i + 1] : undefined;
 };
+/** Every value of a repeatable flag (`--path pdp=/products/x --path category=/products?category=y`). */
+const args = name =>
+  process.argv.flatMap((a, i) =>
+    a === `--${name}` && process.argv[i + 1] ? [process.argv[i + 1]] : []
+  );
 
 /** Viewport id ("390-ar") to a browser context shape. */
 export function viewportOf(id) {
@@ -106,7 +114,7 @@ export const ACTIONS = {
   },
   async 'two-lines'(page, url, base) {
     // A second, option-less line, so the cart shows two rows.
-    await page.goto(`${base}${MANIFEST.secondProductPath}`, {
+    await page.goto(`${base}${SECOND_PRODUCT_PATH}`, {
       waitUntil: 'networkidle',
       timeout: 180000,
     });
@@ -195,9 +203,21 @@ async function main() {
   const out = arg('out');
   const prefix = arg('prefix') ?? store;
   if (!store || !out) {
-    console.error('usage: --store <slug> --out <dir> [--base url] [--prefix name]');
+    console.error(
+      'usage: --store <slug> --out <dir> [--base url] [--prefix name] [--screens a,b] [--viewports 390-ar,1280-en] [--path <screen>=<path>]... [--second-product <path>]'
+    );
     process.exit(2);
   }
+  // A store that is not the Qamar boutique names its own paths (Souq: phones / a phone / earbuds);
+  // a subset of screens and viewports keeps a direction pack to the screens that decide it.
+  const only = arg('screens')?.split(',');
+  const onlyViewports = arg('viewports')?.split(',');
+  const pathOverride = Object.fromEntries(args('path').map(p => p.split(/=(.*)/s).slice(0, 2)));
+  SECOND_PRODUCT_PATH = arg('second-product') ?? MANIFEST.secondProductPath;
+  const screens = MANIFEST.screens
+    .filter(s => !only || only.includes(s.id))
+    .map(s => ({ ...s, path: pathOverride[s.id] ?? s.path }));
+  const viewportIds = MANIFEST.viewports.filter(v => !onlyViewports || onlyViewports.includes(v));
   const u = new URL(base);
   const host = `${store}.${u.hostname}`;
   const origin = `${u.protocol}//${host}${u.port ? `:${u.port}` : ''}`;
@@ -212,13 +232,13 @@ async function main() {
   {
     const warm = await browser.newContext();
     const wp = await warm.newPage();
-    for (const path of new Set(MANIFEST.screens.map(s => s.path)))
+    for (const path of new Set(screens.map(s => s.path)))
       await wp
         .goto(`${origin}${path}`, { waitUntil: 'networkidle', timeout: 180000 })
         .catch(() => {});
     await warm.close();
   }
-  for (const vid of MANIFEST.viewports) {
+  for (const vid of viewportIds) {
     const vp = viewportOf(vid);
     const ctx = await browser.newContext({
       viewport: { width: vp.w, height: vp.h },
@@ -232,7 +252,7 @@ async function main() {
       { name: 'force-cookie-consent', value: consent, domain: host, path: '/' },
     ]);
     const page = await ctx.newPage();
-    for (const s of MANIFEST.screens) {
+    for (const s of screens) {
       const tag = `${prefix}-${s.id}-${vid}`;
       try {
         await ACTIONS[s.action ?? 'none'](page, `${origin}${s.path}`, origin);
