@@ -5,7 +5,11 @@ vi.mock('../../apps/api/src/services/webhook-payload', () => ({
   loadOrderParts: loaders.order,
   loadProductData: loaders.product,
 }));
-import { buildFanoutEvents, SourceNotReadyError } from '../../apps/api/src/services/webhook-events';
+import {
+  buildFanoutEvents,
+  buildInventoryLowEvents,
+  SourceNotReadyError,
+} from '../../apps/api/src/services/webhook-events';
 
 const order = (paymentStatus: string, status = 'confirmed') => ({
   row: { id: 'o1', paymentStatus, status },
@@ -160,5 +164,32 @@ describe('source event -> webhook events', () => {
       'inventory.low:p1:2026-10-21',
       'inventory.low:p2:2026-10-21',
     ]);
+  });
+});
+
+describe('M8 inventory.low events are batched into ONE step per run', () => {
+  const item = (id: string) => ({ productId: id, name: id, inventory: 1, lowStockThreshold: 5 });
+  it('one event per store that has alerted products, none for the rest', () => {
+    const evs = buildInventoryLowEvents('2026-10-21', [
+      { storeId: 's1', items: [item('a')] },
+      { storeId: 's2', items: [] },
+      { storeId: 's3', items: [item('b'), item('c')] },
+    ]);
+    expect(evs.map(e => e.data.storeId)).toEqual(['s1', 's3']);
+    expect(evs[1]).toMatchObject({ name: 'webhook/inventory.low', data: { day: '2026-10-21' } });
+    expect(evs[1].data.items).toHaveLength(2);
+  });
+  it('the cron sends them with a single step.sendEvent after the per-store loop', async () => {
+    const { readFileSync } = await import('node:fs');
+    const { resolve } = await import('node:path');
+    const src = readFileSync(
+      resolve(__dirname, '../../apps/api/src/lib/inngest/functions/stock-low-stock-alert.ts'),
+      'utf8'
+    );
+    const cron = src.slice(0, src.indexOf('export const stockLowStockAlertOnDemand'));
+    expect(cron.match(/step\.sendEvent\(/g)).toHaveLength(1);
+    expect(cron.indexOf('step.sendEvent(')).toBeGreaterThan(
+      cron.indexOf('totalSkipped += scan.skipped')
+    );
   });
 });

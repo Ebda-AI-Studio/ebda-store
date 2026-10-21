@@ -135,3 +135,32 @@ export async function buildFanoutEvents(
     }
   }
 }
+
+/**
+ * One `webhook/inventory.low` event per store with alerted products. The low-stock cron collects
+ * these across stores and sends them in ONE step, so the per-store step count of the cron does not
+ * grow (Inngest caps steps per run; review M8).
+ */
+export function buildInventoryLowEvents(
+  day: string,
+  perStore: Array<{
+    storeId: string;
+    items: Array<{ productId: string; name: string; inventory: number; lowStockThreshold: number }>;
+  }>
+) {
+  return perStore
+    .filter(s => s.items.length > 0)
+    .map(s => ({
+      name: 'webhook/inventory.low' as const,
+      data: {
+        storeId: s.storeId,
+        day,
+        items: s.items.map(p => ({
+          productId: p.productId,
+          name: p.name,
+          inventory: p.inventory,
+          lowStockThreshold: p.lowStockThreshold,
+        })),
+      },
+    }));
+}
