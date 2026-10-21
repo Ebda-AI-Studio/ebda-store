@@ -585,7 +585,8 @@ function dropUnpublishableSections(definition: PageDefinition): PageDefinition {
  * Re-shape the home page to a look's template family without losing content
  * (`applyTemplateFamily` keeps every existing section of a family type and only
  * adds the missing ones; sections outside the family are dropped from the new
- * document). Runs in the CALLER's tenant scope, like the builder routes: it only
+ * document; a look with its own section mix supplies the order, its design keys and
+ * the presets of added sections instead, Ruling B1-3). Runs in the CALLER's tenant scope, like the builder routes: it only
  * composes `saveDraft` / `publishDraft`, which scope themselves.
  *
  * - genuinely fresh store (no revision, no draft, `layout_settings` empty or the
@@ -606,7 +607,10 @@ export async function applyFamilyForLook(
    *  step runs first), so a layout-derived page is re-derived for the new skin + look: the look
    *  owns the default card image ratio, and the old skin's card shape must not be baked into
    *  the new document (Ruling LOOKS-15). */
-  lookId: string | null = null
+  lookId: string | null = null,
+  /** The switch's design choice (TPL-1): `keep` leaves every section design field the merchant
+   *  changed from the outgoing look's mix; `reset` applies the incoming look's design whole. */
+  design: 'keep' | 'reset' = 'reset'
 ): Promise<'published' | 'draft'> {
   const state = await getPageState(storeId, HOME_PAGE_KEY);
   if (!state) throw new AppError(404, 'NOT_FOUND', 'Store not found');
@@ -620,7 +624,30 @@ export async function applyFamilyForLook(
           HOME_PAGE_KEY
         )
       : state.definition;
-  let definition = applyTemplateFamily(start, family);
+  // The OUTGOING look is the one that composed this document (`appliedLook`), else the store
+  // row's (it still holds the old look here). After a discarded draft the published document is
+  // the right baseline, not the store row (C6/C8).
+  const outgoingId = state.definition.appliedLook ?? store.look;
+  const outgoing = getLook(outgoingId);
+  // The skin baseline the start document's layout-backed sections hold: a layout-derived page was
+  // just re-derived for the INCOMING skin + look above; a stored document was composed on the
+  // store's skin (when its look is the store's) or on the outgoing look's skin.
+  const toSkin = look ? { skin: look.skin, look: look.id } : undefined;
+  const fromSkin =
+    start !== state.definition && toSkin
+      ? toSkin
+      : {
+          skin:
+            outgoing && outgoingId !== store.look ? outgoing.skin : (store.template as TemplateId),
+          look: outgoing?.id ?? null,
+        };
+  let definition = applyTemplateFamily(start, family, look, {
+    from: outgoing,
+    design,
+    fromSkin,
+    ...(toSkin ? { toSkin } : {}),
+  });
+  if (look) definition = { ...definition, appliedLook: look.id };
   if (definition.theme && resetThemeKeys.length > 0) {
     const theme = { ...definition.theme } as Record<string, unknown>;
     for (const k of resetThemeKeys) delete theme[k];

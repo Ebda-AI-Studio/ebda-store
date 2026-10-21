@@ -449,6 +449,19 @@ The 5-theme architecture should follow Shopify Polaris's two-layer pattern so fu
 5. **Don't use `p-5 sm:p-6` for any card body** — that's marketing-page padding, not transactional. Cards: `p-3 sm:p-4` max.
 6. **Don't cap category cards above 180px desktop** — reference stores top out at ~150-160px. Bigger reads as "feature tile", not "category nav".
 
+## Exception: image-led looks (`density: 'airy'`, decision (b), Ahmad 2026-10-15)
+
+The caps above protect the default merchant who uploads phone photos. A look whose brief IS the photograph may exceed them, only through its `density: 'airy'` token and only within these ceilings. Today that is Qamar **Atelier** ("oversized photography, almost no chrome"; approved at STOP 1, marked `built` in Task 10) and, among the designed looks, Souq **Showroom** ("product as hero") and Dahab **Worn** (its PDP is Dahab's own, so the gallery row below does not reach it). Two designed looks set `airy` for spacing without an image-led brief, Jasmine **Clinic** and Lamma **Notebook**: their density is reviewed when those templates are built (Ruling B1-50); until then they get the phone gallery below. A new `airy` look is reviewed against this section (the list is pinned by `tests/unit/pdp-airy-gallery.test.tsx`).
+
+| Surface                | Compact default (above) | `airy` ceiling                                                                                                                                                                 | Where                                           |
+| ---------------------- | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------- |
+| PDP gallery below `sm` | `max-w-[280px]`, 3:4    | edge to edge (the full viewport width), **4:5**; the merchant's own gallery aspect still wins; the breadcrumb is hidden below `sm` so the title and price stay in the 390 fold | `ProductDetailClient` `galleryFrameClass` (W2a) |
+| PDP gallery from `sm`  | 400 / 600px             | unchanged                                                                                                                                                                      | same                                            |
+| Product cards          | 150-220px caps          | fill their column, **≤ 4 columns at 1280** (W2b: card sizing lives in the card files)                                                                                          | `card-size.ts` + the card paths                 |
+| Section rhythm         | `--space-unit` 1        | 1.25 (unset section spacing only)                                                                                                                                              | `LOOK_SPACE_UNIT`                               |
+
+Fold rule still binding: at 390 the PDP shows gallery, title and price above the fixed bars; the first selector joins them when the one-bar rule (quality bar C-04, W1) lands. On a phone the PDP photo is never smaller than the same product's card photo.
+
 ## When Ahmad says "still too big"
 
 Pattern recognition: this happens when an element grew during dev to fit

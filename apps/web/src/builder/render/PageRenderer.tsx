@@ -16,6 +16,8 @@ import type { TemplateId, PageDefinition } from '@ebda/shared';
 import {
   sanitizeUrl,
   definitionToLayout,
+  documentForLook,
+  getLook,
   getSectionDefinition,
   renderableSections,
   sectionToLegacy,
@@ -36,8 +38,11 @@ import {
   type ProductSpotlightSettings,
 } from '../sections/ProductSpotlightSection';
 import { TrustBadgesSection, type TrustBadgesSettings } from '../sections/TrustBadgesSection';
+import { ShopTheLookSection, type ShopTheLookSettings } from '../sections/ShopTheLookSection';
+import { HeroCollage } from '../../templates/shared/HeroCollage';
 import { resolveSectionProducts } from '../sections/section-products';
 import { sectionBgStyle } from '../../templates/shared/section-bg';
+import { CategoryChips } from '../../templates/shared/CategoryChips';
 import {
   sectionSpacingClasses,
   sectionVisibilityClass,
@@ -69,7 +74,7 @@ interface HomepageTestimonial {
   rating: number;
   title: string | null;
   comment: string;
-  authorName: string;
+  authorName: string | null;
   authorCity: string | null;
   createdAt: string;
 }
@@ -109,7 +114,7 @@ function heroSlidesWithImage<T extends { image?: string }>(
 }
 
 export function PageRenderer({
-  definition,
+  definition: storedDefinition,
   editorMode = false,
   templateId,
   featuredProducts,
@@ -121,8 +126,10 @@ export function PageRenderer({
 }: PageRendererProps) {
   // The legacy-shaped view of the document: section props plus the
   // cross-section lookups the dividers and the featured fallback need.
-  const layout = definitionToLayout(definition);
   const { store } = useStore();
+  // Under a look with a section mix, sections tagged for another look are left out (C10).
+  const definition = documentForLook(storedDefinition, getLook(store.look));
+  const layout = definitionToLayout(definition);
   const { language } = useLanguage();
   const { addItem } = useCart();
   const storeUrl = useStoreUrl();
@@ -137,6 +144,7 @@ export function PageRenderer({
       n.hidden !== true &&
       (n.type === 'featured-collection' ||
         n.type === 'product-spotlight' ||
+        n.type === 'shop-the-look' ||
         n.type === 'product-carousel')
   );
 
@@ -339,10 +347,27 @@ export function PageRenderer({
   // Hero rendering: prefer the new HeroSlider/HeroBanner shells when the
   // store has supplied slides via layout.hero. When no slides exist we fall
   // back to the legacy T.Hero (which uses the per-store hero text fields).
+  // Collage (Ruling B1-2): needs three slides with a photo (`image`; HeroCollage shows `imageAr` in Arabic when set); with fewer, the
+  // hero renders as the banner / slider below in full-bleed.
+  const collageEligible =
+    layout.hero.enabled &&
+    layout.hero.presentation === 'collage' &&
+    heroSlidesWithImage(layout.hero.slides).length >= 3;
+  // Opt-in hero design key (Ruling B1-41): only a hero set to `frame: 'line'` (Vitrine's mix, or a
+  // merchant's pick) draws the hairline and fills its frame; every other framed hero is unchanged.
+  const heroFrameLine = layout.hero.frame === 'line';
+  const bannerPresentation =
+    layout.hero.presentation === 'collage' ? 'full-bleed' : layout.hero.presentation;
   const sliderEligible =
-    layout.hero.mode === 'slider' && layout.hero.slides.length > 0 && !!T.HeroSlider;
+    !collageEligible &&
+    layout.hero.mode === 'slider' &&
+    layout.hero.slides.length > 0 &&
+    !!T.HeroSlider;
   const bannerEligible =
-    layout.hero.mode === 'single' && layout.hero.slides.length > 0 && !!T.HeroBanner;
+    !collageEligible &&
+    layout.hero.mode === 'single' &&
+    layout.hero.slides.length > 0 &&
+    !!T.HeroBanner;
   // The legacy T.Hero is only useful when the merchant has supplied at
   // least one piece of content for it (title, subtitle, or image). With
   // all three empty we'd render a hero with nothing in it, which is
@@ -409,6 +434,14 @@ export function PageRenderer({
             style={sectionBgStyle(layout.hero.bgColor, store.theme)}
             className={heroVisClass}
           >
+            {collageEligible && (
+              <HeroCollage
+                slides={heroSlidesWithImage(layout.hero.slides)}
+                isRtl={isRtl}
+                urlPrefix={storeUrl('')}
+                headingZone={heroHeadingZone}
+              />
+            )}
             {layout.hero.enabled && sliderEligible && T.HeroSlider && (
               <T.HeroSlider
                 // `image` is optional on HeroSlide only so a DRAFT can hold a
@@ -420,7 +453,9 @@ export function PageRenderer({
                 autoplayMs={layout.hero.autoplayMs}
                 isRtl={isRtl}
                 pack={templateId}
-                presentation={layout.hero.presentation}
+                presentation={bannerPresentation}
+                frameLine={heroFrameLine}
+                textAnchor={layout.hero.textAnchor}
                 headingZone={heroHeadingZone}
                 urlPrefix={storeUrl('')}
               />
@@ -433,25 +468,31 @@ export function PageRenderer({
                   {...heroSlidesWithImage(layout.hero.slides)[0]}
                   isRtl={isRtl}
                   pack={templateId}
-                  presentation={layout.hero.presentation}
+                  presentation={bannerPresentation}
+                  frameLine={heroFrameLine}
+                  textAnchor={layout.hero.textAnchor}
                   headingZone={heroHeadingZone}
                   urlPrefix={storeUrl('')}
                 />
               )}
-            {layout.hero.enabled && !sliderEligible && !bannerEligible && legacyHeroHasContent && (
-              <T.Hero
-                title={heroTitleEn}
-                titleAr={heroTitleArVal}
-                subtitle={heroSubtitleEn}
-                subtitleAr={heroSubtitleArVal}
-                image={heroImage}
-                ctaText={heroCtaEn}
-                ctaTextAr={heroCtaArVal}
-                ctaLink={heroCtaLink}
-                isRtl={isRtl}
-                urlPrefix={storeUrl('')}
-              />
-            )}
+            {layout.hero.enabled &&
+              !collageEligible &&
+              !sliderEligible &&
+              !bannerEligible &&
+              legacyHeroHasContent && (
+                <T.Hero
+                  title={heroTitleEn}
+                  titleAr={heroTitleArVal}
+                  subtitle={heroSubtitleEn}
+                  subtitleAr={heroSubtitleArVal}
+                  image={heroImage}
+                  ctaText={heroCtaEn}
+                  ctaTextAr={heroCtaArVal}
+                  ctaLink={heroCtaLink}
+                  isRtl={isRtl}
+                  urlPrefix={storeUrl('')}
+                />
+              )}
           </div>
         );
 
@@ -546,7 +587,11 @@ export function PageRenderer({
                       renderGrid(caption, vis)
                     );
                   const kindFor = (lay: typeof layout.categories.layout) =>
-                    lay === 'horizontal' && T.CategoryStrip ? 'strip' : 'grid';
+                    lay === 'chips'
+                      ? 'chips'
+                      : lay === 'horizontal' && T.CategoryStrip
+                        ? 'strip'
+                        : 'grid';
                   const desktopKind = kindFor(layout.categories.layout);
                   const mobileKind = kindFor(
                     layout.categories.layoutMobile ?? layout.categories.layout
@@ -554,8 +599,24 @@ export function PageRenderer({
                   const desktopCaption = layout.categories.captionPosition;
                   const mobileCaption =
                     layout.categories.captionPositionMobile ?? layout.categories.captionPosition;
-                  const renderKind = (kind: 'strip' | 'grid', caption: Caption, vis?: string) =>
-                    kind === 'strip' ? renderStrip(caption, vis) : renderGrid(caption, vis);
+                  const renderKind = (
+                    kind: 'strip' | 'grid' | 'chips',
+                    caption: Caption,
+                    vis?: string
+                  ) =>
+                    kind === 'chips' ? (
+                      <div className={vis}>
+                        <CategoryChips
+                          categories={common.categories}
+                          urlPrefix={common.urlPrefix}
+                          isRtl={isRtl}
+                        />
+                      </div>
+                    ) : kind === 'strip' ? (
+                      renderStrip(caption, vis)
+                    ) : (
+                      renderGrid(caption, vis)
+                    );
                   // Render once when desktop + mobile resolve to the SAME layout AND
                   // caption; otherwise render both trees + toggle with md: so each
                   // breakpoint gets its own layout + caption independently.
@@ -902,6 +963,7 @@ export function PageRenderer({
                   subtitleZone={testimonialsSubtitleZone}
                   dividers={layout.testimonials.dividers}
                   sectionBgColor={layout.testimonials.bgColor}
+                  layout={layout.testimonials.layout}
                 />
               </section>
             )}
@@ -1095,6 +1157,22 @@ export function PageRenderer({
                     3
                   ).map(toTemplateProduct)}
                   editorMode={editorMode}
+                />
+              ) : def.type === 'shop-the-look' ? (
+                <ShopTheLookSection
+                  sectionId={section.id}
+                  settings={settings as ShopTheLookSettings}
+                  blocks={section.blocks ?? []}
+                  // Store-scoped pools only: an unknown or foreign id is absent, never rendered (C11).
+                  products={[
+                    ...pools.newArrivals,
+                    ...pools.bestSellers,
+                    ...pools.featured,
+                    ...pools.extra,
+                  ]}
+                  editorMode={editorMode}
+                  showPrice={showCardPriceEff !== false}
+                  cardLayout={layout}
                 />
               ) : def.type === 'trust-badges' ? (
                 <TrustBadgesSection

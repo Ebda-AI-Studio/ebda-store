@@ -240,9 +240,7 @@ export function VariantSelector({
               {selectedDisplay && (
                 <span className="text-sm text-muted-foreground">{selectedDisplay}</span>
               )}
-              {option.name === sizeGuideOption && (
-                <span className="-my-3 ms-auto">{sizeGuide}</span>
-              )}
+              {option.name === sizeGuideOption && <span className="-my-3 ms-2">{sizeGuide}</span>}
             </div>
             <div className="flex flex-wrap gap-2">
               {option.values.map(({ value, valueAr, swatchHex, swatchImageUrl }) => {
@@ -268,10 +266,10 @@ export function VariantSelector({
                       }
                       title={!available ? t('Out of Stock', 'غير متوفر') : pillLabel}
                       className={[
-                        'relative inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full before:absolute before:-inset-1.5 before:content-[""] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                        'relative inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full before:absolute before:-inset-1.5 before:content-[""] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
                         isSelected
                           ? 'ring-2 ring-foreground ring-offset-2 ring-offset-background'
-                          : 'ring-1 ring-foreground/35',
+                          : 'ring-1 ring-foreground',
                         available ? '' : 'cursor-not-allowed opacity-50',
                       ].join(' ')}
                     >
@@ -322,17 +320,17 @@ export function VariantSelector({
                             isSelected
                               ? 'border-primary text-foreground ring-1 ring-inset ring-primary'
                               : available
-                                ? 'border-border text-foreground/85 hover:border-primary/60'
-                                : 'cursor-not-allowed border-border text-muted-foreground line-through opacity-50',
+                                ? 'border-input text-foreground/85 hover:border-primary/60'
+                                : 'cursor-not-allowed border-input text-muted-foreground line-through opacity-50',
                           ].join(' ')
                         : [
-                            'relative min-w-[2.75rem] rounded-lg border px-3 py-2 text-sm font-medium transition-all',
+                            'relative min-h-11 min-w-11 rounded-lg border px-3 py-2 text-sm font-medium transition',
                             thumbnail || dotColor ? 'inline-flex items-center gap-2' : '',
                             isSelected
                               ? 'border-primary bg-primary text-primary-foreground'
                               : available
-                                ? 'border-border bg-background text-foreground hover:border-primary/50 hover:bg-muted'
-                                : 'cursor-not-allowed border-border bg-muted text-muted-foreground line-through opacity-50',
+                                ? 'border-input bg-background text-foreground hover:border-primary/50 hover:bg-muted'
+                                : 'cursor-not-allowed border-input bg-muted text-muted-foreground line-through opacity-50',
                           ].join(' ')
                     }
                   >

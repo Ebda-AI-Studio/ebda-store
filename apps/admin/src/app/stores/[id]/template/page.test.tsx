@@ -37,6 +37,8 @@ function storeWith(look: string | null, template = 'modern') {
 }
 
 async function pickTarget() {
+  // The picker opens on the first template with a built look (Qamar, B1-19): go to Dahab's tab.
+  fireEvent.click(await screen.findByRole('tab', { name: 'Dahab' }));
   const card = await screen.findByRole('radio', { name: new RegExp(target.name.en) });
   fireEvent.click(card);
 }

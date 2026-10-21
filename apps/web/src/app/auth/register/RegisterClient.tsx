@@ -10,6 +10,7 @@ import { api } from '@/lib/api';
 import { MinimalChrome } from '../../../components';
 import { useStoreUrl, useStore } from '../../../contexts/StoreContext';
 import { useLanguage } from '../../../contexts/LanguageContext';
+import { demoRefusalText } from '../../../lib/demo-refusal';
 
 export default function RegisterClient() {
   const { isLoading, error, setError, submit } = useAuthFormSubmit();
@@ -46,7 +47,11 @@ export default function RegisterClient() {
         });
 
         if (!result.success) {
-          throw new Error(result.error?.message || t('Failed to register', 'فشل إنشاء الحساب'));
+          throw new Error(
+            demoRefusalText(result.error, t) ||
+              result.error?.message ||
+              t('Failed to register', 'فشل إنشاء الحساب')
+          );
         }
 
         // T1-4: register no longer returns tokens. The API responds the same way
@@ -74,7 +79,7 @@ export default function RegisterClient() {
               {t('Already have an account?', 'عندك حساب؟')}{' '}
               <Link
                 href={storeUrl('/auth/login')}
-                className="font-medium text-primary hover:underline"
+                className="font-medium text-primary underline underline-offset-2"
               >
                 {t('Sign in', 'تسجيل الدخول')}
               </Link>
@@ -141,16 +146,22 @@ export default function RegisterClient() {
                 <input
                   id="terms"
                   type="checkbox"
-                  className="mt-0.5 h-5 w-5 shrink-0 rounded border-border text-primary focus:ring-primary"
+                  className="mt-0.5 h-5 w-5 shrink-0 rounded border-input text-primary focus:ring-primary"
                   required
                 />
                 <label htmlFor="terms" className="text-sm text-muted-foreground">
                   {t('I agree to the', 'أوافق على')}{' '}
-                  <Link href={storeUrl('/terms')} className="text-primary hover:underline">
+                  <Link
+                    href={storeUrl('/terms')}
+                    className="text-primary underline underline-offset-2"
+                  >
                     {t('Terms of Service', 'الشروط والأحكام')}
                   </Link>{' '}
                   {t('and', 'و')}{' '}
-                  <Link href={storeUrl('/privacy')} className="text-primary hover:underline">
+                  <Link
+                    href={storeUrl('/privacy')}
+                    className="text-primary underline underline-offset-2"
+                  >
                     {t('Privacy Policy', 'سياسة الخصوصية')}
                   </Link>
                 </label>

@@ -40,6 +40,7 @@ import { recordLastListing, consumeFocusProduct } from '@/lib/last-listing';
 
 import { roundToMinor } from '@ebda/shared';
 import { Breadcrumbs } from '../../components/Breadcrumbs';
+import { darkLookListingBand } from '../../templates/shared/section-bg';
 /**
  * How many products the user can choose to load per PLP page. Capped at 96
  * because larger pages start to hurt mobile data + LCP without much UX win.
@@ -48,7 +49,8 @@ import { Breadcrumbs } from '../../components/Breadcrumbs';
 const PRICE_SLIDER_MAX = 5000;
 const PRICE_SLIDER_STEP = 10;
 
-const PER_PAGE_OPTIONS: readonly number[] = [12, 24, 48, 96];
+const PLP_DEFAULT_PER_PAGE = 96;
+const PLP_LEGACY_PER_PAGE_KEY = 'plp-per-page';
 
 /** Sort option labels are translated at render time via the t() helper */
 function getSortOptions(t: (en: string, ar: string) => string) {
@@ -141,15 +143,16 @@ export default function ProductsClient({
   // Dahab skin: shopper-chosen grid density on wide screens (3 or 4 across).
   const [dahabCols, setDahabCols] = useState<3 | 4>(3);
   const [page, setPage] = useState(1);
-  // How many products to load per page. The user can pick from a small
-  // allow-list (12 / 24 / 48 / 96); we persist their choice to localStorage
-  // so it survives reloads but never trust it blindly — anything outside the
-  // allow-list falls back to 96 (default: show all items).
-  const [perPage, setPerPage] = useState<number>(() => {
-    if (typeof window === 'undefined') return 96;
-    const stored = Number(window.localStorage.getItem('plp-per-page'));
-    return PER_PAGE_OPTIONS.includes(stored) ? stored : 96;
-  });
+  // Products per page. The selector was removed (W3), so the size is fixed at the default (show
+  // all). A choice an old build saved to localStorage is never read again; the key is cleared once.
+  const [perPage] = useState<number>(PLP_DEFAULT_PER_PAGE);
+  useEffect(() => {
+    try {
+      window.localStorage.removeItem(PLP_LEGACY_PER_PAGE_KEY);
+    } catch {
+      /* storage blocked: nothing to clear */
+    }
+  }, []);
 
   // Price range in MAJOR units (EGP). 0–5000 EGP covers most catalogue SKUs;
   // see PRICE_SLIDER_MAX.
@@ -250,9 +253,13 @@ export default function ProductsClient({
     categoryFilter === 'best-sellers'
       ? 'الأكثر مبيعاً'
       : (pickLocalizedName(activeCategory, true) ?? translations['All Products']);
-  // Arabic reads "تصفح الدراجية" (with the definite article ال), not "تصفح دراجية".
-  // Prepend ال for the subtitle phrase unless the name already carries it.
-  const ctxArDefinite = ctxAr.startsWith('ال') ? ctxAr : `ال${ctxAr}`;
+  // Subtitle = the category's own description in the shopper's language, or nothing. Never a
+  // generated "Browse X" line (quality bar Y-06: empty means absent; Ruling B1-44).
+  const subtitle = (
+    (language === 'ar'
+      ? activeCategory?.descriptionAr || activeCategory?.description
+      : activeCategory?.description || activeCategory?.descriptionAr) ?? ''
+  ).trim();
 
   // Cart-id → quantity is consumed by ProductListItem (list view). The grid
   // view's PecannbeeProductCard handles its own optimistic add state.
@@ -541,7 +548,11 @@ export default function ProductsClient({
     <ShopChrome>
       <div
         className="flex-1"
-        style={pageSurfaceStyle(productsPage?.bgColor, store.theme, productsPage?.colorScheme)}
+        style={
+          // A dark look lists its (white-ground) product photos on the inverse band (I-3).
+          darkLookListingBand(store.theme, store.look, !!productsPage?.bgColor) ??
+          pageSurfaceStyle(productsPage?.bgColor, store.theme, productsPage?.colorScheme)
+        }
       >
         {/* data-zone="products" wraps the entire listing — header h1 +
           breadcrumb + filter sidebar (sort, price range, search,
@@ -580,17 +591,14 @@ export default function ProductsClient({
             >
               {t(ctxEn, ctxAr)}
             </h1>
-            <p
-              className="mt-2 text-muted-foreground"
-              style={{ ...zoneStyle(plpSubtitleZone, plpScale), ...plpSubheadingColorStyle }}
-            >
-              {categoryFilter
-                ? t(`Browse ${ctxEn}`, `تصفح ${ctxArDefinite}`)
-                : t(
-                    'Browse our collection of premium products',
-                    'تصفح مجموعتنا من المنتجات المميزة'
-                  )}
-            </p>
+            {subtitle && (
+              <p
+                className="mt-2 max-w-[60ch] text-muted-foreground"
+                style={{ ...zoneStyle(plpSubtitleZone, plpScale), ...plpSubheadingColorStyle }}
+              >
+                {subtitle}
+              </p>
+            )}
           </div>
 
           <div className="flex flex-col gap-8 lg:flex-row">
@@ -613,16 +621,7 @@ export default function ProductsClient({
                   onSortChange={setSortBy}
                   resultCount={products.length}
                   isLoading={isLoading}
-                  perPage={perPage}
-                  perPageOptions={PER_PAGE_OPTIONS}
-                  onPerPageChange={next => {
-                    if (PER_PAGE_OPTIONS.includes(next)) {
-                      setPerPage(next);
-                      if (typeof window !== 'undefined') {
-                        window.localStorage.setItem('plp-per-page', String(next));
-                      }
-                    }
-                  }}
+                  // L-07: a page size is not a filter; the PLP keeps its default page size.
                   priceMin={priceMin}
                   priceMax={priceMax}
                   priceFloor={0}
@@ -653,13 +652,13 @@ export default function ProductsClient({
                   }
                 />
                 {/* View Mode */}
-                <div className="hidden items-center gap-1 rounded-lg border border-border bg-background p-1 sm:flex">
+                <div className="hidden items-center gap-1 rounded-lg border border-input bg-background p-1 sm:flex">
                   <button
                     type="button"
                     aria-pressed={viewMode === 'grid'}
                     onClick={() => setViewMode('grid')}
-                    aria-label={t('Grid view', 'عرض شبكي')}
-                    className={`rounded-md p-1.5 transition-colors ${viewMode === 'grid' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'}`}
+                    aria-label={t('Grid view', '\u0639\u0631\u0636 \u0634\u0628\u0643\u064a')}
+                    className={`rounded-md inline-flex h-11 w-11 items-center justify-center transition-colors ${viewMode === 'grid' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'}`}
                   >
                     <svg
                       className="h-4 w-4"
@@ -681,8 +680,8 @@ export default function ProductsClient({
                     type="button"
                     aria-pressed={viewMode === 'list'}
                     onClick={() => setViewMode('list')}
-                    aria-label={t('List view', 'عرض قائمة')}
-                    className={`rounded-md p-1.5 transition-colors ${viewMode === 'list' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'}`}
+                    aria-label={t('List view', '\u0639\u0631\u0636 \u0642\u0627\u0626\u0645\u0629')}
+                    className={`rounded-md inline-flex h-11 w-11 items-center justify-center transition-colors ${viewMode === 'list' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'}`}
                   >
                     <svg
                       className="h-4 w-4"
@@ -739,7 +738,7 @@ export default function ProductsClient({
                     <button
                       type="button"
                       onClick={() => fetchProducts(page)}
-                      className="px-3 py-1 text-sm bg-destructive/20 text-destructive-ink rounded hover:bg-destructive/30"
+                      className="inline-flex min-h-11 items-center px-3 py-1 text-sm bg-destructive/20 text-destructive-ink rounded hover:bg-destructive/30"
                     >
                       {t('Retry', 'إعادة المحاولة')}
                     </button>
@@ -766,7 +765,7 @@ export default function ProductsClient({
                   <div
                     role="group"
                     aria-labelledby="plp-density-label"
-                    className="flex rounded-[var(--radius)] border border-border"
+                    className="flex rounded-[var(--radius)] border border-input"
                   >
                     {([3, 4] as const).map(n => (
                       <button

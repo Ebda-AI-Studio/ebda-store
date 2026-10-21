@@ -144,7 +144,7 @@ export function DahabCartDrawer({
                   )}
                   <div className="mt-auto flex items-center justify-between pt-3">
                     {!item.unavailable ? (
-                      <div className="flex items-center rounded-[var(--radius)] border border-border">
+                      <div className="flex items-center rounded-[var(--radius)] border border-input">
                         <button
                           type="button"
                           onClick={() =>

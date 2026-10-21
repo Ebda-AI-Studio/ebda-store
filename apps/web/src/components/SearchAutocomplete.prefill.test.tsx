@@ -18,8 +18,8 @@ vi.mock('../contexts/StoreContext', () => ({ useStoreUrl: () => (p: string) => p
 vi.mock('../contexts/LanguageContext', () => ({
   useLanguage: () => ({ language: 'ar', t: (en: string) => en }),
 }));
-vi.mock('../hooks/useNumerals', () => ({
-  useNumerals: () => ({ money: (n: number) => String(n) }),
+vi.mock('../hooks/useLocalePrice', () => ({
+  useLocalePrice: () => (n: number) => String(n),
 }));
 
 afterEach(() => {

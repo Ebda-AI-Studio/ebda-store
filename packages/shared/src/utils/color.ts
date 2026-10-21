@@ -125,6 +125,14 @@ export type ColorToken = (typeof COLOR_TOKENS)[number];
 const TOKEN_PREFIX = 'token:';
 
 /**
+ * A section background a look's mix may set (W2a, LB-01): the band takes the page INK as its
+ * colour and the page colour as its text (`sectionBgStyle` re-scopes the ink variables inside
+ * it), so a dark look can put white-ground merchant photos on a light band. Not a COLOR_TOKENS
+ * entry: no colour picker offers it; resolveColor paints it as `token:foreground`.
+ */
+export const INVERSE_SURFACE = 'token:inverse';
+
+/**
  * Maps the short token name (used in colorValue strings and COLOR_TOKENS)
  * to the corresponding StoreTheme field name. StoreTheme uses the `*Color`
  * suffix convention while CSS variables use the bare token name.
@@ -148,6 +156,8 @@ const TOKEN_TO_THEME_KEY: Record<ColorToken, keyof StoreTheme> = {
 export function resolveColor(value: ColorValue | undefined, theme: StoreTheme): string | undefined {
   if (!value) return undefined;
 
+  // The inverse section band (W2a, LB-01) is painted in the page ink.
+  if (value === INVERSE_SURFACE) return resolveColor('token:foreground', theme);
   if (value.startsWith(TOKEN_PREFIX)) {
     const key = value.slice(TOKEN_PREFIX.length) as ColorToken;
     if (!(COLOR_TOKENS as readonly string[]).includes(key)) return undefined;
@@ -448,6 +458,8 @@ export interface CoreBrandTokens {
   cardColor: string;
   mutedColor: string;
   borderColor: string;
+  /** Form-field boundary: the palette's hairline, so fields keep the border colour (B1-43). */
+  inputColor: string;
   primaryForeground: string;
   secondaryForeground: string;
   accentForeground: string;
@@ -614,6 +626,7 @@ export function deriveCoreBrandTokens(seeds: {
       cardColor: cardTriplet,
       mutedColor: mutedTriplet,
       borderColor: borderTriplet,
+      inputColor: borderTriplet,
       primaryForeground: autoFgTriplet(primary),
       secondaryForeground: secondaryFg,
       accentForeground: hexToTriple(primary), // brand text on the light wash
@@ -663,6 +676,7 @@ export function deriveCoreBrandTokens(seeds: {
     cardColor: hexToTriple(cardHex),
     mutedColor: mutedTriplet,
     borderColor: borderTriplet,
+    inputColor: borderTriplet,
     primaryForeground: autoFgTriplet(primary),
     secondaryForeground: autoFgTriplet(secondaryHex),
     accentForeground: autoFgTriplet(accentHex),
@@ -833,4 +847,31 @@ export function generateSectionPalette(
   }
 
   return base;
+}
+
+/**
+ * A boundary colour that reads against `bg` (WCAG 1.4.11, >= `min`:1). Keeps the colour's hue
+ * and saturation and moves only its lightness away from the background, so a merchant's or a
+ * skin's border family survives; returns the input unchanged when it already passes or cannot
+ * be parsed. Output is a bare HSL triplet ("H S% L%").
+ */
+export function boundaryColorFloor(color: string, bg: string, min = 3): string {
+  if (contrastRatio(bg, color) >= min) return color;
+  const trimmed = color.trim();
+  const triplet = trimmed.startsWith('#')
+    ? hexToHsl(trimmed)
+    : trimmed
+        .replace(/^hsla?\(\s*/, '')
+        .replace(/\s*\)$/, '')
+        .replace(/,/g, ' ');
+  const m = /^(-?[\d.]+)\s+([\d.]+)%\s+([\d.]+)%/.exec(triplet.replace(/\s+/g, ' '));
+  const bgRgb = parseColorToRgb(bg);
+  if (!m || !bgRgb) return color;
+  const [hh, ss] = [m[1], m[2]];
+  const darken = relativeLuminance(bgRgb) > 0.18;
+  for (let l = Number(m[3]); l >= 0 && l <= 100; l += darken ? -1 : 1) {
+    const candidate = `${hh} ${ss}% ${l}%`;
+    if (contrastRatio(bg, candidate) >= min) return candidate;
+  }
+  return color;
 }

@@ -56,7 +56,7 @@ export function CheckoutErrorAlert({
     <div
       ref={ref}
       role="alert"
-      className="mb-6 rounded-xl border border-destructive/30 bg-destructive/10 p-4"
+      className="mb-6 rounded-[var(--radius)] border border-destructive/30 bg-destructive/10 p-4"
     >
       <div className="flex items-start gap-3">
         <svg
@@ -75,7 +75,7 @@ export function CheckoutErrorAlert({
         </svg>
         <div className="flex-1">
           <h3 className="text-sm font-medium text-destructive-ink">
-            {t('Checkout Error', 'خطأ في الدفع')}
+            {t('Checkout error', 'خطأ في الدفع')}
           </h3>
           <p className="mt-1 text-sm text-destructive-ink" dir="auto">
             {message}
@@ -93,7 +93,7 @@ export function CheckoutErrorAlert({
           type="button"
           onClick={onClear}
           aria-label={t('Dismiss', 'إغلاق')}
-          className="text-destructive-ink hover:text-destructive-ink/80"
+          className="-m-3 inline-flex h-11 w-11 shrink-0 items-center justify-center text-destructive-ink hover:text-destructive-ink/80"
         >
           <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path

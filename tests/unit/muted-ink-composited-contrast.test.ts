@@ -72,6 +72,20 @@ describe('K-03: every receipt ink composites to >= 4.5:1 on the paper', () => {
     });
 });
 
+// a11y P1-2 / P2-12 (W4): the receipt's own muted text was opacity-60 (4.05:1 on Lookbook's screen)
+// and its paper inks 60-62% alpha: under the K-03 70% floor even where they passed 4.5.
+describe('receipt muted text keeps the 70% floor', () => {
+  const css = readFileSync(join(WEB, 'components/commerce/ReceiptPrinter.module.css'), 'utf8');
+  const tsx = readFileSync(join(WEB, 'components/commerce/ReceiptPrinter.tsx'), 'utf8');
+  it('every paper ink is >= 0.7 alpha', () => {
+    for (const m of css.matchAll(/\.(ink\w*)\s*{\s*color:\s*rgb\([^/]+\/\s*([\d.]+)\s*\)/g))
+      expect(+m[2], m[1]).toBeGreaterThanOrEqual(0.7);
+  });
+  it('no text dims below 70% with opacity', () => {
+    expect(tsx).not.toMatch(/\bopacity-(?:[1-6]\d|\d)\b/);
+  });
+});
+
 describe('K-04: foreground text never drops under 70% alpha', () => {
   const walk = (dir: string): string[] =>
     readdirSync(dir).flatMap(n => {
@@ -168,5 +182,22 @@ describe('K-04: foreground text never drops under 70% alpha', () => {
       .map(([name, fg, bg]) => [name, contrastRatio(bg, composite(fg, 0.7, bg))] as const)
       .filter(([, r]) => r < 4.5);
     expect(fails).toEqual([]);
+  });
+});
+
+// LB-b (independent audit): black and navy swatch dots on Lookbook's navy band were near
+// invisible; only a faint ring (ink at 35%) separated them. The dot ring composites to at
+// least 3:1 (WCAG 1.4.11) against every look's page and surface.
+describe('swatch dot ring is a visible boundary on every look (LB-b)', () => {
+  const src = readFileSync(join(WEB, 'components/commerce/SwatchDots.tsx'), 'utf8');
+  // B1-107: the ring is now solid (no alpha suffix); an alpha suffix, if one returns, is measured.
+  const alpha = Number(/border-foreground\/(\d+)/.exec(src)?.[1] ?? 100) / 100;
+  it.each(
+    LOOKS.flatMap(l => [
+      [`${l.id} page`, l.tokens.ink, l.tokens.page] as [string, string, string],
+      [`${l.id} surface`, l.tokens.ink, l.tokens.surface] as [string, string, string],
+    ])
+  )('%s', (_n, ink, bg) => {
+    expect(contrastRatio(composite(ink, alpha, bg), bg)).toBeGreaterThanOrEqual(3);
   });
 });

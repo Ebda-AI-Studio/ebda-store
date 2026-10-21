@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { localizedMetadata } from '@/lib/seo/localized-metadata';
 import { Suspense } from 'react';
 import CartClient from './CartClient';
 import CartRestoreHydrator from './CartRestoreHydrator';
@@ -10,11 +11,13 @@ import CartRestoreHydrator from './CartRestoreHydrator';
 // docs/plans/2026-07-12-tenant-cacheable-routing.md §3.3/§4/§9.
 export const dynamic = 'force-dynamic';
 
-export const metadata: Metadata = {
-  title: 'Cart',
-  description: 'Review items in your shopping cart.',
-  robots: { index: false, follow: false },
-};
+export function generateMetadata(): Promise<Metadata> {
+  return localizedMetadata({
+    title: ['Cart', 'سلة التسوق'],
+    description: ['Review items in your shopping cart.', 'راجع القطع في سلة التسوق.'],
+    robots: { index: false, follow: false },
+  });
+}
 
 export default function CartPage() {
   return (

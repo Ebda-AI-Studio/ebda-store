@@ -17,7 +17,7 @@ Hover states are ultra-subtle (`opacity-100` reveals, `transition-opacity durati
 - Type weights stay 300–500: `font-extralight`, `font-light`, `font-normal`, `font-medium` — never `font-bold` and absolutely never `font-black`
 - Hybrid serif + sans: `font-serif` (Playfair Display) for footer eyebrows, brand wordmarks; very light `font-sans` (Plus Jakarta Sans) for hero/heading display
 - Italic accent on hero headlines: split first word with `<span className="italic font-normal">` over the rest in `font-extralight`
-- Outlined CTAs that invert on hover: `border border-foreground hover:bg-foreground hover:text-background transition-all duration-500`
+- Outlined CTAs that invert on hover: `border border-foreground hover:bg-foreground hover:text-background transition duration-500`
 - Long transition durations (300ms / 500ms) — everything moves slowly and intentionally
 - ALL CAPS for nav, eyebrows, buttons, card names — sentence-case reserved for body / hero subtitle / form headings
 
@@ -127,7 +127,7 @@ Elegant relies on a near-monochromatic palette dominated by `--foreground` and i
 ```
 group inline-flex items-center gap-4 px-8 py-4 border border-foreground
 text-foreground text-xs tracking-[0.25em] uppercase font-medium
-hover:bg-foreground hover:text-background transition-all duration-500
+hover:bg-foreground hover:text-background transition duration-500
 ```
 
 **OrderSummary CTA (filled, but flat)**
@@ -174,7 +174,7 @@ underline underline-offset-4
 **Wishlist (heart icon, opacity reveal)**
 
 ```
-absolute top-4 [end-edge]-4 p-2 transition-all duration-300
+absolute top-4 [end-edge]-4 p-2 transition duration-300
 opacity-0 group-hover:opacity-100 (or 100 if isWishlisted)
 ```
 
@@ -318,7 +318,7 @@ The announcement bar is the ONE place chromatic primary appears proudly.
 | Flat                 | No border, no shadow                                     | Product cards, empty state — content sits on the page |
 | Hairline             | `border-t border-foreground/20`                          | Order summary, divider above totals                   |
 | Hairline (subtle)    | `divide-y divide-border/50`, `border-b border-border/50` | Cart rows, top utility bar separation                 |
-| Bordered             | `border border-border`                                   | Newsletter input, social tiles                        |
+| Bordered             | `border border-border`                                   | Social tiles (form fields: `border-input`, K-05)      |
 | Subtle hover overlay | `bg-foreground/10`                                       | Hero image scrim, category hover                      |
 
 **Shadow Philosophy**: Elegant uses NO box-shadows. Depth is communicated entirely through hairline dividers, generous whitespace, and image overlays. The most "elevation" any element gets is the `bg-background/95 backdrop-blur-sm` quick-add overlay sliding up from the bottom of a product card — and even then, the visual is a frosted glass blur, not a shadow drop.
@@ -330,7 +330,7 @@ The announcement bar is the ONE place chromatic primary appears proudly.
 - Use `font-light` (300), `font-extralight` (200), or `font-normal` (400) on all display type — Elegant's weight ceiling is `font-medium` (500).
 - Use the italic-accent pattern on hero headlines: split the first word into `italic font-normal` and render the rest in `font-extralight`.
 - Use `tracking-[0.2em]` to `tracking-[0.5em]` plus `uppercase` on labels, eyebrows, nav, badges, button text — tracking IS the hierarchy.
-- Use `border border-foreground` outlined CTAs that invert with `hover:bg-foreground hover:text-background transition-all duration-500`.
+- Use `border border-foreground` outlined CTAs that invert with `hover:bg-foreground hover:text-background transition duration-500`.
 - Use long transition durations: `duration-500` for hovers, `duration-300` for opacity reveals — nothing snaps.
 - Use hairline dividers (`border-foreground/20`, `divide-border/50`) instead of borders or shadows.
 - Center hero text and section eyebrows — Elegant is symmetric and editorial.
@@ -387,4 +387,4 @@ The announcement bar is the ONE place chromatic primary appears proudly.
 
 ## 9. Agent Prompt Guide
 
-When generating new components for the Elegant template, treat `Hero.tsx`, `ProductCard.tsx`, and `Footer.tsx` as canon. Default typography weight to `font-light` (300) for display, `font-normal` (400) for labels, `font-medium` (500) at maximum on CTAs — NEVER reach `font-bold` or higher. Default labels to ALL CAPS with `tracking-[0.2em]` to `tracking-[0.3em]`; reserve `tracking-[0.4em]` and `tracking-[0.5em]` for the smallest eyebrows (10–11px). Default corners to `rounded-none` — sharp corners are signature. Default to NO borders, NO shadows, NO card backgrounds; let images sit directly on `bg-background` (or `bg-gray-50` for product image bg) with text below. CTAs use the outlined-invert pattern: `border border-foreground text-foreground hover:bg-foreground hover:text-background transition-all duration-500`. All transitions take `duration-300` or `duration-500` — never `duration-150` or `duration-200`. The brand `--primary` color is reserved for the announcement bar (`bg-primary`), focus rings, hero italic-accent (no-image variant), and select hover transitions on text links — it does NOT fill resting CTAs. Hero headlines use the italic-split pattern: `<span className="italic font-normal">{firstWord}</span><span className="block font-extralight">{rest}</span>`. Footer column eyebrows use `font-serif` Playfair Display at `text-[10px] tracking-[0.3em] uppercase text-muted-foreground`. Image aspect ratios are portrait by default — `aspect-[3/4]` (products), `aspect-[2/3]` (categories). RTL is supported via `dir`, mirrored chevrons (`rotate-180`), and Arabic strings (`isRtl && nameAr ? nameAr : name`). When in doubt, add more whitespace, lighten the type weight, and lengthen the transition.
+When generating new components for the Elegant template, treat `Hero.tsx`, `ProductCard.tsx`, and `Footer.tsx` as canon. Default typography weight to `font-light` (300) for display, `font-normal` (400) for labels, `font-medium` (500) at maximum on CTAs — NEVER reach `font-bold` or higher. Default labels to ALL CAPS with `tracking-[0.2em]` to `tracking-[0.3em]`; reserve `tracking-[0.4em]` and `tracking-[0.5em]` for the smallest eyebrows (10–11px). Default corners to `rounded-none` — sharp corners are signature. Default to NO borders, NO shadows, NO card backgrounds; let images sit directly on `bg-background` (or `bg-gray-50` for product image bg) with text below. CTAs use the outlined-invert pattern: `border border-foreground text-foreground hover:bg-foreground hover:text-background transition duration-500`. All transitions take `duration-300` or `duration-500` — never `duration-150` or `duration-200`. The brand `--primary` color is reserved for the announcement bar (`bg-primary`), focus rings, hero italic-accent (no-image variant), and select hover transitions on text links — it does NOT fill resting CTAs. Hero headlines use the italic-split pattern: `<span className="italic font-normal">{firstWord}</span><span className="block font-extralight">{rest}</span>`. Footer column eyebrows use `font-serif` Playfair Display at `text-[10px] tracking-[0.3em] uppercase text-muted-foreground`. Image aspect ratios are portrait by default — `aspect-[3/4]` (products), `aspect-[2/3]` (categories). RTL is supported via `dir`, mirrored chevrons (`rotate-180`), and Arabic strings (`isRtl && nameAr ? nameAr : name`). When in doubt, add more whitespace, lighten the type weight, and lengthen the transition.

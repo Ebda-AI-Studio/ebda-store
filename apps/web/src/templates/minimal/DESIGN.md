@@ -57,7 +57,7 @@ Minimal uses the smallest slice of the token palette of any template. Most surfa
 ### Border & Divider
 
 - **Border/20** (`border-border/20`): Footer top divider — the most subdued divider in the system.
-- **Border** (`--border`): Search underline (`border-b border-border`), cart counter implicit alignment, summary total divider (`border-t border-border pt-5`), form field underlines (when used).
+- **Border** (`--border`): Cart counter implicit alignment, summary total divider (`border-t border-border pt-5`). Form fields (search underline included) draw with `--input` (`border-input`, quality bar K-05).
 - **Foreground** (`--foreground`): The one strong divider/border in Minimal — the bottom-border CTA underline (`border-b border-foreground pb-1`). This single hairline is the only "button" Minimal acknowledges.
 
 ### Overlay

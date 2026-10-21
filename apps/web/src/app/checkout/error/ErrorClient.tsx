@@ -134,7 +134,7 @@ export default function ErrorClient() {
                 {t('Retry Payment', 'إعادة محاولة الدفع')}
               </Button>
 
-              <Link href={storeUrl('/cart')}>
+              <Link href={storeUrl('/cart')} className="inline-block">
                 <Button className="w-full" size="lg" variant="outline">
                   {t('Return to Cart', 'العودة إلى السلة')}
                 </Button>

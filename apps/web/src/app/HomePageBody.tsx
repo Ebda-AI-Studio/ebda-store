@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation';
 import { PLATFORM_MARKETING_URL } from '../lib/platform';
 import type { ResolvedStore } from '../lib/store-resolver';
 import { API_URL } from '../lib/api';
+import { idChunks, MANUAL_IDS_PER_FETCH } from '../builder/sections/section-products';
 import type { Product, Category } from '../lib/api';
 import {
   resolveLayoutSettings,
@@ -19,6 +20,7 @@ import { allowedParentOrigins } from '../builder/preview/allowed-parent-origins'
 import { emitZoneCss } from '../lib/emit-zone-css';
 import { buildThemeStyleTag } from '../lib/theme-css';
 import { canBuyNow, inStockNow } from '../lib/can-buy-now';
+import { demoHomeDefinition } from '../lib/demo-home';
 
 /**
  * Homepage body — extracted 2026-07-12 (tenant-cacheable routing, Phase 1)
@@ -42,7 +44,7 @@ interface HomepageTestimonial {
   rating: number;
   title: string | null;
   comment: string;
-  authorName: string;
+  authorName: string | null;
   authorCity: string | null;
   createdAt: string;
 }
@@ -82,7 +84,8 @@ function fetchHomeCategories(
     .catch(() => null);
 }
 
-/** Refs of the document-only product sections (category slug → fetch cap, product ids). */
+/** Refs of the document-only product sections (category slug → fetch cap, product ids),
+ *  including every shop-the-look `look` block's pieces (loaded into `extraProducts`). */
 function documentSectionRefs(def: PageDefinition | undefined): {
   categories: Array<[string, number]>;
   productIds: string[];
@@ -95,6 +98,14 @@ function documentSectionRefs(def: PageDefinition | undefined): {
   let bestSellers = 0;
   for (const n of def?.sections ?? []) {
     if (n.hidden === true) continue;
+    if (n.type === 'shop-the-look') {
+      for (const b of n.blocks ?? []) {
+        const ids = (b.settings as { productIds?: unknown }).productIds;
+        if (b.hidden !== true && Array.isArray(ids))
+          for (const id of ids) if (typeof id === 'string') productIds.push(id);
+      }
+      continue;
+    }
     if (n.type !== 'featured-collection' && n.type !== 'product-spotlight') continue;
     const s = n.settings as {
       productSource?: string;
@@ -220,7 +231,7 @@ async function fetchHomepageData(
     bestSellersResult,
     testimonialsResult,
     categoryResults,
-    manualResult,
+    manualResults,
   ] = await Promise.all([
     prefetched?.featured ?? fetchFeaturedProducts(storeHeaders, store.id),
     prefetched?.categories ?? fetchHomeCategories(storeHeaders, store.id),
@@ -257,9 +268,12 @@ async function fetchHomepageData(
           .catch(() => null)
       )
     ),
-    manualIds.length > 0
-      ? fetch(
-          `${API_URL}/public/products?ids=${encodeURIComponent(manualIds.join(','))}&limit=50`,
+    // Chunked so every referenced id is fetched (two shop-the-look sections alone can name 48
+    // pieces, plus carousel/spotlight picks); the public route caps one page at 50.
+    Promise.all(
+      idChunks(manualIds).map(chunk =>
+        fetch(
+          `${API_URL}/public/products?ids=${encodeURIComponent(chunk.join(','))}&limit=${MANUAL_IDS_PER_FETCH}`,
           {
             next: { revalidate: 60, tags: [`products:${store.id}`] },
             headers: storeHeaders,
@@ -267,7 +281,8 @@ async function fetchHomepageData(
         )
           .then(r => (r.ok ? r.json() : null))
           .catch(() => null)
-      : Promise.resolve(null),
+      )
+    ),
   ]);
 
   let featuredProducts: Product[] = featuredResult?.data?.products ?? [];
@@ -290,7 +305,7 @@ async function fetchHomepageData(
   const testimonials: HomepageTestimonial[] = testimonialsResult?.data?.testimonials ?? [];
 
   const extraProductsMap = new Map<string, Product>();
-  for (const result of [...categoryResults, manualResult]) {
+  for (const result of [...categoryResults, ...manualResults]) {
     const list: Product[] = result?.data?.products ?? [];
     for (const p of list) {
       if (p?.id) extraProductsMap.set(p.id, p);
@@ -419,10 +434,20 @@ export async function HomePageBody({
     fetchLayoutSettings(store.id, draftToken),
     builderToken ? fetchBuilderPreview(store.id, builderToken) : Promise.resolve(undefined),
   ]);
+  // Demo showroom (Ruling B1-8): the published superset document rendered through the current
+  // look's section mix. The SAME object for every non-demo store, so this is a no-op there.
+  const homeDefinition = builderDefinition
+    ? undefined
+    : demoHomeDefinition(store, draftBundle.definition);
+  const demoMixed = !builderDefinition && homeDefinition !== draftBundle.definition;
   // Builder canvas: the DRAFT drives everything the page fetches and the
   // chrome reads (a draft carousel must load its own products), projected
-  // onto the legacy shape the fetchers understand.
-  const layout = builderDefinition ? definitionToLayout(builderDefinition) : draftBundle.layout;
+  // onto the legacy shape the fetchers understand. The demo mix is projected the same way.
+  const layout = builderDefinition
+    ? definitionToLayout(builderDefinition)
+    : demoMixed && homeDefinition
+      ? definitionToLayout(homeDefinition)
+      : draftBundle.layout;
   // Draft typography + theme override CSS — emitted in body so source order
   // beats the head-emitted committed-store typography. Only present when the
   // admin live-preview iframe passes ?_layoutDraft=<token> AND the draft
@@ -439,7 +464,7 @@ export async function HomePageBody({
         featured: featuredPromise,
         categories: categoriesPromise,
       },
-      documentSectionRefs(builderDefinition ?? draftBundle.definition)
+      documentSectionRefs(builderDefinition ?? homeDefinition)
     );
 
   const siteUrl = storeAbsoluteUrl(store, '');
@@ -530,7 +555,7 @@ export async function HomePageBody({
           extraProducts={extraProducts}
           storeName={store.name}
           layout={layout}
-          definition={draftBundle.definition}
+          definition={homeDefinition}
         />
       )}
     </>

@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { CartIcon } from '@ebda/ui';
 import { StoreLogo } from '../shared/StoreLogo';
 import type { HeaderProps } from '../types';
+import { useTabBarShown, HEADER_MENU_WITH_TAB_BAR_KEEP_SLOT } from '../shared/tab-bar-visibility';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useStore } from '../../contexts/StoreContext';
 import { Sheet } from '../../components/ui/Sheet';
@@ -22,6 +23,7 @@ export default function BoldHeader({
   headerBgColor,
 }: HeaderProps) {
   const { isRtl: ctxIsRtl, t } = useLanguage();
+  const tabBarShown = useTabBarShown();
   const { store } = useStore();
   const isRtl = isRtlProp ?? ctxIsRtl;
   // Item 2 (2026-07-12) persona-completion: bold's bordered-header chrome
@@ -78,6 +80,7 @@ export default function BoldHeader({
                 <span
                   className="text-xl font-black ui-caps-toggle tracking-wider text-white"
                   data-zone="storeName"
+                  translate="no"
                 >
                   {displayName}
                 </span>
@@ -85,12 +88,12 @@ export default function BoldHeader({
             </Link>
 
             {/* Desktop Navigation */}
-            <nav className="hidden md:flex items-center gap-1">
+            <nav aria-label={t('Main', 'الرئيسية')} className="hidden md:flex items-center gap-1">
               {navigation.map(item => (
                 <Link
                   key={item.href}
                   href={item.href}
-                  className="relative whitespace-nowrap px-2 py-2 text-base font-bold ui-caps-toggle tracking-wider text-white/70 lg:px-4 lg:text-lg hover:text-white transition-colors duration-200 group cursor-pointer"
+                  className="relative inline-flex min-h-11 items-center whitespace-nowrap px-2 py-2 text-base font-bold ui-caps-toggle tracking-wider text-white/70 lg:px-4 lg:text-lg hover:text-white transition-colors duration-200 group cursor-pointer"
                 >
                   {isRtl && item.labelAr ? item.labelAr : item.label}
                   <span className="absolute bottom-0 inset-x-2 lg:inset-x-4 h-0.5 bg-primary scale-x-0 group-hover:scale-x-100 transition-transform duration-200 origin-left" />
@@ -170,7 +173,7 @@ export default function BoldHeader({
               {/* Mobile Menu */}
               <button
                 onClick={() => setIsMenuOpen(!isMenuOpen)}
-                className="md:hidden inline-flex h-11 w-11 items-center justify-center rounded-lg text-white/70 hover:text-white hover:bg-white/10 transition-colors duration-200 cursor-pointer"
+                className={`md:hidden inline-flex h-11 w-11 items-center justify-center rounded-lg text-white/70 hover:text-white hover:bg-white/10 transition-colors duration-200 cursor-pointer ${tabBarShown ? HEADER_MENU_WITH_TAB_BAR_KEEP_SLOT : ''}`}
                 aria-label={t('Menu', 'القائمة')}
                 aria-expanded={isMenuOpen}
               >
@@ -278,7 +281,11 @@ export default function BoldHeader({
         closeClassName="text-white/70 hover:text-white hover:bg-white/10"
         bodyClassName=""
       >
-        <nav className="p-4 flex flex-col gap-1" dir={isRtl ? 'rtl' : 'ltr'}>
+        <nav
+          aria-label={t('Menu', 'القائمة')}
+          className="p-4 flex flex-col gap-1"
+          dir={isRtl ? 'rtl' : 'ltr'}
+        >
           {navigation.map(item => (
             <Link
               key={item.href}

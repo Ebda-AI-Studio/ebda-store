@@ -6,9 +6,11 @@ import { useStore } from '../../contexts/StoreContext';
 import { ShopChrome } from '../../components';
 import { useFeatures } from '../../contexts/FeatureContext';
 import { useLanguage } from '../../contexts/LanguageContext';
+import { demoRefusalText } from '../../lib/demo-refusal';
 import { API_URL } from '../../lib/api';
 
 import { REGION } from '@ebda/shared';
+import { pickLocalizedName } from '../../templates/shared/display-helpers';
 // ==========================================
 // Referral Tracking (run once per session)
 // ==========================================
@@ -110,6 +112,7 @@ function AffiliatePageContent() {
 
       if (!res.ok || !json.success) {
         const msg =
+          demoRefusalText(json?.error, t) ||
           json?.error?.message ||
           t('Something went wrong. Please try again.', 'حصل خطأ. جرّب تاني.');
         setError(msg);
@@ -192,8 +195,8 @@ function AffiliatePageContent() {
             <p className="text-muted-foreground">
               {t(
                 `Partner with ${store?.name || 'us'} and earn commissions for every sale you refer.`,
-                store?.name
-                  ? `خليك شريك مع ${store.name} واكسب عمولة على كل بيعة تجيبها.`
+                pickLocalizedName(store, true)
+                  ? `خليك شريك مع ${pickLocalizedName(store, true)} واكسب عمولة على كل بيعة تجيبها.`
                   : 'اشترك معانا في برنامج الشراكة واكسب عمولة على كل بيعة تجيبها.'
               )}
             </p>
@@ -249,7 +252,7 @@ function AffiliatePageContent() {
                     onChange={handleChange}
                     placeholder={t('Your full name', 'اسمك الكامل')}
                     required
-                    className="w-full px-4 py-2.5 border border-border rounded-lg bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+                    className="w-full px-4 py-2.5 border border-input rounded-lg bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
                   />
                 </div>
 
@@ -266,7 +269,7 @@ function AffiliatePageContent() {
                     onChange={handleChange}
                     placeholder="you@example.com"
                     required
-                    className="w-full px-4 py-2.5 border border-border rounded-lg bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+                    className="w-full px-4 py-2.5 border border-input rounded-lg bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
                   />
                 </div>
 
@@ -281,7 +284,7 @@ function AffiliatePageContent() {
                     value={form.phone}
                     onChange={handleChange}
                     placeholder={REGION.phone.placeholderIntl}
-                    className="w-full px-4 py-2.5 border border-border rounded-lg bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+                    className="w-full px-4 py-2.5 border border-input rounded-lg bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
                   />
                 </div>
 
@@ -303,7 +306,7 @@ function AffiliatePageContent() {
                       value={form.instagram}
                       onChange={handleChange}
                       placeholder={t('yourhandle', 'حسابك')}
-                      className="w-full pl-8 pr-4 py-2.5 border border-border rounded-lg bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+                      className="w-full pl-8 pr-4 py-2.5 border border-input rounded-lg bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
                     />
                   </div>
                 </div>
@@ -326,7 +329,7 @@ function AffiliatePageContent() {
                       value={form.tiktok}
                       onChange={handleChange}
                       placeholder={t('yourhandle', 'حسابك')}
-                      className="w-full pl-8 pr-4 py-2.5 border border-border rounded-lg bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+                      className="w-full pl-8 pr-4 py-2.5 border border-input rounded-lg bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
                     />
                   </div>
                 </div>

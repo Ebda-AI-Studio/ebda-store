@@ -166,7 +166,7 @@ const NEUTRAL: Array<[string, string]> = [
   ['apps/web/src/components/UnknownHostNotFound.tsx', "'أنشئ متجرك على إبدأ'"],
   ['apps/web/src/components/UnknownHostNotFound.tsx', "'تواصل معنا عبر واتساب'"],
   ['apps/web/src/components/commerce/ReceiptPrinter.tsx', "'موعد الوصول'"],
-  ['apps/web/src/components/demo/DemoLookBar.tsx', "'اختر شكلاً'"],
+  ['apps/web/src/contexts/LanguageContext.tsx', "'اختر شكلاً'"],
 ];
 
 function files(dir: string, out: string[] = []): string[] {

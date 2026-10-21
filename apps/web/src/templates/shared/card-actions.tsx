@@ -8,11 +8,82 @@
  * enough that bold / elegant / minimal / etc. all look at home with it.
  */
 
+export type CardActionKind = 'wishlist-add' | 'wishlist-remove' | 'compare-add' | 'compare-remove';
+
+/**
+ * a11y P2-5: a page of cards must not expose a dozen buttons with one name, so
+ * each per-card action carries the product. Without a name the generic label.
+ */
+export function cardActionLabel(kind: CardActionKind, isRtl: boolean, name?: string): string {
+  const n = name?.trim();
+  switch (kind) {
+    case 'wishlist-add':
+      return isRtl
+        ? n
+          ? `إضافة ${n} إلى المفضلة`
+          : 'إضافة للمفضلة'
+        : n
+          ? `Add ${n} to wishlist`
+          : 'Add to wishlist';
+    case 'wishlist-remove':
+      return isRtl
+        ? n
+          ? `إزالة ${n} من المفضلة`
+          : 'إزالة من المفضلة'
+        : n
+          ? `Remove ${n} from wishlist`
+          : 'Remove from wishlist';
+    case 'compare-add':
+      return isRtl
+        ? n
+          ? `إضافة ${n} إلى المقارنة`
+          : 'إضافة إلى المقارنة'
+        : n
+          ? `Add ${n} to compare`
+          : 'Add to compare';
+    case 'compare-remove':
+      return isRtl
+        ? n
+          ? `إزالة ${n} من المقارنة`
+          : 'إزالة من المقارنة'
+        : n
+          ? `Remove ${n} from compare`
+          : 'Remove from compare';
+  }
+}
+
+/**
+ * a11y P2-14: a card link's accessible name leads with the product; badge words
+ * follow it ("Linen abaya, New, -20%"), never precede it.
+ */
+export function cardLinkLabel(
+  name: string,
+  badges: Array<string | false | null | undefined>
+): string {
+  return [
+    name,
+    ...badges.filter((b): b is string => typeof b === 'string' && b.trim() !== ''),
+  ].join(', ');
+}
+
+/** a11y P2-5 class: a cart line's stepper and remove buttons name the line they act on. */
+export function cartLineLabel(
+  kind: 'remove' | 'increase' | 'decrease',
+  isRtl: boolean,
+  name: string
+): string {
+  if (kind === 'remove') return isRtl ? `إزالة ${name}` : `Remove ${name}`;
+  if (kind === 'increase') return isRtl ? `زيادة كمية ${name}` : `Increase quantity of ${name}`;
+  return isRtl ? `تقليل كمية ${name}` : `Decrease quantity of ${name}`;
+}
+
 interface CompareButtonProps {
   productId: string;
   isInCompare?: boolean;
   onToggle: (productId: string) => void;
   isRtl?: boolean;
+  /** The product's display name, so each card's button is distinct (a11y P2-5). */
+  productName?: string;
   /** tailwind position class, default `top-3`; override to place in a strip. */
   className?: string;
 }
@@ -22,6 +93,7 @@ export function CompareButton({
   isInCompare = false,
   onToggle,
   isRtl = false,
+  productName,
   className = '',
 }: CompareButtonProps) {
   // logical positioning — `start-3` flips automatically under [dir="rtl"]
@@ -38,15 +110,11 @@ export function CompareButton({
           ? 'bg-primary text-primary-foreground scale-105'
           : 'bg-background/95 text-muted-foreground hover:bg-background hover:text-foreground'
       } ${className}`}
-      aria-label={
-        isInCompare
-          ? isRtl
-            ? 'إزالة من المقارنة'
-            : 'Remove from compare'
-          : isRtl
-            ? 'إضافة إلى المقارنة'
-            : 'Add to compare'
-      }
+      aria-label={cardActionLabel(
+        isInCompare ? 'compare-remove' : 'compare-add',
+        isRtl,
+        productName
+      )}
       aria-pressed={isInCompare}
       title={
         isInCompare
@@ -80,6 +148,8 @@ interface RemoveFromWishlistButtonProps {
   productId: string;
   onRemove: (productId: string) => void;
   isRtl?: boolean;
+  /** The product's display name, so each card's button is distinct (a11y P2-5). */
+  productName?: string;
   className?: string;
 }
 
@@ -87,6 +157,7 @@ export function RemoveFromWishlistButton({
   productId,
   onRemove,
   isRtl = false,
+  productName,
   className = '',
 }: RemoveFromWishlistButtonProps) {
   // The remove button sits on the *opposite* side from CompareButton, so it
@@ -100,7 +171,7 @@ export function RemoveFromWishlistButton({
         onRemove(productId);
       }}
       className={`absolute top-3 end-3 z-10 flex h-11 w-11 items-center justify-center rounded-full bg-background/95 text-destructive shadow-md backdrop-blur-sm transition-colors hover:bg-destructive hover:text-[hsl(var(--destructive-foreground))] ${className}`}
-      aria-label={isRtl ? 'إزالة من المفضلة' : 'Remove from wishlist'}
+      aria-label={cardActionLabel('wishlist-remove', isRtl, productName)}
       title={isRtl ? 'إزالة من المفضلة' : 'Remove from wishlist'}
     >
       <svg
