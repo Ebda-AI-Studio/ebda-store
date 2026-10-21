@@ -144,6 +144,9 @@ router.post(
     try {
       const { storeId } = req.params;
       const input = webhookEndpointCreateSchema.parse(req.body);
+      // Serialise concurrent creates of one store: count-then-insert would otherwise let two
+      // parallel requests both pass the cap (the lock is released at COMMIT).
+      await prisma.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`webhook-endpoints:${storeId}`}, 0))`;
       const count = await prisma.webhookEndpoint.count({ where: { storeId } });
       if (count >= WEBHOOK_MAX_ENDPOINTS_PER_STORE) {
         throw new AppError(409, 'WEBHOOK_LIMIT', 'Webhook endpoint limit reached', {

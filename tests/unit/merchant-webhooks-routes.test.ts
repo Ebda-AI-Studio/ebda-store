@@ -24,6 +24,7 @@ const h = vi.hoisted(() => ({
   createTest: vi.fn(),
   createResend: vi.fn(),
   audit: vi.fn(),
+  calls: [] as string[],
 }));
 
 vi.mock('@ebda/database', () => {
@@ -39,7 +40,10 @@ vi.mock('@ebda/database', () => {
           const r = h.endpoints.find(x => match(x, where));
           return r ? pick(r, select) : null;
         },
-        count: async ({ where }: Row) => h.endpoints.filter(r => match(r, where)).length,
+        count: async ({ where }: Row) => {
+          h.calls.push('count');
+          return h.endpoints.filter(r => match(r, where)).length;
+        },
         create: async ({ data, select }: Row) => {
           const row = { id: E1, active: true, consecutiveFailures: 0, ...data };
           h.endpoints.push(row);
@@ -55,6 +59,10 @@ vi.mock('@ebda/database', () => {
           h.endpoints = h.endpoints.filter(r => !match(r, where));
           return { count: n - h.endpoints.length };
         },
+      },
+      $executeRaw: async (strings: TemplateStringsArray) => {
+        h.calls.push(`raw:${strings.join('?').trim()}`);
+        return 1;
       },
       webhookDelivery: {
         findMany: async ({ where }: Row) => h.deliveries.filter(r => match(r, where)),
@@ -147,6 +155,7 @@ beforeEach(() => {
   h.createTest.mockReset().mockResolvedValue('t-1');
   h.createResend.mockReset().mockResolvedValue('r-1');
   h.audit.mockReset();
+  h.calls = [];
 });
 
 describe('permissions', () => {
@@ -249,6 +258,13 @@ describe('create', () => {
     expect(r.status).toBe(400);
     expect(r.body.error.code ?? r.body.code).toBe('WEBHOOK_URL_REJECTED');
     expect(h.endpoints).toHaveLength(0);
+  });
+  it('M4: the cap check runs under a per-store advisory lock, taken BEFORE the count', async () => {
+    await request(app).post(BASE).send(good);
+    const lock = h.calls.findIndex(c => c.startsWith('raw:SELECT pg_advisory_xact_lock'));
+    const count = h.calls.indexOf('count');
+    expect(lock).toBeGreaterThanOrEqual(0);
+    expect(lock).toBeLessThan(count);
   });
   it('caps endpoints per store', async () => {
     h.endpoints = Array.from({ length: 10 }, (_, i) => ep({ id: `x${i}` }));
