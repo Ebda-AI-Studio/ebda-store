@@ -1,0 +1,127 @@
+---
+title: Merchant webhooks
+description: Receive signed order and product events on your own server, verify them, and handle retries.
+section: Reference
+order: 32
+---
+
+Ebda can send an HTTPS `POST` to your server whenever an order or product changes. This page is about webhooks Ebda sends **to you**. For the payment and billing webhooks Ebda receives, see [Webhooks](/webhooks/).
+
+Webhooks are included in the **Growth** and **Business** plans. Manage endpoints in the dashboard under **Settings, Webhooks** (store owner only).
+
+## Endpoint rules
+
+- HTTPS on port 443 only. No credentials in the URL, no IP addresses, no `localhost`, `.local` or `.internal` names.
+- The name is resolved when you save it **and again before every delivery**. If any address it resolves to is private, loopback, link-local (including the cloud metadata address), carrier-grade NAT or otherwise non-public, the delivery is not sent.
+- Redirects are **not followed**. A `3xx` answer counts as a failed delivery, so register the final URL.
+- Reply with any `2xx` within **10 seconds**. Do slow work after you have answered.
+
+## Events
+
+| Type                   | Sent when                                                                                                 |
+| ---------------------- | --------------------------------------------------------------------------------------------------------- |
+| `order.created`        | An order is placed (cash on delivery) or its online payment completes                                     |
+| `order.paid`           | An order is already paid at the moment it is announced                                                    |
+| `order.status_changed` | An order becomes `shipped`, `delivered` or `cancelled`                                                    |
+| `order.refunded`       | An order is refunded (`refund.partial` tells you if it was partial)                                       |
+| `product.created`      | A product is added                                                                                        |
+| `product.updated`      | A product is edited (`changedFields` lists what changed)                                                  |
+| `product.deleted`      | A product is deleted                                                                                      |
+| `inventory.low`        | A product crosses its low-stock threshold (stores with stock alerts on; at most once per product per day) |
+| `webhook.test`         | You pressed **Send test event**                                                                           |
+
+A cash-on-delivery order is paid later; follow it with `order.status_changed`.
+
+## The delivery
+
+```http
+POST /your/path HTTP/1.1
+Content-Type: application/json
+User-Agent: Ebda-Webhooks/1
+X-Ebda-Event: order.created
+X-Ebda-Event-Id: evt_0b6d3c1e-...
+X-Ebda-Delivery-Id: 5f0a...
+X-Ebda-Signature: t=1760000000,v1=9c1f...e2
+```
+
+```json
+{
+  "id": "evt_0b6d3c1e-5c2a-4a43-9d61-1c8d7e0a3f11",
+  "type": "order.created",
+  "apiVersion": "2026-10-21",
+  "createdAt": "2026-10-21T08:15:00.000Z",
+  "storeId": "…",
+  "livemode": true,
+  "data": {
+    "order": {
+      "id": "…",
+      "number": "ORD-1760000000000-AB12CD34",
+      "status": "pending",
+      "paymentStatus": "unpaid",
+      "currency": "EGP",
+      "subtotal": 45000,
+      "tax": 0,
+      "shipping": 3500,
+      "discount": 0,
+      "total": 48500,
+      "createdAt": "2026-10-21T08:15:00.000Z",
+      "items": [
+        {
+          "productId": "…",
+          "variantId": null,
+          "name": "Linen shirt - M",
+          "sku": "LS-M",
+          "quantity": 1,
+          "unitPrice": 45000,
+          "total": 45000
+        }
+      ]
+    }
+  }
+}
+```
+
+Amounts are in **piastres** (1 EGP = 100). `apiVersion` changes only for a breaking change; new fields can appear at any time, so ignore fields you do not know.
+
+### Personal data
+
+Payloads carry no customer details by default. If you turn on **Include customer name, email and phone** for an endpoint, order events gain `data.customer = { name, email, phone }` for that endpoint only. You are then the controller of that copy; Ebda keeps the delivery log for 30 days.
+
+## Verify the signature
+
+`X-Ebda-Signature` is `t=<unix seconds>,v1=<hex>`, where `v1` is the HMAC-SHA256, keyed with your endpoint secret (`whsec_…`), of the string `<t>.<raw request body>`.
+
+1. Read the **raw** body bytes before any JSON parsing.
+2. Recompute the HMAC and compare in constant time.
+3. Reject if `t` is more than **5 minutes** from your clock (replay window).
+4. Use `id` (also the `X-Ebda-Event-Id` header) as your idempotency key: a retry or a resend carries the **same** event id.
+
+```js
+import { createHmac, timingSafeEqual } from 'node:crypto';
+
+export function verifyEbdaWebhook(secret, rawBody, header, toleranceSec = 300) {
+  const m = /^t=(\d+),v1=([0-9a-f]{64})$/.exec(header ?? '');
+  if (!m) return false;
+  const t = Number(m[1]);
+  if (Math.abs(Date.now() / 1000 - t) > toleranceSec) return false;
+  const expected = createHmac('sha256', secret).update(`${t}.${rawBody}`).digest();
+  return timingSafeEqual(expected, Buffer.from(m[2], 'hex'));
+}
+
+// Express: app.post('/hook', express.raw({ type: 'application/json' }), (req, res) => {
+//   if (!verifyEbdaWebhook(process.env.EBDA_WEBHOOK_SECRET, req.body.toString('utf8'), req.get('x-ebda-signature'))) return res.sendStatus(400);
+//   res.sendStatus(200);
+// });
+```
+
+The secret is shown **once**, when you create the endpoint or make a new one. Making a new secret takes effect immediately: update your server first, or deliveries will fail the check.
+
+## Retries and automatic switch-off
+
+A delivery that does not get a `2xx` is tried up to **6 times**: immediately, then after 1 minute, 10 minutes, 1 hour, 6 hours and 17 hours (about 24 hours in all). After the last try it is marked failed.
+
+When **10 deliveries in a row** end up failed, the endpoint is switched off and the store owner is told by email and in the dashboard. Turn it back on from the dashboard once your server answers. Events that happened while it was off are not re-sent automatically; open the delivery log and press **Resend** on the ones you need.
+
+## Delivery log
+
+Each endpoint shows its last 50 deliveries with the status code, a short snippet (first 200 characters) of your response, the number of tries and a **Resend** button. Rows are kept for 30 days.
