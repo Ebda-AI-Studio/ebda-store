@@ -9,6 +9,7 @@ export * from './minimum-order';
 export * from './accounting';
 export * from './image';
 export * from './csv';
+export * from './plural';
 export { TEMPLATE_PRESETS, getTemplatePresets } from './template-presets';
 export type { TemplateSeeds } from './template-presets';
 export { VIBE_PRESETS, getVibePreset } from './vibe-presets';

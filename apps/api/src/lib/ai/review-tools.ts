@@ -4,6 +4,7 @@ import { config } from '../../config';
 import logger from '../logger';
 import { assertAiQuota } from '../ai-quota';
 import { rethrowAsAppError } from './gemini-errors';
+import { EGYPTIAN_ARABIC_REGISTER } from './arabic-register';
 
 async function throttle() {
   const ms = parseInt(process.env.AI_BULK_THROTTLE_MS || '2500', 10);
@@ -248,7 +249,7 @@ export async function draftOwnerResponse(
 
 Write BOTH versions in JSON: { "en": "...", "ar": "..." }
 - en: English
-- ar: Arabic (formal MSA, not dialect)
+- ar: ${EGYPTIAN_ARABIC_REGISTER}
 
 Sign off with the store name, no other branding.
 

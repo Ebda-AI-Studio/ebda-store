@@ -40,9 +40,9 @@ const defaultLabels = {
   },
   ar: {
     addToCart: 'أضف للسلة',
-    addedToCart: 'تمت الإضافة!',
+    addedToCart: 'اتضاف!',
     outOfStock: 'نفذت الكمية',
-    adding: 'جاري الإضافة...',
+    adding: 'بنضيف...',
   },
 };
 
@@ -152,10 +152,12 @@ export const AddToCartButton = forwardRef<HTMLButtonElement, AddToCartButtonProp
           data-zone="cta"
           className={cn(
             'relative flex items-center justify-center w-10 h-10 rounded-full transition-all',
-            'bg-primary text-primary-foreground hover:bg-primary/90',
+            // The added state swaps the whole fill + ink pair (never primary fill + success ink).
+            isAdded
+              ? 'bg-success/20 text-success-ink hover:bg-success/20 border border-success'
+              : 'bg-primary text-primary-foreground hover:bg-primary/90',
             'disabled:opacity-50 disabled:cursor-not-allowed',
             'focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2',
-            isAdded && 'bg-green-500 hover:bg-green-500',
             className
           )}
           aria-label={getLabel()}
@@ -164,7 +166,7 @@ export const AddToCartButton = forwardRef<HTMLButtonElement, AddToCartButtonProp
         >
           {isLoading ? <LoadingSpinner /> : isAdded ? <CheckIcon /> : <CartIconEl />}
           {showQuantityBadge && quantityInCart > 0 && (
-            <span className="absolute -top-1 -right-1 flex items-center justify-center w-5 h-5 text-xs font-bold bg-red-500 text-white rounded-full">
+            <span className="absolute -top-1 -right-1 flex items-center justify-center w-5 h-5 text-xs font-bold bg-background text-destructive-ink ring-1 ring-destructive rounded-full">
               {quantityInCart > 9 ? '9+' : quantityInCart}
             </span>
           )}
@@ -185,7 +187,7 @@ export const AddToCartButton = forwardRef<HTMLButtonElement, AddToCartButtonProp
           // on a single line. Without it, narrow product-card columns
           // wrap the label across two lines.
           'relative whitespace-nowrap',
-          isAdded && 'bg-green-500 hover:bg-green-500 border-green-500',
+          isAdded && 'bg-success/20 text-success-ink hover:bg-success/20 border-success',
           className
         )}
         aria-busy={isLoading}
@@ -194,7 +196,7 @@ export const AddToCartButton = forwardRef<HTMLButtonElement, AddToCartButtonProp
         {isLoading ? <LoadingSpinner /> : isAdded ? <CheckIcon /> : <CartIconEl />}
         <span>{getLabel()}</span>
         {showBadge && (
-          <span className="absolute -top-2 -right-2 flex items-center justify-center w-5 h-5 text-xs font-bold bg-red-500 text-white rounded-full">
+          <span className="absolute -top-2 -right-2 flex items-center justify-center w-5 h-5 text-xs font-bold bg-background text-destructive-ink ring-1 ring-destructive rounded-full">
             {quantityInCart > 9 ? '9+' : quantityInCart}
           </span>
         )}

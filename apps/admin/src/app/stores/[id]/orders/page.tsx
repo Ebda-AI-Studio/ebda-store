@@ -486,6 +486,8 @@ export default function StoreOrdersPage() {
       )}
 
       <OrdersBulkBar
+        storeId={storeId}
+        selectedIds={Array.from(selectedOrders)}
         selectedCount={selectedOrders.size}
         isProcessing={isBulkProcessing}
         onMarkPaid={handleBulkMarkPaid}

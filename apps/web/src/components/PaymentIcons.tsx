@@ -41,7 +41,7 @@ export function VisaIcon({ className = 'h-4 w-4' }: PaymentIconProps) {
 
 export function MastercardIcon({ className = 'h-5 w-5' }: PaymentIconProps) {
   return (
-    <div className="flex h-8 w-10 items-center justify-center rounded bg-gradient-to-br from-red-500 to-orange-500">
+    <div className="flex h-8 w-10 items-center justify-center rounded bg-gradient-to-br from-[#EB001B] to-[#F79E1B]">
       <svg
         className={`${className} text-white`}
         fill="none"

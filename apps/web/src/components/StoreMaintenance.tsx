@@ -47,7 +47,7 @@ export function StoreMaintenance() {
   const headline = t("We'll be back soon", 'سنعود قريباً');
   const bodyTail = t(
     'is currently undergoing maintenance. Please check back later.',
-    'يخضع حالياً لأعمال الصيانة. يرجى المحاولة مرة أخرى لاحقاً.'
+    'عليه صيانة دلوقتي. جرّب تاني بعدين.'
   );
   const contactHeading = t('Need to reach us?', 'تحتاج للتواصل معنا؟');
   const poweredByLabel = t(

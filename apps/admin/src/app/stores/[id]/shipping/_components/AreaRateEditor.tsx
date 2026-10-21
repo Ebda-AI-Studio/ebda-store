@@ -816,7 +816,7 @@ export function AreaRateEditor({ storeId }: Props) {
                 type="button"
                 onClick={confirmImport}
                 disabled={importing || preview.wouldUpsert === 0}
-                className="px-4 py-2 text-sm font-medium bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                className="px-4 py-2 text-sm font-medium bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
               >
                 {importing && (
                   <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
@@ -871,7 +871,7 @@ export function AreaRateEditor({ storeId }: Props) {
             type="button"
             onClick={applyGlobalFee}
             disabled={globalBulkFeeMajor.trim() === ''}
-            className="px-3 py-1 text-xs font-medium bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="px-3 py-1 text-xs font-medium bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {t('applyAllGlobalFeeBtn')}
           </button>
@@ -945,7 +945,7 @@ export function AreaRateEditor({ storeId }: Props) {
                     <button
                       type="button"
                       onClick={() => applyBulkFee(gov.en)}
-                      className="px-3 py-1 text-xs font-medium bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors"
+                      className="px-3 py-1 text-xs font-medium bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors"
                     >
                       {t('applyBtn')}
                     </button>
@@ -1166,7 +1166,7 @@ export function AreaRateEditor({ storeId }: Props) {
                             )
                           }
                           disabled={!addForm.area.trim()}
-                          className="px-3 py-1.5 text-xs font-medium bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                          className="px-3 py-1.5 text-xs font-medium bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                           {t('addBtn')}
                         </button>
@@ -1378,7 +1378,7 @@ export function AreaRateEditor({ storeId }: Props) {
                               type="button"
                               onClick={() => submitAddArea(country, countryAr, gov, govAr)}
                               disabled={!govAddForm.area.trim()}
-                              className="px-3 py-1.5 text-xs font-medium bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                              className="px-3 py-1.5 text-xs font-medium bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                               {t('addBtn')}
                             </button>
@@ -1552,7 +1552,7 @@ export function AreaRateEditor({ storeId }: Props) {
                   !addLocForm.governorate.trim() ||
                   !addLocForm.area.trim()
                 }
-                className="px-4 py-1.5 text-sm font-medium bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-4 py-1.5 text-sm font-medium bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {t('addBtn')}
               </button>
@@ -1567,7 +1567,7 @@ export function AreaRateEditor({ storeId }: Props) {
           type="button"
           onClick={handleSave}
           disabled={saving}
-          className="px-5 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+          className="px-5 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
         >
           {saving && (
             <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />

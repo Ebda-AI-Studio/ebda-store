@@ -74,12 +74,7 @@ export default function CompareClient() {
     return (
       <ShopChrome>
         <div className="container mx-auto px-4 py-8 flex-1">
-          <h1 className="text-3xl font-bold mb-8">
-            {t(
-              'Compare Products',
-              '\u0645\u0642\u0627\u0631\u0646\u0629 \u0627\u0644\u0645\u0646\u062a\u062c\u0627\u062a'
-            )}
-          </h1>
+          <h1 className="text-3xl font-bold mb-8">{t('Compare Products', 'مقارنة المنتجات')}</h1>
           <div className="animate-pulse bg-muted h-96 rounded-lg"></div>
         </div>
       </ShopChrome>
@@ -90,12 +85,7 @@ export default function CompareClient() {
     return (
       <ShopChrome>
         <div className="container mx-auto px-4 py-8 flex-1">
-          <h1 className="text-3xl font-bold mb-8">
-            {t(
-              'Compare Products',
-              '\u0645\u0642\u0627\u0631\u0646\u0629 \u0627\u0644\u0645\u0646\u062a\u062c\u0627\u062a'
-            )}
-          </h1>
+          <h1 className="text-3xl font-bold mb-8">{t('Compare Products', 'مقارنة المنتجات')}</h1>
           <div className="text-center py-12 bg-muted rounded-lg">
             <svg
               className="w-16 h-16 text-muted-foreground mx-auto mb-4"
@@ -111,25 +101,16 @@ export default function CompareClient() {
               />
             </svg>
             <h2 className="text-xl font-semibold mb-2">
-              {t(
-                'No products to compare',
-                '\u0644\u0627 \u062a\u0648\u062c\u062f \u0645\u0646\u062a\u062c\u0627\u062a \u0644\u0644\u0645\u0642\u0627\u0631\u0646\u0629'
-              )}
+              {t('No products to compare', 'مفيش منتجات للمقارنة')}
             </h2>
             <p className="text-muted-foreground mb-4">
-              {t(
-                'Add products to compare their features',
-                '\u0623\u0636\u0641 \u0645\u0646\u062a\u062c\u0627\u062a \u0644\u0645\u0642\u0627\u0631\u0646\u0629 \u0645\u064a\u0632\u0627\u062a\u0647\u0627'
-              )}
+              {t('Add products to compare their features', 'ضيف منتجات عشان تقارن مميزاتها')}
             </p>
             <Link
               href={storeUrl('/products')}
               className="inline-flex items-center px-6 py-3 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90"
             >
-              {t(
-                'Browse Products',
-                '\u062a\u0635\u0641\u062d \u0627\u0644\u0645\u0646\u062a\u062c\u0627\u062a'
-              )}
+              {t('Browse Products', 'تصفح المنتجات')}
             </Link>
           </div>
         </div>
@@ -152,18 +133,13 @@ export default function CompareClient() {
     <ShopChrome>
       <div className="container mx-auto px-4 py-8 flex-1">
         <div className="flex items-center justify-between mb-8">
-          <h1 className="text-3xl font-bold">
-            {t(
-              'Compare Products',
-              '\u0645\u0642\u0627\u0631\u0646\u0629 \u0627\u0644\u0645\u0646\u062a\u062c\u0627\u062a'
-            )}
-          </h1>
+          <h1 className="text-3xl font-bold">{t('Compare Products', 'مقارنة المنتجات')}</h1>
           <button
             type="button"
             onClick={clearAll}
             className="text-destructive-ink hover:text-destructive-ink/80 text-sm"
           >
-            {t('Clear All', '\u0645\u0633\u062d \u0627\u0644\u0643\u0644')}
+            {t('Clear All', 'مسح الكل')}
           </button>
         </div>
 
@@ -171,9 +147,7 @@ export default function CompareClient() {
           <table className="w-full min-w-[600px]">
             <thead>
               <tr>
-                <th className="text-left p-4 bg-muted w-1/4">
-                  {t('Product', '\u0627\u0644\u0645\u0646\u062a\u062c')}
-                </th>
+                <th className="text-left p-4 bg-muted w-1/4">{t('Product', 'المنتج')}</th>
                 {products.map(product => (
                   <th key={product.id} className="p-4 bg-muted">
                     <div className="relative">
@@ -237,9 +211,7 @@ export default function CompareClient() {
             </thead>
             <tbody>
               <tr className="border-t">
-                <td className="p-4 font-medium text-muted-foreground">
-                  {t('Price', '\u0627\u0644\u0633\u0639\u0631')}
-                </td>
+                <td className="p-4 font-medium text-muted-foreground">{t('Price', 'السعر')}</td>
                 {products.map(product => (
                   <td key={product.id} className="p-4 text-center">
                     <span className="font-bold text-lg">{money(product.price)} EGP</span>
@@ -253,7 +225,7 @@ export default function CompareClient() {
               </tr>
               <tr className="border-t">
                 <td className="p-4 font-medium text-muted-foreground">
-                  {t('Description', '\u0627\u0644\u0648\u0635\u0641')}
+                  {t('Description', 'الوصف')}
                 </td>
                 {products.map(product => (
                   <td key={product.id} className="p-4 text-center text-sm text-muted-foreground">
@@ -298,10 +270,7 @@ export default function CompareClient() {
                       onClick={() => handleAddToCart(product)}
                       className="w-full px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90"
                     >
-                      {t(
-                        'Add to Cart',
-                        '\u0623\u0636\u0641 \u0625\u0644\u0649 \u0627\u0644\u0633\u0644\u0629'
-                      )}
+                      {t('Add to Cart', 'أضف إلى السلة')}
                     </button>
                   </td>
                 ))}

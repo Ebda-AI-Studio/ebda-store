@@ -39,7 +39,7 @@ export default function OrdersClient() {
       setError(
         t(
           'Unable to load orders. Please check your connection.',
-          'تعذر تحميل الطلبات. يرجى التحقق من اتصالك بالإنترنت.'
+          'معرفناش نحمّل الطلبات. اتأكد من اتصالك بالإنترنت.'
         )
       );
     } finally {
@@ -76,13 +76,10 @@ export default function OrdersClient() {
       <div className="space-y-6">
         <div>
           <h1 className="text-2xl font-bold text-foreground">
-            {t('Order History', '\u0633\u062c\u0644 \u0627\u0644\u0637\u0644\u0628\u0627\u062a')}
+            {t('Order History', 'سجل الطلبات')}
           </h1>
           <p className="mt-1 text-muted-foreground">
-            {t(
-              'View and track your orders',
-              '\u0639\u0631\u0636 \u0648\u062a\u062a\u0628\u0639 \u0637\u0644\u0628\u0627\u062a\u0643'
-            )}
+            {t('View and track your orders', 'عرض وتتبع طلباتك')}
           </p>
         </div>
         <div className="flex justify-center py-12">
@@ -95,14 +92,9 @@ export default function OrdersClient() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-foreground">
-          {t('Order History', '\u0633\u062c\u0644 \u0627\u0644\u0637\u0644\u0628\u0627\u062a')}
-        </h1>
+        <h1 className="text-2xl font-bold text-foreground">{t('Order History', 'سجل الطلبات')}</h1>
         <p className="mt-1 text-muted-foreground">
-          {t(
-            'View and track your orders',
-            '\u0639\u0631\u0636 \u0648\u062a\u062a\u0628\u0639 \u0637\u0644\u0628\u0627\u062a\u0643'
-          )}
+          {t('View and track your orders', 'عرض وتتبع طلباتك')}
         </p>
       </div>
 
@@ -128,10 +120,7 @@ export default function OrdersClient() {
               onClick={() => fetchOrders()}
               className="px-3 py-1 text-sm bg-destructive/20 text-destructive-ink rounded hover:bg-destructive/30 transition-colors"
             >
-              {t(
-                'Retry',
-                '\u0625\u0639\u0627\u062f\u0629 \u0627\u0644\u0645\u062d\u0627\u0648\u0644\u0629'
-              )}
+              {t('Retry', 'إعادة المحاولة')}
             </button>
           </div>
         </div>
@@ -145,20 +134,16 @@ export default function OrdersClient() {
                 <div className="flex flex-wrap items-center gap-4">
                   <div>
                     <p className="text-sm text-muted-foreground">
-                      {t('Order Number', '\u0631\u0642\u0645 \u0627\u0644\u0637\u0644\u0628')}
+                      {t('Order Number', 'رقم الطلب')}
                     </p>
                     <p className="font-medium text-foreground">#{order.orderNumber}</p>
                   </div>
                   <div>
-                    <p className="text-sm text-muted-foreground">
-                      {t('Date', '\u0627\u0644\u062a\u0627\u0631\u064a\u062e')}
-                    </p>
+                    <p className="text-sm text-muted-foreground">{t('Date', 'التاريخ')}</p>
                     <p className="font-medium text-foreground">{formatDate(order.createdAt)}</p>
                   </div>
                   <div>
-                    <p className="text-sm text-muted-foreground">
-                      {t('Total', '\u0627\u0644\u0625\u062c\u0645\u0627\u0644\u064a')}
-                    </p>
+                    <p className="text-sm text-muted-foreground">{t('Total', 'الإجمالي')}</p>
                     <p className="font-medium text-foreground">{formatPrice(order.total)}</p>
                   </div>
                 </div>
@@ -174,7 +159,7 @@ export default function OrdersClient() {
                   <div className="space-y-4">
                     {groupOrderLinesForDisplay(order.items).map(row => {
                       // Bundle boxes collapse to ONE row (see
-                      // groupOrderLinesForDisplay) \u2014 never the per-component
+                      // groupOrderLinesForDisplay) — never the per-component
                       // allocated prices that fund the box's one price.
                       const name =
                         row.kind === 'bundle'
@@ -221,12 +206,12 @@ export default function OrdersClient() {
                               {name}
                               {row.kind === 'bundle' && (
                                 <span className="ms-2 inline-flex items-center rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
-                                  {t('Bundle', '\u0628\u0627\u0642\u0629')}
+                                  {t('Bundle', 'باقة')}
                                 </span>
                               )}
                             </p>
                             <p className="text-sm text-muted-foreground">
-                              {t('Qty', '\u0627\u0644\u0643\u0645\u064a\u0629')}: {quantity}
+                              {t('Qty', 'الكمية')}: {quantity}
                             </p>
                           </div>
                           <p className="font-medium text-foreground">{formatPrice(price)}</p>
@@ -236,10 +221,7 @@ export default function OrdersClient() {
                   </div>
                 ) : (
                   <p className="text-sm text-muted-foreground">
-                    {t(
-                      'No items in this order',
-                      '\u0644\u0627 \u062a\u0648\u062c\u062f \u0645\u0646\u062a\u062c\u0627\u062a \u0641\u064a \u0647\u0630\u0627 \u0627\u0644\u0637\u0644\u0628'
-                    )}
+                    {t('No items in this order', 'مفيش منتجات في الطلب ده')}
                   </p>
                 )}
               </div>
@@ -252,17 +234,14 @@ export default function OrdersClient() {
                     href={storeUrl(`/account/orders/${order.id}`)}
                     className="rounded-lg border bg-card px-4 py-2 text-sm font-medium text-foreground hover:bg-muted"
                   >
-                    {t('Track Order', '\u062a\u062a\u0628\u0639 \u0627\u0644\u0637\u0644\u0628')}
+                    {t('Track Order', 'تتبع الطلب')}
                   </Link>
                 ) : null}
                 <Link
                   href={storeUrl(`/account/orders/${order.id}`)}
                   className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
                 >
-                  {t(
-                    'View Details',
-                    '\u0639\u0631\u0636 \u0627\u0644\u062a\u0641\u0627\u0635\u064a\u0644'
-                  )}
+                  {t('View Details', 'عرض التفاصيل')}
                 </Link>
               </div>
             </div>
@@ -284,22 +263,16 @@ export default function OrdersClient() {
             />
           </svg>
           <h3 className="mt-4 text-lg font-medium text-foreground">
-            {t(
-              'No orders yet',
-              '\u0644\u0627 \u062a\u0648\u062c\u062f \u0637\u0644\u0628\u0627\u062a \u0628\u0639\u062f'
-            )}
+            {t('No orders yet', 'مفيش طلبات لسه')}
           </h3>
           <p className="mt-2 text-muted-foreground">
-            {t(
-              'When you place orders, they will appear here.',
-              '\u0639\u0646\u062f\u0645\u0627 \u062a\u0642\u0648\u0645 \u0628\u0637\u0644\u0628\u0627\u062a\u060c \u0633\u062a\u0638\u0647\u0631 \u0647\u0646\u0627.'
-            )}
+            {t('When you place orders, they will appear here.', 'لما تطلب، طلباتك هتظهر هنا.')}
           </p>
           <Link
             href={storeUrl('/products')}
             className="mt-6 inline-flex items-center rounded-lg bg-primary px-6 py-3 font-medium text-primary-foreground hover:bg-primary/90"
           >
-            {t('Start Shopping', '\u0627\u0628\u062f\u0623 \u0627\u0644\u062a\u0633\u0648\u0642')}
+            {t('Start Shopping', 'ابدأ التسوق')}
           </Link>
         </div>
       ) : null}

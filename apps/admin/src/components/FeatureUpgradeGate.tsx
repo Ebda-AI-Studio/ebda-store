@@ -102,13 +102,13 @@ export function FeatureUpgradeGate({ featureKey, storeId }: Props) {
         <div className="w-full max-w-lg">
           {/* Card */}
           <div className="rounded-2xl border border-border bg-card shadow-sm overflow-hidden">
-            {/* Orange accent strip */}
-            <div className="h-1.5 w-full bg-gradient-to-r from-orange-500 to-orange-400" />
+            {/* Brand accent strip */}
+            <div className="h-1.5 w-full bg-primary" />
 
             <div className="p-8">
               {/* Lock badge */}
               <div className="flex items-center gap-2 mb-5">
-                <span className="inline-flex items-center gap-1.5 rounded-full bg-orange-50 border border-orange-200 text-orange-700 dark:bg-orange-950/30 dark:border-orange-800 dark:text-orange-400 px-3 py-1 text-xs font-medium">
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 border border-primary/30 text-primary-ink px-3 py-1 text-xs font-medium">
                   {/* Lock icon */}
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
@@ -161,7 +161,7 @@ export function FeatureUpgradeGate({ featureKey, storeId }: Props) {
                 <a href={upgradeLink} target="_blank" rel="noopener noreferrer" className="flex-1">
                   <Button
                     type="button"
-                    className="w-full bg-orange-500 hover:bg-orange-600 text-white border-0 font-semibold"
+                    className="w-full bg-primary hover:bg-primary/90 text-primary-foreground border-0 font-semibold"
                   >
                     {planLabel ? t('upgradeCta', { plan: planLabel }) : t('contactCta')}
                   </Button>
@@ -196,7 +196,7 @@ export function FeatureUpgradeGate({ featureKey, storeId }: Props) {
                           xmlns="http://www.w3.org/2000/svg"
                           viewBox="0 0 20 20"
                           fill="currentColor"
-                          className="w-4 h-4 text-orange-500 mt-0.5 shrink-0"
+                          className="w-4 h-4 text-primary-ink mt-0.5 shrink-0"
                           aria-hidden="true"
                         >
                           <path

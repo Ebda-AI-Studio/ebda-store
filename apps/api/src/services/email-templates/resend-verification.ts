@@ -40,15 +40,15 @@ export const resendVerificationTemplate = {
     const urlEsc = escapeHtml(d.verificationUrl);
     return `
     <h2>رابط تحقق جديد</h2>
-    <p>مرحباً ${escapeHtml(d.name)}،</p>
-    <p>هذا هو رابط التحقق الجديد من بريدك الإلكتروني كما طلبت.</p>
+    <p>أهلاً ${escapeHtml(d.name)}،</p>
+    <p>ده رابط التحقق الجديد من بريدك الإلكتروني زي ما طلبت.</p>
     <p style="text-align: center; margin: 24px 0;">
       <a href="${urlEsc}" class="button">تأكيد البريد الإلكتروني</a>
     </p>
     <p>الرابط ينتهي خلال ${d.expiresInHours} ساعة.</p>
-    <p style="font-size: 14px; color: #666;">إذا لم تطلب ذلك، يُرجى التواصل مع الدعم.</p>
+    <p style="font-size: 14px; color: #666;">لو إنت مطلبتش ده، كلّم الدعم.</p>
     <p style="font-size: 12px; color: #999; margin-top: 24px;">
-      إذا لم يعمل الزر أعلاه، انسخ هذا الرابط والصقه في متصفحك:<br>
+      لو الزرار اللي فوق مشتغلش، انسخ الرابط ده والصقه في المتصفح:<br>
       <a href="${urlEsc}" style="color: ${BRAND.colors.gold}; word-break: break-all;">${urlEsc}</a>
     </p>
   `;

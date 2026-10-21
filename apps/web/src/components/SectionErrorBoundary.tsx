@@ -58,7 +58,7 @@ export class SectionErrorBoundary extends Component<
           role="alert"
           className="my-6 rounded-lg border border-dashed border-border bg-muted/30 px-4 py-6 text-center text-sm text-muted-foreground"
         >
-          {isAr ? 'تعذّر تحميل هذا القسم.' : "This section couldn't load."}
+          {isAr ? 'معرفناش نحمّل القسم ده.' : "This section couldn't load."}
         </div>
       );
     }

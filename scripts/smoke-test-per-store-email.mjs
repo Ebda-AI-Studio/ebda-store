@@ -77,7 +77,7 @@ try {
 <head><meta charset="utf-8"><title>${store.name}</title></head>
 <body style="font-family:-apple-system,sans-serif;line-height:1.6;color:#333;margin:0;padding:24px;background:#f5f5f5;">
   <div style="max-width:600px;margin:0 auto;background:#fff;border-radius:8px;overflow:hidden;">
-    <div style="background:#FF7700;color:#fff;padding:24px;text-align:center;">
+    <div style="background:#B08D57;color:#fff;padding:24px;text-align:center;">
       <h1 style="margin:0;">${store.name}</h1>
     </div>
     <div style="padding:32px 24px;">

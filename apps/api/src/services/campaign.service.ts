@@ -293,7 +293,7 @@ export function renderCampaignEmail(args: {
   const href = args.unsubscribeUrl ? escapeHtml(args.unsubscribeUrl) : '#';
   const footer =
     locale === 'ar'
-      ? `<p style="margin-top:28px;font-size:12px;color:#94a3b8;text-align:center;">وصلتك هذه الرسالة لأنك مشترك في النشرة البريدية لـ ${storeName}. <a href="${href}" style="color:#94a3b8;">إلغاء الاشتراك</a></p>`
+      ? `<p style="margin-top:28px;font-size:12px;color:#94a3b8;text-align:center;">وصلتك الرسالة دي عشان إنت مشترك في النشرة البريدية لـ ${storeName}. <a href="${href}" style="color:#94a3b8;">إلغاء الاشتراك</a></p>`
       : `<p style="margin-top:28px;font-size:12px;color:#94a3b8;text-align:center;">You are receiving this because you subscribed to ${storeName}'s newsletter. <a href="${href}" style="color:#94a3b8;">Unsubscribe</a></p>`;
 
   const html = renderBrandedShell(sanitizeNewsletterHtml(args.bodyHtml) + footer, {
