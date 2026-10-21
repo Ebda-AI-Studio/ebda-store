@@ -68,7 +68,7 @@ Common causes:
 
 ### How do I set quantity prices for a product? — إزاي أحط أسعار بالكمية لمنتج؟
 
-Open the product, find **Wholesale pricing**, add a price break (from quantity, unit price). Leave **Who gets it** on *Everyone* for a public break, or pick a customer group for wholesale-only prices. The price must be lower than the current price, and a bigger quantity must be cheaper than a smaller one. The card shows your margin against the cost price and warns (without blocking) when a price is below cost. Wholesale pricing is part of the Business plan.
+Open the product, find **Wholesale pricing**, add a price break (from quantity, unit price). Leave **Who gets it** on _Everyone_ for a public break, or pick a customer group for wholesale-only prices. The price must be lower than the current price, and a bigger quantity must be cheaper than a smaller one. The card shows your margin against the cost price and warns (without blocking) when a price is below cost. Wholesale pricing is part of the Business plan.
 
 افتح المنتج، وهتلاقي **أسعار الجملة**: أضف شريحة (من كمية، وسعر الوحدة). سيب **مين بياخدها** على "الكل" لشريحة عامة، أو اختار مجموعة عملاء لأسعار الجملة بس. السعر لازم يبقى أقل من السعر الحالي، والكمية الأكبر أرخص من الأصغر. الكارت بيوريك هامشك على التكلفة وبيحذّرك لو السعر أقل منها. أسعار الجملة جزء من باقة Business.
 

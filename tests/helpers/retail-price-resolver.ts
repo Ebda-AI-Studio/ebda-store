@@ -44,11 +44,8 @@ export function retailPriceResolverModule() {
       forBuyer: async () => ({
         groupName: null,
         priceCart,
-        priceLine: async (
-          product: Line['product'],
-          variant: Line['variant'],
-          qty: number
-        ) => (await priceCart([{ key: 'line', product, variant, qty }])).get('line')!,
+        priceLine: async (product: Line['product'], variant: Line['variant'], qty: number) =>
+          (await priceCart([{ key: 'line', product, variant, qty }])).get('line')!,
       }),
     },
     wholesaleEntitledUncached: async () => false,

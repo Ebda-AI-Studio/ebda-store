@@ -1,17 +1,17 @@
 # B2B wholesale pricing API
 
-Plan: `docs/plans/2026-10-21-b2b-wholesale.md`. Rulings: `docs/RULINGS.md` (B2B-*). Feature key `b2b.wholesale` (Business plan, comped). All money is integer piastres. A write that turns a benefit on needs the entitlement; reads, deletes and turning things off never do (Ruling B2B-1b).
+Plan: `docs/plans/2026-10-21-b2b-wholesale.md`. Rulings: `docs/RULINGS.md` (B2B-\*). Feature key `b2b.wholesale` (Business plan, comped). All money is integer piastres. A write that turns a benefit on needs the entitlement; reads, deletes and turning things off never do (Ruling B2B-1b).
 
 ## Storefront (public base `/api/v1/public`)
 
-| Method and path | Auth | Notes |
-| --- | --- | --- |
-| `GET /products`, `/products/:slug` | none | Always the anonymous view: retail price, public tiers (`priceTiers`), `moq`. Wholesale-only products are absent (404 on detail). Cacheable. |
-| `POST /pricing/resolve` | session (optional) | Body `{ items: [{ productId, variantId?, qty }] }`, strict, max 50. Returns the buyer's `unitPrice`, `listPrice`, `priceSource`, `priceTierMinQty`, `belowMoq`, `moqRequired`. `private, no-store`. A price in the body is a 400. |
-| `POST /orders/quote` | session (optional) | The exact total the order would charge (the create function in dry-run). Send it back as `expectedTotal`; a change returns 409 `PRICE_CHANGED`. |
-| `POST /wholesale/apply` | customer session, verified email | Body `{ businessName, phone, commercialRegNo?, notes?, consent: true }`, strict. 409 `ALREADY_PENDING` / `ALREADY_APPROVED`, 429 `REAPPLY_COOLDOWN` (30 days after a rejection or a revoke). |
-| `GET /wholesale/status` | customer session | Own latest application and `isWholesale`. `private, no-store`. |
-| `GET /wholesale/products`, `/wholesale/products/:slug` | approved wholesale session | The wholesale-only catalogue. 404 for everyone else (no existence oracle). `private, no-store`. |
+| Method and path                                        | Auth                             | Notes                                                                                                                                                                                                                             |
+| ------------------------------------------------------ | -------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GET /products`, `/products/:slug`                     | none                             | Always the anonymous view: retail price, public tiers (`priceTiers`), `moq`. Wholesale-only products are absent (404 on detail). Cacheable.                                                                                       |
+| `POST /pricing/resolve`                                | session (optional)               | Body `{ items: [{ productId, variantId?, qty }] }`, strict, max 50. Returns the buyer's `unitPrice`, `listPrice`, `priceSource`, `priceTierMinQty`, `belowMoq`, `moqRequired`. `private, no-store`. A price in the body is a 400. |
+| `POST /orders/quote`                                   | session (optional)               | The exact total the order would charge (the create function in dry-run). Send it back as `expectedTotal`; a change returns 409 `PRICE_CHANGED`.                                                                                   |
+| `POST /wholesale/apply`                                | customer session, verified email | Body `{ businessName, phone, commercialRegNo?, notes?, consent: true }`, strict. 409 `ALREADY_PENDING` / `ALREADY_APPROVED`, 429 `REAPPLY_COOLDOWN` (30 days after a rejection or a revoke).                                      |
+| `GET /wholesale/status`                                | customer session                 | Own latest application and `isWholesale`. `private, no-store`.                                                                                                                                                                    |
+| `GET /wholesale/products`, `/wholesale/products/:slug` | approved wholesale session       | The wholesale-only catalogue. 404 for everyone else (no existence oracle). `private, no-store`.                                                                                                                                   |
 
 Cart and order endpoints take the buyer from the session only; a typed phone or email never selects a group (Ruling B2B-2c).
 
@@ -19,17 +19,17 @@ Cart and order endpoints take the buyer from the session only; a typed phone or 
 
 ## Merchant (`/api/v1/stores/:storeId`, store admin)
 
-| Method and path | Notes |
-| --- | --- |
+| Method and path                                                       | Notes                                                                                                                                                                                                                                                             |
+| --------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `GET/POST /products/:productId/price-tiers`, `PUT/DELETE .../:tierId` | Body `{ variantId?, groupId?, minQty >= 2, priceMinor }`, strict. Errors: `TIER_ABOVE_BASE`, `TIER_NOT_MONOTONE`, `TIER_VARIANT_ABOVE_PRODUCT`, `TIER_DUPLICATE`, `TIER_LIMIT` (10 per scope). Response carries `warnings` (`TIER_BELOW_COST`, `TIER_BELOW_MOQ`). |
-| `PUT /products/:id` | `moq` (null or >= 2) and `audience` (`public` / `wholesale_only`). |
-| `GET/POST/PUT/DELETE /customer-groups` | `pricingMode` (`none` / `percent_off`), `discountBps` (0..9000), `isWholesale`. |
-| `GET /wholesale-applications?status=&limit=&cursor=` | Cursor-paginated queue. |
-| `GET /wholesale-applications/summary` | `{ pendingCount, oldestPendingAt, oldestPendingHours, overdue }` (the admin badge). |
-| `POST /wholesale-applications/:id/approve` | `{ groupId }` (an active wholesale group). Atomic: the loser of a race gets 409 `NOT_PENDING`. |
-| `POST /wholesale-applications/:id/reject` | `{ note? }`. The note is shown to the applicant. |
-| `POST /wholesale-applications/:id/revoke` | `{ note? }`. Removes the buyer from every wholesale group; response `membership` is `removed` or `already_not_wholesale`. 409 `NOT_APPROVED`. |
-| `GET /analytics/price-source` | Line revenue split `retail` / `tier` / `group` / `wholesale`, `wholesaleSharePercent`. |
+| `PUT /products/:id`                                                   | `moq` (null or >= 2) and `audience` (`public` / `wholesale_only`).                                                                                                                                                                                                |
+| `GET/POST/PUT/DELETE /customer-groups`                                | `pricingMode` (`none` / `percent_off`), `discountBps` (0..9000), `isWholesale`.                                                                                                                                                                                   |
+| `GET /wholesale-applications?status=&limit=&cursor=`                  | Cursor-paginated queue.                                                                                                                                                                                                                                           |
+| `GET /wholesale-applications/summary`                                 | `{ pendingCount, oldestPendingAt, oldestPendingHours, overdue }` (the admin badge).                                                                                                                                                                               |
+| `POST /wholesale-applications/:id/approve`                            | `{ groupId }` (an active wholesale group). Atomic: the loser of a race gets 409 `NOT_PENDING`.                                                                                                                                                                    |
+| `POST /wholesale-applications/:id/reject`                             | `{ note? }`. The note is shown to the applicant.                                                                                                                                                                                                                  |
+| `POST /wholesale-applications/:id/revoke`                             | `{ note? }`. Removes the buyer from every wholesale group; response `membership` is `removed` or `already_not_wholesale`. 409 `NOT_APPROVED`.                                                                                                                     |
+| `GET /analytics/price-source`                                         | Line revenue split `retail` / `tier` / `group` / `wholesale`, `wholesaleSharePercent`.                                                                                                                                                                            |
 
 ### Returns (tier-aware partial refunds, Rulings B2B-14, B2B-15, B2B-17, B2B-18, B2B-20)
 

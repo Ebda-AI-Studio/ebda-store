@@ -38,7 +38,9 @@ describe('#1766 checkout wiring', () => {
 
 describe('#2117 /cart enforces the banner: checkout CTAs are gated on unavailable lines', () => {
   it('both CTA sites (theme summary + default list) read the combined gate', () => {
-    expect(cart).toMatch(/const checkoutBlocked = belowMinimumOrder \|\| hasUnavailableLines(?: \|\| !!moqMessage)?;/);
+    expect(cart).toMatch(
+      /const checkoutBlocked = belowMinimumOrder \|\| hasUnavailableLines(?: \|\| !!moqMessage)?;/
+    );
     expect(cart).toMatch(/ctaDisabled=\{checkoutBlocked\}/);
     expect(cart).toMatch(/ctaBlockedMessage=\{checkoutBlockedMessage\}/);
     expect(cart).toMatch(/\{checkoutBlocked \? \(\s*<Button/);
