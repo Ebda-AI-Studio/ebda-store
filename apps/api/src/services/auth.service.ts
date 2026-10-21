@@ -25,6 +25,7 @@ import { config } from '../config';
 import { AppError } from '../middleware/error-handler';
 import { EmailService } from './email.service';
 import { loginGate } from './login-gate';
+import { announcePasskeyPurge } from './passkey-purge';
 import { sendMerchantPasswordResetEmail, sendMerchantVerificationEmail } from './platform-mailer';
 import { accountLockout } from './account-lockout.service';
 import {
@@ -1457,12 +1458,16 @@ export class AuthService {
     }
 
     const passwordHash = await bcrypt.hash(newPassword, this.SALT_ROUNDS);
-    await withUser(userId, tx =>
-      tx.user.update({
+    // Ruling PASSKEY-13: a password CHANGE removes every passkey, in the SAME transaction as the new
+    // hash (all or nothing). An attacker who held the old password and a session may have registered a
+    // passkey of their own; revoking their session alone would leave a key that satisfies MFA.
+    const purged = await withUser(userId, async tx => {
+      await tx.user.update({
         where: { id: userId },
         data: { passwordHash },
-      })
-    );
+      });
+      return tx.passkeyCredential.deleteMany({ where: { userId } });
+    });
 
     // ONE call, and it runs BEFORE anything else observes the change.
     //
@@ -1481,6 +1486,8 @@ export class AuthService {
     // 'reset:' } }` filter was already ineffective, since the unconditional
     // call on the next line revoked those rows anyway.
     await AuthService.revokeAllSessions(userId, 'password_changed');
+
+    await announcePasskeyPurge({ user, count: purged.count, reason: 'password_changed' });
   }
 
   /**
