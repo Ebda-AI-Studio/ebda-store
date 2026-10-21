@@ -2130,6 +2130,7 @@
       "countPlural": "{count} customers",
       "paginationShowing": "Showing {from} to {to} of {total} customers",
       "truncatedNotice": "This store is very large — the customer list is partial: it covers the most recent orders and the newest sign-ups who have not ordered yet. Use the export for a fuller picture, or contact support.",
+      "searchTruncatedNotice": "This search matches more customers than can be listed. Showing the first {shown} — narrow it by typing more of the name, phone or email.",
       "previous": "Previous",
       "next": "Next",
       "badges": {
@@ -6014,11 +6015,18 @@
   "components": {
     "commandPalette": {
       "title": "Command palette",
-      "placeholder": "Search pages…",
+      "placeholder": "Search pages, products, orders, customers…",
       "empty": "No matches.",
       "trigger": "Search…",
       "countResults": "{count} results",
       "navHint": "↑↓ to navigate · ↵ to open",
+      "products": "Products",
+      "orders": "Orders",
+      "customers": "Customers",
+      "searching": "Searching…",
+      "guest": "Guest",
+      "rateLimited": "Too many searches. Wait a moment and try again.",
+      "searchFailed": "Search failed. Check your connection and try again.",
       "pages": {
         "branding": "Branding",
         "seo": "SEO",

@@ -101,7 +101,12 @@ export function EventConfigTable({
     <div className="space-y-4">
       <div className="bg-card rounded-xl border border-border overflow-hidden">
         <div className="px-6 py-4 border-b border-border">
-          <h2 className="text-lg font-semibold text-foreground">{t('title')}</h2>
+          <h2
+            data-setting-id="notifications.events"
+            className="text-lg font-semibold text-foreground"
+          >
+            {t('title')}
+          </h2>
           <p className="text-sm text-muted-foreground mt-0.5">{t('subtitle')}</p>
         </div>
       </div>

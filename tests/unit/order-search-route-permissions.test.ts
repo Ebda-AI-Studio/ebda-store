@@ -45,6 +45,10 @@ describe('order / customer search routes enforce orders:read', () => {
     const src = read('apps/api/src/routes/customers.routes.ts');
     const at = src.indexOf("'/customers/search'");
     const handler = src.slice(at, src.indexOf('searchOrderCustomers(', at));
-    expect(handler).toMatch(/\.slice\(0,\s*100\)/);
+    // the term is read (header first) and capped by the shared helper
+    expect(handler).toMatch(/searchTermOf\(req, res, 'q'\)/);
+    const helper = read('apps/api/src/lib/search-term.ts');
+    expect(helper).toMatch(/SEARCH_TERM_MAX = 100/);
+    expect(helper).toMatch(/\.slice\(0,\s*SEARCH_TERM_MAX\)/);
   });
 });

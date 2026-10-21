@@ -3593,6 +3593,8 @@ EOF
 )"
 ```
 
+**PR 5 follow-ups (tracked in ROADMAP "Search program").** CONTRACT migration dropping the unused per-key trigram indexes and the `ebda_order_search_ids` kinds `guest`/`customers` (SEARCH-P2-5), after the P2 deploy is confirmed and never in the same deploy; removal of the deprecated `?search=`/`?q=` fallbacks one release after the header-sending clients ship (SEARCH-P2-9).
+
 **PR 5 boundary.** **STOP-5** (pre-build the 4 indexes CONCURRENTLY on production before deploy) → merge → deploy → verify live: ⌘K on a real store in Arabic, plus `pg_stat_user_indexes.idx_scan > 0` on the new indexes after a day (read-only, by Ahmad).
 
 ---

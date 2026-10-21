@@ -59,6 +59,8 @@ interface CustomersListResponse {
     total: number;
     totalPages: number;
     truncated: boolean;
+    /** The SQL search hit its own cap: these rows are the first of more. */
+    searchTruncated?: boolean;
     /** Store-wide KPI strip — unaffected by page, search or segment. */
     summary?: CustomersSummary;
     /** RFM segments present anywhere in the store (filter pills). */
@@ -67,7 +69,7 @@ interface CustomersListResponse {
 }
 
 import { formatDate, formatPrice } from '@/lib/format';
-import { customerListFilterParams } from '@ebda/shared';
+import { customerListFilterParams, moveSearchToHeader } from '@ebda/shared';
 
 export default function StoreCustomersPage() {
   const params = useParams();
@@ -99,6 +101,7 @@ export default function StoreCustomersPage() {
   // True when the server capped the order scan (very large store) — surfaced
   // as a notice so the merchant knows the list may be partial.
   const [truncated, setTruncated] = useState(false);
+  const [searchTruncated, setSearchTruncated] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const { error: toastError } = useToast();
 
@@ -144,15 +147,18 @@ export default function StoreCustomersPage() {
     setError(null);
 
     try {
-      const qs = customerListFilterParams({
-        search,
-        segment: segment === 'all' ? undefined : segment,
-      });
+      const { params: qs, headers } = moveSearchToHeader(
+        customerListFilterParams({
+          search,
+          segment: segment === 'all' ? undefined : segment,
+        })
+      );
       qs.set('page', String(page));
       qs.set('perPage', String(CUSTOMERS_PAGE_SIZE));
 
       const { data, error: fetchError } = await apiGet<CustomersListResponse>(
-        `/api/v1/stores/${storeId}/customers?${qs.toString()}`
+        `/api/v1/stores/${storeId}/customers?${qs.toString()}`,
+        headers
       );
       if (!isLatest()) return;
 
@@ -170,6 +176,7 @@ export default function StoreCustomersPage() {
       setTotalCount(data.meta?.total ?? 0);
       setTotalPages(Math.max(1, data.meta?.totalPages ?? 1));
       setTruncated(Boolean(data.meta?.truncated));
+      setSearchTruncated(Boolean(data.meta?.searchTruncated));
       setSummary(data.meta?.summary ?? null);
       setPresentSegments(data.meta?.segments ?? []);
     } catch {
@@ -199,12 +206,16 @@ export default function StoreCustomersPage() {
     setIsExporting(true);
     try {
       // Export what is on screen: the same search + segment the list sends.
-      const qs = customerListFilterParams({
-        search,
-        segment: segment === 'all' ? undefined : segment,
-      });
+      const { params: qs, headers } = moveSearchToHeader(
+        customerListFilterParams({
+          search,
+          segment: segment === 'all' ? undefined : segment,
+        })
+      );
       const suffix = qs.toString() ? `?${qs}` : '';
-      const res = await apiFetch(`/api/v1/stores/${storeId}/customers/export.xlsx${suffix}`);
+      const res = await apiFetch(`/api/v1/stores/${storeId}/customers/export.xlsx${suffix}`, {
+        headers,
+      });
       if (!res.ok) {
         toastError(t('exportFailed'));
         return;
@@ -517,6 +528,15 @@ export default function StoreCustomersPage() {
         {truncated && (
           <div className="rounded-xl border border-warning/30 bg-warning/10 p-4 text-sm text-warning-ink">
             {t('truncatedNotice')}
+          </div>
+        )}
+
+        {searchTruncated && (
+          <div
+            role="status"
+            className="rounded-xl border border-warning/30 bg-warning/10 p-4 text-sm text-warning-ink"
+          >
+            {t('searchTruncatedNotice', { shown: totalCount })}
           </div>
         )}
 

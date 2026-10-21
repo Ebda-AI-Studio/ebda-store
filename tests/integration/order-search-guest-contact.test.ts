@@ -193,6 +193,8 @@ describe.skipIf(!hasDb)('order search: guest contact', () => {
     const rows = await prisma.$queryRaw<Array<{ indexname: string; indexdef: string }>>`
       SELECT indexname, indexdef FROM pg_indexes
       WHERE schemaname = 'public' AND indexname LIKE 'orders\\_guest\\_%\\_trgm\\_idx'
+        -- the normalised expression indexes of 20261027000100 are not key indexes
+        AND indexname NOT IN ('orders_guest_name_norm_trgm_idx', 'orders_guest_phone_digits_trgm_idx', 'orders_guest_email_store_trgm_idx')
       ORDER BY indexname
     `;
     expect(rows.map(r => r.indexname)).toEqual([
@@ -215,6 +217,10 @@ describe.skipIf(!hasDb)('order search: guest contact', () => {
     }
   });
 
+  it('a lone % is literal: it matches nothing (Prisma `contains` does not escape it)', async () => {
+    expect(await actual('%')).toEqual([]);
+  });
+
   it.each([
     ['guest first name, any case', () => `GWENDOLYN${tag}`],
     ['guest last name', () => `okonkwo${tag}`],
@@ -233,7 +239,6 @@ describe.skipIf(!hasDb)('order search: guest contact', () => {
     ['no match', () => `nothing-${tag}`],
     ['shorter than a trigram (JSON-filter fallback)', () => 'Pl'],
     ['shorter than a trigram, only in a registered order JSON', () => 'Js'],
-    ['a lone % (JSON-filter fallback) is literal', () => '%'],
   ])('%s: relation-join rows (unchanged) plus the guest oracle', async (_l, term) => {
     const search = term();
     expect(await actual(search)).toEqual(await expected(search));

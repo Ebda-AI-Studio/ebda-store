@@ -1412,6 +1412,26 @@ export const writeLimiter = rateLimit({
   skip: skipForLoadTest,
 });
 
+// Admin ⌘K record lookup (GET /stores/:storeId/search). GETs skip the global limiter, and each
+// request runs three store-scoped lookups, so it needs its own: per USER (a store's staff share one
+// office IP), generous for typing (the palette debounces to ~5/s at most) and a hard stop for a
+// held key or a script. A merchant who hits it sees a distinct "slow down" state in the palette.
+export const ADMIN_SEARCH_LIMIT_PER_MINUTE = 120;
+export const adminSearchLimiter = rateLimit({
+  store: makeRateLimitStore(rateLimitRedisClient, 'admin-search'),
+  windowMs: 60 * 1000,
+  max: ADMIN_SEARCH_LIMIT_PER_MINUTE,
+  message: {
+    success: false,
+    error: { code: 'RATE_LIMITED', message: 'Too many searches, please slow down.' },
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+  passOnStoreError: true,
+  skip: skipForLoadTest,
+  keyGenerator: req => `admin-search-${req.user?.userId ?? ipKeyGenerator(req.ip ?? '')}`,
+});
+
 // Stricter limiter for payment operations
 export const paymentLimiter = rateLimit({
   store: makeRateLimitStore(rateLimitRedisClient, 'payment'),

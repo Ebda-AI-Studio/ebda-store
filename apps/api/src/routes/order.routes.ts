@@ -1,6 +1,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { ipKeyGenerator } from 'express-rate-limit';
 import { z } from 'zod';
+import { queryWithSearchHeader } from '../lib/search-term';
 import type ExcelJS from 'exceljs';
 import { loadExcelJS } from '../lib/lazy-modules';
 import {
@@ -92,7 +93,7 @@ function parseOrderListFilters(
   req: Request,
   res: Response
 ): Pick<OrderListWhere, 'status' | 'paymentStatus' | 'from' | 'to' | 'search'> | null {
-  const parsed = parseSharedOrderFilters(req.query);
+  const parsed = parseSharedOrderFilters(queryWithSearchHeader(req, res));
   if (!parsed.ok) {
     res.status(422).json({
       success: false,

@@ -108,14 +108,16 @@ describe.skipIf(!hasDb)(
     // scanning a users GIN (the planner weighs both; a store's customers are bounded by the store),
     // so for those the evidence is the exact result and the time, not a counter. What it must NOT
     // do is run under the users RLS policy (a per-row subquery policy): inline it took ~0.5 s.
+    // Search P2: the guest name and phone arms of the order list now go through the NORMALISED
+    // expression indexes of 20261027000100 (the per-key indexes still serve `ebda_order_search_ids`).
     const g = 5000; // a guest order (orders 1..2000 are registered)
     const r = 77; // a registered customer's index (it has orders r and r+1000)
     const cases: Array<[string, string, string | null]> = [
       ['order number', md5(tag + 'o' + g).slice(2, 12), 'orders_order_number_trgm_idx'],
-      ['guest first name', md5(tag + 'gf' + g).slice(2, 12), 'orders_guest_first_name_trgm_idx'],
-      ['guest last name', md5(tag + 'gl' + g).slice(2, 12), 'orders_guest_last_name_trgm_idx'],
+      ['guest first name', md5(tag + 'gf' + g).slice(2, 12), 'orders_guest_name_norm_trgm_idx'],
+      ['guest last name', md5(tag + 'gl' + g).slice(2, 12), 'orders_guest_name_norm_trgm_idx'],
       ['guest email', md5(tag + 'ge' + g).slice(2, 12), 'orders_guest_email_trgm_idx'],
-      ['guest phone', String(g).padStart(8, '0') + '', 'orders_guest_phone_trgm_idx'],
+      ['guest phone', String(g).padStart(8, '0') + '', 'orders_guest_phone_digits_trgm_idx'],
       ['customer first name', md5(tag + 'uf' + r).slice(2, 12), null],
       ['customer last name', md5(tag + 'ul' + r).slice(2, 12), null],
       ['customer email', md5(tag + 're' + r).slice(2, 12), null],

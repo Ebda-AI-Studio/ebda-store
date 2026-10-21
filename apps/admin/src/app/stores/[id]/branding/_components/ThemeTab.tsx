@@ -190,7 +190,9 @@ export function ThemeTab({ branding, onChange, storeId }: ThemeTabProps) {
 
       {/* ── Logo size ────────────────────────────────────────────────────── */}
       <div className="rounded-lg border border-border bg-card p-4">
-        <p className="text-sm font-semibold text-foreground">{t('logoSize.title')}</p>
+        <p data-setting-id="branding.logo-size" className="text-sm font-semibold text-foreground">
+          {t('logoSize.title')}
+        </p>
         <p className="mt-0.5 text-xs text-muted-foreground">{t('logoSize.hint')}</p>
         <div className="mt-3 inline-flex rounded-lg border border-border p-0.5">
           {(['auto', 'sm', 'md', 'lg'] as const).map(opt => {
@@ -216,7 +218,12 @@ export function ThemeTab({ branding, onChange, storeId }: ThemeTabProps) {
       {/* ── Blog ─────────────────────────────────────────────────────────── */}
       <label className="flex cursor-pointer items-center justify-between gap-4 rounded-lg border border-border bg-card p-4">
         <span className="min-w-0 flex-1">
-          <span className="block text-sm font-semibold text-foreground">{t('blog.title')}</span>
+          <span
+            data-setting-id="branding.blog"
+            className="block text-sm font-semibold text-foreground"
+          >
+            {t('blog.title')}
+          </span>
           <span className="mt-0.5 block text-xs text-muted-foreground">{t('blog.hint')}</span>
         </span>
         <input
@@ -266,7 +273,9 @@ export function ThemeTab({ branding, onChange, storeId }: ThemeTabProps) {
       {/* ── Storefront web push ───────────────────────────────────────────── */}
       <div className="space-y-3 rounded-lg border border-border bg-card p-4">
         <div>
-          <p className="text-sm font-semibold text-foreground">{t('webPush.title')}</p>
+          <p data-setting-id="branding.web-push" className="text-sm font-semibold text-foreground">
+            {t('webPush.title')}
+          </p>
           <p className="mt-0.5 text-xs text-muted-foreground">{t('webPush.hint')}</p>
         </div>
         <label className="flex cursor-pointer items-center gap-2">
@@ -379,7 +388,11 @@ export function ThemeTab({ branding, onChange, storeId }: ThemeTabProps) {
           shows 0-9. */}
       <div className="space-y-3 rounded-lg border border-border bg-card p-4">
         <div>
-          <p id="store-numerals-label" className="text-sm font-semibold text-foreground">
+          <p
+            data-setting-id="branding.arabic-numerals"
+            id="store-numerals-label"
+            className="text-sm font-semibold text-foreground"
+          >
             {t('arabicNumerals.title')}
           </p>
           <p className="mt-0.5 text-xs text-muted-foreground">{t('arabicNumerals.hint')}</p>
@@ -425,7 +438,12 @@ export function ThemeTab({ branding, onChange, storeId }: ThemeTabProps) {
       {/* ── Footer logo ───────────────────────────────────────────────────── */}
       <div className="space-y-3 rounded-lg border border-border bg-card p-4">
         <div>
-          <p className="text-sm font-semibold text-foreground">{t('footerLogo.title')}</p>
+          <p
+            data-setting-id="branding.footer-logo"
+            className="text-sm font-semibold text-foreground"
+          >
+            {t('footerLogo.title')}
+          </p>
           <p className="mt-0.5 text-xs text-muted-foreground">{t('footerLogo.hint')}</p>
         </div>
         <ImageUpload

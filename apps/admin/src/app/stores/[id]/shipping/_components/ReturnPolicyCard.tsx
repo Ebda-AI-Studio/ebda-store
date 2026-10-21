@@ -75,7 +75,12 @@ export function ReturnPolicyCard({ storeId }: { storeId: string }) {
 
   return (
     <div className="rounded-xl border border-border bg-card p-4">
-      <h3 className="text-sm font-semibold text-foreground">{t('title')}</h3>
+      <h3
+        data-setting-id="shipping.return-policy"
+        className="text-sm font-semibold text-foreground"
+      >
+        {t('title')}
+      </h3>
       <p className="mt-1 text-xs text-muted-foreground">{t('help')}</p>
 
       <div className="mt-4 grid gap-4 sm:grid-cols-2">

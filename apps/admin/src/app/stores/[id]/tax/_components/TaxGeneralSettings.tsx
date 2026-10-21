@@ -35,7 +35,9 @@ export function TaxGeneralSettings({
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <div>
-            <h3 className="text-sm font-medium text-foreground">{t('enable.title')}</h3>
+            <h3 data-setting-id="tax.enable" className="text-sm font-medium text-foreground">
+              {t('enable.title')}
+            </h3>
             <p className="text-sm text-muted-foreground">{t('enable.description')}</p>
             {!vatVerified && (
               <p className="text-sm text-muted-foreground">
@@ -69,7 +71,9 @@ export function TaxGeneralSettings({
 
         <div className="flex items-center justify-between">
           <div>
-            <h3 className="text-sm font-medium text-foreground">{t('included.title')}</h3>
+            <h3 data-setting-id="tax.included" className="text-sm font-medium text-foreground">
+              {t('included.title')}
+            </h3>
             <p className="text-sm text-muted-foreground">{t('included.description')}</p>
           </div>
           <label className="relative inline-flex items-center cursor-pointer">

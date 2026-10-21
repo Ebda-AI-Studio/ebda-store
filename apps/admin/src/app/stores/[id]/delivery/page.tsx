@@ -227,7 +227,9 @@ export default function CheckoutDeliveryPage() {
         <section className="space-y-3 rounded-xl border bg-card p-4 shadow-sm">
           <div className="flex items-center justify-between gap-4">
             <div>
-              <h2 className="text-sm font-semibold text-foreground">{t('noteSectionTitle')}</h2>
+              <h2 data-setting-id="delivery.note" className="text-sm font-semibold text-foreground">
+                {t('noteSectionTitle')}
+              </h2>
               <p className="mt-0.5 text-xs text-muted-foreground">{t('noteSectionHint')}</p>
             </div>
             <label className="flex shrink-0 items-center gap-2 cursor-pointer">
@@ -267,7 +269,12 @@ export default function CheckoutDeliveryPage() {
         <section className="space-y-3 rounded-xl border bg-card p-4 shadow-sm">
           <div className="flex items-center justify-between gap-4">
             <div>
-              <h2 className="text-sm font-semibold text-foreground">{t('windowsSectionTitle')}</h2>
+              <h2
+                data-setting-id="delivery.windows"
+                className="text-sm font-semibold text-foreground"
+              >
+                {t('windowsSectionTitle')}
+              </h2>
               <p className="mt-0.5 text-xs text-muted-foreground">{t('windowsSectionHint')}</p>
             </div>
             <label className="flex shrink-0 items-center gap-2 cursor-pointer">
@@ -373,7 +380,12 @@ export default function CheckoutDeliveryPage() {
             never hardcoded to a slug. Empty/0 = disabled. */}
         <section className="space-y-3 rounded-xl border bg-card p-4 shadow-sm">
           <div>
-            <h2 className="text-sm font-semibold text-foreground">{t('minOrderSectionTitle')}</h2>
+            <h2
+              data-setting-id="delivery.min-order"
+              className="text-sm font-semibold text-foreground"
+            >
+              {t('minOrderSectionTitle')}
+            </h2>
             <p className="mt-0.5 text-xs text-muted-foreground">{t('minOrderSectionHint')}</p>
           </div>
           <label className="flex max-w-[200px] flex-col gap-1">
@@ -395,7 +407,9 @@ export default function CheckoutDeliveryPage() {
             stores). Both empty = hidden. */}
         <section className="space-y-3 rounded-xl border bg-card p-4 shadow-sm">
           <div>
-            <h2 className="text-sm font-semibold text-foreground">{t('deliveryDaysTitle')}</h2>
+            <h2 data-setting-id="delivery.days" className="text-sm font-semibold text-foreground">
+              {t('deliveryDaysTitle')}
+            </h2>
             <p className="mt-0.5 text-xs text-muted-foreground">{t('deliveryDaysHint')}</p>
           </div>
           <div className="flex flex-wrap items-end gap-3">
@@ -443,7 +457,12 @@ export default function CheckoutDeliveryPage() {
           </div>
           <div className="space-y-2 border-t border-border pt-3">
             <div>
-              <h3 className="text-xs font-semibold text-foreground">{t('deliveryOffDaysTitle')}</h3>
+              <h3
+                data-setting-id="delivery.off-days"
+                className="text-xs font-semibold text-foreground"
+              >
+                {t('deliveryOffDaysTitle')}
+              </h3>
               <p className="mt-0.5 text-xs text-muted-foreground">{t('deliveryOffDaysHint')}</p>
             </div>
             <DeliveryOffDaysField value={deliveryOffDays} onChange={setDeliveryOffDays} />
@@ -455,7 +474,10 @@ export default function CheckoutDeliveryPage() {
             store owner). Empty = disabled. Platform-level, not slug-hardcoded. */}
         <section className="space-y-3 rounded-xl border bg-card p-4 shadow-sm">
           <div>
-            <h2 className="text-sm font-semibold text-foreground">
+            <h2
+              data-setting-id="delivery.invoice-email"
+              className="text-sm font-semibold text-foreground"
+            >
               {t('invoiceEmailSectionTitle')}
             </h2>
             <p className="mt-0.5 text-xs text-muted-foreground">{t('invoiceEmailSectionHint')}</p>
