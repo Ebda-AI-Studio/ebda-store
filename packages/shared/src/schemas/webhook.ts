@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { isBrandHost } from '../brand';
 
 /**
  * Merchant OUTGOING webhooks: the contracts shared by the API
@@ -68,6 +69,8 @@ export function webhookUrlShapeError(raw: string): string | null {
   if (!host.includes('.')) return 'public_hostname_required';
   if (/(^|\.)(localhost|local|internal|localdomain|home\.arpa)$/.test(host.toLowerCase()))
     return 'internal_hostname_not_allowed';
+  // The platform's own zones (api.ebda.app, every storefront): a webhook must not loop back into us.
+  if (isBrandHost(host)) return 'platform_host_not_allowed';
   return null;
 }
 

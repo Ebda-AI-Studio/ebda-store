@@ -86,6 +86,10 @@ describe('endpoint contracts', () => {
     'https://app.internal/x',
     'https://printer.local/x',
     'https://localhost./x',
+    'https://api.ebda.app/api/v1/x',
+    'https://shop.ebda.app/x',
+    'https://ebda.app/',
+    'https://EBDA.APP./x',
     'not a url',
   ])('rejects %s', url => {
     expect(webhookEndpointCreateSchema.safeParse({ ...ok, url }).success).toBe(false);
