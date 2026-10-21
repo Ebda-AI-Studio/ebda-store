@@ -853,6 +853,29 @@ html[lang='ar'] .story h2 {
   overflow: hidden;
   background: #fff;
 }
+.look-shot {
+  display: block;
+  color: inherit;
+}
+.look-shot img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: top;
+}
+.look-shot:focus-visible {
+  outline: 3px solid #7aa2ff;
+  outline-offset: -3px;
+}
+.looks-item figcaption .look-live {
+  margin-top: 10px;
+}
+.look-live a {
+  color: var(--fg);
+  font-weight: 700;
+  text-underline-offset: 3px;
+}
 .look-screen .scr:focus-visible {
   outline: 3px solid #7aa2ff;
   outline-offset: -3px;
