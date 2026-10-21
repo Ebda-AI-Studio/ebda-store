@@ -17,7 +17,12 @@ import { CartRecommendations } from '../../components/CartRecommendations';
 import { BundleLine } from '../../components/BundleLine';
 import { CartLineUnavailableNotice } from '../../templates/shared/CartLineUnavailable';
 import { pageSurfaceStyle } from '@/lib/page-surface';
-import { couponQuoteBasis, couponQuoteCartItems } from '@/lib/coupon-quote-basis';
+import {
+  couponQuoteBasis,
+  couponQuoteCartItems,
+  couponQuoteLooseFields,
+} from '@/lib/coupon-quote-basis';
+import { moqShortfalls, moqCartMessage, cartMaxQty, moqFix } from '@/lib/b2b-moq';
 import { productUnavailableCopy } from '@/lib/product-cart-errors';
 import {
   resolveSectionZone,
@@ -178,7 +183,7 @@ export default function CartClient() {
       } catch {
         cartErrorToast();
       }
-    } else if (newQuantity > 10) {
+    } else if (newQuantity > (item ? cartMaxQty(item) : 10)) {
       info(
         t('Limit reached', 'وصلت للحد'),
         t('Maximum 10 items per product', 'تقدر تطلب لحد 10 قطع من كل منتج')
@@ -237,6 +242,8 @@ export default function CartClient() {
         // The loose lines themselves, so the route evaluates the coupon's
         // targeting now rather than accepting a code checkout will refuse.
         cartItems: couponQuoteCartItems(cartItems),
+        // A free-shipping code is judged on the whole loose cart (Ruling B2B-M2).
+        ...couponQuoteLooseFields(cartItems),
       });
       if (result.success && result.data) {
         setPromoApplied(true);
@@ -302,6 +309,8 @@ export default function CartClient() {
           // Same loose-items-only basis as the manual apply above.
           orderTotal: couponBasis,
           cartItems: couponQuoteCartItems(cartItems),
+          // A free-shipping code is judged on the whole loose cart (Ruling B2B-M2).
+          ...couponQuoteLooseFields(cartItems),
         });
         if (result.success && result.data) {
           setPromoCode(result.data.coupon.code);
@@ -418,7 +427,21 @@ export default function CartClient() {
   // "remove it to check out" is enforced here rather than left advisory —
   // otherwise the shopper fills the whole checkout form only to be refused.
   const hasUnavailableLines = unavailableItems.length > 0;
-  const checkoutBlocked = belowMinimumOrder || hasUnavailableLines;
+  // B2B minimum order quantity: the server flags each line (`belowMoq`); the order would be refused 422 BELOW_MOQ, so the cart
+  // says so inline and disables checkout instead of letting the buyer fill the form first.
+  const moqShort = moqShortfalls(
+    cartItems.map(i => ({
+      productId: i.productId,
+      name: i.name,
+      nameAr: i.nameAr,
+      quantity: i.quantity,
+      belowMoq: i.belowMoq,
+      moqRequired: i.moqRequired,
+      unavailable: i.unavailable,
+    }))
+  );
+  const moqMessage = moqCartMessage(moqShort, language === 'ar' ? 'ar' : 'en');
+  const checkoutBlocked = belowMinimumOrder || hasUnavailableLines || !!moqMessage;
   const checkoutBlockedMessage =
     minimumOrderMessage ??
     (hasUnavailableLines
@@ -426,7 +449,7 @@ export default function CartClient() {
           'Remove the unavailable items to check out.',
           'شيل المنتجات اللي مش متوفرة عشان تكمّل الطلب.'
         )
-      : undefined);
+      : moqMessage);
 
   return (
     <ShopChrome>
@@ -474,6 +497,34 @@ export default function CartClient() {
                 unavailableItems.map(i => (language === 'ar' && i.nameAr ? i.nameAr : i.name))
               )}
             </p>
+          )}
+
+          {moqShort.length > 0 && (
+            <div
+              data-cart-moq-fix=""
+              className="mt-4 space-y-2 rounded-lg border border-warning/30 bg-warning/10 px-4 py-3 text-sm text-warning-ink"
+            >
+              {moqShort.map(sf => {
+                const fix = moqFix(sf, cartItems);
+                return (
+                  <div key={sf.productId} className="flex flex-wrap items-center gap-3">
+                    <span className="font-medium">
+                      <bdi>{language === 'ar' && sf.nameAr ? sf.nameAr : sf.name}</bdi>:{' '}
+                      {t(`minimum order is ${sf.required}`, `الحد الأدنى للطلب ${sf.required}`)}
+                    </span>
+                    {fix ? (
+                      <button
+                        type="button"
+                        className="inline-flex min-h-11 cursor-pointer items-center rounded-md border border-warning/50 px-4 font-medium hover:bg-warning/20"
+                        onClick={() => void handleUpdateQuantity(fix.lineId, fix.quantity)}
+                      >
+                        {t(`Set to ${fix.quantity}`, `اجعلها ${fix.quantity}`)}
+                      </button>
+                    ) : null}
+                  </div>
+                );
+              })}
+            </div>
           )}
 
           {cartItems.length === 0 && cartBundles.length === 0 ? (

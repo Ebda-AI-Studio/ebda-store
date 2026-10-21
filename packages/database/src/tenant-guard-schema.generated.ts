@@ -45,6 +45,7 @@ export const TENANT_GUARD_SCHEMA: readonly TenantGuardModel[] = [
       staffMemberships: 'StoreStaff',
       legalAcceptances: 'LegalAcceptance',
       legalNoticeDeliveries: 'LegalNoticeDelivery',
+      wholesaleApplications: 'WholesaleApplication',
     },
   },
   {
@@ -124,6 +125,8 @@ export const TENANT_GUARD_SCHEMA: readonly TenantGuardModel[] = [
       searchQueryDaily: 'SearchQueryDaily',
       productEmbeddings: 'ProductEmbedding',
       productEmbedFailures: 'ProductEmbedFailure',
+      productPriceTiers: 'ProductPriceTier',
+      wholesaleApplications: 'WholesaleApplication',
       productModelBindings: 'ProductModelBinding',
       affiliates: 'Affiliate',
       affiliateReferrals: 'AffiliateReferral',
@@ -245,6 +248,8 @@ export const TENANT_GUARD_SCHEMA: readonly TenantGuardModel[] = [
       customers: 'Customer',
       coupons: 'Coupon',
       promotions: 'Promotion',
+      priceTiers: 'ProductPriceTier',
+      wholesaleApplications: 'WholesaleApplication',
     },
   },
   {
@@ -304,6 +309,7 @@ export const TENANT_GUARD_SCHEMA: readonly TenantGuardModel[] = [
       model3d: 'ProductModel',
       embedding: 'ProductEmbedding',
       embedFailure: 'ProductEmbedFailure',
+      priceTiers: 'ProductPriceTier',
       sizeChart: 'SizeChart',
     },
   },
@@ -388,6 +394,7 @@ export const TENANT_GUARD_SCHEMA: readonly TenantGuardModel[] = [
       warehouseStock: 'WarehouseStock',
       countLines: 'CountLine',
       bundleItems: 'BundleItem',
+      priceTiers: 'ProductPriceTier',
     },
   },
   {
@@ -415,6 +422,27 @@ export const TENANT_GUARD_SCHEMA: readonly TenantGuardModel[] = [
     relations: {
       product: 'Product',
       store: 'Store',
+    },
+  },
+  {
+    name: 'ProductPriceTier',
+    table: 'product_price_tiers',
+    storeId: true,
+    relations: {
+      store: 'Store',
+      product: 'Product',
+      variant: 'ProductVariant',
+      group: 'CustomerGroup',
+    },
+  },
+  {
+    name: 'WholesaleApplication',
+    table: 'wholesale_applications',
+    storeId: true,
+    relations: {
+      store: 'Store',
+      user: 'User',
+      group: 'CustomerGroup',
     },
   },
   {

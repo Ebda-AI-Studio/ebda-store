@@ -35,6 +35,7 @@ import { accountingPostStockAdjustmentJournal } from './accounting-post-stock-ad
 import { accountingPostExpenseJournal } from './accounting-post-expense-journal';
 import { stockReorderScanCron, stockReorderScanOnDemand } from './stock-reorder-scan';
 import { stockDeadstockScanCron, stockDeadstockScanOnDemand } from './stock-deadstock-scan';
+import { wholesalePendingNudgeCron } from './wholesale-pending-nudge';
 import { stockLowStockAlertCron, stockLowStockAlertOnDemand } from './stock-low-stock-alert';
 import { accountingProfitAnomalyCron } from './accounting-profit-anomaly';
 import { accountingExpenseOcrProcess } from './accounting-expense-ocr-process';
@@ -131,6 +132,7 @@ const allInngestFunctions: InngestFunction.Any[] = [
   stockDeadstockScanCron,
   stockDeadstockScanOnDemand,
   stockLowStockAlertCron,
+  wholesalePendingNudgeCron,
   stockLowStockAlertOnDemand,
   accountingProfitAnomalyCron,
   accountingExpenseOcrProcess,

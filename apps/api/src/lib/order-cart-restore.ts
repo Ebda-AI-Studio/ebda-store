@@ -7,7 +7,7 @@
  * `CartItem` rows, including the component lines a bundle expanded into. A
  * customer whose payment failed on a "Ramadan Box" (componentSum 14500,
  * bundle price 12000) came back to a cart of three loose products priced at
- * shelf price by `cartLineUnitPrice` — 14.500, not 12.000, with no
+ * shelf price by `retailUnitPrice` — 14.500, not 12.000, with no
  * explanation — and re-checking out cost them 2.500 more than they meant to
  * spend while the merchant's bundle never sold. `CartBundle` exists exactly
  * for this and the checkout path already writes to it, so the restore

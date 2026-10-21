@@ -16,7 +16,8 @@ import request from 'supertest';
 
 // ─── Mocks (declared before the route module is dynamically imported) ─────
 
-const { mockPrisma } = vi.hoisted(() => ({
+const { mockPrisma, mockLoadBuyerGroup } = vi.hoisted(() => ({
+  mockLoadBuyerGroup: vi.fn(),
   mockPrisma: {
     coupon: { findFirst: vi.fn() },
     customer: { findFirst: vi.fn() },
@@ -49,6 +50,12 @@ vi.mock('@api/middleware/auth', () => ({
   customerUserId: (req: any) => (req.user?.role === 'customer' ? req.user.userId : undefined),
 }));
 
+// Group membership comes from the shared buyer-group loader (session / merchant pick only; Ruling B2B-2c). Its queries are
+// pinned in tests/unit/price-resolver-service.test.ts and tests/integration/b2b-promo-identity.test.ts.
+vi.mock('@api/services/price-resolver.service', () => ({
+  loadBuyerGroup: mockLoadBuyerGroup,
+}));
+
 vi.mock('@api/middleware/store-access', () => ({
   requireStoreAccess: (_req: any, _res: any, next: any) => next(),
   checkStoreAccess: (_req: any, _res: any, next: any) => next(),
@@ -63,6 +70,7 @@ vi.mock('@api/middleware/feature-gate', () => ({
 
 vi.mock('@api/middleware/security', () => ({
   couponValidateLimiter: (_req: any, _res: any, next: any) => next(),
+  couponValidateDistinctLimiter: (_req: any, _res: any, next: any) => next(),
   publicTenantLimiter: (_req: any, _res: any, next: any) => next(),
   writeLimiter: (_req: any, _res: any, next: any) => next(),
 }));
@@ -326,13 +334,11 @@ describe('POST /public/:storeId/coupons/validate — storefront cart lines (#136
   });
 
   it('quotes a customer-group code by the SIGNED-IN account, not the typed contact (issue 2066)', async () => {
-    // A VIP typing a recipient's phone: the typed phone matches no Customer
-    // row, but the account does — exactly what order-create keys the group on.
+    // A VIP typing a recipient's phone: the typed phone is irrelevant; the session's customers.user_id link decides.
     mockPrisma.coupon.findFirst.mockResolvedValue(couponRow({ customerGroupId: 'vip-group' }));
     mockPrisma.product.findMany.mockResolvedValue([{ id: 'p1', categories: [] }]);
     mockPrisma.order.count.mockResolvedValue(2);
-    mockPrisma.user.findUnique.mockResolvedValue({ phone: '+96550000001', email: 'vip@x.test' });
-    mockPrisma.customer.findFirst.mockResolvedValue({ groupId: 'vip-group' });
+    mockLoadBuyerGroup.mockResolvedValue({ id: 'vip-group' });
 
     const res = await request(app)
       .post(`/api/v1/stores/public/${STORE_ID}/coupons/validate`)
@@ -341,8 +347,29 @@ describe('POST /public/:storeId/coupons/validate — storefront cart lines (#136
 
     expect(res.status).toBe(200);
     expect(res.body.data.discount).toBe(1000);
-    expect(mockPrisma.user.findUnique).toHaveBeenCalledWith(
-      expect.objectContaining({ where: { id: 'user-vip', storeId: STORE_ID } })
+    expect(mockLoadBuyerGroup).toHaveBeenCalledWith(
+      STORE_ID,
+      expect.objectContaining({ kind: 'session', userId: 'user-vip' })
+    );
+    expect(mockPrisma.customer.findFirst).not.toHaveBeenCalled();
+  });
+
+  it('a GUEST typing the VIP phone gets NO group code: the typed contact is not an identity (VIP-phone exploit)', async () => {
+    mockPrisma.coupon.findFirst.mockResolvedValue(couponRow({ customerGroupId: 'vip-group' }));
+    mockPrisma.product.findMany.mockResolvedValue([{ id: 'p1', categories: [] }]);
+    mockPrisma.order.count.mockResolvedValue(0);
+    mockPrisma.customer.findFirst.mockResolvedValue({ groupId: 'vip-group' }); // the old lookup would have matched
+    mockLoadBuyerGroup.mockResolvedValue(null);
+
+    const res = await request(app)
+      .post(`/api/v1/stores/public/${STORE_ID}/coupons/validate`)
+      .send({ code: 'VIP', orderTotal: 10000, cartItems: STOREFRONT_ITEMS, phone: '+96550000001' });
+
+    expect(res.status).toBe(400);
+    expect(res.body.error.code).toBe('COUPON_NOT_ELIGIBLE');
+    expect(mockLoadBuyerGroup).toHaveBeenCalledWith(
+      STORE_ID,
+      expect.objectContaining({ kind: 'anonymous' })
     );
   });
 
@@ -359,6 +386,24 @@ describe('POST /public/:storeId/coupons/validate — storefront cart lines (#136
     expect(res.body.error.code).toBe('COUPON_NOT_ELIGIBLE');
   });
 
+  it('B2B-5 quote: an all-tier cart (basis 0, no cart items) is quoted a 0 discount for a 10% coupon', async () => {
+    mockPrisma.coupon.findFirst.mockResolvedValue(couponRow({ value: 10 }));
+    const res = await request(app)
+      .post(`/api/v1/stores/public/${STORE_ID}/coupons/validate`)
+      .send({ code: 'SAVE', orderTotal: 0, cartItems: [] });
+    expect(res.status).toBe(200);
+    expect(res.body.data.discount).toBe(0);
+  });
+
+  it('B2B-5 quote: a minimum-order coupon on an all-tier cart (basis 0) is reported as not applicable', async () => {
+    mockPrisma.coupon.findFirst.mockResolvedValue(couponRow({ value: 10, minOrderAmount: 5000 }));
+    const res = await request(app)
+      .post(`/api/v1/stores/public/${STORE_ID}/coupons/validate`)
+      .send({ code: 'SAVE', orderTotal: 0, cartItems: [] });
+    expect(res.status).toBe(400);
+    expect(res.body.error.code).toBe('MIN_ORDER_NOT_MET');
+  });
+
   it('an unscoped code quotes the same discount as the whole-cart orderTotal path', async () => {
     mockPrisma.coupon.findFirst.mockResolvedValue(couponRow({ value: 15, maxDiscount: 1200 }));
     mockPrisma.product.findMany.mockResolvedValue([{ id: 'p1', categories: [] }]);
@@ -372,5 +417,54 @@ describe('POST /public/:storeId/coupons/validate — storefront cart lines (#136
 
     expect(withLines.body.data.discount).toBe(1200);
     expect(withLines.body.data.discount).toBe(totalOnly.body.data.discount);
+  });
+
+  describe('Ruling B2B-M2 (final review P2-3): a free-shipping code is judged on the whole loose cart', () => {
+    const TIER_LINES = [{ productId: 'p1', categoryIds: ['c1'], quantity: 10, lineTotal: 85_000 }];
+    const send = (body: Record<string, unknown>) =>
+      request(app).post(`/api/v1/stores/public/${STORE_ID}/coupons/validate`).send(body);
+
+    it('an all-tier cart (base basis 0) meets a free-shipping minimum of 50000 through looseOrderTotal / looseCartItems', async () => {
+      mockPrisma.coupon.findFirst.mockResolvedValue(
+        couponRow({ type: 'free_shipping', value: 0, minOrderAmount: 50_000 })
+      );
+      const res = await send({
+        code: 'SAVE10',
+        orderTotal: 0,
+        cartItems: [],
+        looseOrderTotal: 85_000,
+        looseCartItems: TIER_LINES,
+      });
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+    });
+
+    it('a percentage code with the same minimum still judges the base basis (B2B-5) and refuses', async () => {
+      mockPrisma.coupon.findFirst.mockResolvedValue(couponRow({ minOrderAmount: 50_000 }));
+      const res = await send({
+        code: 'SAVE10',
+        orderTotal: 0,
+        cartItems: [],
+        looseOrderTotal: 85_000,
+        looseCartItems: TIER_LINES,
+      });
+      expect(res.status).toBe(400);
+      expect(res.body.error.code).toBe('MIN_ORDER_NOT_MET');
+    });
+
+    it('an older client that sends no loose fields keeps the base-basis judgement', async () => {
+      mockPrisma.coupon.findFirst.mockResolvedValue(
+        couponRow({ type: 'free_shipping', value: 0, minOrderAmount: 50_000 })
+      );
+      const res = await send({ code: 'SAVE10', orderTotal: 0, cartItems: [] });
+      expect(res.status).toBe(400);
+      expect(res.body.error.code).toBe('MIN_ORDER_NOT_MET');
+    });
+
+    it('a malformed loose field is a clean 400, never reaching Prisma', async () => {
+      mockPrisma.coupon.findFirst.mockResolvedValue(couponRow({ type: 'free_shipping' }));
+      const res = await send({ code: 'SAVE10', looseOrderTotal: -1 });
+      expect(res.status).toBe(400);
+    });
   });
 });

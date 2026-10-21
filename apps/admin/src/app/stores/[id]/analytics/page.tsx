@@ -1,7 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useParams } from 'next/navigation';
+import { reportRangeQueryString } from '@ebda/shared';
 import { useT } from '@/i18n/useT';
 import { AdminLayout } from '../../../../components/AdminLayout';
 import { DateRangePicker } from '../../../../components/DateRangePicker';
@@ -12,10 +13,12 @@ import { CashflowChart } from './_components/CashflowChart';
 import { GlKpiCards } from './_components/GlKpiCards';
 import { InventorySnapshotCard } from './_components/InventorySnapshotCard';
 import { LowStockAlertsCard } from './_components/LowStockAlertsCard';
+import { PriceSourceCard } from './_components/PriceSourceCard';
 import { RecentOrdersCard } from './_components/RecentOrdersCard';
 import { RevenueChart } from './_components/RevenueChart';
 import { TopProductsTable } from './_components/TopProductsTable';
 import { ZeroResultSearchesCard } from './_components/ZeroResultSearchesCard';
+import { resolveDateRange } from './_components/types';
 import type { ChartType, Period, ResolvedDateRange } from './_components/types';
 import { useAnalytics } from './_hooks/useAnalytics';
 
@@ -45,6 +48,14 @@ export default function AnalyticsPage() {
     refetch,
   } = useAnalytics({ storeId, period, customRange });
   const periodLabel = tPeriods(period);
+  // The same startDate/endDate the other range-aware cards use.
+  const rangeQs = useMemo(
+    () =>
+      reportRangeQueryString(
+        period === 'custom' && customRange ? customRange : resolveDateRange(period)
+      ),
+    [period, customRange]
+  );
 
   return (
     <AdminLayout title={tPage('title')} subtitle={tPage('subtitle')}>
@@ -111,6 +122,8 @@ export default function AnalyticsPage() {
             <RecentOrdersCard orders={recentOrders} />
             <LowStockAlertsCard products={lowStockProducts} />
           </div>
+
+          <PriceSourceCard storeId={storeId} rangeQs={rangeQs} />
 
           <ZeroResultSearchesCard storeId={storeId} />
         </>

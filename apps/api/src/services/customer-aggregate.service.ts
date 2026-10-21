@@ -716,8 +716,16 @@ export async function getCustomerProfile(storeId: string, customerKey: string) {
             totalRefunded: 0,
             paymentMethods: [],
             statuses: [],
-            groupId: null,
-            group: null,
+            ...(await (async () => {
+              const linked = await prisma.customer.findFirst({
+                where: { storeId, userId: zeroOrderUser.id },
+                select: {
+                  groupId: true,
+                  group: { select: { id: true, name: true, nameAr: true } },
+                },
+              });
+              return { groupId: linked?.groupId ?? null, group: linked?.group ?? null };
+            })()),
           },
           orders: [],
           truncated: false,
@@ -802,27 +810,39 @@ export async function getCustomerProfile(storeId: string, customerKey: string) {
     statuses: Array.from(statusSet),
   };
 
-  // Resolve the assigned group. Groups live on the `customers` table — a
-  // separate, phone/email-keyed identity from the order's `users` row —
-  // so we look it up by identifier (phone first, the primary GCC
-  // identifier; email as fallback) rather than by the User id.
-  const identityOr: Prisma.CustomerWhereInput[] = [];
-  if (customer.phone) identityOr.push({ phone: customer.phone });
-  if (customer.email) identityOr.push({ email: { equals: customer.email, mode: 'insensitive' } });
+  // Resolve the assigned group. Groups live on the `customers` table. A REGISTERED shopper (customer.isGuest false; the id
+  // is the users.id) is looked up by the `customers.user_id` link ONLY: matching on phone / email showed another person's
+  // group on the wrong profile (a shopper can set any phone on their profile, Ruling B2B-2c). A GUEST key has no account, so
+  // its display falls back to the typed contact, restricted to rows that are NOT linked to a registered user.
   let groupId: string | null = null;
   let group: { id: string; name: string; nameAr: string | null } | null = null;
-  if (identityOr.length > 0) {
-    const grouped = await prisma.customer.findFirst({
-      where: { storeId, OR: identityOr },
-      select: {
-        groupId: true,
-        group: { select: { id: true, name: true, nameAr: true } },
-      },
+  const groupSelect = {
+    groupId: true,
+    group: { select: { id: true, name: true, nameAr: true } },
+  } as const;
+  let grouped: {
+    groupId: string | null;
+    group: { id: string; name: string; nameAr: string | null } | null;
+  } | null = null;
+  if (!customer.isGuest) {
+    grouped = await prisma.customer.findFirst({
+      where: { storeId, userId: customer.id },
+      select: groupSelect,
     });
-    if (grouped) {
-      groupId = grouped.groupId;
-      group = grouped.group;
+  } else {
+    const identityOr: Prisma.CustomerWhereInput[] = [];
+    if (customer.phone) identityOr.push({ phone: customer.phone });
+    if (customer.email) identityOr.push({ email: { equals: customer.email, mode: 'insensitive' } });
+    if (identityOr.length > 0) {
+      grouped = await prisma.customer.findFirst({
+        where: { storeId, userId: null, OR: identityOr },
+        select: groupSelect,
+      });
     }
+  }
+  if (grouped) {
+    groupId = grouped.groupId;
+    group = grouped.group;
   }
 
   // SMS-marketing consent (issue 206): this profile's own key (the user id

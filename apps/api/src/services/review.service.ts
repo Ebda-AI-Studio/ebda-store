@@ -1,3 +1,4 @@
+import { visibleProductWhere } from '../lib/visible-product';
 import { prisma, Prisma } from '@ebda/database';
 import { AppError } from '../middleware/error-handler';
 import { socketService } from './socket.service';
@@ -53,11 +54,14 @@ export class ReviewService {
       ? {
           storeId,
           productId,
+          // B2B M4: a wholesale-only product answers like an unknown id (no reviews), so this is not an existence oracle.
+          product: visibleProductWhere(),
           OR: [{ status: 'published' }, { customerId: viewerCustomerId }],
         }
       : {
           storeId,
           productId,
+          product: visibleProductWhere(),
           status: 'published',
         };
 
@@ -112,7 +116,7 @@ export class ReviewService {
    * Get review statistics for a product
    */
   static async getProductReviewStats(storeId: string, productId: string) {
-    const where = { storeId, productId, status: 'published' };
+    const where = { storeId, productId, status: 'published', product: visibleProductWhere() };
 
     const [aggregate, distribution] = await Promise.all([
       prisma.review.aggregate({

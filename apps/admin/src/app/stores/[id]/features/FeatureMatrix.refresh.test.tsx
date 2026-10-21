@@ -94,7 +94,9 @@ describe('FeatureMatrix → hidden-from-merchants features (WHATSAPP-OFF-1)', ()
       </ToastProvider>
     );
     expect(await screen.findByText('WhatsApp Notifications')).toBeTruthy();
-    expect(screen.getAllByText('row.hiddenFromMerchants').length).toBe(1);
+    // whatsapp (WHATSAPP-OFF-1) and b2b.wholesale (hidden from merchants until its UI ships, B2B Task 8 removes the flag).
+    expect(screen.getAllByText('row.hiddenFromMerchants').length).toBe(2);
+    expect(screen.getByText('Wholesale pricing')).toBeTruthy();
     expect(screen.queryByText('SEO Tools')).toBeNull();
 
     const row = screen.getByText('WhatsApp Notifications').closest('div.flex.items-start');

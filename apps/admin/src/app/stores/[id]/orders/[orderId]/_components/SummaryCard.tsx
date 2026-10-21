@@ -49,6 +49,9 @@ export function SummaryCard({ order }: SummaryCardProps) {
 
   const rows: Array<{ label: string; value: string; muted?: boolean }> = [
     { label: t('subtotal'), value: formatMoney(order.subtotal, order.currency) },
+    ...(order.priceGroupName
+      ? [{ label: t('priceGroup'), value: order.priceGroupName, muted: true }]
+      : []),
     ...(couponPortion > 0
       ? [
           {

@@ -79,6 +79,8 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
       where: { userId, storeId },
       include: {
         items: {
+          // B2B-7b: a product made wholesale-only after it was wishlisted drops out of the anonymous-storefront view
+          where: { product: { audience: 'public' } },
           include: {
             product: {
               include: {
@@ -102,6 +104,8 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
         data: { userId, storeId },
         include: {
           items: {
+            // B2B-7b: a product made wholesale-only after it was wishlisted drops out of the anonymous-storefront view
+            where: { product: { audience: 'public' } },
             include: {
               product: {
                 include: {
@@ -167,7 +171,8 @@ router.post('/', async (req: Request, res: Response, next: NextFunction) => {
 
     // Verify product exists and belongs to this store
     const product = await prisma.product.findFirst({
-      where: { id: productId, storeId },
+      // B2B-7b: a wholesale-only product cannot be wishlisted from the anonymous storefront (404, no existence oracle)
+      where: { id: productId, storeId, audience: 'public' },
     });
 
     if (!product) {

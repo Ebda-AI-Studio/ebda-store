@@ -11,7 +11,13 @@ import { prisma, SlugEntityType, withStore } from '@ebda/database';
 import { readInStoreContext } from '../lib/store-scoped-read';
 import { resolveSlugRedirectCached } from '../services/slug-redirect.service';
 import { AppError } from '../middleware/error-handler';
-import { authenticate, optionalAuthenticate, customerUserId } from '../middleware/auth';
+import {
+  authenticate,
+  optionalAuthenticate,
+  customerUserId,
+  rejectImpersonated,
+} from '../middleware/auth';
+import { buyerFromRequest } from '../lib/buyer-identity';
 import { requireFeature } from '../middleware/feature-gate';
 import {
   publicLimiter,
@@ -19,6 +25,7 @@ import {
   storeResolveLimiter,
   cartLimiter,
   writeLimiter,
+  couponAttemptLimiter,
   newsletterLimiter,
   viewIngestLimiter,
 } from '../middleware/security';
@@ -58,7 +65,7 @@ import {
   parseOptionalBooleanQuery,
   PUBLIC_PRODUCT_LIST_QUERY_KEYS,
 } from '../lib/query-params';
-import { setEdgeCache } from '../lib/edge-cache';
+import { setEdgeCache, setBuyerPrivate } from '../lib/edge-cache';
 import { buildProductFeed } from '../lib/product-feed';
 import {
   listSellableBundles,
@@ -209,6 +216,8 @@ export const createOrderSchema = z.object({
    * Defaults to false when omitted (no silent opt-in).
    */
   smsOptIn: z.boolean().optional().default(false),
+  /** The total (piastres) the shopper last saw: compared to the server-resolved total, never used to charge. */
+  expectedTotal: z.number().int().min(0).optional(),
 });
 
 // GET /products - List all public products (cached 30s)
@@ -650,61 +659,78 @@ router.get('/redirects/resolve', async (req: Request, res: Response, next: NextF
 
 // Cart endpoints (using default store)
 // GET /cart - Get current cart
-router.get('/cart', cartLimiter, async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const sessionId = req.headers['x-session-id'] as string;
-    if (!sessionId) {
-      res.status(400).json({
-        success: false,
-        error: { code: 'MISSING_SESSION', message: 'Session ID required' },
+router.get(
+  '/cart',
+  cartLimiter,
+  optionalAuthenticate,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const sessionId = req.headers['x-session-id'] as string;
+      if (!sessionId) {
+        res.status(400).json({
+          success: false,
+          error: { code: 'MISSING_SESSION', message: 'Session ID required' },
+        });
+        return;
+      }
+
+      const storeId = await getStoreIdFromRequest(req);
+      setBuyerPrivate(res);
+      const cart = await CartService.getOrCreate(
+        storeId,
+        sessionId,
+        undefined,
+        buyerFromRequest(req)
+      );
+
+      res.json({
+        success: true,
+        data: { cart },
       });
-      return;
+    } catch (error) {
+      next(error);
     }
-
-    const storeId = await getStoreIdFromRequest(req);
-    const cart = await CartService.getOrCreate(storeId, sessionId);
-
-    res.json({
-      success: true,
-      data: { cart },
-    });
-  } catch (error) {
-    next(error);
   }
-});
+);
 
 // POST /cart/items - Add item to cart
-router.post('/cart/items', cartLimiter, async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const sessionId = req.headers['x-session-id'] as string;
-    if (!sessionId) {
-      res.status(400).json({
-        success: false,
-        error: { code: 'MISSING_SESSION', message: 'Session ID required' },
+router.post(
+  '/cart/items',
+  cartLimiter,
+  optionalAuthenticate,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const sessionId = req.headers['x-session-id'] as string;
+      if (!sessionId) {
+        res.status(400).json({
+          success: false,
+          error: { code: 'MISSING_SESSION', message: 'Session ID required' },
+        });
+        return;
+      }
+
+      const { productId, quantity, variantId, note } = addCartItemSchema.parse(req.body);
+      const storeId = await getStoreIdFromRequest(req);
+      const cart = await CartService.addItem(
+        storeId,
+        sessionId,
+        productId,
+        quantity,
+        undefined,
+        variantId,
+        note,
+        buyerFromRequest(req)
+      );
+
+      res.json({
+        success: true,
+        data: { cart },
       });
-      return;
+    } catch (error) {
+      next(error);
     }
-
-    const { productId, quantity, variantId, note } = addCartItemSchema.parse(req.body);
-    const storeId = await getStoreIdFromRequest(req);
-    const cart = await CartService.addItem(
-      storeId,
-      sessionId,
-      productId,
-      quantity,
-      undefined,
-      variantId,
-      note
-    );
-
-    res.json({
-      success: true,
-      data: { cart },
-    });
-  } catch (error) {
-    next(error);
   }
-});
+);
 
 // POST /cart/sync - bulk-merge a guest cart into the session cart (post-login
 // migration). Mirrors POST /cart/items but takes an array; uses the existing
@@ -722,24 +748,35 @@ const syncCartSchema = z.object({
     )
     .max(100),
 });
-router.post('/cart/sync', cartLimiter, async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const sessionId = req.headers['x-session-id'] as string;
-    if (!sessionId) {
-      res.status(400).json({
-        success: false,
-        error: { code: 'MISSING_SESSION', message: 'Session ID required' },
-      });
-      return;
+router.post(
+  '/cart/sync',
+  cartLimiter,
+  optionalAuthenticate,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const sessionId = req.headers['x-session-id'] as string;
+      if (!sessionId) {
+        res.status(400).json({
+          success: false,
+          error: { code: 'MISSING_SESSION', message: 'Session ID required' },
+        });
+        return;
+      }
+      const { items } = syncCartSchema.parse(req.body);
+      const storeId = await getStoreIdFromRequest(req);
+      const cart = await CartService.addItems(
+        storeId,
+        sessionId,
+        items,
+        undefined,
+        buyerFromRequest(req)
+      );
+      res.json({ success: true, data: { cart } });
+    } catch (error) {
+      next(error);
     }
-    const { items } = syncCartSchema.parse(req.body);
-    const storeId = await getStoreIdFromRequest(req);
-    const cart = await CartService.addItems(storeId, sessionId, items);
-    res.json({ success: true, data: { cart } });
-  } catch (error) {
-    next(error);
   }
-});
+);
 
 // POST /cart/email-optin - the checkout box "Email me about my cart" (ticked or unticked).
 // Stores the address on this session's cart with a consent time and upserts the store's
@@ -815,6 +852,7 @@ router.post(
 router.put(
   '/cart/items/:itemId',
   cartLimiter,
+  optionalAuthenticate,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const sessionId = req.headers['x-session-id'] as string;
@@ -829,7 +867,14 @@ router.put(
       const { itemId } = req.params;
       const { quantity } = updateCartItemSchema.parse(req.body);
       const storeId = await getStoreIdFromRequest(req);
-      const cart = await CartService.updateItem(storeId, sessionId, itemId, quantity);
+      const cart = await CartService.updateItem(
+        storeId,
+        sessionId,
+        itemId,
+        quantity,
+        undefined,
+        buyerFromRequest(req)
+      );
 
       res.json({
         success: true,
@@ -845,6 +890,7 @@ router.put(
 router.delete(
   '/cart/items/:itemId',
   cartLimiter,
+  optionalAuthenticate,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const sessionId = req.headers['x-session-id'] as string;
@@ -858,7 +904,13 @@ router.delete(
 
       const { itemId } = req.params;
       const storeId = await getStoreIdFromRequest(req);
-      const cart = await CartService.removeItem(storeId, sessionId, itemId);
+      const cart = await CartService.removeItem(
+        storeId,
+        sessionId,
+        itemId,
+        undefined,
+        buyerFromRequest(req)
+      );
 
       res.json({
         success: true,
@@ -905,7 +957,8 @@ router.post(
         sessionId,
         data.bundleId,
         data.quantity,
-        customerId
+        customerId,
+        buyerFromRequest(req)
       );
 
       if (!result.ok) {
@@ -956,7 +1009,13 @@ router.delete(
       const { cartBundleId } = req.params;
       const storeId = await getStoreIdFromRequest(req);
       const customerId = customerUserId(req);
-      const cart = await CartService.removeBundle(storeId, sessionId, cartBundleId, customerId);
+      const cart = await CartService.removeBundle(
+        storeId,
+        sessionId,
+        cartBundleId,
+        customerId,
+        buyerFromRequest(req)
+      );
 
       res.json({
         success: true,
@@ -969,28 +1028,33 @@ router.delete(
 );
 
 // DELETE /cart - Clear cart
-router.delete('/cart', cartLimiter, async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const sessionId = req.headers['x-session-id'] as string;
-    if (!sessionId) {
-      res.status(400).json({
-        success: false,
-        error: { code: 'MISSING_SESSION', message: 'Session ID required' },
+router.delete(
+  '/cart',
+  cartLimiter,
+  optionalAuthenticate,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const sessionId = req.headers['x-session-id'] as string;
+      if (!sessionId) {
+        res.status(400).json({
+          success: false,
+          error: { code: 'MISSING_SESSION', message: 'Session ID required' },
+        });
+        return;
+      }
+
+      const storeId = await getStoreIdFromRequest(req);
+      const cart = await CartService.clear(storeId, sessionId, undefined, buyerFromRequest(req));
+
+      res.json({
+        success: true,
+        data: { cart },
       });
-      return;
+    } catch (error) {
+      next(error);
     }
-
-    const storeId = await getStoreIdFromRequest(req);
-    const cart = await CartService.clear(storeId, sessionId);
-
-    res.json({
-      success: true,
-      data: { cart },
-    });
-  } catch (error) {
-    next(error);
   }
-});
+);
 
 // Order endpoints
 // POST /orders - Create order. Guest checkout supported: customerId is
@@ -1002,7 +1066,11 @@ router.delete('/cart', cartLimiter, async (req: Request, res: Response, next: Ne
 router.post(
   '/orders',
   optionalAuthenticate,
+  // Design review I5 / I-4: an impersonation session (support, platform super_admin) must not place a real order as the
+  // impersonated customer, least of all at that account's wholesale price.
+  rejectImpersonated,
   writeLimiter,
+  couponAttemptLimiter,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const sessionId = req.headers['x-session-id'] as string;
@@ -1033,13 +1101,80 @@ router.post(
         sessionId,
         orderData,
         undefined,
-        { checkoutIp: ipKeyGenerator(req.ip ?? '') || null }
+        { checkoutIp: ipKeyGenerator(req.ip ?? '') || null, buyer: buyerFromRequest(req) }
       );
 
       res.status(201).json({
         success: true,
         data: { order },
       });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// POST /orders/quote - the EXACT total POST /orders would charge for this cart, buyer and inputs (design review I-1).
+// Computed by OrderService.create in dry-run mode, so pricing, MOQ, coupon / promotion eligibility, loyalty, shipping, COD
+// fee and VAT can never drift from the order. Nothing is written and no stock moves. The checkout displays `total` and sends
+// it back as `expectedTotal`, so a buyer who is repriced between this quote and the order (revoked approval, edited tier)
+// gets a 409 PRICE_CHANGED and confirms the new total instead of being charged a number they never saw.
+const quoteOrderSchema = z.object({
+  shippingAddress: z
+    .object({
+      area: z.string().max(120).optional(),
+      governorate: z.string().max(120).optional(),
+      city: z.string().max(120).optional(),
+      state: z.string().max(120).optional(),
+      country: z.string().max(60).optional(),
+      phone: z.string().max(40).optional(),
+      email: z.string().max(255).optional(),
+    })
+    .default({}),
+  paymentMethod: z.string().min(1),
+  couponCode: z.string().trim().min(1).max(50).optional(),
+  pointsToRedeem: z.number().int().min(0).max(100_000_000).optional(),
+});
+router.post(
+  '/orders/quote',
+  optionalAuthenticate,
+  cartLimiter,
+  couponAttemptLimiter,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const sessionId = req.headers['x-session-id'] as string;
+      if (!sessionId) {
+        res.status(400).json({
+          success: false,
+          error: { code: 'MISSING_SESSION', message: 'Session ID required' },
+        });
+        return;
+      }
+      const storeId = await getStoreIdFromRequest(req);
+      const body = quoteOrderSchema.parse(req.body);
+      const quote = await OrderService.quote(
+        storeId,
+        customerUserId(req),
+        sessionId,
+        {
+          shippingAddress: {
+            firstName: '',
+            lastName: '',
+            address1: '',
+            city: '',
+            state: '',
+            postalCode: '',
+            country: 'EG',
+            ...body.shippingAddress,
+          },
+          paymentMethod: body.paymentMethod,
+          couponCode: body.couponCode,
+          pointsToRedeem: body.pointsToRedeem,
+        } as never,
+        buyerFromRequest(req)
+      );
+      setBuyerPrivate(res);
+      res.json({ success: true, data: { quote } });
     } catch (error) {
       next(error);
     }
@@ -1535,7 +1670,7 @@ router.post(
       // Verify the product belongs to this store (ownership guard).
       // Explicit select to avoid fetching unnecessary columns.
       const product = await prisma.product.findFirst({
-        where: { id: productId, storeId, deletedAt: null },
+        where: { id: productId, storeId, deletedAt: null, audience: 'public' },
         select: { id: true },
       });
 

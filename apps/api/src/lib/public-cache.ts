@@ -318,6 +318,8 @@ export async function clearProductsRedis(storeId: string): Promise<void> {
   await invalidateCachedPrefix(`public:products:${storeId}:`);
   await invalidateCachedPrefix(`public:product:${storeId}:`);
   await invalidateCachedPrefix(`public:suggest:${storeId}:`);
+  // B2B C1: recommendation payloads embed related products (name, image, price), so a product audience flip must drop them too.
+  await invalidateCachedPrefix(`recommendations:product:${storeId}:`);
   await invalidateCachedPrefix(`admin:products:${storeId}:`);
   // Redis-only: the caller fires ONE purge covering both tags. Calling the
   // public categories invalidator here would fire a second outbound POST for

@@ -28,6 +28,7 @@ vi.mock('@api/lib/definer', () => ({
   resolveStoreFromWebhookRef: vi.fn().mockResolvedValue('s1'),
 }));
 vi.mock('@api/middleware/auth', () => ({
+  rejectImpersonated: (_req: any, _res: any, next: any) => next(),
   authenticate: (req: any, _res: any, next: any) => {
     req.user = { userId: 'u1', role: 'super_admin' };
     next();

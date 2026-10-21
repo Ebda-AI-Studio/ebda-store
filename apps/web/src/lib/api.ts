@@ -23,6 +23,8 @@
  * admin app uses a simpler 'authToken' approach.
  */
 import { isIosWebkit } from '@ebda/shared';
+import type { buildQuoteRequest, OrderQuote } from './checkout-quote';
+import type { ResolvedPrice } from './b2b-tiers';
 import type {
   PublicModel3d,
   ProductFact,
@@ -106,6 +108,10 @@ interface ProductCategory {
 interface Product {
   id: string;
   name: string;
+  /** B2B minimum order quantity (public data), null / absent = none. */
+  moq?: number | null;
+  /** PUBLIC quantity price breaks only (group tiers are never in this payload). */
+  priceTiers?: Array<{ variantId: string | null; minQty: number; priceMinor: number }>;
   /**
    * Arabic-localized name. Templates render this when the storefront
    * language is `ar` (falling back to `name` when missing). Without it
@@ -411,6 +417,9 @@ interface CreateOrderData {
   /** Pay from the customer wallet (D1). A request — the server spends
    *  min(balance, total) only when the store's wallet checkout is on. */
   useWallet?: boolean;
+  /** The total (piastres) the buyer confirmed, from the server's own quote (POST /public/orders/quote). The server compares and
+   *  never charges it: a mismatch is 409 PRICE_CHANGED. */
+  expectedTotal?: number;
   /** Explicit "Send me offers by SMS" tick (issue 206). Sent only when the
    *  box was rendered AND ticked; never a withdrawal. */
   smsOptIn?: boolean;
@@ -1308,6 +1317,75 @@ class ApiClient {
       method: 'POST',
       body: JSON.stringify(data),
     });
+  }
+
+  /**
+   * The EXACT total the server would charge for the current cart and these inputs (B2B design review I-1). Sent back as
+   * `expectedTotal` on createOrder so a repricing between the two surfaces as 409 PRICE_CHANGED.
+   */
+  async quoteOrder(data: ReturnType<typeof buildQuoteRequest>) {
+    return this.request<{ quote: OrderQuote }>('/public/orders/quote', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  /** The signed-in buyer's price for specific quantities (private, no-store). Never sends or accepts a client price. */
+  async resolvePrices(items: Array<{ productId: string; variantId?: string | null; qty: number }>) {
+    return this.request<{ prices: ResolvedPrice[] }>('/public/pricing/resolve', {
+      method: 'POST',
+      body: JSON.stringify({ items }),
+    });
+  }
+
+  /** Apply for a wholesale account (signed-in customer; the applicant is the session, never a body field). */
+  async applyForWholesale(data: {
+    businessName: string;
+    commercialRegNo?: string | null;
+    phone: string;
+    notes?: string | null;
+    /** The applicant accepted the data notice shown on the form (the server records the time). */
+    consent: true;
+  }) {
+    return this.request<{ application: { id: string; status: string } }>(
+      '/public/wholesale/apply',
+      {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }
+    );
+  }
+
+  /** The approved buyer's extra catalogue (wholesale-only products). 404 for everyone else. Private, no-store. */
+  async getWholesaleProducts(params: { page?: number; limit?: number } = {}) {
+    const q = new URLSearchParams();
+    if (params.page) q.set('page', String(params.page));
+    if (params.limit) q.set('limit', String(params.limit));
+    const qs = q.toString();
+    return this.request<{ products: Product[]; meta: PaginationMeta }>(
+      `/public/wholesale/products${qs ? `?${qs}` : ''}`
+    );
+  }
+
+  /** One wholesale-only product by slug, for an approved buyer. 404 for everyone else. */
+  async getWholesaleProduct(slug: string) {
+    return this.request<{ product: Product }>(
+      `/public/wholesale/products/${encodeURIComponent(slug)}`
+    );
+  }
+
+  async getWholesaleStatus() {
+    return this.request<{
+      application: {
+        id: string;
+        status: 'pending' | 'approved' | 'rejected' | 'revoked';
+        businessName: string;
+        decisionNote: string | null;
+        createdAt: string;
+        decidedAt: string | null;
+      } | null;
+      isWholesale: boolean;
+    }>('/public/wholesale/status');
   }
 
   async getOrders() {

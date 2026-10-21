@@ -44,7 +44,15 @@ vi.mock('@api/middleware/auth', () => ({
     (..._roles: string[]) =>
     (_req: any, _res: any, next: any) =>
       next(),
+  // The preview prices lines for the signed-in customer (none in these tests: anonymous).
+  optionalAuthenticate: (_req: any, _res: any, next: any) => next(),
+  customerUserId: () => undefined,
 }));
+
+// Lines are priced by the real pure resolver with no tiers / group (retail), see tests/helpers/retail-price-resolver.ts.
+vi.mock('@api/services/price-resolver.service', async () =>
+  (await import('../helpers/retail-price-resolver')).retailPriceResolverModule()
+);
 
 vi.mock('@api/middleware/store-access', () => ({
   requireStoreAccess: (_req: any, _res: any, next: any) => next(),

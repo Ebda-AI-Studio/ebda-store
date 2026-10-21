@@ -127,3 +127,8 @@ export function useAuth() {
   }
   return context;
 }
+
+/** Like useAuth, but null outside an AuthProvider (shared PDP pieces that must also render without one). */
+export function useOptionalAuth() {
+  return useContext(AuthContext);
+}

@@ -100,6 +100,7 @@ model User {
   staffMemberships         StoreStaff[]            @relation("StaffUser")
   legalAcceptances         LegalAcceptance[]
   legalNoticeDeliveries    LegalNoticeDelivery[]
+  wholesaleApplications    WholesaleApplication[]
 
   // Composite unique (storeId, email) — one customer account per email per
   // store. Admins (storeId NULL) are not subject to this constraint thanks
@@ -479,6 +480,8 @@ model Store {
   searchQueryDaily           SearchQueryDaily[]
   productEmbeddings          ProductEmbedding[]
   productEmbedFailures       ProductEmbedFailure[]
+  productPriceTiers          ProductPriceTier[]
+  wholesaleApplications      WholesaleApplication[]
   productModelBindings       ProductModelBinding[]
   affiliates                 Affiliate[]
   affiliateReferrals         AffiliateReferral[]
@@ -745,6 +748,13 @@ model Customer {
   /// group must never delete customers.
   groupId String? @map("group_id")
 
+  /// B2B price identity (Ruling B2B-2c): the registered shopper (users.id) this CRM row belongs to. A wholesale price is
+  /// granted ONLY through this link, never through an email / phone match. NULL = CRM or guest row (grants no price).
+  /// Set only by wholesale approval or the merchant's group dropdown on a registered shopper's profile. The composite FK
+  /// (store_id, user_id) -> users(store_id, id) ON DELETE SET NULL (user_id) and the partial unique index
+  /// (store_id, user_id) WHERE user_id IS NOT NULL live in migration 20261028000300 (Prisma cannot express them).
+  userId String? @map("user_id")
+
   store              Store               @relation(fields: [storeId], references: [id], onDelete: Cascade)
   addresses          CustomerAddress[]
   group              CustomerGroup?      @relation(fields: [groupId], references: [id], onDelete: SetNull)
@@ -778,21 +788,32 @@ model Customer {
 /// store, enforced by a partial unique index in the migration (Prisma cannot
 /// express a filtered unique index).
 model CustomerGroup {
-  id        String   @id @default(uuid())
-  storeId   String   @map("store_id")
-  name      String
-  nameAr    String?  @map("name_ar")
+  id               String   @id @default(uuid())
+  storeId          String   @map("store_id")
+  name             String
+  nameAr           String?  @map("name_ar")
   /// Inactive groups keep their members but are hidden from pickers and
   /// skipped by targeting rules.
-  isActive  Boolean  @default(true) @map("is_active")
-  isDefault Boolean  @default(false) @map("is_default")
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  isActive         Boolean  @default(true) @map("is_active")
+  isDefault        Boolean  @default(false) @map("is_default")
+  /// B2B pricing (Ruling B2B-3): 'none' | 'percent_off'. percent_off applies `discountBps`
+  /// to the base price when no tier matches. DB CHECK customer_groups_pricing_mode_chk.
+  pricingMode      String   @default("none") @map("pricing_mode")
+  /// Group percent off in basis points (1250 = 12.5%). DB CHECK 0..9000.
+  discountBps      Int      @default(0) @map("discount_bps")
+  /// Joining needs merchant approval (the wholesale application flow assigns the group).
+  requiresApproval Boolean  @default(false) @map("requires_approval")
+  /// Only wholesale groups unlock `Product.audience = 'wholesale_only'` and the application flow.
+  isWholesale      Boolean  @default(false) @map("is_wholesale")
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
 
-  store      Store       @relation(fields: [storeId], references: [id], onDelete: Cascade)
-  customers  Customer[]
-  coupons    Coupon[]
-  promotions Promotion[]
+  store                 Store                  @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  customers             Customer[]
+  coupons               Coupon[]
+  promotions            Promotion[]
+  priceTiers            ProductPriceTier[]
+  wholesaleApplications WholesaleApplication[]
 
   @@unique([storeId, name])
   @@index([storeId, isActive])
@@ -909,6 +930,10 @@ model Product {
   // DB CHECK products_search_terms_len_chk: at most 500 characters (migration 20261019000200).
   searchTerms          String?       @map("search_terms")
   price                Int // Price in piastres (1 EGP = 100 piastres)
+  /// B2B minimum order quantity across all variants of this product (null = none). DB CHECK null or >= 2.
+  moq                  Int?
+  /// 'public' | 'wholesale_only' (Ruling B2B-7). DB CHECK products_audience_chk.
+  audience             String        @default("public")
   compareAtPrice       Int?          @map("compare_at_price")
   costPrice            Int?          @map("cost_price")
   sku                  String?
@@ -1023,6 +1048,7 @@ model Product {
   model3d              ProductModel?
   embedding            ProductEmbedding?
   embedFailure         ProductEmbedFailure?
+  priceTiers           ProductPriceTier[]
   sizeChart            SizeChart?                 @relation(fields: [sizeChartId], references: [id], onDelete: SetNull)
 
   @@unique([storeId, slug])
@@ -1228,6 +1254,7 @@ model ProductVariant {
   warehouseStock       WarehouseStock[]
   countLines           CountLine[]
   bundleItems          BundleItem[]
+  priceTiers           ProductPriceTier[]
 
   @@index([productId])
   @@index([sku])
@@ -1318,6 +1345,71 @@ model ProductEmbedding {
   @@index([storeId])
   @@index([storeId, embeddedAt])
   @@map("product_embeddings")
+}
+
+/// B2B quantity price break (Rulings B2B-3/4). One row = "from minQty units, the unit price is
+/// priceMinor". variantId NULL = product-level; groupId NULL = every buyer (a PUBLIC tier).
+/// Uniqueness (product, COALESCE(variant), COALESCE(group), min_qty) is a unique INDEX in the
+/// migration (Prisma cannot express COALESCE); priceMinor <= the base price is enforced in the
+/// service at write time and clamped by the resolver at read time. UI: admin product page tier
+/// editor + customer-groups page.
+model ProductPriceTier {
+  id         String   @id @default(uuid())
+  storeId    String   @map("store_id")
+  productId  String   @map("product_id")
+  variantId  String?  @map("variant_id")
+  groupId    String?  @map("group_id")
+  /// First quantity (inclusive) at which this price applies. DB CHECK >= 2.
+  minQty     Int      @map("min_qty")
+  /// Unit price in piastres. DB CHECK >= 0.
+  priceMinor Int      @map("price_minor")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  store   Store           @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  product Product         @relation(fields: [productId], references: [id], onDelete: Cascade)
+  variant ProductVariant? @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  group   CustomerGroup?  @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+  @@index([storeId, productId])
+  @@index([variantId])
+  @@index([groupId])
+  @@map("product_price_tiers")
+}
+
+/// B2B wholesale account application: a signed-in shopper applies, the merchant approves (which
+/// assigns the group) or rejects. Holds PII (business name, phone, commercial reg. no.), so it is
+/// in the customer export + erasure paths. status: pending | approved | rejected | revoked.
+/// At most ONE pending application per (store, user): partial unique index in the migration.
+/// UI: admin wholesale-applications queue.
+model WholesaleApplication {
+  id              String    @id @default(uuid())
+  storeId         String    @map("store_id")
+  /// The AUTHENTICATED shopper (users.id) - never a typed phone/email (Ruling B2B-2).
+  userId          String    @map("user_id")
+  businessName    String    @map("business_name")
+  commercialRegNo String?   @map("commercial_reg_no")
+  phone           String
+  notes           String?
+  status          String    @default("pending")
+  /// Group assigned on approval.
+  groupId         String?   @map("group_id")
+  decidedBy       String?   @map("decided_by")
+  decidedAt       DateTime? @map("decided_at")
+  decisionNote    String?   @map("decision_note")
+  /// When the applicant accepted the data notice on the apply form (review M1).
+  consentAt       DateTime? @map("consent_at")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  store Store          @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  user  User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  group CustomerGroup? @relation(fields: [groupId], references: [id], onDelete: SetNull)
+
+  @@index([storeId, status, createdAt])
+  @@index([userId])
+  @@index([groupId])
+  @@map("wholesale_applications")
 }
 
 /// Embedding quarantine (Task 11 review I2): a product whose CURRENT text (md5 = contentHash) could
@@ -1570,6 +1662,9 @@ model Order {
   // invoice, confirmation email, admin + orders-app order cards, the account
   // order page — plus the XLSX export's "Tax Included In Price" column.
   taxIncludedInPrice          Boolean            @default(false) @map("tax_included_in_price")
+  /// B2B: name of the customer group whose price applied, snapshotted so a renamed/deleted
+  /// group does not rewrite history. NULL = retail (every order placed before B2B).
+  priceGroupName              String?            @map("price_group_name")
   // Frozen at creation ONLY when VAT was collected under a VERIFIED tax profile
   // (ruling TAX-2): the seller's tax registration number and legal name as they
   // stood at the sale, and the summed rate in basis points (1400 = 14%). They
@@ -1849,6 +1944,19 @@ model OrderItem {
   total             Int
   costPriceDeferred Boolean @default(false) @map("cost_price_deferred")
 
+  // B2B price provenance (Ruling B2B-3/5), snapshotted so invoices, returns and analytics never
+  // re-derive a price. NULL on orders placed before B2B reads as source 'base'.
+  // priceSource: 'base' | 'tier' | 'group'. listPrice = the retail unit price at sale time.
+  listPrice         Int?     @map("list_price")
+  priceSource       String?  @map("price_source")
+  priceTierMinQty   Int?     @map("price_tier_min_qty")
+  /// True when the price came from the buyer's wholesale GROUP (group tier or group percent), false for a public break or
+  /// base; NULL before the column existed. Labels and analytics only (final review minor 4).
+  priceGroupApplied Boolean? @map("price_group_applied")
+  /// The buyer's entitlement at sale time ({ rungs: [{minQty, priceMinor, variant, group}], groupPercentMinor }), for
+  /// tier-aware partial returns (Task 8b, Rulings B2B-17 / B2B-18).
+  tierLadder        Json?    @map("tier_ladder")
+
   // Scan-to-pick fulfilment state. pickedQty tracks how many units of this
   // line have been physically scanned/picked. Default 0 so existing rows are
   // unaffected. pickedAt is set when pickedQty reaches quantity.
@@ -2123,6 +2231,16 @@ model ReturnItem {
   quantity    Int
   reason      String?
   condition   String? // new, opened, damaged
+
+  /// B2B Task 8b: signed piastres this item's refund was reduced by (kept units repriced below their tier). Snapshot.
+  tierAdjustment           Int     @default(0) @map("tier_adjustment")
+  adjustmentOverridden     Boolean @default(false) @map("adjustment_overridden")
+  adjustmentOverrideReason String? @map("adjustment_override_reason")
+  adjustmentOverrideBy     String? @map("adjustment_override_by")
+  /// Ruling B2B-20: signed change this return made to its product's carried-forward shortfall (what the floor at 0 could not
+  /// collect): + carried, - consumed or waived. On the product's first item of the return; the sum over completed returns is
+  /// the carry the next return collects first.
+  tierCarry                Int     @default(0) @map("tier_carry")
 
   return    Return    @relation(fields: [returnId], references: [id], onDelete: Cascade)
   orderItem OrderItem @relation(fields: [orderItemId], references: [id], onDelete: Cascade)

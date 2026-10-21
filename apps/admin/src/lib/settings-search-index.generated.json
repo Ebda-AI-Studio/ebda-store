@@ -672,6 +672,17 @@
     "synAr": "ويب هوك ربط احداث تكامل"
   },
   {
+    "id": "page:/wholesale-applications",
+    "kind": "page",
+    "route": "/wholesale-applications",
+    "access": "staff",
+    "en": "Wholesale applications",
+    "ar": "طلبات حسابات الجملة",
+    "synEn": "wholesale b2b trade accounts applications approve reject buyers",
+    "synAr": "جملة تجار طلبات حسابات موافقة رفض",
+    "feature": "b2b.wholesale"
+  },
+  {
     "id": "page:/abandoned-carts",
     "kind": "page",
     "route": "/abandoned-carts",

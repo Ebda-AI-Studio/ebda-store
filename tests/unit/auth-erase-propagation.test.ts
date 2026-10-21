@@ -74,6 +74,10 @@ const { sendMock, mockPrisma } = vi.hoisted(() => {
     abandonedCart: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
     cart: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
     wishlist: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
+    wholesaleApplication: {
+      deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
+      findMany: vi.fn().mockResolvedValue([]),
+    },
     pushSubscription: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
     refreshToken: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
     verificationToken: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
@@ -88,7 +92,11 @@ const { sendMock, mockPrisma } = vi.hoisted(() => {
       findMany: vi.fn().mockResolvedValue([]),
     },
     customerWallet: { findMany: vi.fn().mockResolvedValue([]) },
-    customer: { findMany: vi.fn().mockResolvedValue([]), update: vi.fn().mockResolvedValue({}) },
+    customer: {
+      findMany: vi.fn().mockResolvedValue([]),
+      update: vi.fn().mockResolvedValue({}),
+      updateMany: vi.fn().mockResolvedValue({ count: 0 }),
+    },
     customerAddress: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
     newsletterSubscriber: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
     campaignRecipient: {
