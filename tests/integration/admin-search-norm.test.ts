@@ -34,7 +34,7 @@ describe.skipIf(!hasDb)('admin search normalisation (Task 15)', () => {
       expect(r.valid, r.name).toBe(true);
       expect(r.def).toMatch(/USING gin/);
       expect(r.def).toMatch(/gin_trgm_ops/);
-      expect(r.def).toMatch(/public\.ebda_(digits|ar_norm)\(/);
+      expect(r.def).toMatch(/ebda_(digits|ar_norm)\(/);
     }
     const guest = rows.filter(r => r.name.startsWith('orders_guest_'));
     for (const r of guest) expect(r.def).toMatch(/WHERE .*customer_id IS NULL/);

@@ -77,6 +77,7 @@ import financeRoutes from './finance.routes';
 import smartLayerRoutes from './smart-layer.routes';
 import insightsRoutes from './insights.routes';
 import searchInsightsRoutes from './search-insights.routes';
+import adminSearchRoutes from './admin-search.routes';
 import suppliersRoutes from './suppliers.routes';
 import purchaseOrdersRoutes from './purchase-orders.routes';
 import stockAdjustmentsRoutes from './stock-adjustments.routes';
@@ -485,6 +486,9 @@ router.use('/stores', tenantContext, insightsRoutes);
 
 // Storefront search insights (search program Task 6): reads through getSearchInsights (k>=2 floor).
 router.use('/stores', tenantContext, searchInsightsRoutes);
+
+// Admin ⌘K palette record lookup (search program P2 Task 18): products, orders, customers.
+router.use('/stores', tenantContext, adminSearchRoutes);
 
 // Supplier CRUD (Batch 2 accounting).
 // CONTEXT-LESS (Phase 2 candidate, reverted 2026-07-02 PR #499): service

@@ -5927,11 +5927,16 @@
   "components": {
     "commandPalette": {
       "title": "Command palette",
-      "placeholder": "Search pages…",
+      "placeholder": "Search pages, products, orders, customers…",
       "empty": "No matches.",
       "trigger": "Search…",
       "countResults": "{count} results",
       "navHint": "↑↓ to navigate · ↵ to open",
+      "products": "Products",
+      "orders": "Orders",
+      "customers": "Customers",
+      "searching": "Searching…",
+      "guest": "Guest",
       "pages": {
         "branding": "Branding",
         "seo": "SEO",

@@ -5927,11 +5927,16 @@
   "components": {
     "commandPalette": {
       "title": "لوحة الأوامر",
-      "placeholder": "ابحث في الصفحات…",
+      "placeholder": "ابحث في الصفحات والمنتجات والطلبات والعملاء…",
       "empty": "لا توجد نتائج.",
       "trigger": "بحث…",
       "countResults": "{count} نتيجة",
       "navHint": "↑↓ للتنقل · ↵ للفتح",
+      "products": "منتجات",
+      "orders": "طلبات",
+      "customers": "عملاء",
+      "searching": "بيدور…",
+      "guest": "ضيف",
       "pages": {
         "branding": "الهوية البصرية",
         "seo": "تحسين محركات البحث",

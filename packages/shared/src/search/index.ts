@@ -4,3 +4,4 @@ export * from './search-terms';
 export * from './search-insights';
 export * from './personal-data-term';
 export * from './phone-search';
+export * from './admin-search';
