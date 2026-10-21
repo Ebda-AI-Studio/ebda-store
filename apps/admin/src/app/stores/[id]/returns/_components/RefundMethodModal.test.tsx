@@ -212,3 +212,90 @@ describe('RefundMethodModal', () => {
     expect(onConfirm).toHaveBeenCalledWith('store_credit');
   });
 });
+
+describe('RefundMethodModal: tier adjustment (B2B Task 8b)', () => {
+  const LINE = {
+    returnItemId: 'ri-1',
+    productName: 'Bulk tea',
+    quantity: 90,
+    keptQty: 10,
+    tierMinQty: 100,
+    standardRefund: 720000,
+    adjustment: 20000,
+    adjustedRefund: 700000,
+    shortfall: 0,
+    keptUnitMinor: 10000,
+    reason: 'kept_below_tier',
+    overridden: false,
+    overrideReason: null,
+  };
+  const withLines = (lines: unknown[]) =>
+    apiGet.mockResolvedValue({
+      data: {
+        preview: {
+          isFullReturn: false,
+          recordedAmount: 700000,
+          gateway: {
+            available: true,
+            amount: 700000,
+            refundableRemaining: 900000,
+            unavailableReason: null,
+          },
+          lines,
+        },
+      },
+      error: null,
+    });
+  const toConfirm = async (onConfirm = vi.fn()) => {
+    renderModal(onConfirm);
+    await waitFor(() => expect(radio('bank_transfer')?.disabled).toBe(false));
+    fireEvent.click(radio('bank_transfer')!);
+    fireEvent.click(screen.getByRole('button', { name: 'continue' }));
+    return onConfirm;
+  };
+
+  it('shows the standard refund, the adjustment with its reason and the adjusted refund, in Latin digits', async () => {
+    withLines([LINE]);
+    await toConfirm();
+    const box = screen.getByTestId('tier-adjustment');
+    expect(box.textContent).toContain('7,200.00'); // standard
+    expect(box.textContent).toContain('200.00'); // adjustment
+    expect(box.textContent).toContain('7,000.00'); // adjusted
+    expect(box.textContent).toContain('tierAdjustment.reason.kept_below_tier');
+    expect(box.textContent).toContain('"kept":10');
+    expect(box.textContent).toContain('"tier":100');
+    expect(box.textContent).not.toMatch(/[٠-٩]/);
+  });
+
+  it('is absent when no line is tier-priced (a plain partial return looks exactly as before)', async () => {
+    withLines([{ ...LINE, adjustment: 0, reason: 'none', adjustedRefund: LINE.standardRefund }]);
+    await toConfirm();
+    expect(screen.queryByTestId('tier-adjustment')).toBeNull();
+  });
+
+  it('an override needs a valid amount and a reason, is re-previewed, and is sent with the confirm', async () => {
+    withLines([LINE]);
+    const onConfirm = await toConfirm();
+    fireEvent.click(screen.getByLabelText('tierAdjustment.override'));
+    const amount = screen.getByLabelText('tierAdjustment.overrideAmount') as HTMLInputElement;
+    const reason = screen.getByLabelText('tierAdjustment.overrideReason') as HTMLInputElement;
+    const confirmBtn = () =>
+      screen.getByRole('button', { name: 'refundMethodConfirm' }) as HTMLButtonElement;
+
+    fireEvent.change(amount, { target: { value: '7300' } }); // above the standard refund
+    expect(screen.getByText(/tierAdjustment\.error\.amount/)).toBeTruthy();
+    expect(confirmBtn().disabled).toBe(true);
+    fireEvent.change(amount, { target: { value: '7100' } });
+    expect(confirmBtn().disabled, 'a reason is required').toBe(true);
+    fireEvent.change(reason, { target: { value: 'goodwill' } });
+    expect(confirmBtn().disabled).toBe(false);
+
+    await waitFor(() =>
+      expect(apiGet).toHaveBeenCalledWith(expect.stringContaining('refund-preview?overrides='))
+    );
+    fireEvent.click(confirmBtn());
+    expect(onConfirm).toHaveBeenCalledWith('bank_transfer', {
+      'ri-1': { amountMinor: 710000, reason: 'goodwill' },
+    });
+  });
+});

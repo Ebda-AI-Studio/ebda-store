@@ -1502,7 +1502,10 @@
         "confirmReturnDescription": "The order will be cancelled and nothing is owed on cash on delivery.",
         "restockLabel": "Put the items back in stock",
         "confirmReturn": "Mark as returned"
-      }
+      },
+      "priceTier": "Wholesale price, {qty}+ units",
+      "priceWholesale": "Wholesale price",
+      "priceGroup": "Price group"
     },
     "layout": {
       "title": "Storefront layout",
@@ -2270,7 +2273,9 @@
           "successTitle": "Wallet updated",
           "failed": "Could not update the wallet."
         }
-      }
+      },
+      "priceSourceGuest": "Guests never get group prices. Prices follow a signed-in, approved account.",
+      "priceSourceGroup": "Pays the prices of \"{name}\" when signed in."
     }
   },
   "analytics": {
@@ -4373,7 +4378,10 @@
         "REFUND_EXCEEDS_REMAINING": "The refund is more than what is left un-refunded on this payment. Refresh the page — part of it was refunded elsewhere.",
         "INVALID_REFUND_AMOUNT": "This return has no refund amount. Set the refund amount before completing it.",
         "AMBIGUOUS_PAYMENT": "This payment reference matches more than one payment, so nothing was refunded and the return was not completed. Refund it from the payment provider dashboard and contact support.",
-        "MANUAL_PROVIDER_REFUND": "This order was paid by InstaPay, which cannot refund through the system. Send the money back from your InstaPay app, then complete the return with \"Already refunded — record only\"."
+        "MANUAL_PROVIDER_REFUND": "This order was paid by InstaPay, which cannot refund through the system. Send the money back from your InstaPay app, then complete the return with \"Already refunded — record only\".",
+        "OVERRIDE_NOT_APPLICABLE": "A refund override only applies to a partial return of a tier-priced item. Complete the return without it.",
+        "OVERRIDE_OUT_OF_RANGE": "The override must be between 0 and the standard refund for that item.",
+        "OVERRIDE_UNKNOWN_ITEM": "The override names an item that is not on this return. Reopen the dialog and try again."
       }
     },
     "modal": {
@@ -4426,7 +4434,28 @@
         "REFUND_PERMISSION_REQUIRED": "Not available: sending a refund to the original payment method needs the store owner. Ask them to complete it, or use store credit or bank transfer."
       },
       "cancel": "Cancel",
-      "alreadyFullyRefundedNotice": "This order's payment was already refunded in full — from the order page or in the payment provider's dashboard. Nothing more can be sent to the card. If that refund covered this return, choose \"Already refunded — record only\" to complete it without refunding again."
+      "alreadyFullyRefundedNotice": "This order's payment was already refunded in full — from the order page or in the payment provider's dashboard. Nothing more can be sent to the card. If that refund covered this return, choose \"Already refunded — record only\" to complete it without refunding again.",
+      "tierAdjustment": {
+        "title": "Tier price adjustment",
+        "intro": "The units the customer keeps no longer reach the price break they were sold at, so they are repriced and the refund is reduced by the difference.",
+        "standard": "Standard refund",
+        "adjustment": "Adjustment",
+        "adjusted": "Refund after adjustment",
+        "override": "Override this refund",
+        "overrideAmount": "Refund amount",
+        "overrideReason": "Reason (required)",
+        "shortfall": "The adjustment is larger than this refund, so the refund is 0. {amount} is not charged to the customer.",
+        "reason": {
+          "none": "No adjustment.",
+          "released": "An earlier adjustment on this item is released.",
+          "overridden": "You overrode the amount. Reason: {reason}",
+          "kept_below_tier": "{kept} units kept are below the {tier}+ price break, so they are repriced at {price} each."
+        },
+        "error": {
+          "amount": "Enter an amount between 0 and {max}.",
+          "reason": "Write a reason (at least 3 characters)."
+        }
+      }
     }
   },
   "marketingPixels": {
@@ -6058,7 +6087,8 @@
         "locations": "Locations",
         "customerGroups": "Customer groups",
         "wallet": "Wallet",
-        "visualBuilder": "Visual builder"
+        "visualBuilder": "Visual builder",
+        "wholesaleApplications": "Wholesale applications"
       },
       "superAdmin": "Super Admin",
       "superAdminHint": "Full platform access",
@@ -6097,7 +6127,8 @@
       "navPlatformTaxArchive": "Tax archive (platform)",
       "navPlatformPolicyUpdates": "Policy updates",
       "navPlatformSettings": "Platform settings",
-      "navPlatformProviderActivation": "Activation requests (platform)"
+      "navPlatformProviderActivation": "Activation requests (platform)",
+      "wholesalePendingBadge": "{count} wholesale applications waiting"
     },
     "errorState": {
       "defaultTitle": "Something went wrong",
@@ -8374,7 +8405,17 @@
       "deleteConfirm": "Delete \"{name}\"? {count} customer(s) will become ungrouped — they are not deleted.",
       "loadFailed": "Could not load customer groups.",
       "saveFailed": "Could not save the group.",
-      "deleteFailed": "Could not delete the group."
+      "deleteFailed": "Could not delete the group.",
+      "discountInvalid": "Enter a discount between 0 and 90 with at most two decimals.",
+      "planRequired": "Wholesale pricing needs the Business plan.",
+      "pricingTitle": "Pricing",
+      "wholesaleLabel": "Wholesale group (members must be approved)",
+      "wholesaleHint": "Only approved, signed-in accounts get these prices. A phone number or email typed at checkout never does.",
+      "pricingMode": "Group price",
+      "modeNone": "No group discount",
+      "modePercent": "Percent off the price",
+      "discountPct": "Discount (%)",
+      "discountHint": "Applies when it beats any price break. Coupons do not apply to these lines."
     }
   },
   "agentKey": {
@@ -10324,6 +10365,100 @@
       "sending": "Sending",
       "sent": "Sent",
       "failed": "Failed"
+    }
+  },
+  "wholesale": {
+    "applications": {
+      "title": "Wholesale applications",
+      "subtitle": "Buyers who asked for a wholesale account. Nobody gets wholesale prices until you approve them.",
+      "filterLabel": "Filter by status",
+      "filter": {
+        "pending": "Pending",
+        "approved": "Approved",
+        "rejected": "Rejected",
+        "revoked": "Revoked"
+      },
+      "loadFailed": "Could not load the applications.",
+      "loading": "Loading...",
+      "emptyTitle": "No applications here",
+      "emptyBody": "When a buyer applies from their account page, the request shows up here and you get a notification.",
+      "regNo": "Reg. no.",
+      "decisionNote": "Note",
+      "waiting": "Waiting {hours} h",
+      "waitingOverdue": "Waiting {hours} h - over 48 hours",
+      "approve": "Approve",
+      "reject": "Reject",
+      "revoke": "Revoke access",
+      "loadMore": "Load more",
+      "alreadyDecided": "Someone already decided this application. The list was refreshed.",
+      "approvedNotice": "{name} is approved. They now see wholesale prices.",
+      "rejectedNotice": "{name} was rejected and has been told.",
+      "revokedNotice": "{name} is no longer a wholesale buyer.",
+      "revokedAlreadyOut": "{name} was already outside every wholesale group, so no prices changed. The application is now closed.",
+      "modal": {
+        "approveTitle": "Approve wholesale account",
+        "rejectTitle": "Reject application",
+        "revokeTitle": "Revoke wholesale access",
+        "noGroups": "There is no active wholesale group. Create one under Customer groups first.",
+        "group": "Wholesale group",
+        "groupHint": "The buyer pays this group's prices from the next page load.",
+        "noteToApplicant": "Note to the applicant (optional)",
+        "noteRevoke": "Note (optional)",
+        "noteVisibleHint": "The applicant sees this note. Do not write internal remarks here.",
+        "revokeHint": "The buyer returns to retail prices. Orders already placed keep the prices they were charged.",
+        "cancel": "Cancel",
+        "working": "Working...",
+        "approveConfirm": "Approve",
+        "rejectConfirm": "Reject",
+        "revokeConfirm": "Revoke access"
+      }
+    },
+    "pricing": {
+      "title": "Wholesale pricing",
+      "hint": "Quantity price breaks, a minimum order and who can see this product. Prices are in the store currency.",
+      "vatInclusive": "Your prices include VAT, so tier prices include it too.",
+      "vatExclusive": "Your prices exclude VAT; VAT is added on top of tier prices too.",
+      "upgrade": "Wholesale pricing is part of the Business plan.",
+      "upgradeLink": "See plans",
+      "scope": "Applies to",
+      "minQty": "From quantity",
+      "unitPrice": "Unit price",
+      "stale": "Not applied: at or above the current price",
+      "remove": "Remove",
+      "empty": "No price breaks yet.",
+      "addTitle": "Add a price break",
+      "audience": "Who gets it",
+      "everyone": "Everyone",
+      "variantLabel": "Variant",
+      "allVariants": "All variants",
+      "variant": "Variant",
+      "margin": "Margin on cost: {percent}%",
+      "add": "Add price break",
+      "rulesTitle": "Order rules",
+      "moq": "Minimum order quantity",
+      "moqPlaceholder": "No minimum",
+      "moqHint": "At least 2. Buyers cannot check out below it.",
+      "audienceField": "Visible to",
+      "audiencePublic": "Everyone",
+      "audienceWholesaleOnly": "Approved wholesale buyers only",
+      "audienceHint": "A wholesale-only product is hidden from the public catalogue, search and feeds.",
+      "saveRules": "Save order rules",
+      "rulesSaved": "Order rules saved.",
+      "tierAdded": "Price break added.",
+      "problem": {
+        "minQty": "The quantity must be a whole number, at least 2.",
+        "price": "Enter a valid price.",
+        "moq": "The minimum order must be a whole number, at least 2.",
+        "TIER_ABOVE_BASE": "The tier price must be lower than the current price.",
+        "TIER_NOT_MONOTONE": "A bigger quantity must have a lower price than the smaller quantities.",
+        "TIER_VARIANT_ABOVE_PRODUCT": "A variant price break cannot be higher than the whole-product break for the same audience.",
+        "TIER_DUPLICATE": "There is already a price break at this quantity for this audience.",
+        "TIER_LIMIT": "You reached the limit of 10 price breaks for this scope."
+      },
+      "warning": {
+        "TIER_BELOW_COST": "This price is below your cost price.",
+        "TIER_BELOW_MOQ": "This starts below the minimum order, so it can never apply."
+      }
     }
   }
 }

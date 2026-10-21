@@ -1,8 +1,10 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { useParams, usePathname } from 'next/navigation';
 import { useT } from '@/i18n/useT';
+import { useFeatures } from '../../hooks/useFeatures';
+import { useWholesalePending } from '../../hooks/useWholesalePending';
 
 export interface HubTab {
   label: string;
@@ -16,6 +18,11 @@ export interface HubTab {
    * key keep the older "tab always renders, the page gates" behaviour.
    */
   featureKey?: string;
+  /**
+   * Shows a count badge on the tab. 'wholesalePending' = the wholesale applications waiting for the merchant
+   * (B2B review I5); the badge renders only while the count is above 0 and the store is on the plan.
+   */
+  badgeKey?: 'wholesalePending';
 }
 
 interface Props {
@@ -32,7 +39,15 @@ interface Props {
  */
 export function HubTabs({ items }: Props) {
   const pathname = usePathname();
-  const t = useT('components.adminLayout');
+  const tr = useT('components.adminLayout');
+  const params = useParams();
+  const { isEnabled, isLoading: featuresLoading } = useFeatures();
+  const wantsBadge = items.some(i => i.badgeKey === 'wholesalePending');
+  const pending = useWholesalePending(
+    params?.id as string | undefined,
+    wantsBadge && !featuresLoading && isEnabled('b2b.wholesale')
+  );
+  const pendingCount = pending?.pendingCount ?? 0;
 
   // Active tab: longest href prefix that matches the current pathname.
   const active = items.reduce<string | null>((best, t) => {
@@ -46,7 +61,7 @@ export function HubTabs({ items }: Props) {
     <div className="border-b border-border bg-background sticky top-0 z-10">
       <nav
         className="flex gap-1 overflow-x-auto px-4 py-1 text-sm"
-        aria-label={t('hubSectionsAriaLabel')}
+        aria-label={tr('hubSectionsAriaLabel')}
       >
         {items.map(t => (
           <Link
@@ -62,6 +77,20 @@ export function HubTabs({ items }: Props) {
             }
           >
             {t.label}
+            {t.badgeKey === 'wholesalePending' && pendingCount > 0 ? (
+              <span
+                data-testid="wholesale-pending-badge"
+                aria-label={tr('wholesalePendingBadge', { count: pendingCount })}
+                className={
+                  'ms-1.5 inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-xs font-semibold tabular-nums ' +
+                  (active === t.href
+                    ? 'bg-primary-foreground text-primary'
+                    : 'bg-primary text-primary-foreground')
+                }
+              >
+                {pendingCount > 99 ? '99+' : pendingCount}
+              </span>
+            ) : null}
           </Link>
         ))}
       </nav>

@@ -138,6 +138,7 @@ export function AdminLayout({
     invoices: t('hubTabs.invoices'),
     customers: t('hubTabs.customers'),
     customerGroups: t('hubTabs.customerGroups'),
+    wholesaleApplications: t('hubTabs.wholesaleApplications'),
     reviews: t('hubTabs.reviews'),
     returns: t('hubTabs.returns'),
     coupons: t('hubTabs.coupons'),

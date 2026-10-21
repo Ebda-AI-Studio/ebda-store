@@ -36,6 +36,10 @@ export interface OrderItemDetail {
   quantity: number;
   price: number;
   total: number;
+  /** B2B price provenance snapshotted at sale time (null on orders placed before B2B reads as retail). */
+  listPrice?: number | null;
+  priceSource?: 'base' | 'tier' | 'group' | null;
+  priceTierMinQty?: number | null;
   product?: {
     id: string;
     // Arabic product name from the live product (order_items only snapshots
@@ -105,6 +109,8 @@ export interface OrderDetail {
   total: number;
   currency: string;
   couponCode?: string | null;
+  /** Name of the wholesale group whose price applied (snapshot), else null. */
+  priceGroupName?: string | null;
   couponDiscount?: number;
   /** The automatic-promotion portion of `discount` (0 when a coupon — not a
    *  promotion — was the winning lever, or when no discount applied). */

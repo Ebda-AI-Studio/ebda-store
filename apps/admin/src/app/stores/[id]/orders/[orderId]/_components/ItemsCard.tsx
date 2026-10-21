@@ -198,6 +198,11 @@ function ItemRow({ item, currency }: { item: OrderItemDetail; currency: string }
   const displayName = locale === 'ar' ? item.product?.nameAr || item.productName : item.productName;
   // Per the admin locale, with fallback (Ruling B0-41); one <bdi> per option value (F8).
   const variantName = orderLineVariantTitle(item, locale === 'ar');
+  // B2B: the retail price struck through only when the line was sold below it (from the persisted snapshot).
+  const struckList =
+    item.priceSource && item.priceSource !== 'base' && (item.listPrice ?? 0) > item.price
+      ? (item.listPrice as number)
+      : null;
 
   return (
     <li className="flex items-start gap-3 py-3 first:pt-0 last:pb-0">
@@ -238,8 +243,22 @@ function ItemRow({ item, currency }: { item: OrderItemDetail; currency: string }
           )}
           {variantName && <span aria-hidden>·</span>}
           <span>
-            {t('qty')}: {item.quantity} × {formatMoney(item.price, currency)}
+            {t('qty')}: {item.quantity} ×{' '}
+            {struckList != null ? (
+              <s className="opacity-60">{formatMoney(struckList, currency)}</s>
+            ) : null}{' '}
+            {formatMoney(item.price, currency)}
           </span>
+          {item.priceSource === 'tier' || item.priceSource === 'group' ? (
+            <span
+              data-testid="order-line-price-label"
+              className="rounded bg-primary/10 px-1.5 py-0.5 text-xs text-primary-ink"
+            >
+              {item.priceSource === 'tier' && item.priceTierMinQty != null
+                ? t('priceTier', { qty: item.priceTierMinQty })
+                : t('priceWholesale')}
+            </span>
+          ) : null}
         </div>
         {item.personalisation && <PersonalisationRow text={item.personalisation} />}
       </div>

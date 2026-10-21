@@ -17,6 +17,10 @@ interface CustomerGroupOption {
   name: string;
   nameAr: string | null;
   isActive: boolean;
+  /** B2B: a wholesale group and/or a group percent discount decide this customer's prices. */
+  isWholesale?: boolean;
+  pricingMode?: 'none' | 'percent_off';
+  discountBps?: number;
 }
 
 interface CustomerDetail {
@@ -553,6 +557,23 @@ export default function CustomerDetailPage() {
                     {groupError && (
                       <p className="text-end text-xs text-destructive-ink">{groupError}</p>
                     )}
+                    {/* B2B: which prices this customer actually pays. Group prices are bound to the registered account
+                        (customers.user_id), never to a guest's typed phone or email. */}
+                    {(() => {
+                      const g = groupOptions.find(o => o.id === customer.groupId);
+                      if (!g || !g.isActive || (!g.isWholesale && g.pricingMode !== 'percent_off'))
+                        return null;
+                      return (
+                        <p
+                          className="text-end text-xs text-muted-foreground"
+                          data-testid="customer-price-source"
+                        >
+                          {customer.isGuest
+                            ? t('priceSourceGuest')
+                            : t('priceSourceGroup', { name: g.name })}
+                        </p>
+                      );
+                    })()}
                     {/* SMS offers consent (issue 206): status, when and where it
                         was given or withdrawn. Read-only — only the shopper
                         can give consent. */}

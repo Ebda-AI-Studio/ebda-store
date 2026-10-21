@@ -30,6 +30,7 @@ export type HubLabels = {
   invoices: string;
   customers: string;
   customerGroups: string;
+  wholesaleApplications: string;
   reviews: string;
   returns: string;
   coupons: string;
@@ -118,6 +119,7 @@ export const HUBS: HubDefinition[] = [
       '/invoices',
       '/customers',
       '/customer-groups',
+      '/wholesale-applications',
       '/sales',
       '/reviews',
       '/returns',
@@ -132,8 +134,19 @@ export const HUBS: HubDefinition[] = [
       // Fiscal documents (tax invoices, receipts, credit notes): issued automatically per
       // sale / refund, so this is a read-only list, not a gated feature.
       { label: labels.invoices, href: `/stores/${storeId}/invoices` },
-      { label: labels.customers, href: `/stores/${storeId}/customers` },
+      // B2B review I5: both tabs carry the count of wholesale applications waiting for a decision. The Wholesale
+      // applications tab is not feature-keyed (the page shows the upgrade prompt when the plan lacks b2b.wholesale).
+      {
+        label: labels.customers,
+        href: `/stores/${storeId}/customers`,
+        badgeKey: 'wholesalePending',
+      },
       { label: labels.customerGroups, href: `/stores/${storeId}/customer-groups` },
+      {
+        label: labels.wholesaleApplications,
+        href: `/stores/${storeId}/wholesale-applications`,
+        badgeKey: 'wholesalePending',
+      },
       { label: labels.reviews, href: `/stores/${storeId}/reviews` },
       { label: labels.returns, href: `/stores/${storeId}/returns` },
       // Coupons and loyalty are feature-gated at the page level via
