@@ -1790,7 +1790,7 @@ export class AuthService {
 
   /**
    * Irreversible PII anonymization (GDPR Art. 17 and applicable GCC
-   * data-protection law — see docs/legal/gcc-data-protection.md).
+   * data-protection law — see docs/privacy/data-map.md).
    *
    * Wipes every personally-identifying field on the user and removes child
    * rows that have no audit/financial basis (addresses, push subs, cart,
@@ -2250,7 +2250,7 @@ export class AuthService {
     }
 
     // Third-party deletion propagation (GDPR Art. 17 and applicable GCC
-    // data-protection law — see docs/legal/gcc-data-protection.md):
+    // data-protection law — see docs/privacy/data-map.md):
     // OneSignal + PostHog. Fire-and-forget, same discipline as the
     // R2 cleanup above — a dead Inngest connection must never surface as a
     // failed erase. See lib/inngest/functions/account-erased-propagation.ts +
@@ -2273,7 +2273,7 @@ export class AuthService {
 
   /**
    * Right to data portability (GDPR Art. 20 and applicable GCC
-   * data-protection law — see docs/legal/gcc-data-protection.md).
+   * data-protection law — see docs/privacy/data-map.md).
    *
    * Returns every row across the schema that ties back to this user as a
    * single JSON bundle. Intentionally returns the raw shape — the

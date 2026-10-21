@@ -10,7 +10,7 @@
 
 ## Global Constraints
 
-- Worktree `~/Desktop/projects/_worktrees/force-website-builder__fix-refund-money-integrity` (branch `fix/refund-money-integrity`). Never touch the root checkout.
+- Worktree `~/Desktop/projects/_worktrees/ebda-store__fix-refund-money-integrity` (branch `fix/refund-money-integrity`). Never touch the root checkout.
 - **Money reversals must be idempotent** — each effect guarded by a durable marker written IN THE SAME TRANSACTION as the effect (never before it). Retrying a completed step is a no-op; a partial failure re-runs only the missing effects.
 - Reversal steps THROW on failure (Inngest retries → dead-letters). This is the OPPOSITE of the existing notification steps in `order-refunded.ts`, which swallow (`Promise.allSettled` + log) — do not swallow reversals.
 - Every `prisma.*` in an Inngest step runs inside `runInTenantContext(storeId, …)` (no request middleware → RLS needs the GUC set explicitly). Follow the existing `order-refunded.ts` pattern exactly.

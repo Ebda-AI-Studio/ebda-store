@@ -20,8 +20,8 @@ At checkout, customers pick their **Governorate** (محافظة) then their **Ar
 2. Each governorate appears as a collapsible accordion section. Click a governorate to expand its areas.
    كل محافظة تظهر كقسم قابل للطي. اضغط على المحافظة لعرض مناطقها.
 
-3. For each area, enter the delivery fee in **KWD** (e.g. `1.500` = 1,500 fils). Leave a field empty or zero to exclude that area.
-   أدخل رسوم التوصيل بالدينار الكويتي لكل منطقة (مثال: `1.500` = 1500 فلس). اترك الحقل فارغًا أو صفرًا لاستثناء المنطقة.
+3. For each area, enter the delivery fee in **EGP** (e.g. `1.500` = 1,500 fils). Leave a field empty or zero to exclude that area.
+   أدخل رسوم التوصيل بالدينار مصري لكل منطقة (مثال: `1.500` = 1500 فلس). اترك الحقل فارغًا أو صفرًا لاستثناء المنطقة.
 
 4. Use **"Apply to all areas in this governorate"** (bulk-apply) to set the same fee for every area in a governorate at once. You can still adjust individual areas afterwards.
    استخدم زر **"تطبيق على جميع مناطق المحافظة"** لضبط نفس الرسوم على كل المناطق دفعة واحدة. يمكنك بعدها تعديل أي منطقة بشكل مستقل.
@@ -42,8 +42,8 @@ If you serve many areas, you don't have to type every fee by hand. You can edit 
 1. In the **Delivery areas & fees** editor, click **Export**.
    في محرر **مناطق التوصيل والرسوم**، اضغط **تصدير**.
 
-2. You receive an **Excel (.xlsx)** file. If you have already set fees, the file contains your current rates. If you haven't set any yet, the file is a **template** listing every Kuwait governorate and area with an empty fee column for you to fill in.
-   تحصل على ملف **Excel (.xlsx)**. إذا كنت قد ضبطت رسومًا، يحتوي الملف على أسعارك الحالية. وإذا لم تضبط أيًا بعد، يكون الملف **قالبًا** يسرد كل محافظة ومنطقة في الكويت مع خانة رسوم فارغة لتعبئتها.
+2. You receive an **Excel (.xlsx)** file. If you have already set fees, the file contains your current rates. If you haven't set any yet, the file is a **template** listing every Egypt governorate and area with an empty fee column for you to fill in.
+   تحصل على ملف **Excel (.xlsx)**. إذا كنت قد ضبطت رسومًا، يحتوي الملف على أسعارك الحالية. وإذا لم تضبط أيًا بعد، يكون الملف **قالبًا** يسرد كل محافظة ومنطقة في مصر مع خانة رسوم فارغة لتعبئتها.
 
 ### Import — الاستيراد
 
@@ -113,18 +113,18 @@ below the address form.
 رسوم التوصيل المحسوبة فورًا كمعاينة أسفل نموذج العنوان.
 
 **If the area has no rate configured**, the preview shows a warning and the order
-saves with 0 KWD shipping. You can fix this by setting the rate in Shipping settings.
+saves with 0 EGP shipping. You can fix this by setting the rate in Shipping settings.
 
 **إذا لم تكن للمنطقة رسوم محددة**، يظهر تحذير ويُحفظ الطلب برسوم توصيل 0 د.ك.
 يمكن إصلاح ذلك بضبط الرسوم في إعدادات الشحن.
 
 **Shipping fee override (negotiated rates):** For phone orders where you agree on
-a custom delivery fee with the customer, enter the agreed amount (in KWD) in the
+a custom delivery fee with the customer, enter the agreed amount (in EGP) in the
 **Shipping fee override** field. Leave it blank to use the configured area rate.
 The override replaces the calculated fee only for that single order; your shipping
 settings are not changed.
 
 **تجاوز رسوم الشحن (أسعار مفاوَضة):** للطلبات الهاتفية التي تتفق فيها على سعر
-توصيل مخصص مع العميل، أدخل المبلغ المتفق عليه (بالدينار الكويتي) في حقل
+توصيل مخصص مع العميل، أدخل المبلغ المتفق عليه (بالدينار مصري) في حقل
 **تجاوز رسوم الشحن**. اتركه فارغًا لاستخدام السعر المحدد للمنطقة. التجاوز يؤثر
 على هذا الطلب فقط ولا يغير إعدادات الشحن.

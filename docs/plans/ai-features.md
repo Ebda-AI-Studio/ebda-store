@@ -1,8 +1,8 @@
-# AI features plan — making "Force AI" mean something
+# AI features plan — making "Ebda AI Studio" mean something
 
 **Status:** plan, not yet built
-**Product:** Force AI Store (the e-commerce platform)
-**Company:** Force AI (the parent brand that owns Force AI Store + Force AI WhatsApp Business Platform)
+**Product:** Ebda Store (the e-commerce platform)
+**Company:** Ebda AI Studio (the parent brand that owns Ebda Store + Ebda AI Studio WhatsApp Business Platform)
 **Goal:** ship three concrete AI features so the parent name describes real capabilities
 
 The three features chosen, in priority order:
@@ -135,7 +135,7 @@ Auth: store_admin or super_admin.
 
 System prompt:
 
-> You translate Kuwaiti e-commerce content between English and Arabic. Preserve brand names, product codes, sizes, units, and numbers exactly. Keep the same tone (formal/casual) as the source. Output only the translation as plain text — no quotes, no labels, no commentary.
+> You translate Egyptian e-commerce content between English and Arabic. Preserve brand names, product codes, sizes, units, and numbers exactly. Keep the same tone (formal/casual) as the source. Output only the translation as plain text — no quotes, no labels, no commentary.
 
 User prompt:
 
@@ -189,7 +189,7 @@ Response: { suggestion: { title, titleAr, description, descriptionAr, keywords? 
 
 System prompt:
 
-> You write SEO meta for Kuwaiti e-commerce stores. Output only valid JSON: `{ "title": string, "titleAr": string, "description": string, "descriptionAr": string, "keywords": string[] }`. Title under 60 chars. Description under 160 chars. Keywords: 5-10 short phrases. Match Kuwait + GCC search behaviour. Don't mention prices.
+> You write SEO meta for Egyptian e-commerce stores. Output only valid JSON: `{ "title": string, "titleAr": string, "description": string, "descriptionAr": string, "keywords": string[] }`. Title under 60 chars. Description under 160 chars. Keywords: 5-10 short phrases. Match Egypt + GCC search behaviour. Don't mention prices.
 
 User prompt for `product`:
 
@@ -239,7 +239,7 @@ Server fetches the store's existing categories, gives them to the model along wi
 
 System prompt:
 
-> You categorise products for a Kuwaiti e-commerce store. Given a product and a list of available categories, pick the 1-3 best matches. If none of the categories fit well, return an empty array. Output only valid JSON: `{ "matches": [{ "id": "...", "confidence": "high"|"medium"|"low" }] }`.
+> You categorise products for a Egyptian e-commerce store. Given a product and a list of available categories, pick the 1-3 best matches. If none of the categories fit well, return an empty array. Output only valid JSON: `{ "matches": [{ "id": "...", "confidence": "high"|"medium"|"low" }] }`.
 
 User prompt:
 
@@ -264,7 +264,7 @@ User prompt:
 | Phase | Scope                                                                             | Time   | Outcome                                 |
 | ----- | --------------------------------------------------------------------------------- | ------ | --------------------------------------- |
 | 0     | Shared infra: SDK, env vars, AiUsage model, ai.service.ts skeleton, audit logging | 1 day  | Foundation, no user-visible feature yet |
-| 1     | Feature 1 — translation (per-field + bulk)                                        | 2 days | "Force AI" becomes truthful             |
+| 1     | Feature 1 — translation (per-field + bulk)                                        | 2 days | "Ebda AI Studio" becomes truthful             |
 | 2     | Feature 2 — SEO at all three levels (per-entity + bulk)                           | 2 days | Real SEO ranking lift                   |
 | 3     | Feature 3 — category suggestions                                                  | 1 day  | Polish; faster product entry            |
 

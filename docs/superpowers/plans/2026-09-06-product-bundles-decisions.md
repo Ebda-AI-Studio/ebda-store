@@ -17,7 +17,7 @@ Ruling C2 — `nearestAllocatablePrice` moves to `packages/shared/src/bundle-pri
 `isAllocatable`; it is pure and has no business in a route module. T4's test imports it from
 '@ebda/shared'. Cost if wrong: none material — one extra export in an already-exported module.
 
-Ruling C3 — T10 is split. The FWB-side work (catalogue bridge payload + /feeds/products.json) stays
+Ruling C3 — T10 is split. The Ebda Store-side work (catalogue bridge payload + /feeds/products.json) stays
 in this branch. The whatsapp-bulk-sender change is a SEPARATE PR in that repo and is out of scope
 here; a bundle simply will not appear in DM ordering until it lands. Cost if wrong: bundles sell on
 web before DMs for one release — visible, reversible, and better than a cross-repo branch nobody
@@ -301,7 +301,7 @@ required, and the launch-sequencing guard above is discharged. `POST /wa-bridge/
 resolves an id that fails to match a `Product` row as a bundle (via `resolveBundle`, gated on the
 SAME `bundles` feature flag `/store-catalog` already checks) before returning `PRODUCTS_NOT_FOUND`
 — so WBS needs zero code changes: it already echoes back whatever id `/store-catalog` handed it,
-and that id now resolves on the FWB side regardless of which kind of catalogue entry it was. Cost
+and that id now resolves on the Ebda Store side regardless of which kind of catalogue entry it was. Cost
 if wrong: none material if this is somehow insufficient — the WBS-side PR remains available as a
 fallback path, and the flag stays off for every store today regardless (no plan baseline includes
 `bundles`), so nothing ships to a live merchant on this alone.
@@ -476,7 +476,7 @@ match no shelf price, with no bundle label and no group total: the same defect I
 before. Deliberately not fixed here: it needs a type widening, a new grouped row component and new
 bilingual i18n keys in a THIRD app the review never examined, which is a new UI surface under Ruling
 F-1 (art direction Ahmad reviews), not a fix. Cost of leaving it: during the one-merchant pilot, a
-bundle order picked from `orders.force-ai.co` rather than the admin shows unlabelled components —
+bundle order picked from `orders.ebda.app` rather than the admin shows unlabelled components —
 wrong information to a fulfiller, though the physical items and quantities are all correct and
 present. Recommend fixing it before the pilot merchant fulfils a bundle order from that app.
 
@@ -519,7 +519,7 @@ already echoes back whatever id `/store-catalog` handed it"): that was true for 
 `isBundle` entries (`id: b.id`, always the bundle's own id — verified again here) and false for
 `customerHistory.lastOrder`, which handed back `null` where WBS reads an id. Ruling C3 stays CLOSED
 — the launch gate stays deleted — but ONLY because this fix restores the property C3 assumed
-("every id FWB hands WBS is one FWB can resolve"); had this fix not landed, C3 would need to be
+("every id Ebda Store hands WBS is one Ebda Store can resolve"); had this fix not landed, C3 would need to be
 RE-OPENED and the launch gate restored.
 Grep swept for every other id-shaped field the wa-bridge routes hand to WBS that gets echoed back
 (cross-checked against `whatsapp-bulk-sender/backend/src/services/wa-ordering.js`'s consumption of
@@ -527,11 +527,11 @@ Grep swept for every other id-shaped field the wa-bridge routes hand to WBS that
 bundle entries (`id: b.id`), category entries (`id: c.id`), and `frequentProducts`
 (`productId: item.productId` — the real component product id, sourced straight off `OrderItem`, not
 grouped) are all real, non-null, resolvable ids. `addressId` is echoed back but originates from
-FWB's own address-creation response, not a nullable snapshot field. `grep -n "Id: null\|id: null"
+Ebda Store's own address-creation response, not a nullable snapshot field. `grep -n "Id: null\|id: null"
 apps/api/src/routes/wa-bridge.routes.ts` → no matches. NEW-P1's `lastOrder` bundle row was the only
 id-shaped field WBS could receive un-resolvable. Cost if wrong: none identified by this sweep: if a
 future field is added to this file that hands WBS a snapshot id without also guaranteeing it is a
-FWB-resolvable id, it reintroduces this exact class.
+Ebda Store-resolvable id, it reintroduces this exact class.
 
 **Ruling C14 — P2-f is an ACCEPTED RESIDUAL, not a code change.** `PUT
 /stores/:storeId/bundles/:id` without `items` falls back to `existing.items` and re-validates them,

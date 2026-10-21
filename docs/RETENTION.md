@@ -17,14 +17,14 @@ The policy reconciles two opposing pressures on Ebda:
   "PDPL") states this principle (personal data is kept only as long as the
   purpose requires), and GDPR Art. 5(1)(e) states the same for any EU data
   subject. Ebda's merchants and shoppers are in Egypt; the older GCC
-  analysis is in `docs/legal/gcc-data-protection.md`.
+  analysis is in `docs/privacy/data-map.md`.
 - **Tax and accounting records**: invoice and order financial records must
   be kept for the period the Egyptian Tax Authority requires. This policy
   operates on 5 years. **FLAG (not verified by counsel):** the exact
   statutory period and the article that sets it have not been confirmed
-  for Egypt; this document previously cited Kuwait's Electronic
-  Transactions Law No. 20/2014 and the Kuwait MOF, which were carried over
-  from FWB and do not apply to Ebda. Confirm the Egyptian period and the
+  for Egypt; this document previously cited Egypt's Electronic
+  Transactions Law No. 20/2014 and the Egypt MOF, which were carried over
+  from Ebda Store and do not apply to Ebda. Confirm the Egyptian period and the
   PDPL article numbers with counsel before quoting them to a merchant.
 
 The rule is: financial records survive at the table level, but the PII
@@ -92,7 +92,7 @@ is identical regardless of trigger:
    route the request's `app.current_user_id` GUC is the MERCHANT's id, not the
    shopper's — `tenantContext` sets it from `req.user?.userId`. `addresses` is
    the only erasure target with a USER-scoped RLS policy (`rls_addresses_user`:
-   `user_id = current_user_id()`), so under `force_app` a plain delete would
+   `user_id = current_user_id()`), so under the earlier app role a plain delete would
    match ZERO rows and return `{count: 0}` with no error, leaving the shopper's
    name, phone and street behind an audit row claiming a completed erasure; the
    export would likewise ship an empty `addresses` section. The erase therefore
@@ -101,7 +101,7 @@ is identical regardless of trigger:
    committing connection), and the export reads addresses through
    `withRlsBypass` (safe there — it is read-only). Guarded by
    `erasure-addresses-escapes-user-rls` in `docs/security/defence-mutations.json`.
-   Inert until the `force_app` cutover, since prod still connects as
+   Inert until the the earlier app role cutover, since prod still connects as
    `neondb_owner` (BYPASSRLS) — see `docs/plans/2026-07-02-rls-cutover.md`.
 
 **Sessions die with the erasure.** `eraseAccount` bumps `tokenVersion` in the
@@ -177,7 +177,7 @@ small indexed DELETE per store (`store_id, date`), so it adds no meaningful load
   proves they are the data subject before a CRM-row-keyed erasure is added
   (e.g. un-hiding the admin privacy card for guests, or a verified
   self-service flow keyed on phone/email) — not solved here.
-- **5y order anonymizer**: when the first FWB orders hit 5 years
+- **5y order anonymizer**: when the first Ebda Store orders hit 5 years
   (earliest in 2026-12), add a cron that scrubs `shippingAddress` +
   `billingAddress` JSON to `{anonymized:true}` on `orders` whose
   `createdAt` is >5 years AND `customerId` IS NULL (already-erased

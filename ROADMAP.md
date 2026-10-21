@@ -9,7 +9,7 @@
 ### Platform & Infrastructure
 
 - [x] Monorepo architecture (npm workspaces) — apps: api, admin, web, orders; packages: database, shared, ui, config
-- [x] Multi-tenancy with Row-Level Security (RLS) — database-level tenant isolation via AsyncLocalStorage + Prisma Proxy; non-owner `force_app` role enforces RLS in production
+- [x] Multi-tenancy with Row-Level Security (RLS) — database-level tenant isolation via AsyncLocalStorage + Prisma Proxy; non-owner `ebda_app` role enforces RLS in production
 - [x] Custom domains — auto-provisioned per merchant via Cloudflare-for-SaaS Custom Hostnames with SSL
 - [x] Role-based access — Super Admin (platform-wide), Store Admin (single store), Customer (storefront)
 - [x] Horizontal-scaling readiness — Redis adapter plumbing, Redis-backed rate-limiting, pooled DB connections; see `docs/SCALING.md`

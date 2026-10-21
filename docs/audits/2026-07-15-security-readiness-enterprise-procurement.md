@@ -18,7 +18,7 @@ rest get silence.
 7. Vulnerability-disclosure channel — SECURITY.md + RFC 9116 `/.well-known/security.txt`?
 8. Audit scorecard — consolidated doc a buyer can be handed?
 
-**Scope:** force-website-builder @ `0c698556` (origin/main). Read-only audit from
+**Scope:** ebda-store @ `0c698556` (origin/main). Read-only audit from
 the root checkout; fixes on branch `fix/security-readiness-lens`.
 
 ## Verdict
@@ -38,14 +38,14 @@ orders — all have `public/` dirs, none has the file). Questionnaire line "how 
 report a vulnerability to you?" is unanswerable.
 _Fix:_ root `SECURITY.md` (disclosure policy, scope, response SLO) +
 `public/.well-known/security.txt` (RFC 9116: Contact, Expires, Policy) in all three
-apps. Contact `security@force-ai.co` — verified deliverable today via the zone's
-catch-all Email Routing rule → forceai.0ps1@gmail.com.
+apps. Contact `security@ebda.app` — verified deliverable today via the zone's
+catch-all Email Routing rule → ops@ebda.app.
 
 **H2 — DAST has never run.** `.github/workflows/zap-baseline.yml` (nightly ZAP
 baseline) has been dormant since creation: it exits unless the `ZAP_TARGET` repo
 variable is set, and it never was (`gh variable list` → absent). Zero DAST evidence
 exists despite the pipeline being built.
-_Fix:_ set `ZAP_TARGET=https://store.force-ai.co` (baseline scan is passive —
+_Fix:_ set `ZAP_TARGET=https://store.ebda.app` (baseline scan is passive —
 safe against production) + dispatch one run to produce the first artifact.
 
 **H3 — No buyer-shareable security overview.** The answers to the standard
@@ -54,7 +54,7 @@ questionnaire are scattered across `docs/privacy/data-map.md`, `docs/RETENTION.m
 dated audits. Nothing consolidated to hand a buyer ("answers half the questionnaire
 before they send it").
 _Fix:_ `docs/security/security-overview.md` — grep-derived (not aspirational)
-one-pager: encryption at rest (Neon `fwb-eu` AES-256 @ aws-eu-central-1 Frankfurt;
+one-pager: encryption at rest (Neon `ebda-eu` AES-256 @ aws-eu-central-1 Frankfurt;
 R2), in transit (TLS via Cloudflare, HSTS at API `apps/api/src/middleware/security.ts`),
 scanning cadence (gitleaks + semgrep + npm audit per-PR, ZAP nightly), IR plan pointer,
 residency, backups/DR, erasure + export endpoints, disclosure channel.
@@ -81,10 +81,10 @@ the burp checklist.
 ### LOW
 
 **L1 — No public /security page on the marketing site.** `apps/web` is the tenant
-storefront runtime; the platform marketing site is force-ai.co (**repo
-force-ai-landing — out of this audit's scope**, which Ahmad set to fwb). Flagged
+storefront runtime; the platform marketing site is ebda.app (**repo
+ebda-landing — out of this audit's scope**, which Ahmad set to ebda). Flagged
 cross-repo; the lens is registered in the Builder Reality Audit fleet and will catch
-it when run against force-ai-landing. The security-overview doc (H3) is written so
+it when run against ebda-landing. The security-overview doc (H3) is written so
 its content can be lifted onto that page directly.
 
 ## Already-passing lens items (for the record)

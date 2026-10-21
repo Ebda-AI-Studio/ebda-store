@@ -24,7 +24,7 @@ email, else its active owner, else nothing.
 
 ## `minimumOrderFils?: number`
 
-Minimum items **subtotal** (in fils; 1 KWD = 1000 fils) required to place an order.
+Minimum items **subtotal** (in fils; 1 EGP = 1000 fils) required to place an order.
 `0`/unset = no minimum. Enforced in three places (shared helper `checkMinimumOrder` in
 `packages/shared/src/utils/minimum-order.ts`):
 
@@ -54,7 +54,7 @@ A delivery-window selector; the customer picks one and it's saved onto the order
 
 - **`orderBy?`** — the last store-local time a customer can still pick this window today.
   Falls back to `start` when unset. A window disappears once the store-local time (store
-  `timezone`, default `Asia/Kuwait`) passes its `orderBy`.
+  `timezone`, default `Asia/Egypt`) passes its `orderBy`.
 - **Next-day rollover:** once **all** of today's windows have passed their `orderBy`, the
   selector rolls over to **Tomorrow** (all windows selectable again, "Tomorrow" badge).
 

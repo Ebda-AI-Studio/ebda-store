@@ -145,7 +145,7 @@ export function cardFrameClass(
   if (!on) return '';
   // 2026-05-18 visibility bump (Ahmad: frames not appearing): bumped
   // border opacities to foreground/15-30 + shadow strength so frames
-  // are clearly visible on pure-white themes (wadyaljuz / elegant where
+  // are clearly visible on pure-white themes (demo-merchant / elegant where
   // bg-card == bg-page == white). Previously `border-border` resolved
   // to near-white and the frame was invisible.
   // Border widths (border / border-2 / border-4 / border-8) are intentionally

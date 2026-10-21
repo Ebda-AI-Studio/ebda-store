@@ -1,6 +1,6 @@
 'use client';
 
-import { PoweredByForce } from '../shared/PoweredByForce';
+import { PoweredByEbda } from '../shared/PoweredByEbda';
 import { FooterLegalRow } from '../shared/FooterLegalRow';
 import { FooterWhatsApp } from '../shared/FooterWhatsApp';
 import type { FooterProps } from '../types';
@@ -212,7 +212,7 @@ export default function MinimalFooter({
           urlPrefix={urlPrefix}
           className="text-muted-foreground"
         />
-        <PoweredByForce hidden={hidePoweredBy} />
+        <PoweredByEbda hidden={hidePoweredBy} />
       </div>
     </footer>
   );

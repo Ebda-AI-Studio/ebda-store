@@ -116,7 +116,7 @@
         "storeName": "Store Name",
         "urlSlug": "URL Slug",
         "slugPlaceholder": "my-store-name",
-        "slugHint": "Your store will be at: {slug}.forcemediakw.com",
+        "slugHint": "Your store will be at: {slug}.ebda.app",
         "slugHintPlaceholder": "your-slug",
         "plan": "Plan",
         "status": "Status",
@@ -487,8 +487,8 @@
         "descriptionAr": "Description (Arabic)",
         "descriptionArPlaceholder": "وصف المنتج...",
         "mediaHint": "Drag and drop images here, or click to select",
-        "price": "Price (KWD)",
-        "compareAtPrice": "Compare at Price (KWD)",
+        "price": "Price (EGP)",
+        "compareAtPrice": "Compare at Price (EGP)",
         "pricePlaceholder": "0.000",
         "sku": "SKU",
         "skuPlaceholder": "PROD-001",
@@ -640,10 +640,10 @@
         "descriptionAr": "Description (Arabic)",
         "descriptionArPlaceholder": "وصف المنتج...",
         "mediaHint": "Drag and drop images here, or click to select",
-        "price": "Price (KWD)",
+        "price": "Price (EGP)",
         "pricePlaceholder": "0.000",
-        "compareAtPrice": "Compare at Price (KWD)",
-        "pricingHint": "Enter prices in KWD. Compare at price is used to show a crossed-out price.",
+        "compareAtPrice": "Compare at Price (EGP)",
+        "pricingHint": "Enter prices in EGP. Compare at price is used to show a crossed-out price.",
         "sku": "SKU",
         "skuPlaceholder": "PROD-001",
         "quantity": "Quantity",
@@ -698,7 +698,7 @@
         "status": "Status",
         "date": "Date",
         "actions": "Actions",
-        "totalValue": "{amount} KWD"
+        "totalValue": "{amount} EGP"
       },
       "actions": {
         "updateStatusLabel": "Update order status",
@@ -1010,8 +1010,8 @@
       "phoneArPlaceholder": "٩٦٥ XXXX XXXX+",
       "address": "Address",
       "addressAr": "Address (Arabic)",
-      "addressPlaceholder": "123 Street, City, Kuwait",
-      "addressArPlaceholder": "١٢٣ شارع، المدينة، الكويت"
+      "addressPlaceholder": "123 Street, City, Egypt",
+      "addressArPlaceholder": "١٢٣ شارع، المدينة، مصر"
     },
     "social": {
       "instagram": "Instagram",
@@ -1084,10 +1084,10 @@
       "descriptionPlaceholder": "Get 20% off on all summer items",
       "typeLabel": "Discount Type *",
       "valuePercentageLabel": "Percentage (%) *",
-      "valueAmountLabel": "Amount (KWD) *",
-      "minOrderLabel": "Minimum Order (KWD)",
+      "valueAmountLabel": "Amount (EGP) *",
+      "minOrderLabel": "Minimum Order (EGP)",
       "minOrderPlaceholder": "10.000",
-      "maxDiscountLabel": "Max Discount (KWD)",
+      "maxDiscountLabel": "Max Discount (EGP)",
       "maxDiscountPlaceholder": "50.000",
       "usageLimitLabel": "Total Usage Limit",
       "usageLimitPlaceholder": "100",
@@ -1118,7 +1118,7 @@
       },
       "icarry": {
         "title": "iCarry",
-        "subtitle": "Kuwait delivery via iCarry",
+        "subtitle": "Egypt delivery via iCarry",
         "fields": {
           "apiKey": "API Key",
           "merchantId": "Merchant ID"
@@ -1250,7 +1250,7 @@
       "status": "Status",
       "actions": "Actions",
       "moreAreas": "+{count} more",
-      "freeShippingOver": "Over {amount} KWD",
+      "freeShippingOver": "Over {amount} EGP",
       "dashPlaceholder": "-",
       "daysRange": "{min}-{max} days",
       "daysSingle": "{days} days",
@@ -1258,7 +1258,7 @@
       "inactive": "Inactive",
       "edit": "Edit",
       "delete": "Delete",
-      "priceWithCurrency": "{amount} KWD"
+      "priceWithCurrency": "{amount} EGP"
     },
     "modal": {
       "editTitle": "Edit Shipping Zone",
@@ -1270,12 +1270,12 @@
       "zoneNameArPlaceholder": "e.g., منطقة العاصمة",
       "areasLabel": "Areas",
       "areasPlaceholder": "Separate areas with commas: Capital, Hawalli, Farwaniya",
-      "addAllKuwaitGovernorates": "+ Add All Kuwait Governorates",
+      "addAllEgyptGovernorates": "+ Add All Egypt Governorates",
       "areasArLabel": "Areas (Arabic)",
       "areasArPlaceholder": "العاصمة، حولي، الفروانية",
-      "deliveryFeeLabel": "Delivery Fee (KWD)",
+      "deliveryFeeLabel": "Delivery Fee (EGP)",
       "deliveryFeePlaceholder": "1.000",
-      "freeShippingLabel": "Free Shipping Over (KWD)",
+      "freeShippingLabel": "Free Shipping Over (EGP)",
       "freeShippingPlaceholder": "25.000",
       "estimatedDaysLabel": "Estimated Delivery Time (Days)",
       "estimatedDaysMinPlaceholder": "Min days",
@@ -1410,7 +1410,7 @@
       "lowStock": "Low Stock",
       "outOfStock": "Out of Stock",
       "stockValue": "Stock Value",
-      "kwdValue": "{value} KWD"
+      "kwdValue": "{value} EGP"
     },
     "alertBanner": {
       "needAttention": "{count, plural, =1 {# product needs attention} other {# products need attention}}",
@@ -1432,7 +1432,7 @@
       "tableLabel": "Product inventory",
       "empty": "No products found",
       "adjustAction": "Adjust",
-      "kwdValue": "{value} KWD",
+      "kwdValue": "{value} EGP",
       "filters": {
         "all": "All"
       },
@@ -1678,7 +1678,7 @@
         "defaultCommissionRate": "Default Commission Rate (%)",
         "cookieDurationDays": "Cookie Duration (days)",
         "minPayoutAmount": "Min Payout Amount (fils)",
-        "minPayoutEquivalent": "{amount} KWD equivalent"
+        "minPayoutEquivalent": "{amount} EGP equivalent"
       },
       "toggles": {
         "autoApprove": {
@@ -1701,7 +1701,7 @@
         "available": "Available balance:"
       },
       "fields": {
-        "amount": "Amount (KWD)",
+        "amount": "Amount (EGP)",
         "method": "Method",
         "notes": "Notes",
         "notesPlaceholder": "Optional notes for this payout"
@@ -1762,7 +1762,7 @@
       "instructionsTitle": "How to Import Products",
       "step1": "Download the CSV template using the button below",
       "step2": "Fill in your product data following the template format",
-      "step3": "Prices are in fils (1 KWD = 1000 fils)",
+      "step3": "Prices are in fils (1 EGP = 1000 fils)",
       "step4": "For multiple categories/tags/images, separate with commas within quotes",
       "step5": "Upload the completed CSV file and click Import",
       "downloadTemplate": "Download Template",
@@ -1811,7 +1811,7 @@
         "allFields": "All product fields are included in the export",
         "commaSeparated": "Categories, tags, and images are comma-separated within their columns",
         "reImport": "The exported file can be edited and re-imported to update products",
-        "pricesInFils": "Prices are in fils (1 KWD = 1000 fils)"
+        "pricesInFils": "Prices are in fils (1 EGP = 1000 fils)"
       }
     },
     "errors": {
@@ -1833,7 +1833,7 @@
       "recovered": "Recovered",
       "recoveryRate": "Recovery Rate",
       "recoveredRevenue": "Revenue Recovered",
-      "kwdValue": "{amount} KWD"
+      "kwdValue": "{amount} EGP"
     },
     "status": {
       "pending": "Pending",
@@ -1863,7 +1863,7 @@
         "maxDiscount": "Max Discount",
         "expiry": "Expiry",
         "noLimit": "No limit",
-        "kwd": "KWD",
+        "egp": "EGP",
         "hours": "hours"
       }
     },
@@ -2290,7 +2290,7 @@
     },
     "earning": {
       "title": "Point Earning",
-      "pointsPerDinar": "Points per 1 KWD Spent",
+      "pointsPerDinar": "Points per 1 EGP Spent",
       "signupBonus": "Signup Bonus",
       "referralBonus": "Referral Bonus",
       "reviewBonus": "Review Bonus",
@@ -2397,10 +2397,10 @@
       "displayNameArPlaceholder": "الدفع عند الاستلام",
       "fixedFeeLabel": "Surcharge Fee (fils)",
       "fixedFeePlaceholder": "0",
-      "fixedFeeEquals": "= {amount} KWD",
+      "fixedFeeEquals": "= {amount} EGP",
       "fixedFeeHelpPrefix": "Extra charge added to the order when the customer pays cash on delivery. Enter",
       "fixedFeeHelpZero": "0",
-      "fixedFeeHelpSuffix": "for free COD. 1000 fils = 1 KWD.",
+      "fixedFeeHelpSuffix": "for free COD. 1000 fils = 1 EGP.",
       "infoBanner": "COD orders bypass the payment gateway. The customer confirms the order, and you mark it as paid from the Orders page once cash is collected."
     },
     "gateway": {
@@ -2476,7 +2476,7 @@
       "sectionHint": "Show a banner at the top of your store for promotions, announcements or news",
       "content": "Content",
       "textEnglish": "Announcement Text (English)",
-      "textEnglishPlaceholder": "Free shipping on orders over 10 KWD!",
+      "textEnglishPlaceholder": "Free shipping on orders over 10 EGP!",
       "textArabic": "Announcement Text (Arabic)",
       "textArabicPlaceholder": "شحن مجاني للطلبات فوق ١٠ د.ك!",
       "linkUrl": "Link URL (optional)",
@@ -2562,15 +2562,15 @@
       "arBadge": "AR",
       "advanced": "Advanced",
       "metaTitle": "Meta Title",
-      "metaTitlePlaceholder": "My Store — Best Products in Kuwait",
+      "metaTitlePlaceholder": "My Store — Best Products in Egypt",
       "metaTitleHint": "Appears in browser tabs and search results. Keep under {max} characters for best results.",
       "metaDescription": "Meta Description",
-      "metaDescriptionPlaceholder": "Discover our wide range of products with fast delivery across Kuwait...",
+      "metaDescriptionPlaceholder": "Discover our wide range of products with fast delivery across Egypt...",
       "metaDescriptionHint": "Shown in search result snippets. Keep under {max} characters for best results.",
       "metaTitleAr": "Meta Title (Arabic)",
-      "metaTitleArPlaceholder": "متجري — أفضل المنتجات في الكويت",
+      "metaTitleArPlaceholder": "متجري — أفضل المنتجات في مصر",
       "metaDescriptionAr": "Meta Description (Arabic)",
-      "metaDescriptionArPlaceholder": "اكتشف مجموعتنا الواسعة من المنتجات مع توصيل سريع في الكويت...",
+      "metaDescriptionArPlaceholder": "اكتشف مجموعتنا الواسعة من المنتجات مع توصيل سريع في مصر...",
       "ogImage": "OG Image URL",
       "ogImagePlaceholder": "https://example.com/og-image.jpg",
       "ogImageHint": "Image shown when your store is shared on social media. Recommended: 1200×630px.",
@@ -2946,7 +2946,7 @@
       "ariaLabel": "Language"
     },
     "brand": {
-      "forceMediaAlt": "Force Media"
+      "ebdaAlt": "Ebda AI Studio"
     }
   }
 }

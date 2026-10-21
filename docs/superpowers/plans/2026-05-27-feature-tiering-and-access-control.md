@@ -2,7 +2,7 @@
 
 > **For agentic workers:** Use `superpowers:subagent-driven-development` (or `superpowers:executing-plans`) to execute task-by-task. Steps use checkbox (`- [ ]`) syntax.
 
-**Goal:** Introduce three named plans (Starter / Professional / Enterprise) for Force AI Store + three matching tiers for Force WhatsApp, with sub-feature-level toggles inside Inventory and Accounting, all gated behind a super-admin-only "Manage Features" page. Also gate the "Suspend Store" action to super-admins, and polish the existing storefront suspension page.
+**Goal:** Introduce three named plans (Starter / Professional / Enterprise) for Ebda Store + three matching tiers for Force WhatsApp, with sub-feature-level toggles inside Inventory and Accounting, all gated behind a super-admin-only "Manage Features" page. Also gate the "Suspend Store" action to super-admins, and polish the existing storefront suspension page.
 
 **Architecture:**
 
@@ -30,7 +30,7 @@ Two-layer feature resolution: `PLAN_BASELINE[plan]` constant lists baseline-incl
 | `apps/admin/src/components/RequireSuperAdmin.tsx`                 | create | Tiny wrapper that returns 404 if `useAuth().user.role !== 'super_admin'`                                                                                                                               |
 | `apps/admin/src/components/sidebar/StoreSidebar.tsx`              | modify | "Manage Features" link only when `user.role === 'super_admin'`                                                                                                                                         |
 | `apps/admin/src/app/admin/stores/[id]/settings/page.tsx`          | modify | "Suspend store" button only when super-admin; the existing plan dropdown stays visible to store_admin but is read-only for them                                                                        |
-| `apps/web/src/components/StoreMaintenance.tsx`                    | modify | Add "Powered by Force AI" hyperlink to `https://store.forcemediakw.com` in the footer area                                                                                                             |
+| `apps/web/src/components/StoreMaintenance.tsx`                    | modify | Add "Powered by Ebda AI Studio" hyperlink to `https://store.ebda.app` in the footer area                                                                                                             |
 | `docs/business/04-pricing-tiers.md`                               | modify | Replace "Bands 1-4" framing with the new named-plan table — keep cost floors                                                                                                                           |
 | `docs/business/02-feature-catalog.md`                             | modify | Add "Available in:" badge per feature mapping to plan(s)                                                                                                                                               |
 | `docs/runbooks/SUPER-ADMIN-PLAYBOOK.md`                           | create | How to suspend / reactivate / change plan / override features per store                                                                                                                                |
@@ -63,9 +63,9 @@ Append to `FEATURE_REGISTRY`:
 // Accounting — sub-features
 'accounting.basic': { key: 'accounting.basic', label: 'Accounting — Journal + P&L', description: 'Double-entry journal + simple P&L report' },
 'accounting.expenses': { key: 'accounting.expenses', label: 'Accounting — Expense Tracking', description: 'Expense categories + receipts + monthly summaries' },
-'accounting.invoicing': { key: 'accounting.invoicing', label: 'Accounting — Invoicing', description: 'Kuwait-compliant invoice generation with tax line + bilingual' },
+'accounting.invoicing': { key: 'accounting.invoicing', label: 'Accounting — Invoicing', description: 'Egypt-compliant invoice generation with tax line + bilingual' },
 'accounting.tax_reports': { key: 'accounting.tax_reports', label: 'Accounting — Tax Reports', description: 'VAT / sales-tax exports + period reconciliation' },
-'accounting.multi_currency': { key: 'accounting.multi_currency', label: 'Accounting — Multi-Currency', description: 'Track non-KWD transactions with FX rates + KWD conversion' },
+'accounting.multi_currency': { key: 'accounting.multi_currency', label: 'Accounting — Multi-Currency', description: 'Track non-EGP transactions with FX rates + EGP conversion' },
 'accounting.profit_anomaly': { key: 'accounting.profit_anomaly', label: 'Accounting — Profit Anomaly Watch', description: 'AI-driven margin watcher; flags sales below cost' },
 'accounting.bank_reconcile': { key: 'accounting.bank_reconcile', label: 'Accounting — Bank Reconciliation', description: 'Bank statement import + automated match against ledger' },
 ```
@@ -483,7 +483,7 @@ Store admin can SEE which plan they're on (so support conversations are easier) 
 
 ## Phase D — Storefront suspension UX
 
-### Task D.1: Polish StoreMaintenance + add Powered By Force AI
+### Task D.1: Polish StoreMaintenance + add Powered By Ebda AI Studio
 
 **Files:** `apps/web/src/components/StoreMaintenance.tsx`
 
@@ -494,12 +494,12 @@ Store admin can SEE which plan they're on (so support conversations are easier) 
 ```tsx
 <footer className="mt-12 text-center text-sm text-muted-foreground">
   <a
-    href="https://store.forcemediakw.com"
+    href="https://store.ebda.app"
     target="_blank"
     rel="noopener noreferrer"
     className="hover:text-primary transition-colors"
   >
-    Powered by Force AI
+    Powered by Ebda AI Studio
   </a>
 </footer>
 ```
@@ -511,27 +511,27 @@ Store admin can SEE which plan they're on (so support conversations are easier) 
 - [ ] **Step 4: Commit**
 
 ```
-git commit -m "feat(web): add Powered by Force AI link to store maintenance page"
+git commit -m "feat(web): add Powered by Ebda AI Studio link to store maintenance page"
 ```
 
 ---
 
-## Phase E — Cross-product gate (Force WhatsApp ↔ Force AI Store)
+## Phase E — Cross-product gate (Force WhatsApp ↔ Ebda Store)
 
-### Task E.1: WhatsApp catalog sync respects Force AI Store plan
+### Task E.1: WhatsApp catalog sync respects Ebda Store plan
 
 **Files:**
 
 - `apps/api/src/lib/inngest/functions/meta-catalog-sync.ts` (or wherever the catalog sync function lives)
 - `apps/api/src/routes/wa-bridge.routes.ts` (or equivalent)
 
-- [ ] **Step 1: Gate sync trigger on Force AI Store side**
+- [ ] **Step 1: Gate sync trigger on Ebda Store side**
 
 Before publishing a product to Meta Commerce, check `isFeatureEnabled(storeId, 'whatsapp_catalog_sync')`. If false, skip + log.
 
 - [ ] **Step 2: WBS side validates the bridge call**
 
-When WBS receives a webhook from FWB requesting catalog sync, validate that the FWB store has the feature enabled (call FWB API `GET /stores/:id/features/whatsapp_catalog_sync`).
+When WBS receives a webhook from Ebda Store requesting catalog sync, validate that the Ebda Store store has the feature enabled (call Ebda Store API `GET /stores/:id/features/whatsapp_catalog_sync`).
 
 - [ ] **Step 3: Tests**
 
@@ -580,9 +580,9 @@ Sections: how to onboard a new merchant (set plan, optional overrides), how to g
 - [ ] `isFeatureEnabled(storeId, key)` returns the correct resolved state for: baseline-on, baseline-off, override-on, override-off, plan-change-preserves-overrides
 - [ ] Store admin logs in → no "Manage Features" link, no "Suspend Store" button, plan dropdown is read-only
 - [ ] Super-admin logs in → "Manage Features" link visible, can toggle any feature, can suspend / reactivate, can change plan
-- [ ] Suspended store: storefront shows the existing maintenance page with "Powered by Force AI" link, store admin can still log in to the admin
+- [ ] Suspended store: storefront shows the existing maintenance page with "Powered by Ebda AI Studio" link, store admin can still log in to the admin
 - [ ] WhatsApp catalog sync skips stores without the feature; granting via override lets it run
-- [ ] All 4 Force AI contract / proposal templates already reflect the new feature copy (done 2026-05-27 in the work folder)
+- [ ] All 4 Ebda AI Studio contract / proposal templates already reflect the new feature copy (done 2026-05-27 in the work folder)
 - [ ] Docs updated: pricing-tiers, feature-catalog, super-admin-playbook
 
 ---
@@ -604,10 +604,10 @@ Never push per task — batch into ONE PR off `staging` per Rule 1 in `feedback-
 
 - ✅ **Sub-feature granularity**: inventory._ (7 sub-features) + accounting._ (7 sub-features), each independently toggleable.
 - ✅ **Plan-change behavior**: overrides preserved on upgrade AND downgrade. Plan changes never touch StoreFeature rows.
-- ✅ **Suspend scope**: storefront serves the existing `StoreMaintenance` page; admin login still works. Add "Powered by Force AI" hyperlink to `https://store.forcemediakw.com` in the maintenance footer.
+- ✅ **Suspend scope**: storefront serves the existing `StoreMaintenance` page; admin login still works. Add "Powered by Ebda AI Studio" hyperlink to `https://store.ebda.app` in the maintenance footer.
 - ✅ **Force WhatsApp tier modeling**: separate `Client.plan` enum on WBS side (W-Starter / W-Pro / W-Enterprise) + its own ClientFeature override table + its own super-admin Manage Features page + suspend flow. Mirrors the sales reality of two separate contract templates and lets you sell Force WhatsApp standalone.
 - ✅ **Pricing**: stays out of code per the existing `docs/business/04-pricing-tiers.md` "no public tier list" rule. Numbers TBD; when nailed down, live in proposals only.
-- ✅ **Audit log**: reuse the existing FWB `AuditLog` table (correct shape — `userId` + `storeId` + `action` + `details` + `resourceType` + `resourceId` + `ipAddress`). Mirror it as `ClientAuditLog` on the WBS side. Two-layer visibility on both: per-store / per-client (storeId/clientId = X) visible to that store's/client's admins for their own team-action trail; super-admin sees cross-store / cross-client trail (all entries OR storeId/clientId = null for platform-wide actions).
+- ✅ **Audit log**: reuse the existing Ebda Store `AuditLog` table (correct shape — `userId` + `storeId` + `action` + `details` + `resourceType` + `resourceId` + `ipAddress`). Mirror it as `ClientAuditLog` on the WBS side. Two-layer visibility on both: per-store / per-client (storeId/clientId = X) visible to that store's/client's admins for their own team-action trail; super-admin sees cross-store / cross-client trail (all entries OR storeId/clientId = null for platform-wide actions).
 
 ---
 
@@ -711,11 +711,11 @@ model ClientFeature {
 
 **File:** `backend/src/middleware/feature-gate.js`
 
-Mirror of FWB's helper with in-memory cache + invalidation on override write.
+Mirror of Ebda Store's helper with in-memory cache + invalidation on override write.
 
 ### Task G.3: WBS super-admin UI
 
-Same shape as FWB Phase C. Build `RequireSuperAdmin` wrapper in WBS frontend (`frontend/src/components/`), "Manage Features" page only for super_admin, "Suspend Client" button only for super_admin. WBS already has `SimpleAuth.requireAdminAsync` — add `requireSuperAdminAsync` parallel.
+Same shape as Ebda Store Phase C. Build `RequireSuperAdmin` wrapper in WBS frontend (`frontend/src/components/`), "Manage Features" page only for super_admin, "Suspend Client" button only for super_admin. WBS already has `SimpleAuth.requireAdminAsync` — add `requireSuperAdminAsync` parallel.
 
 ### Task G.4: WBS suspend behavior
 
@@ -753,16 +753,16 @@ Visibility: client admin sees `clientId = own`; super-admin sees all entries.
 
 ---
 
-## Phase H — Cross-product gate (Force AI Store ↔ Force WhatsApp)
+## Phase H — Cross-product gate (Ebda Store ↔ Force WhatsApp)
 
 ### H.0: Standing precondition rule (2026-05-27, Ahmad's clarification)
 
-**ALL `wbs.bot.*` features REQUIRE a linked, active Force AI Store.** This is a SALES rule first, an architecture rule second:
+**ALL `wbs.bot.*` features REQUIRE a linked, active Ebda Store.** This is a SALES rule first, an architecture rule second:
 
-- WBS plans (W-Starter / W-Pro / W-Enterprise) are sold standalone — campaigns, inbox, templates all work without Force AI Store.
-- Bot features (native catalog, service menu, customer addresses, Meta sync, intelligence) only make sense when there's a product catalog to drive — Force AI Store IS that catalog.
-- A merchant on W-Pro WITHOUT Force AI Store gets: bulk campaigns + inbox + templates + segmentation + scheduling + analytics. The bot features in their plan baseline are silently disabled by the precondition; no bot configuration UI appears.
-- The moment they ALSO buy Force AI Store, the bot features automatically unlock (no super-admin action needed — the precondition flips).
+- WBS plans (W-Starter / W-Pro / W-Enterprise) are sold standalone — campaigns, inbox, templates all work without Ebda Store.
+- Bot features (native catalog, service menu, customer addresses, Meta sync, intelligence) only make sense when there's a product catalog to drive — Ebda Store IS that catalog.
+- A merchant on W-Pro WITHOUT Ebda Store gets: bulk campaigns + inbox + templates + segmentation + scheduling + analytics. The bot features in their plan baseline are silently disabled by the precondition; no bot configuration UI appears.
+- The moment they ALSO buy Ebda Store, the bot features automatically unlock (no super-admin action needed — the precondition flips).
 
 ### H.1: Resolver enforces precondition
 
@@ -776,7 +776,7 @@ async function isClientFeatureEnabled(clientId, key) {
   let enabled = await resolveBaselineAndOverride(clientId, key);
   if (!enabled) return false;
 
-  // Bot precondition: all wbs.bot.* features require a linked Force AI Store.
+  // Bot precondition: all wbs.bot.* features require a linked Ebda Store.
   // The link is stored as Client.forceStoreId on WBS side (existing field via the WBS bridge).
   if (key.startsWith(BOT_PREFIX)) {
     const client = await prisma.client.findUnique({
@@ -785,8 +785,8 @@ async function isClientFeatureEnabled(clientId, key) {
     });
     if (!client?.forceStoreId) return false;
 
-    // AND the Force AI Store must currently be active (not suspended).
-    // Use the existing wa-bridge call to check FWB-side state.
+    // AND the Ebda Store must currently be active (not suspended).
+    // Use the existing wa-bridge call to check Ebda Store-side state.
     const storeActive = await forceStoreBridge.isStoreActive(client.forceStoreId);
     if (!storeActive) return false;
   }
@@ -801,7 +801,7 @@ When rendering the WBS Manage Features matrix for a client:
 
 - For every `wbs.bot.*` row, if `client.forceStoreId` is null OR the linked store is inactive:
   - Show the toggle DISABLED (can't be flipped)
-  - Show inline copy: "Requires linked Force AI Store" with a "Connect Force AI Store" CTA if super-admin
+  - Show inline copy: "Requires linked Ebda Store" with a "Connect Ebda Store" CTA if super-admin
 - If `client.forceStoreId` is set + active:
   - Toggle behaves normally per the baseline/override logic
 
@@ -809,32 +809,32 @@ When rendering the WBS Manage Features matrix for a client:
 
 | Merchant state                          | What they see                                                                                                                                                                                |
 | --------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Force AI Store only (no Force WhatsApp) | Admin "Connect WhatsApp" panel says: "Activate Force WhatsApp to enable in-chat ordering. Separate quote."                                                                                   |
-| Force WhatsApp only (no Force AI Store) | Bot tab in WBS admin says: "Bot ordering requires Force AI Store. Force AI Store gives the bot its product catalog and order destination." Bulk campaigns + inbox + templates work normally. |
+| Ebda Store only (no Force WhatsApp) | Admin "Connect WhatsApp" panel says: "Activate Force WhatsApp to enable in-chat ordering. Separate quote."                                                                                   |
+| Force WhatsApp only (no Ebda Store) | Bot tab in WBS admin says: "Bot ordering requires Ebda Store. Ebda Store gives the bot its product catalog and order destination." Bulk campaigns + inbox + templates work normally. |
 | Both products active                    | Bridge unlocks. Bot features render per plan baseline (W-Pro/W-Enterprise) + any overrides.                                                                                                  |
 
 ### H.4: Code locations to gate
 
-- **FWB**: `apps/api/src/lib/inngest/functions/meta-catalog-sync.ts` — check FWB-side `whatsapp_catalog_sync` feature before publishing
-- **WBS**: `backend/src/services/metaCatalogService.js` — bot precondition fires here (no Force AI Store = no sync attempt)
-- **WBS**: `backend/src/services/bot-service-router.js` — bot precondition fires on EVERY inbound message that would trigger a bot response (without Force AI Store, bot stays silent)
+- **Ebda Store**: `apps/api/src/lib/inngest/functions/meta-catalog-sync.ts` — check Ebda Store-side `whatsapp_catalog_sync` feature before publishing
+- **WBS**: `backend/src/services/metaCatalogService.js` — bot precondition fires here (no Ebda Store = no sync attempt)
+- **WBS**: `backend/src/services/bot-service-router.js` — bot precondition fires on EVERY inbound message that would trigger a bot response (without Ebda Store, bot stays silent)
 - **WBS**: `frontend/src/app/admin/clients/[id]/features/page.tsx` — render disabled toggles + precondition copy
-- **FWB**: `apps/admin/src/components/store-settings/WhatsAppCard.tsx` — render different copy based on cross-product state
+- **Ebda Store**: `apps/admin/src/components/store-settings/WhatsAppCard.tsx` — render different copy based on cross-product state
 
 ### H.5: Tests
 
 ```
 tests/integration/wbs-bot-precondition.test.ts
-- W-Pro client, no Force AI Store → wbs.bot.native_catalog resolves false
-- W-Pro client, Force AI Store linked + active → resolves true
-- W-Pro client, Force AI Store linked + suspended → resolves false
-- W-Enterprise client, no Force AI Store → all wbs.bot.* resolve false; non-bot features resolve normally
-- Super-admin override 'enabled=true' on wbs.bot.* without Force AI Store → STILL false (precondition wins; override cannot bypass)
+- W-Pro client, no Ebda Store → wbs.bot.native_catalog resolves false
+- W-Pro client, Ebda Store linked + active → resolves true
+- W-Pro client, Ebda Store linked + suspended → resolves false
+- W-Enterprise client, no Ebda Store → all wbs.bot.* resolve false; non-bot features resolve normally
+- Super-admin override 'enabled=true' on wbs.bot.* without Ebda Store → STILL false (precondition wins; override cannot bypass)
 ```
 
 ### H.6: Sales contract / proposal copy update
 
-The 2 WBS templates already updated 2026-05-27 in `~/Desktop/work/Force AI/assets/` need one additional clarification line:
+The 2 WBS templates already updated 2026-05-27 in `~/Desktop/work/Ebda AI Studio/assets/` need one additional clarification line:
 
-- `عقد خدمات - واتساب - قالب.html` — add a footnote in Section 2 (Scope of Services) on the bot bullets: "ميزات البوت تتطلب الربط بمتجر فورس (Force AI Store) النشط — تعمل الحملات والصندوق الموحد بدون ذلك."
+- `عقد خدمات - واتساب - قالب.html` — add a footnote in Section 2 (Scope of Services) on the bot bullets: "ميزات البوت تتطلب الربط بمتجر ابدأ (Ebda Store) النشط — تعمل الحملات والصندوق الموحد بدون ذلك."
 - `عرض سعر - واتساب - قالب.html` — same note under the new "بوت المحادثة الذكي والكتالوج التفاعلي" section.

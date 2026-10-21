@@ -1,4 +1,4 @@
-# Security Overview — Force Website Builder
+# Security Overview — Ebda Store
 
 Buyer-shareable answers to the standard security-questionnaire items. Every
 claim below is derived from the code/config in this repo (file references in
@@ -19,7 +19,7 @@ Last verified: **2026-07-15**.
 | Dependency audit (`npm audit`, hard gate on high-severity prod deps)                                    | Every PR + every push to `main` (`.github/workflows/ci.yml`)                                                                                                                                                                                                                                                                    |
 | Secret scanning (gitleaks)                                                                              | Every PR + every push to `main` (`.github/workflows/gitleaks.yml`)                                                                                                                                                                                                                                                              |
 | Static analysis (semgrep)                                                                               | Every PR + every push to `main` (`.github/workflows/semgrep.yml`)                                                                                                                                                                                                                                                               |
-| Dynamic scanning (OWASP ZAP baseline DAST against production storefront)                                | Nightly (`.github/workflows/zap-baseline.yml`, target `https://store.force-ai.co`). **Alerts via a red job + Telegram + the report as a build artifact** — not a GitHub issue (changed 2026-09-11). Accepted alerts live in `.zap/rules.tsv` with `review-by:` dates, enforced nightly by `scripts/check-zap-review-dates.mjs`. |
+| Dynamic scanning (OWASP ZAP baseline DAST against production storefront)                                | Nightly (`.github/workflows/zap-baseline.yml`, target `https://store.ebda.app`). **Alerts via a red job + Telegram + the report as a build artifact** — not a GitHub issue (changed 2026-09-11). Accepted alerts live in `.zap/rules.tsv` with `review-by:` dates, enforced nightly by `scripts/check-zap-review-dates.mjs`. |
 | Manual penetration-test pass (Burp checklist)                                                           | Quarterly — see run log in `docs/security/burp-manual-pentest-checklist.md`                                                                                                                                                                                                                                                     |
 | GitHub Action supply-chain pinning (every `uses:` ref pinned to a 40-hex commit SHA, not a mutable tag) | Refreshed weekly by Dependabot (`.github/dependabot.yml`); every PR gated by `scripts/check-action-pins.sh` (`.github/workflows/ci.yml`, `client-secret-scan` job) so a new unpinned ref cannot land                                                                                                                            |
 
@@ -102,7 +102,7 @@ deps) — dated reports live in `docs/audits/`.
   times, detection sources (uptime monitoring, Sentry, deploy-failure alerts),
   and a step-ordered P0 triage checklist. Shareable on request.
 - Rollback procedures: `docs/ROLLBACK.md` + `scripts/rollback.sh`.
-- Vulnerability reports: `security@force-ai.co` — policy in
+- Vulnerability reports: `security@ebda.app` — policy in
   [`SECURITY.md`](../../SECURITY.md), machine-readable
   `/.well-known/security.txt` on all apps.
 
@@ -112,7 +112,7 @@ deps) — dated reports live in `docs/audits/`.
 - Object storage: Cloudflare R2.
 - CDN/edge: Cloudflare global network (sees encrypted traffic only).
 - Data residency requirements per GCC country are tracked in
-  `docs/legal/gcc-data-protection.md`; for Kuwait, the applicable
+  `docs/privacy/data-map.md`; for Egypt, the applicable
   reference is the Electronic Transactions Law No. 20/2014. Erasure
   capability is provided platform-wide regardless (see Privacy below).
 
@@ -161,7 +161,7 @@ comment, which a unit test keeps in step with the spec. For **tenant/RLS**
 specifically, it covers 7 such query-level guards; it does **not** cover the
 session-GUC mechanism itself (`runInTenantContext` / `app.current_store_id` /
 `app.current_user_id`, `apps/api/src/middleware/tenant-context.ts`) — that
-runs under a REAL `force_app` login role in a separate, dedicated CI job
+runs under a REAL the earlier app role login role in a separate, dedicated CI job
 (`test-rls-force-app` in `ci.yml`, driving `tests/integration/
 rls-force-app.test.ts`), not in this record. Both are real, CI-blocking
 proofs; they are just two different mechanisms; conflating them here would
@@ -171,7 +171,7 @@ overstate what a green `defence-mutation-record.md` alone proves about RLS.
 
 | Artifact                                    | Date       | Result                                                                                               |
 | ------------------------------------------- | ---------- | ---------------------------------------------------------------------------------------------------- |
-| ZAP baseline DAST — first activated run     | 2026-07-15 | 0 fail / 15 warn / 54 pass vs `https://store.force-ai.co` (run 29426193025); warns queued for triage |
+| ZAP baseline DAST — first activated run     | 2026-07-15 | 0 fail / 15 warn / 54 pass vs `https://store.ebda.app` (run 29426193025); warns queued for triage |
 | Manual Burp pass                            | —          | no recorded run yet; first scheduled pass Q3 2026                                                    |
 | 13-dimension internal audit sweep           | 2026-07-02 | 0 critical / 0 high open (`docs/audits/2026-07-02-MASTER-deep-audit.md`)                             |
 | Security-readiness (procurement lens) audit | 2026-07-15 | `docs/audits/2026-07-15-security-readiness-enterprise-procurement.md`                                |

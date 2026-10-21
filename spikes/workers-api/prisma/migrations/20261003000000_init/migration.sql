@@ -1,6 +1,6 @@
 -- Ebda Workers spike: tables + non-bypass role + FORCE RLS.
--- GUC names are FWB's: app.current_store_id / app.current_user_id.
--- DIVERGENCE FROM FWB: FWB policies are "allow-contextless"
+-- GUC names are Ebda Store's: app.current_store_id / app.current_user_id.
+-- DIVERGENCE FROM Ebda Store: Ebda Store policies are "allow-contextless"
 --   (current_store_id() IS NULL OR store_id = current_store_id()),
 -- i.e. an unset GUC returns EVERY tenant's rows. Here the policies are STRICT:
 -- unset GUC => NULL comparison => zero rows / INSERT rejected.
@@ -60,7 +60,7 @@ CREATE TABLE webhook_events (
   CONSTRAINT webhook_events_provider_event_id_key UNIQUE (provider, event_id)
 );
 
--- ---- GUC accessors (same shape as FWB's) ----
+-- ---- GUC accessors (same shape as Ebda Store's) ----
 CREATE OR REPLACE FUNCTION current_store_id() RETURNS TEXT AS $$
 BEGIN
   RETURN NULLIF(current_setting('app.current_store_id', true), '');

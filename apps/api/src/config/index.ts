@@ -153,7 +153,7 @@ export const config = {
 
   // PostHog — server-side Right-to-Erasure propagation only (GDPR Art. 17
   // and applicable GCC data-protection law — see
-  // docs/legal/gcc-data-protection.md). Distinct from the storefront's
+  // docs/privacy/data-map.md). Distinct from the storefront's
   // NEXT_PUBLIC_POSTHOG_KEY (public project key, baked into the browser
   // bundle) — deleting a person requires a PERSONAL API key with
   // person-level write scope, which must never reach the browser. Unset

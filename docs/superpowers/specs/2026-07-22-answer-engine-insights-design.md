@@ -5,7 +5,7 @@
 **Thesis fit:** "win on AI / AEO." The platform already helps merchants _get citable_ (JSON-LD,
 sitemap, AEO/GEO content sweeps); this measures whether AI answer engines actually _surface_ them,
 closing the loop from "we optimized" to "here's the proof / here's what to fix next."
-**Branch/worktree:** `feat/answer-engine-insights` → `_worktrees/force-website-builder__feat-answer-engine-insights`.
+**Branch/worktree:** `feat/answer-engine-insights` → `_worktrees/ebda-store__feat-answer-engine-insights`.
 **Deploy:** develop-now, merges in the deploy-all-at-once batch.
 
 ---
@@ -66,7 +66,7 @@ checks (scheduled only); rewriting the existing content sweeps (we _link_ to the
   Setting (see 3c). The job iterates only ENABLED, keyed providers. Gemini is enabled by default; the
   paid two default to disabled/keyless (dormant but code-complete + unit-tested with a mocked client).
 - **Prompts:** a set of buyer-intent prompts per store, **auto-generated** from the store's
-  categories/top products (e.g. "best {category} in {country}", "where to buy {product} in Kuwait"),
+  categories/top products (e.g. "best {category} in {country}", "where to buy {product} in Egypt"),
   with an **optional merchant-editable** override list. Latin + Arabic variants.
 - **Citation detection:** for each (prompt, engine), mark `cited=true` if the store's domain (or a
   configured brand alias) appears in `citedUrls` (grounding sources) or the answer text mentions the
@@ -108,7 +108,7 @@ checks (scheduled only); rewriting the existing content sweeps (we _link_ to the
 Extends `apps/admin/.../stores/[id]/analytics/` (or a sibling `/answer-engine` page):
 
 - "Cited N times this week" per engine + trend over time.
-- Per-prompt win/lose vs competitors ("You were NOT cited for 'best perfume Kuwait' — competitor X
+- Per-prompt win/lose vs competitors ("You were NOT cited for 'best perfume Egypt' — competitor X
   was").
 - GSC impressions/clicks/top-queries trend.
 - **Actionable recs** linking back to the existing AEO/GEO content sweeps ("add an FAQ block for this
@@ -151,7 +151,7 @@ Extends `apps/admin/.../stores/[id]/analytics/` (or a sibling `/answer-engine` p
 ## 6. Open items to resolve during planning (not blockers)
 
 - Exact Gemini grounding API shape in the installed SDK (grounding tool config + how `citedUrls` /
-  `groundingChunks` are returned) — confirm against the model FWB uses (may need a grounding-capable
+  `groundingChunks` are returned) — confirm against the model Ebda Store uses (may need a grounding-capable
   Gemini model, not necessarily flash-lite).
 - Provider API-key storage: masked `Setting` vs an encrypted column (repo convention).
 - GSC credential form: service account (domain-delegated) vs a stored Force OAuth refresh token —

@@ -4,7 +4,7 @@
 
 **Goal:** build Ebda (ebda.app) — Whisky 11's self-serve, Shopify-style store builder for Egypt — to a launch-ready state, with Amelia Aurum as merchant #1.
 
-**Architecture:** clone FWB into `whisky-11/ebda` (full history, FWB as `upstream`), rebrand config-driven, port the backend from Express-on-Railway to Cloudflare Workers, add self-serve onboarding, EGP billing, Egypt-native payments and shipping behind pluggable interfaces, a free WhatsApp tier, the marketing site, docs, help and a status page.
+**Architecture:** clone Ebda Store into `whisky-11/ebda` (full history, Ebda Store as `upstream`), rebrand config-driven, port the backend from Express-on-Railway to Cloudflare Workers, add self-serve onboarding, EGP billing, Egypt-native payments and shipping behind pluggable interfaces, a free WhatsApp tier, the marketing site, docs, help and a status page.
 
 **Tech stack:** Next.js via OpenNext on Cloudflare Workers (app, storefront, marketing); Workers API (Hono or thin router) → Hyperdrive → Neon Postgres with Prisma's pg adapter on workerd; R2; Cloudflare Queues + Cron Triggers; Durable Objects / KV for rate limits and caches; Resend email; Cloudflare for SaaS (custom hostnames) for merchant domains.
 
@@ -12,13 +12,13 @@
 
 ## 0. Context you would otherwise not have
 
-- **Owner:** Ahmad Sharaf. Company: **Whisky 11** (GitHub org `whisky-11`, Free plan). Ebda is a Whisky 11 product. FWB (Force Website Builder) is the GCC product of Force AI (Whisky 11's GCC operating company) — **read-only upstream for you; never push to it**.
+- **Owner:** Ahmad Sharaf. Company: **Whisky 11** (GitHub org `whisky-11`, Free plan). Ebda is a Whisky 11 product. Ebda Store (Ebda Store) is the GCC product of Ebda AI Studio (Whisky 11's GCC operating company) — **read-only upstream for you; never push to it**.
 - **Repos:**
-  - Source to clone: `ForceAI-KW/force-website-builder` (private monorepo: `apps/api` Express+Prisma, `apps/web` storefront, `apps/admin` merchant dashboard, `apps/orders` PWA, `packages/database` Prisma schema + migrations, `packages/shared`; docs in `docs/`, owner decisions in `docs/RULINGS.md`, conventions in `CLAUDE.md` — READ `CLAUDE.md` and the RLS / tenant-context sections before touching tenancy).
-  - Target: `whisky-11/ebda` (private). Branch `plan` holds this file. `main` does not exist yet — SP4 creates it from FWB's history.
+  - Source to clone: `Whisky-11/ebda-store` (private monorepo: `apps/api` Express+Prisma, `apps/web` storefront, `apps/admin` merchant dashboard, `apps/orders` PWA, `packages/database` Prisma schema + migrations, `packages/shared`; docs in `docs/`, owner decisions in `docs/RULINGS.md`, conventions in `CLAUDE.md` — READ `CLAUDE.md` and the RLS / tenant-context sections before touching tenancy).
+  - Target: `whisky-11/ebda` (private). Branch `plan` holds this file. `main` does not exist yet — SP4 creates it from Ebda Store's history.
 - **Brand:** night `#0A0B0C`, Antique Gold `#B08D57`, lift `#CBA873`. Login page art: a "Nile at night from orbit — each light is a store" canvas animation; source script is in `docs/brand/ebda-brief-v2.html` on this branch (second `<script>` block, "Hero: the Nile valley…").
 - **Merchant #1:** Amelia Aurum (ameliaaurum.com, jewellery) — free unlimited plan.
-- **Hard lessons from FWB (do not repeat):**
+- **Hard lessons from Ebda Store (do not repeat):**
   - Tenant resolvers THROW/404 on an unknown store/host — never default to the first store.
   - Under RLS, a per-request DB transaction must not span a slow external call (LLM, payment, carrier, email): Prisma expires interactive transactions after 30 s. Do external calls outside the transaction; keep the user id GUC (`app.current_user_id`) whenever you scope by store.
   - An Express `router.use('/stores/:storeId', …)` is a PREFIX match and silently wraps every later `/stores/:id/*` mount — order mounts deliberately and test it.
@@ -33,7 +33,7 @@
 - Domains: `ebda.app` marketing; `store.ebda.app` merchant dashboard; **every store at `<slug>.ebda.app`** (free), merchant **custom domains** on top; `api.`, `docs.`, `help.`, `status.`; `whatsapp.` reserved for later. **No `store.ebda.app`.** `.app` is HTTPS-only (HSTS preload).
 - Reserved slugs, enforced in validation from the first commit: `app api docs help status whatsapp www admin orders mail cdn assets static store dashboard billing support blog`.
 - **Self-serve like Shopify**: signup → live store with no human from Whisky 11.
-- **Arabic-first (RTL default) + English**, like FWB.
+- **Arabic-first (RTL default) + English**, like Ebda Store.
 - **Currency EGP** in integer piastres; VAT 14% (configurable), charged after discount.
 - **Payments:** every Egyptian provider (Paymob, Kashier, Fawry, Valu/BNPL, Meeza, wallets) + COD + **InstaPay with ONE manual merchant-confirm step**. Merchant subscription billing in **EGP** via an Egyptian provider (Kashier supports subscriptions); Polar last.
 - **Shipping:** every Egyptian carrier with a usable API (Bosta, Aramex, then others from SP10 research) behind one interface.
@@ -46,7 +46,7 @@
 
 | Needed for                               | Item                                                                                                                                     |
 | ---------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| Start                                    | Claude GitHub app access: READ `ForceAI-KW/force-website-builder`, WRITE `whisky-11/ebda`                                                |
+| Start                                    | Claude GitHub app access: READ `Whisky-11/ebda-store`, WRITE `whisky-11/ebda`                                                |
 | SP3 spike deploy (optional), SP4 staging | Cloudflare API token scoped to the Ebda account + `ebda.app` zone; a Neon project for Ebda (connection string as a cloud-session secret) |
 | SP5                                      | Kashier (or chosen) merchant-billing sandbox keys; Resend API key + verified `ebda.app` sender                                           |
 | SP6                                      | Sandbox keys: Paymob, Kashier, Fawry, Valu (as available)                                                                                |
@@ -96,20 +96,20 @@ Briefs in `docs/research/`, sources cited, decision-ready:
 
 ### SP3 — Cloudflare backend design + spike (Opus design)
 
-1. `docs/design/cloudflare-backend.md`: every FWB API dependency → Workers equivalent (router; Prisma pg adapter on workerd via Hyperdrive; Redis uses → DO/KV/rate-limiting each with consistency stated; Inngest → Queues/Cron or Inngest→Worker; R2; Resend; payments); host routing model for `<slug>.ebda.app` + Cloudflare-for-SaaS custom hostnames; tenancy (RLS GUCs per query); observability.
-2. Spike: port 3 routes (a public catalogue read, a cart write, a payment webhook) and run FWB's buy-flow parity harness (`scripts/buy-flow-parity/`) against them, on workerd (`wrangler dev`/miniflare) with the pg adapter.
+1. `docs/design/cloudflare-backend.md`: every Ebda Store API dependency → Workers equivalent (router; Prisma pg adapter on workerd via Hyperdrive; Redis uses → DO/KV/rate-limiting each with consistency stated; Inngest → Queues/Cron or Inngest→Worker; R2; Resend; payments); host routing model for `<slug>.ebda.app` + Cloudflare-for-SaaS custom hostnames; tenancy (RLS GUCs per query); observability.
+2. Spike: port 3 routes (a public catalogue read, a cart write, a payment webhook) and run Ebda Store's buy-flow parity harness (`scripts/buy-flow-parity/`) against them, on workerd (`wrangler dev`/miniflare) with the pg adapter.
 3. Decision (full port vs staged) written as a Ruling in `docs/RULINGS.md`.
    **Done when:** design + spike PR open; parity `result.json` green (read the JSON, not the exit code); **Ahmad approves the design** (stop here and wait).
 
 ### SP4 — Clone, rebrand, Egypt base, hosts
 
-- `main` = FWB history; `git remote add upstream`; `docs/TWIN-PATHS.md` (shared paths) + `scripts/twin-diff.sh` (lists upstream commits touching shared paths since last sync).
-- Config-driven brand (`packages/shared/brand`): name, colours, logo, fonts; zero FWB / Force AI strings visible (CI grep test).
+- `main` = Ebda Store history; `git remote add upstream`; `docs/TWIN-PATHS.md` (shared paths) + `scripts/twin-diff.sh` (lists upstream commits touching shared paths since last sync).
+- Config-driven brand (`packages/shared/brand`): name, colours, logo, fonts; zero Ebda Store / Ebda AI Studio strings visible (CI grep test).
 - EGP minor units end to end; Egypt VAT config; Arabic-first default.
 - Reserved-slug validation; host resolver for `<slug>.ebda.app` + custom domains (throws on unknown host; tests per Review Focus 1).
 - Nile login animation on `store.ebda.app/login` (respect `prefers-reduced-motion`).
 - Backend per SP3 decision.
-  **Done when:** Amelia Aurum's catalogue (CSV import) runs on a staging `amelia.ebda.app` (or local equivalent if no CF token yet) with parity green and the no-FWB-branding test passing.
+  **Done when:** Amelia Aurum's catalogue (CSV import) runs on a staging `amelia.ebda.app` (or local equivalent if no CF token yet) with parity green and the no-Ebda Store-branding test passing.
 
 ### SP5 — Self-serve onboarding + merchant billing
 
@@ -150,7 +150,7 @@ Briefs in `docs/research/`, sources cited, decision-ready:
 
 ### Out of this cloud run (local / Ahmad)
 
-- FWB finish (in flight locally), lessons→skills, Umbra stability (pre-launch Phases 0–2).
+- Ebda Store finish (in flight locally), lessons→skills, Umbra stability (pre-launch Phases 0–2).
 - DNS, Cloudflare zone, provider KYC/accounts, Facebook account.
 - **Launch (SP12):** production deploy, Amelia migration, monitoring/alerting/log drain, backups + DR drill, consent/erasure/export, five testing layers — run with Ahmad, after this cloud run.
 - **Ebda WhatsApp platform (WBS rebrand):** after launch.

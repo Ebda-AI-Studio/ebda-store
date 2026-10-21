@@ -1,4 +1,4 @@
-# Horizontal Scaling Guide — Force Website Builder API
+# Horizontal Scaling Guide — Ebda Store API
 
 This document covers both vertical and horizontal scaling for the Railway-hosted Express API
 (`apps/api`). The code changes that make horizontal scaling safe are on branch
@@ -64,7 +64,7 @@ Before setting `numReplicas > 1`, verify all of these:
 - [ ] **No sticky-session requirement** — the Socket.io redis adapter makes sessions stateless,
       so Railway's default round-robin balancing works. Do NOT enable sticky sessions.
 - [ ] **`REDIS_KEY_PREFIX`** — If staging and prod share the same Redis instance, staging should
-      have `REDIS_KEY_PREFIX=fwb-staging:` set. Prod leaves it unset. The prefix is already wired
+      have `REDIS_KEY_PREFIX=ebda-staging:` set. Prod leaves it unset. The prefix is already wired
       in `redis.service.ts` via the `keyPrefix` ioredis option.
 
 ### Recommended rollout

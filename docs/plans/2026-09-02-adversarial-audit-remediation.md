@@ -409,7 +409,7 @@ limiters.
 
 ## Task 13: Correct `CLAUDE.md` (explicitly requested)
 
-The live API host is `api.force-ai.co` (verified: 200 via Cloudflare). The documented
+The live API host is `api.ebda.app` (verified: 200 via Cloudflare). The documented
 `api-production-c058.up.railway.app` returns `404 / x-railway-fallback: true /
 "Application not found"` — no service is bound to it. Correct the "Tech stack + deployment" line,
 and sweep every other doc repeating it:

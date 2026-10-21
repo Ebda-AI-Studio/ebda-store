@@ -13,7 +13,7 @@ store's theme tokens, so each store's page matches its own brand.
 | --------------- | ------------------------------------------------- |
 | `storeId`       | FK → `stores.id`, `ON DELETE CASCADE`             |
 | `name`          | required; `nameAr?` Arabic                        |
-| `country`       | required (e.g. "Kuwait", "U.A.E."); `countryAr?`  |
+| `country`       | required (e.g. "Egypt", "U.A.E."); `countryAr?`  |
 | `address`       | required; `addressAr?`                            |
 | `phone?`        | `tel:` target                                     |
 | `whatsapp?`     | wa.me number (digits or `+<intl>`)                |
@@ -64,7 +64,7 @@ i18n strings live in `apps/web/src/contexts/LanguageContext.tsx`.
 
 **Brand inheritance:** the component hardcodes zero colors — `bg-background/card/primary`,
 `text-foreground/muted-foreground/primary-foreground`, `border-border`. Same page renders
-pecan-brown for pecannbee and each store's own palette for them.
+pecan-brown for demo-store and each store's own palette for them.
 
 **Discoverability:** when `locationsEnabled` is on, `ShopChrome` auto-appends a
 bilingual **"Locations / الفروع"** item to the store's `navigation` list — which feeds
@@ -75,15 +75,15 @@ extra footer columns via `store.settings.footerLinks`. Requires the API to expos
 `locationsEnabled` on the public store payload (`public.routes.ts`) and the web
 `StoreContext` store type.
 
-## Seed (pecannbee)
+## Seed (demo-store)
 
-`packages/database/scripts/seed-pecannbee-locations.ts` — reads the captured
-`~/Downloads/pecannbee-migration/locations-page/locations.json`, upserts the branches by
+`packages/database/scripts/seed-demo-store-locations.ts` — reads the captured
+`~/Downloads/demo-store-migration/locations-page/locations.json`, upserts the branches by
 `[storeId, name]` (idempotent), and sets `locationsEnabled=true`. Run post-deploy with the
 prod `DATABASE_URL`:
 
 ```bash
-npx tsx packages/database/scripts/seed-pecannbee-locations.ts
+npx tsx packages/database/scripts/seed-demo-store-locations.ts
 ```
 
 Then verify on the storefront `/locations` (EN + AR) and in admin `/stores/<id>/locations`.

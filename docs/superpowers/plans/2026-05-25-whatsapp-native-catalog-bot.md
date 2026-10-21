@@ -8,14 +8,14 @@
 of the existing `wa-ordering.js` state machine, adding pre-catalog greeting/language/services flow +
 saved-address + payment-method steps. Target ≤3s p95 per interaction (current ~15s+).
 
-**Architecture:** Cross-repo (FWB + WBS). FWB owns products/customers/orders + Inngest fanout on
+**Architecture:** Cross-repo (Ebda Store + WBS). Ebda Store owns products/customers/orders + Inngest fanout on
 product changes. WBS owns the state machine + Meta Graph API calls (catalog sync + interactive
 messages). Catalog hosted at Meta Commerce eliminates per-message bridge calls; only async
-background sync hits FWB.
+background sync hits Ebda Store.
 
-**Tech Stack:** Node 20, Express, Prisma 7 (FWB) / Prisma 5 (WBS), Neon Postgres, Redis (BullMQ +
-cache), Inngest (FWB), Meta WhatsApp Cloud API v22, Meta Graph API for Catalog Object, Next.js 16
-(FWB admin).
+**Tech Stack:** Node 20, Express, Prisma 7 (Ebda Store) / Prisma 5 (WBS), Neon Postgres, Redis (BullMQ +
+cache), Inngest (Ebda Store), Meta WhatsApp Cloud API v22, Meta Graph API for Catalog Object, Next.js 16
+(Ebda Store admin).
 
 **Spec:**
 [`docs/superpowers/specs/2026-05-25-whatsapp-native-catalog-bot-design.md`](../specs/2026-05-25-whatsapp-native-catalog-bot-design.md)
@@ -24,7 +24,7 @@ cache), Inngest (FWB), Meta WhatsApp Cloud API v22, Meta Graph API for Catalog O
 
 ## File Structure Overview
 
-### FWB (`/Users/ahmadsharaf/Desktop/projects/force-website-builder`)
+### Ebda Store (`/Users/ahmadsharaf/Desktop/projects/ebda-store`)
 
 | File                                                                                     | Status | Purpose                                                                                                                                                                                                                       |
 | ---------------------------------------------------------------------------------------- | ------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -55,8 +55,8 @@ cache), Inngest (FWB), Meta WhatsApp Cloud API v22, Meta Graph API for Catalog O
 | `backend/src/services/metaCatalogService.js`           | rewrite | (existing 176 LOC stub) — full Meta Graph API client: `upsertProduct(storeConfig, product)`, `deleteProduct(storeConfig, retailerId)`, `getCatalogStatus(storeConfig)`                                                                                                    |
 | `backend/src/services/bot-service-router.js`           | create  | maps service-menu tap → state branch                                                                                                                                                                                                                                      |
 | `backend/src/services/wa-bridge-client.js`             | modify  | new methods: `getCustomerAddresses`, `createCustomerAddress`, `getStoreServiceMenu`, `getStoreMetaCatalogConfig`                                                                                                                                                          |
-| `backend/src/routes/external.js`                       | modify  | new endpoint `POST /internal/inngest-receiver` (auth via shared secret) for FWB-side fanout                                                                                                                                                                               |
-| `backend/scripts/wa-keepalive.js`                      | create  | ping FWB `/health` every 4 min — prevents Railway cold start                                                                                                                                                                                                              |
+| `backend/src/routes/external.js`                       | modify  | new endpoint `POST /internal/inngest-receiver` (auth via shared secret) for Ebda Store-side fanout                                                                                                                                                                               |
+| `backend/scripts/wa-keepalive.js`                      | create  | ping Ebda Store `/health` every 4 min — prevents Railway cold start                                                                                                                                                                                                              |
 | `backend/__tests__/wa-ordering-greeting.test.js`       | create  | greeting → language → service state transitions                                                                                                                                                                                                                           |
 | `backend/__tests__/wa-ordering-service-router.test.js` | create  | each service-menu choice routes correctly                                                                                                                                                                                                                                 |
 | `backend/__tests__/wa-ordering-native-catalog.test.js` | create  | catalog message → cart receive → address → payment                                                                                                                                                                                                                        |
@@ -67,7 +67,7 @@ cache), Inngest (FWB), Meta WhatsApp Cloud API v22, Meta Graph API for Catalog O
 
 | Var                       | Repo | Where to set                               |
 | ------------------------- | ---- | ------------------------------------------ |
-| `INNGEST_RECEIVER_SECRET` | both | `gh secret set` on FWB + WBS Railway env   |
+| `INNGEST_RECEIVER_SECRET` | both | `gh secret set` on Ebda Store + WBS Railway env   |
 | `META_GRAPH_API_BASE`     | WBS  | default `https://graph.facebook.com/v22.0` |
 
 ---
@@ -77,7 +77,7 @@ cache), Inngest (FWB), Meta WhatsApp Cloud API v22, Meta Graph API for Catalog O
 **Goal**: Measure where the current 15s+ comes from. Apply quick wins BEFORE building new flow on
 top of slow bedrock.
 
-### Task 0.1: Add pino timing middleware to FWB wa-bridge routes
+### Task 0.1: Add pino timing middleware to Ebda Store wa-bridge routes
 
 **Files:**
 
@@ -124,7 +124,7 @@ describe('waBridgeTiming', () => {
 - [ ] **Step 2: Run test to verify it fails**
 
 Run:
-`cd /Users/ahmadsharaf/Desktop/projects/force-website-builder && npx vitest run tests/unit/wa-bridge-timing.test.ts`
+`cd /Users/ahmadsharaf/Desktop/projects/ebda-store && npx vitest run tests/unit/wa-bridge-timing.test.ts`
 Expected: FAIL with "Cannot find module '@api/lib/observability/wa-bridge-timing'"
 
 - [ ] **Step 3: Write minimal implementation**
@@ -203,14 +203,14 @@ In `wa-bridge-client.js`, for each exported function (e.g. `getStoreCatalog`, `g
 ```js
 // before:
 async function getStoreCatalog(client, opts) {
-  const url = `${client.fwbApiUrl}/wa-bridge/store-catalog?storeId=${opts.storeId}`;
+  const url = `${client.ebdaApiUrl}/wa-bridge/store-catalog?storeId=${opts.storeId}`;
   const res = await fetch(url, { headers: { 'X-WBS-API-KEY': key } });
   return res.json();
 }
 
 // after:
 async function getStoreCatalog(client, opts) {
-  const url = `${client.fwbApiUrl}/wa-bridge/store-catalog?storeId=${opts.storeId}`;
+  const url = `${client.ebdaApiUrl}/wa-bridge/store-catalog?storeId=${opts.storeId}`;
   const start = process.hrtime.bigint();
   try {
     const res = await fetch(url, { headers: { 'X-WBS-API-KEY': key } });
@@ -245,22 +245,22 @@ git push origin main
 
 - Create: `docs/uat/whatsapp-bot-latency-baseline.md`
 
-- [ ] **Step 1: Trigger a full order from Force Media test WhatsApp number to Wady Aljuz bot**
+- [ ] **Step 1: Trigger a full order from Ebda AI Studio test WhatsApp number to Wady Aljuz bot**
 
 Send: `Hi` → walk through every state → place a real order. Capture log output from Railway:
 
 ```bash
 railway logs --service whatsapp-broadcaster --tail 200 > /tmp/wbs-latency-baseline.log
-railway logs --service api --tail 200 > /tmp/fwb-latency-baseline.log
+railway logs --service api --tail 200 > /tmp/ebda-latency-baseline.log
 ```
 
-(Wbs has the user-perceived latency, FWB has bridge endpoint durations.)
+(Wbs has the user-perceived latency, Ebda Store has bridge endpoint durations.)
 
 - [ ] **Step 2: Compute the latency table**
 
 ```bash
 grep "wa-bridge call" /tmp/wbs-latency-baseline.log | jq -c '{endpoint, durationMs, status}'
-grep "wa-bridge timing" /tmp/fwb-latency-baseline.log | jq -c '{path, durationMs, status, storeId}'
+grep "wa-bridge timing" /tmp/ebda-latency-baseline.log | jq -c '{path, durationMs, status, storeId}'
 ```
 
 Write findings to `docs/uat/whatsapp-bot-latency-baseline.md`. Structure:
@@ -309,7 +309,7 @@ Write findings to `docs/uat/whatsapp-bot-latency-baseline.md`. Structure:
 - [ ] **Step 3: Commit + push**
 
 ```bash
-cd /Users/ahmadsharaf/Desktop/projects/force-website-builder
+cd /Users/ahmadsharaf/Desktop/projects/ebda-store
 git add docs/uat/whatsapp-bot-latency-baseline.md
 git commit -m "docs(uat): wa-bot latency baseline before native catalog work"
 git push origin main
@@ -328,7 +328,7 @@ git push origin main
 ```js
 // backend/scripts/wa-keepalive.js
 /**
- * Pings FWB /wa-bridge/health every 4 min to keep the Railway service warm
+ * Pings Ebda Store /wa-bridge/health every 4 min to keep the Railway service warm
  * + the Neon DB compute unpaused. Without this, the first wa-bot inbound
  * after idle absorbs 5-10s of cold start.
  *
@@ -349,10 +349,10 @@ async function pingAllActiveClients() {
   });
   for (const client of clients) {
     const settings = client.wa_ordering_settings;
-    if (!settings?.fwbApiUrl) continue;
+    if (!settings?.ebdaApiUrl) continue;
     try {
       const start = Date.now();
-      const res = await fetch(`${settings.fwbApiUrl}/wa-bridge/health`, {
+      const res = await fetch(`${settings.ebdaApiUrl}/wa-bridge/health`, {
         headers: { 'X-WBS-API-KEY': (await getDecryptedFwbApiKey(client.id)) || '' },
         signal: AbortSignal.timeout(5000),
       });
@@ -389,7 +389,7 @@ require('./scripts/wa-keepalive').start();
 
 ```bash
 git add backend/scripts/wa-keepalive.js backend/worker.js
-git commit -m "perf(wbs): wa-keepalive script to prevent fwb cold start"
+git commit -m "perf(wbs): wa-keepalive script to prevent ebda cold start"
 git push origin main
 ```
 
@@ -463,7 +463,7 @@ Phase A.
 
 ## Phase A — Catalog Sync (Day 1.5)
 
-**Goal**: FWB product writes propagate to Meta Commerce Catalog in real time (≤5s).
+**Goal**: Ebda Store product writes propagate to Meta Commerce Catalog in real time (≤5s).
 
 ### Task A.1: Migration — Store + Customer schema changes
 
@@ -523,7 +523,7 @@ model CustomerAddress {
 
 - [ ] **Step 2: Create the migration SQL**
 
-Use plural table names because FWB uses `@@map` to plural per memory
+Use plural table names because Ebda Store uses `@@map` to plural per memory
 `feedback-prisma-migration-uses-mapped-table-names.md`:
 
 ```sql
@@ -571,7 +571,7 @@ ALTER TABLE "customer_addresses"
 - [ ] **Step 3: Test migration locally**
 
 ```bash
-cd /Users/ahmadsharaf/Desktop/projects/force-website-builder
+cd /Users/ahmadsharaf/Desktop/projects/ebda-store
 source ~/.nvm/nvm.sh && nvm use 20
 export DATABASE_URL="postgresql://<u>:<p>@localhost:5432/force_test"  # test creds — local container only
 docker run -d --name pg-mig-test -p 5432:5432 -e POSTGRES_USER=test -e POSTGRES_PASSWORD=test -e POSTGRES_DB=force_test postgres:16-alpine
@@ -590,7 +590,7 @@ git commit -m "feat(db): wa native catalog bot schema — store config + custome
 git push origin main
 ```
 
-### Task A.2: customer-address.service.ts (FWB)
+### Task A.2: customer-address.service.ts (Ebda Store)
 
 **Files:**
 
@@ -699,7 +699,7 @@ git commit -m "feat(api): customer-address service"
 git push origin main
 ```
 
-### Task A.3: wa-bridge customer-addresses endpoints (FWB)
+### Task A.3: wa-bridge customer-addresses endpoints (Ebda Store)
 
 **Files:**
 
@@ -813,7 +813,7 @@ git commit -m "feat(api): wa-bridge customer-addresses GET + POST endpoints"
 git push origin main
 ```
 
-### Task A.4: wa-bridge store-config endpoints (FWB)
+### Task A.4: wa-bridge store-config endpoints (Ebda Store)
 
 **Files:**
 
@@ -839,7 +839,7 @@ git commit -m "feat(api): wa-bridge store config endpoints (service menu + meta 
 git push origin main
 ```
 
-### Task A.5: Product Inngest events (FWB)
+### Task A.5: Product Inngest events (Ebda Store)
 
 **Files:**
 
@@ -1041,7 +1041,7 @@ describe('metaCatalogService', () => {
         id: 'prod1',
         name: 'X',
         price: 950,
-        currency: 'KWD',
+        currency: 'EGP',
         images: ['https://img'],
         status: 'active',
       }
@@ -1068,7 +1068,7 @@ describe('metaCatalogService', () => {
 
     const result = await metaCatalog.upsertProduct(
       { catalogId: 'cat123', accessToken: 'tok' },
-      { id: 'prod1', name: 'X', price: 950, currency: 'KWD' }
+      { id: 'prod1', name: 'X', price: 950, currency: 'EGP' }
     );
 
     expect(result.ok).toBe(false);
@@ -1101,7 +1101,7 @@ async function upsertProduct(storeConfig, product) {
       description: product.description || product.name,
       availability: product.status === 'active' ? 'in stock' : 'out of stock',
       condition: 'new',
-      price: `${(product.price / 1000).toFixed(3)} ${product.currency || 'KWD'}`,
+      price: `${(product.price / 1000).toFixed(3)} ${product.currency || 'EGP'}`,
       image_url: (product.images && product.images[0]) || '',
       visibility: product.status === 'active' ? 'published' : 'staging',
     },
@@ -1183,7 +1183,7 @@ npx jest __tests__/metaCatalogService.test.js
 In `backend/src/routes/external.js`, add (require `metaCatalogService` at top):
 
 ```js
-// POST /api/internal/inngest-receiver — called by FWB Inngest functions
+// POST /api/internal/inngest-receiver — called by Ebda Store Inngest functions
 router.post('/internal/inngest-receiver', async (req, res) => {
   const secret = req.headers['x-inngest-receiver-secret'];
   if (secret !== process.env.INNGEST_RECEIVER_SECRET) {
@@ -1194,7 +1194,7 @@ router.post('/internal/inngest-receiver', async (req, res) => {
     return res.status(400).json({ error: 'unknown kind' });
   }
 
-  // Look up the merchant + Meta catalog config (which client maps to this FWB store?)
+  // Look up the merchant + Meta catalog config (which client maps to this Ebda Store store?)
   const client = await prisma.clients.findFirst({
     where: { wa_ordering_settings: { path: ['fwbStoreId'], equals: storeId } },
   });
@@ -1229,7 +1229,7 @@ git commit -m "feat(wbs): meta catalog service + inngest receiver endpoint"
 git push origin main
 ```
 
-**Phase A acceptance gate**: a product create in FWB admin appears in Meta Commerce Manager within
+**Phase A acceptance gate**: a product create in Ebda Store admin appears in Meta Commerce Manager within
 10s (manual smoke).
 
 ---
@@ -1848,8 +1848,8 @@ it('viewing_catalog → user places cart → cart_received → bot sends summary
         catalog_id: 'cat123',
         text: '',
         product_items: [
-          { product_retailer_id: 'prod1', quantity: 1, item_price: '0.950', currency: 'KWD' },
-          { product_retailer_id: 'prod2', quantity: 2, item_price: '0.475', currency: 'KWD' },
+          { product_retailer_id: 'prod1', quantity: 1, item_price: '0.950', currency: 'EGP' },
+          { product_retailer_id: 'prod2', quantity: 2, item_price: '0.475', currency: 'EGP' },
         ],
       },
     },
@@ -1883,7 +1883,7 @@ async function handleCartReceived(client, session, waId, message) {
     productRetailerId: p.product_retailer_id,
     quantity: p.quantity,
     priceFils: Math.round(Number(p.item_price) * 1000),
-    currency: p.currency || 'KWD',
+    currency: p.currency || 'EGP',
   }));
 
   const subtotalFils = items.reduce((s, i) => s + i.priceFils * i.quantity, 0);
@@ -1948,11 +1948,11 @@ Extend `wa-bridge-client.js`:
 
 ```js
 async function getCustomerAddresses(client, { customerId }) {
-  const url = `${client.wa_ordering_settings.fwbApiUrl}/wa-bridge/customer-addresses?customerId=${customerId}`;
+  const url = `${client.wa_ordering_settings.ebdaApiUrl}/wa-bridge/customer-addresses?customerId=${customerId}`;
   // timing wrapper + return data.addresses
 }
 async function createCustomerAddress(client, { customerId, ...rest }) {
-  const url = `${client.wa_ordering_settings.fwbApiUrl}/wa-bridge/customer-addresses`;
+  const url = `${client.wa_ordering_settings.ebdaApiUrl}/wa-bridge/customer-addresses`;
   // POST with body { customerId, ...rest }
 }
 module.exports = { ..., getCustomerAddresses, createCustomerAddress };
@@ -2079,7 +2079,7 @@ async function handleNewAddress(client, session, waId, message) {
     return await sendAddressTextPrompt(client, session, waId, session.context?.locale || 'en');
   }
 
-  // Parse: very naive — let it through for v1, merchant can refine via FWB admin
+  // Parse: very naive — let it through for v1, merchant can refine via Ebda Store admin
   const parts = text.split(/[,،]/).map(s => s.trim());
   const area = parts[0] || text.slice(0, 50);
   const street = parts.slice(1).join(', ') || area;
@@ -2209,7 +2209,7 @@ async function handlePaymentChoice(client, session, waId, message) {
 }
 ```
 
-Update `/cart/from-wa` route in FWB to accept the new fields (addressId, addressFreeform,
+Update `/cart/from-wa` route in Ebda Store to accept the new fields (addressId, addressFreeform,
 paymentMethod, locale) — pass through to order service.
 
 - [ ] **Step 3: Tests + commit (both repos)**
@@ -2229,7 +2229,7 @@ paymentMethod, locale) — pass through to order service.
 - [ ] **Step 3: Commit**
 
 **Phase C acceptance gate**: end-to-end test: Hi → English → Order Now → catalog opens → 2 items
-added → Checkout → saved address picked → Cash → confirmation. Order appears in FWB admin within 3s
+added → Checkout → saved address picked → Cash → confirmation. Order appears in Ebda Store admin within 3s
 of Cash tap.
 
 ---
@@ -2273,7 +2273,7 @@ WHERE "bot_service_menu" IS NULL;
       fields to the schema (additive migration)
 - [ ] Verify `routeLocations` reads these correctly
 
-**Phase D acceptance gate**: A merchant can log into FWB admin → Store → WhatsApp Bot → toggle which
+**Phase D acceptance gate**: A merchant can log into Ebda Store admin → Store → WhatsApp Bot → toggle which
 services appear + paste their Meta catalog credentials. Save → smoke test confirms changes are live.
 
 ---
@@ -2291,14 +2291,14 @@ Step-by-step:
 1. Create Meta Business Manager account
 2. Create Commerce Catalog
 3. Generate System User access token with `catalog_management` scope
-4. Save token + IDs in FWB admin → Store → WhatsApp Bot → Meta Catalog Card
+4. Save token + IDs in Ebda Store admin → Store → WhatsApp Bot → Meta Catalog Card
 5. Trigger initial product sync: `npm run sync-catalog --storeId=<>` (or click button in admin)
 6. Verify in Meta Commerce Manager: products visible
 7. Submit catalog for review (24-48h)
 
 ### Task E.2: Flip Wady Aljuz to `native_catalog_with_gemini_agent`
 
-- [ ] Once Meta approves catalog, set `Store.bot_mode = 'native_catalog_with_gemini_agent'` via FWB
+- [ ] Once Meta approves catalog, set `Store.bot_mode = 'native_catalog_with_gemini_agent'` via Ebda Store
       admin
 - [ ] Send Telegram notify on this state change (new alert in WBS notify service)
 
@@ -2321,7 +2321,7 @@ Real WhatsApp number sends "Hi" → walks the full flow. Captured screenshots in
 - §3 User flow (8 steps) → covered by Phase B (B.3, B.4) + Phase C (C.1-C.4)
 - §4.2 State machine → covered by Phase B + C task list
 - §4.3 Data model → Phase A.1 migration
-- §4.4 New FWB endpoints → Phase A.3 + A.4
+- §4.4 New Ebda Store endpoints → Phase A.3 + A.4
 - §4.5 New WBS services → Phase A.6 (metaCatalog), Phase B.1 (wa-interactive), B.4
   (bot-service-router)
 - §5 Performance → Phase 0 (tasks 0.1-0.6)

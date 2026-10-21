@@ -1,6 +1,6 @@
 /**
  * GDPR Art. 17 + 20 and applicable GCC data-protection law (see
- * docs/legal/gcc-data-protection.md) endpoints:
+ * docs/privacy/data-map.md) endpoints:
  *   POST /auth/me/erase  — irreversible PII anonymization
  *   GET  /auth/me/export — right to data portability
  *

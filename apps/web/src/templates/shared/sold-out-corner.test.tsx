@@ -84,9 +84,9 @@ describe('X-01 on the cards', () => {
     'shared card (%s): the ribbon leaves the heart corner; the sale chip leaves the ribbon corner',
     async lang => {
       languageState.language = lang;
-      const { PecannbeeProductCard } = await import('./PecannbeeProductCard');
+      const { StorefrontProductCard } = await import('./StorefrontProductCard');
       const { container } = render(
-        <PecannbeeProductCard
+        <StorefrontProductCard
           product={
             {
               id: 'p1',
@@ -162,9 +162,9 @@ describe('X-01 (fix round): a MERCHANT-placed sale chip and the sold-out marker 
           discountBadge: { position: lang === 'en' ? 'top-right' : 'top-left' },
         },
       };
-      const { PecannbeeProductCard } = await import('./PecannbeeProductCard');
+      const { StorefrontProductCard } = await import('./StorefrontProductCard');
       const { container } = render(
-        <PecannbeeProductCard
+        <StorefrontProductCard
           product={OOS_ON_SALE as never}
           isRtl={lang === 'ar'}
           onAddToWishlist={() => {}}

@@ -1,8 +1,8 @@
-# FWB Scaling-Cliff Audit — 2026-07-12
+# Ebda Store Scaling-Cliff Audit — 2026-07-12
 
 > **Correction (2026-09-02):** the `api-production-c058.up.railway.app` hostname cited below as
 > "the API's raw domain" no longer serves anything (verified: 404, `server: railway-hikari`,
-> `x-railway-fallback: true`). The live API host is now `api.force-ai.co`, proxied through
+> `x-railway-fallback: true`). The live API host is now `api.ebda.app`, proxied through
 > Cloudflare. This does not change the finding's substance (whether the origin sat behind a CDN
 > at the time) — left as-is for the historical record; do not treat the hostname as current.
 
@@ -279,7 +279,7 @@ This is exactly the "F8" hazard the sibling comment describes: on N Railway
 replicas, a single WBS API key (or an attacker who obtains one) gets N×120
 req/min instead of 120/min, because each replica counts independently.
 The route comment even states the intent — "contain a buggy WBS
-state-machine retry loop from overwhelming FWB" — which the current
+state-machine retry loop from overwhelming Ebda Store" — which the current
 implementation only achieves per-replica, not per-integration.
 
 **Fix:** one-line change — `store: makeRateLimitStore(redis.getClient(), 'wa-bridge')`,
@@ -346,7 +346,7 @@ Straight count by the severity written on each finding:
 
 ---
 
-## What FWB already does well (so this audit reads balanced)
+## What Ebda Store already does well (so this audit reads balanced)
 
 - **Caching infra is mature and correctly layered where it's used**: `public-cache.ts`'s `getCached()` does Redis-primary + bounded in-memory fallback + **in-process single-flight** (collapses a thundering herd at a TTL boundary to one query per pod, not one per request) + `invalidateCached`/`invalidateCachedPrefix` write-side busting. `/products`, `/products/:slugOrId`, `/categories`, `/search/suggest`, `/stores/:slugOrId` all use it correctly, all at the 120s TTL floor the project enforces via an ESLint rule (`cacheTtlSelectors`, referenced in `customers.routes.ts:339`).
 - **Async/Inngest coverage is extensive**: 54 Inngest functions cover bulk AI, accounting journals, order-lifecycle fanout, abandoned carts, payment-webhook processing (with a durable inbox row + inline fallback if `inngest.send` itself fails — `webhook.routes.ts:213-257`), review requests, deadstock/reorder scans, and more. The payment-webhook path specifically moved off the shared Prisma pool to avoid starving auth under a webhook storm (`WebhookEvent` doc comment, `schema.prisma:1351-1364`).

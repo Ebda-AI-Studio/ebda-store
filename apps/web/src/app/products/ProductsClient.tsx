@@ -25,7 +25,7 @@ import { toggleCompare } from '@/lib/compare';
 import { useStore, useStoreUrl } from '../../contexts/StoreContext';
 import { useTemplateComponents } from '../../hooks/useTemplateComponents';
 import { toTemplateProduct } from '../../templates/adapters';
-import { PecannbeeProductCard } from '../../templates/shared/PecannbeeProductCard';
+import { StorefrontProductCard } from '../../templates/shared/StorefrontProductCard';
 import { gridGapClass } from '../../templates/shared/card-size';
 import {
   resolveSectionZone,
@@ -207,7 +207,7 @@ export default function ProductsClient({
   // zones are not accessible from this client component (they're emitted as
   // CSS in layout.tsx), so we pass undefined for the global zone arg — same
   // pattern as HomePageContent.tsx. When no per-section override is set,
-  // resolveSectionZone returns undefined and PecannbeeProductCard falls back
+  // resolveSectionZone returns undefined and StorefrontProductCard falls back
   // to its pack-styles CSS classes (no inline style applied).
   const plpProductNameZone = resolveSectionZone(
     productCardDefaults?.typography?.productName,
@@ -264,7 +264,7 @@ export default function ProductsClient({
   const ctxArDefinite = ctxAr.startsWith('ال') ? ctxAr : `ال${ctxAr}`;
 
   // Cart-id → quantity is consumed by ProductListItem (list view). The grid
-  // view's PecannbeeProductCard handles its own optimistic add state.
+  // view's StorefrontProductCard handles its own optimistic add state.
   const cartQuantities = useMemo<Record<string, number>>(() => {
     const map: Record<string, number> = {};
     for (const item of cartItems) map[item.productId] = item.quantity;
@@ -809,7 +809,7 @@ export default function ProductsClient({
                     // when the shopper returns from cart via "Continue Shopping"
                     // after adding this product on the PDP.
                     <div key={p.id} id={`product-${p.id}`}>
-                      <PecannbeeProductCard
+                      <StorefrontProductCard
                         key={p.id}
                         // First row(s) are above the fold — eager-load + preload
                         // their images to improve LCP (audit). Rest stay lazy.

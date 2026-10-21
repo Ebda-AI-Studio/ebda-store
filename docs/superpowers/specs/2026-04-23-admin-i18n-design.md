@@ -6,7 +6,7 @@
 
 ## Why this is overdue
 
-The storefront (`apps/web`) has been bilingual EN/AR since day one — every customer-facing page runs through `useLanguage()` and renders Arabic with `dir="rtl"`. The admin dashboard (`apps/admin`) is English-only. Store owners whose first language is Arabic currently manage their bilingual store through an English-only control panel. That's a product gap every tenant in Kuwait (the primary market) hits.
+The storefront (`apps/web`) has been bilingual EN/AR since day one — every customer-facing page runs through `useLanguage()` and renders Arabic with `dir="rtl"`. The admin dashboard (`apps/admin`) is English-only. Store owners whose first language is Arabic currently manage their bilingual store through an English-only control panel. That's a product gap every tenant in Egypt (the primary market) hits.
 
 ## Scope
 

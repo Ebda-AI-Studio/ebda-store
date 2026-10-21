@@ -1,12 +1,12 @@
-# RLS Cutover Readiness Map — force_app flip, line-by-line safety foundation (2026-07-16)
+# RLS Cutover Readiness Map — the earlier app role flip, line-by-line safety foundation (2026-07-16)
 
 **Purpose:** the definitive, statically-computed gap list for flipping production
-`DATABASE_URL` from the `neondb_owner` BYPASSRLS role to the non-bypass `force_app`
-login role, per `docs/plans/2026-07-02-rls-cutover.md` Phase 3. Under `force_app`,
+`DATABASE_URL` from the `neondb_owner` BYPASSRLS role to the non-bypass the earlier app role
+login role, per `docs/plans/2026-07-02-rls-cutover.md` Phase 3. Under the earlier app role,
 Postgres RLS starts enforcing. The flip is safe ONLY if every query either
 (a) runs inside tenant context (`runInTenantContext` sets `app.current_store_id` →
 RLS filters), (b) is an intentional `withRlsBypass` (cross-tenant by design), or
-(c) hits a table whose `force_app` policy + grant allow it. Any gap = deny-all
+(c) hits a table whose the earlier app role policy + grant allow it. Any gap = deny-all
 (feature breaks) or, for the ungoverned surfaces, a silent leak.
 
 **Method:** read all 98 migration dirs in `packages/database/prisma/migrations/`
@@ -66,7 +66,7 @@ against current code rather than trusting them.
 3. **Grant gaps:** ALL grants live in ONE migration
    (`20260404000000_add_rls_policies:22-29`); no later migration issues any GRANT.
    Coverage of the 65+ tables created _after_ it relies entirely on
-   `ALTER DEFAULT PRIVILEGES IN SCHEMA public ... TO force_app` **with no `FOR ROLE`
+   `ALTER DEFAULT PRIVILEGES IN SCHEMA public ... TO the earlier app role` **with no `FOR ROLE`
    clause** → it only auto-grants on tables created by the _same role_ that ran that
    statement. This holds IF every migration ran via `prisma migrate deploy` on the
    owner `DIRECT_URL` (plan says it does; CI/Railway config confirms). **This is the
@@ -125,7 +125,7 @@ they're three generations of the same idea):
 
 `*` **product_faqs has RLS via a join to `products.store_id`**, but the app-layer IDOR
 audit's C1 shows the CRUD handlers query by `productId` only — RLS _would_ backstop
-cross-tenant FAQ access once force_app is live (the join predicate filters), but the
+cross-tenant FAQ access once the earlier app role is live (the join predicate filters), but the
 app handler still needs the storeId check because `ProductFaq` itself is reachable
 today under BYPASSRLS. Not a flip-breaker; noted for completeness.
 
@@ -265,15 +265,15 @@ reconciliation sweep. Fix: `await` it, or self-wrap in `runInTenantContext` like
 
 ---
 
-## 5. force_app grants
+## 5. the earlier app role grants
 
 - **All grants in ONE migration:** `20260404000000_add_rls_policies:23-29`:
   ```sql
-  GRANT USAGE ON SCHEMA public TO force_app;
-  GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO force_app;
-  GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO force_app;
-  ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO force_app;
-  ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT USAGE, SELECT ON SEQUENCES TO force_app;
+  GRANT USAGE ON SCHEMA public TO the earlier app role;
+  GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO the earlier app role;
+  GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO the earlier app role;
+  ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO the earlier app role;
+  ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT USAGE, SELECT ON SEQUENCES TO the earlier app role;
   ```
   No later migration (of 98) issues any GRANT/REVOKE/ALTER DEFAULT PRIVILEGES.
 - **The 65+ tables created after this migration have NO explicit per-table grant** —
@@ -289,13 +289,13 @@ reconciliation sweep. Fix: `await` it, or self-wrap in `runInTenantContext` like
   application table, already covered by table grants.
 - **MANDATORY live pre-flip queries** (run against prod as owner, read-only):
   ```sql
-  -- (a) any public table force_app is MISSING a grant on → 42501 at cutover
+  -- (a) any public table the earlier app role is MISSING a grant on → 42501 at cutover
   SELECT t.table_name
   FROM information_schema.tables t
   WHERE t.table_schema='public' AND t.table_type='BASE TABLE'
     AND NOT EXISTS (
       SELECT 1 FROM information_schema.role_table_grants g
-      WHERE g.grantee='force_app' AND g.table_schema='public'
+      WHERE g.grantee='the earlier app role' AND g.table_schema='public'
         AND g.table_name=t.table_name AND g.privilege_type='SELECT');
   -- (b) confirm default-ACL owner covers future tables
   SELECT n.nspname, r.rolname AS defaclrole, a.defaclacl
@@ -304,7 +304,7 @@ reconciliation sweep. Fix: `await` it, or self-wrap in `runInTenantContext` like
   -- (c) drift catch — full policy dump to compare against this static matrix
   SELECT schemaname, tablename, policyname, cmd, qual, with_check FROM pg_policies WHERE schemaname='public' ORDER BY tablename, cmd;
   -- (d) confirm the role we're flipping to is non-bypass
-  SELECT rolname, rolbypassrls FROM pg_roles WHERE rolname IN ('force_app','neondb_owner');
+  SELECT rolname, rolbypassrls FROM pg_roles WHERE rolname IN ('the earlier app role','neondb_owner');
   ```
   Query (a) returning any row = a genuine grant gap to fix before flip. Query (c) is the
   answer to the missing-`20260521000000`-migration caveat in §0.
@@ -336,9 +336,9 @@ wrapper) at `webhook.routes.ts:305` + `payment-webhook-process.ts:173`, AND add 
 the flip; ship now. **[code]** — _Audit A, live High._
 
 **Verification gates (block the flip until green):** 6. **Live grant sweep** — run §5 query (a); fix any returned table with an explicit
-`GRANT ... TO force_app`. **[verify]** 7. **Live policy/default-ACL drift check** — run §5 queries (b),(c),(d); reconcile the
+`GRANT ... TO the earlier app role`. **[verify]** 7. **Live policy/default-ACL drift check** — run §5 queries (b),(c),(d); reconcile the
 `pg_policies` dump against §1's matrix to catch any pre-2026-05-30 out-of-band drift
-(the missing-`20260521000000` caveat). **[verify]** 8. **Phase-2 staging soak on force_app** — exercise checkout (`addresses`), payments,
+(the missing-`20260521000000` caveat). **[verify]** 8. **Phase-2 staging soak on the earlier app role** — exercise checkout (`addresses`), payments,
 refunds, every admin section, the fully-bare F2 routers, the 18 fail-closed NEW
 accounting tables' cross-store reports (confirm they `withRlsBypass`), Inngest jobs +
 crons, Orders PWA. Watch for `42501` / silent-empty regressions. **[verify]**
@@ -380,5 +380,5 @@ every table has both the null-escape and the explicit bypass branch (§1 taxonom
 | payment-settings zero RLS wiring                 | High, novel      | CONFIRMED — fix #3                                                                                        |
 | affiliate fire-and-forget race                   | High, live       | CONFIRMED — fix #5                                                                                        |
 | webhook `_tx` no-op + non-unique txn id          | High, latent     | CONFIRMED — fix #4                                                                                        |
-| force_app CI job covers ~6/~90 tables            | Medium           | CONFIRMED residual — Phase-2 soak (#8) is the mitigation                                                  |
+| the earlier app role CI job covers ~6/~90 tables            | Medium           | CONFIRMED residual — Phase-2 soak (#8) is the mitigation                                                  |
 | ENVIRONMENT.md / DB-BACKUP-RESTORE.md gaps       | Low              | CONFIRMED — doc fix #9                                                                                    |

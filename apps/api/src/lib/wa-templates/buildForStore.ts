@@ -62,7 +62,7 @@ export function buildTemplatesForStore(store: StoreBrandingForTemplates): Templa
   const prefix = slugToTemplatePrefix(store.slug);
   const enName = store.name;
   // Fall back to the english name if the merchant hasn't set nameAr.
-  // Better example than leaving Force-AI default brand strings in the AR.
+  // Better example than leaving Ebda AI Studio default brand strings in the AR.
   const arName = store.nameAr || store.name;
 
   return TEMPLATES.map(tmpl => {

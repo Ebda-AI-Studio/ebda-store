@@ -7,7 +7,7 @@ Ahmad, 2026-10-14: Ebda Store does not launch until Qamar, Souq, Jasmine and Lam
 - **Must work:** a merchant picks any of the 5 templates at onboarding, gets a complete store that looks like an established brand, and can restyle it toward their own taste (colour roles, type pair, radius, density, image shape, section mix) in the editor without breaking it; the shopper side works on every device in Arabic and English.
 - **Exercised:** each template × {390, 820, 1280} × {ar, en} × the scenario matrix below, via Playwright visual + a11y runs, plus a manual walk on a real phone; the editor flows below on desktop and phone.
 - **Must not change:** checkout, pricing, inventory, permissions, tenant isolation, existing stores' published pages, Dahab's look.
-- **Done when:** all checks green in CI, `impeccable critique` ≥ the bar for every template and the editor with zero P0/P1, Ahmad signs off each template after a live review round, and the inherited FWB skins (modern, classic, minimal, bold, elegant) are deleted with no store left on them.
+- **Done when:** all checks green in CI, `impeccable critique` ≥ the bar for every template and the editor with zero P0/P1, Ahmad signs off each template after a live review round, and the inherited Ebda Store skins (modern, classic, minimal, bold, elegant) are deleted with no store left on them.
 
 ## Phase D — directions → looks (decided)
 
@@ -57,4 +57,4 @@ impeccable `critique` → `audit` → `polish` per template; `accessibility-revi
 
 ## Then
 
-Delete the FWB skins (`modern/classic/minimal/bold/elegant`) + enum migration + the 8-render-path rule update in CLAUDE.md, once every store is on an Ebda template.
+Delete the Ebda Store skins (`modern/classic/minimal/bold/elegant`) + enum migration + the 8-render-path rule update in CLAUDE.md, once every store is on an Ebda template.

@@ -2,7 +2,7 @@
 
 ### Executive Summary
 
-At current idle state (fewer than 100 merchants, under 10k MAU), FWB's infrastructure runs at roughly **$15–30/mo** in actual cash outlay — most services are on free tiers, and Railway + Vercel absorb the baseline compute. At 10k MAU across ~100–200 active merchants, total run-rate climbs to **$160–250/mo**, driven primarily by Railway scaling, Neon moving to the paid Launch tier, Resend overage, and Inngest crossing the free step cap. At 100k MAU the bill reaches **$1,100–1,800/mo**, with Railway multi-instance costs and Neon compute becoming the dominant line items. Neither burst scenario (10k in 1hr / 100k in 1hr across the platform) inherently blows up the monthly bill — burst costs are per-use and mostly absorbed by existing overage rates — but both expose hard architectural ceilings that cause **service degradation or outages** before the invoice grows meaningfully.
+At current idle state (fewer than 100 merchants, under 10k MAU), Ebda Store's infrastructure runs at roughly **$15–30/mo** in actual cash outlay — most services are on free tiers, and Railway + Vercel absorb the baseline compute. At 10k MAU across ~100–200 active merchants, total run-rate climbs to **$160–250/mo**, driven primarily by Railway scaling, Neon moving to the paid Launch tier, Resend overage, and Inngest crossing the free step cap. At 100k MAU the bill reaches **$1,100–1,800/mo**, with Railway multi-instance costs and Neon compute becoming the dominant line items. Neither burst scenario (10k in 1hr / 100k in 1hr across the platform) inherently blows up the monthly bill — burst costs are per-use and mostly absorbed by existing overage rates — but both expose hard architectural ceilings that cause **service degradation or outages** before the invoice grows meaningfully.
 
 **🚨 Critical flag for the acquirer:** the platform is currently running on Vercel Hobby. Vercel explicitly prohibits commercial use (SaaS, ecommerce, payment processing) on Hobby. **The platform is in violation of Vercel's terms of service today.** Upgrading to Pro at $20/mo (one seat) resolves this and is the minimum viable change before any investor or acquirer runs due diligence. This is the single highest-priority cost action.
 
@@ -12,13 +12,13 @@ At current idle state (fewer than 100 merchants, under 10k MAU), FWB's infrastru
 
 #### 6.1 Vercel
 
-**Current plan:** Hobby ($0/mo). **Terms violation:** Vercel's Fair Use Guidelines explicitly prohibit any project that processes payments or generates revenue on Hobby. FWB processes merchant orders, charges subscription fees, and is deployed as a commercial SaaS — textbook violation. Vercel can suspend account without notice.
+**Current plan:** Hobby ($0/mo). **Terms violation:** Vercel's Fair Use Guidelines explicitly prohibit any project that processes payments or generates revenue on Hobby. Ebda Store processes merchant orders, charges subscription fees, and is deployed as a commercial SaaS — textbook violation. Vercel can suspend account without notice.
 
 **Hobby limits (2026):** Bandwidth 100GB/mo (hard stop), Function invocations 1M/mo, Image transformations 5K/mo, Active CPU 4hrs/mo, Edge requests 1M/mo, Blob storage 1GB.
 
 **Pro plan:** $20/mo per seat. Pro includes: 1TB bandwidth then $0.15/GB, function invocations + credit then $0.60/1M, image transforms $0.05/1K, Fluid Compute on active execution time.
 
-**FWB usage profile:**
+**Ebda Store usage profile:**
 
 - 2 projects: `force-admin` (low traffic, merchants only) and `force-web` (customer-facing, multi-tenant)
 - `force-web` is bandwidth driver: product images via Next/Image, SSR renders, ISR
@@ -72,7 +72,7 @@ At current idle state (fewer than 100 merchants, under 10k MAU), FWB's infrastru
 - **Launch:** $0.106/CU-hour, $0.35/GB-mo storage, 10 branches, 100GB free egress then $0.10/GB
 - **Scale:** $0.222/CU-hour (higher ceiling up to 56 CU), $0.35/GB-mo, 25 branches
 
-**FWB DB size estimate:**
+**Ebda Store DB size estimate:**
 
 - Current: <0.5GB
 - 10k MAU (100 merchants, 200 products each, 1k orders/merchant): ~2–3GB
@@ -94,7 +94,7 @@ At current idle state (fewer than 100 merchants, under 10k MAU), FWB's infrastru
 
 **Pricing:** Free 10GB-mo + 1M Class A + 10M Class B + zero egress. Paid: $0.015/GB-mo, $4.50/1M Class A, $0.36/1M Class B.
 
-**FWB usage:** Per merchant ~20.5MB (hero ~500KB + 100 product images × 200KB).
+**Ebda Store usage:** Per merchant ~20.5MB (hero ~500KB + 100 product images × 200KB).
 
 | Merchants        | Storage | R2 Cost      |
 | ---------------- | ------- | ------------ |
@@ -161,7 +161,7 @@ At current idle state (fewer than 100 merchants, under 10k MAU), FWB's infrastru
 
 **Free (2026):** 15 RPM, ~500 RPD (the real 429 ceiling we hit in prod on `gemini-flash-lite`; Google nominally publishes higher), 250K TPM. **Paid:** $0.10/1M input + $0.40/1M output.
 
-**FWB usage per call:** ~250 input + 200 output = 450 tokens avg. Daily cap of 450 calls × 450 tokens ≈ 200K tokens/day — comfortably under the **$0.105/day / $3.15/mo** ceiling implied by the older 1,000-call cap.
+**Ebda Store usage per call:** ~250 input + 200 output = 450 tokens avg. Daily cap of 450 calls × 450 tokens ≈ 200K tokens/day — comfortably under the **$0.105/day / $3.15/mo** ceiling implied by the older 1,000-call cap.
 
 | Scenario                           | Gemini cost |
 | ---------------------------------- | ----------- |
@@ -181,11 +181,11 @@ Standard rates (2026):
 | Hesabe | ~2.5% | ~3.5% | — |
 | UPayments | ~2.5% | ~3.0% | — |
 
-**Platform revenue model:** FWB charges SaaS subscription. Payment fees pass through to merchants — FWB doesn't take a cut of GMV. At 10k MAU with KWD 15 avg order × 2/visitor/mo = $1M GMV/mo, processing fees $27,500/mo borne by merchants.
+**Platform revenue model:** Ebda Store charges SaaS subscription. Payment fees pass through to merchants — Ebda Store doesn't take a cut of GMV. At 10k MAU with EGP 15 avg order × 2/visitor/mo = $1M GMV/mo, processing fees $27,500/mo borne by merchants.
 
 #### 6.11 Domains
 
-Force-owned: forcemediakw.com + app/store subdomains ~$30/yr. Per-merchant custom domains: merchant pays own registrar ~$10–15/yr (Vercel handles SSL).
+Force-owned: ebda.app + app/store subdomains ~$30/yr. Per-merchant custom domains: merchant pays own registrar ~$10–15/yr (Vercel handles SSL).
 
 **Platform domain cost: ~$30/yr flat. Negligible.**
 
@@ -193,7 +193,7 @@ Force-owned: forcemediakw.com + app/store subdomains ~$30/yr. Per-merchant custo
 
 **Free (2026, private repo):** 2,000 Linux minutes/mo. Overage: $0.010/min.
 
-**FWB CI:** Run ~10–15 min per push. 5–10 pushes/day = 1,500–4,500 min/mo. 2K free exhausted within 2 weeks of active dev.
+**Ebda Store CI:** Run ~10–15 min per push. 5–10 pushes/day = 1,500–4,500 min/mo. 2K free exhausted within 2 weeks of active dev.
 
 | Scenario                       | GH Actions cost |
 | ------------------------------ | --------------- |
@@ -314,7 +314,7 @@ Linear MAU growth from ~1k (today) to 10k MAU over 12 months:
 - 70% margin = $3,667/mo MRR needed = **$3.67/merchant**
 - Realistic SaaS pricing at this scale: **$49–99/merchant/mo**
 
-**Kuwait market calibration:** Shopify ~$29–79/mo. Salla ~25–99 KWD/mo (~$80–320). FWB's cost structure supports **29–49 KWD/mo ($95–160)** price point with 70%+ gross margins at 100k MAU.
+**Egypt market calibration:** Shopify ~$29–79/mo. Salla ~25–99 EGP/mo (~$80–320). Ebda Store's cost structure supports **29–49 EGP/mo ($95–160)** price point with 70%+ gross margins at 100k MAU.
 
 ---
 

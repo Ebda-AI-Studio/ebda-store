@@ -1,6 +1,6 @@
 # Mutate-in-Place vs Append-Only History Audit
 
-> **Correction (2026-09-22):** "Kuwait Law 13/2023" cited below does not exist. See docs/legal/gcc-data-protection.md for the verified GCC legal basis.
+> **Correction (2026-09-22):** "Egypt Law 13/2023" cited below does not exist. See docs/privacy/data-map.md for the verified GCC legal basis.
 
 **Date:** 2026-05-28
 **Scope:** `packages/database/prisma/schema.prisma` + all `apps/api/src` routes and services
@@ -239,7 +239,7 @@ Add `auditLog({ action: 'review.approved' | 'review.rejected' | 'review.hidden',
 `apps/api/src/routes/admin.routes.ts` lines 527–571.
 
 **Gap impact:**
-If a super-admin account is compromised and grants `store_admin` role to an attacker, the `audit_log` row proves the change happened but cannot prove the account was previously `customer`. Reconstructing the before-state requires joining against older audit rows. For SOC2 or a Kuwait Law 13/2023 erasure audit, the absence of before-values creates a compliance gap.
+If a super-admin account is compromised and grants `store_admin` role to an attacker, the `audit_log` row proves the change happened but cannot prove the account was previously `customer`. Reconstructing the before-state requires joining against older audit rows. For SOC2 or a Egypt Law 13/2023 erasure audit, the absence of before-values creates a compliance gap.
 
 **Recommended fix:**
 Fetch `prisma.user.findUnique({ select: { role, status } })` **before** the `prisma.user.update` call and include `previousRole` / `previousStatus` in the `auditLog` details. One-line addition. **Effort: S (~15 min)**

@@ -2,12 +2,12 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Platform infrastructure note (Ahmad 2026-05-12):** This work targets the FWB platform code (apps/web, apps/api, packages/\*). Every existing AND future tenant inherits all features automatically — no per-store opt-in. Wady Aljuz is referenced only as the verification target; the same code paths serve every merchant. The /llms.txt files are dynamic Prisma-backed routes (Task 18) so new stores appear in AI indexes within the revalidate window with zero config.
+**Platform infrastructure note (Ahmad 2026-05-12):** This work targets the Ebda Store platform code (apps/web, apps/api, packages/\*). Every existing AND future tenant inherits all features automatically — no per-store opt-in. Wady Aljuz is referenced only as the verification target; the same code paths serve every merchant. The /llms.txt files are dynamic Prisma-backed routes (Task 18) so new stores appear in AI indexes within the revalidate window with zero config.
 
-**Scope expansion (Ahmad 2026-05-12, second pass):** Three tracks added beyond the original SEO + bilingual email scope. Force AI's positioning is "AI-native platform" so every discoverability surface gets AI tooling, not just visibility:
+**Scope expansion (Ahmad 2026-05-12, second pass):** Three tracks added beyond the original SEO + bilingual email scope. Ebda AI Studio's positioning is "AI-native platform" so every discoverability surface gets AI tooling, not just visibility:
 
 - **AEO + GEO** (Tasks 21-25): Answer Engine Optimization + Generative Engine Optimization. FAQ/HowTo schemas, conversational meta descriptions, knowledge-graph entity links (sameAs). Every signal piped through the existing Gemini bulk-sweep pattern so merchants don't author this content manually — AI drafts it from product data, merchant approves, bilingual (en/ar) by default.
-- **Real-review collection infrastructure** (Tasks 26-31): Post-purchase review request flow + Schema.org `Review` + `AggregateRating` on product pages — **populated EXCLUSIVELY from verified-purchase real reviews**. Fake/AI-generated reviews were explicitly rejected (Kuwait Law 39/2014 + FTC + EU UCPD violation, Google manual-action de-rank risk for the whole platform). AI tools assist merchants on REAL content: en↔ar translation, theme summarization, draft owner-response replies (merchant approves before sending), spam/fake-review detection. Sample/demo cards exist as labeled placeholders until real reviews arrive — never marked up as Review schema.
+- **Real-review collection infrastructure** (Tasks 26-31): Post-purchase review request flow + Schema.org `Review` + `AggregateRating` on product pages — **populated EXCLUSIVELY from verified-purchase real reviews**. Fake/AI-generated reviews were explicitly rejected (Egypt Law 39/2014 + FTC + EU UCPD violation, Google manual-action de-rank risk for the whole platform). AI tools assist merchants on REAL content: en↔ar translation, theme summarization, draft owner-response replies (merchant approves before sending), spam/fake-review detection. Sample/demo cards exist as labeled placeholders until real reviews arrive — never marked up as Review schema.
 - **Existing-store backfill** (Tasks 32-33): One-time script populates the new AI-fillable fields (FAQ, HowTo, conversational meta, sameAs) across already-onboarded stores. Smoke + verify platform-wide. After this lands, the existing stores look identical to net-new stores from an AEO/GEO standpoint — no per-store catchup required.
 
 **AI integration pattern (canonical for this plan):** every AEO/GEO/review field that can be AI-drafted hooks into the existing `apps/api/src/lib/ai/` infrastructure (Gemini Flash Lite, throttled at `AI_BULK_THROTTLE_MS`, capped at `AI_DAILY_REQUEST_CAP`/`AI_MONTHLY_REQUEST_CAP`, with smart-skip so it never overwrites filled fields). The same Inngest bulk-sweep pattern that fills SEO meta and AI category suggestions extends to FAQ, HowTo, conversational descriptions, review translation, review summary, and owner-response drafting. **One Gemini-Flash-Lite pipeline, one bulk-sweep UI, fifteen AI features.**
@@ -23,20 +23,20 @@
 - **Email language**: `EmailService.sendForStore` gains optional `language?: 'en' | 'ar'` arg that overrides `store.settings.defaultLanguage`. Each public `sendX` method accepts the same param. Templates split into bilingual modules: every template exports `{ en: (data) => string; ar: (data) => string }` and the renderer picks the right key.
 - **Storefront schemas**: `apps/web/src/lib/structured-data.ts` gains `breadcrumbList(items)`, `itemList(products)`, `store(store)` builders alongside the existing `product()`. Each page (`/[slug]`, `/[slug]/products`, `/[slug]/categories/[cat]`) renders the appropriate combination.
 - **Semantic HTML**: `apps/web/src/components/ShopChrome.tsx` upgraded with `<header>` + `<nav>` + `<footer>` wrappers. Product cards in `apps/web/src/components/ProductCard.tsx` (or wherever they live) wrapped in `<article>`.
-- **llms.txt**: static files at `apps/web/public/llms.txt` and `/Users/ahmadsharaf/Desktop/projects/force_media_landing_page/llms.txt`.
+- **llms.txt**: static files at `apps/web/public/llms.txt` and `/Users/ahmadsharaf/Desktop/projects/ebda-landing/llms.txt`.
 
-**Tech Stack:** Express + TypeScript + Prisma + Neon (api), Next.js 16 App Router (apps/web storefront, apps/admin admin), vanilla HTML/JS (force_media_landing_page), Resend SDK, next-intl (en/ar), Vercel + Railway.
+**Tech Stack:** Express + TypeScript + Prisma + Neon (api), Next.js 16 App Router (apps/web storefront, apps/admin admin), vanilla HTML/JS (ebda-landing), Resend SDK, next-intl (en/ar), Vercel + Railway.
 
 **Cross-project scope:**
 
-- `force-website-builder` repo: email service + templates + storefront pages + schema lib + llms.txt
-- `force_media_landing_page` repo: llms.txt + JSON-LD enrichment
+- `ebda-store` repo: email service + templates + storefront pages + schema lib + llms.txt
+- `ebda-landing` repo: llms.txt + JSON-LD enrichment
 
 ---
 
 ## File Structure
 
-**Create (FWB):**
+**Create (Ebda Store):**
 
 - `apps/api/src/services/email-templates/index.ts` — bilingual template registry; exports `welcomeTemplate.en/ar`, `orderConfirmationTemplate.en/ar`, etc.
 - `apps/api/src/services/email-templates/welcome.ts` — `{ en, ar }` exports for welcome template
@@ -51,11 +51,11 @@
 - `apps/api/src/services/email-templates/return-confirmation.ts` — same
 - `apps/api/src/services/email-templates/return-status-update.ts` — same
 - `tests/unit/email-templates-i18n.test.ts` — assertions per template that en + ar both render valid HTML with the right data interpolation
-- `apps/web/public/llms.txt` — LLM-facing site index for store.forcemediakw.com
+- `apps/web/public/llms.txt` — LLM-facing site index for store.ebda.app
 - `apps/web/src/lib/structured-data.ts` (extend) — add `breadcrumbList()`, `itemList()`, `store()`, `faqPage()` builders alongside existing `product()`
 - `apps/web/src/components/BreadcrumbJsonLd.tsx` — client component that emits Breadcrumb JSON-LD from current route
 
-**Modify (FWB):**
+**Modify (Ebda Store):**
 
 - `apps/api/src/services/email.service.ts` — `sendForStore` signature, all public `sendX` methods gain `language?: 'en' | 'ar'`. `renderTemplate` becomes language-aware. Per-template private statics deleted (moved to email-templates/ files).
 - `apps/api/src/lib/inngest/functions/order-created.ts` — pass `language: order.locale` or read from buyer
@@ -73,11 +73,11 @@
 
 **Create (landing):**
 
-- `/Users/ahmadsharaf/Desktop/projects/force_media_landing_page/llms.txt`
+- `/Users/ahmadsharaf/Desktop/projects/ebda-landing/llms.txt`
 
 **Modify (landing):**
 
-- `/Users/ahmadsharaf/Desktop/projects/force_media_landing_page/index.html` — add `Service` schemas for the agency offerings (digital marketing, social media, SEO, etc.) + `LocalBusiness` schema to the existing Organization block, OR a second `application/ld+json` block.
+- `/Users/ahmadsharaf/Desktop/projects/ebda-landing/index.html` — add `Service` schemas for the agency offerings (digital marketing, social media, SEO, etc.) + `LocalBusiness` schema to the existing Organization block, OR a second `application/ld+json` block.
 
 ---
 
@@ -494,7 +494,7 @@ export function itemList(
         url: p.url,
         ...(p.image ? { image: p.image } : {}),
         ...(p.price !== undefined
-          ? { offers: { '@type': 'Offer', price: p.price, priceCurrency: p.currency ?? 'KWD' } }
+          ? { offers: { '@type': 'Offer', price: p.price, priceCurrency: p.currency ?? 'EGP' } }
           : {}),
       },
     })),
@@ -621,7 +621,7 @@ Wrap each product card in `<article>`:
   <h3 itemProp="name">{product.name}</h3>
   <img itemProp="image" src={product.image} alt={product.name} />
   <span itemProp="offers" itemScope itemType="https://schema.org/Offer">
-    <meta itemProp="priceCurrency" content="KWD" />
+    <meta itemProp="priceCurrency" content="EGP" />
     <span itemProp="price">{product.price}</span>
   </span>
 </article>
@@ -639,8 +639,8 @@ Microdata is redundant with JSON-LD but Google reads both; cheap belt-and-suspen
 
 **Files:**
 
-- Create: `apps/web/src/app/llms.txt/route.ts` — platform-level dynamic route at `store.forcemediakw.com/llms.txt` listing every active store
-- Create: `apps/web/src/app/[slug]/llms.txt/route.ts` — per-store dynamic route at `store.forcemediakw.com/<slug>/llms.txt` listing that store's products + categories
+- Create: `apps/web/src/app/llms.txt/route.ts` — platform-level dynamic route at `store.ebda.app/llms.txt` listing every active store
+- Create: `apps/web/src/app/[slug]/llms.txt/route.ts` — per-store dynamic route at `store.ebda.app/<slug>/llms.txt` listing that store's products + categories
 
 - [ ] **Step 18.1: Platform-level /llms.txt route**
 
@@ -665,16 +665,16 @@ export async function GET() {
 
   const storeLines = stores
     .map(s => {
-      const desc = s.description?.trim() || 'Kuwait-based merchant on Force AI Store.';
-      return `- [${s.name}](https://store.forcemediakw.com/${s.slug}): ${desc}`;
+      const desc = s.description?.trim() || 'Egypt-based merchant on Ebda Store.';
+      return `- [${s.name}](https://store.ebda.app/${s.slug}): ${desc}`;
     })
     .join('\n');
 
-  const body = `# Force AI Store — Multi-tenant Storefront Platform
+  const body = `# Ebda Store — Multi-tenant Storefront Platform
 
-> Force AI Store is the per-merchant e-commerce platform run by Force Media Kuwait.
-> Each merchant gets a path-based storefront at \`store.forcemediakw.com/<slug>\`
-> with their own products, branding, and contact info. Customers in Kuwait,
+> Ebda Store is the per-merchant e-commerce platform run by Ebda AI Studio Egypt.
+> Each merchant gets a path-based storefront at \`store.ebda.app/<slug>\`
+> with their own products, branding, and contact info. Customers in Egypt,
 > Saudi Arabia, and Qatar can browse + buy across multiple merchants from one
 > platform.
 
@@ -698,16 +698,16 @@ Every store follows the same URL pattern:
 ## For AI agents
 
 - Schema.org structured data on every page (JSON-LD blocks in <head>)
-- Sitemap: https://store.forcemediakw.com/sitemap.xml (lists every URL for every active store)
+- Sitemap: https://store.ebda.app/sitemap.xml (lists every URL for every active store)
 - Languages: bilingual (English + Arabic). Store default in \`Store.inLanguage\`. Customer can browse either.
-- Currency: KWD (Kuwaiti Dinar) unless individual store overrides
+- Currency: EGP (Egyptian Dinar) unless individual store overrides
 - Real-time inventory in \`Product.offers.availability\` (InStock / OutOfStock)
 - All product data is publicly accessible — no auth or scraping protection on /<slug>/* pages
-- Rate limit: 100 req/min per IP for catalogue scrape. Contact wadyaljuzkw@gmail.com or platform admin for higher quota.
+- Rate limit: 100 req/min per IP for catalogue scrape. Contact demo-merchantkw@gmail.com or platform admin for higher quota.
 
 ## Sitemap
 
-https://store.forcemediakw.com/sitemap.xml
+https://store.ebda.app/sitemap.xml
 `;
 
   return new Response(body, {
@@ -768,17 +768,17 @@ export async function GET(_req: Request, { params }: { params: Promise<{ slug: s
 
   const base = store.domain
     ? `https://${store.domain}`
-    : `https://store.forcemediakw.com/${store.slug}`;
+    : `https://store.ebda.app/${store.slug}`;
 
   const catLines = categories.map(c => `- [${c.name}](${base}/categories/${c.slug})`).join('\n');
 
   const prodLines = products
-    .map(p => `- [${p.name}](${base}/products/${p.slug}) — ${(p.price / 1000).toFixed(3)} KWD`)
+    .map(p => `- [${p.name}](${base}/products/${p.slug}) — ${(p.price / 1000).toFixed(3)} EGP`)
     .join('\n');
 
   const body = `# ${store.name}${store.nameAr ? ` (${store.nameAr})` : ''}
 
-> ${store.description || `${store.name} on Force AI Store — Kuwait-based merchant.`}
+> ${store.description || `${store.name} on Ebda Store — Egypt-based merchant.`}
 
 ## Contact
 
@@ -797,15 +797,15 @@ ${prodLines || '_No active products._'}
 
 ## For AI agents
 
-- Each product page has full JSON-LD \`Product\` schema with name, image, description, price, availability, currency (KWD)
+- Each product page has full JSON-LD \`Product\` schema with name, image, description, price, availability, currency (EGP)
 - Each category page has \`ItemList\` schema enumerating products
 - Sitemap for this store: ${base}/sitemap.xml (subset of the platform sitemap)
 - Inventory updates in real time — re-crawl daily for fresh availability
 
 ## Platform
 
-This store is hosted on Force AI Store, a multi-tenant e-commerce platform by
-Force Media Kuwait. See https://store.forcemediakw.com/llms.txt for the
+This store is hosted on Ebda Store, a multi-tenant e-commerce platform by
+Ebda AI Studio Egypt. See https://store.ebda.app/llms.txt for the
 platform-wide index.
 `;
 
@@ -828,8 +828,8 @@ Optional: add a `<link rel="alternate" type="text/markdown" href="/llms.txt" />`
 - [ ] **Step 18.4: Verify cold-cache + warm-cache**
 
 ```bash
-curl -s https://store.forcemediakw.com/llms.txt | head -30
-curl -s https://store.forcemediakw.com/wady-aljuz/llms.txt | head -50
+curl -s https://store.ebda.app/llms.txt | head -30
+curl -s https://store.ebda.app/wady-aljuz/llms.txt | head -50
 ```
 
 Both should return markdown listing the current active stores / wady-aljuz products. Re-curl after a store launches → new store appears within the revalidate window (1h platform, 10min per-store).
@@ -841,7 +841,7 @@ git add apps/web/src/app/llms.txt apps/web/src/app/\[slug\]/llms.txt
 git commit -m "feat(web): dynamic /llms.txt + per-store /<slug>/llms.txt
 
 ai-agent index files generated from prisma on each request. platform-
-wide file at store.forcemediakw.com/llms.txt enumerates every active
+wide file at store.ebda.app/llms.txt enumerates every active
 store. per-store file at /<slug>/llms.txt lists that store's
 categories + products with prices + per-store contact info.
 
@@ -856,25 +856,25 @@ ai discoverability with zero per-store config."
 
 **Files:**
 
-- Create: `/Users/ahmadsharaf/Desktop/projects/force_media_landing_page/llms.txt`
-- Modify: `/Users/ahmadsharaf/Desktop/projects/force_media_landing_page/index.html`
+- Create: `/Users/ahmadsharaf/Desktop/projects/ebda-landing/llms.txt`
+- Modify: `/Users/ahmadsharaf/Desktop/projects/ebda-landing/index.html`
 
 - [ ] **Step 19.1: llms.txt for the landing**
 
-Create `force_media_landing_page/llms.txt`:
+Create `ebda-landing/llms.txt`:
 
 ```md
-# Force Media Kuwait — Marketing Agency
+# Ebda AI Studio Egypt — Marketing Agency
 
-> Expert marketing solutions in Kuwait, Saudi Arabia, and Qatar. 250+ clients
+> Expert marketing solutions in Egypt, Saudi Arabia, and Qatar. 250+ clients
 > served. Services: digital marketing, social media, content production,
 > SEO, web/app development.
 
-## Products under Force Media
+## Products under Ebda AI Studio
 
-- [Force AI Store](https://store.forcemediakw.com): Multi-tenant e-commerce
-  storefronts for Kuwait merchants. Each merchant gets a branded subdomain
-  path, full catalogue + checkout, KWD/USD/SAR pricing.
+- [Ebda Store](https://store.ebda.app): Multi-tenant e-commerce
+  storefronts for Egypt merchants. Each merchant gets a branded subdomain
+  path, full catalogue + checkout, EGP/USD/SAR pricing.
 
 ## Services
 
@@ -882,18 +882,18 @@ Create `force_media_landing_page/llms.txt`:
 - Social media management — Instagram, TikTok, Snapchat focus
 - Content production — video, photography, graphic design
 - SEO — local + regional search optimization
-- Web/app development — custom builds + Force AI Store deployments
+- Web/app development — custom builds + Ebda Store deployments
 
 ## Contact
 
-- Website: https://www.forcemediakw.com
+- Website: https://www.ebda.app
 - Email: see Contact section on the homepage
 - Phone: +965-6674-0311
-- Address: Sanam Tower, Fahad Al-Salem Street, Kuwait City
+- Address: Sanam Tower, Fahad Al-Salem Street, Cairo
 
 ## Sitemap
 
-https://www.forcemediakw.com/sitemap.xml
+https://www.ebda.app/sitemap.xml
 ```
 
 - [ ] **Step 19.2: Enrich index.html JSON-LD**
@@ -905,11 +905,11 @@ Find the existing `<script type="application/ld+json">` block. ADD a second bloc
   {
     "@context": "https://schema.org",
     "@type": "ProfessionalService",
-    "name": "Force Media Kuwait",
-    "url": "https://www.forcemediakw.com",
-    "image": "https://www.forcemediakw.com/logo.svg",
+    "name": "Ebda AI Studio Egypt",
+    "url": "https://www.ebda.app",
+    "image": "https://www.ebda.app/logo.svg",
     "areaServed": [
-      { "@type": "Country", "name": "Kuwait" },
+      { "@type": "Country", "name": "Egypt" },
       { "@type": "Country", "name": "Saudi Arabia" },
       { "@type": "Country", "name": "Qatar" }
     ],
@@ -972,7 +972,7 @@ Confirm: same store, but email arrives in **English** with LTR layout.
 - [ ] **Step 20.2: Storefront JSON-LD verify**
 
 ```bash
-curl -s https://store.forcemediakw.com/wady-aljuz | grep -oE '"@type":"[^"]+"'
+curl -s https://store.ebda.app/wady-aljuz | grep -oE '"@type":"[^"]+"'
 # Expected: Store, BreadcrumbList, ItemList (if featured products), Organization
 ```
 
@@ -983,8 +983,8 @@ Google's Rich Results Test (https://search.google.com/test/rich-results) — pas
 - [ ] **Step 20.3: llms.txt verify**
 
 ```bash
-curl -s https://store.forcemediakw.com/llms.txt
-curl -s https://www.forcemediakw.com/llms.txt
+curl -s https://store.ebda.app/llms.txt
+curl -s https://www.ebda.app/llms.txt
 ```
 
 Both should return the markdown content.
@@ -1003,7 +1003,7 @@ All of the following must be true before claiming complete:
 2. `cd apps/api && npx tsc --noEmit` → no NEW errors in email/email-templates files.
 3. `grep -rn "EmailService.welcomeTemplate\|EmailService.orderConfirmationTemplate" apps/api/src` → empty. All callers go through the new email-templates module.
 4. Storefront pages have JSON-LD: probe with `curl … | grep '@type'` per Task 20.2.
-5. `/llms.txt` returns 200 with valid markdown on both `store.forcemediakw.com` and `www.forcemediakw.com`.
+5. `/llms.txt` returns 200 with valid markdown on both `store.ebda.app` and `www.ebda.app`.
 6. ShopChrome renders `<header>`/`<nav>`/`<main>`/`<footer>` — verify with browser devtools accessibility tree.
 7. Smoke test confirms: same store, language='ar' arg → Arabic email, language='en' arg → English email.
 8. Wady Aljuz default-language='ar' → customers browsing in Arabic get Arabic emails automatically (after Task 14 wires Order.locale through).
@@ -1631,14 +1631,14 @@ For each of: Wady Aljuz + 2-3 other active stores:
 
 - [ ] **Step 33.2: AEO tooling test**
 
-Open https://www.perplexity.ai → search "Where to buy [product type] in Kuwait". Within 1-2 weeks of indexing, the store should appear in Perplexity's sources for relevant queries.
+Open https://www.perplexity.ai → search "Where to buy [product type] in Egypt". Within 1-2 weeks of indexing, the store should appear in Perplexity's sources for relevant queries.
 
 - [ ] **Step 33.3: Update memory**
 
 Per `~/.claude/CLAUDE.md` rule "Update memory per commit during multi-step work", capture:
 
 - `feedback-aeo-geo-pattern.md` — the FAQ/HowTo/sameAs/conversational-meta pattern as a reusable architecture
-- `reference-fwb-review-infra.md` — the real-review pipeline (token-gated, AI-assisted-merchant-not-AI-author)
+- `reference-ebda-review-infra.md` — the real-review pipeline (token-gated, AI-assisted-merchant-not-AI-author)
 - `feedback-fake-reviews-never.md` — the explicit "never generate fake reviews" rule with the regulatory citations + the legitimate alternative
 
 ---

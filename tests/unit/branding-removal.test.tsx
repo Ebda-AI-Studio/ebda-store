@@ -21,7 +21,7 @@ vi.mock('@api/config', () => ({ config: {} }));
 vi.mock('@api/lib/logger', () => ({ default: { warn: vi.fn(), error: vi.fn(), info: vi.fn() } }));
 vi.mock('@api/services/resend.service', () => ({ ResendService: {} }));
 
-import { PoweredByForce } from '../../apps/web/src/templates/shared/PoweredByForce';
+import { PoweredByEbda } from '../../apps/web/src/templates/shared/PoweredByEbda';
 import {
   renderBrandedShell,
   storeHidesPoweredBy,
@@ -38,17 +38,17 @@ beforeEach(() => {
 
 describe('storefront footer', () => {
   it('shows the attribution by default and when the plan does not remove it (Basic)', () => {
-    expect(render(<PoweredByForce />).container.textContent).toContain('Powered by');
-    expect(render(<PoweredByForce hidden={false} />).container.textContent).toContain('Powered by');
+    expect(render(<PoweredByEbda />).container.textContent).toContain('Powered by');
+    expect(render(<PoweredByEbda hidden={false} />).container.textContent).toContain('Powered by');
   });
   it('is gone when hidden (remove_branding resolved by the plan: Growth / Business / override)', () => {
-    expect(render(<PoweredByForce hidden />).container.textContent).toBe('');
+    expect(render(<PoweredByEbda hidden />).container.textContent).toBe('');
   });
   it('every theme footer wires the plan decision into the attribution (none can drop the prop)', async () => {
     const { readFileSync } = await import('node:fs');
     for (const t of ['bold', 'classic', 'elegant', 'minimal', 'modern']) {
       const src = readFileSync(`apps/web/src/templates/${t}/Footer.tsx`, 'utf8');
-      expect(src, t).toContain('<PoweredByForce hidden={hidePoweredBy} />');
+      expect(src, t).toContain('<PoweredByEbda hidden={hidePoweredBy} />');
     }
     const chrome = readFileSync('apps/web/src/components/ShopChrome.tsx', 'utf8');
     expect(chrome).toContain(

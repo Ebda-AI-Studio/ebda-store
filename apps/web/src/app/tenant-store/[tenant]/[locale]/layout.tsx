@@ -94,7 +94,7 @@ export async function generateMetadata({
  * - `<style>`: `emitZoneCss` does NOT match the root layout's typography
  *   emitter (it leaves `brand-foreground` unresolved, drops the `!important`
  *   on `text-decoration:none`, and puts an `@import` after other rules), and
- *   being later in the document it would win cascade ties on wadyaljuz.
+ *   being later in the document it would win cascade ties on demo-merchant.
  *
  * ONE layer owns each write: the root layout, for now. Flip this to `false` in
  * the same change that removes that chrome from the root layout for this tree

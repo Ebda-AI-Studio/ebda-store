@@ -1,4 +1,4 @@
-# Rulings ledger — Ebda (forked from force-website-builder)
+# Rulings ledger — Ebda (forked from ebda-store)
 
 Decisions that override a plan, reject a finding, or accept a residual, written
 at decision time. Form: `Ruling <id> — <decision>. <evidence>. Cost if wrong: <one sentence>.`
@@ -14,7 +14,7 @@ Ebda rulings sit on top of the inherited ledger below. Where an Ebda ruling and 
 
 Ruling R-EBDA-000: Ebda is a separate product with its own history and release train. Evidence: Ahmad, 2026-10-03. Cost if wrong: a change meant for another product ships into Ebda production.
 
-Ruling R-EBDA-001: the backend runs FWB's Express API on Cloudflare Workers (`nodejs_compat` + `httpServerHandler`). Each request gets its own Prisma client (`@prisma/adapter-pg`, `engineType="client"`) over Hyperdrive (query cache OFF) to Neon, as a non-bypass role, with strict RLS on every tenant table and only transaction-local GUCs. No Hono rewrite. Cloudflare Containers is the fallback if the Stage 1 concurrency exit test fails. This decision was taken under Ahmad's "do not stop" instruction and awaits his review. Evidence: `docs/ebda/design/cloudflare-backend.md`; `spikes/workers-api/` (17/17 tests on workerd, 0 leaks through a transaction-mode pooler, mutation-checked). Cost if wrong: the Stage 1 port work is redone on Containers.
+Ruling R-EBDA-001: the backend runs Ebda Store's Express API on Cloudflare Workers (`nodejs_compat` + `httpServerHandler`). Each request gets its own Prisma client (`@prisma/adapter-pg`, `engineType="client"`) over Hyperdrive (query cache OFF) to Neon, as a non-bypass role, with strict RLS on every tenant table and only transaction-local GUCs. No Hono rewrite. Cloudflare Containers is the fallback if the Stage 1 concurrency exit test fails. This decision was taken under Ahmad's "do not stop" instruction and awaits his review. Evidence: `docs/ebda/design/cloudflare-backend.md`; `spikes/workers-api/` (17/17 tests on workerd, 0 leaks through a transaction-mode pooler, mutation-checked). Cost if wrong: the Stage 1 port work is redone on Containers.
 
 ---
 
@@ -162,7 +162,7 @@ with no cached cart (cleared storage, first visit on a new device) still flashes
 server-only cart arrives — the same as loose items always have.
 
 **Ruling O2-6 — #1614: a merchant-picked custom-badge colour keeps white text.** Only the primary
-fallback now uses `--primary-foreground`. A contrast-computed foreground would flip pecannbee's live
+fallback now uses `--primary-foreground`. A contrast-computed foreground would flip demo-store's live
 red "عرض" chip (the only live custom badge) from white to black text. Cost if wrong: a merchant who
 picks a pale hex still gets low-contrast white text until the ColorField warns about contrast.
 
@@ -173,12 +173,12 @@ picks a pale hex still gets low-contrast white text until the ColorField warns a
 Branch `fix/p2-m4-d1-inventory-accounting`.
 
 **Ruling M4-1 — #1705 (invoice/email `/1000` + `toFixed(3)`) is not changed.**
-It is the non-KWD currency case, and Ruling PC-2 keeps FWB KWD-only: the
+It is the non-EGP currency case, and Ruling PC-2 keeps Ebda Store EGP-only: the
 write path still stores `price * 1000` for every currency, so a
 currency-aware invoice formatter would print a correctly-formatted wrong
 number. The fix belongs to Ebda's money layer. Cost if wrong: an invoice for
-a non-KWD order prints a 3-decimal KWD-shaped amount, which cannot happen
-until a non-KWD store exists.
+a non-EGP order prints a 3-decimal EGP-shaped amount, which cannot happen
+until a non-EGP store exists.
 
 **Ruling M4-2 — #193 (VAT taxable base) needs the owner.** Checkout levies
 tax on the PRE-discount subtotal (`order.service.ts`: `Math.round(subtotal *
@@ -263,9 +263,9 @@ reasoned about — so each is closed as not a defect rather than left open.
 **Ruling — #734 (`.well-known/security.txt` dot-directory asset serving) —
 NOT A DEFECT, verified live.** `curl -sI` against all three production
 hosts, 2026-09-25:
-`https://store.force-ai.co/.well-known/security.txt` → `200`,
+`https://store.ebda.app/.well-known/security.txt` → `200`,
 `strict-transport-security` + `x-content-type-options: nosniff` present;
-same for `admin.force-ai.co` and `orders.force-ai.co`. The dot-prefixed
+same for `store.ebda.app` and `orders.ebda.app`. The dot-prefixed
 asset directory is served correctly by OpenNext's Cloudflare Workers Assets
 layer. Cost if wrong: none — this is a direct production measurement, not
 an inference.
@@ -282,7 +282,7 @@ middleware in front of them). Cost if wrong: none — direct measurement.
 
 **Ruling — #1731 (dot-directory App Router routes: `.well-known/acp.json`,
 `.well-known/ucp`) — NOT A DEFECT, verified live AND via local build.**
-`curl -sI https://store.force-ai.co/.well-known/acp.json` and `/ucp` both
+`curl -sI https://store.ebda.app/.well-known/acp.json` and `/ucp` both
 return `404` with `content-type: application/json` — the route's OWN
 `notFound()` JSON response (`acp.json/route.ts`'s fail-closed 404 for an
 unresolved/non-agent-enabled store on the platform host), not Next's HTML
@@ -489,7 +489,7 @@ the audit and the parity gate both missed returns empty after the next flip — 
 parity gate, the staging soak list, and a one-env-var rollback.
 
 **Ruling RLS-S2 — `prisma.$transaction` opened inside a context inherits that context's GUCs.**
-Measured under a real `force_app` login: inside `runInTenantContext`, a strict-table count was 2
+Measured under a real the earlier app role login: inside `runInTenantContext`, a strict-table count was 2
 directly and 0 through `withMoneyTx` or a batch `$transaction([...])`. Fixing it in the proxy covers
 all 23 `withMoneyTx` and ~20 batch call sites at once. The transaction still opens separately (no
 nesting, callers keep their isolation/timeout options). Inert on the owner role. Cost if wrong: a
@@ -508,9 +508,9 @@ every other store's rows are invisible and the object would be deleted while sti
 wrong: none on correctness — the check only ever reads, and bypass only widens what it can see.
 
 **Ruling RLS-S5 — accepted residual: the parity gate covers public/storefront endpoints only.**
-Admin routes, Inngest jobs and crons are covered by the force_app integration suite and the new
-registry/inheritance tests, not by an owner-vs-force_app payload diff. Cost if wrong: an admin or
-background path that returns fewer rows (not an error) under force_app is found in the staging soak
+Admin routes, Inngest jobs and crons are covered by the the earlier app role integration suite and the new
+registry/inheritance tests, not by an owner-vs-the earlier app role payload diff. Cost if wrong: an admin or
+background path that returns fewer rows (not an error) under the earlier app role is found in the staging soak
 or in production instead of CI.
 
 ---
@@ -712,13 +712,13 @@ see an error for a refund that did go through, and the stock is not restored.
 ## 2026-09-25 — Sentry open-issues sweep (branch `fix/sentry-open-issues`)
 
 **Ruling SN-1 — FORCE-WEB-K/M/Q (`RangeError: Maximum call stack size exceeded`) and FORCE-WEB-N/P
-(`Error: La`) are Chrome for iOS's own injected script, not FWB code; they are filtered at the Sentry
+(`Error: La`) are Chrome for iOS's own injected script, not Ebda Store code; they are filtered at the Sentry
 boundary, not "fixed".** All 63 events (100%) are `Chrome Mobile iOS`, zero from Mobile Safari on the
 same WebKit engine. Every frame is attributed to the DOCUMENT URL (`app:///`, `app:///products`) at
 lines 190-464, while the served HTML is 11-12 lines and the largest `/_next/static/chunks/*.js` the
 storefront loads is 51 lines (Playwright WebKit + Chromium, iPhone profile, the breadcrumb sequence
 home → category tile → logo/back, x6: no pageerror, 23 JS responses, none ≥190 lines, none defining
-`Ok`/`Qk`/`Nk`/`Pk`). The line:col positions are identical across FWB releases two weeks apart
+`Ok`/`Qk`/`Nk`/`Pk`). The line:col positions are identical across Ebda Store releases two weeks apart
 (2214be88 → ad17d6e4) while the Closure-style names change with the Chrome version (152 `Nk`/`Pk`,
 154 `Ok`/`Qk`). `isHostInjectedScriptEvent` (`@ebda/shared`) drops an event only when the UA is
 Chrome/Firefox/Edge for iOS (`CriOS`/`FxiOS`/`EdgiOS` — NOT the Facebook/Instagram in-app
@@ -820,7 +820,7 @@ and the three live stores see no change after deploy.
 
 **Ruling W-1 — stale `customer_wallet` overrides are reset to OFF by the
 migration, and the API feature cache moves to a new namespace.** A read-only
-production query (2026-09-25) found `store_features(palora, customer_wallet,
+production query (2026-09-25) found `store_features(demo-boutique, customer_wallet,
 enabled=true)`, set 2026-03-23 by an enable-everything sweep while the key was a
 hidden no-op (20 other keys were enabled with it, incl. the still-hidden
 `email_campaigns`). Feature resolution is baseline-then-override and the key is
@@ -830,7 +830,7 @@ runs `UPDATE store_features SET enabled = false …` (kept as an explicit off ro
 so it also holds if the key ever joins a baseline; verified locally on a seeded
 row), and `features:store:` → `features:store:v3:` (v3 so it cannot collide with the email-campaigns release, #1939, which takes v2) so no cached `true` outlives
 it. rollback.sql does not restore it; re-enabling is a manual super-admin
-toggle. Cost if wrong: palora's merchant had in fact been relying on a wallet
+toggle. Cost if wrong: demo-boutique's merchant had in fact been relying on a wallet
 that never existed — nothing to lose, the toggle did nothing.
 
 **Ruling W-2 — spending the wallet at checkout ships behind a SECOND per-store
@@ -996,14 +996,14 @@ Neither fans out. Cost if wrong: a slow Gemini response holds one tenant transac
 duration (bounded by the 30s transaction timeout).
 
 **Ruling EC-10 — the migration resets every `email_campaigns` override to OFF, and the feature
-cache moves to a new Redis prefix.** Production had one stale row (palora, `enabled = true`, read-only
-check 2026-09-25) from when the flag was hidden and did nothing; without the reset, palora would have
+cache moves to a new Redis prefix.** Production had one stale row (demo-boutique, `enabled = true`, read-only
+check 2026-09-25) from when the flag was hidden and did nothing; without the reset, demo-boutique would have
 live campaign sending the moment this merged. `UPDATE store_features SET enabled = false WHERE
 feature_key = 'email_campaigns'` is the migration's only data write. It only ever sets false, and
 `tests/unit/campaign-migration.test.ts` fails if it is changed to true or removed (mutation-checked).
 `rollback.sql` deliberately does not restore `true`: re-enabling is a manual super-admin toggle.
 `feature.service.ts` `CACHE_PREFIX` moved to `features:store:v2:` so a map cached before the UPDATE
-(TTL 300s) is never read by the new release. Cost if wrong: palora loses an "enabled" flag that never
+(TTL 300s) is never read by the new release. Cost if wrong: demo-boutique loses an "enabled" flag that never
 did anything, and every store's feature map misses the cache once after deploy (single-flight
 protected).
 
@@ -1016,33 +1016,33 @@ having enabled the feature.
 ---
 
 Context: the pre-clone finish program (Ahmad, 2026-09-25): every unfinished
-FWB item is finished before the repo is cloned into Ebda (Whisky 11, Egypt).
+Ebda Store item is finished before the repo is cloned into Ebda (Whisky 11, Egypt).
 Branch `fix/pre-clone-batch-a`.
 
-**Ruling PC-1 — the Force Media (`forcemediakw.com`) allowlist entries stay.**
+**Ruling PC-1 — the Ebda AI Studio (`ebda.app`) allowlist entries stay.**
 The 2026-06-27 rebrand sweep never landed on main, and ~70 references remain.
 Almost all of them are CORS/CSP/platform-host allowlists and comments, and the
-legacy hosts are still live: on 2026-09-25 `store.forcemediakw.com` 301'd to
-`store.force-ai.co`, `app.forcemediakw.com` 301'd to `admin.force-ai.co`, and
-`store-api.forcemediakw.com` still CNAMEs to the Railway API. Removing them
+legacy hosts are still live: on 2026-09-25 `store.ebda.app` 301'd to
+`store.ebda.app`, `store.ebda.app` 301'd to `store.ebda.app`, and
+`api.ebda.app` still CNAMEs to the Railway API. Removing them
 would break every old link and bookmark that still reaches the platform. Only
 the user-facing stale values changed: the Swagger contact/terms/server URLs,
 the `INNGEST_SERVE_HOST` example in `apps/api/.env.example` and
 `docs/ENVIRONMENT.md`, and the boot warning's example. Cost if wrong: the old
 hosts stay reachable as an attack surface; revisit when their DNS is retired.
 
-**Ruling PC-2 — non-KWD money (closed PR #1689) is built in Ebda, not FWB.**
-FWB stays KWD-only, which is why #1689 was closed, and its fix was incomplete
+**Ruling PC-2 — non-EGP money (closed PR #1689) is built in Ebda, not Ebda Store.**
+Ebda Store stays EGP-only, which is why #1689 was closed, and its fix was incomplete
 (the write path still stores `price * 1000` for every currency). Ebda prices
 in EGP (2 decimals), so the currency-aware money layer is Ebda's first task
-after the clone. Cost if wrong: FWB becomes 10× wrong the day it takes a
-non-KWD store; the currency default is KWD everywhere, so that needs a code
+after the clone. Cost if wrong: Ebda Store becomes 10× wrong the day it takes a
+non-EGP store; the currency default is EGP everywhere, so that needs a code
 change first, not an accident.
 
 **Ruling PC-3 — the storefront shimmer/stagger (design batch item 3) stays removed.**
 The audit flagged `.shimmer` and the empty stagger class as unfinished work.
 They are not: Ahmad had them reverted as a P0 on 2026-07-13 (PR #726) after
-the always-on shimmer made every image slot on wadyaljuz flicker and sweep
+the always-on shimmer made every image slot on demo-merchant flicker and sweep
 rightward, even in RTL. PR #726 kept the keyframes on purpose for a future
 skeleton wired to real image-load state. Cost if wrong: none today; building
 that skeleton is new work, not unfinished work.
@@ -1052,10 +1052,10 @@ Context: issue #1841 — a scoped audit found the SR-7 "Go Home" suppression
 
 **SECOND CORRECTION to SR-7 — the suppression is platform-host-scoped, not
 global.** The first correction (2026-09-16, below) fixed a real defect — the
-link walking a platform-host shopper onto `force-ai.co` — but then suppressed
+link walking a platform-host shopper onto `ebda.app` — but then suppressed
 "Go Home" on EVERY host during a transient, including custom domains, where
 its own text already said "Custom-domain stores were never affected." On a
-custom domain (`wadyaljuz.com` etc. — the majority production configuration)
+custom domain (`demo-merchant.com` etc. — the majority production configuration)
 `useStoreUrl`'s prefix is `''` regardless of whether the store resolved for
 THIS request, so `storeUrl('/')` is `/`, which on that host already IS the
 merchant's storefront home — there is no platform pitch to redirect to.
@@ -1133,8 +1133,8 @@ gateway gets only its share; the wallet share is credited with key
 those shares out of a later whole-order reversal. The preview and the admin
 confirm step show both amounts. See OMD-5 and OMD-6.
 
-**Ruling R2-4 — #1705 (non-KWD formatting in invoices and emails) is declined
-under Ruling PC-2.** FWB is KWD-only; the `/1000`, three-decimal, `KWD` output is
+**Ruling R2-4 — #1705 (non-EGP formatting in invoices and emails) is declined
+under Ruling PC-2.** Ebda Store is EGP-only; the `/1000`, three-decimal, `EGP` output is
 correct for every order it can hold, and the currency-aware money layer is built
 in Ebda. Cost if wrong: the same as PC-2's.
 
@@ -1336,7 +1336,7 @@ more broken than it is.
 longer TITLED "Page not found".** Review found that during the exact scenario
 this work serves, the layout's lenient `getStore()` returns `DEFAULT_STORE`
 (`id:'demo'`) and `generateMetadata` hits that sentinel, emitting
-`title: 'Page not found — Force AI'` around the new retry body — the removed
+`title: 'Page not found — Ebda AI Studio'` around the new retry body — the removed
 claim, relocated from the body to the `<title>`, where it reaches the tab,
 bookmarks and link previews. `lenientResolve` now reports WHICH `null` it
 produced, `getStore()` returns a `transientResolveFailure`-flagged fallback,
@@ -1353,7 +1353,7 @@ title instead of the merchant's, which is the intended trade.
 ruling rebutted a reported dead `/demo` "Go Home" link by concluding "the link
 is `/`" — technically right and materially wrong, because `/` is not the
 merchant's home on the platform host. Measured: `curl -sI
-https://store.force-ai.co/` returns `307 → https://force-ai.co`. So on a
+https://store.ebda.app/` returns `307 → https://ebda.app`. So on a
 path-based store the retry page's only non-retry control walked a merchant's
 shopper onto the Force platform pitch — the HARD multi-tenant rule in
 `app/not-found.tsx`. The link is now suppressed on the transient branch
@@ -1370,7 +1370,7 @@ every store-resolving route defines a title: `products/page.tsx` exports static
 categories/about/contact/locations/bundles/faq/how-to-guides all export static
 metadata. So the layout's "Temporarily unavailable" title is visible chiefly on
 the HOMEPAGE — which is also the only route where the old "Page not found —
-Force AI" title was ever visible, so the bug and the fix have the same reach.
+Ebda AI Studio" title was ever visible, so the bug and the fix have the same reach.
 The `robots: noindex` half DOES inherit on every route. Extending the title to
 the PLP/PDP means touching each page's own metadata export and is deliberately
 not done here.
@@ -1401,7 +1401,7 @@ Declined, with reasons:
   uncertain recovery. Cost if wrong: a shopper on a root-layout failure must
   reload the tab manually, which is today's behaviour.
 - **"Go Home" stays suppressed on custom domains too**, not just the platform
-  host where the `307 → force-ai.co` leak was measured. During a transient the
+  host where the `307 → ebda.app` leak was measured. During a transient the
   API is unreachable for every route, so the merchant's home page would render
   the same retry body — the link would lead from one retry page to another
   while implying escape. "Try Again" is the honest single action on both host
@@ -1901,7 +1901,7 @@ logout.test.ts` now includes one.
 `apps/orders` was left byte-identical to the bug: the same
 `if (!res.ok) return null`, the same blanket catch, the same
 `localStorage.removeItem('accessToken'/'refreshToken')` pair in its
-`checkAuth`. It is a deployed frontend (orders.force-ai.co) and an installed
+`checkAuth`. It is a deployed frontend (orders.ebda.app) and an installed
 iOS PWA that requests persistent storage precisely to keep that one copy of the
 credential alive. And because `refreshLimiter` is keyed per USER, the orders
 PWA, the admin PWA and every browser tab for one merchant share a single
@@ -2269,7 +2269,7 @@ authLimiter's `<ip>-unknown` bucket, per Ruling P2-B2-3.** That ruling split
 out `/auth/refresh` (the only route a client calls unprompted) and kept every
 other emailless auth route together deliberately, as user-initiated, low-volume
 routes where one per-IP ceiling is the right posture. `/verify-email` is the same
-shape. Cost if wrong: a Kuwait carrier CGNAT egress with 15+ verification or
+shape. Cost if wrong: a Egypt carrier CGNAT egress with 15+ verification or
 reset clicks in 15 minutes 429s the 16th, with authLimiter's "Too many login
 attempts" copy — the fix, if it is ever measured, is the same split P2-B2-3
 names.
@@ -2508,7 +2508,7 @@ other 6 paths do.
 P2 (fixed): the inclusive-VAT row printed its amount in the same summed column as
 Subtotal/Shipping/Total, so a `total` that correctly excluded it read as an on-screen arithmetic
 error. All 7 render paths now show the inclusive case as a muted caption after Total
-("Incl. VAT (5%) — KWD 1.000"), never a row in the amount column.
+("Incl. VAT (5%) — EGP 1.000"), never a row in the amount column.
 
 P2 (not filed, fixed anyway): `resolveActiveTaxRate`/`resolveDisplayTaxRatePercent`'s rate query had
 no `ORDER BY`, so a store with more than one active rate could show a different rate than it
@@ -2810,14 +2810,14 @@ unorderable lines. _(Residual closed by EWO-D2 — #2116/#2117.)_
 
 ## 2026-09-30 — Analytics batch 1 (branch `fix/analytics-batch-1`, PR #2220)
 
-Context: `force-website-builder-audit-analytics-2026-09-30.md` findings 1, 2, 5, 6, 8, 9, plus the
+Context: `ebda-store-audit-analytics-2026-09-30.md` findings 1, 2, 5, 6, 8, 9, plus the
 owner decision of 2026-09-30 (no guest contact capture at checkout; payment abandonments stays off
-on pecannbee).
+on demo-store).
 
 **Ruling AN-1 — on a store that takes guest orders, a 0 from an `abandoned_carts`-derived metric
 renders "not tracked for guest checkout"; a non-zero count renders as a number labelled
 "registered customers only".** Abandoned carts are recorded only with a customer contact, so a 0 on
-such a store says nothing about shoppers (pecannbee: 0 checkouts started vs 55 completed in 30d).
+such a store says nothing about shoppers (demo-store: 0 checkouts started vs 55 completed in 30d).
 "Takes guest orders" = at least one order with `customer_id IS NULL` in the surface's window (90d
 for abandoned-cart stats). Paid or not: every surface reads it through `storeTakesGuestOrders`
 (`lib/guest-checkout.ts`) — the insights dashboard used to derive it from its PAID orders and read
@@ -2827,7 +2827,7 @@ Cost if wrong: a mixed store (e.g. wady-aljuz, 5/41 orders registered) shows a r
 undercount next to all-customer figures; the label is the only guard against reading it as total.
 
 **Ruling AN-2 — dead-stock flags for products with no cost price store `stock_value_fils = NULL`
-and are flagged on the 90-day rule alone.** The value threshold (KWD 50) cannot be applied to an
+and are flagged on the 90-day rule alone.** The value threshold (EGP 50) cannot be applied to an
 unknown value; skipping them made the scan blind on stores that never entered costs, and storing 0
 would be a false value. Cost if wrong: a store with many cheap, slow products and no costs sees more
 flags than the value threshold would allow once costs are entered.
@@ -2892,7 +2892,7 @@ GL cards + cashflow after the merge: `glRevenueWindow` reads main's corrected `p
 
 ## 2026-09-30 — accounting + profit batch (branch `fix/accounting-profit-batch`)
 
-Audit: `force-website-builder-audit-accounting-mcp-2026-09-30.md` findings 1–6.
+Audit: `ebda-store-audit-accounting-mcp-2026-09-30.md` findings 1–6.
 
 **Ruling AP-1 — the balance sheet's retained + current earnings row is COMPUTED,
 not posted.** The ledger has no period-closing entries, so cumulative revenue −
@@ -2938,7 +2938,7 @@ cancelled but whose money was knowingly kept books no revenue.
 erroneous reversal (JE-2026-000020) with the standard `reverseEntry`.** No row is
 edited or deleted. The re-booked sale carries source id `…:reversal:reversal`,
 which `postRefundJournal` does not look for. Cost if wrong: if that one order is
-ever genuinely refunded, its 9.500 KWD sale stays booked until reversed by hand.
+ever genuinely refunded, its 9.500 EGP sale stays booked until reversed by hand.
 Script: `scripts/fix-ledger-order-mismatch-2026-09-30.ts` — NOT RUN, awaits Ahmad. Its optional
 `--fix-stock` step refuses (dry run included) if any of the three products has a variant, and re-checks
 that under the row lock: `products.inventory` is not a variant product's stock (issue 2273). It busts the
@@ -3189,7 +3189,7 @@ request per bundle write.
 
 ## 2026-09-30 — Admin UI: coupons chrome, feature-flag staleness, Customers page (branch `fix/admin-ui-coupons-features-customers`)
 
-Source: `force-website-builder-audit-accounting-mcp-2026-09-30.md` §8, §9, §10.
+Source: `ebda-store-audit-accounting-mcp-2026-09-30.md` §8, §9, §10.
 
 **Ruling AUI-1 — the Customers KPI "Total spent" / "Avg order value" / "Repeat rate" count orders
 with `status NOT IN ('cancelled','refunded')`; the table's per-row "Total spent" keeps its existing
@@ -3230,8 +3230,8 @@ per store right after deploy.
 
 ## 2026-09-30 — Merchant MCP read tools + RFM segment drill-down (branch `feat/mcp-read-tools-rfm-drilldown`)
 
-Source: `force-website-builder-audit-accounting-mcp-2026-09-30.md` §7 and
-`force-website-builder-audit-analytics-2026-09-30.md` §4. Builds on the Customers-page segment
+Source: `ebda-store-audit-accounting-mcp-2026-09-30.md` §7 and
+`ebda-store-audit-analytics-2026-09-30.md` §4. Builds on the Customers-page segment
 filter merged in PR 2218.
 
 **Ruling MCP-R1 — the funnel follows owner ruling AUD-2: a stage the platform cannot capture for
@@ -3477,7 +3477,7 @@ Cost if wrong: none for rendered HTML — both host classes seed the same value 
 **Ruling EWO-E3 — `/manifest.webmanifest` runs through middleware again (found while sweeping
 #2153 / #1731's matcher class).** Excluded since 2026-03-16 "so it is not treated as a store slug";
 `extractStoreSlug` has skipped dotted segments since, and the exclusion meant `app/manifest.ts` never
-saw `x-store-domain`: `curl https://pecannbee.com.kw/manifest.webmanifest` on 2026-10-01 returned
+saw `x-store-domain`: `curl https://demo-store.example/manifest.webmanifest` on 2026-10-01 returned
 `{"name":"Force",…,"theme_color":"#ff6e00"}` — every custom-domain merchant's install prompt showed
 the platform identity. Cost if wrong: the manifest now does one extra middleware pass per install
 check; no rewrite applies to it (pinned by tests).
@@ -3610,7 +3610,7 @@ script. Cost if wrong: if `ci-runner-guard.sh` itself stops, a dead runner silen
 every other scheduled job until someone opens the Actions tab.
 
 **Ruling ZAP-10044 — the global `10044 IGNORE` (Big Redirect) stays, with no deterministic gate behind
-it (issue 2100).** It is accepted for one known redirect — the `store.force-ai.co` apex 307, whose body is
+it (issue 2100).** It is accepted for one known redirect — the `store.ebda.app` apex 307, whose body is
 the public 404 markup Next.js serialises from the not-found boundary. What a redirect body contains is a
 runtime property of Next's rendering, not something a unit test can read from config, and narrowing the
 suppression needs URL scoping `rules.tsv` does not have. The 10063 half of the same issue IS gated
@@ -3663,13 +3663,13 @@ because CSRF tokens and `restrictPlatformOnlyOrigins` are the real boundary; a
 domain removal on this replica busts the entry and is never served stale.
 
 **Ruling CL-2 — cross-store aggregates reached from inside a store scope run
-under `withRlsBypass`, and are gated in the force_app suite (issue 2040,
+under `withRlsBypass`, and are gated in the the earlier app role suite (issue 2040,
 issue 2043).** `assertAiQuota`'s daily/monthly counts protect ONE Google project
 ceiling; the per-store slice stays ambient. The mirror of RLS-S1: the strict
 list names readers that NEED a context, and `rls-force-app.test.ts` now carries
 a "must NOT be scoped" block for readers that must not have one. Proven red on
 the pre-fix code under a real non-BYPASSRLS login (a role that is a member of
-`force_app`). Cost if wrong: none on isolation — the two counts only read
+the earlier app role). Cost if wrong: none on isolation — the two counts only read
 `count(*)`, never row contents.
 
 **Ruling CL-3 — RLS helpers assert their precondition instead of documenting it
@@ -3875,7 +3875,7 @@ that visible amount.
 secret derived from `ENCRYPTION_KEY`, not a new env var (issue 2242).** A plain
 sha256 of a guest's contact was reversible (8-digit mobile, masked forms leak
 most of it), so the "contact details are masked" contract (MCP-R2) did not hold.
-`rfmKeyFor` now uses HMAC-SHA256 keyed by `HMAC(ENCRYPTION_KEY, "fwb:customer-
+`rfmKeyFor` now uses HMAC-SHA256 keyed by `HMAC(ENCRYPTION_KEY, "ebda:customer-
 rfm-key:v1")`. A derived key was chosen over a new `CUSTOMER_REF_SECRET` because
 production already refuses to boot without `ENCRYPTION_KEY`, so there is no
 deploy-ordering step and no silent unkeyed fallback. Re-keying repeats Ruling
@@ -3902,13 +3902,13 @@ all-time figure lags a new customer by up to 15 minutes.
 
 **Ruling BS-2 — issue 1705: the currency sweep covers every order-money surface a customer or the
 merchant's accountant receives (invoice, confirmation / payment / refund emails, the two admin
-alert emails); the remaining `/1000 + toFixed(3)` sites are left KWD-only on purpose.** Those are:
-the XLSX exports (`order.routes.ts`, `customers.routes.ts` — their headers say "(KWD)"), the bank
-reconciliation narrations (the GL's base currency is KWD by design), the coupon / minimum-order
+alert emails); the remaining `/1000 + toFixed(3)` sites are left EGP-only on purpose.** Those are:
+the XLSX exports (`order.routes.ts`, `customers.routes.ts` — their headers say "(EGP)"), the bank
+reconciliation narrations (the GL's base currency is EGP by design), the coupon / minimum-order
 error strings, the loyalty ledger description, the abandoned-cart and payment-link WhatsApp copy,
-`shipping.routes.ts`, `product-feed.ts` and `onesignal.service.ts`. KWD emails render
-byte-identically (`emailMoney` keeps the old "X.XXX KWD" / "X.XXX د.ك" form for KWD). Cost if
-wrong: a store selling in a non-KWD currency sees 3-decimal "/1000" figures in its spreadsheet
+`shipping.routes.ts`, `product-feed.ts` and `onesignal.service.ts`. EGP emails render
+byte-identically (`emailMoney` keeps the old "X.XXX EGP" / "X.XXX د.ك" form for EGP). Cost if
+wrong: a store selling in a non-EGP currency sees 3-decimal "/1000" figures in its spreadsheet
 exports and a few merchant-facing messages until they get the same treatment.
 
 **Ruling BS-3 — issue 2142 amends R2-8: the refund fanout's in-band gate still covers only a render
@@ -3996,7 +3996,7 @@ wrapped in a helper, or a `.catch(() => …)` chain) still poisons its request.
 
 ## 2026-10-01 — backlog batch a-money-services (branch `fix/backlog-a-money-services`)
 
-**Ruling AMS-1 — revenue_drop needs 50.000 KWD of weekly revenue in either
+**Ruling AMS-1 — revenue_drop needs 50.000 EGP of weekly revenue in either
 window, and every anomaly baseline is the 3 weeks BEFORE the current one
 (issues 2245 / 2268; extends AP-6).** revenue_drop was dead until the P&L fix
 and was the only metric with no thin-data floor; its 28d/4 baseline also
@@ -4005,7 +4005,7 @@ refund_spike's). Pinned by `tests/integration/accounting/profit-anomaly-revenue-
 The stored column is still named `baseline28d`; it now holds the prior-21d
 per-week figure, and the merchant-facing label (`finance.anomalies.baseline28d`,
 key unchanged) now reads "Weekly baseline (prior 3 weeks)" in en/ar. Cost if wrong: a store whose weekly revenue is below
-50.000 KWD in both windows gets no revenue alert even when it falls to zero.
+50.000 EGP in both windows gets no revenue alert even when it falls to zero.
 
 **Ruling AMS-2 — no `@@unique` on `payments.transaction_id` / `invoice_id` in
 this batch; ambiguity is refused in code instead (issue 769).** A unique index
@@ -4032,7 +4032,7 @@ except eight `[prop]` hits that are not admin chrome: the nav/footer PRESET
 items in `components/NavMenuEditor.tsx` and `FooterLinksEditor.tsx` are
 bilingual content data (each English `label` sits beside its `labelAr` and is
 saved into the store theme for the storefront), and `app/layout.tsx`'s
-"Force AI Store Admin" is the installed-app product name, which must equal
+"Ebda Store Admin" is the installed-app product name, which must equal
 `app/manifest.ts` `name` — a manifest the browser fetches without the locale
 cookie, so it cannot be localized. They live in `WIDENED_FILE_ALLOWLIST`
 (scoped to their file, so a real `header: 'Products'` elsewhere still fails),
@@ -4312,7 +4312,7 @@ passes (at most one origin render per request in the last seconds before it).
 **Ruling DRM-2 — receipt uploads keep the shared 2000px ceiling (issue 1049, declined with a
 measurement).** The finding was reasoning-only ("may degrade OCR"), so it was measured on
 2026-10-01: a synthetic 3024x4032 phone-style receipt photo (receipt ~36% of the frame width, 22
-line items with 3-decimal KWD amounts in ~22px type, then blurred σ1.6, rotated 3°, JPEG q70) and
+line items with 3-decimal EGP amounts in ~22px type, then blurred σ1.6, rotated 3°, JPEG q70) and
 its `fit: inside` 2000px downscale were each sent 3 times through the exact production OCR prompt
 and model (`gemini-flash-lite-latest`, JSON mode). All 6 runs returned the exact total (154.875)
 and 22/22 exact line totals. A separate higher OCR ceiling would store ~2.5x the bytes for no
@@ -4410,7 +4410,7 @@ the bypass itself is ever broken.
 
 **Ruling R2-VIS-2 — an UNKNOWN catalog estimate passes only when the bypass is proven positively
 (issue 2354; amends R2-VIS-1).** The UNKNOWN (`reltuples` -1) refusal had no way out for the role it
-gates: post-cutover `force_app` does not own the STRICT tables, so the guard's ANALYZE is skipped
+gates: post-cutover the earlier app role does not own the STRICT tables, so the guard's ANALYZE is skipped
 with a WARNING, and a table that has never had a row is never auto-analyzed — a standing weekly p1
 and a sweep that never cleans. The guard now reads `current_setting('app.bypass_rls', true)` inside
 the SAME runner the collection used; every STRICT policy admits all rows under it (pinned by
@@ -4435,7 +4435,7 @@ pill sweeps agree (every dark half on `-ink`).
 
 **Ruling CI-SPARSE-1 — no workflow uses sparse-checkout, and every self-hosted checkout job
 disables an inherited sparse config before it checks out (production deploy failure,
-2026-09-30).** The orders PWA deploy failed twice on `fwb-ci6-force-website-builder-2` with
+2026-09-30).** The orders PWA deploy failed twice on `ebda-ci6-ebda-store-2` with
 `npm ci: no package-lock.json`: `railway-deploy.yml`'s hourly `guest-checkout-probe` checked out
 sparse, the persistent self-hosted workspace kept `core.sparseCheckout` in `.git/config`, and the
 next job's plain `actions/checkout` reused it — a tree of only `.git` + `scripts/`. Fixed in two
@@ -4457,7 +4457,7 @@ per job on a workspace that was actually sparse on purpose (none are).
 
 ## 2026-09-30 — single-variant products (branch `fix/single-variant-products`)
 
-Context: owner report (pecannbee) — a product whose ONLY variant is e.g. "Size: 380 Gram" shows a
+Context: owner report (demo-store) — a product whose ONLY variant is e.g. "Size: 380 Gram" shows a
 one-option picker and a disabled "اختر الخيارات" button until the shopper taps it. Part A is a
 one-off data script (`scripts/flatten-single-variant-products-2026-09-30.ts`, NOT applied — the
 owner reviews the dry run); Part B is the PDP auto-select.
@@ -4473,7 +4473,7 @@ longer exists; their snapshot (`variant_name`, `sku`, `price`, `cost_price`) is 
 **Ruling SVF-2 — order lines are unlinked only with `--unlink-order-lines`; without it the product
 is blocked.** The brief said "do not hard-delete a variant an order references"; SVF-1 makes that
 incompatible with flattening, so the default honours the brief and lists the product (29 of 58 on
-pecannbee, 2026-09-30). With the flag, `order_items.variant_id` is set to NULL (what the FK's
+demo-store, 2026-09-30). With the flag, `order_items.variant_id` is set to NULL (what the FK's
 `ON DELETE SET NULL` does anyway) and every id is kept in the backup for `--restore`. NULL is also
 what the stock writers need afterwards: a cancel/return of that order restores onto
 `products.inventory`, the row that now holds the stock. Cost if wrong: a report joining order lines
@@ -4500,8 +4500,8 @@ needs `FOR KEY SHARE` on it), hands the snapshot to the caller, which writes it 
 before the transaction's first write; a skipped or rolled-back product is dropped from the file.
 The cache purge splits into its two independent layers: the storefront tag purge (HTTPS, no Redis)
 is always attempted and awaited, the Redis layer only with a `REDIS_URL`; `--no-bust-caches` opts
-out. Residual: the pecannbee run of 2026-09-30 used the OLD flow — its backups
-(`~/.claude/fwb-lane/flatten-single-variant-pecannbee-*.json`) can miss a line that landed in its
+out. Residual: the demo-store run of 2026-09-30 used the OLD flow — its backups
+(`~/.claude/ebda-lane/flatten-single-variant-demo-store-*.json`) can miss a line that landed in its
 window. Cost if wrong: one order line from that window stays detached from a restored variant; its
 snapshot fields are intact.
 
@@ -4547,13 +4547,13 @@ admin icons keep the role colour because they clear 3:1). Its dropped-class half
 off-scale opacity modifiers) also runs over `apps/web` and `packages/ui`: the two storefront
 offenders (`elegant/Hero.tsx` ring, `modern/CategoryCard.tsx` via-stop at opacity 8) were REMOVED,
 not re-stepped — a compiled probe against apps/web's own Tailwind 3.4.19 config emits no rule for
-either, so removing them is pixel-identical on every store, pecannbee included, while stepping them
+either, so removing them is pixel-identical on every store, demo-store included, while stepping them
 to `/10` would be a visible change. NOT done, and why: (1) bare `text-primary` on the plain surface
 and under `hover:bg-primary/N` — it is the brand orange on every admin link (2.5–2.9:1 on white);
 re-colouring it changes the whole admin's link colour, an owner call. (2) The storefront's tint and
 bare-text shapes (issue 2349's apps/web half: cart/checkout/auth banners, 59 strings) — those pages
-render on pecannbee, whose look must not change; it needs either an owner OK or a default-off theme
-flag with pecannbee pinned by data. Cost if wrong: admin links stay below AA; a shopper on the
+render on demo-store, whose look must not change; it needs either an owner OK or a default-off theme
+flag with demo-store pinned by data. Cost if wrong: admin links stay below AA; a shopper on the
 storefront reads checkout errors at 2–3.3:1 until the storefront decision is made.
 
 **Ruling YWA-2: amends EWO-A1. A 404 from `/auth/me` carrying the API's own
@@ -4623,14 +4623,14 @@ moved its pill elsewhere, gets the chip on the end side anyway. Cost if wrong: f
 out-of-stock sale chip sits on the reading-end side even though the start corner is empty; on the
 narrow (~134px) PLP card the chip can touch the diagonal ribbon's tail (visible in the AFTER shots).
 
-**Ruling OD-9d — the new position is the platform default; pecannbee keeps the legacy corner through
+**Ruling OD-9d — the new position is the platform default; demo-store keeps the legacy corner through
 per-store DATA (`StoreTheme.saleBadgeLegacyCorner = true`), set by a one-off script BEFORE deploy.**
-Owner, 2026-09-30: every store except pecannbee gets the top corner; pecannbee must look exactly as
+Owner, 2026-09-30: every store except demo-store gets the top corner; demo-store must look exactly as
 now. The code never branches on a slug; it reads the flag. `scripts/set-sale-badge-legacy-corner.mjs`
 writes it through the live theme PUT, which shallow-merges an unknown key and busts the store caches,
 so it can run before the code that reads it ships. Proven: every surface with the flag set is
 pixel-identical to origin/main (screenshot diff = 0). Cost if wrong: if the script is not run (or its
-edge-cache check not waited for) before deploy, pecannbee shows the top-corner badge until the flag
+edge-cache check not waited for) before deploy, demo-store shows the top-corner badge until the flag
 lands — the run order in the PR body is the control.
 
 **Ruling OD-9e — a PINNED sale chip never loses the corner to a custom chip; it moves (issue 2343).**
@@ -4799,8 +4799,8 @@ other instead of running together.
   on-order (all of it, apportioned, or none until re-targeted), and how stranded `partial` units
   (and their AP/journal) are settled.
 - Issue 2349's storefront half — `apps/web` cart/checkout/auth banners pair a role tint with the
-  bare role colour (1.98–3.30:1). Those pages render on pecannbee, whose look must not change, so
-  re-colouring needs an owner OK or a default-off theme flag with pecannbee pinned by data.
+  bare role colour (1.98–3.30:1). Those pages render on demo-store, whose look must not change, so
+  re-colouring needs an owner OK or a default-off theme flag with demo-store pinned by data.
 
 ## Backlog batch followups (2026-10-01, branch `fix/backlog-followups`)
 
@@ -5042,7 +5042,7 @@ light / 3.72:1 dark on the admin card) — now `text-destructive-ink`. Storefron
 pixel-identical (Ruling YWA-TXT-1): apps/web renders no `Label`, and its tailwind config maps
 `destructive.ink` to the SAME `hsl(var(--destructive))` declaration (per-store overrides included)
 and safelists `text-gray-700`, so the compiled storefront CSS only gains one rule. Proven by a
-screenshot diff of six live pecannbee pages (home, product, cart, checkout; ar + en) with the ui
+screenshot diff of six live demo-store pages (home, product, cart, checkout; ar + en) with the ui
 form error states injected, 390px + 1280px, light + dark: 0 differing pixels in 24/24 pairs, with
 a positive control (a recoloured ink rule) differing in 24/24. The bank-reconciliation panel's
 `bg-white`→`bg-card` regression (green-800 on the dark card, 2.66:1) and the whole panel, plus the
@@ -5067,7 +5067,7 @@ the store's time zone. See "Finance Reports count store-local days" below.
 `expenseDate` is a calendar date (the form posts `YYYY-MM-DD`, stored as that day's UTC midnight),
 so a viewer-local instant range would drop the first day for any viewer west of UTC. The old parse
 depended on the server's TZ; the explicit `Z` removes that. Cost if wrong: an OCR draft whose
-fallback `expenseDate` is `now()` after 21:00 UTC lists under the next Kuwait day's neighbour.
+fallback `expenseDate` is `now()` after 21:00 UTC lists under the next Egypt day's neighbour.
 
 **Ruling RF-3 — Analytics "Latest 5 orders", "Low stock alerts" and "Inventory snapshot" stay NOT
 period-based and are labelled so (en + ar).** They answer "what is happening now", not "what
@@ -5085,16 +5085,16 @@ export file does not say which filter produced it.
 email, phone; a guest's contact (in `shippingAddress` JSON) is not searched server-side.** The old
 client-side search matched the same fields, but only on the 25 fetched rows. Cost if wrong: a
 guest order is found by its number but not by the guest's name.
-**Ruling BC-1 — storefront status-message text is readable `-ink` by default; pecannbee keeps the old colours through per-store DATA (`StoreTheme.legacyBannerContrast = true`), set by SQL before deploy (issue 2349 storefront half, owner option A 2026-09-30).** Done: 203 changed lines of role-text classes across 46 files in `apps/web/src` (cart, checkout + the 5 templates' `OrderSummary`/`CartTable`, auth, account, returns, search, compare, wishlist, reviews, bundles) now read `text-<role>-ink` (`success`/`warning`/`info`/`destructive`); arbitrary spellings (`bg-[hsl(var(--success))]/20`) became the token form, which a compiled probe against apps/web's Tailwind 3.4.19 shows emits the identical rule. The three `@ebda/ui` field errors already read `text-destructive-ink` (ADM-GREY-2), which the storefront aliased to the bare `--destructive`; that alias now points at the per-store `--destructive-ink`, so they are readable by default and identical under the flag — this supersedes ADM-GREY-2's storefront alias. The ink is NOT a fixed token: stores recolour `--success`/`--warning`/`--destructive`, so `statusInkVars` derives each store's ink from its own palette (nearest lightness at >= 4.6:1 derivation target on card and page, bare and under every tint to 30%) in the shared `themeToCssVars` and the `StoreContext` mirror, and `pageSurfaceStyle` re-derives it on a merchant page colour (a dark checkout page gets LIGHTER inks). With the flag, every ink is `var(--<role>)` and the page wrapper sets none, so each `text-<role>-ink` computes to the colour its `text-<role>` did; the SSR sanitizer admits exactly that value on `-ink` keys and nothing else. The code reads the flag and never a slug. Proven: pecannbee with the flag is pixel-identical to origin/main (screenshot diff in the PR). NOT done, and why: bare `text-primary` (brand colour, YWA-TXT-1); rating stars, the wishlist heart and the modern/elegant footers' newsletter error (graphics, or a merchant-coloured footer the root ink is not measured on — exempt by name in the gate, which fails if an exemption goes stale); raw neutral and raw chromatic palette utilities on the storefront (gates 4 and 5 are admin/orders only; not message text). Cost if wrong: if the SQL is not run (or the 120s Redis + 120s/600s-SWR edge store cache has not turned over) before the storefront deploys, pecannbee shows the darker message colours until the flag reaches it — the run order in the PR body is the control. **Amended (issues 2399–2402) — no readable ink means the old colour, not black or white.** The derivation searches ONE lightness of the role hue that reads on the card AND the page; when the two sit on opposite sides of relative luminance ≈0.18 (a light card on a dark page, the reverse, a legacy Smart Palette seeded with a mid neutral — its card is always darker than its page — or `pageSurfaceStyle` with `colorScheme: 'light'` forced on a dark page colour) no such lightness exists, and the old fallback returned black or white, which measured 1.13:1 on one of the two surfaces against 3.3–5.6:1 for the bare role colour: a regression on the cart / checkout unavailable and minimum-order banners. `deriveStatusInk` now returns `null` there and `statusInkVars` emits `var(--<role>)` — the same pass-through a legacy store gets, already admitted by the SSR sanitizer — so a contradictory palette renders exactly as before the ink. pecannbee is untouched by construction: with `legacyBannerContrast` the derivation is never called (root) and the wrapper sets no ink; proven again by a byte-identical screenshot comparison in the PR. The hue-preservation claim above now holds for every derived ink and is asserted across every palette in `tests/unit/storefront-status-ink.test.ts` (plus a no-worse-than-bare-role assertion, and a pass-through accepted only where an independent sweep proves no lightness reads); the three straddling palettes and three forced-light dark pages were added, and the old fallback turns 19 tests red. Not done: per-surface inks (a card-measured ink at `:root` plus a page-measured override on the wrapper that paints `--background`) — a straddling store therefore gets the pre-ink colour rather than an improved one. Cost if wrong: on a straddling palette a status message stays at the bare role colour's contrast (≥1.9:1 measured for warning), i.e. no better than before this work, until per-surface inks are built.
+**Ruling BC-1 — storefront status-message text is readable `-ink` by default; demo-store keeps the old colours through per-store DATA (`StoreTheme.legacyBannerContrast = true`), set by SQL before deploy (issue 2349 storefront half, owner option A 2026-09-30).** Done: 203 changed lines of role-text classes across 46 files in `apps/web/src` (cart, checkout + the 5 templates' `OrderSummary`/`CartTable`, auth, account, returns, search, compare, wishlist, reviews, bundles) now read `text-<role>-ink` (`success`/`warning`/`info`/`destructive`); arbitrary spellings (`bg-[hsl(var(--success))]/20`) became the token form, which a compiled probe against apps/web's Tailwind 3.4.19 shows emits the identical rule. The three `@ebda/ui` field errors already read `text-destructive-ink` (ADM-GREY-2), which the storefront aliased to the bare `--destructive`; that alias now points at the per-store `--destructive-ink`, so they are readable by default and identical under the flag — this supersedes ADM-GREY-2's storefront alias. The ink is NOT a fixed token: stores recolour `--success`/`--warning`/`--destructive`, so `statusInkVars` derives each store's ink from its own palette (nearest lightness at >= 4.6:1 derivation target on card and page, bare and under every tint to 30%) in the shared `themeToCssVars` and the `StoreContext` mirror, and `pageSurfaceStyle` re-derives it on a merchant page colour (a dark checkout page gets LIGHTER inks). With the flag, every ink is `var(--<role>)` and the page wrapper sets none, so each `text-<role>-ink` computes to the colour its `text-<role>` did; the SSR sanitizer admits exactly that value on `-ink` keys and nothing else. The code reads the flag and never a slug. Proven: demo-store with the flag is pixel-identical to origin/main (screenshot diff in the PR). NOT done, and why: bare `text-primary` (brand colour, YWA-TXT-1); rating stars, the wishlist heart and the modern/elegant footers' newsletter error (graphics, or a merchant-coloured footer the root ink is not measured on — exempt by name in the gate, which fails if an exemption goes stale); raw neutral and raw chromatic palette utilities on the storefront (gates 4 and 5 are admin/orders only; not message text). Cost if wrong: if the SQL is not run (or the 120s Redis + 120s/600s-SWR edge store cache has not turned over) before the storefront deploys, demo-store shows the darker message colours until the flag reaches it — the run order in the PR body is the control. **Amended (issues 2399–2402) — no readable ink means the old colour, not black or white.** The derivation searches ONE lightness of the role hue that reads on the card AND the page; when the two sit on opposite sides of relative luminance ≈0.18 (a light card on a dark page, the reverse, a legacy Smart Palette seeded with a mid neutral — its card is always darker than its page — or `pageSurfaceStyle` with `colorScheme: 'light'` forced on a dark page colour) no such lightness exists, and the old fallback returned black or white, which measured 1.13:1 on one of the two surfaces against 3.3–5.6:1 for the bare role colour: a regression on the cart / checkout unavailable and minimum-order banners. `deriveStatusInk` now returns `null` there and `statusInkVars` emits `var(--<role>)` — the same pass-through a legacy store gets, already admitted by the SSR sanitizer — so a contradictory palette renders exactly as before the ink. demo-store is untouched by construction: with `legacyBannerContrast` the derivation is never called (root) and the wrapper sets no ink; proven again by a byte-identical screenshot comparison in the PR. The hue-preservation claim above now holds for every derived ink and is asserted across every palette in `tests/unit/storefront-status-ink.test.ts` (plus a no-worse-than-bare-role assertion, and a pass-through accepted only where an independent sweep proves no lightness reads); the three straddling palettes and three forced-light dark pages were added, and the old fallback turns 19 tests red. Not done: per-surface inks (a card-measured ink at `:root` plus a page-measured override on the wrapper that paints `--background`) — a straddling store therefore gets the pre-ink colour rather than an improved one. Cost if wrong: on a straddling palette a status message stays at the bare role colour's contrast (≥1.9:1 measured for warning), i.e. no better than before this work, until per-surface inks are built.
 
 ## 2026-10-01 — Finance Reports count store-local days (`fix/finance-reports-store-tz`)
 
 Context: Ruling RF-1 left the finance GL reports on whole-UTC-day periods and asked the owner to
 decide. Owner decision (Ahmad, 2026-10-01): Finance Reports count days in the store's local time
 zone, the same as the finance dashboard. Prod evidence (read-only, 2026-10-01): 8 of 122 journal
-entries (pecannbee 7, wady-aljuz 1) were posted between 00:00 and 03:00 Kuwait time and move to the next
+entries (demo-store 7, wady-aljuz 1) were posted between 00:00 and 03:00 Egypt time and move to the next
 day; 0 cross a month or year boundary and 0 move Tax Payable (2100), so no filed month's
-P&L or tax total changes today. All 3 prod stores have `timezone = 'Asia/Kuwait'`.
+P&L or tax total changes today. All 3 prod stores have `timezone = 'Asia/Egypt'`.
 
 **Ruling FRT-1 — replaces RF-1. P&L, trial balance, balance sheet and tax report (JSON, XLSX, and the
 admin's CSV built from the JSON) resolve a `YYYY-MM-DD` bound as that calendar day in the store's
@@ -5107,20 +5107,20 @@ default window is now the store's current month instead of the server's. The ser
 longer matters (the old date-only parse was server-local). Pinned by
 `tests/integration/finance-reports-store-tz.test.ts` (6 mutants, all killed). Cost if wrong: a
 period filed under UTC days before this change will not reproduce to the fils if re-run for a month
-whose boundary had a 00:00–03:00 Kuwait posting — none exists in prod today.
+whose boundary had a 00:00–03:00 Egypt posting — none exists in prod today.
 
-**Ruling FRT-2 — a store with no usable time zone falls back to Asia/Kuwait.** `stores.timezone` is
-`NOT NULL DEFAULT 'Asia/Kuwait'`, so "no setting" means an empty string or a name the runtime
-cannot resolve (`resolveStoreTimeZone`, `DEFAULT_STORE_TIME_ZONE`). Asia/Kuwait is the platform's
+**Ruling FRT-2 — a store with no usable time zone falls back to Asia/Egypt.** `stores.timezone` is
+`NOT NULL DEFAULT 'Asia/Egypt'`, so "no setting" means an empty string or a name the runtime
+cannot resolve (`resolveStoreTimeZone`, `DEFAULT_STORE_TIME_ZONE`). Asia/Egypt is the platform's
 market and matches the invoice renderer's existing fallback (`invoice.service.ts`). The column is
 now settable (issue 2411, 2412): `PUT /stores/:id` takes `timezone` (rejected unless
-`isValidTimeZone`, so a typo is a 422, never a silent Kuwait fallback), the Tax page has a time-zone
+`isValidTimeZone`, so a typo is a 422, never a silent Egypt fallback), the Tax page has a time-zone
 card that sends it, and `POST /admin/stores` writes `settings.timezone` to the COLUMN (validated, else
 the column default). The old `settings.timezone` JSON key had zero readers and is no longer written
 by provisioning or by `StoreService.create`; rows written before this change may still carry it, and
 nothing reads it. Pinned by `tests/unit/provisioning-store-timezone.test.ts` and
-`tests/unit/store-update-persists-every-accepted-field.test.ts`. Cost if wrong: a future non-Kuwait
-store whose owner never opens the Tax page still counts Kuwait days; a time-zone change applies to
+`tests/unit/store-update-persists-every-accepted-field.test.ts`. Cost if wrong: a future non-Egypt
+store whose owner never opens the Tax page still counts Egypt days; a time-zone change applies to
 reports run afterwards, so a period already filed under the old zone does not re-run identically.
 Amended 2026-10-03 (issues 2431, 2432; owner decision: the store time zone governs reports and tax
 periods). `stores.timezone` is the store's ONE zone, not a report-only knob: the storefront also reads
@@ -5140,7 +5140,7 @@ slots the `index.ts` comment says are already contended. `stores` has RLS disabl
 every migration), so the read needs no tenant GUC. All 9 call sites now `await storeTimeZone(id)`.
 Pinned by `tests/unit/finance-tz-lookup-no-extra-tx.test.ts` (reintroducing the wrapper at any call
 site reddens it). Cost if wrong: if RLS is ever re-enabled on `stores`, the bare read returns no row
-and every report silently counts Kuwait days; the guard to add then is a `stores` policy test.
+and every report silently counts Egypt days; the guard to add then is a `stores` policy test.
 
 ## Tenant routing canary (2026-10-01, branch `feat/tenant-routing-canary`, PR 1979)
 
@@ -5180,7 +5180,7 @@ deploy; `wrangler secret list` before merge settles it.
 `force-web-canary-cache` are no longer needed by this PR, and were not deleted here.** They held the
 Phase-2 evidence, which is recorded in the plan; the next canary runs on production behind the
 secrets. They are left for the owner to delete because deletion is a production action on the
-Force AI account. It is still live: a plain GET on 2026-10-01 returned the harness's 400 ("x-canary-host
+Ebda AI Studio account. It is still live: a plain GET on 2026-10-01 returned the harness's 400 ("x-canary-host
 must be one of …"), so anyone who sends that header gets the 3 live stores rendered by a stale
 2026-09-25 build with the flag on. Cost if wrong: that stale public copy keeps serving until deleted.
 
@@ -5237,7 +5237,7 @@ fallback degrades ONLY the over-cap half (a registered customer match keeps its 
 different JSON expression, `customer_id IS NULL` dropped, LIKE escaping removed, fallback guard
 removed: each turns a test red). Cost if wrong: a store with a very common guest name or phone
 fragment (more than 1,000 guest orders) gets the unindexed JSON filter for the guest half of that
-one search. The cap is reached far more often than "a very common name": every Kuwait guest phone
+one search. The cap is reached far more often than "a very common name": every Egypt guest phone
 starts `+965`, so the characters `965`, `+965`, `9655`... of a phone typed left to right match every
 guest order and, past 1,000 guest orders, take that path for those keystrokes (300 ms debounce, no
 minimum length); four more GIN indexes on `orders` add about 3 ms per 5,000 inserts.
@@ -5260,7 +5260,7 @@ uses the unindexed JSON filter for the guest half even when the filter would lea
 
 **Ruling SMS-3 — withdrawal is phone-wide per store.** Revoking clears every granted row of the store for that phone, so an older guest row cannot revive consent. Cost if wrong: two people sharing one number lose each other's consent, which fails closed.
 
-**Ruling SMS-4 — the checkbox renders only when the store can send promotional SMS** (sms feature on, provider configured with credentials, a promotional event enabled), via `smsMarketingOptIn` on the public store payload. Any other store renders nothing, so Pecannbee's checkout is pixel-identical. The value is BOUNDED-stale (rides the 120s store cache); the send gate re-checks live. Cost if wrong: a provider switched on shows the box up to about 12 minutes late (edge SWR), never early.
+**Ruling SMS-4 — the checkbox renders only when the store can send promotional SMS** (sms feature on, provider configured with credentials, a promotional event enabled), via `smsMarketingOptIn` on the public store payload. Any other store renders nothing, so Storefront's checkout is pixel-identical. The value is BOUNDED-stale (rides the 120s store cache); the send gate re-checks live. Cost if wrong: a provider switched on shows the box up to about 12 minutes late (edge SWR), never early.
 
 **Ruling TRC-5 — issue 2407: while the root layout owns the store chrome, it also owns the document
 metadata; the tenant tree resolves locale the way the root does, not from its `[locale]` segment.**
@@ -5280,26 +5280,26 @@ until the root-layout decomposition; the Phase 4 cache-key blocker (no-cookie vi
 key) in the plan is unchanged and still has to be fixed in middleware before pages cache. Cost if wrong:
 a later change that reads the route segment for metadata again re-opens the English-over-Arabic
 index for cookie-less crawlers.
-**Ruling TRC-5 — the single-store canary on palora was NOT started: the routing switch cannot
-be scoped to one store (2026-10-01).** The owner asked for the production canary on palora only
-(store.force-ai.co/palora), never pecannbee, and to stop rather than flip globally if the switch had
+**Ruling TRC-5 — the single-store canary on demo-boutique was NOT started: the routing switch cannot
+be scoped to one store (2026-10-01).** The owner asked for the production canary on demo-boutique only
+(store.ebda.app/demo-boutique), never demo-store, and to stop rather than flip globally if the switch had
 no per-store scope. It has none. The rewrite is gated by exactly two Worker-wide values,
 `STOREFRONT_TENANT_ROUTING` (`=== 'true'`) and `STOREFRONT_TENANT_ROUTING_ROUTES` (a ROUTE list),
 both read from `process.env` in `apps/web/middleware.ts` (`isTenantTreeEligible`). No input to that
 gate identifies a store, and one Worker, `force-web-cf-preview`, serves every store:
-`scripts/cf-setup-local.sh` routes `store.force-ai.co` (palora), `pecannbee.com.kw/*` and the
-`*/*` SaaS fallback (wadyaljuz.com) to it. Live check 2026-10-01: all three return 200 from
-Cloudflare, with `x-store-domain` set to `pecannbee.com.kw` and `wadyaljuz.com` on the custom
-domains. So `about,faq` would rewrite pecannbee's and wadyaljuz's `/about` and `/faq` in the same
-instant as palora's. Current state, read from an empty directory with
+`scripts/cf-setup-local.sh` routes `store.ebda.app` (demo-boutique), `demo-store.example/*` and the
+`*/*` SaaS fallback (demo-merchant.com) to it. Live check 2026-10-01: all three return 200 from
+Cloudflare, with `x-store-domain` set to `demo-store.example` and `demo-merchant.com` on the custom
+domains. So `about,faq` would rewrite demo-store's and demo-merchant's `/about` and `/faq` in the same
+instant as demo-boutique's. Current state, read from an empty directory with
 `CLOUDFLARE_ACCOUNT_ID=9f70414f9a626137f1004fa2f4add904 wrangler secret list --name force-web-cf-preview`
 (exit 0): the only secret is `REVALIDATE_SECRET`. Both routing variables are unset, which is
 consistent with TRC-3. Nothing was set, deployed or deleted, and no baseline was captured,
 because no change followed. `cf-deploy.yml` never sets either variable. They are secrets only.
 Unblock options, for the owner to choose between: (a) a code PR that adds a fail-closed store
 allowlist (e.g. `STOREFRONT_TENANT_ROUTING_STORES`, matched on `slug:<slug>` or the custom domain,
-missing or empty meaning no store, as TRC-1 does for routes), then the palora canary as asked; or
-(b) accept a route-scoped canary on every store at once, which the owner's "never pecannbee" rules
+missing or empty meaning no store, as TRC-1 does for routes), then the demo-boutique canary as asked; or
+(b) accept a route-scoped canary on every store at once, which the owner's "never demo-store" rules
 out today. The rollback, once any canary is set, is to delete the main flag, from an empty
 directory:
 `CLOUDFLARE_ACCOUNT_ID=9f70414f9a626137f1004fa2f4add904 npx wrangler secret delete STOREFRONT_TENANT_ROUTING --name force-web-cf-preview`.
@@ -5317,21 +5317,21 @@ TRC-1 does for routes. Two decisions inside it. (1) No `all` for stores: the lit
 rejected as unparseable and voids the whole list, so a store can only be switched on by being named, and
 a lost or mistyped value can never widen the canary. A wildcard can be added later as its own ruling
 once there is a reason. (2) A custom domain is allowlisted by HOSTNAME, not by slug. The ask was that
-`pecannbee.com.kw` map to its slug, but middleware is synchronous and has no store lookup (a fetch there
+`demo-store.example` map to its slug, but middleware is synchronous and has no store lookup (a fetch there
 would add latency to every request, and a transient API failure would decide routing); no static
 domain-to-slug map exists in the repo, and inventing one would be a second source of truth for tenancy.
-So slug tokens never match a custom domain, and `pecannbee.com.kw` is on only when that exact hostname
-is listed. This is the safe direction: the palora canary (`palora`) cannot reach pecannbee or wadyaljuz
+So slug tokens never match a custom domain, and `demo-store.example` is on only when that exact hostname
+is listed. This is the safe direction: the demo-boutique canary (`demo-boutique`) cannot reach demo-store or demo-merchant
 by any slug spelling. Evidence, `tests/unit/web-middleware-tenant-routing.test.ts`, 12 store tests:
-list missing, empty, 14 garbage values (incl. `all`, `slug:palora`, `*`), contains palora, does not
-contain pecannbee, other platform slugs, bare-slug-vs-host, route list still narrows, main flag off,
+list missing, empty, 14 garbage values (incl. `all`, `slug:demo-boutique`, `*`), contains demo-boutique, does not
+contain demo-store, other platform slugs, bare-slug-vs-host, route list still narrows, main flag off,
 preview iframe. Six mutants each reddened at least one test and were restored byte-identical: gate
 removed (7 red), missing=allow (3), `all` accepted (1), partial parse (1), cookie path ignoring the store
-(1), custom-domain key forced to palora (2). Parity, 672 host x path x cookie cases against
+(1), custom-domain key forced to demo-boutique (2). Parity, 672 host x path x cookie cases against
 `origin/main`'s middleware: variable unset (flag on + routes `about,faq`) identical in all 672; with the
-variable set to `palora` only, all 546 non-palora cases identical to main under prod env and the 30
-palora-related cases that differ are the intended rewrites; control listing pecannbee.com.kw and
-wadyaljuz.com does change them. Not verified: nothing was set or deployed; no live request was made. One
+variable set to `demo-boutique` only, all 546 non-demo-boutique cases identical to main under prod env and the 30
+demo-boutique-related cases that differ are the intended rewrites; control listing demo-store.example and
+demo-merchant.com does change them. Not verified: nothing was set or deployed; no live request was made. One
 parity run reported 1 unexplained difference on the all-unset check and did not reproduce in 16 reruns;
 middleware has no time or random source, so it is recorded here rather than dismissed. Cost if wrong:
 a store reachable under a custom domain AND a platform slug needs both spellings listed, and an operator
@@ -5421,7 +5421,7 @@ route/cache key, declared on the store token (issue 2419, 2026-10-02).** The rew
 visitor with no `force-language` cookie as `en`, while the root layout renders the store's
 `defaultLanguage`. Middleware is synchronous and has no store lookup (TRC-6), so the default is
 declared where the store is already named: `STOREFRONT_TENANT_ROUTING_STORES` accepts an optional
-`:en` or `:ar` suffix per token (`palora:ar`, `wadyaljuz.com:ar`); a bare token means `en`. The
+`:en` or `:ar` suffix per token (`demo-boutique:ar`, `demo-merchant.com:ar`); a bare token means `en`. The
 locale baked into the rewrite is now: cookie when it is `en` or `ar` (as the root layout does), else
 the token's default. Any other suffix, or a second colon, makes the WHOLE list unparseable, so a
 typo routes no store (fail-closed, as TRC-6). Document metadata was already correct on an
@@ -5437,7 +5437,7 @@ new middleware against `origin/main`'s, 960 host x path x cookie cases per envir
 junk-cookie) request. Not verified: nothing was set or deployed; no live request was made. Accepted
 residual: the declared default can drift from the store's real `settings.defaultLanguage`; the runbook
 reads the store's language into the step-2 baseline and requires a cookie-less request in Verify, which
-is the check that catches a drift. Cost if wrong: if an operator declares `palora:ar` for a store whose
+is the check that catches a drift. Cost if wrong: if an operator declares `demo-boutique:ar` for a store whose
 default is `en`, cookie-less visitors get Arabic cache keys over English content until the token is
 corrected.
 
@@ -5521,7 +5521,7 @@ Ruling F13-4 — no change for FORCE-API-2B (fixed by #1982, 2026-09-26; event 9
 
 Decision: wrangler is pinned exactly at `4.116.0` (root `overrides.wrangler` and all three apps). It is the newest wrangler whose `miniflare` dependency is a STABLE release (`4.20260730.0`); wrangler 4.117.0 and every later 4.x pin a `5.x-alpha` miniflare (verified with `npm view wrangler@<v> dependencies.miniflare` for 4.100.0 through 4.147.0). miniflare 4.20260730.0 declares `undici: 7.28.0` exactly, which is inside the advisory range, so `overrides.miniflare.undici = 7.29.1` is REQUIRED again (it was a no-op only while the alpha miniflare declared 7.29.1 itself; #2461). Remove it once a stable miniflare declares undici >= 7.29.1.
 Residual: wrangler 4.116.0 depends on `unenv@2.0.0-rc.24` (upstream, the same on every wrangler 4.x including the previous 4.86.0). It is a dev/optional tool dependency, not a runtime dependency of the shipped Worker bundle.
-Ruling R-EBDA-002: strict RLS replaces FWB's hybrid policies and the `app.bypass_rls` escape hatch (SP4 Stage 1a, migration `20261004000000_ebda_strict_rls`). Every table with a `store_id` column is ENABLEd + FORCEd with one `store_id = nullif(current_setting('app.current_store_id', true), '')` policy (USING and WITH CHECK, no `IS NULL` allowance); tenant children without `store_id` are covered by EXISTS; `users`, `addresses` and `store_staff` are keyed on `app.current_user_id`. The runtime role is `ebda_app` (NOBYPASSRLS). Cross-store work uses SECURITY DEFINER `ebda_*` functions (fixed search_path, EXECUTE only for `ebda_app`), per-store fan-out (`acrossStores`), or, for the R2 orphan sweep only, an owner-role connection that refuses to run on the app role. Documented exceptions: `stores` (routing table, no RLS, secrets omitted by the client), `refresh_tokens` / `verification_tokens` (credential-keyed before identity is known), `onesignal_subscriptions`, `answer_engine_provider_configs`. Known gaps: legacy `users.store_id IS NULL` customers cannot be erased by a store scope, and the per-URL R2 orphan check visits every store. Evidence: `tests/integration/rls-ebda-app.test.ts` (every `store_id` table enumerated from `information_schema`, on a real `ebda_app` login), `tests/integration/rls-pooler-isolation.test.ts` (pgbouncer transaction mode, 300 interleaved requests, 0 leaks, negative control leaks), `tests/unit/no-session-level-gucs.test.ts`, `tests/unit/no-rls-bypass-in-runtime.test.ts`. Caller guards (added after the Opus security review): the mutating definers check who is calling and raise SQLSTATE 42501 otherwise. `ebda_audit_logs_detach_store` needs the transaction's store or a super_admin; `ebda_audit_logs_unlink_user`, `ebda_user_revoke_sessions` and `ebda_user_addresses_delete` need the user themself, a super_admin, or a user of the transaction's store (customer, staff or owner link) via `ebda_may_act_on_user`; the audit-retention functions, `ebda_webhook_inbox_get/update/stuck` need a super_admin or a named platform job (`withSystemJob`, transaction-local `app.system_job`); the plans-engine cross-store reads need a super_admin. The pre-scope lookups (host, login email, user state, provider references, webhook ingress, SMS opt-out) stay unguarded by necessity and each carries a one-line reason in the migration. Accepted residual (SUPERSEDED by R-EBDA-005, 2026-10-07): `stores` stays outside RLS, so `ebda_app` can read every store row including the encrypted provider credential columns (omitted by the client by default). Enabling it touches 304 call sites in 106 files, so it is deferred to `docs/ebda/plans/sp4-stores-rls-followup.md` (first step: move the secret columns into a store-scoped table).
+Ruling R-EBDA-002: strict RLS replaces Ebda Store's hybrid policies and the `app.bypass_rls` escape hatch (SP4 Stage 1a, migration `20261004000000_ebda_strict_rls`). Every table with a `store_id` column is ENABLEd + FORCEd with one `store_id = nullif(current_setting('app.current_store_id', true), '')` policy (USING and WITH CHECK, no `IS NULL` allowance); tenant children without `store_id` are covered by EXISTS; `users`, `addresses` and `store_staff` are keyed on `app.current_user_id`. The runtime role is `ebda_app` (NOBYPASSRLS). Cross-store work uses SECURITY DEFINER `ebda_*` functions (fixed search_path, EXECUTE only for `ebda_app`), per-store fan-out (`acrossStores`), or, for the R2 orphan sweep only, an owner-role connection that refuses to run on the app role. Documented exceptions: `stores` (routing table, no RLS, secrets omitted by the client), `refresh_tokens` / `verification_tokens` (credential-keyed before identity is known), `onesignal_subscriptions`, `answer_engine_provider_configs`. Known gaps: legacy `users.store_id IS NULL` customers cannot be erased by a store scope, and the per-URL R2 orphan check visits every store. Evidence: `tests/integration/rls-ebda-app.test.ts` (every `store_id` table enumerated from `information_schema`, on a real `ebda_app` login), `tests/integration/rls-pooler-isolation.test.ts` (pgbouncer transaction mode, 300 interleaved requests, 0 leaks, negative control leaks), `tests/unit/no-session-level-gucs.test.ts`, `tests/unit/no-rls-bypass-in-runtime.test.ts`. Caller guards (added after the Opus security review): the mutating definers check who is calling and raise SQLSTATE 42501 otherwise. `ebda_audit_logs_detach_store` needs the transaction's store or a super_admin; `ebda_audit_logs_unlink_user`, `ebda_user_revoke_sessions` and `ebda_user_addresses_delete` need the user themself, a super_admin, or a user of the transaction's store (customer, staff or owner link) via `ebda_may_act_on_user`; the audit-retention functions, `ebda_webhook_inbox_get/update/stuck` need a super_admin or a named platform job (`withSystemJob`, transaction-local `app.system_job`); the plans-engine cross-store reads need a super_admin. The pre-scope lookups (host, login email, user state, provider references, webhook ingress, SMS opt-out) stay unguarded by necessity and each carries a one-line reason in the migration. Accepted residual (SUPERSEDED by R-EBDA-005, 2026-10-07): `stores` stays outside RLS, so `ebda_app` can read every store row including the encrypted provider credential columns (omitted by the client by default). Enabling it touches 304 call sites in 106 files, so it is deferred to `docs/ebda/plans/sp4-stores-rls-followup.md` (first step: move the secret columns into a store-scoped table).
 Cost if wrong: a tenant table added without a policy fails the coverage test, not production; the cost of a missed contextless caller is a `[]` / rejected write, which the integration job surfaces because the API there runs as `ebda_app`.
 Also: `@opennextjs/cloudflare` is exact-pinned `1.19.11` in all three apps again (#2462/#2464), and cf-deploy.yml sets `CF_SETUP_SKIP_DEPS=1` and asserts no package.json/lockfile mutation, so the deployed tree is the audited lockfile (#2463).
 Cost if wrong: wrangler 4.116.0 is ~30 minors behind latest; a Workers platform feature that needs a newer wrangler would be blocked until miniflare 5 ships stable.
@@ -5538,8 +5538,8 @@ Cost if wrong: the monthly total is understated by an unmeasured amount, and a r
 ## Ruling CI-GH-1 — the self-hosted runners have no `gh`; the blast-radius comment uses the REST API (issue 2452, 2026-10-03)
 
 Decision: `.github/workflows/blast-radius.yml` posts its PR comment with python3 and the REST API (the same endpoints `.github/scoped-audit/audit.mjs` uses), logs an explicit `::warning::` when the comment cannot be posted, and no longer relies on `continue-on-error` to hide a 127. The check itself (the compute step and the step summary) is unchanged. Partial: the other `gh`-using workflows were not changed.
-Evidence: the last run on `fwb-ci6` logged `gh: command not found` in the comment step while every step reported success. `auto-fix-watchdog.yml` is the other `gh` user that can land on a self-hosted runner (its `schedule:` path); it installs `jq` for itself but nothing installs `gh`, and its recent scheduled runs report success, so whether it works there was not verified. `runner-health-check.yml` and `cloud-rescue.yml` are `ubuntu-latest` only.
-Cost if wrong: if `gh` is also missing for the watchdog's scheduled runs, its stale-failure escalation never fires; `gh --version` on a `fwb-ci` runner settles it.
+Evidence: the last run on `ebda-ci6` logged `gh: command not found` in the comment step while every step reported success. `auto-fix-watchdog.yml` is the other `gh` user that can land on a self-hosted runner (its `schedule:` path); it installs `jq` for itself but nothing installs `gh`, and its recent scheduled runs report success, so whether it works there was not verified. `runner-health-check.yml` and `cloud-rescue.yml` are `ubuntu-latest` only.
+Cost if wrong: if `gh` is also missing for the watchdog's scheduled runs, its stale-failure escalation never fires; `gh --version` on a `ebda-ci` runner settles it.
 
 ## Ruling CI-CONC-1 — main-push cancellation fixed for gitleaks only (issue 2454, 2026-10-03)
 
@@ -5549,7 +5549,7 @@ Cost if wrong: a burst of merges can still cancel a pending `ci.yml`/`semgrep.ym
 
 Ruling R-EBDA-003: InstaPay is a manual payment method with one merchant action and four enforced rules (SP6a, migration `20261004120000_instapay_manual_payments`). InstaPay has no merchant API, so the order sits in `awaiting_payment_confirmation` (new `OrderStatus`) with a `Payment` of provider `instapay` in `pending`, until the merchant confirms the transfer arrived. (1) It does not ship: the status allows only `confirmed` and `cancelled` (`order-status-machine.ts`, mirrored in `@ebda/shared`, parity-tested), a bare status write to `confirmed` is refused (`INSTAPAY_CONFIRM_REQUIRED`), and carrier booking is refused first (`assertOrderFulfillable`). (2) It is not paid revenue: the order stays `paymentStatus=unpaid`, every analytics / customer-spend / recovered-cart aggregate excludes the status (`NON_REVENUE_ORDER_STATUSES`), and the GL only posts `paymentStatus=paid`; the pull-side reconciliation (`confirmPaymentFromProviderStatus`) is a no-op for it. (3) It expires: `payment_confirmation_expires_at` (per-store window, default 48h, 1h to 14d) is swept every 15 minutes by `instapay-expiry` (one tenant transaction per store to find the orders, one short transaction per order to cancel), stock is released through the normal cancel path, the merchant is pushed and the customer gets the cancellation notice. (4) It is confirmed once: confirm and expiry take `SELECT ... FOR UPDATE` on the order row, so concurrent confirms make one transition, a repeat confirm is an idempotent `changed:false`, a confirm racing expiry ends confirmed XOR cancelled, and a confirm after expiry is refused (409). InstaPay refunds are made by the merchant outside the system (`MANUAL_PROVIDER_REFUND`). The same task closed two gaps found on the way: checkout payment reads ran with no store scope under `ebda_app` (so `POST /payments/create` was a 404 and `GET /payments/config` empty, and the buy-flow parity harness passed 16/16 only because both sides returned the same 404; it now shows 200s), and provider calls no longer run inside a request transaction (read, call behind a deadline and a per-store-per-provider circuit breaker, then a short transaction to record). Evidence: `tests/integration/instapay-manual-payment.test.ts` and `instapay-routes.test.ts` (real Postgres, `ebda_app` login, mutation-checked), `tests/integration/payment-outage-isolation.test.ts`, `tests/unit/payment-provider-contract.test.ts` (the shared adapter contract, six deliberate breakages each turn it red). Cost if wrong: a merchant who confirms from a screenshot takes the fraud risk (open question 4 in the provider research); a store whose hold window is too short cancels orders a slow customer pays for (the merchant raises the window per store).
 
-Ruling R-EBDA-004: the shipping layer (SP7, migration `20261005090000_sp7_shipping`). (1) One `ShippingCarrierProvider` interface evolved from FWB's: `capabilities` (quote, label, webhooks, polling, `cod: true | false | 'unconfirmed'`), a per-call `CarrierCallContext` (non-secret settings, the callback URL), typed `CarrierError`s so an outage (retry) is told from a refusal (do not), cancel answering `cancelled | not_cancellable | failed`, optional `quote` and `getLabel`. Adapters: Bosta (REST v2, COD as an EGP decimal, tracking pushed to a per-store secret URL), Aramex (polled by the tracking cron; COD is REFUSED until the merchant records Aramex's written confirmation that COD is collected in EGP, because one integrator source says USD only; the old `amount / 1000` KWD is gone), and a manual carrier (the merchant types courier and tracking number). Every field not confirmed against a live sandbox is marked `UNVERIFIED:` in the adapter. (2) Bosta signs nothing, so its callback URL is `/api/v1/webhooks/shipping/bosta/:storeId/:token` with a server-generated per-store secret in the store's encrypted carrier credentials (compared in constant time; wrong token, unknown store and a store without Bosta are all the same 401; rotation stops the old URL at once). (3) Booking claims the shipment row (`creating`) before the carrier is called, so a double click or a retry books one parcel, the carrier dedupes on our reference where it can (Bosta by `businessReference`, Aramex by an adapter cache), and a failed booking leaves `creation_failed` with the reason. Confirming an order only sends `shipment/create.requested`: a carrier outage never touches the order, the Inngest job retries 6 times and pushes the merchant when it gives up or at once for a refusal retrying cannot fix. An InstaPay order awaiting confirmation, or an order the status machine will not ship, is refused before any carrier call. (4) Tracking merges by (status, timestamp): a replay is a no-op, a late old event is recorded in order without moving the status back, a finished shipment is not reopened; the poll cron finds shipments with one tenant transaction per store (`sweepAcrossStores`) and polls each in its own store scope. (5) COD reconciliation: `cod_remittances` (strict RLS; gross, fee and net per statement line in piastres, net = gross - fee enforced by a CHECK) is the ledger; a CSV statement is imported idempotently and each shipment's match (awaiting / partial / settled / over-remitted / mismatch) is COMPUTED on read by the pure matcher in `lib/cod-reconciliation.ts`, so partial remittances add up and totals satisfy `owed - collected = outstanding - over` and `collected = fees + net` to the piastre. (6) The shipping routes were context-less, which under strict RLS meant an empty settings page and rejected writes; they now pick a context per request (`shippingCarrierRouteContext`: reads one transaction, carrier calls and writes store scope). Evidence: `tests/contract/shipping-carrier.contract.ts` run for Bosta, Aramex and manual (`tests/unit/shipping-carrier-contract.test.ts`), `tests/unit/cod-reconciliation.test.ts`, `tests/integration/shipping-sp7.test.ts` (real Postgres, `ebda_app` login, loopback stubs), each mutation-checked. Cost if wrong: every `UNVERIFIED:` field (Bosta state codes and endpoints, Aramex sandbox host, domestic product codes, cancel) can be wrong until a real sandbox key is used; Aramex COD stays off until Aramex confirms EGP in writing.
+Ruling R-EBDA-004: the shipping layer (SP7, migration `20261005090000_sp7_shipping`). (1) One `ShippingCarrierProvider` interface evolved from Ebda Store's: `capabilities` (quote, label, webhooks, polling, `cod: true | false | 'unconfirmed'`), a per-call `CarrierCallContext` (non-secret settings, the callback URL), typed `CarrierError`s so an outage (retry) is told from a refusal (do not), cancel answering `cancelled | not_cancellable | failed`, optional `quote` and `getLabel`. Adapters: Bosta (REST v2, COD as an EGP decimal, tracking pushed to a per-store secret URL), Aramex (polled by the tracking cron; COD is REFUSED until the merchant records Aramex's written confirmation that COD is collected in EGP, because one integrator source says USD only; the old `amount / 1000` EGP is gone), and a manual carrier (the merchant types courier and tracking number). Every field not confirmed against a live sandbox is marked `UNVERIFIED:` in the adapter. (2) Bosta signs nothing, so its callback URL is `/api/v1/webhooks/shipping/bosta/:storeId/:token` with a server-generated per-store secret in the store's encrypted carrier credentials (compared in constant time; wrong token, unknown store and a store without Bosta are all the same 401; rotation stops the old URL at once). (3) Booking claims the shipment row (`creating`) before the carrier is called, so a double click or a retry books one parcel, the carrier dedupes on our reference where it can (Bosta by `businessReference`, Aramex by an adapter cache), and a failed booking leaves `creation_failed` with the reason. Confirming an order only sends `shipment/create.requested`: a carrier outage never touches the order, the Inngest job retries 6 times and pushes the merchant when it gives up or at once for a refusal retrying cannot fix. An InstaPay order awaiting confirmation, or an order the status machine will not ship, is refused before any carrier call. (4) Tracking merges by (status, timestamp): a replay is a no-op, a late old event is recorded in order without moving the status back, a finished shipment is not reopened; the poll cron finds shipments with one tenant transaction per store (`sweepAcrossStores`) and polls each in its own store scope. (5) COD reconciliation: `cod_remittances` (strict RLS; gross, fee and net per statement line in piastres, net = gross - fee enforced by a CHECK) is the ledger; a CSV statement is imported idempotently and each shipment's match (awaiting / partial / settled / over-remitted / mismatch) is COMPUTED on read by the pure matcher in `lib/cod-reconciliation.ts`, so partial remittances add up and totals satisfy `owed - collected = outstanding - over` and `collected = fees + net` to the piastre. (6) The shipping routes were context-less, which under strict RLS meant an empty settings page and rejected writes; they now pick a context per request (`shippingCarrierRouteContext`: reads one transaction, carrier calls and writes store scope). Evidence: `tests/contract/shipping-carrier.contract.ts` run for Bosta, Aramex and manual (`tests/unit/shipping-carrier-contract.test.ts`), `tests/unit/cod-reconciliation.test.ts`, `tests/integration/shipping-sp7.test.ts` (real Postgres, `ebda_app` login, loopback stubs), each mutation-checked. Cost if wrong: every `UNVERIFIED:` field (Bosta state codes and endpoints, Aramex sandbox host, domestic product codes, cancel) can be wrong until a real sandbox key is used; Aramex COD stays off until Aramex confirms EGP in writing.
 
 ---
 
@@ -5565,7 +5565,7 @@ Ruling AUDIT-13 — FIXED with a synchronous cap, no queue: bank statements are 
 
 ## 2026-10-07 — cache generation counters + fail-closed Node DB role guard (branch `fix/cache-gen-and-role-guard`)
 
-Source: Ebda/FWB twin audit 2026-10-05, recheck 2026-10-07 (FIX-001, FIX-002, FIX-003). Twin of the same-named FWB branch.
+Source: Ebda/Ebda Store twin audit 2026-10-05, recheck 2026-10-07 (FIX-001, FIX-002, FIX-003). Twin of the same-named Ebda Store branch.
 
 Ruling CACHE-GEN-1 — FIXED on both shells: a cache fill that started before a write could republish the pre-write price/stock after that write's invalidation (FIX-001, P1). Every invalidator (`invalidateCached`, `invalidateCachedPrefix`, so every `invalidateStore*` helper and `clearProductsRedis`) bumps a generation (`cachegen:<name>`, plus a process-local one on Node) BEFORE deleting; `getCached` captures the covering generations before `fetchFn`, skips the write if one moved, and re-checks after writing (deleting its own entry if a bump landed in between). On Workers `cachegen:*` is outside `cache:`, so `CfRedis` routes it to the AuthState Durable Object (atomic INCR, strongly consistent), never to eventually consistent KV. Evidence: `tests/unit/public-cache-stale-refill.test.ts` (Node, adapted from the audit repro) and `tests/unit/public-cache-stale-refill.workers.test.ts` (real `redis.service` → real `CfRedis` → fake KV + the AuthState engine over node:sqlite, incl. a second isolate invalidating mid-fill). With both checks removed 7/27 go red across the three new files (2/4 in the Workers file); with only the post-write re-check removed 1 goes red; the pre-write check alone is redundant with the re-check (it saves a pointless write). Swept: every `getCached(` caller (customer-aggregate, bundle.routes x2, public.routes x7), every `invalidateCached(`/`invalidateCachedPrefix(` caller (19 single-key, 3 prefix outside the lib), and the one direct `redis.delete` of a `getCached` key (`product.service.ts:675`, always followed by `invalidateStoreProductCaches`). Cost if wrong: KV's own propagation delay still lets another PoP read a deleted entry for up to ~60 s (pre-existing, not this race); a generation key evicted/expired (30-day TTL, refreshed per bump) between a fill's two reads and re-bumped to the captured value would let one stale fill through for one TTL.
 
@@ -5573,7 +5573,7 @@ Ruling CACHE-GEN-2 — FIXED on the Node shell: the in-memory L1 was read on eve
 
 Ruling ROLE-GUARD-1 — FIXED on the Node shell: the DB role guard in `apps/api/src/index.ts` ran fire-and-forget after `listen()` and swallowed query errors (FIX-003, P2 for Ebda; the Workers guard was already fail-closed in 23acd07b). It now lives in `apps/api/src/lib/database-role-guard.ts`, is awaited before `server.listen`, reports `rolbypassrls` and `rolsuper` separately (the old query OR-ed them into one column named `rolbypassrls`), and in production exits 1 on a failed query or a missing `pg_roles` row. CI's integration grep now requires `current_user=ebda_app rolbypassrls=false rolsuper=false`. Evidence: `tests/unit/database-role-guard-boot.test.ts`; restoring the swallow-and-continue catch turns 3 red. Cost if wrong: a DB unreachable for the whole retry window at Node boot now crash-loops the process instead of serving with an unverified role — intended.
 
-Ruling ROLE-GUARD-2 — KEPT: the inherited `ALLOW_BYPASSRLS_ROLE=true` hatch stays on the Node shell (it now also covers a superuser and logs at `error` level on every boot) so the twin keeps one contract with FWB, whose production depends on it. Ebda's runtime role is `ebda_app`, so the variable should stay unset; it never excuses an unverifiable role, and the Workers shell ignores it. Cost if wrong: a Node deployment that copies FWB's env verbatim would serve with RLS off, visible only as the boot `error` line.
+Ruling ROLE-GUARD-2 — KEPT: the inherited `ALLOW_BYPASSRLS_ROLE=true` hatch stays on the Node shell (it now also covers a superuser and logs at `error` level on every boot) so the twin keeps one contract with Ebda Store, whose production depends on it. Ebda's runtime role is `ebda_app`, so the variable should stay unset; it never excuses an unverifiable role, and the Workers shell ignores it. Cost if wrong: a Node deployment that copies Ebda Store's env verbatim would serve with RLS off, visible only as the boot `error` line.
 
 ## 2026-10-07 — merchant admin host moves to admin.ebda.app (branch `chore/admin-host`)
 
@@ -5617,7 +5617,7 @@ Ruling BUILDER-LOCAL-1 — local verification ran on Apple `container` Postgres 
 
 ## 2026-10-07 — INFRA-GAPS (branch `fix/infra-gaps`)
 
-Ruling INFRA-1 — FIXED (4 code/test defects, 0 env): the integration failures seen on clean main were (a) a code bug in `seed.ts` (`PaymentConfig.provider: 'tap'`, removed from the enum by `20261004160000_drop_kuwait_providers`, aborted the seed before coupons; now `paymob`), (b) a schema bug (`cod_remittances.shipment_id` FK had only `store_id`-led indexes; new migration `20261007100000_cod_remittances_shipment_fk_index`), (c) a time-bomb in `shipping-sp7` (stub clocks fixed at 2026-10-05/06 became older than the shipment's own `created` history entry once the wall clock passed them, so `mergeTracking` ignored every carrier event as stale; clocks now start 6h ahead of now), (d) a wrong-reason probe in `rls-ebda-app` (`SET ROLE postgres` fails on "role does not exist" in a container whose superuser is `test`; it now resolves the real superuser). `api.test.ts` is not a defect: it needs the built API on :4000 running as `ebda_app` (CI starts it; without it the whole file skips, 20 tests). Evidence: clean main 95 pass / 5 fail over the four files; after 100/100, 0 skipped, with the API up. Cost if wrong: none known; the fixes are test clocks, a seed value and an index.
+Ruling INFRA-1 — FIXED (4 code/test defects, 0 env): the integration failures seen on clean main were (a) a code bug in `seed.ts` (`PaymentConfig.provider: 'tap'`, removed from the enum by `20261004160000_drop_egypt_providers`, aborted the seed before coupons; now `paymob`), (b) a schema bug (`cod_remittances.shipment_id` FK had only `store_id`-led indexes; new migration `20261007100000_cod_remittances_shipment_fk_index`), (c) a time-bomb in `shipping-sp7` (stub clocks fixed at 2026-10-05/06 became older than the shipment's own `created` history entry once the wall clock passed them, so `mergeTracking` ignored every carrier event as stale; clocks now start 6h ahead of now), (d) a wrong-reason probe in `rls-ebda-app` (`SET ROLE postgres` fails on "role does not exist" in a container whose superuser is `test`; it now resolves the real superuser). `api.test.ts` is not a defect: it needs the built API on :4000 running as `ebda_app` (CI starts it; without it the whole file skips, 20 tests). Evidence: clean main 95 pass / 5 fail over the four files; after 100/100, 0 skipped, with the API up. Cost if wrong: none known; the fixes are test clocks, a seed value and an index.
 
 Ruling INFRA-2 — OBSERVATION, not changed: `mergeTracking` lets the NEWEST carrier timestamp decide, and the shipment's own `created` entry is stamped with our clock. A carrier whose event times run behind ours (skew, or local time without offset) would never advance a freshly booked shipment. Not changed here (no incident, behaviour is specified in R-EBDA-004). Cost if wrong: such a shipment shows `created` until a carrier timestamp passes our booking time.
 
@@ -5685,7 +5685,7 @@ Ruling TAX-6 — Ebda's own subscription VAT is a SUPER-ADMIN PLATFORM SETTING, 
 
 Ruling TAX-7 — documents become TAX invoices only from what the ORDER froze. Both order paths freeze `sellerTaxRegistrationNumber`, `sellerTaxLegalName` and `taxRateBps` (new nullable `orders` columns) ONLY when VAT was collected under a verified profile. The printable invoice, the invoice email and the order confirmation email then read "Tax invoice / فاتورة ضريبية", print the seller TRN (+ legal name), the taxable amount and "VAT (14%) / ضريبة القيمة المضافة (14%)"; an order without a frozen TRN prints no VAT wording at all (its tax is 0 under the gate). A revoke or TRN change never rewrites a past invoice. Legacy orders that carried tax before the gate and froze no TRN keep their historic neutral "Tax" row (removing it would make Subtotal + Shipping ≠ Total on a document already issued); per TAX-3 there should be none in production. Evidence: `tests/unit/vat-gate-documents.test.ts` (en/ar, exclusive/inclusive, verified vs unverified across the three documents). Out of scope, recorded: the admin/orders-app/storefront order SummaryCards still label the amount "Tax" without the TRN (internal or post-purchase screens, not the issued document). Cost if wrong: a customer viewing the account order page sees "Tax" instead of "VAT (14%)" for a verified order; the invoice it links to is correct.
 
-Ruling TAX-8 — defence in depth below the routes. `store_tax_profiles` and `store_tax_documents` carry the single strict store policy (auto-enumerated by `tests/integration/rls-ebda-app.test.ts`, 51/51 green). A trigger (`tax_profile_review_guard`) refuses, for `ebda_app`, any transition into verified/rejected/revoked and any edit of a verified identity unless `ebda_is_super_admin()`; a second trigger (`platform_vat_setting_guard`) does the same for writes of `system_settings.ebda.vat` (that table's policy is `true` for `ebda_app`). The cross-store review queue is the definer `ebda_tax_profiles_for_review` (super_admin check inside, fixed search_path, no dynamic SQL, EXECUTE revoked from PUBLIC). Mutation proofs on a live Postgres: neutralising each trigger turns its integration case red; widening the route's `authorize('super_admin')` to store_admin turns 6 unit cases red. Cost if wrong: the triggers key on `current_user = 'ebda_app'`; a deployment that runs the API under another role (e.g. the FWB `ALLOW_BYPASSRLS_ROLE` hatch, ROLE-GUARD-2) loses the DB layer and keeps only the route checks.
+Ruling TAX-8 — defence in depth below the routes. `store_tax_profiles` and `store_tax_documents` carry the single strict store policy (auto-enumerated by `tests/integration/rls-ebda-app.test.ts`, 51/51 green). A trigger (`tax_profile_review_guard`) refuses, for `ebda_app`, any transition into verified/rejected/revoked and any edit of a verified identity unless `ebda_is_super_admin()`; a second trigger (`platform_vat_setting_guard`) does the same for writes of `system_settings.ebda.vat` (that table's policy is `true` for `ebda_app`). The cross-store review queue is the definer `ebda_tax_profiles_for_review` (super_admin check inside, fixed search_path, no dynamic SQL, EXECUTE revoked from PUBLIC). Mutation proofs on a live Postgres: neutralising each trigger turns its integration case red; widening the route's `authorize('super_admin')` to store_admin turns 6 unit cases red. Cost if wrong: the triggers key on `current_user = 'ebda_app'`; a deployment that runs the API under another role (e.g. the Ebda Store `ALLOW_BYPASSRLS_ROLE` hatch, ROLE-GUARD-2) loses the DB layer and keeps only the route checks.
 
 Ruling TAX-9 — routes validate `@ebda/shared` schemas with `safeParse` (`apps/api/src/lib/parse-input.ts`), never `.parse()`. Measured under vitest: a ZodError thrown by a shared schema was NOT `instanceof` the `ZodError` the error handler imports (two module instances), so a bad body answered 500 instead of 400. The helper answers 400 `VALIDATION_ERROR` in the error handler's shape. Not swept repo-wide in this change (pre-existing `updatePlanSchema.parse` etc. in `admin.routes.ts`, owned by another work stream). Cost if wrong: none for the new routes; the existing call sites keep the risk until swept.
 
@@ -5697,7 +5697,7 @@ Ruling BUILDER2-PLASMIC-1 — no Plasmic code adopted in Phase 2, so no `THIRD_P
 
 Ruling BUILDER2-CANVAS-1 — the canvas trusts exactly the storefront's CSP `frame-ancestors` origins (same env var `STOREFRONT_FRAME_ANCESTORS`, same defaults) AND `event.source === window.parent`; the editor trusts only the storefront origin it framed AND that iframe's window. Evidence: `tests/unit/builder-preview-canvas.test.tsx` pins the origin list to `next.config.js`; E2E "a message from a foreign origin is ignored" with a positive control proving the hostile message arrives; dropping the editor-side check turns that test red (`PWNED` reaches the field). Cost if wrong: a framed third-party page could inject text edits into an open editor (still a DRAFT; publishing is a separate explicit click).
 
-Ruling BUILDER2-CSP-1 — the admin's preview CSP rule (`frame-src https:`) now covers `/stores/:id/builder` as well as `/stores/:id/page-builder`. Evidence: the builder canvas embeds a merchant's custom domain, which the catch-all `https://*.ebda.app` list blocks (the same defect class that cost Pecannbee its preview); `tests/unit/admin-page-builder-preview-csp.test.ts` extended (match matrix, served headers). The storefront's `frame-ancestors` remains the real control. Cost if wrong: the builder route may embed any https origin — the admin itself still cannot be framed (`frame-ancestors 'none'`).
+Ruling BUILDER2-CSP-1 — the admin's preview CSP rule (`frame-src https:`) now covers `/stores/:id/builder` as well as `/stores/:id/page-builder`. Evidence: the builder canvas embeds a merchant's custom domain, which the catch-all `https://*.ebda.app` list blocks (the same defect class that cost Storefront its preview); `tests/unit/admin-page-builder-preview-csp.test.ts` extended (match matrix, served headers). The storefront's `frame-ancestors` remains the real control. Cost if wrong: the builder route may embed any https origin — the admin itself still cannot be framed (`frame-ancestors 'none'`).
 
 Ruling BUILDER2-NEWSLETTER-1 — FINDING (pre-existing, not fixed here): the legacy `POST /stores/:id/newsletter/broadcast` sends to every active subscriber with NO unsubscribe link (campaign D2 emails carry a signed one-click link; broadcasts reuse one HTML for all recipients and have no recipient rows to sign). The newsletter section therefore promises only "you agree to receive marketing emails from this store" + the privacy link, not a one-click unsubscribe. Fix belongs to the campaigns area: retire `/newsletter/broadcast` in favour of campaigns, or add a per-subscriber signed token. Cost if wrong: a subscriber who joins via the section and later receives a broadcast cannot unsubscribe from that email (consent/withdrawal gap) — flagged for Ahmad, not deferred silently.
 
@@ -5759,7 +5759,7 @@ Ruling EBDA-BILLFU-4 — `tests/integration/vat-gate.test.ts` "while Ebda VAT is
 
 Ruling EBDA-BILLFU-5 — `BRAND.supportEmail` is now `hello@ebda.app` (was `support@ebda.app`). Evidence (coordinator, 2026-10-07): only `hello@` and `security@ebda.app` receive mail (Cloudflare Email Routing), so every surface reading `BRAND.supportEmail` (marketing/storefront footer, admin public shell, upgrade-request mailto, Swagger contact, VAPID subject default) pointed at a dead mailbox. `EBDA_SUPPORT_EMAIL` defaults to it; `.env.example` VAPID_SUBJECT updated. NOT changed here, on purpose: hardcoded `support@ebda.app` in `apps/marketing/src/lib/content.ts` (5 strings, ar + en legal/footer copy) and `apps/marketing/public/llms.txt` — the marketing copy work stream (copy/egyptian-arabic) owns those files right now. Cost if wrong: until that stream switches them, the marketing legal pages still print an address that does not receive mail.
 
-Ruling EBDA-DEPLOY-1 — the storefront Worker owns ONLY `*.ebda.app/*`; the inherited FWB `ebda.app` custom domain + `cf.ebda.app` + `*/*` routes are removed from `scripts/cf-routes.cjs` and the committed `apps/web/wrangler.jsonc`. Evidence 2026-10-07: the apex is served by `ebda-marketing` (custom domain, live), and `tests/unit/ebda-cf-generated-routes.test.ts` was asserting the web Worker claim `ebda.app` — a deploy from main would have taken the apex off the marketing site. Zone routes run before custom domains (Cloudflare docs, Custom Domains → Interaction with Routes), so `media.ebda.app/*` and `preview.ebda.app/*` got Worker-less exclusion routes; all six hosts were measured serving their own origin after the storefront deploy. Cost if wrong: merchant custom domains (Cloudflare-for-SaaS) have no fallback route until that feature adds one, and any NEW subdomain without its own route answers with the storefront's store-not-found.
+Ruling EBDA-DEPLOY-1 — the storefront Worker owns ONLY `*.ebda.app/*`; the inherited Ebda Store `ebda.app` custom domain + `cf.ebda.app` + `*/*` routes are removed from `scripts/cf-routes.cjs` and the committed `apps/web/wrangler.jsonc`. Evidence 2026-10-07: the apex is served by `ebda-marketing` (custom domain, live), and `tests/unit/ebda-cf-generated-routes.test.ts` was asserting the web Worker claim `ebda.app` — a deploy from main would have taken the apex off the marketing site. Zone routes run before custom domains (Cloudflare docs, Custom Domains → Interaction with Routes), so `media.ebda.app/*` and `preview.ebda.app/*` got Worker-less exclusion routes; all six hosts were measured serving their own origin after the storefront deploy. Cost if wrong: merchant custom domains (Cloudflare-for-SaaS) have no fallback route until that feature adds one, and any NEW subdomain without its own route answers with the storefront's store-not-found.
 
 Ruling EBDA-DEPLOY-2 — production web deploys with `OPENNEXT_CACHE=true` (R2 incremental cache + DO tag cache + DO queue), the same config `ci.yml`'s worker-dry-run already builds, on the EXISTING bucket `ebda-web-isr-cache` (the generator named a never-created `ebda-web-opennext-cache`). Evidence: `wrangler deploy` of ebda-web 2026-10-07 bound NEXT_TAG_CACHE_DO_SHARDED, NEXT_CACHE_DO_QUEUE and NEXT_INC_CACHE_R2_BUCKET (ebda-web-isr-cache). Cost if wrong: a DO/tag-cache defect surfaces in the storefront rather than in a preview; rollback is `wrangler rollback` on ebda-web.
 
@@ -5815,7 +5815,7 @@ Ruling DAHAB-5 — two platform defects found by the pilot are fixed for every s
 
 Ruling DAHAB-6 — the storefront CSP `connect-src` admits a non-production API origin derived from `NEXT_PUBLIC_API_URL` (empty for production's `api.ebda.app`), the same rule the admin CSP already applies. Evidence: without it every client-side fetch of the preview storefront was refused by the CSP; `tests/unit/storefront-csp-google-ads.test.ts` and `storefront-frame-ancestors-prod.test.ts` still pass. Cost if wrong: a build with a wrong `NEXT_PUBLIC_API_URL` would allow that origin — the build already sends every API call there.
 
-Ruling DAHAB-7 — accepted residual: Lighthouse mobile performance is 75 on the Dahab home and product pages (local production build, simulated slow 4G; accessibility 100, best practices 96, SEO 100), short of the ≥ 90 target. Evidence: the same store on the `elegant` skin scores 75/75 on the same stack and data; LCP (the hero / product photo) is dominated by ≈ 600 KB of platform JavaScript and 9 preloaded platform font files sharing the simulated link, and Cloudflare serves storefront images unoptimized (no srcset). Dahab-side mitigations taken: byte budgets on the photography (mobile hero ≤ 50 KB), later slides mounted after load, hover photos only on hover devices, no eager card images on the homepage, one display font file. On the live preview (real network from Kuwait, data cache warm): home 70 / product 75 performance, accessibility 100, best practices 96 (SEO 69/58 only because preview responses are `noindex`). Cost if wrong: the ≥ 90 target needs platform work (JS split, font set, image resizing) before any template can meet it.
+Ruling DAHAB-7 — accepted residual: Lighthouse mobile performance is 75 on the Dahab home and product pages (local production build, simulated slow 4G; accessibility 100, best practices 96, SEO 100), short of the ≥ 90 target. Evidence: the same store on the `elegant` skin scores 75/75 on the same stack and data; LCP (the hero / product photo) is dominated by ≈ 600 KB of platform JavaScript and 9 preloaded platform font files sharing the simulated link, and Cloudflare serves storefront images unoptimized (no srcset). Dahab-side mitigations taken: byte budgets on the photography (mobile hero ≤ 50 KB), later slides mounted after load, hover photos only on hover devices, no eager card images on the homepage, one display font file. On the live preview (real network from Egypt, data cache warm): home 70 / product 75 performance, accessibility 100, best practices 96 (SEO 69/58 only because preview responses are `noindex`). Cost if wrong: the ≥ 90 target needs platform work (JS split, font set, image resizing) before any template can meet it.
 
 Ruling DAHAB-8 — residual: `lib/serverTemplate.ts` imports every skin's homepage sections statically (the existing pattern, so the LCP hero renders on the server), which now includes Dahab's in every store's homepage bundle. Not measured in this pass. Cost if wrong: a few KB of unused JS on non-Dahab homepages until the map is code-split per skin.
 
@@ -6204,7 +6204,7 @@ Ruling FU46-8 — no `sharp` under apps/api (gate test). PWA icons: square PNG �
 
 Ruling FU46-8a — `sharp` is removed from `@ebda/api` (dependency, wrangler alias, stub), and the gate covers `apps/api/**` + `@ebda/shared` + `@ebda/database` + the configs. Evidence: planted-import red, `wrangler deploy --dry-run` EXIT 0 without the alias. Cost if wrong: someone reaching for image processing in the API gets a failing gate instead of a stub; they must use Cloudflare Images.
 
-Ruling FU46-9 — four B0-time integration failures were stale tests, not code: onboarding's customer case expects 401 `TOKEN_INVALID` (S11-1); page-builder's legacy PUT case expects the draft rebased to rev 3 (CLASSIC-SAVE-DRAFT-1) and adds a passing save on the new head; the webhook stuck-sweep case writes its timestamp in UTC (it failed only on a non-UTC Postgres); bundle and wallet fixtures use a per-order / per-customer shopper identity (the open-hold cap). `backorder-checkout-rls` and `mcp/agent-checkout` pass on main and were dropped. Also stale, same task: `instapay-routes.test.ts` (8) — the #65 guard (`MANUAL_HOLD_NOT_ADMITTED`) is right and the fixture now sets `manualHoldAdmitted`. Evidence: each file green twice in a row on a local Postgres 14 in Asia/Kuwait. Cost if wrong: none for production; a test could hide a future regression in the cap if it stopped testing shared identities — `stock-hold-cap.test.ts` keeps the shared one on purpose.
+Ruling FU46-9 — four B0-time integration failures were stale tests, not code: onboarding's customer case expects 401 `TOKEN_INVALID` (S11-1); page-builder's legacy PUT case expects the draft rebased to rev 3 (CLASSIC-SAVE-DRAFT-1) and adds a passing save on the new head; the webhook stuck-sweep case writes its timestamp in UTC (it failed only on a non-UTC Postgres); bundle and wallet fixtures use a per-order / per-customer shopper identity (the open-hold cap). `backorder-checkout-rls` and `mcp/agent-checkout` pass on main and were dropped. Also stale, same task: `instapay-routes.test.ts` (8) — the #65 guard (`MANUAL_HOLD_NOT_ADMITTED`) is right and the fixture now sets `manualHoldAdmitted`. Evidence: each file green twice in a row on a local Postgres 14 in Asia/Egypt. Cost if wrong: none for production; a test could hide a future regression in the cap if it stopped testing shared identities — `stock-hold-cap.test.ts` keeps the shared one on purpose.
 
 Ruling FU46-10 — the defence-mutation spec's 4 entries whose `find` text no longer existed are re-pointed at the same controls as they read on main (`userActive &&` mid-expression; the gateway-or-store-credit refund gate; the toggle route's `enabled === true` branch; the `storeActivated`-aware carrier gate), the record is regenerated for all 213 entries, and `money-wallet-row-lock` scores KILLED again now that its baseline test is green. Evidence: `docs/security/defence-mutation-record.md` (byte-identical on a second run). Cost if wrong: none; a stale entry already scored ERROR, which CI fails on.
 
@@ -6364,7 +6364,7 @@ Ruling SEARCH-T8-5 (2026-10-16, review I1) — every AI content write goes throu
 
 Ruling SEARCH-T8-6 (2026-10-16, review I2) — the `product.upserted` autofill runs three memoized Inngest steps: `read` (one short tenant transaction), `generate` (`runInStoreScope`, no transaction held across any Gemini call), `write` (`applyFill`, one short guarded transaction). A retry re-uses the memoized generation, so a failed write never pays Gemini twice. Deliberate deviation from the coordinator's "usage rows recorded with the write": usage stays recorded AT SPEND, inside the generate step, each row its own committed statement (the AI layer's existing `recordUsage`). Evidence: recording it with the write would lose real spend whenever the write fails permanently or the I1 guard skips every field, and it would mean re-plumbing `recordUsage` out of `AIService.translate/suggestSeo/suggestCategories` (shared by every AI route); the original defect — usage rows rolled back with a 30 s transaction and re-billed on retry — is closed either way because the generate step commits once and is never re-run. `tests/unit/ai-autofill-product-steps.test.ts` (AI calls outside any transaction; retry after a failed write = one paid call) and `tests/integration/ai-autofill-ebda-app.test.ts` (as `ebda_app` with the tenant guard). Cost if wrong: a usage row exists for a generation whose words were never written (spend is still real, so the quota is right).
 
-Ruling SEARCH-T8-7 (2026-10-16, review M6) — `docs/business/02-feature-catalog.md` is the inherited Force AI Store (Kuwait, KNET, GCC) catalogue, not an Ebda document; this task corrected only the Autopilot paragraph it touches ("3-day" → daily, search words). Rebranding the whole catalogue for Ebda/Egypt is a separate docs task (follow-up), not done here. Cost if wrong: a reader of that file sees Force AI/Kuwait copy until the follow-up lands.
+Ruling SEARCH-T8-7 (2026-10-16, review M6) — `docs/business/02-feature-catalog.md` is the inherited Ebda Store (Egypt, KNET, GCC) catalogue, not an Ebda document; this task corrected only the Autopilot paragraph it touches ("3-day" → daily, search words). Rebranding the whole catalogue for Ebda/Egypt is a separate docs task (follow-up), not done here. Cost if wrong: a reader of that file sees Ebda AI Studio/Egypt copy until the follow-up lands.
 
 Ruling SEARCH-T8-8 (2026-10-16, re-review N1/N2) — (a) `ProductService.update` no longer writes back the whole `aiFieldSources` map it read at the start of the request: it merges only the keys this save changed, in SQL on the row as it is at write time (`(ai_field_sources || $set) - $removed`, `store_id`-keyed, in the write transaction), so an AI stamp that committed between the merchant's read and write survives. A per-key merge rather than a row lock because a lock taken at the read protects only callers that hold one transaction across the request, and the merge is correct in every caller context. Evidence: `tests/integration/product-search-terms-field.test.ts` N1 (a separate connection commits an AI stamp mid-request) was red, now green. (b) The sweep stops a store after `MAX_CONSECUTIVE_RATE_LIMITS` (3) provider 429s in a row, warned once; a product that gets through resets the count. Evidence: with Google's daily quota gone every key fails instantly and the unbounded 60 s backoff idled a minute per remaining product; `tests/unit/ai-autofill-sweep-pacing.test.ts`. Cost if wrong: (a) none known (the merged map equals the old result when nothing raced); (b) a store whose 429s were a short burst waits for the next daily run.
 Ruling SEARCH-T9-1 (revised 2026-10-16, review M1/M2/M3/M6) — `ebda_product_embed_doc(name, name_ar, terms, desc, desc_ar)` is built only from IMMUTABLE operators (`||`, `coalesce`, `nullif`, `btrim`, `rtrim`, `left`, `regexp_replace`), so the IMMUTABLE label is honest and the planner inlines it (EXPLAIN test); `concat_ws` was tried first and dropped because it is STABLE. Parts in order name_ar, name, terms, desc_ar, desc, joined by `\n`; each is trimmed of ALL whitespace (`\s`, not only spaces) and skipped when empty. Descriptions: an HTML tag (`<` + letter, `</` or `<!`) becomes a space so block tags do not fuse words (`<p>قطن</p><p>مصري</p>` → `قطن مصري`), a bare `<`/`>` is kept (`price < 50 and > 10`), whitespace runs collapse to one space, then the 1500-char cap; entities are not decoded. The result is NULL (never `''`) when every part is empty, and Task 11 must skip a NULL doc instead of embedding `md5('')` (noted in the plan's Task 11). Evidence: `tests/integration/product-embeddings-schema.test.ts` (13 cases on pg17). Cost if wrong: changing the function later re-embeds every product once (content_hash changes); none before Task 11's first backfill.
@@ -6432,3 +6432,5 @@ Ruling SEARCH-T11-19 (PR3 final review minor 2) — an account-wide ceiling on i
 Ruling SEARCH-T11-20 (PR3 final review minor 3) — `product.upserted` (ProductService create/update) and `product.deleted` (ProductService.delete) are now sent after COMMIT through the shared `sendEventAfterCommit` (`apps/api/src/lib/inngest/send-after-commit.ts`, the same routing `requestStoreReindex` uses since SEARCH-T11-12): the request's COMMIT, else the ambient `runInTenantContext` COMMIT, else at once with no transaction; dropped on rollback. They were `void inngest.send(...)` inside the request transaction, so a consumer (Meta catalogue sync, autofill, the search indexer) could read an uncommitted or rolled-back product (the debounce masked it). Unlike the reindex event, these use `ifUnhookable: 'send'`: inside a caller's own unhookable transaction they keep the old immediate send, because Meta sync has no hash backstop. Evidence: `tests/integration/product-index.test.ts` "PR3 minor 3" (`ProductService.update` inside a tenant transaction: 0 events inside, 1 after COMMIT, 0 after a rollback; red before). Cost if wrong: none; a request that rolls back no longer fans out phantom events.
 
 Ruling SEARCH-T11-21 (PR3 final review minor 7; refines the outage clause of SEARCH-T11-10/15) — a Workers AI outage seen by the indexer (every product of a batch failed retryably, twice) no longer fails that store's run: the run ends `{ outage: true }` with nothing quarantined, and ONE platform P1 (`search-index.outage`) is raised per 6-hour window across all stores (`alertOutageOnce`, Redis `SET NX EX 21600` — the backstop's period; without Redis it alerts every time rather than stay silent). Before, each store's run threw `NonRetriableError`, so `alerts-failure-watch` raised one P1 per store per backstop tick during an outage. The stores are retried by their next event or the next backstop tick. Evidence: `tests/integration/product-index.test.ts` "PR3 minor 7" (two stores in an outage: both runs return `outage`, nothing quarantined, exactly one `search-index.outage` alert; red before: the run threw). Cost if wrong: a second, distinct outage inside the same 6 h window is not re-alerted.
+
+Ruling BRAND-ZERO-1 — the repository carries no inherited brand, tenant, domain, country or currency string, enforced over EVERY tracked file and file path by `tests/unit/no-force-branding.test.ts` (the old per-workstream exclusion list is gone). Applied migrations under `packages/database/prisma/migrations/` are the one scanned-out area (immutable history). Live wire/config values are allowed by name because renaming them is a coordinated deploy, not an edit: the JWT `iss`/`aud` claim values and the third-party resource names `force-api` / `force-app` (Railway service, Sentry project, Axiom dataset, Inngest app id, OTEL service name), the `force-session` hint cookie, the Meta provisioner Railway env vars (FORCE_AI_META_BM_ID, FORCE_AI_META_ADMIN_TOKEN, FORCE_AI_META_PROVISIONER_USER_ID), the WhatsApp template names `force_*_v\d` (being renamed on fix/shopper-messages-egyptian; drop the allowance after it merges), and the WBS bridge fields `fwbStoreId` / `fwbOrderId` (+ `wa_carts` columns). Evidence: the guard fails on a re-introduced string and on a stale allowance (each allowance must still occur). Cost if wrong: if any allowed value turns out to be renamable without a coordinated deploy it stays visible in the code until someone drops its allowance; and the unused legacy DB login role still exists on production until `docs/runbooks/drop-legacy-app-role.md` is run.

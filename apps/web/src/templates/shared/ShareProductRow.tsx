@@ -7,7 +7,7 @@ import { useCurrentUrl } from '../../hooks/useCurrentUrl';
 /**
  * Sprint 4 (2026-05-17): PDP share row — X / Facebook / Telegram /
  * WhatsApp / copy-link. Observed on all 3 OSOSS references during the
- * UI catalog session — FWB PDP had no equivalent before this.
+ * UI catalog session — Ebda Store PDP had no equivalent before this.
  *
  * Each platform link opens in a new tab via `window.open` so the
  * customer doesn't lose the PDP. Copy-link writes the canonical URL

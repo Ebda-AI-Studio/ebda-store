@@ -23,7 +23,7 @@ fixes: C2 (expense date-422), H2 (paid-from guard), H1 (journal role), PR-#86/#8
    - **Supplier:** (optional, leave blank)
    - **Expense Account:** select any expense account (e.g. "Office Supplies")
    - **Paid From:** select **Cash KNET** (code 1000) — a valid cash/bank account
-   - **Amount:** 5.000 KWD
+   - **Amount:** 5.000 EGP
    - **Date:** click the date picker and select today's date (browser emits `YYYY-MM-DD`)
 3. Click **Save / Submit**
 4. Verify: **201 Created** — expense appears in the list

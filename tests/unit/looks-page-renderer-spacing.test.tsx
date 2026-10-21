@@ -112,9 +112,9 @@ describe('home page: unset section spacing is marked on look stores only', () =>
   for (const section of ['testimonials', 'categories', 'newArrivals', 'bestSellers']) {
     it(`${section}: marker on a look store, absent on a legacy store`, () => {
       ctx.look = 'qamar.atelier';
-      const lookHtml = renderHome('pecannbee-flow', 'A', 'modern', 'en');
+      const lookHtml = renderHome('default-flow', 'A', 'modern', 'en');
       ctx.look = null;
-      const legacyHtml = renderHome('pecannbee-flow', 'A', 'modern', 'en');
+      const legacyHtml = renderHome('default-flow', 'A', 'modern', 'en');
       expect(marked(lookHtml, section)).toContain('sp-top-default');
       expect(marked(legacyHtml, section)).not.toContain('sp-');
     });
@@ -124,9 +124,9 @@ describe('home page: unset section spacing is marked on look stores only', () =>
 describe('home page: a stored look id that is not registered renders as legacy', () => {
   it('no spacing markers, markup byte-identical to a store with no look', () => {
     ctx.look = 'qamar.removed';
-    const unknown = renderHome('pecannbee-flow', 'A', 'modern', 'en');
+    const unknown = renderHome('default-flow', 'A', 'modern', 'en');
     ctx.look = null;
-    const legacy = renderHome('pecannbee-flow', 'A', 'modern', 'en');
+    const legacy = renderHome('default-flow', 'A', 'modern', 'en');
     expect(unknown).not.toContain('sp-top-default');
     expect(unknown).toBe(legacy);
   });

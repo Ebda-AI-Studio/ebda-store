@@ -59,10 +59,10 @@ describe('resolveCardBadges — heart/compare avoidance (issue #548 class)', () 
   });
 
   it('the demo-store live bug: heart at top-start collides with an explicit top-right badge in RTL', () => {
-    // PecannbeeProductCard's heart is logical top-start — physical top-RIGHT
+    // StorefrontProductCard's heart is logical top-start — physical top-RIGHT
     // in RTL. A merchant who placed the custom badge at "top-right" (a
     // perfectly normal choice, safe in LTR) got it hidden under the heart
-    // on the Arabic storefront. topStartReserved mirrors PecannbeeProductCard.
+    // on the Arabic storefront. topStartReserved mirrors StorefrontProductCard.
     const beforeFixWouldCollide = resolveCardBadges({
       product: OFFER,
       isRtl: true,

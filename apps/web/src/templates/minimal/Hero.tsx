@@ -66,7 +66,7 @@ export default function MinimalHero({
       </div>
 
       {/* Full-bleed hero image — only rendered when configured. Without an
-          image we let the typographic block stand on its own (Pecannbee
+          image we let the typographic block stand on its own (Storefront
           treatment); a placeholder box would only make the page feel
           unfinished. */}
       {image && (

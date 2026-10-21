@@ -5,12 +5,12 @@
  * `business_management` + `catalog_management` scopes on the Ebda parent
  * Business Manager (FORCE_AI_META_BM_ID). This service uses those credentials
  * to create a per-merchant Commerce Catalog + assign the long-lived system
- * user, then hand the catalog id + a derived system-user token back to FWB so
+ * user, then hand the catalog id + a derived system-user token back to Ebda Store so
  * the merchant doesn't have to navigate Meta Business Manager themselves.
  *
  * One-time Ebda setup (NOT something Ahmad does per merchant):
  *   1. Create Ebda parent Business Manager at https://business.facebook.com/
- *   2. Create a System User named `force-ai-catalog-provisioner` with admin role
+ *   2. Create a System User named `ebda-catalog-provisioner` with admin role
  *   3. Generate a never-expires token with scopes:
  *        - business_management
  *        - catalog_management
@@ -19,7 +19,7 @@
  *   5. Set META_GRAPH_API_VERSION (default v21.0) if you want to pin
  *
  * After that, every merchant onboard just clicks "Provision automatically" in
- * the FWB admin and the catalog/business/token are filled in for them.
+ * the Ebda Store admin and the catalog/business/token are filled in for them.
  */
 
 import logger from '../lib/logger';

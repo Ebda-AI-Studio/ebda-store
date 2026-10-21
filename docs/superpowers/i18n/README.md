@@ -12,7 +12,7 @@ Welcome, and thank you for translating the Force admin dashboard into Arabic.
 
 ## What is being translated
 
-Force is a **Kuwait-based multi-tenant e-commerce SaaS**. The admin dashboard is the back-office tool that merchants (store owners) and platform operators (super admins) use to manage stores, products, orders, payments, shipping, loyalty, marketing, analytics, and more.
+Force is a **Egypt-based multi-tenant e-commerce SaaS**. The admin dashboard is the back-office tool that merchants (store owners) and platform operators (super admins) use to manage stores, products, orders, payments, shipping, loyalty, marketing, analytics, and more.
 
 The strings you see cover every screen of that dashboard: navigation labels, buttons, form fields, table headers, empty-state messages, toast notifications, error messages, validation messages, and email/UI copy.
 
@@ -79,7 +79,7 @@ Arabic-Indic digits (٠١٢٣٤٥٦٧٨٩) are acceptable only for free-flowing 
 
 ### Brand name
 
-The product name **Force** stays in English (Latin script) everywhere. Do not transliterate it to فورس.
+The product name **Force** stays in English (Latin script) everywhere. Do not transliterate it to ابدأ.
 
 ### Technical terms that stay in English
 
@@ -96,7 +96,7 @@ See `glossary.md` for the full list and reasoning.
 
 ### Tone
 
-Use **Modern Standard Arabic (MSA)** with a professional, clear, direct tone. Imagine you are writing UI copy for a modern SaaS product used by small-to-medium business owners. Avoid colloquial Kuwaiti/Gulf dialect, but also avoid overly formal classical phrasing. Aim for clarity over literal translation — if a literal translation sounds awkward, rephrase for naturalness.
+Use **Modern Standard Arabic (MSA)** with a professional, clear, direct tone. Imagine you are writing UI copy for a modern SaaS product used by small-to-medium business owners. Avoid colloquial Egyptian/Gulf dialect, but also avoid overly formal classical phrasing. Aim for clarity over literal translation — if a literal translation sounds awkward, rephrase for naturalness.
 
 ### Consistency
 

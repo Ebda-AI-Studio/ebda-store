@@ -220,7 +220,7 @@ before touching tenant data:
    wrap a query in `tenantContext`, the WHERE clause still scopes
    it.
 4. **Postgres Row-Level Security policies** — final backstop. The
-   API connects as `force_app` (NOT `neondb_owner`) which has
+   API connects as the earlier app role (NOT `neondb_owner`) which has
    `rolbypassrls = false`, so the policies are enforced at the DB
    level. See `packages/database/prisma/migrations/20260404000000_add_rls_policies/`.
 
@@ -241,8 +241,8 @@ flow.
 
 ### Customer-leak guard
 
-The API cookie space is shared between `app.forcemediakw.com` (admin)
-and `store.forcemediakw.com` (storefront). An admin's JWT can reach
+The API cookie space is shared between `store.ebda.app` (admin)
+and `store.ebda.app` (storefront). An admin's JWT can reach
 a customer-facing endpoint. Customer-write endpoints (wishlist, cart,
 loyalty `/my-*`, review create, return create) MUST resolve the
 caller's userId through `customerUserId(req)` from
@@ -316,12 +316,12 @@ they bypass any client-side sanitization and render as stored XSS on the storefr
 
 ---
 
-## Cross-service tenant isolation: Force AI Store ↔ WBS bridge
+## Cross-service tenant isolation: Ebda Store ↔ WBS bridge
 
-The Force AI WhatsApp Business Platform (WBS) calls Force AI Store's `/api/v1/wa-bridge/*`
+The Ebda AI Studio WhatsApp Business Platform (WBS) calls Ebda Store's `/api/v1/wa-bridge/*`
 endpoints to read catalog data, enumerate abandoned carts, toggle DM ordering,
 and proxy bot analytics. Every one of these endpoints must be scoped to a single
-Force AI Store tenant. This section documents how that scoping is enforced.
+Ebda Store tenant. This section documents how that scoping is enforced.
 
 **Feature gate (Ruling WHATSAPP-OFF-1, 2026-10-14).** The WhatsApp Business API
 integration is flagged OFF for every store. After the bridge key resolves the
@@ -340,7 +340,7 @@ token. A super-admin `StoreFeature` `whatsapp` override re-enables one store.
 
 2. **Tenant scope is never passed as a query parameter or request body field.**
    Even though some bridge endpoints accept a `storeId` in the request body (e.g.
-   abandoned-cart enumeration passes `clientId`), the Force AI Store endpoint does
+   abandoned-cart enumeration passes `clientId`), the Ebda Store endpoint does
    NOT trust that value for scoping. The `storeId` is always derived from the
    resolved API key. A WBS caller that passes a different `storeId` in the body
    gets back data for the store the key belongs to, not the spoofed one.
@@ -358,8 +358,8 @@ token. A super-admin `StoreFeature` `whatsapp` override re-enables one store.
 ### Why this matters
 
 WBS is a multi-tenant platform. Each WBS client has one business WhatsApp number
-and may be connected to one Force AI Store. If tenant scoping were based on a
-caller-supplied `storeId`, a WBS client who knew another merchant's Force AI Store
+and may be connected to one Ebda Store. If tenant scoping were based on a
+caller-supplied `storeId`, a WBS client who knew another merchant's Ebda Store
 UUID could enumerate their products, read their abandoned carts, or toggle their
 DM ordering feature. The API-key → storeId resolution prevents this at the entry
 point before any handler code runs.

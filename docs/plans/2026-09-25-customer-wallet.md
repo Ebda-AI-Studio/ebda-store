@@ -47,7 +47,7 @@ through an explicit super-admin override. Toggles live on the super-admin
 `FeatureMatrix` (`/stores/[id]/features`) — un-hiding makes them appear there.
 
 **Found during the build (Ruling W-1):** production already had an enabled
-`customer_wallet` override on the live `palora` store, left by an
+`customer_wallet` override on the live `demo-boutique` store, left by an
 enable-everything sweep while the key was a hidden no-op. Relying on "no
 baseline → off" alone would have switched the wallet on there at deploy. The
 migration resets every `customer_wallet` override to `enabled = false`, the API
@@ -88,7 +88,7 @@ wallet_transactions     (append-only ledger — the source of truth)
 orders.wallet_amount INT NOT NULL DEFAULT 0 (CHECK >= 0)
 ```
 
-- Money is integer fils everywhere; no floats (UI converts KWD↔fils with the
+- Money is integer fils everywhere; no floats (UI converts EGP↔fils with the
   existing format helpers).
 - `store_id` on every row; RLS copied verbatim from
   `20260911190000_merchant_api_keys` (latest store-scoped policy set:
@@ -179,7 +179,7 @@ branch already does with the provider amount.
 Admin (bilingual en/ar, RTL, compact per design.md):
 
 - Customer detail: **Wallet** card — balance, ledger (load more), **Adjust**
-  modal (credit/debit, KWD amount, required note). Registered customers only.
+  modal (credit/debit, EGP amount, required note). Registered customers only.
 - **Sales → Wallet** tab `/stores/[id]/wallet`: outstanding total, count of
   customers holding a balance, customers-with-balance table linking to the
   customer page, and the checkout-toggle status (incl. the accounting block).
@@ -191,7 +191,7 @@ Admin (bilingual en/ar, RTL, compact per design.md):
 Storefront (copy through `LanguageContext` `t(en, ar)`):
 
 - `/account/wallet`: balance + history; nav entry gated on the feature.
-- Checkout: "Use wallet balance (X KWD)" toggle (both toggles on, signed in,
+- Checkout: "Use wallet balance (X EGP)" toggle (both toggles on, signed in,
   balance > 0); summary shows the wallet line and the amount due.
 - Customer order detail: "Paid from wallet" line.
 

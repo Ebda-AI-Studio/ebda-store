@@ -7,8 +7,8 @@
  * `resolveLayoutSettings()` merges with `DEFAULT_LAYOUT_SETTINGS` so existing
  * tenants don't need a backfill.
  *
- * Defaults match the Pecannbee flow (see
- * docs/superpowers/specs/2026-04-26-pecannbee-home-flow-design.md): hero
+ * Defaults match the Storefront flow (see
+ * docs/superpowers/specs/2026-04-26-demo-store-home-flow-design.md): hero
  * slider, 3-up category grid with caption-below, both product carousels,
  * filter sidebar on PLP, testimonials.
  */
@@ -337,7 +337,7 @@ export interface CategoriesSettings
   enabled: boolean;
   // 2026-05-16: split layout + captionPosition into desktop + mobile so
   // merchants can choose e.g. grid on desktop + horizontal-scroll on
-  // mobile (pecannbee pattern), or caption-below on desktop + caption-
+  // mobile (demo-store pattern), or caption-below on desktop + caption-
   // over on mobile (compact card style). Legacy single-field `layout`
   // and `captionPosition` retained for back-compat — when both new
   // breakpoint fields are unset, the legacy field applies to both.
@@ -1071,7 +1071,7 @@ export const NEW_STORE_LAYOUT_SETTINGS = {
 } satisfies Pick<StoreLayoutSettings, 'trustStrip'>;
 
 /**
- * Pecannbee flow defaults. When a tenant's `layout_settings` column is `{}`
+ * Storefront flow defaults. When a tenant's `layout_settings` column is `{}`
  * (the column default), `resolveLayoutSettings` returns this verbatim.
  */
 export const DEFAULT_LAYOUT_SETTINGS: StoreLayoutSettings = {
@@ -1108,7 +1108,7 @@ export const DEFAULT_LAYOUT_SETTINGS: StoreLayoutSettings = {
   cartPage: {},
   testimonials: {
     // Default OFF for new stores. The fake-reviews-illegal posture
-    // (KW Law 39/2014: 50K KWD/offense + closure; FTC 2024 rule; EU
+    // (consumer-protection fines and closure in several markets; FTC 2024 rule; EU
     // UCPD Art 6) makes auto-displaying a testimonials section risky
     // when the merchant hasn't explicitly populated real ones. Merchant
     // enables in admin → Layout → Testimonials once they have real

@@ -1,8 +1,8 @@
 # Auth / Access / Privacy Audit — 2026-05-28
 
-> **Correction (2026-09-22):** "Kuwait Law 13/2023" cited below does not exist. See docs/legal/gcc-data-protection.md for the verified GCC legal basis.
+> **Correction (2026-09-22):** "Egypt Law 13/2023" cited below does not exist. See docs/privacy/data-map.md for the verified GCC legal basis.
 
-**Scope:** Authentication events, session lifecycle, role mutations, credential rotations, webhook secrets, GDPR/Kuwait Law erasure, data export, tenant isolation, cookie consent, push subscriptions, PII access, bot mode.  
+**Scope:** Authentication events, session lifecycle, role mutations, credential rotations, webhook secrets, GDPR/Egypt Law erasure, data export, tenant isolation, cookie consent, push subscriptions, PII access, bot mode.  
 **Excludes:** Business state machines (payments, orders, returns, shipments, reviews, affiliates, loyalty) — those are covered in the companion `2026-05-28-mutate-in-place-audit.md`.  
 **Method:** Grep coverage map of `auditLog({ action: '...' })` writes per surface, cross-referenced against the surfaces themselves.
 
@@ -10,7 +10,7 @@
 
 ## Executive Summary
 
-The FWB codebase has solid audit coverage for the happy-path auth flows (login success/failure via both `auth.routes.ts` + `account-lockout.service.ts`, register, erase, export, user CRUD by super*admin). Five critical gaps remain. The most dangerous: (1) password change/reset are **never audit-logged** so an attacker who exploits a reset token leaves no trace in `AuditLog`; (2) role escalations record only `changedFields: "role"` with no before/after values, making reversal impossible without raw DB inspection; (3) refresh-token reuse detection (a session-hijack signal) is logged to `pino` only — never to `AuditLog`; (4) the `wbs_integration_updated` audit captures whether the WBS API key \_changed* but not whether the Meta access token changed, and neither event records the masked old value; (5) cookie consent mutations are browser-only (no server-side record), making compliance reconstruction for Kuwait Law 13/2023 unverifiable.
+The Ebda Store codebase has solid audit coverage for the happy-path auth flows (login success/failure via both `auth.routes.ts` + `account-lockout.service.ts`, register, erase, export, user CRUD by super*admin). Five critical gaps remain. The most dangerous: (1) password change/reset are **never audit-logged** so an attacker who exploits a reset token leaves no trace in `AuditLog`; (2) role escalations record only `changedFields: "role"` with no before/after values, making reversal impossible without raw DB inspection; (3) refresh-token reuse detection (a session-hijack signal) is logged to `pino` only — never to `AuditLog`; (4) the `wbs_integration_updated` audit captures whether the WBS API key \_changed* but not whether the Meta access token changed, and neither event records the masked old value; (5) cookie consent mutations are browser-only (no server-side record), making compliance reconstruction for Egypt Law 13/2023 unverifiable.
 
 ---
 
@@ -128,7 +128,7 @@ The `store.wbs_integration_updated` audit (line 646) records `{ wbsEnabled, wbsC
 
 The `GET /admin/customers` endpoint returns full customer records (email, firstName, lastName, phone via the `Customer` model) to any `super_admin`. The `requireStoreAccess` middleware only audit-logs write methods (line 57: `const isWrite = !['GET', 'HEAD', 'OPTIONS'].includes(req.method)`). There is no `auditLog()` call in the customers list or individual customer GET handlers.
 
-**Gap:** A super_admin exfiltrating the full customer list leaves no trace in `AuditLog`. Kuwait Law 13/2023 Art. 7 requires data controllers to log PII access for accountability.
+**Gap:** A super_admin exfiltrating the full customer list leaves no trace in `AuditLog`. Egypt Law 13/2023 Art. 7 requires data controllers to log PII access for accountability.
 
 **Fix:** Add `auditLog({ action: 'customer.pii_accessed', userId: req.user.userId, details: { query: JSON.stringify(req.query) }, ip, userAgent })` in the `GET /admin/customers` handler. For individual customer GETs, add `{ action: 'customer.pii_accessed', resourceId: customerId }`.
 
@@ -165,7 +165,7 @@ Admin OneSignal subscription (`POST /admin/notifications/onesignal/subscribe`) a
 
 Cookie consent is written purely client-side via `document.cookie` (line 60–62). The server reads it in `layout.tsx` line 365 to gate pixel scripts, but never writes any server-side record of the consent decision. The `ConsentState` has a `ts` ISO timestamp field (line 21), but this lives only in the browser cookie — it can be cleared, expired, or lost when a customer uses a new device or clears cookies.
 
-**Gap:** Consent history is unrecoverable after cookie expiry (1-year max-age). Kuwait Law 13/2023 Art. 9 requires demonstrable consent — "we set a cookie" is insufficient if the cookie is gone.
+**Gap:** Consent history is unrecoverable after cookie expiry (1-year max-age). Egypt Law 13/2023 Art. 9 requires demonstrable consent — "we set a cookie" is insufficient if the cookie is gone.
 
 **Fix (lightweight):** On first consent decision, POST to `POST /public/:storeId/consent` with `{ marketing: bool, ip, userAgent, ts }`. Write an `AuditLog` row: `{ action: 'customer.consent_granted' | 'customer.consent_rejected', resourceType: 'consent', details: { marketing, storeId } }`. Identified customers include `customerId`. This creates a verifiable server-side consent log that survives cookie clearing.
 
@@ -213,7 +213,7 @@ The existing `user.data_exported` audit row records `userId` (the account being 
 
 | Priority | Gap                                                  | Effort                                                     | Compliance Exposure                            |
 | -------- | ---------------------------------------------------- | ---------------------------------------------------------- | ---------------------------------------------- |
-| 1        | **P0-A** — password change no audit                  | 10 min — one `auditLog()` call in route                    | GDPR Art. 32 / Kuwait Law Art. 12              |
+| 1        | **P0-A** — password change no audit                  | 10 min — one `auditLog()` call in route                    | GDPR Art. 32 / Egypt Law Art. 12              |
 | 2        | **P0-B** — password reset no audit                   | 20 min — two `auditLog()` calls in routes                  | Same as above                                  |
 | 3        | **P0-E** — logout no audit                           | 10 min — one `auditLog()` call                             | Forensic session closure                       |
 | 4        | **P0-C** — role change no before/after               | 15 min — read `existing.role` into `details`               | Insider threat reversal                        |
@@ -221,9 +221,9 @@ The existing `user.data_exported` audit row records `userId` (the account being 
 | 6        | **P2-A** — lockout naming mismatch                   | 20 min — normalize to `user.login.failed`                  | Data quality / query correctness               |
 | 7        | **P1-A** — Meta token rotation not in audit detail   | 10 min — add `metaTokenChanged` to existing audit          | Credential forensics                           |
 | 8        | **P1-C** — botMode not in audit detail               | 10 min — add `botMode` fields to existing audit            | Compliance / ops reconstruction                |
-| 9        | **P1-B** — super_admin PII reads not logged          | 30 min — add `auditLog()` to customer list/get handlers    | Kuwait Law 13/2023 Art. 7                      |
+| 9        | **P1-B** — super_admin PII reads not logged          | 30 min — add `auditLog()` to customer list/get handlers    | Egypt Law 13/2023 Art. 7                      |
 | 10       | **P1-D** — push subscription lifecycle not logged    | 45 min — add audit rows to onesignal + notification routes | Erasure audit completeness                     |
-| 11       | **P1-E** — cookie consent server-side record missing | 2h — new `/public/:storeId/consent` endpoint + schema      | Kuwait Law 13/2023 Art. 9 demonstrable consent |
+| 11       | **P1-E** — cookie consent server-side record missing | 2h — new `/public/:storeId/consent` endpoint + schema      | Egypt Law 13/2023 Art. 9 demonstrable consent |
 | 12       | **P2-B** — token rotation not logged                 | 1h — high volume, evaluate flag                            | Nice-to-have forensics                         |
 
 ### Notes

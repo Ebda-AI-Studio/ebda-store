@@ -7,7 +7,7 @@ updated: 2026-06-09
 
 The reliable primary path that confirms an online payment the moment the
 customer returns to the checkout-success page — independent of the
-account-level MyFatoorah webhook (which doesn't fire per-invoice for FWB).
+account-level MyFatoorah webhook (which doesn't fire per-invoice for Ebda Store).
 
 **Reviewer account:** anonymous (guest checkout — no login)
 **Admin observer account:** see 1Password vault entry `checkout-uat`

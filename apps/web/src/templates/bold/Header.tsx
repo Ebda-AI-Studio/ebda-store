@@ -63,10 +63,10 @@ export default function BoldHeader({
         style={headerBgColor ? { backgroundColor: headerBgColor } : undefined}
       >
         <div className="container mx-auto px-4">
-          {/* Row 1: hamburger | logo | actions — pecannbee-aligned mobile
+          {/* Row 1: hamburger | logo | actions — demo-store-aligned mobile
               layout. Logo absolute-centered on mobile, normal flex on md+. */}
           <div className="relative flex items-center justify-between h-32 overflow-hidden gap-4 md:h-44">
-            {/* Logo — centered on mobile (pecannbee target), normal flex
+            {/* Logo — centered on mobile (demo-store target), normal flex
                 on md+. Bumped mobile to h-20 per Ahmad 2026-05-16. */}
             <Link
               href={urlPrefix || '/'}
@@ -101,7 +101,7 @@ export default function BoldHeader({
             {/* Actions */}
             <div className="flex items-center gap-2">
               {/* Desktop-only search toggle. Mobile has a persistent search
-                  bar below the logo row (pecannbee target). */}
+                  bar below the logo row (demo-store target). */}
               <button
                 onClick={() => setIsSearchOpen(!isSearchOpen)}
                 className="hidden md:inline-flex h-11 w-11 items-center justify-center rounded-lg text-white/70 hover:text-white hover:bg-white/10 transition-colors duration-200 cursor-pointer"
@@ -192,7 +192,7 @@ export default function BoldHeader({
             </div>
           </div>
 
-          {/* Mobile persistent search bar — pecannbee target. Always visible
+          {/* Mobile persistent search bar — demo-store target. Always visible
               under the logo row on mobile, hidden on md+. */}
           <div className="hidden pb-3 border-t border-white/10 pt-3" data-zone="mobile-search">
             <form onSubmit={handleSearch} className="relative">

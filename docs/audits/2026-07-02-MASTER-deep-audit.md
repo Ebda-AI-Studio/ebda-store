@@ -1,12 +1,12 @@
-# FWB Deep Audit — MASTER Consolidated Report (2026-07-02)
+# Ebda Store Deep Audit — MASTER Consolidated Report (2026-07-02)
 
-**Scope:** Full-layer production-readiness audit of Force Website Builder against `origin/main` HEAD `2332c4d5`.
+**Scope:** Full-layer production-readiness audit of Ebda Store against `origin/main` HEAD `2332c4d5`.
 **Method:** Gap Audit Fleet (playbook §15) — 10 read-only lenses dispatched as parallel Sonnet sub-agents, each adversarially verifying findings (CONFIRMED = read the code; PLAUSIBLE = needs runtime check). Per-lens reports live alongside this file as `2026-07-02-<lens>.md`.
 **Stack note:** `apps/api` is **Express 4** + Prisma + Postgres/Neon + Redis + Socket.io; storefront `apps/web` (5 themes, custom `LanguageContext`), admin `apps/admin` (next-intl), fulfilment `apps/orders` (PWA). Deploys: Railway (api) + Vercel + Cloudflare Workers.
 
 ## Headline
 
-FWB is in **solid** production shape — money is integer-fils end-to-end, prod `npm audit` is 0/0/0/0, all apps typecheck clean, security fundamentals (SQLi/CSV-injection/CSRF/auth/GDPR) verified closed, and most classic reliability hazards are already handled. The audit found **no evidence of an active production-down or active-leak bug**, but it surfaced **5 Critical** and **23 High** issues — dominated by three structural themes:
+Ebda Store is in **solid** production shape — money is integer-fils end-to-end, prod `npm audit` is 0/0/0/0, all apps typecheck clean, security fundamentals (SQLi/CSV-injection/CSRF/auth/GDPR) verified closed, and most classic reliability hazards are already handled. The audit found **no evidence of an active production-down or active-leak bug**, but it surfaced **5 Critical** and **23 High** issues — dominated by three structural themes:
 
 1. **Guards read outside the transaction they protect** → money/state effects double-apply under concurrency (refund double-refund; non-idempotent inventory restore).
 2. **Enforcement gated in the UI only** → paid features invokable via direct API call (push broadcast, invoicing, affiliate signup) = billing leaks.
@@ -38,7 +38,7 @@ A recurring meta-pattern worth calling out: several of the worst findings are **
 4. **Page Builder product-name hydration calls a nonexistent route → 404**, so the picker shows raw product IDs instead of names. Real route is `/stores/:id/products`. — `apps/admin/src/app/stores/[id]/page-builder/page.tsx:4221` _(H, CONFIRMED)_
 5. **Sales/pricing docs contradict the code**: 3 business docs call WhatsApp an "always add-on, not baseline-included," but it's been default-open in code since PR #94 — a live proposal/contract risk. — `docs/business/04-pricing-tiers.md:135-141` _(H, CONFIRMED)_
 
-> **Strategic near-critical (structural, not an active leak):** RLS is **inert in prod** — the API connects as `neondb_owner` with `ALLOW_BYPASSRLS_ROLE=true`, so all policies/FORCE/`runInTenantContext` are no-ops; tenant isolation is **app-layer-only**, one forgotten `WHERE` from a leak (`apps/api/src/index.ts:438-480`). And the planned RLS cutover is a **landmine**: `addresses` is FORCE-RLS'd with **no policy** (deny-all for `force_app`) → checkout + saved addresses break platform-wide the moment it ships (`packages/database/prisma/migrations/…`). Treat "turn on RLS" as a Critical-gated project, not a flip.
+> **Strategic near-critical (structural, not an active leak):** RLS is **inert in prod** — the API connects as `neondb_owner` with `ALLOW_BYPASSRLS_ROLE=true`, so all policies/FORCE/`runInTenantContext` are no-ops; tenant isolation is **app-layer-only**, one forgotten `WHERE` from a leak (`apps/api/src/index.ts:438-480`). And the planned RLS cutover is a **landmine**: `addresses` is FORCE-RLS'd with **no policy** (deny-all for the earlier app role) → checkout + saved addresses break platform-wide the moment it ships (`packages/database/prisma/migrations/…`). Treat "turn on RLS" as a Critical-gated project, not a flip.
 
 ## The 24 Highs, grouped
 
@@ -50,7 +50,7 @@ A recurring meta-pattern worth calling out: several of the worst findings are **
 
 **Billing leaks (UI-only gating)**
 
-- Kuwait invoice generation (`accounting.invoicing`, Professional) — zero enforcement at any layer. — `order.routes.ts:529-590`, `public.routes.ts:782`
+- Egypt invoice generation (`accounting.invoicing`, Professional) — zero enforcement at any layer. — `order.routes.ts:529-590`, `public.routes.ts:782`
 - `staff_accounts` is a **dead flag** — declared + implemented + visible in admin, but in no `PLAN_BASELINE` and checked nowhere → every tier gets staff accounts. — `features.ts:268`, `staff.routes.ts`
 - Public affiliate signup accepts applications on any tier (`getConfig()` defaults `publicSignupEnabled: true`, no `isFeatureEnabled('affiliate')`). — `affiliate.routes.ts:444-455`
 
@@ -82,7 +82,7 @@ A recurring meta-pattern worth calling out: several of the worst findings are **
 
 **i18n / RTL (Arabic is a locality pillar)**
 
-- `formatPrice()` defaults to `en-US` and **0 of 86 call-sites override it** → every price on the Arabic storefront renders Western digits/"KWD" prefix, while a newer sibling helper uses `ar-KW` Arabic-Indic digits → mixed-locale currency on the same page. — `packages/shared/src/utils/index.ts:51-65`
+- `formatPrice()` defaults to `en-US` and **0 of 86 call-sites override it** → every price on the Arabic storefront renders Western digits/"EGP" prefix, while a newer sibling helper uses `ar-KW` Arabic-Indic digits → mixed-locale currency on the same page. — `packages/shared/src/utils/index.ts:51-65`
 - Admin AI-recommendations panel is 100% hardcoded English (bypasses next-intl). — `AiSuggestionsPanel.tsx:218-238`
 - Page Builder has ~130 hardcoded English `<option>` labels with no translation keys. — `page-builder/page.tsx`
 

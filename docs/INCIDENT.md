@@ -1,4 +1,4 @@
-# Incident Response — FWB
+# Incident Response — Ebda Store
 
 Companion to `docs/ROLLBACK.md`. Rollback covers HOW to recover.
 This doc covers HOW to know there's an incident AND HOW to triage it.
@@ -29,7 +29,7 @@ In rough order of how an incident usually surfaces:
 
 ```bash
 curl -sS -m 10 -o /dev/null -w "HTTP %{http_code} | %{time_total}s\n" \
-  https://api.force-ai.co/health
+  https://api.ebda.app/health
 ```
 
 - HTTP 200 in <1s → API is up; problem is downstream
@@ -45,23 +45,23 @@ curl -sS -m 10 -o /dev/null -w "HTTP %{http_code} | %{time_total}s\n" \
 **3. Is Inngest processing jobs?**
 
 ```bash
-cd ~/Desktop/projects/force-website-builder/apps/api
+cd ~/Desktop/projects/ebda-store/apps/api
 railway logs --lines 100 | grep -i inngest
 ```
 
 - Stuck "queued" jobs older than 5 min → Inngest sync broken (see `feedback-inngest-deploy-sync-trap.md`)
-- Recovery: `curl -X PUT https://api.force-ai.co/api/v1/inngest` to force re-sync
+- Recovery: `curl -X PUT https://api.ebda.app/api/v1/inngest` to force re-sync
 
 **4. Is Sentry showing a new error cluster?**
 
-- sentry.io → ForceAI-KW project → Issues sorted by Last Seen
+- sentry.io → Whisky-11 project → Issues sorted by Last Seen
 - New cluster in last 30 min = likely the root cause
 - Stack trace's top frame is your starting point
 
 **5. Did anything deploy in the last hour?**
 
 ```bash
-cd ~/Desktop/projects/force-website-builder
+cd ~/Desktop/projects/ebda-store
 git log --since="1 hour ago" --pretty=oneline
 ```
 
@@ -73,7 +73,7 @@ git log --since="1 hour ago" --pretty=oneline
 - Check the provider's own status page:
   - MyFatoorah: status from merchant portal
   - Tap: status.tap.company
-- If provider is up but FWB shows errors → check the recent webhook signatures (per-store credential rotation can break HMAC)
+- If provider is up but Ebda Store shows errors → check the recent webhook signatures (per-store credential rotation can break HMAC)
 
 ## Recovery actions
 
@@ -100,13 +100,13 @@ After every P0 or P1 resolved:
    - How resolved
    - Prevention: add to memory? add to test suite? add new alert?
 
-2. If a new failure class was discovered → update memory at `~/.claude/projects/-Users-ahmadsharaf/memory/` OR FWB project memory.
+2. If a new failure class was discovered → update memory at `~/.claude/projects/-Users-ahmadsharaf/memory/` OR Ebda Store project memory.
 
 3. If a code change is needed → file under `docs/superpowers/plans/` with the canonical date-prefix slug.
 
 ## Solo-developer reality check
 
-FWB is operated by one person. The P0 response time of "investigate immediately" depends on Ahmad being awake or near a phone. The minimum bar:
+Ebda Store is operated by one person. The P0 response time of "investigate immediately" depends on Ahmad being awake or near a phone. The minimum bar:
 
 - **UptimeRobot Telegram alert** is the only reliable wake-up signal at 3am. Without it, downtime can run for hours undetected.
 - **Sentry Telegram alert** catches application errors when uptime is fine but functionality is degrading.

@@ -810,7 +810,7 @@ router.delete(
 );
 
 // POST /auth/me/erase — irreversible PII anonymization (GDPR Art. 17 and
-// applicable GCC data-protection law — see docs/legal/gcc-data-protection.md).
+// applicable GCC data-protection law — see docs/privacy/data-map.md).
 // Unlike DELETE /auth/me (soft-delete that
 // leaves PII intact), this nulls/scrubs every identifying field across
 // the schema in a single transaction and preserves anonymized order
@@ -858,7 +858,7 @@ router.post(
 );
 
 // GET /auth/me/export — right to data portability (GDPR Art. 20 and
-// applicable GCC data-protection law — see docs/legal/gcc-data-protection.md).
+// applicable GCC data-protection law — see docs/privacy/data-map.md).
 // Returns a JSON bundle of every row tied to this
 // user. Marked as an attachment so browsers download it as a file.
 //

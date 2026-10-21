@@ -1,11 +1,11 @@
 import type { TemplateId } from '@ebda/shared';
 
 /**
- * Per-pack style tokens for the 5 shared Pecannbee-flow sections
+ * Per-pack style tokens for the 5 shared Storefront-flow sections
  * (HeroBanner, HeroSlider, CategoryStrip, ProductCarousel, TestimonialRow).
  *
  * Each pack inherits the same layout shape but applies its own border style,
- * radius, font, and weight. Driven from spec § 7 of the Pecannbee design doc.
+ * radius, font, and weight. Driven from spec § 7 of the Storefront design doc.
  *
  * The tokens here are the single source of truth for "premium-boutique"
  * polish across the 5 packs:
@@ -68,7 +68,7 @@ const PACK_STYLES: Record<TemplateId, PackStyles> = {
     // and tracking, not size shrinking.
     // Sprint 1 (2026-05-17): text-size tokens removed from pack-styles so
     // they can be driven by `cardSize` via getProductCardTextSizes(). Each
-    // card consumer (PecannbeeProductCard + ProductCarousel inline cards)
+    // card consumer (StorefrontProductCard + ProductCarousel inline cards)
     // concatenates the size class. Pack-styles now carries flavor only:
     // weight, color, tracking, leading, font-family.
     productCardName:

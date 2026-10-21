@@ -6,7 +6,7 @@ import { HeroBanner } from './HeroBanner';
 import type { HeroSliderProps } from '../types';
 
 /**
- * Autoplay hero slider — pagination dots, no arrows (per Pecannbee spec).
+ * Autoplay hero slider — pagination dots, no arrows (per Storefront spec).
  * One slide is rendered as a HeroBanner so the markup, sizing, and
  * accessibility props match the single-banner mode exactly.
  *

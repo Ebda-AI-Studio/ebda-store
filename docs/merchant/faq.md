@@ -4,20 +4,20 @@ The most common merchant questions, with concrete answers. أكثر الأسئل
 
 ## General
 
-### How much does Force AI Store cost? — كم تكلفة Force AI Store؟
+### How much does Ebda Store cost? — كم تكلفة Ebda Store؟
 
-Pricing is set per merchant by Force Media. Contact your account manager. There's no per-transaction commission collected by Force AI Store itself — your payment provider's fees are separate (2.5–2.85% typically).
+Pricing is set per merchant by Ebda AI Studio. Contact your account manager. There's no per-transaction commission collected by Ebda Store itself — your payment provider's fees are separate (2.5–2.85% typically).
 
-السعر يُحدّد لكل تاجر على حدة من Force Media. لا توجد عمولة على المعاملات من Force AI Store؛ رسوم بوابة الدفع منفصلة (2.5%–2.85% تقريبًا).
+السعر يُحدّد لكل تاجر على حدة من Ebda AI Studio. لا توجد عمولة على المعاملات من Ebda Store؛ رسوم بوابة الدفع منفصلة (2.5%–2.85% تقريبًا).
 
-### What's the difference between Force AI Store and Shopify / Salla? — الفرق بين Force AI Store وShopify أو سلّة؟
+### What's the difference between Ebda Store and Shopify / Salla? — الفرق بين Ebda Store وShopify أو سلّة؟
 
-- **Built for Kuwait first**: KNET, all 4 Kuwait payment providers (Tap/MyFatoorah/Hesabe/UPayments) ship out of the box. Arabic + English are first-class, not afterthoughts.
+- **Built for Egypt first**: KNET, all 4 Egypt payment providers (Tap/MyFatoorah/Hesabe/UPayments) ship out of the box. Arabic + English are first-class, not afterthoughts.
 - **All AI features free**: translation, SEO meta tags, category suggestions, FAQ generation — built-in via Gemini, no AppStore add-ons.
 - **No commission on sales**: only the flat platform fee. Shopify Plus + a payment app would total 4–6% per sale.
-- **Operated by Force Media**: direct WhatsApp support, not a Western support ticket queue.
+- **Operated by Ebda AI Studio**: direct WhatsApp support, not a Western support ticket queue.
 
-مخصّصة للسوق الكويتي، كل خصائص AI مجانية، لا عمولة على المبيعات، دعم مباشر بالعربي من Force Media.
+مخصّصة للسوق مصري، كل خصائص AI مجانية، لا عمولة على المبيعات، دعم مباشر بالعربي من Ebda AI Studio.
 
 ### Can I export my data if I leave? — أقدر أنقل بياناتي لو غادرت؟
 
@@ -47,7 +47,7 @@ Yes. **Admin → Products → Import**:
 
 - Download the CSV template
 - Fill it in (one row per product) — required columns: name, name_ar, price, category_slug, image_url
-- Upload — Force AI Store validates, then queues the import as a background job. Status visible in **Admin → Jobs**
+- Upload — Ebda Store validates, then queues the import as a background job. Status visible in **Admin → Jobs**
 - Smart-skip: existing products (matched by SKU) are updated, new ones created. No duplicates.
 
 نعم — حمّل قالب CSV، عبّيه، ارفعه. الخلفية تعالج الاستيراد وتحدّث الموجود وتنشئ الجديد. مافي تكرار.
@@ -57,7 +57,7 @@ Yes. **Admin → Products → Import**:
 Common causes:
 
 1. RTL (right-to-left) marks copied from a Word document — these invisible characters break alignment. Fix: re-type the name directly in the admin form.
-2. Mixed digits — Latin digits inside Arabic text look misaligned. Decision is yours: Force AI Store doesn't auto-convert. Stick to one digit system within a single field.
+2. Mixed digits — Latin digits inside Arabic text look misaligned. Decision is yours: Ebda Store doesn't auto-convert. Stick to one digit system within a single field.
 3. Browser language vs. storefront language — the storefront toggle is independent of your browser. Hit the AR/EN toggle to confirm what your customer sees.
 
 الأسباب الشائعة: علامات RTL مخفية منسوخة من Word (أعد كتابة الاسم مباشرة)، أرقام لاتينية داخل نص عربي (اختر نظام واحد)، اختلاف لغة المتصفّح عن لغة المتجر (افحص بالتبديل من واجهة المتجر).
@@ -70,7 +70,7 @@ Common causes:
 
 **Admin → Orders** — sorted by newest first.
 
-Real-time push notification fires to your phone if you've installed Force AI Store as a PWA (Progressive Web App) and granted push permission. Setup: open the admin in Chrome/Safari, tap Share → Add to Home Screen, accept the notification prompt.
+Real-time push notification fires to your phone if you've installed Ebda Store as a PWA (Progressive Web App) and granted push permission. Setup: open the admin in Chrome/Safari, tap Share → Add to Home Screen, accept the notification prompt.
 
 تظهر في «الطلبات». لو ثبّت لوحة الإدارة كتطبيق على جوالك (PWA)، تصلك تنبيهات فورية لكل طلب جديد.
 
@@ -80,9 +80,9 @@ Real-time push notification fires to your phone if you've installed Force AI Sto
 
 - Select full or partial refund
 - Choose reason (optional)
-- Click Refund — Force AI Store calls the payment provider's refund API automatically
+- Click Refund — Ebda Store calls the payment provider's refund API automatically
 
-Refunds appear in your customer's account within 5–7 business days depending on their bank. The Force AI Store order status updates to `refunded`.
+Refunds appear in your customer's account within 5–7 business days depending on their bank. The Ebda Store order status updates to `refunded`.
 
 من صفحة الطلب اضغط «استرجاع». يحدث الاسترجاع تلقائيًا عند مزوّد الدفع. يظهر في حساب العميل خلال 5–7 أيام عمل.
 
@@ -96,7 +96,7 @@ Limited editing only:
 - ✅ Add internal notes (only you see them)
 - ❌ Change product quantities or prices — would require canceling + re-creating the order (and likely refunding)
 
-Force AI Store deliberately blocks price/quantity edits to maintain a clean audit trail. If a customer wants to change items, ask them to cancel and re-order.
+Ebda Store deliberately blocks price/quantity edits to maintain a clean audit trail. If a customer wants to change items, ask them to cancel and re-order.
 
 التعديل محدود: تقدر تغيّر عنوان الشحن، رقم التتبّع، الحالة. لا تقدر تعدّل الأسعار أو الكميات (للحفاظ على السجل). للتغييرات الكبيرة، الإلغاء وإعادة الطلب.
 
@@ -110,7 +110,7 @@ This happens when the payment provider's webhook hasn't reached us yet (~1–60 
 
 1. Wait 5 min and refresh the order page
 2. If still pending: check the payment provider's dashboard — search by the customer's email or the order ID
-3. If the provider shows the payment as completed: contact Force Media support with the order ID + transaction ID; we can manually reconcile after verifying
+3. If the provider shows the payment as completed: contact Ebda AI Studio support with the order ID + transaction ID; we can manually reconcile after verifying
 
 يحدث نادرًا لو تأخّر webhook المزوّد. انتظر 5 دقائق ثم افحص في لوحة بوابة الدفع. لو الدفع تمّ هناك لكن لم يصل لنا، تواصل مع الدعم بمعرف الطلب + معرف العملية.
 
@@ -119,8 +119,8 @@ This happens when the payment provider's webhook hasn't reached us yet (~1–60 
 Check in order:
 
 1. **Test mode**: is the toggle set correctly? Test mode rejects real cards; live mode rejects test cards.
-2. **Webhook secret**: was it copied correctly? A single character off and Force AI Store treats every webhook as forged.
-3. **API key permissions**: did the provider give you a "Public" key by mistake? Force AI Store needs the Secret/Live key.
+2. **Webhook secret**: was it copied correctly? A single character off and Ebda Store treats every webhook as forged.
+3. **API key permissions**: did the provider give you a "Public" key by mistake? Ebda Store needs the Secret/Live key.
 4. **Provider account status**: is your account in good standing? Tap, MyFatoorah etc. occasionally pause accounts pending compliance review.
 
 تحقّق بهذا الترتيب: وضع الاختبار/المباشر، صحة سر webhook، مفتاح API (سرّي وليس عام)، حالة حسابك عند المزوّد.
@@ -133,7 +133,7 @@ Check in order:
 
 **Admin → Branding → Theme**
 
-Pick your theme (Modern / Classic / Minimal / Bold / Elegant), then set your primary and accent brand colors. Force AI Store auto-generates the full palette (hover states, disabled states, etc.) from those two. Preview live on the right pane.
+Pick your theme (Modern / Classic / Minimal / Bold / Elegant), then set your primary and accent brand colors. Ebda Store auto-generates the full palette (hover states, disabled states, etc.) from those two. Preview live on the right pane.
 
 من «Branding → Theme»: اختر القالب ثم اللون الرئيسي + اللون الثانوي. باقي درجات الألوان تُولَّد تلقائيًا. معاينة مباشرة بجانب الاختيار.
 
@@ -150,7 +150,7 @@ Yes. **Admin → Page Builder**:
 
 ### Can I add a blog? — أقدر أضيف مدوّنة؟
 
-Yes — Force AI Store has a full built-in blog:
+Yes — Ebda Store has a full built-in blog:
 
 - **Admin → Blog** — create, edit, and publish blog posts in Arabic and English
 - Blog posts appear in a carousel on your storefront homepage when the blog is enabled
@@ -158,7 +158,7 @@ Yes — Force AI Store has a full built-in blog:
 
 Static pages (About Us, Shipping Policy, Return Policy, Privacy Policy, custom pages) are managed separately under **Admin → Pages**.
 
-نعم — Force AI Store تدعم المدوّنة الكاملة: أنشئ مقالات من «Admin → Blog»، تظهر في كاروسيل على الصفحة الرئيسية. الصفحات الثابتة (من نحن، الشحن، الإرجاع، إلخ) من «Admin → Pages».
+نعم — Ebda Store تدعم المدوّنة الكاملة: أنشئ مقالات من «Admin → Blog»، تظهر في كاروسيل على الصفحة الرئيسية. الصفحات الثابتة (من نحن، الشحن، الإرجاع، إلخ) من «Admin → Pages».
 
 ---
 
@@ -166,7 +166,7 @@ Static pages (About Us, Shipping Policy, Return Policy, Privacy Policy, custom p
 
 ### Are customer accounts required to checkout? — هل التسجيل إجباري للشراء؟
 
-No. Guest checkout is enabled by default — customers can complete an order with just an email + phone + delivery address. Optionally they can register an account on the confirmation page (Force AI Store offers one-tap registration to save the order to a new account).
+No. Guest checkout is enabled by default — customers can complete an order with just an email + phone + delivery address. Optionally they can register an account on the confirmation page (Ebda Store offers one-tap registration to save the order to a new account).
 
 لا. الدفع كزائر متاح افتراضيًا — يكفي إيميل ورقم وعنوان. اختياريًا يقدر العميل يسجّل في صفحة التأكيد.
 
@@ -200,7 +200,7 @@ Gross profit is revenue minus the cost of the goods sold. When no cost was booke
 
 ### Why does my storefront load slowly the first time? — لماذا المتجر بطيء أوّل مرة؟
 
-The first visitor every ~5 minutes "warms up" Force AI Store's edge cache. Subsequent visitors are served from cache (~50ms). If first-load is consistently >3 seconds, contact support — that's not normal.
+The first visitor every ~5 minutes "warms up" Ebda Store's edge cache. Subsequent visitors are served from cache (~50ms). If first-load is consistently >3 seconds, contact support — that's not normal.
 
 أول زائر كل 5 دقائق «يدفّي» الكاش. الزوار اللاحقون يحصلون على ردّ سريع (50 مللي ثانية). لو الأول-تحميل بطيء باستمرار (أكثر من 3 ثوان)، تواصل معنا.
 
@@ -216,7 +216,7 @@ If you ever lose data (accidentally deleted a category, etc.), contact us within
 
 نعم — نسخ احتياطية على عدّة طبقات: لقطة قاعدة بيانات مع كل نشر، نسخ يومية مشفّرة، احتفاظ بسجلات 30 يوم. لو حذفت شيء بالغلط، تواصل معنا خلال 7 أيام.
 
-### What happens if Force AI Store goes down? — وش يصير لو Force AI Store تعطّلت؟
+### What happens if Ebda Store goes down? — وش يصير لو Ebda Store تعطّلت؟
 
 Status page: <https://stats.uptimerobot.com/23nuarbz3h> — check there first.
 
@@ -234,6 +234,6 @@ Recent uptime: > 99.9% (single-region, single-replica architecture — see [trou
 
 ## Still have a question? — لا زال عندك سؤال؟
 
-- WhatsApp: contact your Force Media account manager
-- Email: contact@forcemediakw.com
+- WhatsApp: contact your Ebda AI Studio account manager
+- Email: contact@ebda.app
 - Check [troubleshooting.md](./troubleshooting.md) for specific error scenarios

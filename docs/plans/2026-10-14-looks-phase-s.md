@@ -1063,4 +1063,4 @@ static async applyLook(storeId: string, lookId: string, opts: { design: 'keep' |
 
 ## Out of scope (Phase B / E)
 
-Per-template skins and new section types (lookbook carousel, gift finder, routine steps, maker strip, occasion tiles, ingredient hero, engraving band, making steps, reorder row); flipping looks to `status: 'built'`; full editor redesign (Phase E); deleting FWB skins.
+Per-template skins and new section types (lookbook carousel, gift finder, routine steps, maker strip, occasion tiles, ingredient hero, engraving band, making steps, reorder row); flipping looks to `status: 'built'`; full editor redesign (Phase E); deleting Ebda Store skins.

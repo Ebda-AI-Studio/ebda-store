@@ -1,6 +1,6 @@
 # Adversarial audit — Cross-tenant isolation (slug: `tenant-isolation`)
 
-Attacker model: a paying FWB tenant, fully authenticated as `store_admin` of their OWN store, trying to read or write another merchant's data. Production runs the DB as a **BYPASSRLS** role (`neondb_owner`), so RLS is inert — tenant isolation rests ENTIRELY on app-layer `where: { storeId }` scoping + `requireStoreAccess`. Every finding below was confirmed by reading the actual `where` clause / middleware chain end to end, not from grep counts.
+Attacker model: a paying Ebda Store tenant, fully authenticated as `store_admin` of their OWN store, trying to read or write another merchant's data. Production runs the DB as a **BYPASSRLS** role (`neondb_owner`), so RLS is inert — tenant isolation rests ENTIRELY on app-layer `where: { storeId }` scoping + `requireStoreAccess`. Every finding below was confirmed by reading the actual `where` clause / middleware chain end to end, not from grep counts.
 
 Severity counts: **P0 ×2, P1 ×1, P2 ×3, P3 ×6.**
 
@@ -84,7 +84,7 @@ Severity counts: **P0 ×2, P1 ×1, P2 ×3, P3 ×6.**
 
 - **Where:** `apps/api/src/lib/edge-cache.ts:44` hardcodes `Vary: x-store-id`; every `setEdgeCache` call site omits `varyOn` (`public.routes.ts:225,263,312,327,1134,1285,1324,1485`). `/store/resolve` keys only on `x-store-domain` (`public.routes.ts:1340`) and never reads `x-store-id`.
 - **Damage (latent):** if a CDN cache rule ever caches this `Cache-Control: public, s-maxage=120` response, it would key on an always-absent header and serve the first domain's store payload to every other domain for ~120–720s.
-- **Evidence / blind spot:** live-verified read-only — `api.force-ai.co` is Cloudflare-proxied but returns `cf-cache-status: DYNAMIC` (not currently edge-cached), so **no live leak today**. Settled by a CDN config check.
+- **Evidence / blind spot:** live-verified read-only — `api.ebda.app` is Cloudflare-proxied but returns `cf-cache-status: DYNAMIC` (not currently edge-cached), so **no live leak today**. Settled by a CDN config check.
 - **Fix:** pass `varyOn:['x-store-domain']` for domain-keyed responses, or fold the domain into the cache-relevant response identity.
 
 ### [P3] AI `translate` Redis cache key omits storeId
@@ -127,11 +127,11 @@ Severity counts: **P0 ×2, P1 ×1, P2 ×3, P3 ×6.**
 ## UPHELD (attacked hardest, could NOT break)
 
 - **Payment-webhook cross-tenant forgery.** `POST /webhooks/payment/:provider` resolves storeId from the matching Payment row (`webhook.routes.ts:393-435`) then verifies the HMAC with THAT store's secret (`payment.factory.ts:794-846`) AND re-asserts `payment.order.storeId === resolvedStoreId` (`:895-905`). To forge a cross-tenant confirmation an attacker needs the victim store's webhook secret — not obtainable. Solid.
-- **`requireStoreAccess` + store-resolution default-to-first.** `getStoreIdFromRequest` (`utils/store-helpers.ts:29-54`) throws 400 on unresolved input — the old "Palora catalogue leaked into every storefront" default-to-first bug is genuinely fixed; the global-memory "never default to first store" rule holds here. `requireStoreAccess` param precedence (`middleware/store-access.ts:24-40`) prefers `:storeId` over `:id`, blocking the nested-param confusion.
+- **`requireStoreAccess` + store-resolution default-to-first.** `getStoreIdFromRequest` (`utils/store-helpers.ts:29-54`) throws 400 on unresolved input — the old "demo-boutique catalogue leaked into every storefront" default-to-first bug is genuinely fixed; the global-memory "never default to first store" rule holds here. `requireStoreAccess` param precedence (`middleware/store-access.ts:24-40`) prefers `:storeId` over `:id`, blocking the nested-param confusion.
 - **Host/domain resolution.** `apps/web/middleware.ts` reads the tenant from the `Host` header only — no `X-Forwarded-Host`/spoofable header is trusted anywhere (grep-empty). `/tenant-store/*` direct external hits are hard-404'd (`middleware.ts:390-392`). `apps/orders` re-derives access via `checkStoreAccess` against the authenticated user's real membership, ignoring the client-supplied `?store=`. Prior C2 (smart-layer accept/clearance — `purchase-order.service.ts:348` now `findFirst({ where:{ id, storeId } })`) and C3 (wa-bridge meta-catalog now rejects body-storeId mismatch, `wa-bridge.routes.ts:1129-1133`) are confirmed fixed. R2 upload keys are `stores/<storeId>/…` with `checkStoreAccess` re-verification (`upload.routes.ts:105-151,394-471`).
 
 ## BLIND SPOTS
 
-- Whether Cloudflare ever applies a "cache everything" rule to `api.force-ai.co/public/*` — would flip the P3 `Vary` bug live. Settle with a CDN config read or repeated `curl -sI` watching `cf-cache-status`.
-- The accounting IDORs are backstopped at the DB level ONLY after the RLS force_app cutover; prod is BYPASSRLS today, so there is no second line. Settle by confirming `DATABASE_URL` role (`SELECT current_user, rolbypassrls`).
+- Whether Cloudflare ever applies a "cache everything" rule to `api.ebda.app/public/*` — would flip the P3 `Vary` bug live. Settle with a CDN config read or repeated `curl -sI` watching `cf-cache-status`.
+- The accounting IDORs are backstopped at the DB level ONLY after the RLS the earlier app role cutover; prod is BYPASSRLS today, so there is no second line. Settle by confirming `DATABASE_URL` role (`SELECT current_user, rolbypassrls`).
 - Variant/product-id harvestability assumed from `/public/:storeId/products` shape (static read); a live `curl` against a real storefront would confirm the exact fields returned.

@@ -166,11 +166,11 @@ describe('PageRenderer: the published-document path renders the same page', () =
   });
 
   it('honours document order, including a carousel placed between fixed sections', () => {
-    const def = layoutToDefinition(asStorefront('pecannbee-flow', 'modern'));
+    const def = layoutToDefinition(asStorefront('default-flow', 'modern'));
     const extra = def.sections.findIndex(s => s.type === 'product-carousel');
     const [carousel] = def.sections.splice(extra, 1);
     def.sections.unshift(carousel);
-    const html = renderHome('pecannbee-flow', 'A', 'modern', 'en', { definition: def });
+    const html = renderHome('default-flow', 'A', 'modern', 'en', { definition: def });
     expect(html.indexOf('data-section="extra:')).toBeLessThan(html.indexOf('data-section="hero"'));
   });
 

@@ -29,21 +29,21 @@
 2. Click away (the fetch auto-triggers on field change)
 3. **Expect:**
    - **Orders** card shows the number of distinct orders with a tax movement in that period, with the number of tax entries (each sale, and each refund or return that reversed tax) underneath
-   - **Total Taxable Sales** card shows the sum of (subtotal - discount) in KWD (3 decimal places)
-   - **Total Tax Collected** card (amber) shows the sum of tax collected in KWD
+   - **Total Taxable Sales** card shows the sum of (subtotal - discount) in EGP (3 decimal places)
+   - **Total Tax Collected** card (amber) shows the sum of tax collected in EGP
 
 ### 3. Verify by-rate breakdown table
 
 1. With the same date range
 2. **Expect:** A "Breakdown by Rate" section appears if tax rates differ
    - One row per distinct effective tax rate (e.g. 5.00%, 10.00%)
-   - Columns: Tax Rate, Entries, Taxable Base (KWD), Tax Collected (KWD)
+   - Columns: Tax Rate, Entries, Taxable Base (EGP), Tax Collected (EGP)
    - Totals across all rates match the summary cards
 
 ### 4. Verify transaction table
 
 1. **Expect:** One row per tax-moving journal entry, ordered by date ascending: the sale, plus one row per refund or return that reversed tax (negative amounts)
-   - Type | Date | Order # | Customer | Taxable Base (KWD) | Tax Rate | Tax Collected (KWD) | Order Total (KWD)
+   - Type | Date | Order # | Customer | Taxable Base (EGP) | Tax Rate | Tax Collected (EGP) | Order Total (EGP)
    - Type is **Sale** on the sale row and **Refund / return** on the rows that reverse it; one order can show several rows with the same Order #; refund/return rows are muted
    - Order Total is filled on the Sale row only (— on refund/return rows), so the column sums to each order's value once (#1253, #1208)
    - Guest orders show "Guest" in the Customer column
@@ -56,7 +56,7 @@
 2. **Expect:**
    - Browser downloads `tax-report-YYYY-MM-DD-to-YYYY-MM-DD.csv`
    - File has a header row and one data row per entry, with Type as the first column
-   - KWD amounts have 3 decimal places
+   - EGP amounts have 3 decimal places
 
 ### 6. Export XLSX
 
@@ -64,7 +64,7 @@
 2. **Expect:**
    - Browser downloads `tax-report-YYYY-MM-DD-to-YYYY-MM-DD.xlsx`
    - Sheet "Tax Report" has: bold grey header row, entry rows (Type = Sale or Refund / return, Order Total empty on refund/return rows), then a summary section below
-   - KWD columns formatted as `#,##0.000`
+   - EGP columns formatted as `#,##0.000`
    - Amount columns are numeric (not text) so Excel can SUM them
 
 ---
@@ -83,16 +83,16 @@
 
 ### E3 — Date boundary (first and last day of month inclusive, in the store's time zone)
 
-Days are calendar days in the **store's time zone** (`stores.timezone`, Asia/Kuwait for every
-store today; a store with no usable zone falls back to Asia/Kuwait — Rulings FRT-1/FRT-2 in
+Days are calendar days in the **store's time zone** (`stores.timezone`, Asia/Egypt for every
+store today; a store with no usable zone falls back to Asia/Egypt — Rulings FRT-1/FRT-2 in
 `docs/RULINGS.md`). The page shows the zone under the tabs.
 The zone is set on the Tax page (card "Store time zone"). It is the store's ONE zone, so it also moves
 checkout delivery-window cutoffs and the dates customers see; changing it writes a
 `STORE_TIMEZONE_CHANGED` audit row with the old and new zone.
 
 1. Set **From** = 2026-01-01, **To** = 2026-01-31
-2. **Expect:** Orders paid on 2026-01-01 AND 2026-01-31 (Kuwait time) both appear; orders from 2026-01-15 appear; orders before 2026-01-01 or after 2026-01-31 do not appear
-3. **Expect:** An order paid at 01:30 Kuwait time on 2026-02-01 (22:30 UTC on 2026-01-31) is NOT in January — it is in February, and its row is dated 2026-02-01
+2. **Expect:** Orders paid on 2026-01-01 AND 2026-01-31 (Egypt time) both appear; orders from 2026-01-15 appear; orders before 2026-01-01 or after 2026-01-31 do not appear
+3. **Expect:** An order paid at 01:30 Egypt time on 2026-02-01 (22:30 UTC on 2026-01-31) is NOT in January — it is in February, and its row is dated 2026-02-01
 
 ### E4 — Guest orders
 
@@ -108,8 +108,8 @@ checkout delivery-window cutoffs and the dates customers see; changing it writes
 
 ### E6 — Orders with discount
 
-1. Place a paid taxable order with `discount > 0` (e.g. subtotal=20 KWD, discount=5 KWD, tax = 5% of 15 KWD = 750 fils)
-2. **Expect:** The Taxable Base column shows `15.000 KWD` (not 20.000), and Tax Collected = `0.750 KWD`
+1. Place a paid taxable order with `discount > 0` (e.g. subtotal=20 EGP, discount=5 EGP, tax = 5% of 15 EGP = 750 fils)
+2. **Expect:** The Taxable Base column shows `15.000 EGP` (not 20.000), and Tax Collected = `0.750 EGP`
 3. **Expect:** the Tax Rate column reads `5.00%`, and a single-rate store with discounted and
    undiscounted orders shows ONE row in Breakdown by Rate. Checkout levies VAT after discount
    (`computeOrderTax`, `apps/api/src/lib/order-tax.ts`; owner decision on #193), so the report's
@@ -118,7 +118,7 @@ checkout delivery-window cutoffs and the dates customers see; changing it writes
 
 > **Open (#193, needs owner):** checkout currently levies tax on the PRE-discount
 > subtotal (`order.service.ts`: `Math.round(subtotal * taxRate)`), so this order
-> is charged 1.000 KWD, not 0.750, and the report shows a 6.67% effective rate
+> is charged 1.000 EGP, not 0.750, and the report shows a 6.67% effective rate
 > on a 15.000 base. Whether tax belongs on the discounted or the gross amount
 > has not been decided; until it is, this case does not pass as written.
 
@@ -138,7 +138,7 @@ Feature: accounting.tax_reports (Enterprise)
 200 response shape:
 {
   "data": {
-    "from": "2026-02-28T21:00:00.000Z",   ← 2026-03-01 00:00 in the store's zone (Kuwait, UTC+3)
+    "from": "2026-02-28T21:00:00.000Z",   ← 2026-03-01 00:00 in the store's zone (Egypt, UTC+3)
     "to": "2026-03-31T20:59:59.999Z",     ← 2026-03-31 23:59:59.999 in the store's zone
     "rows": [
       {

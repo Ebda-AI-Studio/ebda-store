@@ -3,189 +3,189 @@
   "generated_at": "2026-05-16T18:55:00Z",
   "nodes": [
     {
-      "id": "fwb-zod-silent-strip-bug-class",
+      "id": "ebda-zod-silent-strip-bug-class",
       "label": "Zod Silent Strip Bug Class",
       "type": "bug-class",
       "summary": "Adding a field to TypeScript type + admin form + storefront but omitting it from the API route's Zod schema causes the field to be silently dropped on PUT. Save succeeds with toast, but data is gone on reload because Zod strips unknown keys before Prisma sees them.",
-      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-force-website-builder/memory/feedback-fwb-zod-silent-strip-trap.md"
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-ebda-store/memory/feedback-ebda-zod-silent-strip-trap.md"
     },
     {
-      "id": "fwb-four-layer-lockstep-rule",
+      "id": "ebda-four-layer-lockstep-rule",
       "label": "Four-Layer Lock-Step Rule",
       "type": "rule",
       "summary": "Every new admin field must land in all four layers simultaneously: (1) TypeScript type in packages/shared, (2) API Zod schema in apps/api/src/routes/*.routes.ts, (3) storefront emitter in apps/web, (4) admin form in apps/admin. Missing layer 2 is the silent killer.",
-      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-force-website-builder/memory/feedback-fwb-zod-silent-strip-trap.md"
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-ebda-store/memory/feedback-ebda-zod-silent-strip-trap.md"
     },
     {
-      "id": "fwb-four-grep-detection-recipe",
+      "id": "ebda-four-grep-detection-recipe",
       "label": "Four-Grep Detection Recipe",
       "type": "pattern",
       "summary": "Before marking a new admin field done: grep for the field name in packages/shared/types, apps/api/routes, apps/admin/app, and apps/web/src. All four must return at least one hit. A zero hit on the API routes grep is the definitive sign the Zod schema was skipped.",
-      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-force-website-builder/memory/feedback-fwb-zod-silent-strip-trap.md"
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-ebda-store/memory/feedback-ebda-zod-silent-strip-trap.md"
     },
     {
-      "id": "fwb-admin-feature-smoke-test-recipe",
+      "id": "ebda-admin-feature-smoke-test-recipe",
       "label": "Admin Feature Smoke Test Recipe",
       "type": "pattern",
       "summary": "Four-step smoke test for every admin field: set value → Save → hard-reload page → verify value still shows → open storefront → confirm UI state. Step 2 failing (value gone after hard reload) is the canonical symptom of the Zod silent strip trap.",
-      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-force-website-builder/memory/feedback-fwb-zod-silent-strip-trap.md"
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-ebda-store/memory/feedback-ebda-zod-silent-strip-trap.md"
     },
     {
-      "id": "fwb-shared-zod-schemas-prevention",
+      "id": "ebda-shared-zod-schemas-prevention",
       "label": "Shared Zod Schemas Prevention Pattern",
       "type": "pattern",
       "summary": "Future architectural fix: extract Zod schemas from apps/api/src/routes into @force/shared/schemas/ so the API route imports the same schema that the TypeScript type is derived from, eliminating the class of duplication that enables silent strip bugs.",
-      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-force-website-builder/memory/feedback-fwb-zod-silent-strip-trap.md"
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-ebda-store/memory/feedback-ebda-zod-silent-strip-trap.md"
     },
     {
-      "id": "fwb-zod-strip-documented-but-repeated",
+      "id": "ebda-zod-strip-documented-but-repeated",
       "label": "Documentation Doesn't Prevent Bug Repetition",
       "type": "rule",
       "summary": "The cardGap and cardShape Zod omissions happened on the same day the trap was first documented, proving that knowledge-based prevention fails — the fix must be procedural (grep recipe + smoke test) not knowledge-based.",
-      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-force-website-builder/memory/feedback-fwb-zod-silent-strip-trap.md"
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-ebda-store/memory/feedback-ebda-zod-silent-strip-trap.md"
     },
     {
-      "id": "fwb-section-heading-four-sub-zones",
+      "id": "ebda-section-heading-four-sub-zones",
       "label": "SectionHeading 4 Sub-Zones",
       "type": "feature",
       "summary": "SectionHeading.tsx was split 2026-05-16 into four element-specific typography zones: sectionKicker (eyebrow chip), sectionTitle (h2), sectionSubtitle (p tagline), sectionSeeAll (View All link). Each text element gets its own data-zone attribute; the outer wrapper carries none.",
-      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-force-website-builder/memory/feedback-fwb-section-heading-sub-zones.md"
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-ebda-store/memory/feedback-ebda-section-heading-sub-zones.md"
     },
     {
-      "id": "fwb-wrapper-no-data-zone-rule",
+      "id": "ebda-wrapper-no-data-zone-rule",
       "label": "Wrapper Must Not Carry data-zone",
       "type": "rule",
       "summary": "Never place data-zone on a multi-element wrapper — CSS [data-zone] * cascades to all descendants, so styling one element (e.g. sectionTitle pill preset) bleeds onto siblings (e.g. sectionSeeAll link). Each independently-styleable element gets its own zone; wrappers inherit from the broader parent zone.",
-      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-force-website-builder/memory/feedback-fwb-section-heading-sub-zones.md"
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-ebda-store/memory/feedback-ebda-section-heading-sub-zones.md"
     },
     {
-      "id": "fwb-tag-every-styleable-element-principle",
+      "id": "ebda-tag-every-styleable-element-principle",
       "label": "Tag Every Independently-Styleable Element",
       "type": "pattern",
       "summary": "General principle for CSS-zone-based styling systems: when a heading row, hero block, or similar contains multiple text elements a merchant might want to style independently, each gets its own data-zone. Ask 'can a merchant want different fonts/colours on each one?' — yes means individual zones, no means wrapper is fine.",
-      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-force-website-builder/memory/feedback-fwb-section-heading-sub-zones.md"
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-ebda-store/memory/feedback-ebda-section-heading-sub-zones.md"
     },
     {
-      "id": "fwb-section-heading-backwards-compat",
+      "id": "ebda-section-heading-backwards-compat",
       "label": "Sub-Zone Backwards Compatibility",
       "type": "pattern",
       "summary": "Splitting a single zone (sectionTitle on wrapper) into four sub-zones is backwards compatible: existing stores with sectionTitle customizations keep working unchanged because the h2 now carries the zone instead of the wrapper. Merchants gain new per-element control without losing old styles.",
-      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-force-website-builder/memory/feedback-fwb-section-heading-sub-zones.md"
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-ebda-store/memory/feedback-ebda-section-heading-sub-zones.md"
     },
     {
-      "id": "fwb-four-layer-zone-wiring",
+      "id": "ebda-four-layer-zone-wiring",
       "label": "Four-Layer Zone Wiring",
       "type": "pattern",
       "summary": "Adding a new typography zone requires the same four-layer touch as any admin field: (1) TypographyZone union + TYPOGRAPHY_ZONES array in packages/shared types, (2) zoneSchema entries in typography.routes.ts, (3) ZONE_NAMES in apps/web layout.tsx CSS emitter, (4) ZoneDef entries in apps/admin typography page. Commit e11e3e2 wired all four sub-zones simultaneously.",
-      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-force-website-builder/memory/feedback-fwb-section-heading-sub-zones.md"
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-ebda-store/memory/feedback-ebda-section-heading-sub-zones.md"
     },
     {
-      "id": "fwb-zone-cascade-bleed-bug-class",
+      "id": "ebda-zone-cascade-bleed-bug-class",
       "label": "Zone Cascade Bleed Bug Class",
       "type": "bug-class",
       "summary": "Placing data-zone on a wrapper that contains multiple independently-styled elements causes CSS preset changes to bleed onto unintended siblings. Symptom: 'I styled X and Y broke'. Root cause: descendant selector * under the zone catches everything in the subtree.",
-      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-force-website-builder/memory/feedback-fwb-section-heading-sub-zones.md"
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-ebda-store/memory/feedback-ebda-section-heading-sub-zones.md"
     }
   ],
   "edges": [
     {
-      "from": "fwb-four-layer-lockstep-rule",
-      "to": "fwb-zod-silent-strip-bug-class",
+      "from": "ebda-four-layer-lockstep-rule",
+      "to": "ebda-zod-silent-strip-bug-class",
       "relation": "mitigates"
     },
     {
-      "from": "fwb-four-grep-detection-recipe",
-      "to": "fwb-zod-silent-strip-bug-class",
+      "from": "ebda-four-grep-detection-recipe",
+      "to": "ebda-zod-silent-strip-bug-class",
       "relation": "mitigates"
     },
     {
-      "from": "fwb-admin-feature-smoke-test-recipe",
-      "to": "fwb-zod-silent-strip-bug-class",
+      "from": "ebda-admin-feature-smoke-test-recipe",
+      "to": "ebda-zod-silent-strip-bug-class",
       "relation": "mitigates"
     },
     {
-      "from": "fwb-shared-zod-schemas-prevention",
-      "to": "fwb-zod-silent-strip-bug-class",
+      "from": "ebda-shared-zod-schemas-prevention",
+      "to": "ebda-zod-silent-strip-bug-class",
       "relation": "mitigates"
     },
     {
-      "from": "fwb-zod-strip-documented-but-repeated",
-      "to": "fwb-zod-silent-strip-bug-class",
+      "from": "ebda-zod-strip-documented-but-repeated",
+      "to": "ebda-zod-silent-strip-bug-class",
       "relation": "example-of"
     },
     {
-      "from": "fwb-four-layer-lockstep-rule",
-      "to": "fwb-four-layer-zone-wiring",
+      "from": "ebda-four-layer-lockstep-rule",
+      "to": "ebda-four-layer-zone-wiring",
       "relation": "related"
     },
     {
-      "from": "fwb-wrapper-no-data-zone-rule",
-      "to": "fwb-zone-cascade-bleed-bug-class",
+      "from": "ebda-wrapper-no-data-zone-rule",
+      "to": "ebda-zone-cascade-bleed-bug-class",
       "relation": "mitigates"
     },
     {
-      "from": "fwb-tag-every-styleable-element-principle",
-      "to": "fwb-wrapper-no-data-zone-rule",
+      "from": "ebda-tag-every-styleable-element-principle",
+      "to": "ebda-wrapper-no-data-zone-rule",
       "relation": "enforces"
     },
     {
-      "from": "fwb-section-heading-four-sub-zones",
-      "to": "fwb-zone-cascade-bleed-bug-class",
+      "from": "ebda-section-heading-four-sub-zones",
+      "to": "ebda-zone-cascade-bleed-bug-class",
       "relation": "mitigates"
     },
     {
-      "from": "fwb-section-heading-four-sub-zones",
-      "to": "fwb-tag-every-styleable-element-principle",
+      "from": "ebda-section-heading-four-sub-zones",
+      "to": "ebda-tag-every-styleable-element-principle",
       "relation": "example-of"
     },
     {
-      "from": "fwb-section-heading-backwards-compat",
-      "to": "fwb-section-heading-four-sub-zones",
+      "from": "ebda-section-heading-backwards-compat",
+      "to": "ebda-section-heading-four-sub-zones",
       "relation": "related"
     },
     {
-      "from": "fwb-four-layer-zone-wiring",
-      "to": "fwb-section-heading-four-sub-zones",
+      "from": "ebda-four-layer-zone-wiring",
+      "to": "ebda-section-heading-four-sub-zones",
       "relation": "implements"
     },
     {
-      "from": "fwb-zod-silent-strip-bug-class",
-      "to": "fwb-no-prisma-migration-policy",
+      "from": "ebda-zod-silent-strip-bug-class",
+      "to": "ebda-no-prisma-migration-policy",
       "relation": "related"
     },
     {
-      "from": "fwb-section-heading-four-sub-zones",
-      "to": "fwb-typography-zone-extensions",
+      "from": "ebda-section-heading-four-sub-zones",
+      "to": "ebda-typography-zone-extensions",
       "relation": "related"
     },
     {
-      "from": "fwb-zone-cascade-bleed-bug-class",
-      "to": "fwb-typography-zone-extensions",
+      "from": "ebda-zone-cascade-bleed-bug-class",
+      "to": "ebda-typography-zone-extensions",
       "relation": "related"
     },
     {
-      "from": "fwb-four-layer-zone-wiring",
-      "to": "fwb-typography-zone-extensions",
+      "from": "ebda-four-layer-zone-wiring",
+      "to": "ebda-typography-zone-extensions",
       "relation": "implements"
     },
     {
-      "from": "fwb-zod-silent-strip-bug-class",
-      "to": "fwb-card-shape-picker",
+      "from": "ebda-zod-silent-strip-bug-class",
+      "to": "ebda-card-shape-picker",
       "relation": "related"
     },
     {
-      "from": "fwb-zod-silent-strip-bug-class",
-      "to": "fwb-categories-rounded-centered-gap",
+      "from": "ebda-zod-silent-strip-bug-class",
+      "to": "ebda-categories-rounded-centered-gap",
       "relation": "related"
     },
     {
-      "from": "fwb-zod-silent-strip-bug-class",
-      "to": "fwb-card-size-admin-system",
+      "from": "ebda-zod-silent-strip-bug-class",
+      "to": "ebda-card-size-admin-system",
       "relation": "related"
     },
     {
-      "from": "fwb-shared-zod-schemas-prevention",
-      "to": "fwb-three-product-render-paths",
+      "from": "ebda-shared-zod-schemas-prevention",
+      "to": "ebda-three-product-render-paths",
       "relation": "related"
     }
   ]

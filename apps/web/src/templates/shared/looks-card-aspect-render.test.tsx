@@ -63,7 +63,7 @@ vi.mock('next/link', () => ({
     React.createElement('a', { href, ...rest }, children),
 }));
 
-const { PecannbeeProductCard } = await import('./PecannbeeProductCard');
+const { StorefrontProductCard } = await import('./StorefrontProductCard');
 const { default: ModernProductCard } = await import('../modern/ProductCard');
 const { default: ElegantProductCard } = await import('../elegant/ProductCard');
 const { default: ClassicProductCard } = await import('../classic/ProductCard');
@@ -82,7 +82,7 @@ const PRODUCT = {
   inStock: true,
 };
 const CARDS = [
-  ['PecannbeeProductCard', PecannbeeProductCard],
+  ['StorefrontProductCard', StorefrontProductCard],
   ['modern', ModernProductCard],
   ['elegant', ElegantProductCard],
   ['classic', ClassicProductCard],

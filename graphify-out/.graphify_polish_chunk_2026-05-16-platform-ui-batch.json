@@ -1,171 +1,171 @@
 {
   "nodes": [
     {
-      "id": "fwb-three-product-render-paths",
-      "name": "FWB Three Product Render Paths",
+      "id": "ebda-three-product-render-paths",
+      "name": "Ebda Store Three Product Render Paths",
       "type": "pattern",
-      "description": "FWB storefront has three distinct product-card rendering surfaces (PecannbeeProductCard, per-theme ProductCard x5, ProductCarousel) — all 7 files must be updated together for any platform-level product UX change, or the fix is incomplete.",
-      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-force-website-builder/memory/feedback-fwb-three-product-render-paths.md",
-      "tags": ["fwb", "product-card", "platform-level", "multi-file", "storefront"]
+      "description": "Ebda Store storefront has three distinct product-card rendering surfaces (StorefrontProductCard, per-theme ProductCard x5, ProductCarousel) — all 7 files must be updated together for any platform-level product UX change, or the fix is incomplete.",
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-ebda-store/memory/feedback-ebda-three-product-render-paths.md",
+      "tags": ["ebda", "product-card", "platform-level", "multi-file", "storefront"]
     },
     {
-      "id": "file-pecannbee-product-card",
-      "name": "PecannbeeProductCard.tsx",
+      "id": "file-demo-store-product-card",
+      "name": "StorefrontProductCard.tsx",
       "type": "file",
       "description": "Shared pack-aware product card used on PLP (/products), /search, and /categories/[slug] — pack-agnostic structure with per-pack className via pack-styles.ts.",
-      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-force-website-builder/memory/feedback-fwb-three-product-render-paths.md",
-      "tags": ["fwb", "storefront", "product-card", "plp", "shared"]
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-ebda-store/memory/feedback-ebda-three-product-render-paths.md",
+      "tags": ["ebda", "storefront", "product-card", "plp", "shared"]
     },
     {
       "id": "file-theme-product-cards",
       "name": "Theme ProductCard.tsx (5 files)",
       "type": "file",
       "description": "Per-theme pack-opinionated product cards (modern, elegant, classic, minimal, bold) — each owns its own card layout and is used by T.ProductGrid for theme identity on collection grids.",
-      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-force-website-builder/memory/feedback-fwb-three-product-render-paths.md",
-      "tags": ["fwb", "storefront", "product-card", "theme", "multi-theme"]
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-ebda-store/memory/feedback-ebda-three-product-render-paths.md",
+      "tags": ["ebda", "storefront", "product-card", "theme", "multi-theme"]
     },
     {
       "id": "file-product-carousel",
       "name": "ProductCarousel.tsx",
       "type": "file",
-      "description": "Horizontal-scroll homepage carousel component rendering 'New Arrivals' and 'Best Sellers' strips — the silent third render path that bypasses both PecannbeeProductCard and theme ProductCard.",
-      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-force-website-builder/memory/feedback-fwb-three-product-render-paths.md",
-      "tags": ["fwb", "storefront", "homepage", "carousel", "product-card"]
+      "description": "Horizontal-scroll homepage carousel component rendering 'New Arrivals' and 'Best Sellers' strips — the silent third render path that bypasses both StorefrontProductCard and theme ProductCard.",
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-ebda-store/memory/feedback-ebda-three-product-render-paths.md",
+      "tags": ["ebda", "storefront", "homepage", "carousel", "product-card"]
     },
     {
       "id": "file-product-card-cta",
       "name": "ProductCardCta.tsx (shared)",
       "type": "file",
       "description": "Canonical shared CTA component accepting hasVariants, viewHref, inStock — the single source of truth for product-card call-to-action that all three render paths should import rather than inlining button JSX.",
-      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-force-website-builder/memory/feedback-fwb-three-product-render-paths.md",
-      "tags": ["fwb", "storefront", "shared", "product-card", "cta"]
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-ebda-store/memory/feedback-ebda-three-product-render-paths.md",
+      "tags": ["ebda", "storefront", "shared", "product-card", "cta"]
     },
     {
       "id": "anti-pattern-partial-product-card-fix",
       "name": "Partial Product Card Fix (Path 3 Omission)",
       "type": "anti_pattern",
-      "description": "Updating PecannbeeProductCard + theme ProductCards without updating ProductCarousel leaves the homepage broken — commit ca8b4ed demonstrated this trap when variant-aware CTA was missing from the carousel.",
-      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-force-website-builder/memory/feedback-fwb-three-product-render-paths.md",
-      "tags": ["fwb", "anti-pattern", "product-card", "homepage", "regression"]
+      "description": "Updating StorefrontProductCard + theme ProductCards without updating ProductCarousel leaves the homepage broken — commit ca8b4ed demonstrated this trap when variant-aware CTA was missing from the carousel.",
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-ebda-store/memory/feedback-ebda-three-product-render-paths.md",
+      "tags": ["ebda", "anti-pattern", "product-card", "homepage", "regression"]
     },
     {
       "id": "commit-ca8b4ed",
       "name": "Commit ca8b4ed — Partial CTA fix (missed path 3)",
       "type": "commit",
       "description": "Initial platform CTA commit that fixed paths 1 and 2 but missed ProductCarousel (path 3) — left homepage without variant-aware CTA.",
-      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-force-website-builder/memory/feedback-fwb-three-product-render-paths.md",
-      "tags": ["fwb", "commit", "product-card", "regression"]
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-ebda-store/memory/feedback-ebda-three-product-render-paths.md",
+      "tags": ["ebda", "commit", "product-card", "regression"]
     },
     {
       "id": "commit-33abdf6",
       "name": "Commit 33abdf6 — Path 3 + RTL select fix",
       "type": "commit",
       "description": "Fixed ProductCarousel (path 3) after Ahmad re-flagged missing variant CTA on homepage; also applied RTL select min-w fix for Arabic truncation on PLP toolbar.",
-      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-force-website-builder/memory/feedback-fwb-three-product-render-paths.md",
-      "tags": ["fwb", "commit", "product-card", "rtl", "plp"]
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-ebda-store/memory/feedback-ebda-three-product-render-paths.md",
+      "tags": ["ebda", "commit", "product-card", "rtl", "plp"]
     },
     {
-      "id": "fwb-mobile-header-pecannbee-spec",
-      "name": "FWB Mobile Header Pecannbee Spec",
+      "id": "ebda-mobile-header-demo-store-spec",
+      "name": "Ebda Store Mobile Header Storefront Spec",
       "type": "pattern",
-      "description": "Standing mobile header pattern for all 5 FWB themes: Row 1 = hamburger + h-24 centered logo + actions; Row 2 = always-visible persistent search bar (not toggleable). Target reference: pecannbee.com.kw mobile.",
-      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-force-website-builder/memory/feedback-fwb-mobile-header-pecannbee.md",
-      "tags": ["fwb", "mobile", "header", "ui", "platform-level", "all-themes"]
+      "description": "Standing mobile header pattern for all 5 Ebda Store themes: Row 1 = hamburger + h-24 centered logo + actions; Row 2 = always-visible persistent search bar (not toggleable). Target reference: demo-store.example mobile.",
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-ebda-store/memory/feedback-ebda-mobile-header-demo-store.md",
+      "tags": ["ebda", "mobile", "header", "ui", "platform-level", "all-themes"]
     },
     {
       "id": "pattern-centered-logo-absolute-positioning",
       "name": "Centered Logo Absolute Positioning Pattern",
       "type": "pattern",
       "description": "Use `absolute left-1/2 -translate-x-1/2` on the logo Link with max-w-[55%] guard — parent flex justify-between then correctly bookends hamburger and actions without fighting the centered child. Do NOT nest inside a fixed-width container.",
-      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-force-website-builder/memory/feedback-fwb-mobile-header-pecannbee.md",
-      "tags": ["fwb", "css", "mobile", "header", "layout"]
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-ebda-store/memory/feedback-ebda-mobile-header-demo-store.md",
+      "tags": ["ebda", "css", "mobile", "header", "layout"]
     },
     {
       "id": "anti-pattern-mobile-search-toggle",
       "name": "Anti-pattern: Toggleable Mobile Search Bar",
       "type": "anti_pattern",
-      "description": "Hiding the search bar behind a toggle on mobile hurts discoverability — the pecannbee target spec requires the search bar always-visible (persistent) on mobile. Toggle stays desktop-only.",
-      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-force-website-builder/memory/feedback-fwb-mobile-header-pecannbee.md",
-      "tags": ["fwb", "anti-pattern", "mobile", "header", "search", "ux"]
+      "description": "Hiding the search bar behind a toggle on mobile hurts discoverability — the demo-store target spec requires the search bar always-visible (persistent) on mobile. Toggle stays desktop-only.",
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-ebda-store/memory/feedback-ebda-mobile-header-demo-store.md",
+      "tags": ["ebda", "anti-pattern", "mobile", "header", "search", "ux"]
     },
     {
       "id": "anti-pattern-small-mobile-logo",
       "name": "Anti-pattern: Small Mobile Logo (h-16)",
       "type": "anti_pattern",
-      "description": "Shrinking logo to h-16 on mobile for 'compact' reasons violates the pecannbee spec — Ahmad explicitly requires h-24 (96px) as the floor for wordmark logos like PECANNBEE.",
-      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-force-website-builder/memory/feedback-fwb-mobile-header-pecannbee.md",
-      "tags": ["fwb", "anti-pattern", "mobile", "header", "logo"]
+      "description": "Shrinking logo to h-16 on mobile for 'compact' reasons violates the demo-store spec — Ahmad explicitly requires h-24 (96px) as the floor for wordmark logos like demo-store.",
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-ebda-store/memory/feedback-ebda-mobile-header-demo-store.md",
+      "tags": ["ebda", "anti-pattern", "mobile", "header", "logo"]
     },
     {
       "id": "commit-873bc7d",
       "name": "Commit 873bc7d — Mobile header propagated to 4 remaining themes",
       "type": "commit",
-      "description": "Second commit in the mobile header batch: propagated the pecannbee mobile header spec (h-24 logo, persistent search row) from modern theme to elegant, classic, minimal, and bold.",
-      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-force-website-builder/memory/feedback-fwb-mobile-header-pecannbee.md",
-      "tags": ["fwb", "commit", "mobile", "header", "multi-theme"]
+      "description": "Second commit in the mobile header batch: propagated the demo-store mobile header spec (h-24 logo, persistent search row) from modern theme to elegant, classic, minimal, and bold.",
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-ebda-store/memory/feedback-ebda-mobile-header-demo-store.md",
+      "tags": ["ebda", "commit", "mobile", "header", "multi-theme"]
     },
     {
-      "id": "fwb-rtl-select-min-width",
-      "name": "FWB RTL Select Min-Width Pattern",
+      "id": "ebda-rtl-select-min-width",
+      "name": "Ebda Store RTL Select Min-Width Pattern",
       "type": "pattern",
       "description": "Arabic Select labels in horizontal toolbars truncate without explicit min-w because Arabic option text is longer than English equivalents and RTL connected-script glyphs need more pixel width. Fix: min-w-[12rem] for Sort, min-w-[6rem] for Show, stack until lg: (not sm:).",
-      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-force-website-builder/memory/feedback-fwb-rtl-select-min-width.md",
-      "tags": ["fwb", "rtl", "arabic", "select", "toolbar", "plp", "i18n"]
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-ebda-store/memory/feedback-ebda-rtl-select-min-width.md",
+      "tags": ["ebda", "rtl", "arabic", "select", "toolbar", "plp", "i18n"]
     },
     {
       "id": "anti-pattern-sm-breakpoint-toolbar-with-sidebar",
       "name": "Anti-pattern: sm: Breakpoint for Toolbar Next to Sidebar",
       "type": "anti_pattern",
       "description": "Using sm: to switch a PLP toolbar to single-row puts it in flex-row layout while the lg: sidebar is still squeezing the products column — worst case for truncation. Must match the sidebar's own lg: breakpoint.",
-      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-force-website-builder/memory/feedback-fwb-rtl-select-min-width.md",
-      "tags": ["fwb", "anti-pattern", "rtl", "toolbar", "breakpoint", "sidebar"]
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-ebda-store/memory/feedback-ebda-rtl-select-min-width.md",
+      "tags": ["ebda", "anti-pattern", "rtl", "toolbar", "breakpoint", "sidebar"]
     },
     {
       "id": "rule-select-min-w-arabic",
       "name": "Rule: Select Components Require Arabic-Width min-w",
       "type": "rule",
       "description": "Every Select in apps/web/src/app/**/*Client.tsx must have an explicit min-w-[Nrem]; Selects with only flex-1 sm:flex-initial and no min-w are truncation time-bombs in Arabic locale.",
-      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-force-website-builder/memory/feedback-fwb-rtl-select-min-width.md",
-      "tags": ["fwb", "rule", "rtl", "select", "arabic", "i18n"]
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-ebda-store/memory/feedback-ebda-rtl-select-min-width.md",
+      "tags": ["ebda", "rule", "rtl", "select", "arabic", "i18n"]
     },
     {
       "id": "pattern-mobile-form-text-base-cross-file",
       "name": "iOS No-Zoom 16px Floor (cross-file reference)",
       "type": "concept",
       "description": "text-base (16px) on mobile form inputs and Select triggers prevents iOS Safari forced-zoom on focus — referenced by both the mobile header spec (search input) and the RTL select pattern (select trigger). See global feedback-mobile-form-text-base.",
-      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-force-website-builder/memory/feedback-fwb-mobile-header-pecannbee.md",
-      "tags": ["fwb", "ios", "pwa", "form", "mobile", "accessibility", "cross-file"]
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-ebda-store/memory/feedback-ebda-mobile-header-demo-store.md",
+      "tags": ["ebda", "ios", "pwa", "form", "mobile", "accessibility", "cross-file"]
     },
     {
       "id": "concept-platform-level-fix-propagation",
       "name": "Platform-Level Fix Propagation Rule",
       "type": "concept",
       "description": "Ahmad's standing rule: any product UX, header, or UI fix must propagate to all themes and all render paths — not just the one tested. Operationalized by the 7-file grep check for product cards and the 5-theme propagation requirement for headers.",
-      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-force-website-builder/memory/feedback-fwb-three-product-render-paths.md",
-      "tags": ["fwb", "rule", "platform-level", "multi-theme", "propagation"]
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-ebda-store/memory/feedback-ebda-three-product-render-paths.md",
+      "tags": ["ebda", "rule", "platform-level", "multi-theme", "propagation"]
     }
   ],
   "edges": [
     {
-      "from": "fwb-three-product-render-paths",
-      "to": "file-pecannbee-product-card",
+      "from": "ebda-three-product-render-paths",
+      "to": "file-demo-store-product-card",
       "type": "references",
       "weight": 1.0
     },
     {
-      "from": "fwb-three-product-render-paths",
+      "from": "ebda-three-product-render-paths",
       "to": "file-theme-product-cards",
       "type": "references",
       "weight": 1.0
     },
     {
-      "from": "fwb-three-product-render-paths",
+      "from": "ebda-three-product-render-paths",
       "to": "file-product-carousel",
       "type": "references",
       "weight": 1.0
     },
     {
-      "from": "fwb-three-product-render-paths",
+      "from": "ebda-three-product-render-paths",
       "to": "file-product-card-cta",
       "type": "references",
       "weight": 0.9
@@ -189,98 +189,98 @@
       "weight": 1.0
     },
     {
-      "from": "fwb-three-product-render-paths",
+      "from": "ebda-three-product-render-paths",
       "to": "anti-pattern-partial-product-card-fix",
       "type": "prevents",
       "weight": 1.0
     },
     {
-      "from": "fwb-three-product-render-paths",
+      "from": "ebda-three-product-render-paths",
       "to": "concept-platform-level-fix-propagation",
       "type": "implements",
       "weight": 0.9
     },
     {
-      "from": "fwb-mobile-header-pecannbee-spec",
+      "from": "ebda-mobile-header-demo-store-spec",
       "to": "concept-platform-level-fix-propagation",
       "type": "implements",
       "weight": 0.9
     },
     {
-      "from": "fwb-mobile-header-pecannbee-spec",
+      "from": "ebda-mobile-header-demo-store-spec",
       "to": "commit-ca8b4ed",
       "type": "references",
       "weight": 0.8
     },
     {
-      "from": "fwb-mobile-header-pecannbee-spec",
+      "from": "ebda-mobile-header-demo-store-spec",
       "to": "commit-873bc7d",
       "type": "references",
       "weight": 1.0
     },
     {
-      "from": "fwb-mobile-header-pecannbee-spec",
+      "from": "ebda-mobile-header-demo-store-spec",
       "to": "pattern-centered-logo-absolute-positioning",
       "type": "extends",
       "weight": 0.9
     },
     {
-      "from": "fwb-mobile-header-pecannbee-spec",
+      "from": "ebda-mobile-header-demo-store-spec",
       "to": "anti-pattern-mobile-search-toggle",
       "type": "prevents",
       "weight": 1.0
     },
     {
-      "from": "fwb-mobile-header-pecannbee-spec",
+      "from": "ebda-mobile-header-demo-store-spec",
       "to": "anti-pattern-small-mobile-logo",
       "type": "prevents",
       "weight": 1.0
     },
     {
-      "from": "fwb-mobile-header-pecannbee-spec",
+      "from": "ebda-mobile-header-demo-store-spec",
       "to": "pattern-mobile-form-text-base-cross-file",
       "type": "references",
       "weight": 0.8
     },
     {
-      "from": "fwb-rtl-select-min-width",
+      "from": "ebda-rtl-select-min-width",
       "to": "rule-select-min-w-arabic",
       "type": "implements",
       "weight": 1.0
     },
     {
-      "from": "fwb-rtl-select-min-width",
+      "from": "ebda-rtl-select-min-width",
       "to": "anti-pattern-sm-breakpoint-toolbar-with-sidebar",
       "type": "prevents",
       "weight": 1.0
     },
     {
-      "from": "fwb-rtl-select-min-width",
+      "from": "ebda-rtl-select-min-width",
       "to": "commit-33abdf6",
       "type": "references",
       "weight": 1.0
     },
     {
-      "from": "fwb-rtl-select-min-width",
+      "from": "ebda-rtl-select-min-width",
       "to": "pattern-mobile-form-text-base-cross-file",
       "type": "references",
       "weight": 0.7
     },
     {
       "from": "rule-select-min-w-arabic",
-      "to": "file-pecannbee-product-card",
+      "to": "file-demo-store-product-card",
       "type": "applies_to",
       "weight": 0.7
     },
     {
       "from": "commit-33abdf6",
-      "to": "fwb-three-product-render-paths",
+      "to": "ebda-three-product-render-paths",
       "type": "fixed_by",
       "weight": 1.0
     },
     {
       "from": "commit-33abdf6",
-      "to": "fwb-rtl-select-min-width",
+      "to": "ebda-rtl-select-min-width",
       "type": "fixed_by",
       "weight": 1.0
     }

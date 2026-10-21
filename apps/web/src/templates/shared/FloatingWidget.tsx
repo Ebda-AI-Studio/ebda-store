@@ -35,8 +35,8 @@ interface FloatingWidgetProps {
 }
 
 /** Extract an Instagram handle from a URL or @handle string. Returns null
- *  when no handle can be recovered. Accepts "@wadyaljuz", "wadyaljuz",
- *  "https://instagram.com/wadyaljuz", "https://www.instagram.com/wadyaljuz/". */
+ *  when no handle can be recovered. Accepts "@demo-merchant", "demo-merchant",
+ *  "https://instagram.com/demo-merchant", "https://www.instagram.com/demo-merchant/". */
 function instagramHandleFromUrl(input: string | undefined): string | null {
   if (!input) return null;
   const trimmed = input.trim();

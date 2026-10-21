@@ -4,12 +4,12 @@ Ebda is a **Whisky 11** product (org `whisky-11`, repo `whisky-11/ebda`, still e
 
 ## Domain map
 
-| Host                | Purpose                                                                                                                | FWB equivalent today     |
+| Host                | Purpose                                                                                                                | Ebda Store equivalent today     |
 | ------------------- | ---------------------------------------------------------------------------------------------------------------------- | ------------------------ |
-| `ebda.app`          | Main marketing website (Shopify.com equivalent)                                                                        | force-ai.co landing      |
-| `store.ebda.app`    | Ebda Store merchant app: sign-up, plan, payment, onboarding, dashboard (Ruling HOST-STORE-1; `admin.ebda.app` retired) | admin.force-ai.co        |
+| `ebda.app`          | Main marketing website (Shopify.com equivalent)                                                                        | ebda.app landing      |
+| `store.ebda.app`    | Ebda Store merchant app: sign-up, plan, payment, onboarding, dashboard (Ruling HOST-STORE-1; `admin.ebda.app` retired) | store.ebda.app        |
 | `*.ebda.app`        | Individual merchant stores (`<slug>.ebda.app`); custom domains on top                                                  | per-store custom domains |
-| `api.ebda.app`      | API                                                                                                                    | api.force-ai.co          |
+| `api.ebda.app`      | API                                                                                                                    | api.ebda.app          |
 | `docs.ebda.app`     | API & developer documentation                                                                                          | —                        |
 | `whatsapp.ebda.app` | WhatsApp integration                                                                                                   | WBS (separate product)   |
 | `help.ebda.app`     | Help center                                                                                                            | —                        |
@@ -39,10 +39,10 @@ Original brief (2026-10-03, superseded):
 
 ## Decisions (Ahmad, 2026-10-03, later)
 
-- **Self-serve like Shopify, NOT managed like FWB**: merchants sign up, build and run their store alone; no onboarding by us.
+- **Self-serve like Shopify, NOT managed like Ebda Store**: merchants sign up, build and run their store alone; no onboarding by us.
 - **Payments: every Egyptian provider** (Paymob, Kashier, Fawry, Valu/BNPL, Meeza, wallets, COD, and the rest available) behind a pluggable provider layer, plus **InstaPay** as a method with ONE manual step (merchant confirms the transfer).
 - **Shipping: every available Egyptian carrier** — Bosta, Aramex, and the rest (e.g. J&T, Mylerz, R2S, Sprint, Egypt Post…) behind a pluggable carrier layer (rates, label, tracking webhooks).
-- **Language: Arabic-first (RTL default) + English**, like FWB.
+- **Language: Arabic-first (RTL default) + English**, like Ebda Store.
 - **Pricing/packaging: not decided** — needs research on what to bundle per plan.
 - **status.ebda.app: build it** (small, on infra independent of what it monitors).
 - **whatsapp.ebda.app: WBS** — fix its backlog, rebrand it for Ebda; Ahmad will create a new Facebook account with the same permissions later. Parked for now.
@@ -54,7 +54,7 @@ Original brief (2026-10-03, superseded):
 ## Questions answered above (kept for history)
 
 - `store.ebda.app`: path-based default stores, or only `<slug>.ebda.app`?
-- Language: Arabic-first (RTL default) with English toggle, like FWB storefronts?
+- Language: Arabic-first (RTL default) with English toggle, like Ebda Store storefronts?
 - Pricing shown on the site: EGP 0 / 1,500 / 3,500 per month, 15,000 per year — my reading of "at least one fifty", not yet confirmed.
 - `status.ebda.app`: hosted status page (e.g. a status provider) or built in?
 - `whatsapp.ebda.app`: Ebda's own WhatsApp module, or WBS rebranded?

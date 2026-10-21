@@ -1,12 +1,12 @@
-# Cloudflare preview workers — FWB frontends (OpenNext)
+# Cloudflare preview workers — Ebda Store frontends (OpenNext)
 
-> Status: **all three FWB Next apps validated on Cloudflare Workers** (preview, 2026-06-19). Vercel remains production — these are parallel preview deploys, **zero DNS / prod impact**. Companion to `docs/migration/cloudflare-readiness.md`.
+> Status: **all three Ebda Store Next apps validated on Cloudflare Workers** (preview, 2026-06-19). Vercel remains production — these are parallel preview deploys, **zero DNS / prod impact**. Companion to `docs/migration/cloudflare-readiness.md`.
 
 ## Preview worker URLs
 
 | App                        | Worker        | URL                                            | Notes                                                                                                    |
 | -------------------------- | ------------- | ---------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
-| `apps/web` (storefront)    | `ebda-web`    | https://ebda-web.ahmed0montaser.workers.dev    | Root = Platform landing. Real stores render by slug: `/pecannbee`, `/wady-aljuz`, `/palora` (see below). |
+| `apps/web` (storefront)    | `ebda-web`    | https://ebda-web.ahmed0montaser.workers.dev    | Root = Platform landing. Real stores render by slug: `/demo-store`, `/wady-aljuz`, `/demo-boutique` (see below). |
 | `apps/orders` (orders PWA) | `ebda-orders` | https://ebda-orders.ahmed0montaser.workers.dev | Clean — no blockers. SSR via OpenNext.                                                                   |
 | `apps/admin` (dashboard)   | `ebda-admin`  | https://ebda-admin.ahmed0montaser.workers.dev  | `instrumentation.ts` moved aside at build time (see below).                                              |
 
@@ -17,18 +17,18 @@ All three: `next: 16.2.9` under `@opennextjs/cloudflare@1.19.11`, `compatibility
 The storefront is multi-tenant: a custom domain resolves one store; a **platform host** serves the Platform landing at root and resolves stores by **slug** (`/<slug>`). `*.workers.dev` is now classed as a platform host (fix below), so without any DNS change you can view live stores on the preview worker:
 
 - https://ebda-web.ahmed0montaser.workers.dev/ — Platform landing
-- https://ebda-web.ahmed0montaser.workers.dev/pecannbee — Pecannbee
+- https://ebda-web.ahmed0montaser.workers.dev/demo-store — Storefront
 - https://ebda-web.ahmed0montaser.workers.dev/wady-aljuz — Wady Aljuz (وادي الجوز)
-- https://ebda-web.ahmed0montaser.workers.dev/palora — Palora (بالورا)
+- https://ebda-web.ahmed0montaser.workers.dev/demo-boutique — demo-boutique (بالورا)
 
-After the DNS move, each store is served at its OWN domain (e.g. `wadyaljuz.com`) with no `/<slug>` prefix — the same code path, just resolved by domain instead of slug.
+After the DNS move, each store is served at its OWN domain (e.g. `demo-merchant.com`) with no `/<slug>` prefix — the same code path, just resolved by domain instead of slug.
 
 ### Required build env for `apps/web` (storefront)
 
 `NEXT_PUBLIC_*` vars are **inlined at build time**. Without `NEXT_PUBLIC_API_URL` the worker falls back to `http://localhost:4000/api/v1` and every store fails to resolve (→ Platform landing for every slug). Build web with at least:
 
 ```bash
-export NEXT_PUBLIC_API_URL="https://api.force-ai.co/api/v1"  # corrected 2026-09-02: the old raw api-production-c058.up.railway.app host now 404s
+export NEXT_PUBLIC_API_URL="https://api.ebda.app/api/v1"  # corrected 2026-09-02: the old raw api-production-c058.up.railway.app host now 404s
 export NEXT_PUBLIC_SITE_URL="https://ebda-web.ahmed0montaser.workers.dev"  # optional (canonical/OG)
 bash scripts/cf-build.sh web && (cd apps/web && npx wrangler deploy)
 ```

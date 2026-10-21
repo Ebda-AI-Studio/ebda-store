@@ -11,7 +11,7 @@ export { default as OrderSummary } from './OrderSummary';
 export { default as EmptyState } from './EmptyState';
 export { default as FormCard } from './FormCard';
 
-// Pecannbee-flow sections (Epic A) — shared shells, theme-token-styled so
+// Storefront-flow sections (Epic A) — shared shells, theme-token-styled so
 // each pack inherits its own --primary, --foreground, font weights, etc.
 // Replace per-pack later if a pack needs distinct visual treatment.
 export { HeroBanner } from '../shared/HeroBanner';

@@ -13,7 +13,7 @@ import { useStore, useStoreUrl } from '../../contexts/StoreContext';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { sectionBgStyle } from '../../templates/shared/section-bg';
 import { sectionSpacingClasses } from '../../templates/shared/section-spacing';
-import { PecannbeeProductCard } from '../../templates/shared/PecannbeeProductCard';
+import { StorefrontProductCard } from '../../templates/shared/StorefrontProductCard';
 import type { TemplateProduct } from '../../templates/types';
 import { SectionHeader } from './SectionHeader';
 import type { SectionProductRefs } from './section-products';
@@ -96,7 +96,7 @@ export function FeaturedCollectionSection({
           ].join(' ')}
         >
           {products.map(p => (
-            <PecannbeeProductCard
+            <StorefrontProductCard
               key={p.id}
               product={p}
               pack={pack}

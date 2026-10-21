@@ -43,8 +43,8 @@ import { runCitationScan } from '@api/services/answer-engine/citation-scan.servi
 import type { AnswerEngineProvider } from '@api/services/answer-engine/provider';
 
 const PROMPTS = [
-  { text: 'best dates in kuwait', locale: 'en' as const },
-  { text: 'best honey in kuwait', locale: 'en' as const },
+  { text: 'best dates in cairo', locale: 'en' as const },
+  { text: 'best honey in cairo', locale: 'en' as const },
   { text: 'افضل تمر', locale: 'ar' as const },
 ];
 
@@ -66,7 +66,7 @@ describe('runCitationScan', () => {
   it('resumes a retried step: pairs this run already wrote are neither re-queried nor re-written', async () => {
     // The crashed first attempt wrote the first prompt's row.
     mockFindMany.mockResolvedValue([
-      { engine: 'perplexity', promptText: 'best dates in kuwait', locale: 'en' },
+      { engine: 'perplexity', promptText: 'best dates in cairo', locale: 'en' },
     ]);
     const p = provider();
     const runStartedAt = new Date('2026-09-21T02:00:00.000Z');
@@ -81,7 +81,7 @@ describe('runCitationScan', () => {
       expect.objectContaining({ where: { storeId: 'store-1', runAt: { gte: runStartedAt } } })
     );
     expect(p.query).toHaveBeenCalledTimes(2);
-    expect(p.query.mock.calls.map(c => c[1])).toEqual(['best honey in kuwait', 'افضل تمر']);
+    expect(p.query.mock.calls.map(c => c[1])).toEqual(['best honey in cairo', 'افضل تمر']);
     expect(mockCreate).toHaveBeenCalledTimes(2);
     expect(mockRecordUsage).toHaveBeenCalledTimes(2);
     // The resumed pair still counts, so the run's totals are unchanged.

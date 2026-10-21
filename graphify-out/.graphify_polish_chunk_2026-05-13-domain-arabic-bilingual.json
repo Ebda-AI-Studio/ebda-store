@@ -6,7 +6,7 @@
       "type": "pattern",
       "summary": "Merchant attaches ONE A record (@→76.76.21.21); the platform auto-attaches www at the Vercel project level. Avoids locked CNAME conflicts on GoDaddy/Namecheap-style registrars where www CNAME cannot be edited.",
       "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf/memory/feedback-merchant-domain-flow.md",
-      "tags": ["vercel", "custom-domain", "multi-tenant", "dns", "fwb"]
+      "tags": ["vercel", "custom-domain", "multi-tenant", "dns", "ebda"]
     },
     {
       "id": "vercel-domain-verified-vs-live",
@@ -14,7 +14,7 @@
       "type": "trap",
       "summary": "Vercel's verified:true means ownership link confirmed — independent of DNS. Live requires verified && !misconfigured. Showing a green badge on verified alone leaves customers hitting the registrar parking page.",
       "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf/memory/feedback-merchant-domain-flow.md",
-      "tags": ["vercel", "custom-domain", "trap", "fwb", "multi-tenant"]
+      "tags": ["vercel", "custom-domain", "trap", "ebda", "multi-tenant"]
     },
     {
       "id": "vercel-domain-www-auto-attach",
@@ -22,7 +22,7 @@
       "type": "rule",
       "summary": "When a merchant attaches an apex domain, the platform calls Vercel's domain API twice — once for the apex, once for the www variant — and soft-fails the www add. Never auto-attach www of a subdomain input (guard with parts.length===2).",
       "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf/memory/feedback-merchant-domain-flow.md",
-      "tags": ["vercel", "custom-domain", "fwb", "pattern", "rule"]
+      "tags": ["vercel", "custom-domain", "ebda", "pattern", "rule"]
     },
     {
       "id": "arabic-letter-spacing-shaping-trap",
@@ -30,7 +30,7 @@
       "type": "trap",
       "summary": "Non-zero CSS letter-spacing defeats the browser's Arabic shaping engine, rendering isolated glyph forms instead of connected script. Global :lang(ar) reset with letter-spacing:normal !important is the correct one-line fix — per-element patching of 78+ Tailwind tracking-[X] sites is impractical and fragile.",
       "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf/memory/feedback-arabic-letter-spacing-shaping.md",
-      "tags": ["arabic", "rtl", "css", "tailwind", "typography", "fwb", "kuwait-stack"]
+      "tags": ["arabic", "rtl", "css", "tailwind", "typography", "ebda", "egypt-stack"]
     },
     {
       "id": "arabic-lang-attr-prerequisite",
@@ -38,31 +38,31 @@
       "type": "rule",
       "summary": "The global :lang(ar) CSS reset only fires if <html lang='ar'> is actually set server-side. Requires cookie-based locale detection in layout.tsx (see locale-cookie-ssr). Without SSR wiring, the reset rule has nothing to match.",
       "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf/memory/feedback-arabic-letter-spacing-shaping.md",
-      "tags": ["arabic", "ssr", "nextjs", "css", "fwb", "locale"]
+      "tags": ["arabic", "ssr", "nextjs", "css", "ebda", "locale"]
     },
     {
-      "id": "fwb-bilingual-jsonb-editor-trap",
+      "id": "ebda-bilingual-jsonb-editor-trap",
       "label": "Bilingual JSONB Editor Parity Trap",
       "type": "trap",
       "summary": "When a JSONB column has a paired *Ar sibling (e.g. steps + stepsAr), the admin form must render and mutate both arrays in lockstep. AI bulk-sweep writes both sides; the storefront renders both correctly; but an EN-only editor leaves merchants unable to refine the AR content without SQL access.",
-      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-force-website-builder/memory/feedback-fwb-bilingual-jsonb-editor.md",
-      "tags": ["fwb", "bilingual", "jsonb", "admin", "prisma", "arabic", "editor"]
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-ebda-store/memory/feedback-ebda-bilingual-jsonb-editor.md",
+      "tags": ["ebda", "bilingual", "jsonb", "admin", "prisma", "arabic", "editor"]
     },
     {
-      "id": "fwb-bilingual-jsonb-align-recipe",
+      "id": "ebda-bilingual-jsonb-align-recipe",
       "label": "JSONB Bilingual Array Alignment Recipe",
       "type": "helper",
       "summary": "Four-step recipe for bilingual JSONB array editors: (1) initialize EMPTY_HOWTO with both arrays, (2) alignStepsAr() normalizes null/length-mismatched AR arrays on load, (3) add/remove step handlers mutate both arrays at the same index, (4) render side-by-side grid with lang=ar dir=rtl on the AR input.",
-      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-force-website-builder/memory/feedback-fwb-bilingual-jsonb-editor.md",
-      "tags": ["fwb", "bilingual", "jsonb", "react", "recipe", "admin"]
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-ebda-store/memory/feedback-ebda-bilingual-jsonb-editor.md",
+      "tags": ["ebda", "bilingual", "jsonb", "react", "recipe", "admin"]
     },
     {
-      "id": "fwb-bilingual-column-audit-rule",
+      "id": "ebda-bilingual-column-audit-rule",
       "label": "Bilingual Column Audit Rule on Schema Change",
       "type": "rule",
       "summary": "Any time a *Ar column is added to a Prisma schema, the admin form for that table MUST be audited to ensure it renders both the EN and AR sides. The storefront rendering the AR side correctly is not a proxy for admin parity — they are independent surfaces.",
-      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-force-website-builder/memory/feedback-fwb-bilingual-jsonb-editor.md",
-      "tags": ["fwb", "bilingual", "prisma", "admin", "rule", "audit"]
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-ebda-store/memory/feedback-ebda-bilingual-jsonb-editor.md",
+      "tags": ["ebda", "bilingual", "prisma", "admin", "rule", "audit"]
     }
   ],
   "edges": [
@@ -78,7 +78,7 @@
     },
     {
       "from": "vercel-domain-verified-vs-live",
-      "to": "fwb-content-visibility-split-trap",
+      "to": "ebda-content-visibility-split-trap",
       "type": "related-to"
     },
     {
@@ -88,37 +88,37 @@
     },
     {
       "from": "arabic-lang-attr-prerequisite",
-      "to": "fwb-cookie-link-ssr-layout",
+      "to": "ebda-cookie-link-ssr-layout",
       "type": "requires"
     },
     {
-      "from": "fwb-bilingual-jsonb-editor-trap",
-      "to": "fwb-bilingual-jsonb-align-recipe",
+      "from": "ebda-bilingual-jsonb-editor-trap",
+      "to": "ebda-bilingual-jsonb-align-recipe",
       "type": "fixes"
     },
     {
-      "from": "fwb-bilingual-jsonb-editor-trap",
-      "to": "fwb-cms-and-tenant-control",
+      "from": "ebda-bilingual-jsonb-editor-trap",
+      "to": "ebda-cms-and-tenant-control",
       "type": "related-to"
     },
     {
-      "from": "fwb-bilingual-jsonb-editor-trap",
-      "to": "fwb-content-visibility-split-trap",
+      "from": "ebda-bilingual-jsonb-editor-trap",
+      "to": "ebda-content-visibility-split-trap",
       "type": "related-to"
     },
     {
-      "from": "fwb-bilingual-column-audit-rule",
-      "to": "fwb-bilingual-jsonb-editor-trap",
+      "from": "ebda-bilingual-column-audit-rule",
+      "to": "ebda-bilingual-jsonb-editor-trap",
       "type": "fixes"
     },
     {
-      "from": "fwb-bilingual-jsonb-align-recipe",
-      "to": "fwb-bilingual-column-audit-rule",
+      "from": "ebda-bilingual-jsonb-align-recipe",
+      "to": "ebda-bilingual-column-audit-rule",
       "type": "complements"
     },
     {
       "from": "arabic-letter-spacing-shaping-trap",
-      "to": "fwb-bilingual-jsonb-editor-trap",
+      "to": "ebda-bilingual-jsonb-editor-trap",
       "type": "related-to"
     }
   ]

@@ -23,7 +23,7 @@ _2026-09-25 · branch `feat/d2-email-campaigns` · feature key `email_campaigns`
 | Feature key `email_campaigns` | `packages/shared/src/features.ts`                    | registered, `hidden: true`, **in no `PLAN_BASELINE`** → resolves OFF for every store unless a super-admin `StoreFeature` override turns it on (`feature.service.ts#rowsToMap`). Only `super_admin` can write overrides (`feature.routes.ts`). |
 | Newsletter subscribers        | `NewsletterSubscriber` (`newsletter_subscribers`)    | the only explicit email-marketing opt-in in the schema. Email is lowercased on write (`public.routes.ts /newsletter/subscribe`), `isActive` + `unsubscribedAt` track consent. No double opt-in field exists.                                  |
 | Customer marketing consent    | —                                                    | **none for email.** `Order.smsOptIn` is SMS-only and per order. `Customer` has no consent column.                                                                                                                                             |
-| Sender resolution             | `services/email-sender.ts#resolveSender`             | verified store domain → `<local>@<domain>`, else platform `noreply@force-ai.co`. `ResendService.sendBrandedEmail` uses it.                                                                                                                    |
+| Sender resolution             | `services/email-sender.ts#resolveSender`             | verified store domain → `<local>@<domain>`, else platform `noreply@ebda.app`. `ResendService.sendBrandedEmail` uses it.                                                                                                                    |
 | Branded shell                 | `email.service.ts#renderBrandedShell`                | wraps content with the store header/footer.                                                                                                                                                                                                   |
 | Sanitizer                     | `lib/email-html-sanitizer.ts#sanitizeNewsletterHtml` | allowlist pass, no dependency. Reused, not replaced.                                                                                                                                                                                          |
 | Resend SDK 4.8.0              | `resend`                                             | supports `headers` (List-Unsubscribe) and `idempotencyKey` per send.                                                                                                                                                                          |
@@ -48,9 +48,9 @@ _2026-09-25 · branch `feat/d2-email-campaigns` · feature key `email_campaigns`
   `subscriber_id` and `customer_id`.
 - FKs: store → CASCADE (both), campaign → CASCADE, subscriber/customer → SET NULL (deleting a
   subscriber or customer must never delete send history nor be blocked by it).
-- RLS: ENABLE + FORCE, four `force_app`-path policies copying
+- RLS: ENABLE + FORCE, four the earlier app role path policies copying
   `20260911190000_merchant_api_keys` byte for byte.
-- The migration creates two empty tables, inserts nothing and schedules nothing. Its one data change is `UPDATE store_features SET enabled = false WHERE feature_key = 'email_campaigns'` — stale enabled rows (palora) from when the flag was hidden are reset to off (Ruling EC-10).
+- The migration creates two empty tables, inserts nothing and schedules nothing. Its one data change is `UPDATE store_features SET enabled = false WHERE feature_key = 'email_campaigns'` — stale enabled rows (demo-boutique) from when the flag was hidden are reset to off (Ruling EC-10).
 
 ### Audience (consent)
 
@@ -168,7 +168,7 @@ accepts the `List-Unsubscribe` headers as given and how Gmail renders its unsubs
 affordance; the Inngest function on a real Inngest server (the step shim replays memoized steps
 the way Inngest documents, but it is a shim).
 
-Stale override (Ruling EC-10): a read-only production check found palora with
+Stale override (Ruling EC-10): a read-only production check found demo-boutique with
 `email_campaigns` enabled = true, left over from when the flag was hidden. The migration resets
-every such row to false; verified on a throwaway Postgres 16 with a seeded palora-shaped row
+every such row to false; verified on a throwaway Postgres 16 with a seeded demo-boutique-shaped row
 (true → false, other features and other stores untouched), then rollback left it false.

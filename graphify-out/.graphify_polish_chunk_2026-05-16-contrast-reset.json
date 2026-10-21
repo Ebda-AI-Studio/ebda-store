@@ -7,84 +7,84 @@
       "label": "White-on-White Preview Bug Class",
       "type": "bug-class",
       "summary": "Near-white preview canvases (bg-background, bg-primary/[0.03]) cause light text colours to vanish — merchant sees nothing, assumes the setting didn't apply, and may commit bad styling. Same trap repeats on every preview surface that isn't explicitly contrast-hardened.",
-      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-force-website-builder/memory/feedback-fwb-preview-contrast-audit.md"
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-ebda-store/memory/feedback-ebda-preview-contrast-audit.md"
     },
     {
       "id": "neutral-mid-tone-canvas-rule",
       "label": "Neutral Mid-Tone Canvas Rule",
       "type": "rule",
       "summary": "Every admin preview surface must use bg-foreground/[0.05] with ring-1 ring-foreground/5 — never bg-background or bg-card — so that both light and dark text colour picks remain visible regardless of the active theme.",
-      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-force-website-builder/memory/feedback-fwb-preview-contrast-audit.md"
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-ebda-store/memory/feedback-ebda-preview-contrast-audit.md"
     },
     {
       "id": "foreground-tint-formula",
       "label": "Foreground-Tint Preview Canvas Formula",
       "type": "pattern",
       "summary": "bg-foreground/[0.05] resolves to ~5% opacity of the theme's dark foreground token, yielding a soft mid-gray on both light and dark themes. Paired with ring-1 ring-foreground/5 it visually signals 'this is a preview frame' while guaranteeing contrast for any merchant colour choice.",
-      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-force-website-builder/memory/feedback-fwb-preview-contrast-audit.md"
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-ebda-store/memory/feedback-ebda-preview-contrast-audit.md"
     },
     {
       "id": "self-contrast-aware-preset-rule",
       "label": "Self-Contrast-Aware Preset Rule",
       "type": "rule",
       "summary": "A preset that uses a light text colour (e.g. brand-muted) must still read on the neutral preview canvas — 'muted text on muted-bg' is a preset authoring error, not a canvas error. Presets carry the elegant feel through weight and tracking, not through low-contrast colour.",
-      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-force-website-builder/memory/feedback-fwb-preview-contrast-audit.md"
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-ebda-store/memory/feedback-ebda-preview-contrast-audit.md"
     },
     {
       "id": "light-dark-theme-detection-recipe",
       "label": "Light + Dark Theme Detection Recipe for Preview Audit",
       "type": "pattern",
       "summary": "Verification matrix: open each preview surface with (light theme + muted-text preset), (dark theme + foreground-text preset), and (brand-primary chip bg + white text). If any combination is invisible the canvas choice is wrong — fix the canvas, not the individual preset.",
-      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-force-website-builder/memory/feedback-fwb-preview-contrast-audit.md"
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-ebda-store/memory/feedback-ebda-preview-contrast-audit.md"
     },
     {
       "id": "preview-canvas-anti-patterns",
       "label": "Preview Canvas Anti-Patterns",
       "type": "bug-class",
       "summary": "Three anti-patterns to refuse: (1) bg-card / bg-background — clean but kills light text; (2) patching individual presets to use darker text — symptom fix that breaks new presets; (3) hardcoded #f5f5f5 — breaks dark-mode merchants with the inverse problem.",
-      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-force-website-builder/memory/feedback-fwb-preview-contrast-audit.md"
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-ebda-store/memory/feedback-ebda-preview-contrast-audit.md"
     },
     {
       "id": "global-reset-escape-hatch-pattern",
       "label": "Global Reset Escape-Hatch Pattern",
       "type": "pattern",
       "summary": "Any admin config form exposing >10 fields ships a destructive 'Reset all' button alongside Save. Confirms via locale-aware confirm(), writes a truly-blank state via the same PUT endpoint, and toasts the result. Turns experimentation from risky to safe — no support ticket needed to recover.",
-      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-force-website-builder/memory/feedback-fwb-admin-global-reset-escape-hatch.md"
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-ebda-store/memory/feedback-ebda-admin-global-reset-escape-hatch.md"
     },
     {
       "id": "destructive-styling-requirement",
       "label": "Destructive Button Styling Requirement",
       "type": "rule",
       "summary": "Reset buttons must use border-destructive/40 + text-destructive (red border/text) so they are visually distinct from the primary Save action. Placement must be near Save — not a separate danger zone at the bottom — so the merchant sees the visual warning in the same eye scan.",
-      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-force-website-builder/memory/feedback-fwb-admin-global-reset-escape-hatch.md"
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-ebda-store/memory/feedback-ebda-admin-global-reset-escape-hatch.md"
     },
     {
       "id": "blank-state-not-baked-defaults-rule",
       "label": "Blank State, Not Baked Defaults Rule",
       "type": "rule",
       "summary": "Reset must write a truly-empty state (e.g. { fonts: [], zones: {} }) — NOT a 'factory defaults' object. Baked-in defaults become stale when templates change and leave merchants stuck with someone else's old opinions. The storefront's inheritance from the active template is the real default.",
-      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-force-website-builder/memory/feedback-fwb-admin-global-reset-escape-hatch.md"
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-ebda-store/memory/feedback-ebda-admin-global-reset-escape-hatch.md"
     },
     {
       "id": "locale-aware-confirm-dialog-rule",
       "label": "Locale-Aware Confirm Dialog Rule",
       "type": "rule",
       "summary": "Destructive confirm() dialogs must render in the active UI locale — Arabic merchants must not see an English warning they may not parse. The bilingual confirm string must be derived from the same isAr flag used throughout the admin UI.",
-      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-force-website-builder/memory/feedback-fwb-admin-global-reset-escape-hatch.md"
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-ebda-store/memory/feedback-ebda-admin-global-reset-escape-hatch.md"
     },
     {
       "id": "safe-experimentation-loop-principle",
       "label": "Safe-Experimentation Loop Principle",
       "type": "concept",
       "summary": "Live preview (iterate without committing) + quick presets (known-good starting points) + global reset (one-click recovery) together form a closed loop: merchants can experiment freely knowing they can always get back to a clean slate. Any admin config UI missing one leg of this loop creates friction or risk.",
-      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-force-website-builder/memory/feedback-fwb-admin-global-reset-escape-hatch.md"
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-ebda-store/memory/feedback-ebda-admin-global-reset-escape-hatch.md"
     },
     {
       "id": "reset-same-endpoint-rule",
       "label": "Reset Uses Same Save Endpoint Rule",
       "type": "rule",
       "summary": "The Reset action must call the same PUT endpoint as Save with a blank payload — not a dedicated delete endpoint. This ensures reset goes through the same Zod validation, audit log, and idempotency guarantees as normal saves, preventing column corruption or audit gaps.",
-      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-force-website-builder/memory/feedback-fwb-admin-global-reset-escape-hatch.md"
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-ebda-store/memory/feedback-ebda-admin-global-reset-escape-hatch.md"
     }
   ],
   "edges": [
@@ -115,17 +115,17 @@
     },
     {
       "from": "neutral-mid-tone-canvas-rule",
-      "to": "fwb-admin-live-preview-pattern",
+      "to": "ebda-admin-live-preview-pattern",
       "relation": "enforces"
     },
     {
       "from": "self-contrast-aware-preset-rule",
-      "to": "fwb-multi-zone-quick-presets",
+      "to": "ebda-multi-zone-quick-presets",
       "relation": "enforces"
     },
     {
       "from": "foreground-tint-formula",
-      "to": "fwb-typography-zone-extensions",
+      "to": "ebda-typography-zone-extensions",
       "relation": "implements"
     },
     {
@@ -135,12 +135,12 @@
     },
     {
       "from": "safe-experimentation-loop-principle",
-      "to": "fwb-admin-live-preview-pattern",
+      "to": "ebda-admin-live-preview-pattern",
       "relation": "depends-on"
     },
     {
       "from": "safe-experimentation-loop-principle",
-      "to": "fwb-multi-zone-quick-presets",
+      "to": "ebda-multi-zone-quick-presets",
       "relation": "depends-on"
     },
     {

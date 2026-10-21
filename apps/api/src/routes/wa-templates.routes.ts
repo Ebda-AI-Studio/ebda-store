@@ -103,7 +103,7 @@ router.post(
     try {
       // Phase 7 smart generation: load the store's branding (slug + name)
       // so the templates get per-store names + per-store example body_text
-      // values instead of the canonical Force-AI defaults.
+      // values instead of the canonical Ebda AI Studio defaults.
       const store = await prisma.store.findUnique({
         where: { id: storeId },
         select: { slug: true, name: true, nameAr: true },
@@ -315,7 +315,7 @@ router.post(
 
       // Build the WBS submit payload. Use the per-store builder so the
       // template name + example body_text reflect the merchant's branding,
-      // not the Force-AI default. The DB stores body for display; submission
+      // not the Ebda AI Studio default. The DB stores body for display; submission
       // needs the full component structure with examples for Meta review.
       const storeForBranding = await prisma.store.findUnique({
         where: { id: storeId },

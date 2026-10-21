@@ -12,7 +12,7 @@ import Link from 'next/link';
 import { AcceptedPaymentBadges } from '../../components/AcceptedPaymentBadges';
 import type { FooterProps } from '../types';
 import { useLanguage } from '../../contexts/LanguageContext';
-import { PoweredByForce } from '../shared/PoweredByForce';
+import { PoweredByEbda } from '../shared/PoweredByEbda';
 import { FooterLegalRow } from '../shared/FooterLegalRow';
 import { FooterWhatsApp } from '../shared/FooterWhatsApp';
 import { footerRootPaint } from '../shared/footer-ink';
@@ -237,7 +237,7 @@ export default function DahabFooter({
           />
         </div>
         <div className={DAHAB_CONTAINER}>
-          <PoweredByForce hidden={hidePoweredBy} />
+          <PoweredByEbda hidden={hidePoweredBy} />
         </div>
       </div>
     </footer>

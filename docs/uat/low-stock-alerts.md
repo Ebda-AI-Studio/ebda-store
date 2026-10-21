@@ -80,7 +80,7 @@
 - [ ] Brand color applied to ribbon, button, links ✓
 - [ ] Table: product name / current stock (red) / threshold columns ✓
 - [ ] "Manage Inventory" CTA button links to `/inventory` in the admin ✓
-- [ ] Footer: store name, address, phone, powered by Force AI ✓
+- [ ] Footer: store name, address, phone, powered by Ebda AI Studio ✓
 - [ ] No raw HTML tags visible ✓
 - [ ] No XSS: a product named `<script>alert(1)</script>` renders as escaped text ✓
 
@@ -89,5 +89,5 @@
 ## Cron Schedule
 
 The cron fires at `0 */6 * * *` (every 6 hours: 00:00, 06:00, 12:00, 18:00 UTC).
-Kuwait time (UTC+3): 03:00, 09:00, 15:00, 21:00.
+Egypt time (UTC+3): 03:00, 09:00, 15:00, 21:00.
 Merchants can expect at most a 6-hour delay between a stock drop and the alert email, and only on the FIRST drop (subsequent runs are silent via sentinel dedup).

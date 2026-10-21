@@ -2,8 +2,8 @@
 
 **Status**: design approved, ready for implementation plan
 **Author**: Ahmad Sharaf + Claude (brainstorming session 2026-05-25)
-**Touches**: `force-website-builder` (FWB) + `whatsapp-broadcaster` (WBS)
-**First merchant**: Wady Aljuz (`wadyaljuz.com`)
+**Touches**: `ebda-store` (Ebda Store) + `whatsapp-broadcaster` (WBS)
+**First merchant**: Wady Aljuz (`demo-merchant.com`)
 **Reference UX**: "Platinum Fit" WhatsApp business commerce flow (Meta-recommended pattern)
 
 ---
@@ -35,18 +35,18 @@ See §11 (Future features) for everything we're deferring.
 
 3. User taps "Order Now"
    └─ Bot sends Interactive Catalog Message with View Catalog CTA
-   └─ Reference: Meta Commerce Catalog (synced from FWB store)
+   └─ Reference: Meta Commerce Catalog (synced from Ebda Store store)
 
 4. User browses + adds in Meta Catalog UI
    └─ User taps "Place order" inside catalog
    └─ Meta sends cart-back message to webhook
 
 5. Bot receives cart, summarizes:
-   "Subtotal: KWD 1.900"
+   "Subtotal: EGP 1.900"
    Interactive Buttons: [Checkout] [Add More] [Clear Cart]
 
 6. User taps Checkout
-   └─ Bot queries FWB /wa-bridge/customer-addresses?phone=...
+   └─ Bot queries Ebda Store /wa-bridge/customer-addresses?phone=...
    └─ If addresses exist → Interactive List of saved addresses
    └─ If none → text-collection sub-flow (Street, Block, Area)
    └─ New address saved via /wa-bridge/customer-addresses/create
@@ -55,11 +55,11 @@ See §11 (Future features) for everything we're deferring.
    └─ Bot sends Interactive Buttons: [💳 Online] [💵 Cash]
 
 8. User picks payment method
-   └─ Both → bot calls FWB /wa-bridge/cart/from-wa with {address, paymentMethod}
-   └─ FWB creates Order
+   └─ Both → bot calls Ebda Store /wa-bridge/cart/from-wa with {address, paymentMethod}
+   └─ Ebda Store creates Order
    └─ Cash → bot sends order summary + confirmation (state: completed)
-   └─ Online → bot sends payment link from FWB → state: checkout_sent →
-              FWB webhook fires on payment success → bot sends confirmation
+   └─ Online → bot sends payment link from Ebda Store → state: checkout_sent →
+              Ebda Store webhook fires on payment success → bot sends confirmation
 
 Alternative branches from step 2:
 - "Chat with Agent" → state: agent_chat → routes future inbound to existing
@@ -75,7 +75,7 @@ Alternative branches from step 2:
 ### 4.1 Service decomposition
 
 ```
-┌────────────── FWB ──────────────┐         ┌────────────── WBS ──────────────┐
+┌────────────── Ebda Store ──────────────┐         ┌────────────── WBS ──────────────┐
 │                                  │         │                                  │
 │  Product/Customer/Order writes   │         │  WhatsApp webhook in            │
 │         │                        │         │         │                        │
@@ -136,13 +136,13 @@ order_summary               ← new (final pre-place confirmation)
         ├─ cash → completed
         └─ online → checkout_sent  ← existing, kept
                         │
-                        ▼ (FWB webhook on payment success)
+                        ▼ (Ebda Store webhook on payment success)
                     completed
 ```
 
 ### 4.3 Data model changes
 
-**FWB `packages/database/prisma/schema.prisma`**:
+**Ebda Store `packages/database/prisma/schema.prisma`**:
 
 ```prisma
 model Store {
@@ -183,7 +183,7 @@ model CustomerAddress {
 
 **WBS** (no schema change — `wa_carts` already has `context: Json` for transient state).
 
-### 4.4 New FWB endpoints (added to `apps/api/src/routes/wa-bridge.routes.ts`)
+### 4.4 New Ebda Store endpoints (added to `apps/api/src/routes/wa-bridge.routes.ts`)
 
 | Endpoint                                            | Purpose                                            |
 | --------------------------------------------------- | -------------------------------------------------- |
@@ -191,7 +191,7 @@ model CustomerAddress {
 | `POST /wa-bridge/customer-addresses`                | Create address for customer + return it            |
 | `GET /wa-bridge/store/service-menu?storeId=`        | Get this merchant's `bot_service_menu` JSON        |
 | `GET /wa-bridge/store/meta-catalog-config?storeId=` | Get `meta_catalog_id` + `meta_business_id`         |
-| `POST /wa-bridge/store/meta-catalog-config`         | Set the IDs (called from FWB admin save)           |
+| `POST /wa-bridge/store/meta-catalog-config`         | Set the IDs (called from Ebda Store admin save)           |
 
 ### 4.5 New WBS services
 
@@ -203,7 +203,7 @@ model CustomerAddress {
 
 ### 4.6 New WBS Inngest webhook receiver
 
-FWB fires `product.synced.requested` events; WBS exposes `/internal/inngest-receiver` endpoint that calls `metaCatalogService.syncProduct`. Authenticated via shared secret.
+Ebda Store fires `product.synced.requested` events; WBS exposes `/internal/inngest-receiver` endpoint that calls `metaCatalogService.syncProduct`. Authenticated via shared secret.
 
 ## 5. Performance (p50 / p95 budgets)
 
@@ -214,7 +214,7 @@ FWB fires `product.synced.requested` events; WBS exposes `/internal/inngest-rece
 | Step                                               | p50   | p95  | Hard ceiling |
 | -------------------------------------------------- | ----- | ---- | ------------ |
 | Webhook inbound → bot reply (no DB write)          | 500ms | 1s   | 2s           |
-| Webhook inbound → bot reply (with FWB bridge call) | 800ms | 2s   | 3s           |
+| Webhook inbound → bot reply (with Ebda Store bridge call) | 800ms | 2s   | 3s           |
 | Catalog open (catalog_message send)                | 600ms | 1.2s | 2s           |
 | Cart received → next message                       | 1s    | 2.5s | 4s           |
 | Order finalization (cart/from-wa write)            | 1.5s  | 3s   | 5s           |
@@ -231,22 +231,22 @@ Before any feature work, instrument the existing flow:
    - Meta send start → ack
 2. **Run a real test** on the WBS-Wady Aljuz stack with verbose logging
 3. **Identify top-3 contributors** to current 15s p95:
-   - Suspected: FWB API cold start on Railway free tier (5-10s)
+   - Suspected: Ebda Store API cold start on Railway free tier (5-10s)
    - Suspected: Neon DB cold start (compute pause, 2-5s)
    - Suspected: Sequential bridge calls that could parallelize
    - Suspected: BullMQ queue lag between webhook receipt and processing
 4. **Document findings** in `docs/uat/whatsapp-bot-latency-baseline.md`
 5. **Quick wins** (apply BEFORE Phase A):
-   - Keepalive ping every 4 min to FWB `/health` + Neon (prevent cold start)
+   - Keepalive ping every 4 min to Ebda Store `/health` + Neon (prevent cold start)
    - Parallelize independent bridge calls with `Promise.all`
    - Increase Railway service min instances if free-tier sleep is the cause
    - Move Meta API calls to fire-and-forget where possible (cart-back side-effects)
 
 ### 5.3 Design-time latency optimizations
 
-- **Catalog hosted at Meta**: zero round-trip from bot to FWB during browse — Meta serves the catalog UI from their CDN. The user's "View catalog" tap shows the menu instantly. Only the catalog SYNC (background, async) hits FWB.
+- **Catalog hosted at Meta**: zero round-trip from bot to Ebda Store during browse — Meta serves the catalog UI from their CDN. The user's "View catalog" tap shows the menu instantly. Only the catalog SYNC (background, async) hits Ebda Store.
 - **Sticky language**: skip the language picker entirely on second+ conversation within 30 days (read `Customer.preferred_locale`).
-- **Pre-warmed FWB**: keepalive ping → no cold start on the bridge calls.
+- **Pre-warmed Ebda Store**: keepalive ping → no cold start on the bridge calls.
 - **Redis cache** for `Store.bot_service_menu` (already exists in WBS, TTL 5 min, invalidated on save).
 - **Single bridge call per state transition**: collect all needed data in one `/wa-bridge/<endpoint>` shot; don't make 3 sequential calls.
 - **Inngest events for non-blocking work**: analytics logging, customer last-seen update, etc. fire-and-forget via Inngest, NOT inline.
@@ -254,7 +254,7 @@ Before any feature work, instrument the existing flow:
 ## 6. Migration plan
 
 - New `Store.bot_mode` enum defaults to `legacy_chat` on every existing store. **No automatic cutover.**
-- New `bot_mode` admin UI in FWB: a single dropdown on Store → WhatsApp Settings tab.
+- New `bot_mode` admin UI in Ebda Store: a single dropdown on Store → WhatsApp Settings tab.
 - Wady Aljuz manually flipped to `native_catalog_with_gemini_agent` only AFTER:
   - Phase A-D shipped
   - Meta Commerce Catalog set up + approved (Meta-side, 24-48h)
@@ -264,11 +264,11 @@ Before any feature work, instrument the existing flow:
 
 ## 7. Testing
 
-Per the [Force AI 5-layer testing standard](file:///Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf/memory/feedback-force-ai-ci-cd-standard.md):
+Per the [Ebda AI Studio 5-layer testing standard](file:///Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf/memory/feedback-ebda-ci-cd-standard.md):
 
 - **Unit**: state machine transitions (every state → every valid next-state), `wa-interactive.js` builders (output validation), `metaCatalogService.js` mocked Meta responses
-- **Integration**: full state machine drive (mock webhook inbound → assert correct outbound message + state transition); FWB `/wa-bridge/customer-addresses` endpoint roundtrip
-- **E2E**: Playwright not applicable (no UI). Instead, **a "live" smoke** against a Force-Media-owned test WhatsApp number that walks the full flow daily via cron.
+- **Integration**: full state machine drive (mock webhook inbound → assert correct outbound message + state transition); Ebda Store `/wa-bridge/customer-addresses` endpoint roundtrip
+- **E2E**: Playwright not applicable (no UI). Instead, **a "live" smoke** against a Ebda-owned test WhatsApp number that walks the full flow daily via cron.
 - **Load**: k6 webhook-burst (100 concurrent inbound → < 5s p95 outbound)
 - **UAT**: `docs/uat/whatsapp-native-catalog-bot.md` with golden path + 6 edge cases (no saved address, Online fails, language re-pick, Agent → back to menu, etc.)
 
@@ -277,9 +277,9 @@ Per the [Force AI 5-layer testing standard](file:///Users/ahmadsharaf/.claude/pr
 | Failure                                    | Detection                                                 | Behavior                                                                                                                          |
 | ------------------------------------------ | --------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
 | Meta Catalog API down                      | metaCatalogService 5xx                                    | bot replies "Catalog temporarily unavailable, please try in a few min" + offers Agent path                                        |
-| FWB /wa-bridge/\* down                     | timeout >3s                                               | bot replies "I'm having trouble loading your store, please try again" + Telegram alert to merchant                                |
-| Cart received but order create fails       | FWB returns error                                         | bot keeps cart in session, replies "There was a problem placing your order. Please tap Checkout again." + Sentry alert            |
-| Payment URL never returned to bot (Online) | timer in `checkout_sent`, ping FWB every 5 min for 30 min | if order in `paid` state → send confirmation; else expire to `failed` with "We couldn't confirm payment" + agent escalation offer |
+| Ebda Store /wa-bridge/\* down                     | timeout >3s                                               | bot replies "I'm having trouble loading your store, please try again" + Telegram alert to merchant                                |
+| Cart received but order create fails       | Ebda Store returns error                                         | bot keeps cart in session, replies "There was a problem placing your order. Please tap Checkout again." + Sentry alert            |
+| Payment URL never returned to bot (Online) | timer in `checkout_sent`, ping Ebda Store every 5 min for 30 min | if order in `paid` state → send confirmation; else expire to `failed` with "We couldn't confirm payment" + agent escalation offer |
 | User types free-form text mid-flow         | state machine doesn't match                               | reply with bilingual "Please use the buttons below" + re-send current state's interactive                                         |
 | User in `agent_chat` types `/menu`         | command match                                             | exit to `awaiting_service`                                                                                                        |
 | Session TTL hit (60 min default)           | `wa-cart-expiry` cron (existing)                          | mark `expired`, bot replies fresh greeting on next inbound                                                                        |
@@ -298,7 +298,7 @@ Working assumption: one engineer (me + subagents), no parallel work.
 | Phase             | Days       | Description                                                                      |
 | ----------------- | ---------- | -------------------------------------------------------------------------------- |
 | Phase 0           | 0.5        | Latency diagnosis + quick wins                                                   |
-| Phase A           | 1.5        | Catalog sync (Inngest events FWB + metaCatalogService WBS + per-merchant config) |
+| Phase A           | 1.5        | Catalog sync (Inngest events Ebda Store + metaCatalogService WBS + per-merchant config) |
 | Phase B           | 1          | State machine extension + interactive message builders                           |
 | Phase C           | 1.5        | Native Catalog send + cart receive + address book + payment                      |
 | Phase D           | 1          | Service menu config + Locations & Hours + Chat with Agent routing + admin UI     |
@@ -311,7 +311,7 @@ To be tracked here so we don't forget:
 
 ### 11.1 Subscription Boxes flow
 
-Real subscription product type in FWB + recurring-billing handler + bot flow for browse + subscribe. Currently `subscription_replied` is a terminal "coming soon" reply.
+Real subscription product type in Ebda Store + recurring-billing handler + bot flow for browse + subscribe. Currently `subscription_replied` is a terminal "coming soon" reply.
 
 ### 11.2 Agent handoff to live merchant inbox
 
@@ -323,7 +323,7 @@ The 5-phase bot supports voice transcription (Phase 3 multimodal). Bring that in
 
 ### 11.4 Order tracking + status via bot
 
-`/track <order-id>` command OR Services menu addition: "Track an Order" → list user's recent orders → tap → status updates. Pulls from FWB `Order.status` history.
+`/track <order-id>` command OR Services menu addition: "Track an Order" → list user's recent orders → tap → status updates. Pulls from Ebda Store `Order.status` history.
 
 ### 11.5 Per-merchant catalog image policy
 
@@ -331,15 +331,15 @@ Some merchants want WhatsApp catalog images square 1:1 (Meta default), others wa
 
 ### 11.6 Loyalty + promotions in-chat
 
-When user opens a cart, show "Use 50 points for KWD 0.500 off" inline. Requires FWB loyalty module (not built yet).
+When user opens a cart, show "Use 50 points for EGP 0.500 off" inline. Requires Ebda Store loyalty module (not built yet).
 
 ### 11.7 Multi-language beyond EN/AR
 
-Spanish, French, etc. for non-Kuwait merchants. Current locale is binary; add `Store.supported_locales: string[]` and dynamic language picker.
+Spanish, French, etc. for non-Egypt merchants. Current locale is binary; add `Store.supported_locales: string[]` and dynamic language picker.
 
 ### 11.8 Bot analytics dashboard
 
-Per-merchant funnel: greeting sent → language picked → service tapped → catalog opened → cart placed → order created. Already capturing via `botAnalytics`; need FWB admin dashboard to surface.
+Per-merchant funnel: greeting sent → language picked → service tapped → catalog opened → cart placed → order created. Already capturing via `botAnalytics`; need Ebda Store admin dashboard to surface.
 
 ### 11.9 Re-engagement flow
 
@@ -351,7 +351,7 @@ When Meta releases new interactive message types (flows, forms, etc.), abstract 
 
 ### 11.11 A/B test framework
 
-Per-store: test which service menu layout converts best (2 button vs list vs catalog-first). Pipe results to FWB analytics.
+Per-store: test which service menu layout converts best (2 button vs list vs catalog-first). Pipe results to Ebda Store analytics.
 
 ### 11.12 Group chat support
 
@@ -376,6 +376,6 @@ Currently 1:1 only. Some merchants run WhatsApp Group orders. Out of scope for v
 - Native Catalog (not in-chat lists)
 - Gemini kept for Agent path
 - Real-time product sync (not batch)
-- FWB customer record for addresses (not separate WBS store)
+- Ebda Store customer record for addresses (not separate WBS store)
 - All 4 service menu items, configurable per merchant
 - Wady Aljuz first

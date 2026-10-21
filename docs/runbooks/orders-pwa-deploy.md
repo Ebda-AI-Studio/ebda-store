@@ -1,7 +1,7 @@
 # Orders PWA — Deploy + Domain Runbook
 
 > **SUPERSEDED (2026-07).** The Orders PWA now deploys as the Cloudflare Worker
-> `ebda-orders` (`orders.force-ai.co`) via `cf-deploy.yml` — the same
+> `ebda-orders` (`orders.ebda.app`) via `cf-deploy.yml` — the same
 > GitHub Actions pipeline that builds `apps/web` and `apps/admin` (see
 > `docs/DEPLOYMENT.md` and `docs/migration/cloudflare-ci-deploy.md`). The Vercel
 > project this runbook describes creating is decommissioned; the steps below are
@@ -9,8 +9,8 @@
 
 The Orders PWA (`apps/orders`, `@ebda/orders`) is a focused, installable
 order-management app for store staff. It deploys to its **own Vercel project**
-on the domain **`orders.forcemediakw.com`** — separate from the admin
-(`app.forcemediakw.com`) and storefront (`wadyaljuz.com`) projects.
+on the domain **`orders.ebda.app`** — separate from the admin
+(`store.ebda.app`) and storefront (`demo-merchant.com`) projects.
 
 It is an internal staff tool: every route is `noindex` (next.config.js headers +
 `vercel.json` `X-Robots-Tag`).
@@ -20,7 +20,7 @@ It is an internal staff tool: every route is `noindex` (next.config.js headers +
 Mirror the `force-admin` / `force-web` project setup:
 
 1. Vercel dashboard → **Add New… → Project** → import the
-   `ForceAI-KW/force-website-builder` repo.
+   `Whisky-11/ebda-store` repo.
 2. **Project name:** `force-orders`.
 3. **Root Directory:** `apps/orders` (so Vercel builds only this app).
    Vercel auto-detects Next.js + the npm-workspaces monorepo and installs from
@@ -43,16 +43,16 @@ Set in Vercel → `force-orders` → Settings → Environment Variables:
 | Var                                   | Value                                        | Notes                                                                                  |
 | ------------------------------------- | -------------------------------------------- | -------------------------------------------------------------------------------------- |
 | `NEXT_PUBLIC_API_URL`                 | `https://api-production-c058.up.railway.app` | Same Railway API the admin/web use. No `/api/v1` suffix — the app appends it.          |
-| `NEXT_PUBLIC_ONESIGNAL_ORDERS_APP_ID` | the Orders OneSignal app id                  | Public app id for the SEPARATE OneSignal app whose origin = `orders.forcemediakw.com`. |
+| `NEXT_PUBLIC_ONESIGNAL_ORDERS_APP_ID` | the Orders OneSignal app id                  | Public app id for the SEPARATE OneSignal app whose origin = `orders.ebda.app`. |
 
 The Orders OneSignal **REST API key** (`ONESIGNAL_ORDERS_REST_API_KEY`) and the
 matching `ONESIGNAL_ORDERS_APP_ID` live ONLY on the Railway API — the orders PWA
 never sees the REST key. OneSignal locks one app per origin, so this is a
-DISTINCT OneSignal app from the admin (`app.forcemediakw.com`) and storefront
-(`store.forcemediakw.com`) ones; create it with `orders.forcemediakw.com` as the
+DISTINCT OneSignal app from the admin (`store.ebda.app`) and storefront
+(`store.ebda.app`) ones; create it with `orders.ebda.app` as the
 site URL.
 
-Also set **`ORDERS_URL=https://orders.forcemediakw.com`** on the Railway API —
+Also set **`ORDERS_URL=https://orders.ebda.app`** on the Railway API —
 it's the base for the push deep-link (`${ORDERS_URL}/orders/:id?store=:storeId`).
 It defaults to `http://localhost:3002` (the orders dev port), so if it's unset
 in production the push still arrives but its tap-through link points at
@@ -69,20 +69,20 @@ unset.
 > mirroring the working admin flow. `NEXT_PUBLIC_VAPID_PUBLIC_KEY` is no longer
 > used by this app.
 
-## 3. Attach the domain `orders.forcemediakw.com`
+## 3. Attach the domain `orders.ebda.app`
 
 1. Vercel → `force-orders` → Settings → **Domains** → Add
-   `orders.forcemediakw.com`.
-2. Vercel shows a DNS target. In the `forcemediakw.com` DNS provider, add the
+   `orders.ebda.app`.
+2. Vercel shows a DNS target. In the `ebda.app` DNS provider, add the
    record Vercel asks for (typically a **CNAME** `orders → cname.vercel-dns.com`,
    or an A/ALIAS if the apex provider requires it).
 3. Wait for DNS propagation + Vercel's automatic TLS cert issuance (Let's
    Encrypt). Status flips to **Valid Configuration** when done.
-4. Set `orders.forcemediakw.com` as the **Production** domain for the project.
+4. Set `orders.ebda.app` as the **Production** domain for the project.
 
 ## 4. Verify after first deploy
 
-- Open `https://orders.forcemediakw.com` → login screen renders.
+- Open `https://orders.ebda.app` → login screen renders.
 - Sign in as a store-staff user → orders list loads.
 - Install the PWA (Android/desktop Chrome: install banner; iOS: Share → Add to
   Home Screen).
@@ -100,8 +100,8 @@ unset.
 
 - **Stack:** OneSignal Web SDK (`react-onesignal` v3.5.1), mirroring the admin
   flow. OneSignal locks each app to one origin, so the orders PWA uses its OWN
-  OneSignal app (origin `orders.forcemediakw.com`) — distinct from the admin
-  (`app.forcemediakw.com`) and storefront (`store.forcemediakw.com`) apps, so
+  OneSignal app (origin `orders.ebda.app`) — distinct from the admin
+  (`store.ebda.app`) and storefront (`store.ebda.app`) apps, so
   the three never double-send.
 - **Init:** `apps/orders/src/components/OneSignalInit.tsx` inits the SDK
   post-auth with the Orders app id + the static `/OneSignalSDKWorker.js`. It

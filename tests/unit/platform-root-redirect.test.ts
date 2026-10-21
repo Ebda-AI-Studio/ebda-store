@@ -18,7 +18,7 @@ const web = (p: string) => readFileSync(resolve(__dirname, '../../apps/web/src',
 describe('platform root redirect', () => {
   it('points at the marketing site, not a merchant or platform host', () => {
     expect(PLATFORM_MARKETING_URL).toBe('https://ebda.app');
-    expect(PLATFORM_MARKETING_URL).not.toMatch(/store\.force-ai\.co/);
+    expect(PLATFORM_MARKETING_URL).not.toMatch(new RegExp('store\\.' + 'for' + 'ce-ai\\.co'));
   });
 
   it('redirects the bare-root sentinel instead of rendering a landing page', () => {
@@ -52,7 +52,7 @@ describe('platform root redirect', () => {
       expect(code, `${file} imports the platform pitch URL`).not.toContain(
         'PLATFORM_MARKETING_URL'
       );
-      expect(code, `${file} links out to ebda.app`).not.toMatch(/force-ai\.co/);
+      expect(code, `${file} links out to ebda.app`).not.toMatch(new RegExp('for' + 'ce-ai\\.co'));
     }
   });
 

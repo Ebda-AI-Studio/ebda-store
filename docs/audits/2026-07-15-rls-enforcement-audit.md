@@ -28,7 +28,7 @@ every prior sweep — a payment-settings router with zero RLS wiring of any
 kind, and a fire-and-forget affiliate-commission write that races its own
 transaction's commit and is a **live bug today, independent of the RLS
 cutover** — plus a confirmed policy typo that will silently break product-view
-tracking the moment `force_app` goes live.
+tracking the moment the earlier app role goes live.
 
 ---
 
@@ -45,7 +45,7 @@ migration since `20260702170000` creates a new table). **Two gaps found:**
   `grep -rn "bypass_rls.*=.*'" apps/api/src packages/database/src`: every
   call site (`packages/database/src/index.ts:295`, `store.service.ts:388`,
   `provisioning.service.ts:129`) sets `'true'`, never `'on'`. Under
-  `force_app`, INSERT/UPDATE on this table are **unconditionally denied**.
+  the earlier app role, INSERT/UPDATE on this table are **unconditionally denied**.
   The only write path, `apps/api/src/services/view-ingest.service.ts:99-114`,
   wraps the upsert in `withRlsBypass` and fail-open swallows the resulting
   42501 in a `catch` (`view-ingest.service.ts:109-114`) — product-view
@@ -375,12 +375,12 @@ sits inside these handlers — confirmed none does).
   config, no tenant meaning, documented.
 - Phase 1c CI proof job (`test-rls-force-app` in `.github/workflows/ci.yml`,
   `tests/integration/rls-force-app.test.ts`) genuinely authenticates as
-  `force_app` (non-bypass role) and exercises real cross-tenant denial —
+  the earlier app role (non-bypass role) and exercises real cross-tenant denial —
   **but only covers ~6 tables** (products, addresses, payments, return_items,
   system_settings, wishlist_items) out of ~90 RLS-governed tables. Not a
   finding on its own (matches the plan's "a sample of store-scoped tables"
   intent), but flagged as residual coverage risk: most of the schema has
-  never been proven under real `force_app` enforcement in CI.
+  never been proven under real the earlier app role enforcement in CI.
 - `withRlsBypass` mechanics (`packages/database/src/index.ts:290-308`) —
   correctly resets both `app.bypass_rls='true'` and `app.current_store_id=''`
   inside its own transaction, satisfying both policy generations.
@@ -397,7 +397,7 @@ storeId }` inside its bypass, matches prior audit's verified-safe call.
 | ------------ | ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Critical** | 0     | —                                                                                                                                                                                                                                                                                                                                                             |
 | **High**     | 5     | F1 (BYPASSRLS owner, still open) · `payment-settings.routes.ts` zero RLS wiring (new) · fire-and-forget affiliate-referral race (new, live today) · `product_daily_views` INSERT/UPDATE policy typo (breaks at cutover) · webhook `withRlsBypass(_tx=>)` no-op + non-unique `transactionId`/`invoiceId` (latent)                                              |
-| **Medium**   | 4     | Bulk-AI Inngest functions run bare RLS under stale comments (F4, still present) · force_app CI proof job covers only ~6/~90 tables · ~17 context-less routers + several service functions have zero RLS backstop by caller-coincidence, not structural guarantee · historical FORCE-array name-typo drift (already remediated, process lesson)                |
+| **Medium**   | 4     | Bulk-AI Inngest functions run bare RLS under stale comments (F4, still present) · the earlier app role CI proof job covers only ~6/~90 tables · ~17 context-less routers + several service functions have zero RLS backstop by caller-coincidence, not structural guarantee · historical FORCE-array name-typo drift (already remediated, process lesson)                |
 | **Low**      | 6     | `store_staff` missing UPDATE policy (unreachable) · `staff.routes.ts` cross-tenant staff-email side-channel · `warehouse.service.ts` stale bypass docstring · `AuthService.eraseAccount` no RLS wrap (safe today) · `ALLOW_BYPASSRLS_ROLE` undocumented in `docs/ENVIRONMENT.md` · `docs/DB-BACKUP-RESTORE.md` references nonexistent `npm run db:rls` script |
 
 ## Ranked top findings
@@ -406,11 +406,11 @@ storeId }` inside its bypass, matches prior audit's verified-safe call.
 | --- | -------- | ------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
 | 1   | High     | CONFIRMED (carried, still true) | Prod connects as BYPASSRLS `neondb_owner`; every RLS policy inert; isolation is 100% app-layer today                                                                                                                                                       | `apps/api/src/index.ts:438-480`                                                            |
 | 2   | High     | CONFIRMED, novel                | `payment-settings.routes.ts` never sets RLS context anywhere — router-level or per-callsite — for `PaymentConfig` (holds encrypted secrets); missed by the entire F2 remediation + regression test                                                         | `apps/api/src/routes/payment-settings.routes.ts`; `routes/index.ts:75`                     |
-| 3   | High     | CONFIRMED, novel, live today    | Fire-and-forget `affiliateService.linkOrderToReferral` races the per-request tenant tx's commit-on-`res.finish`; silent commission-attribution loss, no reconciliation sweep — independent of RLS/`force_app` status                                       | `apps/api/src/services/order.service.ts:730-735`; `affiliate.service.ts:437-461`           |
-| 4   | High     | CONFIRMED                       | `product_daily_views` INSERT/UPDATE RLS policies check `bypass_rls='on'` (app only ever sets `'true'`) with no store fallback; never `FORCE`'d; will silently kill view-tracking at `force_app` cutover (fail-open `catch`)                                | `20260622100000_product_daily_views/migration.sql:57-70`; `view-ingest.service.ts:99-114`  |
+| 3   | High     | CONFIRMED, novel, live today    | Fire-and-forget `affiliateService.linkOrderToReferral` races the per-request tenant tx's commit-on-`res.finish`; silent commission-attribution loss, no reconciliation sweep — independent of RLS/the earlier app role status                                       | `apps/api/src/services/order.service.ts:730-735`; `affiliate.service.ts:437-461`           |
+| 4   | High     | CONFIRMED                       | `product_daily_views` INSERT/UPDATE RLS policies check `bypass_rls='on'` (app only ever sets `'true'`) with no store fallback; never `FORCE`'d; will silently kill view-tracking at the earlier app role cutover (fail-open `catch`)                                | `20260622100000_product_daily_views/migration.sql:57-70`; `view-ingest.service.ts:99-114`  |
 | 5   | High     | CONFIRMED, latent               | `webhook.routes.ts`/`payment-webhook-process.ts` `withRlsBypass(_tx=>...)` discards `tx` (no-op wrapper); relies on fail-open RLS + non-unique `transactionId`/`invoiceId` `findFirst` with no `orderBy` — theoretical cross-tenant payment mis-resolution | `webhook.routes.ts:305`; `payment-webhook-process.ts:173`; `payment.factory.ts:854-863`    |
 | 6   | Medium   | CONFIRMED (carried, still true) | 8 bulk-AI Inngest functions run with bare RLS context under stale "end runInTenantContext" comments                                                                                                                                                        | `lib/inngest/functions/bulk-ai-*.ts` (verified `bulk-ai-translate.ts:534` still stale)     |
-| 7   | Medium   | CONFIRMED                       | `force_app` CI proof job exercises only ~6 of ~90 RLS-governed tables — most of the schema has never been proven under real RLS enforcement                                                                                                                | `.github/workflows/ci.yml` `test-rls-force-app`; `tests/integration/rls-force-app.test.ts` |
+| 7   | Medium   | CONFIRMED                       | the earlier app role CI proof job exercises only ~6 of ~90 RLS-governed tables — most of the schema has never been proven under real RLS enforcement                                                                                                                | `.github/workflows/ci.yml` `test-rls-force-app`; `tests/integration/rls-force-app.test.ts` |
 | 8   | Medium   | CONFIRMED                       | ~17 "Phase 2 candidate" routers + several accounting-service functions have zero RLS defense-in-depth, safe only by every-current-caller coincidence                                                                                                       | `routes/index.ts` CONTEXT-LESS comments; `account.service.ts`, `purchase-order.service.ts` |
 | 9   | Medium   | CONFIRMED, remediated           | `20260530000000` FORCE-array had 4 wrong table names → 3-week ENABLE-not-FORCE window, self-caught by `20260609000000`; no CI check would catch a repeat                                                                                                   | `20260530000000_force_rls_enforcement/migration.sql:23-32`                                 |
 | 10  | Low      | CONFIRMED                       | `store_staff` has no UPDATE policy (unreachable — no code calls `.update()` on it)                                                                                                                                                                         | `20260615010000`/`20260616210000`/`20260621060000`                                         |
@@ -424,5 +424,5 @@ command found to be _always_ silently broken (item 3, the closest candidate,
 is a race that can lose, not a guaranteed failure). Items 1-5 (High) should
 be closed as a set: 2-5 are cheap, surgical, mechanical fixes (route wrap,
 `await`, policy string fix, `tx` threading + unique constraint); 1 is the
-tracked `force_app` cutover already gated behind items 2-9 per
+tracked the earlier app role cutover already gated behind items 2-9 per
 `docs/plans/2026-07-02-rls-cutover.md`.

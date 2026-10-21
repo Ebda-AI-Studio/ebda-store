@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { PoweredByForce } from '../shared/PoweredByForce';
+import { PoweredByEbda } from '../shared/PoweredByEbda';
 import { FooterLegalRow } from '../shared/FooterLegalRow';
 import { FooterWhatsApp } from '../shared/FooterWhatsApp';
 import { useState } from 'react';
@@ -406,7 +406,7 @@ export default function ElegantFooter({
           urlPrefix={urlPrefix}
           className="text-foreground/70"
         />
-        <PoweredByForce hidden={hidePoweredBy} />
+        <PoweredByEbda hidden={hidePoweredBy} />
       </div>
     </footer>
   );

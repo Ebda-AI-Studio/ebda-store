@@ -3,230 +3,230 @@
   "generated_at": "2026-05-16T00:00:00Z",
   "nodes": [
     {
-      "id": "fwb-16px-floor-main-content",
+      "id": "ebda-16px-floor-main-content",
       "label": "16px Floor on Main Reading Content",
       "type": "rule",
-      "summary": "productCardName, productCardPrice, and categoryCaption are locked to text-base (16px minimum) across all FWB themes. Below-16px breaks iOS Safari auto-zoom, cramps Arabic diacritics on mobile, and violates WCAG 1.4.4 readability.",
-      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-force-website-builder/memory/feedback-fwb-typography-size-table.md"
+      "summary": "productCardName, productCardPrice, and categoryCaption are locked to text-base (16px minimum) across all Ebda Store themes. Below-16px breaks iOS Safari auto-zoom, cramps Arabic diacritics on mobile, and violates WCAG 1.4.4 readability.",
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-ebda-store/memory/feedback-ebda-typography-size-table.md"
     },
     {
-      "id": "fwb-theme-identity-not-via-size",
+      "id": "ebda-theme-identity-not-via-size",
       "label": "Theme Identity Carried by Weight/Tracking/Family, Not Size",
       "type": "rule",
-      "summary": "No FWB theme may shrink main reading text below 16px to achieve a distinctive look. Identity differentiators are font-weight, letter-spacing, font-family, and border-radius — not size reduction.",
-      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-force-website-builder/memory/feedback-fwb-typography-size-table.md"
+      "summary": "No Ebda Store theme may shrink main reading text below 16px to achieve a distinctive look. Identity differentiators are font-weight, letter-spacing, font-family, and border-radius — not size reduction.",
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-ebda-store/memory/feedback-ebda-typography-size-table.md"
     },
     {
-      "id": "fwb-typography-size-table-location",
+      "id": "ebda-typography-size-table-location",
       "label": "design.md as Canonical Typography Size Table",
       "type": "architecture",
       "summary": "The repo-root design.md holds the authoritative per-zone fontSize table. Every pack-styles.ts token must match the corresponding row; any intentional deviation requires an inline comment with a justification.",
-      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-force-website-builder/memory/feedback-fwb-typography-size-table.md"
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-ebda-store/memory/feedback-ebda-typography-size-table.md"
     },
     {
-      "id": "fwb-per-theme-identity-carriers",
+      "id": "ebda-per-theme-identity-carriers",
       "label": "Per-Theme Typography Identity Carriers",
       "type": "pattern",
-      "summary": "Each of the five FWB themes (modern, classic, minimal, bold, elegant) differentiates via weight+tracking+family combinations: e.g. elegant = font-extralight + tracking-[0.22-0.32em] + hairline borders; bold = font-black uppercase + tracking-tight + brutalist borders. Size stays uniform.",
-      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-force-website-builder/memory/feedback-fwb-typography-size-table.md"
+      "summary": "Each of the five Ebda Store themes (modern, classic, minimal, bold, elegant) differentiates via weight+tracking+family combinations: e.g. elegant = font-extralight + tracking-[0.22-0.32em] + hairline borders; bold = font-black uppercase + tracking-tight + brutalist borders. Size stays uniform.",
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-ebda-store/memory/feedback-ebda-typography-size-table.md"
     },
     {
-      "id": "fwb-typography-audit-recipe",
+      "id": "ebda-typography-audit-recipe",
       "label": "pack-styles.ts Audit Recipe",
       "type": "pattern",
       "summary": "Before adding or modifying any theme pack, run grep -E 'text-(\\[11px\\]|xs|sm|base|lg|xl)' on pack-styles.ts and cross-check every hit against the design.md size table. Any divergence must have a code comment explaining the exception.",
-      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-force-website-builder/memory/feedback-fwb-typography-size-table.md"
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-ebda-store/memory/feedback-ebda-typography-size-table.md"
     },
     {
-      "id": "fwb-cta-seeall-standardized-14px",
+      "id": "ebda-cta-seeall-standardized-14px",
       "label": "CTA and seeAll Links Standardized at 14px",
       "type": "rule",
       "summary": "productCardCta and sectionSeeAll are fixed at text-sm (14px) across all five themes, resolving previous drift that ranged from text-xs (12px) to text-[11px] to text-sm depending on the theme.",
-      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-force-website-builder/memory/feedback-fwb-typography-size-table.md"
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-ebda-store/memory/feedback-ebda-typography-size-table.md"
     },
     {
-      "id": "fwb-typography-anti-patterns",
+      "id": "ebda-typography-anti-patterns",
       "label": "Typography Anti-Patterns (Size Drift)",
       "type": "bug-class",
       "summary": "Four anti-patterns: (1) new theme sets productCardName to text-sm 'for elegance'; (2) seeAll shrunk to text-xs as 'secondary'; (3) price bumped above text-base 'for prominence'; (4) editing pack-styles.ts without consulting design.md first. All cause accidental inter-theme drift.",
-      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-force-website-builder/memory/feedback-fwb-typography-size-table.md"
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-ebda-store/memory/feedback-ebda-typography-size-table.md"
     },
     {
-      "id": "fwb-context-aware-color-tokens",
+      "id": "ebda-context-aware-color-tokens",
       "label": "Context-Aware Brand Color Token Resolution",
       "type": "pattern",
       "summary": "resolveColorValue(v, context) auto-swaps surface tokens to their foreground pairs when context='text', preventing white-on-white or black-on-black. brand-muted as text → --muted-foreground; brand-foreground as background → --background.",
-      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-force-website-builder/memory/feedback-fwb-context-aware-color-tokens.md"
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-ebda-store/memory/feedback-ebda-context-aware-color-tokens.md"
     },
     {
-      "id": "fwb-semantic-surface-foreground-pair",
+      "id": "ebda-semantic-surface-foreground-pair",
       "label": "Semantic Surface/Foreground Token Pairing",
       "type": "concept",
       "summary": "Every design-system surface color (--muted, --primary, --secondary, --accent, --background) has a foreground counterpart (--muted-foreground, --primary-foreground, etc.). The context resolver bridges merchant intent ('brand-muted means gray text') vs literal CSS var ('--muted is the light-gray surface').",
-      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-force-website-builder/memory/feedback-fwb-context-aware-color-tokens.md"
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-ebda-store/memory/feedback-ebda-context-aware-color-tokens.md"
     },
     {
-      "id": "fwb-three-layer-lockstep",
+      "id": "ebda-three-layer-lockstep",
       "label": "Three-Layer Token Lock-Step (Emitter + Preview + Picker)",
       "type": "architecture",
       "summary": "Context-aware resolution must stay in sync across three callsites: (1) storefront CSS emitter in apps/web/src/app/layout.tsx, (2) admin live preview helper (cfgToInlineStyle / resolveColorForPreview), (3) admin color picker swatches. If any layer diverges, merchants see one color in the picker and a different one on the live storefront.",
-      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-force-website-builder/memory/feedback-fwb-context-aware-color-tokens.md"
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-ebda-store/memory/feedback-ebda-context-aware-color-tokens.md"
     },
     {
-      "id": "fwb-token-not-hex-storage",
+      "id": "ebda-token-not-hex-storage",
       "label": "Store Token String, Resolve at Render",
       "type": "rule",
       "summary": "Color fields must persist the semantic token string ('brand-muted') rather than the resolved hex value. This preserves the brand-link: when a merchant updates their brand color in Branding, every typography zone using a preset auto-updates without manual re-selection.",
-      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-force-website-builder/memory/feedback-fwb-context-aware-color-tokens.md"
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-ebda-store/memory/feedback-ebda-context-aware-color-tokens.md"
     },
     {
-      "id": "fwb-brand-link-preservation",
+      "id": "ebda-brand-link-preservation",
       "label": "Brand-Link Preservation Principle",
       "type": "concept",
       "summary": "Storing tokens instead of hex values means a single Branding page update cascades to every zone that uses a preset — section headings, product names, CTAs, decorations — without the merchant needing to touch each field individually.",
-      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-force-website-builder/memory/feedback-fwb-context-aware-color-tokens.md"
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-ebda-store/memory/feedback-ebda-context-aware-color-tokens.md"
     },
     {
-      "id": "fwb-color-token-anti-patterns",
+      "id": "ebda-color-token-anti-patterns",
       "label": "Context-Aware Token Anti-Patterns",
       "type": "bug-class",
       "summary": "Three anti-patterns: (1) new brand token added without auditing both text+background semantics; (2) new color-using field added without passing the context flag (silently defaults to 'background', breaks text fields); (3) resolved hex stored on save (breaks brand-link when merchant changes palette).",
-      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-force-website-builder/memory/feedback-fwb-context-aware-color-tokens.md"
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-ebda-store/memory/feedback-ebda-context-aware-color-tokens.md"
     },
     {
-      "id": "fwb-color-token-verification-recipe",
+      "id": "ebda-color-token-verification-recipe",
       "label": "Color Token Verification Recipe",
       "type": "pattern",
       "summary": "Four-step verification: pick surface token on text field → swatch shows muted-text color; pick on background field → swatch shows surface color; save+reload storefront → matches preview; change brand color in Branding → both fields auto-update. Any step failing points to a specific out-of-sync layer.",
-      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-force-website-builder/memory/feedback-fwb-context-aware-color-tokens.md"
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-ebda-store/memory/feedback-ebda-context-aware-color-tokens.md"
     },
     {
-      "id": "fwb-muted-foreground-auto-flip",
+      "id": "ebda-muted-foreground-auto-flip",
       "label": "brand-muted Text-Context Auto-Flip to --muted-foreground",
       "type": "feature",
       "summary": "When a merchant selects brand-muted in a text-color slot, the resolver returns hsl(var(--muted-foreground)) instead of hsl(var(--muted)). This is the canonical example of the surface→foreground bridge: the merchant says 'muted' and gets legible gray text, not invisible near-white.",
-      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-force-website-builder/memory/feedback-fwb-context-aware-color-tokens.md"
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-ebda-store/memory/feedback-ebda-context-aware-color-tokens.md"
     }
   ],
   "edges": [
     {
-      "from": "fwb-16px-floor-main-content",
-      "to": "fwb-typography-size-table-location",
+      "from": "ebda-16px-floor-main-content",
+      "to": "ebda-typography-size-table-location",
       "relation": "enforces"
     },
     {
-      "from": "fwb-theme-identity-not-via-size",
-      "to": "fwb-per-theme-identity-carriers",
+      "from": "ebda-theme-identity-not-via-size",
+      "to": "ebda-per-theme-identity-carriers",
       "relation": "implements"
     },
     {
-      "from": "fwb-theme-identity-not-via-size",
-      "to": "fwb-16px-floor-main-content",
+      "from": "ebda-theme-identity-not-via-size",
+      "to": "ebda-16px-floor-main-content",
       "relation": "depends-on"
     },
     {
-      "from": "fwb-typography-size-table-location",
-      "to": "fwb-design-md-source-of-truth",
+      "from": "ebda-typography-size-table-location",
+      "to": "ebda-design-md-source-of-truth",
       "relation": "implements"
     },
     {
-      "from": "fwb-typography-audit-recipe",
-      "to": "fwb-typography-size-table-location",
+      "from": "ebda-typography-audit-recipe",
+      "to": "ebda-typography-size-table-location",
       "relation": "enforces"
     },
     {
-      "from": "fwb-typography-audit-recipe",
-      "to": "fwb-theme-identity-audit",
+      "from": "ebda-typography-audit-recipe",
+      "to": "ebda-theme-identity-audit",
       "relation": "related"
     },
     {
-      "from": "fwb-typography-anti-patterns",
-      "to": "fwb-16px-floor-main-content",
+      "from": "ebda-typography-anti-patterns",
+      "to": "ebda-16px-floor-main-content",
       "relation": "mitigates"
     },
     {
-      "from": "fwb-typography-anti-patterns",
-      "to": "fwb-theme-identity-audit",
+      "from": "ebda-typography-anti-patterns",
+      "to": "ebda-theme-identity-audit",
       "relation": "related"
     },
     {
-      "from": "fwb-cta-seeall-standardized-14px",
-      "to": "fwb-typography-size-table-location",
+      "from": "ebda-cta-seeall-standardized-14px",
+      "to": "ebda-typography-size-table-location",
       "relation": "implements"
     },
     {
-      "from": "fwb-16px-floor-main-content",
+      "from": "ebda-16px-floor-main-content",
       "to": "mobile-form-text-base",
       "relation": "related"
     },
     {
-      "from": "fwb-context-aware-color-tokens",
-      "to": "fwb-semantic-surface-foreground-pair",
+      "from": "ebda-context-aware-color-tokens",
+      "to": "ebda-semantic-surface-foreground-pair",
       "relation": "implements"
     },
     {
-      "from": "fwb-context-aware-color-tokens",
-      "to": "fwb-three-layer-lockstep",
+      "from": "ebda-context-aware-color-tokens",
+      "to": "ebda-three-layer-lockstep",
       "relation": "depends-on"
     },
     {
-      "from": "fwb-three-layer-lockstep",
-      "to": "fwb-admin-live-preview-pattern",
+      "from": "ebda-three-layer-lockstep",
+      "to": "ebda-admin-live-preview-pattern",
       "relation": "implements"
     },
     {
-      "from": "fwb-token-not-hex-storage",
-      "to": "fwb-brand-link-preservation",
+      "from": "ebda-token-not-hex-storage",
+      "to": "ebda-brand-link-preservation",
       "relation": "implements"
     },
     {
-      "from": "fwb-token-not-hex-storage",
-      "to": "fwb-context-aware-color-tokens",
+      "from": "ebda-token-not-hex-storage",
+      "to": "ebda-context-aware-color-tokens",
       "relation": "enforces"
     },
     {
-      "from": "fwb-color-token-anti-patterns",
-      "to": "fwb-three-layer-lockstep",
+      "from": "ebda-color-token-anti-patterns",
+      "to": "ebda-three-layer-lockstep",
       "relation": "mitigates"
     },
     {
-      "from": "fwb-color-token-anti-patterns",
-      "to": "fwb-token-not-hex-storage",
+      "from": "ebda-color-token-anti-patterns",
+      "to": "ebda-token-not-hex-storage",
       "relation": "mitigates"
     },
     {
-      "from": "fwb-color-token-verification-recipe",
-      "to": "fwb-three-layer-lockstep",
+      "from": "ebda-color-token-verification-recipe",
+      "to": "ebda-three-layer-lockstep",
       "relation": "enforces"
     },
     {
-      "from": "fwb-color-token-verification-recipe",
-      "to": "fwb-preview-contrast-audit",
+      "from": "ebda-color-token-verification-recipe",
+      "to": "ebda-preview-contrast-audit",
       "relation": "related"
     },
     {
-      "from": "fwb-muted-foreground-auto-flip",
-      "to": "fwb-context-aware-color-tokens",
+      "from": "ebda-muted-foreground-auto-flip",
+      "to": "ebda-context-aware-color-tokens",
       "relation": "example-of"
     },
     {
-      "from": "fwb-muted-foreground-auto-flip",
-      "to": "fwb-semantic-surface-foreground-pair",
+      "from": "ebda-muted-foreground-auto-flip",
+      "to": "ebda-semantic-surface-foreground-pair",
       "relation": "example-of"
     },
     {
-      "from": "fwb-context-aware-color-tokens",
-      "to": "fwb-typography-zone-extensions",
+      "from": "ebda-context-aware-color-tokens",
+      "to": "ebda-typography-zone-extensions",
       "relation": "related"
     },
     {
-      "from": "fwb-color-token-verification-recipe",
-      "to": "fwb-admin-live-preview-pattern",
+      "from": "ebda-color-token-verification-recipe",
+      "to": "ebda-admin-live-preview-pattern",
       "relation": "related"
     },
     {
-      "from": "fwb-per-theme-identity-carriers",
-      "to": "fwb-theme-identity-audit",
+      "from": "ebda-per-theme-identity-carriers",
+      "to": "ebda-theme-identity-audit",
       "relation": "related"
     }
   ]

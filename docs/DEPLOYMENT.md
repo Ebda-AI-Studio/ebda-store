@@ -1,8 +1,8 @@
-# Force Website Builder - Production Deployment Guide
+# Ebda Store - Production Deployment Guide
 
 > **2026-05-22 update:** prior versions of this doc described a Cloudflare Pages + Supabase topology that was never the production state. The canonical production stack is below. The old doc misled incident responders during the 2026-05-22 audit (P1-7).
 >
-> **2026-07-05 update:** `apps/web`, `apps/admin`, and `apps/orders` have since fully MIGRATED off Vercel to **Cloudflare Workers** (OpenNext, deployed by GitHub Actions via `wrangler deploy` (Ebda: only the API workflow `.github/workflows/cf-api-deploy.yml` exists, manual `workflow_dispatch` on `main`; there is no `cf-deploy.yml` for web/admin/orders yet) — `ebda-web` / `ebda-admin` / `ebda-orders`, serving `store.force-ai.co` / `admin.force-ai.co` / `orders.force-ai.co`). The old Vercel projects (`force-admin`, `force-web`, `force-orders`) are decommissioned. Steps below that reference Vercel setup/rollback are kept for history where useful but no longer reflect where to actually deploy — see `docs/migration/cloudflare-ci-deploy.md` and `docs/migration/cloudflare-cutover-runbook.md` for the current procedure.
+> **2026-07-05 update:** `apps/web`, `apps/admin`, and `apps/orders` have since fully MIGRATED off Vercel to **Cloudflare Workers** (OpenNext, deployed by GitHub Actions via `wrangler deploy` (Ebda: only the API workflow `.github/workflows/cf-api-deploy.yml` exists, manual `workflow_dispatch` on `main`; there is no `cf-deploy.yml` for web/admin/orders yet) — `ebda-web` / `ebda-admin` / `ebda-orders`, serving `store.ebda.app` / `store.ebda.app` / `orders.ebda.app`). The old Vercel projects (`force-admin`, `force-web`, `force-orders`) are decommissioned. Steps below that reference Vercel setup/rollback are kept for history where useful but no longer reflect where to actually deploy — see `docs/migration/cloudflare-ci-deploy.md` and `docs/migration/cloudflare-cutover-runbook.md` for the current procedure.
 
 ## CI gate
 
@@ -29,12 +29,12 @@ To run the full gate manually: `bash scripts/safe-deploy.sh`
 │              CLOUDFLARE WORKERS (GitHub Actions, wrangler deploy)│
 │  ┌──────────────────────────┐  ┌──────────────────────────┐      │
 │  │ ebda-admin   │  │ ebda-web     │      │
-│  │  admin.force-ai.co       │  │  store.force-ai.co       │      │
+│  │  store.ebda.app       │  │  store.ebda.app       │      │
 │  │                          │  │  + per-tenant domains    │      │
-│  └──────────────────────────┘  │  (wadyaljuz.com, ...)    │      │
+│  └──────────────────────────┘  │  (demo-merchant.com, ...)    │      │
 │  ┌──────────────────────────┐  └──────────────────────────┘      │
 │  │ ebda-orders  │                                    │
-│  │  orders.force-ai.co      │                                    │
+│  │  orders.ebda.app      │                                    │
 │  └──────────────────────────┘                                    │
 └──────────────────────────────────────────────────────────────────┘
                                   │
@@ -43,7 +43,7 @@ To run the full gate manually: `bash scripts/safe-deploy.sh`
 │                      RAILWAY (~$10-20/mo)                        │
 │  ┌──────────────────────────────────────────────────────────┐    │
 │  │  Express.js API (Dockerfile.api, builder=DOCKERFILE)       │    │
-│  │  api.force-ai.co (old: store-api.forcemediakw.com)       │    │
+│  │  api.ebda.app (old: api.ebda.app)       │    │
 │  │  + Redis (railway internal :6379)                        │    │
 │  └──────────────────────────────────────────────────────────┘    │
 └──────────────────────────────────────────────────────────────────┘
@@ -76,7 +76,7 @@ Estimated Monthly Cost (current scale): ~$26/mo
 
 1. Click "New Project"
 2. Select "Deploy from GitHub repo"
-3. Choose `ForceAI-KW/force-website-builder`
+3. Choose `Whisky-11/ebda-store`
 4. Select the `main` branch
 
 ### 1.3 Configure Service
@@ -116,7 +116,7 @@ ADMIN_URL=https://admin.yourdomain.com
 # Payment (Tap)
 TAP_API_KEY=sk_live_xxx
 PAYMENT_TEST_MODE=false
-DEFAULT_CURRENCY=KWD
+DEFAULT_CURRENCY=EGP
 
 # Storage (R2)
 STORAGE_ENDPOINT=https://xxx.r2.cloudflarestorage.com
@@ -143,9 +143,9 @@ SMTP_FROM_EMAIL=noreply@yourdomain.com
 
 ## Step 2: Cloudflare Workers Setup (Web, Admin & Orders)
 
-> ⚠️ **NOTE (updated 2026-07-05):** Production storefront, admin, and orders PWA run on **Cloudflare Workers** (OpenNext), NOT Vercel. Worker names: `ebda-admin` (`admin.force-ai.co`), `ebda-web` (`store.force-ai.co` + per-tenant custom domains), `ebda-orders` (`orders.force-ai.co`). The Vercel projects that previously hosted these apps are decommissioned.
+> ⚠️ **NOTE (updated 2026-07-05):** Production storefront, admin, and orders PWA run on **Cloudflare Workers** (OpenNext), NOT Vercel. Worker names: `ebda-admin` (`store.ebda.app`), `ebda-web` (`store.ebda.app` + per-tenant custom domains), `ebda-orders` (`orders.ebda.app`). The Vercel projects that previously hosted these apps are decommissioned.
 
-**Ebda status (2026-10-07):** all four Workers deploy from GitHub Actions on `ubuntu-latest`, `environment: production`, `main` only. `cf-api-deploy.yml` (manual `workflow_dispatch`) deploys `ebda-api`; `cf-admin-deploy.yml`, `cf-web-deploy.yml` and `cf-orders-deploy.yml` deploy `ebda-admin` (`store.ebda.app`), `ebda-web` (every `<slug>.ebda.app` store) and `ebda-orders` (`orders.ebda.app`) on a push to `main` touching their app (or `packages/shared`, `packages/ui`, the lockfile, the CF scripts), or by `workflow_dispatch`. Each one: `npm ci` → route tests → `scripts/cf-setup-local.sh <app>` (routes from BRAND via `scripts/cf-routes.cjs`; web with `OPENNEXT_CACHE=true` on R2 bucket `ebda-web-isr-cache` + DO tag cache) → `scripts/cf-build.sh <app>` with the `NEXT_PUBLIC_*` build env → required Worker secrets check (web: `REVALIDATE_SECRET`) → `wrangler deploy` → POLL until `/_next/static/<BUILD_ID>/_buildManifest.js` (exists only in this build) is 200 and the probe page answers (admin `/signup` 200, orders `/login` 200, web an unknown store host 404). The first deploy of all three was run locally from the same build on 2026-10-07. The FWB `cf-deploy.yml` described below does not exist in this repo.
+**Ebda status (2026-10-07):** all four Workers deploy from GitHub Actions on `ubuntu-latest`, `environment: production`, `main` only. `cf-api-deploy.yml` (manual `workflow_dispatch`) deploys `ebda-api`; `cf-admin-deploy.yml`, `cf-web-deploy.yml` and `cf-orders-deploy.yml` deploy `ebda-admin` (`store.ebda.app`), `ebda-web` (every `<slug>.ebda.app` store) and `ebda-orders` (`orders.ebda.app`) on a push to `main` touching their app (or `packages/shared`, `packages/ui`, the lockfile, the CF scripts), or by `workflow_dispatch`. Each one: `npm ci` → route tests → `scripts/cf-setup-local.sh <app>` (routes from BRAND via `scripts/cf-routes.cjs`; web with `OPENNEXT_CACHE=true` on R2 bucket `ebda-web-isr-cache` + DO tag cache) → `scripts/cf-build.sh <app>` with the `NEXT_PUBLIC_*` build env → required Worker secrets check (web: `REVALIDATE_SECRET`) → `wrangler deploy` → POLL until `/_next/static/<BUILD_ID>/_buildManifest.js` (exists only in this build) is 200 and the probe page answers (admin `/signup` 200, orders `/login` 200, web an unknown store host 404). The first deploy of all three was run locally from the same build on 2026-10-07. The Ebda Store `cf-deploy.yml` described below does not exist in this repo.
 
 ### Deploy safety (Rulings DEPLOY-SAFETY-1..5, 2026-10-08)
 
@@ -169,7 +169,7 @@ Zone routes run BEFORE Workers custom domains, so the storefront's `*.ebda.app/*
 | `media.ebda.app`                     | R2 `ebda-media`              | R2 custom domain + a **Worker-less** `media.ebda.app/*` route (exclusion)                                         |
 | `<slug>.ebda.app`                    | `ebda-web`                   | `*.ebda.app/*` route + a proxied wildcard DNS record `*`                                                          |
 
-Any NEW subdomain served by something other than the storefront needs either its own Worker route or a Worker-less exclusion route (`POST /zones/<zone>/workers/routes {"pattern":"<host>/*"}` with no `script`) — otherwise the storefront answers it with store-not-found. Wildcard DNS: `A * 192.0.2.0 proxied` (originless; explicit records still win). The Cloudflare-for-SaaS `*/*` fallback route inherited from FWB is deliberately NOT used — it would also capture the marketing apex; merchant custom domains need it (or a dedicated fallback-origin host) when that feature ships (Ruling EBDA-DEPLOY-1).
+Any NEW subdomain served by something other than the storefront needs either its own Worker route or a Worker-less exclusion route (`POST /zones/<zone>/workers/routes {"pattern":"<host>/*"}` with no `script`) — otherwise the storefront answers it with store-not-found. Wildcard DNS: `A * 192.0.2.0 proxied` (originless; explicit records still win). The Cloudflare-for-SaaS `*/*` fallback route inherited from Ebda Store is deliberately NOT used — it would also capture the marketing apex; merchant custom domains need it (or a dedicated fallback-origin host) when that feature ships (Ruling EBDA-DEPLOY-1).
 
 **A `*.ebda.app` host that is not a live store** (a mistyped or never-opened slug such as `demostore.ebda.app`, an archived/draft store, an unenrolled custom domain, an unknown path on the bare platform host) is answered by `ebda-web` with ONE Ebda-branded 404 page: HTTP 404, no redirect, Arabic by default. It is chosen in `apps/web/src/app/not-found.tsx` by `notFoundKind()` (`apps/web/src/lib/unknown-store-page.ts`): a request whose Host named a store AND resolved keeps that store's own themed 404 (`StoreNotFound`); everything else renders `UnknownHostNotFound`. A suspended store still resolves, so it keeps its own maintenance page. Reserved labels (`api`, `store`, `orders`, `www`, ...) never reach it: `middleware.ts` 404s them as plain text first. CTAs: "اعمل متجرك على إبدأ" to `https://ebda.app`; WhatsApp from `BRAND.contact.whatsapp` (omitted if empty); "جرّب المتجر التجريبي" to `https://storedemo.ebda.app` only when the `ebda-web` Worker var `SHOW_DEMO_STORE_LINK` is exactly `true` (default off; turn on when the demo store goes live). Ruling SUBDOMAIN-404-1. Tests: `tests/unit/unknown-store-not-found.test.tsx`.
 
@@ -224,7 +224,7 @@ Use the connection strings from your Neon project dashboard:
 - `DATABASE_URL` — pooled URL (PgBouncer, port 5432, `?pgbouncer=true`)
 - `DIRECT_URL` — direct (non-pooled) URL required for Prisma migrations
 
-Backups: daily local `pg_dump` runs on the developer Mac at 3:30am via launchd (`com.forceai.neon-backup`). 30-day rotation at `~/Desktop/projects/_backups/ebda/` (requires `NEON_API_KEY_EBDA` in `~/.whisky-services.env`). See `docs/ROLLBACK.md` §C for the restore procedure.
+Backups: daily local `pg_dump` runs on the developer Mac at 3:30am via launchd (`com.ebda.neon-backup`). 30-day rotation at `~/Desktop/projects/_backups/ebda/` (requires `NEON_API_KEY_EBDA` in `~/.whisky-services.env`). See `docs/ROLLBACK.md` §C for the restore procedure.
 
 ---
 
@@ -344,9 +344,9 @@ npx prisma migrate dev --name rollback_xxx
 
 **Current posture (2026-05-15, "option C" — safe-by-default Preview)**: there is no separate staging Railway service. Preview deployments for web/admin (whether the historical Vercel Preview flow or the Cloudflare Workers preview environment) have `NEXT_PUBLIC_API_URL=http://localhost:4000` so PR previews are **non-functional by default** — they can't talk to production. A contributor who wants their preview to reach an API must override the env var on their PR explicitly. This blocks the worst-case data-integrity gap (a PR preview from a contributor writing to prod Neon) at zero cost.
 
-**Correction (2026-09-02):** the paragraph above used to also claim a CI gate, `preview-env-isolation.yml`, "verifies the production-vs-preview value differs and passes." That gate only ever checked **Vercel** project env vars via the Vercel API; FWB's Vercel projects were decommissioned in the 2026-07 Cloudflare migration, so it had no `VERCEL_API_TOKEN` / `VERCEL_PROJECT_ID_*` to read and fell through its own "unset → warn + exit 0" branches on every run — green on every PR while checking nothing (verified: last 5 runs all `success`; no Vercel secret/vars configured on the repo). It has been deleted rather than left as false assurance. The safe-by-default `localhost:4000` value above is the actual, still-real mitigation; there is currently no automated CI check that this default hasn't been overridden to point at production — that's a real gap, not (as the deleted workflow implied) a covered one. If/when Cloudflare Workers Builds gets a real per-PR preview environment, build an isolation check against that surface instead of resurrecting the Vercel one.
+**Correction (2026-09-02):** the paragraph above used to also claim a CI gate, `preview-env-isolation.yml`, "verifies the production-vs-preview value differs and passes." That gate only ever checked **Vercel** project env vars via the Vercel API; Ebda Store's Vercel projects were decommissioned in the 2026-07 Cloudflare migration, so it had no `VERCEL_API_TOKEN` / `VERCEL_PROJECT_ID_*` to read and fell through its own "unset → warn + exit 0" branches on every run — green on every PR while checking nothing (verified: last 5 runs all `success`; no Vercel secret/vars configured on the repo). It has been deleted rather than left as false assurance. The safe-by-default `localhost:4000` value above is the actual, still-real mitigation; there is currently no automated CI check that this default hasn't been overridden to point at production — that's a real gap, not (as the deleted workflow implied) a covered one. If/when Cloudflare Workers Builds gets a real per-PR preview environment, build an isolation check against that surface instead of resurrecting the Vercel one.
 
-**Why not a real staging Railway service yet**: at single-merchant scale (wadyaljuz only) the operational cost of maintaining a parallel Railway + Neon-branch + per-provider sandbox account chain (~4-6h setup, ~$20/mo Railway Pro OR a separate Hobby project) outweighs the marginal risk reduction. The safe-by-default Preview value gives ~80% of the protection at 5 minutes of setup.
+**Why not a real staging Railway service yet**: at single-merchant scale (demo-merchant only) the operational cost of maintaining a parallel Railway + Neon-branch + per-provider sandbox account chain (~4-6h setup, ~$20/mo Railway Pro OR a separate Hobby project) outweighs the marginal risk reduction. The safe-by-default Preview value gives ~80% of the protection at 5 minutes of setup.
 
 **Upgrade trigger — when to graduate to real staging (option B)**:
 
@@ -357,10 +357,10 @@ npx prisma migrate dev --name rollback_xxx
 
 When any of these fire, the path to real staging is:
 
-- New Railway project `fwb-staging` on Hobby plan (~$5/mo, separate from prod)
+- New Railway project `ebda-staging` on Hobby plan (~$5/mo, separate from prod)
 - Neon branch `staging` from `main` + seed fixtures script at `scripts/seed-staging.mjs`
-- Custom domain `store-api-staging.forcemediakw.com` → CNAME → Railway service
-- Preview environment `NEXT_PUBLIC_API_URL` swap from `localhost:4000` → `https://store-api-staging.forcemediakw.com`
+- Custom domain `api-staging.ebda.app` → CNAME → Railway service
+- Preview environment `NEXT_PUBLIC_API_URL` swap from `localhost:4000` → `https://api-staging.ebda.app`
 - Per-provider sandbox credentials: Tap/MyFatoorah/Hesabe/UPayments test mode, OneSignal separate "staging" app, Cloudflare R2 separate bucket `force-uploads-staging`, Sentry environment tag `staging`, Inngest separate `INNGEST_DEPLOY_ID`, Axiom dataset `force-api-railway-staging`
 - Documentation in this section updated with the URLs + dashboards
 
@@ -400,11 +400,11 @@ catches something the others can't.
 - **Dashboard**: https://uptimerobot.com
 - **Public status page**: https://stats.uptimerobot.com/23nuarbz3h — merchant-facing self-service for incident state (closes iceberg item "no public status page", 2026-05-15 audit)
 - **Active monitors**:
-  - `FWB API` → `https://api.force-ai.co/health` — HTTPS, 5-min interval, 30s timeout, alert on 2 consecutive failures
-  - `FWB store · wadyaljuz.com` → `https://wadyaljuz.com` — same settings
-  - `FWB admin` → `https://admin.force-ai.co` — same settings (added 2026-05-15; domain updated 2026-07-05 after the Cloudflare Workers migration)
+  - `Ebda Store API` → `https://api.ebda.app/health` — HTTPS, 5-min interval, 30s timeout, alert on 2 consecutive failures
+  - `Ebda Store store · demo-merchant.com` → `https://demo-merchant.com` — same settings
+  - `Ebda Store admin` → `https://store.ebda.app` — same settings (added 2026-05-15; domain updated 2026-07-05 after the Cloudflare Workers migration)
 - **Alert routing**: UptimeRobot mobile app push (instant on iPhone/Android, free tier, replaces Telegram which is paid-tier on UptimeRobot). The bridge to Telegram is via the in-API channel below for code-level alerts.
-- **Adding a new merchant**: clone the existing storefront monitor, swap the URL to the merchant's domain, name it `FWB store · <slug>`. Attach the same mobile-push alert contact. Also add it to the public status page.
+- **Adding a new merchant**: clone the existing storefront monitor, swap the URL to the merchant's domain, name it `Ebda Store store · <slug>`. Attach the same mobile-push alert contact. Also add it to the public status page.
 
 ### 2. Sentry — "code threw"
 
@@ -417,7 +417,7 @@ Four Sentry projects (one per app) so issues stay isolated in the dashboard UI:
 - **No-op when DSN missing** (graceful in dev / preview / pre-account-creation).
 - **Source maps + releases (added 2026-07-02, audit H2)**: web/admin/orders `next.config.js` are now wrapped in `withSentryConfig`. Upload only activates when `SENTRY_AUTH_TOKEN` (+ `SENTRY_ORG`/`SENTRY_PROJECT_*`) is set; `cf-deploy.yml` wires them in (2026-09-25) and warns on every deploy until the secret exists — see docs/ENVIRONMENT.md. Before this, every Sentry issue from web/admin arrived with minified/obfuscated stack traces and no release association.
 - **Sample rates**: storefront `tracesSampleRate=0.1` in prod (high traffic), admin `1.0` (low volume, every trace is signal). Session replays fire only on errors, not on healthy sessions.
-- **Cloudflare Workers target — storefront only (2026-07-02):** the standard `@sentry/nextjs` server SDK can't run on Workers (and `cf-build.sh` moves `instrumentation.ts` aside for the CF build regardless — see `docs/migration/cloudflare-preview-workers.md`). `apps/web/sentry-worker-entry.ts` wraps the OpenNext Worker's fetch handler with `@sentry/cloudflare`'s `Sentry.withSentry(...)` so SSR/RSC errors ARE captured on `store.force-ai.co` too. The DSN reaches the Worker as a runtime var `SENTRY_DSN` (`cf-deploy.yml` → `wrangler deploy --var SENTRY_DSN:<value>`, sourced from the same `NEXT_PUBLIC_SENTRY_DSN_WEB` repo variable; omitted → clean no-op). `apps/admin` and `apps/orders` do NOT have this yet — follow-up, same pattern.
+- **Cloudflare Workers target — storefront only (2026-07-02):** the standard `@sentry/nextjs` server SDK can't run on Workers (and `cf-build.sh` moves `instrumentation.ts` aside for the CF build regardless — see `docs/migration/cloudflare-preview-workers.md`). `apps/web/sentry-worker-entry.ts` wraps the OpenNext Worker's fetch handler with `@sentry/cloudflare`'s `Sentry.withSentry(...)` so SSR/RSC errors ARE captured on `store.ebda.app` too. The DSN reaches the Worker as a runtime var `SENTRY_DSN` (`cf-deploy.yml` → `wrangler deploy --var SENTRY_DSN:<value>`, sourced from the same `NEXT_PUBLIC_SENTRY_DSN_WEB` repo variable; omitted → clean no-op). `apps/admin` and `apps/orders` do NOT have this yet — follow-up, same pattern.
 
 ### 3. PostHog — product analytics
 
@@ -431,7 +431,7 @@ Four Sentry projects (one per app) so issues stay isolated in the dashboard UI:
 
 ### 4. Telegram alerts service — "business logic P0/P1"
 
-- **Bot**: `@ForceAI1_bot` (created via @BotFather, currently DMs Ahmad — chat_id `1943728711`)
+- **Bot**: `@ebda1_bot` (created via @BotFather, currently DMs Ahmad — chat_id `1943728711`)
 - **Env vars (Railway)**:
   - `TELEGRAM_BOT_TOKEN` — API token from @BotFather
   - `TELEGRAM_ALERT_CHAT_ID` — chat to deliver to (DM = positive int; group = negative int)
@@ -465,7 +465,7 @@ Railway's stdout buffer is ephemeral (~72h on the Pro plan, less on Hobby). With
 - **Redaction**: same pino redact rules apply to Axiom — auth headers, cookies, passwords, tokens, card numbers all masked before leaving the process
 - **Setup** (one-time):
   1. Sign up at https://app.axiom.co/register → create dataset `force-api-railway`
-  2. Settings → API tokens → create token with **Ingest** scope (name: `FWB API ingest`)
+  2. Settings → API tokens → create token with **Ingest** scope (name: `Ebda Store API ingest`)
   3. Set `AXIOM_TOKEN` + `AXIOM_DATASET` env vars on Railway and redeploy
   4. Verify in Axiom Stream view within 30s — request log lines should land
 - **What to expect**: every pino log line lands in Axiom within ~2 sec. Search by `request`, `Unhandled error`, request ID, etc. Axiom's APL query language is more powerful than BetterStack's for log filtering.
@@ -497,11 +497,11 @@ curl -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
   -d "{\"chat_id\":\"${TELEGRAM_ALERT_CHAT_ID}\",\"text\":\"smoke test\"}"
 
 # 2. Confirm API health
-curl https://api.force-ai.co/health
+curl https://api.ebda.app/health
 
 # 3. Trigger UptimeRobot manually: dashboard → monitor → "Test" → expect OK within 30s
 
-# 4. Trigger Sentry from the storefront (paste into browser console on wadyaljuz.com):
+# 4. Trigger Sentry from the storefront (paste into browser console on demo-merchant.com):
 #    throw new Error("sentry-storefront-smoke-test");
 #    Issue should appear in Sentry dashboard within ~30s.
 
@@ -532,15 +532,15 @@ Renewal verification: re-check these in the per-provider dashboard quarterly —
 
 | Service                | Account email          | Project / org                                                                                                  |
 | ---------------------- | ---------------------- | -------------------------------------------------------------------------------------------------------------- |
-| Cloudflare             | forceai.0ps1@gmail.com | Workers hosting (deployed by GitHub Actions) `force-web`/`force-admin`/`ebda-orders` (replaced Vercel 2026-07) |
-| Railway                | forceai.0ps1@gmail.com | project `force-website-builder`                                                                                |
-| Neon                   | forceai.0ps1@gmail.com | project `ep-falling-meadow-a1uq2yil` (ap-southeast-1)                                                          |
-| Sentry                 | forceai.0ps1@gmail.com | one org with four projects: `api`, `web`, `admin`, `orders`                                                    |
-| PostHog                | forceai.0ps1@gmail.com | EU region, single project covering web + admin                                                                 |
-| UptimeRobot            | forceai.0ps1@gmail.com | free tier, 2 monitors currently                                                                                |
+| Cloudflare             | ops@ebda.app | Workers hosting (deployed by GitHub Actions) `force-web`/`force-admin`/`ebda-orders` (replaced Vercel 2026-07) |
+| Railway                | ops@ebda.app | project `ebda-store`                                                                                |
+| Neon                   | ops@ebda.app | project `ep-falling-meadow-a1uq2yil` (ap-southeast-1)                                                          |
+| Sentry                 | ops@ebda.app | one org with four projects: `api`, `web`, `admin`, `orders`                                                    |
+| PostHog                | ops@ebda.app | EU region, single project covering web + admin                                                                 |
+| UptimeRobot            | ops@ebda.app | free tier, 2 monitors currently                                                                                |
 | Axiom                  | (Ahmad's account)      | free tier (500GB/30d) — dataset `force-api-railway`                                                            |
 | Resend                 | platform-wide          | one account; per-merchant domains added under it                                                               |
-| @ForceAI1_bot Telegram | personal DM to Ahmad   | chat_id `1943728711`                                                                                           |
+| @ebda1_bot Telegram | personal DM to Ahmad   | chat_id `1943728711`                                                                                           |
 
 ---
 

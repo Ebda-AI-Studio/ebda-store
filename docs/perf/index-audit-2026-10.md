@@ -61,7 +61,7 @@ registered customers. Registered customers' results are unchanged: a registered 
 matched through its shipping JSON, only through the account, as before. Terms under 3 characters and
 terms matching more than 1,000 guest orders take an unindexed `shipping_address` JSON path filter for
 the GUEST half only, with the same rows; a registered customer match keeps its indexed
-`customer_id IN (…)` arm (issue 2444). Every Kuwait guest phone starts `+965`, so the first digits of a
+`customer_id IN (…)` arm (issue 2444). Every Egypt guest phone starts `+965`, so the first digits of a
 phone typed left to right reach that cap on any store past 1,000 guest orders.
 
 Scratch PG 16, 2 stores × 25,000 orders (91.7 % guest, like production's 92.6 %), `ANALYZE`d:

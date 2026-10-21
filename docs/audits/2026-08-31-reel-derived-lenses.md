@@ -2,7 +2,7 @@
 
 Source: 21 Instagram reels (@-MM, `#vibecoding #aidirectedengineering`) on builder/SaaS
 production failure modes. Each reel asserts one concrete failure and its fix; each was
-turned into a checkable lens and run against `force-website-builder`.
+turned into a checkable lens and run against `ebda-store`.
 
 Method: distilled each reel to its claim, expressed the claim as a grep-able / config
 check, ran it, then **verified every hit by reading the code** before recording it.
@@ -11,13 +11,13 @@ inspection, and that is the point of the second pass.
 
 ## Result
 
-**17 of 21 lenses are code-auditable against FWB. 14 pass. 3 real gaps. 4 are OS/process
+**17 of 21 lenses are code-auditable against Ebda Store. 14 pass. 3 real gaps. 4 are OS/process
 or business lenses that do not apply to a repo.** ⚠️ **Corrected 2026-09-02: L16 and L20
 were originally scored PASS; both are falsified — see "Correction (2026-09-02)" below.
 As corrected: 12 pass, 1 provisioned-but-inert (L16), 1 alerting-category-error now FAIL
 (L20), 3 real gaps.**
 
-FWB scoring well here is expected rather than surprising — most of these lenses cover
+Ebda Store scoring well here is expected rather than surprising — most of these lenses cover
 ground the existing audit fleet already walks. The value is in the 3 that were not
 covered, and in registering all 21 so they re-run against the other repos.
 
@@ -66,7 +66,7 @@ writing: "Counting policies tells you what was provisioned; only the role's
 `neondb_owner`, `rolbypassrls = true`. Every RLS policy is silently ignored
 for every row, on every connection, right now. This is a known, explicit,
 PARKED decision (Ahmad: "we will merge when I tell you" — memory
-`project-fwb-rls-cutover-and-security-program-2026-07`), not a regression to
+`project-ebda-rls-cutover-and-security-program-2026-07`), not a regression to
 fix here — its Phase-1 prerequisite plumbing
 (`packages/database/src/tenant-storage.ts`) is verifiably not on `main`
 (`git cat-file -e origin/main:packages/database/src/tenant-storage.ts` fails).
@@ -88,7 +88,7 @@ error-tracking evidence for an SLO-alerting claim is a category error, not a
 close call.
 
 **Standing rule these two produce, for this lens pack (recorded here; not
-propagated to `force-ai-foundation`'s lens-pack source — that repo is outside
+propagated to `the shared ops foundation`'s lens-pack source — that repo is outside
 this worktree):** a PASS on an enforcement claim must cite the runtime fact
 the claim depends on, never a count of what was declared/provisioned/
 integrated. An RLS verdict cites the `pg_roles.rolbypassrls` query result for
@@ -146,7 +146,7 @@ L2's claim applied to this machine: 19 Google/Gemini skills were installed 2026-
 and the install note records no review or disposal step. The reel's framing —
 "prescriptions, not assets: apply, verify, dispose" — is the missing half.
 
-**Fix:** belongs in `force-ai-foundation`, not here.
+**Fix:** belongs in `the shared ops foundation`, not here.
 
 ## Lens registration
 

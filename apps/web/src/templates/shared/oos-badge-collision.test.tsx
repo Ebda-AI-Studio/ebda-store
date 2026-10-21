@@ -34,7 +34,7 @@ describe('OutOfStockRibbon — issue #548 collision avoidance', () => {
     expect(html).toMatch(/\btop-2 start-2\b/);
   });
 
-  it('PecannbeeProductCard-shaped heart (topStartReserved) moves the DEFAULT pill to top-end', () => {
+  it('StorefrontProductCard-shaped heart (topStartReserved) moves the DEFAULT pill to top-end', () => {
     // This is the exact #548 bug: previously a max-width-only guard left the
     // pill's *start* edge still under the heart. It must now render at a
     // genuinely different corner.

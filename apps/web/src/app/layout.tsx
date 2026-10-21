@@ -86,7 +86,7 @@ export async function generateMetadata(): Promise<Metadata> {
   const store = await getStore();
 
   // Detect whether we're rendering for the merchant's custom domain
-  // (wadyaljuz.com) vs the platform path (<slug>.ebda.app).
+  // (demo-merchant.com) vs the platform path (<slug>.ebda.app).
   // The signal is the request host header. When on the custom domain,
   // GSC verification needs the merchant's own token — emitting the
   // platform token alongside breaks verification (GSC reads only the
@@ -212,7 +212,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   // Cookie consent — read server-side so MarketingPixelsProvider is only
   // RENDERED into the HTML when the user has consented to marketing.
   // GDPR Art. 6(a) + ePrivacy + applicable GCC data-protection law
-  // (see docs/legal/gcc-data-protection.md) require prior consent
+  // (see docs/privacy/data-map.md) require prior consent
   // BEFORE non-essential tracking scripts execute. Client-side gating
   // alone leaks the script on first paint; SSR gating prevents that.
   const consentCookieRaw = cookieStore.get('force-cookie-consent')?.value;
@@ -309,7 +309,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     // doesn't carry the matching `*Color` field (e.g. card/muted/border are
     // newer tokens not present on legacy theme rows).
     //
-    // Verified 2026-05-20 — wadyaljuz had merchant picked `token:card` for
+    // Verified 2026-05-20 — demo-merchant had merchant picked `token:card` for
     // the footer color zone, but the old switch-style handler below only
     // knew primary/secondary/accent, so the literal string "token:card" was
     // emitted as a CSS value and the browser silently dropped the rule.
@@ -412,7 +412,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       // font-family carries !important so it beats per-theme pack-styles
       // Tailwind utility classes (`font-serif` / `font-sans` / `font-mono`)
       // which match the same element with equal specificity (0,1,0) and
-      // win via Tailwind v4 layer ordering. Verified on wadyaljuz 2026-05-18
+      // win via Tailwind v4 layer ordering. Verified on demo-merchant 2026-05-18
       // where merchant-selected Tajawal in admin wasn't applying to the
       // h2[data-zone="sectionTitle"] inside elegant's font-serif h2.
       // Other zone declarations stay on normal cascade so a merchant who
@@ -621,7 +621,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                     consented (read from the `force-cookie-consent` cookie
                     server-side). No consent → scripts never reach the
                     browser. GDPR/ePrivacy/applicable GCC data-protection
-                    law compliance (see docs/legal/gcc-data-protection.md). */}
+                    law compliance (see docs/privacy/data-map.md). */}
                       {marketingConsentGranted &&
                         store.marketingPixels &&
                         Object.keys(store.marketingPixels).length > 0 && (

@@ -1,6 +1,6 @@
 # Ebda launch readiness
 
-Goal: signup → verified merchant → setup → product → COD → storefront order runs in workerd; public Ebda branding and actionable errors. Preserve existing data/payment contracts and FWB source.
+Goal: signup → verified merchant → setup → product → COD → storefront order runs in workerd; public Ebda branding and actionable errors. Preserve existing data/payment contracts and Ebda Store source.
 
 1. Audit runtime, tenant scope, wiring, branding and deployment inputs.
 2. Fix confirmed defects with targeted regressions; require mobile server-side.

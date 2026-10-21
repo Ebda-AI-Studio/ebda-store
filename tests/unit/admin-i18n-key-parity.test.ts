@@ -247,7 +247,7 @@ const IDENTICAL_VALUE_ALLOWLIST = new Set<string>([
   'components.adminLayout.forcePlatformBrand',
   'components.adminLayout.forceAdminBrand',
   'components.adminLayout.forceBrandPrefix',
-  'components.brand.forceMediaAlt',
+  'components.brand.ebdaAlt',
   'finance.newEntry.memoArPlaceholder',
   'insights.dashboard.aiCallout',
   'insights.segments.segment.vip',

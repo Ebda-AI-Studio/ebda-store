@@ -106,17 +106,17 @@ Doing only one causes trouble: token without disabling auto-deploy → **double 
 disabling auto-deploy without the token → **no deploy path**. So:
 
 1. **Add the deploy token**
-   - Railway → the `force-website-builder` project → **Settings → Tokens** → create a
+   - Railway → the `ebda-store` project → **Settings → Tokens** → create a
      **Project token** scoped to the **`production`** environment. Copy it.
    - GitHub → repo **Settings → Secrets and variables → Actions**:
      - **Variable** `RAILWAY_ACTIONS_DEPLOY` = `true` — this is what switches the job on.
      - **Secret** `RAILWAY_TOKEN` = the project token.
      - **Variable** `RAILWAY_SERVICE` = the exact service name of the API service (as shown
        in the Railway project). The service is named **`api`** (verified via the Railway
-       API — the _project_ is `force-website-builder`, the _service_ inside it is `api`),
+       API — the _project_ is `ebda-store`, the _service_ inside it is `api`),
        which is the workflow default; set `RAILWAY_SERVICE` only if that ever changes.
      - (optional) `RAILWAY_ENVIRONMENT` (default `production`), `RAILWAY_HEALTH_URL`
-       (default `https://api.force-ai.co/health`).
+       (default `https://api.ebda.app/health`).
 
 2. **Disable Railway's own auto-deploy** (so Actions is the only deployer)
    - Railway → project → the API service → **Settings → Deploys / Source** → turn **off**
@@ -159,7 +159,7 @@ process can report. Do not read absence from either list as absence from the pro
   redeploy an earlier successful deploy.
 - **Code:** `git revert HEAD && git push` → the workflow redeploys the reverted commit.
 - **Autonomous:** the self-heal medic (`~/.claude/scripts/self-heal.sh`) monitors
-  `api.force-ai.co/health`; once this cutover is live, its Railway recovery becomes a true
+  `api.ebda.app/health`; once this cutover is live, its Railway recovery becomes a true
   rollback-to-last-good instead of redeploy-from-source.
 
 ## Rollback of the cutover itself

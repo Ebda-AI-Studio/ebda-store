@@ -1917,7 +1917,7 @@ Nodes (81): Alert(), AlertProps, AlertVariant, VARIANT_CLASSES, AutoPopulateBann
 
 ### Community 46 - "Community 46"
 Cohesion: 0.03
-Nodes (74): AreaRate, Cart, KUWAIT_AREAS, PaymentStep, ShippingZone, CheckoutErrorAlert(), DeliverySection(), DeliverySectionProps (+66 more)
+Nodes (74): AreaRate, Cart, EGYPT_AREAS, PaymentStep, ShippingZone, CheckoutErrorAlert(), DeliverySection(), DeliverySectionProps (+66 more)
 
 ### Community 47 - "Community 47"
 Cohesion: 0.04
@@ -2177,7 +2177,7 @@ Nodes (41): AUG, customerIds, emails, exported, get(), list(), localRange(), pur
 
 ### Community 111 - "Community 111"
 Cohesion: 0.04
-Nodes (47): Are there any hidden fees?, Are you GDPR / GCC data-protection compliant?, Are you GDPR / Kuwait Law 13/2023 compliant?, Bilingual + Arabic, Can I add features later?, Can I cancel anytime?, Can I customize the design?, Can I import my existing store? (+39 more)
+Nodes (47): Are there any hidden fees?, Are you GDPR / GCC data-protection compliant?, Are you GDPR / Egypt Law 13/2023 compliant?, Bilingual + Arabic, Can I add features later?, Can I cancel anytime?, Can I customize the design?, Can I import my existing store? (+39 more)
 
 ### Community 112 - "Community 112"
 Cohesion: 0.04
@@ -2193,7 +2193,7 @@ Nodes (34): AnswerEnginePage(), AnswerEngineSkeleton(), EngineCard(), EngineSumm
 
 ### Community 115 - "Community 115"
 Cohesion: 0.04
-Nodes (46): `/auth/` is not a blanket exemption (issue 2425), Corollary: never mount an admin router at `/public` (#1993), Cross-service tenant isolation: Force AI Store ↔ WBS bridge, CSRF protection: when JSON requests skip the token, Customer-leak guard, Email enumeration: the four flows, Implications, JWT lifetime contract (+38 more)
+Nodes (46): `/auth/` is not a blanket exemption (issue 2425), Corollary: never mount an admin router at `/public` (#1993), Cross-service tenant isolation: Ebda Store ↔ WBS bridge, CSRF protection: when JSON requests skip the token, Customer-leak guard, Email enumeration: the four flows, Implications, JWT lifetime contract (+38 more)
 
 ### Community 116 - "Community 116"
 Cohesion: 0.04
@@ -2269,7 +2269,7 @@ Nodes (40): code:prisma (enum SlugEntityType {), code:ts (// GET /public/redirec
 
 ### Community 134 - "Community 134"
 Cohesion: 0.05
-Nodes (41): code:sql (ALTER TABLE "store_locations" ENABLE ROW LEVEL SECURITY;), code:typescript (import { prisma, Prisma } from '@force/database';), code:bash (git add apps/api/src/services/locations.service.ts), code:typescript (import { Router, Request, Response, NextFunction } from 'exp), code:bash (git add apps/api/src/routes/locations.routes.ts apps/api/src), code:typescript (import { describe, it, expect, beforeAll, afterAll } from 'v), code:bash (DATABASE_URL=postgresql://$USER@localhost:5432/fwb_loc_test ), code:bash (git add tests/integration/store-locations.test.ts) (+33 more)
+Nodes (41): code:sql (ALTER TABLE "store_locations" ENABLE ROW LEVEL SECURITY;), code:typescript (import { prisma, Prisma } from '@force/database';), code:bash (git add apps/api/src/services/locations.service.ts), code:typescript (import { Router, Request, Response, NextFunction } from 'exp), code:bash (git add apps/api/src/routes/locations.routes.ts apps/api/src), code:typescript (import { describe, it, expect, beforeAll, afterAll } from 'v), code:bash (DATABASE_URL=postgresql://$USER@localhost:5432/ebda_loc_test ), code:bash (git add tests/integration/store-locations.test.ts) (+33 more)
 
 ### Community 135 - "Community 135"
 Cohesion: 0.05
@@ -2309,7 +2309,7 @@ Nodes (39): 10. Summary: Top Findings + Recommended Scale, 1. Complete Font-Size
 
 ### Community 144 - "Community 144"
 Cohesion: 0.05
-Nodes (39): 0. Method and evidence quality, 10. Coverage, limits, and what to verify, 11. Appendix — verified FWB inventory (audit 2026-07-21), 1. Executive summary, 2.10 Purchasing, 2.11 Accounting & finance, 2.12 Platform, data & administration, 2.13 Storefront & design (+31 more)
+Nodes (39): 0. Method and evidence quality, 10. Coverage, limits, and what to verify, 11. Appendix — verified Ebda Store inventory (audit 2026-07-21), 1. Executive summary, 2.10 Purchasing, 2.11 Accounting & finance, 2.12 Platform, data & administration, 2.13 Storefront & design (+31 more)
 
 ### Community 145 - "Community 145"
 Cohesion: 0.05
@@ -2345,7 +2345,7 @@ Nodes (38): 1. The Mechanical System Model, 1a. The ONE Type Scale, 1b. The ONE 
 
 ### Community 153 - "Community 153"
 Cohesion: 0.05
-Nodes (38): 1.1 PecannbeeProductCard (`apps/web/src/templates/shared/PecannbeeProductCard.tsx`), 1.2 ProductCarousel (`apps/web/src/templates/shared/ProductCarousel.tsx`), 1.3 Modern ProductCard (`apps/web/src/templates/modern/ProductCard.tsx`), 1.4 Elegant ProductCard (`apps/web/src/templates/elegant/ProductCard.tsx`), 1.5 Classic ProductCard (`apps/web/src/templates/classic/ProductCard.tsx`), 1.6 Minimal ProductCard (`apps/web/src/templates/minimal/ProductCard.tsx`), 1.7 Bold ProductCard (`apps/web/src/templates/bold/ProductCard.tsx`), 1. Product Cards (+30 more)
+Nodes (38): 1.1 StorefrontProductCard (`apps/web/src/templates/shared/StorefrontProductCard.tsx`), 1.2 ProductCarousel (`apps/web/src/templates/shared/ProductCarousel.tsx`), 1.3 Modern ProductCard (`apps/web/src/templates/modern/ProductCard.tsx`), 1.4 Elegant ProductCard (`apps/web/src/templates/elegant/ProductCard.tsx`), 1.5 Classic ProductCard (`apps/web/src/templates/classic/ProductCard.tsx`), 1.6 Minimal ProductCard (`apps/web/src/templates/minimal/ProductCard.tsx`), 1.7 Bold ProductCard (`apps/web/src/templates/bold/ProductCard.tsx`), 1. Product Cards (+30 more)
 
 ### Community 154 - "Community 154"
 Cohesion: 0.05
@@ -2413,7 +2413,7 @@ Nodes (30): blockSchema, bulletsBlock, buttonBlock, headingBlock, imageBlock, nu
 
 ### Community 171 - "Community 171"
 Cohesion: 0.05
-Nodes (36): AI features plan — making "Force AI" mean something, API, API, API, Audit logging, Bulk sweep, Bulk translation job, code:ts (export class AIService {) (+28 more)
+Nodes (36): AI features plan — making "Ebda AI Studio" mean something, API, API, API, Audit logging, Bulk sweep, Bulk translation job, code:ts (export class AIService {) (+28 more)
 
 ### Community 172 - "Community 172"
 Cohesion: 0.05
@@ -2421,7 +2421,7 @@ Nodes (36): Abandoned Cart Recovery Implementation Plan, code:typescript ('cart_
 
 ### Community 173 - "Community 173"
 Cohesion: 0.05
-Nodes (36): Canonical dataset (authoritative content for Task 1), CI gates this feature must pass (the "what CI needs to be finished" answer), code:ts (// packages/shared/src/data/kuwait-areas.ts), code:bash (git add apps/api/src/services/shipping.service.ts tests/unit), code:bash (git add apps/api/src/routes/shipping-area-rate.routes.ts app), code:bash (git add apps/api/src/routes/order.routes.ts apps/api/src/rou), code:bash (git add apps/web/src/app/checkout/_components/GovernorateAre), code:bash (git add apps/web/src/app/checkout/_lib/savedCheckout.ts apps) (+28 more)
+Nodes (36): Canonical dataset (authoritative content for Task 1), CI gates this feature must pass (the "what CI needs to be finished" answer), code:ts (// packages/shared/src/data/egypt-areas.ts), code:bash (git add apps/api/src/services/shipping.service.ts tests/unit), code:bash (git add apps/api/src/routes/shipping-area-rate.routes.ts app), code:bash (git add apps/api/src/routes/order.routes.ts apps/api/src/rou), code:bash (git add apps/web/src/app/checkout/_components/GovernorateAre), code:bash (git add apps/web/src/app/checkout/_lib/savedCheckout.ts apps) (+28 more)
 
 ### Community 174 - "Community 174"
 Cohesion: 0.05
@@ -2617,7 +2617,7 @@ Nodes (30): A new order didn't trigger a notification — طلب جديد ولم
 
 ### Community 223 - "Community 223"
 Cohesion: 0.06
-Nodes (31): API, API Documentation, Available Scripts, Code Documentation, Code of Conduct, Code Style, code:bash (# Install dependencies), code:block2 (force-website-builder/) (+23 more)
+Nodes (31): API, API Documentation, Available Scripts, Code Documentation, Code of Conduct, Code Style, code:bash (# Install dependencies), code:block2 (ebda-store/) (+23 more)
 
 ### Community 224 - "Community 224"
 Cohesion: 0.13
@@ -2761,7 +2761,7 @@ Nodes (27): API, API Documentation, Available Scripts, Buy-flow parity (money pa
 
 ### Community 259 - "Community 259"
 Cohesion: 0.07
-Nodes (27): API, API Documentation, Buy-flow parity (money paths), Code Documentation, Code of Conduct, Code Style, code:block2 (force-website-builder/), code:block3 (<type>(<scope>): <subject>) (+19 more)
+Nodes (27): API, API Documentation, Buy-flow parity (money paths), Code Documentation, Code of Conduct, Code Style, code:block2 (ebda-store/), code:block3 (<type>(<scope>): <subject>) (+19 more)
 
 ### Community 260 - "Community 260"
 Cohesion: 0.07
@@ -2769,7 +2769,7 @@ Nodes (27): API, API Documentation, Available Scripts, Buy-flow parity (money pa
 
 ### Community 261 - "Community 261"
 Cohesion: 0.07
-Nodes (27): API, API Documentation, Buy-flow parity (money paths), Code Documentation, Code of Conduct, Code Style, code:block2 (force-website-builder/), code:block3 (<type>(<scope>): <subject>) (+19 more)
+Nodes (27): API, API Documentation, Buy-flow parity (money paths), Code Documentation, Code of Conduct, Code Style, code:block2 (ebda-store/), code:block3 (<type>(<scope>): <subject>) (+19 more)
 
 ### Community 262 - "Community 262"
 Cohesion: 0.07
@@ -2821,11 +2821,11 @@ Nodes (19): assertPublicHttpUrl(), CREDENTIAL_HEADERS, HostResolver, initForHop(
 
 ### Community 274 - "Community 274"
 Cohesion: 0.08
-Nodes (26): Admin App, Anti-patterns to refuse, code:block2 (authenticate → authorize('store_admin', 'super_admin') → req), Critical architecture rules, Cross-project standing rules, Every data has a UI (every PR), Force Website Builder — Project Guidelines, graphify (+18 more)
+Nodes (26): Admin App, Anti-patterns to refuse, code:block2 (authenticate → authorize('store_admin', 'super_admin') → req), Critical architecture rules, Cross-project standing rules, Every data has a UI (every PR), Ebda Store — Project Guidelines, graphify (+18 more)
 
 ### Community 275 - "Community 275"
 Cohesion: 0.08
-Nodes (25): 1. How Force AI Store actually sells, 2. Inputs for writing a proposal, 2a. Cost-floor math (from the 2026-05-22 audit), 2b. INTERNAL — Market reference benchmarks (NEVER shown to clients), 2c. Plan tiers and feature value bands (what to charge for each feature group in a proposal), 2d. Payment processing economics (no GMV cut from you), 2e. Kuwait market context for proposal-writing, 3. Sample proposal structures (illustrative — your actual numbers may vary) (+17 more)
+Nodes (25): 1. How Ebda Store actually sells, 2. Inputs for writing a proposal, 2a. Cost-floor math (from the 2026-05-22 audit), 2b. INTERNAL — Market reference benchmarks (NEVER shown to clients), 2c. Plan tiers and feature value bands (what to charge for each feature group in a proposal), 2d. Payment processing economics (no GMV cut from you), 2e. Egypt market context for proposal-writing, 3. Sample proposal structures (illustrative — your actual numbers may vary) (+17 more)
 
 ### Community 276 - "Community 276"
 Cohesion: 0.08
@@ -2881,7 +2881,7 @@ Nodes (24): Auth / Access / Privacy Audit — 2026-05-28, Auth coverage map — 
 
 ### Community 289 - "Community 289"
 Cohesion: 0.08
-Nodes (24): 12-Month Cost Trajectory, Acquisition Due-Diligence Checklist, Audit slice documents, Combined remediation budget, Executive Summary (for the would-be acquirer), Final Verdict, Forecast Summary, FWB (Force Website Builder) — Comprehensive SaaS Due-Diligence Audit (+16 more)
+Nodes (24): 12-Month Cost Trajectory, Acquisition Due-Diligence Checklist, Audit slice documents, Combined remediation budget, Executive Summary (for the would-be acquirer), Final Verdict, Forecast Summary, Ebda Store (Ebda Store) — Comprehensive SaaS Due-Diligence Audit (+16 more)
 
 ### Community 290 - "Community 290"
 Cohesion: 0.08
@@ -3001,7 +3001,7 @@ Nodes (22): 1. Current behaviour (verified in code on `origin/main` @ `6af9aa42`
 
 ### Community 319 - "Community 319"
 Cohesion: 0.09
-Nodes (22): 10. Data subject rights — what FWB already implements, 11. Security measures — summary (full detail in Annex 2), 12. This DPA does not cover, 14. Sources, 1. Parties & roles, 2. Subject matter, nature, purpose, and duration of processing, 3. Categories of data subjects and personal data, 4. Processor obligations (+14 more)
+Nodes (22): 10. Data subject rights — what Ebda Store already implements, 11. Security measures — summary (full detail in Annex 2), 12. This DPA does not cover, 14. Sources, 1. Parties & roles, 2. Subject matter, nature, purpose, and duration of processing, 3. Categories of data subjects and personal data, 4. Processor obligations (+14 more)
 
 ### Community 320 - "Community 320"
 Cohesion: 0.09
@@ -3033,7 +3033,7 @@ Nodes (21): AI Features Universal Baseline — Implementation Plan, code:typescr
 
 ### Community 327 - "Community 327"
 Cohesion: 0.09
-Nodes (21): 1. Customer acquisition, 2. First target customer, 3. Integration proof (shared account across products), 4. Exceptions / support load, 5.1 AI (Gemini `gemini-flash-lite-latest`), 5.2 Infra (USD/month, ASSUMED usage, list prices from memory/the FWB cost forecast), 5.3 Collecting the subscription (Ebda's own gateway cost), 5.4 Support (+13 more)
+Nodes (21): 1. Customer acquisition, 2. First target customer, 3. Integration proof (shared account across products), 4. Exceptions / support load, 5.1 AI (Gemini `gemini-flash-lite-latest`), 5.2 Infra (USD/month, ASSUMED usage, list prices from memory/the Ebda Store cost forecast), 5.3 Collecting the subscription (Ebda's own gateway cost), 5.4 Support (+13 more)
 
 ### Community 328 - "Community 328"
 Cohesion: 0.09
@@ -3053,7 +3053,7 @@ Nodes (22): crossOriginEmbedderPolicy(), crossOriginOpenerPolicy(), crossOriginR
 
 ### Community 332 - "Community 332"
 Cohesion: 0.09
-Nodes (21): API, API Documentation, Code Documentation, Code of Conduct, Code Style, code:block2 (force-website-builder/), code:bash (# Run all tests), Coding Standards (+13 more)
+Nodes (21): API, API Documentation, Code Documentation, Code of Conduct, Code Style, code:block2 (ebda-store/), code:bash (# Run all tests), Coding Standards (+13 more)
 
 ### Community 333 - "Community 333"
 Cohesion: 0.1
@@ -3093,15 +3093,15 @@ Nodes (20): 1. Seed disposable test stores, 2. Run the scenario, 3. Clean up aft
 
 ### Community 342 - "Community 342"
 Cohesion: 0.1
-Nodes (20): 10. `apps/admin/src/app/stores/[id]/integrations/wbs/page.tsx`, 11. FWB admin sidebar, 12. `tests/unit/order-whatsapp-notify.test.ts`, 1. `packages/database/prisma/schema.prisma`, 2. `packages/database/prisma/migrations/<ts>_add_wbs_bridge/migration.sql` (hand-written), 3. `apps/api/src/utils/phone-e164.ts`, 4. `apps/api/src/services/wbs-bridge.service.ts`, 5. `apps/api/src/lib/inngest/client.ts` (+12 more)
+Nodes (20): 10. `apps/admin/src/app/stores/[id]/integrations/wbs/page.tsx`, 11. Ebda Store admin sidebar, 12. `tests/unit/order-whatsapp-notify.test.ts`, 1. `packages/database/prisma/schema.prisma`, 2. `packages/database/prisma/migrations/<ts>_add_wbs_bridge/migration.sql` (hand-written), 3. `apps/api/src/utils/phone-e164.ts`, 4. `apps/api/src/services/wbs-bridge.service.ts`, 5. `apps/api/src/lib/inngest/client.ts` (+12 more)
 
 ### Community 343 - "Community 343"
 Cohesion: 0.1
-Nodes (20): Critical, FWB Deep Audit — Observability / DR / CI-CD / Environments (2026-07-02), H1 — Orders PWA ships to production with NO Sentry error capture, H2 — Sentry source maps are never uploaded (no `withSentryConfig`) → minified stack traces in prod, H3 — Branch sprawl: 242 branches incl. orphan `auto-fix/*` — violates branch-hygiene standard + widens gitleaks/secret surface, High, L1 — `Dockerfile.api` CMD also runs `prisma migrate deploy` (double-migrate / multi-replica race risk), L2 — No queue-depth alert on the in-process email/SMS/abandoned-cart queues (+12 more)
+Nodes (20): Critical, Ebda Store Deep Audit — Observability / DR / CI-CD / Environments (2026-07-02), H1 — Orders PWA ships to production with NO Sentry error capture, H2 — Sentry source maps are never uploaded (no `withSentryConfig`) → minified stack traces in prod, H3 — Branch sprawl: 242 branches incl. orphan `auto-fix/*` — violates branch-hygiene standard + widens gitleaks/secret surface, High, L1 — `Dockerfile.api` CMD also runs `prisma migrate deploy` (double-migrate / multi-replica race risk), L2 — No queue-depth alert on the in-process email/SMS/abandoned-cart queues (+12 more)
 
 ### Community 344 - "Community 344"
 Cohesion: 0.1
-Nodes (20): 1. Current AI / Smart Software Inventory, 1a. Gemini Flash Lite — live in production, 1b. Deterministic smart software (no LLM), 2. Opportunity Inventory (25 opportunities), 3. Table-stakes vs Differentiation, 4. Top 10 Highest-Impact Opportunities (Ranked), 5. Executive Summary (150 words), AI Competitive Audit — FWB vs Kuwait Market Positioning (+12 more)
+Nodes (20): 1. Current AI / Smart Software Inventory, 1a. Gemini Flash Lite — live in production, 1b. Deterministic smart software (no LLM), 2. Opportunity Inventory (25 opportunities), 3. Table-stakes vs Differentiation, 4. Top 10 Highest-Impact Opportunities (Ranked), 5. Executive Summary (150 words), AI Competitive Audit — Ebda Store vs Egypt Market Positioning (+12 more)
 
 ### Community 345 - "Community 345"
 Cohesion: 0.1
@@ -3109,7 +3109,7 @@ Nodes (20): 1. Problem, 2. Core principle — provenance, 3.1 Provenance store (
 
 ### Community 346 - "Community 346"
 Cohesion: 0.1
-Nodes (21): Architecture, Bot Intelligence (Phase 8), Branding & PWA, code:block1 (┌───────────────────────────────────────────────────────────), code:block2 (force-website-builder/), Commerce, Communication Hub, Deployment (+13 more)
+Nodes (21): Architecture, Bot Intelligence (Phase 8), Branding & PWA, code:block1 (┌───────────────────────────────────────────────────────────), code:block2 (ebda-store/), Commerce, Communication Hub, Deployment (+13 more)
 
 ### Community 347 - "Community 347"
 Cohesion: 0.1
@@ -3197,7 +3197,7 @@ Nodes (19): Acceptance criteria, AI-discoverability + bilingual email rollout �
 
 ### Community 368 - "Community 368"
 Cohesion: 0.1
-Nodes (19): code:bash (git commit -m "feat(accounting): expense service + posting +), code:ts (import { prisma } from '@force/database';), code:ts (const inStock = product.inventory > 0;), code:bash (# Workspace builds), code:bash (nohup ~/.claude/scripts/update-memory-pipeline.sh all > /tmp), Execution Handoff, File Structure, FWB Accounting Batch 2 — Stock + Backorders + Finance Dashboard Implementation Plan (+11 more)
+Nodes (19): code:bash (git commit -m "feat(accounting): expense service + posting +), code:ts (import { prisma } from '@force/database';), code:ts (const inStock = product.inventory > 0;), code:bash (# Workspace builds), code:bash (nohup ~/.claude/scripts/update-memory-pipeline.sh all > /tmp), Execution Handoff, File Structure, Ebda Store Accounting Batch 2 — Stock + Backorders + Finance Dashboard Implementation Plan (+11 more)
 
 ### Community 369 - "Community 369"
 Cohesion: 0.1
@@ -3205,7 +3205,7 @@ Nodes (19): Admin UI — unified DNS records list, API routes, Branded template 
 
 ### Community 370 - "Community 370"
 Cohesion: 0.1
-Nodes (19): Arabic Translation Handoff — Force Admin Dashboard, Brand name, code:json ({), code:json ({), code:json ("items": "{count, plural, one {# item} other {# items}}"), code:block4 (apps/admin/src/i18n/messages/ar.json), Consistency, Digits and numbers (+11 more)
+Nodes (19): Arabic Translation Handoff — Ebda Admin Dashboard, Brand name, code:json ({), code:json ({), code:json ("items": "{count, plural, one {# item} other {# items}}"), code:block4 (apps/admin/src/i18n/messages/ar.json), Consistency, Digits and numbers (+11 more)
 
 ### Community 371 - "Community 371"
 Cohesion: 0.1
@@ -3309,7 +3309,7 @@ Nodes (17): a, after, b, base, before, blob, both, c (+9 more)
 
 ### Community 396 - "Community 396"
 Cohesion: 0.11
-Nodes (18): Ebda — fork notice (read first), code:bash (npm run dev:api|dev:admin|dev:web     # dev servers (admin 3), Commands, Critical architecture rules, Cross-project standing rules, Every data has a UI (every PR), Force Website Builder — Project Guidelines, graphify (+10 more)
+Nodes (18): Ebda — fork notice (read first), code:bash (npm run dev:api|dev:admin|dev:web     # dev servers (admin 3), Commands, Critical architecture rules, Cross-project standing rules, Every data has a UI (every PR), Ebda Store — Project Guidelines, graphify (+10 more)
 
 ### Community 397 - "Community 397"
 Cohesion: 0.11
@@ -3329,7 +3329,7 @@ Nodes (18): A1 — Locale-matched meta (root cause), A2 — Brand entity, A3 —
 
 ### Community 401 - "Community 401"
 Cohesion: 0.11
-Nodes (18): Adversarial audit — force-website-builder, 2026-09-02, Blind spots — what would settle them, code:sql (SELECT count(*) FROM inventory_history a), code:block2 (GET https://api-production-c058.up.railway.app/{/,/health,/a), Corrected during synthesis, P0-1 · Cross-tenant absolute inventory write via stock-adjustment, P0-2 · Cross-tenant inventory + cost write, foreign backorder/order-item tampering, supplier PII, P0-3 · Merchant custom domain → CSRF-exempt credentialed cross-origin → platform takeover (+10 more)
+Nodes (18): Adversarial audit — ebda-store, 2026-09-02, Blind spots — what would settle them, code:sql (SELECT count(*) FROM inventory_history a), code:block2 (GET https://api-production-c058.up.railway.app/{/,/health,/a), Corrected during synthesis, P0-1 · Cross-tenant absolute inventory write via stock-adjustment, P0-2 · Cross-tenant inventory + cost write, foreign backorder/order-item tampering, supplier PII, P0-3 · Merchant custom domain → CSRF-exempt credentialed cross-origin → platform takeover (+10 more)
 
 ### Community 402 - "Community 402"
 Cohesion: 0.11
@@ -3337,7 +3337,7 @@ Nodes (18): 3.10 Env var management, 3.11 Multi-tenant domain provisioning, 3.12
 
 ### Community 403 - "Community 403"
 Cohesion: 0.11
-Nodes (18): For acquirers, For investors, For Kuwait merchants, Pitch Deck Outline, Slide 10 — Why merchants stay, Slide 11 — Team, Slide 12 — The Ask, Slide 1 — Title (+10 more)
+Nodes (18): For acquirers, For investors, For Egypt merchants, Pitch Deck Outline, Slide 10 — Why merchants stay, Slide 11 — Team, Slide 12 — The Ask, Slide 1 — Title (+10 more)
 
 ### Community 404 - "Community 404"
 Cohesion: 0.11
@@ -3345,7 +3345,7 @@ Nodes (18): code:ts (import sharp from 'sharp';), code:ts (// POST /stores/:id/p
 
 ### Community 405 - "Community 405"
 Cohesion: 0.11
-Nodes (18): Admin changes (Commit 6), Decisions (2026-05-16, Ahmad confirmed), Delta vs current FWB (`apps/web/src/templates/`), End-to-end admin sync (added 2026-05-16 mid-plan), Files that need explicit reading before touching, Implementation order (file-by-file), Interactive controls (catalog from target screenshots), Mobile UI ship — match Pecannbee + Bank-Alkahraman sizing (+10 more)
+Nodes (18): Admin changes (Commit 6), Decisions (2026-05-16, Ahmad confirmed), Delta vs current Ebda Store (`apps/web/src/templates/`), End-to-end admin sync (added 2026-05-16 mid-plan), Files that need explicit reading before touching, Implementation order (file-by-file), Interactive controls (catalog from target screenshots), Mobile UI ship — match Storefront + Bank-Alkahraman sizing (+10 more)
 
 ### Community 406 - "Community 406"
 Cohesion: 0.11
@@ -3357,15 +3357,15 @@ Nodes (15): bodyComp, have, toCreate, body, definitions, buildTemplatesForStore(
 
 ### Community 408 - "Community 408"
 Cohesion: 0.11
-Nodes (19): Accounting Module (Professional plan), AI Features (Google Gemini Flash Lite), Commerce Core, Communication, Force AI Store — Product Roadmap, Infrastructure, Inventory (tiered by plan), Kuwait Payment Stack (+11 more)
+Nodes (19): Accounting Module (Professional plan), AI Features (Google Gemini Flash Lite), Commerce Core, Communication, Ebda Store — Product Roadmap, Infrastructure, Inventory (tiered by plan), Egypt Payment Stack (+11 more)
 
 ### Community 409 - "Community 409"
 Cohesion: 0.11
-Nodes (19): Accounting Module (Professional plan), AI Features (Google Gemini Flash Lite), Commerce Core, Communication, Force AI Store — Product Roadmap, Infrastructure, Inventory (tiered by plan), Kuwait Payment Stack (+11 more)
+Nodes (19): Accounting Module (Professional plan), AI Features (Google Gemini Flash Lite), Commerce Core, Communication, Ebda Store — Product Roadmap, Infrastructure, Inventory (tiered by plan), Egypt Payment Stack (+11 more)
 
 ### Community 410 - "Community 410"
 Cohesion: 0.11
-Nodes (19): Accounting Module (Professional plan), AI Features (Google Gemini Flash Lite), Commerce Core, Communication, Force AI Store — Product Roadmap, Infrastructure, Inventory (tiered by plan), Kuwait Payment Stack (+11 more)
+Nodes (19): Accounting Module (Professional plan), AI Features (Google Gemini Flash Lite), Commerce Core, Communication, Ebda Store — Product Roadmap, Infrastructure, Inventory (tiered by plan), Egypt Payment Stack (+11 more)
 
 ### Community 411 - "Community 411"
 Cohesion: 0.11
@@ -3377,7 +3377,7 @@ Nodes (19): Accounting Module (Professional plan), AI Features (Google Gemini Fl
 
 ### Community 413 - "Community 413"
 Cohesion: 0.11
-Nodes (19): Accounting Module (Professional plan), AI Features (Google Gemini Flash Lite), Commerce Core, Communication, Force AI Store — Product Roadmap, Infrastructure, Inventory (tiered by plan), Kuwait Payment Stack (+11 more)
+Nodes (19): Accounting Module (Professional plan), AI Features (Google Gemini Flash Lite), Commerce Core, Communication, Ebda Store — Product Roadmap, Infrastructure, Inventory (tiered by plan), Egypt Payment Stack (+11 more)
 
 ### Community 414 - "Community 414"
 Cohesion: 0.15
@@ -3449,7 +3449,7 @@ Nodes (17): code:ts (import { prisma } from '@force/database';), code:ts (/**), 
 
 ### Community 431 - "Community 431"
 Cohesion: 0.11
-Nodes (18): code:ts (const productCardDefaultsSchema = z), code:tsx (cardFrameColor={layout.<section>.cardFrameColor || layout.pr), code:tsx (className={`snap-start shrink-0 w-[44vw] sm:w-[28vw] md:w-[2), code:tsx (className={`snap-start shrink-0 w-[44vw] sm:w-[28vw] md:w-[2), code:bash (grep -l "cardFrameColor" apps/web/src/templates/shared/Pecan), code:tsx (<PecannbeeProductCard), code:tsx (<ColorField), code:bash (git add packages/shared/src/types/store-layout.ts apps/api/s) (+10 more)
+Nodes (18): code:ts (const productCardDefaultsSchema = z), code:tsx (cardFrameColor={layout.<section>.cardFrameColor || layout.pr), code:tsx (className={`snap-start shrink-0 w-[44vw] sm:w-[28vw] md:w-[2), code:tsx (className={`snap-start shrink-0 w-[44vw] sm:w-[28vw] md:w-[2), code:bash (grep -l "cardFrameColor" apps/web/src/templates/shared/Pecan), code:tsx (<StorefrontProductCard), code:tsx (<ColorField), code:bash (git add packages/shared/src/types/store-layout.ts apps/api/s) (+10 more)
 
 ### Community 432 - "Community 432"
 Cohesion: 0.11
@@ -3569,7 +3569,7 @@ Nodes (16): Anti-patterns, Anti-patterns to refuse, Ebda Design — sizing rules
 
 ### Community 462 - "Community 462"
 Cohesion: 0.12
-Nodes (17): code:bash (npm run dev:api|dev:admin|dev:web     # dev servers (admin 3), Commands, Critical architecture rules, Cross-project standing rules, Every data has a UI (every PR), Force Website Builder — Project Guidelines, graphify, Inventory model (+9 more)
+Nodes (17): code:bash (npm run dev:api|dev:admin|dev:web     # dev servers (admin 3), Commands, Critical architecture rules, Cross-project standing rules, Every data has a UI (every PR), Ebda Store — Project Guidelines, graphify, Inventory model (+9 more)
 
 ### Community 463 - "Community 463"
 Cohesion: 0.12
@@ -3577,15 +3577,15 @@ Nodes (17): code:bash (npm run dev:api|dev:admin|dev:web     # dev servers (admi
 
 ### Community 464 - "Community 464"
 Cohesion: 0.12
-Nodes (17): code:bash (npm run dev:api|dev:admin|dev:web     # dev servers (admin 3), Commands, Critical architecture rules, Cross-project standing rules, Every data has a UI (every PR), Force Website Builder — Project Guidelines, graphify, Inventory model (+9 more)
+Nodes (17): code:bash (npm run dev:api|dev:admin|dev:web     # dev servers (admin 3), Commands, Critical architecture rules, Cross-project standing rules, Every data has a UI (every PR), Ebda Store — Project Guidelines, graphify, Inventory model (+9 more)
 
 ### Community 465 - "Community 465"
 Cohesion: 0.12
-Nodes (17): code:bash (npm run dev:api|dev:admin|dev:web     # dev servers (admin 3), Commands, Critical architecture rules, Cross-project standing rules, Every data has a UI (every PR), Force Website Builder — Project Guidelines, graphify, Inventory model (+9 more)
+Nodes (17): code:bash (npm run dev:api|dev:admin|dev:web     # dev servers (admin 3), Commands, Critical architecture rules, Cross-project standing rules, Every data has a UI (every PR), Ebda Store — Project Guidelines, graphify, Inventory model (+9 more)
 
 ### Community 466 - "Community 466"
 Cohesion: 0.12
-Nodes (17): code:bash (npm run dev:api|dev:admin|dev:web     # dev servers (admin 3), Commands, Critical architecture rules, Cross-project standing rules, Every data has a UI (every PR), Force Website Builder — Project Guidelines, graphify, Inventory model (+9 more)
+Nodes (17): code:bash (npm run dev:api|dev:admin|dev:web     # dev servers (admin 3), Commands, Critical architecture rules, Cross-project standing rules, Every data has a UI (every PR), Ebda Store — Project Guidelines, graphify, Inventory model (+9 more)
 
 ### Community 467 - "Community 467"
 Cohesion: 0.12
@@ -3617,7 +3617,7 @@ Nodes (16): Answer to Q1 — what state does a mid-transaction P2028 timeout lea
 
 ### Community 474 - "Community 474"
 Cohesion: 0.12
-Nodes (16): 1.10 Security gates in CI, 1.1 Authentication, 1.2 Authorization & tenant isolation, 1.3 OWASP Top 10 surface, 1.4 Headers + CSRF, 1.5 Secrets management, 1.6 PII handling, 1.7 GDPR / Kuwait Law 13/2023 compliance (+8 more)
+Nodes (16): 1.10 Security gates in CI, 1.1 Authentication, 1.2 Authorization & tenant isolation, 1.3 OWASP Top 10 surface, 1.4 Headers + CSRF, 1.5 Secrets management, 1.6 PII handling, 1.7 GDPR / Egypt Law 13/2023 compliance (+8 more)
 
 ### Community 475 - "Community 475"
 Cohesion: 0.12
@@ -3625,7 +3625,7 @@ Nodes (16): 4.10 Graph Signals (God Nodes, Bridges), 4.1 Monorepo Structure & De
 
 ### Community 476 - "Community 476"
 Cohesion: 0.12
-Nodes (16): Adversarial audit — slug: `falsification`, BLIND SPOTS (what I could not verify statically, and what settles it), Dimension: falsify the record (audits, gates, tests — not feature code), FALSIFIED (prior-audit PASS verdicts disproved), [P1] Four colocated web tests run NOWHERE — the exact orphan-test class CI's own comment warns about, recurred after the fix, [P1] "Preview env isolation (rule 13)" is a zombie gate — green on every PR, verifies nothing, and the platform it checked no longer hosts FWB, [P1] The five-layer testing claim is 60% real: load layer dead 3 months, perf layer red 7 weeks with no alert, UAT nonexistent, [P2 — FALSIFIED verdict] 2026-08-31 lens L16 "PASS — 324 storeId columns, 233 RLS policy statements": RLS is still INERT in production (+8 more)
+Nodes (16): Adversarial audit — slug: `falsification`, BLIND SPOTS (what I could not verify statically, and what settles it), Dimension: falsify the record (audits, gates, tests — not feature code), FALSIFIED (prior-audit PASS verdicts disproved), [P1] Four colocated web tests run NOWHERE — the exact orphan-test class CI's own comment warns about, recurred after the fix, [P1] "Preview env isolation (rule 13)" is a zombie gate — green on every PR, verifies nothing, and the platform it checked no longer hosts Ebda Store, [P1] The five-layer testing claim is 60% real: load layer dead 3 months, perf layer red 7 weeks with no alert, UAT nonexistent, [P2 — FALSIFIED verdict] 2026-08-31 lens L16 "PASS — 324 storeId columns, 233 RLS policy statements": RLS is still INERT in production (+8 more)
 
 ### Community 477 - "Community 477"
 Cohesion: 0.12
@@ -3641,7 +3641,7 @@ Nodes (16): Client configuration, code:block1 (GET    /api/v1/stores/:id/integra
 
 ### Community 480 - "Community 480"
 Cohesion: 0.12
-Nodes (16): 10. Sources — full list, 1. Kuwait, 2. Saudi Arabia, 3. United Arab Emirates, 3a. Federal PDPL, 3b. DIFC (Dubai International Financial Centre — free zone), 3c. ADGM (Abu Dhabi Global Market — free zone), 4. Qatar (+8 more)
+Nodes (16): 10. Sources — full list, 1. Egypt, 2. Saudi Arabia, 3. United Arab Emirates, 3a. Federal PDPL, 3b. DIFC (Dubai International Financial Centre — free zone), 3c. ADGM (Abu Dhabi Global Market — free zone), 4. Qatar (+8 more)
 
 ### Community 481 - "Community 481"
 Cohesion: 0.12
@@ -3669,7 +3669,7 @@ Nodes (16): 1a. Create CF resources (one-time, needs `CLOUDFLARE_API_TOKEN` + ac
 
 ### Community 487 - "Community 487"
 Cohesion: 0.12
-Nodes (16): Cash on Delivery (COD), code:block1 (https://api.force-ai.co/api/v1/webhooks/payment/<provider>), Comparison, Hesabe setup, How a paid order is confirmed (two paths), Multi-provider strategy, Multi-tenant safety (technical), MyFatoorah setup (+8 more)
+Nodes (16): Cash on Delivery (COD), code:block1 (https://api.ebda.app/api/v1/webhooks/payment/<provider>), Comparison, Hesabe setup, How a paid order is confirmed (two paths), Multi-provider strategy, Multi-tenant safety (technical), MyFatoorah setup (+8 more)
 
 ### Community 488 - "Community 488"
 Cohesion: 0.12
@@ -3733,27 +3733,27 @@ Nodes (12): build(), draw(), gauss(), lightRandomStore(), NileNight(), Pt, rnd()
 
 ### Community 503 - "Community 503"
 Cohesion: 0.12
-Nodes (16): Anti-patterns, Anti-patterns to refuse, FWB Design — sizing rules (ahmad standing preference), How merchants upload (admin paths), How to scaffold a new theme from this doc, How to use this doc for AI-driven scaffolding, Image asset standards (canonical designer brief — 2026-05-17 night), Industry benchmark sizes (apply these) (+8 more)
+Nodes (16): Anti-patterns, Anti-patterns to refuse, Ebda Store Design — sizing rules (ahmad standing preference), How merchants upload (admin paths), How to scaffold a new theme from this doc, How to use this doc for AI-driven scaffolding, Image asset standards (canonical designer brief — 2026-05-17 night), Industry benchmark sizes (apply these) (+8 more)
 
 ### Community 504 - "Community 504"
 Cohesion: 0.12
-Nodes (16): Anti-patterns, Anti-patterns to refuse, FWB Design — sizing rules (ahmad standing preference), How merchants upload (admin paths), How to scaffold a new theme from this doc, How to use this doc for AI-driven scaffolding, Image asset standards (canonical designer brief — 2026-05-17 night), Industry benchmark sizes (apply these) (+8 more)
+Nodes (16): Anti-patterns, Anti-patterns to refuse, Ebda Store Design — sizing rules (ahmad standing preference), How merchants upload (admin paths), How to scaffold a new theme from this doc, How to use this doc for AI-driven scaffolding, Image asset standards (canonical designer brief — 2026-05-17 night), Industry benchmark sizes (apply these) (+8 more)
 
 ### Community 505 - "Community 505"
 Cohesion: 0.12
-Nodes (16): Anti-patterns, Anti-patterns to refuse, FWB Design — sizing rules (ahmad standing preference), How merchants upload (admin paths), How to scaffold a new theme from this doc, How to use this doc for AI-driven scaffolding, Image asset standards (canonical designer brief — 2026-05-17 night), Industry benchmark sizes (apply these) (+8 more)
+Nodes (16): Anti-patterns, Anti-patterns to refuse, Ebda Store Design — sizing rules (ahmad standing preference), How merchants upload (admin paths), How to scaffold a new theme from this doc, How to use this doc for AI-driven scaffolding, Image asset standards (canonical designer brief — 2026-05-17 night), Industry benchmark sizes (apply these) (+8 more)
 
 ### Community 506 - "Community 506"
 Cohesion: 0.12
-Nodes (16): Anti-patterns, Anti-patterns to refuse, FWB Design — sizing rules (ahmad standing preference), How merchants upload (admin paths), How to scaffold a new theme from this doc, How to use this doc for AI-driven scaffolding, Image asset standards (canonical designer brief — 2026-05-17 night), Industry benchmark sizes (apply these) (+8 more)
+Nodes (16): Anti-patterns, Anti-patterns to refuse, Ebda Store Design — sizing rules (ahmad standing preference), How merchants upload (admin paths), How to scaffold a new theme from this doc, How to use this doc for AI-driven scaffolding, Image asset standards (canonical designer brief — 2026-05-17 night), Industry benchmark sizes (apply these) (+8 more)
 
 ### Community 507 - "Community 507"
 Cohesion: 0.12
-Nodes (16): Anti-patterns, Anti-patterns to refuse, FWB Design — sizing rules (ahmad standing preference), How merchants upload (admin paths), How to scaffold a new theme from this doc, How to use this doc for AI-driven scaffolding, Image asset standards (canonical designer brief — 2026-05-17 night), Industry benchmark sizes (apply these) (+8 more)
+Nodes (16): Anti-patterns, Anti-patterns to refuse, Ebda Store Design — sizing rules (ahmad standing preference), How merchants upload (admin paths), How to scaffold a new theme from this doc, How to use this doc for AI-driven scaffolding, Image asset standards (canonical designer brief — 2026-05-17 night), Industry benchmark sizes (apply these) (+8 more)
 
 ### Community 508 - "Community 508"
 Cohesion: 0.12
-Nodes (16): Anti-patterns, Anti-patterns to refuse, FWB Design — sizing rules (ahmad standing preference), How merchants upload (admin paths), How to scaffold a new theme from this doc, How to use this doc for AI-driven scaffolding, Image asset standards (canonical designer brief — 2026-05-17 night), Industry benchmark sizes (apply these) (+8 more)
+Nodes (16): Anti-patterns, Anti-patterns to refuse, Ebda Store Design — sizing rules (ahmad standing preference), How merchants upload (admin paths), How to scaffold a new theme from this doc, How to use this doc for AI-driven scaffolding, Image asset standards (canonical designer brief — 2026-05-17 night), Industry benchmark sizes (apply these) (+8 more)
 
 ### Community 509 - "Community 509"
 Cohesion: 0.12
@@ -3765,7 +3765,7 @@ Nodes (15): Checkout debit, code:block1 (enum WalletTransactionType { credit deb
 
 ### Community 511 - "Community 511"
 Cohesion: 0.12
-Nodes (15): 1a. Fix context on the ~26 bare-mount routers (F2) — code only, no migration, 1b. Add the missing `force_app` policies (F3) — migration, idempotent, 1c. Make CI exercise RLS as force_app — the proof harness, 2026-09-25 — first Phase 3 attempt, rolled back (13:21–13:25), code:sql (SELECT c.relname,), Current state (verified from migrations + code), Definition of done, Phase 0 — Discovery & guardrails (no behavior change, ship first) (+7 more)
+Nodes (15): 1a. Fix context on the ~26 bare-mount routers (F2) — code only, no migration, 1b. Add the missing `the earlier app role` policies (F3) — migration, idempotent, 1c. Make CI exercise RLS as the earlier app role — the proof harness, 2026-09-25 — first Phase 3 attempt, rolled back (13:21–13:25), code:sql (SELECT c.relname,), Current state (verified from migrations + code), Definition of done, Phase 0 — Discovery & guardrails (no behavior change, ship first) (+7 more)
 
 ### Community 512 - "Community 512"
 Cohesion: 0.12
@@ -3789,11 +3789,11 @@ Nodes (15): Aggregators (alternative route), Answer, Aramex Egypt, Bosta, Carrie
 
 ### Community 517 - "Community 517"
 Cohesion: 0.12
-Nodes (15): Blocker log (in order), Bundle size (`wrangler deploy --dry-run --outdir`), code:jsonc ({), code:ts (import '../cf-stubs/cf-env-init'; // Hyperdrive getter + boo), Experiment: can FWB's existing Express API run on Cloudflare workerd?, Interpretation for the decision, Latency, Request lifecycle checks (item 6) (+7 more)
+Nodes (15): Blocker log (in order), Bundle size (`wrangler deploy --dry-run --outdir`), code:jsonc ({), code:ts (import '../cf-stubs/cf-env-init'; // Hyperdrive getter + boo), Experiment: can Ebda Store's existing Express API run on Cloudflare workerd?, Interpretation for the decision, Latency, Request lifecycle checks (item 6) (+7 more)
 
 ### Community 518 - "Community 518"
 Cohesion: 0.12
-Nodes (15): code:ts (// apps/api/src/lib/ai-quota.ts (new file)), code:bash (grep -rn "refetchInterval" apps/admin/src/), code:ts (const queryClient = new QueryClient({), Context (read first), FWB cost-reduction plan — 2026-05-04, Out of scope (don't implement), Phase 1 — URGENT (this week), Phase 2 — Code changes that pay back at scale (1 week, low risk) (+7 more)
+Nodes (15): code:ts (// apps/api/src/lib/ai-quota.ts (new file)), code:bash (grep -rn "refetchInterval" apps/admin/src/), code:ts (const queryClient = new QueryClient({), Context (read first), Ebda Store cost-reduction plan — 2026-05-04, Out of scope (don't implement), Phase 1 — URGENT (this week), Phase 2 — Code changes that pay back at scale (1 week, low risk) (+7 more)
 
 ### Community 519 - "Community 519"
 Cohesion: 0.12
@@ -3817,7 +3817,7 @@ Nodes (15): Done criteria per group, Execution order, Group A — Footer overhau
 
 ### Community 524 - "Community 524"
 Cohesion: 0.12
-Nodes (15): 10. Rollout, 11. Open decisions (resolved in brainstorm), 1. Problem & goal, 2. Foundations already shipped (build on, don't replace), 3. The scale model (the decision), 4. Architecture (isolated, testable units), 5. Hard constraint — wadyaljuz AND palora never change, 6. Demos — showcase all 5 identities under one brand (+7 more)
+Nodes (15): 10. Rollout, 11. Open decisions (resolved in brainstorm), 1. Problem & goal, 2. Foundations already shipped (build on, don't replace), 3. The scale model (the decision), 4. Architecture (isolated, testable units), 5. Hard constraint — demo-merchant AND demo-boutique never change, 6. Demos — showcase all 5 identities under one brand (+7 more)
 
 ### Community 525 - "Community 525"
 Cohesion: 0.12
@@ -3937,27 +3937,27 @@ Nodes (14): 1. The back-catalog stampede (this already happened once), 2. Re-fir
 
 ### Community 554 - "Community 554"
 Cohesion: 0.13
-Nodes (14): A1. Cache inventory by staleness class, A2. Event-invalidation vs TTL-only, A3. Cache-miss stampede protection, Candidate new CLAUDE.md standing rule, Delta vs the 2026-07-02 MASTER audit, FWB Builder Reality Audit v1 (2026-07-09), Lens A — Cache correctness & staleness, Lens B — Token / auth hardening (+6 more)
+Nodes (14): A1. Cache inventory by staleness class, A2. Event-invalidation vs TTL-only, A3. Cache-miss stampede protection, Candidate new CLAUDE.md standing rule, Delta vs the 2026-07-02 MASTER audit, Ebda Store Builder Reality Audit v1 (2026-07-09), Lens A — Cache correctness & staleness, Lens B — Token / auth hardening (+6 more)
 
 ### Community 555 - "Community 555"
 Cohesion: 0.13
-Nodes (14): F1 — Production runs with RLS entirely disabled (BYPASSRLS owner role); isolation is app-layer-only, F2 — RLS tenant context is never set for ~32 routers mounted at bare `/stores`, `/`, `/admin`, F3 — `addresses` table is FORCE-RLS'd with NO policy → deny-all for `force_app` at cutover (checkout + saved addresses break platform-wide), F4 — Bulk-AI Inngest functions run in bare RLS context under false `runInTenantContext` comments, F5 — PLP compare-list reads the un-namespaced legacy `compareProducts` key → functional desync + cross-store bleed, F5b — Static, un-namespaced storefront storage keys bleed UX/PII state between stores, F6 — Public wishlist is disclosed by `userId` with no share/consent flag, F7 — `bulk-ai-balance-descriptions.ts` comment misstates that `products`/`bulk_ai_jobs` are "NOT RLS-protected" (+6 more)
+Nodes (14): F1 — Production runs with RLS entirely disabled (BYPASSRLS owner role); isolation is app-layer-only, F2 — RLS tenant context is never set for ~32 routers mounted at bare `/stores`, `/`, `/admin`, F3 — `addresses` table is FORCE-RLS'd with NO policy → deny-all for `the earlier app role` at cutover (checkout + saved addresses break platform-wide), F4 — Bulk-AI Inngest functions run in bare RLS context under false `runInTenantContext` comments, F5 — PLP compare-list reads the un-namespaced legacy `compareProducts` key → functional desync + cross-store bleed, F5b — Static, un-namespaced storefront storage keys bleed UX/PII state between stores, F6 — Public wishlist is disclosed by `userId` with no share/consent flag, F7 — `bulk-ai-balance-descriptions.ts` comment misstates that `products`/`bulk_ai_jobs` are "NOT RLS-protected" (+6 more)
 
 ### Community 556 - "Community 556"
 Cohesion: 0.13
-Nodes (14): code:bash (# In the FWB repo root:), code:bash (TOKEN="<your-token>"), Meta auto-provisioner — one-time Force AI setup, Related, Step 1 — Create the Force AI parent Business Manager, Step 2 — Note the Business Manager ID, Step 3 — Create the provisioner system user, Step 4 — Generate the never-expires token (+6 more)
+Nodes (14): code:bash (# In the Ebda Store repo root:), code:bash (TOKEN="<your-token>"), Meta auto-provisioner — one-time Ebda AI Studio setup, Related, Step 1 — Create the Ebda AI Studio parent Business Manager, Step 2 — Note the Business Manager ID, Step 3 — Create the provisioner system user, Step 4 — Generate the never-expires token (+6 more)
 
 ### Community 557 - "Community 557"
 Cohesion: 0.13
-Nodes (14): code:block1 (isFeatureEnabled(storeId, key) =), Force AI WhatsApp side, How to change a merchant's plan, How to grant or revoke a single feature, How to onboard a new merchant, How to reactivate, How to suspend a store, Money alerts that need a human (+6 more)
+Nodes (14): code:block1 (isFeatureEnabled(storeId, key) =), Ebda AI Studio WhatsApp side, How to change a merchant's plan, How to grant or revoke a single feature, How to onboard a new merchant, How to reactivate, How to suspend a store, Money alerts that need a human (+6 more)
 
 ### Community 558 - "Community 558"
 Cohesion: 0.15
-Nodes (14): 1. `fix-wsl-runner.sh` — heal the flaky box (run first), 2. `setup-parallel-runners.sh` — run CI jobs in parallel per project, code:bash (bash fix-wsl-runner.sh          # needs sudo once (your WSL ), code:bash (bash setup-parallel-runners.sh            # ensure 2 runners), code:bash (pkill -9 -f jest 2>/dev/null; pkill -9 -f Runner.Worker 2>/d), code:bash (gh variable set USE_SELF_HOSTED --body false --repo ForceAI-), code:block5 (runs-on: ${{ (inputs.force_cloud || vars.USE_SELF_HOSTED != ), code:block6 (runs-on: ${{ (inputs.force_cloud || (github.event_name == 's) (+6 more)
+Nodes (14): 1. `fix-wsl-runner.sh` — heal the flaky box (run first), 2. `setup-parallel-runners.sh` — run CI jobs in parallel per project, code:bash (bash fix-wsl-runner.sh          # needs sudo once (your WSL ), code:bash (bash setup-parallel-runners.sh            # ensure 2 runners), code:bash (pkill -9 -f jest 2>/dev/null; pkill -9 -f Runner.Worker 2>/d), code:bash (gh variable set USE_SELF_HOSTED --body false --repo Ebda AI Studio-), code:block5 (runs-on: ${{ (inputs.force_cloud || vars.USE_SELF_HOSTED != ), code:block6 (runs-on: ${{ (inputs.force_cloud || (github.event_name == 's) (+6 more)
 
 ### Community 559 - "Community 559"
 Cohesion: 0.13
-Nodes (14): Category 1 — declared but never migrated (production is MISSING these), Category 2 — looked destructive, turned out to be a non-issue, Category 3 — cosmetic, deliberately not fixed, code:prisma (@@unique([storeId, sku]) // Prevent duplicate SKUs within a ), code:sql (-- deleted_at IS NULL  -> 0 rows        (looks safe: WRONG)), code:sql (CREATE INDEX ... ON public.product_variants (product_id, bar), code:block4 (ERROR:  column "stripe_payment_intent_id" does not exist), code:bash (createdb fwb_drift_shadow) (+6 more)
+Nodes (14): Category 1 — declared but never migrated (production is MISSING these), Category 2 — looked destructive, turned out to be a non-issue, Category 3 — cosmetic, deliberately not fixed, code:prisma (@@unique([storeId, sku]) // Prevent duplicate SKUs within a ), code:sql (-- deleted_at IS NULL  -> 0 rows        (looks safe: WRONG)), code:sql (CREATE INDEX ... ON public.product_variants (product_id, bar), code:block4 (ERROR:  column "stripe_payment_intent_id" does not exist), code:bash (createdb ebda_drift_shadow) (+6 more)
 
 ### Community 560 - "Community 560"
 Cohesion: 0.13
@@ -3977,7 +3977,7 @@ Nodes (14): Admin UI, Cache Strategy, code:typescript (class NotificationConfigS
 
 ### Community 564 - "Community 564"
 Cohesion: 0.13
-Nodes (14): 1. `instrumentation.ts` — server Sentry (Node SDK) → Workers, 2. `opengraph-image.tsx` — `sharp` → `next/og`, 3. Image optimization, 4. Per-tenant custom domains (the scale driver), Adapter compatibility — entire fleet is supported, Cloudflare migration readiness — Force AI Vercel fleet, Cost forecast @ 100 stores (≈8.4M pageviews/mo, mixed traffic), Dual-run plan (run both until validated, then cut over per-tenant) (+6 more)
+Nodes (14): 1. `instrumentation.ts` — server Sentry (Node SDK) → Workers, 2. `opengraph-image.tsx` — `sharp` → `next/og`, 3. Image optimization, 4. Per-tenant custom domains (the scale driver), Adapter compatibility — entire fleet is supported, Cloudflare migration readiness — Ebda AI Studio Vercel fleet, Cost forecast @ 100 stores (≈8.4M pageviews/mo, mixed traffic), Dual-run plan (run both until validated, then cut over per-tenant) (+6 more)
 
 ### Community 565 - "Community 565"
 Cohesion: 0.13
@@ -4116,7 +4116,7 @@ Nodes (10): MANUAL_REFUND_METHODS, ManualRefundDialog(), ManualRefundDialogProps
 
 ### Community 597 - "Community 597"
 Cohesion: 0.14
-Nodes (13): Abandoned-cart and shipping-carrier crons, Code changes that make this safe (merged in this PR), code:bash (redis-cli -u $REDIS_URL keys "leader:*"), Horizontal Scaling, Horizontal Scaling Guide — Force Website Builder API, Leader-lock contention, Neon connection count vs pool limit, Prerequisites checklist (+5 more)
+Nodes (13): Abandoned-cart and shipping-carrier crons, Code changes that make this safe (merged in this PR), code:bash (redis-cli -u $REDIS_URL keys "leader:*"), Horizontal Scaling, Horizontal Scaling Guide — Ebda Store API, Leader-lock contention, Neon connection count vs pool limit, Prerequisites checklist (+5 more)
 
 ### Community 598 - "Community 598"
 Cohesion: 0.14
@@ -4164,11 +4164,11 @@ Nodes (13): 1. Prisma schema (additive migration), 2. Parsers, 3. Matching engin
 
 ### Community 609 - "Community 609"
 Cohesion: 0.14
-Nodes (13): 1. Problem & premise (verified against source, 2026-07-22), 2. Goal, 3. Architecture, 3a. Subsystem A — Answer-engine provider abstraction + citation-check job, 3b. Subsystem B — Force-managed GSC ingestion, 3c. Admin config placeholder (the "set anytime" surface), 3d. Data model (append-only), 3e. Merchant dashboard (the deliverable — every-data-needs-a-UI) (+5 more)
+Nodes (13): 1. Problem & premise (verified against source, 2026-07-22), 2. Goal, 3. Architecture, 3a. Subsystem A — Answer-engine provider abstraction + citation-check job, 3b. Subsystem B — Ebda-managed GSC ingestion, 3c. Admin config placeholder (the "set anytime" surface), 3d. Data model (append-only), 3e. Merchant dashboard (the deliverable — every-data-needs-a-UI) (+5 more)
 
 ### Community 610 - "Community 610"
 Cohesion: 0.14
-Nodes (13): Build + deploy recipe (per app), Cloudflare preview workers — FWB frontends (OpenNext), code:bash (export NEXT_PUBLIC_API_URL="https://api.force-ai.co/api/v1" ), code:bash (# 1. devDeps (local only)), code:bash (bash scripts/cf-build.sh orders                # -> apps/ord), code:block4 (Error: File server/instrumentation.js does not exist), Fixes that made the web worker production-equivalent (this PR), Next steps (when promoting beyond preview) (+5 more)
+Nodes (13): Build + deploy recipe (per app), Cloudflare preview workers — Ebda Store frontends (OpenNext), code:bash (export NEXT_PUBLIC_API_URL="https://api.ebda.app/api/v1" ), code:bash (# 1. devDeps (local only)), code:bash (bash scripts/cf-build.sh orders                # -> apps/ord), code:block4 (Error: File server/instrumentation.js does not exist), Fixes that made the web worker production-equivalent (this PR), Next steps (when promoting beyond preview) (+5 more)
 
 ### Community 611 - "Community 611"
 Cohesion: 0.21
@@ -4176,19 +4176,19 @@ Nodes (14): addSubscriber(), api(), att(), emitStore(), ensureRoomTable(), onCon
 
 ### Community 612 - "Community 612"
 Cohesion: 0.14
-Nodes (14): Architecture, Branding & PWA, code:block1 (┌───────────────────────────────────────────────────────────), code:block2 (force-website-builder/), Deployment, Force Website Builder, License, Ports (Local Development) (+6 more)
+Nodes (14): Architecture, Branding & PWA, code:block1 (┌───────────────────────────────────────────────────────────), code:block2 (ebda-store/), Deployment, Ebda Store, License, Ports (Local Development) (+6 more)
 
 ### Community 613 - "Community 613"
 Cohesion: 0.14
-Nodes (14): Architecture, Branding & PWA, code:block1 (┌───────────────────────────────────────────────────────────), code:block2 (force-website-builder/), Deployment, Force Website Builder, License, Ports (Local Development) (+6 more)
+Nodes (14): Architecture, Branding & PWA, code:block1 (┌───────────────────────────────────────────────────────────), code:block2 (ebda-store/), Deployment, Ebda Store, License, Ports (Local Development) (+6 more)
 
 ### Community 614 - "Community 614"
 Cohesion: 0.14
-Nodes (14): Architecture, Branding & PWA, code:block1 (┌───────────────────────────────────────────────────────────), code:block2 (force-website-builder/), Deployment, Force Website Builder, License, Ports (Local Development) (+6 more)
+Nodes (14): Architecture, Branding & PWA, code:block1 (┌───────────────────────────────────────────────────────────), code:block2 (ebda-store/), Deployment, Ebda Store, License, Ports (Local Development) (+6 more)
 
 ### Community 615 - "Community 615"
 Cohesion: 0.14
-Nodes (14): Architecture, Branding & PWA, code:block1 (┌───────────────────────────────────────────────────────────), code:block2 (force-website-builder/), Deployment, Force Website Builder, License, Ports (Local Development) (+6 more)
+Nodes (14): Architecture, Branding & PWA, code:block1 (┌───────────────────────────────────────────────────────────), code:block2 (ebda-store/), Deployment, Ebda Store, License, Ports (Local Development) (+6 more)
 
 ### Community 616 - "Community 616"
 Cohesion: 0.17
@@ -4276,7 +4276,7 @@ Nodes (7): GenericImage, IMAGE_BREAKPOINTS, ImageConstructor, ImageDimensions, I
 
 ### Community 638 - "Community 638"
 Cohesion: 0.19
-Nodes (11): EgyptAddressInput, egyptAddressSchema, httpsUrl, KuwaitAddressInput, kuwaitAddressSchema, LocationInput, locationInputSchema, mapsEmbedSrc() (+3 more)
+Nodes (11): EgyptAddressInput, egyptAddressSchema, httpsUrl, EgyptAddressInput, egyptAddressSchema, LocationInput, locationInputSchema, mapsEmbedSrc() (+3 more)
 
 ### Community 639 - "Community 639"
 Cohesion: 0.15
@@ -4316,11 +4316,11 @@ Nodes (12): CI integration (post-deploy), code:bash (# First-time setup: install
 
 ### Community 648 - "Community 648"
 Cohesion: 0.15
-Nodes (12): ✅ ALL CLEAR — no open blockers as of last update, Backlog still open (Phase 2 — `docs/plans/2026-05-31-phase2-remediation.md`), C1 REVERTED + WBS bot merged (2026-06-01), DONE earlier this session, DONE + verified (landed on FWB main), (earlier) FINAL @ main `b125c587` — build-clean for CI/deploy ✅, Force AI — Session Changelog (running), Infra answers (from code/infra inspection) (+4 more)
+Nodes (12): ✅ ALL CLEAR — no open blockers as of last update, Backlog still open (Phase 2 — `docs/plans/2026-05-31-phase2-remediation.md`), C1 REVERTED + WBS bot merged (2026-06-01), DONE earlier this session, DONE + verified (landed on Ebda Store main), (earlier) FINAL @ main `b125c587` — build-clean for CI/deploy ✅, Ebda AI Studio — Session Changelog (running), Infra answers (from code/infra inspection) (+4 more)
 
 ### Community 649 - "Community 649"
 Cohesion: 0.15
-Nodes (12): F1 — CRITICAL — CONFIRMED — Admin push broadcast has zero feature gate (any tier can blast real push notifications), F2 — HIGH — CONFIRMED — Kuwait invoice generation (accounting.invoicing, Professional addon) has zero gate anywhere, F3 — HIGH — CONFIRMED — `staff_accounts` is a fully dead flag: declared, visible, implemented, never enforced, and excluded from every plan baseline, F4 — HIGH — CONFIRMED — Public affiliate signup accepts applications on stores that never bought `affiliate` (Enterprise-only), F5 — MEDIUM — CONFIRMED — SMS/Push channel config + test-connection routes ungated (config leak, not send leak), F6 — MEDIUM — CONFIRMED — Floating widget write route ungated (config-ahead-of-payment, same shape as F5), F7 — MEDIUM — CONFIRMED — Profit-anomaly read/acknowledge routes ungated; write-gate (Inngest) and read-gate (route) disagree, Feature-Flag 4-Layer Enforcement Audit — 2026-07-02 (+4 more)
+Nodes (12): F1 — CRITICAL — CONFIRMED — Admin push broadcast has zero feature gate (any tier can blast real push notifications), F2 — HIGH — CONFIRMED — Egypt invoice generation (accounting.invoicing, Professional addon) has zero gate anywhere, F3 — HIGH — CONFIRMED — `staff_accounts` is a fully dead flag: declared, visible, implemented, never enforced, and excluded from every plan baseline, F4 — HIGH — CONFIRMED — Public affiliate signup accepts applications on stores that never bought `affiliate` (Enterprise-only), F5 — MEDIUM — CONFIRMED — SMS/Push channel config + test-connection routes ungated (config leak, not send leak), F6 — MEDIUM — CONFIRMED — Floating widget write route ungated (config-ahead-of-payment, same shape as F5), F7 — MEDIUM — CONFIRMED — Profit-anomaly read/acknowledge routes ungated; write-gate (Inngest) and read-gate (route) disagree, Feature-Flag 4-Layer Enforcement Audit — 2026-07-02 (+4 more)
 
 ### Community 650 - "Community 650"
 Cohesion: 0.15
@@ -4328,19 +4328,19 @@ Nodes (12): code:ts (const payment = await prisma.payment.findFirst({ where: { t
 
 ### Community 651 - "Community 651"
 Cohesion: 0.15
-Nodes (12): 1. The one-line read, 2. OSOSS modules (observed), 3. Gap A — OSOSS has it, FWB does not, 4. Gap B — FWB has it, OSOSS does not, 5. Parity, 6. What I'd actually do, 7. Where FWB's advantage is thinner than it looks, 8. Still unverified — settle before this goes in a proposal (+4 more)
+Nodes (12): 1. The one-line read, 2. OSOSS modules (observed), 3. Gap A — OSOSS has it, Ebda Store does not, 4. Gap B — Ebda Store has it, OSOSS does not, 5. Parity, 6. What I'd actually do, 7. Where Ebda Store's advantage is thinner than it looks, 8. Still unverified — settle before this goes in a proposal (+4 more)
 
 ### Community 652 - "Community 652"
 Cohesion: 0.15
-Nodes (12): 1. Purpose + disclaimer, 2. What cyber-liability insurance covers, and why FWB needs it, 3. Recommended coverage limits, 4. Risk profile — copy-pasteable underwriting questionnaire, 5. Carrier / broker shortlist, 6. Action checklist, code:block1 (ENTITY), Cyber-Liability Insurance Brief — Force Website Builder (FWB) / ForceAI (+4 more)
+Nodes (12): 1. Purpose + disclaimer, 2. What cyber-liability insurance covers, and why Ebda Store needs it, 3. Recommended coverage limits, 4. Risk profile — copy-pasteable underwriting questionnaire, 5. Carrier / broker shortlist, 6. Action checklist, code:block1 (ENTITY), Cyber-Liability Insurance Brief — Ebda Store (Ebda Store) / Ebda AI Studio (+4 more)
 
 ### Community 653 - "Community 653"
 Cohesion: 0.15
-Nodes (12): Companion docs (technical), Document lifecycle, Documents in this folder, Force AI Store — Business Documentation, Internal team / future hires, Investor / VC, Journalist / blogger writing about Force AI Store, Kuwait merchant evaluating Force AI Store (+4 more)
+Nodes (12): Companion docs (technical), Document lifecycle, Documents in this folder, Ebda Store — Business Documentation, Internal team / future hires, Investor / VC, Journalist / blogger writing about Ebda Store, Egypt merchant evaluating Ebda Store (+4 more)
 
 ### Community 654 - "Community 654"
 Cohesion: 0.15
-Nodes (12): Detailed Comparison Matrix, Force AI Store — What Merchants Get (and How We're Positioned), Magento Open Source, Per-Platform Context, Salla, Shopify, The 4 Pillars Force AI Store Is Built Around, Total Cost of Ownership — Typical Kuwait Merchant, $50,000/yr GMV (+4 more)
+Nodes (12): Detailed Comparison Matrix, Ebda Store — What Merchants Get (and How We're Positioned), Magento Open Source, Per-Platform Context, Salla, Shopify, The 4 Pillars Ebda Store Is Built Around, Total Cost of Ownership — Typical Egypt Merchant, $50,000/yr GMV (+4 more)
 
 ### Community 655 - "Community 655"
 Cohesion: 0.15
@@ -4348,7 +4348,7 @@ Nodes (12): 1. Purpose, 2. Summary table, 3. Per-vendor detail, 4. Concentration
 
 ### Community 656 - "Community 656"
 Cohesion: 0.15
-Nodes (12): 1. AI-as-default, 2. Arabic-first locality, 3. Kuwait payment stack as first-party, 4. Customization granularity, Force AI Store — One-Pager, Get started, One-click WhatsApp Meta-catalog setup, The 30-second pitch (+4 more)
+Nodes (12): 1. AI-as-default, 2. Arabic-first locality, 3. Egypt payment stack as first-party, 4. Customization granularity, Ebda Store — One-Pager, Get started, One-click WhatsApp Meta-catalog setup, The 30-second pitch (+4 more)
 
 ### Community 657 - "Community 657"
 Cohesion: 0.15
@@ -4360,7 +4360,7 @@ Nodes (13): code:markdown (You are a senior staff engineer reviewing a pull requ
 
 ### Community 659 - "Community 659"
 Cohesion: 0.15
-Nodes (12): Europe region migration runbook — FWB + WBS → Frankfurt/Netherlands, Measured facts (2026-06-27), Open coordination points (need Ahmad), Per-service cutover (run top-to-bottom, one service at a time), Phase 0 — provision the Frankfurt target (no downtime), Phase 1 — dry-run restore (no downtime, fully reversible — DO THIS BEFORE the freeze), Phase 2 — cutover (SHORT write-freeze), Phase 3 — post-cutover (+4 more)
+Nodes (12): Europe region migration runbook — Ebda Store + WBS → Frankfurt/Netherlands, Measured facts (2026-06-27), Open coordination points (need Ahmad), Per-service cutover (run top-to-bottom, one service at a time), Phase 0 — provision the Frankfurt target (no downtime), Phase 1 — dry-run restore (no downtime, fully reversible — DO THIS BEFORE the freeze), Phase 2 — cutover (SHORT write-freeze), Phase 3 — post-cutover (+4 more)
 
 ### Community 660 - "Community 660"
 Cohesion: 0.15
@@ -4380,11 +4380,11 @@ Nodes (13): T0-10 — `redeemPoints` double-spend race, T0-11 — CSRF bypass vi
 
 ### Community 664 - "Community 664"
 Cohesion: 0.15
-Nodes (13): Accounting Module (Professional plan), AI Features (Google Gemini Flash Lite), Commerce Core, Communication, Inventory (tiered by plan), Kuwait Payment Stack, Other, Plan Tier System (+5 more)
+Nodes (13): Accounting Module (Professional plan), AI Features (Google Gemini Flash Lite), Commerce Core, Communication, Inventory (tiered by plan), Egypt Payment Stack, Other, Plan Tier System (+5 more)
 
 ### Community 665 - "Community 665"
 Cohesion: 0.15
-Nodes (13): Accounting Module (Professional plan), AI Features (Google Gemini Flash Lite), Commerce Core, Communication, Inventory (tiered by plan), Kuwait Payment Stack, Other, Plan Tier System (+5 more)
+Nodes (13): Accounting Module (Professional plan), AI Features (Google Gemini Flash Lite), Commerce Core, Communication, Inventory (tiered by plan), Egypt Payment Stack, Other, Plan Tier System (+5 more)
 
 ### Community 666 - "Community 666"
 Cohesion: 0.17
@@ -4464,7 +4464,7 @@ Nodes (12): 1. UptimeRobot — "process is gone / URL unreachable", 2. Sentry �
 
 ### Community 687 - "Community 687"
 Cohesion: 0.17
-Nodes (11): Architecture Overview, CI gate, code:block1 (┌───────────────────────────────────────────────────────────), code:javascript (// pre-register before importScripts so Chromium 133+ doesn'), Cost Summary, Environments & staging posture, Force Website Builder - Production Deployment Guide, Service Worker: pre-registration pattern (commit `91d735cf`) (+3 more)
+Nodes (11): Architecture Overview, CI gate, code:block1 (┌───────────────────────────────────────────────────────────), code:javascript (// pre-register before importScripts so Chromium 133+ doesn'), Cost Summary, Environments & staging posture, Ebda Store - Production Deployment Guide, Service Worker: pre-registration pattern (commit `91d735cf`) (+3 more)
 
 ### Community 688 - "Community 688"
 Cohesion: 0.17
@@ -4484,7 +4484,7 @@ Nodes (11): Architecture — transactional inbox (`WebhookEvent`), Files, Flow (
 
 ### Community 692 - "Community 692"
 Cohesion: 0.17
-Nodes (11): F1 — Coupon `usageLimitPerUser` (per-customer limit) is never enforced, F2 — Cart P2002-recovery `findFirst` lacks `orderBy` → stale-cart bug survives on the race path, F3 — Module-level `setInterval` timers not cleared/unref'd → vitest worker-hang risk + delayed shutdown, F4 — FBT scheduled recalculation cron is seeded with an empty store list and can never be re-seeded, F5 — Email/SMS queue: one item per tick throughput ceiling + non-durable `setTimeout` retry, F6 — Abandoned-cart processing lock TTL (60s) can be shorter than a worst-case run, Findings, FWB Reliability Audit — Races, Leaks, Job Correctness, Replica-Safety (+3 more)
+Nodes (11): F1 — Coupon `usageLimitPerUser` (per-customer limit) is never enforced, F2 — Cart P2002-recovery `findFirst` lacks `orderBy` → stale-cart bug survives on the race path, F3 — Module-level `setInterval` timers not cleared/unref'd → vitest worker-hang risk + delayed shutdown, F4 — FBT scheduled recalculation cron is seeded with an empty store list and can never be re-seeded, F5 — Email/SMS queue: one item per tick throughput ceiling + non-durable `setTimeout` retry, F6 — Abandoned-cart processing lock TTL (60s) can be shorter than a worst-case run, Findings, Ebda Store Reliability Audit — Races, Leaks, Job Correctness, Replica-Safety (+3 more)
 
 ### Community 693 - "Community 693"
 Cohesion: 0.17
@@ -4492,7 +4492,7 @@ Nodes (11): 1. Sidebar hub structure, 2. Redundancy matrix — same data editabl
 
 ### Community 694 - "Community 694"
 Cohesion: 0.17
-Nodes (11): 0. Executive answers (the four asks), 1. Per-table RLS state matrix (computed from all migrations), 2. Route → tenant-context map (every mount in apps/api/src/routes/index.ts), 3. Every withRlsBypass + runInTenantContext(\_, public) site, 4. Policy predicate correctness, 5. force_app grants, 6. The definitive pre-flip checklist (ordered), Appendix — status of every prior-audit RLS finding (+3 more)
+Nodes (11): 0. Executive answers (the four asks), 1. Per-table RLS state matrix (computed from all migrations), 2. Route → tenant-context map (every mount in apps/api/src/routes/index.ts), 3. Every withRlsBypass + runInTenantContext(\_, public) site, 4. Policy predicate correctness, 5. the earlier app role grants, 6. The definitive pre-flip checklist (ordered), Appendix — status of every prior-audit RLS finding (+3 more)
 
 ### Community 695 - "Community 695"
 Cohesion: 0.17
@@ -4500,7 +4500,7 @@ Nodes (11): Already enforced before this PR (verified not changed), Async-job la
 
 ### Community 696 - "Community 696"
 Cohesion: 0.17
-Nodes (11): Addendum — fixes applied (2026-07-13, branch `fix/cache-stampede-audit`), Findings, Force Website Builder — Cache Stampede Audit, H1 — `ProductService.listPublic`'s inner Redis cache is never invalidated, silently re-poisoning the outer (correctly-invalidated) cache, L1 — `/public/store` (legacy "default store" endpoint) has no single-flight, no invalidation hook, L2 — `apps/web/src/lib/store-resolver.ts`: per-isolate 8s cache has no cross-isolate coalescing, but the layer underneath it is centralized, not per-isolate, M1 — `FeatureService` has no single-flight; every concurrent cold read of a store's feature map runs its own 2-query DB read, M2 — Bulk product import never invalidates the public product cache (staleness bug, not a stampede — but worth fixing in the same pass) (+3 more)
+Nodes (11): Addendum — fixes applied (2026-07-13, branch `fix/cache-stampede-audit`), Findings, Ebda Store — Cache Stampede Audit, H1 — `ProductService.listPublic`'s inner Redis cache is never invalidated, silently re-poisoning the outer (correctly-invalidated) cache, L1 — `/public/store` (legacy "default store" endpoint) has no single-flight, no invalidation hook, L2 — `apps/web/src/lib/store-resolver.ts`: per-isolate 8s cache has no cross-isolate coalescing, but the layer underneath it is centralized, not per-isolate, M1 — `FeatureService` has no single-flight; every concurrent cold read of a store's feature map runs its own 2-query DB read, M2 — Bulk product import never invalidates the public product cache (staleness bug, not a stampede — but worth fixing in the same pass) (+3 more)
 
 ### Community 697 - "Community 697"
 Cohesion: 0.17
@@ -4520,7 +4520,7 @@ Nodes (11): 1. Decision, 2. Request path, 3. Database and tenancy (Review Focus 
 
 ### Community 701 - "Community 701"
 Cohesion: 0.17
-Nodes (11): 0. The rules this branch implements, 1. Legacy `*Fils` / `*_fils` identifiers — kept on purpose (66 files), 2. Payment providers — SP6 (leave their KWD logic, replace with Egyptian adapters), 3. Shipping carriers — SP7, 4. Brand / marketing / legal copy — owned by the rebrand task (SP4 task 1) and SP9, 5. FX table / exponent table — legitimate, 6. Comments / examples only (no behaviour), 7. Money-valued constants that were re-based (product to confirm) (+3 more)
+Nodes (11): 0. The rules this branch implements, 1. Legacy `*Fils` / `*_fils` identifiers — kept on purpose (66 files), 2. Payment providers — SP6 (leave their EGP logic, replace with Egyptian adapters), 3. Shipping carriers — SP7, 4. Brand / marketing / legal copy — owned by the rebrand task (SP4 task 1) and SP9, 5. FX table / exponent table — legitimate, 6. Comments / examples only (no behaviour), 7. Money-valued constants that were re-based (product to confirm) (+3 more)
 
 ### Community 702 - "Community 702"
 Cohesion: 0.17
@@ -4528,7 +4528,7 @@ Nodes (11): Added by the SP5 merges (stores-only, no tenant table involved), Cal
 
 ### Community 703 - "Community 703"
 Cohesion: 0.17
-Nodes (11): Acceptance criteria (whole PR), code:block21 (tests/integration/whatsapp-catalog-gate.test.ts), code:block22 (### Loyalty Program (برنامج الولاء)), Decisions locked 2026-05-27, Feature tiering + super-admin access control — implementation plan, File structure, Phase E — Cross-product gate (Force WhatsApp ↔ Force AI Store), Phase F — Docs (parity rule) (+3 more)
+Nodes (11): Acceptance criteria (whole PR), code:block21 (tests/integration/whatsapp-catalog-gate.test.ts), code:block22 (### Loyalty Program (برنامج الولاء)), Decisions locked 2026-05-27, Feature tiering + super-admin access control — implementation plan, File structure, Phase E — Cross-product gate (Ebda WhatsApp ↔ Ebda Store), Phase F — Docs (parity rule) (+3 more)
 
 ### Community 704 - "Community 704"
 Cohesion: 0.17
@@ -4544,7 +4544,7 @@ Nodes (12): code:ts (case 'xxs':), code:bash (grep -n "'xs', 'sm', 'md', 'lg', '
 
 ### Community 707 - "Community 707"
 Cohesion: 0.17
-Nodes (11): code:ts (import type { AccountType } from '@force/database';), code:bash (git add apps/api/src/services/accounting/coa-template.ts), code:ts (import { describe, it, expect } from 'vitest';), code:bash (npm run dev:api &), code:bash (git add tests/integration/accounting-refund.test.ts), Execution Handoff, File Structure, FWB Accounting Batch 1 — Foundations Implementation Plan (+3 more)
+Nodes (11): code:ts (import type { AccountType } from '@force/database';), code:bash (git add apps/api/src/services/accounting/coa-template.ts), code:ts (import { describe, it, expect } from 'vitest';), code:bash (npm run dev:api &), code:bash (git add tests/integration/accounting-refund.test.ts), Execution Handoff, File Structure, Ebda Store Accounting Batch 1 — Foundations Implementation Plan (+3 more)
 
 ### Community 708 - "Community 708"
 Cohesion: 0.17
@@ -4556,11 +4556,11 @@ Nodes (12): code:ts (import { describe, it, expect, beforeAll, afterAll } from '
 
 ### Community 710 - "Community 710"
 Cohesion: 0.17
-Nodes (11): Cross-repo env vars (one-time set), File Structure Overview, FWB (`/Users/ahmadsharaf/Desktop/projects/force-website-builder`), Phase E — Migration + Smoke (Day 0.5), Self-Review Notes, Task E.1: Wady Aljuz Meta Commerce setup checklist, Task E.2: Flip Wady Aljuz to `native_catalog_with_gemini_agent`, Task E.3: Smoke test against Wady Aljuz number (+3 more)
+Nodes (11): Cross-repo env vars (one-time set), File Structure Overview, Ebda Store (`/Users/ahmadsharaf/Desktop/projects/ebda-store`), Phase E — Migration + Smoke (Day 0.5), Self-Review Notes, Task E.1: Wady Aljuz Meta Commerce setup checklist, Task E.2: Flip Wady Aljuz to `native_catalog_with_gemini_agent`, Task E.3: Smoke test against Wady Aljuz number (+3 more)
 
 ### Community 711 - "Community 711"
 Cohesion: 0.17
-Nodes (11): code:bash (git add .github/workflows/semgrep.yml), code:yaml (name: CodeQL), code:bash (git add .github/workflows/codeql.yml), code:yaml (name: Semgrep), Corrected shared facts (verified 2026-06-07), Force AI Suite — Security Hardening + AI PR Reviewer Implementation Plan, Per-repo deltas for Workstream B, Target status matrix (definition of done) (+3 more)
+Nodes (11): code:bash (git add .github/workflows/semgrep.yml), code:yaml (name: CodeQL), code:bash (git add .github/workflows/codeql.yml), code:yaml (name: Semgrep), Corrected shared facts (verified 2026-06-07), Ebda AI Studio Suite — Security Hardening + AI PR Reviewer Implementation Plan, Per-repo deltas for Workstream B, Target status matrix (definition of done) (+3 more)
 
 ### Community 712 - "Community 712"
 Cohesion: 0.17
@@ -4744,7 +4744,7 @@ Nodes (11): 5 theme personas + per-theme token spec (2026-05-17 night), Cross-th
 
 ### Community 757 - "Community 757"
 Cohesion: 0.18
-Nodes (10): code:bash (curl -sS -m 10 -o /dev/null -w "HTTP %{http_code} | %{time_t), code:bash (cd ~/Desktop/projects/force-website-builder/apps/api), code:bash (cd ~/Desktop/projects/force-website-builder), Detection sources (where alerts come from), Incident Response — FWB, P0 Triage Checklist (run in order, stop when you find the root cause), Post-incident, Recovery actions (+2 more)
+Nodes (10): code:bash (curl -sS -m 10 -o /dev/null -w "HTTP %{http_code} | %{time_t), code:bash (cd ~/Desktop/projects/ebda-store/apps/api), code:bash (cd ~/Desktop/projects/ebda-store), Detection sources (where alerts come from), Incident Response — Ebda Store, P0 Triage Checklist (run in order, stop when you find the root cause), Post-incident, Recovery actions (+2 more)
 
 ### Community 758 - "Community 758"
 Cohesion: 0.18
@@ -4752,7 +4752,7 @@ Nodes (10): code:bash (curl -X POST https://<preview-api>/api/v1/public/<storeId
 
 ### Community 759 - "Community 759"
 Cohesion: 0.18
-Nodes (10): 1. `fetchMetadata` in `wbs-bridge.service.ts`, 2. Updated `GET /stores/:id/integrations/wbs`, 3. Updated `PUT /stores/:id/integrations/wbs`, 4. Updated admin page `wbs/page.tsx`, Files to change, FWB Side — Connect-by-Key UX Plan (2026-05-19), New artefacts, No schema changes needed (+2 more)
+Nodes (10): 1. `fetchMetadata` in `wbs-bridge.service.ts`, 2. Updated `GET /stores/:id/integrations/wbs`, 3. Updated `PUT /stores/:id/integrations/wbs`, 4. Updated admin page `wbs/page.tsx`, Files to change, Ebda Store Side — Connect-by-Key UX Plan (2026-05-19), New artefacts, No schema changes needed (+2 more)
 
 ### Community 760 - "Community 760"
 Cohesion: 0.18
@@ -4792,7 +4792,7 @@ Nodes (10): 1. What was run, 2. Numbers, 3. What changed to get there, 4. Memory
 
 ### Community 769 - "Community 769"
 Cohesion: 0.18
-Nodes (10): Ebda (ابدأ) — pre-launch plan, Global CLAUDE.md, Lessons to write down (memory + enforcement), Order and evidence, Phase 0 — finish FWB (in progress), Phase 1 — lessons from this session become rules, tools and skills, Phase 2 — Umbra stability (close the gaps found this session), Phase 3 — Ebda on Cloudflare (design first, then build) (+2 more)
+Nodes (10): Ebda (ابدأ) — pre-launch plan, Global CLAUDE.md, Lessons to write down (memory + enforcement), Order and evidence, Phase 0 — finish Ebda Store (in progress), Phase 1 — lessons from this session become rules, tools and skills, Phase 2 — Umbra stability (close the gaps found this session), Phase 3 — Ebda on Cloudflare (design first, then build) (+2 more)
 
 ### Community 770 - "Community 770"
 Cohesion: 0.18
@@ -4808,7 +4808,7 @@ Nodes (11): code:tsx (// AiFieldBadge.tsx), code:tsx (<label className="flex ite
 
 ### Community 773 - "Community 773"
 Cohesion: 0.18
-Nodes (10): Answer-Engine Insights — Plan 8B: Force-Managed GSC Ingestion, code:prisma (model GscDailyMetric {), File Structure, Final verification (before PR), Global Constraints, ⚠️ Go-live gate (Ahmad, before real data flows), Task 1: `GscDailyMetric` model + migration, Task 2: GSC client (service-account auth + Search Analytics) — dormant until credentialed (+2 more)
+Nodes (10): Answer-Engine Insights — Plan 8B: Ebda-managed GSC Ingestion, code:prisma (model GscDailyMetric {), File Structure, Final verification (before PR), Global Constraints, ⚠️ Go-live gate (Ahmad, before real data flows), Task 1: `GscDailyMetric` model + migration, Task 2: GSC client (service-account auth + Search Analytics) — dormant until credentialed (+2 more)
 
 ### Community 774 - "Community 774"
 Cohesion: 0.18
@@ -4816,7 +4816,7 @@ Nodes (11): code:ts (bannerMobile: {), code:ts (categoryMobile: {), code:ts (pro
 
 ### Community 775 - "Community 775"
 Cohesion: 0.18
-Nodes (10): Delta vs 2026-05-13 Baseline, FWB Iceberg Audit — 2026-05-15, Proposed New CLAUDE.md Rules, Quick Wins (<1h each), Rule #11: Log retention verification before any merchant goes live, Rule #12: External alert bridge token must be set, Rule #13: Preview environment isolation gate before any PR merges, Strategic Items (+2 more)
+Nodes (10): Delta vs 2026-05-13 Baseline, Ebda Store Iceberg Audit — 2026-05-15, Proposed New CLAUDE.md Rules, Quick Wins (<1h each), Rule #11: Log retention verification before any merchant goes live, Rule #12: External alert bridge token must be set, Rule #13: Preview environment isolation gate before any PR merges, Strategic Items (+2 more)
 
 ### Community 776 - "Community 776"
 Cohesion: 0.18
@@ -4848,7 +4848,7 @@ Nodes (11): code:block11 (# ruleId	action	(ignore|warn|fail)	url-regex), code:ba
 
 ### Community 783 - "Community 783"
 Cohesion: 0.18
-Nodes (10): FWB Accounting + Stock + Insights — Design, Goals, Non-goals (v1), Part 10 — Acceptance criteria, Part 11 — Open questions / decisions deferred, Part 12 — Risks + mitigations, Part 5 — Kuwait COA template, Part 8 — Kuwait + MOF specifics (+2 more)
+Nodes (10): Ebda Store Accounting + Stock + Insights — Design, Goals, Non-goals (v1), Part 10 — Acceptance criteria, Part 11 — Open questions / decisions deferred, Part 12 — Risks + mitigations, Part 5 — Egypt COA template, Part 8 — Egypt + MOF specifics (+2 more)
 
 ### Community 784 - "Community 784"
 Cohesion: 0.18
@@ -5008,7 +5008,7 @@ Nodes (7): { container }, echo, inclusive, labels, order(), t, terms
 
 ### Community 825 - "Community 825"
 Cohesion: 0.2
-Nodes (9): A. Needs Ahmad's input / external action first, B. Design-gated (need sign-off before code — per CLAUDE.md plan-before-code rule), C. Blocked / infra (real work, sequenced), Current state (verified), D. Smaller backlog items not yet done, DONE this session, Force AI — Session Handoff (2026-05-29 → 2026-06-01), LEFT TO DO (next session, in priority order) (+1 more)
+Nodes (9): A. Needs Ahmad's input / external action first, B. Design-gated (need sign-off before code — per CLAUDE.md plan-before-code rule), C. Blocked / infra (real work, sequenced), Current state (verified), D. Smaller backlog items not yet done, DONE this session, Ebda AI Studio — Session Handoff (2026-05-29 → 2026-06-01), LEFT TO DO (next session, in priority order) (+1 more)
 
 ### Community 826 - "Community 826"
 Cohesion: 0.2
@@ -5016,7 +5016,7 @@ Nodes (9): Edge cases, Golden path — AEO sweep, Golden path — Force-replace 
 
 ### Community 827 - "Community 827"
 Cohesion: 0.2
-Nodes (9): 1. Report being investigated, 2. The suspected cause does not apply to FWB, 3. What actually happened (proven from production logs), 4. Measurements (production, GET-only, 2026-09-15 ~11:14–11:25Z), 5. Findings that remain, and options (decision required), 6. Rulings, 7. Not verified, and why, code:block1 (06:59 {200: 8}) (+1 more)
+Nodes (9): 1. Report being investigated, 2. The suspected cause does not apply to Ebda Store, 3. What actually happened (proven from production logs), 4. Measurements (production, GET-only, 2026-09-15 ~11:14–11:25Z), 5. Findings that remain, and options (decision required), 6. Rulings, 7. Not verified, and why, code:block1 (06:59 {200: 8}) (+1 more)
 
 ### Community 828 - "Community 828"
 Cohesion: 0.2
@@ -5036,7 +5036,7 @@ Nodes (9): Admin Endpoint Connection Audit — 2026-05-28, code:ts (apiGet<{ dat
 
 ### Community 832 - "Community 832"
 Cohesion: 0.2
-Nodes (9): Audit — the 5 new foundation lenses (21–25) against FWB · 2026-08-08, code:block1 ($ curl -sI https://api-production-c058.up.railway.app/health), Lens 21 — migration safety: 1, with today's miss already closed, Lens 22 — error surface: 2, P1 — no AI transparency surface at all (23.1, 23.4, 23.6), P1 — the API origin bypasses the edge (24.1, 24.2), P2 — unit economics: instrumented, not measured (25.3, 25.4), Ranked next actions (+1 more)
+Nodes (9): Audit — the 5 new foundation lenses (21–25) against Ebda Store · 2026-08-08, code:block1 ($ curl -sI https://api-production-c058.up.railway.app/health), Lens 21 — migration safety: 1, with today's miss already closed, Lens 22 — error surface: 2, P1 — no AI transparency surface at all (23.1, 23.4, 23.6), P1 — the API origin bypasses the edge (24.1, 24.2), P2 — unit economics: instrumented, not measured (25.3, 25.4), Ranked next actions (+1 more)
 
 ### Community 833 - "Community 833"
 Cohesion: 0.2
@@ -5048,7 +5048,7 @@ Nodes (9): Auth, Headers / transport, Injection, Manual Burp Suite Pentest Check
 
 ### Community 835 - "Community 835"
 Cohesion: 0.2
-Nodes (9): Admin, API, code:bash (npx tsx packages/database/scripts/seed-pecannbee-locations.t), Data model, Gating, Seed (pecannbee), Store Locations — runbook, Storefront (+1 more)
+Nodes (9): Admin, API, code:bash (npx tsx packages/database/scripts/seed-demo-store-locations.t), Data model, Gating, Seed (demo-store), Store Locations — runbook, Storefront (+1 more)
 
 ### Community 836 - "Community 836"
 Cohesion: 0.2
@@ -5060,11 +5060,11 @@ Nodes (9): Admin surface — list + delete (#903), Capture sites (4), code:block
 
 ### Community 838 - "Community 838"
 Cohesion: 0.2
-Nodes (9): Admin (app.forcemediakw.com), Cross-browser Playwright baseline — FWB — 2026-05-24, Firefox-specific failures, Mobile Safari-specific failures, Notes, Per-browser failures, Results, Storefront (wadyaljuz.com) (+1 more)
+Nodes (9): Admin (store.ebda.app), Cross-browser Playwright baseline — Ebda Store — 2026-05-24, Firefox-specific failures, Mobile Safari-specific failures, Notes, Per-browser failures, Results, Storefront (demo-merchant.com) (+1 more)
 
 ### Community 839 - "Community 839"
 Cohesion: 0.2
-Nodes (9): code:bash (cd force-website-builder), Comparison to the 2026-05-24 baseline, How to re-run, Interpretation (unchanged from May, still true), Mutation testing baseline — FWB — 2026-09-02, `payment.service.ts` — still not in the scored breakdown (open question, not re-investigated), Per-module score, Ratchet (+1 more)
+Nodes (9): code:bash (cd ebda-store), Comparison to the 2026-05-24 baseline, How to re-run, Interpretation (unchanged from May, still true), Mutation testing baseline — Ebda Store — 2026-09-02, `payment.service.ts` — still not in the scored breakdown (open question, not re-investigated), Per-module score, Ratchet (+1 more)
 
 ### Community 840 - "Community 840"
 Cohesion: 0.2
@@ -5088,7 +5088,7 @@ Nodes (10): code:js (const BOT_PREFIX = 'wbs.bot.';), code:block28 (tests/integr
 
 ### Community 845 - "Community 845"
 Cohesion: 0.2
-Nodes (10): code:prisma (enum ClientPlan {), code:js (// backend/src/lib/plan-baselines.js), code:prisma (model ClientFeature {), code:prisma (model ClientAuditLog {), Phase G — WBS-side mirror (Force WhatsApp tier system), Task G.1: WBS plan baseline + sub-features, Task G.2: WBS feature-gate helper, Task G.3: WBS super-admin UI (+2 more)
+Nodes (10): code:prisma (enum ClientPlan {), code:js (// backend/src/lib/plan-baselines.js), code:prisma (model ClientFeature {), code:prisma (model ClientAuditLog {), Phase G — WBS-side mirror (Ebda WhatsApp tier system), Task G.1: WBS plan baseline + sub-features, Task G.2: WBS feature-gate helper, Task G.3: WBS super-admin UI (+2 more)
 
 ### Community 846 - "Community 846"
 Cohesion: 0.2
@@ -5104,7 +5104,7 @@ Nodes (9): Admin, Admin (`apps/admin` ThemeTab.tsx), Branding v2 (primary+second
 
 ### Community 849 - "Community 849"
 Cohesion: 0.2
-Nodes (10): code:block29 (# Default owner for everything), code:bash (gh api -X PUT repos/ForceAI-KW/force-website-builder/branche), code:yaml (- name: npm audit (prod zero-tolerance)), Execution notes, Self-Review (run against the spec), Task G1: CODEOWNERS, Task G2: Apply branch protection via gh api (per repo), Task G3: Fix WBS PR audit severity (moderate → low) (+2 more)
+Nodes (10): code:block29 (# Default owner for everything), code:bash (gh api -X PUT repos/Whisky-11/ebda-store/branche), code:yaml (- name: npm audit (prod zero-tolerance)), Execution notes, Self-Review (run against the spec), Task G1: CODEOWNERS, Task G2: Apply branch protection via gh api (per repo), Task G3: Fix WBS PR audit severity (moderate → low) (+2 more)
 
 ### Community 850 - "Community 850"
 Cohesion: 0.2
@@ -5136,11 +5136,11 @@ Nodes (8): API, APPLY, args, body, die(), getPublicStore(), lost, STORE
 
 ### Community 857 - "Community 857"
 Cohesion: 0.2
-Nodes (10): CI state (2026-07-23) — runner UNSTUCK; merges HELD per Ahmad (deploy-all-at-once), Current state, Goal, Handoff — FWB OSOSS build program (develop-now, deploy-all-at-once), Item 5 (WarehouseStock data-integrity) — IN PROGRESS (spec+plan committed, SDD running), Item 7: Agentic Checkout (MCP) — ✅ COMPLETE → PR #881 (OPEN, do not merge), Item 8 Plan 8A (answer-engine citation checking) — ✅ COMPLETE → PR #908 (OPEN, do not merge), Item 8 Plan 8B (Force-managed GSC ingestion) — ✅ COMPLETE → PR #920 (OPEN, STACKED on #908, do not merge) (+2 more)
+Nodes (10): CI state (2026-07-23) — runner UNSTUCK; merges HELD per Ahmad (deploy-all-at-once), Current state, Goal, Handoff — Ebda Store OSOSS build program (develop-now, deploy-all-at-once), Item 5 (WarehouseStock data-integrity) — IN PROGRESS (spec+plan committed, SDD running), Item 7: Agentic Checkout (MCP) — ✅ COMPLETE → PR #881 (OPEN, do not merge), Item 8 Plan 8A (answer-engine citation checking) — ✅ COMPLETE → PR #908 (OPEN, do not merge), Item 8 Plan 8B (Ebda-managed GSC ingestion) — ✅ COMPLETE → PR #920 (OPEN, STACKED on #908, do not merge) (+2 more)
 
 ### Community 858 - "Community 858"
 Cohesion: 0.2
-Nodes (9): Force Website Builder — Hardening Plan (historical), Force Website Builder — Hardening Plan (historical), Force Website Builder — Hardening Plan (historical), Force Website Builder — Hardening Plan (historical), Force Website Builder — Hardening Plan (historical), Applied immediately in this session, Force Website Builder — Hardening Plan, Tier 2 — This sprint (hardening / consistency) (+1 more)
+Nodes (9): Ebda Store — Hardening Plan (historical), Ebda Store — Hardening Plan (historical), Ebda Store — Hardening Plan (historical), Ebda Store — Hardening Plan (historical), Ebda Store — Hardening Plan (historical), Applied immediately in this session, Ebda Store — Hardening Plan, Tier 2 — This sprint (hardening / consistency) (+1 more)
 
 ### Community 859 - "Community 859"
 Cohesion: 0.27
@@ -5304,7 +5304,7 @@ Nodes (7): can(), effectivePermissions(), OrderPermission, PermissionSubject, Ro
 
 ### Community 899 - "Community 899"
 Cohesion: 0.22
-Nodes (8): ADR 0001 — FWB tenant isolation: Postgres Row-Level Security, code:block1 (current_store_id() IS NULL                          -- no te), Complete FORCE coverage (2026-06-09), Consequences, Context, Decision, Policy idiom — hybrid (superset of both historical generations), Related
+Nodes (8): ADR 0001 — Ebda Store tenant isolation: Postgres Row-Level Security, code:block1 (current_store_id() IS NULL                          -- no te), Complete FORCE coverage (2026-06-09), Consequences, Context, Decision, Policy idiom — hybrid (superset of both historical generations), Related
 
 ### Community 900 - "Community 900"
 Cohesion: 0.22
@@ -5324,7 +5324,7 @@ Nodes (8): code:block1 (Transaction API error: Transaction already closed: A que
 
 ### Community 904 - "Community 904"
 Cohesion: 0.22
-Nodes (8): Already good — do NOT "fix" away, BINDING CONSTRAINT — live client stores (added 2026-07-12, Ahmad-explicit), Cross-cutting top 10 (by user-perceived impact), Design-taste sweep — all 5 templates + shared (2026-07-12), Page-builder reality addendum — wadyaljuz.com live render (2026-07-12), Per-template verdicts, Quick wins (≤1h each), Structural (plan-mode)
+Nodes (8): Already good — do NOT "fix" away, BINDING CONSTRAINT — live client stores (added 2026-07-12, Ahmad-explicit), Cross-cutting top 10 (by user-perceived impact), Design-taste sweep — all 5 templates + shared (2026-07-12), Page-builder reality addendum — demo-merchant.com live render (2026-07-12), Per-template verdicts, Quick wins (≤1h each), Structural (plan-mode)
 
 ### Community 905 - "Community 905"
 Cohesion: 0.22
@@ -5336,11 +5336,11 @@ Nodes (9): 2. Admin Features (لوحة التحكم), Analytics (التحليل�
 
 ### Community 907 - "Community 907"
 Cohesion: 0.22
-Nodes (8): 3. AI Features (ما يميّزنا — الذكاء الاصطناعي), 4. Kuwait/GCC-Specific Features (مخصص للكويت والخليج), 5. Multi-Tenant Capabilities (كل متجر مستقل بذاته), 8. Smart Payment Links — روابط الدفع الذكية, Arabic-First, Not Arabic-Supported, Force AI Store — Feature Catalog, KNET and Local Payment Gateways, Kuwait Delivery Areas & Fees (مناطق التوصيل والرسوم)
+Nodes (8): 3. AI Features (ما يميّزنا — الذكاء الاصطناعي), 4. Egypt/GCC-Specific Features (مخصص للكويت والخليج), 5. Multi-Tenant Capabilities (كل متجر مستقل بذاته), 8. Smart Payment Links — روابط الدفع الذكية, Arabic-First, Not Arabic-Supported, Ebda Store — Feature Catalog, KNET and Local Payment Gateways, Egypt Delivery Areas & Fees (مناطق التوصيل والرسوم)
 
 ### Community 908 - "Community 908"
 Cohesion: 0.22
-Nodes (8): Before, code:block1 (cd "$(mktemp -d)"), code:block2 (cd "$(mktemp -d)"), Flip (palora only, `/about` and `/faq`), Roll back, Tenant routing canary (palora first), Verify, Widening
+Nodes (8): Before, code:block1 (cd "$(mktemp -d)"), code:block2 (cd "$(mktemp -d)"), Flip (demo-boutique only, `/about` and `/faq`), Roll back, Tenant routing canary (demo-boutique first), Verify, Widening
 
 ### Community 909 - "Community 909"
 Cohesion: 0.22
@@ -5384,11 +5384,11 @@ Nodes (9): code:ts (import { generateSectionPalette, lightenColor, darkenColor }
 
 ### Community 919 - "Community 919"
 Cohesion: 0.22
-Nodes (9): 1. Authentication, 1. Security & Identity, 2. Access Control, 3. Secrets Management, 4. GDPR / Kuwait Law 13/2023, 5. Cookies / Tracking Consent, 6. Data Integrity, 7. Data Retention (+1 more)
+Nodes (9): 1. Authentication, 1. Security & Identity, 2. Access Control, 3. Secrets Management, 4. GDPR / Egypt Law 13/2023, 5. Cookies / Tracking Consent, 6. Data Integrity, 7. Data Retention (+1 more)
 
 ### Community 920 - "Community 920"
 Cohesion: 0.22
-Nodes (8): code:bash (cd /Users/ahmadsharaf/Desktop/projects/force-website-builder), code:bash (git add apps/admin/src/app/stores/[id]/features/page.tsx app), code:bash (npx vitest run tests/e2e/feature-toggle.test.ts), code:bash (git add tests/e2e/feature-toggle.test.ts), Feature Toggle Engine Implementation Plan, File Structure, Task 14: Integration Test, Task 9: Admin UI — Features Tab
+Nodes (8): code:bash (cd /Users/ahmadsharaf/Desktop/projects/ebda-store), code:bash (git add apps/admin/src/app/stores/[id]/features/page.tsx app), code:bash (npx vitest run tests/e2e/feature-toggle.test.ts), code:bash (git add tests/e2e/feature-toggle.test.ts), Feature Toggle Engine Implementation Plan, File Structure, Task 14: Integration Test, Task 9: Admin UI — Features Tab
 
 ### Community 921 - "Community 921"
 Cohesion: 0.22
@@ -5408,7 +5408,7 @@ Nodes (8): code:ts (export interface ProductCardProps {), Contract extension, Ou
 
 ### Community 925 - "Community 925"
 Cohesion: 0.22
-Nodes (9): 3.1 Reorder suggestions, 3.2 Dead-stock detection, 3.3 Profit anomaly detection, 3.4 Expense OCR (Gemini Vision), 3.5 Insights/BI rollups (Batch 4), code:block5 (velocity7d  = sum(OrderItem.quantity in last 7 days where pr), code:block6 (margin7d  = (revenue7d - cogs7d)  / revenue7d), code:block7 (You are a receipt parser for a Kuwait retailer. Extract:) (+1 more)
+Nodes (9): 3.1 Reorder suggestions, 3.2 Dead-stock detection, 3.3 Profit anomaly detection, 3.4 Expense OCR (Gemini Vision), 3.5 Insights/BI rollups (Batch 4), code:block5 (velocity7d  = sum(OrderItem.quantity in last 7 days where pr), code:block6 (margin7d  = (revenue7d - cogs7d)  / revenue7d), code:block7 (You are a receipt parser for a Egypt retailer. Extract:) (+1 more)
 
 ### Community 926 - "Community 926"
 Cohesion: 0.22
@@ -5444,7 +5444,7 @@ Nodes (9): cloneChildren(), cloneNode(), isCDATA(), isComment(), isDirective(), 
 
 ### Community 934 - "Community 934"
 Cohesion: 0.22
-Nodes (8): code:bash (scripts/twin-diff.sh                 # upstream commits touc), Diverged files (sync by hand, expect conflicts), Ebda merchant UI divergence (2026-10-05), Ebda-only (never overwritten by a sync), Launch wiring divergence (2026-10-05), Shared (worth syncing), Twin paths — what Ebda shares with FWB, Workflow
+Nodes (8): code:bash (scripts/twin-diff.sh                 # upstream commits touc), Diverged files (sync by hand, expect conflicts), Ebda merchant UI divergence (2026-10-05), Ebda-only (never overwritten by a sync), Launch wiring divergence (2026-10-05), Shared (worth syncing), Twin paths — what Ebda shares with Ebda Store, Workflow
 
 ### Community 935 - "Community 935"
 Cohesion: 0.25
@@ -5452,7 +5452,7 @@ Nodes (8): DELIBERATE, gitleaks, pinned, runsOnValues(), SANCTIONED, unknown, wo
 
 ### Community 936 - "Community 936"
 Cohesion: 0.22
-Nodes (9): Deployment Checklist, Force AI Store — Product Roadmap, Infrastructure, Near-term (design-gated or partially implemented), Next, Post-deployment, Pre-deployment, Tech Stack (+1 more)
+Nodes (9): Deployment Checklist, Ebda Store — Product Roadmap, Infrastructure, Near-term (design-gated or partially implemented), Next, Post-deployment, Pre-deployment, Tech Stack (+1 more)
 
 ### Community 937 - "Community 937"
 Cohesion: 0.25
@@ -5628,7 +5628,7 @@ Nodes (8): Async Work (Inngest), Authentication Flow (Cross-Origin), Critical Ar
 
 ### Community 980 - "Community 980"
 Cohesion: 0.25
-Nodes (7): A-group — Page-builder consolidation, AI / RLS fixes, B-group — Product discount feature, D-group — Inventory/search/explanations, FWB — Backlog completion (2026-06-01), Order-page status labels (C1), Still open / needs Ahmad
+Nodes (7): A-group — Page-builder consolidation, AI / RLS fixes, B-group — Product discount feature, D-group — Inventory/search/explanations, Ebda Store — Backlog completion (2026-06-01), Order-page status labels (C1), Still open / needs Ahmad
 
 ### Community 981 - "Community 981"
 Cohesion: 0.25
@@ -5644,7 +5644,7 @@ Nodes (7): Edge case — discount cap at subtotal / percentage, Edge case — gu
 
 ### Community 984 - "Community 984"
 Cohesion: 0.25
-Nodes (7): Candidate new standing rules (for CLAUDE.md review), FWB Deep Audit — MASTER Consolidated Report (2026-07-02), Headline, Suggested fix batches (each = one isolated-worktree PR), Tally across all 10 lenses, The 24 Highs, grouped, The 5 Criticals (ranked by user-facing risk × business impact)
+Nodes (7): Candidate new standing rules (for CLAUDE.md review), Ebda Store Deep Audit — MASTER Consolidated Report (2026-07-02), Headline, Suggested fix batches (each = one isolated-worktree PR), Tally across all 10 lenses, The 24 Highs, grouped, The 5 Criticals (ranked by user-facing risk × business impact)
 
 ### Community 985 - "Community 985"
 Cohesion: 0.25
@@ -5668,7 +5668,7 @@ Nodes (7): Adversarial audit — dimension: injection-render (untrusted input �
 
 ### Community 990 - "Community 990"
 Cohesion: 0.25
-Nodes (7): ADVERSARIAL AUDIT BRIEF — force-website-builder (FWB), Also report, explicitly, code:block1 (### [P0|P1|P2|P3] <short title>), Finding format, Method (mandatory, in order), Output — TWO things, What this is
+Nodes (7): ADVERSARIAL AUDIT BRIEF — ebda-store (Ebda Store), Also report, explicitly, code:block1 (### [P0|P1|P2|P3] <short title>), Finding format, Method (mandatory, in order), Output — TWO things, What this is
 
 ### Community 991 - "Community 991"
 Cohesion: 0.25
@@ -5684,11 +5684,11 @@ Nodes (7): A truncated audit reports PARTIAL, never PASSED, Dependabot PRs are n
 
 ### Community 994 - "Community 994"
 Cohesion: 0.25
-Nodes (7): 1. What the OSOSS export looks like, 2. Images — pull them off OSOSS S3 NOW, 3. The FWB import sheet contract (native variant import), 4. Admin steps, 5. Post-import AI cleanup, 6. Gotchas, OSOSS → FWB Migration Runbook
+Nodes (7): 1. What the OSOSS export looks like, 2. Images — pull them off OSOSS S3 NOW, 3. The Ebda Store import sheet contract (native variant import), 4. Admin steps, 5. Post-import AI cleanup, 6. Gotchas, OSOSS → Ebda Store Migration Runbook
 
 ### Community 995 - "Community 995"
 Cohesion: 0.25
-Nodes (7): 1. api — Express.js (Railway), 2. admin — Next.js (Cloudflare Workers), 3. web (storefront) — Next.js (Cloudflare Workers), 4. Distributed Tracing (OpenTelemetry), 5. Error Budget Policy, 6. Runbook References, Service Level Objectives (SLOs) — Force Website Builder
+Nodes (7): 1. api — Express.js (Railway), 2. admin — Next.js (Cloudflare Workers), 3. web (storefront) — Next.js (Cloudflare Workers), 4. Distributed Tracing (OpenTelemetry), 5. Error Budget Policy, 6. Runbook References, Service Level Objectives (SLOs) — Ebda Store
 
 ### Community 996 - "Community 996"
 Cohesion: 0.25
@@ -5700,7 +5700,7 @@ Nodes (7): `checkoutDelivery?: { note, windows }`, Editing / adding a setting, `
 
 ### Community 998 - "Community 998"
 Cohesion: 0.25
-Nodes (7): code:bash (cd /Users/ahmadsharaf/Desktop/projects/force-website-builder), How to re-run, Interpretation, Mutation testing baseline — FWB — 2026-05-24, Per-module score, Root cause of 0% coverage on auth.service.ts and ai-quota.ts, Top surviving mutants (5 examples)
+Nodes (7): code:bash (cd /Users/ahmadsharaf/Desktop/projects/ebda-store), How to re-run, Interpretation, Mutation testing baseline — Ebda Store — 2026-05-24, Per-module score, Root cause of 0% coverage on auth.service.ts and ai-quota.ts, Top surviving mutants (5 examples)
 
 ### Community 999 - "Community 999"
 Cohesion: 0.25
@@ -5732,7 +5732,7 @@ Nodes (7): Final Push — Plan, Step A — Phase 5.2: OrderSummary × 5 template
 
 ### Community 1006 - "Community 1006"
 Cohesion: 0.25
-Nodes (7): Batch 1 — Storefront bugs (bounded, highest user-impact), Batch 2 — Storefront card + image controls (the big customization features), Batch 3 — Admin / accounting / inventory, Batch 4 — Order page + analytics pipeline, Batch 5 — Pecannbee catalog match (separate, large), Cross-cutting guardrails (every batch), FWB Storefront + Ops Sprint — Plan
+Nodes (7): Batch 1 — Storefront bugs (bounded, highest user-impact), Batch 2 — Storefront card + image controls (the big customization features), Batch 3 — Admin / accounting / inventory, Batch 4 — Order page + analytics pipeline, Batch 5 — Storefront catalog match (separate, large), Cross-cutting guardrails (every batch), Ebda Store Storefront + Ops Sprint — Plan
 
 ### Community 1007 - "Community 1007"
 Cohesion: 0.25
@@ -5816,7 +5816,7 @@ Nodes (8): handleArray(), handleAttrPresenceName(), handleAttrValueName(), handl
 
 ### Community 1027 - "Community 1027"
 Cohesion: 0.25
-Nodes (7): Architecture Overview, code:block1 (┌───────────────────────────────────────────────────────────), Cost Summary, Environments & staging posture, Force Website Builder - Production Deployment Guide, Step 5: DNS Configuration, Support Contacts
+Nodes (7): Architecture Overview, code:block1 (┌───────────────────────────────────────────────────────────), Cost Summary, Environments & staging posture, Ebda Store - Production Deployment Guide, Step 5: DNS Configuration, Support Contacts
 
 ### Community 1028 - "Community 1028"
 Cohesion: 0.25
@@ -6076,19 +6076,19 @@ Nodes (6): Already-passing lens items, LOW, MEDIUM, Session-Timeout UX Audit —
 
 ### Community 1097 - "Community 1097"
 Cohesion: 0.29
-Nodes (6): Client-store impact, Fix table, FWB "Vibecode Lens" Perf Audit — 2026-07-12, Per-claim verdict, Verification, What NOT to do (guardrails re-affirmed, not touched by this pass)
+Nodes (6): Client-store impact, Fix table, Ebda Store "Vibecode Lens" Perf Audit — 2026-07-12, Per-claim verdict, Verification, What NOT to do (guardrails re-affirmed, not touched by this pass)
 
 ### Community 1098 - "Community 1098"
 Cohesion: 0.29
-Nodes (6): Adjacent finding (separate commit), Audit — variant stock drift (2026-08-30), Corruption, Fix, Impact, per surface (pecannbee store), Root cause
+Nodes (6): Adjacent finding (separate commit), Audit — variant stock drift (2026-08-30), Corruption, Fix, Impact, per surface (demo-store store), Root cause
 
 ### Community 1099 - "Community 1099"
 Cohesion: 0.29
-Nodes (6): 2026-07-21 — AI-first baseline, Force AI Store — Plan ⇄ Feature Matrix, How to regenerate, Matrix, Not plan-gated by baseline (add-on or always-on), Upgrade UX
+Nodes (6): 2026-07-21 — AI-first baseline, Ebda Store — Plan ⇄ Feature Matrix, How to regenerate, Matrix, Not plan-gated by baseline (add-on or always-on), Upgrade UX
 
 ### Community 1100 - "Community 1100"
 Cohesion: 0.29
-Nodes (6): 1. Create the Vercel project (one-time), 2. Environment variables (Production + Preview), 3. Attach the domain `orders.forcemediakw.com`, 4. Verify after first deploy, How push delivery works (reference), Orders PWA — Deploy + Domain Runbook
+Nodes (6): 1. Create the Vercel project (one-time), 2. Environment variables (Production + Preview), 3. Attach the domain `orders.ebda.app`, 4. Verify after first deploy, How push delivery works (reference), Orders PWA — Deploy + Domain Runbook
 
 ### Community 1101 - "Community 1101"
 Cohesion: 0.29
@@ -6108,7 +6108,7 @@ Nodes (6): code:bash (PARITY_PW=parity   # the local password of the harness rol
 
 ### Community 1105 - "Community 1105"
 Cohesion: 0.29
-Nodes (6): Acceptance criteria, code:bash (npx vitest run tests/unit/email-sender.test.ts tests/unit/re), code:bash (git add -p   # interactively stage only the relevant changes), File Structure, Per-store branded email via Resend — implementation plan, Task 14: Bug-class audit — `forcemedia.com` typo + hardcoded "Force Media" subjects
+Nodes (6): Acceptance criteria, code:bash (npx vitest run tests/unit/email-sender.test.ts tests/unit/re), code:bash (git add -p   # interactively stage only the relevant changes), File Structure, Per-store branded email via Resend — implementation plan, Task 14: Bug-class audit — `ebda.app` typo + hardcoded "Ebda AI Studio" subjects
 
 ### Community 1106 - "Community 1106"
 Cohesion: 0.29
@@ -6156,7 +6156,7 @@ Nodes (7): code:json ({), code:json ({), code:tsx ('use client';), code:bash (np
 
 ### Community 1117 - "Community 1117"
 Cohesion: 0.29
-Nodes (7): code:prisma (model StoreFeature {), code:prisma (features   StoreFeature[]), code:prisma (featureToggles StoreFeature[] @relation("FeatureToggledBy")), code:bash (cd /Users/ahmadsharaf/Desktop/projects/force-website-builder), code:bash (cd /Users/ahmadsharaf/Desktop/projects/force-website-builder), code:bash (git add packages/database/prisma/schema.prisma packages/data), Task 2: Prisma Schema — StoreFeature Model
+Nodes (7): code:prisma (model StoreFeature {), code:prisma (features   StoreFeature[]), code:prisma (featureToggles StoreFeature[] @relation("FeatureToggledBy")), code:bash (cd /Users/ahmadsharaf/Desktop/projects/ebda-store), code:bash (cd /Users/ahmadsharaf/Desktop/projects/ebda-store), code:bash (git add packages/database/prisma/schema.prisma packages/data), Task 2: Prisma Schema — StoreFeature Model
 
 ### Community 1118 - "Community 1118"
 Cohesion: 0.29
@@ -6168,11 +6168,11 @@ Nodes (7): code:ts (// In stock filter — variant-aware. A variant product's st
 
 ### Community 1120 - "Community 1120"
 Cohesion: 0.29
-Nodes (7): code:js (// backend/__tests__/metaCatalogService.test.js), code:js (// backend/src/services/metaCatalogService.js), code:bash (cd /Users/ahmadsharaf/Desktop/projects/whatsapp-bulk-sender/), code:bash (npx jest __tests__/metaCatalogService.test.js), code:js (// POST /api/internal/inngest-receiver — called by FWB Innge), code:bash (# WBS:), Task A.6: WBS inngest-receiver endpoint + metaCatalogService rewrite
+Nodes (7): code:js (// backend/__tests__/metaCatalogService.test.js), code:js (// backend/src/services/metaCatalogService.js), code:bash (cd /Users/ahmadsharaf/Desktop/projects/whatsapp-bulk-sender/), code:bash (npx jest __tests__/metaCatalogService.test.js), code:js (// POST /api/internal/inngest-receiver — called by Ebda Store Innge), code:bash (# WBS:), Task A.6: WBS inngest-receiver endpoint + metaCatalogService rewrite
 
 ### Community 1121 - "Community 1121"
 Cohesion: 0.29
-Nodes (7): code:prisma (model Store {), code:prisma (model Customer {), code:prisma (model CustomerAddress {), code:sql (-- packages/database/prisma/migrations/20260525120000_wa_nat), code:bash (cd /Users/ahmadsharaf/Desktop/projects/force-website-builder), code:bash (git add packages/database/prisma/schema.prisma packages/data), Task A.1: Migration — Store + Customer schema changes
+Nodes (7): code:prisma (model Store {), code:prisma (model Customer {), code:prisma (model CustomerAddress {), code:sql (-- packages/database/prisma/migrations/20260525120000_wa_nat), code:bash (cd /Users/ahmadsharaf/Desktop/projects/ebda-store), code:bash (git add packages/database/prisma/schema.prisma packages/data), Task A.1: Migration — Store + Customer schema changes
 
 ### Community 1122 - "Community 1122"
 Cohesion: 0.29
@@ -6180,7 +6180,7 @@ Nodes (7): code:bash (git add apps/admin/src/app/stores/\[id\]/stock/reorder/ ap
 
 ### Community 1123 - "Community 1123"
 Cohesion: 0.29
-Nodes (7): code:typescript (import { describe, it, expect } from 'vitest';), Task E0: Add an RLS-enforcement integration test (guards against regressions), Task E2a: Architecture Decision Record, Task E2b: Authorization guard test (proves the control holds), Workstream E — RLS / Tenant Isolation, WS-E0 (FWB): verify already-full RLS, WS-E2 (CRM): role-based authz guard + ADR (RLS is N/A)
+Nodes (7): code:typescript (import { describe, it, expect } from 'vitest';), Task E0: Add an RLS-enforcement integration test (guards against regressions), Task E2a: Architecture Decision Record, Task E2b: Authorization guard test (proves the control holds), Workstream E — RLS / Tenant Isolation, WS-E0 (Ebda Store): verify already-full RLS, WS-E2 (CRM): role-based authz guard + ADR (RLS is N/A)
 
 ### Community 1124 - "Community 1124"
 Cohesion: 0.29
@@ -6248,7 +6248,7 @@ Nodes (7): _getExceptionFromEvent(), getFramesFromEvent(), _isSameExceptionEvent
 
 ### Community 1140 - "Community 1140"
 Cohesion: 0.43
-Nodes (6): Agent skills for Ebda merchants, Agent skills for Force AI Store merchants, code:json ({), Setup (once per store), The rule these skills follow, Why these live here and not in the product
+Nodes (6): Agent skills for Ebda merchants, Agent skills for Ebda Store merchants, code:json ({), Setup (once per store), The rule these skills follow, Why these live here and not in the product
 
 ### Community 1141 - "Community 1141"
 Cohesion: 0.29
@@ -6296,7 +6296,7 @@ Nodes (7): 2026-10-01 — backlog batch e-web-orders (branch `fix/backlog-e-web-
 
 ### Community 1152 - "Community 1152"
 Cohesion: 0.29
-Nodes (6): Force AI Store — Product Roadmap, Infrastructure, Near-term (design-gated or partially implemented), Next, Tech Stack, WBS / Cross-product
+Nodes (6): Ebda Store — Product Roadmap, Infrastructure, Near-term (design-gated or partially implemented), Next, Tech Stack, WBS / Cross-product
 
 ### Community 1153 - "Community 1153"
 Cohesion: 0.29
@@ -6308,7 +6308,7 @@ Nodes (7): code:bash (# Railway auto-deploys on git push), code:bash (# Cloudfla
 
 ### Community 1155 - "Community 1155"
 Cohesion: 0.29
-Nodes (7): Product Grid Card, Footer Component, Header Component, Template Adapters, Server Template Loader, Pecannbee Home Flow Design, Storefront Template Coverage Phase 1 Design
+Nodes (7): Product Grid Card, Footer Component, Header Component, Template Adapters, Server Template Loader, Storefront Home Flow Design, Storefront Template Coverage Phase 1 Design
 
 ### Community 1156 - "Community 1156"
 Cohesion: 0.33
@@ -6532,7 +6532,7 @@ Nodes (5): CSP hardening: removing `script-src 'unsafe-inline'`, Reference, What
 
 ### Community 1217 - "Community 1217"
 Cohesion: 0.33
-Nodes (5): After product changes, Bundle (Force AI Store + Force AI WhatsApp), Every claim in a contract/quote must be true against the codebase, Force AI — Contract & Proposal Pre-Signing Checklist, Terms that were verified accurate (don't change without a reason)
+Nodes (5): After product changes, Bundle (Ebda Store + Ebda AI Studio WhatsApp), Every claim in a contract/quote must be true against the codebase, Ebda AI Studio — Contract & Proposal Pre-Signing Checklist, Terms that were verified accurate (don't change without a reason)
 
 ### Community 1218 - "Community 1218"
 Cohesion: 0.33
@@ -6572,7 +6572,7 @@ Nodes (6): code:ts (export type CardFrameWidth = 'thin' | 'normal' | 'thick' | '
 
 ### Community 1227 - "Community 1227"
 Cohesion: 0.33
-Nodes (5): Consumer-trap discipline (per `feedback-fwb-card-controls-consumer-trap`), File structure (created / modified), Layout Card Controls & Image-Spec Refresh — Implementation Plan, Self-review notes, Spec coverage map
+Nodes (5): Consumer-trap discipline (per `feedback-ebda-card-controls-consumer-trap`), File structure (created / modified), Layout Card Controls & Image-Spec Refresh — Implementation Plan, Self-review notes, Spec coverage map
 
 ### Community 1228 - "Community 1228"
 Cohesion: 0.33
@@ -6624,11 +6624,11 @@ Nodes (6): code:sql (-- ========================================================
 
 ### Community 1240 - "Community 1240"
 Cohesion: 0.33
-Nodes (5): Brand recolor rule (applies to EVERY component), Force AI Platform Landing Redesign, Guardrails (non-negotiable), Section map (Ahmad feeds these incrementally), Source assets
+Nodes (5): Brand recolor rule (applies to EVERY component), Ebda AI Studio Platform Landing Redesign, Guardrails (non-negotiable), Section map (Ahmad feeds these incrementally), Source assets
 
 ### Community 1241 - "Community 1241"
 Cohesion: 0.33
-Nodes (6): code:bash (cd /Users/ahmadsharaf/Desktop/projects/force-website-builder), code:typescript (// For each store:), code:bash (npx tsx scripts/migrate-feature-flags.ts), code:bash (cd packages/database), code:bash (git add packages/database/prisma/ apps/ scripts/), Task 8: Migrate Existing Boolean Flags (BEFORE gating routes)
+Nodes (6): code:bash (cd /Users/ahmadsharaf/Desktop/projects/ebda-store), code:typescript (// For each store:), code:bash (npx tsx scripts/migrate-feature-flags.ts), code:bash (cd packages/database), code:bash (git add packages/database/prisma/ apps/ scripts/), Task 8: Migrate Existing Boolean Flags (BEFORE gating routes)
 
 ### Community 1242 - "Community 1242"
 Cohesion: 0.33
@@ -6660,7 +6660,7 @@ Nodes (5): Design decisions, Discipline, Layers, Loyalty redemption at checkout 
 
 ### Community 1249 - "Community 1249"
 Cohesion: 0.33
-Nodes (6): code:js (async headers() {), code:ts (const nextConfig: NextConfig = {), Workstream F — Security Headers / HTTPS everywhere, WS-F0 (FWB): verify, WS-F1 (WBS frontend): add headers, WS-F2 (CRM): add headers
+Nodes (6): code:js (async headers() {), code:ts (const nextConfig: NextConfig = {), Workstream F — Security Headers / HTTPS everywhere, WS-F0 (Ebda Store): verify, WS-F1 (WBS frontend): add headers, WS-F2 (CRM): add headers
 
 ### Community 1250 - "Community 1250"
 Cohesion: 0.33
@@ -7104,11 +7104,11 @@ Nodes (5): 23. Logging, 24. Alerting, 25. Incident Response, 26. Instrumentation
 
 ### Community 1373 - "Community 1373"
 Cohesion: 0.4
-Nodes (5): code:ts (import { prisma } from '@force/database';), code:ts (import { prisma } from '@force/database';), code:bash (curl -s https://store.forcemediakw.com/llms.txt | head -30), code:bash (git add apps/web/src/app/llms.txt apps/web/src/app/\[slug\]/), Task 18: Storefront /llms.txt — DYNAMIC, platform-level
+Nodes (5): code:ts (import { prisma } from '@force/database';), code:ts (import { prisma } from '@force/database';), code:bash (curl -s https://store.ebda.app/llms.txt | head -30), code:bash (git add apps/web/src/app/llms.txt apps/web/src/app/\[slug\]/), Task 18: Storefront /llms.txt — DYNAMIC, platform-level
 
 ### Community 1374 - "Community 1374"
 Cohesion: 0.4
-Nodes (5): code:bash (# Edit the script to add a language override OR add a second), code:bash (SMOKE_LANGUAGE=en node scripts/smoke-real-pipeline.mjs), code:bash (curl -s https://store.forcemediakw.com/wady-aljuz | grep -oE), code:bash (curl -s https://store.forcemediakw.com/llms.txt), Task 20: Smoke + verify
+Nodes (5): code:bash (# Edit the script to add a language override OR add a second), code:bash (SMOKE_LANGUAGE=en node scripts/smoke-real-pipeline.mjs), code:bash (curl -s https://store.ebda.app/wady-aljuz | grep -oE), code:bash (curl -s https://store.ebda.app/llms.txt), Task 20: Smoke + verify
 
 ### Community 1375 - "Community 1375"
 Cohesion: 0.4
@@ -7164,7 +7164,7 @@ Nodes (5): Task 12 — Stock dashboard + inventory + adjustments, Task 13 — Su
 
 ### Community 1388 - "Community 1388"
 Cohesion: 0.4
-Nodes (5): code:bash (cd /Users/ahmadsharaf/Desktop/projects/force-website-builder), code:bash (railway logs --service whatsapp-broadcaster --tail 200 > /tm), code:bash (grep "wa-bridge call" /tmp/wbs-latency-baseline.log | jq -c ), code:markdown (# WhatsApp Bot Latency Baseline (2026-05-25)), Task 0.3: Drive a real customer order against Wady Aljuz + collect baseline
+Nodes (5): code:bash (cd /Users/ahmadsharaf/Desktop/projects/ebda-store), code:bash (railway logs --service whatsapp-broadcaster --tail 200 > /tm), code:bash (grep "wa-bridge call" /tmp/wbs-latency-baseline.log | jq -c ), code:markdown (# WhatsApp Bot Latency Baseline (2026-05-25)), Task 0.3: Drive a real customer order against Wady Aljuz + collect baseline
 
 ### Community 1389 - "Community 1389"
 Cohesion: 0.4
@@ -7180,7 +7180,7 @@ Nodes (5): Architecture, code:block1 (OrderService.updateStatus('shipped')), cod
 
 ### Community 1392 - "Community 1392"
 Cohesion: 0.6
-Nodes (4): Force AI Store — Merchant Guide, Force Store — Merchant Guide, Index — الفهرس, Need help? — تحتاج مساعدة؟
+Nodes (4): Ebda Store — Merchant Guide, Ebda Store — Merchant Guide, Index — الفهرس, Need help? — تحتاج مساعدة؟
 
 ### Community 1393 - "Community 1393"
 Cohesion: 0.4
@@ -7268,7 +7268,7 @@ Nodes (5): code:block3 (<type>(<scope>): <subject>), code:block4 (feat(api): add
 
 ### Community 1414 - "Community 1414"
 Cohesion: 0.4
-Nodes (5): 4.1 Multi-tenancy, 4.2 Force AI v2, 4.3 Integrations, 4.4 Analytics & Reporting, Phase 4: Advanced Features
+Nodes (5): 4.1 Multi-tenancy, 4.2 Ebda AI Studio v2, 4.3 Integrations, 4.4 Analytics & Reporting, Phase 4: Advanced Features
 
 ### Community 1415 - "Community 1415"
 Cohesion: 0.4
@@ -7444,7 +7444,7 @@ Nodes (4): code:ts (describe('ResendService.removeStoreDomain', () => {), code:t
 
 ### Community 1485 - "Community 1485"
 Cohesion: 0.5
-Nodes (4): code:tsx (<footer className="mt-12 text-center text-sm text-muted-fore), code:block20 (git commit -m "feat(web): add Powered by Force AI link to st), Phase D — Storefront suspension UX, Task D.1: Polish StoreMaintenance + add Powered By Force AI
+Nodes (4): code:tsx (<footer className="mt-12 text-center text-sm text-muted-fore), code:block20 (git commit -m "feat(web): add Powered by Ebda AI Studio link to st), Phase D — Storefront suspension UX, Task D.1: Polish StoreMaintenance + add Powered By Ebda AI Studio
 
 ### Community 1486 - "Community 1486"
 Cohesion: 0.5
@@ -7464,7 +7464,7 @@ Nodes (4): code:typescript (const META_API_BASE = 'https://graph.facebook.com/v2
 
 ### Community 1490 - "Community 1490"
 Cohesion: 0.5
-Nodes (4): code:bash (cd /Users/ahmadsharaf/Desktop/projects/force-website-builder), code:typescript (import * as admin from 'firebase-admin';), code:bash (git commit -m "feat(api): add push notification service with), Task 6: Push Notification Service
+Nodes (4): code:bash (cd /Users/ahmadsharaf/Desktop/projects/ebda-store), code:typescript (import * as admin from 'firebase-admin';), code:bash (git commit -m "feat(api): add push notification service with), Task 6: Push Notification Service
 
 ### Community 1491 - "Community 1491"
 Cohesion: 0.5
@@ -7484,7 +7484,7 @@ Nodes (4): code:prisma (model Review {), code:prisma (deliveredAt   DateTime? @m
 
 ### Community 1495 - "Community 1495"
 Cohesion: 0.5
-Nodes (4): code:md (# Force Media Kuwait — Marketing Agency), code:html (<script type="application/ld+json">), code:bash (git add llms.txt index.html), Task 19: Landing page llms.txt + JSON-LD audit
+Nodes (4): code:md (# Ebda AI Studio Egypt — Marketing Agency), code:html (<script type="application/ld+json">), code:bash (git add llms.txt index.html), Task 19: Landing page llms.txt + JSON-LD audit
 
 ### Community 1496 - "Community 1496"
 Cohesion: 0.5
@@ -7516,11 +7516,11 @@ Nodes (4): code:typescript (import { requireFeature } from '../middleware/featur
 
 ### Community 1503 - "Community 1503"
 Cohesion: 0.5
-Nodes (4): code:bash (cd /Users/ahmadsharaf/Desktop/projects/force-website-builder), code:bash (npm run build), code:bash (git add -A), Task 15: Final Verification
+Nodes (4): code:bash (cd /Users/ahmadsharaf/Desktop/projects/ebda-store), code:bash (npm run build), code:bash (git add -A), Task 15: Final Verification
 
 ### Community 1504 - "Community 1504"
 Cohesion: 0.5
-Nodes (4): code:typescript (import { describe, it, expect, vi, beforeEach } from 'vitest), code:bash (cd /Users/ahmadsharaf/Desktop/projects/force-website-builder), code:bash (git add tests/unit/feature.test.ts), Task 5: Unit Tests for Feature Service + Middleware
+Nodes (4): code:typescript (import { describe, it, expect, vi, beforeEach } from 'vitest), code:bash (cd /Users/ahmadsharaf/Desktop/projects/ebda-store), code:bash (git add tests/unit/feature.test.ts), Task 5: Unit Tests for Feature Service + Middleware
 
 ### Community 1505 - "Community 1505"
 Cohesion: 0.5
@@ -7536,7 +7536,7 @@ Nodes (4): code:js (// backend/scripts/wa-keepalive.js), code:js (// backend/wor
 
 ### Community 1508 - "Community 1508"
 Cohesion: 0.5
-Nodes (4): 7.1 Frontend session, 7.2 WBS (WhatsApp Bulk Sender) integration session, 7.3 Existing FWB systems we hook into (no schema change to them), Part 7 — Integration hooks (boundary contracts with other sessions)
+Nodes (4): 7.1 Frontend session, 7.2 WBS (WhatsApp Bulk Sender) integration session, 7.3 Existing Ebda Store systems we hook into (no schema change to them), Part 7 — Integration hooks (boundary contracts with other sessions)
 
 ### Community 1509 - "Community 1509"
 Cohesion: 0.5
@@ -7608,7 +7608,7 @@ Nodes (4): buildCommitSha(), buildIdentity(), deploymentId(), nonEmpty()
 
 ### Community 1526 - "Community 1526"
 Cohesion: 0.5
-Nodes (4): Applied immediately in this session, Force Website Builder — Hardening Plan, Tier 2 — This sprint (hardening / consistency), Tier 3 — Backlog
+Nodes (4): Applied immediately in this session, Ebda Store — Hardening Plan, Tier 2 — This sprint (hardening / consistency), Tier 3 — Backlog
 
 ### Community 1585 - "Community 1585"
 Cohesion: 0.67
@@ -7652,7 +7652,7 @@ Nodes (3): code:typescript ({), code:bash (git commit -m "feat(admin): add notif
 
 ### Community 1598 - "Community 1598"
 Cohesion: 0.67
-Nodes (3): code:bash (cd /Users/ahmadsharaf/Desktop/projects/force-website-builder), code:bash (git commit -m "feat(database): add notification config, even), Task 2: Prisma Schema — Notification Models
+Nodes (3): code:bash (cd /Users/ahmadsharaf/Desktop/projects/ebda-store), code:bash (git commit -m "feat(database): add notification config, even), Task 2: Prisma Schema — Notification Models
 
 ### Community 1599 - "Community 1599"
 Cohesion: 0.67
@@ -7724,7 +7724,7 @@ Nodes (3): bindGetRetryPlugin(), bindRetryMiddleware(), "../../node_modules/@smi
 
 ### Community 1625 - "Community 1625"
 Cohesion: 0.67
-Nodes (3): Hardening Plan, Force Website Builder, Phase 2 Roadmap
+Nodes (3): Hardening Plan, Ebda Store, Phase 2 Roadmap
 
 ### Community 1626 - "Community 1626"
 Cohesion: 0.67

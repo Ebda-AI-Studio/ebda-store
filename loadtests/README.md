@@ -1,6 +1,6 @@
 # Load tests
 
-[k6](https://k6.io) scenarios for the Force Website Builder API.
+[k6](https://k6.io) scenarios for the Ebda Store API.
 
 ## Install
 

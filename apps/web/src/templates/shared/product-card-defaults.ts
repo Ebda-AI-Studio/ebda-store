@@ -5,7 +5,7 @@ import type { CtaShape, CtaSize } from './card-size';
  * Resolve the merchant-configurable product-card defaults once.
  *
  * The same sixteen-line `defaults?.x` block existed in SIX card components —
- * bold, classic, elegant, minimal, modern and the canonical PecannbeeProductCard
+ * bold, classic, elegant, minimal, modern and the canonical StorefrontProductCard
  * — identical apart from two comments and one place that wrote
  * `layout?.productCardDefaults?.productNameCase` instead of
  * `defaults?.productNameCase` (the same expression, since `defaults` IS

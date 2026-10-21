@@ -4,7 +4,7 @@ import { useLanguage } from '../../contexts/LanguageContext';
 
 /**
  * Sprint 4 (2026-05-17): PDP key-value spec table. Observed on
- * Pecannbee PDP (IMG_7993 "Specifications" section: "Size: 300 Gram").
+ * Storefront PDP (IMG_7993 "Specifications" section: "Size: 300 Gram").
  * Renders structured product specifications from
  * `product.specifications` JSON (already in schema). Returns null when
  * no specs are present — no empty section, no chrome bloat.

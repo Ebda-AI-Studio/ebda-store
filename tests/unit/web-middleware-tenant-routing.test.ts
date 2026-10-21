@@ -326,7 +326,7 @@ describe('middleware — STOREFRONT_TENANT_ROUTING_ROUTES canary list', () => {
  */
 describe('middleware — STOREFRONT_TENANT_ROUTING_STORES allowlist (TRC-6)', () => {
   const rewriteOf = (res: Response) => res.headers.get('x-middleware-rewrite') ?? '';
-  const PALORA_KEY = 'demo-boutique.ebda.app';
+  const DEMO_BOUTIQUE_KEY = 'demo-boutique.ebda.app';
 
   const demoStoreRequest = (pathname: string) =>
     new NextRequest(`https://demo-store.example${pathname}`, {
@@ -338,7 +338,9 @@ describe('middleware — STOREFRONT_TENANT_ROUTING_STORES allowlist (TRC-6)', ()
     });
 
   const demoBoutiqueRewrites = () =>
-    rewriteOf(middleware(subdomainRequest('/about'))).includes(`/tenant-store/${PALORA_KEY}/`);
+    rewriteOf(middleware(subdomainRequest('/about'))).includes(
+      `/tenant-store/${DEMO_BOUTIQUE_KEY}/`
+    );
   const demoStoreRewrites = () =>
     rewriteOf(middleware(demoStoreRequest('/about'))).includes('/tenant-store/');
   const demoShopRewrites = () =>
@@ -395,7 +397,7 @@ describe('middleware — STOREFRONT_TENANT_ROUTING_STORES allowlist (TRC-6)', ()
   it('store list "demo-boutique": demo-boutique rewrites on the path and cookie paths (positive control)', () => {
     process.env.STOREFRONT_TENANT_ROUTING_STORES = 'demo-boutique';
     expect(rewriteOf(middleware(subdomainRequest('/about')))).toContain(
-      `/tenant-store/${PALORA_KEY}/en/about`
+      `/tenant-store/${DEMO_BOUTIQUE_KEY}/en/about`
     );
     expect(demoBoutiqueCookieRewrites()).toBe(true);
   });

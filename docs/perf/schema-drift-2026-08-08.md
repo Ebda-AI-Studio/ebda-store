@@ -69,7 +69,7 @@ soft-deleted rows. Against production:
 
 That row is a merchant who soft-deleted an Arabic-titled product and recreated it
 in English reusing the SKU — normal, correct behaviour. A plain unique index
-would have **failed at CREATE time**, and since FWB applies migrations on API
+would have **failed at CREATE time**, and since Ebda Store applies migrations on API
 boot, that failure is an outage.
 
 **Shipped as a PARTIAL unique index** (`WHERE deleted_at IS NULL`), which is also
@@ -146,8 +146,8 @@ so treat "no NEW drift for the objects I touched" as the passing bar — that is
 ## Re-run
 
 ```bash
-createdb fwb_drift_shadow
-SHADOW="postgresql://$USER@localhost:5432/fwb_drift_shadow"
+createdb ebda_drift_shadow
+SHADOW="postgresql://$USER@localhost:5432/ebda_drift_shadow"
 DATABASE_URL="$SHADOW" DIRECT_URL="$SHADOW" npx prisma migrate diff \
   --from-migrations packages/database/prisma/migrations \
   --to-schema-datamodel packages/database/prisma/schema.prisma \

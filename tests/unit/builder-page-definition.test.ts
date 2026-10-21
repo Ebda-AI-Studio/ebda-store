@@ -34,7 +34,7 @@ const asStorefront = (raw: unknown, t: TemplateId): StoreLayoutSettings =>
   resolveLayoutSettings(JSON.parse(JSON.stringify(resolveLayoutSettings(raw, t))));
 const clone = <T>(v: T): T => JSON.parse(JSON.stringify(v));
 const baseDef = (): PageDefinition =>
-  layoutToDefinition(asStorefront(loadLayoutFixture('pecannbee-flow'), 'modern'));
+  layoutToDefinition(asStorefront(loadLayoutFixture('default-flow'), 'modern'));
 
 // ── deterministic generator ────────────────────────────────────────────────
 function rng(seed: number) {

@@ -51,7 +51,7 @@ const sampleOrder = {
     {
       name: 'Smoke test item (this is not a real order)',
       quantity: 1,
-      price: 1000, // 1.000 KWD
+      price: 1000, // 10.00 EGP
     },
   ],
   subtotal: 1000,
@@ -62,10 +62,10 @@ const sampleOrder = {
     firstName: 'Ahmad',
     lastName: 'Sharaf',
     address1: 'Smoke test address — no order was created',
-    city: 'Kuwait City',
+    city: 'Cairo',
     state: '',
     postalCode: '',
-    country: 'Kuwait',
+    country: 'Egypt',
   },
 };
 

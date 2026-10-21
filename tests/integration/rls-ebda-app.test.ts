@@ -276,7 +276,7 @@ beforeAll(async () => {
     data: {
       orderId: order.id,
       amount: 10,
-      currency: 'KWD',
+      currency: 'EGP',
       provider: 'cod',
       status: 'pending',
       transactionId: ids.txnRefB,

@@ -134,7 +134,7 @@ export class SentryService {
     }
 
     // SECURITY: drop email from Sentry user context (GDPR / applicable GCC
-    // data-protection law, see docs/legal/gcc-data-protection.md —
+    // data-protection law, see docs/privacy/data-map.md —
     // customer email shouldn't reach a US SaaS without explicit consent for
     // error-tracking). 2026-05-22 audit P2.
     return Sentry.captureException(error, {

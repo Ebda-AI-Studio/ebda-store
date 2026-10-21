@@ -1,8 +1,8 @@
 # Payment Provider Setup — إعداد بوابات الدفع
 
-Force AI Store integrates with 4 Kuwait-based payment providers + Cash on Delivery. You only need **one** provider account to accept online payments; multiple providers give your customers more checkout options.
+Ebda Store integrates with 4 Egypt-based payment providers + Cash on Delivery. You only need **one** provider account to accept online payments; multiple providers give your customers more checkout options.
 
-تتكامل Force AI Store مع 4 بوابات دفع كويتية + الدفع عند الاستلام. تحتاج حساب مع بوابة واحدة فقط — الباقي اختياري.
+تتكامل Ebda Store مع 4 بوابات دفع كويتية + الدفع عند الاستلام. تحتاج حساب مع بوابة واحدة فقط — الباقي اختياري.
 
 ## Comparison
 
@@ -18,17 +18,17 @@ Fees are approximate per public pricing pages 2026-05; confirm with each provide
 
 ## Universal webhook URL
 
-**All four providers use the SAME webhook URL on Force AI Store:**
+**All four providers use the SAME webhook URL on Ebda Store:**
 
 ```
-https://api.force-ai.co/api/v1/webhooks/payment/<provider>
+https://api.ebda.app/api/v1/webhooks/payment/<provider>
 ```
 
-(`api.force-ai.co` is the new primary API domain; `store-api.forcemediakw.com` continues to be served during migration — both work.)
+(`api.ebda.app` is the new primary API domain; `api.ebda.app` continues to be served during migration — both work.)
 
 Where `<provider>` is one of: `tap`, `myfatoorah`, `hesabe`, `upayments`.
 
-Force AI Store displays the exact URL inside each provider's panel in **Admin → Settings → Payment Settings** with a one-click Copy button — you don't need to construct it manually.
+Ebda Store displays the exact URL inside each provider's panel in **Admin → Settings → Payment Settings** with a one-click Copy button — you don't need to construct it manually.
 
 كل بوابات الدفع تستخدم نفس صيغة الـ webhook URL — تجده مع زر نسخ بجانب كل مزوّد في لوحة إعدادات الدفع.
 
@@ -36,33 +36,33 @@ Force AI Store displays the exact URL inside each provider's panel in **Admin �
 
 ## Tap Payments setup
 
-1. Sign up at <https://www.tap.company/kw/en> (Kuwait business registration + CR required)
+1. Sign up at <https://www.tap.company/kw/en> (Egypt business registration + CR required)
 2. Once approved, log into <https://dashboard.tap.company>
 3. Settings → **API Keys** → create a **Live Secret Key** (starts with `sk_live_`)
 4. Settings → **Webhooks** → Add new webhook:
-   - URL: `https://api.force-ai.co/api/v1/webhooks/payment/tap`
+   - URL: `https://api.ebda.app/api/v1/webhooks/payment/tap`
    - Events: `charge.created`, `charge.updated`, `charge.captured`, `charge.failed`, `charge.refunded`
    - Save → Tap shows the webhook secret — **copy it now, shown once**
-5. In Force AI Store: **Admin → Settings → Payment Settings → Tap**:
+5. In Ebda Store: **Admin → Settings → Payment Settings → Tap**:
    - Toggle: ON
    - API Key: paste the secret key from step 3
    - Webhook Secret: paste the webhook secret from step 4
    - Test Mode: OFF for live, ON while testing
    - **Save**
-6. Test: make a real ~1 KWD purchase from your storefront — confirm the order shows `payment_status=paid` in **Admin → Orders**
+6. Test: make a real ~1 EGP purchase from your storefront — confirm the order shows `payment_status=paid` in **Admin → Orders**
 
 ---
 
 ## MyFatoorah setup
 
-1. Sign up at <https://portal.myfatoorah.com> (Kuwait business registration required)
+1. Sign up at <https://portal.myfatoorah.com> (Egypt business registration required)
 2. Once approved, navigate to **Developer → API Keys**
 3. Generate a **Live Token** (long string, often base64-looking)
 4. Navigate to **Notifications → Web Hooks → Add**:
-   - URL: `https://api.force-ai.co/api/v1/webhooks/payment/myfatoorah`
+   - URL: `https://api.ebda.app/api/v1/webhooks/payment/myfatoorah`
    - Secret: click Generate → copy the secret
    - Events: tick all payment events (Paid, Failed, Refunded, etc.)
-5. In Force AI Store: **Admin → Settings → Payment Settings → MyFatoorah**:
+5. In Ebda Store: **Admin → Settings → Payment Settings → MyFatoorah**:
    - Toggle: ON
    - API Key: paste the live token
    - Webhook Secret: paste the webhook secret
@@ -81,7 +81,7 @@ Hesabe is contract-based — you'll receive credentials by email from your accou
    - Merchant Code
    - API Key
    - Webhook Secret
-3. In Force AI Store: **Admin → Settings → Payment Settings → Hesabe**:
+3. In Ebda Store: **Admin → Settings → Payment Settings → Hesabe**:
    - Toggle: ON
    - Merchant ID: paste the merchant code
    - API Key: paste the key
@@ -89,20 +89,20 @@ Hesabe is contract-based — you'll receive credentials by email from your accou
    - Test Mode: OFF for live
    - **Save**
 4. Email Hesabe support to register the webhook URL on their side:
-   `https://api.force-ai.co/api/v1/webhooks/payment/hesabe`
+   `https://api.ebda.app/api/v1/webhooks/payment/hesabe`
 
 ---
 
 ## UPayments setup
 
-1. Sign up at <https://www.upayments.com> (Kuwait business registration)
+1. Sign up at <https://www.upayments.com> (Egypt business registration)
 2. Once approved, log into the merchant dashboard
 3. **Settings → API Credentials**:
    - Copy the **Live API Key** (starts with `sk_live_`)
 4. **Settings → Webhooks**:
-   - URL: `https://api.force-ai.co/api/v1/webhooks/payment/upayments`
+   - URL: `https://api.ebda.app/api/v1/webhooks/payment/upayments`
    - Secret: copy
-5. In Force AI Store: **Admin → Settings → Payment Settings → UPayments**:
+5. In Ebda Store: **Admin → Settings → Payment Settings → UPayments**:
    - Toggle: ON
    - API Key + Webhook Secret: paste
    - Test Mode: OFF for live
@@ -125,7 +125,7 @@ No external account needed.
 1. **Admin → Settings → Payment Settings → Cash on Delivery**
 2. Toggle: ON
 3. Display Name: e.g. "Cash on Delivery" / "الدفع عند الاستلام"
-4. Fixed fee: optional (e.g. 1 KWD handling fee added to every COD order)
+4. Fixed fee: optional (e.g. 1 EGP handling fee added to every COD order)
 5. **Save**
 
 COD orders are marked `payment_status=cod_pending` until you mark them paid in **Admin → Orders → [order] → Mark as Paid** after collecting cash on delivery.
@@ -154,7 +154,7 @@ If you enable multiple providers, your customer sees them as separate options at
 
 - Set one as **default** (selected first at checkout)
 - Reorder them with the up/down arrows
-- Set a different fixed fee per provider (e.g. UPayments has lower fees → no extra fee; Hesabe contract has higher fees → pass 1 KWD to customer)
+- Set a different fixed fee per provider (e.g. UPayments has lower fees → no extra fee; Hesabe contract has higher fees → pass 1 EGP to customer)
 
 لو فعّلت أكثر من بوابة، اختر واحدة افتراضية وأعد ترتيب الباقي. تقدر تضيف رسوم ثابتة مختلفة لكل بوابة.
 
@@ -169,7 +169,7 @@ To generate a payment link from the admin:
 1. **Admin → Orders → [any order] → Payment Link** (or create a new manual order)
 2. Use the **typeahead product picker** to search your catalog and add products, OR enter a **custom amount** for a deposit or service fee
 3. Click **Generate Link** → copy and paste into WhatsApp
-4. The customer taps the link → lands on your Force AI Store checkout with the cart pre-filled
+4. The customer taps the link → lands on your Ebda Store checkout with the cart pre-filled
 5. Pays via their preferred method (KNET, Apple Pay, cards — whatever your gateway supports)
 
 If a payment link was already generated for an order, the **Copy** and **Open** buttons appear inline — you do not need to generate a new one.
@@ -182,7 +182,7 @@ If a payment link was already generated for an order, the **Copy** and **Open** 
 
 You may wonder: "if every store uses the same webhook URL, can other merchants see my payment events?"
 
-**No.** Each store has its own per-tenant webhook secret. When a payment provider sends a webhook to `api.force-ai.co/api/v1/webhooks/payment/myfatoorah`, Force AI Store:
+**No.** Each store has its own per-tenant webhook secret. When a payment provider sends a webhook to `api.ebda.app/api/v1/webhooks/payment/myfatoorah`, Ebda Store:
 
 1. Looks up the transaction ID inside the payload
 2. Finds which store's order it belongs to (via the `Order` table)
@@ -197,9 +197,9 @@ A merchant configuring a different store's credentials can't intercept anyone el
 
 ## How a paid order is confirmed (two paths)
 
-Force AI Store confirms an online payment via **two** independent paths, so a single misconfigured webhook can't leave a paid order stuck:
+Ebda Store confirms an online payment via **two** independent paths, so a single misconfigured webhook can't leave a paid order stuck:
 
-1. **Verify-on-return (primary).** The moment the customer returns to the order-success page after paying, Force AI Store asks the provider directly "is this invoice paid?" and — if yes — marks the order paid and fires all your notifications (email + admin push + WhatsApp). This works even when the provider's webhook isn't configured. The success page then shows the truthful status: **paid**, **confirming…**, or **payment not completed** (with a "Try payment again" button).
+1. **Verify-on-return (primary).** The moment the customer returns to the order-success page after paying, Ebda Store asks the provider directly "is this invoice paid?" and — if yes — marks the order paid and fires all your notifications (email + admin push + WhatsApp). This works even when the provider's webhook isn't configured. The success page then shows the truthful status: **paid**, **confirming…**, or **payment not completed** (with a "Try payment again" button).
 2. **Webhook (backup).** If you've pasted the webhook URL into your provider portal, the provider also pushes the status to us. This is the safety net — and it's idempotent with path (1), so the customer/admin never get duplicate notifications.
 
 طريقتان مستقلتان لتأكيد الدفع: (1) **التحقق عند العودة** — بمجرد رجوع العميل لصفحة نجاح الطلب نسأل المزوّد مباشرة إن كان الدفع تمّ، ونؤكد الطلب ونرسل الإشعارات؛ (2) **الويب هوك** كخط احتياطي. الطريقتان لا تُكرّران الإشعارات.
@@ -211,7 +211,7 @@ With verify-on-return above, a missed webhook usually no longer leaves an order 
 If the order is stuck in `pending` for >1 hour:
 
 1. Check the provider's dashboard — was the payment actually completed?
-2. If yes: contact the Force Media team — we can manually mark the order paid after verifying the transaction ID
+2. If yes: contact the Ebda AI Studio team — we can manually mark the order paid after verifying the transaction ID
 3. If no: the payment likely failed silently; ask the customer to try again
 
-لو الطلب بقي في حالة `pending` أكثر من ساعة: تأكد من لوحة المزوّد إذا الدفع تمّ فعلًا، تواصل مع فريق Force Media لتعديل الحالة يدويًا بعد التحقّق.
+لو الطلب بقي في حالة `pending` أكثر من ساعة: تأكد من لوحة المزوّد إذا الدفع تمّ فعلًا، تواصل مع فريق Ebda AI Studio لتعديل الحالة يدويًا بعد التحقّق.

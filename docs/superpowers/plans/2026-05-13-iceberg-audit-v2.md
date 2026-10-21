@@ -1,6 +1,6 @@
 # Iceberg Audit follow-up plan v2 — item-by-item triage
 
-> **Correction (2026-09-22):** "Kuwait Law 13/2023" cited below does not exist. See docs/legal/gcc-data-protection.md for the verified GCC legal basis.
+> **Correction (2026-09-22):** "Egypt Law 13/2023" cited below does not exist. See docs/privacy/data-map.md for the verified GCC legal basis.
 
 **Supersedes** `2026-05-13-iceberg-audit-followup.md` (v1). v1 kept the session structure; v2 adds the real-life impact + choice list per gap so Ahmad can triage with full context.
 
@@ -16,12 +16,12 @@ These are actively at risk RIGHT NOW. Every day Wady Aljuz takes another order, 
 
 ### 35. Cookies — ❌ Missing
 
-**Real-life impact**: Marketing pixels (Meta, GA4, TikTok, Snapchat, Twitter, Pinterest) fire on every storefront page load without user consent. Under GDPR Art. 6(a) + ePrivacy Directive + Kuwait Law 13/2023, this is a regulatory violation per visitor. Concrete consequences: (a) any visitor or competitor can file a complaint with the Kuwait Data Protection Authority → investigation + fine (up to 5M KWD or 5% global revenue, whichever is higher); (b) Google flags the site during ad account review → ads paused until consent banner added (typically 7-14 day disruption); (c) if Wady Aljuz expands to EU customers, single GDPR complaint triggers €20M / 4% global revenue cap; (d) Meta's pixel terms require "valid legal basis for processing" — they can disable the pixel ID on report.
+**Real-life impact**: Marketing pixels (Meta, GA4, TikTok, Snapchat, Twitter, Pinterest) fire on every storefront page load without user consent. Under GDPR Art. 6(a) + ePrivacy Directive + Egypt Law 13/2023, this is a regulatory violation per visitor. Concrete consequences: (a) any visitor or competitor can file a complaint with the Egypt Data Protection Authority → investigation + fine (up to 5M EGP or 5% global revenue, whichever is higher); (b) Google flags the site during ad account review → ads paused until consent banner added (typically 7-14 day disruption); (c) if Wady Aljuz expands to EU customers, single GDPR complaint triggers €20M / 4% global revenue cap; (d) Meta's pixel terms require "valid legal basis for processing" — they can disable the pixel ID on report.
 
 **Options**:
 
 - **A. Custom 4-hour build** (recommended): `CookieConsentBanner` component + `force-cookie-consent` cookie + gate `MarketingPixelsProvider`. Three-option modal: Accept all / Reject all / Customize. Mirrors the `force-language` cookie pattern from `feedback-locale-cookie-ssr.md`. EN/AR bilingual. Total: ~200 lines.
-- **B. Drop-in library** (`vanilla-cookieconsent` or `cookieconsent` from Osano, ~6KB): faster integration (~1 hour) but adds an external dep + their UI doesn't match FWB's design.
+- **B. Drop-in library** (`vanilla-cookieconsent` or `cookieconsent` from Osano, ~6KB): faster integration (~1 hour) but adds an external dep + their UI doesn't match Ebda Store's design.
 - **C. Server-side consent gating**: read consent cookie in `layout.tsx` SSR pass, never even SEND pixel scripts to non-consenting browsers. Slightly more secure (no client-side races) + better Lighthouse score, but more invasive.
 
 **Recommendation**: **A** for full control + design consistency. Bake the SSR check from C into A from day 1 since we already proved that pattern with the locale cookie.
@@ -30,7 +30,7 @@ These are actively at risk RIGHT NOW. Every day Wady Aljuz takes another order, 
 
 ### 16. GDPR/CCPA — ⚠️ Partial
 
-**Real-life impact**: `DELETE /auth/me` soft-deletes (`deletedAt`) but leaves email, phone, name, address, order PII fully intact in the DB. GDPR Art. 17 (Right to Erasure) requires irreversible anonymization, not hiding. A single customer email asking "please delete my data" that gets a partial response = formal complaint material. Penalty: same scale as #35 above. Bonus consequence: Kuwait Law 13/2023 also requires data export on request (Art. 20 portability) — FWB has zero mechanism for this. Customer asks "send me my data" → no response possible without DB direct access.
+**Real-life impact**: `DELETE /auth/me` soft-deletes (`deletedAt`) but leaves email, phone, name, address, order PII fully intact in the DB. GDPR Art. 17 (Right to Erasure) requires irreversible anonymization, not hiding. A single customer email asking "please delete my data" that gets a partial response = formal complaint material. Penalty: same scale as #35 above. Bonus consequence: Egypt Law 13/2023 also requires data export on request (Art. 20 portability) — Ebda Store has zero mechanism for this. Customer asks "send me my data" → no response possible without DB direct access.
 
 **Options**:
 
@@ -44,7 +44,7 @@ These are actively at risk RIGHT NOW. Every day Wady Aljuz takes another order, 
 
 ### 12. Alerting — ❌ Missing
 
-**Real-life impact**: Site can go down at 3am with zero notification. Recent precedent: the day FWB's Railway API crashed for 12 minutes in March 2026 — discovery was a merchant WhatsApp message. Sentry catches errors but doesn't tell you "the server is unreachable". A payment provider HMAC misconfiguration could silently 401 every webhook for hours before anyone notices. Concrete impact: for every hour of unmonitored downtime, you lose ~50-200 KWD in orders (Wady Aljuz averages) AND erode merchant trust ("their platform is unreliable") AND give competitors talking points. For multi-merchant future, downtime = SLA breach = potential contract penalty.
+**Real-life impact**: Site can go down at 3am with zero notification. Recent precedent: the day Ebda Store's Railway API crashed for 12 minutes in March 2026 — discovery was a merchant WhatsApp message. Sentry catches errors but doesn't tell you "the server is unreachable". A payment provider HMAC misconfiguration could silently 401 every webhook for hours before anyone notices. Concrete impact: for every hour of unmonitored downtime, you lose ~50-200 EGP in orders (Wady Aljuz averages) AND erode merchant trust ("their platform is unreliable") AND give competitors talking points. For multi-merchant future, downtime = SLA breach = potential contract penalty.
 
 **Options**:
 
@@ -98,7 +98,7 @@ These don't break today, but every week without them increases the cost of fixin
 - **B. Neon branch for E2E only**: cheaper (~1 day) — keep preview pointing at prod API but isolate E2E suite to a dedicated Neon branch. Doesn't solve preview-deploy mutations.
 - **C. Read-only seeded test fixtures**: only safe if all E2E + preview interactions are read-only. Most aren't.
 
-**Recommendation**: **A**. The 3-day cost saves a multi-week migration when FWB onboards merchant #2 and the "tests writing to prod" pattern stops being tenable.
+**Recommendation**: **A**. The 3-day cost saves a multi-week migration when Ebda Store onboards merchant #2 and the "tests writing to prod" pattern stops being tenable.
 
 ---
 
@@ -140,7 +140,7 @@ These don't break today, but every week without them increases the cost of fixin
 - **B. Full 80% threshold across all files**: ~1-2 weeks. Diminishing returns on UI components and trivial CRUD.
 - **C. Critical-path-only e2e tests**: write 5-10 high-value e2e tests covering checkout, refund, multi-tenant isolation. Cheaper (~1 day) but doesn't catch unit-level regressions.
 
-**Recommendation**: **A**. The four files account for ~80% of FWB's customer-facing risk surface.
+**Recommendation**: **A**. The four files account for ~80% of Ebda Store's customer-facing risk surface.
 
 ---
 
@@ -148,7 +148,7 @@ These don't break today, but every week without them increases the cost of fixin
 
 ### 15. Data retention — ⚠️ Partial
 
-**Real-life impact**: Audit log retention is implemented (90d → R2 archive) — good. But abandoned carts, soft-deleted users, and customer PII accumulate forever. Kuwait MOF requires invoice retention ≥5 years for tax compliance, but Kuwait Law 13/2023 also requires _not_ retaining PII beyond business need. The conflict means orders should be anonymized at 5+ years, not kept with PII. Abandoned carts older than 30 days serve zero business purpose and grow DB cost. Concrete impact: a year from now your `Cart` table has 100K rows of dead data slowing every query.
+**Real-life impact**: Audit log retention is implemented (90d → R2 archive) — good. But abandoned carts, soft-deleted users, and customer PII accumulate forever. Egypt MOF requires invoice retention ≥5 years for tax compliance, but Egypt Law 13/2023 also requires _not_ retaining PII beyond business need. The conflict means orders should be anonymized at 5+ years, not kept with PII. Abandoned carts older than 30 days serve zero business purpose and grow DB cost. Concrete impact: a year from now your `Cart` table has 100K rows of dead data slowing every query.
 
 **Options**:
 
@@ -170,7 +170,7 @@ These don't break today, but every week without them increases the cost of fixin
 - **B. Pre-receive hook on Railway-deployed projects**: blocks pushes that contain certain patterns (force-push, --no-verify markers). More complex; rarely needed.
 - **C. No change**: trust the operators. Acceptable today; not when merchant count grows.
 
-**Recommendation**: **A** on all 5 repos (FWB, CRM, WBS, Landing, claude-memory-vault). 25 min total.
+**Recommendation**: **A** on all 5 repos (Ebda Store, CRM, WBS, Landing, claude-memory-vault). 25 min total.
 
 ---
 
@@ -182,7 +182,7 @@ These don't break today, but every week without them increases the cost of fixin
 
 - **A. Crisp chat widget on admin app** (recommended): free tier covers 1 operator + unlimited conversations. Drop a `<Script>` in `apps/admin/src/app/layout.tsx`. Adds a chat bubble for merchants. Conversation history persisted in Crisp dashboard. ~15 min. Combined with the Telegram alert from #12 covers escalations too (P0 alerts → Telegram, merchant tickets → Crisp).
 - **B. Lightweight ticketing (Linear, Plain)**: more structured but more setup. ~2 hours + ongoing curation.
-- **C. Email-only**: rely on `support@forcemediakw.com`. Cheap, but no history visibility, no SLA tracking.
+- **C. Email-only**: rely on `support@ebda.app`. Cheap, but no history visibility, no SLA tracking.
 
 **Recommendation**: **A**. Crisp is the standard solo-operator support tool. Move to B when merchant count > 5.
 
@@ -239,7 +239,7 @@ These don't break today, but every week without them increases the cost of fixin
 
 - **A. PostHog free tier** (recommended): 1M events/month free. Install `posthog-js`, wire to existing FeatureContext. ~4 hours.
 - **B. GrowthBook self-hosted**: zero cost, more setup. Overkill.
-- **C. Custom feature-flag-based experiments**: FWB already has `FeatureContext`. Adding variant assignment + analytics + significance check is 1-2 days of bespoke work that PostHog gives for free.
+- **C. Custom feature-flag-based experiments**: Ebda Store already has `FeatureContext`. Adding variant assignment + analytics + significance check is 1-2 days of bespoke work that PostHog gives for free.
 
 **Recommendation**: **A**. Depends on cookie consent (#35) being live so analytics are GDPR-compliant.
 
@@ -247,12 +247,12 @@ These don't break today, but every week without them increases the cost of fixin
 
 ### 3. Billing logic (platform → merchant) — ⚠️ Partial
 
-**Real-life impact**: `StorePlan` exists in schema but assignment is manual. As merchant count grows past ~3, you can't manually invoice each one without dropping balls. Today: zero merchants paying monthly fees → manual is fine. Tomorrow: 10 merchants × ~50 KWD/mo each = $500/mo revenue you can't reliably collect without automation. Concrete consequence: merchants stay on free indefinitely because there's no payment mechanism to upgrade them.
+**Real-life impact**: `StorePlan` exists in schema but assignment is manual. As merchant count grows past ~3, you can't manually invoice each one without dropping balls. Today: zero merchants paying monthly fees → manual is fine. Tomorrow: 10 merchants × ~50 EGP/mo each = $500/mo revenue you can't reliably collect without automation. Concrete consequence: merchants stay on free indefinitely because there's no payment mechanism to upgrade them.
 
 **Options**:
 
 - **A. Stripe Billing** (recommended at scale): `StoreSubscription` table + Stripe Checkout for subscription signup + webhook for lifecycle events + dunning. ~1 week.
-- **B. MyFatoorah recurring invoicing**: keeps everything Kuwait-native. ~1-2 weeks. Worse Stripe-Billing-style UX.
+- **B. MyFatoorah recurring invoicing**: keeps everything Egypt-native. ~1-2 weeks. Worse Stripe-Billing-style UX.
 - **C. Manual + email invoices**: tolerable until merchant #5.
 
 **Recommendation**: **C** today. **A** when merchant #3 signs up.
@@ -265,7 +265,7 @@ These don't break today, but every week without them increases the cost of fixin
 
 **Options**:
 
-- **A. Notion/GitBook public docs site at `docs.forcemediakw.com`** (recommended): topics — payment provider setup, custom domain wiring, product management, order workflow, AI sweep guide. ~2-3 days writing.
+- **A. Notion/GitBook public docs site at `docs.ebda.app`** (recommended): topics — payment provider setup, custom domain wiring, product management, order workflow, AI sweep guide. ~2-3 days writing.
 - **B. In-app docs (admin sidebar links)**: cheaper but no SEO. Merchants Google instead.
 - **C. Loom video library**: 5-10 short walkthroughs. ~1 day. Lower friction to create, lower discoverability.
 
@@ -275,11 +275,11 @@ These don't break today, but every week without them increases the cost of fixin
 
 ### 28. Multi-region — ❌ Missing
 
-**Real-life impact**: API is single-region (currently `ap-southeast-1` per DATABASE_URL — Singapore). Kuwait-market users hit a Singapore server → ~150ms RTT per uncached API call. Acceptable today; suboptimal compared to a Bahrain/UAE region (~30ms).
+**Real-life impact**: API is single-region (currently `ap-southeast-1` per DATABASE_URL — Singapore). Egypt-market users hit a Singapore server → ~150ms RTT per uncached API call. Acceptable today; suboptimal compared to a Bahrain/UAE region (~30ms).
 
 **Options**:
 
-- **A. Move Railway region to closer location** (Frankfurt or US-East, whichever Railway offers nearest to Kuwait): one-time migration, ~2 hours.
+- **A. Move Railway region to closer location** (Frankfurt or US-East, whichever Railway offers nearest to Egypt): one-time migration, ~2 hours.
 - **B. Add edge-cache layer to compensate**: aggressive Vercel edge cache for all read paths.
 - **C. Defer**: acceptable while p95 < 1s and customer satisfaction is fine.
 
@@ -310,7 +310,7 @@ These tiers apply to every Force project. Stack-specific weighting:
 
 | Project                        | Tier 1 priority                                                                    | Tier 2 priority                        | Notes                                                                 |
 | ------------------------------ | ---------------------------------------------------------------------------------- | -------------------------------------- | --------------------------------------------------------------------- |
-| **Force Media CRM**            | #16 GDPR (PII-heavy client data, automations history), #35 Cookies (admin has GA?) | #22 Test coverage, #19 Staging         | No customer-facing storefront → cookie risk lower                     |
+| **Ebda AI Studio CRM**            | #16 GDPR (PII-heavy client data, automations history), #35 Cookies (admin has GA?) | #22 Test coverage, #19 Staging         | No customer-facing storefront → cookie risk lower                     |
 | **WhatsApp Bulk Sender (WBS)** | #16 GDPR (contact lists), #12 Alerting (per-tenant webhook URLs)                   | #22 Test coverage, #23 Instrumentation | Per-tenant WhatsApp credentials → secrets management is critical      |
-| **Force Media Landing**        | #35 Cookies (marketing site = highest impact), #16 GDPR (lead form PII)            | #37 Documentation                      | Vanilla HTML stack = different fix shape but same compliance baseline |
+| **Ebda AI Studio Landing**        | #35 Cookies (marketing site = highest impact), #16 GDPR (lead form PII)            | #37 Documentation                      | Vanilla HTML stack = different fix shape but same compliance baseline |
 | **New project (Mnasati ERP)**  | All 10 CLAUDE.md rules from day 1 — never retrofit                                 | n/a (no debt yet)                      | Bake the audit-passed posture in before first customer                |

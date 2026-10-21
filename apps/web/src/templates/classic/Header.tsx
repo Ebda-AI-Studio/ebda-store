@@ -251,7 +251,7 @@ export default function ClassicHeader({
         </div>
       </div>
 
-      {/* Mobile persistent search bar — pecannbee target layout. Always
+      {/* Mobile persistent search bar — demo-store target layout. Always
           visible under the main header row on mobile so customers don't
           have to open the menu to search. Hidden on md+. */}
       <div className="hidden border-t border-border/40 py-3" data-zone="mobile-search">

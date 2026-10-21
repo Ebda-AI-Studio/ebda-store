@@ -1,6 +1,6 @@
 /**
  * Right-to-erasure (GDPR Art. 17 and applicable GCC data-protection law —
- * see docs/legal/gcc-data-protection.md) propagation
+ * see docs/privacy/data-map.md) propagation
  * to third parties that hold a copy of the user's personal data outside
  * Neon Postgres.
  *

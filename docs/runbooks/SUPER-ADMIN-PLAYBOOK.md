@@ -4,12 +4,12 @@
 
 ## Roles
 
-- **`super_admin`** — Ahmad and any future Force AI staff. Can see and toggle ALL features for any store, change plans, and suspend/reactivate. Sees the "Manage Features" link in the store sidebar.
+- **`super_admin`** — Ahmad and any future Ebda AI Studio staff. Can see and toggle ALL features for any store, change plans, and suspend/reactivate. Sees the "Manage Features" link in the store sidebar.
 - **`store_admin`** — Merchant team. Can see + use only the features that resolve to enabled for their store. Does NOT see "Manage Features" or any plan-change UI. Plan is shown read-only.
 
 ## Plans
 
-Force AI Store: **Starter / Professional / Enterprise** (plus `free` as a stripped fallback for the demo state / lapsed payment).
+Ebda Store: **Starter / Professional / Enterprise** (plus `free` as a stripped fallback for the demo state / lapsed payment).
 
 | Domain                                                                               | Starter            | Professional       | Enterprise         |
 | ------------------------------------------------------------------------------------ | ------------------ | ------------------ | ------------------ |
@@ -22,7 +22,7 @@ Force AI Store: **Starter / Professional / Enterprise** (plus `free` as a stripp
 | Accounting — tax reports + multi-currency + profit anomaly + bank reconcile          | —                  | —                  | ✓                  |
 | Loyalty + push notifications + upsell-crosssell                                      | —                  | ✓                  | ✓                  |
 | Affiliate program + SMS + floating widget                                            | —                  | —                  | ✓                  |
-| Force AI WhatsApp bot integration                                                    | **Separate quote** | **Separate quote** | **Separate quote** |
+| Ebda AI Studio WhatsApp bot integration                                                    | **Separate quote** | **Separate quote** | **Separate quote** |
 
 The canonical source is `packages/shared/src/plan-baselines.ts` — when the table here disagrees with the code, the code is right.
 
@@ -75,7 +75,7 @@ Suspension is for missed renewals + AUP violations. **Super-admin only.**
    - Feature cache invalidated
    - AuditLog entry written (`action: store.suspend`)
 4. External effects:
-   - Storefront serves the `StoreMaintenance` page (HTTP 200 with branded "we'll be back soon" + "Powered by Force AI" link)
+   - Storefront serves the `StoreMaintenance` page (HTTP 200 with branded "we'll be back soon" + "Powered by Ebda AI Studio" link)
    - Store admin can still log into admin (so they can pay invoice + click reactivate)
    - Background jobs (Inngest functions, abandoned cart reminders, etc.) skip suspended stores
 
@@ -83,11 +83,11 @@ Suspension is for missed renewals + AUP violations. **Super-admin only.**
 
 Same UI, the button reads "Reactivate Store" in green when status is suspended. Click → confirm → `status` flips to `active`. Storefront returns immediately on the next request.
 
-## Force AI WhatsApp side
+## Ebda AI Studio WhatsApp side
 
-Force AI WhatsApp is a **separate product** with its own 3-tier plan system on the WBS side (`Client.plan` + `ClientFeature` table). Same super-admin UI pattern in WBS admin frontend.
+Ebda AI Studio WhatsApp is a **separate product** with its own 3-tier plan system on the WBS side (`Client.plan` + `ClientFeature` table). Same super-admin UI pattern in WBS admin frontend.
 
-**Cross-product rule (HARD):** `wbs.bot.*` features REQUIRE a linked active Force AI Store. WBS plan can be at any tier, but if no Force AI Store is linked OR the linked store is suspended/inactive, all bot features resolve to disabled. Bulk campaigns + unified inbox + templates work without Force AI Store. Super-admin override on a `wbs.bot.*` feature CANNOT bypass this precondition — it's a runtime check, not a config flag.
+**Cross-product rule (HARD):** `wbs.bot.*` features REQUIRE a linked active Ebda Store. WBS plan can be at any tier, but if no Ebda Store is linked OR the linked store is suspended/inactive, all bot features resolve to disabled. Bulk campaigns + unified inbox + templates work without Ebda Store. Super-admin override on a `wbs.bot.*` feature CANNOT bypass this precondition — it's a runtime check, not a config flag.
 
 ## Money alerts that need a human
 
@@ -136,4 +136,3 @@ accepted what: Users -> the merchant -> **Policy acceptances**. Rulings LEGAL-4/
 
 - [`ROLLBACK.md`](ROLLBACK.md) — code + DB rollback
 - [`STAGING-DEPLOYMENT.md`](STAGING-DEPLOYMENT.md) — promotion flow
-- [`../business/04-pricing-tiers.md`](../business/04-pricing-tiers.md) — proposal pricing framework

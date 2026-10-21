@@ -9,7 +9,7 @@ import { inngest } from '../client';
 
 /**
  * Third-party Right-to-Erasure propagation (GDPR Art. 17 and applicable
- * GCC data-protection law — see docs/legal/gcc-data-protection.md).
+ * GCC data-protection law — see docs/privacy/data-map.md).
  *
  * `AuthService.eraseAccount` anonymizes Neon in a single transaction and
  * that MUST succeed on its own — this consumer runs entirely AFTER that

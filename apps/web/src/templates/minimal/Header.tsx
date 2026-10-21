@@ -203,7 +203,7 @@ export default function MinimalHeader({
         </div>
 
         {/* Mobile persistent search bar — always visible under the logo
-            row on mobile (pecannbee target layout). Hidden on lg+ where
+            row on mobile (demo-store target layout). Hidden on lg+ where
             the expandable search-toggle in the actions row handles it. */}
         <div className="hidden pb-3" data-zone="mobile-search">
           <form onSubmit={handleSearch} className="relative">

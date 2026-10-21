@@ -17,14 +17,14 @@ Manage orders from **Admin → Sales → Orders**, or from the dedicated **Order
 The list supports:
 
 - **Search** — find an order by number, by a registered customer's name, email or phone, or by the name, email or phone a **guest** entered at checkout. It searches **all** your orders, not just the page on screen. Type at least 3 characters for the fast path; shorter searches still work, they just take longer on a large store.
-- **Date filter** — narrow the list to any time period. Days are your own calendar days (a Kuwait order at 01:00 belongs to that day, not the previous one).
+- **Date filter** — narrow the list to any time period. Days are your own calendar days (a Egypt order at 01:00 belongs to that day, not the previous one).
 - **Export** — downloads **exactly the filtered list**: the same dates, status and search. The file name carries the date range (e.g. `orders-2026-09-01_to_2026-09-30.xlsx`) and a **Filters** sheet says what was applied.
 - **Bulk "mark paid"** — select multiple orders and mark them paid in one action (useful for cash-on-delivery batches).
 
 تدعم القائمة:
 
 - **البحث** — عن طلب برقمه، أو باسم العميل المسجَّل أو بريده أو هاتفه. يبحث في **كل** طلباتك وليس في الصفحة المعروضة فقط.
-- **تصفية بالتاريخ** — حصر القائمة بأي فترة زمنية، بأيامك أنت (طلب في الكويت الساعة 1 صباحًا يُحسب لذلك اليوم لا لليوم السابق).
+- **تصفية بالتاريخ** — حصر القائمة بأي فترة زمنية، بأيامك أنت (طلب في مصر الساعة 1 صباحًا يُحسب لذلك اليوم لا لليوم السابق).
 - **التصدير** — يُنزّل **القائمة المصفّاة نفسها بالضبط**: نفس التواريخ والحالة والبحث. اسم الملف يحمل الفترة (مثل `orders-2026-09-01_to_2026-09-30.xlsx`) وورقة **Filters** توضح ما طُبّق.
 - **"تعليم كمدفوع" بالجملة** — تحديد عدة طلبات وتعليمها كمدفوعة دفعة واحدة (مفيد لطلبات الدفع عند الاستلام).
 
@@ -78,8 +78,8 @@ The platform watches the payment state of online orders for you:
 - **لا "استرداد" زائف** — إلغاء طلب لم يُدفع أصلًا يُعيد مخزونه لكنه **لا** يُبلغ العميل بحدوث استرداد. إشعار الاسترداد يُرسل فقط للطلبات المدفوعة فعلًا.
 - **إلغاء تلقائي للطلبات غير المدفوعة** — الطلبات الإلكترونية التي تبقى دون دفع بعد المهلة تُلغى تلقائيًا؛ يصل العميل إشعار الإلغاء المعتاد دون محاولة استرداد لأنه لم يُدفع شيء.
 
-> The exact timing of these alerts and the auto-cancel window are set by Force AI for your deployment. Ask your account manager if you'd like them adjusted.
-> توقيت هذه التنبيهات ومهلة الإلغاء التلقائي يضبطها فريق Force AI لمتجرك. تواصل مع مدير حسابك لتعديلها.
+> The exact timing of these alerts and the auto-cancel window are set by Ebda AI Studio for your deployment. Ask your account manager if you'd like them adjusted.
+> توقيت هذه التنبيهات ومهلة الإلغاء التلقائي يضبطها فريق Ebda AI Studio لمتجرك. تواصل مع مدير حسابك لتعديلها.
 
 ---
 

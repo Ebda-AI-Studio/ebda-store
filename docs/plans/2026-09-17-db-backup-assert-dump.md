@@ -33,7 +33,7 @@ distinguish the failure that actually destroys a DR position:
 | zero bytes              | 0           | ~48 B          | fail ✅  | no                    |
 | **schema-only / wiped** | **~3.5 KB** | **~3.5 KB**    | **pass** | **an empty database** |
 
-The third row is not hypothetical. On 2026-08-02 the Force Media CRM production database was wiped and
+The third row is not hypothetical. On 2026-08-02 the Ebda AI Studio CRM production database was wiped and
 its nightly backup archived **30 consecutive schema-only dumps**, each far above any byte floor, each
 reported as a success, for five weeks. The DR that was supposed to make the wipe survivable had been
 backing up an empty database the whole time.
@@ -86,7 +86,7 @@ upload) with its message corrected to say what it actually measures.
 
 ## 3. The producer of the empty local dumps — **identified**
 
-Six archives in `~/Desktop/projects/_backups/force-website-builder/` are valid gzip files containing
+Six archives in `~/Desktop/projects/_backups/ebda-store/` are valid gzip files containing
 zero bytes, named `<UTC timestamp>-<8-char commit>.sql.gz`.
 
 **Verdict: `scripts/backup-db.sh`, in this repo, invoked from `.husky/pre-push` on `main`.**
@@ -131,7 +131,7 @@ to `main` from a checkout parked on that commit, each firing the hook, each dump
 ### What could NOT be re-verified
 
 The four named artifacts are **no longer on disk** — checked 2026-09-17, all four absent from
-`~/Desktop/projects/_backups/force-website-builder/` (Ahmad owns that tree and had already cleared
+`~/Desktop/projects/_backups/ebda-store/` (Ahmad owns that tree and had already cleared
 them). So the verdict above rests on the reproduction, the naming scheme and the invocation path, not
 on re-inspecting the files themselves. Anyone re-checking this later will not find them.
 
@@ -140,7 +140,7 @@ across 17 project directories, of which this project holds **26** — so the "19
 original report is the FLEET-wide figure, not this project's directory, and retention (cap 30 per
 project) is working normally.
 
-**Positive control against production data.** `verify-dump.sh` was run against the current real FWB
+**Positive control against production data.** `verify-dump.sh` was run against the current real Ebda Store
 dump and accepts it:
 
 ```
@@ -221,7 +221,7 @@ _Cost if wrong:_ someone restores from one — mitigated because `verify-dump.sh
 candidate before use, and the runbook tells them to run it.
 
 **Ruling DB-4 — `PROJECT_NAME` is still `basename "$(git rev-parse --show-toplevel)"`, unchanged.**
-Run from a git worktree this resolves to e.g. `force-website-builder__fix-foo` and would write into a
+Run from a git worktree this resolves to e.g. `ebda-store__fix-foo` and would write into a
 differently-named backup directory. Not fixed here: the only caller runs on `main` in the root checkout,
 and changing the destination path is a bigger blast radius than this PR's subject. _Cost if wrong:_ a
 manual run from a worktree creates a stray `_backups/<worktree-name>/` directory — noisy, not lossy.

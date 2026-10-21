@@ -3,7 +3,7 @@
  * a public read used by the storefront when rendering the home composition.
  *
  * The shape is `StoreLayoutSettings` from @ebda/shared; an empty `{}` blob
- * resolves to packaged Pecannbee-flow defaults via `resolveLayoutSettings`,
+ * resolves to packaged Storefront-flow defaults via `resolveLayoutSettings`,
  * so existing tenants don't need a backfill before this ships.
  */
 

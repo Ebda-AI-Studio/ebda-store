@@ -1,7 +1,7 @@
-# FWB (Force Website Builder) — Comprehensive SaaS Due-Diligence Audit
+# Ebda Store (Ebda Store) — Comprehensive SaaS Due-Diligence Audit
 
 **Date:** 2026-05-22
-**Subject:** Force Website Builder / Force AI Store (proprietary multi-tenant e-commerce SaaS)
+**Subject:** Ebda Store / Ebda Store (proprietary multi-tenant e-commerce SaaS)
 **Audit framing:** acquirer-grade due diligence — every square inch
 **Scope:** security, database, infrastructure, code quality, business features, cost forecast, risk register, SWOT
 
@@ -9,15 +9,15 @@
 
 ## Executive Summary (for the would-be acquirer)
 
-Force Website Builder (operated as "Force AI Store" by Force AI Kuwait) is a **proprietary multi-tenant SaaS e-commerce platform** purpose-built for Kuwait/GCC SMB merchants. The codebase is **1,158 tracked files, 79 Prisma models, 30 async Inngest functions, 51 API route files, 5 production storefront themes**, currently serving 2 live merchants (Wady Aljuz @ 235 products / 8 categories; Palora). Source code is proprietary (`license: UNLICENSED`).
+Ebda Store (operated as "Ebda Store" by Ebda AI Studio Egypt) is a **proprietary multi-tenant SaaS e-commerce platform** purpose-built for Egypt/GCC SMB merchants. The codebase is **1,158 tracked files, 79 Prisma models, 30 async Inngest functions, 51 API route files, 5 production storefront themes**, currently serving 2 live merchants (Wady Aljuz @ 235 products / 8 categories; demo-boutique). Source code is proprietary (`license: UNLICENSED`).
 
-**The headline assessment:** this is a remarkably well-architected SaaS for its production stage. The 4 pillar moats — AI-as-default via Gemini Flash Lite, Arabic-first locality, Kuwait-native payment stack (Tap/MyFatoorah/Hesabe/UPayments), per-section customization granularity — are genuinely differentiated. Feature depth (full Chart-of-Accounts accounting, AEO/GEO 7-layer architecture, WBS WhatsApp bridge, dual-stack push) exceeds the SMB tier and would typically be found in $200–500/mo enterprise platforms. The platform's primary commercial weakness is operational: **no self-serve signup or public pricing exists**, capping growth to what the Force Media agency can close manually.
+**The headline assessment:** this is a remarkably well-architected SaaS for its production stage. The 4 pillar moats — AI-as-default via Gemini Flash Lite, Arabic-first locality, Egypt-native payment stack (Tap/MyFatoorah/Hesabe/UPayments), per-section customization granularity — are genuinely differentiated. Feature depth (full Chart-of-Accounts accounting, AEO/GEO 7-layer architecture, WBS WhatsApp bridge, dual-stack push) exceeds the SMB tier and would typically be found in $200–500/mo enterprise platforms. The platform's primary commercial weakness is operational: **no self-serve signup or public pricing exists**, capping growth to what the Ebda AI Studio agency can close manually.
 
 The infrastructure topology (Vercel × 2 + Railway + Neon + Cloudflare R2 + Inngest) has been thoughtfully hardened: per-commit Neon snapshots, 5-channel observability (Sentry + UptimeRobot + PostHog + Telegram + Axiom log drain), correct rollback automation, RLS-backed tenant isolation, and zero-vulns CI gates. Cost discipline is excellent — current run-rate is **~$26/mo**, scaling linearly to **~$170/mo at 10k MAU** and **~$1,100/mo at 100k MAU**.
 
 The audit surfaces **three P0 issues**, **eight P1 issues**, and a longer list of P2/P3 items. The P0s are remediable in days, not months. The single most material issue: **Vercel Hobby plan violates Vercel's commercial-use terms** — the platform processes payments and operates as a SaaS but runs on a $0 plan that explicitly forbids this. A $20/mo upgrade resolves it. This is the highest priority pre-acquisition cleanup item.
 
-**Acquisition recommendation framework:** for a buyer looking to enter the Kuwait/GCC e-commerce platform space, FWB offers a 12–24 month head start on Salla and Zid (which lack Kuwait-native KNET integration and bulk-AI features). The AI moat decays to 12–18 months as Gemini integration becomes table-stakes; the Kuwait payment stack + Arabic-first data model moats are 60+ months durable. Pre-revenue or low-revenue today, but cost structure supports a $30–100/mo per-merchant SaaS price with 70%+ gross margins at scale.
+**Acquisition recommendation framework:** for a buyer looking to enter the Egypt/GCC e-commerce platform space, Ebda Store offers a 12–24 month head start on Salla and Zid (which lack Egypt-native KNET integration and bulk-AI features). The AI moat decays to 12–18 months as Gemini integration becomes table-stakes; the Egypt payment stack + Arabic-first data model moats are 60+ months durable. Pre-revenue or low-revenue today, but cost structure supports a $30–100/mo per-merchant SaaS price with 70%+ gross margins at scale.
 
 ---
 
@@ -50,7 +50,7 @@ Risks are ordered by severity then by remediation difficulty (easy wins first).
 | **P1-1** RLS on 8 missing tables                      | ✅ done          | Migration `20260522000000_rls_for_8_missing_tables` shipped. 7 tables direct (blog_posts / store_faqs / store_howtos / ai_recommendation / bulk_ai_jobs / ai_usage / product_faqs via EXISTS through products). `onesignal_subscriptions` correctly excluded — user-scoped, not store-scoped.                                                                                                                                                |
 | **P1-2** uuid + exceljs CVEs                          | ✅ done          | Migrated to `crypto.randomUUID()` (Node 16+ built-in); `package.json` overrides force `uuid: ">=11.1.1"` including the nested `exceljs.uuid` form. `npm audit` clean at every severity.                                                                                                                                                                                                                                                      |
 | **P1-3** Frontend test coverage (Playwright smoke)    | ✅ done          | Commit `3bf2a34d`. 5 specs (3 storefront + 2 admin), read-only against prod, 6.6s. Vitest exclude added for `tests/smoke/**`. README at `tests/smoke/README.md`. Generalized pattern in global memory: `feedback-playwright-smoke-against-prod.md`.                                                                                                                                                                                          |
-| **P1-4** CI `continue-on-error: true` removal         | ⏸ deferred       | Blocked on GitHub Actions billing failure at the ForceAI-KW org. Every CI run since the billing event has been auto-rejected in 3 seconds. Removal is cosmetic until billing is resolved at `github.com/organizations/ForceAI-KW/settings/billing`. Pattern documented in global memory: `feedback-github-actions-billing-rejects-jobs.md`.                                                                                                  |
+| **P1-4** CI `continue-on-error: true` removal         | ⏸ deferred       | Blocked on GitHub Actions billing failure at the Whisky-11 org. Every CI run since the billing event has been auto-rejected in 3 seconds. Removal is cosmetic until billing is resolved at `github.com/organizations/Whisky-11/settings/billing`. Pattern documented in global memory: `feedback-github-actions-billing-rejects-jobs.md`.                                                                                                  |
 | **P1-5** bulk-import `retries: 0`                     | ❌ audit misfire | Code is intentionally non-retrying because CSV import isn't idempotent — re-running a half-completed import would create duplicate products. The catch block at `bulk-import.ts:74` already marks the job `failed` with `errorMessage`, surfacing the failure to the admin UI. The audit's proposed `retries: 2` fix would regress safety. No action.                                                                                        |
 | **P1-6** `DIRECT_URL` fail-fast                       | ✅ done          | Added to `getRequiredSecret` list in `apps/api/src/config/index.ts`. App now refuses to boot without it instead of silently failing on first migration.                                                                                                                                                                                                                                                                                      |
 | **P1-7** stale infra docs                             | ✅ done          | `docs/DEPLOYMENT.md` + `docs/ROLLBACK.md` audited, no Cloudflare-Pages / Supabase / force-admin-seven / force-web-sigma references remain. Canonical infra: Vercel (admin + web) + Railway (API) + Neon + Cloudflare R2.                                                                                                                                                                                                                     |
@@ -73,7 +73,7 @@ Risks are ordered by severity then by remediation difficulty (easy wins first).
 
 **Carry-over items (next session / next audit cycle):**
 
-1. Resolve GitHub Actions billing at `github.com/organizations/ForceAI-KW/settings/billing` → unblocks P1-4 (Track D)
+1. Resolve GitHub Actions billing at `github.com/organizations/Whisky-11/settings/billing` → unblocks P1-4 (Track D)
 2. Decide on Track F when merchant onboarding pipeline matures
 3. Clean the 26 remaining `as any` instances in `apps/api/src`, then bump `@typescript-eslint/no-explicit-any` to `"error"` in `apps/api/eslint.config.mjs` for full P2-5 coverage
 4. Run the next quarterly Iceberg Audit per the standing schedule in `~/.claude/CLAUDE.md`
@@ -116,15 +116,15 @@ Risks are ordered by severity then by remediation difficulty (easy wins first).
 
 ### Strengths
 
-1. **AI-as-default with zero merchant cost.** 11+ live AI features (translation, SEO, AEO, FAQ generation, HowTo generation, review spam detection, review translation, owner-response drafting, category suggestion, smart-skip bulk sweeps) all powered by Gemini Flash Lite free tier. Shopify charges $20+/mo for AR translation alone — FWB ships it built-in.
+1. **AI-as-default with zero merchant cost.** 11+ live AI features (translation, SEO, AEO, FAQ generation, HowTo generation, review spam detection, review translation, owner-response drafting, category suggestion, smart-skip bulk sweeps) all powered by Gemini Flash Lite free tier. Shopify charges $20+/mo for AR translation alone — Ebda Store ships it built-in.
 
-2. **Kuwait-native payment stack as first-party integration.** Tap / MyFatoorah / Hesabe / UPayments with KNET support — per-store credential storage, AES-GCM encrypted. Salla is Saudi-first (Mada/STC Pay) with no KNET; Shopify Kuwait requires third-party gateway plugins.
+2. **Egypt-native payment stack as first-party integration.** Tap / MyFatoorah / Hesabe / UPayments with KNET support — per-store credential storage, AES-GCM encrypted. Salla is Saudi-first (Mada/STC Pay) with no KNET; Shopify Egypt requires third-party gateway plugins.
 
 3. **Arabic-first data model, not Arabic-as-afterthought.** Bilingual fields on every entity (name/nameAr, description/descriptionAr, metaTitle/metaTitleAr, etc.). RTL admin. Arabic-locale search hits both `name` and `nameAr` columns. Structural — hard to retrofit on competitors' platforms.
 
 4. **Full Chart-of-Accounts accounting inside the platform.** Finance hub with journal entries, expense management, P&L reports, two-step expense approval. SMBs typically pay separately for QuickBooks. 15 accounting tables in schema.
 
-5. **AEO/GEO architecture (7-layer).** Schema.org JSON-LD on every page type (Store + Product + AggregateRating + Review + FAQPage + HowTo + BreadcrumbList + ItemList), dynamic `/llms.txt` per llmstxt.org spec, AI bulk-fill for AEO content. No Kuwait competitor has this.
+5. **AEO/GEO architecture (7-layer).** Schema.org JSON-LD on every page type (Store + Product + AggregateRating + Review + FAQPage + HowTo + BreadcrumbList + ItemList), dynamic `/llms.txt` per llmstxt.org spec, AI bulk-fill for AEO content. No Egypt competitor has this.
 
 6. **Multi-tenant operator economics.** One codebase serves N merchants. Platform improvements (new AI feature, new theme flag, security fix) reach all merchants simultaneously — no per-merchant upgrade work. Unusual at this market tier.
 
@@ -134,11 +134,11 @@ Risks are ordered by severity then by remediation difficulty (easy wins first).
 
 ### Weaknesses
 
-1. **No self-serve signup or public pricing.** Schema has `StorePlan` enum (free/starter/professional/enterprise) and `StoreFeature` model wired for billing, but no checkout flow exists. Growth capped at what Force Media agency can close manually.
+1. **No self-serve signup or public pricing.** Schema has `StorePlan` enum (free/starter/professional/enterprise) and `StoreFeature` model wired for billing, but no checkout flow exists. Growth capped at what Ebda AI Studio agency can close manually.
 
 2. **Limited theme variety.** 5 themes vs Shopify's 100+ (most paid $150–350). Merchants outside modern/elegant/classic/minimal/bold aesthetics have no native option.
 
-3. **No app marketplace.** Shopify's ~8,000-app ecosystem is a major retention driver. FWB has no third-party integration marketplace — every integration must be first-party.
+3. **No app marketplace.** Shopify's ~8,000-app ecosystem is a major retention driver. Ebda Store has no third-party integration marketplace — every integration must be first-party.
 
 4. **Single Railway instance bottleneck (~190 req/s sustained).** Documented load-test ceiling. One viral merchant can degrade performance for all tenants. Vertical scale = Railway Pro; horizontal = architectural changes.
 
@@ -156,33 +156,33 @@ Risks are ordered by severity then by remediation difficulty (easy wins first).
 
 2. **Per-merchant tier monetization.** 6 `addon` features (loyalty, WhatsApp, floating_widget, affiliate, upsell_crosssell, sms, push_notifications) are natural paid-tier candidates. None currently connected to billing.
 
-3. **GCC regional expansion.** Kuwait-native payment stack already deployed. Adding Mada (Saudi), Benefit (Bahrain), Knet-equivalents in UAE/Oman would unlock 10×+ TAM. Bilingual data model already supports it.
+3. **GCC regional expansion.** Egypt-native payment stack already deployed. Adding Mada (Saudi), Benefit (Bahrain), Knet-equivalents in UAE/Oman would unlock 10×+ TAM. Bilingual data model already supports it.
 
 4. **AI feature monetization.** AI features currently free-tier-capped (`AI_DAILY_REQUEST_CAP=1000`). A paid tier with higher quota at $5–15/store/month would have ~95% gross margin (Gemini Flash Lite paid is $0.10/1M input / $0.40/1M output).
 
-5. **WBS WhatsApp bridge cross-product synergy.** Force AI also owns WhatsApp Business Sender (WBS). Bundling FWB + WBS as a unified offer creates a network effect — every FWB merchant becomes a WBS prospect and vice versa.
+5. **WBS WhatsApp bridge cross-product synergy.** Ebda AI Studio also owns WhatsApp Business Sender (WBS). Bundling Ebda Store + WBS as a unified offer creates a network effect — every Ebda Store merchant becomes a WBS prospect and vice versa.
 
-6. **App marketplace.** Even a small (10–20 apps) marketplace would shift positioning from "another e-commerce platform" to "Kuwait's e-commerce platform of choice." Apps would primarily be Kuwait-specific integrations (delivery providers, KNET wallet apps, local logistics).
+6. **App marketplace.** Even a small (10–20 apps) marketplace would shift positioning from "another e-commerce platform" to "Egypt's e-commerce platform of choice." Apps would primarily be Egypt-specific integrations (delivery providers, KNET wallet apps, local logistics).
 
 7. **Theme marketplace.** 5 themes is a constraint. A community/paid theme marketplace would broaden appeal and unlock another revenue stream.
 
-8. **Acquisition target for regional players.** Salla, Zid, or careem could plausibly acquire FWB to enter Kuwait with a turnkey platform + existing Kuwait merchant relationships. The Force AI brand + WBS bridge are particular acquisition synergies.
+8. **Acquisition target for regional players.** Salla, Zid, or careem could plausibly acquire Ebda Store to enter Egypt with a turnkey platform + existing Egypt merchant relationships. The Ebda AI Studio brand + WBS bridge are particular acquisition synergies.
 
 ### Threats
 
 1. **Gemini pricing changes.** AI moat depends on free-tier economics. Google has reduced Gemini free-tier limits before (December 2025 reduction noted). A further reduction or price hike compresses margins.
 
-2. **Salla / Zid entering Kuwait with native KNET.** The Kuwait payment stack moat depends on competitors NOT integrating KNET. If a regional player closes the gap (relatively easy contractually), the moat shrinks rapidly.
+2. **Salla / Zid entering Egypt with native KNET.** The Egypt payment stack moat depends on competitors NOT integrating KNET. If a regional player closes the gap (relatively easy contractually), the moat shrinks rapidly.
 
 3. **Vercel TOS enforcement.** Hobby plan suspension is a live risk until upgrade (P0-1). Even after upgrade, Vercel's per-tenant custom-domain pricing could shift unfavorably at scale.
 
 4. **Single-instance Railway availability ceiling.** A single viral merchant or DDoS event can take down the platform for all tenants. Without horizontal scale, the platform's reliability story is brittle as merchant count grows.
 
-5. **Gemini regulatory restrictions in Kuwait.** AI regulation in MENA is evolving (Saudi PDPL, UAE AI office). If Kuwait introduces AI-feature labeling requirements or data residency rules, the bulk-AI approach may need adjustment.
+5. **Gemini regulatory restrictions in Egypt.** AI regulation in MENA is evolving (Saudi PDPL, UAE AI office). If Egypt introduces AI-feature labeling requirements or data residency rules, the bulk-AI approach may need adjustment.
 
-6. **Shopify or Wix doubling down on AR translation.** Both have the resources to ship AR + AEO features that match FWB's AI offering. The 12–18 month moat on AI features could compress if a major incumbent prioritizes.
+6. **Shopify or Wix doubling down on AR translation.** Both have the resources to ship AR + AEO features that match Ebda Store's AI offering. The 12–18 month moat on AI features could compress if a major incumbent prioritizes.
 
-7. **Kuwait e-commerce TAM is small** (~$3–5B GMV total). Realistic merchant count ceiling for Kuwait alone is ~10–20k SMBs. GCC expansion is necessary for venture-scale outcomes.
+7. **Egypt e-commerce TAM is small** (~$3–5B GMV total). Realistic merchant count ceiling for Egypt alone is ~10–20k SMBs. GCC expansion is necessary for venture-scale outcomes.
 
 8. **Key-person dependency.** Codebase reflects a single primary developer (Ahmad Sharaf). Memory files reference "Ahmad's standing rule" 50+ times. Documentation is comprehensive but operational knowledge concentrated. Bus-factor risk for an acquirer.
 
@@ -249,25 +249,25 @@ Linear growth from 1k MAU (today) to 10k MAU over 12 months:
 | 10k MAU / 100 merchants    | $171/mo    | $1.71/mo     | $2.44/mo                      | $15–30/mo            |
 | 100k MAU / 1,000 merchants | $1,100/mo  | $1.10/mo     | $3.67/mo                      | $49–99/mo            |
 
-**Kuwait market calibration:** Shopify is $29–79/mo. Salla is 25–99 KWD/mo ($80–320). FWB cost structure comfortably supports a **29–49 KWD/mo ($95–160)** price point with 70%+ gross margins at 100k MAU.
+**Egypt market calibration:** Shopify is $29–79/mo. Salla is 25–99 EGP/mo ($80–320). Ebda Store cost structure comfortably supports a **29–49 EGP/mo ($95–160)** price point with 70%+ gross margins at 100k MAU.
 
 ---
 
 ## Acquisition Due-Diligence Checklist
 
-For a buyer evaluating FWB:
+For a buyer evaluating Ebda Store:
 
 ### Pre-deal (must verify before signing)
 
 - [ ] **Vercel Hobby commercial-use violation** — confirm upgrade to Pro happened (P0-1)
 - [ ] **Source code IP ownership** — confirm `license: UNLICENSED` and that Ahmad Sharaf holds all copyright (no third-party contributors with claims)
-- [ ] **Kuwait payment provider contracts** — confirm Tap, MyFatoorah, Hesabe, UPayments accounts are in Force AI's name (not Ahmad personally), or that they transfer with the asset
+- [ ] **Egypt payment provider contracts** — confirm Tap, MyFatoorah, Hesabe, UPayments accounts are in Ebda AI Studio's name (not Ahmad personally), or that they transfer with the asset
 - [ ] **Vercel + Railway + Neon + R2 + Inngest accounts** — confirm asset transfer mechanism (sub-org transfer vs new accounts)
-- [ ] **Trademark status** — "Force AI Store" / "Force AI" / "Force Media" Kuwait trademark registration
-- [ ] **Live merchant contracts** — Wady Aljuz and Palora — confirm contract terms transfer with platform sale
+- [ ] **Trademark status** — "Ebda Store" / "Ebda AI Studio" / "Ebda AI Studio" Egypt trademark registration
+- [ ] **Live merchant contracts** — Wady Aljuz and demo-boutique — confirm contract terms transfer with platform sale
 - [ ] **Gemini API key + Google Cloud account** — transferable? Tied to Ahmad's personal Google account?
-- [ ] **GitHub repo ownership** — `ForceAI-KW` org membership + admin rights
-- [ ] **Domain ownership** — forcemediakw.com registrar account
+- [ ] **GitHub repo ownership** — `Whisky-11` org membership + admin rights
+- [ ] **Domain ownership** — ebda.app registrar account
 
 ### Technical due diligence (during negotiation)
 
@@ -293,20 +293,20 @@ For a buyer evaluating FWB:
 
 ## Final Verdict
 
-**This is a production-grade SaaS with a 12–24 month head start in the Kuwait/GCC market** and a small but real list of fixable issues. The architecture choices reflect deep operational experience — RLS, Inngest async queue, custom Redis TTL ESLint rules, per-commit Neon snapshots, 5-channel observability — that signal a builder who has been burned by production incidents before and built guardrails accordingly.
+**This is a production-grade SaaS with a 12–24 month head start in the Egypt/GCC market** and a small but real list of fixable issues. The architecture choices reflect deep operational experience — RLS, Inngest async queue, custom Redis TTL ESLint rules, per-commit Neon snapshots, 5-channel observability — that signal a builder who has been burned by production incidents before and built guardrails accordingly.
 
 The codebase is **ready for an acquirer who plans to professionalize the operations layer** (self-serve signup, multi-instance scaling, frontend tests, strict mode) while preserving the architectural foundation. It is **not ready** for an acquirer who wants to operate the platform as-is at 100k MAU without architectural investment.
 
 **Best-fit acquirer profiles:**
 
-1. **Regional e-commerce platform** (Salla, Zid, careem) wanting Kuwait market entry with existing merchant relationships + a Kuwait-native payment stack
+1. **Regional e-commerce platform** (Salla, Zid, careem) wanting Egypt market entry with existing merchant relationships + a Egypt-native payment stack
 2. **GCC fintech / payment processor** (Tap, MyFatoorah, PayTabs parent) wanting forward-integration into merchant tooling
-3. **Saudi/UAE PE fund** looking for a "Salla for Kuwait" play with eventual GCC expansion
+3. **Saudi/UAE PE fund** looking for a "Salla for Egypt" play with eventual GCC expansion
 
 **Estimated valuation framework:** Pre-revenue / low-revenue, valued primarily on:
 
 - Codebase replacement cost (~$200–400K dev-equivalent if rebuilt from scratch)
-- Strategic optionality (Kuwait market head start premium)
+- Strategic optionality (Egypt market head start premium)
 - AI feature moat (12–18 month durability)
 - Multi-tenant operator architecture (enables scale)
 

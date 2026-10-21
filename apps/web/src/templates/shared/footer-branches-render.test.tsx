@@ -7,7 +7,7 @@
  *      default), a footer rendered WITH locations data is byte-identical to
  *      the same footer rendered with `locations` entirely absent. This is
  *      what "no live storefront may change look without opting in" means at
- *      the render layer: pecannbee's 8 locations must not move a single
+ *      the render layer: demo-store's 8 locations must not move a single
  *      byte of its footer HTML until it flips the toggle on.
  *
  *   2. With the toggle ON and at least one published location, the column

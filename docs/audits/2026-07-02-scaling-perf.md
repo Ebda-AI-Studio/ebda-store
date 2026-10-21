@@ -1,4 +1,4 @@
-# FWB Scaling & Performance Audit — 2026-07-02
+# Ebda Store Scaling & Performance Audit — 2026-07-02
 
 Read-only audit. Lens: "works at 100, dies at 1000" — N+1 queries, index
 coverage, pagination, caching correctness, rate limiting, sync-vs-async work,
@@ -20,10 +20,10 @@ Prior context verified against current code (not re-derived from memory alone):
   products/tx, deadstock-scan's per-product loop is pure in-memory work
   after one grouped query). **The same defect class recurs, unfixed, in
   `bank-reconcile.service.ts`** — see Finding 2.
-- `feedback-fwb-public-api-variant-include-gap.md` — verified still fixed:
+- `feedback-ebda-public-api-variant-include-gap.md` — verified still fixed:
   `listPublic`/`advancedSearch` in `product.service.ts` include `variants`
   with a narrow `select`.
-- `feedback-fwb-api-shape-mismatch-silent-cap.md` — not a scaling defect,
+- `feedback-ebda-api-shape-mismatch-silent-cap.md` — not a scaling defect,
   out of this lens's scope; not re-checked.
 
 Index coverage (`packages/database/prisma/schema.prisma`, 3487 lines) is

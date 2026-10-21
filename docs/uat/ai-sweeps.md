@@ -54,7 +54,7 @@ updated: 2026-05-24
 
 ## Golden path — GEO sweep
 
-23. GEO tab → Run GEO Sweep → verify geo-enriched content (e.g. Kuwait-localized description) on ≥1 product
+23. GEO tab → Run GEO Sweep → verify geo-enriched content (e.g. Egypt-localized description) on ≥1 product
 
 ## Golden path — Recommendations sweep
 

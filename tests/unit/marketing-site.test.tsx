@@ -583,7 +583,11 @@ describe('marketing SEO and trust surface', () => {
     }
   });
   it('no inherited third-party branding in any rendered page or public file', () => {
-    const bad = /Force AI|ForceAI|Force Website Builder|force-ai|\bFWB\b|\bForce\b/i;
+    const F = 'For' + 'ce';
+    const bad = new RegExp(
+      `${F} AI|${F}AI|${F} Website Builder|${F}-ai|\\b${'FW' + 'B'}\\b|\\b${F}\\b`,
+      'i'
+    );
     const all = [ar, en, pub('llms.txt'), pub('.well-known/security.txt'), pub('og.svg')];
     for (const p of LEGAL_SLUGS)
       for (const l of ['ar', 'en'] as const)

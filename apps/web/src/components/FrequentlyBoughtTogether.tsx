@@ -8,7 +8,7 @@ import { useCart } from '../contexts/CartContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useStore, useStoreUrl, useStoreTemplate } from '../contexts/StoreContext';
 import { useToast, Skeleton, SkeletonProductCard } from '@ebda/ui';
-import { PecannbeeProductCard } from '../templates/shared/PecannbeeProductCard';
+import { StorefrontProductCard } from '../templates/shared/StorefrontProductCard';
 import { gridGapClass } from '../templates/shared/card-size';
 import { SectionRetryNotice } from './SectionRetryNotice';
 import { countText, ITEMS_ADDED, ITEMS_NEED_OPTIONS } from '../lib/plural';
@@ -48,7 +48,7 @@ export function FrequentlyBoughtTogether({ storeId, productId }: FrequentlyBough
   // Honour the same per-store productCardDefaults as the PLP and homepage
   // carousels so frame/size/shape settings apply on this surface too.
   // Eliminates the T.ProductGrid 4th render path: these cards now go through
-  // PecannbeeProductCard (same path as PLP and catalog listings).
+  // StorefrontProductCard (same path as PLP and catalog listings).
   const productCardDefaults = layout?.productCardDefaults;
 
   // Variant-parent products can't be added to cart silently from a
@@ -170,7 +170,7 @@ export function FrequentlyBoughtTogether({ storeId, productId }: FrequentlyBough
           {t('Add All to Cart', 'أضف الكل إلى السلة')}
         </button>
       </div>
-      {/* Issue 2 fix (2026-05-28): PecannbeeProductCard honours per-store
+      {/* Issue 2 fix (2026-05-28): StorefrontProductCard honours per-store
           productCardDefaults (frame, size, shape) the same as PLP/carousels.
           Eliminates the T.ProductGrid 4th render path on the PDP. */}
       <div
@@ -182,7 +182,7 @@ export function FrequentlyBoughtTogether({ storeId, productId }: FrequentlyBough
         dir={isRtl ? 'rtl' : 'ltr'}
       >
         {products.map(p => (
-          <PecannbeeProductCard
+          <StorefrontProductCard
             key={p.id}
             product={recommendedToTemplateProduct(p)}
             isRtl={isRtl}

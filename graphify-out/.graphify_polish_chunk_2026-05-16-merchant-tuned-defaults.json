@@ -7,70 +7,70 @@
       "label": "Merchant-Tuned-as-Platform-Default Pattern",
       "type": "pattern",
       "summary": "When a merchant's per-store config is iterated to perfection, the generic portion (sizes, spacing) is extracted and baked as the platform default so every future tenant inherits a calibrated baseline without manual re-tuning.",
-      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-force-website-builder/memory/feedback-fwb-merchant-tuned-defaults-pattern.md"
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-ebda-store/memory/feedback-ebda-merchant-tuned-defaults-pattern.md"
     },
     {
       "id": "generic-vs-specific-split-rule",
       "label": "Generic vs Brand-Specific Split Rule",
       "type": "rule",
       "summary": "Platform defaults may only absorb geometry (fontSize, fontWeight, padding, borderRadius, letterSpacing, layout structure); brand-specific values (fontFamily, color references, chip backgroundColor, textDecorationColor) stay in the merchant's Store.typography JSON.",
-      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-force-website-builder/memory/feedback-fwb-merchant-tuned-defaults-pattern.md"
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-ebda-store/memory/feedback-ebda-merchant-tuned-defaults-pattern.md"
     },
     {
       "id": "neon-snapshot-sql-pull-recipe",
       "label": "Neon Snapshot SQL Pull Recipe",
       "type": "pattern",
       "summary": "Pull a merchant's live config via `SELECT typography, layout_settings, theme, settings FROM stores WHERE slug = '...'`. For historical state, point a prod-<sha> Neon snapshot branch at the SQL editor and diff the two JSONs.",
-      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-force-website-builder/memory/feedback-fwb-merchant-tuned-defaults-pattern.md"
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-ebda-store/memory/feedback-ebda-merchant-tuned-defaults-pattern.md"
     },
     {
       "id": "pack-styles-migration-cascade",
       "label": "Pack-Styles Migration Cascade (5-Step)",
       "type": "rule",
       "summary": "When baking a new size default, all 5 layers must be updated in order: (1) pack-styles.ts per theme, (2) SectionHeading.tsx hardcoded classes, (3) component-level hardcoded sizes (e.g. ProductsFilterSidebar), (4) THEME_DEFAULT_SIZES table in admin typography page, (5) design.md typography size table. Missing any step causes storefront/admin badge drift.",
-      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-force-website-builder/memory/feedback-fwb-merchant-tuned-defaults-pattern.md"
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-ebda-store/memory/feedback-ebda-merchant-tuned-defaults-pattern.md"
     },
     {
       "id": "wady-aljuz-typography-worked-example",
       "label": "Wady Aljuz Typography → Platform Default (2026-05-16)",
       "type": "feature",
       "summary": "Six fontSize overrides pulled from Wady Aljuz (sectionTitle 22px, sectionSeeAll/sectionSubtitle 20px, productName 18.5px→18, filters/header 18px) baked into all 5 themes via pack-styles.ts. Cairo font and brand color refs were NOT baked — stayed merchant-specific.",
-      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-force-website-builder/memory/feedback-fwb-merchant-tuned-defaults-pattern.md"
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-ebda-store/memory/feedback-ebda-merchant-tuned-defaults-pattern.md"
     },
     {
       "id": "theme-default-sizes-sync-requirement",
       "label": "THEME_DEFAULT_SIZES Must Stay in Sync",
       "type": "rule",
       "summary": "The THEME_DEFAULT_SIZES constant in apps/admin typography page drives the gray 'theme default' badge in the admin UI. If pack-styles.ts is updated but THEME_DEFAULT_SIZES is not, the badge lies about what actually renders on the storefront.",
-      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-force-website-builder/memory/feedback-fwb-merchant-tuned-defaults-pattern.md"
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-ebda-store/memory/feedback-ebda-merchant-tuned-defaults-pattern.md"
     },
     {
       "id": "multi-theme-cascade-discipline",
       "label": "Multi-Theme Cascade Discipline",
       "type": "rule",
-      "summary": "Size defaults must be applied to all 5 FWB themes in pack-styles.ts simultaneously. Cascading to only one theme silently introduces cross-theme size drift that is hard to detect without comparing storefronts side by side.",
-      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-force-website-builder/memory/feedback-fwb-merchant-tuned-defaults-pattern.md"
+      "summary": "Size defaults must be applied to all 5 Ebda Store themes in pack-styles.ts simultaneously. Cascading to only one theme silently introduces cross-theme size drift that is hard to detect without comparing storefronts side by side.",
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-ebda-store/memory/feedback-ebda-merchant-tuned-defaults-pattern.md"
     },
     {
       "id": "brand-font-not-a-platform-default",
       "label": "Brand Font Must Not Become Platform Default",
       "type": "rule",
       "summary": "fontFamily (e.g. Cairo used by Wady Aljuz) is never baked as a platform default — doing so locks every new merchant into one brand's typeface. It belongs in Store.typography and exposed via the multi-zone quick presets for merchants who want the same look.",
-      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-force-website-builder/memory/feedback-fwb-merchant-tuned-defaults-pattern.md"
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-ebda-store/memory/feedback-ebda-merchant-tuned-defaults-pattern.md"
     },
     {
       "id": "chip-shape-vs-color-separation",
       "label": "Chip Shape vs Color Separation Anti-Pattern",
       "type": "bug-class",
       "summary": "Baking chip padding+radius+backgroundColor together as a platform default mixes geometry (platform-safe) with brand color (merchant-specific). Correct approach: bake shape geometry as default, expose the color as a preset option via multi-zone quick presets.",
-      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-force-website-builder/memory/feedback-fwb-merchant-tuned-defaults-pattern.md"
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-ebda-store/memory/feedback-ebda-merchant-tuned-defaults-pattern.md"
     },
     {
       "id": "design-md-as-platform-spec",
       "label": "design.md as Living Platform Typography Spec",
       "type": "architecture",
       "summary": "design.md at the repo root contains the authoritative typography size table. Every bake-in of merchant-validated sizes must update this file so it remains the single source of truth for designers and future Claude sessions.",
-      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-force-website-builder/memory/feedback-fwb-merchant-tuned-defaults-pattern.md"
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-ebda-store/memory/feedback-ebda-merchant-tuned-defaults-pattern.md"
     }
   ],
   "edges": [
@@ -126,22 +126,22 @@
     },
     {
       "from": "merchant-tuned-as-platform-default",
-      "to": "fwb-typography-size-table",
+      "to": "ebda-typography-size-table",
       "relation": "related"
     },
     {
       "from": "theme-default-sizes-sync-requirement",
-      "to": "fwb-admin-current-vs-override-badge",
+      "to": "ebda-admin-current-vs-override-badge",
       "relation": "related"
     },
     {
       "from": "generic-vs-specific-split-rule",
-      "to": "fwb-multi-zone-quick-presets",
+      "to": "ebda-multi-zone-quick-presets",
       "relation": "related"
     },
     {
       "from": "pack-styles-migration-cascade",
-      "to": "fwb-no-prisma-migration-policy",
+      "to": "ebda-no-prisma-migration-policy",
       "relation": "related"
     }
   ]

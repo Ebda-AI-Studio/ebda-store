@@ -123,7 +123,7 @@ async function order(opts: {
 let augOrder: string;
 let sepOrder: string;
 let sepCancelled: string;
-let kuwaitOct1: string;
+let localOct1: string;
 
 beforeAll(async () => {
   await prisma.user.upsert({
@@ -183,7 +183,7 @@ beforeAll(async () => {
     await order({ at: '2026-09-16T10:00:00Z', total: 500, status: 'cancelled', customerId: salem })
   ).id;
   // Sep 30 in UTC, 1 Oct in Egypt.
-  kuwaitOct1 = (await order({ at: '2026-09-30T22:30:00Z', total: 700, customerId: salem })).id;
+  localOct1 = (await order({ at: '2026-09-30T22:30:00Z', total: 700, customerId: salem })).id;
   // Payment abandonments, one per month.
   await order({
     at: '2026-08-20T10:00:00Z',
@@ -300,7 +300,7 @@ describe('orders list: every filter is applied server-side', () => {
     const sep = await list({ range: SEP });
     expect(sep).toEqual(expect.arrayContaining([sepOrder, sepCancelled]));
     expect(sep).not.toContain(augOrder);
-    expect(sep).not.toContain(kuwaitOct1);
+    expect(sep).not.toContain(localOct1);
   });
 
   it('status narrows the rows', async () => {

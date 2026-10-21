@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Backfill the Kuwait-retail Chart of Accounts for every existing store
+ * Backfill the retail Chart of Accounts for every existing store
  * that has accountingEnabled=true. Idempotent — re-running is a safe no-op
  * for stores whose system accounts are already seeded.
  *

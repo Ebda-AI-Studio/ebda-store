@@ -14,7 +14,7 @@ Emits the following for every page (including inner pages like `/products/slug`
 and `/categories`):
 
 ```html
-<meta property="og:title" content="Store Name - Online Shopping in Kuwait" />
+<meta property="og:title" content="Store Name - Online Shopping in Egypt" />
 <meta property="og:description" content="Shop online at Store Name. ..." />
 <meta property="og:url" content="https://storename.com" />
 <meta property="og:site_name" content="Store Name" />
@@ -46,7 +46,7 @@ runtime** for low latency.
 The card renders:
 
 - **Background**: linear gradient using the store's `theme.primaryColor` HSL value
-  (falls back to Force AI brand orange `hsl(26, 100%, 50%)`)
+  (falls back to Ebda AI Studio brand orange `hsl(26, 100%, 50%)`)
 - **Center**: store logo on a white pill background (transparent PNG safe), or the
   store name in large white text when no logo is uploaded
 - **Bottom badge**: store name in a semi-transparent pill

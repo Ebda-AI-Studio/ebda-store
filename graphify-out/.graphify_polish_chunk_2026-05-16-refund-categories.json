@@ -7,137 +7,137 @@
       "label": "MyFatoorah Amount Always Required",
       "type": "rule",
       "summary": "MakeRefund requires Amount on every call, even full refunds. First implementation omitted it for full-refund case, causing 400s surfaced as generic 500. Fix: default to status.paidAmount from GetPaymentStatus when caller omits.",
-      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-force-website-builder/memory/feedback-fwb-myfatoorah-refund-quirks.md"
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-ebda-store/memory/feedback-ebda-myfatoorah-refund-quirks.md"
     },
     {
       "id": "myfatoorah-keytype-lowercase-rule",
       "label": "MyFatoorah KeyType Lowercase Canonical",
       "type": "rule",
-      "summary": "MyFatoorah docs show TitleCase KeyType ('InvoiceId'/'PaymentId') but all SDKs use lowercase ('invoiceid'/'paymentid'). FWB standardises on lowercase. Reduces case-sensitivity bug surface.",
-      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-force-website-builder/memory/feedback-fwb-myfatoorah-refund-quirks.md"
+      "summary": "MyFatoorah docs show TitleCase KeyType ('InvoiceId'/'PaymentId') but all SDKs use lowercase ('invoiceid'/'paymentid'). Ebda Store standardises on lowercase. Reduces case-sensitivity bug surface.",
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-ebda-store/memory/feedback-ebda-myfatoorah-refund-quirks.md"
     },
     {
       "id": "myfatoorah-key-keytype-agreement",
       "label": "MyFatoorah Key/KeyType Must Agree",
       "type": "bug-class",
       "summary": "Key and KeyType must be derived together. Bug pattern: hardcode KeyType='paymentid' but fall back to InvoiceId for Key value. If metadata.paymentId is missing, fall back to KeyType='invoiceid' with InvoiceId — never mix the two.",
-      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-force-website-builder/memory/feedback-fwb-myfatoorah-refund-quirks.md"
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-ebda-store/memory/feedback-ebda-myfatoorah-refund-quirks.md"
     },
     {
       "id": "myfatoorah-refund-async-queued",
       "label": "MyFatoorah Refunds Are Async/Queued",
       "type": "concept",
       "summary": "MakeRefund submits to MyFatoorah's finance queue; settlement happens 1-3 business days later after human review. refund() returns status:'pending' not 'completed'. UX copy must say 'Refund Requested' not 'Refund Issued'.",
-      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-force-website-builder/memory/feedback-fwb-myfatoorah-refund-quirks.md"
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-ebda-store/memory/feedback-ebda-myfatoorah-refund-quirks.md"
     },
     {
       "id": "myfatoorah-external-identifier",
       "label": "MyFatoorah ExternalIdentifier for Reconciliation",
       "type": "pattern",
       "summary": "Set ExternalIdentifier to 'order:<invoiceId>' on every MakeRefund call. MyFatoorah surfaces it in the portal refund list so finance can map refunds back to orders. Also returned in GetRefundStatus responses.",
-      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-force-website-builder/memory/feedback-fwb-myfatoorah-refund-quirks.md"
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-ebda-store/memory/feedback-ebda-myfatoorah-refund-quirks.md"
     },
     {
       "id": "myfatoorah-refund-status-mapping",
       "label": "MyFatoorah Refund Status Normalization",
       "type": "pattern",
       "summary": "MyFatoorahProvider.getRefundStatus maps: Refunded→completed (credited), Pending→pending (queued), Canceled→failed (rejected). GetRefundStatus response Data.RefundStatusResult is an array; take [0] when looking up by RefundId.",
-      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-force-website-builder/memory/feedback-fwb-myfatoorah-refund-quirks.md"
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-ebda-store/memory/feedback-ebda-myfatoorah-refund-quirks.md"
     },
     {
       "id": "myfatoorah-refund-effects-immediate",
       "label": "Refund Side-Effects Run Immediately on Submission",
       "type": "architecture",
       "summary": "applyRefundEffects (inventory/coupon/loyalty reversal + Inngest fan-out) runs immediately on admin click even though settlement is async. The commitment to refund is made at submission time, not at settlement time.",
-      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-force-website-builder/memory/feedback-fwb-myfatoorah-refund-quirks.md"
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-ebda-store/memory/feedback-ebda-myfatoorah-refund-quirks.md"
     },
     {
       "id": "myfatoorah-webhook-envelope-distinction",
       "label": "MyFatoorah Webhook Envelope Distinction",
       "type": "pattern",
       "summary": "Payment events carry Data.InvoiceStatus; refund events carry Data.RefundId + Data.RefundStatus. Both arrive at the same webhook URL. Distinguish by presence of Data.RefundId — the field acts as the event-type discriminator.",
-      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-force-website-builder/memory/feedback-fwb-myfatoorah-refund-quirks.md"
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-ebda-store/memory/feedback-ebda-myfatoorah-refund-quirks.md"
     },
     {
       "id": "webhook-event-multiplexing-pattern",
       "label": "Webhook Event Multiplexing Pattern",
       "type": "pattern",
       "summary": "When a payment provider ships multiple event types to one URL, dispatch on payload field-shape (not EventType numeric code). Use `if (isRefundEvent) return ...` before the payment state machine. Design routing from day 1 — retrofitting costs more than the upfront if.",
-      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-force-website-builder/memory/feedback-fwb-webhook-event-multiplexing.md"
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-ebda-store/memory/feedback-ebda-webhook-event-multiplexing.md"
     },
     {
       "id": "webhook-refund-short-circuit",
       "label": "Refund Webhook Short-Circuits Payment State Machine",
       "type": "architecture",
       "summary": "WebhookPayload.refund is an optional field. When set, handleWebhook short-circuits before the payment state machine to prevent refund status values ('Refunded') from corrupting the payment status transitions.",
-      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-force-website-builder/memory/feedback-fwb-webhook-event-multiplexing.md"
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-ebda-store/memory/feedback-ebda-webhook-event-multiplexing.md"
     },
     {
       "id": "webhook-refund-idempotency",
       "label": "Refund Webhook Idempotency",
       "type": "rule",
       "summary": "Provider retries same refund webhook on 5xx. Compare current Payment.metadata.refundStatus against incoming status — match means no-op (return success without DB writes). Different status means a real transition.",
-      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-force-website-builder/memory/feedback-fwb-webhook-event-multiplexing.md"
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-ebda-store/memory/feedback-ebda-webhook-event-multiplexing.md"
     },
     {
       "id": "webhook-out-of-band-refund-detection",
       "label": "Out-of-Band Refund Detection via Webhook",
       "type": "pattern",
       "summary": "Admins can refund directly in MyFatoorah portal, bypassing our admin button. Detect by checking if Payment.status is still 'completed' (not 'refunded') when an executed-refund webhook arrives — if so, fire applyRefundEffects fresh for exactly-once side-effect delivery.",
-      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-force-website-builder/memory/feedback-fwb-webhook-event-multiplexing.md"
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-ebda-store/memory/feedback-ebda-webhook-event-multiplexing.md"
     },
     {
       "id": "category-image-rounded-per-theme",
       "label": "Category Card Image Rounded Per Theme",
       "type": "rule",
       "summary": "Every CategoryCard image wrapper must have a rounded-* class. Radius reflects theme identity: modern=rounded-xl, elegant=rounded-md, classic=rounded-sm, minimal=rounded-md, bold=rounded-3xl. CategoryCard and CategoryStrip (pack-styles) must be updated together — both render paths exist.",
-      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-force-website-builder/memory/feedback-fwb-categories-rounded-centered-gap.md"
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-ebda-store/memory/feedback-ebda-categories-rounded-centered-gap.md"
     },
     {
       "id": "category-caption-always-centered",
       "label": "Category Caption Always Centered",
       "type": "rule",
       "summary": "Category captions use text-center for all themes. Never combine text-center with locale-conditional text-right/text-left in the same className — Tailwind picks the last matching class and the conditional alignment wins, misaligning captions. Centered sections stay centered for all locales.",
-      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-force-website-builder/memory/feedback-fwb-categories-rounded-centered-gap.md"
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-ebda-store/memory/feedback-ebda-categories-rounded-centered-gap.md"
     },
     {
       "id": "card-gap-admin-pattern",
       "label": "cardGap Admin Control Pattern",
       "type": "pattern",
       "summary": "CategoriesSettings.cardGap enum (tight/normal/loose/xloose) maps to responsive gap-* classes via gridGapClass() helper in card-size.ts. Default=normal preserves baseline. Static-string enumeration in the helper keeps Tailwind JIT working — no dynamic concatenation.",
-      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-force-website-builder/memory/feedback-fwb-categories-rounded-centered-gap.md"
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-ebda-store/memory/feedback-ebda-categories-rounded-centered-gap.md"
     },
     {
       "id": "three-layer-admin-setting-wiring",
       "label": "Three-Layer Admin Setting Wiring Principle",
       "type": "architecture",
       "summary": "Every per-section admin setting requires: (1) type/enum in packages/shared/src/types/store-layout.ts, (2) Tailwind class helper in card-size.ts, (3) prop on component + destructure across all 5 theme files + admin form select. Any missing layer breaks one direction of the wiring.",
-      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-force-website-builder/memory/feedback-fwb-categories-rounded-centered-gap.md"
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-ebda-store/memory/feedback-ebda-categories-rounded-centered-gap.md"
     },
     {
       "id": "tailwind-centered-locale-antipattern",
       "label": "Tailwind Centered + Locale-Conditional Alignment Antipattern",
       "type": "bug-class",
       "summary": "Combining text-center with locale-conditional text-right/text-left in the same className causes the conditional to win (Tailwind picks last match in source order). This misaligns captions under centered images. Choose one alignment strategy per element.",
-      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-force-website-builder/memory/feedback-fwb-categories-rounded-centered-gap.md"
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-ebda-store/memory/feedback-ebda-categories-rounded-centered-gap.md"
     },
     {
       "id": "category-strip-card-dual-render-paths",
       "label": "CategoryStrip + CategoryCard Dual Render Paths",
       "type": "architecture",
       "summary": "The homepage uses pack-styles for CategoryStrip; the products page uses per-theme CategoryCard.tsx. Both are distinct render paths that must be updated in tandem for any visual change (rounded corners, gap, caption alignment).",
-      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-force-website-builder/memory/feedback-fwb-categories-rounded-centered-gap.md"
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-ebda-store/memory/feedback-ebda-categories-rounded-centered-gap.md"
     }
   ],
   "edges": [
     {
       "from": "myfatoorah-amount-required-rule",
-      "to": "fwb-myfatoorah-integration",
+      "to": "ebda-myfatoorah-integration",
       "relation": "related"
     },
     {
       "from": "myfatoorah-keytype-lowercase-rule",
-      "to": "fwb-myfatoorah-integration",
+      "to": "ebda-myfatoorah-integration",
       "relation": "related"
     },
     {
@@ -152,12 +152,12 @@
     },
     {
       "from": "myfatoorah-refund-async-queued",
-      "to": "fwb-refresh-payment-safety-net",
+      "to": "ebda-refresh-payment-safety-net",
       "relation": "related"
     },
     {
       "from": "myfatoorah-refund-effects-immediate",
-      "to": "fwb-refund-side-effect-pipeline",
+      "to": "ebda-refund-side-effect-pipeline",
       "relation": "implements"
     },
     {
@@ -167,7 +167,7 @@
     },
     {
       "from": "myfatoorah-external-identifier",
-      "to": "fwb-myfatoorah-integration",
+      "to": "ebda-myfatoorah-integration",
       "relation": "related"
     },
     {
@@ -177,7 +177,7 @@
     },
     {
       "from": "myfatoorah-webhook-envelope-distinction",
-      "to": "fwb-payment-webhook-urls",
+      "to": "ebda-payment-webhook-urls",
       "relation": "related"
     },
     {
@@ -187,7 +187,7 @@
     },
     {
       "from": "webhook-event-multiplexing-pattern",
-      "to": "fwb-action-side-effect-graph",
+      "to": "ebda-action-side-effect-graph",
       "relation": "related"
     },
     {
@@ -202,7 +202,7 @@
     },
     {
       "from": "webhook-out-of-band-refund-detection",
-      "to": "fwb-refund-side-effect-pipeline",
+      "to": "ebda-refund-side-effect-pipeline",
       "relation": "mitigates"
     },
     {
@@ -212,7 +212,7 @@
     },
     {
       "from": "card-gap-admin-pattern",
-      "to": "fwb-card-size-admin-system",
+      "to": "ebda-card-size-admin-system",
       "relation": "related"
     },
     {
@@ -222,17 +222,17 @@
     },
     {
       "from": "three-layer-admin-setting-wiring",
-      "to": "fwb-card-size-admin-system",
+      "to": "ebda-card-size-admin-system",
       "relation": "related"
     },
     {
       "from": "three-layer-admin-setting-wiring",
-      "to": "fwb-three-product-render-paths",
+      "to": "ebda-three-product-render-paths",
       "relation": "related"
     },
     {
       "from": "category-image-rounded-per-theme",
-      "to": "fwb-theme-identity-audit",
+      "to": "ebda-theme-identity-audit",
       "relation": "related"
     },
     {
@@ -252,7 +252,7 @@
     },
     {
       "from": "category-strip-card-dual-render-paths",
-      "to": "fwb-three-product-render-paths",
+      "to": "ebda-three-product-render-paths",
       "relation": "related"
     }
   ]

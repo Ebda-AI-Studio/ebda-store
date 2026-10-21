@@ -11,7 +11,7 @@
  *      back to the free plan's limits (the store keeps its data, loses the paid
  *      ceiling). `trialing`/`active`/`past_due`/`comped` use the plan's own limits.
  *   2. No subscription row (a store created before the migration, or by a path
- *      that has not been taught to create one) -> FWB's legacy `Store.plan` enum
+ *      that has not been taught to create one) -> Ebda Store's legacy `Store.plan` enum
  *      mapped onto a plan code. The migration backfills every existing store, so
  *      this is the safety net, not the normal path.
  *   3. A plan row that is missing or whose `limits` JSON fails the zod schema

@@ -31,7 +31,7 @@ describe('pickLocalizedName', () => {
 const DISPLAY_PATHS = [
   'apps/web/src/templates/shared/ProductCarousel.tsx',
   'apps/web/src/templates/shared/CategoryStrip.tsx',
-  'apps/web/src/templates/shared/PecannbeeProductCard.tsx',
+  'apps/web/src/templates/shared/StorefrontProductCard.tsx',
   'apps/web/src/templates/modern/ProductCard.tsx',
   'apps/web/src/templates/elegant/ProductCard.tsx',
   'apps/web/src/templates/classic/ProductCard.tsx',

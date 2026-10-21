@@ -320,7 +320,7 @@ sale through an unfloored helper, and PO receive incremented it on every
 variant receipt. A variant product's parent column starts at 0, so it drifted:
 24 live products had reached −16 while their variants held four-figure stock.
 
-Eleven read paths then consumed that drift. Measured on the `pecannbee`
+Eleven read paths then consumed that drift. Measured on the `demo-store`
 production store before the fix:
 
 | Surface               | Reported                                                   | Reality           |

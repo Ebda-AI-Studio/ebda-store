@@ -1,4 +1,4 @@
-# Adversarial audit — force-website-builder, 2026-09-02
+# Adversarial audit — ebda-store, 2026-09-02
 
 Baseline: `main` @ `4f202f22`, clean. Read-only; no code was modified for this audit.
 
@@ -8,7 +8,7 @@ auditing the audit record itself. Standing brief: grep counts are not findings; 
 carry a concrete exploit path and file:line evidence; kill your own false positives before
 reporting. Each agent was also required to name what it attacked and could **not** break.
 
-**Why adversarial and not another checklist.** FWB carries 20 prior audit reports and most say PASS.
+**Why adversarial and not another checklist.** Ebda Store carries 20 prior audit reports and most say PASS.
 The premise here was that the next real defect is behind a PASS verdict, not in an unaudited corner.
 That premise held: **5 prior PASS verdicts were falsified, and the two highest-severity findings sit
 directly behind one of them.**
@@ -260,7 +260,7 @@ Two agent findings were revised by the orchestrator against live evidence rather
    `x-railway-fallback: true` = no service bound to that hostname (the same `/health` returns 200
    through Cloudflare). Residual: Railway may still route the service on a different generated
    domain — proven for the documented host only, not universally.
-2. **`api.force-ai.co` IS Cloudflare-proxied** (`server: cloudflare`, `cf-ray`,
+2. **`api.ebda.app` IS Cloudflare-proxied** (`server: cloudflare`, `cf-ray`,
    `cf-cache-status: DYNAMIC`) — settles a blind spot in two reports and keeps the P3 edge-cache
    `Vary` bug dormant (nothing is edge-cached today).
 
@@ -314,7 +314,7 @@ Worth as much as the findings — each was attacked hard and held:
 | Question                                                                             | Settles it                                                                                                                                                                                                                        |
 | ------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | How many orders has P0-4 already double-restored?                                    | the SQL above, read-only                                                                                                                                                                                                          |
-| Prod role state                                                                      | `SELECT rolname, rolbypassrls FROM pg_roles WHERE rolname IN ('neondb_owner','force_app');`                                                                                                                                       |
+| Prod role state                                                                      | `SELECT rolname, rolbypassrls FROM pg_roles WHERE rolname IN ('neondb_owner','the earlier app role');`                                                                                                                                       |
 | What the P1-1 SSRF actually reaches inside Railway                                   | set an iCarry `baseUrl` to a burn URL from a test store, read `testConnection`                                                                                                                                                    |
 | Live `TRUST_PROXY_HOPS`, and whether any Railway domain still accepts direct traffic | `railway variables`; Railway dashboard                                                                                                                                                                                            |
 | Does the CORS preflight really echo a merchant origin with `Allow-Credentials`?      | a preflight probe against a non-destructive endpoint with a configured merchant `Origin` header settles it (trimmed 2026-09-02 — P0-3 is still open; the fix commit for `security.ts:155` is the reproducible record once landed) |

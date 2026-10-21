@@ -1,13 +1,13 @@
-# Force AI Store — Merchant Guide
+# Ebda Store — Merchant Guide
 
-Welcome. This guide covers everything you need to set up and run your store on Force AI Store. It is bilingual: every section has English + Arabic.
+Welcome. This guide covers everything you need to set up and run your store on Ebda Store. It is bilingual: every section has English + Arabic.
 
-أهلًا بك. هذا الدليل يغطي كل ما تحتاجه لإعداد متجرك وتشغيله على Force AI Store. الدليل ثنائي اللغة.
+أهلًا بك. هذا الدليل يغطي كل ما تحتاجه لإعداد متجرك وتشغيله على Ebda Store. الدليل ثنائي اللغة.
 
 ## Index — الفهرس
 
 1. [Quickstart — البدء السريع](./quickstart.md) — get your store live in under an hour
-2. [Custom Domain Setup — ربط النطاق المخصص](./custom-domain.md) — point yourstore.com at Force AI Store
+2. [Custom Domain Setup — ربط النطاق المخصص](./custom-domain.md) — point yourstore.com at Ebda Store
 3. [Payment Provider Setup — إعداد بوابات الدفع](./payment-providers.md) — Tap / MyFatoorah / Hesabe / UPayments
    - [Activating a payment or shipping service — تفعيل خدمة دفع أو شحن](./provider-activation.md) — about 5 hours per service
 4. [Delivery Areas & Fees — مناطق التوصيل والرسوم](./shipping-areas.md) — set per-area delivery fees with governorate → area cascade + bulk import/export
@@ -19,8 +19,8 @@ Welcome. This guide covers everything you need to set up and run your store on F
 
 ## Need help? — تحتاج مساعدة؟
 
-- WhatsApp: contact the Force Media team directly
+- WhatsApp: contact the Ebda AI Studio team directly
 - Status page: <https://stats.uptimerobot.com/23nuarbz3h> — check if the platform is up before reporting an outage
-- Email: contact@forcemediakw.com
+- Email: contact@ebda.app
 
 تواصل عبر الواتساب أو الإيميل — أو افحص صفحة الحالة قبل الإبلاغ عن خلل.

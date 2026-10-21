@@ -1,7 +1,7 @@
 # Storefront per-store PWA — extend to full size set
 
 **Date:** 2026-05-04
-**Scope:** FWB storefront only. Admin already updated to FSA branding + full sizes (separate work).
+**Scope:** Ebda Store storefront only. Admin already updated to FSA branding + full sizes (separate work).
 
 ## Context
 
@@ -14,7 +14,7 @@ Per-store PWA is **already implemented** end-to-end. No new architecture needed 
 - `apps/api/src/routes/pwa.routes.ts` — exposes `GET /public/:storeId/manifest.json`
 - `apps/admin/src/app/stores/[id]/pwa/` — admin settings page with `PwaIconUploader`, `PwaBranding`, etc.
 - `Store.pwaEnabled`, `Store.pwaSettings` schema fields with `icon192`, `icon512`, `maskableIcon`, `themeColor`, `backgroundColor`, `appName`, `shortName`, etc.
-- `pwa` feature flag in the FWB feature toggle engine
+- `pwa` feature flag in the Ebda Store feature toggle engine
 
 **Gap:** existing implementation only supports `icon192` + `icon512` + `maskableIcon`. Missing the standard set: 384 (Android splash), 180 (iOS apple-touch), 32 + 16 (browser tab favicon). Merchants today get a degraded install experience on iOS (no apple-touch-icon → ugly default home-screen tile) and Android splash screens use the wrong size.
 
@@ -203,8 +203,8 @@ railway run --service api -- npx tsx ../../scripts/backfill-store-pwa-icons.mjs 
 
 ## Verification
 
-1. **Per-tenant install on Chrome desktop:** open `palora.com` in Chrome → "Install Palora" → installed app uses Palora's logo + theme color, not Force orange. Same for Wady Aljuz.
-2. **iOS apple-touch-icon:** Safari → palora.com → Add to Home Screen → home-screen tile shows Palora's icon at the right size, no default white border.
+1. **Per-tenant install on Chrome desktop:** open `demo-boutique.com` in Chrome → "Install demo-boutique" → installed app uses demo-boutique's logo + theme color, not Force orange. Same for Wady Aljuz.
+2. **iOS apple-touch-icon:** Safari → demo-boutique.com → Add to Home Screen → home-screen tile shows demo-boutique's icon at the right size, no default white border.
 3. **Browser tab favicon:** desktop browser tab shows the merchant's 32×32 favicon, not Force defaults.
 4. **Manifest preview in admin:** the PWA settings page shows all 6 sizes after a single upload.
 5. **R2 inspection:** `force-uploads` bucket has `stores/{storeId}/pwa/source.png`, `icon192.png`, … through `favicon16.png` for any store with `pwaEnabled=true`.
@@ -218,6 +218,6 @@ railway run --service api -- npx tsx ../../scripts/backfill-store-pwa-icons.mjs 
 
 ## Reference
 
-- Existing memory: `feedback-fwb-cms-and-tenant-control` (every customer-facing string and visual block must be tenant-overridable)
+- Existing memory: `feedback-ebda-cms-and-tenant-control` (every customer-facing string and visual block must be tenant-overridable)
 - Existing memory: per-store R2 path convention `stores/<storeId>/<asset>/...` (commit `8863938`)
-- Sharp is already in the FWB monorepo node_modules
+- Sharp is already in the Ebda Store monorepo node_modules

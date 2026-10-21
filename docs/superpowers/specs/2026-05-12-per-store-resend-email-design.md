@@ -3,16 +3,16 @@
 **Date:** 2026-05-12
 **Status:** approved (verbal, in-chat)
 **Author:** Ahmad Sharaf + Claude
-**Tracks:** [[reference-fwb-seo-system]] (sibling pattern for HTML-tag verification)
+**Tracks:** [[reference-ebda-seo-system]] (sibling pattern for HTML-tag verification)
 
 ## Problem
 
-Every transactional email currently ships from a single hardcoded `Force Media <noreply@forcemedia.com>` sender (note the typo in the env default — `forcemedia.com`, not `forcemediakw.com`). The HTML wrapper is hardcoded `Force Media` in both header bar and footer. Customers buying from Wady Aljuz get an order confirmation that looks like it came from a different company. There is no per-store branding, no per-merchant sender authentication, and no path for merchants to send under their own custom domain.
+Every transactional email currently ships from a single hardcoded `Ebda AI Studio <noreply@ebda.app>` sender (note the typo in the env default — `ebda.app`, not `ebda.app`). The HTML wrapper is hardcoded `Ebda AI Studio` in both header bar and footer. Customers buying from Wady Aljuz get an order confirmation that looks like it came from a different company. There is no per-store branding, no per-merchant sender authentication, and no path for merchants to send under their own custom domain.
 
 ## Goals
 
 1. Every transactional email reflects the store the customer bought from — display name, logo, theme color, contact details.
-2. Merchants with a verified custom domain send under their own DKIM (`noreply@theirstore.com`); merchants without fall back to the platform domain (`noreply@forcemediakw.com`) with display-name branding.
+2. Merchants with a verified custom domain send under their own DKIM (`noreply@theirstore.com`); merchants without fall back to the platform domain (`noreply@ebda.app`) with display-name branding.
 3. The merchant never deals with Resend directly. The backend provisions Resend domains the same way the backend provisions Vercel domains for storefront routing — invisibly. The admin UI surfaces only the DNS records the merchant must add to their registrar, presented as one unified list.
 4. Receipts include the full order content (items + totals + shipping address) and clearly identify the store.
 
@@ -38,7 +38,7 @@ function resolveSender(store: StoreSenderShape): { from: string; replyTo?: strin
     };
   }
   return {
-    from: `${displayName} <${localPart}@forcemediakw.com>`,
+    from: `${displayName} <${localPart}@ebda.app>`,
     replyTo: store.email || undefined,
   };
 }
@@ -75,8 +75,8 @@ Changes vs current static wrapper:
 
 - **Header bar** background = sanitized `store.theme.primary` (HSL string or hex, runs through the existing `sanitizeThemeColor` pipeline from `apps/web/src/app/layout.tsx`). Fall back to platform orange `#ff6e00` if missing or invalid.
 - **Header content** = `<img src="${store.logo}">` if logo present, else `<h1>${store.name}</h1>` in white. RTL-aware via `dir="rtl"` when `defaultLanguage === 'ar'`.
-- **Footer** = `© ${year} ${store.name}` + store address + phone + contact email, followed by a small grey "Powered by Force AI" attribution line.
-- **Subjects** — every hardcoded "Force Media" in `subject:` strings replaced with `store.name`. Localized AR variants when `defaultLanguage === 'ar'`.
+- **Footer** = `© ${year} ${store.name}` + store address + phone + contact email, followed by a small grey "Powered by Ebda AI Studio" attribution line.
+- **Subjects** — every hardcoded "Ebda AI Studio" in `subject:` strings replaced with `store.name`. Localized AR variants when `defaultLanguage === 'ar'`.
 - **Order confirmation** receipt content — already structurally correct (items + totals + shipping addr). Add the "Thanks for shopping at ${store.name}" line at the top.
 
 All store-supplied strings continue to flow through `escapeHtml()` to preserve the XSS hardening already in place.
@@ -145,7 +145,7 @@ Bundled into `/stores/[id]/domain`:
 
 1. **"Custom domain" card** — unchanged.
 2. **"Email sender" card** (new) — appears when a custom domain is set.
-   - Status: `Sending as: Wady Aljuz <noreply@wadyaljuz.com>` + badge (`verified` / `pending` / `not configured` / `failed`).
+   - Status: `Sending as: Wady Aljuz <noreply@demo-merchant.com>` + badge (`verified` / `pending` / `not configured` / `failed`).
    - When status is `pending` or `not configured`, button "Set up branded email" calls `POST /api/v1/stores/:id/email-sender/provision` which runs `ResendService.provisionStoreDomain` and returns DNS records.
    - When status is `pending`, "Verify" button calls `POST /api/v1/stores/:id/email-sender/verify` which runs `ResendService.refreshDomainStatus`. Polling cadence: on button click only (no background polling).
 3. **"DNS records" panel** (new, unified) — single list showing every DNS record the merchant needs to add at their registrar. Each row: `Type | Host | Value` + a copy button. Internally we merge Vercel's records (A/CNAME for storefront routing) with Resend's records (3 DKIM CNAMEs + 1 SPF TXT). The merchant sees one list. No mention of underlying providers.
@@ -173,7 +173,7 @@ GET  /stores/:id/email-sender/dns         → returns unified DNS record list (V
 
 ## Bug-class audit (per Ahmad's standing rule)
 
-While in this code path, fix all instances of the `forcemedia.com` typo. Grep `apps/api/src` + `packages/shared/src` for `'forcemedia.com'` (without the `kw`) and replace with `'forcemediakw.com'`. Also audit subject-line and template-string hardcodes for any other `Force Media` / `Force AI Store` references that should be `store.name` in the customer-facing path.
+While in this code path, fix all instances of the `ebda.app` typo. Grep `apps/api/src` + `packages/shared/src` for `'ebda.app'` (without the `kw`) and replace with `'ebda.app'`. Also audit subject-line and template-string hardcodes for any other `Ebda AI Studio` / `Ebda Store` references that should be `store.name` in the customer-facing path.
 
 ## Out of scope (deferred)
 
@@ -192,5 +192,5 @@ The detailed plan goes in a separate file via the `writing-plans` skill, but the
 4. API routes for provision/verify/dns.
 5. Admin domain page: email-sender card + unified DNS list.
 6. Admin SEO page: sender prefix input.
-7. Fix the `forcemedia.com` typo + bug-class audit.
+7. Fix the `ebda.app` typo + bug-class audit.
 8. Smoke test against a real merchant store (Wady Aljuz) using a test order.
