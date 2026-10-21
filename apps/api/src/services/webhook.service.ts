@@ -12,6 +12,7 @@ import {
   WEBHOOK_PAYLOAD_VERSION,
   WEBHOOK_RETRY_DELAYS_SEC,
   WEBHOOK_SECRET_PREFIX,
+  planIncludesWebhooks,
   WEBHOOK_TEST_EVENT,
   type WebhookEnvelope,
   type WebhookEventType,
@@ -19,6 +20,7 @@ import {
 import { encryption } from './encryption.service';
 import { postWebhook } from '../lib/webhook-http';
 import { withSavepoint } from '../lib/savepoint';
+import { getEntitlements } from './plan-entitlements';
 import type { FanoutEvent } from './webhook-payload';
 
 // ---------------------------------------------------------------------------
@@ -71,6 +73,12 @@ export function buildEnvelope(a: {
     livemode: true,
     data: a.data,
   };
+}
+
+/** Growth / Business only (Ruling WH-1). Fails closed when the plan cannot be read. */
+export async function webhookStoreEntitled(storeId: string): Promise<boolean> {
+  const e = await getEntitlements(storeId);
+  return !!e && planIncludesWebhooks(e.planCode);
 }
 
 // ---------------------------------------------------------------------------
@@ -233,6 +241,17 @@ export async function runDeliveryAttempt(
       prisma.webhookDelivery.updateMany({
         where: { id: deliveryId, storeId },
         data: { status: 'failed', error: 'endpoint_disabled', nextAttemptAt: null },
+      })
+    );
+    return { decision: 'skipped', endpointDisabled: false, endpointId: ep.id };
+  }
+
+  // A store that dropped below Growth stops sending, including deliveries already queued (I3).
+  if (!loaded.isTest && !(await webhookStoreEntitled(storeId))) {
+    await runInTenantContext(storeId, () =>
+      prisma.webhookDelivery.updateMany({
+        where: { id: deliveryId, storeId },
+        data: { status: 'failed', error: 'plan_lapsed', nextAttemptAt: null },
       })
     );
     return { decision: 'skipped', endpointDisabled: false, endpointId: ep.id };

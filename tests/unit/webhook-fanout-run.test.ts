@@ -4,6 +4,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 const h = vi.hoisted(() => ({
   build: vi.fn(),
   fanout: vi.fn(),
+  plan: vi.fn(),
   count: vi.fn(),
 }));
 vi.mock('@ebda/database', () => ({
@@ -18,6 +19,7 @@ vi.mock('../../apps/api/src/services/webhook-events', async () => {
 });
 vi.mock('../../apps/api/src/services/webhook.service', () => ({
   fanoutWebhookEvent: h.fanout,
+  webhookStoreEntitled: h.plan,
   delayBeforeAttempt: () => 0,
   runDeliveryAttempt: vi.fn(),
 }));
@@ -44,6 +46,7 @@ const ev = { name: 'order/created', data: { storeId: 's1', orderId: 'o1' }, id: 
 beforeEach(() => {
   Object.values(h).forEach(f => f.mockReset());
   h.count.mockResolvedValue(1);
+  h.plan.mockResolvedValue(true);
   h.fanout.mockResolvedValue(['d1']);
 });
 
@@ -72,6 +75,14 @@ describe('runWebhookFanout', () => {
   it('a real error (not "not ready") still fails the run', async () => {
     h.build.mockRejectedValue(new Error('db down'));
     await expect(runWebhookFanout(makeStep() as any, ev as any)).rejects.toThrow('db down');
+  });
+  it('I3: a store that is no longer entitled gets nothing and the source row is never read', async () => {
+    h.plan.mockResolvedValue(false);
+    const step = makeStep();
+    const r = await runWebhookFanout(step as any, ev as any);
+    expect(r).toMatchObject({ skipped: 'not_entitled' });
+    expect(h.build).not.toHaveBeenCalled();
+    expect(h.fanout).not.toHaveBeenCalled();
   });
   it('no active endpoint: nothing is read or built', async () => {
     h.count.mockResolvedValue(0);

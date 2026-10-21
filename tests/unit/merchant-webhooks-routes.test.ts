@@ -165,14 +165,47 @@ describe('permissions', () => {
   it('plan gate: Basic and Free get 402 with an upgrade target; Growth and Business pass', async () => {
     for (const plan of ['free', 'basic', null]) {
       h.plan = plan;
-      const r = await request(app).get(BASE);
+      const r = await request(app).post(BASE).send(good);
       expect(r.status).toBe(402);
       expect(r.body.error.details.upgradeTo.code).toBe('growth');
     }
     for (const plan of ['growth', 'business']) {
       h.plan = plan;
-      expect((await request(app).get(BASE)).status).toBe(200);
+      expect((await request(app).post(BASE).send(good)).status).toBe(201);
+      h.endpoints = [];
     }
+  });
+  it('I3: on a lapsed plan the merchant can still SEE, DISABLE and DELETE (read + kill)', async () => {
+    h.plan = 'basic';
+    h.endpoints = [ep()];
+    h.deliveries = [{ id: D1, endpointId: E1, storeId: S1 }];
+    expect((await request(app).get(BASE)).status).toBe(200);
+    expect((await request(app).get(`${BASE}/${E1}/deliveries`)).status).toBe(200);
+    expect((await request(app).get(`${BASE}/${E1}/deliveries/${D1}`)).status).toBe(200);
+    expect((await request(app).patch(`${BASE}/${E1}`).send({ active: false })).status).toBe(200);
+    expect(h.endpoints[0].active).toBe(false);
+    expect((await request(app).delete(`${BASE}/${E1}`)).status).toBe(200);
+    expect(h.endpoints).toHaveLength(0);
+  });
+  it('I3: on a lapsed plan create, test, resend, rotate, re-enable and any other edit are 402', async () => {
+    h.plan = 'basic';
+    h.endpoints = [ep({ active: false })];
+    h.deliveries = [{ id: D1, endpointId: E1, storeId: S1 }];
+    const u = `${BASE}/${E1}`;
+    for (const r of [
+      await request(app).post(BASE).send(good),
+      await request(app).post(`${u}/test`),
+      await request(app).post(`${u}/deliveries/${D1}/resend`),
+      await request(app).post(`${u}/rotate-secret`),
+      await request(app).patch(u).send({ active: true }),
+      await request(app).patch(u).send({ url: 'https://other.example.com/x' }),
+      await request(app).patch(u).send({ active: false, includeCustomer: true }),
+    ]) {
+      expect(r.status).toBe(402);
+    }
+    expect(h.createTest).not.toHaveBeenCalled();
+    expect(h.createResend).not.toHaveBeenCalled();
+    expect(h.endpoints[0].active).toBe(false);
   });
   it('super_admin bypasses the plan gate', async () => {
     h.role = 'super_admin';

@@ -117,6 +117,9 @@ vi.mock('../../apps/api/src/lib/savepoint', () => ({
     }
   },
 }));
+vi.mock('../../apps/api/src/services/plan-entitlements', () => ({
+  getEntitlements: async () => (db.plan ? { planCode: db.plan } : null),
+}));
 vi.mock('../../apps/api/src/lib/webhook-http', () => ({ postWebhook: db.post }));
 vi.mock('../../apps/api/src/services/encryption.service', () => ({
   encryption: { decrypt: (s: string) => `dec(${s})`, encrypt: (s: string) => `enc(${s})` },
@@ -130,6 +133,7 @@ import {
   delayBeforeAttempt,
   decideAfterAttempt,
   newWebhookSecret,
+  webhookStoreEntitled,
 } from '../../apps/api/src/services/webhook.service';
 
 const ep = (o: Row = {}) => ({
@@ -155,6 +159,7 @@ beforeEach(() => {
   db.deliveries = [];
   db.ambient = 's1';
   db.aborted = false;
+  db.plan = 'growth';
   db.post.mockReset();
 });
 
@@ -346,6 +351,26 @@ describe('attempts and auto-disable', () => {
     expect(r.decision).toBe('skipped');
     expect(db.post).not.toHaveBeenCalled();
     expect(db.deliveries[0]).toMatchObject({ status: 'failed', error: 'endpoint_disabled' });
+  });
+  it('I3: a delivery queued before a downgrade is not sent after it (and is marked failed, not retried)', async () => {
+    const [id] = await fanoutWebhookEvent('s1', ev);
+    db.plan = 'basic';
+    const r = await runDeliveryAttempt('s1', id, 1);
+    expect(r.decision).toBe('skipped');
+    expect(db.post).not.toHaveBeenCalled();
+    expect(db.deliveries[0]).toMatchObject({ status: 'failed', error: 'plan_lapsed' });
+  });
+  it('I3: entitlement is Growth/Business only and fails closed when unknown', async () => {
+    for (const [plan, want] of [
+      ['growth', true],
+      ['business', true],
+      ['basic', false],
+      ['free', false],
+      [null, false],
+    ] as const) {
+      db.plan = plan;
+      expect(await webhookStoreEntitled('s1')).toBe(want);
+    }
   });
   it('an already-successful delivery is never re-sent (Inngest replay)', async () => {
     const [id] = await fanoutWebhookEvent('s1', ev);

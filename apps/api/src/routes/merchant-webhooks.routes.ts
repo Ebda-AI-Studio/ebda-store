@@ -54,12 +54,20 @@ async function requireWebhooksPlan(req: Request, _res: Response, next: NextFunct
   }
 }
 
-router.use(
-  authenticate,
-  authorize('store_admin', 'super_admin'),
-  requireStoreAccess,
-  requireWebhooksPlan
-);
+router.use(authenticate, authorize('store_admin', 'super_admin'), requireStoreAccess);
+
+/**
+ * A lapsed plan keeps READ + KILL (list, log, disable, delete) so a merchant who dropped below
+ * Growth can see and switch off what still holds their data; everything that creates or extends
+ * sending (create, test, resend, rotate, re-enable, any other edit) is 402 (review I3).
+ */
+const isDisableOnly = (b: unknown) =>
+  !!b &&
+  typeof b === 'object' &&
+  Object.keys(b as object).length === 1 &&
+  (b as { active?: unknown }).active === false;
+const planGateUnlessDisable = (req: Request, res: Response, next: NextFunction) =>
+  isDisableOnly(req.body) ? next() : requireWebhooksPlan(req, res, next);
 
 const idParam = z.object({ id: z.string().uuid() });
 const deliveryParam = z.object({ id: z.string().uuid(), deliveryId: z.string().uuid() });
@@ -128,66 +136,77 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
   }
 });
 
-router.post('/', writeLimiter, async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const { storeId } = req.params;
-    const input = webhookEndpointCreateSchema.parse(req.body);
-    const count = await prisma.webhookEndpoint.count({ where: { storeId } });
-    if (count >= WEBHOOK_MAX_ENDPOINTS_PER_STORE) {
-      throw new AppError(409, 'WEBHOOK_LIMIT', 'Webhook endpoint limit reached', {
-        limit: WEBHOOK_MAX_ENDPOINTS_PER_STORE,
+router.post(
+  '/',
+  writeLimiter,
+  requireWebhooksPlan,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { storeId } = req.params;
+      const input = webhookEndpointCreateSchema.parse(req.body);
+      const count = await prisma.webhookEndpoint.count({ where: { storeId } });
+      if (count >= WEBHOOK_MAX_ENDPOINTS_PER_STORE) {
+        throw new AppError(409, 'WEBHOOK_LIMIT', 'Webhook endpoint limit reached', {
+          limit: WEBHOOK_MAX_ENDPOINTS_PER_STORE,
+        });
+      }
+      await checkUrl(input.url);
+      const { secret, hint } = newWebhookSecret();
+      const endpoint = await prisma.webhookEndpoint.create({
+        data: {
+          storeId,
+          url: input.url,
+          description: input.description || null,
+          events: input.events,
+          includeCustomer: input.includeCustomer,
+          secretEnc: encryption.encrypt(secret),
+          secretHint: hint,
+          createdBy: req.user?.userId ?? null,
+        },
+        select: ENDPOINT_SELECT,
       });
+      await audit(req, 'webhook_endpoint.created', endpoint.id);
+      res.status(201).json({ success: true, data: { endpoint, secret } });
+    } catch (error) {
+      next(error);
     }
-    await checkUrl(input.url);
-    const { secret, hint } = newWebhookSecret();
-    const endpoint = await prisma.webhookEndpoint.create({
-      data: {
-        storeId,
-        url: input.url,
-        description: input.description || null,
-        events: input.events,
-        includeCustomer: input.includeCustomer,
-        secretEnc: encryption.encrypt(secret),
-        secretHint: hint,
-        createdBy: req.user?.userId ?? null,
-      },
-      select: ENDPOINT_SELECT,
-    });
-    await audit(req, 'webhook_endpoint.created', endpoint.id);
-    res.status(201).json({ success: true, data: { endpoint, secret } });
-  } catch (error) {
-    next(error);
   }
-});
+);
 
-router.patch('/:id', writeLimiter, async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const { storeId } = req.params;
-    const { id } = idParam.parse(req.params);
-    const input = webhookEndpointUpdateSchema.parse(req.body);
-    const current = await endpointOr404(storeId, id);
-    if (input.url !== undefined || input.active === true) await checkUrl(input.url ?? current.url);
-    // Turning it back on resets the failure streak; turning it off is the merchant's choice.
-    const reactivate = input.active === true && !current.active;
-    const data = {
-      ...(input.url !== undefined ? { url: input.url } : {}),
-      ...(input.description !== undefined ? { description: input.description || null } : {}),
-      ...(input.events !== undefined ? { events: input.events } : {}),
-      ...(input.includeCustomer !== undefined ? { includeCustomer: input.includeCustomer } : {}),
-      ...(reactivate
-        ? { active: true, disabledReason: null, disabledAt: null, consecutiveFailures: 0 }
-        : {}),
-      ...(input.active === false && current.active
-        ? { active: false, disabledReason: 'merchant', disabledAt: new Date() }
-        : {}),
-    };
-    await prisma.webhookEndpoint.updateMany({ where: { id, storeId }, data });
-    await audit(req, 'webhook_endpoint.updated', id);
-    res.json({ success: true, data: { endpoint: await endpointOr404(storeId, id) } });
-  } catch (error) {
-    next(error);
+router.patch(
+  '/:id',
+  writeLimiter,
+  planGateUnlessDisable,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { storeId } = req.params;
+      const { id } = idParam.parse(req.params);
+      const input = webhookEndpointUpdateSchema.parse(req.body);
+      const current = await endpointOr404(storeId, id);
+      if (input.url !== undefined || input.active === true)
+        await checkUrl(input.url ?? current.url);
+      // Turning it back on resets the failure streak; turning it off is the merchant's choice.
+      const reactivate = input.active === true && !current.active;
+      const data = {
+        ...(input.url !== undefined ? { url: input.url } : {}),
+        ...(input.description !== undefined ? { description: input.description || null } : {}),
+        ...(input.events !== undefined ? { events: input.events } : {}),
+        ...(input.includeCustomer !== undefined ? { includeCustomer: input.includeCustomer } : {}),
+        ...(reactivate
+          ? { active: true, disabledReason: null, disabledAt: null, consecutiveFailures: 0 }
+          : {}),
+        ...(input.active === false && current.active
+          ? { active: false, disabledReason: 'merchant', disabledAt: new Date() }
+          : {}),
+      };
+      await prisma.webhookEndpoint.updateMany({ where: { id, storeId }, data });
+      await audit(req, 'webhook_endpoint.updated', id);
+      res.json({ success: true, data: { endpoint: await endpointOr404(storeId, id) } });
+    } catch (error) {
+      next(error);
+    }
   }
-});
+);
 
 router.delete('/:id', writeLimiter, async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -205,6 +224,7 @@ router.delete('/:id', writeLimiter, async (req: Request, res: Response, next: Ne
 router.post(
   '/:id/rotate-secret',
   writeLimiter,
+  requireWebhooksPlan,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId } = req.params;
@@ -223,22 +243,27 @@ router.post(
   }
 );
 
-router.post('/:id/test', writeLimiter, async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const { storeId } = req.params;
-    const { id } = idParam.parse(req.params);
-    await endpointOr404(storeId, id);
-    const deliveryId = await createTestDelivery(storeId, id);
-    await sendEventAfterCommit(
-      'webhook.test',
-      { name: 'webhook/delivery.requested', data: { storeId, deliveryId } },
-      { ifUnhookable: 'drop' }
-    );
-    res.status(202).json({ success: true, data: { deliveryId } });
-  } catch (error) {
-    next(error);
+router.post(
+  '/:id/test',
+  writeLimiter,
+  requireWebhooksPlan,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { storeId } = req.params;
+      const { id } = idParam.parse(req.params);
+      await endpointOr404(storeId, id);
+      const deliveryId = await createTestDelivery(storeId, id);
+      await sendEventAfterCommit(
+        'webhook.test',
+        { name: 'webhook/delivery.requested', data: { storeId, deliveryId } },
+        { ifUnhookable: 'drop' }
+      );
+      res.status(202).json({ success: true, data: { deliveryId } });
+    } catch (error) {
+      next(error);
+    }
   }
-});
+);
 
 router.get('/:id/deliveries', async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -292,6 +317,7 @@ router.get(
 router.post(
   '/:id/deliveries/:deliveryId/resend',
   writeLimiter,
+  requireWebhooksPlan,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId } = req.params;

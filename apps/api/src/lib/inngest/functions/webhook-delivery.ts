@@ -19,6 +19,7 @@ import {
   delayBeforeAttempt,
   fanoutWebhookEvent,
   runDeliveryAttempt,
+  webhookStoreEntitled,
 } from '../../../services/webhook.service';
 
 /**
@@ -57,6 +58,10 @@ export async function runWebhookFanout(
 ): Promise<Record<string, unknown>> {
   const storeId = event.data.storeId as string | undefined;
   if (!storeId) return { skipped: 'no_store' };
+  // A store that dropped below Growth no longer sends (I3); its source rows are not even read.
+  if (!(await step.run('check-plan', () => webhookStoreEntitled(storeId)))) {
+    return { skipped: 'not_entitled' };
+  }
   let ids: string[] | null = null;
   for (let i = 0; i <= FANOUT_NOT_READY_WAITS_SEC.length; i++) {
     // Each pass is its own memoised step, so a replay never repeats a completed one.

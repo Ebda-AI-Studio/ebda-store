@@ -75,9 +75,11 @@ export default function WebhooksPage() {
 
   const errText = useCallback(
     (e: ApiError) =>
-      e.code === 'WEBHOOK_URL_REJECTED' || e.code === 'WEBHOOK_LIMIT'
-        ? t(`error.${e.code}`)
-        : e.message,
+      e.status === 402
+        ? t('plan.title')
+        : e.code === 'WEBHOOK_URL_REJECTED' || e.code === 'WEBHOOK_LIMIT'
+          ? t(`error.${e.code}`)
+          : e.message,
     [t]
   );
 
