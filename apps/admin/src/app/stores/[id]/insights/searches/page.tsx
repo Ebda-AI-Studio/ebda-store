@@ -148,6 +148,25 @@ export default function InsightsSearchesPage() {
   return (
     <AdminLayout title={t('title')} subtitle={t('description')}>
       <div className="max-w-6xl space-y-6" aria-busy={loading}>
+        {data.index && (
+          // Task 12: the viewer of product_embeddings. Counts go in as strings so they stay Latin
+          // digits in Arabic (NUMERALS-1).
+          <p data-testid="search-index-status" className="text-sm text-muted-foreground">
+            {!data.index.semanticEnabled && <span>{t('indexOff')} · </span>}
+            <span className="tabular-nums">
+              {t('indexStatus', {
+                indexed: String(data.index.indexed),
+                products: String(data.index.products),
+              })}
+            </span>
+            {data.index.failed > 0 && (
+              <span className="tabular-nums text-amber-700 dark:text-amber-500">
+                {' · '}
+                {t('indexFailed', { failed: String(data.index.failed) })}
+              </span>
+            )}
+          </p>
+        )}
         <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
           <div role="group" aria-label={t('range')} className="flex gap-2">
             {RANGES.map(r => (

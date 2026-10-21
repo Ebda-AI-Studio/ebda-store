@@ -142,7 +142,7 @@ export function SearchAutocomplete({ query, onSelect, committedQuery }: SearchAu
     if (trimmed !== mountedQueryRef.current) editedRef.current = true;
     if (!editedRef.current) return;
 
-    if (trimmed.length < 2) {
+    if (trimmed.length < 1) {
       setSuggestions(null);
       setIsOpen(false);
       setActiveIndex(-1);

@@ -1,0 +1,4221 @@
+## no search
+{
+ "products": [
+  {
+   "id": "<product Hat>",
+   "storeId": "<store>",
+   "name": "Hat",
+   "nameAr": null,
+   "slug": "golden-5-<run>",
+   "description": null,
+   "descriptionAr": null,
+   "excerpt": null,
+   "excerptAr": null,
+   "price": 100,
+   "compareAtPrice": null,
+   "discountType": null,
+   "discountValue": null,
+   "sku": null,
+   "inventory": 5,
+   "allowBackorder": false,
+   "status": "active",
+   "metaDescription": null,
+   "metaDescriptionAr": null,
+   "metaDescriptionAeo": null,
+   "metaDescriptionAeoAr": null,
+   "isNew": false,
+   "badgeLabel": null,
+   "badgeLabelAr": null,
+   "facts": [],
+   "leadTimeDays": null,
+   "personalisation": null,
+   "updatedAt": "<ts>",
+   "createdAt": "2026-01-06T00:00:00.000Z",
+   "images": [],
+   "categories": [],
+   "options": [],
+   "store": {
+    "id": "<store>",
+    "name": "golden",
+    "slug": "golden-<run>"
+   },
+   "variants": [],
+   "inStock": true,
+   "lowStock": true,
+   "acceptsBackorder": false,
+   "availableQty": 5
+  },
+  {
+   "id": "<product Sport trainer>",
+   "storeId": "<store>",
+   "name": "Sport trainer",
+   "nameAr": "حذاء رياضي",
+   "slug": "golden-3-<run>",
+   "description": null,
+   "descriptionAr": null,
+   "excerpt": null,
+   "excerptAr": null,
+   "price": 5000,
+   "compareAtPrice": null,
+   "discountType": null,
+   "discountValue": null,
+   "sku": null,
+   "inventory": 5,
+   "allowBackorder": false,
+   "status": "active",
+   "metaDescription": null,
+   "metaDescriptionAr": null,
+   "metaDescriptionAeo": null,
+   "metaDescriptionAeoAr": null,
+   "isNew": false,
+   "badgeLabel": null,
+   "badgeLabelAr": null,
+   "facts": [],
+   "leadTimeDays": null,
+   "personalisation": null,
+   "updatedAt": "<ts>",
+   "createdAt": "2026-01-04T00:00:00.000Z",
+   "images": [],
+   "categories": [],
+   "options": [],
+   "store": {
+    "id": "<store>",
+    "name": "golden",
+    "slug": "golden-<run>"
+   },
+   "variants": [],
+   "inStock": true,
+   "lowStock": true,
+   "acceptsBackorder": false,
+   "availableQty": 5
+  },
+  {
+   "id": "<product Shoes bag>",
+   "storeId": "<store>",
+   "name": "Shoes bag",
+   "nameAr": null,
+   "slug": "golden-4-<run>",
+   "description": null,
+   "descriptionAr": null,
+   "excerpt": null,
+   "excerptAr": null,
+   "price": 700,
+   "compareAtPrice": null,
+   "discountType": null,
+   "discountValue": null,
+   "sku": null,
+   "inventory": 5,
+   "allowBackorder": false,
+   "status": "active",
+   "metaDescription": null,
+   "metaDescriptionAr": null,
+   "metaDescriptionAeo": null,
+   "metaDescriptionAeoAr": null,
+   "isNew": false,
+   "badgeLabel": null,
+   "badgeLabelAr": null,
+   "facts": [],
+   "leadTimeDays": null,
+   "personalisation": null,
+   "updatedAt": "<ts>",
+   "createdAt": "2026-01-02T00:00:00.000Z",
+   "images": [],
+   "categories": [
+    {
+     "productId": "<product Shoes bag>",
+     "categoryId": "<id 1>",
+     "position": 6,
+     "category": {
+      "id": "<id 1>",
+      "storeId": "<store>",
+      "name": "Cat",
+      "nameAr": null,
+      "slug": "golden-cat-<run>",
+      "description": null,
+      "descriptionAr": null,
+      "image": null,
+      "parentId": null,
+      "position": 0,
+      "isActive": true,
+      "showOnHomeStrip": true,
+      "metaTitle": null,
+      "metaTitleAr": null,
+      "metaDescription": null,
+      "metaDescriptionAr": null,
+      "metaDescriptionAeo": null,
+      "metaDescriptionAeoAr": null,
+      "sizeChartId": null,
+      "createdAt": "<ts>",
+      "updatedAt": "<ts>",
+      "deletedAt": null
+     }
+    }
+   ],
+   "options": [],
+   "store": {
+    "id": "<store>",
+    "name": "golden",
+    "slug": "golden-<run>"
+   },
+   "variants": [],
+   "inStock": true,
+   "lowStock": true,
+   "acceptsBackorder": false,
+   "availableQty": 5
+  },
+  {
+   "id": "<product Kids shoes>",
+   "storeId": "<store>",
+   "name": "Kids shoes",
+   "nameAr": null,
+   "slug": "golden-2-<run>",
+   "description": null,
+   "descriptionAr": null,
+   "excerpt": null,
+   "excerptAr": null,
+   "price": 1500,
+   "compareAtPrice": null,
+   "discountType": null,
+   "discountValue": null,
+   "sku": null,
+   "inventory": 5,
+   "allowBackorder": false,
+   "status": "active",
+   "metaDescription": null,
+   "metaDescriptionAr": null,
+   "metaDescriptionAeo": null,
+   "metaDescriptionAeoAr": null,
+   "isNew": false,
+   "badgeLabel": null,
+   "badgeLabelAr": null,
+   "facts": [],
+   "leadTimeDays": null,
+   "personalisation": null,
+   "updatedAt": "<ts>",
+   "createdAt": "2026-01-02T00:00:00.000Z",
+   "images": [],
+   "categories": [
+    {
+     "productId": "<product Kids shoes>",
+     "categoryId": "<id 1>",
+     "position": 8,
+     "category": {
+      "id": "<id 1>",
+      "storeId": "<store>",
+      "name": "Cat",
+      "nameAr": null,
+      "slug": "golden-cat-<run>",
+      "description": null,
+      "descriptionAr": null,
+      "image": null,
+      "parentId": null,
+      "position": 0,
+      "isActive": true,
+      "showOnHomeStrip": true,
+      "metaTitle": null,
+      "metaTitleAr": null,
+      "metaDescription": null,
+      "metaDescriptionAr": null,
+      "metaDescriptionAeo": null,
+      "metaDescriptionAeoAr": null,
+      "sizeChartId": null,
+      "createdAt": "<ts>",
+      "updatedAt": "<ts>",
+      "deletedAt": null
+     }
+    }
+   ],
+   "options": [],
+   "store": {
+    "id": "<store>",
+    "name": "golden",
+    "slug": "golden-<run>"
+   },
+   "variants": [],
+   "inStock": true,
+   "lowStock": true,
+   "acceptsBackorder": false,
+   "availableQty": 5
+  },
+  {
+   "id": "<product Canvas shoes>",
+   "storeId": "<store>",
+   "name": "Canvas shoes",
+   "nameAr": null,
+   "slug": "golden-1-<run>",
+   "description": null,
+   "descriptionAr": null,
+   "excerpt": null,
+   "excerptAr": null,
+   "price": 2000,
+   "compareAtPrice": null,
+   "discountType": null,
+   "discountValue": null,
+   "sku": null,
+   "inventory": 3,
+   "allowBackorder": false,
+   "status": "active",
+   "metaDescription": null,
+   "metaDescriptionAr": null,
+   "metaDescriptionAeo": null,
+   "metaDescriptionAeoAr": null,
+   "isNew": false,
+   "badgeLabel": null,
+   "badgeLabelAr": null,
+   "facts": [],
+   "leadTimeDays": null,
+   "personalisation": null,
+   "updatedAt": "<ts>",
+   "createdAt": "2026-01-02T00:00:00.000Z",
+   "images": [],
+   "categories": [],
+   "options": [
+    {
+     "name": "Size",
+     "nameAr": null,
+     "_count": {
+      "values": 0
+     },
+     "values": []
+    }
+   ],
+   "store": {
+    "id": "<store>",
+    "name": "golden",
+    "slug": "golden-<run>"
+   },
+   "variants": [
+    {
+     "id": "<id 2>",
+     "price": 2100,
+     "compareAtPrice": null,
+     "inventory": 3,
+     "allowBackorder": false,
+     "inStock": true,
+     "lowStock": true,
+     "acceptsBackorder": false,
+     "availableQty": 3
+    }
+   ],
+   "inStock": true,
+   "lowStock": true,
+   "acceptsBackorder": false,
+   "availableQty": 3
+  },
+  {
+   "id": "<product Leather shoes>",
+   "storeId": "<store>",
+   "name": "Leather shoes",
+   "nameAr": "احذية جلد",
+   "slug": "golden-0-<run>",
+   "description": null,
+   "descriptionAr": null,
+   "excerpt": null,
+   "excerptAr": null,
+   "price": 3000,
+   "compareAtPrice": null,
+   "discountType": null,
+   "discountValue": null,
+   "sku": null,
+   "inventory": 5,
+   "allowBackorder": false,
+   "status": "active",
+   "metaDescription": null,
+   "metaDescriptionAr": null,
+   "metaDescriptionAeo": null,
+   "metaDescriptionAeoAr": null,
+   "isNew": true,
+   "badgeLabel": null,
+   "badgeLabelAr": null,
+   "facts": [],
+   "leadTimeDays": null,
+   "personalisation": null,
+   "updatedAt": "<ts>",
+   "createdAt": "2026-01-01T00:00:00.000Z",
+   "images": [
+    {
+     "id": "<id 3>",
+     "productId": "<product Leather shoes>",
+     "url": "https://example.test/a.png",
+     "alt": null,
+     "position": 0,
+     "createdAt": "<ts>"
+    }
+   ],
+   "categories": [
+    {
+     "productId": "<product Leather shoes>",
+     "categoryId": "<id 1>",
+     "position": 10,
+     "category": {
+      "id": "<id 1>",
+      "storeId": "<store>",
+      "name": "Cat",
+      "nameAr": null,
+      "slug": "golden-cat-<run>",
+      "description": null,
+      "descriptionAr": null,
+      "image": null,
+      "parentId": null,
+      "position": 0,
+      "isActive": true,
+      "showOnHomeStrip": true,
+      "metaTitle": null,
+      "metaTitleAr": null,
+      "metaDescription": null,
+      "metaDescriptionAr": null,
+      "metaDescriptionAeo": null,
+      "metaDescriptionAeoAr": null,
+      "sizeChartId": null,
+      "createdAt": "<ts>",
+      "updatedAt": "<ts>",
+      "deletedAt": null
+     }
+    }
+   ],
+   "options": [],
+   "store": {
+    "id": "<store>",
+    "name": "golden",
+    "slug": "golden-<run>"
+   },
+   "variants": [],
+   "inStock": true,
+   "lowStock": true,
+   "acceptsBackorder": false,
+   "availableQty": 5
+  }
+ ],
+ "facets": [
+  {
+   "name": "Size",
+   "nameAr": null,
+   "values": [
+    {
+     "value": "S",
+     "valueAr": null
+    },
+    {
+     "value": "M",
+     "valueAr": null
+    }
+   ]
+  }
+ ],
+ "meta": {
+  "page": 1,
+  "limit": 20,
+  "total": 6,
+  "totalPages": 1
+ }
+}
+
+## search shoes
+{
+ "products": [
+  {
+   "id": "<product Shoes bag>",
+   "storeId": "<store>",
+   "name": "Shoes bag",
+   "nameAr": null,
+   "slug": "golden-4-<run>",
+   "description": null,
+   "descriptionAr": null,
+   "excerpt": null,
+   "excerptAr": null,
+   "price": 700,
+   "compareAtPrice": null,
+   "discountType": null,
+   "discountValue": null,
+   "sku": null,
+   "inventory": 5,
+   "allowBackorder": false,
+   "status": "active",
+   "metaDescription": null,
+   "metaDescriptionAr": null,
+   "metaDescriptionAeo": null,
+   "metaDescriptionAeoAr": null,
+   "isNew": false,
+   "badgeLabel": null,
+   "badgeLabelAr": null,
+   "facts": [],
+   "leadTimeDays": null,
+   "personalisation": null,
+   "updatedAt": "<ts>",
+   "createdAt": "2026-01-02T00:00:00.000Z",
+   "images": [],
+   "categories": [
+    {
+     "productId": "<product Shoes bag>",
+     "categoryId": "<id 1>",
+     "position": 6,
+     "category": {
+      "id": "<id 1>",
+      "storeId": "<store>",
+      "name": "Cat",
+      "nameAr": null,
+      "slug": "golden-cat-<run>",
+      "description": null,
+      "descriptionAr": null,
+      "image": null,
+      "parentId": null,
+      "position": 0,
+      "isActive": true,
+      "showOnHomeStrip": true,
+      "metaTitle": null,
+      "metaTitleAr": null,
+      "metaDescription": null,
+      "metaDescriptionAr": null,
+      "metaDescriptionAeo": null,
+      "metaDescriptionAeoAr": null,
+      "sizeChartId": null,
+      "createdAt": "<ts>",
+      "updatedAt": "<ts>",
+      "deletedAt": null
+     }
+    }
+   ],
+   "options": [],
+   "store": {
+    "id": "<store>",
+    "name": "golden",
+    "slug": "golden-<run>"
+   },
+   "variants": [],
+   "inStock": true,
+   "lowStock": true,
+   "acceptsBackorder": false,
+   "availableQty": 5
+  },
+  {
+   "id": "<product Kids shoes>",
+   "storeId": "<store>",
+   "name": "Kids shoes",
+   "nameAr": null,
+   "slug": "golden-2-<run>",
+   "description": null,
+   "descriptionAr": null,
+   "excerpt": null,
+   "excerptAr": null,
+   "price": 1500,
+   "compareAtPrice": null,
+   "discountType": null,
+   "discountValue": null,
+   "sku": null,
+   "inventory": 5,
+   "allowBackorder": false,
+   "status": "active",
+   "metaDescription": null,
+   "metaDescriptionAr": null,
+   "metaDescriptionAeo": null,
+   "metaDescriptionAeoAr": null,
+   "isNew": false,
+   "badgeLabel": null,
+   "badgeLabelAr": null,
+   "facts": [],
+   "leadTimeDays": null,
+   "personalisation": null,
+   "updatedAt": "<ts>",
+   "createdAt": "2026-01-02T00:00:00.000Z",
+   "images": [],
+   "categories": [
+    {
+     "productId": "<product Kids shoes>",
+     "categoryId": "<id 1>",
+     "position": 8,
+     "category": {
+      "id": "<id 1>",
+      "storeId": "<store>",
+      "name": "Cat",
+      "nameAr": null,
+      "slug": "golden-cat-<run>",
+      "description": null,
+      "descriptionAr": null,
+      "image": null,
+      "parentId": null,
+      "position": 0,
+      "isActive": true,
+      "showOnHomeStrip": true,
+      "metaTitle": null,
+      "metaTitleAr": null,
+      "metaDescription": null,
+      "metaDescriptionAr": null,
+      "metaDescriptionAeo": null,
+      "metaDescriptionAeoAr": null,
+      "sizeChartId": null,
+      "createdAt": "<ts>",
+      "updatedAt": "<ts>",
+      "deletedAt": null
+     }
+    }
+   ],
+   "options": [],
+   "store": {
+    "id": "<store>",
+    "name": "golden",
+    "slug": "golden-<run>"
+   },
+   "variants": [],
+   "inStock": true,
+   "lowStock": true,
+   "acceptsBackorder": false,
+   "availableQty": 5
+  },
+  {
+   "id": "<product Canvas shoes>",
+   "storeId": "<store>",
+   "name": "Canvas shoes",
+   "nameAr": null,
+   "slug": "golden-1-<run>",
+   "description": null,
+   "descriptionAr": null,
+   "excerpt": null,
+   "excerptAr": null,
+   "price": 2000,
+   "compareAtPrice": null,
+   "discountType": null,
+   "discountValue": null,
+   "sku": null,
+   "inventory": 3,
+   "allowBackorder": false,
+   "status": "active",
+   "metaDescription": null,
+   "metaDescriptionAr": null,
+   "metaDescriptionAeo": null,
+   "metaDescriptionAeoAr": null,
+   "isNew": false,
+   "badgeLabel": null,
+   "badgeLabelAr": null,
+   "facts": [],
+   "leadTimeDays": null,
+   "personalisation": null,
+   "updatedAt": "<ts>",
+   "createdAt": "2026-01-02T00:00:00.000Z",
+   "images": [],
+   "categories": [],
+   "options": [
+    {
+     "name": "Size",
+     "nameAr": null,
+     "_count": {
+      "values": 0
+     },
+     "values": []
+    }
+   ],
+   "store": {
+    "id": "<store>",
+    "name": "golden",
+    "slug": "golden-<run>"
+   },
+   "variants": [
+    {
+     "id": "<id 2>",
+     "price": 2100,
+     "compareAtPrice": null,
+     "inventory": 3,
+     "allowBackorder": false,
+     "inStock": true,
+     "lowStock": true,
+     "acceptsBackorder": false,
+     "availableQty": 3
+    }
+   ],
+   "inStock": true,
+   "lowStock": true,
+   "acceptsBackorder": false,
+   "availableQty": 3
+  },
+  {
+   "id": "<product Leather shoes>",
+   "storeId": "<store>",
+   "name": "Leather shoes",
+   "nameAr": "احذية جلد",
+   "slug": "golden-0-<run>",
+   "description": null,
+   "descriptionAr": null,
+   "excerpt": null,
+   "excerptAr": null,
+   "price": 3000,
+   "compareAtPrice": null,
+   "discountType": null,
+   "discountValue": null,
+   "sku": null,
+   "inventory": 5,
+   "allowBackorder": false,
+   "status": "active",
+   "metaDescription": null,
+   "metaDescriptionAr": null,
+   "metaDescriptionAeo": null,
+   "metaDescriptionAeoAr": null,
+   "isNew": true,
+   "badgeLabel": null,
+   "badgeLabelAr": null,
+   "facts": [],
+   "leadTimeDays": null,
+   "personalisation": null,
+   "updatedAt": "<ts>",
+   "createdAt": "2026-01-01T00:00:00.000Z",
+   "images": [
+    {
+     "id": "<id 3>",
+     "productId": "<product Leather shoes>",
+     "url": "https://example.test/a.png",
+     "alt": null,
+     "position": 0,
+     "createdAt": "<ts>"
+    }
+   ],
+   "categories": [
+    {
+     "productId": "<product Leather shoes>",
+     "categoryId": "<id 1>",
+     "position": 10,
+     "category": {
+      "id": "<id 1>",
+      "storeId": "<store>",
+      "name": "Cat",
+      "nameAr": null,
+      "slug": "golden-cat-<run>",
+      "description": null,
+      "descriptionAr": null,
+      "image": null,
+      "parentId": null,
+      "position": 0,
+      "isActive": true,
+      "showOnHomeStrip": true,
+      "metaTitle": null,
+      "metaTitleAr": null,
+      "metaDescription": null,
+      "metaDescriptionAr": null,
+      "metaDescriptionAeo": null,
+      "metaDescriptionAeoAr": null,
+      "sizeChartId": null,
+      "createdAt": "<ts>",
+      "updatedAt": "<ts>",
+      "deletedAt": null
+     }
+    }
+   ],
+   "options": [],
+   "store": {
+    "id": "<store>",
+    "name": "golden",
+    "slug": "golden-<run>"
+   },
+   "variants": [],
+   "inStock": true,
+   "lowStock": true,
+   "acceptsBackorder": false,
+   "availableQty": 5
+  }
+ ],
+ "facets": [
+  {
+   "name": "Size",
+   "nameAr": null,
+   "values": [
+    {
+     "value": "S",
+     "valueAr": null
+    },
+    {
+     "value": "M",
+     "valueAr": null
+    }
+   ]
+  }
+ ],
+ "meta": {
+  "page": 1,
+  "limit": 20,
+  "total": 4,
+  "totalPages": 1
+ }
+}
+
+## search arabic
+{
+ "products": [
+  {
+   "id": "<product Leather shoes>",
+   "storeId": "<store>",
+   "name": "Leather shoes",
+   "nameAr": "احذية جلد",
+   "slug": "golden-0-<run>",
+   "description": null,
+   "descriptionAr": null,
+   "excerpt": null,
+   "excerptAr": null,
+   "price": 3000,
+   "compareAtPrice": null,
+   "discountType": null,
+   "discountValue": null,
+   "sku": null,
+   "inventory": 5,
+   "allowBackorder": false,
+   "status": "active",
+   "metaDescription": null,
+   "metaDescriptionAr": null,
+   "metaDescriptionAeo": null,
+   "metaDescriptionAeoAr": null,
+   "isNew": true,
+   "badgeLabel": null,
+   "badgeLabelAr": null,
+   "facts": [],
+   "leadTimeDays": null,
+   "personalisation": null,
+   "updatedAt": "<ts>",
+   "createdAt": "2026-01-01T00:00:00.000Z",
+   "images": [
+    {
+     "id": "<id 3>",
+     "productId": "<product Leather shoes>",
+     "url": "https://example.test/a.png",
+     "alt": null,
+     "position": 0,
+     "createdAt": "<ts>"
+    }
+   ],
+   "categories": [
+    {
+     "productId": "<product Leather shoes>",
+     "categoryId": "<id 1>",
+     "position": 10,
+     "category": {
+      "id": "<id 1>",
+      "storeId": "<store>",
+      "name": "Cat",
+      "nameAr": null,
+      "slug": "golden-cat-<run>",
+      "description": null,
+      "descriptionAr": null,
+      "image": null,
+      "parentId": null,
+      "position": 0,
+      "isActive": true,
+      "showOnHomeStrip": true,
+      "metaTitle": null,
+      "metaTitleAr": null,
+      "metaDescription": null,
+      "metaDescriptionAr": null,
+      "metaDescriptionAeo": null,
+      "metaDescriptionAeoAr": null,
+      "sizeChartId": null,
+      "createdAt": "<ts>",
+      "updatedAt": "<ts>",
+      "deletedAt": null
+     }
+    }
+   ],
+   "options": [],
+   "store": {
+    "id": "<store>",
+    "name": "golden",
+    "slug": "golden-<run>"
+   },
+   "variants": [],
+   "inStock": true,
+   "lowStock": true,
+   "acceptsBackorder": false,
+   "availableQty": 5
+  }
+ ],
+ "facets": [],
+ "meta": {
+  "page": 1,
+  "limit": 20,
+  "total": 1,
+  "totalPages": 1
+ }
+}
+
+## search no keyword match
+{
+ "products": [],
+ "facets": [],
+ "meta": {
+  "page": 1,
+  "limit": 20,
+  "total": 0,
+  "totalPages": 0
+ }
+}
+
+## search + category (merchant order)
+{
+ "products": [
+  {
+   "id": "<product Shoes bag>",
+   "storeId": "<store>",
+   "name": "Shoes bag",
+   "nameAr": null,
+   "slug": "golden-4-<run>",
+   "description": null,
+   "descriptionAr": null,
+   "excerpt": null,
+   "excerptAr": null,
+   "price": 700,
+   "compareAtPrice": null,
+   "discountType": null,
+   "discountValue": null,
+   "sku": null,
+   "inventory": 5,
+   "allowBackorder": false,
+   "status": "active",
+   "metaDescription": null,
+   "metaDescriptionAr": null,
+   "metaDescriptionAeo": null,
+   "metaDescriptionAeoAr": null,
+   "isNew": false,
+   "badgeLabel": null,
+   "badgeLabelAr": null,
+   "facts": [],
+   "leadTimeDays": null,
+   "personalisation": null,
+   "updatedAt": "<ts>",
+   "createdAt": "2026-01-02T00:00:00.000Z",
+   "images": [],
+   "categories": [
+    {
+     "productId": "<product Shoes bag>",
+     "categoryId": "<id 1>",
+     "position": 6,
+     "category": {
+      "id": "<id 1>",
+      "storeId": "<store>",
+      "name": "Cat",
+      "nameAr": null,
+      "slug": "golden-cat-<run>",
+      "description": null,
+      "descriptionAr": null,
+      "image": null,
+      "parentId": null,
+      "position": 0,
+      "isActive": true,
+      "showOnHomeStrip": true,
+      "metaTitle": null,
+      "metaTitleAr": null,
+      "metaDescription": null,
+      "metaDescriptionAr": null,
+      "metaDescriptionAeo": null,
+      "metaDescriptionAeoAr": null,
+      "sizeChartId": null,
+      "createdAt": "<ts>",
+      "updatedAt": "<ts>",
+      "deletedAt": null
+     }
+    }
+   ],
+   "options": [],
+   "store": {
+    "id": "<store>",
+    "name": "golden",
+    "slug": "golden-<run>"
+   },
+   "variants": [],
+   "inStock": true,
+   "lowStock": true,
+   "acceptsBackorder": false,
+   "availableQty": 5
+  },
+  {
+   "id": "<product Kids shoes>",
+   "storeId": "<store>",
+   "name": "Kids shoes",
+   "nameAr": null,
+   "slug": "golden-2-<run>",
+   "description": null,
+   "descriptionAr": null,
+   "excerpt": null,
+   "excerptAr": null,
+   "price": 1500,
+   "compareAtPrice": null,
+   "discountType": null,
+   "discountValue": null,
+   "sku": null,
+   "inventory": 5,
+   "allowBackorder": false,
+   "status": "active",
+   "metaDescription": null,
+   "metaDescriptionAr": null,
+   "metaDescriptionAeo": null,
+   "metaDescriptionAeoAr": null,
+   "isNew": false,
+   "badgeLabel": null,
+   "badgeLabelAr": null,
+   "facts": [],
+   "leadTimeDays": null,
+   "personalisation": null,
+   "updatedAt": "<ts>",
+   "createdAt": "2026-01-02T00:00:00.000Z",
+   "images": [],
+   "categories": [
+    {
+     "productId": "<product Kids shoes>",
+     "categoryId": "<id 1>",
+     "position": 8,
+     "category": {
+      "id": "<id 1>",
+      "storeId": "<store>",
+      "name": "Cat",
+      "nameAr": null,
+      "slug": "golden-cat-<run>",
+      "description": null,
+      "descriptionAr": null,
+      "image": null,
+      "parentId": null,
+      "position": 0,
+      "isActive": true,
+      "showOnHomeStrip": true,
+      "metaTitle": null,
+      "metaTitleAr": null,
+      "metaDescription": null,
+      "metaDescriptionAr": null,
+      "metaDescriptionAeo": null,
+      "metaDescriptionAeoAr": null,
+      "sizeChartId": null,
+      "createdAt": "<ts>",
+      "updatedAt": "<ts>",
+      "deletedAt": null
+     }
+    }
+   ],
+   "options": [],
+   "store": {
+    "id": "<store>",
+    "name": "golden",
+    "slug": "golden-<run>"
+   },
+   "variants": [],
+   "inStock": true,
+   "lowStock": true,
+   "acceptsBackorder": false,
+   "availableQty": 5
+  },
+  {
+   "id": "<product Leather shoes>",
+   "storeId": "<store>",
+   "name": "Leather shoes",
+   "nameAr": "احذية جلد",
+   "slug": "golden-0-<run>",
+   "description": null,
+   "descriptionAr": null,
+   "excerpt": null,
+   "excerptAr": null,
+   "price": 3000,
+   "compareAtPrice": null,
+   "discountType": null,
+   "discountValue": null,
+   "sku": null,
+   "inventory": 5,
+   "allowBackorder": false,
+   "status": "active",
+   "metaDescription": null,
+   "metaDescriptionAr": null,
+   "metaDescriptionAeo": null,
+   "metaDescriptionAeoAr": null,
+   "isNew": true,
+   "badgeLabel": null,
+   "badgeLabelAr": null,
+   "facts": [],
+   "leadTimeDays": null,
+   "personalisation": null,
+   "updatedAt": "<ts>",
+   "createdAt": "2026-01-01T00:00:00.000Z",
+   "images": [
+    {
+     "id": "<id 3>",
+     "productId": "<product Leather shoes>",
+     "url": "https://example.test/a.png",
+     "alt": null,
+     "position": 0,
+     "createdAt": "<ts>"
+    }
+   ],
+   "categories": [
+    {
+     "productId": "<product Leather shoes>",
+     "categoryId": "<id 1>",
+     "position": 10,
+     "category": {
+      "id": "<id 1>",
+      "storeId": "<store>",
+      "name": "Cat",
+      "nameAr": null,
+      "slug": "golden-cat-<run>",
+      "description": null,
+      "descriptionAr": null,
+      "image": null,
+      "parentId": null,
+      "position": 0,
+      "isActive": true,
+      "showOnHomeStrip": true,
+      "metaTitle": null,
+      "metaTitleAr": null,
+      "metaDescription": null,
+      "metaDescriptionAr": null,
+      "metaDescriptionAeo": null,
+      "metaDescriptionAeoAr": null,
+      "sizeChartId": null,
+      "createdAt": "<ts>",
+      "updatedAt": "<ts>",
+      "deletedAt": null
+     }
+    }
+   ],
+   "options": [],
+   "store": {
+    "id": "<store>",
+    "name": "golden",
+    "slug": "golden-<run>"
+   },
+   "variants": [],
+   "inStock": true,
+   "lowStock": true,
+   "acceptsBackorder": false,
+   "availableQty": 5
+  }
+ ],
+ "facets": [],
+ "meta": {
+  "page": 1,
+  "limit": 20,
+  "total": 3,
+  "totalPages": 1
+ }
+}
+
+## category (merchant order)
+{
+ "products": [
+  {
+   "id": "<product Shoes bag>",
+   "storeId": "<store>",
+   "name": "Shoes bag",
+   "nameAr": null,
+   "slug": "golden-4-<run>",
+   "description": null,
+   "descriptionAr": null,
+   "excerpt": null,
+   "excerptAr": null,
+   "price": 700,
+   "compareAtPrice": null,
+   "discountType": null,
+   "discountValue": null,
+   "sku": null,
+   "inventory": 5,
+   "allowBackorder": false,
+   "status": "active",
+   "metaDescription": null,
+   "metaDescriptionAr": null,
+   "metaDescriptionAeo": null,
+   "metaDescriptionAeoAr": null,
+   "isNew": false,
+   "badgeLabel": null,
+   "badgeLabelAr": null,
+   "facts": [],
+   "leadTimeDays": null,
+   "personalisation": null,
+   "updatedAt": "<ts>",
+   "createdAt": "2026-01-02T00:00:00.000Z",
+   "images": [],
+   "categories": [
+    {
+     "productId": "<product Shoes bag>",
+     "categoryId": "<id 1>",
+     "position": 6,
+     "category": {
+      "id": "<id 1>",
+      "storeId": "<store>",
+      "name": "Cat",
+      "nameAr": null,
+      "slug": "golden-cat-<run>",
+      "description": null,
+      "descriptionAr": null,
+      "image": null,
+      "parentId": null,
+      "position": 0,
+      "isActive": true,
+      "showOnHomeStrip": true,
+      "metaTitle": null,
+      "metaTitleAr": null,
+      "metaDescription": null,
+      "metaDescriptionAr": null,
+      "metaDescriptionAeo": null,
+      "metaDescriptionAeoAr": null,
+      "sizeChartId": null,
+      "createdAt": "<ts>",
+      "updatedAt": "<ts>",
+      "deletedAt": null
+     }
+    }
+   ],
+   "options": [],
+   "store": {
+    "id": "<store>",
+    "name": "golden",
+    "slug": "golden-<run>"
+   },
+   "variants": [],
+   "inStock": true,
+   "lowStock": true,
+   "acceptsBackorder": false,
+   "availableQty": 5
+  },
+  {
+   "id": "<product Kids shoes>",
+   "storeId": "<store>",
+   "name": "Kids shoes",
+   "nameAr": null,
+   "slug": "golden-2-<run>",
+   "description": null,
+   "descriptionAr": null,
+   "excerpt": null,
+   "excerptAr": null,
+   "price": 1500,
+   "compareAtPrice": null,
+   "discountType": null,
+   "discountValue": null,
+   "sku": null,
+   "inventory": 5,
+   "allowBackorder": false,
+   "status": "active",
+   "metaDescription": null,
+   "metaDescriptionAr": null,
+   "metaDescriptionAeo": null,
+   "metaDescriptionAeoAr": null,
+   "isNew": false,
+   "badgeLabel": null,
+   "badgeLabelAr": null,
+   "facts": [],
+   "leadTimeDays": null,
+   "personalisation": null,
+   "updatedAt": "<ts>",
+   "createdAt": "2026-01-02T00:00:00.000Z",
+   "images": [],
+   "categories": [
+    {
+     "productId": "<product Kids shoes>",
+     "categoryId": "<id 1>",
+     "position": 8,
+     "category": {
+      "id": "<id 1>",
+      "storeId": "<store>",
+      "name": "Cat",
+      "nameAr": null,
+      "slug": "golden-cat-<run>",
+      "description": null,
+      "descriptionAr": null,
+      "image": null,
+      "parentId": null,
+      "position": 0,
+      "isActive": true,
+      "showOnHomeStrip": true,
+      "metaTitle": null,
+      "metaTitleAr": null,
+      "metaDescription": null,
+      "metaDescriptionAr": null,
+      "metaDescriptionAeo": null,
+      "metaDescriptionAeoAr": null,
+      "sizeChartId": null,
+      "createdAt": "<ts>",
+      "updatedAt": "<ts>",
+      "deletedAt": null
+     }
+    }
+   ],
+   "options": [],
+   "store": {
+    "id": "<store>",
+    "name": "golden",
+    "slug": "golden-<run>"
+   },
+   "variants": [],
+   "inStock": true,
+   "lowStock": true,
+   "acceptsBackorder": false,
+   "availableQty": 5
+  },
+  {
+   "id": "<product Leather shoes>",
+   "storeId": "<store>",
+   "name": "Leather shoes",
+   "nameAr": "احذية جلد",
+   "slug": "golden-0-<run>",
+   "description": null,
+   "descriptionAr": null,
+   "excerpt": null,
+   "excerptAr": null,
+   "price": 3000,
+   "compareAtPrice": null,
+   "discountType": null,
+   "discountValue": null,
+   "sku": null,
+   "inventory": 5,
+   "allowBackorder": false,
+   "status": "active",
+   "metaDescription": null,
+   "metaDescriptionAr": null,
+   "metaDescriptionAeo": null,
+   "metaDescriptionAeoAr": null,
+   "isNew": true,
+   "badgeLabel": null,
+   "badgeLabelAr": null,
+   "facts": [],
+   "leadTimeDays": null,
+   "personalisation": null,
+   "updatedAt": "<ts>",
+   "createdAt": "2026-01-01T00:00:00.000Z",
+   "images": [
+    {
+     "id": "<id 3>",
+     "productId": "<product Leather shoes>",
+     "url": "https://example.test/a.png",
+     "alt": null,
+     "position": 0,
+     "createdAt": "<ts>"
+    }
+   ],
+   "categories": [
+    {
+     "productId": "<product Leather shoes>",
+     "categoryId": "<id 1>",
+     "position": 10,
+     "category": {
+      "id": "<id 1>",
+      "storeId": "<store>",
+      "name": "Cat",
+      "nameAr": null,
+      "slug": "golden-cat-<run>",
+      "description": null,
+      "descriptionAr": null,
+      "image": null,
+      "parentId": null,
+      "position": 0,
+      "isActive": true,
+      "showOnHomeStrip": true,
+      "metaTitle": null,
+      "metaTitleAr": null,
+      "metaDescription": null,
+      "metaDescriptionAr": null,
+      "metaDescriptionAeo": null,
+      "metaDescriptionAeoAr": null,
+      "sizeChartId": null,
+      "createdAt": "<ts>",
+      "updatedAt": "<ts>",
+      "deletedAt": null
+     }
+    }
+   ],
+   "options": [],
+   "store": {
+    "id": "<store>",
+    "name": "golden",
+    "slug": "golden-<run>"
+   },
+   "variants": [],
+   "inStock": true,
+   "lowStock": true,
+   "acceptsBackorder": false,
+   "availableQty": 5
+  }
+ ],
+ "facets": [],
+ "meta": {
+  "page": 1,
+  "limit": 20,
+  "total": 3,
+  "totalPages": 1
+ }
+}
+
+## search + price
+{
+ "products": [
+  {
+   "id": "<product Kids shoes>",
+   "storeId": "<store>",
+   "name": "Kids shoes",
+   "nameAr": null,
+   "slug": "golden-2-<run>",
+   "description": null,
+   "descriptionAr": null,
+   "excerpt": null,
+   "excerptAr": null,
+   "price": 1500,
+   "compareAtPrice": null,
+   "discountType": null,
+   "discountValue": null,
+   "sku": null,
+   "inventory": 5,
+   "allowBackorder": false,
+   "status": "active",
+   "metaDescription": null,
+   "metaDescriptionAr": null,
+   "metaDescriptionAeo": null,
+   "metaDescriptionAeoAr": null,
+   "isNew": false,
+   "badgeLabel": null,
+   "badgeLabelAr": null,
+   "facts": [],
+   "leadTimeDays": null,
+   "personalisation": null,
+   "updatedAt": "<ts>",
+   "createdAt": "2026-01-02T00:00:00.000Z",
+   "images": [],
+   "categories": [
+    {
+     "productId": "<product Kids shoes>",
+     "categoryId": "<id 1>",
+     "position": 8,
+     "category": {
+      "id": "<id 1>",
+      "storeId": "<store>",
+      "name": "Cat",
+      "nameAr": null,
+      "slug": "golden-cat-<run>",
+      "description": null,
+      "descriptionAr": null,
+      "image": null,
+      "parentId": null,
+      "position": 0,
+      "isActive": true,
+      "showOnHomeStrip": true,
+      "metaTitle": null,
+      "metaTitleAr": null,
+      "metaDescription": null,
+      "metaDescriptionAr": null,
+      "metaDescriptionAeo": null,
+      "metaDescriptionAeoAr": null,
+      "sizeChartId": null,
+      "createdAt": "<ts>",
+      "updatedAt": "<ts>",
+      "deletedAt": null
+     }
+    }
+   ],
+   "options": [],
+   "store": {
+    "id": "<store>",
+    "name": "golden",
+    "slug": "golden-<run>"
+   },
+   "variants": [],
+   "inStock": true,
+   "lowStock": true,
+   "acceptsBackorder": false,
+   "availableQty": 5
+  },
+  {
+   "id": "<product Canvas shoes>",
+   "storeId": "<store>",
+   "name": "Canvas shoes",
+   "nameAr": null,
+   "slug": "golden-1-<run>",
+   "description": null,
+   "descriptionAr": null,
+   "excerpt": null,
+   "excerptAr": null,
+   "price": 2000,
+   "compareAtPrice": null,
+   "discountType": null,
+   "discountValue": null,
+   "sku": null,
+   "inventory": 3,
+   "allowBackorder": false,
+   "status": "active",
+   "metaDescription": null,
+   "metaDescriptionAr": null,
+   "metaDescriptionAeo": null,
+   "metaDescriptionAeoAr": null,
+   "isNew": false,
+   "badgeLabel": null,
+   "badgeLabelAr": null,
+   "facts": [],
+   "leadTimeDays": null,
+   "personalisation": null,
+   "updatedAt": "<ts>",
+   "createdAt": "2026-01-02T00:00:00.000Z",
+   "images": [],
+   "categories": [],
+   "options": [
+    {
+     "name": "Size",
+     "nameAr": null,
+     "_count": {
+      "values": 0
+     },
+     "values": []
+    }
+   ],
+   "store": {
+    "id": "<store>",
+    "name": "golden",
+    "slug": "golden-<run>"
+   },
+   "variants": [
+    {
+     "id": "<id 2>",
+     "price": 2100,
+     "compareAtPrice": null,
+     "inventory": 3,
+     "allowBackorder": false,
+     "inStock": true,
+     "lowStock": true,
+     "acceptsBackorder": false,
+     "availableQty": 3
+    }
+   ],
+   "inStock": true,
+   "lowStock": true,
+   "acceptsBackorder": false,
+   "availableQty": 3
+  }
+ ],
+ "facets": [
+  {
+   "name": "Size",
+   "nameAr": null,
+   "values": [
+    {
+     "value": "S",
+     "valueAr": null
+    },
+    {
+     "value": "M",
+     "valueAr": null
+    }
+   ]
+  }
+ ],
+ "meta": {
+  "page": 1,
+  "limit": 20,
+  "total": 2,
+  "totalPages": 1
+ }
+}
+
+## search + featured
+{
+ "products": [
+  {
+   "id": "<product Shoes bag>",
+   "storeId": "<store>",
+   "name": "Shoes bag",
+   "nameAr": null,
+   "slug": "golden-4-<run>",
+   "description": null,
+   "descriptionAr": null,
+   "excerpt": null,
+   "excerptAr": null,
+   "price": 700,
+   "compareAtPrice": null,
+   "discountType": null,
+   "discountValue": null,
+   "sku": null,
+   "inventory": 5,
+   "allowBackorder": false,
+   "status": "active",
+   "metaDescription": null,
+   "metaDescriptionAr": null,
+   "metaDescriptionAeo": null,
+   "metaDescriptionAeoAr": null,
+   "isNew": false,
+   "badgeLabel": null,
+   "badgeLabelAr": null,
+   "facts": [],
+   "leadTimeDays": null,
+   "personalisation": null,
+   "updatedAt": "<ts>",
+   "createdAt": "2026-01-02T00:00:00.000Z",
+   "images": [],
+   "categories": [
+    {
+     "productId": "<product Shoes bag>",
+     "categoryId": "<id 1>",
+     "position": 6,
+     "category": {
+      "id": "<id 1>",
+      "storeId": "<store>",
+      "name": "Cat",
+      "nameAr": null,
+      "slug": "golden-cat-<run>",
+      "description": null,
+      "descriptionAr": null,
+      "image": null,
+      "parentId": null,
+      "position": 0,
+      "isActive": true,
+      "showOnHomeStrip": true,
+      "metaTitle": null,
+      "metaTitleAr": null,
+      "metaDescription": null,
+      "metaDescriptionAr": null,
+      "metaDescriptionAeo": null,
+      "metaDescriptionAeoAr": null,
+      "sizeChartId": null,
+      "createdAt": "<ts>",
+      "updatedAt": "<ts>",
+      "deletedAt": null
+     }
+    }
+   ],
+   "options": [],
+   "store": {
+    "id": "<store>",
+    "name": "golden",
+    "slug": "golden-<run>"
+   },
+   "variants": [],
+   "inStock": true,
+   "lowStock": true,
+   "acceptsBackorder": false,
+   "availableQty": 5
+  },
+  {
+   "id": "<product Leather shoes>",
+   "storeId": "<store>",
+   "name": "Leather shoes",
+   "nameAr": "احذية جلد",
+   "slug": "golden-0-<run>",
+   "description": null,
+   "descriptionAr": null,
+   "excerpt": null,
+   "excerptAr": null,
+   "price": 3000,
+   "compareAtPrice": null,
+   "discountType": null,
+   "discountValue": null,
+   "sku": null,
+   "inventory": 5,
+   "allowBackorder": false,
+   "status": "active",
+   "metaDescription": null,
+   "metaDescriptionAr": null,
+   "metaDescriptionAeo": null,
+   "metaDescriptionAeoAr": null,
+   "isNew": true,
+   "badgeLabel": null,
+   "badgeLabelAr": null,
+   "facts": [],
+   "leadTimeDays": null,
+   "personalisation": null,
+   "updatedAt": "<ts>",
+   "createdAt": "2026-01-01T00:00:00.000Z",
+   "images": [
+    {
+     "id": "<id 3>",
+     "productId": "<product Leather shoes>",
+     "url": "https://example.test/a.png",
+     "alt": null,
+     "position": 0,
+     "createdAt": "<ts>"
+    }
+   ],
+   "categories": [
+    {
+     "productId": "<product Leather shoes>",
+     "categoryId": "<id 1>",
+     "position": 10,
+     "category": {
+      "id": "<id 1>",
+      "storeId": "<store>",
+      "name": "Cat",
+      "nameAr": null,
+      "slug": "golden-cat-<run>",
+      "description": null,
+      "descriptionAr": null,
+      "image": null,
+      "parentId": null,
+      "position": 0,
+      "isActive": true,
+      "showOnHomeStrip": true,
+      "metaTitle": null,
+      "metaTitleAr": null,
+      "metaDescription": null,
+      "metaDescriptionAr": null,
+      "metaDescriptionAeo": null,
+      "metaDescriptionAeoAr": null,
+      "sizeChartId": null,
+      "createdAt": "<ts>",
+      "updatedAt": "<ts>",
+      "deletedAt": null
+     }
+    }
+   ],
+   "options": [],
+   "store": {
+    "id": "<store>",
+    "name": "golden",
+    "slug": "golden-<run>"
+   },
+   "variants": [],
+   "inStock": true,
+   "lowStock": true,
+   "acceptsBackorder": false,
+   "availableQty": 5
+  }
+ ],
+ "facets": [],
+ "meta": {
+  "page": 1,
+  "limit": 20,
+  "total": 2,
+  "totalPages": 1
+ }
+}
+
+## search + not featured
+{
+ "products": [
+  {
+   "id": "<product Kids shoes>",
+   "storeId": "<store>",
+   "name": "Kids shoes",
+   "nameAr": null,
+   "slug": "golden-2-<run>",
+   "description": null,
+   "descriptionAr": null,
+   "excerpt": null,
+   "excerptAr": null,
+   "price": 1500,
+   "compareAtPrice": null,
+   "discountType": null,
+   "discountValue": null,
+   "sku": null,
+   "inventory": 5,
+   "allowBackorder": false,
+   "status": "active",
+   "metaDescription": null,
+   "metaDescriptionAr": null,
+   "metaDescriptionAeo": null,
+   "metaDescriptionAeoAr": null,
+   "isNew": false,
+   "badgeLabel": null,
+   "badgeLabelAr": null,
+   "facts": [],
+   "leadTimeDays": null,
+   "personalisation": null,
+   "updatedAt": "<ts>",
+   "createdAt": "2026-01-02T00:00:00.000Z",
+   "images": [],
+   "categories": [
+    {
+     "productId": "<product Kids shoes>",
+     "categoryId": "<id 1>",
+     "position": 8,
+     "category": {
+      "id": "<id 1>",
+      "storeId": "<store>",
+      "name": "Cat",
+      "nameAr": null,
+      "slug": "golden-cat-<run>",
+      "description": null,
+      "descriptionAr": null,
+      "image": null,
+      "parentId": null,
+      "position": 0,
+      "isActive": true,
+      "showOnHomeStrip": true,
+      "metaTitle": null,
+      "metaTitleAr": null,
+      "metaDescription": null,
+      "metaDescriptionAr": null,
+      "metaDescriptionAeo": null,
+      "metaDescriptionAeoAr": null,
+      "sizeChartId": null,
+      "createdAt": "<ts>",
+      "updatedAt": "<ts>",
+      "deletedAt": null
+     }
+    }
+   ],
+   "options": [],
+   "store": {
+    "id": "<store>",
+    "name": "golden",
+    "slug": "golden-<run>"
+   },
+   "variants": [],
+   "inStock": true,
+   "lowStock": true,
+   "acceptsBackorder": false,
+   "availableQty": 5
+  },
+  {
+   "id": "<product Canvas shoes>",
+   "storeId": "<store>",
+   "name": "Canvas shoes",
+   "nameAr": null,
+   "slug": "golden-1-<run>",
+   "description": null,
+   "descriptionAr": null,
+   "excerpt": null,
+   "excerptAr": null,
+   "price": 2000,
+   "compareAtPrice": null,
+   "discountType": null,
+   "discountValue": null,
+   "sku": null,
+   "inventory": 3,
+   "allowBackorder": false,
+   "status": "active",
+   "metaDescription": null,
+   "metaDescriptionAr": null,
+   "metaDescriptionAeo": null,
+   "metaDescriptionAeoAr": null,
+   "isNew": false,
+   "badgeLabel": null,
+   "badgeLabelAr": null,
+   "facts": [],
+   "leadTimeDays": null,
+   "personalisation": null,
+   "updatedAt": "<ts>",
+   "createdAt": "2026-01-02T00:00:00.000Z",
+   "images": [],
+   "categories": [],
+   "options": [
+    {
+     "name": "Size",
+     "nameAr": null,
+     "_count": {
+      "values": 0
+     },
+     "values": []
+    }
+   ],
+   "store": {
+    "id": "<store>",
+    "name": "golden",
+    "slug": "golden-<run>"
+   },
+   "variants": [
+    {
+     "id": "<id 2>",
+     "price": 2100,
+     "compareAtPrice": null,
+     "inventory": 3,
+     "allowBackorder": false,
+     "inStock": true,
+     "lowStock": true,
+     "acceptsBackorder": false,
+     "availableQty": 3
+    }
+   ],
+   "inStock": true,
+   "lowStock": true,
+   "acceptsBackorder": false,
+   "availableQty": 3
+  }
+ ],
+ "facets": [
+  {
+   "name": "Size",
+   "nameAr": null,
+   "values": [
+    {
+     "value": "S",
+     "valueAr": null
+    },
+    {
+     "value": "M",
+     "valueAr": null
+    }
+   ]
+  }
+ ],
+ "meta": {
+  "page": 1,
+  "limit": 20,
+  "total": 2,
+  "totalPages": 1
+ }
+}
+
+## search page 2 of 1
+{
+ "products": [
+  {
+   "id": "<product Kids shoes>",
+   "storeId": "<store>",
+   "name": "Kids shoes",
+   "nameAr": null,
+   "slug": "golden-2-<run>",
+   "description": null,
+   "descriptionAr": null,
+   "excerpt": null,
+   "excerptAr": null,
+   "price": 1500,
+   "compareAtPrice": null,
+   "discountType": null,
+   "discountValue": null,
+   "sku": null,
+   "inventory": 5,
+   "allowBackorder": false,
+   "status": "active",
+   "metaDescription": null,
+   "metaDescriptionAr": null,
+   "metaDescriptionAeo": null,
+   "metaDescriptionAeoAr": null,
+   "isNew": false,
+   "badgeLabel": null,
+   "badgeLabelAr": null,
+   "facts": [],
+   "leadTimeDays": null,
+   "personalisation": null,
+   "updatedAt": "<ts>",
+   "createdAt": "2026-01-02T00:00:00.000Z",
+   "images": [],
+   "categories": [
+    {
+     "productId": "<product Kids shoes>",
+     "categoryId": "<id 1>",
+     "position": 8,
+     "category": {
+      "id": "<id 1>",
+      "storeId": "<store>",
+      "name": "Cat",
+      "nameAr": null,
+      "slug": "golden-cat-<run>",
+      "description": null,
+      "descriptionAr": null,
+      "image": null,
+      "parentId": null,
+      "position": 0,
+      "isActive": true,
+      "showOnHomeStrip": true,
+      "metaTitle": null,
+      "metaTitleAr": null,
+      "metaDescription": null,
+      "metaDescriptionAr": null,
+      "metaDescriptionAeo": null,
+      "metaDescriptionAeoAr": null,
+      "sizeChartId": null,
+      "createdAt": "<ts>",
+      "updatedAt": "<ts>",
+      "deletedAt": null
+     }
+    }
+   ],
+   "options": [],
+   "store": {
+    "id": "<store>",
+    "name": "golden",
+    "slug": "golden-<run>"
+   },
+   "variants": [],
+   "inStock": true,
+   "lowStock": true,
+   "acceptsBackorder": false,
+   "availableQty": 5
+  }
+ ],
+ "facets": [
+  {
+   "name": "Size",
+   "nameAr": null,
+   "values": [
+    {
+     "value": "S",
+     "valueAr": null
+    },
+    {
+     "value": "M",
+     "valueAr": null
+    }
+   ]
+  }
+ ],
+ "meta": {
+  "page": 2,
+  "limit": 1,
+  "total": 4,
+  "totalPages": 4
+ }
+}
+
+## search cursor
+{
+ "products": [
+  {
+   "id": "<product Leather shoes>",
+   "storeId": "<store>",
+   "name": "Leather shoes",
+   "nameAr": "احذية جلد",
+   "slug": "golden-0-<run>",
+   "description": null,
+   "descriptionAr": null,
+   "excerpt": null,
+   "excerptAr": null,
+   "price": 3000,
+   "compareAtPrice": null,
+   "discountType": null,
+   "discountValue": null,
+   "sku": null,
+   "inventory": 5,
+   "allowBackorder": false,
+   "status": "active",
+   "metaDescription": null,
+   "metaDescriptionAr": null,
+   "metaDescriptionAeo": null,
+   "metaDescriptionAeoAr": null,
+   "isNew": true,
+   "badgeLabel": null,
+   "badgeLabelAr": null,
+   "facts": [],
+   "leadTimeDays": null,
+   "personalisation": null,
+   "updatedAt": "<ts>",
+   "createdAt": "2026-01-01T00:00:00.000Z",
+   "images": [
+    {
+     "id": "<id 3>",
+     "productId": "<product Leather shoes>",
+     "url": "https://example.test/a.png",
+     "alt": null,
+     "position": 0,
+     "createdAt": "<ts>"
+    }
+   ],
+   "categories": [
+    {
+     "productId": "<product Leather shoes>",
+     "categoryId": "<id 1>",
+     "position": 10,
+     "category": {
+      "id": "<id 1>",
+      "storeId": "<store>",
+      "name": "Cat",
+      "nameAr": null,
+      "slug": "golden-cat-<run>",
+      "description": null,
+      "descriptionAr": null,
+      "image": null,
+      "parentId": null,
+      "position": 0,
+      "isActive": true,
+      "showOnHomeStrip": true,
+      "metaTitle": null,
+      "metaTitleAr": null,
+      "metaDescription": null,
+      "metaDescriptionAr": null,
+      "metaDescriptionAeo": null,
+      "metaDescriptionAeoAr": null,
+      "sizeChartId": null,
+      "createdAt": "<ts>",
+      "updatedAt": "<ts>",
+      "deletedAt": null
+     }
+    }
+   ],
+   "options": [],
+   "store": {
+    "id": "<store>",
+    "name": "golden",
+    "slug": "golden-<run>"
+   },
+   "variants": [],
+   "inStock": true,
+   "lowStock": true,
+   "acceptsBackorder": false,
+   "availableQty": 5
+  }
+ ],
+ "facets": [
+  {
+   "name": "Size",
+   "nameAr": null,
+   "values": [
+    {
+     "value": "S",
+     "valueAr": null
+    },
+    {
+     "value": "M",
+     "valueAr": null
+    }
+   ]
+  }
+ ],
+ "meta": {
+  "limit": 2,
+  "total": 4
+ }
+}
+
+## search + ids
+{
+ "products": [
+  {
+   "id": "<product Kids shoes>",
+   "storeId": "<store>",
+   "name": "Kids shoes",
+   "nameAr": null,
+   "slug": "golden-2-<run>",
+   "description": null,
+   "descriptionAr": null,
+   "excerpt": null,
+   "excerptAr": null,
+   "price": 1500,
+   "compareAtPrice": null,
+   "discountType": null,
+   "discountValue": null,
+   "sku": null,
+   "inventory": 5,
+   "allowBackorder": false,
+   "status": "active",
+   "metaDescription": null,
+   "metaDescriptionAr": null,
+   "metaDescriptionAeo": null,
+   "metaDescriptionAeoAr": null,
+   "isNew": false,
+   "badgeLabel": null,
+   "badgeLabelAr": null,
+   "facts": [],
+   "leadTimeDays": null,
+   "personalisation": null,
+   "updatedAt": "<ts>",
+   "createdAt": "2026-01-02T00:00:00.000Z",
+   "images": [],
+   "categories": [
+    {
+     "productId": "<product Kids shoes>",
+     "categoryId": "<id 1>",
+     "position": 8,
+     "category": {
+      "id": "<id 1>",
+      "storeId": "<store>",
+      "name": "Cat",
+      "nameAr": null,
+      "slug": "golden-cat-<run>",
+      "description": null,
+      "descriptionAr": null,
+      "image": null,
+      "parentId": null,
+      "position": 0,
+      "isActive": true,
+      "showOnHomeStrip": true,
+      "metaTitle": null,
+      "metaTitleAr": null,
+      "metaDescription": null,
+      "metaDescriptionAr": null,
+      "metaDescriptionAeo": null,
+      "metaDescriptionAeoAr": null,
+      "sizeChartId": null,
+      "createdAt": "<ts>",
+      "updatedAt": "<ts>",
+      "deletedAt": null
+     }
+    }
+   ],
+   "options": [],
+   "store": {
+    "id": "<store>",
+    "name": "golden",
+    "slug": "golden-<run>"
+   },
+   "variants": [],
+   "inStock": true,
+   "lowStock": true,
+   "acceptsBackorder": false,
+   "availableQty": 5
+  },
+  {
+   "id": "<product Leather shoes>",
+   "storeId": "<store>",
+   "name": "Leather shoes",
+   "nameAr": "احذية جلد",
+   "slug": "golden-0-<run>",
+   "description": null,
+   "descriptionAr": null,
+   "excerpt": null,
+   "excerptAr": null,
+   "price": 3000,
+   "compareAtPrice": null,
+   "discountType": null,
+   "discountValue": null,
+   "sku": null,
+   "inventory": 5,
+   "allowBackorder": false,
+   "status": "active",
+   "metaDescription": null,
+   "metaDescriptionAr": null,
+   "metaDescriptionAeo": null,
+   "metaDescriptionAeoAr": null,
+   "isNew": true,
+   "badgeLabel": null,
+   "badgeLabelAr": null,
+   "facts": [],
+   "leadTimeDays": null,
+   "personalisation": null,
+   "updatedAt": "<ts>",
+   "createdAt": "2026-01-01T00:00:00.000Z",
+   "images": [
+    {
+     "id": "<id 3>",
+     "productId": "<product Leather shoes>",
+     "url": "https://example.test/a.png",
+     "alt": null,
+     "position": 0,
+     "createdAt": "<ts>"
+    }
+   ],
+   "categories": [
+    {
+     "productId": "<product Leather shoes>",
+     "categoryId": "<id 1>",
+     "position": 10,
+     "category": {
+      "id": "<id 1>",
+      "storeId": "<store>",
+      "name": "Cat",
+      "nameAr": null,
+      "slug": "golden-cat-<run>",
+      "description": null,
+      "descriptionAr": null,
+      "image": null,
+      "parentId": null,
+      "position": 0,
+      "isActive": true,
+      "showOnHomeStrip": true,
+      "metaTitle": null,
+      "metaTitleAr": null,
+      "metaDescription": null,
+      "metaDescriptionAr": null,
+      "metaDescriptionAeo": null,
+      "metaDescriptionAeoAr": null,
+      "sizeChartId": null,
+      "createdAt": "<ts>",
+      "updatedAt": "<ts>",
+      "deletedAt": null
+     }
+    }
+   ],
+   "options": [],
+   "store": {
+    "id": "<store>",
+    "name": "golden",
+    "slug": "golden-<run>"
+   },
+   "variants": [],
+   "inStock": true,
+   "lowStock": true,
+   "acceptsBackorder": false,
+   "availableQty": 5
+  }
+ ],
+ "facets": [],
+ "meta": {
+  "page": 1,
+  "limit": 20,
+  "total": 2,
+  "totalPages": 1
+ }
+}
+
+## search + option facet
+{
+ "products": [
+  {
+   "id": "<product Canvas shoes>",
+   "storeId": "<store>",
+   "name": "Canvas shoes",
+   "nameAr": null,
+   "slug": "golden-1-<run>",
+   "description": null,
+   "descriptionAr": null,
+   "excerpt": null,
+   "excerptAr": null,
+   "price": 2000,
+   "compareAtPrice": null,
+   "discountType": null,
+   "discountValue": null,
+   "sku": null,
+   "inventory": 3,
+   "allowBackorder": false,
+   "status": "active",
+   "metaDescription": null,
+   "metaDescriptionAr": null,
+   "metaDescriptionAeo": null,
+   "metaDescriptionAeoAr": null,
+   "isNew": false,
+   "badgeLabel": null,
+   "badgeLabelAr": null,
+   "facts": [],
+   "leadTimeDays": null,
+   "personalisation": null,
+   "updatedAt": "<ts>",
+   "createdAt": "2026-01-02T00:00:00.000Z",
+   "images": [],
+   "categories": [],
+   "options": [
+    {
+     "name": "Size",
+     "nameAr": null,
+     "_count": {
+      "values": 0
+     },
+     "values": []
+    }
+   ],
+   "store": {
+    "id": "<store>",
+    "name": "golden",
+    "slug": "golden-<run>"
+   },
+   "variants": [
+    {
+     "id": "<id 2>",
+     "price": 2100,
+     "compareAtPrice": null,
+     "inventory": 3,
+     "allowBackorder": false,
+     "inStock": true,
+     "lowStock": true,
+     "acceptsBackorder": false,
+     "availableQty": 3
+    }
+   ],
+   "inStock": true,
+   "lowStock": true,
+   "acceptsBackorder": false,
+   "availableQty": 3
+  }
+ ],
+ "facets": [
+  {
+   "name": "Size",
+   "nameAr": null,
+   "values": [
+    {
+     "value": "S",
+     "valueAr": null
+    },
+    {
+     "value": "M",
+     "valueAr": null
+    }
+   ]
+  }
+ ],
+ "meta": {
+  "page": 1,
+  "limit": 20,
+  "total": 1,
+  "totalPages": 1
+ }
+}
+
+## search price_asc
+{
+ "products": [
+  {
+   "id": "<product Shoes bag>",
+   "storeId": "<store>",
+   "name": "Shoes bag",
+   "nameAr": null,
+   "slug": "golden-4-<run>",
+   "description": null,
+   "descriptionAr": null,
+   "excerpt": null,
+   "excerptAr": null,
+   "price": 700,
+   "compareAtPrice": null,
+   "discountType": null,
+   "discountValue": null,
+   "sku": null,
+   "inventory": 5,
+   "allowBackorder": false,
+   "status": "active",
+   "metaDescription": null,
+   "metaDescriptionAr": null,
+   "metaDescriptionAeo": null,
+   "metaDescriptionAeoAr": null,
+   "isNew": false,
+   "badgeLabel": null,
+   "badgeLabelAr": null,
+   "facts": [],
+   "leadTimeDays": null,
+   "personalisation": null,
+   "updatedAt": "<ts>",
+   "createdAt": "2026-01-02T00:00:00.000Z",
+   "images": [],
+   "categories": [
+    {
+     "productId": "<product Shoes bag>",
+     "categoryId": "<id 1>",
+     "position": 6,
+     "category": {
+      "id": "<id 1>",
+      "storeId": "<store>",
+      "name": "Cat",
+      "nameAr": null,
+      "slug": "golden-cat-<run>",
+      "description": null,
+      "descriptionAr": null,
+      "image": null,
+      "parentId": null,
+      "position": 0,
+      "isActive": true,
+      "showOnHomeStrip": true,
+      "metaTitle": null,
+      "metaTitleAr": null,
+      "metaDescription": null,
+      "metaDescriptionAr": null,
+      "metaDescriptionAeo": null,
+      "metaDescriptionAeoAr": null,
+      "sizeChartId": null,
+      "createdAt": "<ts>",
+      "updatedAt": "<ts>",
+      "deletedAt": null
+     }
+    }
+   ],
+   "options": [],
+   "store": {
+    "id": "<store>",
+    "name": "golden",
+    "slug": "golden-<run>"
+   },
+   "variants": [],
+   "inStock": true,
+   "lowStock": true,
+   "acceptsBackorder": false,
+   "availableQty": 5
+  },
+  {
+   "id": "<product Kids shoes>",
+   "storeId": "<store>",
+   "name": "Kids shoes",
+   "nameAr": null,
+   "slug": "golden-2-<run>",
+   "description": null,
+   "descriptionAr": null,
+   "excerpt": null,
+   "excerptAr": null,
+   "price": 1500,
+   "compareAtPrice": null,
+   "discountType": null,
+   "discountValue": null,
+   "sku": null,
+   "inventory": 5,
+   "allowBackorder": false,
+   "status": "active",
+   "metaDescription": null,
+   "metaDescriptionAr": null,
+   "metaDescriptionAeo": null,
+   "metaDescriptionAeoAr": null,
+   "isNew": false,
+   "badgeLabel": null,
+   "badgeLabelAr": null,
+   "facts": [],
+   "leadTimeDays": null,
+   "personalisation": null,
+   "updatedAt": "<ts>",
+   "createdAt": "2026-01-02T00:00:00.000Z",
+   "images": [],
+   "categories": [
+    {
+     "productId": "<product Kids shoes>",
+     "categoryId": "<id 1>",
+     "position": 8,
+     "category": {
+      "id": "<id 1>",
+      "storeId": "<store>",
+      "name": "Cat",
+      "nameAr": null,
+      "slug": "golden-cat-<run>",
+      "description": null,
+      "descriptionAr": null,
+      "image": null,
+      "parentId": null,
+      "position": 0,
+      "isActive": true,
+      "showOnHomeStrip": true,
+      "metaTitle": null,
+      "metaTitleAr": null,
+      "metaDescription": null,
+      "metaDescriptionAr": null,
+      "metaDescriptionAeo": null,
+      "metaDescriptionAeoAr": null,
+      "sizeChartId": null,
+      "createdAt": "<ts>",
+      "updatedAt": "<ts>",
+      "deletedAt": null
+     }
+    }
+   ],
+   "options": [],
+   "store": {
+    "id": "<store>",
+    "name": "golden",
+    "slug": "golden-<run>"
+   },
+   "variants": [],
+   "inStock": true,
+   "lowStock": true,
+   "acceptsBackorder": false,
+   "availableQty": 5
+  },
+  {
+   "id": "<product Canvas shoes>",
+   "storeId": "<store>",
+   "name": "Canvas shoes",
+   "nameAr": null,
+   "slug": "golden-1-<run>",
+   "description": null,
+   "descriptionAr": null,
+   "excerpt": null,
+   "excerptAr": null,
+   "price": 2000,
+   "compareAtPrice": null,
+   "discountType": null,
+   "discountValue": null,
+   "sku": null,
+   "inventory": 3,
+   "allowBackorder": false,
+   "status": "active",
+   "metaDescription": null,
+   "metaDescriptionAr": null,
+   "metaDescriptionAeo": null,
+   "metaDescriptionAeoAr": null,
+   "isNew": false,
+   "badgeLabel": null,
+   "badgeLabelAr": null,
+   "facts": [],
+   "leadTimeDays": null,
+   "personalisation": null,
+   "updatedAt": "<ts>",
+   "createdAt": "2026-01-02T00:00:00.000Z",
+   "images": [],
+   "categories": [],
+   "options": [
+    {
+     "name": "Size",
+     "nameAr": null,
+     "_count": {
+      "values": 0
+     },
+     "values": []
+    }
+   ],
+   "store": {
+    "id": "<store>",
+    "name": "golden",
+    "slug": "golden-<run>"
+   },
+   "variants": [
+    {
+     "id": "<id 2>",
+     "price": 2100,
+     "compareAtPrice": null,
+     "inventory": 3,
+     "allowBackorder": false,
+     "inStock": true,
+     "lowStock": true,
+     "acceptsBackorder": false,
+     "availableQty": 3
+    }
+   ],
+   "inStock": true,
+   "lowStock": true,
+   "acceptsBackorder": false,
+   "availableQty": 3
+  },
+  {
+   "id": "<product Leather shoes>",
+   "storeId": "<store>",
+   "name": "Leather shoes",
+   "nameAr": "احذية جلد",
+   "slug": "golden-0-<run>",
+   "description": null,
+   "descriptionAr": null,
+   "excerpt": null,
+   "excerptAr": null,
+   "price": 3000,
+   "compareAtPrice": null,
+   "discountType": null,
+   "discountValue": null,
+   "sku": null,
+   "inventory": 5,
+   "allowBackorder": false,
+   "status": "active",
+   "metaDescription": null,
+   "metaDescriptionAr": null,
+   "metaDescriptionAeo": null,
+   "metaDescriptionAeoAr": null,
+   "isNew": true,
+   "badgeLabel": null,
+   "badgeLabelAr": null,
+   "facts": [],
+   "leadTimeDays": null,
+   "personalisation": null,
+   "updatedAt": "<ts>",
+   "createdAt": "2026-01-01T00:00:00.000Z",
+   "images": [
+    {
+     "id": "<id 3>",
+     "productId": "<product Leather shoes>",
+     "url": "https://example.test/a.png",
+     "alt": null,
+     "position": 0,
+     "createdAt": "<ts>"
+    }
+   ],
+   "categories": [
+    {
+     "productId": "<product Leather shoes>",
+     "categoryId": "<id 1>",
+     "position": 10,
+     "category": {
+      "id": "<id 1>",
+      "storeId": "<store>",
+      "name": "Cat",
+      "nameAr": null,
+      "slug": "golden-cat-<run>",
+      "description": null,
+      "descriptionAr": null,
+      "image": null,
+      "parentId": null,
+      "position": 0,
+      "isActive": true,
+      "showOnHomeStrip": true,
+      "metaTitle": null,
+      "metaTitleAr": null,
+      "metaDescription": null,
+      "metaDescriptionAr": null,
+      "metaDescriptionAeo": null,
+      "metaDescriptionAeoAr": null,
+      "sizeChartId": null,
+      "createdAt": "<ts>",
+      "updatedAt": "<ts>",
+      "deletedAt": null
+     }
+    }
+   ],
+   "options": [],
+   "store": {
+    "id": "<store>",
+    "name": "golden",
+    "slug": "golden-<run>"
+   },
+   "variants": [],
+   "inStock": true,
+   "lowStock": true,
+   "acceptsBackorder": false,
+   "availableQty": 5
+  }
+ ],
+ "facets": [
+  {
+   "name": "Size",
+   "nameAr": null,
+   "values": [
+    {
+     "value": "S",
+     "valueAr": null
+    },
+    {
+     "value": "M",
+     "valueAr": null
+    }
+   ]
+  }
+ ],
+ "meta": {
+  "page": 1,
+  "limit": 20,
+  "total": 4,
+  "totalPages": 1
+ }
+}
+
+## search price_desc
+{
+ "products": [
+  {
+   "id": "<product Leather shoes>",
+   "storeId": "<store>",
+   "name": "Leather shoes",
+   "nameAr": "احذية جلد",
+   "slug": "golden-0-<run>",
+   "description": null,
+   "descriptionAr": null,
+   "excerpt": null,
+   "excerptAr": null,
+   "price": 3000,
+   "compareAtPrice": null,
+   "discountType": null,
+   "discountValue": null,
+   "sku": null,
+   "inventory": 5,
+   "allowBackorder": false,
+   "status": "active",
+   "metaDescription": null,
+   "metaDescriptionAr": null,
+   "metaDescriptionAeo": null,
+   "metaDescriptionAeoAr": null,
+   "isNew": true,
+   "badgeLabel": null,
+   "badgeLabelAr": null,
+   "facts": [],
+   "leadTimeDays": null,
+   "personalisation": null,
+   "updatedAt": "<ts>",
+   "createdAt": "2026-01-01T00:00:00.000Z",
+   "images": [
+    {
+     "id": "<id 3>",
+     "productId": "<product Leather shoes>",
+     "url": "https://example.test/a.png",
+     "alt": null,
+     "position": 0,
+     "createdAt": "<ts>"
+    }
+   ],
+   "categories": [
+    {
+     "productId": "<product Leather shoes>",
+     "categoryId": "<id 1>",
+     "position": 10,
+     "category": {
+      "id": "<id 1>",
+      "storeId": "<store>",
+      "name": "Cat",
+      "nameAr": null,
+      "slug": "golden-cat-<run>",
+      "description": null,
+      "descriptionAr": null,
+      "image": null,
+      "parentId": null,
+      "position": 0,
+      "isActive": true,
+      "showOnHomeStrip": true,
+      "metaTitle": null,
+      "metaTitleAr": null,
+      "metaDescription": null,
+      "metaDescriptionAr": null,
+      "metaDescriptionAeo": null,
+      "metaDescriptionAeoAr": null,
+      "sizeChartId": null,
+      "createdAt": "<ts>",
+      "updatedAt": "<ts>",
+      "deletedAt": null
+     }
+    }
+   ],
+   "options": [],
+   "store": {
+    "id": "<store>",
+    "name": "golden",
+    "slug": "golden-<run>"
+   },
+   "variants": [],
+   "inStock": true,
+   "lowStock": true,
+   "acceptsBackorder": false,
+   "availableQty": 5
+  },
+  {
+   "id": "<product Canvas shoes>",
+   "storeId": "<store>",
+   "name": "Canvas shoes",
+   "nameAr": null,
+   "slug": "golden-1-<run>",
+   "description": null,
+   "descriptionAr": null,
+   "excerpt": null,
+   "excerptAr": null,
+   "price": 2000,
+   "compareAtPrice": null,
+   "discountType": null,
+   "discountValue": null,
+   "sku": null,
+   "inventory": 3,
+   "allowBackorder": false,
+   "status": "active",
+   "metaDescription": null,
+   "metaDescriptionAr": null,
+   "metaDescriptionAeo": null,
+   "metaDescriptionAeoAr": null,
+   "isNew": false,
+   "badgeLabel": null,
+   "badgeLabelAr": null,
+   "facts": [],
+   "leadTimeDays": null,
+   "personalisation": null,
+   "updatedAt": "<ts>",
+   "createdAt": "2026-01-02T00:00:00.000Z",
+   "images": [],
+   "categories": [],
+   "options": [
+    {
+     "name": "Size",
+     "nameAr": null,
+     "_count": {
+      "values": 0
+     },
+     "values": []
+    }
+   ],
+   "store": {
+    "id": "<store>",
+    "name": "golden",
+    "slug": "golden-<run>"
+   },
+   "variants": [
+    {
+     "id": "<id 2>",
+     "price": 2100,
+     "compareAtPrice": null,
+     "inventory": 3,
+     "allowBackorder": false,
+     "inStock": true,
+     "lowStock": true,
+     "acceptsBackorder": false,
+     "availableQty": 3
+    }
+   ],
+   "inStock": true,
+   "lowStock": true,
+   "acceptsBackorder": false,
+   "availableQty": 3
+  },
+  {
+   "id": "<product Kids shoes>",
+   "storeId": "<store>",
+   "name": "Kids shoes",
+   "nameAr": null,
+   "slug": "golden-2-<run>",
+   "description": null,
+   "descriptionAr": null,
+   "excerpt": null,
+   "excerptAr": null,
+   "price": 1500,
+   "compareAtPrice": null,
+   "discountType": null,
+   "discountValue": null,
+   "sku": null,
+   "inventory": 5,
+   "allowBackorder": false,
+   "status": "active",
+   "metaDescription": null,
+   "metaDescriptionAr": null,
+   "metaDescriptionAeo": null,
+   "metaDescriptionAeoAr": null,
+   "isNew": false,
+   "badgeLabel": null,
+   "badgeLabelAr": null,
+   "facts": [],
+   "leadTimeDays": null,
+   "personalisation": null,
+   "updatedAt": "<ts>",
+   "createdAt": "2026-01-02T00:00:00.000Z",
+   "images": [],
+   "categories": [
+    {
+     "productId": "<product Kids shoes>",
+     "categoryId": "<id 1>",
+     "position": 8,
+     "category": {
+      "id": "<id 1>",
+      "storeId": "<store>",
+      "name": "Cat",
+      "nameAr": null,
+      "slug": "golden-cat-<run>",
+      "description": null,
+      "descriptionAr": null,
+      "image": null,
+      "parentId": null,
+      "position": 0,
+      "isActive": true,
+      "showOnHomeStrip": true,
+      "metaTitle": null,
+      "metaTitleAr": null,
+      "metaDescription": null,
+      "metaDescriptionAr": null,
+      "metaDescriptionAeo": null,
+      "metaDescriptionAeoAr": null,
+      "sizeChartId": null,
+      "createdAt": "<ts>",
+      "updatedAt": "<ts>",
+      "deletedAt": null
+     }
+    }
+   ],
+   "options": [],
+   "store": {
+    "id": "<store>",
+    "name": "golden",
+    "slug": "golden-<run>"
+   },
+   "variants": [],
+   "inStock": true,
+   "lowStock": true,
+   "acceptsBackorder": false,
+   "availableQty": 5
+  },
+  {
+   "id": "<product Shoes bag>",
+   "storeId": "<store>",
+   "name": "Shoes bag",
+   "nameAr": null,
+   "slug": "golden-4-<run>",
+   "description": null,
+   "descriptionAr": null,
+   "excerpt": null,
+   "excerptAr": null,
+   "price": 700,
+   "compareAtPrice": null,
+   "discountType": null,
+   "discountValue": null,
+   "sku": null,
+   "inventory": 5,
+   "allowBackorder": false,
+   "status": "active",
+   "metaDescription": null,
+   "metaDescriptionAr": null,
+   "metaDescriptionAeo": null,
+   "metaDescriptionAeoAr": null,
+   "isNew": false,
+   "badgeLabel": null,
+   "badgeLabelAr": null,
+   "facts": [],
+   "leadTimeDays": null,
+   "personalisation": null,
+   "updatedAt": "<ts>",
+   "createdAt": "2026-01-02T00:00:00.000Z",
+   "images": [],
+   "categories": [
+    {
+     "productId": "<product Shoes bag>",
+     "categoryId": "<id 1>",
+     "position": 6,
+     "category": {
+      "id": "<id 1>",
+      "storeId": "<store>",
+      "name": "Cat",
+      "nameAr": null,
+      "slug": "golden-cat-<run>",
+      "description": null,
+      "descriptionAr": null,
+      "image": null,
+      "parentId": null,
+      "position": 0,
+      "isActive": true,
+      "showOnHomeStrip": true,
+      "metaTitle": null,
+      "metaTitleAr": null,
+      "metaDescription": null,
+      "metaDescriptionAr": null,
+      "metaDescriptionAeo": null,
+      "metaDescriptionAeoAr": null,
+      "sizeChartId": null,
+      "createdAt": "<ts>",
+      "updatedAt": "<ts>",
+      "deletedAt": null
+     }
+    }
+   ],
+   "options": [],
+   "store": {
+    "id": "<store>",
+    "name": "golden",
+    "slug": "golden-<run>"
+   },
+   "variants": [],
+   "inStock": true,
+   "lowStock": true,
+   "acceptsBackorder": false,
+   "availableQty": 5
+  }
+ ],
+ "facets": [
+  {
+   "name": "Size",
+   "nameAr": null,
+   "values": [
+    {
+     "value": "S",
+     "valueAr": null
+    },
+    {
+     "value": "M",
+     "valueAr": null
+    }
+   ]
+  }
+ ],
+ "meta": {
+  "page": 1,
+  "limit": 20,
+  "total": 4,
+  "totalPages": 1
+ }
+}
+
+## search newest
+{
+ "products": [
+  {
+   "id": "<product Leather shoes>",
+   "storeId": "<store>",
+   "name": "Leather shoes",
+   "nameAr": "احذية جلد",
+   "slug": "golden-0-<run>",
+   "description": null,
+   "descriptionAr": null,
+   "excerpt": null,
+   "excerptAr": null,
+   "price": 3000,
+   "compareAtPrice": null,
+   "discountType": null,
+   "discountValue": null,
+   "sku": null,
+   "inventory": 5,
+   "allowBackorder": false,
+   "status": "active",
+   "metaDescription": null,
+   "metaDescriptionAr": null,
+   "metaDescriptionAeo": null,
+   "metaDescriptionAeoAr": null,
+   "isNew": true,
+   "badgeLabel": null,
+   "badgeLabelAr": null,
+   "facts": [],
+   "leadTimeDays": null,
+   "personalisation": null,
+   "updatedAt": "<ts>",
+   "createdAt": "2026-01-01T00:00:00.000Z",
+   "images": [
+    {
+     "id": "<id 3>",
+     "productId": "<product Leather shoes>",
+     "url": "https://example.test/a.png",
+     "alt": null,
+     "position": 0,
+     "createdAt": "<ts>"
+    }
+   ],
+   "categories": [
+    {
+     "productId": "<product Leather shoes>",
+     "categoryId": "<id 1>",
+     "position": 10,
+     "category": {
+      "id": "<id 1>",
+      "storeId": "<store>",
+      "name": "Cat",
+      "nameAr": null,
+      "slug": "golden-cat-<run>",
+      "description": null,
+      "descriptionAr": null,
+      "image": null,
+      "parentId": null,
+      "position": 0,
+      "isActive": true,
+      "showOnHomeStrip": true,
+      "metaTitle": null,
+      "metaTitleAr": null,
+      "metaDescription": null,
+      "metaDescriptionAr": null,
+      "metaDescriptionAeo": null,
+      "metaDescriptionAeoAr": null,
+      "sizeChartId": null,
+      "createdAt": "<ts>",
+      "updatedAt": "<ts>",
+      "deletedAt": null
+     }
+    }
+   ],
+   "options": [],
+   "store": {
+    "id": "<store>",
+    "name": "golden",
+    "slug": "golden-<run>"
+   },
+   "variants": [],
+   "inStock": true,
+   "lowStock": true,
+   "acceptsBackorder": false,
+   "availableQty": 5
+  }
+ ],
+ "facets": [
+  {
+   "name": "Size",
+   "nameAr": null,
+   "values": [
+    {
+     "value": "S",
+     "valueAr": null
+    },
+    {
+     "value": "M",
+     "valueAr": null
+    }
+   ]
+  }
+ ],
+ "meta": {
+  "page": 1,
+  "limit": 20,
+  "total": 1,
+  "totalPages": 1
+ }
+}
+
+## search best_seller
+{
+ "products": [
+  {
+   "id": "<product Canvas shoes>",
+   "storeId": "<store>",
+   "name": "Canvas shoes",
+   "nameAr": null,
+   "slug": "golden-1-<run>",
+   "description": null,
+   "descriptionAr": null,
+   "excerpt": null,
+   "excerptAr": null,
+   "price": 2000,
+   "compareAtPrice": null,
+   "discountType": null,
+   "discountValue": null,
+   "sku": null,
+   "inventory": 3,
+   "allowBackorder": false,
+   "status": "active",
+   "metaDescription": null,
+   "metaDescriptionAr": null,
+   "metaDescriptionAeo": null,
+   "metaDescriptionAeoAr": null,
+   "isNew": false,
+   "badgeLabel": null,
+   "badgeLabelAr": null,
+   "facts": [],
+   "leadTimeDays": null,
+   "personalisation": null,
+   "updatedAt": "<ts>",
+   "createdAt": "2026-01-02T00:00:00.000Z",
+   "images": [],
+   "categories": [],
+   "options": [
+    {
+     "name": "Size",
+     "nameAr": null,
+     "_count": {
+      "values": 0
+     },
+     "values": []
+    }
+   ],
+   "store": {
+    "id": "<store>",
+    "name": "golden",
+    "slug": "golden-<run>"
+   },
+   "variants": [
+    {
+     "id": "<id 2>",
+     "price": 2100,
+     "compareAtPrice": null,
+     "inventory": 3,
+     "allowBackorder": false,
+     "inStock": true,
+     "lowStock": true,
+     "acceptsBackorder": false,
+     "availableQty": 3
+    }
+   ],
+   "inStock": true,
+   "lowStock": true,
+   "acceptsBackorder": false,
+   "availableQty": 3
+  }
+ ],
+ "facets": [
+  {
+   "name": "Size",
+   "nameAr": null,
+   "values": [
+    {
+     "value": "S",
+     "valueAr": null
+    },
+    {
+     "value": "M",
+     "valueAr": null
+    }
+   ]
+  }
+ ],
+ "meta": {
+  "page": 1,
+  "limit": 20,
+  "total": 1,
+  "totalPages": 1
+ }
+}
+
+## price_asc page 2
+{
+ "products": [
+  {
+   "id": "<product Canvas shoes>",
+   "storeId": "<store>",
+   "name": "Canvas shoes",
+   "nameAr": null,
+   "slug": "golden-1-<run>",
+   "description": null,
+   "descriptionAr": null,
+   "excerpt": null,
+   "excerptAr": null,
+   "price": 2000,
+   "compareAtPrice": null,
+   "discountType": null,
+   "discountValue": null,
+   "sku": null,
+   "inventory": 3,
+   "allowBackorder": false,
+   "status": "active",
+   "metaDescription": null,
+   "metaDescriptionAr": null,
+   "metaDescriptionAeo": null,
+   "metaDescriptionAeoAr": null,
+   "isNew": false,
+   "badgeLabel": null,
+   "badgeLabelAr": null,
+   "facts": [],
+   "leadTimeDays": null,
+   "personalisation": null,
+   "updatedAt": "<ts>",
+   "createdAt": "2026-01-02T00:00:00.000Z",
+   "images": [],
+   "categories": [],
+   "options": [
+    {
+     "name": "Size",
+     "nameAr": null,
+     "_count": {
+      "values": 0
+     },
+     "values": []
+    }
+   ],
+   "store": {
+    "id": "<store>",
+    "name": "golden",
+    "slug": "golden-<run>"
+   },
+   "variants": [
+    {
+     "id": "<id 2>",
+     "price": 2100,
+     "compareAtPrice": null,
+     "inventory": 3,
+     "allowBackorder": false,
+     "inStock": true,
+     "lowStock": true,
+     "acceptsBackorder": false,
+     "availableQty": 3
+    }
+   ],
+   "inStock": true,
+   "lowStock": true,
+   "acceptsBackorder": false,
+   "availableQty": 3
+  },
+  {
+   "id": "<product Leather shoes>",
+   "storeId": "<store>",
+   "name": "Leather shoes",
+   "nameAr": "احذية جلد",
+   "slug": "golden-0-<run>",
+   "description": null,
+   "descriptionAr": null,
+   "excerpt": null,
+   "excerptAr": null,
+   "price": 3000,
+   "compareAtPrice": null,
+   "discountType": null,
+   "discountValue": null,
+   "sku": null,
+   "inventory": 5,
+   "allowBackorder": false,
+   "status": "active",
+   "metaDescription": null,
+   "metaDescriptionAr": null,
+   "metaDescriptionAeo": null,
+   "metaDescriptionAeoAr": null,
+   "isNew": true,
+   "badgeLabel": null,
+   "badgeLabelAr": null,
+   "facts": [],
+   "leadTimeDays": null,
+   "personalisation": null,
+   "updatedAt": "<ts>",
+   "createdAt": "2026-01-01T00:00:00.000Z",
+   "images": [
+    {
+     "id": "<id 3>",
+     "productId": "<product Leather shoes>",
+     "url": "https://example.test/a.png",
+     "alt": null,
+     "position": 0,
+     "createdAt": "<ts>"
+    }
+   ],
+   "categories": [
+    {
+     "productId": "<product Leather shoes>",
+     "categoryId": "<id 1>",
+     "position": 10,
+     "category": {
+      "id": "<id 1>",
+      "storeId": "<store>",
+      "name": "Cat",
+      "nameAr": null,
+      "slug": "golden-cat-<run>",
+      "description": null,
+      "descriptionAr": null,
+      "image": null,
+      "parentId": null,
+      "position": 0,
+      "isActive": true,
+      "showOnHomeStrip": true,
+      "metaTitle": null,
+      "metaTitleAr": null,
+      "metaDescription": null,
+      "metaDescriptionAr": null,
+      "metaDescriptionAeo": null,
+      "metaDescriptionAeoAr": null,
+      "sizeChartId": null,
+      "createdAt": "<ts>",
+      "updatedAt": "<ts>",
+      "deletedAt": null
+     }
+    }
+   ],
+   "options": [],
+   "store": {
+    "id": "<store>",
+    "name": "golden",
+    "slug": "golden-<run>"
+   },
+   "variants": [],
+   "inStock": true,
+   "lowStock": true,
+   "acceptsBackorder": false,
+   "availableQty": 5
+  },
+  {
+   "id": "<product Sport trainer>",
+   "storeId": "<store>",
+   "name": "Sport trainer",
+   "nameAr": "حذاء رياضي",
+   "slug": "golden-3-<run>",
+   "description": null,
+   "descriptionAr": null,
+   "excerpt": null,
+   "excerptAr": null,
+   "price": 5000,
+   "compareAtPrice": null,
+   "discountType": null,
+   "discountValue": null,
+   "sku": null,
+   "inventory": 5,
+   "allowBackorder": false,
+   "status": "active",
+   "metaDescription": null,
+   "metaDescriptionAr": null,
+   "metaDescriptionAeo": null,
+   "metaDescriptionAeoAr": null,
+   "isNew": false,
+   "badgeLabel": null,
+   "badgeLabelAr": null,
+   "facts": [],
+   "leadTimeDays": null,
+   "personalisation": null,
+   "updatedAt": "<ts>",
+   "createdAt": "2026-01-04T00:00:00.000Z",
+   "images": [],
+   "categories": [],
+   "options": [],
+   "store": {
+    "id": "<store>",
+    "name": "golden",
+    "slug": "golden-<run>"
+   },
+   "variants": [],
+   "inStock": true,
+   "lowStock": true,
+   "acceptsBackorder": false,
+   "availableQty": 5
+  }
+ ],
+ "facets": [
+  {
+   "name": "Size",
+   "nameAr": null,
+   "values": [
+    {
+     "value": "S",
+     "valueAr": null
+    },
+    {
+     "value": "M",
+     "valueAr": null
+    }
+   ]
+  }
+ ],
+ "meta": {
+  "page": 2,
+  "limit": 3,
+  "total": 6,
+  "totalPages": 2
+ }
+}
+
+## skip cap
+{
+ "products": [],
+ "facets": [
+  {
+   "name": "Size",
+   "nameAr": null,
+   "values": [
+    {
+     "value": "S",
+     "valueAr": null
+    },
+    {
+     "value": "M",
+     "valueAr": null
+    }
+   ]
+  }
+ ],
+ "meta": {
+  "page": 20000,
+  "limit": 1,
+  "total": 4,
+  "totalPages": 4,
+  "skipCapped": true
+ }
+}
+
+## search relevance
+{
+ "products": [
+  {
+   "id": "<product Shoes bag>",
+   "storeId": "<store>",
+   "name": "Shoes bag",
+   "nameAr": null,
+   "slug": "golden-4-<run>",
+   "description": null,
+   "descriptionAr": null,
+   "excerpt": null,
+   "excerptAr": null,
+   "price": 700,
+   "compareAtPrice": null,
+   "discountType": null,
+   "discountValue": null,
+   "sku": null,
+   "inventory": 5,
+   "allowBackorder": false,
+   "status": "active",
+   "metaDescription": null,
+   "metaDescriptionAr": null,
+   "metaDescriptionAeo": null,
+   "metaDescriptionAeoAr": null,
+   "isNew": false,
+   "badgeLabel": null,
+   "badgeLabelAr": null,
+   "facts": [],
+   "leadTimeDays": null,
+   "personalisation": null,
+   "updatedAt": "<ts>",
+   "createdAt": "2026-01-02T00:00:00.000Z",
+   "images": [],
+   "categories": [
+    {
+     "productId": "<product Shoes bag>",
+     "categoryId": "<id 1>",
+     "position": 6,
+     "category": {
+      "id": "<id 1>",
+      "storeId": "<store>",
+      "name": "Cat",
+      "nameAr": null,
+      "slug": "golden-cat-<run>",
+      "description": null,
+      "descriptionAr": null,
+      "image": null,
+      "parentId": null,
+      "position": 0,
+      "isActive": true,
+      "showOnHomeStrip": true,
+      "metaTitle": null,
+      "metaTitleAr": null,
+      "metaDescription": null,
+      "metaDescriptionAr": null,
+      "metaDescriptionAeo": null,
+      "metaDescriptionAeoAr": null,
+      "sizeChartId": null,
+      "createdAt": "<ts>",
+      "updatedAt": "<ts>",
+      "deletedAt": null
+     }
+    }
+   ],
+   "options": [],
+   "store": {
+    "id": "<store>",
+    "name": "golden",
+    "slug": "golden-<run>"
+   },
+   "variants": [],
+   "inStock": true,
+   "lowStock": true,
+   "acceptsBackorder": false,
+   "availableQty": 5
+  },
+  {
+   "id": "<product Kids shoes>",
+   "storeId": "<store>",
+   "name": "Kids shoes",
+   "nameAr": null,
+   "slug": "golden-2-<run>",
+   "description": null,
+   "descriptionAr": null,
+   "excerpt": null,
+   "excerptAr": null,
+   "price": 1500,
+   "compareAtPrice": null,
+   "discountType": null,
+   "discountValue": null,
+   "sku": null,
+   "inventory": 5,
+   "allowBackorder": false,
+   "status": "active",
+   "metaDescription": null,
+   "metaDescriptionAr": null,
+   "metaDescriptionAeo": null,
+   "metaDescriptionAeoAr": null,
+   "isNew": false,
+   "badgeLabel": null,
+   "badgeLabelAr": null,
+   "facts": [],
+   "leadTimeDays": null,
+   "personalisation": null,
+   "updatedAt": "<ts>",
+   "createdAt": "2026-01-02T00:00:00.000Z",
+   "images": [],
+   "categories": [
+    {
+     "productId": "<product Kids shoes>",
+     "categoryId": "<id 1>",
+     "position": 8,
+     "category": {
+      "id": "<id 1>",
+      "storeId": "<store>",
+      "name": "Cat",
+      "nameAr": null,
+      "slug": "golden-cat-<run>",
+      "description": null,
+      "descriptionAr": null,
+      "image": null,
+      "parentId": null,
+      "position": 0,
+      "isActive": true,
+      "showOnHomeStrip": true,
+      "metaTitle": null,
+      "metaTitleAr": null,
+      "metaDescription": null,
+      "metaDescriptionAr": null,
+      "metaDescriptionAeo": null,
+      "metaDescriptionAeoAr": null,
+      "sizeChartId": null,
+      "createdAt": "<ts>",
+      "updatedAt": "<ts>",
+      "deletedAt": null
+     }
+    }
+   ],
+   "options": [],
+   "store": {
+    "id": "<store>",
+    "name": "golden",
+    "slug": "golden-<run>"
+   },
+   "variants": [],
+   "inStock": true,
+   "lowStock": true,
+   "acceptsBackorder": false,
+   "availableQty": 5
+  },
+  {
+   "id": "<product Canvas shoes>",
+   "storeId": "<store>",
+   "name": "Canvas shoes",
+   "nameAr": null,
+   "slug": "golden-1-<run>",
+   "description": null,
+   "descriptionAr": null,
+   "excerpt": null,
+   "excerptAr": null,
+   "price": 2000,
+   "compareAtPrice": null,
+   "discountType": null,
+   "discountValue": null,
+   "sku": null,
+   "inventory": 3,
+   "allowBackorder": false,
+   "status": "active",
+   "metaDescription": null,
+   "metaDescriptionAr": null,
+   "metaDescriptionAeo": null,
+   "metaDescriptionAeoAr": null,
+   "isNew": false,
+   "badgeLabel": null,
+   "badgeLabelAr": null,
+   "facts": [],
+   "leadTimeDays": null,
+   "personalisation": null,
+   "updatedAt": "<ts>",
+   "createdAt": "2026-01-02T00:00:00.000Z",
+   "images": [],
+   "categories": [],
+   "options": [
+    {
+     "name": "Size",
+     "nameAr": null,
+     "_count": {
+      "values": 0
+     },
+     "values": []
+    }
+   ],
+   "store": {
+    "id": "<store>",
+    "name": "golden",
+    "slug": "golden-<run>"
+   },
+   "variants": [
+    {
+     "id": "<id 2>",
+     "price": 2100,
+     "compareAtPrice": null,
+     "inventory": 3,
+     "allowBackorder": false,
+     "inStock": true,
+     "lowStock": true,
+     "acceptsBackorder": false,
+     "availableQty": 3
+    }
+   ],
+   "inStock": true,
+   "lowStock": true,
+   "acceptsBackorder": false,
+   "availableQty": 3
+  },
+  {
+   "id": "<product Leather shoes>",
+   "storeId": "<store>",
+   "name": "Leather shoes",
+   "nameAr": "احذية جلد",
+   "slug": "golden-0-<run>",
+   "description": null,
+   "descriptionAr": null,
+   "excerpt": null,
+   "excerptAr": null,
+   "price": 3000,
+   "compareAtPrice": null,
+   "discountType": null,
+   "discountValue": null,
+   "sku": null,
+   "inventory": 5,
+   "allowBackorder": false,
+   "status": "active",
+   "metaDescription": null,
+   "metaDescriptionAr": null,
+   "metaDescriptionAeo": null,
+   "metaDescriptionAeoAr": null,
+   "isNew": true,
+   "badgeLabel": null,
+   "badgeLabelAr": null,
+   "facts": [],
+   "leadTimeDays": null,
+   "personalisation": null,
+   "updatedAt": "<ts>",
+   "createdAt": "2026-01-01T00:00:00.000Z",
+   "images": [
+    {
+     "id": "<id 3>",
+     "productId": "<product Leather shoes>",
+     "url": "https://example.test/a.png",
+     "alt": null,
+     "position": 0,
+     "createdAt": "<ts>"
+    }
+   ],
+   "categories": [
+    {
+     "productId": "<product Leather shoes>",
+     "categoryId": "<id 1>",
+     "position": 10,
+     "category": {
+      "id": "<id 1>",
+      "storeId": "<store>",
+      "name": "Cat",
+      "nameAr": null,
+      "slug": "golden-cat-<run>",
+      "description": null,
+      "descriptionAr": null,
+      "image": null,
+      "parentId": null,
+      "position": 0,
+      "isActive": true,
+      "showOnHomeStrip": true,
+      "metaTitle": null,
+      "metaTitleAr": null,
+      "metaDescription": null,
+      "metaDescriptionAr": null,
+      "metaDescriptionAeo": null,
+      "metaDescriptionAeoAr": null,
+      "sizeChartId": null,
+      "createdAt": "<ts>",
+      "updatedAt": "<ts>",
+      "deletedAt": null
+     }
+    }
+   ],
+   "options": [],
+   "store": {
+    "id": "<store>",
+    "name": "golden",
+    "slug": "golden-<run>"
+   },
+   "variants": [],
+   "inStock": true,
+   "lowStock": true,
+   "acceptsBackorder": false,
+   "availableQty": 5
+  }
+ ],
+ "facets": [
+  {
+   "name": "Size",
+   "nameAr": null,
+   "values": [
+    {
+     "value": "S",
+     "valueAr": null
+    },
+    {
+     "value": "M",
+     "valueAr": null
+    }
+   ]
+  }
+ ],
+ "meta": {
+  "page": 1,
+  "limit": 20,
+  "total": 4,
+  "totalPages": 1
+ }
+}
+
+## search + category relevance
+{
+ "products": [
+  {
+   "id": "<product Shoes bag>",
+   "storeId": "<store>",
+   "name": "Shoes bag",
+   "nameAr": null,
+   "slug": "golden-4-<run>",
+   "description": null,
+   "descriptionAr": null,
+   "excerpt": null,
+   "excerptAr": null,
+   "price": 700,
+   "compareAtPrice": null,
+   "discountType": null,
+   "discountValue": null,
+   "sku": null,
+   "inventory": 5,
+   "allowBackorder": false,
+   "status": "active",
+   "metaDescription": null,
+   "metaDescriptionAr": null,
+   "metaDescriptionAeo": null,
+   "metaDescriptionAeoAr": null,
+   "isNew": false,
+   "badgeLabel": null,
+   "badgeLabelAr": null,
+   "facts": [],
+   "leadTimeDays": null,
+   "personalisation": null,
+   "updatedAt": "<ts>",
+   "createdAt": "2026-01-02T00:00:00.000Z",
+   "images": [],
+   "categories": [
+    {
+     "productId": "<product Shoes bag>",
+     "categoryId": "<id 1>",
+     "position": 6,
+     "category": {
+      "id": "<id 1>",
+      "storeId": "<store>",
+      "name": "Cat",
+      "nameAr": null,
+      "slug": "golden-cat-<run>",
+      "description": null,
+      "descriptionAr": null,
+      "image": null,
+      "parentId": null,
+      "position": 0,
+      "isActive": true,
+      "showOnHomeStrip": true,
+      "metaTitle": null,
+      "metaTitleAr": null,
+      "metaDescription": null,
+      "metaDescriptionAr": null,
+      "metaDescriptionAeo": null,
+      "metaDescriptionAeoAr": null,
+      "sizeChartId": null,
+      "createdAt": "<ts>",
+      "updatedAt": "<ts>",
+      "deletedAt": null
+     }
+    }
+   ],
+   "options": [],
+   "store": {
+    "id": "<store>",
+    "name": "golden",
+    "slug": "golden-<run>"
+   },
+   "variants": [],
+   "inStock": true,
+   "lowStock": true,
+   "acceptsBackorder": false,
+   "availableQty": 5
+  },
+  {
+   "id": "<product Kids shoes>",
+   "storeId": "<store>",
+   "name": "Kids shoes",
+   "nameAr": null,
+   "slug": "golden-2-<run>",
+   "description": null,
+   "descriptionAr": null,
+   "excerpt": null,
+   "excerptAr": null,
+   "price": 1500,
+   "compareAtPrice": null,
+   "discountType": null,
+   "discountValue": null,
+   "sku": null,
+   "inventory": 5,
+   "allowBackorder": false,
+   "status": "active",
+   "metaDescription": null,
+   "metaDescriptionAr": null,
+   "metaDescriptionAeo": null,
+   "metaDescriptionAeoAr": null,
+   "isNew": false,
+   "badgeLabel": null,
+   "badgeLabelAr": null,
+   "facts": [],
+   "leadTimeDays": null,
+   "personalisation": null,
+   "updatedAt": "<ts>",
+   "createdAt": "2026-01-02T00:00:00.000Z",
+   "images": [],
+   "categories": [
+    {
+     "productId": "<product Kids shoes>",
+     "categoryId": "<id 1>",
+     "position": 8,
+     "category": {
+      "id": "<id 1>",
+      "storeId": "<store>",
+      "name": "Cat",
+      "nameAr": null,
+      "slug": "golden-cat-<run>",
+      "description": null,
+      "descriptionAr": null,
+      "image": null,
+      "parentId": null,
+      "position": 0,
+      "isActive": true,
+      "showOnHomeStrip": true,
+      "metaTitle": null,
+      "metaTitleAr": null,
+      "metaDescription": null,
+      "metaDescriptionAr": null,
+      "metaDescriptionAeo": null,
+      "metaDescriptionAeoAr": null,
+      "sizeChartId": null,
+      "createdAt": "<ts>",
+      "updatedAt": "<ts>",
+      "deletedAt": null
+     }
+    }
+   ],
+   "options": [],
+   "store": {
+    "id": "<store>",
+    "name": "golden",
+    "slug": "golden-<run>"
+   },
+   "variants": [],
+   "inStock": true,
+   "lowStock": true,
+   "acceptsBackorder": false,
+   "availableQty": 5
+  },
+  {
+   "id": "<product Leather shoes>",
+   "storeId": "<store>",
+   "name": "Leather shoes",
+   "nameAr": "احذية جلد",
+   "slug": "golden-0-<run>",
+   "description": null,
+   "descriptionAr": null,
+   "excerpt": null,
+   "excerptAr": null,
+   "price": 3000,
+   "compareAtPrice": null,
+   "discountType": null,
+   "discountValue": null,
+   "sku": null,
+   "inventory": 5,
+   "allowBackorder": false,
+   "status": "active",
+   "metaDescription": null,
+   "metaDescriptionAr": null,
+   "metaDescriptionAeo": null,
+   "metaDescriptionAeoAr": null,
+   "isNew": true,
+   "badgeLabel": null,
+   "badgeLabelAr": null,
+   "facts": [],
+   "leadTimeDays": null,
+   "personalisation": null,
+   "updatedAt": "<ts>",
+   "createdAt": "2026-01-01T00:00:00.000Z",
+   "images": [
+    {
+     "id": "<id 3>",
+     "productId": "<product Leather shoes>",
+     "url": "https://example.test/a.png",
+     "alt": null,
+     "position": 0,
+     "createdAt": "<ts>"
+    }
+   ],
+   "categories": [
+    {
+     "productId": "<product Leather shoes>",
+     "categoryId": "<id 1>",
+     "position": 10,
+     "category": {
+      "id": "<id 1>",
+      "storeId": "<store>",
+      "name": "Cat",
+      "nameAr": null,
+      "slug": "golden-cat-<run>",
+      "description": null,
+      "descriptionAr": null,
+      "image": null,
+      "parentId": null,
+      "position": 0,
+      "isActive": true,
+      "showOnHomeStrip": true,
+      "metaTitle": null,
+      "metaTitleAr": null,
+      "metaDescription": null,
+      "metaDescriptionAr": null,
+      "metaDescriptionAeo": null,
+      "metaDescriptionAeoAr": null,
+      "sizeChartId": null,
+      "createdAt": "<ts>",
+      "updatedAt": "<ts>",
+      "deletedAt": null
+     }
+    }
+   ],
+   "options": [],
+   "store": {
+    "id": "<store>",
+    "name": "golden",
+    "slug": "golden-<run>"
+   },
+   "variants": [],
+   "inStock": true,
+   "lowStock": true,
+   "acceptsBackorder": false,
+   "availableQty": 5
+  }
+ ],
+ "facets": [],
+ "meta": {
+  "page": 1,
+  "limit": 20,
+  "total": 3,
+  "totalPages": 1
+ }
+}
+
+## category relevance
+{
+ "products": [
+  {
+   "id": "<product Shoes bag>",
+   "storeId": "<store>",
+   "name": "Shoes bag",
+   "nameAr": null,
+   "slug": "golden-4-<run>",
+   "description": null,
+   "descriptionAr": null,
+   "excerpt": null,
+   "excerptAr": null,
+   "price": 700,
+   "compareAtPrice": null,
+   "discountType": null,
+   "discountValue": null,
+   "sku": null,
+   "inventory": 5,
+   "allowBackorder": false,
+   "status": "active",
+   "metaDescription": null,
+   "metaDescriptionAr": null,
+   "metaDescriptionAeo": null,
+   "metaDescriptionAeoAr": null,
+   "isNew": false,
+   "badgeLabel": null,
+   "badgeLabelAr": null,
+   "facts": [],
+   "leadTimeDays": null,
+   "personalisation": null,
+   "updatedAt": "<ts>",
+   "createdAt": "2026-01-02T00:00:00.000Z",
+   "images": [],
+   "categories": [
+    {
+     "productId": "<product Shoes bag>",
+     "categoryId": "<id 1>",
+     "position": 6,
+     "category": {
+      "id": "<id 1>",
+      "storeId": "<store>",
+      "name": "Cat",
+      "nameAr": null,
+      "slug": "golden-cat-<run>",
+      "description": null,
+      "descriptionAr": null,
+      "image": null,
+      "parentId": null,
+      "position": 0,
+      "isActive": true,
+      "showOnHomeStrip": true,
+      "metaTitle": null,
+      "metaTitleAr": null,
+      "metaDescription": null,
+      "metaDescriptionAr": null,
+      "metaDescriptionAeo": null,
+      "metaDescriptionAeoAr": null,
+      "sizeChartId": null,
+      "createdAt": "<ts>",
+      "updatedAt": "<ts>",
+      "deletedAt": null
+     }
+    }
+   ],
+   "options": [],
+   "store": {
+    "id": "<store>",
+    "name": "golden",
+    "slug": "golden-<run>"
+   },
+   "variants": [],
+   "inStock": true,
+   "lowStock": true,
+   "acceptsBackorder": false,
+   "availableQty": 5
+  },
+  {
+   "id": "<product Kids shoes>",
+   "storeId": "<store>",
+   "name": "Kids shoes",
+   "nameAr": null,
+   "slug": "golden-2-<run>",
+   "description": null,
+   "descriptionAr": null,
+   "excerpt": null,
+   "excerptAr": null,
+   "price": 1500,
+   "compareAtPrice": null,
+   "discountType": null,
+   "discountValue": null,
+   "sku": null,
+   "inventory": 5,
+   "allowBackorder": false,
+   "status": "active",
+   "metaDescription": null,
+   "metaDescriptionAr": null,
+   "metaDescriptionAeo": null,
+   "metaDescriptionAeoAr": null,
+   "isNew": false,
+   "badgeLabel": null,
+   "badgeLabelAr": null,
+   "facts": [],
+   "leadTimeDays": null,
+   "personalisation": null,
+   "updatedAt": "<ts>",
+   "createdAt": "2026-01-02T00:00:00.000Z",
+   "images": [],
+   "categories": [
+    {
+     "productId": "<product Kids shoes>",
+     "categoryId": "<id 1>",
+     "position": 8,
+     "category": {
+      "id": "<id 1>",
+      "storeId": "<store>",
+      "name": "Cat",
+      "nameAr": null,
+      "slug": "golden-cat-<run>",
+      "description": null,
+      "descriptionAr": null,
+      "image": null,
+      "parentId": null,
+      "position": 0,
+      "isActive": true,
+      "showOnHomeStrip": true,
+      "metaTitle": null,
+      "metaTitleAr": null,
+      "metaDescription": null,
+      "metaDescriptionAr": null,
+      "metaDescriptionAeo": null,
+      "metaDescriptionAeoAr": null,
+      "sizeChartId": null,
+      "createdAt": "<ts>",
+      "updatedAt": "<ts>",
+      "deletedAt": null
+     }
+    }
+   ],
+   "options": [],
+   "store": {
+    "id": "<store>",
+    "name": "golden",
+    "slug": "golden-<run>"
+   },
+   "variants": [],
+   "inStock": true,
+   "lowStock": true,
+   "acceptsBackorder": false,
+   "availableQty": 5
+  },
+  {
+   "id": "<product Leather shoes>",
+   "storeId": "<store>",
+   "name": "Leather shoes",
+   "nameAr": "احذية جلد",
+   "slug": "golden-0-<run>",
+   "description": null,
+   "descriptionAr": null,
+   "excerpt": null,
+   "excerptAr": null,
+   "price": 3000,
+   "compareAtPrice": null,
+   "discountType": null,
+   "discountValue": null,
+   "sku": null,
+   "inventory": 5,
+   "allowBackorder": false,
+   "status": "active",
+   "metaDescription": null,
+   "metaDescriptionAr": null,
+   "metaDescriptionAeo": null,
+   "metaDescriptionAeoAr": null,
+   "isNew": true,
+   "badgeLabel": null,
+   "badgeLabelAr": null,
+   "facts": [],
+   "leadTimeDays": null,
+   "personalisation": null,
+   "updatedAt": "<ts>",
+   "createdAt": "2026-01-01T00:00:00.000Z",
+   "images": [
+    {
+     "id": "<id 3>",
+     "productId": "<product Leather shoes>",
+     "url": "https://example.test/a.png",
+     "alt": null,
+     "position": 0,
+     "createdAt": "<ts>"
+    }
+   ],
+   "categories": [
+    {
+     "productId": "<product Leather shoes>",
+     "categoryId": "<id 1>",
+     "position": 10,
+     "category": {
+      "id": "<id 1>",
+      "storeId": "<store>",
+      "name": "Cat",
+      "nameAr": null,
+      "slug": "golden-cat-<run>",
+      "description": null,
+      "descriptionAr": null,
+      "image": null,
+      "parentId": null,
+      "position": 0,
+      "isActive": true,
+      "showOnHomeStrip": true,
+      "metaTitle": null,
+      "metaTitleAr": null,
+      "metaDescription": null,
+      "metaDescriptionAr": null,
+      "metaDescriptionAeo": null,
+      "metaDescriptionAeoAr": null,
+      "sizeChartId": null,
+      "createdAt": "<ts>",
+      "updatedAt": "<ts>",
+      "deletedAt": null
+     }
+    }
+   ],
+   "options": [],
+   "store": {
+    "id": "<store>",
+    "name": "golden",
+    "slug": "golden-<run>"
+   },
+   "variants": [],
+   "inStock": true,
+   "lowStock": true,
+   "acceptsBackorder": false,
+   "availableQty": 5
+  }
+ ],
+ "facets": [],
+ "meta": {
+  "page": 1,
+  "limit": 20,
+  "total": 3,
+  "totalPages": 1
+ }
+}

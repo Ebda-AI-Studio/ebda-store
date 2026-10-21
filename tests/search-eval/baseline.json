@@ -1,0 +1,4 @@
+{
+  "note": "Absolute floors for the SEARCH-10 bar (review M5, Ruling SEARCH-T13-4): hybrid hit-rate@10 of msa and en in the names-only run of record (real bge-m3, shipped config threshold 50 / distance 0.55, 2026-10-16, task-13-report.md run 1). A run may not drop more than FLOOR_TOLERANCE (0.02, one query in 50) below these. Update only from a new names-only run of record, never to make a run pass.",
+  "floors": { "msa": 0.98, "en": 1.0 }
+}

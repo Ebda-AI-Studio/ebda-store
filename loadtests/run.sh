@@ -6,6 +6,7 @@
 #   ./run.sh multi-store-storm
 #   ./run.sh lens-n-medium-traffic
 #   ./run.sh lens-scaling-admin-auth
+#   BASE_URL=... STORE_ID=... ./run.sh storefront-search   (local/staging only)
 #   ./run.sh all
 #
 # Required env: STORE_ID (single-store scenarios).

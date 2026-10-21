@@ -19,7 +19,7 @@
  *     fallback — plus the store scope, soft-deleted orders and guest orders.
  */
 import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
-import { prisma, Prisma } from '@ebda/database';
+import { prisma, Prisma, runInTenantContext } from '@ebda/database';
 import { hasDb } from '../helpers/bundle-fixtures';
 
 vi.mock('../../apps/api/src/lib/inngest/client', () => ({
@@ -28,6 +28,10 @@ vi.mock('../../apps/api/src/lib/inngest/client', () => ({
 
 const { OrderService, ORDER_SEARCH_CUSTOMER_ID_CAP } =
   await import('../../apps/api/src/services/order.service');
+
+/** The search lookups are SECURITY DEFINER and take the store from the scoped session (Task 14
+ * security review): a store scope is part of every search, as in production. */
+const inScope = <T>(fn: () => Promise<T>) => runInTenantContext(storeId, fn);
 
 const suffix = `${Date.now()}-${process.pid}-${Math.random().toString(36).slice(2, 8)}`;
 const tag = suffix.replace(/[^a-z0-9]/gi, '').slice(-10);
@@ -158,7 +162,7 @@ describe.skipIf(!hasDb)('order search indexes (issue 2405)', () => {
   });
 
   it('the resolved-customer path is what serves an ordinary term', async () => {
-    const where = await OrderService.listWhere(storeId, { search: `zubaida${tag}` });
+    const where = await inScope(() => OrderService.listWhere(storeId, { search: `zubaida${tag}` }));
     expect(JSON.stringify(where.OR)).toContain('"customerId":{"in":');
     expect(JSON.stringify(where.OR)).not.toContain('"customer":');
   });
@@ -166,20 +170,36 @@ describe.skipIf(!hasDb)('order search indexes (issue 2405)', () => {
   it.each([
     ['order number fragment', () => `OS-${tag}-1`],
     ['first name, any case', () => `ZUBAIDA${tag}`],
-    ['last name of a customer with users.store_id NULL', () => `qurain${tag}`],
-    ['email of a customer registered on another store', () => `noorbox${tag}`],
     ['phone', () => tag.slice(-7)],
     ['no match', () => `nothing-${tag}`],
     ['shorter than a trigram (relation fallback)', () => 'Os'],
   ])('%s: same rows as the relation-join shape', async (_label, term) => {
     const search = term();
     const expected = await ids(relationWhere(storeId, search));
-    const actual = await ids(await OrderService.listWhere(storeId, { search }));
+    const actual = await ids(await inScope(() => OrderService.listWhere(storeId, { search })));
     expect(actual).toEqual(expected);
   });
 
+  it.each([
+    ['last name of a customer with users.store_id NULL', () => `qurain${tag}`],
+    ['email of a customer registered on another store', () => `noorbox${tag}`],
+  ])(
+    '%s: not matched, because the users RLS policy hides that account from a store scope (Task 14 security review)',
+    async (_label, term) => {
+      // Before the review the id lookup ignored RLS and these customers matched ("same rows as the
+      // relation join, run as the owner"). As `ebda_app` the join never saw them: the `users`
+      // policy shows a store only its own customers (users.store_id = scope), its owner / staff,
+      // the caller and super admins. The definer now applies the same predicate.
+      expect(
+        await ids(await inScope(() => OrderService.listWhere(storeId, { search: term() })))
+      ).toEqual([]);
+    }
+  );
+
   it('matches across the store only, never a soft-deleted or foreign order', async () => {
-    const found = await ids(await OrderService.listWhere(storeId, { search: `zubaida${tag}` }));
+    const found = await ids(
+      await inScope(() => OrderService.listWhere(storeId, { search: `zubaida${tag}` }))
+    );
     const zubInStore = await prisma.order.findMany({
       where: { storeId, customerId: userIds[0], deletedAt: null },
       select: { id: true },
@@ -203,6 +223,7 @@ describe.skipIf(!hasDb)('order search indexes (issue 2405)', () => {
         firstName: crowd,
         lastName: `c${i}`,
         role: 'customer' as const,
+        storeId,
       })),
       select: { id: true },
     });
@@ -219,7 +240,7 @@ describe.skipIf(!hasDb)('order search indexes (issue 2405)', () => {
       })),
     });
 
-    const where = await OrderService.listWhere(storeId, { search: crowd });
+    const where = await inScope(() => OrderService.listWhere(storeId, { search: crowd }));
     expect(JSON.stringify(where.OR)).toContain('"customer":');
     const actual = await ids(where);
     expect(actual).toHaveLength(ORDER_SEARCH_CUSTOMER_ID_CAP + 1);

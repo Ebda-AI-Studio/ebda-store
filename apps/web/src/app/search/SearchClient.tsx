@@ -14,57 +14,8 @@ import { toTemplateProduct } from '../../templates/adapters';
 import { trackSearch } from '../../components/MarketingPixels';
 import { SearchAutocomplete } from '../../components/SearchAutocomplete';
 import { countText, RESULTS } from '../../lib/plural';
+import { displaySort, getSortOptions, sortProducts, type SortValue } from './search-sort';
 import { darkLookListingBand } from '../../templates/shared/section-bg';
-
-const sortValues = ['newest', 'price-asc', 'price-desc', 'name-asc'] as const;
-
-type SortValue = (typeof sortValues)[number];
-
-/** Build sort options with translated labels */
-function getSortOptions(t: (en: string, ar: string) => string) {
-  return [
-    { value: 'newest' as const, label: t('Newest', 'الأحدث') },
-    {
-      value: 'price-asc' as const,
-      label: t(
-        'Price: Low to High',
-        '\u0627\u0644\u0633\u0639\u0631: \u0645\u0646 \u0627\u0644\u0623\u0642\u0644 \u0644\u0644\u0623\u0639\u0644\u0649'
-      ),
-    },
-    {
-      value: 'price-desc' as const,
-      label: t(
-        'Price: High to Low',
-        '\u0627\u0644\u0633\u0639\u0631: \u0645\u0646 \u0627\u0644\u0623\u0639\u0644\u0649 \u0644\u0644\u0623\u0642\u0644'
-      ),
-    },
-    {
-      value: 'name-asc' as const,
-      label: t('Name A-Z', 'الاسم أ-ي'),
-    },
-  ];
-}
-
-/** Sort products client-side so the UI responds instantly. */
-function sortProducts(products: Product[], sortBy: SortValue): Product[] {
-  const copy = [...products];
-  switch (sortBy) {
-    case 'price-asc':
-      return copy.sort((a, b) => a.price - b.price);
-    case 'price-desc':
-      return copy.sort((a, b) => b.price - a.price);
-    case 'name-asc':
-      return copy.sort((a, b) => a.name.localeCompare(b.name));
-    case 'newest':
-    default:
-      return copy.sort((a, b) => {
-        if (a.createdAt && b.createdAt) {
-          return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
-        }
-        return 0;
-      });
-  }
-}
 
 function SearchContent() {
   const router = useRouter();
@@ -101,13 +52,15 @@ function SearchContent() {
   // Derive initial values from URL params for shareability
   const committedQuery = searchParams?.get('q') || '';
   const committedCategory = searchParams?.get('category') || '';
-  const committedSort = (searchParams?.get('sort') as SortValue | null) || 'newest';
+  const committedSort = (searchParams?.get('sort') as SortValue | null) || 'relevance';
 
   const [searchTerm, setSearchTerm] = useState(committedQuery);
   const [categoryFilter, setCategoryFilter] = useState(committedCategory);
   const [sortBy, setSortBy] = useState<SortValue>(committedSort);
 
   const [allProducts, setAllProducts] = useState<Product[]>([]);
+  // The server returned the list in relevance order (meta.ranked).
+  const [ranked, setRanked] = useState(false);
   const [categories, setCategories] = useState<Category[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -129,6 +82,7 @@ function SearchContent() {
   const performSearch = useCallback(async (term: string, category: string) => {
     if (!term.trim()) {
       setAllProducts([]);
+      setRanked(false);
       return;
     }
     setIsLoading(true);
@@ -143,6 +97,7 @@ function SearchContent() {
       const response = await api.getProducts(params);
       if (response.success && response.data) {
         setAllProducts(response.data.products || []);
+        setRanked(response.data.meta?.ranked === true);
       } else {
         setError(
           response.error?.message || t('Failed to search products', 'البحث عن المنتجات منفعش')
@@ -175,7 +130,7 @@ function SearchContent() {
     const params = new URLSearchParams();
     if (term) params.set('q', term);
     if (category) params.set('category', category);
-    if (sort && sort !== 'newest') params.set('sort', sort);
+    if (sort && sort !== 'relevance') params.set('sort', sort);
     router.push(storeUrl(`/search?${params.toString()}`));
   }
 
@@ -203,7 +158,8 @@ function SearchContent() {
         )
       )
     : allProducts;
-  const products = sortProducts(filtered, sortBy);
+  const effectiveSort = displaySort(sortBy, ranked);
+  const products = sortProducts(filtered, effectiveSort);
 
   const displayQuery = committedQuery || searchTerm;
 
@@ -351,13 +307,15 @@ function SearchContent() {
                 </span>
                 <Select
                   id="search-sort"
-                  value={sortBy}
+                  value={effectiveSort}
                   onChange={e => handleSortChange(e.target.value as SortValue)}
-                  options={getSortOptions(t).map(opt => ({ value: opt.value, label: opt.label }))}
+                  options={getSortOptions(t, ranked).map(opt => ({
+                    value: opt.value,
+                    label: opt.label,
+                  }))}
                   className="flex-1 min-w-[12rem] h-11 rounded-lg border border-input bg-background px-3 text-base focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 lg:h-10 lg:text-sm"
                 />
               </div>
-
               {categoryFilter && (
                 <button
                   onClick={() => handleCategoryChange('')}
