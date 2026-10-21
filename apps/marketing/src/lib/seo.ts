@@ -21,12 +21,16 @@ const productAlt = (locale: Locale) =>
   locale === 'ar' ? BRAND.product.nameEn : BRAND.product.nameAr;
 
 /**
- * The one disambiguating brand line, on every title, and in the JSON-LD names: it keeps Ebda Store
+ * The one disambiguating brand line, in the OG description and the JSON-LD names (titles carry only the short tail): it keeps Ebda Store
  * (ebda.app, by Ebda AI Studio) from being confused with other "Ebda" sites. The product name leads
  * (ruling PRODUCT-NAME-1); the studio is named as the maker, never as the last word of a title.
  */
 export const brandLine = () =>
   `${BRAND.product.nameEn} — ${BRAND.product.nameAr}, by ${BRAND.company.shortNameEn} (${BRAND.domains.marketing})`;
+
+/** Short tail for inner-page titles (SERP titles stay under ~60 characters); the full line is on the home title, OG site data and JSON-LD. */
+export const shortBrand = (locale: Locale) =>
+  `${productLabel(locale)} (${BRAND.domains.marketing})`;
 
 const OG_IMAGE = {
   url: '/og.png',
@@ -47,10 +51,10 @@ export function pageMetadata(
   // Titles, OG and Twitter name the PRODUCT (ruling PRODUCT-NAME-1); the studio is only the
   // publisher / organization (see jsonLd).
   const name = productLabel(locale);
-  // Home: brand line first, then the tagline. Other pages: page title first. A title that already
+  // Home: the product title as written. Other pages: page title, then the short brand tail. A title that already
   // names the product (the about page) is not repeated.
   const lead = (title ?? c.meta.title).replace(new RegExp(`^${name} — `), '');
-  const t = title ? `${lead} | ${brandLine()}` : `${brandLine()} | ${lead}`;
+  const t = title ? `${lead} | ${shortBrand(locale)}` : c.meta.title;
   const d = description ?? c.meta.description;
   const languages: Record<string, string> = {
     ar: pagePath('ar', page),
@@ -66,7 +70,8 @@ export function pageMetadata(
       type: 'website',
       siteName: name,
       title: t,
-      description: d,
+      // the full disambiguating line rides in the OG description (and the JSON-LD), not in every title
+      description: `${d} ${brandLine()}.`,
       url: pagePath(locale, page),
       locale: locale === 'ar' ? 'ar_EG' : 'en_US',
       alternateLocale: locale === 'ar' ? ['en_US'] : ['ar_EG'],
@@ -95,7 +100,7 @@ export function jsonLd(
 ) {
   const c = COPY[locale];
   const org = `${SITE_URL}/#organization`;
-  const brand = `${SITE_URL}/#brand`;
+  const brand = `${SITE_URL}/#store`;
   const site = `${SITE_URL}/#website`;
   return {
     '@context': 'https://schema.org',
@@ -118,7 +123,7 @@ export function jsonLd(
         '@id': brand,
         name: BRAND.product.nameEn,
         alternateName: [BRAND.product.nameAr, brandLine()],
-        url: SITE_URL,
+        url: `${SITE_URL}/#store`,
         logo: `${SITE_URL}/icon-512.png`,
         email: BRAND.supportEmail,
         parentOrganization: { '@id': org },

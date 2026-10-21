@@ -45,14 +45,11 @@ describe('marketing nav', () => {
   it('names the product (not the studio) in both marketing page titles', () => {
     expect(pageMetadata('ar', '').title).toContain('ابدأ ستور');
     expect(pageMetadata('en', '').title).toContain('Ebda Store');
-    // the product leads; the studio appears only as the maker inside the one brand line
-    // (Ahmad 2026-10-21: "Ebda Store — ابدأ ستور, by Ebda AI Studio (ebda.app)" on every title)
+    // the product leads and the studio is not named in the title (the brand line is in OG + JSON-LD)
     for (const l of ['ar', 'en'] as const) {
       const t = String(pageMetadata(l, '').title);
-      expect(t.startsWith('Ebda Store — ابدأ ستور, by Ebda AI Studio (ebda.app)')).toBe(true);
-      expect(t.replace('by Ebda AI Studio (ebda.app)', '')).not.toMatch(
-        /Ebda AI Studio|ابدأ استوديو/
-      );
+      expect(t.length).toBeLessThanOrEqual(60);
+      expect(t).not.toMatch(/Ebda AI Studio|ابدأ استوديو/);
     }
   });
   it('has the five links in page order with correct targets (en)', () => {

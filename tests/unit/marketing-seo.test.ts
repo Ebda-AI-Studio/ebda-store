@@ -75,13 +75,14 @@ describe('JSON-LD', () => {
       byType.Organization = byId['https://ebda.app/#organization'];
       expect(byType.Organization.sameAs).toEqual([]);
       expect(byType.Organization.name).toBe('Ebda AI Studio');
-      const brand = byId['https://ebda.app/#brand'];
+      const brand = byId['https://ebda.app/#store'];
       expect(brand['@type']).toBe('Organization');
       expect(brand.name).toBe('Ebda Store');
       expect(brand.parentOrganization['@id']).toBe(byType.Organization['@id']);
       expect(brand.alternateName).toContain('ابدأ ستور');
       expect(brand.alternateName).toContain('Ebda Store — ابدأ ستور, by Ebda AI Studio (ebda.app)');
-      expect(brand.url).toBe('https://ebda.app');
+      expect(brand['@id']).toBe('https://ebda.app/#store');
+      expect(brand.url).toBe('https://ebda.app/#store');
       expect(byType.SoftwareApplication.brand['@id']).toBe(brand['@id']);
       expect(byType.SoftwareApplication.featureList.length).toBeGreaterThan(10);
       const product = locale === 'ar' ? 'ابدأ ستور' : 'Ebda Store';
@@ -126,8 +127,14 @@ describe('every page exports metadata with a canonical', () => {
       expect(meta.title).toContain(isEn ? 'Ebda Store' : 'ابدأ ستور');
       expect(meta.openGraph.title).not.toMatch(/Ebda AI Studio\s*$/);
       expect(meta.openGraph.title).toBe(meta.title);
-      // brand disambiguation (not ebda3i.com or any other "Ebda"): every title carries the one brand line
-      expect(meta.title).toContain('Ebda Store — ابدأ ستور, by Ebda AI Studio (ebda.app)');
+      // brand disambiguation (not ebda3i.com or any other "Ebda"): the one brand line is in the OG
+      // description; inner titles end in the short tail and stay SERP-length
+      expect(meta.openGraph.description).toContain(
+        'Ebda Store — ابدأ ستور, by Ebda AI Studio (ebda.app)'
+      );
+      if (page)
+        expect(meta.title.endsWith(`| ${isEn ? 'Ebda Store' : 'ابدأ ستور'} (ebda.app)`)).toBe(true);
+      expect(meta.title.length).toBeLessThanOrEqual(page ? 90 : 60);
       expect(meta.twitter.title).toBe(meta.title);
       expect(meta.openGraph.siteName).toBe(isEn ? 'Ebda Store' : 'ابدأ ستور');
       expect(meta.description).toBeTruthy();
