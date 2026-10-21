@@ -9,7 +9,12 @@ vi.mock('@api/services/storage.service', () => ({
     getPublicUrl: (k: string) => `https://cdn.ebda.app/${k}`,
   },
 }));
-vi.mock('@api/config', () => ({ config: { jwtSecret: 'x'.repeat(40) } }));
+const cfg = vi.hoisted(() => ({
+  jwtSecret: 'x'.repeat(40),
+  barcodeKeySecret: '',
+  encryptionKey: 'e'.repeat(64),
+}));
+vi.mock('@api/config', () => ({ config: cfg }));
 vi.mock('@api/lib/logger', () => ({ default: { info: vi.fn(), warn: vi.fn(), error: vi.fn() } }));
 
 const { ensureEmailBarcode } = await import('@api/services/barcode-image.service');
@@ -99,5 +104,90 @@ describe('ensureEmailBarcode', () => {
     }));
     const { ensureEmailBarcode: e2 } = await import('@api/services/barcode-image.service');
     expect(await e2({ storeId: STORE, kind: 'order', number: 'ORD-1', shape: 'plain' })).toBeNull();
+  });
+});
+
+describe('plain PNG holds the 2 css px module floor (I2)', () => {
+  it('a legacy 24-char number (too many modules for 360 css px) sends text only', async () => {
+    const r = await ensureEmailBarcode({
+      storeId: STORE,
+      kind: 'order',
+      number: 'ORD-1760000000000-ab12cd34',
+      shape: 'plain',
+    });
+    expect(r).toBeNull();
+    expect(put).not.toHaveBeenCalled();
+  });
+  it('a standard number is fine', async () => {
+    expect(
+      await ensureEmailBarcode({
+        storeId: STORE,
+        kind: 'order',
+        number: 'ORD-T5JK9Q-AB3XY',
+        shape: 'plain',
+      })
+    ).not.toBeNull();
+  });
+});
+
+describe('timer and key secret', () => {
+  it('clears the time-budget timer when the work finishes (M1)', async () => {
+    const spy = vi.spyOn(globalThis, 'clearTimeout');
+    await ensureEmailBarcode({
+      storeId: STORE,
+      kind: 'order',
+      number: 'ORD-T5JK9Q-AB3XY',
+      shape: 'plain',
+    });
+    expect(spy).toHaveBeenCalled();
+    spy.mockRestore();
+  });
+  it('keys come from BARCODE_KEY_SECRET, not the JWT secret: rotating JWT changes nothing (M2)', async () => {
+    cfg.barcodeKeySecret = 'k'.repeat(40);
+    const key = async () => {
+      put.mockClear();
+      await ensureEmailBarcode({
+        storeId: STORE,
+        kind: 'order',
+        number: 'ORD-T5JK9Q-AB3XY',
+        shape: 'plain',
+      });
+      return put.mock.calls[0]![0] as string;
+    };
+    const a = await key();
+    cfg.jwtSecret = 'rotated-'.padEnd(40, 'z');
+    expect(await key()).toBe(a);
+    cfg.barcodeKeySecret = 'other-'.padEnd(40, 'q');
+    expect(await key()).not.toBe(a);
+  });
+  it('unset: derived from ENCRYPTION_KEY, also untouched by a JWT rotation', async () => {
+    cfg.barcodeKeySecret = '';
+    const key = async () => {
+      put.mockClear();
+      await ensureEmailBarcode({
+        storeId: STORE,
+        kind: 'order',
+        number: 'ORD-T5JK9Q-AB3XY',
+        shape: 'plain',
+      });
+      return put.mock.calls[0]![0] as string;
+    };
+    const a = await key();
+    cfg.jwtSecret = 'rotated-again-'.padEnd(40, 'z');
+    expect(await key()).toBe(a);
+    cfg.encryptionKey = 'f'.repeat(64);
+    expect(await key()).not.toBe(a);
+  });
+  it('no secret at all (non-production only): text-only email, never a throw', async () => {
+    cfg.barcodeKeySecret = '';
+    cfg.encryptionKey = '';
+    expect(
+      await ensureEmailBarcode({
+        storeId: STORE,
+        kind: 'order',
+        number: 'ORD-T5JK9Q-AB3XY',
+        shape: 'plain',
+      })
+    ).toBeNull();
   });
 });

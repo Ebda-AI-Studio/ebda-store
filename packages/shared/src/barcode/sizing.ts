@@ -39,5 +39,10 @@ export function moduleCssPx(value: string, shape: string, displayPx: number): nu
  */
 export function resolveBarcodeShape(shape: string, value: string, displayPx: number): string {
   if (shape === 'off' || shape === 'plain') return shape;
-  return moduleCssPx(value, shape, displayPx) >= MIN_MODULE_CSS_PX - 1e-9 ? shape : 'plain';
+  return meetsModuleFloor(value, shape, displayPx) ? shape : 'plain';
+}
+
+/** True when `value` drawn in `shape` at `displayPx` keeps every module at or over the floor. */
+export function meetsModuleFloor(value: string, shape: string, displayPx: number): boolean {
+  return moduleCssPx(value, shape, displayPx) >= MIN_MODULE_CSS_PX - 1e-9;
 }

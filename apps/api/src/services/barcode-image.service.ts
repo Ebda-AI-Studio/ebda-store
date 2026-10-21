@@ -1,9 +1,20 @@
-import { BARCODE_DISPLAY_PX } from '@ebda/shared';
+import { BARCODE_DISPLAY_PX, meetsModuleFloor } from '@ebda/shared';
 import { config } from '../config';
+import { derivedSecret } from '../lib/derived-secret';
 import logger from '../lib/logger';
 import { renderBarcodePng } from '../lib/barcode-png/render';
 import { barcodeObjectKey } from '../lib/barcode-png/key';
 import { StorageService } from './storage.service';
+
+/**
+ * HMAC key for the R2 object names: `BARCODE_KEY_SECRET` when set (docs/ENVIRONMENT.md), else a
+ * key HKDF-derived from ENCRYPTION_KEY (`ebda:barcode-key:v1`, lib/derived-secret.ts). Never
+ * JWT_SECRET: rotating it signs sessions out and must not move any barcode URL already sent.
+ * Throws when neither exists (non-production only); the caller turns that into "no image".
+ */
+function keySecret(): string {
+  return config.barcodeKeySecret || derivedSecret('ebda:barcode-key:v1').toString('hex');
+}
 
 export interface EmailBarcodeImage {
   url: string;
@@ -32,16 +43,20 @@ export async function ensureEmailBarcode(args: {
   const work = (async (): Promise<EmailBarcodeImage | null> => {
     if (!StorageService.isAvailable()) return null;
     const img = renderBarcodePng({ value: args.number, shape: args.shape });
-    const key = barcodeObjectKey(config.jwtSecret, args.storeId, args.kind, args.number, img.shape);
+    // Plain bars too must hold the 2 css px module floor at the email width (Ruling BARCODE-4):
+    // a long legacy number cannot, so that email carries the number as text only.
+    if (!meetsModuleFloor(args.number, img.shape, BARCODE_DISPLAY_PX.email)) return null;
+    const key = barcodeObjectKey(keySecret(), args.storeId, args.kind, args.number, img.shape);
     await StorageService.putDerived(key, img.png, 'image/png');
     const url = StorageService.getPublicUrl(key);
     if (!/^https:\/\//i.test(url)) return null;
     const width = BARCODE_DISPLAY_PX.email;
     return { url, width, height: Math.round((width * img.height) / img.width) };
   })();
-  const budget = new Promise<null>(resolve =>
-    setTimeout(() => resolve(null), args.timeoutMs ?? 8000)
-  );
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const budget = new Promise<null>(resolve => {
+    timer = setTimeout(() => resolve(null), args.timeoutMs ?? 8000);
+  });
   try {
     const out = await Promise.race([work, budget]);
     if (!out) work.catch(() => undefined); // a late failure must not become an unhandled rejection
@@ -52,5 +67,7 @@ export async function ensureEmailBarcode(args: {
       'email barcode: render/upload failed, sending text only'
     );
     return null;
+  } finally {
+    clearTimeout(timer);
   }
 }
