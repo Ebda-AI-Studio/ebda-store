@@ -120,7 +120,9 @@ The secret is shown **once**, when you create the endpoint or make a new one. Ma
 
 A delivery that does not get a `2xx` is tried up to **6 times**: immediately, then after 1 minute, 10 minutes, 1 hour, 6 hours and 17 hours (about 24 hours in all). After the last try it is marked failed.
 
-When **10 deliveries in a row** end up failed, the endpoint is switched off and the store owner is told by email and in the dashboard. Turn it back on from the dashboard once your server answers. Events that happened while it was off are not re-sent automatically; open the delivery log and press **Resend** on the ones you need.
+When **10 deliveries in a row** end up failed, the endpoint is switched off and the store owner is told by email and in the dashboard. Turn it back on from the dashboard once your server answers.
+
+Events that happen while an endpoint is off (or after the plan lapses) are **not stored and not re-sent**: no delivery row is created for them, so there is nothing to resend. To catch up, read the orders or products from the API. **Resend** only works on rows that exist in the delivery log, for example one that failed after all its tries.
 
 ## Delivery log
 

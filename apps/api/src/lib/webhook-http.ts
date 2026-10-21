@@ -6,9 +6,10 @@
  * - SSRF: https only, no IP literals, and the host is resolved AGAIN here on every send and every
  *   address checked (`assertPublicHttpUrl`), so a name that was public at registration and was
  *   re-pointed at 127.0.0.1 / 169.254.169.254 afterwards is refused before any connection.
- *   Residual: the fetch itself re-resolves (classic check/connect rebinding window); closing it
- *   needs address pinning, which Workers' fetch cannot do. The window is one DNS TTL per send, and
- *   the response is never shown to the merchant beyond 200 chars, so it is not a read oracle.
+ *   Residual (Ruling WH-6): the fetch re-resolves the name after our check and neither Node nor
+ *   Workers can pin the validated address. Production is bounded (a Worker cannot reach private
+ *   ranges); on a Node host a rebinding name can read back up to 200 characters of an internal reply
+ *   through the delivery log, so a Node deployment must add an address-pinning dispatcher.
  * - Redirects are NEVER followed (Ruling WH-2): a 3xx is a failed delivery, so a public host cannot
  *   bounce us to a private address.
  * - 10 s timeout; only the first WEBHOOK_RESPONSE_SNIPPET_CHARS of the response body are read.

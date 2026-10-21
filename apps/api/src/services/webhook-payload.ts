@@ -1,5 +1,5 @@
 /**
- * Payload builders for merchant outgoing webhooks. Minimal PII by design (docs/developers/webhooks.md):
+ * Payload builders for merchant outgoing webhooks. Minimal PII by design (apps/docs/content/merchant-webhooks.mdx):
  * an order carries ids, totals (minor units = piastres), status and line items; the customer's name,
  * email and phone travel ONLY on an endpoint whose `includeCustomer` is on.
  */
