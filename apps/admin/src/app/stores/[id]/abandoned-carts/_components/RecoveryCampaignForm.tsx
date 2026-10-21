@@ -204,7 +204,7 @@ export function RecoveryCampaignForm({
           </div>
         </StepRow>
 
-        <div className="border border-border rounded-lg p-4">
+        <div id="cart-email-settings" className="border border-border rounded-lg p-4">
           <div className="flex items-center justify-between mb-1">
             <h3 className="font-medium text-foreground">{t('email.title')}</h3>
             <Toggle

@@ -24,3 +24,12 @@ Branch `feat/cart-email-campaigns`. Two features, lean build (touched tests per 
 ## Risks
 - Detection only covers logged-in customers' carts and scans stores with an explicit `store_features` row (existing; flagged, not changed).
 - Real Resend send and the Inngest dev server are not exercised (unit-level only).
+
+## Review pass (2026-10-21, `.superpowers/cart-email-review.md`: approve with fixes)
+Each item is its own commit; rulings CART-EMAIL-5..9, CART-DETECT-1, CART-CONSENT-1, CART-RESTORE-1 in `docs/RULINGS.md`.
+1. Checkout email opt-in (unchecked box, cart-reminders consent scope, guest cart email, signed restore link) - migration `20261022000400_cart_email_consent`.
+2. Stop-on-convert: re-read the cart after the send-slot wait. 3. Transient Resend errors retry; only permanent 4xx fail.
+4. Detection by effective entitlement (plan baseline OR row), for push, SMS and email.
+5. Minors: sweep prefilter, per-store cart cap in the shared budget, requeue of stuck `queued`, neutral copy, price label, re-subscribe ruling.
+6. Default stays OFF + dismissible nudge.
+Integration tests (DB) are pending the coordinator's "db slot free".

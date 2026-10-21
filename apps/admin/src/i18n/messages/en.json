@@ -4282,6 +4282,12 @@
       "sent": "Sent",
       "skipped": "Skipped",
       "failed": "Failed"
+    },
+    "emailNudge": {
+      "title": "Get abandoned carts back by email",
+      "body": "One reminder email per cart, sent as your store and only to shoppers who opted in. It is off until you turn it on.",
+      "review": "Review settings",
+      "dismiss": "Not now"
     }
   },
   "returns": {
