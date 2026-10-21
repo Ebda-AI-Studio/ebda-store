@@ -14,7 +14,7 @@ import { encryption } from './encryption.service';
 import { MfaService } from './mfa.service';
 import { AuthService } from './auth.service';
 import { loginGate } from './login-gate';
-import { sendPasskeyNoticeEmail } from './platform-mailer';
+import { sendPasskeyNotice } from './passkey-notices';
 import { redis } from './redis.service';
 
 /**
@@ -241,12 +241,19 @@ async function notifyPasskeyChange(
     const u = await withUser(userId, tx =>
       tx.user.findUnique({
         where: { id: userId },
-        select: { email: true, firstName: true, language: true },
+        select: { email: true, firstName: true, language: true, storeId: true },
       })
     );
     if (!u) return;
-    await sendPasskeyNoticeEmail(
-      { email: u.email, name: u.firstName, kind, passkeyName, at: new Date().toISOString() },
+    await sendPasskeyNotice(
+      {
+        email: u.email,
+        name: u.firstName,
+        kind,
+        passkeyName,
+        at: new Date().toISOString(),
+        storeId: u.storeId,
+      },
       u.language === 'ar' ? 'ar' : 'en'
     );
   } catch (err) {

@@ -68,7 +68,16 @@ vi.mock('@api/services/auth.service', () => ({
 vi.mock('@api/services/platform-mailer', () => ({
   sendPasskeyNoticeEmail: async (d: any) => {
     if (h.state.mailFails) throw new Error('resend down');
-    h.state.mails.push(d);
+    h.state.mails.push({ ...d, via: 'platform' });
+  },
+}));
+// A shopper's notice comes from the STORE's sender identity (review M8), not from Ebda.
+vi.mock('@api/services/email.service', () => ({
+  EmailService: {
+    sendPasskeyNotice: async (storeId: string, d: any) => {
+      if (h.state.mailFails) throw new Error('resend down');
+      h.state.mails.push({ ...d, via: 'store', storeId });
+    },
   },
 }));
 
@@ -1015,5 +1024,20 @@ describe('notices and revocation (PASSKEY-9)', () => {
     const cred = await enrol('user-1', ADMIN_ORIGIN);
     h.state.users.set('user-1', user({ tokenVersion: 7 }));
     expect((await (await signIn(ADMIN_ORIGIN, cred)).result).user.tokenVersion).toBe(7);
+  });
+
+  it('a merchant notice comes from the platform sender; a shopper notice from THEIR STORE (review M8)', async () => {
+    await enrol('user-1', ADMIN_ORIGIN, 'Work laptop');
+    expect(h.state.mails[0]).toMatchObject({ via: 'platform', email: 'm@x.com' });
+    await enrol('cust-a', STORE_A, 'My iPhone');
+    expect(h.state.mails[1]).toMatchObject({
+      via: 'store',
+      storeId: 'store-a',
+      email: 'c@a.com',
+      kind: 'added',
+      passkeyName: 'My iPhone',
+    });
+    await PasskeyService.remove({ userId: 'cust-a', sessionId: SID }, h.state.creds[1].id);
+    expect(h.state.mails[2]).toMatchObject({ via: 'store', storeId: 'store-a', kind: 'removed' });
   });
 });
