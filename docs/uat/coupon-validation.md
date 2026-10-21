@@ -52,7 +52,7 @@ Run three scenarios and verify they all return the SAME error code (`INVALID_COU
 | Code exists but expired               | `INVALID_COUPON` |
 | Code exists but usage limit exhausted | `INVALID_COUPON` |
 
-The same generic answer applies to `POST /orders/quote` and `POST /orders` (not-found, inactive, not-started, expired and exhausted all return `INVALID_COUPON`), and those two endpoints share the `/coupons/validate` per-IP budget (20/min, bucket `coupon-validate`) through `couponAttemptLimiter` whenever a `couponCode` is sent.
+The same generic answer applies to `POST /orders/quote` and `POST /orders` (not-found, inactive, not-started, expired and exhausted all return `INVALID_COUPON`), and those two endpoints are limited by `couponAttemptLimiter` to 20 *distinct* coupon codes per IP per 60s (prefix `coupon-validate-distinct`; repeating an already-tried code never counts, so a shopper re-quoting with an applied coupon is never throttled). `/coupons/validate` keeps its own 20/min request limiter and also feeds the same distinct-code budget via `couponValidateDistinctLimiter`.
 
 **To test expired coupon:**
 
