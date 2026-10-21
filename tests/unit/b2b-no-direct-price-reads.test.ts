@@ -129,7 +129,7 @@ const ALLOW: Record<string, AllowEntry> = {
   'services/accounting/posting/partial-return-allocation.ts': {
     category: 'persisted',
     reason: 'allocation over persisted lines',
-    reads: { allocatePartialReturn: 2 },
+    reads: { allocatePartialReturn: 5 }, // + the discount-eligible gross (final review P2-2)
   },
   'services/email-templates/order-confirmation.ts': {
     category: 'persisted',
@@ -231,7 +231,7 @@ const ALLOW: Record<string, AllowEntry> = {
       listPublic: 6,
       reshapePublicProductDetail: 2,
       update: 4,
-      b2bPublicFields: 1,
+      b2bPublicFields: 3, // product price + variant.price ?? product.price: hides a stale variant tier (final review minor 2)
     },
   },
   'mcp/tools/admin-read.tools.ts': {

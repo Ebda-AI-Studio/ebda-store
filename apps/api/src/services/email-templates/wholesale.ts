@@ -80,7 +80,7 @@ export function wholesaleMerchantNotice(
     return kind === 'received'
       ? {
           subject: `طلب حساب جملة جديد - ${d.storeName}`,
-          content: `<p>وصل طلب حساب جملة جديد من <strong>${escapeHtml(d.businessName ?? '')}</strong>. العميل مستني ردك.</p><p>عدد الطلبات اللي لسه ما اتراجعتش: ${d.pendingCount}.</p>${link}`,
+          content: `<p>وصل طلب حساب جملة جديد من <strong>${escapeHtml(d.businessName ?? '')}</strong>. العميل مستني ردك.</p><p>عدد الطلبات اللي لسه متراجعتش: ${d.pendingCount}.</p>${link}`,
         }
       : {
           subject: `طلبات جملة مستنية ردك - ${d.storeName}`,
