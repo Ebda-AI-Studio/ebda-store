@@ -41,15 +41,15 @@ export const emailVerificationTemplate = {
     const urlEsc = escapeHtml(d.verificationUrl);
     return `
     <h2>تأكيد بريدك الإلكتروني</h2>
-    <p>مرحباً ${escapeHtml(d.name)}،</p>
-    <p>شكراً للتسجيل! يُرجى تأكيد بريدك الإلكتروني لإتمام إعداد حسابك.</p>
+    <p>أهلاً ${escapeHtml(d.name)}،</p>
+    <p>شكراً إنك سجلت! أكّد بريدك الإلكتروني عشان نكمّل إعداد حسابك.</p>
     <p style="text-align: center; margin: 24px 0;">
       <a href="${urlEsc}" class="button">تأكيد البريد الإلكتروني</a>
     </p>
     <p>الرابط ينتهي خلال ${d.expiresInHours} ساعة.</p>
-    <p style="font-size: 14px; color: #666;">إذا لم تنشئ حساباً، يمكنك تجاهل هذه الرسالة بأمان.</p>
+    <p style="font-size: 14px; color: #666;">لو إنت معملتش حساب، تجاهل الرسالة دي وماتقلقش.</p>
     <p style="font-size: 12px; color: #999; margin-top: 24px;">
-      إذا لم يعمل الزر أعلاه، انسخ هذا الرابط والصقه في متصفحك:<br>
+      لو الزرار اللي فوق مشتغلش، انسخ الرابط ده والصقه في المتصفح:<br>
       <a href="${urlEsc}" style="color: ${BRAND.colors.gold}; word-break: break-all;">${urlEsc}</a>
     </p>
   `;

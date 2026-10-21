@@ -4,7 +4,7 @@ import type { OrderRefundEmailData } from '../email.service';
 export const orderRefundedTemplate = {
   subject: {
     en: (d: OrderRefundEmailData) => `Refund Requested — Order #${d.orderNumber}`,
-    ar: (d: OrderRefundEmailData) => `تم طلب الاسترداد — طلب رقم ${d.orderNumber}`,
+    ar: (d: OrderRefundEmailData) => `بنرجّعلك فلوسك — طلب رقم ${d.orderNumber}`,
   },
 
   en: (d: OrderRefundEmailData) => `
@@ -40,12 +40,12 @@ export const orderRefundedTemplate = {
   `,
 
   ar: (d: OrderRefundEmailData) => `
-    <h2>تم استرداد مبلغ طلبك</h2>
-    <p>مرحباً ${escapeHtml(d.customerName)}،</p>
+    <h2>بنرجّعلك مبلغ طلبك</h2>
+    <p>أهلاً ${escapeHtml(d.customerName)}،</p>
     <p>
-      أصدرنا استرداداً بقيمة <strong>${emailMoney(d.refundAmount, d.currency, 'ar')}</strong>
-      للطلب رقم <strong>${escapeHtml(d.orderNumber)}</strong>. سيظهر المبلغ في طريقة الدفع
-      الأصلية خلال 5 إلى 10 أيام عمل وفقاً لبنكك.
+      بعتنا طلب استرداد بقيمة <strong>${emailMoney(d.refundAmount, d.currency, 'ar')}</strong>
+      للطلب رقم <strong>${escapeHtml(d.orderNumber)}</strong>. المبلغ هيظهر في طريقة الدفع
+      الأصلية خلال 5 إلى 10 أيام عمل حسب بنكك.
     </p>
 
     ${
@@ -67,6 +67,6 @@ export const orderRefundedTemplate = {
       </tbody>
     </table>
 
-    <p style="margin-top: 1.5rem;">لأي استفسار، يكفي الرد على هذه الرسالة.</p>
+    <p style="margin-top: 1.5rem;">لو عندك أي سؤال، رُد على الرسالة دي.</p>
   `,
 };

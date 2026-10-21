@@ -34,12 +34,12 @@ export const passwordResetTemplate = {
 
   ar: (d: PasswordResetData, _storeName: string) => `
     <h2>إعادة تعيين كلمة المرور</h2>
-    <p>مرحباً ${escapeHtml(d.name)}،</p>
-    <p>تلقينا طلباً لإعادة تعيين كلمة المرور. اضغط أدناه لإنشاء كلمة مرور جديدة:</p>
+    <p>أهلاً ${escapeHtml(d.name)}،</p>
+    <p>وصلنا طلب لإعادة تعيين كلمة المرور. اضغط تحت عشان تعمل كلمة مرور جديدة:</p>
     <p style="text-align: center; margin: 24px 0;">
       <a href="${escapeHtml(d.resetUrl)}" class="button">إعادة تعيين كلمة المرور</a>
     </p>
     <p>الرابط ينتهي خلال ${d.expiresInMinutes} دقيقة.</p>
-    <p>إذا لم تطلب ذلك، يمكنك تجاهل هذه الرسالة بأمان.</p>
+    <p>لو إنت مطلبتش ده، تجاهل الرسالة دي وماتقلقش.</p>
   `,
 };

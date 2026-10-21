@@ -8,7 +8,7 @@ export interface WelcomeData {
 export const welcomeTemplate = {
   subject: {
     en: (_d: WelcomeData, storeName: string) => `Welcome to ${storeName}`,
-    ar: (_d: WelcomeData, storeName: string) => `مرحباً بك في ${storeName}`,
+    ar: (_d: WelcomeData, storeName: string) => `أهلاً بيك في ${storeName}`,
   },
 
   en: (d: WelcomeData, _storeName: string, webUrl: string) => `
@@ -28,13 +28,13 @@ export const welcomeTemplate = {
 
   ar: (d: WelcomeData, _storeName: string, webUrl: string) => `
     <h2>أهلاً${d.name ? '، ' + escapeHtml(d.name) : ''}!</h2>
-    <p>شكراً لإنشائك حساباً معنا. يسعدنا انضمامك إلينا!</p>
-    <p>يمكنك الآن:</p>
+    <p>شكراً إنك عملت حساب عندنا. فرحانين بيك!</p>
+    <p>دلوقتي تقدر:</p>
     <ul>
-      <li>تصفح كتالوج المنتجات</li>
-      <li>حفظ المنتجات في قائمة الأمنيات</li>
-      <li>متابعة طلباتك</li>
-      <li>الاستمتاع بالعروض الحصرية</li>
+      <li>تتصفح المنتجات</li>
+      <li>تحفظ المنتجات في المفضلة</li>
+      <li>تتابع طلباتك</li>
+      <li>تستمتع بالعروض الحصرية</li>
     </ul>
     <p style="text-align: center; margin: 24px 0;">
       <a href="${escapeHtml(webUrl)}/products" class="button">ابدأ التسوق</a>
