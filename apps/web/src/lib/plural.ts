@@ -89,6 +89,20 @@ export const DAYS_FORMAL: CountedNoun = {
   ar: { ...DAYS.ar, many: '{n} يومًا' },
 };
 
+/** Months (instalment plans, 3 to 60). */
+export const MONTHS: CountedNoun = {
+  en: { one: '{n} month', other: '{n} months' },
+  ar: {
+    zero: '{n} شهر',
+    one: 'شهر واحد',
+    two: 'شهرين',
+    twoOblique: 'شهرين',
+    few: '{n} أشهر',
+    many: '{n} شهرًا',
+    other: '{n} شهر',
+  },
+};
+
 /** Business days (shipping-zone estimates). */
 export const BUSINESS_DAYS: CountedNoun = {
   en: { one: '{n} business day', other: '{n} business days' },

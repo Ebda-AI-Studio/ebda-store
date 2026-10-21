@@ -52,6 +52,7 @@ import { DahabProductDetail } from '../../../templates/dahab/ProductDetail';
 import { REGION } from '@ebda/shared';
 import { FactsTable } from '../../../components/commerce/FactsTable';
 import { DeliveryChip } from '../../../components/commerce/DeliveryChip';
+import { InstalmentLine } from '../../../components/commerce/InstalmentLine';
 import { TrustLine } from '../../../components/commerce/TrustLine';
 import { relatedHeadingSize } from '../../../templates/shared/look-card';
 import type { CodOffer } from '../../../lib/cod-offer';
@@ -1196,6 +1197,8 @@ export default function ProductDetailClient({
                     {formatPrice(displayCompare)}
                   </span>
                 )}
+                {/* B2-9: merchant-configured estimate, PDP only; renders nothing when off. */}
+                <InstalmentLine priceMinor={displayPrice} buyable={buyableNow} />
               </div>
               <TaxInclusiveLabel className="mt-1 block text-xs text-muted-foreground" />
               <B2bPdpPanel
