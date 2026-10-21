@@ -13,6 +13,7 @@ const INDEXES = [
   'users_name_norm_trgm_idx',
   'orders_guest_phone_digits_trgm_idx',
   'orders_guest_name_norm_trgm_idx',
+  'orders_guest_email_store_trgm_idx',
 ];
 
 describe.skipIf(!hasDb)('admin search normalisation (Task 15)', () => {
@@ -24,7 +25,7 @@ describe.skipIf(!hasDb)('admin search normalisation (Task 15)', () => {
     expect(r).toEqual({ a: '20101234', b: '0101234', c: null });
   });
 
-  it('all four indexes exist, are VALID and are GIN trigram expression indexes', async () => {
+  it('all five indexes exist, are VALID and are GIN trigram expression indexes', async () => {
     const rows = await prisma.$queryRaw<Array<{ name: string; valid: boolean; def: string }>>`
       SELECT c.relname::text AS name, i.indisvalid AS valid, pg_get_indexdef(i.indexrelid) AS def
       FROM pg_index i JOIN pg_class c ON c.oid = i.indexrelid
@@ -34,10 +35,14 @@ describe.skipIf(!hasDb)('admin search normalisation (Task 15)', () => {
       expect(r.valid, r.name).toBe(true);
       expect(r.def).toMatch(/USING gin/);
       expect(r.def).toMatch(/gin_trgm_ops/);
-      expect(r.def).toMatch(/ebda_(digits|ar_norm)\(/);
+      if (!r.name.includes('email')) expect(r.def).toMatch(/ebda_(digits|ar_norm)\(/);
     }
     const guest = rows.filter(r => r.name.startsWith('orders_guest_'));
-    for (const r of guest) expect(r.def).toMatch(/WHERE .*customer_id IS NULL/);
+    for (const r of guest) {
+      expect(r.def).toMatch(/WHERE .*customer_id IS NULL/);
+      // store-leading (btree_gin): a search is for one store (Ruling SEARCH-P2-8)
+      expect(r.def, r.name).toMatch(/USING gin \(store_id, /);
+    }
   });
 
   it('the normalised name matches the way the search sees it', async () => {

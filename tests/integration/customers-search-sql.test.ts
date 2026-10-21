@@ -126,6 +126,19 @@ describe.skipIf(!hasDb)('customers + orders search in SQL as ebda_app (Tasks 15-
       expect(mine.guestOrderIds).toEqual([g('g1')]);
     });
 
+    it('an erased (soft-deleted) account is never matched, with or without orders (review M1)', async () => {
+      await prisma.$executeRaw`
+        INSERT INTO public.users (id, store_id, email, password_hash, first_name, last_name, phone, role, updated_at, deleted_at)
+        VALUES (${g('del')}, ${A}, ${`gone.${tag}@x.test`}, 'x', 'محذوف', 'تماما', '+201555000999', 'customer', now(), now())`;
+      await prisma.$executeRaw`
+        INSERT INTO public.orders (id, store_id, order_number, subtotal, total, shipping_address, billing_address, customer_id, updated_at)
+        VALUES (${g('odel')}, ${A}, ${`EB-${tag}-odel`}, 1, 1, '{}', '{}', ${g('del')}, now())`;
+      for (const q of ['محذوف', '01555000999', `gone.${tag}`]) {
+        const m = await inA(() => matchingCustomers(A, q));
+        expect([q, m.userIds]).toEqual([q, []]);
+      }
+    });
+
     it('a two-letter term (no trigram) is answered from the store set, with the same results', async () => {
       const m = await inA(() => matchingCustomers(A, 'عل'));
       expect(m.userIds).toEqual([ids.u1]);
@@ -301,3 +314,145 @@ describe.skipIf(!hasDb)('normalised expression indexes are used as ebda_app (Tas
     expect(r.orders.map(o => o.id)).toEqual([`${t2}-o1`]);
   }, 60_000);
 });
+
+// ---------------------------------------------------------------------------------------------
+// Part 3: MANY stores (Ruling SEARCH-P2-8, review I3). One tenant's proof says nothing about a
+// multi-tenant table: a common name matches a large share of the PLATFORM's users and guest orders,
+// and a small store must not pay for that. 20 stores x 1,000 registered customers + 1,000 guest
+// orders (19 full stores, one tiny store with 10 of each); every name starts with "محمد".
+// ---------------------------------------------------------------------------------------------
+describe.skipIf(!hasDb)(
+  'a small store stays fast beside 19 large ones (Task 16, review I3)',
+  () => {
+    const t3 = `${tag}m`;
+    const STORES = 20;
+    const PER_STORE = 1000;
+    const SMALL = 10;
+    /** Store 1 is a big shop: enough guest orders that the planner prefers the store-leading index. */
+    const BIG_ORDERS = 12_000;
+    const storeIds: string[] = [];
+    let owner = '';
+    const small = () => storeIds[STORES - 1];
+
+    /** Sequential-scan tuples read from a table so far, as the owner, after the app session flushed. */
+    async function seqTupRead(table: 'orders' | 'users'): Promise<number> {
+      await planner!.flush();
+      await prisma.$queryRaw`SELECT pg_stat_clear_snapshot()`;
+      const r = await prisma.$queryRaw<Array<{ n: bigint }>>`
+      SELECT seq_tup_read AS n FROM pg_stat_user_tables WHERE relname = ${table}`;
+      return Number(r[0].n);
+    }
+
+    beforeAll(async () => {
+      owner = (
+        await prisma.user.create({
+          data: {
+            email: `${t3}@x.test`,
+            passwordHash: 'x',
+            firstName: 'Cs',
+            lastName: 'Multi',
+            role: 'store_admin',
+          },
+        })
+      ).id;
+      for (let i = 1; i <= STORES; i++) {
+        storeIds.push(
+          (
+            await prisma.store.create({
+              data: { name: `${t3}${i}`, slug: `${t3}${i}`, ownerId: owner },
+            })
+          ).id
+        );
+      }
+      await prisma.$executeRaw`
+      INSERT INTO public.users (id, store_id, email, password_hash, first_name, last_name, phone, role, updated_at)
+      SELECT ${t3} || '-u' || s.i || '-' || g, st.id, 'mu' || md5(${t3} || s.i || 'e' || g) || '@x.test', 'x',
+             'محمد' || md5(${t3} || s.i || 'f' || g), 'l' || md5(${t3} || s.i || 'l' || g),
+             '+2012' || lpad(g::text, 8, '0'), 'customer', now()
+      FROM generate_series(1, ${STORES}::int) s(i)
+      JOIN public.stores st ON st.slug = ${t3} || s.i::text
+      CROSS JOIN LATERAL generate_series(1, CASE WHEN s.i = ${STORES}::int THEN ${SMALL}::int ELSE ${PER_STORE}::int END) g`;
+      await prisma.$executeRaw`
+      INSERT INTO public.orders
+        (id, store_id, order_number, subtotal, total, shipping_address, billing_address, customer_id, updated_at)
+      SELECT ${t3} || '-o' || s.i || '-' || g, st.id, 'EB' || upper(md5(${t3} || s.i || 'o' || g)), 1000, 1000,
+             jsonb_build_object('firstName', 'محمد' || md5(${t3} || s.i || 'gf' || g), 'lastName', 'g' || md5(${t3} || s.i || 'gl' || g),
+               'email', 'mg' || md5(${t3} || s.i || 'ge' || g) || '@x.test', 'phone', '+2011' || lpad(g::text, 8, '0')),
+             jsonb_build_object('note', repeat('x', 600)), NULL, now()
+      FROM generate_series(1, ${STORES}::int) s(i)
+      JOIN public.stores st ON st.slug = ${t3} || s.i::text
+      CROSS JOIN LATERAL generate_series(1, CASE WHEN s.i = ${STORES}::int THEN ${SMALL}::int WHEN s.i = 1 THEN ${BIG_ORDERS}::int ELSE ${PER_STORE}::int END) g`;
+      await prisma.$executeRaw`ANALYZE public.orders`;
+      await prisma.$executeRaw`ANALYZE public.users`;
+    }, 240_000);
+
+    afterAll(async () => {
+      for (const s of storeIds) {
+        await prisma.$executeRaw`DELETE FROM public.orders WHERE store_id = ${s}`;
+        await prisma.$executeRaw`DELETE FROM public.users WHERE store_id = ${s}`;
+        await prisma.store.delete({ where: { id: s } }).catch(() => undefined);
+      }
+      if (owner) await prisma.user.delete({ where: { id: owner } }).catch(() => undefined);
+    }, 240_000);
+
+    it('the fixture is what the test says it is', async () => {
+      const [r] = await prisma.$queryRaw<Array<{ u: bigint; o: bigint; s: bigint }>>`
+      SELECT (SELECT count(*) FROM public.users WHERE id LIKE ${t3 + '-u%'}) AS u,
+             (SELECT count(*) FROM public.orders WHERE id LIKE ${t3 + '-o%'}) AS o,
+             (SELECT count(*) FROM public.stores WHERE slug LIKE ${t3 + '%'}) AS s`;
+      expect([Number(r.u), Number(r.o), Number(r.s)]).toEqual([
+        (STORES - 1) * PER_STORE + SMALL,
+        (STORES - 2) * PER_STORE + SMALL + BIG_ORDERS,
+        STORES,
+      ]);
+    });
+
+    it('the common name "محمد" in the tiny store: exact, fast, and it does not read the platform’s matches', async () => {
+      // warm the connection, then measure
+      await planner!.inStore(small(), () => matchingCustomers(small(), 'محمد'));
+      const ordersSeqBefore = await seqTupRead('orders');
+      const usersSeqBefore = await seqTupRead('users');
+      const t0 = performance.now();
+      const m = await planner!.inStore(small(), () => matchingCustomers(small(), 'محمد'));
+      const ms = performance.now() - t0;
+      expect(m.userIds).toHaveLength(SMALL);
+      expect(m.guestOrderIds).toHaveLength(SMALL);
+      expect(m.truncated).toBe(false);
+      expect(ms).toBeLessThan(150);
+      // ~19,000 guest orders and ~19,000 users carry the name platform-wide; neither table is read in full.
+      expect((await seqTupRead('orders')) - ordersSeqBefore).toBeLessThan(3000);
+      expect((await seqTupRead('users')) - usersSeqBefore).toBeLessThan(3000);
+    }, 60_000);
+
+    it('a phone fragment shared across stores is answered from the store only', async () => {
+      const t0 = performance.now();
+      const m = await planner!.inStore(small(), () => matchingCustomers(small(), '2012000000'));
+      const ms = performance.now() - t0;
+      expect(m.userIds).toHaveLength(SMALL);
+      expect(ms).toBeLessThan(150);
+    }, 60_000);
+
+    it('a large store’s rare-name search rides the store-leading index', async () => {
+      const big = storeIds[0];
+      const before = await planner!.idxScans('orders_guest_name_norm_trgm_idx');
+      const m = await planner!.inStore(big, () =>
+        matchingCustomers(
+          big,
+          `محمد${crypto.createHash('md5').update(`${t3}1gf500`).digest('hex')}`
+        )
+      );
+      expect(m.guestOrderIds).toEqual([`${t3}-o1-500`]);
+      await planner!.expectScansAbove('orders_guest_name_norm_trgm_idx', before);
+    }, 60_000);
+
+    it('a large store is capped, not unbounded (the palette’s small caps)', async () => {
+      const big = storeIds[0];
+      const m = await planner!.inStore(big, () =>
+        matchingCustomers(big, 'محمد', { userCap: 50, guestCap: 200 })
+      );
+      expect(m.userIds).toHaveLength(50);
+      expect(m.guestOrderIds).toHaveLength(200);
+      expect(m.usersTruncated && m.guestsTruncated).toBe(true);
+    }, 60_000);
+  }
+);

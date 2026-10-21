@@ -4,6 +4,12 @@
 -- and must be able to rebuild the indexes). The four indexes are expression trigram indexes; the
 -- store-scoped SECURITY DEFINER lookup of 20261027000200 is what lets ebda_app use them (RLS makes
 -- an inline predicate unable to; Ruling SEARCH-T14-1).
+-- The three guest-order indexes LEAD WITH store_id (btree_gin): a search is for ONE store, and a
+-- plain trigram index returns every store's matches before the store filter applies, so a small
+-- store paid for the platform's "محمد" (Ruling SEARCH-P2-8, review I3). With the composite the
+-- store restricts the index scan itself. users has no store column that names its customers (a
+-- customer's store comes through orders), so the users arms are driven from the store's own
+-- customer set instead (20261027000200).
 -- Index build time (measured locally, pgvector/pgvector:0.8.0-pg17, 1 GB, plain CREATE INDEX): 20k users: phone
 -- 41 ms, name 396 ms; 100k orders (all guests): guest phone 191 ms, guest name 1.98 s. Production sizes are
 -- far smaller today (pre-launch); re-measure before any post-launch CONCURRENTLY pre-build.
@@ -14,6 +20,7 @@
 -- Rollback: rollback.sql (roll the CODE back first).
 
 CREATE EXTENSION IF NOT EXISTS pg_trgm;
+CREATE EXTENSION IF NOT EXISTS btree_gin;
 
 CREATE OR REPLACE FUNCTION public.ebda_digits(t text) RETURNS text
 LANGUAGE sql IMMUTABLE STRICT PARALLEL SAFE AS $$
@@ -25,7 +32,10 @@ CREATE INDEX IF NOT EXISTS "users_phone_digits_trgm_idx" ON "users" USING gin
 CREATE INDEX IF NOT EXISTS "users_name_norm_trgm_idx" ON "users" USING gin
   (public.ebda_ar_norm(coalesce("first_name", '') || ' ' || coalesce("last_name", '')) gin_trgm_ops);
 CREATE INDEX IF NOT EXISTS "orders_guest_phone_digits_trgm_idx" ON "orders" USING gin
-  (public.ebda_digits("shipping_address" ->> 'phone') gin_trgm_ops) WHERE "customer_id" IS NULL;
-CREATE INDEX IF NOT EXISTS "orders_guest_name_norm_trgm_idx" ON "orders" USING gin
-  (public.ebda_ar_norm(coalesce("shipping_address" ->> 'firstName', '') || ' ' || coalesce("shipping_address" ->> 'lastName', '')) gin_trgm_ops)
+  ("store_id", public.ebda_digits("shipping_address" ->> 'phone') gin_trgm_ops)
   WHERE "customer_id" IS NULL;
+CREATE INDEX IF NOT EXISTS "orders_guest_name_norm_trgm_idx" ON "orders" USING gin
+  ("store_id", public.ebda_ar_norm(coalesce("shipping_address" ->> 'firstName', '') || ' ' || coalesce("shipping_address" ->> 'lastName', '')) gin_trgm_ops)
+  WHERE "customer_id" IS NULL;
+CREATE INDEX IF NOT EXISTS "orders_guest_email_store_trgm_idx" ON "orders" USING gin
+  ("store_id", ("shipping_address" ->> 'email') gin_trgm_ops) WHERE "customer_id" IS NULL;

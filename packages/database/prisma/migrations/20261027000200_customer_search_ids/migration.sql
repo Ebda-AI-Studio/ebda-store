@@ -15,9 +15,10 @@
 -- is taken only from app.current_store_id (no scope: 42501; another store in the argument: empty);
 -- it returns ids only; a 'user' must be one the `users` policy would show a store scope (same store,
 -- the caller, the store's owner/staff, or a super admin). Callers re-read rows as ebda_app.
--- When no pattern is long enough for a trigram (every name token and the phone shorter than 3
--- characters) the user arm is evaluated over the store's own customer set instead of the global
--- users table, so a two-letter term never scans every store's users.
+-- Store first (Ruling SEARCH-P2-8): the user arm is joined to THE STORE'S OWN customer set (users
+-- with a live order here, or registered on this store) before the name/phone/email match, so a
+-- small store never pays for the platform's matches of a common name; the guest arm rides the
+-- store-leading indexes of 20261027000100. Soft-deleted users are excluded (review M1).
 --
 -- Additive (CREATE FUNCTION only). Rollback: rollback.sql (roll the CODE back first).
 
@@ -45,7 +46,6 @@ DECLARE
   v_phone_g text := 'false';
   v_email_u text := 'false';
   v_email_g text := 'false';
-  v_trigram boolean := false;
   v_candidates text;
   i integer;
 BEGIN
@@ -80,30 +80,25 @@ BEGIN
     END LOOP;
     v_name_u := v_name_u || ')';
     v_name_g := v_name_g || ')';
-    -- a pattern is '%token%': the token is long enough for a trigram at 3+ characters
-    SELECT bool_or(length(p) - 2 >= 3) INTO v_trigram FROM unnest(v_names) p;
   END IF;
   IF p_digits_pattern IS NOT NULL THEN
     v_phone_u := 'public.ebda_digits(u.phone) LIKE $3';
     v_phone_g := 'public.ebda_digits(o.shipping_address ->> ''phone'') LIKE $3';
-    v_trigram := true; -- the phone term is always >= 4 digits
   END IF;
   IF p_email_pattern IS NOT NULL THEN
     v_email_u := 'u.email ILIKE $4';
     v_email_g := 'o.shipping_address ->> ''email'' ILIKE $4';
-    v_trigram := v_trigram OR length(p_email_pattern) - 2 >= 3;
   END IF;
 
-  -- the store's own customers: the bounded form for terms no trigram index can serve
-  v_candidates := CASE WHEN v_trigram THEN '' ELSE
+  -- the store's own customers (live order here, or registered here): the match runs inside this set
+  v_candidates :=
     ' AND u.id IN (SELECT o2.customer_id FROM public.orders o2 WHERE o2.store_id = $1 AND o2.deleted_at IS NULL AND o2.customer_id IS NOT NULL
-                   UNION SELECT u2.id FROM public.users u2 WHERE u2.store_id = $1 AND u2.role = ''customer'' AND u2.deleted_at IS NULL)' END;
+                   UNION SELECT u2.id FROM public.users u2 WHERE u2.store_id = $1 AND u2.role = ''customer'' AND u2.deleted_at IS NULL)';
 
   RETURN QUERY EXECUTE
     'SELECT ''user''::text, u.id FROM public.users u
-      WHERE (' || v_name_u || ' OR ' || v_phone_u || ' OR ' || v_email_u || ')' || v_candidates || '
-        AND (EXISTS (SELECT 1 FROM public.orders o WHERE o.store_id = $1 AND o.deleted_at IS NULL AND o.customer_id = u.id)
-             OR (u.store_id = $1 AND u.role = ''customer'' AND u.deleted_at IS NULL))
+      WHERE u.deleted_at IS NULL' || v_candidates || '
+        AND (' || v_name_u || ' OR ' || v_phone_u || ' OR ' || v_email_u || ')
         AND (u.store_id = $1
              OR u.id = nullif(current_setting(''app.current_user_id'', true), '''')
              OR EXISTS (SELECT 1 FROM public.stores s WHERE s.owner_id = u.id AND s.id = $1)

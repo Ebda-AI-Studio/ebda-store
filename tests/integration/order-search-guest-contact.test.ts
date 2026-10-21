@@ -194,7 +194,7 @@ describe.skipIf(!hasDb)('order search: guest contact', () => {
       SELECT indexname, indexdef FROM pg_indexes
       WHERE schemaname = 'public' AND indexname LIKE 'orders\\_guest\\_%\\_trgm\\_idx'
         -- the normalised expression indexes of 20261027000100 are not key indexes
-        AND indexname NOT IN ('orders_guest_name_norm_trgm_idx', 'orders_guest_phone_digits_trgm_idx')
+        AND indexname NOT IN ('orders_guest_name_norm_trgm_idx', 'orders_guest_phone_digits_trgm_idx', 'orders_guest_email_store_trgm_idx')
       ORDER BY indexname
     `;
     expect(rows.map(r => r.indexname)).toEqual([
