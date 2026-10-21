@@ -2,8 +2,8 @@
 
 import { useId, useRef, useState, type KeyboardEvent } from 'react';
 import {
-  LOOK_TEMPLATES,
   TEMPLATE_FAMILIES,
+  builtLookTemplates,
   getLook,
   looksForTemplate,
   type LookId,
@@ -18,19 +18,20 @@ interface LookPickerProps {
 }
 
 /**
- * Pick a storefront look: five template tabs (registry order, Dahab first), three looks each.
- * The registry (`LOOKS`) is the only source of names and copy; this component owns no template list.
+ * Pick a storefront look: one tab per BUILT template (registry order), its built looks under it.
+ * The registry (`LOOKS`, `status`) is the only source of names, copy and what is offered, so a
+ * template that ships appears here with no edit; this component owns no template list. The
+ * store's current look (`value`) stays visible even if it is not built, so an existing store can
+ * see where it is, but nothing unbuilt can be picked into.
  */
 export function LookPicker({ value, onChange, locale }: LookPickerProps) {
   const t = useT('looks.picker');
   const uid = useId();
   const rtl = locale === 'ar';
-  const [active, setActive] = useState<LookTemplate>(
-    () =>
-      getLook(value)?.template ??
-      LOOK_TEMPLATES.find(t => looksForTemplate(t).some(l => l.status === 'built')) ??
-      LOOK_TEMPLATES[0]!
-  );
+  const current = getLook(value);
+  const tabs: LookTemplate[] = builtLookTemplates();
+  if (current && !tabs.includes(current.template)) tabs.push(current.template);
+  const [active, setActive] = useState<LookTemplate>(() => current?.template ?? tabs[0]!);
   const tabRefs = useRef<(HTMLButtonElement | null)[]>([]);
 
   const label = (id: LookTemplate) => {
@@ -39,10 +40,10 @@ export function LookPicker({ value, onChange, locale }: LookPickerProps) {
   };
 
   function focusIndex(index: number) {
-    const n = LOOK_TEMPLATES.length;
+    const n = tabs.length;
     const clamped = ((index % n) + n) % n;
     tabRefs.current[clamped]?.focus();
-    setActive(LOOK_TEMPLATES[clamped]!);
+    setActive(tabs[clamped]!);
   }
 
   function onKeyDown(e: KeyboardEvent<HTMLButtonElement>, index: number) {
@@ -63,14 +64,14 @@ export function LookPicker({ value, onChange, locale }: LookPickerProps) {
         break;
       case 'End':
         e.preventDefault();
-        focusIndex(LOOK_TEMPLATES.length - 1);
+        focusIndex(tabs.length - 1);
         break;
       default:
         break;
     }
   }
 
-  const looks = looksForTemplate(active);
+  const looks = looksForTemplate(active).filter(l => l.status === 'built' || l.id === value);
 
   return (
     <div dir={rtl ? 'rtl' : 'ltr'} className="space-y-3">
@@ -79,7 +80,7 @@ export function LookPicker({ value, onChange, locale }: LookPickerProps) {
         aria-label={t('tabs')}
         className="flex flex-wrap gap-2 border-b border-border"
       >
-        {LOOK_TEMPLATES.map((id, index) => {
+        {tabs.map((id, index) => {
           const on = id === active;
           return (
             <button

@@ -941,12 +941,14 @@ export class StoreService {
   static async updateTemplate(storeId: string, template: string) {
     const store = await this.getById(storeId);
 
-    const validTemplates = ['modern', 'classic', 'minimal', 'bold', 'elegant', 'dahab'];
-    if (!validTemplates.includes(template)) {
+    // Existing stores keep their current skin (a re-save of it is allowed), but nobody can switch
+    // INTO a bare skin: the five legacy Force skins are closed to new choices and Qamar is only
+    // reachable through a look (Ruling B1-17). Switching is `applyLook`, gated on built looks.
+    if (template !== store.template) {
       throw new AppError(
         400,
         'INVALID_TEMPLATE',
-        `Template must be one of: ${validTemplates.join(', ')}`
+        'A store cannot switch to a bare template; choose a look instead'
       );
     }
 
@@ -979,6 +981,10 @@ export class StoreService {
     const look = getLook(lookId);
     if (!look) throw new AppError(400, 'INVALID_LOOK', 'Unknown look');
     const store = await this.getById(storeId);
+    // Only built looks can be switched into (re-applying the store's own current look stays allowed).
+    if (look.status !== 'built' && store.look !== look.id) {
+      throw new AppError(400, 'LOOK_NOT_AVAILABLE', 'This look is not available yet');
+    }
     // Builder FIRST: it can refuse (409/422), and a refusal throws before any store write, so a
     // refused switch leaves the store row untouched. /stores/:id routes run under
     // storeScopeContext (no request transaction): each query below is its own transaction, so the
