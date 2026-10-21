@@ -50,6 +50,23 @@ const STALE_AFTER_MS = 6 * 60 * 60 * 1000;
 const SWEEP_WINDOW_MS = (CART_EMAIL_MAX_DELAY_MINUTES + 60) * 60 * 1000 + STALE_AFTER_MS;
 const ERROR_MAX = 300;
 
+/**
+ * Resend errors that are the REQUEST's fault (4xx): retrying cannot help, so the cart is marked
+ * failed. Everything else (5xx `application_error`, rate limits, unknown codes, network errors)
+ * is transient and is rethrown so Inngest retries it; the idempotency key makes the retry safe
+ * and `onFailure` marks the cart failed once the retries are exhausted.
+ */
+const PERMANENT_SEND_CODES: ReadonlySet<string> = new Set([
+  'validation_error',
+  'missing_required_field',
+  'invalid_from_address',
+  'invalid_to',
+  'invalid_parameter',
+  'invalid_access',
+  'restricted_api_key',
+  'not_found',
+]);
+
 export const CART_RECOVERY_EMAIL_EVENT = 'cart-recovery/email-requested';
 
 /** Delay is minutes of inactivity; the record already exists after 60 idle minutes. */
@@ -292,7 +309,7 @@ export async function deliverCartRecoveryEmail(
       idempotencyKey: `cart-recovery-email/${ac.id}`,
     });
   } catch (err) {
-    if (err instanceof ResendSendError && err.code === 'rate_limit_exceeded') throw err;
+    if (!(err instanceof ResendSendError && PERMANENT_SEND_CODES.has(err.code))) throw err;
     const message = (err instanceof Error ? err.message : 'send failed').slice(0, ERROR_MAX);
     await finish(storeId, ac.id, { emailStatus: 'failed', emailDetail: message });
     logger.warn(

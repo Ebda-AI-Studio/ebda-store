@@ -400,6 +400,33 @@ describe('deliverCartRecoveryEmail', () => {
     expect(c.emailStatus).toBe('failed');
   });
 
+  it.each([
+    ['a Resend 5xx', () => new ResendSendError('application_error', 'resend is down')],
+    ['an unknown Resend code', () => new ResendSendError('something_new', 'huh')],
+    ['a network error', () => new TypeError('fetch failed')],
+  ])('%s is transient: rethrown so Inngest retries, the row stays queued', async (_n, mk) => {
+    const c = queued();
+    db.subs.push(sub('sara@example.com'));
+    h.sendMarketingEmail.mockRejectedValueOnce(mk());
+    await expect(deliverCartRecoveryEmail(STORE_A, c.id)).rejects.toThrow();
+    expect(c.emailStatus).toBe('queued');
+    // the retry reaches Resend again with the same idempotency key
+    expect((await deliverCartRecoveryEmail(STORE_A, c.id)).outcome).toBe('sent');
+    const keys = h.sendMarketingEmail.mock.calls.map(call => (call[1] as Row).idempotencyKey);
+    expect(new Set(keys).size).toBe(1);
+  });
+
+  it.each(['validation_error', 'missing_required_field', 'invalid_from_address'])(
+    'a permanent 4xx (%s) marks the cart failed without a retry',
+    async code => {
+      const c = queued();
+      db.subs.push(sub('sara@example.com'));
+      h.sendMarketingEmail.mockRejectedValueOnce(new ResendSendError(code, 'nope'));
+      expect((await deliverCartRecoveryEmail(STORE_A, c.id)).outcome).toBe('failed');
+      expect(c.emailStatus).toBe('failed');
+    }
+  );
+
   it('waits for a platform send slot and retries (throws) when none is free', async () => {
     const c = queued();
     db.subs.push(sub('sara@example.com'));
