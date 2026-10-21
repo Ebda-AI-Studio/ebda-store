@@ -268,10 +268,7 @@ export default function PasskeysCard() {
                     {' \u00b7 '}
                     {p.lastUsedAt
                       ? `${t('Last used', '\u0622\u062e\u0631 \u0627\u0633\u062a\u062e\u062f\u0627\u0645')} ${fmt(p.lastUsedAt)}`
-                      : t(
-                          'Never used',
-                          '\u0644\u0633\u0647 \u0645\u0627 \u0627\u062a\u0633\u062a\u062e\u062f\u0645\u0634'
-                        )}
+                      : t('Never used', 'لسه مااتستخدمش')}
                   </p>
                   {p.needsReenrol && (
                     <p className="mt-1 text-xs text-warning-ink">

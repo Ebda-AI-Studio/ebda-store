@@ -18,10 +18,10 @@ const purgedWhy = (d: PasskeyNoticeData, lang: 'en' | 'ar') =>
   d.reason === 'password_reset'
     ? lang === 'en'
       ? 'reset'
-      : 'إعادة تعيين'
+      : 'اتعمل لها إعادة تعيين'
     : lang === 'en'
       ? 'changed'
-      : 'تغيير';
+      : 'اتغيّرت';
 
 /**
  * Security notice: a passkey was added to / removed from the account, or every passkey was removed because
@@ -39,10 +39,10 @@ export const passkeyNoticeTemplate = {
           : 'Your passkeys were removed',
     ar: (d: PasskeyNoticeData) =>
       d.kind === 'added'
-        ? 'تمت إضافة مفتاح مرور إلى حسابك'
+        ? 'مفتاح مرور اتضاف لحسابك'
         : d.kind === 'removed'
-          ? 'تم حذف مفتاح مرور من حسابك'
-          : 'تم حذف مفاتيح المرور من حسابك',
+          ? 'مفتاح مرور اتشال من حسابك'
+          : 'مفاتيح المرور اتشالت من حسابك',
   },
 
   en: (d: PasskeyNoticeData) =>
@@ -69,21 +69,21 @@ export const passkeyNoticeTemplate = {
   ar: (d: PasskeyNoticeData) =>
     d.kind === 'purged'
       ? `
-    <h2>تم حذف مفاتيح المرور</h2>
-    <p>مرحباً ${escapeHtml(d.name)}،</p>
-    <p>تم ${purgedWhy(d, 'ar')} كلمة المرور بتاريخ ${escapeHtml(stamp(d.at))}. حفاظاً على أمانك، تم حذف كل مفاتيح المرور على حسابك (${d.count ?? 0}) وتسجيل خروجك من جميع الأجهزة.</p>
-    <p>سجّل الدخول بكلمة المرور الجديدة، ويمكنك إضافة مفاتيح المرور من جديد من إعدادات الأمان.</p>
-    <p><strong>إذا لم تكن أنت</strong>، تواصل مع الدعم فوراً.</p>
+    <h2>مفاتيح المرور اتشالت</h2>
+    <p>أهلاً ${escapeHtml(d.name)}،</p>
+    <p>كلمة المرور ${purgedWhy(d, 'ar')} بتاريخ ${escapeHtml(stamp(d.at))}. عشان أمانك، شلنا كل مفاتيح المرور على حسابك (${d.count ?? 0}) وسجّلنا خروجك من كل أجهزتك.</p>
+    <p>سجّل دخول بكلمة المرور الجديدة، وتقدر تضيف مفاتيح المرور تاني من إعدادات الأمان.</p>
+    <p><strong>لو مش إنت</strong>، كلّم الدعم فوراً.</p>
   `
       : `
-    <h2>${d.kind === 'added' ? 'تمت إضافة مفتاح مرور' : 'تم حذف مفتاح مرور'}</h2>
-    <p>مرحباً ${escapeHtml(d.name)}،</p>
-    <p>${d.kind === 'added' ? 'تمت إضافة' : 'تم حذف'} مفتاح المرور <strong>${escapeHtml(d.passkeyName)}</strong> ${d.kind === 'added' ? 'إلى' : 'من'} حسابك بتاريخ ${escapeHtml(stamp(d.at))}.</p>
+    <h2>${d.kind === 'added' ? 'مفتاح مرور اتضاف' : 'مفتاح مرور اتشال'}</h2>
+    <p>أهلاً ${escapeHtml(d.name)}،</p>
+    <p>مفتاح المرور <strong>${escapeHtml(d.passkeyName)}</strong> ${d.kind === 'added' ? 'اتضاف لـ' : 'اتشال من'} حسابك بتاريخ ${escapeHtml(stamp(d.at))}.</p>
     <p>${
       d.kind === 'added'
-        ? 'يستطيع هذا المفتاح الآن تسجيل الدخول إلى حسابك بدون كلمة مرور.'
-        : 'تم تسجيل خروجك من جميع أجهزتك.'
+        ? 'المفتاح ده يقدر دلوقتي يسجّل دخول لحسابك من غير كلمة مرور.'
+        : 'سجّلنا خروجك من كل أجهزتك.'
     }</p>
-    <p><strong>إذا لم تكن أنت</strong>، غيّر كلمة المرور فوراً. تغيير كلمة المرور أو إعادة تعيينها يحذف كل مفاتيح المرور على الحساب.</p>
+    <p><strong>لو مش إنت</strong>، غيّر كلمة المرور فوراً. تغيير كلمة المرور أو إعادة تعيينها بيشيل كل مفاتيح المرور على الحساب.</p>
   `,
 };

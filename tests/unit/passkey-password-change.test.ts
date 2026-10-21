@@ -292,7 +292,7 @@ describe('the notice copy is true (review I1)', () => {
   it('every sentence that promises "password change/reset removes passkeys" is backed by code', () => {
     const claims = [
       /Changing or resetting your password removes every passkey/,
-      /تغيير كلمة المرور أو إعادة تعيينها يحذف كل مفاتيح المرور/,
+      /تغيير كلمة المرور أو إعادة تعيينها بيشيل كل مفاتيح المرور/,
     ];
     const rendered = [
       passkeyNoticeTemplate.en(sample('added')),
@@ -308,7 +308,7 @@ describe('the notice copy is true (review I1)', () => {
 
   it('the purged notice states the count and the right verb in both languages', () => {
     expect(passkeyNoticeTemplate.en(sample('purged'))).toMatch(/changed[^<]*\(2\)/);
-    expect(passkeyNoticeTemplate.ar(sample('purged'))).toMatch(/تغيير كلمة المرور[^<]*\(2\)/);
+    expect(passkeyNoticeTemplate.ar(sample('purged'))).toMatch(/كلمة المرور اتغيّرت[^<]*\(2\)/);
     expect(passkeyNoticeTemplate.en({ ...sample('purged'), reason: 'password_reset' })).toMatch(
       /reset/
     );
