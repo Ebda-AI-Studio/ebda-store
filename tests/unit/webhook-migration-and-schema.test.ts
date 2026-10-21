@@ -42,6 +42,18 @@ describe.each(['webhook_endpoints', 'webhook_deliveries'])('%s', table => {
   });
 });
 
+describe('M3 a delivery can only belong to an endpoint of the SAME store', () => {
+  it('endpoint_id + store_id is a composite FK onto a unique (id, store_id)', () => {
+    expect(sql).toMatch(
+      /CREATE UNIQUE INDEX "webhook_endpoints_id_store_id_key" ON "webhook_endpoints"\("id", "store_id"\)/
+    );
+    expect(sql).toMatch(
+      /"webhook_deliveries_endpoint_id_store_id_fkey" FOREIGN KEY \("endpoint_id", "store_id"\) REFERENCES "webhook_endpoints"\("id", "store_id"\) ON DELETE CASCADE/
+    );
+    expect(sql).not.toMatch(/FOREIGN KEY \("endpoint_id"\)/);
+  });
+});
+
 describe('endpoint contracts', () => {
   const ok = { url: 'https://hooks.example.com/ebda', events: ['order.created'] };
   it('accepts a public https url and dedupes events', () => {

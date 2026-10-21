@@ -5395,6 +5395,7 @@ model WebhookEndpoint {
   store      Store             @relation(fields: [storeId], references: [id], onDelete: Cascade)
   deliveries WebhookDelivery[]
 
+  @@unique([id, storeId])
   @@index([storeId, createdAt])
   @@map("webhook_endpoints")
 }
@@ -5427,7 +5428,7 @@ model WebhookDelivery {
   updatedAt       DateTime  @updatedAt @map("updated_at")
 
   store    Store           @relation(fields: [storeId], references: [id], onDelete: Cascade)
-  endpoint WebhookEndpoint @relation(fields: [endpointId], references: [id], onDelete: Cascade)
+  endpoint WebhookEndpoint @relation(fields: [endpointId, storeId], references: [id, storeId], onDelete: Cascade)
 
   @@unique([endpointId, dedupeKey])
   @@index([endpointId, createdAt(sort: Desc)])

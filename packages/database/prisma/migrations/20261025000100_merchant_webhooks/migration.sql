@@ -61,6 +61,9 @@ CREATE TABLE "webhook_deliveries" (
 );
 
 -- CreateIndex
+CREATE UNIQUE INDEX "webhook_endpoints_id_store_id_key" ON "webhook_endpoints"("id", "store_id");
+
+-- CreateIndex
 CREATE INDEX "webhook_endpoints_store_id_created_at_idx" ON "webhook_endpoints"("store_id", "created_at");
 
 -- CreateIndex
@@ -78,8 +81,8 @@ ALTER TABLE "webhook_endpoints" ADD CONSTRAINT "webhook_endpoints_store_id_fkey"
 -- AddForeignKey
 ALTER TABLE "webhook_deliveries" ADD CONSTRAINT "webhook_deliveries_store_id_fkey" FOREIGN KEY ("store_id") REFERENCES "stores"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
--- AddForeignKey
-ALTER TABLE "webhook_deliveries" ADD CONSTRAINT "webhook_deliveries_endpoint_id_fkey" FOREIGN KEY ("endpoint_id") REFERENCES "webhook_endpoints"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+-- AddForeignKey (composite: a delivery can only point at an endpoint of its OWN store)
+ALTER TABLE "webhook_deliveries" ADD CONSTRAINT "webhook_deliveries_endpoint_id_store_id_fkey" FOREIGN KEY ("endpoint_id", "store_id") REFERENCES "webhook_endpoints"("id", "store_id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- Strict tenant isolation (R-EBDA-001): the same single policy every store_id table carries.
 ALTER TABLE webhook_endpoints ENABLE ROW LEVEL SECURITY;
