@@ -151,7 +151,7 @@ function totalsRows(d: OrderEmailData, locale: 'en' | 'ar'): string {
 export const orderConfirmationTemplate = {
   subject: {
     en: (d: OrderEmailData, _storeName: string) => `Order Confirmed - #${d.orderNumber}`,
-    ar: (d: OrderEmailData, _storeName: string) => `تم تأكيد الطلب - #${d.orderNumber}`,
+    ar: (d: OrderEmailData, _storeName: string) => `طلبك اتأكد - #${d.orderNumber}`,
   },
 
   en: (d: OrderEmailData, _storeName: string) => {
@@ -210,8 +210,8 @@ export const orderConfirmationTemplate = {
 
     return `
     <h2>شكراً على طلبك!</h2>
-    <p>مرحباً ${escapeHtml(d.customerName)}،</p>
-    <p>استلمنا طلبك وجاري تجهيزه. سنبلغك حين يتم الشحن.</p>
+    <p>أهلاً ${escapeHtml(d.customerName)}،</p>
+    <p>طلبك اتسجل عندنا وبنجهّزه دلوقتي. هنبلغك أول ما يتشحن.</p>
 
     <h3>طلب رقم ${escapeHtml(d.orderNumber)}</h3>${barcodeImgHtml(d.barcode, d.orderNumber, 'ar', 'order')}
 

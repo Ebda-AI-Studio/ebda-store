@@ -55,7 +55,9 @@ function AboutFallback() {
               )}
               {store.phone && (
                 <li>
-                  <span className="font-medium text-foreground">{t('Phone:', 'الهاتف:')}</span>{' '}
+                  <span className="font-medium text-foreground">
+                    {t('Phone:', 'رقم الموبايل:')}
+                  </span>{' '}
                   <a href={`tel:${store.phone}`} className="text-primary hover:underline" dir="ltr">
                     {store.phone}
                   </a>

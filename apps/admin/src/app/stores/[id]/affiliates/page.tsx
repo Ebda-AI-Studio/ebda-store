@@ -290,7 +290,7 @@ export default function AffiliatesPage() {
         <button
           type="button"
           onClick={openInviteModal}
-          className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors flex items-center gap-2 text-sm font-medium"
+          className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors flex items-center gap-2 text-sm font-medium"
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -313,7 +313,7 @@ export default function AffiliatesPage() {
               onClick={() => setActiveTab('affiliates')}
               className={`px-4 py-2 rounded-lg font-medium transition-colors ${
                 activeTab === 'affiliates'
-                  ? 'bg-primary text-white'
+                  ? 'bg-primary text-primary-foreground'
                   : 'bg-muted text-foreground hover:bg-muted/80'
               }`}
             >
@@ -324,7 +324,7 @@ export default function AffiliatesPage() {
               onClick={() => setActiveTab('config')}
               className={`px-4 py-2 rounded-lg font-medium transition-colors ${
                 activeTab === 'config'
-                  ? 'bg-primary text-white'
+                  ? 'bg-primary text-primary-foreground'
                   : 'bg-muted text-foreground hover:bg-muted/80'
               }`}
             >
@@ -517,7 +517,7 @@ export default function AffiliatesPage() {
                 <button
                   type="submit"
                   disabled={inviting || !inviteName.trim() || !inviteEmail.trim()}
-                  className="px-4 py-2 bg-primary text-white rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-50"
+                  className="px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-50"
                 >
                   {inviting ? tPage('inviting') : tPage('inviteSubmit')}
                 </button>

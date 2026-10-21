@@ -1,7 +1,7 @@
 import { deriveBrandRoles } from '@ebda/shared';
 
 export interface StoreTheme {
-  // Core brand colors (HSL triplets e.g. '26 100% 50%')
+  // Core brand colors (HSL triplets e.g. '36 36% 52%')
   primaryColor: string;
   primaryForeground: string;
   secondaryColor: string;
@@ -38,6 +38,8 @@ export interface StoreTheme {
    * badge is in that corner. Default false.
    */
   showBrandBadge?: boolean;
+  /** Opt-in "New" badge on product cards (Ruling D1016-NEW-1). Default false. */
+  showNewBadge?: boolean;
   /**
    * Opt-in quick-add (+) circle overlay on carousel cards (E3).
    * Single-tap add-to-cart without leaving the page. Default false.
@@ -194,14 +196,15 @@ export interface StoreBranding {
 export type BrandingTabId = 'branding' | 'theme' | 'contact' | 'social' | 'locations';
 
 const BASE_THEME: StoreTheme = {
-  primaryColor: '26 100% 50%',
-  // Derived below: the storefront picks the ink from the primary (deriveBrandRoles); a literal
-  // white here was 2.79:1 on this orange (FU46 M-3).
+  // Ebda night (Ruling D1016-ORANGE-1, mirrors DEFAULT_THEME in @ebda/shared).
+  primaryColor: '210 9% 4%',
+  // Derived below: the storefront picks the ink from the primary (deriveBrandRoles) — white on
+  // night, 19.7:1 (FU46 M-3).
   primaryForeground: '',
   secondaryColor: '220 14% 96%',
   secondaryForeground: '220 9% 46%',
-  accentColor: '26 100% 95%',
-  accentForeground: '26 100% 25%',
+  accentColor: '36 36% 95%',
+  accentForeground: '36 40% 25%',
   backgroundColor: '0 0% 100%',
   foregroundColor: '224 71% 4%',
   cardColor: '0 0% 100%',
@@ -213,6 +216,7 @@ const BASE_THEME: StoreTheme = {
   borderRadius: 'md',
   backgroundPreset: 'none',
   showBrandBadge: false,
+  showNewBadge: false,
   showQuickAdd: false,
   showBrandStory: true,
   showTrustStrip: true,

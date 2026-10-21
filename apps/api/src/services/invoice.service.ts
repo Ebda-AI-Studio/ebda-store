@@ -38,10 +38,10 @@ function escapeHtml(value: string | null | undefined): string {
 
 /**
  * Read a brand color from the store's theme JSON. Theme stores HSL components
- * (e.g. "26 100% 50%") matching the Tailwind theme-token format. Returns a
- * complete `hsl(...)` string; falls back to Force Orange when no color set.
+ * (e.g. "36 36% 52%") matching the Tailwind theme-token format. Returns a
+ * complete `hsl(...)` string; falls back to Ebda night when no color set (Ruling D1016-ORANGE-1).
  */
-function readBrandColor(theme: unknown, fallback = 'hsl(26 100% 50%)'): string {
+function readBrandColor(theme: unknown, fallback = 'hsl(210 9% 4%)'): string {
   if (theme && typeof theme === 'object' && 'primaryColor' in theme) {
     const v = (theme as { primaryColor?: unknown }).primaryColor;
     if (typeof v === 'string' && v.trim()) return `hsl(${v})`;

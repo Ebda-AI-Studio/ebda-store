@@ -406,7 +406,7 @@ export function VariantSelector({
                   ? t(`Choose ${axisLabel}`, `اختر ${axisLabel}`)
                   : t(
                       'This combination is not available. Please choose a different option.',
-                      'هذه التركيبة غير متوفرة. يرجى اختيار خيار آخر.'
+                      'الاختيار ده مش متوفر. اختار حاجة تانية.'
                     )
                 : ''}
             </p>
@@ -431,7 +431,7 @@ export function VariantSelector({
           <p className="text-muted-foreground">
             {t(
               'This combination is not available. Please choose a different option.',
-              'هذه التركيبة غير متوفرة. يرجى اختيار خيار آخر.'
+              'الاختيار ده مش متوفر. اختار حاجة تانية.'
             )}
           </p>
         </div>

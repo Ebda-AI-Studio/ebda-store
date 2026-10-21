@@ -72,7 +72,7 @@ export async function requireStoreAccess(
       const messageEn =
         'This store is read-only: your plan covers fewer stores. Upgrade to Business to edit it again.';
       const messageAr =
-        'هذا المتجر للقراءة فقط: باقتك تشمل عددًا أقل من المتاجر. قم بالترقية إلى باقة الأعمال لتعديله من جديد.';
+        'المتجر ده للقراءة بس: باقتك فيها متاجر أقل. اعمل ترقية لباقة الأعمال عشان تعدّله تاني.';
       throw new AppError(402, 'STORE_OVER_PLAN_LIMIT', messageEn, {
         limitKey: 'maxStores',
         upgradeTo: upgradePlanFor('maxStores', 2),

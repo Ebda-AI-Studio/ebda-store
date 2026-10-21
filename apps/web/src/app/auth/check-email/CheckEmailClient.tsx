@@ -39,14 +39,14 @@ export default function CheckEmailClient() {
           <p className="text-muted-foreground">
             {t(
               "We've sent a verification link to your inbox. Open the email and click the link to finish setting up your account.",
-              'أرسلنا رابط التحقق إلى بريدك. افتح البريد واضغط على الرابط لإكمال إعداد حسابك.'
+              'بعتنا رابط التأكيد على بريدك. افتح البريد ودوس على الرابط عشان تكمّل إعداد حسابك.'
             )}
           </p>
 
           <p className="text-sm text-muted-foreground">
             {t(
               "If your email is already registered, we'll let you know in your inbox so you can sign in or reset your password.",
-              'إذا كان بريدك مسجلاً بالفعل، سنخبرك في بريدك لتتمكن من تسجيل الدخول أو إعادة تعيين كلمة المرور.'
+              'لو بريدك متسجل قبل كده، هنبعتلك على بريدك عشان تسجّل دخول أو تغيّر كلمة المرور.'
             )}
           </p>
 

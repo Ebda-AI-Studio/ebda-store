@@ -173,7 +173,7 @@ function PecannbeeProductCardImpl({
     }
   };
 
-  const showNewBadge = inStock && isProductNew(product, renderNow);
+  const showNewBadge = inStock && isProductNew(product, renderNow, store.theme);
 
   // Task 3 B: read CTA + OOS defaults from productCardDefaults.
   const defaults = layout?.productCardDefaults;

@@ -111,7 +111,7 @@ function AffiliatePageContent() {
       if (!res.ok || !json.success) {
         const msg =
           json?.error?.message ||
-          t('Something went wrong. Please try again.', 'حدث خطأ ما. يرجى المحاولة مرة أخرى.');
+          t('Something went wrong. Please try again.', 'حصل خطأ. جرّب تاني.');
         setError(msg);
       } else {
         setSuccess(true);
@@ -121,7 +121,7 @@ function AffiliatePageContent() {
       setError(
         t(
           'Network error. Please check your connection and try again.',
-          'خطأ في الشبكة. يرجى التحقق من اتصالك والمحاولة مرة أخرى.'
+          'مشكلة في الشبكة. اتأكد من اتصالك وجرّب تاني.'
         )
       );
     } finally {
@@ -156,7 +156,7 @@ function AffiliatePageContent() {
             <p className="text-muted-foreground">
               {t(
                 'The affiliate program is not currently available for this store.',
-                'برنامج الشراكة غير متاح حالياً لهذا المتجر.'
+                'برنامج الشراكة مش متاح للمتجر ده دلوقتي.'
               )}
             </p>
           </div>
@@ -192,7 +192,9 @@ function AffiliatePageContent() {
             <p className="text-muted-foreground">
               {t(
                 `Partner with ${store?.name || 'us'} and earn commissions for every sale you refer.`,
-                `كن شريكاً مع ${store?.name || 'نا'} واكسب عمولات على كل عملية بيع تحيلها.`
+                store?.name
+                  ? `خليك شريك مع ${store.name} واكسب عمولة على كل بيعة تجيبها.`
+                  : 'اشترك معانا في برنامج الشراكة واكسب عمولة على كل بيعة تجيبها.'
               )}
             </p>
           </div>
@@ -216,12 +218,12 @@ function AffiliatePageContent() {
                 </svg>
               </div>
               <h2 className="text-lg font-semibold text-success-ink mb-2">
-                {t('Application Submitted!', 'تم إرسال الطلب!')}
+                {t('Application Submitted!', 'الطلب اتبعت!')}
               </h2>
               <p className="text-success-ink">
                 {t(
                   "We'll review it shortly and get back to you via email.",
-                  'سنقوم بمراجعته قريباً والرد عليك عبر البريد الإلكتروني.'
+                  'هنراجعه قريب ونرد عليك على البريد الإلكتروني.'
                 )}
               </p>
             </div>
@@ -270,7 +272,7 @@ function AffiliatePageContent() {
 
                 <div>
                   <label htmlFor="phone" className="block text-sm font-medium text-foreground mb-1">
-                    {t('Phone Number', 'رقم الهاتف')}
+                    {t('Phone Number', 'رقم الموبايل')}
                   </label>
                   <input
                     id="phone"
@@ -337,7 +339,7 @@ function AffiliatePageContent() {
                   {submitting && (
                     <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-current" />
                   )}
-                  {submitting ? t('Submitting...', 'جاري الإرسال...') : t('Apply Now', 'قدّم الآن')}
+                  {submitting ? t('Submitting...', 'بنبعت...') : t('Apply Now', 'قدّم الآن')}
                 </button>
               </form>
             </div>

@@ -208,7 +208,7 @@ export function ReceiptPrinter({
             {/* S-02: when it arrives, from the store's own zones/settings. A
                     failed payment is not on its way, so it gets no window. */}
             {deliveryWindow && paymentState !== 'failed' && (
-              <MetaRow label={t('Arrives', 'يصلك')} ar={ar}>
+              <MetaRow label={t('Arrives', 'موعد الوصول')} ar={ar}>
                 <span data-testid="receipt-delivery-window">
                   {deliveryWindow.from === deliveryWindow.to
                     ? deliveryWindow.from
@@ -229,7 +229,7 @@ export function ReceiptPrinter({
               >
                 {t(
                   'Questions? Message the store on WhatsApp',
-                  'هل لديك سؤال؟ راسل المتجر على واتساب'
+                  'عندك سؤال؟ كلّم المتجر على واتساب'
                 )}
               </a>
             </p>
@@ -470,20 +470,20 @@ function statusCopy(kind: StatusKind, t: (en: string, ar: string) => string): st
   switch (kind) {
     case 'printing':
     case 'verifying':
-      return t('Printing your receipt…', 'جارٍ طباعة فاتورتك…');
+      return t('Printing your receipt…', 'بنطبع فاتورتك…');
     case 'paid':
-      return t('Paid, order confirmed', 'تم الدفع وتأكيد طلبك');
+      return t('Paid, order confirmed', 'اتدفع، طلبك اتأكد');
     case 'cod':
-      return t('Order placed, pay on delivery', 'تم تسجيل طلبك، الدفع عند الاستلام');
+      return t('Order placed, pay on delivery', 'طلبك اتسجل، الدفع عند الاستلام');
     case 'awaiting':
-      return t('Order placed, awaiting payment', 'تم تسجيل طلبك، في انتظار الدفع');
+      return t('Order placed, awaiting payment', 'طلبك اتسجل، في انتظار الدفع');
     case 'pending':
-      return t('Order placed, confirming payment', 'تم تسجيل طلبك، جارٍ تأكيد الدفع');
+      return t('Order placed, confirming payment', 'طلبك اتسجل، بنأكد الدفع');
     case 'failed':
-      return t('Payment failed', 'لم يكتمل الدفع');
+      return t('Payment failed', 'الدفع متمش');
     case 'unknown':
     default:
-      return t('Order received', 'تم استلام طلبك');
+      return t('Order received', 'طلبك وصل');
   }
 }
 

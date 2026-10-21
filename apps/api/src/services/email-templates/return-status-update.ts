@@ -21,13 +21,13 @@ const statusMessagesEn: Record<string, string> = {
 };
 
 const statusMessagesAr: Record<string, string> = {
-  approved: 'تمت الموافقة على طلب الإرجاع! يُرجى إعادة إرسال المنتجات وفق التعليمات المُرفقة.',
-  rejected: 'للأسف، لم نتمكن من الموافقة على طلب الإرجاع.',
-  shipped: 'لاحظنا أنه تم شحن منتجات الإرجاع.',
-  received: 'استلمنا منتجات الإرجاع وهي قيد الفحص.',
-  inspecting: 'يقوم فريقنا حالياً بفحص المنتجات.',
-  completed: 'اكتمل الإرجاع وتمت معالجة الاسترداد.',
-  cancelled: 'تم إلغاء طلب الإرجاع.',
+  approved: 'وافقنا على طلب الإرجاع! ابعت المنتجات تاني حسب التعليمات المرفقة.',
+  rejected: 'للأسف، معرفناش نوافق على طلب الإرجاع.',
+  shipped: 'شفنا إن منتجات الإرجاع اتشحنت.',
+  received: 'استلمنا منتجات الإرجاع وبنفحصها.',
+  inspecting: 'فريقنا بيفحص المنتجات دلوقتي.',
+  completed: 'الإرجاع خلص واتعمل الاسترداد.',
+  cancelled: 'طلب الإرجاع اتلغى.',
 };
 
 export const returnStatusUpdateTemplate = {
@@ -57,17 +57,17 @@ export const returnStatusUpdateTemplate = {
 
   ar: (d: ReturnStatusUpdateData, _storeName: string) => {
     const message =
-      statusMessagesAr[d.status] || `تم تحديث حالة طلب الإرجاع إلى: ${escapeHtml(d.status)}`;
+      statusMessagesAr[d.status] || `حالة طلب الإرجاع اتحدّثت لـ: ${escapeHtml(d.status)}`;
     return `
     <h2>تحديث الحالة</h2>
-    <p>مرحباً ${escapeHtml(d.customerName)}،</p>
+    <p>أهلاً ${escapeHtml(d.customerName)}،</p>
     <p><strong>رقم المرتجع:</strong> ${escapeHtml(d.returnNumber)}</p>
     <p>${message}</p>
     ${d.notes ? `<p><strong>ملاحظة من فريقنا:</strong> ${escapeHtml(d.notes)}</p>` : ''}
     <p style="font-size: 14px; color: #666; margin-top: 24px;">
-      إذا كان لديك أي استفسار، يُرجى التواصل مع فريق الدعم.
+      لو عندك أي سؤال، كلّم فريق الدعم.
     </p>
-    <p>مع أطيب التحيات،<br>فريق ${escapeHtml(d.storeName)}</p>
+    <p>تحياتنا،<br>فريق ${escapeHtml(d.storeName)}</p>
   `;
   },
 };

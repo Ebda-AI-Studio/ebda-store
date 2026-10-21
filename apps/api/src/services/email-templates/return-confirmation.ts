@@ -19,10 +19,10 @@ function typeLabelAr(type: string): string {
 
 function typeLabelArRequest(type: string): string {
   return type === 'exchange'
-    ? 'تم استلام طلب الاستبدال'
+    ? 'استلمنا طلب الاستبدال'
     : type === 'refund'
-      ? 'تم استلام طلب الاسترداد'
-      : 'تم استلام طلب الإرجاع';
+      ? 'استلمنا طلب الاسترداد'
+      : 'استلمنا طلب الإرجاع';
 }
 
 export const returnConfirmationTemplate = {
@@ -54,15 +54,15 @@ export const returnConfirmationTemplate = {
     const requestLabel = typeLabelArRequest(d.type);
     return `
     <h2>${requestLabel}</h2>
-    <p>مرحباً ${escapeHtml(d.customerName)}،</p>
-    <p>استلمنا طلب ${label} الخاص بالطلب رقم ${escapeHtml(d.orderNumber)}.</p>
+    <p>أهلاً ${escapeHtml(d.customerName)}،</p>
+    <p>استلمنا طلب ${label} للطلب رقم ${escapeHtml(d.orderNumber)}.</p>
     <p><strong>رقم ${label}:</strong> ${escapeHtml(d.returnNumber)}</p>
-    <p>سيراجع فريقنا طلبك ويردّ عليك خلال يوم إلى يومي عمل.</p>
+    <p>فريقنا هيراجع طلبك ويرد عليك خلال يوم لحد يومين عمل.</p>
     <p style="font-size: 14px; color: #666; margin-top: 24px;">
-      إذا كان لديك أي استفسار، لا تتردد في التواصل مع فريق الدعم.
+      لو عندك أي سؤال، كلّم فريق الدعم في أي وقت.
     </p>
-    <p style="margin-top: 24px;">شكراً لصبرك!</p>
-    <p>مع أطيب التحيات،<br>فريق ${escapeHtml(d.storeName)}</p>
+    <p style="margin-top: 24px;">شكراً على صبرك!</p>
+    <p>تحياتنا،<br>فريق ${escapeHtml(d.storeName)}</p>
   `;
   },
 };

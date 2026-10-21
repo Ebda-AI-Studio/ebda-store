@@ -157,40 +157,40 @@ function SuccessContent() {
       : paymentState === 'awaiting'
         ? t('Waiting for your transfer', 'بانتظار التحويل')
         : paymentState === 'failed'
-          ? t('Payment not completed', 'لم يكتمل الدفع')
+          ? t('Payment not completed', 'الدفع مكملش')
           : paymentState === 'pending'
-            ? t('Confirming your payment…', 'جاري تأكيد الدفع…')
+            ? t('Confirming your payment…', 'بنأكد الدفع…')
             : t('Thank you for your order!', 'شكراً لطلبك!');
 
   const subCopy =
     paymentState === 'awaiting' && fawryRef
       ? t(
           'Your order is held for you. Pay the reference code below at any Fawry outlet.',
-          'طلبك محجوز لك. ادفع كود الدفع الموضّح أدناه في أي منفذ فوري.'
+          'طلبك محجوز ليك. ادفع كود الدفع اللي تحت في أي منفذ فوري.'
         )
       : paymentState === 'awaiting'
         ? t(
             'Your order is held for you. Transfer the amount below and the store will confirm it.',
-            'طلبك محجوز لك. حوّل المبلغ الموضّح أدناه وسيؤكده المتجر.'
+            'طلبك محجوز ليك. حوّل المبلغ اللي تحت والمتجر هيأكده.'
           )
         : paymentState === 'failed'
           ? t(
               'We could not confirm your payment. If you were charged, it will be reconciled shortly — otherwise please try again.',
-              'لم نتمكن من تأكيد الدفع. إذا تم خصم المبلغ فسيتم تسويته قريباً، وإلا يرجى المحاولة مرة أخرى.'
+              'معرفناش نأكد الدفع. لو المبلغ اتخصم هيتسوّى قريب، ولو لأ جرّب تاني.'
             )
           : paymentState === 'pending'
             ? t(
                 'Your payment is being confirmed. This page will update, or check your order status shortly.',
-                'جاري تأكيد دفعتك. ستتحدث هذه الصفحة، أو تحقق من حالة طلبك بعد قليل.'
+                'بنأكد دفعتك. الصفحة دي هتتحدث، أو شوف حالة طلبك بعد شوية.'
               )
             : isCod
               ? t(
                   'Your order has been placed. Please have the payment ready when your order is delivered.',
-                  'تم تقديم طلبك. يرجى تجهيز المبلغ عند استلام الطلب.'
+                  'طلبك اتسجل. جهّز المبلغ لما الطلب يوصلك.'
                 )
               : t(
                   'Your payment is confirmed and your order will be shipped soon.',
-                  'تم تأكيد دفعتك وسيتم شحن طلبك قريباً.'
+                  'دفعتك اتأكدت وطلبك هيتشحن قريب.'
                 );
 
   // The receipt printer owns the confirmation moment (Task 10 ruling): while
@@ -267,7 +267,7 @@ function SuccessContent() {
               <p className="text-sm font-medium text-warning-ink">
                 {t(
                   'Cash on Delivery — Pay when your order arrives',
-                  '\u0627\u0644\u062f\u0641\u0639 \u0639\u0646\u062f \u0627\u0644\u0627\u0633\u062a\u0644\u0627\u0645 — \u0627\u062f\u0641\u0639 \u0639\u0646\u062f \u0648\u0635\u0648\u0644 \u0637\u0644\u0628\u0643'
+                  'الدفع عند الاستلام — ادفع لما طلبك يوصلك'
                 )}
               </p>
             </div>
@@ -301,7 +301,7 @@ function SuccessContent() {
             <p className="mt-8 text-sm text-muted-foreground">
               {t(
                 'Your order has been received. You can track its status anytime from your account.',
-                'تم استلام طلبك. يمكنك متابعة حالته في أي وقت من حسابك.'
+                'طلبك وصلنا. تقدر تتابع حالته في أي وقت من حسابك.'
               )}
             </p>
           )}
@@ -337,10 +337,7 @@ function SuccessContent() {
           </div>
 
           <p className="mt-8 text-sm text-muted-foreground">
-            {t(
-              'Questions about your order?',
-              '\u0647\u0644 \u0644\u062f\u064a\u0643 \u0623\u0633\u0626\u0644\u0629 \u062d\u0648\u0644 \u0637\u0644\u0628\u0643\u061f'
-            )}{' '}
+            {t('Questions about your order?', 'عندك سؤال عن طلبك؟')}{' '}
             <Link href={storeUrl('/contact')} className="text-primary hover:underline">
               {t(
                 'Contact Support',

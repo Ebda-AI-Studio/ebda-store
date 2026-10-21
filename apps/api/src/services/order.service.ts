@@ -759,7 +759,7 @@ export class OrderService {
     if (sizelessLines.length > 0) {
       const first = sizelessLines[0];
       const messageEn = `Please choose a size for “${first.name}” before checking out`;
-      const messageAr = `يرجى اختيار المقاس لـ «${first.nameAr || first.name}» قبل إتمام الطلب`;
+      const messageAr = `اختار المقاس لـ «${first.nameAr || first.name}» قبل ما تكمل الطلب`;
       throw new AppError(400, 'VARIANT_REQUIRED', messageEn, {
         messageEn,
         messageAr,
