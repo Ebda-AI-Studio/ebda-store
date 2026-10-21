@@ -61,6 +61,7 @@ vi.mock('@api/middleware/security', () => ({
   writeLimiter: (_req: unknown, _res: unknown, next: () => void) => next(),
   passkeyBeginLimiter: (_req: unknown, _res: unknown, next: () => void) => next(),
   passkeyFinishLimiter: (_req: unknown, _res: unknown, next: () => void) => next(),
+  passkeyStepUpLimiter: (_req: unknown, _res: unknown, next: () => void) => next(),
   auditLog: vi.fn(),
   generateCsrfToken: vi.fn(() => 'csrf'),
 }));

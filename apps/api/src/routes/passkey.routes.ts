@@ -4,10 +4,10 @@ import jwt from 'jsonwebtoken';
 import { authenticate, rejectImpersonated } from '../middleware/auth';
 import {
   auditLog,
-  authLimiter,
   generateCsrfToken,
   passkeyBeginLimiter,
   passkeyFinishLimiter,
+  passkeyStepUpLimiter,
   writeLimiter,
 } from '../middleware/security';
 import { config } from '../config';
@@ -176,12 +176,12 @@ router.get('/', authenticate, async (req: Request, res: Response, next: NextFunc
 });
 
 // Step-up (Ruling PASSKEY-7): password (+ TOTP code when TOTP is on) opens a 5-minute window in which
-// this account may add, rename or remove passkeys. Same IP+email limiter and SAME lockout counter as login.
+// this account may add, rename or remove passkeys. Per-user limiter and the SAME lockout counter as login.
 router.post(
   '/step-up',
   authenticate,
   rejectImpersonated,
-  authLimiter,
+  passkeyStepUpLimiter,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const parsed = z

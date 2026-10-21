@@ -950,8 +950,34 @@ export function createPasskeyLimiter(
     keyGenerator: passkeyLimiterKey,
   });
 }
+/**
+ * Step-up (PASSKEY-7) is an AUTHENTICATED call, so its bucket is the authenticated user (review M2):
+ * `authLimiter` keys on `req.body.email`, which an attacker rotates for a fresh bucket per request. The
+ * shared lockout counter stays the real guard against password guessing; this bounds the request rate.
+ */
+export function passkeyStepUpLimiterKey(req: Request): string {
+  return `stepup-${req.user?.userId ?? ipKeyGenerator(req.ip ?? '')}`;
+}
+
+export function createPasskeyStepUpLimiter(opts?: { skip?: (req: Request) => boolean }) {
+  return rateLimit({
+    store: makeRateLimitStore(rateLimitRedisClient, 'passkey-stepup'),
+    windowMs: 15 * 60 * 1000,
+    max: 10,
+    message: {
+      success: false,
+      error: { code: 'RATE_LIMITED', message: 'Too many attempts, please try again later.' },
+    },
+    standardHeaders: true,
+    legacyHeaders: false,
+    passOnStoreError: true,
+    skip: opts?.skip ?? skipForLoadTestOrTests,
+    keyGenerator: passkeyStepUpLimiterKey,
+  });
+}
 export const passkeyBeginLimiter = createPasskeyLimiter('begin');
 export const passkeyFinishLimiter = createPasskeyLimiter('finish');
+export const passkeyStepUpLimiter = createPasskeyStepUpLimiter();
 
 /**
  * Exported so it can be unit-tested directly (same reasoning as

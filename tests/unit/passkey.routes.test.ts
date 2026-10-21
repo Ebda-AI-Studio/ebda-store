@@ -95,6 +95,7 @@ vi.mock('@api/middleware/security', () => ({
   writeLimiter: pass,
   passkeyBeginLimiter: pass,
   passkeyFinishLimiter: pass,
+  passkeyStepUpLimiter: pass,
   auditLog: async (e: Row) => void h.audit.push(e),
   generateCsrfToken: async () => 'csrf-token',
 }));
