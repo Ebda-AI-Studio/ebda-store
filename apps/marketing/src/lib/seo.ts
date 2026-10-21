@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { BRAND } from '@ebda/shared/brand';
+import { CAPABILITIES } from './capabilities';
 import { COPY } from './content';
 import { PLANS, PRICING_PUBLISHED } from './plans';
 import {
@@ -18,6 +19,18 @@ const productLabel = (locale: Locale) =>
   locale === 'ar' ? BRAND.product.nameAr : BRAND.product.nameEn;
 const productAlt = (locale: Locale) =>
   locale === 'ar' ? BRAND.product.nameEn : BRAND.product.nameAr;
+
+/**
+ * The one disambiguating brand line, in the OG description and the JSON-LD names (titles carry only the short tail): it keeps Ebda Store
+ * (ebda.app, by Ebda AI Studio) from being confused with other "Ebda" sites. The product name leads
+ * (ruling PRODUCT-NAME-1); the studio is named as the maker, never as the last word of a title.
+ */
+export const brandLine = () =>
+  `${BRAND.product.nameEn} — ${BRAND.product.nameAr}, by ${BRAND.company.shortNameEn} (${BRAND.domains.marketing})`;
+
+/** Short tail for inner-page titles (SERP titles stay under ~60 characters); the full line is on the home title, OG site data and JSON-LD. */
+export const shortBrand = (locale: Locale) =>
+  `${productLabel(locale)} (${BRAND.domains.marketing})`;
 
 const OG_IMAGE = {
   url: '/og.png',
@@ -38,7 +51,10 @@ export function pageMetadata(
   // Titles, OG and Twitter name the PRODUCT (ruling PRODUCT-NAME-1); the studio is only the
   // publisher / organization (see jsonLd).
   const name = productLabel(locale);
-  const t = title ? (title.includes(name) ? title : `${title} | ${name}`) : c.meta.title;
+  // Home: the product title as written. Other pages: page title, then the short brand tail. A title that already
+  // names the product (the about page) is not repeated.
+  const lead = (title ?? c.meta.title).replace(new RegExp(`^${name} — `), '');
+  const t = title ? `${lead} | ${shortBrand(locale)}` : c.meta.title;
   const d = description ?? c.meta.description;
   const languages: Record<string, string> = {
     ar: pagePath('ar', page),
@@ -54,7 +70,8 @@ export function pageMetadata(
       type: 'website',
       siteName: name,
       title: t,
-      description: d,
+      // the full disambiguating line rides in the OG description (and the JSON-LD), not in every title
+      description: `${d} ${brandLine()}.`,
       url: pagePath(locale, page),
       locale: locale === 'ar' ? 'ar_EG' : 'en_US',
       alternateLocale: locale === 'ar' ? ['en_US'] : ['ar_EG'],
@@ -77,9 +94,13 @@ export function pageMetadata(
  * JSON-LD graph: Organization (the studio, the publisher) + WebSite and SoftwareApplication (both name the
  * product, «ابدأ ستور» / Ebda Store) + FAQPage (home). Offers come from PLANS. No ratings.
  */
-export function jsonLd(locale: Locale) {
+export function jsonLd(
+  locale: Locale,
+  faq: readonly { q: string; a: string }[] = COPY[locale].faq.items
+) {
   const c = COPY[locale];
   const org = `${SITE_URL}/#organization`;
+  const brand = `${SITE_URL}/#store`;
   const site = `${SITE_URL}/#website`;
   return {
     '@context': 'https://schema.org',
@@ -93,6 +114,19 @@ export function jsonLd(locale: Locale) {
         url: SITE_URL,
         logo: `${SITE_URL}/icon-512.png`,
         email: BRAND.supportEmail,
+        // No verified public profiles yet; add real ones only (never a guessed handle).
+        sameAs: [] as string[],
+      },
+      {
+        // The product as a brand: "Ebda Store" (ابدأ ستور), made by the studio above.
+        '@type': 'Organization',
+        '@id': brand,
+        name: BRAND.product.nameEn,
+        alternateName: [BRAND.product.nameAr, brandLine()],
+        url: `${SITE_URL}/#store`,
+        logo: `${SITE_URL}/icon-512.png`,
+        email: BRAND.supportEmail,
+        parentOrganization: { '@id': org },
         sameAs: [] as string[],
       },
       {
@@ -103,6 +137,7 @@ export function jsonLd(locale: Locale) {
         alternateName: productAlt(locale),
         inLanguage: locale,
         publisher: { '@id': org },
+        about: { '@id': brand },
       },
       {
         '@type': 'SoftwareApplication',
@@ -111,6 +146,8 @@ export function jsonLd(locale: Locale) {
         applicationCategory: 'BusinessApplication',
         operatingSystem: 'Web',
         description: c.meta.description,
+        brand: { '@id': brand },
+        featureList: Object.values(CAPABILITIES[locale]).map(x => x.t),
         url: SIGNUP_URL,
         installUrl: SIGNUP_URL,
         publisher: { '@id': org },
@@ -133,12 +170,12 @@ export function jsonLd(locale: Locale) {
           })),
         }),
       },
-      ...(c.faq.items.length
+      ...(faq.length
         ? [
             {
               '@type': 'FAQPage',
               inLanguage: locale,
-              mainEntity: c.faq.items.map(i => ({
+              mainEntity: faq.map(i => ({
                 '@type': 'Question',
                 name: i.q,
                 acceptedAnswer: { '@type': 'Answer', text: i.a },

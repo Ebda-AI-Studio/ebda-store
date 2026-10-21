@@ -1,4 +1,4 @@
-import { prisma } from '@ebda/database';
+import { prisma, withStore } from '@ebda/database';
 import { isCampaignContentComplete, resolveDefaultLanguage, storefrontOrigin } from '@ebda/shared';
 import { sanitizeNewsletterHtml } from '../lib/email-html-sanitizer';
 import { renderBrandedShell } from './email.service';
@@ -25,9 +25,29 @@ function positiveIntEnv(name: string, fallback: number): number {
  * platform's shared Resend sender reputation: one store blasting a stale list
  * degrades deliverability for every store on the platform-domain fallback
  * sender. Test sends do not count.
+ *
+ * Per plan (Ruling CAMP-PLAN-2): `store.plan` (the plan's feature tier) picks
+ * the default - Growth/professional 1000, Business/enterprise 5000, any other
+ * tier (reachable only via a super-admin override) 500. No plan = the old
+ * flat 1000. An explicit `CAMPAIGN_DAILY_SEND_CAP` is the ops override and
+ * applies to every plan.
  */
-export function campaignDailyCap(): number {
-  return positiveIntEnv('CAMPAIGN_DAILY_SEND_CAP', 1000);
+export const CAMPAIGN_DAILY_CAP_BY_PLAN: Record<string, number> = {
+  professional: 1000,
+  enterprise: 5000,
+};
+
+export function campaignDailyCap(plan?: string | null): number {
+  const fallback = plan ? (CAMPAIGN_DAILY_CAP_BY_PLAN[plan] ?? 500) : 1000;
+  return positiveIntEnv('CAMPAIGN_DAILY_SEND_CAP', fallback);
+}
+
+/** The cap for one store, reading its plan tier in the store's own scope. */
+export async function storeCampaignDailyCap(storeId: string): Promise<number> {
+  const store = await withStore(storeId, tx =>
+    tx.store.findUnique({ where: { id: storeId }, select: { plan: true } })
+  );
+  return campaignDailyCap(store?.plan);
 }
 
 /**
@@ -47,7 +67,7 @@ export function campaignThrottleMs(): number {
  *  can keep the rows this window still counts (see `sentInLast24h`). */
 export const SEND_CAP_WINDOW_MS = 24 * 60 * 60 * 1000;
 
-/** Campaign emails this store actually sent in the last 24h. `sentAt` is set
+/** Campaign + cart-recovery emails this store actually sent in the last 24h. `sentAt` is set
  *  only on a successful send and survives a later unsubscribe, so a recipient
  *  who unsubscribed still counts against the window it was sent in.
  *
@@ -57,9 +77,14 @@ export const SEND_CAP_WINDOW_MS = 24 * 60 * 60 * 1000;
  *  anonymizes those rows instead of deleting them (issue 2083,
  *  `AuthService.eraseAccount`). A new deleter must do the same. */
 export async function sentInLast24h(storeId: string, now: Date = new Date()): Promise<number> {
-  return prisma.campaignRecipient.count({
-    where: { storeId, sentAt: { gte: new Date(now.getTime() - SEND_CAP_WINDOW_MS) } },
-  });
+  const since = new Date(now.getTime() - SEND_CAP_WINDOW_MS);
+  // Cart-recovery emails go out through the same Resend key and sender reputation, so they spend
+  // the same rolling 24h budget (Ruling CART-EMAIL-6).
+  const [campaign, cart] = await Promise.all([
+    prisma.campaignRecipient.count({ where: { storeId, sentAt: { gte: since } } }),
+    prisma.abandonedCart.count({ where: { storeId, emailSentAt: { gte: since } } }),
+  ]);
+  return campaign + cart;
 }
 
 // ─── Audience (consent) ──────────────────────────────────────────────────────
@@ -105,6 +130,7 @@ export async function audienceCount(storeId: string): Promise<number> {
     WHERE store_id = ${storeId}
       AND is_active = true
       AND unsubscribed_at IS NULL
+      AND consent_scope <> 'cart_reminders'
       AND email LIKE '%@%'
   `;
   return Number(rows[0]?.count ?? 0);
@@ -112,7 +138,13 @@ export async function audienceCount(storeId: string): Promise<number> {
 
 export async function buildCampaignAudience(storeId: string): Promise<AudienceMember[]> {
   const rows = await prisma.newsletterSubscriber.findMany({
-    where: { storeId, isActive: true, unsubscribedAt: null },
+    // 'cart_reminders' (the checkout box) is consent for cart reminders ONLY, never campaigns.
+    where: {
+      storeId,
+      isActive: true,
+      unsubscribedAt: null,
+      consentScope: { not: 'cart_reminders' },
+    },
     select: { id: true, email: true, language: true },
     orderBy: { subscribedAt: 'asc' },
   });

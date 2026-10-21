@@ -12,7 +12,7 @@ import { sendAlert } from '../../../services/alerts.service';
 import {
   CAMPAIGN_STORE_SELECT,
   buildCampaignAudience,
-  campaignDailyCap,
+  storeCampaignDailyCap,
   campaignThrottleMs,
   listUnsubscribeHeaders,
   pickCampaignContent,
@@ -259,7 +259,8 @@ const campaignSendFn = inngest.createFunction(
 
       const audience = await runInTenantContext(storeId, () => buildCampaignAudience(storeId));
       const alreadySent = await runInTenantContext(storeId, () => sentInLast24h(storeId));
-      const remaining = Math.max(0, campaignDailyCap() - alreadySent);
+      const dailyCap = await runInTenantContext(storeId, () => storeCampaignDailyCap(storeId));
+      const remaining = Math.max(0, dailyCap - alreadySent);
       const abort = async (reason: string) => {
         await runInTenantContext(storeId, () =>
           prisma.campaign.updateMany({

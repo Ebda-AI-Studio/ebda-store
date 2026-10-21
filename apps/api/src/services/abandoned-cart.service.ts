@@ -28,6 +28,11 @@ import { notificationDispatcher } from './notification-dispatcher.service';
 import { resolveBundle } from './bundle.service';
 import { wbsBridgeService, WbsUnauthorizedError, type AbandonedWaCart } from './wbs-bridge.service';
 import { encryption } from './encryption.service';
+import { featureService } from './feature.service';
+import {
+  sweepCartRecoveryEmails,
+  CART_EMAIL_DEFAULT_DELAY_MINUTES,
+} from './cart-recovery-email.service';
 import logger from '../lib/logger';
 import crypto from 'crypto';
 import { config } from '../config';
@@ -74,6 +79,9 @@ interface AbandonedCartConfigDefaults {
   couponDiscountPercent: number;
   couponMaxDiscount: number | null;
   couponExpiryHours: number;
+  /** Recovery email channel (cart-recovery-email.service). OFF until the merchant opts in. */
+  emailEnabled: boolean;
+  emailDelayMinutes: number;
 }
 
 const DEFAULT_CONFIG: AbandonedCartConfigDefaults = {
@@ -87,6 +95,8 @@ const DEFAULT_CONFIG: AbandonedCartConfigDefaults = {
   couponDiscountPercent: 10,
   couponMaxDiscount: null,
   couponExpiryHours: 48,
+  emailEnabled: false,
+  emailDelayMinutes: CART_EMAIL_DEFAULT_DELAY_MINUTES,
 };
 
 interface CartItemSnapshot {
@@ -103,6 +113,30 @@ interface CartItemSnapshot {
    * never reach a customer-facing surface.
    */
   isBundle?: boolean;
+}
+
+/**
+ * Stores whose EFFECTIVE `feature` entitlement is on: the plan baseline OR a `store_features`
+ * override, exactly what `featureService` resolves for the request paths. Detection used to
+ * ask only for an enabled `store_features` ROW, so a store entitled purely by its plan (every
+ * plan has `abandoned_cart` in STARTER_CORE; no row exists) was never swept and push, SMS and the
+ * email channel silently never fired for it. `storeDirectory` lists stores through the definer
+ * (stores is under RLS); the feature map is cached 5 min per store (BOUNDED-stale).
+ */
+async function storeIdsWithFeature(feature: 'abandoned_cart' | 'whatsapp'): Promise<string[]> {
+  const stores = await storeDirectory();
+  const out: string[] = [];
+  const CHUNK = 20;
+  for (let i = 0; i < stores.length; i += CHUNK) {
+    const part = stores.slice(i, i + CHUNK);
+    const flags = await Promise.all(
+      part.map(st => featureService.isFeatureEnabled(st.id, feature).catch(() => false))
+    );
+    part.forEach((st, j) => {
+      if (flags[j]) out.push(st.id);
+    });
+  }
+  return out;
 }
 
 // ==========================================
@@ -167,6 +201,14 @@ class AbandonedCartService {
 
       await this.processReminders(correlationId);
 
+      // Email channel (own state in email_status, independent of the push/SMS steps). A failure
+      // here must not fail the sweep that already ran the other channels.
+      try {
+        await sweepCartRecoveryEmails();
+      } catch (err) {
+        logger.error({ err, correlationId }, '[AbandonedCart] Email sweep failed');
+      }
+
       logger.info({ correlationId }, '[AbandonedCart] Processing completed');
     } catch (err) {
       logger.error({ err, correlationId }, '[AbandonedCart] Processing failed');
@@ -180,19 +222,10 @@ class AbandonedCartService {
   // ──────────────────────────────────────────
 
   async detectNewAbandonments(correlationId?: string): Promise<void> {
-    // Find all stores with the abandoned_cart feature enabled.
-    // store_features is FORCE-RLS; this is a platform-level cron with no tenant
-    // context, and the scan is INTENTIONALLY cross-tenant (all eligible stores).
-    // Contextless, the policy returns 0 rows → the whole abandoned-cart system
-    // silently never runs. So the scan visits each store in its own scope.
-    const storeFeatures = await acrossStoresFlat(storeId =>
-      prisma.storeFeature.findMany({
-        where: { storeId, featureKey: 'abandoned_cart', enabled: true },
-        select: { storeId: true },
-      })
-    );
+    // Stores with the EFFECTIVE abandoned_cart entitlement (plan baseline OR override row).
+    const storeFeatureIds = await storeIdsWithFeature('abandoned_cart');
 
-    if (storeFeatures.length === 0) {
+    if (storeFeatureIds.length === 0) {
       logger.debug(
         { correlationId },
         '[AbandonedCart] No stores have abandoned_cart feature enabled'
@@ -200,7 +233,7 @@ class AbandonedCartService {
       return;
     }
 
-    const storeIds = storeFeatures.map(sf => sf.storeId);
+    const storeIds = storeFeatureIds;
     const abandonmentCutoff = new Date(Date.now() - ABANDONMENT_THRESHOLD_MS);
 
     logger.info(
@@ -225,11 +258,18 @@ class AbandonedCartService {
           where: {
             storeId,
             lastActivityAt: { lt: abandonmentCutoff },
-            OR: [{ items: { some: {} } }, { bundles: { some: {} } }],
             abandonedCart: null,
-            customer: {
-              OR: [{ email: { not: '' } }, { phone: { not: null } }],
-            },
+            AND: [
+              { OR: [{ items: { some: {} } }, { bundles: { some: {} } }] },
+              {
+                OR: [
+                  { customer: { OR: [{ email: { not: '' } }, { phone: { not: null } }] } },
+                  // A guest (or any shopper) who ticked the checkout box "email me about my
+                  // cart": reachable by the email channel only. Consent is re-checked at send time.
+                  { guestEmail: { not: null }, guestEmailConsentAt: { not: null } },
+                ],
+              },
+            ],
           },
           include: {
             customer: {
@@ -331,9 +371,13 @@ class AbandonedCartService {
 
             const cartItemCount = liveItems.length + bundleSnapshot.length;
 
-            const nextStepAt = nextStepAtFromConfig();
+            // Push/SMS steps need a customer (a phone, an account); a guest cart has neither, so it
+            // gets no push/SMS sequence and only the email channel serves it.
+            const nextStepAt = cart.customer ? nextStepAtFromConfig() : null;
 
-            const customerEmail = cart.customer?.email ?? null;
+            // The address the shopper consented to at checkout wins over the account email.
+            const customerEmail =
+              (cart.guestEmailConsentAt ? cart.guestEmail : null) ?? cart.customer?.email ?? null;
             const customerPhone = cart.customer?.phone ?? null;
 
             await prisma.abandonedCart.create({
@@ -391,29 +435,13 @@ class AbandonedCartService {
    *   WA-origin cart → WhatsApp template only (email not applicable)
    */
   async detectAndNotifyAbandonedWaCarts(correlationId?: string): Promise<void> {
-    // Find all stores with both abandoned_cart + whatsapp features enabled.
-    // Cross-tenant platform cron over FORCE-RLS store_features → per-store scan
-    // (same reason as detectNewAbandonments above).
-    const perStore = await acrossStores(storeId =>
-      Promise.all([
-        prisma.storeFeature.findMany({
-          where: { storeId, featureKey: 'abandoned_cart', enabled: true },
-          select: { storeId: true },
-        }),
-        prisma.storeFeature.findMany({
-          where: { storeId, featureKey: 'whatsapp', enabled: true },
-          select: { storeId: true },
-        }),
-      ])
-    );
-    const storeFeatures = perStore.flatMap(r => r.value[0]);
-    const waFeatures = perStore.flatMap(r => r.value[1]);
-
-    const abandonedCartStoreIds = new Set(storeFeatures.map(sf => sf.storeId));
-    const waStoreIds = new Set(waFeatures.map(sf => sf.storeId));
-
-    // Only stores that have BOTH features enabled
-    const eligibleStoreIds = [...abandonedCartStoreIds].filter(id => waStoreIds.has(id));
+    // Stores with BOTH effective entitlements (plan baseline OR override row).
+    const [cartIds, waIds] = await Promise.all([
+      storeIdsWithFeature('abandoned_cart'),
+      storeIdsWithFeature('whatsapp'),
+    ]);
+    const waStoreIds = new Set(waIds);
+    const eligibleStoreIds = cartIds.filter(id => waStoreIds.has(id));
 
     if (eligibleStoreIds.length === 0) {
       logger.debug(
@@ -946,6 +974,8 @@ class AbandonedCartService {
       couponDiscountPercent: row.couponDiscountPercent,
       couponMaxDiscount: row.couponMaxDiscount,
       couponExpiryHours: row.couponExpiryHours,
+      emailEnabled: row.emailEnabled,
+      emailDelayMinutes: row.emailDelayMinutes,
     };
   }
 
@@ -979,6 +1009,8 @@ class AbandonedCartService {
       couponDiscountPercent: row.couponDiscountPercent,
       couponMaxDiscount: row.couponMaxDiscount,
       couponExpiryHours: row.couponExpiryHours,
+      emailEnabled: row.emailEnabled,
+      emailDelayMinutes: row.emailDelayMinutes,
     };
   }
 

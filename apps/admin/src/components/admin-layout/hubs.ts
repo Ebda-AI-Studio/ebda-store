@@ -231,7 +231,7 @@ export const HUBS: HubDefinition[] = [
       { label: labels.answerEngine, href: `/stores/${storeId}/answer-engine` },
       { label: labels.notifications, href: `/stores/${storeId}/notifications` },
       { label: labels.newsletter, href: `/stores/${storeId}/newsletter` },
-      // Feature-gated (`email_campaigns` is in NO plan baseline) via
+      // Feature-gated (`email_campaigns` is Growth + Business, not Basic) via
       // useRequireFeature('email_campaigns') — same "tab always renders,
       // the page itself gates" pattern as bundles/coupons/loyalty above.
       { label: labels.campaigns, href: `/stores/${storeId}/campaigns` },

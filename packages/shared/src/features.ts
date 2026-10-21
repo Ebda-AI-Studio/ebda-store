@@ -316,9 +316,9 @@ export const FEATURE_REGISTRY: Record<FeatureKey, FeatureDefinition> = {
     descriptionAr: 'كتابة رسائل تسويقية بالعربية والإنجليزية وإرسالها لمشتركي النشرة الذين وافقوا.',
     category: 'marketing',
     tier: 'experimental',
-    // Un-hidden 2026-09-25 (D2): the campaign builder shipped. Still in NO plan
-    // baseline (plan-baselines.ts), so it resolves OFF for every store until a
-    // super-admin StoreFeature override turns it on.
+    // Un-hidden 2026-09-25 (D2): the campaign builder shipped. In the Growth + Business
+    // baselines since 2026-10-21 (plan-baselines.ts PROFESSIONAL_ADDITIONS); Basic resolves OFF
+    // unless a super-admin StoreFeature override turns it on.
   },
   abandoned_cart: {
     key: 'abandoned_cart',

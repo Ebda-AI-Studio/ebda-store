@@ -28,6 +28,7 @@ import {
   storeSlugIssueCode,
   deliveryDaysSchema,
   deliveryOffDaysSchema,
+  receiptBarcodeShapeSchema,
   footerBottomBarSchema,
   normalizeStoredBottomBar,
 } from '@ebda/shared';
@@ -102,6 +103,36 @@ function addDeliveryOffDaysIssues(
   }
 }
 
+/** `settings.receiptBarcodeShape`: plain | off | one of the approved shape ids; null clears. */
+function addReceiptBarcodeShapeIssues(
+  settings: Record<string, unknown> | undefined,
+  ctx: z.RefinementCtx
+) {
+  const v = settings?.receiptBarcodeShape;
+  if (v === undefined || v === null) return;
+  if (receiptBarcodeShapeSchema.safeParse(v).success) return;
+  ctx.addIssue({
+    code: z.ZodIssueCode.custom,
+    path: ['receiptBarcodeShape'],
+    message: 'Unknown receipt barcode shape',
+  });
+}
+
+/** `settings.packingSlipNote`: the optional footer text printed on packing slips (<= 300 chars; null/'' clears). */
+function addPackingSlipNoteIssues(
+  settings: Record<string, unknown> | undefined,
+  ctx: z.RefinementCtx
+) {
+  const v = settings?.packingSlipNote;
+  if (v === undefined || v === null) return;
+  if (typeof v === 'string' && v.length <= 300) return;
+  ctx.addIssue({
+    code: z.ZodIssueCode.custom,
+    path: ['packingSlipNote'],
+    message: 'Packing slip note must be text up to 300 characters',
+  });
+}
+
 /**
  * Everything the open `settings` blob must satisfy, on EVERY route that writes it (create AND
  * update — a check on update only leaves POST /stores as the bypass):
@@ -129,6 +160,8 @@ function addSettingsIssues(settings: Record<string, unknown> | undefined, ctx: z
   }
   addDeliveryDaysIssues(settings, ctx);
   addDeliveryOffDaysIssues(settings, ctx);
+  addReceiptBarcodeShapeIssues(settings, ctx);
+  addPackingSlipNoteIssues(settings, ctx);
   // The footer legal row's toggles + © override (S-01): typed, length-capped.
   const footerLinks = settings?.footerLinks;
   if (footerLinks && typeof footerLinks === 'object' && 'bottomBar' in footerLinks) {

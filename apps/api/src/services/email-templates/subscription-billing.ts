@@ -1,5 +1,6 @@
 import { BRAND } from '@ebda/shared';
 import { escapeHtml, emailMoney } from './_util';
+import { barcodeImgHtml, type EmailBarcode } from './_barcode';
 
 export type SubscriptionBillingNoticeKind =
   | 'payment_failed'
@@ -22,6 +23,9 @@ export interface SubscriptionBillingNoticeData {
   /** payment_failed: when the next automatic retry happens (ISO date text). */
   retryOn?: string;
   billingUrl: string;
+  /** payment_confirmed: the palm barcode PNG of `paymentNumber` (null/absent = text only). */
+  barcode?: EmailBarcode | null;
+  paymentNumber?: string;
   /** payment_due: the due date (ISO date text) and whole days left (0 = today). */
   dueOn?: string;
   daysLeft?: number;
@@ -111,7 +115,7 @@ function reviewNotice(d: SubscriptionBillingNoticeData, lang: 'en' | 'ar'): stri
     if (d.kind === 'payment_confirmed')
       return `
     <h2 dir="rtl">تم تأكيد دفعتك</h2>
-    <p dir="rtl">فريق ${BRAND.company.shortNameAr} راجع تحويل إنستاباي الخاص بمتجر <strong>${store}</strong> وأكّده. باقة <strong>${escapeHtml(d.planName)}</strong> مدفوعة حتى ${escapeHtml(d.paidUntil ?? '')}.</p>
+    <p dir="rtl">فريق ${BRAND.company.shortNameAr} راجع تحويل إنستاباي الخاص بمتجر <strong>${store}</strong> وأكّده. باقة <strong>${escapeHtml(d.planName)}</strong> مدفوعة حتى ${escapeHtml(d.paidUntil ?? '')}.</p>${barcodeImgHtml(d.barcode, d.paymentNumber ?? '', 'ar', 'billing')}
     <p dir="rtl"><a href="${link}">افتح صفحة الاشتراك</a></p>`;
     if (d.kind === 'payment_rejected')
       return `
@@ -130,7 +134,7 @@ function reviewNotice(d: SubscriptionBillingNoticeData, lang: 'en' | 'ar'): stri
   if (d.kind === 'payment_confirmed')
     return `
     <h2>Your payment is confirmed</h2>
-    <p>The ${BRAND.company.shortNameEn} team checked the InstaPay transfer for <strong>${store}</strong> and confirmed it. The <strong>${escapeHtml(d.planName)}</strong> plan is paid until ${escapeHtml(d.paidUntil ?? '')}.</p>
+    <p>The ${BRAND.company.shortNameEn} team checked the InstaPay transfer for <strong>${store}</strong> and confirmed it. The <strong>${escapeHtml(d.planName)}</strong> plan is paid until ${escapeHtml(d.paidUntil ?? '')}.</p>${barcodeImgHtml(d.barcode, d.paymentNumber ?? '', 'en', 'billing')}
     <p><a href="${link}">Open billing</a></p>`;
   if (d.kind === 'payment_rejected')
     return `

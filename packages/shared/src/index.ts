@@ -43,3 +43,4 @@ export * from './looks';
 export * from './commerce';
 export * from './uploads';
 export * from './pricing';
+export * from './barcode';
