@@ -19,13 +19,20 @@ const h = vi.hoisted(() => ({
 vi.mock('@ebda/database', async importOriginal => ({
   ...(await importOriginal<typeof import('@ebda/database')>()),
   prisma: {
-    // every lookup is the store-scoped definer `ebda_order_search_ids(store, kind, pattern, limit)`;
-    // the second bound value of the statement is the kind
-    $queryRaw: async (sql: { values: unknown[] }) => {
-      const kind = sql.values[1];
-      h.queryRaw(kind);
-      const fn = kind === 'customers' ? h.customers : kind === 'guest' ? h.guests : h.numbers;
-      return fn();
+    // two store-scoped definers: ebda_customer_search_ids(...) -> (kind, id) rows for customers +
+    // guest orders, and ebda_order_search_ids(store, kind, pattern, limit) for the order number
+    $queryRaw: async (sql: { strings: string[]; values: unknown[] }) => {
+      if (sql.strings.join('').includes('ebda_customer_search_ids')) {
+        h.queryRaw('customers+guests');
+        const users = (await h.customers()) as Array<{ id: string }>;
+        const guests = (await h.guests()) as Array<{ id: string }>;
+        return [
+          ...users.map(r => ({ kind: 'user', id: r.id })),
+          ...guests.map(r => ({ kind: 'guest_order', id: r.id })),
+        ];
+      }
+      h.queryRaw(sql.values[1]);
+      return h.numbers();
     },
   },
 }));

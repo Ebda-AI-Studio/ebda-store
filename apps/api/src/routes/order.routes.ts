@@ -1,6 +1,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { ipKeyGenerator } from 'express-rate-limit';
 import { z } from 'zod';
+import { queryWithSearchHeader } from '../lib/search-term';
 import type ExcelJS from 'exceljs';
 import { loadExcelJS } from '../lib/lazy-modules';
 import {
@@ -9,7 +10,12 @@ import {
   describeRange,
   summarizeExportFilters,
 } from '../lib/exports/xlsx';
-import { authenticate, authorize, customerUserId } from '../middleware/auth';
+import { authenticate, authorize, customerUserId, rejectImpersonated } from '../middleware/auth';
+import {
+  ANONYMOUS_BUYER,
+  buyerFromRequest,
+  buyerFromMerchantShopperSelection,
+} from '../lib/buyer-identity';
 import { requireStoreAccess, checkStoreAccess } from '../middleware/store-access';
 import { requireFeature } from '../middleware/feature-gate';
 import {
@@ -87,7 +93,7 @@ function parseOrderListFilters(
   req: Request,
   res: Response
 ): Pick<OrderListWhere, 'status' | 'paymentStatus' | 'from' | 'to' | 'search'> | null {
-  const parsed = parseSharedOrderFilters(req.query);
+  const parsed = parseSharedOrderFilters(queryWithSearchHeader(req, res));
   if (!parsed.ok) {
     res.status(422).json({
       success: false,
@@ -484,6 +490,8 @@ const createOrderSchema = z.object({
   pointsToRedeem: z.number().int().min(0).max(100_000_000).optional(),
   // Pay from the customer wallet (D1) — a request, resolved server-side.
   useWallet: z.boolean().optional(),
+  // The total the shopper last saw: compared to the server-resolved total, never used to charge (409 PRICE_CHANGED).
+  expectedTotal: z.number().int().min(0).optional(),
 });
 
 const updateStatusSchema = z.object({
@@ -635,6 +643,7 @@ router.get('/:id', authenticate, async (req: Request, res: Response, next: NextF
 router.post(
   '/',
   authenticate,
+  rejectImpersonated,
   writeLimiter,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -659,6 +668,7 @@ router.post(
 
       const order = await OrderService.create(storeId, customerId, sessionId, data, referralCode, {
         checkoutIp: ipKeyGenerator(req.ip ?? '') || null,
+        buyer: buyerFromRequest(req),
       });
 
       res.status(201).json({
@@ -1912,8 +1922,21 @@ const adminOrderSchema = z
      */
     overrideCouponRules: z.boolean().optional(),
     couponOverrideReason: z.string().trim().min(3).max(500).optional(),
+    /**
+     * B2B minimum order quantity: refused by default (422 BELOW_MOQ). store_admin / super_admin may override with a
+     * reason, which is recorded with the actor (order event + audit log). Rejected for staff in the service.
+     */
+    overrideMoq: z.boolean().optional(),
+    moqOverrideReason: z.string().trim().min(3).max(500).optional(),
   })
   .superRefine((v, ctx) => {
+    if (v.overrideMoq === true && !v.moqOverrideReason) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['moqOverrideReason'],
+        message: 'A reason is required to override the minimum order quantity',
+      });
+    }
     if (v.overrideCouponRules !== true) return;
     if (!v.couponCode) {
       ctx.addIssue({
@@ -1943,9 +1966,18 @@ router.post(
       const user = getAuthUser(req);
       const data = adminOrderSchema.parse(req.body ?? {});
 
-      const order = await OrderService.createAdminOrder(storeId, user.userId, data, {
-        role: user.role,
-      });
+      // Ruling B2B-2d: an admin order is priced as the Customer the merchant explicitly SELECTED (the form's customerId),
+      // never from a typed phone / email; with no selection it is retail.
+      const buyer = data.customerId
+        ? buyerFromMerchantShopperSelection(req, data.customerId)
+        : ANONYMOUS_BUYER;
+      const order = await OrderService.createAdminOrder(
+        storeId,
+        user.userId,
+        data,
+        { role: user.role },
+        { buyer }
+      );
 
       res.json({
         success: true,

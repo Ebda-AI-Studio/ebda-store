@@ -1,5 +1,6 @@
 'use client';
 
+import { pdpMaxQty } from '@/lib/b2b-moq';
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { firstCategoryId, pickRelated } from '../../../lib/related-products';
 import { useLocalePrice } from '../../../hooks/useLocalePrice';
@@ -33,6 +34,7 @@ import { useNumerals } from '../../../hooks/useNumerals';
 import { toTemplateProduct } from '../../../templates/adapters';
 import { ProductCarousel } from '../../../templates/shared/ProductCarousel';
 import { TaxInclusiveLabel } from '../../../templates/shared/tax-inclusive-label';
+import { B2bPdpPanel } from '../../../components/pricing/B2bPdpPanel';
 import { ShareProductRow } from '../../../templates/shared/ShareProductRow';
 import { WaMeProductButton } from '../../../templates/shared/WaMeButtons';
 import { SpecTable } from '../../../templates/shared/SpecTable';
@@ -184,7 +186,12 @@ export default function ProductDetailClient({
   const [relatedProducts, setRelatedProducts] = useState<Product[]>([]);
   const [isLoading, setIsLoading] = useState(!initialProduct);
   const [error, setError] = useState<string | null>(null);
-  const [quantity, setQuantity] = useState(1);
+  // B2B M7: the stepper starts at the product's minimum order quantity (a retail product's is 1).
+  const [quantity, setQuantity] = useState(Math.max(1, initialProduct?.moq ?? 1));
+  const moqFloor = Math.max(1, product?.moq ?? 1);
+  useEffect(() => {
+    setQuantity(q => Math.max(q, moqFloor));
+  }, [moqFloor]);
   // Per-item personalisation text (e.g. the name to embroider). Part of the cart line identity.
   const [note, setNote] = useState('');
   // Bumped when a tap on add-to-cart is blocked ONLY by the empty required note:
@@ -750,13 +757,29 @@ export default function ProductDetailClient({
 
   // Dahab skin: same data and handlers, Dahab presentation (templates/dahab/ProductDetail).
   if (templateId === 'dahab') {
-    const maxQty =
+    const retailCap =
       effectiveInventory != null && effectiveInventory > 0 ? Math.min(effectiveInventory, 10) : 10;
+    // B2B M7: a MOQ or price break above the retail cap stays selectable (stock still bounds it).
+    const pricedMax = pdpMaxQty(retailCap, product.moq, product.priceTiers);
+    const maxQty = Math.max(
+      moqFloor,
+      effectiveInventory != null && effectiveInventory > 0
+        ? Math.min(pricedMax, effectiveInventory)
+        : pricedMax
+    );
     const badges = [pdpCustomBadgeText, discountBadgeText].filter((b): b is string => !!b);
     return (
       <ShopChrome layout={resolvedLayout}>
         <div className="flex-1" style={pdpBgStyle}>
           <DahabProductDetail
+            b2bPanel={
+              <B2bPdpPanel
+                productId={product.id}
+                variantId={selectedVariant?.id ?? null}
+                moq={product.moq}
+                tiers={product.priceTiers}
+              />
+            }
             images={images}
             name={displayName}
             categoryName={categoryName ?? undefined}
@@ -786,6 +809,7 @@ export default function ProductDetailClient({
             quantity={quantity}
             setQuantity={setQuantity}
             maxQuantity={maxQty}
+            minQuantity={moqFloor}
             stockText={
               outOfStock && !canBackorder
                 ? t('Out of stock', 'مش متوفر دلوقتي')
@@ -1174,6 +1198,12 @@ export default function ProductDetailClient({
                 )}
               </div>
               <TaxInclusiveLabel className="mt-1 block text-xs text-muted-foreground" />
+              <B2bPdpPanel
+                productId={product.id}
+                variantId={selectedVariant?.id ?? null}
+                moq={product.moq}
+                tiers={product.priceTiers}
+              />
 
               {/* Variant Selector */}
               {hasVariants && hasOptions ? (
@@ -1210,7 +1240,7 @@ export default function ProductDetailClient({
                   <div className="flex items-center rounded-lg border border-input">
                     <button
                       type="button"
-                      onClick={() => setQuantity(Math.max(1, quantity - 1))}
+                      onClick={() => setQuantity(Math.max(moqFloor, quantity - 1))}
                       aria-label={t('Decrease quantity', 'تقليل الكمية')}
                       // a11y re-audit P2-N11: no quantity to choose when it cannot be bought.
                       disabled={!buyableNow}
@@ -1224,11 +1254,17 @@ export default function ProductDetailClient({
                     <button
                       type="button"
                       onClick={() => {
-                        const maxQty =
+                        const retailCap =
                           effectiveInventory != null && effectiveInventory > 0
                             ? Math.min(effectiveInventory, 10)
                             : 10;
-                        setQuantity(Math.min(quantity + 1, maxQty));
+                        // A MOQ or price break above the retail cap must be selectable (stock still bounds it).
+                        const maxQty = pdpMaxQty(retailCap, product?.moq, product?.priceTiers);
+                        const stockCap =
+                          effectiveInventory != null && effectiveInventory > 0
+                            ? Math.min(maxQty, effectiveInventory)
+                            : maxQty;
+                        setQuantity(Math.min(quantity + 1, Math.max(stockCap, moqFloor)));
                       }}
                       aria-label={t('Increase quantity', 'زيادة الكمية')}
                       disabled={!buyableNow}

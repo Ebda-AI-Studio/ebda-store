@@ -1,3 +1,4 @@
+import { redactWebhookCustomerData } from './webhook-erasure';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
@@ -1927,6 +1928,19 @@ export class AuthService {
       // The ambient store of this erasure: the shopper's own store (self-service,
       // retention cron) or the merchant route's store (== user.storeId, checked above).
       const eraseStoreId = user.storeId ?? currentStoreId();
+      // Webhook delivery log: strip the shopper's contact data from stored payloads (Ruling WH-7).
+      // Must run before the orders lose their customer link below. Already-delivered payloads on
+      // the merchant's own server cannot be recalled.
+      await redactWebhookCustomerData(tx, {
+        storeId: eraseStoreId,
+        orderIds: (
+          await tx.order.findMany({
+            where: { customerId: userId, storeId: eraseStoreId },
+            select: { id: true },
+          })
+        ).map(o => o.id),
+        email: user.email,
+      });
       // Orders: preserve for tax records (Egypt MOF ≥5y), drop the PII.
       // The customer FK is already `onDelete: SetNull` but we explicitly
       // null it so the row's history loses the back-reference even before
@@ -1979,6 +1993,14 @@ export class AuthService {
         where: { customerId: userId, storeId: eraseStoreId },
       });
       await tx.loyaltyPoints.deleteMany({ where: { customerId: userId, storeId: eraseStoreId } });
+      // B2B wholesale (Task 5): the application holds PII (business name, phone, commercial registration no.) and the
+      // CRM row's user_id link is what grants a group price. Erase the applications and sever the link + membership, so an
+      // erased account can never price as a wholesaler again (the account is anonymised, not deleted, so no FK cascade fires).
+      await tx.wholesaleApplication.deleteMany({ where: { userId, storeId: eraseStoreId } });
+      await tx.customer.updateMany({
+        where: { userId, storeId: eraseStoreId },
+        data: { userId: null, groupId: null },
+      });
 
       // Customer wallet (D1, Ruling W-4). Unlike loyalty, the wallet ledger is
       // a FINANCIAL record of money the merchant owed and paid out, so it is
@@ -2361,6 +2383,7 @@ export class AuthService {
       onesignalSubscriptions,
       passkeys,
       smsMarketingConsents,
+      wholesaleApplications,
     ] = await Promise.all([
       // Same user-scoped RLS policy as the erase path above: on the
       // merchant-initiated export `current_user_id()` is the MERCHANT, so a
@@ -2442,6 +2465,24 @@ export class AuthService {
           updatedAt: true,
         },
       }),
+      // B2B wholesale applications (business name, phone, commercial registration no., decision note): the applicant's own data.
+      prisma.wholesaleApplication.findMany({
+        where: { userId, storeId },
+        // Explicit select (review M2): the staff user id that decided it (`decidedBy`) is not the applicant's data. The
+        // decision note IS exported: the applicant is shown it already.
+        select: {
+          id: true,
+          businessName: true,
+          commercialRegNo: true,
+          phone: true,
+          notes: true,
+          status: true,
+          decisionNote: true,
+          decidedAt: true,
+          consentAt: true,
+          createdAt: true,
+        },
+      }),
     ]);
 
     return {
@@ -2461,6 +2502,7 @@ export class AuthService {
       onesignalSubscriptions,
       passkeys,
       smsMarketingConsents,
+      wholesaleApplications,
     };
   }
 

@@ -1,3 +1,8 @@
+import {
+  wholesaleNotice,
+  wholesaleMerchantNotice,
+  type WholesaleNoticeKind,
+} from './email-templates/wholesale';
 import { withStore } from '@ebda/database';
 import { config } from '../config';
 import logger from '../lib/logger';
@@ -53,6 +58,10 @@ import {
   subscriptionBillingTemplate,
   type SubscriptionBillingNoticeData,
 } from './email-templates/subscription-billing';
+import {
+  webhookDisabledTemplate,
+  type WebhookDisabledData,
+} from './email-templates/webhook-disabled';
 import { BRAND, BRAND_EMAIL_LOGO_URL, brandFrom, poweredByBrand } from '@ebda/shared';
 
 import { resolveDefaultLanguage } from '@ebda/shared';
@@ -588,6 +597,76 @@ export class EmailService {
   }
 
   /**
+   * B2B wholesale application notices to the APPLICANT's account email only (received / approved / rejected). Queued with
+   * the order-lifecycle emails so a transient provider failure retries instead of vanishing.
+   */
+  /** Merchant-facing wholesale notice (new application / 48h nudge) to the store owner. Throws on failure; callers log it. */
+  static async sendWholesaleMerchantNotice(
+    storeId: string,
+    args: {
+      kind: 'received' | 'nudge';
+      businessName?: string;
+      pendingCount: number;
+      adminUrl: string;
+      to?: string | null;
+    }
+  ): Promise<void> {
+    const store = await withStore(storeId, tx =>
+      tx.store.findUnique({
+        where: { id: storeId },
+        select: { name: true, settings: true, owner: { select: { email: true } } },
+      })
+    );
+    if (!store) throw new Error(`Store ${storeId} not found`);
+    const to = args.to ?? store.owner?.email;
+    if (!to) return;
+    const lang: 'en' | 'ar' = resolveDefaultLanguage(
+      (store.settings as { defaultLanguage?: string } | null)?.defaultLanguage
+    );
+    const { subject, content } = wholesaleMerchantNotice(args.kind, lang, {
+      storeName: store.name,
+      businessName: args.businessName,
+      pendingCount: args.pendingCount,
+      adminUrl: args.adminUrl,
+    });
+    await this.sendForStore(storeId, { to, subject, content, language: lang }, { queue: true });
+  }
+
+  static async sendWholesaleNotice(
+    storeId: string,
+    args: {
+      to: string;
+      kind: WholesaleNoticeKind;
+      customerName: string;
+      businessName: string;
+      note?: string | null;
+      language?: 'en' | 'ar';
+    }
+  ): Promise<void> {
+    if (!args.to) return;
+    const store = await withStore(storeId, tx =>
+      tx.store.findUnique({ where: { id: storeId }, select: { name: true, settings: true } })
+    );
+    if (!store) throw new Error(`Store ${storeId} not found`);
+    const lang: 'en' | 'ar' =
+      args.language ??
+      resolveDefaultLanguage(
+        (store.settings as { defaultLanguage?: string } | null)?.defaultLanguage
+      );
+    const { subject, content } = wholesaleNotice(args.kind, lang, {
+      customerName: args.customerName,
+      storeName: store.name,
+      businessName: args.businessName,
+      note: args.note,
+    });
+    await this.sendForStore(
+      storeId,
+      { to: args.to, subject, content, language: lang },
+      { queue: true }
+    );
+  }
+
+  /**
    * The customer's notice when an order is cancelled before any refund has
    * moved (issue 1948): "You were not charged." when the payment was never
    * captured, "Your refund is being processed." when it was (`data.charged`).
@@ -1062,6 +1141,25 @@ export class EmailService {
       content: planLimitReachedTemplate[lang](data),
       language: lang,
     });
+  }
+
+  /** Merchant notice: a webhook endpoint was switched off after repeated failures. */
+  static async sendWebhookDisabledNotice(
+    storeId: string,
+    data: WebhookDisabledData & { to: string },
+    language?: 'en' | 'ar'
+  ): Promise<void> {
+    const lang: 'en' | 'ar' = language ?? 'ar';
+    await this.sendForStore(
+      storeId,
+      {
+        to: data.to,
+        subject: webhookDisabledTemplate.subject[lang](data),
+        content: webhookDisabledTemplate[lang](data),
+        language: lang,
+      },
+      { queue: true }
+    );
   }
 
   /**

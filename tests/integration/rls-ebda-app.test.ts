@@ -459,6 +459,8 @@ describe('every table with a store_id column is under STRICT, FORCED RLS (auto-e
     expect(tables).toContain('size_charts');
     // Storefront search log (search program P0 Task 5, 2026-10-15) — same automatic coverage.
     expect(tables).toContain('search_query_daily');
+    // Merchant outgoing webhooks (2026-10-21) — same automatic coverage.
+    expect(tables).toEqual(expect.arrayContaining(['webhook_endpoints', 'webhook_deliveries']));
     const [{ n }] = await owner.$queryRaw<Array<{ n: bigint }>>`
       SELECT count(*) AS n FROM public.store_page_revisions`;
     expect(Number(n)).toBeGreaterThanOrEqual(2); // not vacuously empty for the 0-row assertion below
@@ -836,6 +838,7 @@ describe('users / addresses / store_staff: identity-keyed policies', () => {
  */
 const PURE_IMMUTABLE_EBDA_FNS = new Set([
   'ebda_ar_norm',
+  'ebda_digits', // search P2 Task 15 (migration 20261027000100): digit-only phone fold
   'ebda_product_search_doc',
   'ebda_product_name_doc',
   'ebda_product_embed_doc', // search P1 Task 9 (migration 20261022000100): the embedding input

@@ -15,6 +15,7 @@ await runA11y({
     '/money/',
     '/rate-limits/',
     '/webhooks/',
+    '/merchant-webhooks/',
     '/storefront-api/',
     '/merchant-api/',
     '/api-reference/',

@@ -49,6 +49,7 @@ vi.mock('@api/lib/definer', () => ({ getOrderStoreId: async () => 'store-1' }));
 vi.mock('@api/middleware/auth', () => ({
   authenticate: (_req: any, _res: any, next: any) => next(),
   optionalAuthenticate: (_req: any, _res: any, next: any) => next(),
+  rejectImpersonated: (_req: any, _res: any, next: any) => next(),
 }));
 vi.mock('@api/middleware/rbac', () => ({
   requirePermission: () => (_req: any, _res: any, next: any) => next(),

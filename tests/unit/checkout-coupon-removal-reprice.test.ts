@@ -103,7 +103,7 @@ describe('CheckoutClient wiring (source-pinned: no DOM in this repo)', () => {
 
   it('Place Order stays disabled while shipping is being repriced or quoted', () => {
     expect(src).toMatch(
-      /isProcessing=\{isProcessing \|\| repricingShipping \|\| shippingQuotePending\}/
+      /isProcessing=\{\s*isProcessing \|\| repricingShipping \|\| shippingQuotePending \|\| quotePending\s*\}/
     );
   });
 

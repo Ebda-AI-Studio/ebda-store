@@ -574,7 +574,12 @@ export default function StoreSeoPage() {
 
           <div>
             <div className="flex items-center justify-between mb-1">
-              <label className="text-sm font-medium text-foreground">{t('metaTitle')}</label>
+              <label
+                data-setting-id="seo.meta-title"
+                className="text-sm font-medium text-foreground"
+              >
+                {t('metaTitle')}
+              </label>
               <CharCount value={settings.metaTitle} max={TITLE_MAX} />
             </div>
             <input
@@ -674,7 +679,9 @@ export default function StoreSeoPage() {
               <span className="text-xs font-bold text-primary">AEO</span>
             </div>
             <div>
-              <h2 className="font-semibold text-foreground">{t('aeoTitle')}</h2>
+              <h2 data-setting-id="seo.aeo" className="font-semibold text-foreground">
+                {t('aeoTitle')}
+              </h2>
               <p className="text-xs text-muted-foreground mt-0.5">{t('aeoHint')}</p>
             </div>
           </div>
@@ -819,7 +826,9 @@ export default function StoreSeoPage() {
         <div id="faqs" className="scroll-mt-24 rounded-xl border bg-card p-6 shadow-sm space-y-4">
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="font-semibold text-foreground">{t('faqsTitle')}</h2>
+              <h2 data-setting-id="seo.faqs" className="font-semibold text-foreground">
+                {t('faqsTitle')}
+              </h2>
               <p className="text-xs text-muted-foreground mt-0.5">{t('faqsSubtitle')}</p>
             </div>
             {editingFaqId === null && (
@@ -1073,7 +1082,9 @@ export default function StoreSeoPage() {
         <div id="howtos" className="scroll-mt-24 rounded-xl border bg-card p-6 shadow-sm space-y-4">
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="font-semibold text-foreground">{t('howtosTitle')}</h2>
+              <h2 data-setting-id="seo.how-tos" className="font-semibold text-foreground">
+                {t('howtosTitle')}
+              </h2>
               <p className="text-xs text-muted-foreground mt-0.5">{t('howtosSubtitle')}</p>
             </div>
             {editingHowtoId === null && (

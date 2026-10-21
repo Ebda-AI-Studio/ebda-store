@@ -17,6 +17,11 @@ export interface PaletteItem {
    *  concept word (e.g. "logo" / "شعار") finds the page even when the page's
    *  own name doesn't contain it. */
   keywords?: string;
+  /**
+   * Set on admin-search registry entries (lib/settings-search.ts). A single `setting` is listed
+   * only once the user types, so the empty palette stays the short list of hubs and pages.
+   */
+  kind?: 'page' | 'setting';
 }
 
 // Concept synonyms per page, EN + AR, keyed by the LAST path segment of the
@@ -103,6 +108,7 @@ export interface SettingsPaletteLabels {
   announcement: string;
   agentKey: string;
   merchantKeys: string;
+  webhooks: string;
   billing: string;
 }
 
@@ -166,6 +172,7 @@ export function buildStorePaletteItems(
       [settings.staff, `/stores/${storeId}/staff`],
       [settings.agentKey, `/stores/${storeId}/agent-key`],
       [settings.merchantKeys, `/stores/${storeId}/merchant-keys`],
+      [settings.webhooks, `/stores/${storeId}/webhooks`],
       [settings.billing, `/stores/${storeId}/billing`],
     ];
     for (const [name, href] of pages)

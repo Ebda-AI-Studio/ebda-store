@@ -13,6 +13,7 @@ import { useParams } from 'next/navigation';
 import { useT } from '@/i18n/useT';
 import { AdminLayout } from '../../../../components/AdminLayout';
 import { apiGet, apiPost, apiPut, apiDelete } from '../../../../lib/api';
+import { pctToBps } from './pct';
 import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
 
 interface CustomerGroup {
@@ -22,6 +23,10 @@ interface CustomerGroup {
   isActive: boolean;
   isDefault: boolean;
   customerCount: number;
+  /** B2B pricing (Task 4/7): wholesale flag, percent-off mode and its basis points (1250 = 12.5%). */
+  isWholesale: boolean;
+  pricingMode: 'none' | 'percent_off';
+  discountBps: number;
 }
 
 interface FormState {
@@ -29,9 +34,21 @@ interface FormState {
   nameAr: string;
   isActive: boolean;
   isDefault: boolean;
+  isWholesale: boolean;
+  pricingMode: 'none' | 'percent_off';
+  /** Percent as typed (e.g. "12.5"); converted to basis points on save. */
+  discountPct: string;
 }
 
-const EMPTY_FORM: FormState = { name: '', nameAr: '', isActive: true, isDefault: false };
+const EMPTY_FORM: FormState = {
+  name: '',
+  nameAr: '',
+  isActive: true,
+  isDefault: false,
+  isWholesale: false,
+  pricingMode: 'none',
+  discountPct: '',
+};
 
 export default function CustomerGroupsPage() {
   const params = useParams();
@@ -79,6 +96,9 @@ export default function CustomerGroupsPage() {
       nameAr: group.nameAr ?? '',
       isActive: group.isActive,
       isDefault: group.isDefault,
+      isWholesale: group.isWholesale,
+      pricingMode: group.pricingMode,
+      discountPct: group.discountBps ? String(group.discountBps / 100) : '',
     });
     setShowModal(true);
   };
@@ -87,16 +107,33 @@ export default function CustomerGroupsPage() {
     setSaving(true);
     setError(null);
     try {
+      let discountBps = 0;
+      if (form.pricingMode === 'percent_off') {
+        const bps = pctToBps(form.discountPct);
+        if (bps === null) {
+          setError(t('discountInvalid'));
+          setSaving(false);
+          return;
+        }
+        discountBps = bps;
+      }
       const body = {
         name: form.name.trim(),
         nameAr: form.nameAr.trim() || null,
         isActive: form.isActive,
         isDefault: form.isDefault,
+        isWholesale: form.isWholesale,
+        pricingMode: form.pricingMode,
+        discountBps,
       };
-      if (editing) {
-        await apiPut(`/api/v1/stores/${storeId}/customer-groups/${editing.id}`, body);
-      } else {
-        await apiPost(`/api/v1/stores/${storeId}/customer-groups`, body);
+      const res = editing
+        ? await apiPut(`/api/v1/stores/${storeId}/customer-groups/${editing.id}`, body)
+        : await apiPost(`/api/v1/stores/${storeId}/customer-groups`, body);
+      if (res.error) {
+        // FEATURE_DISABLED = turning wholesale pricing ON needs the plan (turning it off never does).
+        setError(res.error.code === 'FEATURE_DISABLED' ? t('planRequired') : res.error.message);
+        setSaving(false);
+        return;
       }
       setShowModal(false);
       await fetchGroups();
@@ -243,6 +280,47 @@ export default function CustomerGroupsPage() {
                   className="w-full rounded-md border px-3 py-2 text-sm"
                 />
               </label>
+
+              <fieldset className="mb-3 rounded-md border p-3">
+                <legend className="px-1 text-sm font-medium">{t('pricingTitle')}</legend>
+                <label className="mb-2 flex items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={form.isWholesale}
+                    onChange={e => setForm({ ...form, isWholesale: e.target.checked })}
+                  />
+                  {t('wholesaleLabel')}
+                </label>
+                <p className="mb-2 text-xs text-muted-foreground">{t('wholesaleHint')}</p>
+                <label className="mb-2 block text-sm">
+                  <span className="mb-1 block font-medium">{t('pricingMode')}</span>
+                  <select
+                    value={form.pricingMode}
+                    onChange={e =>
+                      setForm({ ...form, pricingMode: e.target.value as FormState['pricingMode'] })
+                    }
+                    className="min-h-11 w-full rounded-md border px-3 text-sm"
+                  >
+                    <option value="none">{t('modeNone')}</option>
+                    <option value="percent_off">{t('modePercent')}</option>
+                  </select>
+                </label>
+                {form.pricingMode === 'percent_off' ? (
+                  <label className="block text-sm">
+                    <span className="mb-1 block font-medium">{t('discountPct')}</span>
+                    <input
+                      inputMode="decimal"
+                      dir="ltr"
+                      value={form.discountPct}
+                      onChange={e => setForm({ ...form, discountPct: e.target.value })}
+                      className="min-h-11 w-full rounded-md border px-3 text-sm"
+                    />
+                    <span className="mt-1 block text-xs text-muted-foreground">
+                      {t('discountHint')}
+                    </span>
+                  </label>
+                ) : null}
+              </fieldset>
 
               <label className="mb-2 flex items-center gap-2 text-sm">
                 <input

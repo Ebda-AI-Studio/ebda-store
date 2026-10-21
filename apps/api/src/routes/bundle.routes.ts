@@ -39,7 +39,7 @@ import { requireFeature } from '../middleware/feature-gate';
 import { publicLimiter, publicTenantLimiter } from '../middleware/security';
 import { tenantContext } from '../middleware/tenant-context';
 import { AppError } from '../middleware/error-handler';
-import { cartLineUnitPrice } from '../lib/cart-pricing';
+import { retailUnitPrice } from '../lib/cart-pricing';
 import {
   resolveBundle,
   compareBundleComponents,
@@ -167,7 +167,7 @@ const listQuerySchema = z.object({
 
 /**
  * Resolves each component to its CURRENT store-scoped unit price (via the
- * same `cartLineUnitPrice` fallback the cart/resolveBundle use, so a bundle
+ * same `retailUnitPrice` fallback the cart/resolveBundle use, so a bundle
  * never charges a different price for a component than buying it standalone
  * would) and builds the `BundleLine[]` + `componentSum` the pricing/
  * allocation functions need.
@@ -280,7 +280,7 @@ async function resolveBundleLines(
     }
     return {
       key: `${index}`,
-      unitPrice: cartLineUnitPrice({ variant, product }),
+      unitPrice: retailUnitPrice({ variant, product }),
       quantity: item.quantity,
     };
   });
@@ -841,8 +841,12 @@ router.get(
           // `pricingType`/`pricingValue`, which this response also omits).
           const items = await prisma.bundleItem.findMany({
             where: { bundleId: row.id },
-            select: { product: { select: { name: true, nameAr: true } } },
+            select: { product: { select: { name: true, nameAr: true, audience: true } } },
           });
+          // B2B I1: a bundle holding a wholesale-only product does not exist for the anonymous storefront (no names leak).
+          if (items.some(i => i.product.audience === 'wholesale_only')) {
+            throw new AppError(404, 'NOT_FOUND', 'Bundle not found for this store');
+          }
 
           return {
             id: resolved.id,

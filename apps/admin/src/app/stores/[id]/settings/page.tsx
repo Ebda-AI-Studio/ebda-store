@@ -500,6 +500,21 @@ export default function StoreSettingsPage() {
       ),
     },
     {
+      key: 'webhooks',
+      href: `/stores/${storeId}/webhooks`,
+      color: 'bg-muted text-muted-ink',
+      icon: (
+        <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M13 10V3L4 14h7v7l9-11h-7z"
+          />
+        </svg>
+      ),
+    },
+    {
       /*
        * Merchant MCP keys — the MERCHANT-ADMIN surface, not the buyer one.
        * Separate card from `agentKey` above because they are different
@@ -568,11 +583,7 @@ export default function StoreSettingsPage() {
         </Link>
       }
     >
-      <SettingsSearch
-        searchItems={cards
-          .filter(card => !card.featureKey || isEnabled(card.featureKey))
-          .map(card => ({ key: card.key, href: card.href }))}
-      />
+      <SettingsSearch />
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {isLoading
           ? Array.from({ length: 9 }).map((_, i) => (

@@ -140,6 +140,12 @@ with a comment on the owning model. As a result, `prisma migrate diff` and `migr
 - `users_{first_name,last_name,email,phone}_trgm_idx`
 - `orders_guest_{first_name,last_name,email,phone}_trgm_idx` (partial, on the `shipping_address ->> '<key>'`
   expression; Prisma cannot declare either)
+- `users_{phone_digits,name_norm}_trgm_idx` and `orders_guest_{phone_digits,name_norm}_trgm_idx` (partial,
+  `customer_id IS NULL`): EXPRESSION indexes on `public.ebda_digits(...)` / `public.ebda_ar_norm(...)`
+  (migration `20261027000100`). Changing either function requires `REINDEX INDEX CONCURRENTLY` of all four.
+  The three `orders_guest_*` ones (and `orders_guest_email_store_trgm_idx`) are `btree_gin` composites that LEAD
+  WITH `store_id`, so a one-store search does not read the whole platform's trigram matches (Ruling
+  SEARCH-P2-8); `btree_gin` is created by that migration (available on Neon).
 - `products_{search_doc,name_doc}_trgm_idx` (EXPRESSION indexes on `public.ebda_product_*_doc`) and
   `products_sku_norm_trgm_idx` (on `public.ebda_ar_norm(coalesce(sku, ''))`); changing `ebda_ar_norm`
   requires `REINDEX INDEX CONCURRENTLY` of all three. The `products_search_terms_len_chk` CHECK is not

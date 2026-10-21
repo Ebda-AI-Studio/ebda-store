@@ -83,6 +83,10 @@ export const FEATURE_KEYS_ARRAY = [
   // PLAN (`brandingRemoval` limit: Growth + Business) via FeatureService's plan
   // layer — in NO PLAN_BASELINE; a super-admin StoreFeature override still wins.
   'remove_branding',
+  // B2B wholesale pricing (2026-10-21, Ruling B2B-1; docs/plans/2026-10-21-b2b-wholesale.md).
+  // Decided by the PLAN (`wholesalePricing` limit: Business + comped) via FeatureService's plan
+  // layer, in NO PLAN_BASELINE; a super-admin StoreFeature override wins both ways.
+  'b2b.wholesale',
   // Product 3D models + AR on the PDP (2026-10-07). Included in EVERY plan's
   // baseline (Ahmad 2026-10-07, Ruling R-EBDA-3D-2 — no plan gate). A key at all
   // only so a super-admin StoreFeature override can switch it off per store.
@@ -660,6 +664,24 @@ export const FEATURE_REGISTRY: Record<FeatureKey, FeatureDefinition> = {
       'العمليات الجماعية) تحتاج تأكيداً على دفعتين. مفعّلة حسب الباقة (النمو والأعمال)، ويقدر التاجر يقفلها لكل متجر.',
     category: 'marketing',
     tier: 'addon',
+  },
+  'b2b.wholesale': {
+    key: 'b2b.wholesale',
+    name: 'Wholesale pricing',
+    nameAr: 'أسعار الجملة',
+    description:
+      'Quantity price breaks, customer-group prices, minimum order quantities, wholesale-only ' +
+      'products and a wholesale account application you approve. Included in Business; granted ' +
+      'per store by a super-admin override otherwise.',
+    descriptionAr:
+      'خصومات الكميات وأسعار مجموعات العملاء والحد الأدنى للطلب ومنتجات الجملة فقط ' +
+      'وطلبات حسابات الجملة التي توافق عليها. مضمّن في باقة الأعمال، ويُمنح لمتجر بعينه عبر تجاوز من المشرف العام.',
+    category: 'commerce',
+    tier: 'addon',
+    // Hidden from the merchant feature list until the merchant + storefront UI ships (Tasks 6-7); a super-admin can
+    // still switch it per store in the FeatureMatrix. Task 8 removes both flags.
+    hidden: true,
+    superAdminToggleable: true,
   },
   remove_branding: {
     key: 'remove_branding',

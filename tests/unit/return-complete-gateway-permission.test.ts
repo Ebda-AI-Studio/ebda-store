@@ -93,7 +93,7 @@ describe('returns complete — gateway refunds need orders:refund (issue 2024)',
     for (const method of ['cash', 'bank_transfer', 'manual']) {
       const res = await request(app()).post(COMPLETE).send({ refundMethod: method });
       expect(res.status).toBe(200);
-      expect(mockComplete).toHaveBeenCalledWith('store-1', 'ret-1', 'u-1', method);
+      expect(mockComplete).toHaveBeenCalledWith('store-1', 'ret-1', 'u-1', method, {});
     }
   });
 
@@ -107,7 +107,7 @@ describe('returns complete — gateway refunds need orders:refund (issue 2024)',
     state.role = 'store_admin';
     const res = await request(app()).post(COMPLETE).send({ refundMethod: 'original' });
     expect(res.status).toBe(200);
-    expect(mockComplete).toHaveBeenCalledWith('store-1', 'ret-1', 'u-1', 'original');
+    expect(mockComplete).toHaveBeenCalledWith('store-1', 'ret-1', 'u-1', 'original', {});
   });
 
   it('the preview marks the gateway unavailable for staff, with a reason the modal renders', async () => {
@@ -124,5 +124,31 @@ describe('returns complete — gateway refunds need orders:refund (issue 2024)',
     state.role = 'store_admin';
     const res = await request(app()).get(PREVIEW);
     expect(res.body.data.preview.gateway.available).toBe(true);
+  });
+  it('refuses staff a refund override even with a record-only method (B2B Task 8b: it changes the amount paid out)', async () => {
+    state.role = 'staff';
+    const res = await request(app())
+      .post(COMPLETE)
+      .send({
+        refundMethod: 'cash',
+        refundOverrides: {
+          '11111111-1111-4111-8111-111111111111': { amountMinor: 100, reason: 'goodwill' },
+        },
+      });
+    expect(res.status).toBe(403);
+    expect(res.body.error.code).toBe('REFUND_PERMISSION_REQUIRED');
+    expect(mockComplete).not.toHaveBeenCalled();
+  });
+
+  it('lets a store_admin pass an override through to the service', async () => {
+    state.role = 'store_admin';
+    const overrides = {
+      '11111111-1111-4111-8111-111111111111': { amountMinor: 100, reason: 'goodwill' },
+    };
+    const res = await request(app())
+      .post(COMPLETE)
+      .send({ refundMethod: 'cash', refundOverrides: overrides });
+    expect(res.status).toBe(200);
+    expect(mockComplete).toHaveBeenCalledWith('store-1', 'ret-1', 'u-1', 'cash', overrides);
   });
 });

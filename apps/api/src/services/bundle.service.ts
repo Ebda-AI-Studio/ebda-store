@@ -10,7 +10,7 @@
 import type { DbClient } from '@ebda/database';
 import { computeBundlePrice, type BundleLine, type BundlePricingType } from '@ebda/shared';
 import { AppError } from '../middleware/error-handler';
-import { cartLineUnitPrice } from '../lib/cart-pricing';
+import { retailUnitPrice } from '../lib/cart-pricing';
 import { effectiveInventory } from '../lib/effective-inventory';
 
 export interface AvailabilityItem {
@@ -176,7 +176,7 @@ export function nextSaleWindowBoundarySeconds(
 
 /**
  * Load a bundle for `storeId` with everything the cart/checkout/admin need:
- * its component lines (priced through `cartLineUnitPrice`, the same
+ * its component lines (priced through `retailUnitPrice`, the same
  * variant-vs-parent fallback the cart uses, so a bundle never charges a
  * different price for a component than buying it standalone would), the
  * derived `price` (via `computeBundlePrice`), the derived `available` count,
@@ -219,6 +219,7 @@ export async function resolveBundle(
               variants: { select: { inventory: true, isActive: true } },
               deletedAt: true,
               status: true,
+              audience: true,
             },
           },
           variant: { select: { price: true, inventory: true, isActive: true } },
@@ -237,7 +238,7 @@ export async function resolveBundle(
 
   const lines: BundleLine[] = orderedItems.map(item => ({
     key: item.id,
-    unitPrice: cartLineUnitPrice({ variant: item.variant, product: item.product }),
+    unitPrice: retailUnitPrice({ variant: item.variant, product: item.product }),
     quantity: item.quantity,
   }));
 
@@ -274,6 +275,9 @@ export async function resolveBundle(
   // still open the bundle to see and fix the broken line.
   const allComponentsPurchasable = bundle.items.every(item => {
     if (item.product.deletedAt !== null || item.product.status !== 'active') return false;
+    // B2B I1: a bundle with ANY wholesale-only component is not sellable and not listed (fail closed, like a deleted
+    // component), so it can be neither carted nor ordered; the merchant can still open it in admin. Ruling B2B-I1.
+    if (item.product.audience === 'wholesale_only') return false;
     if (item.variantId && item.variant?.isActive === false) return false;
     // P1-3 (final review): a line on a VARIANT product that pins no variant
     // is an unsellable shape, not a sellable one. `products.inventory` is

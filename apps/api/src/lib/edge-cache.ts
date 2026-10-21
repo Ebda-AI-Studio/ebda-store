@@ -57,6 +57,13 @@ export function setEdgeCache(
     varyOn?: string[];
   }
 ): void {
+  // Design review I3 (B2B): a response that was computed for a SIGNED-IN caller may differ per buyer (group prices,
+  // wholesale-only products) and must never be stored by a shared cache. Fixed here, in the one helper every public route
+  // calls, so all 8 call sites are covered and a future caller cannot forget. The anonymous path below is unchanged.
+  if (requestIsAuthenticated(res)) {
+    setBuyerPrivate(res);
+    return;
+  }
   const swr = opts.staleWhileRevalidate ?? opts.sMaxAge * 5;
   res.setHeader('Cache-Control', `public, s-maxage=${opts.sMaxAge}, stale-while-revalidate=${swr}`);
   // res.vary() APPENDS (merge + case-insensitive dedupe) instead of
@@ -70,4 +77,21 @@ export function setEdgeCache(
   for (const token of opts.varyOn ?? []) {
     res.vary(token);
   }
+}
+
+/** True when the request carries credentials (Authorization header or the session `token` cookie). */
+function requestIsAuthenticated(res: Response): boolean {
+  const req = res.req as (Response['req'] & { cookies?: Record<string, string> }) | undefined;
+  if (!req) return false;
+  return Boolean(req.headers?.authorization) || Boolean(req.cookies?.token);
+}
+
+/**
+ * Mark a response that depends on WHO is asking (buyer-specific prices, the signed-in buyer's catalogue) as private:
+ * no shared cache, no CDN, no Next data cache may store it, and any cache that honours Vary keys on the credentials.
+ */
+export function setBuyerPrivate(res: Response): void {
+  res.setHeader('Cache-Control', 'private, no-store');
+  res.vary('Cookie');
+  res.vary('Authorization');
 }

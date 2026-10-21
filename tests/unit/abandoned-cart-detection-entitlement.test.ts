@@ -62,6 +62,16 @@ vi.mock('@api/services/feature.service', () => ({
 }));
 vi.mock('@api/services/redis.service', () => ({ redis: {} }));
 vi.mock('@api/services/notification-dispatcher.service', () => ({ notificationDispatcher: {} }));
+// The resolver reads a customer's price group from the database; this suite is about entitlement and email
+// consent, so it prices every line at the product's own price.
+vi.mock('@api/services/price-resolver.service', () => ({
+  PriceResolver: {
+    forBuyer: async () => ({
+      priceCart: async (lines: { key: string; product: { price: number }; qty: number }[]) =>
+        new Map(lines.map(l => [l.key, { unitMinor: l.product.price }])),
+    }),
+  },
+}));
 vi.mock('@api/services/bundle.service', () => ({ resolveBundle: vi.fn() }));
 vi.mock('@api/services/wbs-bridge.service', () => ({
   wbsBridgeService: {},

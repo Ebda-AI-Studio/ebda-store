@@ -14,6 +14,14 @@ import { useCart } from '../../contexts/CartContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { useLanguage, translations } from '../../contexts/LanguageContext';
 import { api } from '../../lib/api';
+import {
+  buildQuoteRequest,
+  quoteKey,
+  freshQuote,
+  expectedTotalFor,
+  priceChangedCopy,
+  type HeldQuote,
+} from '../../lib/checkout-quote';
 import { CheckoutErrorAlert } from './CheckoutErrorAlert';
 import {
   orderLocale,
@@ -55,7 +63,11 @@ import {
   type DeliveryDay,
 } from './_lib/deliveryWindows';
 import { pageSurfaceStyle } from '@/lib/page-surface';
-import { couponQuoteBasis, couponQuoteCartItems } from '@/lib/coupon-quote-basis';
+import {
+  couponQuoteBasis,
+  couponQuoteCartItems,
+  couponQuoteLooseFields,
+} from '@/lib/coupon-quote-basis';
 import {
   resolveSectionZone,
   zoneStyle,
@@ -181,6 +193,10 @@ export default function CheckoutClient() {
   const formatPrice = useLocalePrice();
   const [step, setStep] = useState(1);
   const [isProcessing, setIsProcessing] = useState(false);
+  // The server's own quote of the order total (design review I-1): what the buyer confirms and what is sent as `expectedTotal`.
+  const [heldQuote, setHeldQuote] = useState<HeldQuote | null>(null);
+  const [quotePending, setQuotePending] = useState(false);
+  const [quoteNonce, setQuoteNonce] = useState(0);
   // True while shipping is being recomputed after a coupon was removed; holds
   // Place Order closed so the charge can never run ahead of the summary.
   const [repricingShipping, setRepricingShipping] = useState(false);
@@ -899,6 +915,8 @@ export default function CheckoutClient() {
             // way OrderService.create will, instead of accepting a code the
             // order then refuses.
             cartItems: couponQuoteCartItems(cartContextItems),
+            // A free-shipping code is judged on the whole loose cart (Ruling B2B-M2).
+            ...couponQuoteLooseFields(cartContextItems),
             phone: formData.phone.trim() || undefined,
             email: formData.email.trim() || undefined,
           }
@@ -1153,7 +1171,7 @@ export default function CheckoutClient() {
   // subtotal → discounts → shipping → COD fee → VAT → total, VAT on the whole
   // supply incl. shipping and the COD fee (ruling MONEYB-2) — the function the
   // order is charged with, so this summary is the order's numbers.
-  const { tax, total } = computeOrderAmounts({
+  const { tax: localTax, total: localTotal } = computeOrderAmounts({
     subtotal,
     discount,
     shipping,
@@ -1161,6 +1179,57 @@ export default function CheckoutClient() {
     ratePercent: taxRatePercent,
     includedInPrice: taxIncludedInPrice,
   });
+  // The server's quote of THIS cart with THESE inputs (priced for this buyer: tier / group / retail, MOQ, coupon eligibility,
+  // loyalty, shipping, COD fee, VAT). Once it has loaded, every figure the buyer is asked to confirm comes from it; the local
+  // numbers above are only the estimate shown while it loads.
+  const quoteInputs = {
+    area: formData.area,
+    governorate: formData.governorate,
+    country: REGION.countryName.en,
+    phone: formData.phone,
+    email: formData.email,
+    selectedProvider,
+    couponCode: appliedCoupon?.code ?? null,
+    pointsToRedeem: pointsToSend,
+  };
+  const currentQuoteKey = quoteKey(
+    quoteInputs,
+    (cart?.items ?? []).map(i => ({ id: i.id, quantity: i.quantity, price: i.price })),
+    quoteNonce
+  );
+  const serverQuote = freshQuote(heldQuote, currentQuoteKey);
+  const tax = serverQuote ? serverQuote.tax : localTax;
+  const total = serverQuote ? serverQuote.total : localTotal;
+  const shownSubtotal = serverQuote ? serverQuote.subtotal : subtotal;
+  const shownDiscount = serverQuote ? serverQuote.discount : discount;
+  const shownShipping = serverQuote ? serverQuote.shipping : shipping;
+  const shownCodFee = serverQuote ? serverQuote.codFee : codFee;
+  const quoteStep = step;
+  useEffect(() => {
+    // Quote on the payment step: that is where the buyer confirms a total. A deterministic refusal (below MOQ, ineligible
+    // coupon ...) leaves no quote; Place order then reproduces the same error with its own friendly mapping.
+    if (quoteStep !== 2 || !cart || cart.items.length === 0) return;
+    let cancelled = false;
+    setQuotePending(true);
+    void api
+      .quoteOrder(buildQuoteRequest(quoteInputs))
+      .then(res => {
+        if (cancelled) return;
+        setHeldQuote(
+          res.success && res.data?.quote ? { key: currentQuoteKey, quote: res.data.quote } : null
+        );
+      })
+      .catch(() => {
+        if (!cancelled) setHeldQuote(null);
+      })
+      .finally(() => {
+        if (!cancelled) setQuotePending(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [quoteStep, currentQuoteKey]);
   // Display estimate of the wallet portion; the server re-resolves it.
   const walletApplied =
     walletSpendable && useWalletBalance && wallet ? Math.min(wallet.balance, total) : 0;
@@ -1412,6 +1481,11 @@ export default function CheckoutClient() {
         // amount clears the store minimum. The server re-validates against the
         // real balance + caps regardless.
         pointsToRedeem: pointsToSend > 0 ? pointsToSend : undefined,
+        // The total the buyer is looking at, as computed by the SERVER's quote for exactly these inputs and this cart. If the
+        // server prices the order differently (approval revoked, tier edited, plan changed) it answers 409 PRICE_CHANGED and
+        // nothing is charged. Undefined when no fresh quote exists (the quote request failed), in which case the server
+        // simply charges its own price as before.
+        expectedTotal: expectedTotalFor(heldQuote, currentQuoteKey),
         // Only sent when the customer ticked "Use wallet balance" on a store
         // where the API reports wallet checkout as available.
         useWallet: walletApplied > 0 ? true : undefined,
@@ -1732,6 +1806,15 @@ export default function CheckoutClient() {
           refreshWallet();
           setUseWalletBalance(false);
           break;
+        case 'INVALID_COUPON':
+          // Generic on purpose: the API no longer says whether a code is unknown, expired or used up.
+          await removeCoupon();
+          setStep(1);
+          friendly = t(
+            'The coupon you applied is no longer valid, so it has been removed. Please try again.',
+            'الكوبون ده مبقاش صالح، فشيلناه. جرّب تاني.'
+          );
+          break;
         case 'COUPON_LIMIT_REACHED':
           friendly = t(
             'The coupon you applied has reached its usage limit. Please remove it and try again.',
@@ -1780,6 +1863,44 @@ export default function CheckoutClient() {
             );
           setStep(1);
           break;
+        case 'PRICE_CHANGED':
+          // B2B (Ruling B2B-9): the server re-priced the order and its total differs from the quote the buyer confirmed
+          // (revoked approval, tier edit, plan change, a new price). Nothing was charged. Stay on the payment step, drop the
+          // held quote and refetch the cart: a fresh server quote loads, the buyer sees the NEW total (named in this
+          // message) and confirms it by pressing Place order again, which sends that new total as `expectedTotal`.
+          setHeldQuote(null);
+          setQuoteNonce(n => n + 1);
+          void refetchCart().catch(() => undefined);
+          friendly = priceChangedCopy(
+            details as { total?: unknown } | null | undefined,
+            formatPrice,
+            t
+          );
+          break;
+        case 'BELOW_MOQ': {
+          // B2B minimum order quantity: deterministic until the quantity is raised or the line removed, so a retry can never
+          // succeed. The server lists EVERY offending product; name them and send the buyer to the cart.
+          const lines = ((details as { lines?: unknown } | null | undefined)?.lines ??
+            []) as Array<{
+            name?: string;
+            nameAr?: string | null;
+            required?: number;
+          }>;
+          const names = lines
+            .map(l => `${language === 'ar' ? l.nameAr || l.name : l.name} (${l.required})`)
+            .join(language === 'ar' ? '، ' : ', ');
+          setStep(1);
+          friendly = names
+            ? t(
+                `Some items are below their minimum order quantity: ${names}. Please increase the quantity to continue.`,
+                `فيه منتجات أقل من الحد الأدنى للكمية: ${names}. زوّد الكمية عشان تكمّل.`
+              )
+            : t(
+                'Some items are below their minimum order quantity. Please increase the quantity to continue.',
+                'فيه منتجات أقل من الحد الأدنى للكمية. زوّد الكمية عشان تكمّل.'
+              );
+          break;
+        }
         case 'INSUFFICIENT_INVENTORY':
           friendly = t(
             'One of the items in your cart is out of stock. Please review your cart.',
@@ -2401,7 +2522,9 @@ export default function CheckoutClient() {
                     onRetryPaymentConfig={() => setCheckoutReloadKey(k => k + 1)}
                     selectedProvider={selectedProvider}
                     onSelectProvider={setSelectedProvider}
-                    isProcessing={isProcessing || repricingShipping || shippingQuotePending}
+                    isProcessing={
+                      isProcessing || repricingShipping || shippingQuotePending || quotePending
+                    }
                     total={total}
                     formatPrice={formatPrice}
                     belowMinimumOrder={belowMinimumOrder}
@@ -2432,11 +2555,11 @@ export default function CheckoutClient() {
             <OrderSummary
               items={cart.items}
               bundles={cart.bundles}
-              subtotal={subtotal}
-              discount={discount}
+              subtotal={shownSubtotal}
+              discount={shownDiscount}
               promotionDiscount={promotionAppliedDiscount}
-              shipping={shipping}
-              codFee={codFee}
+              shipping={shownShipping}
+              codFee={shownCodFee}
               tax={tax}
               taxRatePercent={taxRatePercent}
               taxIncludedInPrice={taxIncludedInPrice}

@@ -2,6 +2,8 @@ import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import { CartService } from '../services/cart.service';
 import { customerUserId } from '../middleware/auth';
+import { buyerFromRequest } from '../lib/buyer-identity';
+import { setBuyerPrivate } from '../lib/edge-cache';
 import { requireFeature } from '../middleware/feature-gate';
 
 const router = Router({ mergeParams: true });
@@ -60,7 +62,13 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
     const sessionId = getSessionId(req);
     const customerId = customerUserId(req);
 
-    const cart = await CartService.getOrCreate(storeId, sessionId, customerId);
+    setBuyerPrivate(res);
+    const cart = await CartService.getOrCreate(
+      storeId,
+      sessionId,
+      customerId,
+      buyerFromRequest(req)
+    );
 
     res.json({
       success: true,
@@ -86,7 +94,8 @@ router.post('/items', async (req: Request, res: Response, next: NextFunction) =>
       data.quantity,
       customerId,
       data.variantId,
-      data.note
+      data.note,
+      buyerFromRequest(req)
     );
 
     res.status(201).json({
@@ -108,7 +117,13 @@ router.post('/sync', async (req: Request, res: Response, next: NextFunction) => 
     const customerId = customerUserId(req);
     const data = bulkSyncSchema.parse(req.body);
 
-    const cart = await CartService.addItems(storeId, sessionId, data.items, customerId);
+    const cart = await CartService.addItems(
+      storeId,
+      sessionId,
+      data.items,
+      customerId,
+      buyerFromRequest(req)
+    );
 
     res.status(200).json({
       success: true,
@@ -132,7 +147,8 @@ router.put('/items/:itemId', async (req: Request, res: Response, next: NextFunct
       sessionId,
       itemId,
       data.quantity,
-      customerId
+      customerId,
+      buyerFromRequest(req)
     );
 
     res.json({
@@ -151,7 +167,13 @@ router.delete('/items/:itemId', async (req: Request, res: Response, next: NextFu
     const sessionId = getSessionId(req);
     const customerId = customerUserId(req);
 
-    const cart = await CartService.removeItem(storeId, sessionId, itemId, customerId);
+    const cart = await CartService.removeItem(
+      storeId,
+      sessionId,
+      itemId,
+      customerId,
+      buyerFromRequest(req)
+    );
 
     res.json({
       success: true,
@@ -196,7 +218,8 @@ router.post(
         sessionId,
         data.bundleId,
         data.quantity,
-        customerId
+        customerId,
+        buyerFromRequest(req)
       );
 
       if (!result.ok) {
@@ -226,7 +249,13 @@ router.delete(
       const sessionId = getSessionId(req);
       const customerId = customerUserId(req);
 
-      const cart = await CartService.removeBundle(storeId, sessionId, id, customerId);
+      const cart = await CartService.removeBundle(
+        storeId,
+        sessionId,
+        id,
+        customerId,
+        buyerFromRequest(req)
+      );
 
       res.json({
         success: true,
@@ -245,7 +274,7 @@ router.delete('/', async (req: Request, res: Response, next: NextFunction) => {
     const sessionId = getSessionId(req);
     const customerId = customerUserId(req);
 
-    const cart = await CartService.clear(storeId, sessionId, customerId);
+    const cart = await CartService.clear(storeId, sessionId, customerId, buyerFromRequest(req));
 
     res.json({
       success: true,

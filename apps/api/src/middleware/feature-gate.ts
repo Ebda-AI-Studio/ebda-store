@@ -14,11 +14,12 @@ import {
 /** Features whose availability comes from the plan's boolean limits. */
 const PLAN_GATED_FEATURES: Record<
   string,
-  'apiAccess' | 'brandingRemoval' | 'abandonedCartAutomation'
+  'apiAccess' | 'brandingRemoval' | 'abandonedCartAutomation' | 'wholesalePricing'
 > = {
   merchant_mcp: 'apiAccess',
   remove_branding: 'brandingRemoval',
   abandoned_cart: 'abandonedCartAutomation',
+  'b2b.wholesale': 'wholesalePricing',
 };
 
 /**

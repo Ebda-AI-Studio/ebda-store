@@ -9,6 +9,7 @@
     "start": "next start -p 3001",
     "lint": "eslint src --ext .ts,.tsx",
     "lint:fix": "eslint src --ext .ts,.tsx --fix",
+    "gen:settings-search": "tsx scripts/gen-settings-search-index.ts",
     "clean": "rm -rf .next node_modules"
   },
   "dependencies": {

@@ -1,7 +1,11 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { couponQuoteBasis, couponQuoteCartItems } from './coupon-quote-basis';
+import {
+  couponQuoteBasis,
+  couponQuoteCartItems,
+  couponQuoteLooseFields,
+} from './coupon-quote-basis';
 
 /**
  * P0-1 (final review) — the storefront half of "quote must equal charge".
@@ -56,14 +60,14 @@ function read(relative: string): string {
 }
 
 /** The bodies of every `POST .../coupons/validate` call in a source file. */
-function couponValidateCalls(source: string): string[] {
+function couponValidateCalls(source: string, window = 400): string[] {
   const calls: string[] = [];
   let from = 0;
   for (;;) {
     const at = source.indexOf('coupons/validate', from);
     if (at === -1) break;
     // The request body always lands within the next few lines of the call.
-    calls.push(source.slice(at, at + 400));
+    calls.push(source.slice(at, at + window));
     from = at + 1;
   }
   return calls;
@@ -80,6 +84,12 @@ describe('coupon quote basis call sites (P0-1 / P2-c)', () => {
       expect(call).toContain('orderTotal: couponBasis');
       expect(call).not.toContain('orderTotal: cart.subtotal');
       expect(call).not.toContain('orderTotal: cartContextTotal');
+    }
+  });
+
+  it('every call also sends the whole loose cart for a free-shipping code (Ruling B2B-M2, final review P2-3)', () => {
+    for (const call of [...couponValidateCalls(checkout, 900), ...couponValidateCalls(cart, 900)]) {
+      expect(call).toContain('...couponQuoteLooseFields(');
     }
   });
 
@@ -139,5 +149,56 @@ describe('#1766 — an unavailable (deleted-product) line is not part of the cou
     const lines = couponQuoteCartItems(items);
     expect(lines.map(l => l.productId)).toEqual(['a']);
     expect(lines.reduce((s, l) => s + l.lineTotal, 0)).toBe(couponQuoteBasis(items));
+  });
+});
+
+/**
+ * B2B Ruling B2B-5 (design review I-2): a line priced by a quantity tier or a wholesale group price is excluded from the
+ * coupon basis, exactly as `OrderService.create` builds it. Real arithmetic, so the quote equals the charge.
+ */
+describe('couponQuoteBasis / couponQuoteCartItems exclude tier and group priced lines (display == charge)', () => {
+  const tier = { productId: 'p1', price: 8500, quantity: 10, priceSource: 'tier' as const };
+  const group = { productId: 'p2', price: 9000, quantity: 2, priceSource: 'group' as const };
+  const base = { productId: 'p3', price: 1000, quantity: 3, priceSource: 'base' as const };
+
+  it('an all-tier / group cart has basis 0 and no cart items: a 10% coupon is quoted 0, not 10% of the cart', () => {
+    expect(couponQuoteBasis([tier, group])).toBe(0);
+    expect(couponQuoteCartItems([tier, group])).toEqual([]);
+    expect(Math.round((couponQuoteBasis([tier, group]) * 10) / 100)).toBe(0);
+  });
+
+  it('a mixed cart quotes only the base-priced lines: 10% of 3000, not of 88000', () => {
+    expect(couponQuoteBasis([tier, base])).toBe(3000);
+    expect(couponQuoteCartItems([tier, base])).toEqual([
+      { productId: 'p3', quantity: 3, lineTotal: 3000 },
+    ]);
+    expect(Math.round((couponQuoteBasis([tier, base]) * 10) / 100)).toBe(300);
+  });
+
+  it('a minimum-order coupon is judged on the base basis, so an all-tier cart does NOT meet it', () => {
+    const minOrder = 5000;
+    expect(couponQuoteBasis([tier]) >= minOrder).toBe(false); // 85000 of tier goods, basis 0
+    expect(
+      couponQuoteBasis([tier, base, { ...base, productId: 'p4', quantity: 2 }]) >= minOrder
+    ).toBe(true); // 5000 base
+  });
+
+  it('a FREE-SHIPPING code is judged on the whole loose cart (Ruling B2B-M2): an all-tier cart of 85000 meets "free over 5000"', () => {
+    const f = couponQuoteLooseFields([
+      tier,
+      base,
+      { ...base, productId: 'gone', unavailable: true },
+    ]);
+    expect(f.looseOrderTotal).toBe(85_000 + 3_000);
+    expect(f.looseCartItems).toEqual([
+      { productId: 'p1', quantity: 10, lineTotal: 85_000 },
+      { productId: 'p3', quantity: 3, lineTotal: 3_000 },
+    ]);
+    expect(couponQuoteLooseFields([tier]).looseOrderTotal >= 5000).toBe(true);
+  });
+
+  it('a line with no priceSource (older API) or unavailable behaves as before: base / excluded', () => {
+    expect(couponQuoteBasis([{ price: 1000, quantity: 2 }])).toBe(2000);
+    expect(couponQuoteBasis([{ price: 1000, quantity: 2, unavailable: true }])).toBe(0);
   });
 });

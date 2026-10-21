@@ -57,7 +57,12 @@ export function ContactInfoTab({ branding, onChange }: ContactInfoTabProps) {
       </div>
 
       <fieldset className="space-y-3 rounded-xl border p-4" data-testid="wa-me-toggles">
-        <legend className="px-1 text-sm font-semibold text-foreground">{t('waMeTitle')}</legend>
+        <legend
+          data-setting-id="branding.whatsapp-buttons"
+          className="px-1 text-sm font-semibold text-foreground"
+        >
+          {t('waMeTitle')}
+        </legend>
         {!waReady && <p className="text-xs text-muted-foreground">{t('waMeNeedsNumber')}</p>}
         {toggles.map(([key, label, hint]) => (
           <label key={key} className="flex cursor-pointer items-center justify-between gap-4">

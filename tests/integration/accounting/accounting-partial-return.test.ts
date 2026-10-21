@@ -36,13 +36,15 @@
  * partial-return-refund-effects.test.ts: self-skips without a real
  * DATABASE_URL, unique suffix, cleans up in afterAll.
  */
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
 import { prisma, withRlsBypass, runInTenantContext } from '@ebda/database';
 import { seedCoaForStore } from '../../../apps/api/src/services/accounting/account.service';
 import { postOrderPaymentJournal as postOrderPaymentJournalRaw } from '../../../apps/api/src/services/accounting/posting/order-posting';
 import { postRefundJournal as postRefundJournalRaw } from '../../../apps/api/src/services/accounting/posting/refund-posting';
 import { postPartialReturnJournal as postPartialReturnJournalRaw } from '../../../apps/api/src/services/accounting/posting/partial-return-posting';
 import { generateTaxReport } from '../../../apps/api/src/services/accounting/tax-report.service';
+import { ReturnService } from '../../../apps/api/src/services/return.service';
+import { OrderService } from '../../../apps/api/src/services/order.service';
 
 const hasDb =
   !!process.env.DATABASE_URL && !process.env.DATABASE_URL.includes('localhost:5432/test_db');
@@ -153,7 +155,13 @@ async function seedOrder(tag: string, overrides?: { discount?: number; tax?: num
  */
 async function createCompletedReturn(
   order: { id: string },
-  items: Array<{ orderItemId: string; productId: string; quantity: number }>,
+  items: Array<{
+    orderItemId: string;
+    productId: string;
+    quantity: number;
+    /** B2B Task 8b: the persisted tier adjustment of this item (signed piastres). */
+    tierAdjustment?: number;
+  }>,
   reason = 'defective'
 ): Promise<string> {
   const ret = await prisma.return.create({
@@ -172,6 +180,7 @@ async function createCompletedReturn(
           productId: i.productId,
           productName: 'Partial GL Product',
           quantity: i.quantity,
+          tierAdjustment: i.tierAdjustment ?? 0,
         })),
       },
     },
@@ -276,6 +285,211 @@ afterAll(async () => {
 });
 
 describe.skipIf(!hasDb)('partial-return pro-rata GL adjustment', () => {
+  it('B2B tier adjustment: the journal books the ADJUSTED value, and a later release telescopes to the unadjusted total', async () => {
+    const { order, itemA, itemB } = await seedOrder('TADJ');
+    await postOrderPaymentJournal({ orderId: order.id });
+
+    // 1 of A returned, 1000 retained (kept units repriced below their tier): credited gross 2000 - 1000 = 1000
+    const r1 = await createCompletedReturn(order, [
+      { orderItemId: itemA.id, productId: productAId, quantity: 1, tierAdjustment: 1000 },
+    ]);
+    await postPartialReturnJournal({
+      orderId: order.id,
+      refundKey: r1,
+      items: [{ orderItemId: itemA.id, quantity: 1 }],
+    });
+    const e1 = await prisma.journalEntry.findFirstOrThrow({
+      where: { storeId, source: 'order', sourceId: `${order.id}:partial:${r1}` },
+      include: { lines: true },
+    });
+    // discount share by the RETURNED gross, floor(1000x2000/9000) = 222 (final review P2-2: the adjustment re-prices kept
+    // units, it does not shrink the discount the returned unit received); tax share by credited gross floor(900x1000/9000) = 100
+    expect(e1.lines.find(l => l.accountId === acct.revenue)?.debit).toBe(778);
+    expect(e1.lines.find(l => l.accountId === acct.taxPayable)?.debit).toBe(100);
+    expect(e1.lines.find(l => l.accountId === acct.cashKnet)?.credit).toBe(878); // unadjusted would be 1978
+
+    // everything else comes back and releases the 1000: the cash credits add up to the whole order's goods
+    const r2 = await createCompletedReturn(order, [
+      { orderItemId: itemA.id, productId: productAId, quantity: 2, tierAdjustment: -1000 },
+      { orderItemId: itemB.id, productId: productBId, quantity: 2 },
+    ]);
+    await postPartialReturnJournal({
+      orderId: order.id,
+      refundKey: r2,
+      items: [
+        { orderItemId: itemA.id, quantity: 2 },
+        { orderItemId: itemB.id, quantity: 2 },
+      ],
+    });
+    const e2 = await prisma.journalEntry.findFirstOrThrow({
+      where: { storeId, source: 'order', sourceId: `${order.id}:partial:${r2}` },
+      include: { lines: true },
+    });
+    // credited gross 7000 + 1000 released = 8000, discount 1000 - 222 = 778, tax 900 - 100 = 800
+    expect(e2.lines.find(l => l.accountId === acct.cashKnet)?.credit).toBe(8022);
+    expect(878 + 8022).toBe(9000 - 1000 + 900); // subtotal - discount + tax: the order's goods, nothing dropped, nothing doubled
+  });
+
+  // ---- final review P2-2 + Ruling B2B-17: the GL, the provider-side refund and the persisted adjustment are ONE number ----
+  /**
+   * A: tier-priced note-lines 5 + 5 @ 800 (list 1000, tier 10+ @ 800) = 8000; B: base 1 x 1000 that took a 20% coupon (200).
+   * subtotal 9000, discount 200, tax 0, total 8800.
+   */
+  async function seedTierOrder(tag: string) {
+    const ladder = {
+      rungs: [{ minQty: 10, priceMinor: 800, variant: false, group: false }],
+      groupPercentMinor: null,
+    };
+    const tierLine = (name: string) => ({
+      productId: productAId,
+      productName: name,
+      quantity: 5,
+      price: 800,
+      total: 4000,
+      costPrice: 400,
+      listPrice: 1000,
+      priceSource: 'tier',
+      priceTierMinQty: 10,
+      tierLadder: ladder,
+    });
+    const order = await prisma.order.create({
+      data: {
+        storeId,
+        orderNumber: `PGL-${tag}-${Date.now()}`,
+        status: 'delivered',
+        paymentStatus: 'paid',
+        customerId: CUSTOMER,
+        subtotal: 9000,
+        tax: 0,
+        shipping: 0,
+        discount: 200,
+        total: 8800,
+        currency: 'EGP',
+        shippingAddress: {},
+        billingAddress: {},
+        items: {
+          create: [
+            tierLine('A1'),
+            tierLine('A2'),
+            {
+              productId: productBId,
+              productName: 'B',
+              quantity: 1,
+              price: 1000,
+              total: 1000,
+              costPrice: 500,
+              listPrice: 1000,
+              priceSource: 'base',
+            },
+          ],
+        },
+        payments: {
+          create: [{ provider: 'paymob', status: 'completed', amount: 8800, paidAt: new Date() }],
+        },
+      },
+      include: { items: true },
+    });
+    const by = (n: string) => order.items.find(i => i.productName === n)!;
+    return { order, a1: by('A1'), a2: by('A2'), b: by('B') };
+  }
+  /** Complete a return through ReturnService (cash), then post its journal the way order/refunded would. */
+  async function completeAndPost(
+    orderId: string,
+    items: Array<{ orderItemId: string; productId: string; quantity: number }>
+  ) {
+    const ret = await prisma.return.create({
+      data: {
+        storeId,
+        orderId,
+        customerId: CUSTOMER,
+        returnNumber: `RET-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        type: 'return',
+        status: 'received',
+        reason: 'defective',
+        items: { create: items.map(i => ({ ...i, productName: 'x' })) },
+      },
+      select: { id: true },
+    });
+    const effects = vi.spyOn(OrderService, 'applyRefundEffects').mockResolvedValue(undefined);
+    const done = await ReturnService.complete(storeId, ret.id, 'staff-1', 'cash');
+    effects.mockRestore();
+    await postPartialReturnJournal({
+      orderId,
+      refundKey: ret.id,
+      items: items.map(i => ({ orderItemId: i.orderItemId, quantity: i.quantity })),
+    });
+    // A zero refund (the floor bit, Ruling B2B-20) posts no cash entry; every other case asserts a non-zero cash credit.
+    const entry = (await prisma.journalEntry.findFirst({
+      where: { storeId, source: 'order', sourceId: `${orderId}:partial:${ret.id}` },
+      include: { lines: true },
+    })) ?? { lines: [] as Array<{ accountId: string; debit: number; credit: number }> };
+    const adj = await prisma.returnItem.aggregate({
+      where: { returnId: ret.id },
+      _sum: { tierAdjustment: true },
+    });
+    return {
+      refund: done.refundAmount,
+      cash: entry.lines.find(l => l.accountId === acct.cashKnet)?.credit ?? 0,
+      revenue: entry.lines.find(l => l.accountId === acct.revenue)?.debit ?? 0,
+      adjustment: adj._sum.tierAdjustment ?? 0,
+    };
+  }
+
+  it('P2-2: a tier line returned from a mixed coupon cart refunds in full; the base line takes back the whole coupon; GL == refund', async () => {
+    const { order, a1, a2, b } = await seedTierOrder('P22');
+    await postOrderPaymentJournal({ orderId: order.id });
+    const r1 = await completeAndPost(order.id, [
+      { orderItemId: a1.id, productId: productAId, quantity: 5 },
+      { orderItemId: a2.id, productId: productAId, quantity: 5 },
+    ]);
+    // all 10 tier units back: nothing kept, no adjustment, and no share of a coupon the tier line never had
+    expect(r1).toEqual({ refund: 8000, cash: 8000, revenue: 8000, adjustment: 0 }); // was 7823
+    const r2 = await completeAndPost(order.id, [
+      { orderItemId: b.id, productId: productBId, quantity: 1 },
+    ]);
+    expect(r2).toMatchObject({ refund: 800, cash: 800 });
+    expect(r1.cash + r2.cash).toBe(8800);
+  });
+
+  it('B2B-17 in the GL: return one of two 5-unit note-lines (tier 10+) -> 1000 retained, then the rest releases it; cash credits == refunds == 8800', async () => {
+    const { order, a1, a2, b } = await seedTierOrder('B217');
+    await postOrderPaymentJournal({ orderId: order.id });
+    const r1 = await completeAndPost(order.id, [
+      { orderItemId: a1.id, productId: productAId, quantity: 5 },
+    ]);
+    // kept 5 of the product < 10: the 5 on A2 are repriced at 1000, adjustment 1000, refund 4000 - 1000
+    expect(r1).toEqual({ refund: 3000, cash: 3000, revenue: 3000, adjustment: 1000 });
+    const r2 = await completeAndPost(order.id, [
+      { orderItemId: a2.id, productId: productAId, quantity: 5 },
+      { orderItemId: b.id, productId: productBId, quantity: 1 },
+    ]);
+    // release 1000 on A2 (4000 + 1000) + B 1000 - its 200 coupon
+    expect(r2).toMatchObject({ refund: 5800, cash: 5800, adjustment: -1000 });
+    expect(r1.cash + r2.cash).toBe(8800);
+  });
+
+  it('B2B-20 in the GL: return 1 of 5 + 5 (tier 10+) -> refund 0 and 1000 carried; 4 more -> the carry is collected (3000, was 4000); the rest -> cash credits == refunds == 8800', async () => {
+    const { order, a1, a2, b } = await seedTierOrder('B220');
+    await postOrderPaymentJournal({ orderId: order.id });
+    const r1 = await completeAndPost(order.id, [
+      { orderItemId: a1.id, productId: productAId, quantity: 1 },
+    ]);
+    // 9 kept < 10: raw 1800, the 800 refund floors at 0, 1000 carried forward
+    expect(r1).toEqual({ refund: 0, cash: 0, revenue: 0, adjustment: 800 });
+    const r2 = await completeAndPost(order.id, [
+      { orderItemId: a1.id, productId: productAId, quantity: 4 },
+    ]);
+    // 5 kept: raw -800 + 1000 carried = 200 collected from the 3200 standard refund
+    expect(r2).toEqual({ refund: 3000, cash: 3000, revenue: 3000, adjustment: 200 });
+    const r3 = await completeAndPost(order.id, [
+      { orderItemId: a2.id, productId: productAId, quantity: 5 },
+      { orderItemId: b.id, productId: productBId, quantity: 1 },
+    ]);
+    // release the 1000 retained on A (4000 + 1000) + B 1000 less its 200 coupon
+    expect(r3).toMatchObject({ refund: 5800, cash: 5800, adjustment: -1000 });
+    expect(r1.cash + r2.cash + r3.cash).toBe(8800);
+  });
+
   it('posts a balanced pro-rata adjustment for a partial return, mirroring full-refund conventions', async () => {
     const { order, itemA } = await seedOrder('T1');
     await postOrderPaymentJournal({ orderId: order.id });

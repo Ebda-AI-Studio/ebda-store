@@ -20,6 +20,7 @@ import {
   type EmailDir,
 } from './email-templates/_layout';
 import { AppError } from '../middleware/error-handler';
+import { priceLineLabel, struckListPrice } from '../lib/order-pricing';
 import { storeBrandTheme } from '../lib/store-brand-theme';
 
 /**
@@ -444,12 +445,24 @@ export class InvoiceService {
                 <div class="item-meta">
                   <div class="item-name">${escapeHtml(displayName)}${item.variantName ? ` &middot; ${escapeHtml(item.variantName)}` : ''}</div>
                   ${item.personalisation ? `<div class="item-note">&#9998; <bdi>${escapeHtml(item.personalisation)}</bdi></div>` : ''}
+                  ${(() => {
+                    // B2B: the tier / wholesale label from the line's persisted snapshot (never re-resolved).
+                    const label = priceLineLabel(item, ar ? 'ar' : 'en');
+                    return label
+                      ? `<div class="item-note" data-price-label="1">${escapeHtml(label)}</div>`
+                      : '';
+                  })()}
                   ${item.sku ? `<div class="item-sku">${escapeHtml(item.sku)}</div>` : ''}
                 </div>
               </div>
             </td>
             <td class="col-qty">${item.quantity}</td>
-            <td class="col-price">${formatPrice(item.price)}</td>
+            <td class="col-price">${(() => {
+              const list = struckListPrice(item);
+              return list != null
+                ? `<s class="list-price" style="opacity:.6">${formatPrice(list)}</s> ${formatPrice(item.price)}`
+                : formatPrice(item.price);
+            })()}</td>
             <td class="col-total">${formatPrice(item.total)}</td>
           </tr>`;
       })

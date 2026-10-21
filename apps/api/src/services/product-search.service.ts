@@ -73,6 +73,9 @@ export function productSearchSql(
   const withSku = opts.withSku ?? opts.scope === 'admin';
   const storefront = opts.scope === 'storefront';
   const status = storefront ? Prisma.sql`AND p.status = 'active'` : Prisma.empty;
+  // B2B-7b: the storefront search NEVER returns a wholesale-only product. The predicate sits in the WHERE, BEFORE the LIMIT
+  // below, so hidden products can never occupy result slots or change the truncation flag (raw-SQL visibility checklist).
+  const audience = storefront ? Prisma.sql`AND p.audience = 'public'` : Prisma.empty;
   const deleted = opts.includeDeleted ? Prisma.empty : Prisma.sql`AND p.deleted_at IS NULL`;
   const orderBy =
     opts.order === 'featured'
@@ -90,7 +93,7 @@ export function productSearchSql(
   const patterns = tokens.map(t => (wordStart ? `${escapeLike(t)}%` : `%${escapeLike(t)}%`));
   // limit + 1: the extra row only says "there were more" (truncated).
   return Prisma.sql`SELECT p.id FROM products p
-    WHERE p.store_id = ${storeId} ${deleted} ${status}
+    WHERE p.store_id = ${storeId} ${deleted} ${status} ${audience}
       AND p.id IN (SELECT public.ebda_product_search_ids(
         ${storeId}, ${opts.field === 'name' ? 'name' : 'all'}, ${withSku}, ${storefront},
         ${opts.includeDeleted === true}, ${wordStart}, ${patterns}::text[]))
@@ -392,6 +395,8 @@ async function vectorLeg(
             CROSS JOIN (SELECT ${q}::halfvec(1024) AS v) q
            WHERE e.store_id = ${storeId} AND e.model = ${EMBED_MODEL}
              AND p.status = 'active' AND p.deleted_at IS NULL
+             -- B2B-7b: the storefront (this leg is storefront-only) never ranks a wholesale-only product.
+             AND p.audience = 'public'
         ) k
         WHERE k.d <= ${vectorMaxDistance()}
         ORDER BY k.d, k.id

@@ -42,6 +42,10 @@ vi.mock('@api/lib/order-tax', async importOriginal => ({
     .fn()
     .mockResolvedValue({ ratePercent: 0, includedInPrice: false, seller: null }),
 }));
+vi.mock('@api/services/price-resolver.service', async () =>
+  (await import('../helpers/retail-price-resolver')).retailPriceResolverModule()
+);
+
 vi.mock('@api/services/fiscal-document.service', () => ({
   FiscalDocumentService: {
     issueSaleDocument: vi.fn().mockResolvedValue(null),

@@ -48,6 +48,7 @@ const BOOLEAN_KEYS = [
   'whatsappAutomation',
   'brandingRemoval',
   'apiAccess',
+  'wholesalePricing',
 ] as const;
 const TIER_KEYS = [
   { key: 'analyticsTier', options: ['basic', 'standard', 'advanced'] },

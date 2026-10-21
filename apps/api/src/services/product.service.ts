@@ -19,6 +19,8 @@ import {
 } from '@ebda/shared';
 import { redis } from './redis.service';
 import { invalidateStoreProductCaches } from '../lib/public-cache';
+import { assertWholesaleEntitled } from '../lib/b2b-invalidate';
+import { featureService } from './feature.service';
 import logger from '../lib/logger';
 import { requestStoreReindex } from '../lib/search/reindex';
 import { sendEventAfterCommit } from '../lib/inngest/send-after-commit';
@@ -135,6 +137,9 @@ interface CreateProductData {
   compareAtPrice?: number | null;
   /** Cost-of-goods in piastres. Used for profit reporting. */
   costPrice?: number | null;
+  /** B2B minimum order quantity (null = none) and audience (Task 4). */
+  moq?: number | null;
+  audience?: 'public' | 'wholesale_only';
   /** Admin-authored discount type — 'percentage' | 'fixed'. null clears. */
   discountType?: 'percentage' | 'fixed' | null;
   /**
@@ -189,7 +194,16 @@ interface CreateProductData {
 
 type UpdateProductData = Partial<CreateProductData>;
 
+/** Setting a MOQ or a wholesale-only audience needs b2b.wholesale; clearing / resetting to public never does (B2B-1b). */
+async function assertB2bProductFields(storeId: string, data: UpdateProductData): Promise<void> {
+  if ((data.moq != null && data.moq > 0) || data.audience === 'wholesale_only') {
+    await assertWholesaleEntitled(storeId);
+  }
+}
+
 interface ListProductsOptions {
+  /** 'public' (default) or 'wholesale_only' (the approved-buyer catalogue). Never both in one response. */
+  audience?: 'public' | 'wholesale_only';
   page?: number;
   limit?: number;
   status?: string;
@@ -673,6 +687,7 @@ export class ProductService {
   }
 
   static async create(storeId: string, data: CreateProductData) {
+    await assertB2bProductFields(storeId, data);
     // Plan ceiling (SP5): one more product must fit the store's maxProducts.
     await assertWithinLimit(storeId, 'maxProducts');
     await this.assertCategoriesInStore(storeId, data.categories);
@@ -716,6 +731,8 @@ export class ProductService {
         price: data.price,
         compareAtPrice: data.compareAtPrice ?? null,
         costPrice: data.costPrice ?? null,
+        moq: data.moq ?? null,
+        audience: data.audience ?? 'public',
         // Discount input columns — stored verbatim; the admin form pre-derives
         // price/compareAtPrice before sending, so the service just persists.
         discountType: data.discountType ?? null,
@@ -788,6 +805,7 @@ export class ProductService {
   }
 
   static async update(storeId: string, productId: string, data: UpdateProductData) {
+    await assertB2bProductFields(storeId, data);
     await this.assertCategoriesInStore(storeId, data.categories);
     await assertSizeChartInStore(storeId, data.sizeChartId);
     const product = await this.getById(storeId, productId);
@@ -934,6 +952,8 @@ export class ProductService {
           // as the curated flags below.
           ...(data.compareAtPrice !== undefined ? { compareAtPrice: data.compareAtPrice } : {}),
           ...(data.costPrice !== undefined ? { costPrice: data.costPrice } : {}),
+          ...(data.moq !== undefined ? { moq: data.moq } : {}),
+          ...(data.audience !== undefined ? { audience: data.audience } : {}),
           // Discount input columns — same undefined/null convention.
           ...(data.discountType !== undefined ? { discountType: data.discountType } : {}),
           ...(data.discountValue !== undefined ? { discountValue: data.discountValue } : {}),
@@ -1334,6 +1354,8 @@ export class ProductService {
       storeId,
       status: status as ProductStatus,
       deletedAt: null,
+      // B2B-7b: anonymous public listing by default; the approved-buyer catalogue passes 'wholesale_only'.
+      audience: options.audience ?? 'public',
     };
 
     if (featured !== undefined) {
@@ -1682,6 +1704,8 @@ export class ProductService {
    */
   private static readonly PUBLIC_PRODUCT_DETAIL_SELECT = {
     ...STOREFRONT_PRODUCT_SELECT,
+    // B2B: the minimum order quantity is public product data (a restriction, shown even after a plan downgrade).
+    moq: true,
     lowStockThreshold: true,
     trackInventory: true,
     images: { orderBy: { position: 'asc' } },
@@ -1925,9 +1949,60 @@ export class ProductService {
     };
   }
 
-  static async getPublicBySlug(storeId: string, slug: string) {
+  /**
+   * B2B fields of the PUBLIC (anonymous, cacheable) product payload: the MOQ and the PUBLIC quantity tiers only
+   * (`group_id IS NULL`). Group tiers and group prices NEVER appear here: a cacheable response must not depend on who asked
+   * (Ruling B2B-7b). Tiers are listed only while the store is entitled (benefit), the MOQ always (restriction, B2B-1b), and a
+   * stale tier (at or above the current base) is dropped so the page never promises a break the resolver will not give.
+   */
+  private static async b2bPublicFields(
+    storeId: string,
+    product: {
+      id: string;
+      price: number;
+      moq?: number | null;
+      variants?: ReadonlyArray<{ id: string; price: number | null }>;
+    }
+  ) {
+    const entitled = await featureService.isFeatureEnabled(storeId, 'b2b.wholesale');
+    const rows = entitled
+      ? await prisma.productPriceTier.findMany({
+          where: { storeId, productId: product.id, groupId: null },
+          select: { variantId: true, minQty: true, priceMinor: true },
+          orderBy: [{ variantId: 'asc' }, { minQty: 'asc' }],
+        })
+      : [];
+    // A break at or above the price it would apply to is never applied by the resolver (Ruling B2B-3b), so it is not shown:
+    // a product-level tier against the product price, a variant-level tier against THAT variant's price (variant.price ??
+    // product.price; final review minor 2). A variant tier whose variant is gone is not shown either.
+    const variantBase = new Map(
+      (product.variants ?? []).map(v => [v.id, v.price ?? product.price] as const)
+    );
+    return {
+      moq: product.moq ?? null,
+      priceTiers: rows.filter(t =>
+        t.variantId === null
+          ? t.priceMinor < product.price
+          : variantBase.has(t.variantId) && t.priceMinor < variantBase.get(t.variantId)!
+      ),
+    };
+  }
+
+  static async getPublicBySlug(
+    storeId: string,
+    slug: string,
+    opts: { audience?: 'public' | 'wholesale_only' } = {}
+  ) {
+    // B2B-7b: the public catalogue is anonymous and NEVER returns a wholesale-only product (404, no existence oracle). The
+    // approved-buyer route asks for audience 'wholesale_only' explicitly after checking membership.
     const product = await prisma.product.findFirst({
-      where: { storeId, slug, status: 'active', deletedAt: null },
+      where: {
+        storeId,
+        slug,
+        status: 'active',
+        deletedAt: null,
+        audience: opts.audience ?? 'public',
+      },
       select: this.PUBLIC_PRODUCT_DETAIL_SELECT,
     });
 
@@ -1952,12 +2027,13 @@ export class ProductService {
       ...this.publicDetailWithStock(this.withSizeChart(product)),
       model3d: toPublicModel3d(product.model3d),
       ratingStats,
+      ...(await this.b2bPublicFields(storeId, product)),
     };
   }
 
   static async getPublicById(storeId: string, productId: string) {
     const product = await prisma.product.findFirst({
-      where: { storeId, id: productId, status: 'active', deletedAt: null },
+      where: { storeId, id: productId, status: 'active', deletedAt: null, audience: 'public' },
       select: this.PUBLIC_PRODUCT_DETAIL_SELECT,
     });
 
@@ -1982,6 +2058,7 @@ export class ProductService {
       ...this.publicDetailWithStock(this.withSizeChart(product)),
       model3d: toPublicModel3d(product.model3d),
       ratingStats,
+      ...(await this.b2bPublicFields(storeId, product)),
     };
   }
 
@@ -2035,12 +2112,22 @@ export class ProductService {
           // Storefront "X items" badge = only products a customer can actually
           // see, so archived / draft / deleted products don't inflate the count.
           _count: {
-            select: { products: { where: { product: { status: 'active', deletedAt: null } } } },
+            select: {
+              products: {
+                where: { product: { status: 'active', deletedAt: null, audience: 'public' } },
+              },
+            },
           },
         },
       }),
       prisma.product.count({
-        where: { storeId, isBestSeller: true, deletedAt: null, status: 'active' },
+        where: {
+          storeId,
+          isBestSeller: true,
+          deletedAt: null,
+          status: 'active',
+          audience: 'public',
+        },
       }),
       // Defensive: bestSellersImage was added in migration
       // 20260501000000. Until that lands on every environment, treat a
@@ -2135,6 +2222,8 @@ export class ProductService {
       storeId,
       status: 'active',
       deletedAt: null,
+      // B2B-7b: advanced search is a public surface: wholesale-only products never appear.
+      audience: 'public',
     };
 
     // Text search — Arabic-normalised word-AND (product-search.service), SKU included.
@@ -2264,7 +2353,7 @@ export class ProductService {
       prisma.product.count({ where }),
       // Get price range for filters
       prisma.product.aggregate({
-        where: { storeId, status: 'active' },
+        where: { storeId, status: 'active', audience: 'public' },
         _min: { price: true },
         _max: { price: true },
       }),
@@ -2334,7 +2423,13 @@ export class ProductService {
     });
     if (matchIds.length === 0) return { suggestions: [] as Array<unknown> };
     const products = await prisma.product.findMany({
-      where: { storeId, status: 'active', deletedAt: null, id: { in: matchIds } },
+      where: {
+        storeId,
+        status: 'active',
+        deletedAt: null,
+        audience: 'public',
+        id: { in: matchIds },
+      },
       select: {
         id: true,
         slug: true,
@@ -2372,6 +2467,7 @@ export class ProductService {
         storeId,
         status: 'active',
         deletedAt: null,
+        audience: 'public',
         id: {
           in: await searchProductIds(storeId, query, {
             scope: 'storefront',
@@ -2428,7 +2524,7 @@ export class ProductService {
           _count: {
             select: {
               products: {
-                where: { product: { status: 'active' } },
+                where: { product: { status: 'active', audience: 'public' } },
               },
             },
           },
@@ -2440,7 +2536,7 @@ export class ProductService {
           storeId,
           products: {
             some: {
-              product: { storeId, status: 'active' },
+              product: { storeId, status: 'active', audience: 'public' },
             },
           },
         },
@@ -2450,7 +2546,7 @@ export class ProductService {
           _count: {
             select: {
               products: {
-                where: { product: { storeId, status: 'active' } },
+                where: { product: { storeId, status: 'active', audience: 'public' } },
               },
             },
           },
@@ -2458,7 +2554,7 @@ export class ProductService {
         orderBy: { name: 'asc' },
       }),
       prisma.product.aggregate({
-        where: { storeId, status: 'active' },
+        where: { storeId, status: 'active', audience: 'public' },
         _min: { price: true },
         _max: { price: true },
       }),

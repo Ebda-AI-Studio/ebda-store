@@ -4,6 +4,7 @@ import { customerKeyOf, rfmKeyFor } from '../lib/customer-key';
 import { SmsConsentService } from './sms-consent.service';
 import { AppError } from '../middleware/error-handler';
 import { NON_REVENUE_ORDER_STATUSES } from '@ebda/shared';
+import { matchingCustomers } from './admin-search.service';
 
 /**
  * Customer aggregation — the Customers page's definition of "a customer"
@@ -256,7 +257,19 @@ export interface OrderWithItems {
   }>;
 }
 
-async function aggregateCustomersUncached(storeId: string): Promise<{
+/**
+ * Narrows the aggregation to the rows a search matched (see `aggregateCustomersMatching`): the order
+ * scan is ANDed with `orderWhere` and the zero-order union is limited to `zeroOrderUserIds`.
+ */
+export interface CustomerAggregateScope {
+  orderWhere: Prisma.OrderWhereInput;
+  zeroOrderUserIds: string[];
+}
+
+async function aggregateCustomersUncached(
+  storeId: string,
+  scope?: CustomerAggregateScope
+): Promise<{
   customers: AggregatedCustomer[];
   /** The list is partial: the order scan OR the zero-order union hit its cap. */
   truncated: boolean;
@@ -269,7 +282,7 @@ async function aggregateCustomersUncached(storeId: string): Promise<{
   summary: CustomersSummary;
 }> {
   const fetched = await prisma.order.findMany({
-    where: { storeId, deletedAt: null },
+    where: { storeId, deletedAt: null, ...(scope ? scope.orderWhere : {}) },
     select: {
       id: true,
       orderNumber: true,
@@ -449,6 +462,7 @@ async function aggregateCustomersUncached(storeId: string): Promise<{
       role: 'customer',
       deletedAt: null,
       orders: { none: { storeId, deletedAt: null } },
+      ...(scope ? { id: { in: scope.zeroOrderUserIds } } : {}),
     },
     select: { id: true, email: true, firstName: true, lastName: true, phone: true },
     orderBy: { createdAt: 'desc' },
@@ -702,8 +716,16 @@ export async function getCustomerProfile(storeId: string, customerKey: string) {
             totalRefunded: 0,
             paymentMethods: [],
             statuses: [],
-            groupId: null,
-            group: null,
+            ...(await (async () => {
+              const linked = await prisma.customer.findFirst({
+                where: { storeId, userId: zeroOrderUser.id },
+                select: {
+                  groupId: true,
+                  group: { select: { id: true, name: true, nameAr: true } },
+                },
+              });
+              return { groupId: linked?.groupId ?? null, group: linked?.group ?? null };
+            })()),
           },
           orders: [],
           truncated: false,
@@ -788,27 +810,39 @@ export async function getCustomerProfile(storeId: string, customerKey: string) {
     statuses: Array.from(statusSet),
   };
 
-  // Resolve the assigned group. Groups live on the `customers` table — a
-  // separate, phone/email-keyed identity from the order's `users` row —
-  // so we look it up by identifier (phone first, the primary GCC
-  // identifier; email as fallback) rather than by the User id.
-  const identityOr: Prisma.CustomerWhereInput[] = [];
-  if (customer.phone) identityOr.push({ phone: customer.phone });
-  if (customer.email) identityOr.push({ email: { equals: customer.email, mode: 'insensitive' } });
+  // Resolve the assigned group. Groups live on the `customers` table. A REGISTERED shopper (customer.isGuest false; the id
+  // is the users.id) is looked up by the `customers.user_id` link ONLY: matching on phone / email showed another person's
+  // group on the wrong profile (a shopper can set any phone on their profile, Ruling B2B-2c). A GUEST key has no account, so
+  // its display falls back to the typed contact, restricted to rows that are NOT linked to a registered user.
   let groupId: string | null = null;
   let group: { id: string; name: string; nameAr: string | null } | null = null;
-  if (identityOr.length > 0) {
-    const grouped = await prisma.customer.findFirst({
-      where: { storeId, OR: identityOr },
-      select: {
-        groupId: true,
-        group: { select: { id: true, name: true, nameAr: true } },
-      },
+  const groupSelect = {
+    groupId: true,
+    group: { select: { id: true, name: true, nameAr: true } },
+  } as const;
+  let grouped: {
+    groupId: string | null;
+    group: { id: string; name: string; nameAr: string | null } | null;
+  } | null = null;
+  if (!customer.isGuest) {
+    grouped = await prisma.customer.findFirst({
+      where: { storeId, userId: customer.id },
+      select: groupSelect,
     });
-    if (grouped) {
-      groupId = grouped.groupId;
-      group = grouped.group;
+  } else {
+    const identityOr: Prisma.CustomerWhereInput[] = [];
+    if (customer.phone) identityOr.push({ phone: customer.phone });
+    if (customer.email) identityOr.push({ email: { equals: customer.email, mode: 'insensitive' } });
+    if (identityOr.length > 0) {
+      grouped = await prisma.customer.findFirst({
+        where: { storeId, userId: null, OR: identityOr },
+        select: groupSelect,
+      });
     }
+  }
+  if (grouped) {
+    groupId = grouped.groupId;
+    group = grouped.group;
   }
 
   // SMS-marketing consent (issue 206): this profile's own key (the user id
@@ -888,4 +922,27 @@ export async function presentRfmSegments(storeId: string): Promise<RfmSegment[]>
   });
   const present = new Set(groups.map(g => g.segment));
   return RFM_SEGMENT_VALUES.filter(s => present.has(s));
+}
+
+/**
+ * The customers a search matched, aggregated the same way as `aggregateCustomers` (same row shape,
+ * all of each matched customer's orders). Uncached: the result is small and query-specific. The
+ * match itself is SQL (`matchingCustomers`: Arabic-normalised names, any phone form, email), so a
+ * customer older than the 20k-order scan of the cached aggregate is still found, which the old
+ * in-memory filter could not do. `summary` describes the matched rows only; the store-wide KPI strip
+ * must keep reading the cached `aggregateCustomers`.
+ *
+ * Ruling SEARCH-P2-1: a GUEST row is built from the guest orders that matched, so when one contact
+ * placed orders under different names, a name search aggregates only the orders carrying that name
+ * (its totals can undercount). Matching on the contact key instead would need a second round trip
+ * per guest. Cost if wrong: a guest's order count/total shown under a name search is partial; the
+ * customer detail page (keyed by email/phone) is complete.
+ */
+export async function aggregateCustomersMatching(storeId: string, search: string) {
+  const m = await matchingCustomers(storeId, search);
+  const r = await aggregateCustomersUncached(storeId, {
+    orderWhere: { OR: [{ customerId: { in: m.userIds } }, { id: { in: m.guestOrderIds } }] },
+    zeroOrderUserIds: m.userIds,
+  });
+  return { ...r, truncated: r.truncated || m.truncated, searchTruncated: m.truncated };
 }

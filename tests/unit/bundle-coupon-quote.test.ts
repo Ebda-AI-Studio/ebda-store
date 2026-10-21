@@ -199,6 +199,9 @@ const { mockPrisma, capturedOrderCreate } = vi.hoisted(() => {
 
 // Money batch B: fiscal documents + the frozen COD fee are covered end-to-end
 // by tests/integration/fiscal-documents.test.ts; this unit suite stubs them.
+vi.mock('@api/services/price-resolver.service', async () =>
+  (await import('../helpers/retail-price-resolver')).retailPriceResolverModule()
+);
 vi.mock('@api/services/fiscal-document.service', () => ({
   FiscalDocumentService: {
     issueSaleDocument: vi.fn().mockResolvedValue(null),
@@ -285,6 +288,7 @@ vi.mock('@api/middleware/feature-gate', () => ({
 vi.mock('@api/middleware/security', () => ({
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   couponValidateLimiter: (_req: any, _res: any, next: any) => next(),
+  couponValidateDistinctLimiter: (_req: any, _res: any, next: any) => next(),
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   publicTenantLimiter: (_req: any, _res: any, next: any) => next(),
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

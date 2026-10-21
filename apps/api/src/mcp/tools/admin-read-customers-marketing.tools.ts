@@ -8,6 +8,7 @@ import { CouponService } from '../../services/coupon.service';
 import { ReviewService } from '../../services/review.service';
 import {
   aggregateCustomers,
+  aggregateCustomersMatching,
   getCustomerProfile,
   RFM_SEGMENT_VALUES,
   segmentsForCustomers,
@@ -201,7 +202,13 @@ export function registerAdminCustomerMarketingReadTools(server: McpServer, store
       const limit = args.limit ?? 25;
 
       return runInTenantContext(store.id, async () => {
-        const { customers, truncated, summary } = await aggregateCustomers(store.id);
+        const { customers: all, truncated, summary } = await aggregateCustomers(store.id);
+        // A search is resolved in SQL (Arabic-normalised names, any phone form, email), the same
+        // match as the Customers page, so it also finds customers beyond the aggregate's order-scan
+        // window. The KPI strip and `truncated` keep describing the whole store.
+        const customers = args.search
+          ? (await aggregateCustomersMatching(store.id, args.search)).customers
+          : all;
 
         // Segment filter reads only that segment's members; per-row segments
         // only for the returned page (issue 2243).
@@ -211,16 +218,7 @@ export function registerAdminCustomerMarketingReadTools(server: McpServer, store
             : args.segment
               ? await filterCustomersBySegment(store.id, customers, args.segment as RfmSegment)
               : customers;
-        const q = args.search?.toLowerCase();
-        const filtered = q
-          ? bySegment.filter(
-              c =>
-                c.firstName.toLowerCase().includes(q) ||
-                c.lastName.toLowerCase().includes(q) ||
-                c.email.toLowerCase().includes(q) ||
-                c.phone.toLowerCase().includes(q)
-            )
-          : bySegment;
+        const filtered = bySegment;
 
         const start = (page - 1) * limit;
         const pageRows = filtered.slice(start, start + limit);

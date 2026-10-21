@@ -23,6 +23,40 @@ describe('mapServerItem', () => {
   });
 });
 
+describe('mapServerItem: the server-resolved B2B price wins (the cart never multiplies a catalogue price)', () => {
+  it('uses unitPrice over the variant and product prices and carries provenance and MOQ state', () => {
+    const line = mapServerItem(
+      server({
+        variant: { id: 'v1', title: 'XL', price: 12000 },
+        unitPrice: 8500,
+        listPrice: 12000,
+        priceSource: 'tier',
+        priceTierMinQty: 10,
+        belowMoq: true,
+        moqRequired: 12,
+      })
+    );
+    expect(line).toMatchObject({
+      price: 8500,
+      listPrice: 12000,
+      priceSource: 'tier',
+      priceTierMinQty: 10,
+      belowMoq: true,
+      moqRequired: 12,
+    });
+    // so the displayed line total and cartTotals equal the server's lineTotal / subtotal
+    expect(cartTotals([line], []).total).toBe(8500 * 2);
+  });
+
+  it('falls back to variant price, then product price, when the server sent no unitPrice (unavailable line / older API)', () => {
+    expect(mapServerItem(server({ variant: { id: 'v1', title: 'S', price: 6000 } })).price).toBe(
+      6000
+    );
+    expect(mapServerItem(server()).price).toBe(5000);
+    expect(mapServerItem(server()).belowMoq).toBeUndefined();
+  });
+});
+
 describe('cartTotals', () => {
   it('excludes unavailable lines from both count and total', () => {
     const r = cartTotals(

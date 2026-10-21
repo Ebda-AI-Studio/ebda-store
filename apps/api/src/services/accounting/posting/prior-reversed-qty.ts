@@ -44,7 +44,12 @@ export function backorderRefundKey(backorderLineId: string): string {
 export async function loadPriorReversedQty(
   client: DbClient,
   args: { storeId: string; orderId: string; excludeKey?: string }
-): Promise<{ prevQty: Map<string, number>; reasons: Map<string, string | null> }> {
+): Promise<{
+  prevQty: Map<string, number>;
+  reasons: Map<string, string | null>;
+  /** Sum of the B2B tier adjustments (signed piastres) the earlier completed returns carried (Task 8b). */
+  prevAdjustment: number;
+}> {
   const { storeId, orderId, excludeKey } = args;
   const [completedReturns, backorder] = await Promise.all([
     client.return.findMany({
@@ -52,7 +57,7 @@ export async function loadPriorReversedQty(
       select: {
         id: true,
         reason: true,
-        items: { select: { orderItemId: true, quantity: true } },
+        items: { select: { orderItemId: true, quantity: true, tierAdjustment: true } },
       },
     }),
     loadBackorderCancelledQty(client, { storeId, orderId, excludeKey }),
@@ -60,14 +65,16 @@ export async function loadPriorReversedQty(
 
   const prevQty = backorder.qty;
   const reasons = backorder.reasons;
+  let prevAdjustment = 0;
   for (const ret of completedReturns) {
     reasons.set(ret.id, ret.reason ?? null);
     if (ret.id === excludeKey) continue;
     for (const it of ret.items) {
       prevQty.set(it.orderItemId, (prevQty.get(it.orderItemId) ?? 0) + it.quantity);
+      prevAdjustment += it.tierAdjustment ?? 0;
     }
   }
-  return { prevQty, reasons };
+  return { prevQty, reasons, prevAdjustment };
 }
 
 /**

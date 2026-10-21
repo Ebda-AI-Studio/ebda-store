@@ -35,6 +35,7 @@ import { accountingPostStockAdjustmentJournal } from './accounting-post-stock-ad
 import { accountingPostExpenseJournal } from './accounting-post-expense-journal';
 import { stockReorderScanCron, stockReorderScanOnDemand } from './stock-reorder-scan';
 import { stockDeadstockScanCron, stockDeadstockScanOnDemand } from './stock-deadstock-scan';
+import { wholesalePendingNudgeCron } from './wholesale-pending-nudge';
 import { stockLowStockAlertCron, stockLowStockAlertOnDemand } from './stock-low-stock-alert';
 import { accountingProfitAnomalyCron } from './accounting-profit-anomaly';
 import { accountingExpenseOcrProcess } from './accounting-expense-ocr-process';
@@ -80,6 +81,7 @@ import {
 import { gscIngestCron, gscIngestOnDemand } from './gsc-ingest';
 import { contactFormSend } from './contact-form-send';
 import { campaignSend } from './campaign-send';
+import { webhookFanout, webhookDeliver, webhookDeliveryPurge } from './webhook-delivery';
 import { cartRecoveryEmail } from './cart-recovery-email';
 import { legalNoticeSend } from './legal-notice-send';
 
@@ -130,6 +132,7 @@ const allInngestFunctions: InngestFunction.Any[] = [
   stockDeadstockScanCron,
   stockDeadstockScanOnDemand,
   stockLowStockAlertCron,
+  wholesalePendingNudgeCron,
   stockLowStockAlertOnDemand,
   accountingProfitAnomalyCron,
   accountingExpenseOcrProcess,
@@ -226,6 +229,9 @@ const allInngestFunctions: InngestFunction.Any[] = [
   // D2 email campaigns: event-triggered only (a merchant pressing send) —
   // no cron, so registering it sends nothing on its own.
   campaignSend,
+  webhookFanout,
+  webhookDeliver,
+  webhookDeliveryPurge,
   // Abandoned-cart recovery email: event-triggered only (the 15-min cart sweep claims a due
   // cart and emits one event); consent-gated and once per cart.
   cartRecoveryEmail,
