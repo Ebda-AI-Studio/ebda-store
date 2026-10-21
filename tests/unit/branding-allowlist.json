@@ -41,16 +41,13 @@
  ],
  "hintCookie": [
   "docs/RULINGS.md",
-  "graphify-out/graph.json"
+  "graphify-out/graph.json",
+  "packages/shared/src/auth/session-hint-cookie.ts"
  ],
  "metaEnv": [
-  ".env.production.example",
-  "apps/api/src/routes/wbs-integration.routes.ts",
   "apps/api/src/services/meta-provisioner.service.ts",
   "docs/ENVIRONMENT.md",
-  "docs/HANDOFF-2026-06-01.md",
-  "docs/RULINGS.md",
-  "docs/runbooks/meta-provisioner-one-time-setup.md"
+  "docs/RULINGS.md"
  ],
  "wbsBridge": [
   "apps/api/src/lib/inngest/functions/order-whatsapp-notify.ts",

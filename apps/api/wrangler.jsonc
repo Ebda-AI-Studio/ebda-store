@@ -3,6 +3,9 @@
 // leases a pooled Prisma client (packages/database/src/client-pool.ts) and its own pg
 // connections over Hyperdrive. NO SECRETS HERE: local secrets live in
 // `.dev.vars` (see `.dev.vars.example`), deployed ones in `wrangler secret put`.
+// Meta provisioner (optional): secrets EBDA_META_ADMIN_TOKEN and EBDA_META_BM_ID, optional
+// EBDA_META_PROVISIONER_USER_ID. The previous names are read as a fallback
+// until 2026-12-01 (apps/api/src/services/meta-provisioner.service.ts).
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "ebda-api",

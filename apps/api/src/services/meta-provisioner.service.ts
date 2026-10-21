@@ -1,9 +1,9 @@
 /**
  * Meta Commerce auto-provisioner.
  *
- * Ebda holds ONE master access token at FORCE_AI_META_ADMIN_TOKEN with the
+ * Ebda holds ONE master access token at EBDA_META_ADMIN_TOKEN with the
  * `business_management` + `catalog_management` scopes on the Ebda parent
- * Business Manager (FORCE_AI_META_BM_ID). This service uses those credentials
+ * Business Manager (EBDA_META_BM_ID). This service uses those credentials
  * to create a per-merchant Commerce Catalog + assign the long-lived system
  * user, then hand the catalog id + a derived system-user token back to Ebda Store so
  * the merchant doesn't have to navigate Meta Business Manager themselves.
@@ -15,7 +15,7 @@
  *        - business_management
  *        - catalog_management
  *        - whatsapp_business_management
- *   4. Set FORCE_AI_META_BM_ID + FORCE_AI_META_ADMIN_TOKEN on Railway
+ *   4. Set EBDA_META_BM_ID + EBDA_META_ADMIN_TOKEN on the API worker
  *   5. Set META_GRAPH_API_VERSION (default v21.0) if you want to pin
  *
  * After that, every merchant onboard just clicks "Provision automatically" in
@@ -44,14 +44,37 @@ export class MetaProvisionerError extends Error {
   }
 }
 
+const pick = (env: NodeJS.ProcessEnv, next: string, legacy: string): string | undefined =>
+  env[next]?.trim() || env[legacy]?.trim() || undefined;
+
+/**
+ * Env resolution: EBDA_META_* wins, the pre-rename names are a one-release fallback.
+ * TODO(2026-12-01): drop the legacy names (and this file from
+ * tests/unit/branding-allowlist.json).
+ */
+export function resolveMetaEnv(env: NodeJS.ProcessEnv = process.env): {
+  bmId?: string;
+  adminToken?: string;
+  provisionerUserId?: string;
+} {
+  return {
+    bmId: pick(env, 'EBDA_META_BM_ID', 'FORCE_AI_META_BM_ID'),
+    adminToken: pick(env, 'EBDA_META_ADMIN_TOKEN', 'FORCE_AI_META_ADMIN_TOKEN'),
+    provisionerUserId: pick(
+      env,
+      'EBDA_META_PROVISIONER_USER_ID',
+      'FORCE_AI_META_PROVISIONER_USER_ID'
+    ),
+  };
+}
+
 function getCredentials(): { bmId: string; adminToken: string } {
-  const bmId = process.env.FORCE_AI_META_BM_ID;
-  const adminToken = process.env.FORCE_AI_META_ADMIN_TOKEN;
+  const { bmId, adminToken } = resolveMetaEnv();
 
   if (!bmId || !adminToken) {
     throw new MetaProvisionerError(
-      'Meta auto-provisioning is not configured. Set FORCE_AI_META_BM_ID + ' +
-        'FORCE_AI_META_ADMIN_TOKEN on Railway (one-time Ebda AI Studio setup).',
+      'Meta auto-provisioning is not configured. Set EBDA_META_BM_ID + ' +
+        'EBDA_META_ADMIN_TOKEN on the API worker (one-time Ebda AI Studio setup).',
       'config'
     );
   }
@@ -59,7 +82,8 @@ function getCredentials(): { bmId: string; adminToken: string } {
 }
 
 export function isProvisioningConfigured(): boolean {
-  return Boolean(process.env.FORCE_AI_META_BM_ID && process.env.FORCE_AI_META_ADMIN_TOKEN);
+  const { bmId, adminToken } = resolveMetaEnv();
+  return Boolean(bmId && adminToken);
 }
 
 async function graph<T>(url: string, init: RequestInit, stage: string): Promise<T> {
@@ -117,7 +141,7 @@ async function createCatalog(name: string): Promise<string> {
  */
 async function assignCatalogToProvisioner(catalogId: string): Promise<void> {
   const { adminToken } = getCredentials();
-  const provisionerUserId = process.env.FORCE_AI_META_PROVISIONER_USER_ID;
+  const { provisionerUserId } = resolveMetaEnv();
   if (!provisionerUserId) {
     // Optional: if the admin token IS the provisioner token there's nothing to
     // assign. Skip silently — the admin token already has access.

@@ -751,8 +751,8 @@ router.post(
           error: {
             code: 'PROVISIONER_NOT_CONFIGURED',
             message:
-              'Meta auto-provisioning is not configured. Set FORCE_AI_META_BM_ID + ' +
-              'FORCE_AI_META_ADMIN_TOKEN on Railway (one-time Ebda AI Studio setup).',
+              'Meta auto-provisioning is not configured. Set EBDA_META_BM_ID + ' +
+              'EBDA_META_ADMIN_TOKEN on the API worker (one-time Ebda AI Studio setup).',
           },
         });
         return;

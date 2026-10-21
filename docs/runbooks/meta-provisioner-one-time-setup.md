@@ -8,15 +8,15 @@
 
 A Ebda AI Studio parent Business Manager that owns every merchant's Commerce catalog, with one long-lived system-user access token that the Ebda Store backend uses to provision new catalogs on demand.
 
-Two env vars on Railway:
+Two env vars on the API worker:
 
-- `FORCE_AI_META_BM_ID` — the Ebda AI Studio parent Business Manager id (a number, ~15 digits)
-- `FORCE_AI_META_ADMIN_TOKEN` — the never-expires system-user access token
+- `EBDA_META_BM_ID` — the Ebda AI Studio parent Business Manager id (a number, ~15 digits)
+- `EBDA_META_ADMIN_TOKEN` — the never-expires system-user access token
 
 Optional:
 
 - `META_GRAPH_API_VERSION` — defaults to `v21.0`. Bump when Meta deprecates.
-- `FORCE_AI_META_PROVISIONER_USER_ID` — system user id, only needed if the admin token is from a different system user than the provisioner
+- `EBDA_META_PROVISIONER_USER_ID` — system user id, only needed if the admin token is from a different system user than the provisioner
 
 ## Step 1 — Create the Ebda AI Studio parent Business Manager
 
@@ -34,7 +34,7 @@ You're now the admin on a fresh BM.
 
 1. https://business.facebook.com/settings → top-left dropdown should show **Ebda AI Studio** selected
 2. Settings → **Business Info** → copy the **Business Manager ID** (15-16 digit number)
-3. This goes into `FORCE_AI_META_BM_ID` on Railway
+3. This goes into `EBDA_META_BM_ID` on the API worker
 
 ## Step 3 — Create the provisioner system user
 
@@ -59,14 +59,13 @@ Still inside the system user you just created:
 5. **Copy the token IMMEDIATELY.** Meta only shows it once.
 6. Save to your password manager labeled `ebda-meta-admin-token` with today's date.
 
-## Step 5 — Set the two env vars on Railway
+## Step 5 — Set the two env vars on the API worker
 
 ```bash
-# In the Ebda Store repo root:
-railway link  # if not already linked
-railway variables --set FORCE_AI_META_BM_ID=<paste-the-BM-id-from-step-2>
-railway variables --set FORCE_AI_META_ADMIN_TOKEN=<paste-the-token-from-step-4>
-railway redeploy --yes  # so the API picks up the new env
+# From apps/api (each command prompts for the value; never put it on the command line):
+npx wrangler secret put EBDA_META_BM_ID
+npx wrangler secret put EBDA_META_ADMIN_TOKEN
+# then redeploy the API worker so it picks them up (cf-api-deploy workflow)
 ```
 
 Alternative if you prefer the dashboard: Railway → Ebda Store API service → **Variables** tab → **+ New Variable** for each.
@@ -103,7 +102,7 @@ If either returns a `401` or `OAuthException`, the token is wrong / scopes are m
 Save to your password manager:
 
 - Vault entry: `Ebda AI Studio — Meta master provisioner token`
-- Note: this token is in Railway's env vars on the Ebda Store API service as `FORCE_AI_META_ADMIN_TOKEN`. Rotating it requires (a) generating a fresh token in Meta BM (re-do step 4), (b) updating the Railway var, (c) `railway redeploy`. No merchant downtime.
+- Note: this token is in Railway's env vars on the Ebda Store API service as `EBDA_META_ADMIN_TOKEN`. Rotating it requires (a) generating a fresh token in Meta BM (re-do step 4), (b) updating the Railway var, (c) `railway redeploy`. No merchant downtime.
 
 ## Troubleshooting
 
