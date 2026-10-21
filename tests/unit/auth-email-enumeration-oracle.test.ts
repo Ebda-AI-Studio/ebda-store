@@ -264,3 +264,34 @@ describe('POST /auth/forgot-password — the demo guard never opens a second ora
     expect(mockRequestPasswordReset).not.toHaveBeenCalled();
   });
 });
+
+// Minor M-2 (B1 final review): resend-verification mirrors forgot-password above.
+describe('POST /auth/resend-verification — the demo guard never opens a second oracle', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    demoGuard.fail = null;
+    mockResendVerificationEmail.mockResolvedValue({
+      success: true,
+      message: 'If an account exists with this email, a verification link has been sent.',
+    });
+  });
+  it('a failing store lookup in the guard gives the generic 200, not next(error)', async () => {
+    const handler = getHandler('post', '/resend-verification');
+    demoGuard.fail = new Error('db down');
+    const failing = capture({ email: 'nobody@example.test', storeId: 's1' });
+    await handler(failing.req, failing.res, failing.next);
+    expect(failing.next).not.toHaveBeenCalled();
+    expect(failing.recorded.status).toBe(200);
+    expect(failing.recorded.body).toMatchObject({ success: true });
+    expect(mockResendVerificationEmail).not.toHaveBeenCalled();
+  });
+  it('the DEMO_STORE refusal itself is still passed on (403 by the error handler)', async () => {
+    const { AppError } = await import('@api/middleware/error-handler');
+    const handler = getHandler('post', '/resend-verification');
+    demoGuard.fail = new AppError(403, 'DEMO_STORE', 'demo');
+    const c = capture({ email: 'nobody@example.test', storeId: 'demo' });
+    await handler(c.req, c.res, c.next);
+    expect(c.next).toHaveBeenCalledWith(demoGuard.fail);
+    expect(mockResendVerificationEmail).not.toHaveBeenCalled();
+  });
+});

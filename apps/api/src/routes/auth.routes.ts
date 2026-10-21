@@ -1167,7 +1167,13 @@ router.post(
       const demoScope = (req.body ?? {}).storeId;
       if (typeof demoScope === 'string') await assertNotDemoStore(demoScope);
     } catch (error) {
-      next(error);
+      // Only the demo refusal itself is a 403. Any other guard failure answers the generic 200
+      // (enumeration defence), as on /forgot-password, never a 500 that differs by storeId.
+      if (error instanceof AppError && error.code === 'DEMO_STORE') {
+        next(error);
+        return;
+      }
+      res.json({ success: true, data: { ...GENERIC_RESEND_VERIFICATION_RESULT } });
       return;
     }
     try {
