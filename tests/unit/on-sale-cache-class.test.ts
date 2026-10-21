@@ -20,19 +20,18 @@ describe('on_sale: cache class and invalidation', () => {
 
   it('the public route allows the sort and keys the cache on it (a distinct entry per sort)', () => {
     expect(route).toMatch(/sortValue === 'on_sale'/);
-    const key = route.slice(route.indexOf('const cacheKey ='));
-    expect(key.slice(0, key.indexOf('`;', 10))).toContain('${sortValue || ');
+    const list = route.slice(route.indexOf('const listTail ='));
+    expect(list.slice(0, list.indexOf('`;', 10))).toContain('${sortValue || ');
+    expect(route).toContain(
+      "const cacheKey = `public:products:${storeId}:${sortValue === 'on_sale' ? saleTail : listTail}`;"
+    );
   });
 
   it('the key sits under the prefix invalidateStoreProductCaches sweeps', () => {
-    expect(route).toContain('`public:products:${storeId}:');
-    // the on_sale key: same prefix, no page / cursor in it (a crafted ?page=N mints nothing)
-    const onSaleKey = route.slice(
-      route.indexOf("sortValue === 'on_sale'\n        ?"),
-      route.indexOf(': `public:products:${storeId}:${page')
-    );
-    expect(onSaleKey).toContain('public:products:${storeId}:on_sale:');
-    expect(onSaleKey).not.toMatch(/page|cursor/i);
+    // the on_sale tail: no page / cursor in it (a crafted ?page=N mints nothing)
+    const sale = route.slice(route.indexOf('const saleTail ='), route.indexOf('const cacheKey ='));
+    expect(sale).toContain('on_sale:');
+    expect(sale).not.toMatch(/page|cursor/i);
     expect(cache).toMatch(
       /export async function clearProductsRedis[\s\S]*invalidateCachedPrefix\(`public:products:\$\{storeId\}:`\)/
     );
