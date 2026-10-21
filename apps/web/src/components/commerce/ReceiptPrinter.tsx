@@ -43,7 +43,7 @@ export type PaymentState =
   | 'awaiting'
   | 'unknown';
 
-type ReceiptStore = Pick<StoreData, 'name' | 'nameAr' | 'logo' | 'logoAr' | 'timezone'>;
+type ReceiptStore = Pick<StoreData, 'name' | 'nameAr' | 'logo' | 'logoAr' | 'timezone' | 'settings'>;
 
 export interface ReceiptPrinterProps {
   order: Order | null;
@@ -365,7 +365,11 @@ export function ReceiptPrinter({
               )}
 
               <div className="mt-6 flex flex-col items-center gap-1.5 pb-4">
-                <Barcode value={order.orderNumber} className={`h-11 w-[78%] ${styles.ink}`} />
+                <Barcode
+                  value={order.orderNumber}
+                  shape={store.settings?.receiptBarcodeShape as string | undefined}
+                  className={`block w-[78%] max-w-[16rem] ${styles.ink}`}
+                />
                 <p
                   data-testid="receipt-barcode-caption"
                   dir="ltr"

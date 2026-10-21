@@ -1,48 +1,45 @@
+import { useMemo } from 'react';
+import { renderBarcodeSvg } from '@ebda/shared';
+
 /**
- * A barcode-LOOKING strip for the order receipt, built deterministically from
- * the order number: the same order always draws the same bars.
+ * The order receipt's barcode: a REAL, scannable Code 128 of the order number
+ * (replaces the old look-alike strip, Ruling B0-3), optionally clipped into a
+ * BARKOD-studio shape (`store.settings.receiptBarcodeShape`). Shape drawings:
+ * BARKOD studio (barkod.studio), used with permission.
  *
- * NOT SCANNABLE (Ruling B0-3). It only looks like Code-128: each character is
- * hashed into three bar/space pairs of width 1-3. A real encoder would need a
- * dependency and buys nothing until the orders app scans receipts. Cost if
- * wrong: swapping in a real Code-128 encoder inside this one component.
- *
- * Decorative only (`aria-hidden`): the `#orderNumber` caption the receipt
- * renders under it is the accessible, copyable text.
+ * Ink is `currentColor` (the receipt's near-black paper ink, never the brand
+ * accent). The bars are LTR always, so the SVG sits in `<bdi dir="ltr">`
+ * inside an RTL page. The caption under it carries the accessible number, so
+ * this wrapper is `aria-hidden`. `off` (or an un-encodable number) draws nothing.
  */
-const GUARD = [2, 1, 1, 2, 3, 2];
-
-function barWidths(value: string): number[] {
-  const widths = [...GUARD];
-  let h = 2166136261;
-  for (const ch of value) {
-    h = Math.imul(h ^ ch.charCodeAt(0), 16777619) >>> 0;
-    for (let i = 0; i < 6; i++) widths.push(((h >>> (i * 3)) % 3) + 1);
-  }
-  return widths.concat(GUARD.slice().reverse(), [2]);
-}
-
-export function Barcode({ value, className }: { value: string; className?: string }) {
-  const widths = barWidths(value);
-  const rects: Array<{ x: number; w: number }> = [];
-  let x = 0;
-  widths.forEach((w, i) => {
-    if (i % 2 === 0) rects.push({ x, w });
-    x += w;
-  });
+export function Barcode({
+  value,
+  shape = 'plain',
+  className,
+}: {
+  value: string;
+  shape?: string | null;
+  className?: string;
+}) {
+  const svg = useMemo(() => {
+    if (shape === 'off') return null;
+    try {
+      return renderBarcodeSvg({ value, shape: shape ?? 'plain', label: false });
+    } catch {
+      return null; // a number Code 128 cannot carry: caption only
+    }
+  }, [value, shape]);
+  if (!svg) return null;
   return (
-    <svg
-      aria-hidden="true"
-      focusable="false"
-      className={className}
-      viewBox={`0 0 ${x} 40`}
-      preserveAspectRatio="none"
-      shapeRendering="crispEdges"
-      data-testid="receipt-barcode"
-    >
-      {rects.map(r => (
-        <rect key={r.x} x={r.x} y={0} width={r.w} height={40} fill="currentColor" />
-      ))}
-    </svg>
+    <bdi dir="ltr" className={className}>
+      <span
+        aria-hidden="true"
+        data-testid="receipt-barcode"
+        data-shape={shape ?? 'plain'}
+        className="block [&>svg]:h-auto [&>svg]:w-full"
+        // The SVG is built from our own encoder; `value` is escaped in it.
+        dangerouslySetInnerHTML={{ __html: svg }}
+      />
+    </bdi>
   );
 }
