@@ -517,7 +517,8 @@ export class AnalyticsService {
    */
   /**
    * B2B: line revenue split by how the line was priced (read-only, additive). `retail` = plain price (including every line
-   * sold before B2B, whose `price_source` is NULL), `tier` = a quantity break, `group` = a wholesale group percent;
+   * sold before B2B, whose `price_source` is NULL), `tier` = a PUBLIC quantity break, `group` = the buyer's wholesale group
+   * (the group percent, or a group tier: `price_group_applied`, final review minor 4);
    * `wholesale` = tier + group. Item-line revenue BEFORE order-level discounts, tax and shipping (so the shares add up to the
    * top-products figures, not to the order totals). Same revenue population as the rest of this service.
    */
@@ -526,7 +527,7 @@ export class AnalyticsService {
     const startDate = dateRange?.startDate || new Date(now.getFullYear(), now.getMonth(), 1);
     const endDate = dateRange?.endDate || now;
     const grouped = await prisma.orderItem.groupBy({
-      by: ['priceSource'],
+      by: ['priceSource', 'priceGroupApplied'],
       where: {
         order: {
           storeId,
@@ -541,7 +542,11 @@ export class AnalyticsService {
     const out = { retail: { ...bucket }, tier: { ...bucket }, group: { ...bucket } };
     for (const g of grouped) {
       const key =
-        g.priceSource === 'tier' ? 'tier' : g.priceSource === 'group' ? 'group' : 'retail';
+        g.priceSource === 'group' || (g.priceSource === 'tier' && g.priceGroupApplied === true)
+          ? 'group'
+          : g.priceSource === 'tier'
+            ? 'tier'
+            : 'retail';
       out[key].revenue += g._sum.total ?? 0;
       out[key].units += g._sum.quantity ?? 0;
     }

@@ -1505,6 +1505,7 @@
       },
       "priceTier": "سعر الجملة، {qty}+ وحدة",
       "priceWholesale": "سعر الجملة",
+      "priceQuantity": "سعر الكمية، {qty}+ وحدة",
       "priceGroup": "مجموعة السعر"
     },
     "layout": {

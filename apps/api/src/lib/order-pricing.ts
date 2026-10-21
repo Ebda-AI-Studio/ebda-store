@@ -47,23 +47,35 @@ export function assertMoqSatisfied(lines: readonly MoqLine[]): void {
 /** The persisted price provenance for one order line (Ruling B2B-3b/5): invoices, returns and analytics read these, never re-resolve. */
 /**
  * The label printed under an order line that was NOT sold at the plain retail price (invoice, credit note), from the
- * snapshot persisted on the line - never re-resolved. A quantity break or a wholesale group price reads "Wholesale price"
- * (with the threshold for a break). Latin digits in both languages (NUMERALS-1). null for a retail line and for a line sold
- * before the snapshot existed, so an old invoice renders exactly as it always did.
+ * snapshot persisted on the line - never re-resolved. A price from the buyer's wholesale GROUP (group tier or group
+ * percent) reads "Wholesale price"; a PUBLIC quantity break, which any shopper can reach, reads "Quantity price" (final
+ * review minor 4: it used to say "Wholesale price" on a retail shopper's invoice). A break carries its threshold. Latin
+ * digits in both languages (NUMERALS-1). null for a retail line and for a line sold before the snapshot existed, so an old
+ * invoice renders exactly as it always did.
  */
 export function priceLineLabel(
-  i: { priceSource?: string | null; priceTierMinQty?: number | null },
+  i: {
+    priceSource?: string | null;
+    priceTierMinQty?: number | null;
+    priceGroupApplied?: boolean | null;
+  },
   lang: 'en' | 'ar'
 ): string | null {
-  if (i.priceSource === 'tier' && i.priceTierMinQty != null) {
-    return lang === 'ar'
-      ? `سعر الجملة، ${i.priceTierMinQty}+ وحدة`
-      : `Wholesale price, ${i.priceTierMinQty}+ units`;
-  }
-  if (i.priceSource === 'tier' || i.priceSource === 'group') {
-    return lang === 'ar' ? 'سعر الجملة' : 'Wholesale price';
-  }
-  return null;
+  if (i.priceSource === 'group') return lang === 'ar' ? 'سعر الجملة' : 'Wholesale price';
+  if (i.priceSource !== 'tier') return null;
+  const wholesale = i.priceGroupApplied === true;
+  const name =
+    lang === 'ar'
+      ? wholesale
+        ? 'سعر الجملة'
+        : 'سعر الكمية'
+      : wholesale
+        ? 'Wholesale price'
+        : 'Quantity price';
+  if (i.priceTierMinQty == null) return name;
+  return lang === 'ar'
+    ? `${name}، ${i.priceTierMinQty}+ وحدة`
+    : `${name}, ${i.priceTierMinQty}+ units`;
 }
 
 /** The retail list price to strike through beside the charged unit price: only when the line was sold below it. */
@@ -81,6 +93,8 @@ export function priceSnapshot(r: Resolved): {
   listPrice: number;
   priceSource: Resolved['source'];
   priceTierMinQty: number | null;
+  /** The price came from the buyer's group (labels + analytics, final review minor 4). */
+  priceGroupApplied: boolean;
   /**
    * The buyer's entitlement at sale time (Task 8b, Rulings B2B-17 / B2B-18): the price breaks on offer with their scope and
    * audience, plus the group-percent price. Read only by a later partial return. undefined when there were no breaks, so the
@@ -92,6 +106,7 @@ export function priceSnapshot(r: Resolved): {
     listPrice: r.listMinor,
     priceSource: r.source,
     priceTierMinQty: r.tierMinQty,
+    priceGroupApplied: r.groupApplied,
     tierLadder:
       r.ladder.length > 0
         ? { rungs: r.ladder.map(x => ({ ...x })), groupPercentMinor: r.groupPercentMinor }

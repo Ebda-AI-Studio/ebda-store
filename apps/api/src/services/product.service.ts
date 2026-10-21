@@ -1883,7 +1883,12 @@ export class ProductService {
    */
   private static async b2bPublicFields(
     storeId: string,
-    product: { id: string; price: number; moq?: number | null }
+    product: {
+      id: string;
+      price: number;
+      moq?: number | null;
+      variants?: ReadonlyArray<{ id: string; price: number | null }>;
+    }
   ) {
     const entitled = await featureService.isFeatureEnabled(storeId, 'b2b.wholesale');
     const rows = entitled
@@ -1893,9 +1898,19 @@ export class ProductService {
           orderBy: [{ variantId: 'asc' }, { minQty: 'asc' }],
         })
       : [];
+    // A break at or above the price it would apply to is never applied by the resolver (Ruling B2B-3b), so it is not shown:
+    // a product-level tier against the product price, a variant-level tier against THAT variant's price (variant.price ??
+    // product.price; final review minor 2). A variant tier whose variant is gone is not shown either.
+    const variantBase = new Map(
+      (product.variants ?? []).map(v => [v.id, v.price ?? product.price] as const)
+    );
     return {
       moq: product.moq ?? null,
-      priceTiers: rows.filter(t => t.variantId !== null || t.priceMinor < product.price),
+      priceTiers: rows.filter(t =>
+        t.variantId === null
+          ? t.priceMinor < product.price
+          : variantBase.has(t.variantId) && t.priceMinor < variantBase.get(t.variantId)!
+      ),
     };
   }
 

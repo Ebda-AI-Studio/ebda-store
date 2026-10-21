@@ -1935,11 +1935,15 @@ model OrderItem {
   // B2B price provenance (Ruling B2B-3/5), snapshotted so invoices, returns and analytics never
   // re-derive a price. NULL on orders placed before B2B reads as source 'base'.
   // priceSource: 'base' | 'tier' | 'group'. listPrice = the retail unit price at sale time.
-  listPrice       Int?    @map("list_price")
-  priceSource     String? @map("price_source")
-  priceTierMinQty Int?    @map("price_tier_min_qty")
-  /// Price breaks the buyer could reach at sale time ([{minQty, priceMinor}]), for tier-aware partial returns (Task 8b).
-  tierLadder      Json?   @map("tier_ladder")
+  listPrice         Int?     @map("list_price")
+  priceSource       String?  @map("price_source")
+  priceTierMinQty   Int?     @map("price_tier_min_qty")
+  /// True when the price came from the buyer's wholesale GROUP (group tier or group percent), false for a public break or
+  /// base; NULL before the column existed. Labels and analytics only (final review minor 4).
+  priceGroupApplied Boolean? @map("price_group_applied")
+  /// The buyer's entitlement at sale time ({ rungs: [{minQty, priceMinor, variant, group}], groupPercentMinor }), for
+  /// tier-aware partial returns (Task 8b, Rulings B2B-17 / B2B-18).
+  tierLadder        Json?    @map("tier_ladder")
 
   // Scan-to-pick fulfilment state. pickedQty tracks how many units of this
   // line have been physically scanned/picked. Default 0 so existing rows are

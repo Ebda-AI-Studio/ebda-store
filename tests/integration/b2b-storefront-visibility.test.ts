@@ -210,6 +210,33 @@ describe.skipIf(!hasDb)(
       }
     });
 
+    it("final review minor 2: a VARIANT tier at or above that variant's own price is stale and not shown; one below it is", async () => {
+      const v = await prisma.productVariant.create({
+        data: { productId: id.pub!, title: `Big ${SUF}`, price: 9_500, inventory: 5 },
+      });
+      await Promise.all(
+        [
+          { variantId: v.id, minQty: 5, priceMinor: 9_600 }, // above the variant's 9500: never applied
+          { variantId: v.id, minQty: 20, priceMinor: 9_400 }, // a real break for this variant
+        ].map(t =>
+          prisma.productPriceTier.create({ data: { storeId: id.s!, productId: id.pub!, ...t } })
+        )
+      );
+      try {
+        const p = await ProductService.getPublicBySlug(id.s!, id.pubSlug!);
+        expect(p.priceTiers).toEqual(
+          expect.arrayContaining([
+            { variantId: null, minQty: 10, priceMinor: 9_000 },
+            { variantId: v.id, minQty: 20, priceMinor: 9_400 },
+          ])
+        );
+        expect(p.priceTiers).toHaveLength(2);
+      } finally {
+        await prisma.productPriceTier.deleteMany({ where: { variantId: v.id } });
+        await prisma.productVariant.delete({ where: { id: v.id } });
+      }
+    });
+
     it('cart add: a wholesale-only product is a plain 404 for guests and non-members (same as an unknown product), allowed for an active-group member', async () => {
       const unknown = await CartService.addItem(
         id.s!,

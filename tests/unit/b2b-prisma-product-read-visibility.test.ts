@@ -28,6 +28,8 @@ const STOREFRONT_FILES = [
   'routes/wa-bridge.routes.ts',
   'routes/payment-links.routes.ts',
   'routes/wholesale.routes.ts',
+  // product names leave the platform as answer-engine prompts (ChatGPT / Perplexity citation scan): final review minor 1
+  'services/answer-engine/prompts.ts',
 ];
 
 /** `file :: kind` -> how many reads in that file may lack the filter, and why that is safe. */

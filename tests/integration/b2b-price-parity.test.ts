@@ -262,6 +262,7 @@ describe.skipIf(!hasDb)('B2B price parity, order-time binding, MOQ, coupon exclu
       listPrice: 10_000,
       priceSource: 'group',
       priceTierMinQty: null,
+      priceGroupApplied: true,
     });
     const full = await prisma.order.findUniqueOrThrow({ where: { id: order.id } });
     expect(full.priceGroupName).toBe('Wholesale');
@@ -273,6 +274,14 @@ describe.skipIf(!hasDb)('B2B price parity, order-time binding, MOQ, coupon exclu
       listPrice: 10_000,
       priceSource: 'tier',
       priceTierMinQty: 10,
+      priceGroupApplied: false, // a public break: labelled "Quantity price" (final review minor 4)
+    });
+    // the entitlement snapshot a later partial return reads (Rulings B2B-17 / B2B-18)
+    expect(tierOrder.items[0]!.tierLadder).toMatchObject({
+      rungs: expect.arrayContaining([
+        { minQty: 10, priceMinor: 8_500, variant: false, group: false },
+      ]),
+      groupPercentMinor: null,
     });
     expect(
       (await prisma.order.findUniqueOrThrow({ where: { id: tierOrder.id } })).priceGroupName

@@ -15,16 +15,20 @@ import { hasDb } from '../helpers/bundle-fixtures';
 const SUF = `${Date.now().toString(36)}-${crypto.randomBytes(3).toString('hex')}`;
 
 describe('price label helpers (pure)', () => {
-  it('labels a tier line with its threshold and a group line plainly, in both languages with Latin digits', () => {
-    expect(priceLineLabel({ priceSource: 'tier', priceTierMinQty: 10 }, 'en')).toBe(
-      'Wholesale price, 10+ units'
-    );
-    expect(priceLineLabel({ priceSource: 'tier', priceTierMinQty: 10 }, 'ar')).toBe(
-      'سعر الجملة، 10+ وحدة'
-    );
+  it('labels a GROUP tier "Wholesale price" with its threshold, a group line plainly, in both languages with Latin digits', () => {
+    const g = { priceSource: 'tier', priceTierMinQty: 10, priceGroupApplied: true };
+    expect(priceLineLabel(g, 'en')).toBe('Wholesale price, 10+ units');
+    expect(priceLineLabel(g, 'ar')).toBe('سعر الجملة، 10+ وحدة');
     expect(priceLineLabel({ priceSource: 'group', priceTierMinQty: null }, 'en')).toBe(
       'Wholesale price'
     );
+  });
+  it('final review minor 4: a PUBLIC quantity break (any shopper) reads "Quantity price", never "Wholesale price"', () => {
+    for (const groupApplied of [false, null, undefined]) {
+      const pub = { priceSource: 'tier', priceTierMinQty: 10, priceGroupApplied: groupApplied };
+      expect(priceLineLabel(pub, 'en')).toBe('Quantity price, 10+ units');
+      expect(priceLineLabel(pub, 'ar')).toBe('سعر الكمية، 10+ وحدة');
+    }
   });
   it('prints nothing for a retail line and for a line sold before the snapshot existed', () => {
     for (const i of [{ priceSource: 'base' }, { priceSource: null }, {}]) {
@@ -76,6 +80,7 @@ describe('price label helpers (pure)', () => {
 describe.skipIf(!hasDb)('invoice + analytics against Postgres', () => {
   let storeId = '';
   let tierOrderId = '';
+  let groupTierOrderId = '';
   let legacyOrderId = '';
 
   beforeAll(async () => {
@@ -151,6 +156,19 @@ describe.skipIf(!hasDb)('invoice + analytics against Postgres', () => {
           96000
         )
       ).id;
+      groupTierOrderId = (
+        await mk(
+          'G',
+          {
+            price: 7000,
+            listPrice: 10000,
+            priceSource: 'tier',
+            priceTierMinQty: 10,
+            priceGroupApplied: true,
+          },
+          84000
+        )
+      ).id;
       legacyOrderId = (await mk('L', { price: 10000 }, 120000)).id;
     });
   });
@@ -165,10 +183,15 @@ describe.skipIf(!hasDb)('invoice + analytics against Postgres', () => {
 
   it('the invoice shows the tier label (en and ar) and the struck list price for the snapshotted line', async () => {
     const en = await InvoiceService.generateInvoice(storeId, tierOrderId, 'en');
-    expect(en).toContain('Wholesale price, 10+ units');
+    expect(en).toContain('Quantity price, 10+ units'); // a public break
+    expect(en).not.toContain('Wholesale price');
     expect(en).toContain('list-price');
     const ar = await InvoiceService.generateInvoice(storeId, tierOrderId, 'ar');
-    expect(ar).toContain('سعر الجملة، 10+ وحدة');
+    expect(ar).toContain('سعر الكمية، 10+ وحدة');
+    const g = await InvoiceService.generateInvoice(storeId, groupTierOrderId, 'en');
+    expect(g).toContain('Wholesale price, 10+ units'); // the buyer's group tier
+    const gAr = await InvoiceService.generateInvoice(storeId, groupTierOrderId, 'ar');
+    expect(gAr).toContain('سعر الجملة، 10+ وحدة');
   });
 
   it('an order placed before B2B renders with no label and no struck price', async () => {
@@ -184,8 +207,9 @@ describe.skipIf(!hasDb)('invoice + analytics against Postgres', () => {
     });
     expect(r.tier).toEqual({ revenue: 96000, units: 12 });
     expect(r.retail).toEqual({ revenue: 120000, units: 12 });
-    expect(r.group).toEqual({ revenue: 0, units: 0 });
-    expect(r.wholesale).toEqual({ revenue: 96000, units: 12 });
-    expect(r.wholesaleSharePercent).toBe(44); // 96000 / 216000
+    // a GROUP tier is the buyer's group price, not a public quantity break (final review minor 4)
+    expect(r.group).toEqual({ revenue: 84000, units: 12 });
+    expect(r.wholesale).toEqual({ revenue: 180000, units: 24 });
+    expect(r.wholesaleSharePercent).toBe(60); // 180000 / 300000
   });
 });

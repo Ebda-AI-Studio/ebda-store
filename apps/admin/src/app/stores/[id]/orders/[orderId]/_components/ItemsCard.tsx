@@ -254,8 +254,11 @@ function ItemRow({ item, currency }: { item: OrderItemDetail; currency: string }
               data-testid="order-line-price-label"
               className="rounded bg-primary/10 px-1.5 py-0.5 text-xs text-primary-ink"
             >
+              {/* A public quantity break is open to every shopper: "Quantity price", not "Wholesale" (final review minor 4). */}
               {item.priceSource === 'tier' && item.priceTierMinQty != null
-                ? t('priceTier', { qty: item.priceTierMinQty })
+                ? t(item.priceGroupApplied === true ? 'priceTier' : 'priceQuantity', {
+                    qty: item.priceTierMinQty,
+                  })
                 : t('priceWholesale')}
             </span>
           ) : null}

@@ -40,6 +40,8 @@ export interface OrderItemDetail {
   listPrice?: number | null;
   priceSource?: 'base' | 'tier' | 'group' | null;
   priceTierMinQty?: number | null;
+  /** The price came from the buyer's wholesale group, not a public quantity break (null on older lines). */
+  priceGroupApplied?: boolean | null;
   product?: {
     id: string;
     // Arabic product name from the live product (order_items only snapshots
