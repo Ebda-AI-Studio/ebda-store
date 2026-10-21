@@ -39,6 +39,8 @@ const applySchema = z
     commercialRegNo: z.string().trim().max(60).nullish(),
     phone: z.string().trim().min(6).max(40),
     notes: z.string().trim().max(1000).nullish(),
+    // The form shows the data notice; the applicant must accept it and the server stamps `consent_at` (review M1).
+    consent: z.literal(true),
   })
   .strict();
 
@@ -56,11 +58,11 @@ publicWholesaleRouter.post(
   writeLimiter,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
+      setBuyerPrivate(res);
       const userId = requireCustomer(req);
       const storeId = await getStoreIdFromRequest(req);
       const body = applySchema.parse(req.body);
       const application = await WholesaleApplicationService.apply(storeId, userId, body);
-      setBuyerPrivate(res);
       res.status(201).json({ success: true, data: { application } });
     } catch (e) {
       next(e);
@@ -70,6 +72,7 @@ publicWholesaleRouter.post(
 
 publicWholesaleRouter.get('/wholesale/status', optionalAuthenticate, async (req, res, next) => {
   try {
+    setBuyerPrivate(res);
     const userId = requireCustomer(req);
     const storeId = await getStoreIdFromRequest(req);
     const out = await WholesaleApplicationService.status(storeId, userId);
@@ -239,6 +242,22 @@ merchantWholesaleRouter.get(
   }
 );
 
+// Pending count + age of the oldest pending application: feeds the merchant badge and the 48h nudge (review I5).
+merchantWholesaleRouter.get(
+  `${base}/summary`,
+  ...guard,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      res.json({
+        success: true,
+        data: await WholesaleApplicationService.summary(req.params.storeId),
+      });
+    } catch (e) {
+      next(e);
+    }
+  }
+);
+
 merchantWholesaleRouter.post(
   `${base}/:id/approve`,
   ...guard,
@@ -284,13 +303,14 @@ merchantWholesaleRouter.post(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { note } = noteSchema.parse(req.body ?? {});
-      const application = await WholesaleApplicationService.revoke(
+      const { membership, ...application } = await WholesaleApplicationService.revoke(
         req.params.storeId,
         req.params.id,
         note ?? null,
         getAuthUser(req).userId
       );
-      res.json({ success: true, data: { application } });
+      // `membership` tells the merchant whether the buyer was actually moved out of wholesale (never a silent no-op).
+      res.json({ success: true, data: { application, membership } });
     } catch (e) {
       next(e);
     }

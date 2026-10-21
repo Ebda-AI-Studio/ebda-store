@@ -1,4 +1,8 @@
-import { wholesaleNotice, type WholesaleNoticeKind } from './email-templates/wholesale';
+import {
+  wholesaleNotice,
+  wholesaleMerchantNotice,
+  type WholesaleNoticeKind,
+} from './email-templates/wholesale';
 import { withStore } from '@ebda/database';
 import { config } from '../config';
 import logger from '../lib/logger';
@@ -570,6 +574,38 @@ export class EmailService {
    * B2B wholesale application notices to the APPLICANT's account email only (received / approved / rejected). Queued with
    * the order-lifecycle emails so a transient provider failure retries instead of vanishing.
    */
+  /** Merchant-facing wholesale notice (new application / 48h nudge) to the store owner. Throws on failure; callers log it. */
+  static async sendWholesaleMerchantNotice(
+    storeId: string,
+    args: {
+      kind: 'received' | 'nudge';
+      businessName?: string;
+      pendingCount: number;
+      adminUrl: string;
+      to?: string | null;
+    }
+  ): Promise<void> {
+    const store = await withStore(storeId, tx =>
+      tx.store.findUnique({
+        where: { id: storeId },
+        select: { name: true, settings: true, owner: { select: { email: true } } },
+      })
+    );
+    if (!store) throw new Error(`Store ${storeId} not found`);
+    const to = args.to ?? store.owner?.email;
+    if (!to) return;
+    const lang: 'en' | 'ar' = resolveDefaultLanguage(
+      (store.settings as { defaultLanguage?: string } | null)?.defaultLanguage
+    );
+    const { subject, content } = wholesaleMerchantNotice(args.kind, lang, {
+      storeName: store.name,
+      businessName: args.businessName,
+      pendingCount: args.pendingCount,
+      adminUrl: args.adminUrl,
+    });
+    await this.sendForStore(storeId, { to, subject, content, language: lang }, { queue: true });
+  }
+
   static async sendWholesaleNotice(
     storeId: string,
     args: {

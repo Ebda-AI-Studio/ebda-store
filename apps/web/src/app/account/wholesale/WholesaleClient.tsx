@@ -5,14 +5,24 @@
  * session; this form sends no user id). Arabic first copy via `t(en, ar)`, Latin digits.
  */
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { Button } from '@ebda/ui';
 import { api } from '@/lib/api';
 import { useLanguage } from '../../../contexts/LanguageContext';
+import { useLocalePrice } from '../../../hooks/useLocalePrice';
 
 type Status = Awaited<ReturnType<typeof api.getWholesaleStatus>>;
+type CatalogProduct = NonNullable<
+  Awaited<ReturnType<typeof api.getWholesaleProducts>>['data']
+>['products'][number];
+
+const INPUT = 'mt-1 min-h-11 w-full rounded-md border px-3 py-2';
 
 export default function WholesaleClient() {
   const { t } = useLanguage();
+  const formatPrice = useLocalePrice();
+  const [catalog, setCatalog] = useState<CatalogProduct[]>([]);
+  const [consent, setConsent] = useState(false);
   const [status, setStatus] = useState<NonNullable<Status['data']> | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -27,6 +37,20 @@ export default function WholesaleClient() {
   useEffect(() => {
     void load();
   }, []);
+  // I2: an approved buyer lists the wholesale-only products here (the storefront catalogue never contains them).
+  useEffect(() => {
+    if (!status?.isWholesale) return;
+    let cancelled = false;
+    void api
+      .getWholesaleProducts({ limit: 24 })
+      .then(res => {
+        if (!cancelled && res.success && res.data) setCatalog(res.data.products);
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [status?.isWholesale]);
 
   const messageFor = (code?: string, fallback?: string) => {
     switch (code) {
@@ -39,8 +63,8 @@ export default function WholesaleClient() {
         return t('Your account already has wholesale access.', 'حسابك لديه صلاحية الجملة بالفعل.');
       case 'REAPPLY_COOLDOWN':
         return t(
-          'You can apply again 30 days after a rejection.',
-          'يمكنك التقديم مرة أخرى بعد 30 يومًا من الرفض.'
+          'You can apply again 30 days after the decision on your last application.',
+          'يمكنك التقديم مرة أخرى بعد 30 يومًا من صدور القرار في طلبك الأخير.'
         );
       case 'EMAIL_NOT_VERIFIED':
         return t(
@@ -69,6 +93,7 @@ export default function WholesaleClient() {
       commercialRegNo: form.commercialRegNo.trim() || null,
       phone: form.phone.trim(),
       notes: form.notes.trim() || null,
+      consent: true,
     });
     if (!res.success) setError(messageFor(res.error?.code, res.error?.message));
     else await load();
@@ -77,7 +102,11 @@ export default function WholesaleClient() {
 
   if (loading)
     return (
-      <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+      <div
+        role="status"
+        aria-label={t('Loading', 'جارٍ التحميل')}
+        className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent"
+      />
     );
 
   const app = status?.application;
@@ -94,6 +123,24 @@ export default function WholesaleClient() {
             'Your account has wholesale access. Your wholesale prices appear on products, in your cart and at checkout.',
             'حسابك لديه صلاحية الجملة. تظهر أسعار الجملة على المنتجات وفي السلة وعند إتمام الطلب.'
           )}
+        </p>
+      ) : null}
+      {/* approved, but the wholesale group is no longer active: say so instead of rendering nothing */}
+      {app?.status === 'approved' && !status?.isWholesale ? (
+        <p className="rounded-lg bg-muted p-3 text-sm">
+          {t(
+            'Your application was approved, but wholesale access is paused on this account right now. Contact the store.',
+            'تمت الموافقة على طلبك، لكن صلاحية الجملة متوقفة على حسابك حاليًا. يرجى التواصل مع المتجر.'
+          )}
+        </p>
+      ) : null}
+      {app?.status === 'revoked' ? (
+        <p className="rounded-lg bg-muted p-3 text-sm">
+          {t(
+            'Your wholesale access was ended by the store.',
+            'أنهى المتجر صلاحية الجملة على حسابك.'
+          )}{' '}
+          {app.decisionNote ? <bdi>{app.decisionNote}</bdi> : null}
         </p>
       ) : null}
 
@@ -118,7 +165,7 @@ export default function WholesaleClient() {
               required
               minLength={2}
               maxLength={160}
-              className="mt-1 w-full rounded-md border px-3 py-2"
+              className={INPUT}
               value={form.businessName}
               onChange={e => setForm({ ...form, businessName: e.target.value })}
             />
@@ -127,7 +174,7 @@ export default function WholesaleClient() {
             {t('Commercial registration no. (optional)', 'رقم السجل التجاري (اختياري)')}
             <input
               maxLength={60}
-              className="mt-1 w-full rounded-md border px-3 py-2"
+              className={INPUT}
               value={form.commercialRegNo}
               onChange={e => setForm({ ...form, commercialRegNo: e.target.value })}
             />
@@ -140,32 +187,73 @@ export default function WholesaleClient() {
               minLength={6}
               maxLength={40}
               dir="ltr"
-              className="mt-1 w-full rounded-md border px-3 py-2"
+              className={INPUT}
               value={form.phone}
               onChange={e => setForm({ ...form, phone: e.target.value })}
             />
           </label>
           <label className="block text-sm">
-            {t('Notes (optional)', 'ملاحظات (اختياري)')}
+            {t('Notes (optional, no ID numbers please)', 'ملاحظات (اختياري، دون أرقام هوية)')}
             <textarea
               maxLength={1000}
               rows={3}
-              className="mt-1 w-full rounded-md border px-3 py-2"
+              className={INPUT}
               value={form.notes}
               onChange={e => setForm({ ...form, notes: e.target.value })}
             />
+          </label>
+          <label className="flex items-start gap-3 text-sm" data-testid="wholesale-consent">
+            <input
+              type="checkbox"
+              required
+              checked={consent}
+              onChange={e => setConsent(e.target.checked)}
+              className="mt-1 h-5 w-5 shrink-0"
+            />
+            <span>
+              {t(
+                'I agree that the store keeps these details (business name, phone, registration number, notes) to review my application and manage my wholesale account, and deletes them if I ask. ',
+                'أوافق على أن يحتفظ المتجر بهذه البيانات (اسم النشاط، الهاتف، رقم السجل، الملاحظات) لمراجعة طلبي وإدارة حساب الجملة، وأن يحذفها عند طلبي. '
+              )}
+              <Link href="/privacy" className="underline">
+                {t('Privacy policy', 'سياسة الخصوصية')}
+              </Link>
+            </span>
           </label>
           {error ? (
             <p role="alert" className="text-sm text-destructive-ink">
               {error}
             </p>
           ) : null}
-          <Button type="submit" disabled={busy}>
+          <Button type="submit" disabled={busy || !consent} className="min-h-11">
             {busy
               ? t('Sending...', 'جارٍ الإرسال...')
               : t('Apply for a wholesale account', 'التقديم على حساب جملة')}
           </Button>
         </form>
+      ) : null}
+      {status?.isWholesale && catalog.length > 0 ? (
+        <section aria-labelledby="wholesale-catalog-title" data-testid="wholesale-catalog">
+          <h2 id="wholesale-catalog-title" className="mt-6 text-lg font-semibold">
+            {t('Wholesale-only products', 'منتجات الجملة فقط')}
+          </h2>
+          <ul className="mt-3 grid gap-3 sm:grid-cols-2">
+            {catalog.map(p => (
+              <li key={p.id} className="rounded-lg border p-3">
+                <Link
+                  href={`/products/${encodeURIComponent(p.slug)}`}
+                  className="font-medium underline-offset-2 hover:underline"
+                >
+                  <bdi>{p.name}</bdi>
+                </Link>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  {formatPrice(p.price)}
+                  {p.moq ? ` - ${t(`minimum order ${p.moq}`, `الحد الأدنى للطلب ${p.moq}`)}` : ''}
+                </p>
+              </li>
+            ))}
+          </ul>
+        </section>
       ) : null}
     </div>
   );

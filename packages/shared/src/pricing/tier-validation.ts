@@ -33,7 +33,7 @@ export type TierErrorCode =
 
 export interface TierValidation {
   errors: Array<{ code: TierErrorCode; message: string }>;
-  warnings: Array<{ code: 'TIER_BELOW_COST'; message: string }>;
+  warnings: Array<{ code: 'TIER_BELOW_COST' | 'TIER_BELOW_MOQ'; message: string }>;
 }
 
 export function validateTierWrite(i: {
@@ -44,6 +44,8 @@ export function validateTierWrite(i: {
   /** The variant's own price when the tier is variant-level and the variant has one. */
   variantPriceMinor?: number | null;
   costPriceMinor?: number | null;
+  /** The product's minimum order quantity: a tier whose minQty is below it can never apply (review M5). */
+  moq?: number | null;
 }): TierValidation {
   const { tier } = i;
   const others = i.existing.filter(e => e.id === undefined || e.id !== tier.id);
@@ -106,6 +108,12 @@ export function validateTierWrite(i: {
 
   if (i.costPriceMinor != null && tier.priceMinor < i.costPriceMinor) {
     warnings.push({ code: 'TIER_BELOW_COST', message: 'This tier price is below the cost price.' });
+  }
+  if (i.moq != null && tier.minQty < i.moq) {
+    warnings.push({
+      code: 'TIER_BELOW_MOQ',
+      message: `This tier starts at ${tier.minQty} but the minimum order is ${i.moq}, so it can never apply.`,
+    });
   }
   return { errors, warnings };
 }

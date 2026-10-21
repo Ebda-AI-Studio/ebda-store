@@ -219,6 +219,7 @@ export async function resolveBundle(
               variants: { select: { inventory: true, isActive: true } },
               deletedAt: true,
               status: true,
+              audience: true,
             },
           },
           variant: { select: { price: true, inventory: true, isActive: true } },
@@ -274,6 +275,9 @@ export async function resolveBundle(
   // still open the bundle to see and fix the broken line.
   const allComponentsPurchasable = bundle.items.every(item => {
     if (item.product.deletedAt !== null || item.product.status !== 'active') return false;
+    // B2B I1: a bundle with ANY wholesale-only component is not sellable and not listed (fail closed, like a deleted
+    // component), so it can be neither carted nor ordered; the merchant can still open it in admin. Ruling B2B-I1.
+    if (item.product.audience === 'wholesale_only') return false;
     if (item.variantId && item.variant?.isActive === false) return false;
     // P1-3 (final review): a line on a VARIANT product that pins no variant
     // is an unsellable shape, not a sellable one. `products.inventory` is

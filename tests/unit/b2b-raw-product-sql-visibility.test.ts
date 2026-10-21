@@ -169,7 +169,13 @@ describe('B2B raw-SQL product visibility checklist', () => {
     const count = (f: string) =>
       (fs.readFileSync(resolve(API_SRC, f), 'utf8').match(/audience: 'public'/g) ?? []).length;
     expect(count('services/product.service.ts')).toBeGreaterThanOrEqual(10);
-    expect(count('services/recommendation.service.ts')).toBe(2);
+    // recommendation reads go through the shared helper (review C1); the exact per-read check is b2b-prisma-product-read-visibility
+    const helperUses = (
+      fs
+        .readFileSync(resolve(API_SRC, 'services/recommendation.service.ts'), 'utf8')
+        .match(/visibleProductWhere\(\)/g) ?? []
+    ).length;
+    expect(helperUses).toBeGreaterThanOrEqual(9);
     expect(count('routes/wa-bridge.routes.ts')).toBe(4);
     expect(count('routes/payment-links.routes.ts')).toBe(1);
     expect(count('routes/wishlist.routes.ts')).toBeGreaterThanOrEqual(1);

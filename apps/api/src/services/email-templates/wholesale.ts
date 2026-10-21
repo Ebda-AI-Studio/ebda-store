@@ -61,3 +61,39 @@ export function wholesaleNotice(
   const c = COPY[lang];
   return { subject: c[kind].subject(d), content: `${c.hi(d)}${c[kind].body(d)}${c.bye(d)}` };
 }
+
+export interface WholesaleMerchantNoticeData {
+  storeName: string;
+  businessName?: string;
+  pendingCount: number;
+  adminUrl: string;
+}
+
+/** Notice to the MERCHANT: a new application arrived ('received'), or applications have waited 48h+ ('nudge'). */
+export function wholesaleMerchantNotice(
+  kind: 'received' | 'nudge',
+  lang: 'en' | 'ar',
+  d: WholesaleMerchantNoticeData
+): { subject: string; content: string } {
+  const link = `<p><a href="${escapeHtml(d.adminUrl)}">${lang === 'ar' ? 'افتح طلبات الجملة' : 'Open wholesale applications'}</a></p>`;
+  if (lang === 'ar') {
+    return kind === 'received'
+      ? {
+          subject: `طلب حساب جملة جديد - ${d.storeName}`,
+          content: `<p>وصل طلب حساب جملة جديد من <strong>${escapeHtml(d.businessName ?? '')}</strong>. العميل مستني ردك.</p><p>عدد الطلبات اللي لسه ما اتراجعتش: ${d.pendingCount}.</p>${link}`,
+        }
+      : {
+          subject: `طلبات جملة مستنية ردك - ${d.storeName}`,
+          content: `<p>فيه ${d.pendingCount} طلب حساب جملة مستني ردك بقاله أكتر من 48 ساعة. العملاء دول اتقالهم إن المتجر هيراجع طلبهم قريب.</p>${link}`,
+        };
+  }
+  return kind === 'received'
+    ? {
+        subject: `New wholesale application - ${d.storeName}`,
+        content: `<p>A new wholesale account application arrived from <strong>${escapeHtml(d.businessName ?? '')}</strong>. The buyer is waiting for your decision.</p><p>Applications still waiting: ${d.pendingCount}.</p>${link}`,
+      }
+    : {
+        subject: `Wholesale applications waiting for you - ${d.storeName}`,
+        content: `<p>${d.pendingCount} wholesale application${d.pendingCount === 1 ? ' has' : 's have'} been waiting more than 48 hours. These buyers were told the store would review them shortly.</p>${link}`,
+      };
+}

@@ -1390,6 +1390,8 @@ model WholesaleApplication {
   decidedBy       String?   @map("decided_by")
   decidedAt       DateTime? @map("decided_at")
   decisionNote    String?   @map("decision_note")
+  /// When the applicant accepted the data notice on the apply form (review M1).
+  consentAt       DateTime? @map("consent_at")
   createdAt       DateTime  @default(now()) @map("created_at")
   updatedAt       DateTime  @updatedAt @map("updated_at")
 

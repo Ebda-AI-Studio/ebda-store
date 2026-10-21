@@ -13,6 +13,7 @@ const m = vi.hoisted(() => ({
   approve: vi.fn(),
   reject: vi.fn(),
   revoke: vi.fn(),
+  summary: vi.fn(),
   gates: [] as string[],
 }));
 vi.mock('@api/services/wholesale-application.service', () => ({ WholesaleApplicationService: m }));
@@ -75,13 +76,13 @@ beforeAll(async () => {
   app.use(errorHandler);
 });
 beforeEach(() => {
-  for (const f of [m.apply, m.status, m.list, m.approve, m.reject, m.revoke])
+  for (const f of [m.apply, m.status, m.list, m.approve, m.reject, m.revoke, m.summary])
     f.mockReset().mockResolvedValue({});
   m.gates.length = 0;
 });
 
 describe('shopper routes', () => {
-  const body = { businessName: 'Cairo Traders', phone: '+201000000123' };
+  const body = { businessName: 'Cairo Traders', phone: '+201000000123', consent: true };
   it('apply: the applicant is the session user; a guest is 401; an impersonation session is refused', async () => {
     expect((await request(app).post('/public/wholesale/apply').send(body)).status).toBe(401);
     const ok = await request(app)
@@ -116,6 +117,8 @@ describe('shopper routes', () => {
     ['groupId', { ...body, groupId: G }],
     ['short name', { ...body, businessName: 'x' }],
     ['long notes', { ...body, notes: 'n'.repeat(1001) }],
+    ['no consent', { businessName: 'Cairo Traders', phone: '+201000000123' }],
+    ['consent false', { ...body, consent: false }],
   ])('apply rejects %s with 400 before the service', async (_n, b) => {
     const res = await request(app)
       .post('/public/wholesale/apply')
@@ -156,7 +159,20 @@ describe('merchant routes', () => {
           .send({ note: 'x'.repeat(501) })
       ).status
     ).toBe(400);
-    expect((await request(app).post(`${url}/${A}/revoke`).send({})).status).toBe(200);
+    m.revoke.mockResolvedValue({ id: A, status: 'revoked', membership: 'already_not_wholesale' });
+    const rv = await request(app).post(`${url}/${A}/revoke`).send({});
+    expect(rv.status).toBe(200);
+    // the merchant is told whether the buyer was actually moved (never a silent no-op)
+    expect(rv.body.data.membership).toBe('already_not_wholesale');
+    expect(rv.body.data.application).toEqual({ id: A, status: 'revoked' });
+  });
+  it('summary (pending count + oldest age) is a merchant read: not plan-gated, and a distinct path from :id', async () => {
+    m.summary.mockResolvedValue({ pendingCount: 3, oldestPendingHours: 50, overdue: true });
+    const res = await request(app).get(`${url}/summary`);
+    expect(res.status).toBe(200);
+    expect(res.body.data).toMatchObject({ pendingCount: 3, overdue: true });
+    expect(m.summary).toHaveBeenCalledWith(S);
+    expect(m.gates).toEqual([]);
   });
   it('list validates status / limit / cursor', async () => {
     expect((await request(app).get(`${url}?status=bogus`)).status).toBe(400);

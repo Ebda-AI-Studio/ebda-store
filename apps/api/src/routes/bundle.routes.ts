@@ -841,8 +841,12 @@ router.get(
           // `pricingType`/`pricingValue`, which this response also omits).
           const items = await prisma.bundleItem.findMany({
             where: { bundleId: row.id },
-            select: { product: { select: { name: true, nameAr: true } } },
+            select: { product: { select: { name: true, nameAr: true, audience: true } } },
           });
+          // B2B I1: a bundle holding a wholesale-only product does not exist for the anonymous storefront (no names leak).
+          if (items.some(i => i.product.audience === 'wholesale_only')) {
+            throw new AppError(404, 'NOT_FOUND', 'Bundle not found for this store');
+          }
 
           return {
             id: resolved.id,

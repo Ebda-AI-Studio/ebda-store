@@ -260,28 +260,35 @@ export const CustomerGroupService = {
   },
 
   /**
-   * Wholesale revoke: the shopper returns to the store's default group (or none). Membership is read per request, so open
-   * carts re-price to retail at the next read; the persisted lines of orders already created are untouched.
+   * Wholesale revoke: take the shopper OUT of wholesale, whatever group they are in now (review I4). A later manual move to
+   * another WHOLESALE group must not survive a revoke, or the buyer would keep wholesale prices and wholesale-only
+   * visibility. They land in the store's default non-wholesale group (or none). Returns `removed: false` when the buyer is
+   * already in no wholesale group (moved out by hand, or the link is gone): the end state is the one asked for, and the
+   * caller reports it instead of pretending a change happened. Membership is read per request, so open carts re-price to
+   * retail at the next read; the persisted lines of orders already created are untouched.
    */
-  async unlinkBuyer(storeId: string, userId: string, fromGroupId?: string | null) {
+  async unlinkBuyer(
+    storeId: string,
+    userId: string
+  ): Promise<{ removed: boolean; fromGroupId: string | null }> {
     const linked = await prisma.customer.findFirst({
       where: { storeId, userId },
-      select: { id: true, groupId: true },
+      select: { id: true, groupId: true, group: { select: { isWholesale: true } } },
     });
-    if (!linked) return null;
-    // Only move them if they are still in the group being revoked (a later manual move wins).
-    if (fromGroupId && linked.groupId !== fromGroupId) return null;
+    if (!linked || !linked.groupId || !linked.group?.isWholesale) {
+      return { removed: false, fromGroupId: linked?.groupId ?? null };
+    }
     const dflt = await prisma.customerGroup.findFirst({
-      where: { storeId, isDefault: true, ...(fromGroupId ? { id: { not: fromGroupId } } : {}) },
+      where: { storeId, isDefault: true, isWholesale: false },
       select: { id: true },
     });
-    const row = await prisma.customer.update({
+    await prisma.customer.update({
       where: { id: linked.id, storeId },
       data: { groupId: dflt?.id ?? null },
-      select: assignReturnSelect,
+      select: { id: true },
     });
     invalidateB2bPricing(storeId);
-    return row;
+    return { removed: true, fromGroupId: linked.groupId };
   },
 
   /**

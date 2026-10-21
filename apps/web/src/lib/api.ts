@@ -1341,6 +1341,8 @@ class ApiClient {
     commercialRegNo?: string | null;
     phone: string;
     notes?: string | null;
+    /** The applicant accepted the data notice shown on the form (the server records the time). */
+    consent: true;
   }) {
     return this.request<{ application: { id: string; status: string } }>(
       '/public/wholesale/apply',
@@ -1348,6 +1350,24 @@ class ApiClient {
         method: 'POST',
         body: JSON.stringify(data),
       }
+    );
+  }
+
+  /** The approved buyer's extra catalogue (wholesale-only products). 404 for everyone else. Private, no-store. */
+  async getWholesaleProducts(params: { page?: number; limit?: number } = {}) {
+    const q = new URLSearchParams();
+    if (params.page) q.set('page', String(params.page));
+    if (params.limit) q.set('limit', String(params.limit));
+    const qs = q.toString();
+    return this.request<{ products: Product[]; meta: PaginationMeta }>(
+      `/public/wholesale/products${qs ? `?${qs}` : ''}`
+    );
+  }
+
+  /** One wholesale-only product by slug, for an approved buyer. 404 for everyone else. */
+  async getWholesaleProduct(slug: string) {
+    return this.request<{ product: Product }>(
+      `/public/wholesale/products/${encodeURIComponent(slug)}`
     );
   }
 

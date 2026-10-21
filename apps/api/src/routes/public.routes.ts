@@ -1523,7 +1523,7 @@ router.post(
       // Verify the product belongs to this store (ownership guard).
       // Explicit select to avoid fetching unnecessary columns.
       const product = await prisma.product.findFirst({
-        where: { id: productId, storeId, deletedAt: null },
+        where: { id: productId, storeId, deletedAt: null, audience: 'public' },
         select: { id: true },
       });
 

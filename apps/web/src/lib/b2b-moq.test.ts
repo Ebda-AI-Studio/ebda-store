@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { moqShortfalls, moqCartMessage } from './b2b-moq';
+import { moqShortfalls, moqCartMessage, pdpMaxQty, cartMaxQty, moqFix } from './b2b-moq';
 
 const line = (o: Record<string, unknown>) => ({
   productId: 'p1',
@@ -50,4 +50,30 @@ describe('moqCartMessage', () => {
     expect(ar).not.toMatch(/[٠-٩]/);
   });
   it('is undefined when nothing is short', () => expect(moqCartMessage([], 'en')).toBeUndefined());
+});
+
+describe('quantity caps and the MOQ fix (review M7)', () => {
+  it('pdpMaxQty keeps the retail cap but reaches a MOQ or a tier above it, never past the server limit', () => {
+    expect(pdpMaxQty(10, null, [])).toBe(10);
+    expect(pdpMaxQty(10, 24, [])).toBe(24);
+    expect(pdpMaxQty(10, 6, [{ minQty: 50 }, { minQty: 200 }])).toBe(200);
+    expect(pdpMaxQty(10, 5000, [])).toBe(1000);
+  });
+  it('cartMaxQty lifts the cap only for a MOQ line or a line already on a tier / group price', () => {
+    expect(cartMaxQty({})).toBe(10);
+    expect(cartMaxQty({ priceSource: 'base' })).toBe(10);
+    expect(cartMaxQty({ moqRequired: 12 })).toBe(1000);
+    expect(cartMaxQty({ priceSource: 'tier' })).toBe(1000);
+    expect(cartMaxQty({ priceSource: 'group' })).toBe(1000);
+  });
+  it('moqFix returns the quantity to set on the first line of the short product', () => {
+    expect(
+      moqFix({ productId: 'p1', required: 12, current: 5 }, [
+        { id: 'l1', productId: 'p1', quantity: 3 },
+        { id: 'l2', productId: 'p1', quantity: 2 },
+        { id: 'l3', productId: 'p2', quantity: 9 },
+      ])
+    ).toEqual({ lineId: 'l1', quantity: 10 });
+    expect(moqFix({ productId: 'px', required: 2, current: 1 }, [])).toBeNull();
+  });
 });

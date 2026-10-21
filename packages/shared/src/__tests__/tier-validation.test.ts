@@ -96,6 +96,14 @@ describe('validateTierWrite', () => {
     expect(r.warnings.map(w => w.code)).toEqual(['TIER_BELOW_COST']);
     expect(run(t(10, 900), [], { costPriceMinor: 900 }).warnings).toEqual([]);
   });
+
+  it('warns (does not block) when minQty is below the product MOQ: the tier could never apply (review M5)', () => {
+    const r = run(t(5, 9_000), [], { moq: 12 });
+    expect(r.errors).toEqual([]);
+    expect(r.warnings.map(w => w.code)).toEqual(['TIER_BELOW_MOQ']);
+    expect(run(t(12, 9_000), [], { moq: 12 }).warnings).toEqual([]);
+    expect(run(t(5, 9_000), [], { moq: null }).warnings).toEqual([]);
+  });
 });
 
 describe('isStaleTier', () => {

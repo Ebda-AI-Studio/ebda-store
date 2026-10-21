@@ -58,6 +58,9 @@ const LEDGER: Array<[string, string, RegExp]> = [
   // existing writers that change a public price / MOQ / audience already funnel through the product-cache invalidator
   ['services/product.service.ts', 'update', /invalidateStoreProductCache\(/],
   ['services/product.service.ts', 'delete', /invalidateStoreProductCache\(/],
+  // C1: a product audience flip must also drop the cached recommendation payloads (they embed related products)
+  ['lib/public-cache.ts', 'clearProductsRedis', /recommendations:product:/],
+  // variant writers are covered by the per-method count test below; bulk routes invalidate at the route (bulk.routes.ts)
   // any change to the resolved feature map (plan change, override) drops the cached public product payload (it lists tiers only while entitled)
   ['services/feature.service.ts', 'invalidateCache', /invalidateStoreProductCaches\(/],
   // a plan-limit edit (wholesalePricing) busts every store on that plan
@@ -90,6 +93,15 @@ describe('B2B invalidation ledger', () => {
     };
     walk(API);
     expect(callers.length).toBeGreaterThanOrEqual(3);
+  });
+
+  it('variant.service invalidates after every write path (one invalidation per mutating method)', () => {
+    const src = read('services/variant.service.ts');
+    const writes = (
+      src.match(/\bpublic static async (create|update|delete|bulk|set|reorder)\w*/g) ?? []
+    ).length;
+    const inv = (src.match(/invalidateStoreProductCaches\(/g) ?? []).length;
+    expect(inv).toBeGreaterThanOrEqual(Math.min(writes, 8));
   });
 
   it('there is no per-buyer cache: no B2B module caches a resolved price (setEx / cache set / Map of prices)', () => {

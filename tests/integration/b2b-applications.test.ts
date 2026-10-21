@@ -10,7 +10,11 @@ vi.mock('@api/services/email.service', async importOriginal => {
   const real = await importOriginal<typeof import('@api/services/email.service')>();
   return {
     ...real,
-    EmailService: { ...real.EmailService, sendWholesaleNotice: vi.fn(async () => undefined) },
+    EmailService: {
+      ...real.EmailService,
+      sendWholesaleNotice: vi.fn(async () => undefined),
+      sendWholesaleMerchantNotice: vi.fn(async () => undefined),
+    },
   };
 });
 
@@ -51,6 +55,7 @@ const form = (o: Record<string, unknown> = {}) => ({
   phone: '+201000000123',
   commercialRegNo: 'CR-1',
   notes: 'resell',
+  consent: true as const,
   ...o,
 });
 const priceFor = async (userId: string) =>

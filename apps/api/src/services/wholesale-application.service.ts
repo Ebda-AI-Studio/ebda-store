@@ -11,15 +11,19 @@ import { withSavepoint } from '../lib/savepoint';
 import { assertWholesaleEntitled, invalidateB2bPricing } from '../lib/b2b-invalidate';
 import { CustomerGroupService } from './customer-group.service';
 import { EmailService } from './email.service';
+import { notifyMerchantOfApplications } from '../lib/wholesale-merchant-notify';
 import logger from '../lib/logger';
 
 export const REAPPLY_COOLDOWN_DAYS = 30;
+export const NUDGE_AFTER_HOURS = 48;
 
 export interface ApplyInput {
   businessName: string;
   commercialRegNo?: string | null;
   phone: string;
   notes?: string | null;
+  /** The applicant accepted the data notice on the form (review M1). The route requires literal `true`. */
+  consent: true;
 }
 
 const appSelect = {
@@ -34,6 +38,7 @@ const appSelect = {
   decidedBy: true,
   decidedAt: true,
   decisionNote: true,
+  consentAt: true,
   createdAt: true,
   updatedAt: true,
 } as const;
@@ -95,13 +100,14 @@ export const WholesaleApplicationService = {
         'You already have a wholesale application waiting for review.'
       );
     }
-    if (latest?.status === 'rejected' && latest.decidedAt) {
+    // Rejected AND revoked: a revoke followed by an immediate re-apply would otherwise be unbounded (each apply sends emails).
+    if ((latest?.status === 'rejected' || latest?.status === 'revoked') && latest.decidedAt) {
       const until = new Date(latest.decidedAt.getTime() + REAPPLY_COOLDOWN_DAYS * 86_400_000);
       if (until.getTime() > Date.now()) {
         throw new AppError(
           429,
           'REAPPLY_COOLDOWN',
-          'You can apply again 30 days after a rejection.',
+          'You can apply again 30 days after a decision on your last application.',
           {
             retryAfter: until.toISOString(),
           }
@@ -119,11 +125,29 @@ export const WholesaleApplicationService = {
             commercialRegNo: input.commercialRegNo ?? null,
             phone: input.phone,
             notes: input.notes ?? null,
+            consentAt: new Date(),
           },
           select: appSelect,
         })
       );
       void notify(storeId, 'received', user, input.businessName);
+      // Fail-soft (not money): a merchant-notification failure never un-creates the application.
+      void (async () => {
+        try {
+          const pendingCount = await prisma.wholesaleApplication.count({
+            where: { storeId, status: 'pending' },
+          });
+          await notifyMerchantOfApplications(storeId, 'received', {
+            pendingCount,
+            businessName: input.businessName,
+          });
+        } catch (err) {
+          logger.warn(
+            { err, storeId },
+            '[wholesale] merchant notification failed (application kept)'
+          );
+        }
+      })();
       return created;
     } catch (err) {
       if ((err as { code?: string })?.code === 'P2002') {
@@ -177,6 +201,33 @@ export const WholesaleApplicationService = {
     return { items, nextCursor: hasMore ? items[items.length - 1]!.id : null };
   },
 
+  /** Pending count and age of the oldest pending application, for the merchant badge and the nudge (review I5). */
+  async summary(storeId: string) {
+    const [pendingCount, oldest] = await Promise.all([
+      prisma.wholesaleApplication.count({ where: { storeId, status: 'pending' } }),
+      prisma.wholesaleApplication.findFirst({
+        where: { storeId, status: 'pending' },
+        orderBy: { createdAt: 'asc' },
+        select: { createdAt: true },
+      }),
+    ]);
+    const oldestPendingAt = oldest?.createdAt ?? null;
+    const oldestPendingHours = oldestPendingAt
+      ? Math.floor((Date.now() - oldestPendingAt.getTime()) / 3_600_000)
+      : null;
+    return {
+      pendingCount,
+      oldestPendingAt,
+      oldestPendingHours,
+      overdue: oldestPendingHours !== null && oldestPendingHours >= NUDGE_AFTER_HOURS,
+    };
+  },
+
+  /**
+   * Decisions are CLAIMED atomically: `UPDATE ... WHERE status = <expected>` and the loser (count 0) gets 409 (review I3).
+   * Two admins, or a double click, can no longer approve and reject the same application. The buyer link is made only
+   * after the claim, and the claim is released again if the link fails, so a row never says approved without a link.
+   */
   async approve(storeId: string, id: string, groupId: string, actorUserId: string) {
     const app = await prisma.wholesaleApplication.findFirst({
       where: { id, storeId },
@@ -194,11 +245,24 @@ export const WholesaleApplicationService = {
     if (!group.isWholesale || !group.isActive) {
       throw new AppError(422, 'GROUP_NOT_WHOLESALE', 'Choose an active wholesale group.');
     }
-    // The link is made from the application's session user id, never from the typed phone / email.
-    await CustomerGroupService.linkApprovedBuyer(storeId, app.userId, groupId);
-    const updated = await prisma.wholesaleApplication.update({
-      where: { id, storeId },
+    const claim = await prisma.wholesaleApplication.updateMany({
+      where: { id, storeId, status: 'pending' },
       data: { status: 'approved', groupId, decidedBy: actorUserId, decidedAt: new Date() },
+    });
+    if (claim.count === 0)
+      throw new AppError(409, 'NOT_PENDING', 'This application was already decided.');
+    try {
+      // The link is made from the application's session user id, never from the typed phone / email.
+      await CustomerGroupService.linkApprovedBuyer(storeId, app.userId, groupId);
+    } catch (err) {
+      await prisma.wholesaleApplication.updateMany({
+        where: { id, storeId, status: 'approved' },
+        data: { status: 'pending', groupId: null, decidedBy: null, decidedAt: null },
+      });
+      throw err;
+    }
+    const updated = await prisma.wholesaleApplication.findFirstOrThrow({
+      where: { id, storeId },
       select: appSelect,
     });
     invalidateB2bPricing(storeId);
@@ -216,16 +280,19 @@ export const WholesaleApplicationService = {
       select: appSelect,
     });
     if (!app) throw new AppError(404, 'NOT_FOUND', 'Application not found');
-    if (app.status !== 'pending')
-      throw new AppError(409, 'NOT_PENDING', 'This application was already decided.');
-    const updated = await prisma.wholesaleApplication.update({
-      where: { id, storeId },
+    const claim = await prisma.wholesaleApplication.updateMany({
+      where: { id, storeId, status: 'pending' },
       data: {
         status: 'rejected',
         decidedBy: actorUserId,
         decidedAt: new Date(),
         decisionNote: note,
       },
+    });
+    if (claim.count === 0)
+      throw new AppError(409, 'NOT_PENDING', 'This application was already decided.');
+    const updated = await prisma.wholesaleApplication.findFirstOrThrow({
+      where: { id, storeId },
       select: appSelect,
     });
     const user = await prisma.user.findFirst({
@@ -236,27 +303,52 @@ export const WholesaleApplicationService = {
     return updated;
   },
 
-  /** Revoke an approved buyer: back to the default group (or none); open carts re-price to retail at the next read. */
+  /**
+   * Revoke an approved buyer: out of EVERY wholesale group (review I4), whatever group they sit in now; open carts re-price to
+   * retail at the next read. `membership` says what actually happened, so the merchant is never told a revoke changed
+   * something when it did not: `removed` (the buyer was in a wholesale group and was moved out) or `already_not_wholesale`
+   * (a later manual move had already taken them out; the application is still closed).
+   */
   async revoke(storeId: string, id: string, note: string | null, actorUserId: string) {
     const app = await prisma.wholesaleApplication.findFirst({
       where: { id, storeId },
       select: appSelect,
     });
     if (!app) throw new AppError(404, 'NOT_FOUND', 'Application not found');
-    if (app.status !== 'approved')
-      throw new AppError(409, 'NOT_APPROVED', 'Only an approved application can be revoked.');
-    await CustomerGroupService.unlinkBuyer(storeId, app.userId, app.groupId);
-    const updated = await prisma.wholesaleApplication.update({
-      where: { id, storeId },
+    const claim = await prisma.wholesaleApplication.updateMany({
+      where: { id, storeId, status: 'approved' },
       data: {
         status: 'revoked',
         decidedBy: actorUserId,
         decidedAt: new Date(),
         decisionNote: note,
       },
+    });
+    if (claim.count === 0)
+      throw new AppError(409, 'NOT_APPROVED', 'Only an approved application can be revoked.');
+    let result;
+    try {
+      result = await CustomerGroupService.unlinkBuyer(storeId, app.userId);
+    } catch (err) {
+      await prisma.wholesaleApplication.updateMany({
+        where: { id, storeId, status: 'revoked' },
+        data: {
+          status: 'approved',
+          decidedBy: app.decidedBy,
+          decidedAt: app.decidedAt,
+          decisionNote: app.decisionNote,
+        },
+      });
+      throw err;
+    }
+    const updated = await prisma.wholesaleApplication.findFirstOrThrow({
+      where: { id, storeId },
       select: appSelect,
     });
     invalidateB2bPricing(storeId);
-    return updated;
+    return {
+      ...updated,
+      membership: result.removed ? ('removed' as const) : ('already_not_wholesale' as const),
+    };
   },
 };

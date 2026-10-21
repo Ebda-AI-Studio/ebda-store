@@ -13,6 +13,8 @@ import type { BuyerIdentity } from './buyer-identity';
 /** Prisma `where` fragment for every anonymous product query. */
 export const PUBLIC_AUDIENCE = { audience: 'public' } as const;
 
+export { visibleProductWhere } from './visible-product';
+
 /** True for a buyer in an active wholesale group. Anonymous buyers are never members. */
 export async function canSeeWholesaleOnly(storeId: string, buyer: BuyerIdentity): Promise<boolean> {
   if (buyer.kind === 'anonymous') return false;

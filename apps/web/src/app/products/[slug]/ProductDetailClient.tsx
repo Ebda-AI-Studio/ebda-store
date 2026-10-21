@@ -1,5 +1,6 @@
 'use client';
 
+import { pdpMaxQty } from '@/lib/b2b-moq';
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { firstCategoryId, pickRelated } from '../../../lib/related-products';
 import { useLocalePrice } from '../../../hooks/useLocalePrice';
@@ -183,7 +184,12 @@ export default function ProductDetailClient({
   const [relatedProducts, setRelatedProducts] = useState<Product[]>([]);
   const [isLoading, setIsLoading] = useState(!initialProduct);
   const [error, setError] = useState<string | null>(null);
-  const [quantity, setQuantity] = useState(1);
+  // B2B M7: the stepper starts at the product's minimum order quantity (a retail product's is 1).
+  const [quantity, setQuantity] = useState(Math.max(1, initialProduct?.moq ?? 1));
+  const moqFloor = Math.max(1, product?.moq ?? 1);
+  useEffect(() => {
+    setQuantity(q => Math.max(q, moqFloor));
+  }, [moqFloor]);
   // Per-item personalisation text (e.g. the name to embroider). Part of the cart line identity.
   const [note, setNote] = useState('');
   // Bumped when a tap on add-to-cart is blocked ONLY by the empty required note:
@@ -730,8 +736,16 @@ export default function ProductDetailClient({
 
   // Dahab skin: same data and handlers, Dahab presentation (templates/dahab/ProductDetail).
   if (templateId === 'dahab') {
-    const maxQty =
+    const retailCap =
       effectiveInventory != null && effectiveInventory > 0 ? Math.min(effectiveInventory, 10) : 10;
+    // B2B M7: a MOQ or price break above the retail cap stays selectable (stock still bounds it).
+    const pricedMax = pdpMaxQty(retailCap, product.moq, product.priceTiers);
+    const maxQty = Math.max(
+      moqFloor,
+      effectiveInventory != null && effectiveInventory > 0
+        ? Math.min(pricedMax, effectiveInventory)
+        : pricedMax
+    );
     const badges = [pdpCustomBadgeText, discountBadgeText].filter((b): b is string => !!b);
     return (
       <ShopChrome layout={resolvedLayout}>
@@ -774,6 +788,7 @@ export default function ProductDetailClient({
             quantity={quantity}
             setQuantity={setQuantity}
             maxQuantity={maxQty}
+            minQuantity={moqFloor}
             stockText={
               outOfStock && !canBackorder
                 ? t('Out of stock', 'مش متوفر دلوقتي')
@@ -1136,7 +1151,7 @@ export default function ProductDetailClient({
                   <div className="flex items-center rounded-lg border border-border">
                     <button
                       type="button"
-                      onClick={() => setQuantity(Math.max(1, quantity - 1))}
+                      onClick={() => setQuantity(Math.max(moqFloor, quantity - 1))}
                       aria-label={t('Decrease quantity', 'تقليل الكمية')}
                       className="flex h-11 min-w-11 items-center justify-center px-4 text-muted-foreground hover:bg-muted cursor-pointer"
                     >
@@ -1148,11 +1163,17 @@ export default function ProductDetailClient({
                     <button
                       type="button"
                       onClick={() => {
-                        const maxQty =
+                        const retailCap =
                           effectiveInventory != null && effectiveInventory > 0
                             ? Math.min(effectiveInventory, 10)
                             : 10;
-                        setQuantity(Math.min(quantity + 1, maxQty));
+                        // A MOQ or price break above the retail cap must be selectable (stock still bounds it).
+                        const maxQty = pdpMaxQty(retailCap, product?.moq, product?.priceTiers);
+                        const stockCap =
+                          effectiveInventory != null && effectiveInventory > 0
+                            ? Math.min(maxQty, effectiveInventory)
+                            : maxQty;
+                        setQuantity(Math.min(quantity + 1, Math.max(stockCap, moqFloor)));
                       }}
                       aria-label={t('Increase quantity', 'زيادة الكمية')}
                       className="flex h-11 min-w-11 items-center justify-center px-4 text-muted-foreground hover:bg-muted cursor-pointer"

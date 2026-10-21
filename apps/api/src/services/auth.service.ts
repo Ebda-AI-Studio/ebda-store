@@ -2411,7 +2411,23 @@ export class AuthService {
         },
       }),
       // B2B wholesale applications (business name, phone, commercial registration no., decision note): the applicant's own data.
-      prisma.wholesaleApplication.findMany({ where: { userId, storeId } }),
+      prisma.wholesaleApplication.findMany({
+        where: { userId, storeId },
+        // Explicit select (review M2): the staff user id that decided it (`decidedBy`) is not the applicant's data. The
+        // decision note IS exported: the applicant is shown it already.
+        select: {
+          id: true,
+          businessName: true,
+          commercialRegNo: true,
+          phone: true,
+          notes: true,
+          status: true,
+          decisionNote: true,
+          decidedAt: true,
+          consentAt: true,
+          createdAt: true,
+        },
+      }),
     ]);
 
     return {

@@ -31,7 +31,7 @@ const tierSelect = {
 async function loadProduct(storeId: string, productId: string) {
   const product = await prisma.product.findFirst({
     where: { id: productId, storeId, deletedAt: null },
-    select: { id: true, price: true, costPrice: true },
+    select: { id: true, price: true, costPrice: true, moq: true },
   });
   if (!product) throw new AppError(404, 'NOT_FOUND', 'Product not found');
   return product;
@@ -55,7 +55,7 @@ async function validate(
   storeId: string,
   productId: string,
   tier: TierInput,
-  product: { price: number; costPrice: number | null }
+  product: { price: number; costPrice: number | null; moq?: number | null }
 ) {
   let variantPrice: number | null = null;
   let variantCost: number | null = null;
@@ -85,6 +85,7 @@ async function validate(
     productPriceMinor: product.price,
     variantPriceMinor: variantPrice,
     costPriceMinor: tier.variantId ? (variantCost ?? product.costPrice) : product.costPrice,
+    moq: product.moq,
   });
   const first = result.errors[0];
   if (first) {

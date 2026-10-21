@@ -68,6 +68,8 @@ export interface DahabProductDetailProps {
   quantity: number;
   setQuantity: (q: number) => void;
   maxQuantity: number;
+  /** B2B minimum order quantity (1 for retail products). */
+  minQuantity?: number;
   stockText?: string | null;
   onAddToCart: () => void;
   isAdding: boolean;
@@ -435,7 +437,7 @@ export function DahabProductDetail(p: DahabProductDetailProps) {
               <div className="flex items-center rounded-[var(--radius)] border border-border">
                 <button
                   type="button"
-                  onClick={() => p.setQuantity(Math.max(1, p.quantity - 1))}
+                  onClick={() => p.setQuantity(Math.max(p.minQuantity ?? 1, p.quantity - 1))}
                   aria-label={t('Decrease quantity', 'تقليل الكمية')}
                   className="flex h-12 w-11 items-center justify-center text-foreground/80 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 >
