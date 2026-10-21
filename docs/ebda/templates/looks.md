@@ -13,13 +13,13 @@ Looks are **data**, not code: they live in `@ebda/shared` (`packages/shared/src/
 
 ## The 15 looks
 
-All 15 are `status: 'designed'` today. The three Qamar looks render on the `qamar` skin (Phase B1, Ruling B1-1); the other twelve still render on `skin: 'minimal'`. The showroom lists and previews only `built` looks, so nothing is visible there until Phase B flips them after Ahmad's review.
+3 of the 15 are `status: 'built'` (the Qamar looks, flipped in Phase B1 Task 10 after Ahmad's STOP 2 approval, 2026-10-21); the other 12 are `designed`. The Qamar looks render on the `qamar` skin (Ruling B1-1); the twelve others still render on `skin: 'minimal'`. The showroom lists and previews only `built` looks, so today it offers exactly the three Qamar looks. The admin `LookPicker` shows all 15 and, with no look chosen, opens on the first template that has a built look (Qamar; Ruling B1-19).
 
 | Id                   | Template | Name (ar)    | Name (en)        | Status   |
 | -------------------- | -------- | ------------ | ---------------- | -------- |
-| `qamar.atelier`      | qamar    | أتيليه       | Atelier          | designed |
-| `qamar.lookbook`     | qamar    | لوك بوك      | Lookbook         | designed |
-| `qamar.vitrine`      | qamar    | فاترينة      | Vitrine          | designed |
+| `qamar.atelier`      | qamar    | أتيليه       | Atelier          | built    |
+| `qamar.lookbook`     | qamar    | لوك بوك      | Lookbook         | built    |
+| `qamar.vitrine`      | qamar    | فاترينة      | Vitrine          | built    |
 | `souq.catalogue`     | souq     | كتالوج       | Catalogue        | designed |
 | `souq.night`         | souq     | سوق الليل    | Night souq       | designed |
 | `souq.showroom`      | souq     | شو روم       | Showroom         | designed |
@@ -124,7 +124,9 @@ Full flow and caching in `docs/ebda/templates/demo-store.md`; the contract:
 1. **Registry entry.** Add or edit the `LookDefinition` in `packages/shared/src/looks/registry.ts` (id `<template>.<name>`, matching `^(qamar|souq|jasmine|lamma|dahab)\.[a-z]+$` and the `stores_look_format` CHECK; bilingual `name`/`forWhom`/`idea`; tokens as hex; `skin`; `status: 'designed'`). Fonts must be in `LOOK_FONT_SPECS` (`fonts.ts`) so `lookFontsHref` can load them.
 2. **Contrast test.** `tests/unit/looks-contrast.test.ts` runs over every registry entry: every text pair >= 4.5:1, nothing under 12px, no cream/sand page background. `looks-registry.test.ts` checks completeness (ar + en strings, A/B/C unique per template) and that `Object.keys(lookTheme(l))` equals `LOOK_TOKEN_KEYS` plus the UI tokens the look declares (`looks-compose.test.ts`). Run `npx vitest run tests/unit/looks-*.test.ts`.
 3. **Thumbnail.** `node apps/admin/scripts/look-thumbs.mjs [lookId ...]` renders `apps/admin/public/looks/<lookId>.webp` for the admin `LookPicker` from the marketing fragments (needs macOS Chrome, `sips`, `cwebp`).
-4. **Status `built`.** Flip `status` to `'built'` only after Ahmad has reviewed the look in a browser and its skin/sections ship. That is what makes the showroom list and preview it.
+4. **Status `built`.** Flip `status` to `'built'` only after Ahmad has reviewed the look in a browser and its skin/sections ship, AND the look carries a `sections` mix and a `chrome` block (`tests/unit/looks-built-qamar.test.ts` fails a built look without them, or whose `skin` is not its own template), AND an independent audit has cleared `quality-bar.md` § 10. That is what makes the showroom list and preview it.
 5. **Docs.** Update the table above in the same change.
+
+The Qamar looks' design record (tokens, section mixes, what was left out) is `docs/ebda/templates/qamar.md`.
 
 Do not add a look to a `Record<TemplateId, ...>` map; the four new template ids join `TemplateId` in Phase B with their skins (Ruling LOOKS-5).
