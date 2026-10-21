@@ -21,6 +21,8 @@ const h = vi.hoisted(() => {
       configs: [] as Row[],
       stores: [] as Row[],
       subs: [] as Row[],
+      cartItems: [] as Row[],
+      cartBundles: [] as Row[],
     },
     send: vi.fn(async (_p?: unknown) => ({ ids: ['evt'] })),
     sendMarketingEmail: vi.fn(async (..._a: unknown[]) => ({ id: 'msg_1' })),
@@ -38,6 +40,7 @@ function table(rows: () => Row[]) {
     return o;
   };
   return {
+    count: async ({ where }: { where?: Row } = {}) => rows().filter(r => matches(r, where)).length,
     findMany: async ({ where, select }: { where?: Row; select?: Row } = {}) =>
       rows()
         .filter(r => matches(r, where))
@@ -64,6 +67,8 @@ vi.mock('@ebda/database', () => {
     abandonedCartConfig: table(() => h.db.configs),
     store: table(() => h.db.stores),
     newsletterSubscriber: table(() => h.db.subs),
+    cartItem: table(() => h.db.cartItems),
+    cartBundle: table(() => h.db.cartBundles),
   };
   return {
     prisma,
@@ -178,6 +183,8 @@ beforeEach(() => {
   db.configs.length = 0;
   db.stores.length = 0;
   db.subs.length = 0;
+  db.cartItems.length = 0;
+  db.cartBundles.length = 0;
   db.stores.push(store());
   h.send.mockReset().mockResolvedValue({ ids: ['evt'] });
   h.sendMarketingEmail.mockReset().mockResolvedValue({ id: 'msg_1' });
@@ -279,6 +286,7 @@ describe('deliverCartRecoveryEmail', () => {
     db.configs.push(config());
     const c = cart({ emailStatus: 'queued', ...extra });
     db.carts.push(c);
+    db.cartItems.push({ id: uuid(), cartId: c.cartId });
     return c;
   }
 
@@ -361,6 +369,27 @@ describe('deliverCartRecoveryEmail', () => {
     const r = await deliverCartRecoveryEmail(STORE_A, c.id);
     expect(r.outcome).toBe('skipped');
     expect(c.emailDetail).toBe('recovered');
+    expect(h.sendMarketingEmail).not.toHaveBeenCalled();
+  });
+
+  it('re-reads the cart AFTER the slot wait: an order placed during the wait stops the send', async () => {
+    const c = queued();
+    db.subs.push(sub('sara@example.com'));
+    h.awaitSlot.mockImplementationOnce(async () => {
+      c.status = 'recovered'; // the order transaction commits while we wait for a send slot
+      return true;
+    });
+    const r = await deliverCartRecoveryEmail(STORE_A, c.id);
+    expect(r).toEqual({ outcome: 'skipped', detail: 'recovered' });
+    expect(h.sendMarketingEmail).not.toHaveBeenCalled();
+    expect(c.emailStatus).toBe('skipped');
+  });
+
+  it('a cart the shopper emptied before the send is skipped', async () => {
+    const c = queued();
+    db.subs.push(sub('sara@example.com'));
+    db.cartItems.length = 0;
+    expect((await deliverCartRecoveryEmail(STORE_A, c.id)).detail).toBe('cart_empty');
     expect(h.sendMarketingEmail).not.toHaveBeenCalled();
   });
 

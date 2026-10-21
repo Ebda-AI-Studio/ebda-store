@@ -227,6 +227,7 @@ export async function deliverCartRecoveryEmail(
       where: { id: abandonedCartId, storeId },
       select: {
         id: true,
+        cartId: true,
         status: true,
         emailStatus: true,
         customerEmail: true,
@@ -300,6 +301,23 @@ export async function deliverCartRecoveryEmail(
   if (!(await awaitCampaignSendSlot(30_000))) {
     throw new Error('no platform send slot free; retrying');
   }
+  // Stop-on-convert (Ruling CART-EMAIL-3): the slot wait above can take up to 30 s, so re-read the
+  // cart's state in the last moment before Resend. An order placed meanwhile, or a cart the
+  // shopper emptied, must not get the reminder.
+  const fresh = await runInTenantContext(storeId, async () => {
+    const [row, items, bundles] = await Promise.all([
+      prisma.abandonedCart.findFirst({
+        where: { id: ac.id, storeId },
+        select: { status: true, recoveredAt: true, emailStatus: true },
+      }),
+      prisma.cartItem.count({ where: { cartId: ac.cartId } }),
+      prisma.cartBundle.count({ where: { cartId: ac.cartId } }),
+    ]);
+    return { row, hasItems: items + bundles > 0 };
+  });
+  if (!fresh.row || fresh.row.emailStatus !== 'queued') return { outcome: 'noop' };
+  if (fresh.row.status === 'recovered' || fresh.row.recoveredAt) return skip('recovered');
+  if (!fresh.hasItems) return skip('cart_empty');
   try {
     await ResendService.sendMarketingEmail(store, {
       to: email,
