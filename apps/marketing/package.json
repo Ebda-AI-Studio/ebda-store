@@ -19,6 +19,7 @@
     "check": "npm run build && npm run check:a11y",
     "clean": "rm -rf .next out node_modules",
     "qr": "tsx scripts/3d/make-qr.ts",
+    "llms-full": "tsx scripts/make-llms-full.ts",
     "stills": "node scripts/3d/make-stills.mjs"
   },
   "dependencies": {

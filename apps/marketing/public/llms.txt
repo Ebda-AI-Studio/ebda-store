@@ -1,10 +1,15 @@
 # Ebda Store (ابدأ ستور)
 
+Ebda Store — ابدأ ستور, by Ebda AI Studio (ebda.app). Not to be confused with any other site named Ebda: this is the Egyptian store builder at https://ebda.app, made by Ebda AI Studio.
+
 > Ebda Store, from Ebda AI Studio — Your doorway to business. A self-serve online store builder for sellers in Egypt; a product of Ebda AI Studio (ابدأ استوديو للذكاء الاصطناعي). Arabic-first (RTL) with English. Merchants sign up, build and run their own store; every store gets a free <slug>.ebda.app address and can attach a custom domain.
 
 Pricing (EGP per month): Basic 1,490, Growth 3,490, Business 9,990; yearly billing saves 25%; 14-day free Growth trial; 0% commission on orders on every plan. Full plan comparison (orders, team, stores, winning back abandoned carts, removing the Ebda Store badge, running the store from an AI assistant, 3D product models, analytics, support) is on the home page.
 
 ## Pages
+- [Features (Arabic)](https://ebda.app/features/) ([English](https://ebda.app/en/features/)): every capability Ebda Store has today, with the plans that include it, and a FAQ
+- [Ebda Store vs Salla](https://ebda.app/en/compare/salla/) ([Arabic](https://ebda.app/compare/salla/)), [vs Zid](https://ebda.app/en/compare/zid/) ([Arabic](https://ebda.app/compare/zid/)), [vs Shopify](https://ebda.app/en/compare/shopify/) ([Arabic](https://ebda.app/compare/shopify/)): balanced comparisons for a seller in Egypt, including what Ebda Store does not have yet (as of October 2026)
+- [Full capability list for AI assistants](https://ebda.app/llms-full.txt)
 - [Home (Arabic, Egyptian colloquial)](https://ebda.app/): how it works in four steps, five templates with three looks each as working phone previews (open a product, add to cart), features, payments and shipping, pricing and plan comparison, FAQ
 - [Home (English)](https://ebda.app/en/): the same in English
 - [About Ebda AI Studio](https://ebda.app/about/) ([English](https://ebda.app/en/about/)): the company behind Ebda Store, the Ebda AI Studio story, contact
@@ -14,11 +19,30 @@ Pricing (EGP per month): Basic 1,490, Growth 3,490, Business 9,990; yearly billi
 - [Merchant agreement](https://ebda.app/merchant-agreement/)
 - [Acceptable use](https://ebda.app/acceptable-use/)
 
+## Capabilities (what exists today)
+- Page builder with five templates and three looks each: change colours, photos and section order, no developer needed.
+- Free yourname.ebda.app address on every store, and a custom domain on every plan.
+- AI tools (paid plans, monthly usage allowance): product descriptions, Arabic/English translation, search words, categories, tags, image alt text, SEO titles and descriptions, FAQs.
+- Search that understands Egyptian Arabic and Franco-Arabic: Arabic letter variants are unified, and AI adds dialect, Franco and English search words to each product.
+- SEO and AI-answer visibility: redirects for old links, structured FAQs, a store llms.txt, a product feed for AI agents, and tracking of whether ChatGPT, Gemini and Perplexity mention the store.
+- Run the store from an AI assistant over MCP (Growth and Business).
+- Abandoned-cart recovery in steps by notification, or SMS with the shopper's consent (Growth and Business). No cart reminder by email yet.
+- Automatic order emails: confirmation, shipping, refunds, payment status, review request.
+- Loyalty points, tiers and referral rewards (Growth and Business); affiliate programme with commission (Business).
+- Customer reviews, moderated by the merchant.
+- Analytics and search insights (detail grows with the plan).
+- Multiple warehouses, purchase orders and barcode scanning (Business).
+- Coupons and promotions, returns, team accounts, bulk CSV/Excel import, server-side Meta and TikTok conversion tracking, 3D/AR product models on every plan.
+- 0% commission on orders on every plan.
+
+## Not there yet (stated plainly)
+No app marketplace, no custom code editor, no wholesale (B2B) price lists, no point of sale, no multi-currency store (EGP only). Marketing email campaigns are built but are not part of the plans yet; they are switched on store by store. Ebda Store is a newer platform than Salla, Zid or Shopify, with fewer integrations.
+
 ## Facts
 - Store design: five templates (Qamar fashion, Souq retail, Jasmine beauty, Lamma home food, Dahab jewellery), three looks each, edited in a visual page builder (colours, photos, sections). Previews on the home page are illustrative.
 - 3D: merchants upload a .glb; shoppers turn it, switch glTF colour variants and place it in their room with AR (Android Scene Viewer, iOS Quick Look). Included on every plan.
 - Payments: cash on delivery, InstaPay, and card/wallet payments through Paymob, Kashier and FawryPay.
 - Shipping: Bosta, ShipBlu, Mylerz and Aramex, or the merchant's own delivery.
-- Also: AI product descriptions and Arabic/English translation, VAT for registered merchants, a dashboard installable on the phone with order notifications, analytics, wa.me WhatsApp order buttons.
+- Also: VAT for registered merchants, a dashboard installable on the phone with order notifications, analytics, wa.me WhatsApp order buttons.
 - Sign up: https://store.ebda.app/signup
 - Contact: ahlan@ebda.app, WhatsApp +20 120 776 1882 (https://wa.me/201207761882); security reports: security@ebda.app
