@@ -1,6 +1,6 @@
 'use client';
 
-import { resolveColor, pickReadableForeground } from '@ebda/shared';
+import { resolveColor, pickReadableForeground, DEFAULT_THEME } from '@ebda/shared';
 import { useT } from '@/i18n/useT';
 import type {
   StoreTheme,
@@ -85,7 +85,7 @@ function resolveDividerColor(
     case 'foreground':
       return `${autoFg}4D`; // ~30% alpha matching bg-foreground/30
     case 'accent':
-      return theme.primaryColor ? `hsl(${theme.primaryColor})` : '#FF6E00';
+      return `hsl(${theme.primaryColor || DEFAULT_THEME.primaryColor})`;
     case 'custom':
       return settings.customColor || 'rgba(0,0,0,0.20)';
     case 'auto':

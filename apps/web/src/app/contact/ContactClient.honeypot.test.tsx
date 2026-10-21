@@ -78,7 +78,7 @@ describe('storefront contact form (FU46-1)', () => {
       company_site: '',
     });
     await waitFor(() =>
-      expect(toast.success).toHaveBeenCalledWith('تم إرسال رسالتك', expect.any(String))
+      expect(toast.success).toHaveBeenCalledWith('رسالتك اتبعتت', expect.any(String))
     );
   });
 });

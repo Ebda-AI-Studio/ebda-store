@@ -22,7 +22,7 @@ describe('order-cancelled email — not charged', () => {
   });
   it('ar', () => {
     const html = flat(t.ar(d));
-    expect(html).toContain('تم إلغاء طلبك رقم <strong>ORD-1</strong>. لم يتم خصم أي مبلغ منك.');
+    expect(html).toContain('طلبك رقم <strong>ORD-1</strong> اتلغى. مخدناش منك أي مبلغ.');
     expect(html).not.toContain('استرداد');
   });
 });
@@ -38,7 +38,7 @@ describe('order-cancelled email — captured, refund pending', () => {
   });
   it('ar', () => {
     const html = flat(t.ar(d));
-    expect(html).toContain('تم إلغاء طلبك رقم <strong>ORD-1</strong>. جارٍ معالجة استرداد المبلغ.');
-    expect(html).not.toContain('لم يتم خصم');
+    expect(html).toContain('طلبك رقم <strong>ORD-1</strong> اتلغى. بنرجّعلك المبلغ دلوقتي.');
+    expect(html).not.toContain('مخدناش منك');
   });
 });

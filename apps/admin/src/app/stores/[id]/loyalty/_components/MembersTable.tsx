@@ -129,7 +129,7 @@ export function MembersTable({
             onClick={() => onTierFilterChange(tier)}
             className={`px-4 py-2 min-h-9 rounded-lg text-sm font-medium transition-colors ${
               tierFilter === tier
-                ? 'bg-primary text-white'
+                ? 'bg-primary text-primary-foreground'
                 : 'bg-card text-foreground hover:bg-muted border border-border'
             }`}
           >

@@ -42,6 +42,7 @@ import {
   STRICT_R2_TABLES,
   type R2ReferenceDb,
   type R2ReferenceRunner,
+  isDerivedR2Key,
 } from '../apps/api/src/lib/r2-references';
 
 interface R2Object {
@@ -238,6 +239,8 @@ export function classifyOrphans(
   for (const obj of objects) {
     totalBytes += obj.size;
     if (referenced.has(obj.key)) continue;
+    // Derived objects (email barcode PNGs) have no DB column: never orphans; the weekly sweep expires them by age.
+    if (isDerivedR2Key(obj.key)) continue;
 
     const ageMs = obj.lastModified ? now - obj.lastModified.getTime() : Infinity;
     if (ageMs < minAgeMs) {

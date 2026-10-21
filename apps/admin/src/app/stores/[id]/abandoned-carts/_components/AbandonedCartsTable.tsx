@@ -48,6 +48,7 @@ export function AbandonedCartsTable({
   const t = useT('abandonedCarts.list');
   const tStatus = useT('abandonedCarts.status');
   const tMajor = useT('abandonedCarts.stats');
+  const tEmail = useT('abandonedCarts.emailStatus');
 
   const columns: DataTableColumn<AbandonedCartRecord>[] = [
     {
@@ -76,6 +77,17 @@ export function AbandonedCartsTable({
           namespace="abandonedCarts.status"
           colorMap={ABANDONED_CART_COLORS}
         />
+      ),
+    },
+    {
+      header: t('columns.email'),
+      cell: record => (
+        <span
+          className="text-sm text-muted-foreground whitespace-nowrap"
+          title={record.emailDetail ?? undefined}
+        >
+          {tEmail(record.emailStatus ?? 'none')}
+        </span>
       ),
     },
     {

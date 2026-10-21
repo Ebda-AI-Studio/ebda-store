@@ -82,7 +82,7 @@ export default function ErrorClient() {
             <div className="rounded-xl border bg-card p-8 shadow-sm">
               <div className="mx-auto h-10 w-10 animate-spin rounded-full border-2 border-muted border-t-primary" />
               <p className="mt-6 text-muted-foreground">
-                {t('Confirming your payment…', 'جارٍ تأكيد الدفع…')}
+                {t('Confirming your payment…', 'بنأكد الدفع…')}
               </p>
             </div>
           </div>
@@ -113,15 +113,12 @@ export default function ErrorClient() {
             </div>
 
             <h1 className="mt-6 text-2xl font-bold text-foreground">
-              {t(
-                'Payment could not be processed',
-                '\u062a\u0639\u0630\u0631\u062a \u0645\u0639\u0627\u0644\u062c\u0629 \u0627\u0644\u062f\u0641\u0639'
-              )}
+              {t('Payment could not be processed', 'تعذرت معالجة الدفع')}
             </h1>
             <p className="mt-2 text-muted-foreground">
               {t(
                 'Something went wrong during checkout. Please try again or contact support if the problem persists.',
-                '\u062d\u062f\u062b \u062e\u0637\u0623 \u0623\u062b\u0646\u0627\u0621 \u0627\u0644\u062f\u0641\u0639. \u064a\u0631\u062c\u0649 \u0627\u0644\u0645\u062d\u0627\u0648\u0644\u0629 \u0645\u0631\u0629 \u0623\u062e\u0631\u0649 \u0623\u0648 \u0627\u0644\u062a\u0648\u0627\u0635\u0644 \u0645\u0639 \u0627\u0644\u062f\u0639\u0645 \u0625\u0630\u0627 \u0627\u0633\u062a\u0645\u0631\u062a \u0627\u0644\u0645\u0634\u0643\u0644\u0629.'
+                'حصل خطأ في الدفع. جرّب تاني أو كلّم الدعم لو المشكلة فضلت.'
               )}
             </p>
 
@@ -134,18 +131,12 @@ export default function ErrorClient() {
                 onClick={handleRetryPayment}
                 isLoading={isRetrying}
               >
-                {t(
-                  'Retry Payment',
-                  '\u0625\u0639\u0627\u062f\u0629 \u0645\u062d\u0627\u0648\u0644\u0629 \u0627\u0644\u062f\u0641\u0639'
-                )}
+                {t('Retry Payment', 'إعادة محاولة الدفع')}
               </Button>
 
               <Link href={storeUrl('/cart')}>
                 <Button className="w-full" size="lg" variant="outline">
-                  {t(
-                    'Return to Cart',
-                    '\u0627\u0644\u0639\u0648\u062f\u0629 \u0625\u0644\u0649 \u0627\u0644\u0633\u0644\u0629'
-                  )}
+                  {t('Return to Cart', 'العودة إلى السلة')}
                 </Button>
               </Link>
             </div>

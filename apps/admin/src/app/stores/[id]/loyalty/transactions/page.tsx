@@ -286,7 +286,7 @@ export default function LoyaltyTransactionsPage() {
             />
             <button
               type="submit"
-              className="rounded-lg bg-primary px-3 py-2 text-sm font-medium text-white hover:bg-primary/90 transition-colors"
+              className="rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
             >
               {t('searchButton')}
             </button>

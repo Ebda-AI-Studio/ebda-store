@@ -22,7 +22,7 @@ export interface OrderCancelledEmailData {
 export const orderCancelledNotChargedTemplate = {
   subject: {
     en: (d: OrderCancelledEmailData) => `Order #${d.orderNumber} cancelled`,
-    ar: (d: OrderCancelledEmailData) => `تم إلغاء الطلب رقم ${d.orderNumber}`,
+    ar: (d: OrderCancelledEmailData) => `طلبك رقم ${d.orderNumber} اتلغى`,
   },
 
   en: (d: OrderCancelledEmailData) => `
@@ -36,12 +36,12 @@ export const orderCancelledNotChargedTemplate = {
   `,
 
   ar: (d: OrderCancelledEmailData) => `
-    <h2>تم إلغاء طلبك</h2>
-    <p>مرحباً ${escapeHtml(d.customerName)}،</p>
+    <h2>طلبك اتلغى</h2>
+    <p>أهلاً ${escapeHtml(d.customerName)}،</p>
     <p>
-      تم إلغاء طلبك رقم <strong>${escapeHtml(d.orderNumber)}</strong>.
-      ${d.charged ? 'جارٍ معالجة استرداد المبلغ.' : 'لم يتم خصم أي مبلغ منك.'}
+      طلبك رقم <strong>${escapeHtml(d.orderNumber)}</strong> اتلغى.
+      ${d.charged ? 'بنرجّعلك المبلغ دلوقتي.' : 'مخدناش منك أي مبلغ.'}
     </p>
-    <p style="margin-top: 1.5rem;">لأي استفسار، يكفي الرد على هذه الرسالة.</p>
+    <p style="margin-top: 1.5rem;">لو عندك أي سؤال، رُد على الرسالة دي.</p>
   `,
 };

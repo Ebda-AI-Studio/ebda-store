@@ -51,7 +51,7 @@ export default function DahabProductGrid({
         </div>
       ) : (
         <p className="py-16 text-center text-sm text-muted-foreground">
-          {t('No pieces to show yet.', 'لا توجد قطع للعرض حالياً.')}
+          {t('No pieces to show yet.', 'مفيش قطع للعرض دلوقتي.')}
         </p>
       )}
     </div>

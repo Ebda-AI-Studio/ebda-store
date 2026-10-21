@@ -117,7 +117,7 @@ export function ShareProductRow({ productName, url, className = '' }: ShareProdu
                   d="M5 13l4 4L19 7"
                 />
               </svg>
-              {isRtl ? 'تم النسخ' : 'Copied'}
+              {isRtl ? 'اتنسخ' : 'Copied'}
             </>
           ) : (
             <>

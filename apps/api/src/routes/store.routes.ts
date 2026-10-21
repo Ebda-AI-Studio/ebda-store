@@ -26,11 +26,9 @@ import {
   parseStoreHost,
   storeSlugSchema,
   storeSlugIssueCode,
-  LOOK_DENSITIES,
-  LOOK_IMAGE_RATIOS,
-  LOOK_MOTIONS,
   deliveryDaysSchema,
   deliveryOffDaysSchema,
+  receiptBarcodeShapeSchema,
   footerBottomBarSchema,
   normalizeStoredBottomBar,
 } from '@ebda/shared';
@@ -39,6 +37,7 @@ import {
   preserveMaskedPixelSecrets,
 } from '../lib/marketing-pixels-secrets';
 import { floatingWidgetLinkIssues } from '../lib/floating-widget-links';
+import { themeSchema } from '../lib/theme-schema';
 
 const router = Router();
 
@@ -104,6 +103,36 @@ function addDeliveryOffDaysIssues(
   }
 }
 
+/** `settings.receiptBarcodeShape`: plain | off | one of the approved shape ids; null clears. */
+function addReceiptBarcodeShapeIssues(
+  settings: Record<string, unknown> | undefined,
+  ctx: z.RefinementCtx
+) {
+  const v = settings?.receiptBarcodeShape;
+  if (v === undefined || v === null) return;
+  if (receiptBarcodeShapeSchema.safeParse(v).success) return;
+  ctx.addIssue({
+    code: z.ZodIssueCode.custom,
+    path: ['receiptBarcodeShape'],
+    message: 'Unknown receipt barcode shape',
+  });
+}
+
+/** `settings.packingSlipNote`: the optional footer text printed on packing slips (<= 300 chars; null/'' clears). */
+function addPackingSlipNoteIssues(
+  settings: Record<string, unknown> | undefined,
+  ctx: z.RefinementCtx
+) {
+  const v = settings?.packingSlipNote;
+  if (v === undefined || v === null) return;
+  if (typeof v === 'string' && v.length <= 300) return;
+  ctx.addIssue({
+    code: z.ZodIssueCode.custom,
+    path: ['packingSlipNote'],
+    message: 'Packing slip note must be text up to 300 characters',
+  });
+}
+
 /**
  * Everything the open `settings` blob must satisfy, on EVERY route that writes it (create AND
  * update — a check on update only leaves POST /stores as the bypass):
@@ -131,6 +160,8 @@ function addSettingsIssues(settings: Record<string, unknown> | undefined, ctx: z
   }
   addDeliveryDaysIssues(settings, ctx);
   addDeliveryOffDaysIssues(settings, ctx);
+  addReceiptBarcodeShapeIssues(settings, ctx);
+  addPackingSlipNoteIssues(settings, ctx);
   // The footer legal row's toggles + © override (S-01): typed, length-capped.
   const footerLinks = settings?.footerLinks;
   if (footerLinks && typeof footerLinks === 'object' && 'bottomBar' in footerLinks) {
@@ -220,55 +251,6 @@ export const updateStoreSchema = createStoreSchema.partial().extend({
 const lookBody = z
   .object({ lookId: z.string().max(40), design: z.enum(['keep', 'reset']).default('keep') })
   .strict();
-
-const themeSchema = z
-  .record(z.string(), z.unknown())
-  .refine(
-    data => {
-      // Validate known string fields have reasonable lengths
-      const stringFields = [
-        'primaryColor',
-        'secondaryColor',
-        'accentColor',
-        'backgroundColor',
-        'textColor',
-        'buttonStyle',
-      ];
-      for (const field of stringFields) {
-        if (field in data && typeof data[field] === 'string' && (data[field] as string).length > 50)
-          return false;
-      }
-      const longStringFields = ['fontFamily', 'headingFontFamily'];
-      for (const field of longStringFields) {
-        if (
-          field in data &&
-          typeof data[field] === 'string' &&
-          (data[field] as string).length > 100
-        )
-          return false;
-      }
-      return true;
-    },
-    { message: 'Theme field values exceed maximum length' }
-  )
-  .superRefine((data, ctx) => {
-    // Look-only keys feed CSS variables through fixed maps: only their known values (or null =
-    // delete the key) may be stored, so a bad value can never reach the storefront.
-    const allowed: Record<string, readonly string[]> = {
-      density: LOOK_DENSITIES,
-      imageRatio: LOOK_IMAGE_RATIOS,
-      motion: LOOK_MOTIONS,
-    };
-    for (const [key, values] of Object.entries(allowed)) {
-      if (!(key in data) || data[key] === null) continue;
-      if (typeof data[key] !== 'string' || !values.includes(data[key] as string))
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: [key],
-          message: `${key} must be one of ${values.join(', ')}`,
-        });
-    }
-  });
 
 // Helpers that coerce empty strings and nulls to undefined before validation
 const optionalStr = (maxLen: number) =>

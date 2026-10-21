@@ -49,6 +49,8 @@ export interface ThemeUpdates {
   /** Card-level toggles staged from the page-builder "Product Cards" section
    *  card (Ahmad 2026-05-20: moved from branding/ThemeTab). */
   showBrandBadge?: boolean;
+  /** Ruling D1016-NEW-1 — the card "New" badge, merchant's choice, default off. */
+  showNewBadge?: boolean;
   showQuickAdd?: boolean;
   /** #1998 — keep the legacy bottom-left sale-badge corner (Page Builder toggle). */
   saleBadgeLegacyCorner?: boolean;
@@ -542,7 +544,7 @@ export function SmartPaletteModal({
 
               // Build theme updates: only when the merchant entered a raw hex
               // (not a token ref). Convert hex → HSL triplet to match the
-              // format StoreTheme stores (e.g. '26 100% 50%').
+              // format StoreTheme stores (e.g. '36 36% 52%').
               //
               // When a concrete primary hex is available, derive ALL core brand
               // tokens so the Branding color editor fields get filled on apply.

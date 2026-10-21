@@ -194,7 +194,7 @@ export default function DahabHeader({
               value={query}
               onChange={e => setQuery(e.target.value)}
               autoFocus={searchOpen}
-              placeholder={t('Rings, chains, 21K gold…', 'خواتم، سلاسل، ذهب عيار 21…')}
+              placeholder={t('Rings, chains, 21K gold…', 'خواتم، سلاسل، دهب عيار 21…')}
               className="h-12 w-full border-0 border-b border-border bg-transparent ps-8 text-base text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none"
             />
             <SearchAutocomplete

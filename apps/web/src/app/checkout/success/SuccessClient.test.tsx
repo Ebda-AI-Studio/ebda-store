@@ -80,7 +80,7 @@ describe('SuccessClient hero vs receipt', () => {
     expect(screen.queryByTestId('success-hero-icon')).toBeNull();
     expect(screen.queryByTestId('success-cod-banner')).toBeNull();
     expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('شكراً لطلبك!');
-    expect(screen.getByText('تم تقديم طلبك. يرجى تجهيز المبلغ عند استلام الطلب.')).toBeTruthy();
+    expect(screen.getByText('طلبك اتسجل. جهّز المبلغ لما الطلب يوصلك.')).toBeTruthy();
   });
 
   it('while the order loads the printer is up and the hero stays hidden', () => {
@@ -97,6 +97,6 @@ describe('SuccessClient hero vs receipt', () => {
     await waitFor(() => expect(screen.getByTestId('success-hero-icon')).toBeTruthy());
     expect(screen.queryByTestId('receipt')).toBeNull();
     expect(screen.getByTestId('success-cod-banner')).toBeTruthy();
-    expect(screen.getByText('تم استلام طلبك. يمكنك متابعة حالته في أي وقت من حسابك.')).toBeTruthy();
+    expect(screen.getByText('طلبك وصلنا. تقدر تتابع حالته في أي وقت من حسابك.')).toBeTruthy();
   });
 });

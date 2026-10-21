@@ -28,6 +28,7 @@ import {
   normalizePhoneForStorage,
   activePersonalisation,
   REGION,
+  orderNumberFromScanCode,
 } from '@ebda/shared';
 import { FiscalDocumentService } from './fiscal-document.service';
 import { recordPaymentEvent } from './payment-event.service';
@@ -255,11 +256,25 @@ const GUEST_CONTACT_FIELDS = ['firstName', 'lastName', 'email', 'phone'] as cons
  * or guest orders degrades ONLY that half to its relation/JSON arm; the other
  * half keeps its indexed `IN (...)` arm (issue 2444).
  */
+/**
+ * What a barcode scanner types: the 18 digits of `scanCodeFor('ORD-xxxxxx-xxxxx')`
+ * (Ruling BARCODE-4). Returns the real order number, or null for anything that is
+ * not a scan code (typed searches, phones, `EBD-` payment numbers).
+ */
+export function orderNumberFromScan(input: string): string | null {
+  const n = orderNumberFromScanCode(input.trim());
+  return n.startsWith('ORD-') ? n : null;
+}
+
 export async function orderSearchWhere(
   storeId: string,
   search: string,
   opts: { indexed?: boolean } = {}
 ): Promise<Prisma.OrderWhereInput[]> {
+  // A scanned receipt/slip/email barcode opens that order: one exact arm, no customer fan-out.
+  // Still store-scoped: callers AND this with their own `storeId`.
+  const scanned = orderNumberFromScan(search);
+  if (scanned) return [{ orderNumber: scanned }];
   const contains = { contains: search, mode: 'insensitive' as const };
   const customerMatch: Prisma.UserWhereInput[] = [
     { firstName: contains },
@@ -510,7 +525,9 @@ export class OrderService {
     return result;
   }
 
-  static async getByOrderNumber(storeId: string, orderNumber: string) {
+  static async getByOrderNumber(storeId: string, orderNumberOrScan: string) {
+    // Accepts the typed number or the scanned barcode digits (Ruling BARCODE-4).
+    const orderNumber = orderNumberFromScan(orderNumberOrScan) ?? orderNumberOrScan;
     const order = await prisma.order.findFirst({
       where: { orderNumber, storeId, deletedAt: null },
       include: {
@@ -698,7 +715,7 @@ export class OrderService {
     if (sizelessLines.length > 0) {
       const first = sizelessLines[0];
       const messageEn = `Please choose a size for “${first.name}” before checking out`;
-      const messageAr = `يرجى اختيار المقاس لـ «${first.nameAr || first.name}» قبل إتمام الطلب`;
+      const messageAr = `اختار المقاس لـ «${first.nameAr || first.name}» قبل ما تكمل الطلب`;
       throw new AppError(400, 'VARIANT_REQUIRED', messageEn, {
         messageEn,
         messageAr,
