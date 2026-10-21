@@ -27,21 +27,19 @@
   "ecosystem.config.js",
   "graphify-out/graph.json",
   "loadtests/push-metrics.sh",
+  "packages/shared/src/auth/jwt-claims.ts",
   "scripts/buy-flow-parity/run.mjs",
   "tests/unit/ai-routes-no-request-transaction.test.ts",
   "tests/unit/cart.test.ts",
   "tests/unit/db-retry.test.ts",
   "tests/unit/error-status-parity.test.ts",
   "tests/unit/feature-service-transient-db.test.ts",
+  "tests/unit/jwt-claims-compat.test.ts",
   "tests/unit/transient-read-retry.test.ts",
   "tests/unit/zod-edge-routes.test.ts",
   "tests/unit/zod-validation-http-no-sentry.test.ts"
  ],
  "hintCookie": [
-  "apps/admin/src/lib/api.ts",
-  "apps/admin/src/lib/auth.tsx",
-  "apps/admin/src/middleware.ts",
-  "apps/orders/src/lib/api.ts",
   "docs/RULINGS.md",
   "graphify-out/graph.json"
  ],

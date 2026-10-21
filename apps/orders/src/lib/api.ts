@@ -13,6 +13,8 @@
  * and storefront use. No new endpoints are introduced by this app.
  */
 
+import { hasSessionHintCookie, sessionHintCookieClears } from '@ebda/shared';
+
 export interface ApiResponse<T = unknown> {
   success: boolean;
   data?: T;
@@ -116,7 +118,7 @@ export function clearStoredSession(): void {
   localStorage.removeItem(SESSION_MARKER_KEY);
   localStorage.removeItem('csrfToken');
   if (typeof document !== 'undefined') {
-    document.cookie = 'force-session=; path=/; max-age=0';
+    for (const c of sessionHintCookieClears()) document.cookie = c;
   }
 }
 
@@ -424,7 +426,7 @@ export function readStoredRefreshToken(ios: boolean): string | null {
  * 8 × /auth/refresh. Same gate as apps/web (`hasSessionEvidence`).
  *
  * Evidence: the marker written on every authenticated answer, a stored token
- * (iOS mirrors them), or the admin's `force-session=1` hint cookie.
+ * (iOS mirrors them), or the admin's `ebda-session=1` hint cookie.
  */
 const SESSION_MARKER_KEY = 'hadSession';
 
@@ -443,9 +445,7 @@ export function hasSessionEvidence(): boolean {
   ) {
     return true;
   }
-  return (
-    typeof document !== 'undefined' && /(?:^|;\s*)force-session=1(?:;|$)/.test(document.cookie)
-  );
+  return typeof document !== 'undefined' && hasSessionHintCookie(document.cookie);
 }
 
 /**
