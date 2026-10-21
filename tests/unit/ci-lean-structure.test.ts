@@ -96,7 +96,10 @@ describe('ci.yml triggers', () => {
     // Exactly one setup-node skips the cache: the `changes` job, which only
     // runs the dependency-free scripts/ci-affected.mjs and installs nothing.
     const uncached = steps.filter(
-      b => !/^[^\n]*\n\s+with:[\s\S]*?cache: \$\{\{ vars\.EBDA_RUNS_ON == '' && 'npm' \|\| '' \}\}/.test(b.split('\n\n')[0] + '\n')
+      b =>
+        !/^[^\n]*\n\s+with:[\s\S]*?cache: \$\{\{ vars\.EBDA_RUNS_ON == '' && 'npm' \|\| '' \}\}/.test(
+          b.split('\n\n')[0] + '\n'
+        )
     );
     expect(uncached).toHaveLength(1);
   });
