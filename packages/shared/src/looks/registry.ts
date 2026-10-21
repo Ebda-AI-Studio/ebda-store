@@ -15,7 +15,7 @@ export const LOOKS: readonly LookDefinition[] = [
     template: 'qamar',
     letter: 'A',
     skin: 'qamar',
-    status: 'designed',
+    status: 'built',
     chrome: { header: { logoPlacement: 'start' } },
     // Ruling B1-3. Category row as text chips, image break full-bleed (plan amendment C1).
     // The carousel preset is `newest`, never a demo category slug (C7).
@@ -84,7 +84,7 @@ export const LOOKS: readonly LookDefinition[] = [
     template: 'qamar',
     letter: 'B',
     skin: 'qamar',
-    status: 'designed',
+    status: 'built',
     chrome: { header: { logoPlacement: 'start' } },
     // Ruling B1-3 / B1-2: the collage hero and shop-the-look lead; categories scroll as a photo
     // row. No hero `mode` (slideshow vs single is the merchant's content): a collage needs three
@@ -151,7 +151,7 @@ export const LOOKS: readonly LookDefinition[] = [
     template: 'qamar',
     letter: 'C',
     skin: 'qamar',
-    status: 'designed',
+    status: 'built',
     chrome: { header: { logoPlacement: 'centre' } },
     // Occasion first (Ruling B1-2/B1-5): a framed hero whose hairline draws in once, occasion
     // bands, the window of new pieces, one customer line. No hero `mode` (plan amendment C6): the

@@ -37,7 +37,7 @@ beforeAll(() => {
 });
 
 import { DemoLookBar, DEMO_BAR_SELECT_CLASS } from './DemoLookBar';
-import { LOOKS } from '@ebda/shared';
+import { LOOKS, getLook } from '@ebda/shared';
 import { DemoCheckoutNotice } from './DemoCheckoutNotice';
 
 afterEach(() => {
@@ -72,6 +72,18 @@ describe('DemoLookBar: template, then look', () => {
       'qamar.vitrine',
     ]);
     expect(lookSelect(container).value).toBe('qamar.lookbook');
+  });
+
+  it('with the real registry it lists exactly the three Qamar looks', () => {
+    const { container } = render(
+      <DemoLookBar activeLook="qamar.atelier" isBuilt={id => getLook(id)?.status === 'built'} />
+    );
+    expect(values(templateSelect(container))).toEqual(['qamar']);
+    expect(values(lookSelect(container))).toEqual([
+      'qamar.atelier',
+      'qamar.lookbook',
+      'qamar.vitrine',
+    ]);
   });
 
   it('with only the Qamar looks built, Qamar is the one template listed', () => {
