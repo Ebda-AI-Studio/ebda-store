@@ -4,6 +4,7 @@ import { randomUUID } from 'node:crypto';
 import path from 'path';
 import { config } from '../config';
 import { AppError } from '../middleware/error-handler';
+import { isBarcodeObjectKey } from '../lib/barcode-png/key';
 
 // ==========================================
 // Storage Service
@@ -185,6 +186,29 @@ export class StorageService {
       size: buffer.length,
       contentType: mimeType,
     };
+  }
+
+  /**
+   * Write a DERIVED object (one the API renders itself, e.g. the email barcode
+   * PNG) at a caller-computed deterministic key. Only keys of the exact shape
+   * `stores/<storeId>/barcodes/<32 hex>.png` are accepted; it has no DB column,
+   * so it is registered as derived in lib/r2-references.ts (never an orphan,
+   * expires by age).
+   */
+  static async putDerived(key: string, body: Uint8Array, contentType: string): Promise<void> {
+    if (!isBarcodeObjectKey(key)) {
+      throw new AppError(400, 'INVALID_DERIVED_KEY', 'Not a derived object key');
+    }
+    const client = await this.getClient();
+    await client.send(
+      new (await loadS3()).PutObjectCommand({
+        Bucket: config.storageBucket,
+        Key: key,
+        Body: body,
+        ContentType: contentType,
+        CacheControl: 'public, max-age=31536000, immutable',
+      })
+    );
   }
 
   /**
