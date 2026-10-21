@@ -456,6 +456,10 @@ export function GovernorateAreaSelect({
   const govPlaceholder = locale === 'ar' ? 'المحافظة' : 'Governorate';
   const areaPlaceholder = locale === 'ar' ? 'المنطقة' : 'Area';
 
+  // STOP-2 P2-3: the Area field is disabled until a governorate is chosen; an error the shopper
+  // cannot act on yet is noise, so it waits.
+  const shownAreaError = governorate ? areaError : undefined;
+
   return (
     <div className="space-y-4">
       {/* Country selector — only rendered for multi-country stores */}
@@ -494,7 +498,7 @@ export function GovernorateAreaSelect({
           )}
         </div>
 
-        <div data-error={!!areaError}>
+        <div data-error={!!shownAreaError}>
           <Combobox
             id={areaId}
             label={areaLabel}
@@ -502,14 +506,14 @@ export function GovernorateAreaSelect({
             value={area}
             options={areaOptions}
             disabled={!governorate}
-            hasError={!!areaError}
+            hasError={!!shownAreaError}
             onSelect={handleAreaSelect}
             onClear={handleAreaCleared}
             clearLabel={clearLabel}
           />
-          {areaError && (
+          {shownAreaError && (
             <p id={`${areaId}-error`} className="mt-1 text-sm text-destructive-ink">
-              {areaError}
+              {shownAreaError}
             </p>
           )}
         </div>

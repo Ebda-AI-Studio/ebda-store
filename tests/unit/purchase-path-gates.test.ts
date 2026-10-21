@@ -298,4 +298,17 @@ describe('(P2) STOP-2 cart and checkout copy and states', () => {
     expect(c).not.toContain('سلة التسوق فارغة');
     expect(c).not.toContain('يبدو أنك لم تضف');
   });
+  it('the Area field shows no error while it is still disabled (no governorate yet)', () => {
+    const g = src('app/checkout/_components/GovernorateAreaSelect.tsx');
+    expect(g).toMatch(/const shownAreaError = governorate \? areaError : undefined;/);
+    expect(g).not.toMatch(/hasError=\{!!areaError\}/);
+    expect(g).not.toMatch(/\{areaError &&/);
+  });
+  it('the fixed country is plain text, not an input-shaped box', () => {
+    const c = src('app/checkout/CheckoutClient.tsx');
+    const i = c.indexOf('{isSingleCountryStore && (');
+    const block = c.slice(i, c.indexOf(')}', i));
+    expect(block).not.toMatch(/\bborder\b|\brounded-lg\b|<label/);
+    expect(block).toMatch(/<p /);
+  });
 });

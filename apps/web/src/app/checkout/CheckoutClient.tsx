@@ -2101,14 +2101,9 @@ export default function CheckoutClient() {
                       {/* Country row \u2014 fixed display for single-country stores.
                           Multi-country stores get an interactive selector inside GovernorateAreaSelect. */}
                       {isSingleCountryStore && (
-                        <div>
-                          <label className="block text-sm font-medium text-foreground mb-1">
-                            {t('Country', '\u0627\u0644\u0628\u0644\u062f')}
-                          </label>
-                          <div className="flex items-center rounded-lg border border-border bg-muted/40 px-3 py-2 text-sm text-foreground">
-                            {t(singleCountryEn, singleCountryAr)}
-                          </div>
-                        </div>
+                        <p className="text-sm text-muted-foreground">
+                          {t(`Shipping within ${singleCountryEn}`, `الشحن جوّه ${singleCountryAr}`)}
+                        </p>
                       )}
 
                       {/* Governorate \u2192 Area typeahead cascade (+ optional country selector for multi-country stores) */}
