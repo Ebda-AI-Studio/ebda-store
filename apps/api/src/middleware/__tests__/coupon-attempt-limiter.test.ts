@@ -78,6 +78,41 @@ describe('couponAttemptLimiter (distinct codes per IP per window)', () => {
     expect(await post('/quote', '10.0.0.4', { couponCode: 'V0' })).toBe(200);
   });
 
+  it('refuses BOTH of a concurrent same-code pair when over budget (no reset race)', async () => {
+    for (let i = 0; i < 20; i++)
+      expect(await post('/quote', '10.0.1.1', { couponCode: `F${i}` })).toBe(200);
+    for (let n = 0; n < 5; n++) {
+      const pair = await Promise.all([
+        post('/quote', '10.0.1.1', { couponCode: `FRESH${n}` }),
+        post('/validate', '10.0.1.1', { code: `FRESH${n}` }),
+      ]);
+      expect(pair).toEqual([429, 429]);
+    }
+    // an admitted code is still free to repeat
+    expect(await post('/quote', '10.0.1.1', { couponCode: 'F0' })).toBe(200);
+  });
+
+  it('interleaved direct calls: both of a same-code pair are refused over budget', async () => {
+    // HTTP round-trips can serialise the pair; calling the middleware directly forces the
+    // await-level interleaving that the old seen-marker-then-reset design lost.
+    const call = (ip: string, code: string) =>
+      new Promise<number>(resolve => {
+        const res = {
+          setHeader: () => res,
+          status: (n: number) => ({ json: () => resolve(n) }),
+        };
+        void couponAttemptLimiter({ body: { couponCode: code }, ip } as never, res as never, () =>
+          resolve(200)
+        );
+      });
+    for (let i = 0; i < 20; i++) expect(await call('10.0.2.1', `G${i}`)).toBe(200);
+    for (let n = 0; n < 5; n++) {
+      expect(await Promise.all([call('10.0.2.1', `NEW${n}`), call('10.0.2.1', `NEW${n}`)])).toEqual(
+        [429, 429]
+      );
+    }
+  });
+
   it('keeps IPs independent', async () => {
     for (let i = 0; i < 25; i++) await post('/quote', '10.0.0.5', { couponCode: `E${i}` });
     expect(await post('/quote', '10.0.0.6', { couponCode: 'E0' })).toBe(200);

@@ -1617,14 +1617,19 @@ export const couponValidateLimiter = rateLimit({
 //
 // Built from two counters on the same RedisOrMemoryStore the other limiters use
 // (Redis, the Workers AuthState DO, or process memory), because the Workers shim
-// has no set commands: a per-(ip, code-hash) "seen" marker whose FIRST hit in the
-// window means the code is new, and a per-IP counter bumped only for new codes.
-// The marker is the set member (hash only, never the raw code); both expire in 60s.
+// has no set commands: an "admitted" marker per (ip, code-hash) written only AFTER
+// the code was let through, and a per-IP counter of codes that were not yet admitted.
+// Over budget NOTHING is written (no marker to reset), so two concurrent requests for
+// the same new code are both refused; under budget such a pair may count twice, which
+// only over-counts (conservative). Markers hold the hash only, never the raw code.
 const COUPON_DISTINCT_MAX = 20;
 const COUPON_DISTINCT_WINDOW_MS = 60 * 1000;
-const couponSeenStore = makeRateLimitStore(rateLimitRedisClient, 'coupon-validate-distinct-seen');
+const couponAdmittedStore = makeRateLimitStore(
+  rateLimitRedisClient,
+  'coupon-validate-distinct-admitted'
+);
 const couponDistinctStore = makeRateLimitStore(rateLimitRedisClient, 'coupon-validate-distinct');
-couponSeenStore.init?.({ windowMs: COUPON_DISTINCT_WINDOW_MS } as Options);
+couponAdmittedStore.init?.({ windowMs: COUPON_DISTINCT_WINDOW_MS } as Options);
 couponDistinctStore.init?.({ windowMs: COUPON_DISTINCT_WINDOW_MS } as Options);
 
 function couponDistinctGate(field: 'couponCode' | 'code') {
@@ -1637,13 +1642,10 @@ function couponDistinctGate(field: 'couponCode' | 'code') {
     try {
       const ip = ipKeyGenerator(req.ip ?? '') || 'noip';
       const hash = createHash('sha256').update(raw.trim().toUpperCase()).digest('hex');
-      const seen = await couponSeenStore.increment(`${ip}:${hash}`);
-      if (seen.totalHits === 1) {
+      const markerKey = `${ip}:${hash}`;
+      if (!(await couponAdmittedStore.get?.(markerKey))) {
         const distinct = await couponDistinctStore.increment(ip);
         if (distinct.totalHits > COUPON_DISTINCT_MAX) {
-          // Forget the marker so retrying this refused code is still "new" (and refused):
-          // otherwise the 2nd attempt would sail through as a repeat.
-          await couponSeenStore.resetKey(`${ip}:${hash}`);
           res.setHeader('Retry-After', String(COUPON_DISTINCT_WINDOW_MS / 1000));
           res.status(429).json({
             success: false,
@@ -1651,6 +1653,7 @@ function couponDistinctGate(field: 'couponCode' | 'code') {
           });
           return;
         }
+        await couponAdmittedStore.increment(markerKey);
       }
     } catch (err) {
       // Fail-OPEN on a store error, same posture as passOnStoreError on the other limiters.
