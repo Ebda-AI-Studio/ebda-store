@@ -153,7 +153,13 @@ async function seedOrder(tag: string, overrides?: { discount?: number; tax?: num
  */
 async function createCompletedReturn(
   order: { id: string },
-  items: Array<{ orderItemId: string; productId: string; quantity: number }>,
+  items: Array<{
+    orderItemId: string;
+    productId: string;
+    quantity: number;
+    /** B2B Task 8b: the persisted tier adjustment of this item (signed piastres). */
+    tierAdjustment?: number;
+  }>,
   reason = 'defective'
 ): Promise<string> {
   const ret = await prisma.return.create({
@@ -172,6 +178,7 @@ async function createCompletedReturn(
           productId: i.productId,
           productName: 'Partial GL Product',
           quantity: i.quantity,
+          tierAdjustment: i.tierAdjustment ?? 0,
         })),
       },
     },
@@ -276,6 +283,50 @@ afterAll(async () => {
 });
 
 describe.skipIf(!hasDb)('partial-return pro-rata GL adjustment', () => {
+  it('B2B tier adjustment: the journal books the ADJUSTED value, and a later release telescopes to the unadjusted total', async () => {
+    const { order, itemA, itemB } = await seedOrder('TADJ');
+    await postOrderPaymentJournal({ orderId: order.id });
+
+    // 1 of A returned, 1000 retained (kept units repriced below their tier): credited gross 2000 - 1000 = 1000
+    const r1 = await createCompletedReturn(order, [
+      { orderItemId: itemA.id, productId: productAId, quantity: 1, tierAdjustment: 1000 },
+    ]);
+    await postPartialReturnJournal({
+      orderId: order.id,
+      refundKey: r1,
+      items: [{ orderItemId: itemA.id, quantity: 1 }],
+    });
+    const e1 = await prisma.journalEntry.findFirstOrThrow({
+      where: { storeId, source: 'order', sourceId: `${order.id}:partial:${r1}` },
+      include: { lines: true },
+    });
+    // discount share floor(1000x1000/9000) = 111, tax share floor(900x1000/9000) = 100
+    expect(e1.lines.find(l => l.accountId === acct.revenue)?.debit).toBe(889);
+    expect(e1.lines.find(l => l.accountId === acct.taxPayable)?.debit).toBe(100);
+    expect(e1.lines.find(l => l.accountId === acct.cashKnet)?.credit).toBe(989); // unadjusted would be 1978
+
+    // everything else comes back and releases the 1000: the cash credits add up to the whole order's goods
+    const r2 = await createCompletedReturn(order, [
+      { orderItemId: itemA.id, productId: productAId, quantity: 2, tierAdjustment: -1000 },
+      { orderItemId: itemB.id, productId: productBId, quantity: 2 },
+    ]);
+    await postPartialReturnJournal({
+      orderId: order.id,
+      refundKey: r2,
+      items: [
+        { orderItemId: itemA.id, quantity: 2 },
+        { orderItemId: itemB.id, quantity: 2 },
+      ],
+    });
+    const e2 = await prisma.journalEntry.findFirstOrThrow({
+      where: { storeId, source: 'order', sourceId: `${order.id}:partial:${r2}` },
+      include: { lines: true },
+    });
+    // credited gross 7000 + 1000 released = 8000; the earlier 111 / 100 are subtracted from the totals, not re-derived
+    expect(e2.lines.find(l => l.accountId === acct.cashKnet)?.credit).toBe(7911);
+    expect(989 + 7911).toBe(9000 - 1000 + 900); // subtotal - discount + tax: the order's goods, nothing dropped, nothing doubled
+  });
+
   it('posts a balanced pro-rata adjustment for a partial return, mirroring full-refund conventions', async () => {
     const { order, itemA } = await seedOrder('T1');
     await postOrderPaymentJournal({ orderId: order.id });

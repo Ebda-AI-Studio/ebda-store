@@ -77,6 +77,13 @@ export interface Resolved {
   /** True when qty is below the product MOQ. The price above is still valid. */
   belowMoq: boolean;
   moqRequired: number | null;
+  /**
+   * The price breaks THIS buyer could reach for this line: public tiers plus the active group's tiers that are in scope for
+   * the line (variant tier for this variant; product tier only when base === the product's price) and below base, sorted by
+   * minQty then price, whatever the current quantity. Persisted on the order line (Task 8b) so a later partial return
+   * reprices the kept units from what was on offer at sale time, and read by the cart to know how high a stepper may go.
+   */
+  ladder: Array<{ minQty: number; priceMinor: number }>;
 }
 
 const INT4_MAX = 2_147_483_647;
@@ -124,6 +131,16 @@ export function resolveUnitPrice(i: ResolveInput): Resolved {
   const activeGroupId = group !== null && group.isActive ? group.id : null;
   const moqRequired = i.moq ?? null;
   const belowMoq = moqRequired !== null && i.qty < moqRequired;
+  const productPriceForLadder = i.productPriceMinor ?? base;
+  const ladder = i.tiers
+    .filter(t => {
+      if (t.priceMinor >= base) return false;
+      if (t.groupId !== null && t.groupId !== activeGroupId) return false;
+      if (t.variantId !== null) return t.variantId === i.variantId;
+      return base === productPriceForLadder;
+    })
+    .map(t => ({ minQty: t.minQty, priceMinor: t.priceMinor }))
+    .sort((a, b) => a.minQty - b.minQty || a.priceMinor - b.priceMinor);
   const out = (
     unitMinor: number,
     source: PriceSource,
@@ -137,6 +154,7 @@ export function resolveUnitPrice(i: ResolveInput): Resolved {
     groupApplied,
     belowMoq,
     moqRequired,
+    ladder,
   });
 
   const productPrice = i.productPriceMinor ?? base;

@@ -1938,6 +1938,8 @@ model OrderItem {
   listPrice       Int?    @map("list_price")
   priceSource     String? @map("price_source")
   priceTierMinQty Int?    @map("price_tier_min_qty")
+  /// Price breaks the buyer could reach at sale time ([{minQty, priceMinor}]), for tier-aware partial returns (Task 8b).
+  tierLadder      Json?   @map("tier_ladder")
 
   // Scan-to-pick fulfilment state. pickedQty tracks how many units of this
   // line have been physically scanned/picked. Default 0 so existing rows are
@@ -2213,6 +2215,12 @@ model ReturnItem {
   quantity    Int
   reason      String?
   condition   String? // new, opened, damaged
+
+  /// B2B Task 8b: signed piastres this item's refund was reduced by (kept units repriced below their tier). Snapshot.
+  tierAdjustment           Int     @default(0) @map("tier_adjustment")
+  adjustmentOverridden     Boolean @default(false) @map("adjustment_overridden")
+  adjustmentOverrideReason String? @map("adjustment_override_reason")
+  adjustmentOverrideBy     String? @map("adjustment_override_by")
 
   return    Return    @relation(fields: [returnId], references: [id], onDelete: Cascade)
   orderItem OrderItem @relation(fields: [orderItemId], references: [id], onDelete: Cascade)

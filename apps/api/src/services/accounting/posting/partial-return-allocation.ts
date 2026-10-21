@@ -76,8 +76,26 @@ export function allocatePartialReturn<L extends AllocationLine>(input: {
   prevQty: Map<string, number>;
   /** The lines this return is claiming. */
   requested: Array<{ orderItemId: string; quantity: number }>;
+  /**
+   * B2B tier-aware returns (Task 8b): signed piastres by which EARLIER returns' credited value was reduced (kept units
+   * repriced below their tier), and by which THIS return's is. Subtracted from the gross each side contributes, so the
+   * discount and tax shares, the revenue debit and the cash credit all follow the adjusted value and the GL and the
+   * provider refund stay one number. Both default to 0: every caller that passes neither is unchanged.
+   */
+  prevAdjustment?: number;
+  thisAdjustment?: number;
 }): AllocationResult<L> {
-  const { subtotal, discount, tax, taxIncludedInPrice = false, lines, prevQty, requested } = input;
+  const {
+    subtotal,
+    discount,
+    tax,
+    taxIncludedInPrice = false,
+    lines,
+    prevQty,
+    requested,
+    prevAdjustment = 0,
+    thisAdjustment = 0,
+  } = input;
 
   // `claimed` runs cumulatively so duplicate orderItemIds in one payload
   // cannot double-count against the same line's remainder.
@@ -108,10 +126,13 @@ export function allocatePartialReturn<L extends AllocationLine>(input: {
     return Math.min(amount, Math.floor((amount * g) / subtotal));
   };
 
-  const cumGross = prevGross + curGross;
+  // Credited value after the tier adjustment. `prevGross` / `curGross` in the RESULT stay the raw gross.
+  const prevCredited = Math.max(0, prevGross - prevAdjustment);
+  const curCredited = Math.max(0, curGross - thisAdjustment);
+  const cumGross = prevCredited + curCredited;
   const discountThis = Math.min(
-    entitled(discount, cumGross) - entitled(discount, prevGross),
-    curGross
+    entitled(discount, cumGross) - entitled(discount, prevCredited),
+    curCredited
   );
   // The line value the customer is being credited for, less their discount
   // share. Which SIDE of it the tax sits on is the only thing the two tax
@@ -123,13 +144,13 @@ export function allocatePartialReturn<L extends AllocationLine>(input: {
   //     is owed that price and NO MORE (adding taxThis on top refunds the VAT
   //     a second time), and the revenue the sale booked was the price LESS
   //     its tax share.
-  const netOfDiscount = curGross - discountThis;
+  const netOfDiscount = curCredited - discountThis;
   // An inclusive share comes OUT of the line value, so it cannot exceed it —
   // clamped so a rounding edge can never produce a negative revenue debit
   // (which partial-return-posting would drop, unbalancing the entry).
   const taxThis = taxIncludedInPrice
-    ? Math.min(entitled(tax, cumGross) - entitled(tax, prevGross), netOfDiscount)
-    : entitled(tax, cumGross) - entitled(tax, prevGross);
+    ? Math.min(entitled(tax, cumGross) - entitled(tax, prevCredited), netOfDiscount)
+    : entitled(tax, cumGross) - entitled(tax, prevCredited);
   const revenueDebit = taxIncludedInPrice ? netOfDiscount - taxThis : netOfDiscount;
   const cashCredit = revenueDebit + taxThis;
 

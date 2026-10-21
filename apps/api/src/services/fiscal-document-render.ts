@@ -118,9 +118,13 @@ export function renderFiscalDocumentHtml(
   const lines = Array.isArray(p.lines)
     ? p.lines
         .map(
-          ln => `<tr><td>${esc(ar && ln.descriptionAr ? ln.descriptionAr : ln.description)}</td>
+          ln => `<tr><td>${esc(ar && ln.descriptionAr ? ln.descriptionAr : ln.description)}${
+            (ar ? (ln.priceLabelAr ?? ln.priceLabel) : ln.priceLabel)
+              ? `<div class="muted" data-price-label="1">${esc(ar ? (ln.priceLabelAr ?? ln.priceLabel) : ln.priceLabel)}</div>`
+              : ''
+          }</td>
             <td class="n">${esc(ln.quantity)}</td>
-            <td class="n">${ln.unitPrice == null ? '—' : money(ln.unitPrice)}</td>
+            <td class="n">${ln.unitPrice == null ? '—' : `${ln.listPrice != null ? `<s style="opacity:.6">${money(ln.listPrice)}</s> ` : ''}${money(ln.unitPrice)}`}</td>
             <td class="n">${money(ln.amount)}</td></tr>`
         )
         .join('')

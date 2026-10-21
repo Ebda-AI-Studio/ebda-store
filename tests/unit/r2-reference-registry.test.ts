@@ -76,6 +76,8 @@ const URL_SHAPED =
  * column, or that is also registered, fails the suite.
  */
 const NOT_R2_REFERENCES: Record<string, string> = {
+  'OrderItem.tierLadder':
+    'JSON price ladder [{ minQty, priceMinor }] snapshotted at sale time (B2B Task 8b), never a URL',
   'InstapayReceipt.extracted':
     'what the AI read off a transfer receipt (amounts, names, references), never a URL; the image is a private-bucket key, not a public R2 URL',
   'StoreTaxDocument.profileId': 'foreign key to store_tax_profiles, never a URL',

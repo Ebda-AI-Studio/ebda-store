@@ -400,6 +400,27 @@ router.get(
   }
 );
 
+// GET /stores/:storeId/analytics/price-source - B2B: line revenue split retail vs quantity break vs wholesale group
+router.get(
+  '/price-source',
+  authenticate,
+  requirePermission('analytics:read'),
+  requireStoreAccess,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { storeId } = req.params;
+      const parsedRange = parseDateRange(req, res);
+      if (!parsedRange) return;
+      res.json({
+        success: true,
+        data: await AnalyticsService.getRevenueByPriceSource(storeId, parsedRange.range),
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
 // GET /stores/:storeId/analytics/performance - Quick performance summary (with GL gross profit)
 router.get(
   '/performance',

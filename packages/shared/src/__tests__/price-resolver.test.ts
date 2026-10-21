@@ -72,6 +72,7 @@ describe('RF4 tier boundary and quantity change', () => {
       groupApplied: false,
       belowMoq: false,
       moqRequired: null,
+      ladder: expect.any(Array),
     });
     const miss = resolveUnitPrice(input({ qty: 3, tiers }));
     expect(miss).toMatchObject({ unitMinor: 10_000, source: 'base', tierMinQty: null });
@@ -620,5 +621,41 @@ describe('Review Focus map: items not provable in a pure function and where they
       RF13: 'tests/unit/price-resolver-service.test.ts (feature off => base)',
     };
     expect(Object.keys(owners)).toHaveLength(13);
+  });
+});
+
+describe('ladder: the price breaks this buyer could reach (Task 8b snapshot, cart stepper)', () => {
+  it('lists public tiers plus the buyer ACTIVE group tiers in scope, sorted, whatever the quantity; never another audience or an out-of-scope tier', () => {
+    const tiers = [
+      tier(50, 9_000),
+      tier(10, 9_500),
+      tier(20, 8_000, { groupId: G }),
+      tier(20, 7_000, { groupId: OTHER_G }), // another group's: invisible
+      tier(5, 9_900, { variantId: V2 }), // another variant's: out of scope
+      tier(5, 10_000), // not below base: not a break
+    ];
+    const r = resolveUnitPrice(input({ qty: 1, tiers, buyerGroup: group() }));
+    expect(r.ladder).toEqual([
+      { minQty: 10, priceMinor: 9_500 },
+      { minQty: 20, priceMinor: 8_000 },
+      { minQty: 50, priceMinor: 9_000 },
+    ]);
+    const anon = resolveUnitPrice(input({ qty: 1, tiers }));
+    expect(anon.ladder).toEqual([
+      { minQty: 10, priceMinor: 9_500 },
+      { minQty: 50, priceMinor: 9_000 },
+    ]);
+    expect(resolveUnitPrice(input({ qty: 1 })).ladder).toEqual([]);
+  });
+  it('an inactive group contributes no rungs; a product tier on a variant with its own price is not offered', () => {
+    const t = [tier(20, 8_000, { groupId: G })];
+    expect(
+      resolveUnitPrice(input({ tiers: t, buyerGroup: group({ isActive: false }) })).ladder
+    ).toEqual([]);
+    expect(
+      resolveUnitPrice(
+        input({ baseMinor: 12_000, productPriceMinor: 10_000, tiers: [tier(10, 9_000)] })
+      ).ladder
+    ).toEqual([]);
   });
 });

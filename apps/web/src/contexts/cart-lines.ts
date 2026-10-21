@@ -32,6 +32,8 @@ export interface ServerCartItem {
   listPrice?: number;
   priceSource?: 'base' | 'tier' | 'group';
   priceTierMinQty?: number | null;
+  /** Highest price break on offer for this line (null / absent = none). */
+  priceLadderTopMinQty?: number | null;
   belowMoq?: boolean;
   moqRequired?: number | null;
 }
@@ -49,6 +51,7 @@ export function mapServerItem(item: ServerCartItem): CartItem {
     listPrice: item.listPrice,
     priceSource: item.priceSource,
     priceTierMinQty: item.priceTierMinQty ?? undefined,
+    priceLadderTopMinQty: item.priceLadderTopMinQty ?? undefined,
     belowMoq: item.belowMoq === true ? true : undefined,
     moqRequired: item.moqRequired ?? undefined,
     quantity: item.quantity,

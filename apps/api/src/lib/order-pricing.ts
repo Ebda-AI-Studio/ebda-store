@@ -45,12 +45,51 @@ export function assertMoqSatisfied(lines: readonly MoqLine[]): void {
 }
 
 /** The persisted price provenance for one order line (Ruling B2B-3b/5): invoices, returns and analytics read these, never re-resolve. */
+/**
+ * The label printed under an order line that was NOT sold at the plain retail price (invoice, credit note), from the
+ * snapshot persisted on the line - never re-resolved. A quantity break or a wholesale group price reads "Wholesale price"
+ * (with the threshold for a break). Latin digits in both languages (NUMERALS-1). null for a retail line and for a line sold
+ * before the snapshot existed, so an old invoice renders exactly as it always did.
+ */
+export function priceLineLabel(
+  i: { priceSource?: string | null; priceTierMinQty?: number | null },
+  lang: 'en' | 'ar'
+): string | null {
+  if (i.priceSource === 'tier' && i.priceTierMinQty != null) {
+    return lang === 'ar'
+      ? `سعر الجملة، ${i.priceTierMinQty}+ وحدة`
+      : `Wholesale price, ${i.priceTierMinQty}+ units`;
+  }
+  if (i.priceSource === 'tier' || i.priceSource === 'group') {
+    return lang === 'ar' ? 'سعر الجملة' : 'Wholesale price';
+  }
+  return null;
+}
+
+/** The retail list price to strike through beside the charged unit price: only when the line was sold below it. */
+export function struckListPrice(i: {
+  priceSource?: string | null;
+  listPrice?: number | null;
+  price: number;
+}): number | null {
+  return i.priceSource && i.priceSource !== 'base' && i.listPrice != null && i.listPrice > i.price
+    ? i.listPrice
+    : null;
+}
+
 export function priceSnapshot(r: Resolved): {
   listPrice: number;
   priceSource: Resolved['source'];
   priceTierMinQty: number | null;
+  /** The price breaks on offer at sale time (Task 8b); undefined when there were none, so the column stays NULL for plain lines. */
+  tierLadder: Array<{ minQty: number; priceMinor: number }> | undefined;
 } {
-  return { listPrice: r.listMinor, priceSource: r.source, priceTierMinQty: r.tierMinQty };
+  return {
+    listPrice: r.listMinor,
+    priceSource: r.source,
+    priceTierMinQty: r.tierMinQty,
+    tierLadder: r.ladder.length > 0 ? r.ladder : undefined,
+  };
 }
 
 /**

@@ -71,10 +71,12 @@ export function pdpMaxQty(
 export function cartMaxQty(line: {
   moqRequired?: number | null;
   priceSource?: 'base' | 'tier' | 'group';
+  /** Highest price break on offer for the line (server-resolved): a base-priced line can still step up to it. */
+  priceLadderTopMinQty?: number | null;
 }): number {
-  return line.moqRequired || (line.priceSource && line.priceSource !== 'base')
-    ? SERVER_MAX_QTY
-    : 10;
+  const RETAIL_CAP = 10;
+  if (line.moqRequired || (line.priceSource && line.priceSource !== 'base')) return SERVER_MAX_QTY;
+  return Math.min(Math.max(RETAIL_CAP, line.priceLadderTopMinQty ?? 0), SERVER_MAX_QTY);
 }
 
 /**

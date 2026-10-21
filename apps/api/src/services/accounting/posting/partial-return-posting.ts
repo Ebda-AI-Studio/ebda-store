@@ -193,7 +193,7 @@ export async function postPartialReturnJournal(
   // committed too by the time its event arrives. The same read supplies this
   // reversal's merchant-entered reason for the memo (issue 1191 — the event
   // payload carries no reason field).
-  const { prevQty, reasons } = await loadPriorReversedQty(tx, {
+  const { prevQty, reasons, prevAdjustment } = await loadPriorReversedQty(tx, {
     storeId,
     orderId,
     excludeKey: refundKey,
@@ -214,6 +214,16 @@ export async function postPartialReturnJournal(
     lines: order.items,
     prevQty,
     requested: items,
+    // B2B Task 8b: the tier adjustments persisted on the return items (this one's, and the earlier ones' via the loader).
+    prevAdjustment,
+    thisAdjustment: isBackorderCancel
+      ? 0
+      : ((
+          await tx.returnItem.aggregate({
+            where: { returnId: refundKey, return: { storeId } },
+            _sum: { tierAdjustment: true },
+          })
+        )._sum.tierAdjustment ?? 0),
   });
   const { curGross, discountThis, taxThis, revenueDebit, cashCredit, returnedLines } = alloc;
 

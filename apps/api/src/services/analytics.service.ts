@@ -515,6 +515,48 @@ export class AnalyticsService {
    * Uses groupBy + _sum at the database level to avoid loading every order
    * item row into JavaScript memory.
    */
+  /**
+   * B2B: line revenue split by how the line was priced (read-only, additive). `retail` = plain price (including every line
+   * sold before B2B, whose `price_source` is NULL), `tier` = a quantity break, `group` = a wholesale group percent;
+   * `wholesale` = tier + group. Item-line revenue BEFORE order-level discounts, tax and shipping (so the shares add up to the
+   * top-products figures, not to the order totals). Same revenue population as the rest of this service.
+   */
+  static async getRevenueByPriceSource(storeId: string, dateRange?: DateRange) {
+    const now = new Date();
+    const startDate = dateRange?.startDate || new Date(now.getFullYear(), now.getMonth(), 1);
+    const endDate = dateRange?.endDate || now;
+    const grouped = await prisma.orderItem.groupBy({
+      by: ['priceSource'],
+      where: {
+        order: {
+          storeId,
+          createdAt: { gte: startDate, lte: endDate },
+          status: { notIn: [...NON_REVENUE_ORDER_STATUSES] },
+          paymentStatus: { not: 'failed' },
+        },
+      },
+      _sum: { quantity: true, total: true },
+    });
+    const bucket = { revenue: 0, units: 0 };
+    const out = { retail: { ...bucket }, tier: { ...bucket }, group: { ...bucket } };
+    for (const g of grouped) {
+      const key =
+        g.priceSource === 'tier' ? 'tier' : g.priceSource === 'group' ? 'group' : 'retail';
+      out[key].revenue += g._sum.total ?? 0;
+      out[key].units += g._sum.quantity ?? 0;
+    }
+    const wholesale = {
+      revenue: out.tier.revenue + out.group.revenue,
+      units: out.tier.units + out.group.units,
+    };
+    const total = out.retail.revenue + wholesale.revenue;
+    return {
+      ...out,
+      wholesale,
+      wholesaleSharePercent: total > 0 ? Math.round((wholesale.revenue / total) * 100) : 0,
+    };
+  }
+
   static async getTopProducts(
     storeId: string,
     limit = 10,

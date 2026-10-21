@@ -254,6 +254,24 @@ describe.skipIf(!hasDb)(
       expect(bulk.items).toEqual([]); // the bulk sync treats it exactly like an unknown product: skipped
     });
 
+    it('the cart line reports the highest price break on offer so the stepper can reach it (anonymous: the public break only)', async () => {
+      const sessionId = cartSessionId('sf-ladder');
+      await CartService.addItem(
+        id.s!,
+        sessionId,
+        id.pub!,
+        1,
+        undefined,
+        undefined,
+        undefined,
+        ANONYMOUS_BUYER
+      );
+      const cart = await CartService.getOrCreate(id.s!, sessionId, undefined, ANONYMOUS_BUYER);
+      const line = cart.items[0] as { priceSource: string; priceLadderTopMinQty: number | null };
+      expect(line.priceSource).toBe('base'); // 1 unit: no break reached yet ...
+      expect(line.priceLadderTopMinQty).toBe(10); // ... but the 10+ break is on offer: the cart + button may go there
+    });
+
     it('checkout: a wholesale-only line left in the cart after approval is revoked is refused 409 PRODUCT_NO_LONGER_AVAILABLE', async () => {
       const sessionId = cartSessionId('sf-co');
       await CartService.addItem(

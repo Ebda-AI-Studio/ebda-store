@@ -246,6 +246,8 @@ export class CartService {
         listPrice: r.listMinor,
         priceSource: r.source,
         priceTierMinQty: r.tierMinQty,
+        // The highest price break this buyer could reach (null = none): the storefront stepper must be able to get there.
+        priceLadderTopMinQty: r.ladder.length > 0 ? r.ladder[r.ladder.length - 1]!.minQty : null,
         belowMoq: r.belowMoq,
         moqRequired: r.moqRequired,
       };

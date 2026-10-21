@@ -40,6 +40,7 @@ export interface CartItem {
   /** Where the charged price came from: 'base' (retail), 'tier' (quantity break) or 'group' (wholesale group). */
   priceSource?: 'base' | 'tier' | 'group';
   priceTierMinQty?: number;
+  priceLadderTopMinQty?: number;
   /** B2B minimum order quantity: true when this product's total quantity in the cart is below it. */
   belowMoq?: boolean;
   moqRequired?: number;

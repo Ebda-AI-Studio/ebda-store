@@ -7,10 +7,32 @@ import { auditLog, writeLimiter } from '../middleware/security';
 import { requireStoreAccess, checkStoreAccess } from '../middleware/store-access';
 import { requireFeature } from '../middleware/feature-gate';
 import { prisma } from '@ebda/database';
+import { AppError } from '../middleware/error-handler';
 
 const router = Router({ mergeParams: true });
 
 // Validation schemas
+/** Task 8b: per RETURN ITEM id, the refund the merchant chose instead of the computed one. Strict; the service checks the range. */
+const overridesSchema = z.record(
+  z.string().uuid(),
+  z
+    .object({ amountMinor: z.number().int().min(0), reason: z.string().trim().min(3).max(300) })
+    .strict()
+);
+/** `?overrides=` on the preview is a JSON object of the same shape (read-only what-if). */
+function parseOverrides(raw: unknown) {
+  if (typeof raw !== 'string' || raw === '') return {};
+  try {
+    return overridesSchema.parse(JSON.parse(raw));
+  } catch {
+    throw new AppError(
+      400,
+      'VALIDATION_ERROR',
+      'overrides must be a JSON object of { amountMinor, reason } by return item id'
+    );
+  }
+}
+
 const createReturnSchema = z
   .object({
     orderId: z.string().uuid(),
@@ -372,7 +394,11 @@ router.get(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId, id } = req.params;
-      const preview = await ReturnService.refundPreview(storeId, id);
+      const preview = await ReturnService.refundPreview(
+        storeId,
+        id,
+        parseOverrides(req.query.overrides)
+      );
       // Issue 2024: a caller who may complete returns but may not send money
       // back through a gateway (staff — no `orders:refund`) is shown the
       // option disabled with a reason, rather than 403'd after confirming.
@@ -452,11 +478,28 @@ router.post(
         return;
       }
 
+      // B2B Task 8b: overriding a tier adjustment changes the amount paid out, so it needs the same permission as a refund.
+      const refundOverrides = overridesSchema.parse(req.body?.refundOverrides ?? {});
+      if (
+        Object.keys(refundOverrides).length > 0 &&
+        !hasPermission(req.user!.role as Role, 'orders:refund')
+      ) {
+        res.status(403).json({
+          success: false,
+          error: {
+            code: 'REFUND_PERMISSION_REQUIRED',
+            message: 'Overriding a refund requires the orders:refund permission.',
+          },
+        });
+        return;
+      }
+
       const returnRequest = await ReturnService.complete(
         storeId,
         id,
         req.user!.userId,
-        refundMethod
+        refundMethod,
+        refundOverrides
       );
 
       // Audit log
@@ -465,7 +508,13 @@ router.post(
         userId: req.user!.userId,
         resourceType: 'return',
         resourceId: id,
-        details: { refundMethod },
+        details: {
+          refundMethod,
+          // Who overrode which item's refund, and why (Task 8b): the override is a money decision, so it is audit-logged.
+          ...(Object.keys(refundOverrides).length > 0
+            ? { refundOverrides, overriddenBy: req.user!.userId }
+            : {}),
+        },
         ip: req.ip,
         userAgent: req.headers['user-agent'],
       });

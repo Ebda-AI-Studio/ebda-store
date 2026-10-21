@@ -1,4 +1,5 @@
 import { prisma, type Prisma } from '@ebda/database';
+import { priceLineLabel, struckListPrice } from '../lib/order-pricing';
 import { groupOrderLinesForDisplay, mulDivRound, orderAddressLines } from '@ebda/shared';
 import { AppError } from '../middleware/error-handler';
 import logger from '../lib/logger';
@@ -63,6 +64,10 @@ export interface FiscalLine {
   quantity: number;
   unitPrice: number | null;
   amount: number;
+  /** B2B: tier / wholesale label and the struck-through retail price, from the line's persisted snapshot. */
+  priceLabel?: string | null;
+  priceLabelAr?: string | null;
+  listPrice?: number | null;
 }
 
 export interface FiscalDiscount {
@@ -173,6 +178,9 @@ export function buildSaleLines(order: {
       quantity: it.quantity,
       unitPrice: it.price,
       amount: it.total,
+      priceLabel: priceLineLabel(it, 'en'),
+      priceLabelAr: priceLineLabel(it, 'ar'),
+      listPrice: struckListPrice(it),
     };
   });
   if (order.extraAmount > 0) {

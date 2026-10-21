@@ -65,6 +65,10 @@ describe('quantity caps and the MOQ fix (review M7)', () => {
     expect(cartMaxQty({ moqRequired: 12 })).toBe(1000);
     expect(cartMaxQty({ priceSource: 'tier' })).toBe(1000);
     expect(cartMaxQty({ priceSource: 'group' })).toBe(1000);
+    // a base-priced line reaches the highest price break on offer (the cart + button, same as the PDP)
+    expect(cartMaxQty({ priceSource: 'base', priceLadderTopMinQty: 50 })).toBe(50);
+    expect(cartMaxQty({ priceSource: 'base', priceLadderTopMinQty: 6 })).toBe(10);
+    expect(cartMaxQty({ priceLadderTopMinQty: null })).toBe(10);
   });
   it('moqFix returns the quantity to set on the first line of the short product', () => {
     expect(

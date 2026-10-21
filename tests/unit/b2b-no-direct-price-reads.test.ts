@@ -95,7 +95,13 @@ const ALLOW: Record<string, AllowEntry> = {
   'services/invoice.service.ts': {
     category: 'persisted',
     reason: 'invoice lines from OrderItem snapshots',
-    reads: { generateInvoice: 2, renderInvoiceEmailContent: 1 },
+    reads: { generateInvoice: 3, renderInvoiceEmailContent: 1 }, // +1: the struck list price compares to the snapshot price
+  },
+  'lib/order-pricing.ts': {
+    category: 'persisted',
+    reason:
+      'struckListPrice compares the persisted list price with the persisted paid price (invoice display)',
+    reads: { struckListPrice: 1 },
   },
   'services/fiscal-document-render.ts': {
     category: 'persisted',
@@ -111,7 +117,7 @@ const ALLOW: Record<string, AllowEntry> = {
     category: 'persisted',
     reason:
       'refund math uses OrderItem.price (RF11); Task 8b adds the tier adjustment from snapshots',
-    reads: { complete: 1, create: 1, refundPreview: 1 },
+    reads: { complete: 1, create: 2, refundPreview: 1, computeLineAdjustments: 2 }, // snapshots only; create's estimate also reads the paid price
   },
   'services/accounting/backorder.service.ts': {
     category: 'persisted',
