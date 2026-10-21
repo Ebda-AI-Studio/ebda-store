@@ -79,8 +79,9 @@ describe('/compare is balanced', () => {
     for (const locale of LOCALES) {
       it(`${locale} ${slug}: says where Ebda is stronger AND not yet, dated, no forbidden strings`, () => {
         const html = renderToStaticMarkup(<ComparePage locale={locale} slug={slug} />);
-        expect(html).toContain('data-verdict="ebda"');
-        expect(html).toContain('data-verdict="them"');
+        // verdicts of "stronger" either way only where the fact is firmly public: Shopify
+        expect(html.includes('data-verdict="ebda"')).toBe(slug === 'shopify');
+        expect(html.includes('data-verdict="them"')).toBe(slug === 'shopify');
         for (const r of GAP_ROWS) expect(html).toContain(r.label[locale]);
         for (const r of STRENGTH_ROWS) expect(html).toContain(r.label[locale]);
         expect(html).toContain(locale === 'en' ? 'October 2026' : 'أكتوبر 2026');

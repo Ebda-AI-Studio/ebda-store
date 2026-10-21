@@ -135,7 +135,7 @@ export const GAP_ROWS: readonly RowDef[] = [
     id: 'email',
     label: { ar: 'حملات الإيميل التسويقية', en: 'Marketing email campaigns' },
     ebda: {
-      ar: 'إيميلات الطلبات شغالة. حملات الإيميل التسويقية متبنية بس لسه مش في الباقات، وبنفعّلها لكل متجر على حدة.',
+      ar: 'إيميلات الطلبات شغالة. حملات الإيميل التسويقية مبنية بس لسه مش في الباقات، وبنفعّلها لكل متجر على حدة.',
       en: 'Order emails work. Marketing email campaigns are built but not in the plans yet; we switch them on store by store.',
     },
   },
@@ -156,73 +156,76 @@ interface Them {
 
 const same = (en: string, ar: string): Pair => ({ en, ar });
 
-const GULF = {
-  market: same('Saudi Arabia and the Gulf first.', 'السعودية والخليج أولًا.'),
-  currency: same('Priced in Saudi riyals.', 'الاشتراك بالريال السعودي.'),
-  commission: same(
-    'Check the current plan terms on their site. Payment gateway fees apply on any platform.',
-    'راجع شروط الباقات الحالية على موقعهم. ورسوم بوابة الدفع بتتحسب على أي منصة.'
-  ),
-  arabic: same(
-    'Arabic-first, built for Arabic-speaking merchants.',
-    'عربية من الأساس، ومبنية للتجار العرب.'
-  ),
-  search: same(
-    'Compare the current search features on their site.',
-    'قارن مميزات البحث الحالية على موقعهم.'
-  ),
-  ai: same(
-    'Has AI features. Compare the current scope and which plan includes them.',
-    'فيها أدوات ذكاء اصطناعي. قارن النطاق الحالي وأي باقة بتشملها.'
-  ),
-  payments: same(
-    'Strong Gulf coverage. Check which Egyptian gateways and carriers are available.',
-    'تغطية قوية للخليج. اتأكد من بوابات الدفع وشركات الشحن المصرية المتاحة.'
-  ),
-  builder: same('A theme store and a theme editor.', 'متجر قوالب ومحرر قوالب.'),
-  growth: same('Available, built in or through apps.', 'متاحة، جاهزة أو من خلال تطبيقات.'),
-  apps: same(
-    'An app store with many third-party apps.',
-    'متجر تطبيقات فيه تطبيقات كتير من أطراف تانية.'
-  ),
-  code: same('Developer tools for custom themes.', 'أدوات للمطورين لتخصيص القوالب.'),
-  b2b: same('Available through apps or higher plans.', 'متاحة من خلال تطبيقات أو باقات أعلى.'),
-  pos: same('A point-of-sale offering for physical shops.', 'عندهم حل نقطة بيع للمحلات.'),
-  multicur: same('Supports selling in more than one currency.', 'بيدعموا البيع بأكتر من عملة.'),
-  email: same(
-    'Email marketing through built-in tools or apps.',
-    'تسويق بالإيميل من أدوات جاهزة أو تطبيقات.'
-  ),
-  ecosystem: same(
-    'An established platform with a large merchant base and partner ecosystem.',
-    'منصة راسخة بقاعدة تجار كبيرة وشركاء كتير.'
-  ),
-} satisfies Record<string, Pair>;
+/**
+ * Per-vendor cells for Salla and Zid. Only facts we can stand behind (both started in Saudi Arabia, both are
+ * Arabic-first); everything else says to check the vendor's own site, and its verdict is "even".
+ */
+const vendorCells = (nameEn: string, nameAr: string) =>
+  ({
+    market: same(`${nameEn} started in Saudi Arabia.`, `${nameAr} بدأت في السعودية.`),
+    currency: same(
+      `Check ${nameEn}'s site for current pricing and billing currency.`,
+      `راجع موقع ${nameAr} للأسعار الحالية وعملة الاشتراك.`
+    ),
+    commission: same(
+      `Check ${nameEn}'s current plan terms. Payment gateway fees apply on any platform.`,
+      `راجع شروط باقات ${nameAr} الحالية. ورسوم بوابة الدفع بتتحسب على أي منصة.`
+    ),
+    arabic: same(`${nameEn} is Arabic-first.`, `${nameAr} عربية من الأساس.`),
+    search: same(
+      `Check ${nameEn}'s site for its current search features.`,
+      `راجع موقع ${nameAr} لمميزات البحث الحالية.`
+    ),
+    ai: same(
+      `Check ${nameEn}'s site for its AI features and which plan includes them.`,
+      `راجع موقع ${nameAr} لأدوات الذكاء الاصطناعي وأي باقة بتشملها.`
+    ),
+    payments: same(
+      `Check which Egyptian gateways and carriers ${nameEn} supports for your account.`,
+      `اتأكد من بوابات الدفع وشركات الشحن المصرية اللي ${nameAr} بتدعمها لحسابك.`
+    ),
+    builder: same(
+      `Check ${nameEn}'s site for its themes and editor.`,
+      `راجع موقع ${nameAr} للقوالب والمحرر.`
+    ),
+    growth: same(
+      `Check ${nameEn}'s site for cart recovery and loyalty options.`,
+      `راجع موقع ${nameAr} لخيارات السلات المتروكة والولاء.`
+    ),
+    apps: same(`Check ${nameEn}'s site for its app store.`, `راجع موقع ${nameAr} لمتجر التطبيقات.`),
+    code: same(
+      `Check ${nameEn}'s site for developer and theme customisation tools.`,
+      `راجع موقع ${nameAr} لأدوات المطورين وتخصيص القوالب.`
+    ),
+    b2b: same(
+      `Check ${nameEn}'s site for wholesale pricing.`,
+      `راجع موقع ${nameAr} لأسعار الجملة.`
+    ),
+    pos: same(
+      `Check ${nameEn}'s site for in-store selling options.`,
+      `راجع موقع ${nameAr} لخيارات البيع من المحل.`
+    ),
+    multicur: same(
+      `Check ${nameEn}'s site for multi-currency support.`,
+      `راجع موقع ${nameAr} لدعم العملات المتعددة.`
+    ),
+    email: same(
+      `Check ${nameEn}'s site for email marketing options.`,
+      `راجع موقع ${nameAr} لخيارات التسويق بالإيميل.`
+    ),
+    ecosystem: same(
+      `Check ${nameEn}'s site for its merchant base and partners.`,
+      `راجع موقع ${nameAr} لعدد التجار والشركاء.`
+    ),
+  }) satisfies Record<string, Pair>;
 
-const verdictOf: Record<string, Verdict> = {
-  market: 'ebda',
-  currency: 'ebda',
-  commission: 'even',
-  arabic: 'even',
-  search: 'even',
-  ai: 'even',
-  payments: 'even',
-  builder: 'even',
-  growth: 'even',
-  apps: 'them',
-  code: 'them',
-  b2b: 'them',
-  pos: 'them',
-  multicur: 'them',
-  email: 'them',
-  ecosystem: 'them',
-};
+const verdictOf: Record<string, Verdict> = {};
 
 const them = (cells: Record<string, Pair>, over: Partial<Record<string, Verdict>> = {}) =>
   Object.fromEntries(
     Object.entries(cells).map(([id, text]) => [
       id,
-      { v: over[id] ?? verdictOf[id], text } satisfies Them,
+      { v: over[id] ?? verdictOf[id] ?? 'even', text } satisfies Them,
     ])
   ) as Record<string, Them>;
 
@@ -261,12 +264,11 @@ const gulfCopy = (nameEn: string, nameAr: string): Record<Locale, CompareCopy> =
     title: `ابدأ ستور مقابل ${nameAr}`,
     desc: `مقارنة صريحة بين ابدأ ستور و${nameAr} لبائع في مصر: فين ابدأ ستور أقوى، وفين ${nameAr} أقوى، وإيه اللي لسه مش موجود. بتاريخ أكتوبر 2026.`,
     h1: `ابدأ ستور مقابل ${nameAr}`,
-    intro: `ابدأ ستور و${nameAr} الاتنين بيخلّوك تفتح متجر أونلاين بالعربي. الفرق إن ابدأ ستور مبني لمصر، و${nameAr} مبني للسعودية والخليج. الجدول ده بيقولك فين كل واحد أقوى، وإحنا صريحين في اللي لسه مش عندنا.`,
+    intro: `ابدأ ستور و${nameAr} الاتنين بيخلّوك تفتح متجر أونلاين بالعربي. الفرق إن ابدأ ستور مبني لمصر، و${nameAr} بدأت في السعودية. الجدول ده بيقولك فين كل واحد أقوى، وإحنا صريحين في اللي لسه مش عندنا.`,
     chooseThemH: `اختار ${nameAr} لو`,
     chooseThem: [
-      'بتبيع في السعودية أو الخليج.',
-      'محتاج متجر تطبيقات كبير وتكاملات كتير.',
-      'محتاج نقطة بيع لمحل، أو أسعار جملة، أو بيع بأكتر من عملة.',
+      `بتبيع في السعودية أو الخليج وخدمة ${nameAr} مناسبة لسوقك.`,
+      `محتاج حاجة مش موجودة في ابدأ ستور لسه، زي متجر تطبيقات أو نقطة بيع أو بيع بأكتر من عملة، واتأكدت إنها متاحة عند ${nameAr}.`,
     ],
     chooseEbdaH: 'اختار ابدأ ستور لو',
     chooseEbda: ebdaChoiceAr,
@@ -277,12 +279,11 @@ const gulfCopy = (nameEn: string, nameAr: string): Record<Locale, CompareCopy> =
     title: `Ebda Store vs ${nameEn}`,
     desc: `An honest comparison of Ebda Store and ${nameEn} for a seller in Egypt: where Ebda Store is stronger, where ${nameEn} is stronger, and what is not there yet. As of October 2026.`,
     h1: `Ebda Store vs ${nameEn}`,
-    intro: `Both Ebda Store and ${nameEn} let you open an online store in Arabic. The difference is that Ebda Store is built for Egypt, while ${nameEn} is built for Saudi Arabia and the Gulf. This page says where each is stronger, including what Ebda Store does not have yet.`,
+    intro: `Both Ebda Store and ${nameEn} let you open an online store in Arabic. The difference is that Ebda Store is built for Egypt, while ${nameEn} started in Saudi Arabia. This page says where each is stronger, including what Ebda Store does not have yet.`,
     chooseThemH: `Choose ${nameEn} if`,
     chooseThem: [
-      'You sell in Saudi Arabia or the Gulf.',
-      'You need a large app store and many integrations.',
-      'You need a point of sale for a shop, wholesale pricing, or selling in more than one currency.',
+      `You sell in Saudi Arabia or the Gulf and ${nameEn} serves your market.`,
+      `You need something Ebda Store lacks, such as an app store, a point of sale or multiple currencies, and you have confirmed ${nameEn} offers it.`,
     ],
     chooseEbdaH: 'Choose Ebda Store if',
     chooseEbda: ebdaChoiceEn,
@@ -332,7 +333,10 @@ export const COMPARE: Record<CompareSlug, CompareDef> = (() => {
   const shopifyCells = them(
     {
       market: same('Global, with merchants in many countries.', 'عالمية، وتجارها في دول كتير.'),
-      currency: same('Priced in US dollars.', 'الاشتراك بالدولار الأمريكي.'),
+      currency: same(
+        "Check Shopify's site for the billing currency in Egypt.",
+        'راجع موقع شوبيفاي لعملة الاشتراك في مصر.'
+      ),
       commission: same(
         'A transaction fee applies on orders paid through third-party gateways unless you use Shopify Payments. Check whether it is available for Egypt.',
         'فيه رسوم معاملة على الطلبات اللي بتتدفع عن طريق بوابات خارجية، إلا لو استخدمت Shopify Payments. اتأكد إذا كانت متاحة في مصر.'
@@ -357,7 +361,10 @@ export const COMPARE: Record<CompareSlug, CompareDef> = (() => {
       growth: same('Available, built in or through apps.', 'متاحة، جاهزة أو من خلال تطبيقات.'),
       apps: same('A very large app store.', 'متجر تطبيقات ضخم.'),
       code: same('A theme code editor and developer tools.', 'محرر أكواد للقوالب وأدوات للمطورين.'),
-      b2b: same('B2B features on higher plans.', 'ميزات B2B في الباقات الأعلى.'),
+      b2b: same(
+        "Check Shopify's site for B2B features and which plans include them.",
+        'راجع موقع شوبيفاي لميزات B2B وأي باقات بتشملها.'
+      ),
       pos: same('Shopify POS for physical shops.', 'Shopify POS للمحلات.'),
       multicur: same('Selling in multiple currencies and countries.', 'بيع بعملات ودول متعددة.'),
       email: same(
@@ -369,12 +376,20 @@ export const COMPARE: Record<CompareSlug, CompareDef> = (() => {
         'منصة راسخة بقاعدة تجار ضخمة وشركاء كتير.'
       ),
     },
-    { commission: 'ebda', arabic: 'even' }
+    {
+      market: 'ebda',
+      commission: 'ebda',
+      apps: 'them',
+      code: 'them',
+      pos: 'them',
+      multicur: 'them',
+      ecosystem: 'them',
+    }
   );
-  const gulfCells = them(GULF);
+
   return {
-    salla: { ...salla, cells: gulfCells },
-    zid: { ...zid, cells: gulfCells },
+    salla: { ...salla, cells: them(vendorCells('Salla', 'سلة')) },
+    zid: { ...zid, cells: them(vendorCells('Zid', 'زد')) },
     shopify: { ...shopify, cells: shopifyCells },
   };
 })();
