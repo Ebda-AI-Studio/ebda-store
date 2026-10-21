@@ -22,6 +22,8 @@ import {
   BUSINESS_DAYS,
   VERIFIED_REVIEWS,
   ITEMS_ADDED,
+  ITEMS_NEED_OPTIONS,
+  STARS,
 } from '../../apps/web/src/lib/plural';
 import { formatEstimatedDays } from '../../apps/web/src/lib/delivery-estimate';
 import { daysPhrase } from '../../apps/web/src/lib/return-policy-text';
@@ -32,21 +34,19 @@ describe('Y-01: the plural helper', () => {
     const ar = (n: number) => countText('ar', n, ITEMS);
     expect(ar(0)).toBe('0 قطعة');
     expect(ar(1)).toBe('قطعة واحدة');
-    expect(ar(2)).toBe('قطعتان'); // MSA nominative dual (Ruling FU46-Y02)
+    expect(ar(2)).toBe('قطعتين'); // Egyptian dual (Ruling FU46-Y02a)
     expect(ar(3)).toBe('3 قطع');
     expect(ar(10)).toBe('10 قطع');
     expect(ar(11)).toBe('11 قطعة');
     expect(ar(100)).toBe('100 قطعة');
   });
 
-  it('Arabic days decline (يوم واحد / يومان / ٣ أيام / ١١ يومًا / ١٠٠ يوم)', () => {
+  it('Arabic days in Egyptian (يوم واحد / يومين / ٣ أيام / ١١ يوم / ١٠٠ يوم)', () => {
     expect(countText('ar', 1, DAYS)).toBe('يوم واحد');
-    expect(countText('ar', 2, DAYS)).toBe('يومان');
-    // after a preposition the MSA dual is oblique: "خلال يومين"
-    expect(countText('ar', 2, DAYS, undefined, 'oblique')).toBe('يومين');
-    expect(countText('ar', 3, DAYS, undefined, 'oblique')).toBe('3 أيام');
+    expect(countText('ar', 2, DAYS)).toBe('يومين');
+    expect(daysPhrase(2, 'ar')).toBe('يومين'); // "خلال يومين": one form in every position
     expect(countText('ar', 3, DAYS)).toBe('3 أيام');
-    expect(countText('ar', 11, DAYS)).toBe('11 يومًا');
+    expect(countText('ar', 11, DAYS)).toBe('11 يوم');
     expect(countText('ar', 100, DAYS)).toBe('100 يوم');
   });
 
@@ -58,14 +58,31 @@ describe('Y-01: the plural helper', () => {
     expect(countText('en', 0, PIECES)).toBe('0 pieces');
   });
 
-  it('Modern Standard register (Ruling FU46-Y02): nominative dual everywhere it stands alone', () => {
-    expect(countText('ar', 2, ITEMS_ADDED)).toBe('أُضيفت قطعتان إلى سلتك');
-    expect(countText('ar', 2, RESULTS)).toBe('نتيجتان');
-    expect(countText('ar', 2, VERIFIED_REVIEWS)).toBe('مراجعتان موثّقتان');
-    expect(countText('ar', 2, BUSINESS_DAYS)).toBe('يوما عمل');
-    // no colloquial accusative dual stands as a nominative form
-    for (const noun of [ITEMS, RESULTS, VERIFIED_REVIEWS, DAYS, BUSINESS_DAYS, ITEMS_ADDED])
-      expect(noun.ar.two ?? '').not.toMatch(/تين(?:\s|$)|ين(?:\s|$)/);
+  it('Egyptian register (Ruling FU46-Y02a): the -ين dual everywhere, bare singular at 11+', () => {
+    expect(countText('ar', 2, ITEMS_ADDED)).toBe('اتضافت قطعتين لسلتك');
+    expect(countText('ar', 2, RESULTS)).toBe('نتيجتين');
+    expect(countText('ar', 2, VERIFIED_REVIEWS)).toBe('مراجعتين موثّقتين');
+    expect(countText('ar', 2, BUSINESS_DAYS)).toBe('يومين عمل');
+    expect(countText('ar', 2, STARS)).toBe('نجمتين');
+    expect(countText('ar', 2, ITEMS_NEED_OPTIONS)).toBe('منتجين محتاجين تختار نوعهم');
+    const nouns = [
+      ITEMS,
+      RESULTS,
+      VERIFIED_REVIEWS,
+      DAYS,
+      BUSINESS_DAYS,
+      ITEMS_ADDED,
+      ITEMS_NEED_OPTIONS,
+      STARS,
+    ];
+    for (const noun of nouns) {
+      // no MSA nominative dual (-ان / -ا before a construct) and no tanween accusative
+      for (const form of Object.values(noun.ar)) {
+        expect(form, form).not.toMatch(/(?:تان|ان|يوما)(?:\s|$)/);
+        expect(form, form).not.toMatch(/[\u064B\u064C\u064D]|اً/);
+      }
+      expect(noun.ar.two ?? '', JSON.stringify(noun.ar)).toMatch(/ين(?:\s|$)/);
+    }
   });
 
   it('the displayed number can be the render digits', () => {
@@ -87,11 +104,11 @@ describe('Y-01: the plural helper', () => {
   });
 
   it('the old hand-rolled helpers now agree with it', () => {
-    expect(daysPhrase(14, 'ar')).toBe('14 يومًا');
+    expect(daysPhrase(14, 'ar')).toBe('14 يوم');
     expect(daysPhrase(1, 'en')).toBe('1 day');
-    expect(formatEstimatedDays({ estimatedDays: 2 }, 'ar')).toBe('يوما عمل');
+    expect(formatEstimatedDays({ estimatedDays: 2 }, 'ar')).toBe('يومين عمل');
     expect(daysPhrase(2, 'ar')).toBe('يومين'); // every caller says "خلال …"
-    expect(daysPhrase(14, 'ar', n => n.toLocaleString('ar-EG'))).toBe('١٤ يومًا');
+    expect(daysPhrase(14, 'ar', n => n.toLocaleString('ar-EG'))).toBe('١٤ يوم');
     expect(categoryCountText(undefined, true, 1)).toBe('قطعة واحدة');
     expect(categoryCountText(undefined, false, 4)).toBe('4 pieces');
     // A merchant's own unit word is printed as typed (it cannot be declined).

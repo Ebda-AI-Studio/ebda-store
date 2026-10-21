@@ -197,7 +197,7 @@ function ModernProductCard({
     // Issue #1997 — the NEW badge below renders at logical top-start under
     // this exact condition; a discount/custom badge avoiding a reserved
     // heart corner must not land on top of it.
-    newOrBrandBadgeReserved: Boolean(orderable && isProductNew(product, renderNow)),
+    newOrBrandBadgeReserved: Boolean(orderable && isProductNew(product, renderNow, store.theme)),
     // The mobile quick-add CTA band below is an unconditional full-width
     // overlay (hidden only via a `lg:` desktop hover state, never removed
     // from the DOM), so it reserves the whole bottom edge.
@@ -311,7 +311,7 @@ function ModernProductCard({
               ribbon (OutOfStockRibbon below) to match the pecannbee/
               alkahraman target across every theme. NEW stays top corner,
               only shown when orderable (unchanged). */}
-          {orderable && isProductNew(product, renderNow) && (
+          {orderable && isProductNew(product, renderNow, store.theme) && (
             <ProductBadgeGroup absolute position={isRtl ? 'top-right' : 'top-left'} isRtl={isRtl}>
               <ProductBadge variant="new" isRtl={isRtl} size="sm" />
             </ProductBadgeGroup>

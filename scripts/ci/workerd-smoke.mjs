@@ -33,6 +33,19 @@ export function stripAiBinding(source) {
   return source.replace(re, '');
 }
 
+/**
+ * The deploy config may carry the Cloudflare Images binding (EBDA_IMAGES_BINDING=true,
+ * Ruling D1016-ICONS-1). Local workerd has no real Images service, and the boot check does not
+ * need it (the icon route falls back without it), so the smoke strips it like the AI binding.
+ * Absent = unchanged (no throw: the binding is optional).
+ */
+export function stripImagesBinding(source) {
+  return source.replace(
+    /^[ \t]*"images":[ \t]*\{[ \t]*"binding":[ \t]*"IMAGES"[ \t]*\},?[ \t]*\r?\n/gm,
+    ''
+  );
+}
+
 /** Pure verdict on a set of observed responses; exported for the unit test. */
 export function smokeProblems(observed) {
   const problems = [];
@@ -88,7 +101,9 @@ async function main() {
     throw new Error('SMOKE_OWNER_DATABASE_URL and SMOKE_APP_DATABASE_URL are required');
   const config = arg('config') ?? 'wrangler.jsonc';
   // Before anything is written: a config with no AI line fails here, leaving no files behind.
-  const smokeSource = stripAiBinding(readFileSync(path.join(API, config), 'utf8'));
+  const smokeSource = stripImagesBinding(
+    stripAiBinding(readFileSync(path.join(API, config), 'utf8'))
+  );
   const port = Number(arg('port') ?? 8799);
   const base = `http://127.0.0.1:${port}`;
 

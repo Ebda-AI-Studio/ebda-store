@@ -136,7 +136,7 @@ describe('InstapayCard receipt flow', () => {
       })
     );
     render(<InstapayCard orderId="o1" />);
-    await screen.findByText('سيراجع صاحب المتجر التحويل');
+    await screen.findByText('صاحب المتجر هيراجع التحويل');
     expect(document.getElementById('instapay-receipt-file')).toBeNull();
   });
 

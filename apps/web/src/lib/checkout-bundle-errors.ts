@@ -51,11 +51,11 @@ export function checkoutBundleErrorCopy(
     return name
       ? t(
           `"${name}" is no longer available. Please remove it from your cart and try again.`,
-          `"${name}" لم تعد متاحة. يرجى إزالتها من سلتك والمحاولة مرة أخرى.`
+          `"${name}" مبقتش متاحة. شيلها من سلتك وجرّب تاني.`
         )
       : t(
           'One of the bundles in your cart is no longer available. Please remove it from your cart and try again.',
-          'إحدى الباقات في سلتك لم تعد متاحة. يرجى إزالتها من سلتك والمحاولة مرة أخرى.'
+          'في باقة في سلتك مبقتش متاحة. شيلها من سلتك وجرّب تاني.'
         );
   }
 
@@ -70,11 +70,11 @@ export function checkoutBundleErrorCopy(
     return name
       ? t(
           `"${name}" can no longer be priced correctly. Please remove it from your cart to continue.`,
-          `"${name}" لم يعد من الممكن تسعيرها بشكل صحيح. يرجى إزالتها من سلتك للمتابعة.`
+          `"${name}" مبقاش ينفع نحسب سعرها صح. شيلها من سلتك عشان تكمّل.`
         )
       : t(
           'One of the bundles in your cart can no longer be priced correctly. Please remove it from your cart to continue.',
-          'إحدى الباقات في سلتك لم يعد من الممكن تسعيرها بشكل صحيح. يرجى إزالتها من سلتك للمتابعة.'
+          'في باقة في سلتك مبقاش ينفع نحسب سعرها صح. شيلها من سلتك عشان تكمّل.'
         );
   }
 
@@ -90,7 +90,7 @@ export function checkoutBundleErrorCopy(
     if (!bundleName) return null;
     return t(
       `An item in the "${bundleName}" bundle just sold out. Please remove that bundle from your cart and try again.`,
-      `أحد العناصر داخل باقة "${bundleName}" نفدت كميته للتو. يرجى إزالة هذه الباقة من سلتك والمحاولة مرة أخرى.`
+      `في حاجة جوه باقة "${bundleName}" خلصت من المخزون دلوقتي. شيل الباقة دي من سلتك وجرّب تاني.`
     );
   }
 

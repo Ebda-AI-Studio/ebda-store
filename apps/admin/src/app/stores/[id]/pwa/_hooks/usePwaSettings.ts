@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { apiGet, apiPut } from '../../../../../lib/api';
 import { hslToHex } from '../../../../../lib/color';
+import { BRAND } from '@ebda/shared';
 import {
   DEFAULT_SETTINGS,
   type PWASettings,
@@ -73,7 +74,7 @@ export function usePwaSettings(storeId: string) {
 
     const themeColor = storeInfo.theme?.primaryColor
       ? hslToHex(storeInfo.theme.primaryColor)
-      : '#f97316';
+      : BRAND.colors.night;
 
     setSettings(prev => ({
       ...prev,
@@ -95,7 +96,7 @@ export function usePwaSettings(storeId: string) {
       if (!storeInfo) return;
       const themeColor = storeInfo.theme?.primaryColor
         ? hslToHex(storeInfo.theme.primaryColor)
-        : '#f97316';
+        : BRAND.colors.night;
       setSettings(prev => ({
         ...prev,
         appName: storeInfo.name || prev.appName,

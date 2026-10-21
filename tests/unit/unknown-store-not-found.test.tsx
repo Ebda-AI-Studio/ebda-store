@@ -27,7 +27,7 @@ const render = (lang: 'en' | 'ar', links = unknownHostLinks({})) => {
 describe('UnknownHostNotFound', () => {
   it('renders Arabic copy and the ebda.app CTA', () => {
     const html = render('ar');
-    expect(html).toContain('هذا المتجر غير موجود أو لم يُفتح بعد');
+    expect(html).toContain('المتجر ده مش موجود أو لسه مفتحش');
     expect(html).toContain('أنشئ متجرك على إبدأ');
     expect(html).toContain('href="https://ebda.app"');
   });

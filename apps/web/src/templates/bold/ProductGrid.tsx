@@ -78,7 +78,7 @@ export default function BoldProductGrid({
               <span className="text-4xl">📦</span>
             </div>
             <p className="text-xl font-bold text-muted-foreground">
-              {isRtl ? 'لا توجد منتجات بعد' : 'No products yet'}
+              {isRtl ? 'مفيش منتجات لسه' : 'No products yet'}
             </p>
           </div>
         )}

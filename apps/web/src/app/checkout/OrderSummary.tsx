@@ -223,10 +223,10 @@ export function OrderSummary({
                 <span className="text-sm font-medium text-success-ink">{appliedCoupon.code}</span>
                 <span className="text-sm text-success-ink ml-2">
                   {appliedCoupon.type === 'percentage'
-                    ? `${localize(appliedCoupon.value)}% ${t('off', '\u062e\u0635\u0645')}`
+                    ? `${localize(appliedCoupon.value)}% ${t('off', 'خصم')}`
                     : appliedCoupon.type === 'free_shipping'
-                      ? t('Free shipping', '\u0634\u062d\u0646 \u0645\u062c\u0627\u0646\u064a')
-                      : `${formatPrice(appliedCoupon.value)} ${t('off', '\u062e\u0635\u0645')}`}
+                      ? t('Free shipping', 'شحن مجاني')
+                      : `${formatPrice(appliedCoupon.value)} ${t('off', 'خصم')}`}
                 </span>
               </div>
               <button
@@ -246,7 +246,7 @@ export function OrderSummary({
           ) : (
             <div className="flex gap-2">
               <Input
-                placeholder={t('Coupon code', '\u0643\u0648\u062f \u0627\u0644\u062e\u0635\u0645')}
+                placeholder={t('Coupon code', 'كود الخصم')}
                 value={couponCode}
                 onChange={e => onCouponCodeChange(e.target.value.toUpperCase())}
                 className="flex-1"
@@ -362,7 +362,7 @@ export function OrderSummary({
                 <span className="block text-xs text-muted-foreground">
                   {t(
                     'Your store credit is applied first; you pay the rest as usual.',
-                    'يُخصم رصيد المتجر أولاً، وتدفع الباقي بالطريقة المعتادة.'
+                    'رصيد المتجر بيتخصم الأول، والباقي تدفعه بالطريقة العادية.'
                   )}
                 </span>
               </span>
@@ -384,7 +384,7 @@ export function OrderSummary({
             </span>
           </div>
           {(() => {
-            // `discount` is coupon + promotion (best-of, never both \u2014 see
+            // `discount` is coupon + promotion (best-of, never both — see
             // CheckoutClient's primaryDiscount) + loyalty combined. Show each
             // portion as its own line so the customer sees exactly what
             // saved them what.
@@ -395,7 +395,7 @@ export function OrderSummary({
                 {couponPortion > 0 && (
                   <div className="flex justify-between text-sm">
                     <span className="text-success-ink" style={typography?.label}>
-                      {t('Discount', '\u0627\u0644\u062e\u0635\u0645')}
+                      {t('Discount', 'الخصم')}
                     </span>
                     <span
                       className="font-medium text-success-ink tabular-nums"
@@ -421,10 +421,7 @@ export function OrderSummary({
                 {loyaltyDiscount > 0 && (
                   <div className="flex justify-between text-sm">
                     <span className="text-success-ink" style={typography?.label}>
-                      {t(
-                        'Loyalty points',
-                        '\u0646\u0642\u0627\u0637 \u0627\u0644\u0648\u0644\u0627\u0621'
-                      )}
+                      {t('Loyalty points', 'نقاط الولاء')}
                     </span>
                     <span
                       className="font-medium text-success-ink tabular-nums"
@@ -452,10 +449,7 @@ export function OrderSummary({
                 ? t('Free', translations['Free'])
                 : shipping > 0
                   ? formatPrice(shipping)
-                  : t(
-                      'Select area',
-                      '\u0627\u062e\u062a\u0631 \u0627\u0644\u0645\u0646\u0637\u0642\u0629'
-                    )}
+                  : t('Select area', 'اختر المنطقة')}
             </span>
           </div>
           {codFee > 0 && (
@@ -504,7 +498,7 @@ export function OrderSummary({
               like an on-screen arithmetic error). */}
           {tax > 0 && taxLabel && taxIncludedInPrice && (
             <p className="text-xs text-muted-foreground">
-              {taxLabel} {'\u2014'} {formatPrice(tax)}
+              {taxLabel} {'—'} {formatPrice(tax)}
             </p>
           )}
           {wallet && wallet.enabled && wallet.applied > 0 && (

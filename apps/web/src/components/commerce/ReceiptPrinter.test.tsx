@@ -155,7 +155,7 @@ describe('ReceiptPrinter', () => {
     render(<ReceiptPrinter order={order} paymentState="paid" store={store} />);
     finishFeed();
     expect(screen.getByText('المدفوع')).toBeTruthy();
-    expect(screen.getByRole('status').textContent).toContain('تم الدفع وتأكيد طلبك');
+    expect(screen.getByRole('status').textContent).toContain('اتدفع، طلبك اتأكد');
   });
 
   it('renders every line, bundle as one row, and the order number under the barcode', () => {
@@ -188,7 +188,7 @@ describe('ReceiptPrinter', () => {
     render(<ReceiptPrinter order={order} paymentState="cod" store={store} />);
     expect(screen.getByTestId('receipt-paper').getAttribute('data-feeding')).toBe('true');
     expect(screen.getByTestId('receipt-status-icon').getAttribute('data-state')).toBe('printing');
-    expect(screen.getByRole('status').textContent).toContain('جارٍ طباعة فاتورتك…');
+    expect(screen.getByRole('status').textContent).toContain('بنطبع فاتورتك…');
     // The receipt is real text during the feed: nothing is hidden from screen readers.
     expect(screen.getByText('الإجمالي')).toBeTruthy();
     finishFeed();
@@ -293,10 +293,10 @@ describe('ReceiptPrinter', () => {
     const leaving = screen.getByTestId('receipt-status-leaving');
     expect(leaving.getAttribute('aria-hidden')).toBe('true');
     expect(leaving.className).toContain(styles.statusOut);
-    expect(leaving.textContent).toContain('جارٍ طباعة فاتورتك…');
+    expect(leaving.textContent).toContain('بنطبع فاتورتك…');
     const current = screen.getByTestId('receipt-status-current');
     expect(current.className).toContain(styles.statusIn);
-    expect(current.textContent).toContain('تم تسجيل طلبك، الدفع عند الاستلام');
+    expect(current.textContent).toContain('طلبك اتسجل، الدفع عند الاستلام');
     fireEvent(leaving, new Event('animationend', { bubbles: true }));
     fireEvent(leaving, new Event('webkitAnimationEnd', { bubbles: true }));
     expect(screen.queryByTestId('receipt-status-leaving')).toBeNull();

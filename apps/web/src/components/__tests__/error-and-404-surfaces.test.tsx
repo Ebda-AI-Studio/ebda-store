@@ -70,7 +70,7 @@ describe('UnknownHostNotFound', () => {
   it('renders Arabic copy for an Arabic visitor', () => {
     languageState.language = 'ar';
     const { container } = render(<UnknownHostNotFound links={unknownHostLinks({})} />);
-    expect(container.textContent).toContain('هذا المتجر غير موجود أو لم يُفتح بعد');
+    expect(container.textContent).toContain('المتجر ده مش موجود أو لسه مفتحش');
     expect(container.textContent).toContain('أنشئ متجرك على إبدأ');
     expect(container.textContent).not.toContain('Create your store on Ebda');
   });

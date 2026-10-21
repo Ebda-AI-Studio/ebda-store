@@ -70,10 +70,10 @@ export default function ElegantFooter({
         setSubscribed(true);
         setEmail('');
       } else {
-        setErrorMsg(isRtl ? 'تعذر الاشتراك، حاول لاحقاً' : 'Could not subscribe, please try again');
+        setErrorMsg(isRtl ? 'الاشتراك منفعش، جرّب بعدين' : 'Could not subscribe, please try again');
       }
     } catch {
-      setErrorMsg(isRtl ? 'تعذر الاشتراك، حاول لاحقاً' : 'Could not subscribe, please try again');
+      setErrorMsg(isRtl ? 'الاشتراك منفعش، جرّب بعدين' : 'Could not subscribe, please try again');
     } finally {
       setSubmitting(false);
     }
@@ -157,7 +157,7 @@ export default function ElegantFooter({
                     >
                       {submitting
                         ? isRtl
-                          ? 'جاري...'
+                          ? 'لحظة...'
                           : 'Sending...'
                         : isRtl
                           ? 'اشتراك'

@@ -422,7 +422,7 @@ export function ShipmentCard({ storeId, orderId, onChanged }: ShipmentCardProps)
                   !carrier ||
                   (carrier === 'manual' && (!manualName.trim() || !manualTracking.trim()))
                 }
-                className="px-4 py-2 text-sm font-medium rounded-lg bg-primary text-white hover:bg-primary/90 disabled:opacity-50"
+                className="px-4 py-2 text-sm font-medium rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
               >
                 {failed ? t('retry') : t('create')}
               </button>

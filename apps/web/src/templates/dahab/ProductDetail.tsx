@@ -457,7 +457,7 @@ export function DahabProductDetail(p: DahabProductDetailProps) {
                 disabled={p.addDisabled || p.isAdding}
                 className={cx(DAHAB_BTN_PRIMARY, 'flex-1')}
               >
-                {p.isAdding ? t('Adding…', 'جاري الإضافة…') : p.addLabel}
+                {p.isAdding ? t('Adding…', 'بنضيف…') : p.addLabel}
               </button>
               <button
                 type="button"
@@ -500,7 +500,7 @@ export function DahabProductDetail(p: DahabProductDetailProps) {
                 <p>
                   {t(
                     'Delivery times and fees for your area are shown at checkout.',
-                    'مواعيد التوصيل ورسومه لمنطقتك تظهر في خطوة إتمام الطلب.'
+                    'مواعيد ومصاريف التوصيل لمنطقتك بتظهر في خطوة إتمام الطلب.'
                   )}{' '}
                   <Link
                     href={p.shippingHref}
@@ -514,7 +514,7 @@ export function DahabProductDetail(p: DahabProductDetailProps) {
                 <p>
                   {t(
                     'Read how returns and exchanges work for this store.',
-                    'اعرف طريقة الاسترجاع والاستبدال في هذا المتجر.'
+                    'اعرف إزاي الاسترجاع والاستبدال في المتجر ده.'
                   )}{' '}
                   <Link
                     href={p.returnsHref}
@@ -573,7 +573,7 @@ export function DahabProductDetail(p: DahabProductDetailProps) {
             disabled={p.addDisabled || p.isAdding}
             className={cx(DAHAB_BTN_PRIMARY, 'px-6')}
           >
-            {p.isAdding ? t('Adding…', 'جاري الإضافة…') : p.addLabel}
+            {p.isAdding ? t('Adding…', 'بنضيف…') : p.addLabel}
           </button>
         </div>
       </div>

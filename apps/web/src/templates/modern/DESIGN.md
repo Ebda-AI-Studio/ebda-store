@@ -2,7 +2,7 @@
 
 ## 1. Visual Theme & Atmosphere
 
-The Modern template is the friendly, contemporary default of the Force storefront family — a soft, approachable surface language built on rounded corners, gentle elevation, and a single warm gradient lift on the hero. It suits general-purpose retail (lifestyle, electronics, home goods, food, casual fashion) where the goal is conversion clarity rather than editorial mood. Cards lift on hover (`hover:-translate-y-0.5`), images zoom subtly (`group-hover:scale-105`), and the brand accent (Force Orange by default) appears as a soft halo behind the hero image, on the gradient headline text, and as a glowing CTA shadow (`shadow-primary/20`).
+The Modern template is the friendly, contemporary default of the Ebda storefront family — a soft, approachable surface language built on rounded corners, gentle elevation, and a single warm gradient lift on the hero. It suits general-purpose retail (lifestyle, electronics, home goods, food, casual fashion) where the goal is conversion clarity rather than editorial mood. Cards lift on hover (`hover:-translate-y-0.5`), images zoom subtly (`group-hover:scale-105`), and the brand accent (Ebda gold by default) appears as a soft halo behind the hero image, on the gradient headline text, and as a glowing CTA shadow (`shadow-primary/20`).
 
 Surfaces are predominantly `bg-background` and `bg-card` with translucent `border-border/60` hairlines. The header uses `bg-background/85 backdrop-blur-lg` (theme-token, not hardcoded white/slate) so it sits on top of content and always matches the store's surface colour — no clash when the OS prefers dark mode. The footer flips to `bg-gray-950 text-gray-300` to ground the page, with social tiles on `bg-white/8` and the brand color reserved for the newsletter CTA. Motion is consistent and bouncy: `transition-all duration-300`, the staggered grid fade-in (`fadeUp` keyframe with `--i` delay), and the `cartPulse` 700ms scale on cart count change.
 
@@ -38,7 +38,7 @@ All colors flow through `globals.css` CSS variables. Each tenant overrides `--pr
 
 ### Brand & Accent
 
-- **Primary** (`--primary` / Force Orange `26 100% 50%` / `#ff6e00` default): CTAs, hero gradient, cart badge, focus rings, social hover, newsletter button.
+- **Primary** (`--primary` / Ebda gold `36 36% 52%` / `#B08D57` template default; Ruling D1016-ORANGE-1): CTAs, hero gradient, cart badge, focus rings, social hover, newsletter button.
 - **Primary Foreground** (`--primary-foreground` / `0 0% 100%`): Always paired with primary for contrast.
 - **Primary/5–30** (opacity utility): Used for ambient effects — `bg-primary/5` for icon halos in empty states, `shadow-primary/20` on hero CTA, `from-primary/15 to-muted` for image fallback gradients (two-stop: the old `via-primary/8` emitted no CSS — issue 2342).
 

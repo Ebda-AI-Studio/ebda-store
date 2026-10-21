@@ -194,7 +194,7 @@ function ElegantProductCard({
     // Issue #1997 — the NEW badge below renders at logical top-start under
     // this exact condition; a discount/custom badge avoiding a reserved
     // heart corner must not land on top of it.
-    newOrBrandBadgeReserved: Boolean(orderable && isProductNew(product, renderNow)),
+    newOrBrandBadgeReserved: Boolean(orderable && isProductNew(product, renderNow, store.theme)),
     // The mobile quick-add CTA band below is an unconditional full-width
     // overlay (hidden only via a `lg:` desktop hover state, never removed
     // from the DOM), so it reserves the whole bottom edge.
@@ -354,7 +354,7 @@ function ElegantProductCard({
 
           {/* NEW badge — BUG 2 fix: no inStock gate removed from the group;
               NEW stays top corner, only shown when orderable (unchanged). */}
-          {orderable && isProductNew(product, renderNow) && (
+          {orderable && isProductNew(product, renderNow, store.theme) && (
             <ProductBadgeGroup absolute position={isRtl ? 'top-right' : 'top-left'} isRtl={isRtl}>
               <ProductBadge
                 variant="new"
@@ -421,9 +421,9 @@ function ElegantProductCard({
               )}
               labels={{
                 addToCart: isRtl ? 'أضف للسلة' : 'Add to Bag',
-                addedToCart: isRtl ? 'تمت الإضافة' : 'Added',
+                addedToCart: isRtl ? 'اتضاف' : 'Added',
                 outOfStock: isRtl ? 'نفذت الكمية' : 'Sold Out',
-                adding: isRtl ? 'جاري...' : 'Adding...',
+                adding: isRtl ? 'لحظة...' : 'Adding...',
                 view: isRtl ? 'عرض' : 'View',
               }}
               ctaShape={resolvedCtaShape}

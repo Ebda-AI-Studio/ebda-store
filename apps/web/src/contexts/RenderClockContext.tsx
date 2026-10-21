@@ -5,7 +5,7 @@ import { createContext, useContext, type ReactNode } from 'react';
 /**
  * One "now" for a whole render, read once on the server and handed to the
  * client as a prop, so the server HTML and the hydrating client agree on every
- * time-based decision (the card "New" badge: `isProductNew(product, now)`).
+ * time-based decision (the card "New" badge: `isProductNew(product, now, store.theme)`).
  * Reading `Date.now()` during render made a card that crossed the 14-day
  * boundary between the cached render and hydration mismatch (W1c review M9).
  */

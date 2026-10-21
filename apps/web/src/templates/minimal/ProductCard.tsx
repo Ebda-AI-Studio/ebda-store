@@ -184,7 +184,9 @@ function MinimalProductCard({
     topEndReserved: Boolean(onRemoveFromWishlist),
     // Issue #2092 (#1997 sweep) — minimal's own NEW chip sits at logical
     // top-start; the SAME expression it renders on below.
-    newOrBrandBadgeReserved: Boolean(product.inStock !== false && isProductNew(product, renderNow)),
+    newOrBrandBadgeReserved: Boolean(
+      product.inStock !== false && isProductNew(product, renderNow, store.theme)
+    ),
     bottomOverlay: 'both',
   });
 
@@ -240,7 +242,7 @@ function MinimalProductCard({
               so it doesn't violate the chrome-free identity but still
               flags fresh inventory. Hides under OOS via isProductNew
               implicit gating in caller order. */}
-          {product.inStock !== false && isProductNew(product, renderNow) && (
+          {product.inStock !== false && isProductNew(product, renderNow, store.theme) && (
             <span
               className="absolute top-2 start-2 z-10 px-2 py-0.5 text-xs font-medium uppercase tracking-[0.18em] text-[hsl(var(--primary))] bg-background"
               aria-label={t('New product', 'منتج جديد')}
@@ -372,7 +374,7 @@ function MinimalProductCard({
               )}
               labels={{
                 addToCart: isRtl ? 'أضف للسلة' : 'Add to Cart',
-                addedToCart: isRtl ? 'تمت الإضافة' : 'Added',
+                addedToCart: isRtl ? 'اتضاف' : 'Added',
                 outOfStock: isRtl ? 'نفذت الكمية' : 'Sold Out',
                 adding: isRtl ? '...' : '...',
                 view: isRtl ? 'عرض' : 'View',

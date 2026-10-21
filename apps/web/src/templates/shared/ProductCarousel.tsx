@@ -360,7 +360,7 @@ function SharedProductCarousel({
               const inStock = product.inStock !== false;
               // Task 13: backorder-aware orderable signal.
               const orderable = canBuyNow(product);
-              const showNewBadge = inStock && isProductNew(product, renderNow);
+              const showNewBadge = inStock && isProductNew(product, renderNow, store.theme);
               // Issue #1609 — mirror the EXACT expression the quick-add
               // button below renders on, so a badge only lifts for a
               // product that will actually get a quick-add circle overlaid

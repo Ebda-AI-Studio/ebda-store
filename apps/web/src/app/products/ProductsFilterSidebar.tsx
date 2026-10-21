@@ -63,7 +63,7 @@ interface ProductsFilterSidebarProps {
    * Merchant-controlled background color for the WHOLE filter UI — desktop
    * panel, mobile trigger, AND the mobile bottom-sheet + every inner accent
    * (category chips, price slider, sort/search). Passed as an HSL TRIPLET
-   * ("26 100% 50%", via `colorToHslTriplet(value, theme)`) and applied as a
+   * ("36 36% 52%", via `colorToHslTriplet(value, theme)`) and applied as a
    * local `--primary` override on the <aside>, so it cascades to every
    * descendant — including the fixed-position mobile sheet — and works with the
    * existing `hsl(var(--primary)/alpha)` shades. Undefined → inherits the

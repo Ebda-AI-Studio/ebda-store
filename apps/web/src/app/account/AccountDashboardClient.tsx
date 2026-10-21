@@ -57,7 +57,7 @@ export default function AccountDashboardClient() {
       setError(
         t(
           'Unable to load orders. Please check your connection.',
-          'تعذر تحميل الطلبات. يرجى التحقق من اتصالك بالإنترنت.'
+          'معرفناش نحمّل الطلبات. اتأكد من اتصالك بالإنترنت.'
         )
       );
     } finally {
@@ -90,13 +90,10 @@ export default function AccountDashboardClient() {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-foreground">
-          {t('Account Dashboard', '\u0644\u0648\u062d\u0629 \u0627\u0644\u062a\u062d\u0643\u0645')}
+          {t('Account Dashboard', 'لوحة التحكم')}
         </h1>
         <p className="mt-1 text-muted-foreground">
-          {t(
-            'Manage your account and view your orders',
-            '\u0625\u062f\u0627\u0631\u0629 \u062d\u0633\u0627\u0628\u0643 \u0648\u0639\u0631\u0636 \u0637\u0644\u0628\u0627\u062a\u0643'
-          )}
+          {t('Manage your account and view your orders', 'إدارة حسابك وعرض طلباتك')}
         </p>
       </div>
 
@@ -122,10 +119,7 @@ export default function AccountDashboardClient() {
               onClick={() => fetchOrders()}
               className="px-3 py-1 text-sm bg-destructive/20 text-destructive-ink rounded hover:bg-destructive/30 transition-colors"
             >
-              {t(
-                'Retry',
-                '\u0625\u0639\u0627\u062f\u0629 \u0627\u0644\u0645\u062d\u0627\u0648\u0644\u0629'
-              )}
+              {t('Retry', 'إعادة المحاولة')}
             </button>
           </div>
         </div>
@@ -154,12 +148,7 @@ export default function AccountDashboardClient() {
               <p className="text-2xl font-bold text-foreground tabular-nums">
                 {recentOrders.length}
               </p>
-              <p className="text-sm text-muted-foreground">
-                {t(
-                  'Total Orders',
-                  '\u0625\u062c\u0645\u0627\u0644\u064a \u0627\u0644\u0637\u0644\u0628\u0627\u062a'
-                )}
-              </p>
+              <p className="text-sm text-muted-foreground">{t('Total Orders', 'إجمالي الطلبات')}</p>
             </div>
           </div>
         </div>
@@ -190,10 +179,7 @@ export default function AccountDashboardClient() {
             <div>
               <p className="text-2xl font-bold text-foreground tabular-nums">{addressCount}</p>
               <p className="text-sm text-muted-foreground">
-                {t(
-                  'Saved Addresses',
-                  '\u0627\u0644\u0639\u0646\u0627\u0648\u064a\u0646 \u0627\u0644\u0645\u062d\u0641\u0648\u0638\u0629'
-                )}
+                {t('Saved Addresses', 'العناوين المحفوظة')}
               </p>
             </div>
           </div>
@@ -219,10 +205,7 @@ export default function AccountDashboardClient() {
             <div>
               <p className="text-2xl font-bold text-foreground tabular-nums">{wishlistCount}</p>
               <p className="text-sm text-muted-foreground">
-                {t(
-                  'Wishlist Items',
-                  '\u0642\u0627\u0626\u0645\u0629 \u0627\u0644\u0623\u0645\u0646\u064a\u0627\u062a'
-                )}
+                {t('Wishlist Items', 'قائمة الأمنيات')}
               </p>
             </div>
           </div>
@@ -232,14 +215,9 @@ export default function AccountDashboardClient() {
       {/* Recent Orders */}
       <div className="rounded-xl border bg-card shadow-sm">
         <div className="flex items-center justify-between border-b p-4">
-          <h2 className="font-semibold text-foreground">
-            {t(
-              'Recent Orders',
-              '\u0627\u0644\u0637\u0644\u0628\u0627\u062a \u0627\u0644\u0623\u062e\u064a\u0631\u0629'
-            )}
-          </h2>
+          <h2 className="font-semibold text-foreground">{t('Recent Orders', 'الطلبات الأخيرة')}</h2>
           <Link href={storeUrl('/account/orders')} className="text-sm text-primary hover:underline">
-            {t('View All', '\u0639\u0631\u0636 \u0627\u0644\u0643\u0644')}
+            {t('View All', 'عرض الكل')}
           </Link>
         </div>
 
@@ -285,17 +263,12 @@ export default function AccountDashboardClient() {
                 d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
               />
             </svg>
-            <p className="mt-4 text-muted-foreground">
-              {t(
-                'No orders yet',
-                '\u0644\u0627 \u062a\u0648\u062c\u062f \u0637\u0644\u0628\u0627\u062a \u0628\u0639\u062f'
-              )}
-            </p>
+            <p className="mt-4 text-muted-foreground">{t('No orders yet', 'مفيش طلبات لسه')}</p>
             <Link
               href={storeUrl('/products')}
               className="mt-2 inline-block text-primary hover:underline"
             >
-              {t('Start shopping', '\u0627\u0628\u062f\u0623 \u0627\u0644\u062a\u0633\u0648\u0642')}
+              {t('Start shopping', 'ابدأ التسوق')}
             </Link>
           </div>
         )}
@@ -323,14 +296,9 @@ export default function AccountDashboardClient() {
             </svg>
           </div>
           <div>
-            <p className="font-medium text-foreground">
-              {t('Add Address', '\u0625\u0636\u0627\u0641\u0629 \u0639\u0646\u0648\u0627\u0646')}
-            </p>
+            <p className="font-medium text-foreground">{t('Add Address', 'إضافة عنوان')}</p>
             <p className="text-sm text-muted-foreground">
-              {t(
-                'Save a new delivery address',
-                '\u062d\u0641\u0638 \u0639\u0646\u0648\u0627\u0646 \u062a\u0648\u0635\u064a\u0644 \u062c\u062f\u064a\u062f'
-              )}
+              {t('Save a new delivery address', 'حفظ عنوان توصيل جديد')}
             </p>
           </div>
         </Link>
@@ -361,22 +329,14 @@ export default function AccountDashboardClient() {
             </svg>
           </div>
           <div>
-            <p className="font-medium text-foreground">
-              {t(
-                'Account Settings',
-                '\u0625\u0639\u062f\u0627\u062f\u0627\u062a \u0627\u0644\u062d\u0633\u0627\u0628'
-              )}
-            </p>
+            <p className="font-medium text-foreground">{t('Account Settings', 'إعدادات الحساب')}</p>
             <p className="text-sm text-muted-foreground">
-              {t(
-                'Update your profile and password',
-                '\u062a\u062d\u062f\u064a\u062b \u0645\u0644\u0641\u0643 \u0627\u0644\u0634\u062e\u0635\u064a \u0648\u0643\u0644\u0645\u0629 \u0627\u0644\u0645\u0631\u0648\u0631'
-              )}
+              {t('Update your profile and password', 'تحديث ملفك الشخصي وكلمة المرور')}
             </p>
           </div>
         </Link>
 
-        {/* Loyalty entry point \u2014 only shown when the store has loyalty enabled */}
+        {/* Loyalty entry point — only shown when the store has loyalty enabled */}
         {isEnabled('loyalty') && (
           <Link
             href={storeUrl('/account/loyalty')}
@@ -398,16 +358,11 @@ export default function AccountDashboardClient() {
               </svg>
             </div>
             <div className="flex-1">
-              <p className="font-medium text-foreground">
-                {t(
-                  'Loyalty Rewards',
-                  '\u0645\u0643\u0627\u0641\u0622\u062a \u0627\u0644\u0648\u0644\u0627\u0621'
-                )}
-              </p>
+              <p className="font-medium text-foreground">{t('Loyalty Rewards', 'مكافآت الولاء')}</p>
               <p className="text-sm text-muted-foreground">
                 {t(
                   'Earn points on every order and redeem for discounts',
-                  '\u0627\u0643\u0633\u0628 \u0646\u0642\u0627\u0637\u0627\u064b \u0639\u0644\u0649 \u0643\u0644 \u0637\u0644\u0628 \u0648\u0627\u0633\u062a\u0628\u062f\u0644\u0647\u0627 \u0644\u0644\u062d\u0635\u0648\u0644 \u0639\u0644\u0649 \u062e\u0635\u0648\u0645\u0627\u062a'
+                  'اكسب نقط على كل طلب واستبدلها بخصومات'
                 )}
               </p>
             </div>
