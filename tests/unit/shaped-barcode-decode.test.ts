@@ -11,7 +11,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import { Resvg } from '@resvg/resvg-js';
-import { readBarcodes } from 'zxing-wasm/reader';
+import { decodeCode128 } from '../helpers/zxing';
 import {
   renderBarcodeSvg,
   RECEIPT_BARCODE_SHAPES,
@@ -34,11 +34,7 @@ async function decode(svg: string, widthPx: number): Promise<string[]> {
   })
     .render()
     .asPng();
-  const res = await readBarcodes(new Blob([png], { type: 'image/png' }), {
-    formats: ['Code128'],
-    tryHarder: true,
-  });
-  return res.map(r => r.text);
+  return decodeCode128(png);
 }
 
 const MASKED = /<path d="M[^"]*" fill="[^"]+" mask="[^"]+"\/>/;
@@ -46,7 +42,11 @@ const ZONE = /<path d="M[^"]*" fill="[^"]+"\/>/;
 const zoneOnly = (svg: string) => svg.replace(MASKED, '');
 
 const SURFACES = [
-  { name: 'storefront receipt', px: BARCODE_DISPLAY_PX.storefrontReceipt, raster: BARCODE_DISPLAY_PX.storefrontReceipt },
+  {
+    name: 'storefront receipt',
+    px: BARCODE_DISPLAY_PX.storefrontReceipt,
+    raster: BARCODE_DISPLAY_PX.storefrontReceipt,
+  },
   { name: 'email png (2x)', px: BARCODE_DISPLAY_PX.email, raster: BARCODE_DISPLAY_PX.email * 2 },
 ] as const;
 
@@ -68,23 +68,40 @@ describe('decode gate at real display sizes', () => {
 
   it('invoice width: every shape decodes', async () => {
     for (const shape of SHAPES) {
-      const svg = renderBarcodeSvg({ value: REAL[0]!, shape, ink: '#141414', displayPx: BARCODE_DISPLAY_PX.invoice });
-      expect(await decode(zoneOnly(svg), BARCODE_DISPLAY_PX.invoice), shape).toContain(scanCodeFor(REAL[0]!));
+      const svg = renderBarcodeSvg({
+        value: REAL[0]!,
+        shape,
+        ink: '#141414',
+        displayPx: BARCODE_DISPLAY_PX.invoice,
+      });
+      expect(await decode(zoneOnly(svg), BARCODE_DISPLAY_PX.invoice), shape).toContain(
+        scanCodeFor(REAL[0]!)
+      );
     }
   });
 
   it('billing receipt: the palm payment number decodes at receipt width and in the email', async () => {
     const value = billingPaymentNumber('3f2a91c4-7b1e-4d0a-9c55-0e8a1f2b3c4d');
-    const svg = renderBarcodeSvg({ value, shape: EBDA_BILLING_BARCODE_SHAPE, ink: '#141414', displayPx: BARCODE_DISPLAY_PX.billingReceipt });
+    const svg = renderBarcodeSvg({
+      value,
+      shape: EBDA_BILLING_BARCODE_SHAPE,
+      ink: '#141414',
+      displayPx: BARCODE_DISPLAY_PX.billingReceipt,
+    });
     expect(svg).toContain('<mask'); // palm meets the floor at this size: it stays a palm
-    expect(await decode(zoneOnly(svg), BARCODE_DISPLAY_PX.billingReceipt)).toContain(scanCodeFor(value));
+    expect(await decode(zoneOnly(svg), BARCODE_DISPLAY_PX.billingReceipt)).toContain(
+      scanCodeFor(value)
+    );
     expect(await decode(svg, BARCODE_DISPLAY_PX.billingReceipt * 2)).toContain(scanCodeFor(value));
   });
 });
 
 describe('negative controls (the gate can fail)', () => {
   it('a different number does not decode to the expected one', async () => {
-    const out = await decode(renderBarcodeSvg({ value: REAL[0]!, shape: 'palm', ink: '#111', displayPx: 360 }), 720);
+    const out = await decode(
+      renderBarcodeSvg({ value: REAL[0]!, shape: 'palm', ink: '#111', displayPx: 360 }),
+      720
+    );
     expect(out).not.toContain(scanCodeFor(REAL[1]!));
   });
   it('deleting the scan-zone path makes the zone-only decode fail', async () => {
@@ -94,14 +111,20 @@ describe('negative controls (the gate can fail)', () => {
     expect(await decode(noZone, 720)).toEqual([]);
   });
   it('blanked bars decode to nothing', async () => {
-    const svg = renderBarcodeSvg({ value: REAL[0]!, shape: 'palm', ink: '#111', displayPx: 360 }).replace(/fill="#111"/g, 'fill="none"');
+    const svg = renderBarcodeSvg({
+      value: REAL[0]!,
+      shape: 'palm',
+      ink: '#111',
+      displayPx: 360,
+    }).replace(/fill="#111"/g, 'fill="none"');
     expect(await decode(svg, 720)).toEqual([]);
   });
 });
 
 describe('which shapes meet the floor', () => {
   it('reports the fallbacks (informational, pinned so a change is noticed)', () => {
-    const fb = (px: number) => RECEIPT_BARCODE_SHAPES.filter(s => resolveBarcodeShape(s, REAL[0]!, px) !== s);
+    const fb = (px: number) =>
+      RECEIPT_BARCODE_SHAPES.filter(s => resolveBarcodeShape(s, REAL[0]!, px) !== s);
     // pinned lists: update deliberately
     expect(fb(BARCODE_DISPLAY_PX.storefrontReceipt)).toEqual(fb(BARCODE_DISPLAY_PX.billingReceipt));
     expect(fb(BARCODE_DISPLAY_PX.storefrontReceipt)).not.toContain('palm');

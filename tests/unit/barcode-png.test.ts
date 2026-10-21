@@ -5,7 +5,7 @@
  * here directly from the PNG bytes, with the decoration masked away too.
  */
 import { describe, it, expect } from 'vitest';
-import { readBarcodes } from 'zxing-wasm/reader';
+import { decodeCode128 } from '../helpers/zxing';
 import { inflateSync } from 'node:zlib';
 import {
   RECEIPT_BARCODE_SHAPES,
@@ -22,13 +22,7 @@ import {
 
 const REAL = ['ORD-T5JK9Q-AB3XY', 'ORD-000000-00000', 'ORD-ZZZZZZ-ZZZZZ'];
 
-async function decodePng(png: Uint8Array): Promise<string[]> {
-  const res = await readBarcodes(new Blob([png], { type: 'image/png' }), {
-    formats: ['Code128'],
-    tryHarder: true,
-  });
-  return res.map(r => r.text);
-}
+const decodePng = decodeCode128;
 
 describe('renderBarcodePng', () => {
   it('is a valid PNG of about 600-720px, grayscale, with its real size reported', () => {
