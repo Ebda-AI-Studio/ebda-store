@@ -140,3 +140,29 @@ describe('settings.receiptBarcodeShape (create + update)', () => {
     }
   });
 });
+
+describe('settings.packingSlipNote (create + update)', () => {
+  const BAD_NOTE = [7, ['x'], { a: 1 }, 'x'.repeat(301)];
+  it.each(BAD_NOTE)('rejects %j', async bad => {
+    const post = await request(app)
+      .post('/stores')
+      .send({ name: 'Shop', settings: { packingSlipNote: bad } });
+    expect(post.status).toBe(400);
+    const put = await request(app)
+      .put(`/stores/${STORE_ID}`)
+      .send({ settings: { packingSlipNote: bad } });
+    expect(put.status).toBe(400);
+  });
+  it('accepts text, empty and null (clear)', async () => {
+    for (const packingSlipNote of ['شكراً لتسوقك معنا', '', null, 'x'.repeat(300)]) {
+      expect(
+        (await request(app).put(`/stores/${STORE_ID}`).send({ settings: { packingSlipNote } }))
+          .status
+      ).toBe(200);
+    }
+  });
+  it('is NOT a public storefront key (staff-only print text)', async () => {
+    const { PUBLIC_SETTINGS_KEYS } = await import('@api/lib/public-store-settings');
+    expect(PUBLIC_SETTINGS_KEYS).not.toContain('packingSlipNote');
+  });
+});
