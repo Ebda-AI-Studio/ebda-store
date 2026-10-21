@@ -28,6 +28,7 @@ import {
   SMS_TEMPLATES,
   PUSH_TEMPLATES,
   renderSmsTemplate,
+  resolveDefaultLanguage,
   storefrontOrigin,
 } from '@ebda/shared';
 import type { SmsConfig } from './sms.service';
@@ -267,11 +268,11 @@ class NotificationDispatcherService {
     } else {
       try {
         const smsTemplate = SMS_TEMPLATES[event];
-        // Default to English; locale selection can be extended later
-        let messageText = renderSmsTemplate(smsTemplate.en, data);
+        const locale = await resolveShopperLocale(storeId, data.locale);
+        let messageText = renderSmsTemplate(smsTemplate[locale], data);
         // Every promotional SMS carries its own opt-out link (issue 206).
         if (consentId) {
-          messageText += ` ${SMS_OPT_OUT_LABEL.en}: ${await smsOptOutUrl(storeId, consentId)}`;
+          messageText += ` ${SMS_OPT_OUT_LABEL[locale]}: ${await smsOptOutUrl(storeId, consentId)}`;
         }
         const smsCredentials = smsConfig!.credentials as unknown as SmsConfig;
 
@@ -308,9 +309,9 @@ class NotificationDispatcherService {
     } else {
       try {
         const pushTemplate = PUSH_TEMPLATES[event];
-        // Default to English; locale selection can be extended later
-        const title = pushTemplate.title.en;
-        const body = renderPushBody(pushTemplate.body.en, data);
+        const locale = await resolveShopperLocale(storeId, data.locale);
+        const title = pushTemplate.title[locale];
+        const body = renderPushBody(pushTemplate.body[locale], data);
 
         await pushService.sendToStore(storeId, title, body, {
           event,
@@ -328,6 +329,29 @@ class NotificationDispatcherService {
 // ==========================================
 // Helpers
 // ==========================================
+
+/**
+ * The language a shopper's SMS / push is written in: the order's or customer's stored locale
+ * (`data.locale`), else the store's `settings.defaultLanguage`, else the region default (`ar`
+ * for Egypt). Never throws: a failed store read falls back to the region default.
+ */
+export async function resolveShopperLocale(
+  storeId: string,
+  stored: unknown
+): Promise<'en' | 'ar'> {
+  if (stored === 'en' || stored === 'ar') return stored;
+  try {
+    const store = await withStore(storeId, tx =>
+      tx.store.findUnique({ where: { id: storeId }, select: { settings: true } })
+    );
+    return resolveDefaultLanguage(
+      (store?.settings as { defaultLanguage?: string } | null)?.defaultLanguage
+    );
+  } catch (err) {
+    logger.warn({ err, storeId }, '[NotificationDispatcher] locale lookup failed, region default');
+    return resolveDefaultLanguage(undefined);
+  }
+}
 
 const SMS_OPT_OUT_LABEL = { en: 'Stop offers', ar: 'إيقاف العروض' } as const;
 

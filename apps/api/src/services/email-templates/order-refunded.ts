@@ -14,7 +14,7 @@ export const orderRefundedTemplate = {
       A refund of <strong>${emailMoney(d.refundAmount, d.currency, 'en')}</strong>
       for order <strong>#${escapeHtml(d.orderNumber)}</strong> has been submitted to the
       payment provider. The amount will appear on your original payment method within
-      1–3 business days, depending on the provider and your bank.
+      5–10 business days, depending on the provider and your bank.
     </p>
 
     ${
@@ -45,7 +45,7 @@ export const orderRefundedTemplate = {
     <p>
       بعتنا طلب استرداد بقيمة <strong>${emailMoney(d.refundAmount, d.currency, 'ar')}</strong>
       للطلب رقم <strong>${escapeHtml(d.orderNumber)}</strong>. المبلغ هيظهر في طريقة الدفع
-      الأصلية خلال 5 إلى 10 أيام عمل حسب بنكك.
+      الأصلية خلال 5–10 أيام عمل حسب بنكك.
     </p>
 
     ${

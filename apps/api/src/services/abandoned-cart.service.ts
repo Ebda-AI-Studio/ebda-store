@@ -686,7 +686,15 @@ class AbandonedCartService {
         },
         include: {
           store: { select: { id: true, name: true, domain: true, slug: true } },
-          customer: { select: { firstName: true, lastName: true, email: true, phone: true } },
+          customer: {
+            select: {
+              firstName: true,
+              lastName: true,
+              email: true,
+              phone: true,
+              preferredLocale: true,
+            },
+          },
         },
       })
     );
@@ -780,6 +788,7 @@ class AbandonedCartService {
       cartTotal: cartTotalFormatted,
       cartItemCount: abandonedCart.cartItemCount,
       couponCode: couponCode ?? undefined,
+      locale: abandonedCart.customer?.preferredLocale,
     };
 
     const event: NotificationEvent = `cart_abandoned_step${stepNumber}` as NotificationEvent;

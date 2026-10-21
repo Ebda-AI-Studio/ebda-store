@@ -45,6 +45,11 @@ export interface NotificationData {
    * phone (issue 206), never trusted from the caller.
    */
   dedupeKey?: string;
+  /**
+   * The shopper's stored locale ('en' | 'ar'): the order's, else the customer's. Absent → the
+   * dispatcher falls back to the store's default language, then the region default (ar).
+   */
+  locale?: string | null;
 }
 
 // ─── SMS Templates ────────────────────────────────────────────────────────────
@@ -76,8 +81,8 @@ export const SMS_TEMPLATES: Record<NotificationEvent, SmsTemplate> = {
     ar: 'أهلاً {name}، طلبك رقم #{number} اتلغى. السبب: {reason}. كلّمنا لو محتاج مساعدة.',
   },
   refund_processed: {
-    en: 'Hi {name}, a refund of {amount} for order #{number} has been processed. It may take 3-5 business days.',
-    ar: 'أهلاً {name}، بنرجّعلك {amount} من الطلب رقم #{number}. ممكن ياخد من 3 لـ 5 أيام عمل.',
+    en: 'Hi {name}, a refund of {amount} for order #{number} has been processed. It may take 5–10 business days.',
+    ar: 'أهلاً {name}، بنرجّعلك {amount} من الطلب رقم #{number}. ممكن ياخد 5–10 أيام عمل.',
   },
   cart_abandoned_step1: {
     en: 'Hi {name}, you left {cartItemCount} items ({cartTotal} EGP) in your cart at {storeName}. Complete your order: {cartUrl}',
