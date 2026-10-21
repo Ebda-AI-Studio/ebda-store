@@ -328,6 +328,13 @@ export const PAGES: PageEntry[] = [
       ar: 'ويب هوك ربط احداث تكامل',
     },
   }),
+  page('/wholesale-applications', 'wholesale.applications.title', 'staff', {
+    feature: 'b2b.wholesale',
+    syn: {
+      en: 'wholesale b2b trade accounts applications approve reject buyers',
+      ar: 'جملة تجار طلبات حسابات موافقة رفض',
+    },
+  }),
   page('/abandoned-carts', `${HUB}.abandonedCarts`, 'staff', {
     feature: 'abandoned_cart',
     syn: { en: 'cart recovery left behind', ar: 'سلة متروكة استرداد' },
