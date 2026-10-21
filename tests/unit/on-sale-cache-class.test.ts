@@ -98,12 +98,14 @@ describe('on_sale: scalar sort at the edge, filters inside the SQL, B2B hook', (
     expect(service).toMatch(/pc\.category_id = \$\{resolvedCategoryId\}/);
     expect(service).toMatch(/p\.id = ANY\(\$\{safeIds\}::text\[\]\)/);
   });
-  it('names the B2B visibility hook inside the SQL and points at feat/b2b-wholesale', () => {
+  it('carries the B2B audience predicate INSIDE the SQL, before the LIMIT (B2B-7b, B2-28)', () => {
     const at = service.indexOf('SELECT p.id');
     const sql = service.slice(at, service.indexOf('LIMIT ${limit}', at));
-    expect(sql).toContain('${onSaleVisibility}');
-    expect(service).toContain('ON_SALE_VISIBILITY_PREDICATE');
-    expect(service).toContain('TODO(feat/b2b-wholesale)');
+    // a wholesale-only product must never take one of the 12 slots (a post-filter would)
+    expect(sql).toContain("p.audience = 'public'");
+    // the integration hook is closed: no placeholder predicate is left behind
+    expect(service).not.toContain('ON_SALE_VISIBILITY_PREDICATE');
+    expect(service).not.toContain('TODO(feat/b2b-wholesale)');
   });
   it('skips facets and ignores a cursor for on_sale', () => {
     expect(service).toMatch(/sort === 'on_sale'\s*\? Promise\.resolve\(\[\] as ProductFacet\[\]\)/);
