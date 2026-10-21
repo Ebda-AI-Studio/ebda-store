@@ -103,6 +103,38 @@ describe('DemoLookBar: template, then look', () => {
     expect(assign).toHaveBeenCalledWith('/products/linen-shirt?look=souq.night');
   });
 
+  it("on a demo host, changing the template goes to that template's own demo store (B2-7)", () => {
+    const loc = window.location as unknown as Record<string, unknown>;
+    const saved = { host: loc.host, protocol: loc.protocol };
+    loc.host = 'storedemo.ebda.app';
+    loc.protocol = 'https:';
+    try {
+      const { container } = render(<DemoLookBar activeLook="qamar.vitrine" isBuilt={isBuilt} />);
+      fireEvent.change(templateSelect(container), { target: { value: 'souq' } });
+      // the other template's host, its first built look, the home path (its catalogue differs)
+      expect(assign).toHaveBeenCalledWith('https://storedemo-souq.ebda.app/?look=souq.night');
+      cleanup();
+      assign.mockReset();
+      loc.host = 'storedemo-souq.ebda.app';
+      const back = render(<DemoLookBar activeLook="souq.night" isBuilt={isBuilt} />);
+      fireEvent.change(templateSelect(back.container), { target: { value: 'qamar' } });
+      expect(assign).toHaveBeenCalledWith('https://storedemo.ebda.app/?look=qamar.atelier');
+    } finally {
+      loc.host = saved.host;
+      loc.protocol = saved.protocol;
+    }
+  });
+
+  it('a template without a demo store is not offered (the bar lists demo-hosted templates only)', () => {
+    const { container } = render(
+      <DemoLookBar
+        activeLook="qamar.atelier"
+        isBuilt={id => id.startsWith('qamar.') || id.startsWith('jasmine.')}
+      />
+    );
+    expect(values(templateSelect(container))).toEqual(['qamar']);
+  });
+
   it('selecting a look navigates to ?look=<id> on the same path', () => {
     pathname = '/products/linen-shirt';
     const { container } = render(<DemoLookBar activeLook="qamar.atelier" isBuilt={isBuilt} />);
