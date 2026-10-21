@@ -349,8 +349,11 @@ export const LOOKS: readonly LookDefinition[] = [
       // page, 3.5+:1 on the card) with dark ink on it, the lantern-market warmth. This is the ONE
       // scoped exception to the no-orange gate (B2-2): exactly this hex, only as `souq.night`'s
       // primary CTA tokens (see tests/unit/souq-look-tokens.test.ts, BRASS_CTA_EXCEPTION). Everything
-      // else in Night stays out of the 12-50 degree band: the sale / new chips are pomegranate, a
-      // FILL with dark ink (4.74:1 on the page, so never a text colour there).
+      // else in Night stays out of the 12-50 degree band. Ruling B2-26 (controller, from Ahmad's taste
+      // profile: metal is the accent on deep grounds): the sale / new / custom chips and the PDP
+      // discount pill are ALSO brass, read through `--chip-bg` = the primary pair (globals.css), so
+      // the look has ONE accent and no coral. The `accent` token below (pomegranate) stays as the
+      // look's declared secondary fill for status UI, never painted on a chip.
       primary: '#C89B3C',
       onPrimary: '#10151C',
       accent: '#F57A83',

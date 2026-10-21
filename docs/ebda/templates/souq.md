@@ -6,13 +6,13 @@ Souq is the Egyptian general-retail and electronics template: phones, appliances
 
 ## The three looks
 
-|              | Catalogue (`souq.catalogue`)                | Night souq (`souq.night`)                                                          | Showroom (`souq.showroom`)                      |
-| ------------ | ------------------------------------------- | ---------------------------------------------------------------------------------- | ----------------------------------------------- |
-| Scene        | Many SKUs, shoppers who know what they want | A lit market after dark, warmth without clutter                                    | A small premium range sold one object at a time |
-| Colour       | Ink on white, cobalt `#1F5FD6`              | Deep green `#0F3B2E`, cream ink, brass CTAs `#C89B3C`, pomegranate chips `#F57A83` | Soft grey page, ink, electric blue `#1D5CE6`    |
-| Type         | IBM Plex Sans Arabic / IBM Plex Sans        | Changa / Cairo / Manrope                                                           | Alexandria / Readex Pro / Inter Tight           |
-| Radius, etc. | md, compact, 1/1, subtle                    | md, regular, 1/1, expressive                                                       | lg, airy, 1/1, subtle                           |
-| Card action  | the skin's quick add                        | the skin's quick add                                                               | quiet outline add (`cardCta: 'quiet'`)          |
+|              | Catalogue (`souq.catalogue`)                | Night souq (`souq.night`)                                       | Showroom (`souq.showroom`)                      |
+| ------------ | ------------------------------------------- | --------------------------------------------------------------- | ----------------------------------------------- |
+| Scene        | Many SKUs, shoppers who know what they want | A lit market after dark, warmth without clutter                 | A small premium range sold one object at a time |
+| Colour       | Ink on white, cobalt `#1F5FD6`              | Deep green `#0F3B2E`, cream ink, brass CTAs and chips `#C89B3C` | Soft grey page, ink, electric blue `#1D5CE6`    |
+| Type         | IBM Plex Sans Arabic / IBM Plex Sans        | Changa / Cairo / Manrope                                        | Alexandria / Readex Pro / Inter Tight           |
+| Radius, etc. | md, compact, 1/1, subtle                    | md, regular, 1/1, expressive                                    | lg, airy, 1/1, subtle                           |
+| Card action  | the skin's quick add                        | the skin's quick add                                            | quiet outline add (`cardCta: 'quiet'`)          |
 
 ### Tokens and measured contrast (computed 2026-10-21, asserted in `tests/unit/souq-look-tokens.test.ts`)
 
@@ -25,7 +25,7 @@ Souq is the Egyptian general-retail and electronics template: phones, appliances
 | chip fill on card / page | n/a       | 3.55 / 4.74     | n/a      |
 | primary as text on page  | 5.73      | 4.87 (brass)    | 5.08     |
 
-Night's pomegranate is a FILL with dark ink for sale and new chips (>= 3:1 against the card and the page). Inputs read `--input` (the muted ink), so a field boundary is >= 3:1 on every look.
+Night's sale / new chips and the PDP discount pill are the same brass with dark ink (4.87:1 on the page, 7.16:1 for the ink; Ruling B2-26: one accent, no coral). Inputs read `--input` (the muted ink), so a field boundary is >= 3:1 on every look.
 
 ## Night souq's brass (Ruling B2-18)
 
@@ -51,7 +51,7 @@ Mixes are data (`packages/shared/src/looks/registry.ts`); a section the incoming
 
 **Catalogue.** Scene: a shopper who knows the model number and wants it in two taps. Colour strategy: restrained, one cobalt accent on white, the photo is the colour. Type: IBM Plex Sans Arabic with IBM Plex Sans (one family, tabular prices). Bold idea: the search field IS the first screen, with the category rail under it and no hero. Mix: rail, deals (`on_sale`), newest 4-up, trust, newsletter. Motion: subtle (200 ms, no parallax). Contrast: ink on page 17.0:1, muted 6.9:1, white on cobalt 5.73:1.
 
-**Night souq.** Scene: a covered market after dark, lanterns lit. Colour strategy: committed, deep green ground, cream ink, brass CTAs (B2-18; metallic warmth, never orange), pomegranate chips as fills; merchant white-background photos sit on a light band (B2-19). Type: Changa (Arabic display), Cairo (body), Manrope (Latin). Bold idea: the champagne-lantern arcade hero (generated, empty, 0.1% orange) over a green ground with one brass button, then one featured product. Mix: hero, one stage, category tiles, curated and deals rows, newest grid, trust, brand story. Motion: expressive but reduced-motion safe. Contrast: ink 11.23:1, muted 7.38:1, ink on brass 7.16:1, brass on page 4.87:1 (text on a card 3.65:1, so re-inked there, B2-20).
+**Night souq.** Scene: a covered market after dark, lanterns lit. Colour strategy: committed, deep green ground, cream ink, brass CTAs (B2-18; metallic warmth, never orange), brass chips (B2-26); merchant white-background photos sit on a light band (B2-19). Type: Changa (Arabic display), Cairo (body), Manrope (Latin). Bold idea: the champagne-lantern arcade hero (generated, empty, 0.1% orange) over a green ground with one brass button, then one featured product. Mix: hero, one stage, category tiles, curated and deals rows, newest grid, trust, brand story. Motion: expressive but reduced-motion safe. Contrast: ink 11.23:1, muted 7.38:1, ink on brass 7.16:1, brass on page 4.87:1 (text on a card 3.65:1, so re-inked there, B2-20).
 
 **Showroom.** Scene: a small premium range sold one object at a time. Colour strategy: restrained soft grey, ink, one electric-blue action. Type: Alexandria (Arabic display), Readex Pro, Inter Tight. Bold idea: each product is a full-width stage (photo, two facts, price, Choose options and Compare), categories as chips under the header. Mix: chips, up to three stages, hand-picked collection, 4-up grid (2 on phones), trust. Motion: subtle. Contrast: blue `#1D5CE6` 5.08:1 on the page, 5.64:1 under white.
 
