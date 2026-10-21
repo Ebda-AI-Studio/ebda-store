@@ -45,3 +45,16 @@ export function isReservedSlug(slug: string | null | undefined): boolean {
   if (typeof slug !== 'string') return false;
   return RESERVED_SET.has(slug.trim().toLowerCase());
 }
+
+/**
+ * The demo showroom family (Ruling B2-17): `storedemo` (Qamar) and `storedemo-*` (`storedemo-souq`,
+ * a future template). These belong to `scripts/storedemo/seed.mjs`; a merchant who registered one
+ * first would be overwritten by the seed, or would impersonate the official demo. Refused on
+ * SIGNUP / create / slug change (`validateStoreSlug`) but deliberately NOT in RESERVED_SLUGS: a
+ * reserved label is a PLATFORM host, and `storedemo.ebda.app` must keep resolving as a store.
+ * `demo*` in general is not reserved (ordinary merchants use `demo-shop`).
+ */
+export function isDemoShowroomSlug(slug: string | null | undefined): boolean {
+  if (typeof slug !== 'string') return false;
+  return slug.trim().toLowerCase().startsWith('storedemo');
+}
