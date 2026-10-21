@@ -55,10 +55,7 @@ export default function WholesaleClient() {
   const messageFor = (code?: string, fallback?: string) => {
     switch (code) {
       case 'ALREADY_PENDING':
-        return t(
-          'You already have an application waiting for review.',
-          'عندك طلب لسه بيتراجع.'
-        );
+        return t('You already have an application waiting for review.', 'عندك طلب لسه بيتراجع.');
       case 'ALREADY_APPROVED':
         return t('Your account already has wholesale access.', 'حسابك فيه صلاحية الجملة أصلًا.');
       case 'REAPPLY_COOLDOWN':
@@ -77,10 +74,7 @@ export default function WholesaleClient() {
           'المتجر ده مش بيقدّم حسابات جملة.'
         );
       default:
-        return (
-          fallback ||
-          t('Something went wrong. Please try again.', 'حصلت مشكلة. جرّب تاني.')
-        );
+        return fallback || t('Something went wrong. Please try again.', 'حصلت مشكلة. جرّب تاني.');
     }
   };
 

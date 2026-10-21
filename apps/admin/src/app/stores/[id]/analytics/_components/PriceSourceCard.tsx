@@ -81,7 +81,10 @@ export function PriceSourceCard({ storeId, rangeQs }: { storeId: string; rangeQs
             role="img"
             aria-label={t('shareBar', { percent: data.wholesaleSharePercent })}
           >
-            <div className="h-full bg-primary" style={{ width: `${data.wholesaleSharePercent}%` }} />
+            <div
+              className="h-full bg-primary"
+              style={{ width: `${data.wholesaleSharePercent}%` }}
+            />
           </div>
           <table className="mt-4 w-full text-sm">
             <thead>
