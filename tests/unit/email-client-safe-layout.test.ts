@@ -58,6 +58,7 @@ import { returnStatusUpdateTemplate } from '@api/services/email-templates/return
 import { reviewRequestTemplate } from '@api/services/email-templates/review-request';
 import { lowStockAlertTemplate } from '@api/services/email-templates/low-stock-alert';
 import { planLimitReachedTemplate } from '@api/services/email-templates/plan-limit-reached';
+import { webhookDisabledTemplate } from '@api/services/email-templates/webhook-disabled';
 import { subscriptionBillingTemplate } from '@api/services/email-templates/subscription-billing';
 import { staffInviteTemplate } from '@api/services/email-templates/staff-invite';
 import { legalNoticeTemplate } from '@api/services/email-templates/legal-notice';
@@ -171,6 +172,7 @@ const TEMPLATES: Record<string, Tpl> = {
   reviewRequest: reviewRequestTemplate,
   lowStockAlert: lowStockAlertTemplate,
   planLimitReached: planLimitReachedTemplate,
+  webhookDisabled: webhookDisabledTemplate,
   subscriptionBilling: subscriptionBillingTemplate,
   staffInvite: staffInviteTemplate,
   // Recovery email takes a data object, not the (data, storeName, url) triple.
