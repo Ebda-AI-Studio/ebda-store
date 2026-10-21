@@ -20,6 +20,7 @@ import { GeminiFailoverClient } from './gemini-keys';
 import { parseAiJson } from './parse-ai-json';
 import { rethrowAsAppError } from './gemini-errors';
 import { recordUsage } from '../../services/ai.service';
+import { EGYPTIAN_ARABIC_REGISTER } from './arabic-register';
 
 export type MetaAeoKind = 'store' | 'product' | 'category';
 
@@ -68,7 +69,7 @@ Write a meta description that directly answers the question a user might ask an 
 - Factual and specific, no marketing fluff or keyword stuffing
 - Between 130-160 characters (English)
 - Naturally include ${naturalInclude}
-- Both English and Arabic (formal MSA)
+- Both English and Arabic. ${EGYPTIAN_ARABIC_REGISTER}
 
 Return ONLY a JSON object with keys "en" and "ar". No markdown, no code fences — pure JSON only.
 Example: {"en": "Ebda is an Egypt-based online retailer ...", "ar": "ابدأ متجر مصري متخصص في ..."}`;

@@ -155,10 +155,10 @@ export default function LoyaltyClient() {
       const result = await api.joinLoyalty(storeId);
       if (result.success && result.data) {
         toastSuccess(
-          t('Welcome to the loyalty program!', '!مرحباً بك في برنامج الولاء'),
+          t('Welcome to the loyalty program!', 'أهلاً بيك في برنامج الولاء!'),
           t(
             'Your points balance has been created. Start earning on every order.',
-            'تم إنشاء رصيدك من النقاط. ابدأ في الكسب مع كل طلب.'
+            'حسابك في برنامج النقط جاهز. ابدأ اكسب نقط مع كل طلب.'
           )
         );
         // Re-fetch to pick up the new record (includes the signup bonus).
@@ -186,16 +186,13 @@ export default function LoyaltyClient() {
       } else {
         const msg =
           result.error?.message ||
-          t('Failed to join. Please try again.', 'فشل الانضمام. يرجى المحاولة مرة أخرى.');
-        toastError(t('Could not join', 'تعذّر الانضمام'), msg);
+          t('Failed to join. Please try again.', 'الانضمام منفعش. جرّب تاني.');
+        toastError(t('Could not join', 'معرفناش نسجّلك'), msg);
       }
     } catch {
       toastError(
-        t('Could not join', 'تعذّر الانضمام'),
-        t(
-          'An unexpected error occurred. Please try again.',
-          'حدث خطأ غير متوقع. يرجى المحاولة مرة أخرى.'
-        )
+        t('Could not join', 'معرفناش نسجّلك'),
+        t('An unexpected error occurred. Please try again.', 'حصل خطأ مش متوقع. جرّب تاني.')
       );
     } finally {
       setIsJoining(false);
@@ -210,7 +207,7 @@ export default function LoyaltyClient() {
             {t('Loyalty Program', 'برنامج الولاء')}
           </h1>
           <p className="mt-1 text-muted-foreground">
-            {t('Your points and rewards', 'نقاطك ومكافآتك')}
+            {t('Your points and rewards', 'نقطك ومكافآتك')}
           </p>
         </div>
         <div className="flex justify-center py-12">
@@ -228,7 +225,7 @@ export default function LoyaltyClient() {
             {t('Loyalty Program', 'برنامج الولاء')}
           </h1>
           <p className="mt-1 text-muted-foreground">
-            {t('Your points and rewards', 'نقاطك ومكافآتك')}
+            {t('Your points and rewards', 'نقطك ومكافآتك')}
           </p>
         </div>
         <div className="rounded-xl border bg-card p-10 text-center shadow-sm">
@@ -248,15 +245,12 @@ export default function LoyaltyClient() {
             </svg>
           </div>
           <h2 className="mt-4 text-lg font-semibold text-foreground">
-            {t(
-              'Loyalty Program Not Enabled',
-              '\u0628\u0631\u0646\u0627\u0645\u062c \u0627\u0644\u0648\u0644\u0627\u0621 \u063a\u064a\u0631 \u0645\u0641\u0639\u0651\u0644'
-            )}
+            {t('Loyalty Program Not Enabled', 'برنامج الولاء غير مفعّل')}
           </h2>
           <p className="mt-2 text-muted-foreground">
             {t(
               'This store does not currently offer a loyalty rewards program.',
-              '\u0647\u0630\u0627 \u0627\u0644\u0645\u062a\u062c\u0631 \u0644\u0627 \u064a\u0642\u062f\u0645 \u062d\u0627\u0644\u064a\u0627\u064b \u0628\u0631\u0646\u0627\u0645\u062c \u0645\u0643\u0627\u0641\u0622\u062a \u0648\u0644\u0627\u0621.'
+              'المتجر ده مش بيقدم برنامج مكافآت ولاء دلوقتي.'
             )}
           </p>
         </div>
@@ -265,21 +259,18 @@ export default function LoyaltyClient() {
   }
 
   // Customer is authenticated and loyalty is active for this store, but they
-  // have no loyalty record yet \u2014 show the enrolment CTA.
+  // have no loyalty record yet — show the enrolment CTA.
   if (notEnrolled && !isLoadingPoints) {
     return (
       <div className="space-y-6">
         <div>
           <h1 className="text-2xl font-bold text-foreground">
-            {t(
-              'Loyalty Program',
-              '\u0628\u0631\u0646\u0627\u0645\u062c \u0627\u0644\u0648\u0644\u0627\u0621'
-            )}
+            {t('Loyalty Program', 'برنامج الولاء')}
           </h1>
           <p className="mt-1 text-muted-foreground">
             {t(
               'Earn points on every purchase and redeem them at checkout',
-              '\u0627\u0643\u0633\u0628 \u0646\u0642\u0627\u0637\u0627\u064b \u0639\u0644\u0649 \u0643\u0644 \u0634\u0631\u0627\u0621 \u0648\u0627\u0633\u062a\u0628\u062f\u0644\u0647\u0627 \u0639\u0646\u062f \u0627\u0644\u062f\u0641\u0639'
+              'اكسب نقط على كل شراء واستبدلها وقت الدفع'
             )}
           </p>
         </div>
@@ -305,15 +296,12 @@ export default function LoyaltyClient() {
             </div>
 
             <h2 className="mt-5 text-2xl font-bold text-foreground">
-              {t(
-                'Join Our Loyalty Program',
-                '\u0627\u0646\u0636\u0645 \u0625\u0644\u0649 \u0628\u0631\u0646\u0627\u0645\u062c \u0627\u0644\u0648\u0644\u0627\u0621'
-              )}
+              {t('Join Our Loyalty Program', 'انضم إلى برنامج الولاء')}
             </h2>
             <p className="mt-2 text-muted-foreground max-w-sm mx-auto">
               {t(
                 'Sign up today and start earning points on every order. Redeem your points for discounts at checkout.',
-                '\u0633\u062c\u0651\u0644 \u0627\u0644\u064a\u0648\u0645 \u0648\u0627\u0628\u062f\u0623 \u0628\u0643\u0633\u0628 \u0646\u0642\u0627\u0637 \u0639\u0644\u0649 \u0643\u0644 \u0637\u0644\u0628. \u0627\u0633\u062a\u0628\u062f\u0644 \u0646\u0642\u0627\u0637\u0643 \u0644\u0644\u062d\u0635\u0648\u0644 \u0639\u0644\u0649 \u062e\u0635\u0648\u0645\u0627\u062a \u0639\u0646\u062f \u0627\u0644\u062f\u0641\u0639.'
+                'سجّل النهارده وابدأ اكسب نقط على كل طلب. استبدل نقطك بخصومات وقت الدفع.'
               )}
             </p>
 
@@ -333,10 +321,7 @@ export default function LoyaltyClient() {
                     d="M5 13l4 4L19 7"
                   />
                 </svg>
-                {t(
-                  'Earn points on every purchase',
-                  '\u0627\u0643\u0633\u0628 \u0646\u0642\u0627\u0637\u0627\u064b \u0639\u0644\u0649 \u0643\u0644 \u0639\u0645\u0644\u064a\u0629 \u0634\u0631\u0627\u0621'
-                )}
+                {t('Earn points on every purchase', 'اكسب نقط على كل شراء')}
               </li>
               <li className="flex items-center gap-2 text-foreground">
                 <svg
@@ -352,10 +337,7 @@ export default function LoyaltyClient() {
                     d="M5 13l4 4L19 7"
                   />
                 </svg>
-                {t(
-                  'Redeem points for discounts at checkout',
-                  '\u0627\u0633\u062a\u0628\u062f\u0644 \u0627\u0644\u0646\u0642\u0627\u0637 \u0644\u062e\u0635\u0648\u0645\u0627\u062a \u0639\u0646\u062f \u0627\u0644\u062f\u0641\u0639'
-                )}
+                {t('Redeem points for discounts at checkout', 'استبدل النقط بخصومات وقت الدفع')}
               </li>
               <li className="flex items-center gap-2 text-foreground">
                 <svg
@@ -371,10 +353,7 @@ export default function LoyaltyClient() {
                     d="M5 13l4 4L19 7"
                   />
                 </svg>
-                {t(
-                  'Unlock higher tiers with more rewards',
-                  '\u0627\u0646\u0636\u0645 \u0625\u0644\u0649 \u0645\u0633\u062a\u0648\u064a\u0627\u062a \u0623\u0639\u0644\u0649 \u0648\u0627\u062d\u0635\u0644 \u0639\u0644\u0649 \u0645\u0632\u064a\u062f \u0645\u0646 \u0627\u0644\u0645\u0643\u0627\u0641\u0622\u062a'
-                )}
+                {t('Unlock higher tiers with more rewards', 'اطلع مستويات أعلى وخد مكافآت أكتر')}
               </li>
             </ul>
 
@@ -386,13 +365,10 @@ export default function LoyaltyClient() {
               {isJoining ? (
                 <>
                   <span className="h-4 w-4 animate-spin rounded-full border-2 border-primary-foreground border-t-transparent" />
-                  {t(
-                    'Joining\u2026',
-                    '\u062c\u0627\u0631\u064a \u0627\u0644\u0627\u0646\u0636\u0645\u0627\u0645\u2026'
-                  )}
+                  {t('Joining…', 'بنسجّلك…')}
                 </>
               ) : (
-                t('Join Now', '\u0627\u0646\u0636\u0645 \u0627\u0644\u0622\u0646')
+                t('Join Now', 'انضم الآن')
               )}
             </button>
           </div>
@@ -405,16 +381,10 @@ export default function LoyaltyClient() {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-foreground">
-          {t(
-            'Loyalty Program',
-            '\u0628\u0631\u0646\u0627\u0645\u062c \u0627\u0644\u0648\u0644\u0627\u0621'
-          )}
+          {t('Loyalty Program', 'برنامج الولاء')}
         </h1>
         <p className="mt-1 text-muted-foreground">
-          {t(
-            'Your points and rewards',
-            '\u0646\u0642\u0627\u0637\u0643 \u0648\u0645\u0643\u0627\u0641\u0622\u062a\u0643'
-          )}
+          {t('Your points and rewards', 'نقطك ومكافآتك')}
         </p>
       </div>
 
@@ -433,25 +403,17 @@ export default function LoyaltyClient() {
             <div className="flex flex-wrap items-center justify-between gap-4">
               <div>
                 <p className="text-sm font-medium text-muted-foreground">
-                  {t(
-                    'Current Balance',
-                    '\u0627\u0644\u0631\u0635\u064a\u062f \u0627\u0644\u062d\u0627\u0644\u064a'
-                  )}
+                  {t('Current Balance', 'الرصيد الحالي')}
                 </p>
                 <p className="mt-1 text-5xl font-bold text-primary">
                   {localize(loyaltyPoints.points.toLocaleString('en-US'))}
                 </p>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  {t('points', '\u0646\u0642\u0627\u0637')}
-                </p>
+                <p className="mt-1 text-sm text-muted-foreground">{t('points', 'نقط')}</p>
               </div>
               {loyaltyPoints.tier && (
                 <div className="text-right">
                   <p className="text-sm text-muted-foreground mb-1">
-                    {t(
-                      'Membership Tier',
-                      '\u0645\u0633\u062a\u0648\u0649 \u0627\u0644\u0639\u0636\u0648\u064a\u0629'
-                    )}
+                    {t('Membership Tier', 'مستوى العضوية')}
                   </p>
                   <span
                     className={`inline-block rounded-full px-4 py-1 text-sm font-semibold ${tierColor(
@@ -470,14 +432,9 @@ export default function LoyaltyClient() {
       {/* Transaction history */}
       <div className="rounded-xl border bg-card shadow-sm">
         <div className="border-b p-4">
-          <h2 className="font-semibold text-foreground">
-            {t('Points History', '\u0633\u062c\u0644 \u0627\u0644\u0646\u0642\u0627\u0637')}
-          </h2>
+          <h2 className="font-semibold text-foreground">{t('Points History', 'سجل النقط')}</h2>
           <p className="text-sm text-muted-foreground">
-            {t(
-              'Your recent loyalty activity',
-              '\u0646\u0634\u0627\u0637 \u0627\u0644\u0648\u0644\u0627\u0621 \u0627\u0644\u0623\u062e\u064a\u0631'
-            )}
+            {t('Your recent loyalty activity', 'نشاط الولاء الأخير')}
           </p>
         </div>
 
@@ -507,10 +464,7 @@ export default function LoyaltyClient() {
               />
             </svg>
             <p className="mt-3 text-muted-foreground">
-              {t(
-                'No transactions yet.',
-                '\u0644\u0627 \u062a\u0648\u062c\u062f \u0645\u0639\u0627\u0645\u0644\u0627\u062a \u0628\u0639\u062f.'
-              )}
+              {t('No transactions yet.', 'مفيش معاملات لسه.')}
             </p>
           </div>
         ) : (
@@ -519,16 +473,16 @@ export default function LoyaltyClient() {
               <thead>
                 <tr className="border-b bg-muted text-left">
                   <th className="px-6 py-3 font-medium text-muted-foreground">
-                    {t('Date', '\u0627\u0644\u062a\u0627\u0631\u064a\u062e')}
+                    {t('Date', 'التاريخ')}
                   </th>
                   <th className="px-6 py-3 font-medium text-muted-foreground">
-                    {t('Type', '\u0627\u0644\u0646\u0648\u0639')}
+                    {t('Type', 'النوع')}
                   </th>
                   <th className="px-6 py-3 font-medium text-muted-foreground">
-                    {t('Description', '\u0627\u0644\u0648\u0635\u0641')}
+                    {t('Description', 'الوصف')}
                   </th>
                   <th className="px-6 py-3 text-right font-medium text-muted-foreground">
-                    {t('Points', '\u0627\u0644\u0646\u0642\u0627\u0637')}
+                    {t('Points', 'النقط')}
                   </th>
                 </tr>
               </thead>

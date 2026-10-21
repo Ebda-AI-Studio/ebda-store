@@ -279,7 +279,7 @@ export default function StoreSettingsPage() {
     {
       key: 'announcement',
       href: `/stores/${storeId}/announcement`,
-      color: 'bg-orange-100 text-orange-600 dark:bg-orange-900/30 dark:text-orange-300',
+      color: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300',
       icon: (
         <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path

@@ -27,7 +27,7 @@ const SAMPLE_CARDS = [
     author: 'Verified Buyer',
     authorAr: 'مشتري موثّق',
     body: 'Quality is great, shipped fast. Definitely buying again.',
-    bodyAr: 'الجودة ممتازة، الشحن سريع. سأشتري مرة أخرى بكل تأكيد.',
+    bodyAr: 'الجودة ممتازة والشحن سريع. أكيد هشتري تاني.',
   },
   {
     rating: 4,
@@ -36,7 +36,7 @@ const SAMPLE_CARDS = [
     author: 'Verified Buyer',
     authorAr: 'مشتري موثّق',
     body: 'Works as described. Packaging could be better.',
-    bodyAr: 'يعمل كما هو موصوف. التغليف يمكن أن يكون أفضل.',
+    bodyAr: 'شغال زي الوصف بالظبط. التغليف كان ممكن يبقى أحسن.',
   },
 ];
 
@@ -257,7 +257,7 @@ export default function ReviewSection({ storeId, productId }: Props) {
     if (rating === 0) {
       setSubmitMessage({
         type: 'error',
-        text: t('Please select a star rating.', 'يرجى اختيار تقييم بالنجوم.'),
+        text: t('Please select a star rating.', 'اختار تقييم بالنجوم.'),
       });
       return;
     }
@@ -270,7 +270,7 @@ export default function ReviewSection({ storeId, productId }: Props) {
         type: 'error',
         text: t(
           'Please write at least 20 characters so your review is useful to other shoppers.',
-          'يرجى كتابة 20 حرفاً على الأقل حتى تكون مراجعتك مفيدة للمتسوقين الآخرين.'
+          'اكتب 20 حرف على الأقل عشان تقييمك يفيد اللي بيشتروا بعدك.'
         ),
       });
       return;
@@ -281,7 +281,7 @@ export default function ReviewSection({ storeId, productId }: Props) {
         type: 'error',
         text: t(
           'Only customers who bought this product can review it.',
-          'يمكن للعملاء الذين اشتروا هذا المنتج فقط تقييمه.'
+          'اللي اشتروا المنتج ده بس يقدروا يقيّموه.'
         ),
       });
       return;
@@ -312,7 +312,7 @@ export default function ReviewSection({ storeId, productId }: Props) {
           type: 'success',
           text: t(
             'Thanks! Your review is awaiting approval — you can see it on this page until the merchant publishes it.',
-            'شكراً! مراجعتك بانتظار الموافقة — تستطيع رؤيتها هنا إلى أن يقوم التاجر بنشرها.'
+            'شكرًا! تقييمك مستني الموافقة — تقدر تشوفه هنا لحد ما التاجر ينشره.'
           ),
         });
         setRating(0);
@@ -325,10 +325,7 @@ export default function ReviewSection({ storeId, productId }: Props) {
           type: 'error',
           text:
             json.error?.message ||
-            t(
-              'Failed to submit review. Please try again.',
-              'فشل إرسال المراجعة. يرجى المحاولة مرة أخرى.'
-            ),
+            t('Failed to submit review. Please try again.', 'التقييم متبعتش. جرّب تاني.'),
         });
       }
     } catch {
@@ -336,7 +333,7 @@ export default function ReviewSection({ storeId, productId }: Props) {
         type: 'error',
         text: t(
           'Failed to submit review. Please check your connection.',
-          'فشل إرسال المراجعة. يرجى التحقق من اتصالك.'
+          'التقييم متبعتش. اتأكد من اتصالك.'
         ),
       });
     } finally {
@@ -450,7 +447,7 @@ export default function ReviewSection({ storeId, productId }: Props) {
                   <p className="mt-2 text-xs font-medium text-warning-ink">
                     {t(
                       'Your review · pending approval. Only you can see it for now.',
-                      'مراجعتك · بانتظار الموافقة. أنت فقط من يستطيع رؤيتها الآن.'
+                      'تقييمك · مستني الموافقة. إنت بس اللي تقدر تشوفه دلوقتي.'
                     )}
                   </p>
                 )}
@@ -499,7 +496,7 @@ export default function ReviewSection({ storeId, productId }: Props) {
         <SectionRetryNotice
           onRetry={fetchReviews}
           message="Couldn't load reviews."
-          messageAr="تعذّر تحميل المراجعات."
+          messageAr="معرفناش نحمّل التقييمات."
           className="mt-6"
         />
       )}
@@ -513,7 +510,7 @@ export default function ReviewSection({ storeId, productId }: Props) {
           <p className="text-muted-foreground mb-8">
             {t(
               'No reviews yet. Be the first to review this product.',
-              'لا توجد مراجعات بعد. كن أول من يراجع هذا المنتج.'
+              'مفيش تقييمات لسه. خليك أول واحد يقيّم المنتج ده.'
             )}
           </p>
 
@@ -523,7 +520,7 @@ export default function ReviewSection({ storeId, productId }: Props) {
           <div className="relative" aria-hidden="true">
             {/* Amber badge overlapping the top edge of the card grid */}
             <div className="absolute -top-3 inset-x-0 mx-auto w-fit px-3 py-1 rounded-full bg-amber-100 text-amber-900 text-xs font-semibold uppercase tracking-wide z-10 border border-amber-300">
-              {language === 'ar' ? 'مثال — ليست مراجعات حقيقية' : 'Sample — not real reviews'}
+              {language === 'ar' ? 'مثال — مش تقييمات حقيقية' : 'Sample — not real reviews'}
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 opacity-40 pointer-events-none select-none">
               {SAMPLE_CARDS.map((s, i) => (
@@ -623,7 +620,7 @@ export default function ReviewSection({ storeId, productId }: Props) {
                   onChange={e => setComment(e.target.value)}
                   placeholder={t(
                     `Share your experience with this product from ${storeName}...`,
-                    `شارك تجربتك مع هذا المنتج من ${storeName}...`
+                    `احكي تجربتك مع المنتج ده من ${storeName}...`
                   )}
                   className="w-full rounded-lg border border-border bg-background px-4 py-3 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 resize-none"
                 />

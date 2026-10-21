@@ -416,7 +416,7 @@ export default function ProductDetailClient({
         setError(
           t(
             'Unable to load product. Please check your connection.',
-            'تعذر تحميل المنتج. يرجى التحقق من اتصالك بالإنترنت.'
+            'معرفناش نحمّل المنتج. اتأكد من اتصالك بالإنترنت.'
           )
         );
       } finally {
@@ -441,21 +441,21 @@ export default function ProductDetailClient({
       if (wasWishlisted) {
         await api.delete(`/wishlist/product/${product.id}`);
         toastSuccess(
-          t('Removed from wishlist', 'أُزيل من المفضلة'),
-          t(`${name} removed from your wishlist`, `أُزيل ${name} من المفضلة`)
+          t('Removed from wishlist', 'اتشال من المفضلة'),
+          t(`${name} removed from your wishlist`, `شيلنا ${name} من المفضلة`)
         );
       } else {
         await api.post('/wishlist', { productId: product.id });
         toastSuccess(
-          t('Added to wishlist', 'أُضيف إلى المفضلة'),
-          t(`${name} added to your wishlist`, `أُضيف ${name} إلى المفضلة`)
+          t('Added to wishlist', 'اتضاف للمفضلة'),
+          t(`${name} added to your wishlist`, `ضفنا ${name} للمفضلة`)
         );
       }
     } catch {
       setIsWishlisted(wasWishlisted);
       toastError(
         t('Error', 'خطأ'),
-        t('Failed to update wishlist. Please try again.', 'تعذّر تحديث المفضلة. حاول مرة أخرى.')
+        t('Failed to update wishlist. Please try again.', 'معرفناش نحدّث المفضلة. جرّب تاني.')
       );
     }
   };
@@ -542,7 +542,7 @@ export default function ProductDetailClient({
           <p className="mt-2 text-muted-foreground">
             {t(
               "The product you're looking for may have been removed or doesn't exist.",
-              'المنتج الذي تبحث عنه ربما تم إزالته أو غير موجود.'
+              'المنتج اللي بتدوّر عليه ممكن يكون اتشال أو مش موجود.'
             )}
           </p>
           <Link href={storeUrl('/products')}>
@@ -767,9 +767,9 @@ export default function ProductDetailClient({
             maxQuantity={maxQty}
             stockText={
               outOfStock && !canBackorder
-                ? t('Out of stock', 'غير متوفر حالياً')
+                ? t('Out of stock', 'مش متوفر دلوقتي')
                 : canBackorder
-                  ? t('Made to order — ships when ready', 'يُصنع حسب الطلب — يُشحن فور تجهيزه')
+                  ? t('Made to order — ships when ready', 'بيتعمل مخصوص — بيتشحن أول ما يجهز')
                   : null
             }
             onAddToCart={handleAddToCart}

@@ -84,7 +84,7 @@ export default function PaymentAbandonmentsPage() {
             <button
               type="button"
               onClick={() => applyDateFilter(localFrom, localTo)}
-              className="px-4 py-1.5 text-sm bg-primary text-white rounded-lg hover:opacity-90"
+              className="px-4 py-1.5 text-sm bg-primary text-primary-foreground rounded-lg hover:opacity-90"
             >
               {t('dateApply')}
             </button>

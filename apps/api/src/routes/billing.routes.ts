@@ -152,6 +152,7 @@ router.get(
     try {
       const hint = getBillingProvider().parseReturn(req.query as Record<string, unknown>);
       let status: string | null = null;
+      let chargeId: string | null = null;
       if (hint.merchantOrderId && /^[0-9a-f-]{36}$/i.test(hint.merchantOrderId)) {
         const row = await withStore(req.params.storeId, tx =>
           tx.billingEvent.findFirst({
@@ -160,8 +161,10 @@ router.get(
           })
         );
         status = row?.status ?? null;
+        // The ledger row (this store's) the gateway returned for: the page prints THIS charge's receipt.
+        chargeId = row ? hint.merchantOrderId : null;
       }
-      res.json({ success: true, data: { hint: hint.outcome, status } });
+      res.json({ success: true, data: { hint: hint.outcome, status, chargeId } });
     } catch (err) {
       next(err);
     }

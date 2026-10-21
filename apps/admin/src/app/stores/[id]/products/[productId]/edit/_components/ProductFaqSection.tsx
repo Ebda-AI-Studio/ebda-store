@@ -291,7 +291,7 @@ export const ProductFaqSection = forwardRef<ProductFaqSectionHandle, Props>(
               type="button"
               onClick={generateWithAi}
               disabled={aiGenerating}
-              className="inline-flex items-center gap-2 rounded-lg border border-[#ff6e00]/40 bg-[#ff6e00]/5 px-3 py-1.5 text-xs font-semibold text-[#ff6e00] transition-colors hover:bg-[#ff6e00]/10 disabled:cursor-not-allowed disabled:opacity-50"
+              className="inline-flex items-center gap-2 rounded-lg border border-primary/40 bg-primary/5 px-3 py-1.5 text-xs font-semibold text-primary-ink transition-colors hover:bg-primary/10 disabled:cursor-not-allowed disabled:opacity-50"
             >
               <span aria-hidden="true">✨</span>
               {aiGenerating ? t('generating') : t('generateWithAi')}
@@ -309,7 +309,7 @@ export const ProductFaqSection = forwardRef<ProductFaqSectionHandle, Props>(
             {aiDrafts.length > 0 && (
               <div className="mb-4 space-y-3">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-medium text-[#ff6e00]">{t('reviewNote')}</span>
+                  <span className="text-xs font-medium text-primary-ink">{t('reviewNote')}</span>
                   <div className="flex gap-2">
                     <button
                       type="button"
@@ -328,10 +328,7 @@ export const ProductFaqSection = forwardRef<ProductFaqSectionHandle, Props>(
                   </div>
                 </div>
                 {aiDrafts.map((draft, idx) => (
-                  <div
-                    key={idx}
-                    className="rounded-lg border border-[#ff6e00]/30 bg-[#ff6e00]/5 p-4"
-                  >
+                  <div key={idx} className="rounded-lg border border-primary/30 bg-primary/5 p-4">
                     <div className="mb-2 grid gap-3 sm:grid-cols-2">
                       <div>
                         <p className="mb-1 text-xs font-medium text-muted-foreground">

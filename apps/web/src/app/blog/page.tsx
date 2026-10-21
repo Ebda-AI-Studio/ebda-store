@@ -75,15 +75,15 @@ export default function BlogIndexPage() {
 
           {isLoading ? (
             <p className="text-center text-sm text-foreground/70 py-16">
-              {isRtl ? 'جارٍ التحميل…' : 'Loading…'}
+              {isRtl ? 'بنحمّل…' : 'Loading…'}
             </p>
           ) : disabled ? (
             <p className="text-center text-sm text-foreground/70 py-16">
-              {isRtl ? 'المدونة غير متاحة حالياً.' : 'Blog is not available right now.'}
+              {isRtl ? 'المدونة مش متاحة دلوقتي.' : 'Blog is not available right now.'}
             </p>
           ) : posts.length === 0 ? (
             <p className="text-center text-sm text-foreground/70 py-16">
-              {isRtl ? 'لا توجد مقالات بعد.' : 'No posts yet.'}
+              {isRtl ? 'مفيش مقالات لسه.' : 'No posts yet.'}
             </p>
           ) : (
             <ul className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">

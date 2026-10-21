@@ -21,7 +21,7 @@ export default function CtaSection() {
       <div
         aria-hidden
         className="pointer-events-none absolute left-1/2 top-1/2 -z-0 h-[520px] w-[520px] -translate-x-1/2 -translate-y-1/2 rounded-full blur-[130px]"
-        style={{ background: 'radial-gradient(circle, rgba(255,106,26,0.10), transparent 62%)' }}
+        style={{ background: 'radial-gradient(circle, rgba(176,141,87,0.10), transparent 62%)' }}
       />
 
       <div className="relative z-10 mx-auto flex max-w-3xl flex-col items-center gap-10 text-center">

@@ -763,7 +763,7 @@ function ReplaceCheckbox({
         type="checkbox"
         checked={checked}
         onChange={e => onChange(e.target.checked)}
-        className="h-3.5 w-3.5 cursor-pointer accent-[#fc6b02]"
+        className="h-3.5 w-3.5 cursor-pointer accent-primary"
       />
       <span className="text-xs text-muted-foreground">{label}</span>
       <span
@@ -841,7 +841,7 @@ function BulkActionCard({
         type="button"
         onClick={() => onAction(replaceExisting)}
         disabled={loading || disabled}
-        className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[#fc6b02] px-4 py-2 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+        className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
       >
         {loading ? <SpinIcon /> : <span aria-hidden>✨</span>}
         <span>{loading ? startingLabel : buttonLabel}</span>
@@ -888,7 +888,7 @@ function MasterSweepButton({
       type="button"
       onClick={onClick}
       disabled={loading || disabled}
-      className="inline-flex items-center gap-2 rounded-lg bg-[#fc6b02] px-4 py-2 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+      className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
     >
       {loading ? <SpinIcon /> : <span aria-hidden>✨</span>}
       {loading ? startingLabel : label}
@@ -970,7 +970,7 @@ function ActiveJobCard({
   })();
 
   return (
-    <div className="mt-6 rounded-xl border-2 border-[#fc6b02]/30 bg-[#fc6b02]/5 p-5">
+    <div className="mt-6 rounded-xl border-2 border-primary/30 bg-primary/5 p-5">
       <div className="mb-3 flex items-center justify-between gap-3">
         <div>
           <h3 className="text-base font-semibold">
@@ -1007,7 +1007,7 @@ function ActiveJobCard({
           <span className="text-muted-foreground">{pct}%</span>
         </div>
         <div className="h-2 w-full overflow-hidden rounded bg-white/70">
-          <div className="h-full bg-[#fc6b02] transition-all" style={{ width: `${pct}%` }} />
+          <div className="h-full bg-primary transition-all" style={{ width: `${pct}%` }} />
         </div>
       </div>
 
@@ -1036,7 +1036,7 @@ function ActiveJobCard({
                 {storeId ? (
                   <Link
                     href={`/stores/${storeId}/products/${p.id}`}
-                    className="font-medium text-foreground hover:text-[#fc6b02] hover:underline"
+                    className="font-medium text-foreground hover:text-primary-ink hover:underline"
                   >
                     {p.name}
                   </Link>
@@ -1117,7 +1117,7 @@ function MasterSweepCard({
       : 'queued';
 
   return (
-    <div className="mt-6 rounded-xl border-2 border-[#fc6b02]/30 bg-[#fc6b02]/5 p-5">
+    <div className="mt-6 rounded-xl border-2 border-primary/30 bg-primary/5 p-5">
       <div className="mb-3 flex items-center justify-between gap-3">
         <div>
           <h3 className="text-base font-semibold">{label}</h3>
@@ -1156,7 +1156,7 @@ function MasterSweepCard({
           <span className="text-muted-foreground">{pct}%</span>
         </div>
         <div className="h-2 w-full overflow-hidden rounded bg-white/70">
-          <div className="h-full bg-[#fc6b02] transition-all" style={{ width: `${pct}%` }} />
+          <div className="h-full bg-primary transition-all" style={{ width: `${pct}%` }} />
         </div>
       </div>
 

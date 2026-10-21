@@ -25,7 +25,7 @@ import { AIService } from '../services/ai.service';
 import {
   CAMPAIGN_STORE_SELECT,
   audienceCount,
-  campaignDailyCap,
+  storeCampaignDailyCap,
   pickCampaignContent,
   renderCampaignEmail,
   sentInLast24h,
@@ -38,9 +38,10 @@ import {
  * Plan: docs/plans/2026-09-25-email-campaigns.md.
  *
  * Every route: authenticate → authorize(store_admin, super_admin) →
- * requireStoreAccess → requireFeature('email_campaigns'). The feature is in no
- * plan baseline, so for every store it is OFF until a super-admin enables it,
- * and while it is off every route here answers 403 FEATURE_DISABLED.
+ * requireStoreAccess → requireFeature('email_campaigns'). The feature is in the
+ * Growth + Business baselines (not Basic), so on a Basic store it is OFF until
+ * the store upgrades or a super-admin enables it, and while it is off every
+ * route here answers 403 FEATURE_DISABLED.
  *
  * The ONLY route that can cause subscriber email is `POST /:campaignId/send`.
  * `POST /:campaignId/test` mails the signed-in admin's own address and nobody
@@ -142,8 +143,11 @@ router.get('/audience', async (req: Request, res: Response, next: NextFunction) 
   try {
     const { storeId } = req.params;
     // #1953: count-only — this route never used the actual rows.
-    const [count, sent24h] = await Promise.all([audienceCount(storeId), sentInLast24h(storeId)]);
-    const cap = campaignDailyCap();
+    const [count, sent24h, cap] = await Promise.all([
+      audienceCount(storeId),
+      sentInLast24h(storeId),
+      storeCampaignDailyCap(storeId),
+    ]);
     res.json({
       success: true,
       data: {
@@ -371,14 +375,15 @@ router.post(
       // #1953: count-only — this pre-check never used the actual rows either
       // (the real materialization happens in the Inngest job, which still
       // calls buildCampaignAudience for the full rows it needs to send to).
-      const [audienceSize, sent24h] = await Promise.all([
+      const [audienceSize, sent24h, dailyCap] = await Promise.all([
         audienceCount(storeId),
         sentInLast24h(storeId),
+        storeCampaignDailyCap(storeId),
       ]);
       if (audienceSize === 0) {
         throw new AppError(422, 'EMPTY_AUDIENCE', 'No subscribers have opted in yet');
       }
-      const remaining = Math.max(0, campaignDailyCap() - sent24h);
+      const remaining = Math.max(0, dailyCap - sent24h);
       // Checked here for immediate feedback on a send-now; the job re-checks
       // at send time, which is what governs a scheduled campaign.
       if (!body.scheduledAt && audienceSize > remaining) {

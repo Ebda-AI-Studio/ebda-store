@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { BRAND } from '@ebda/shared/brand';
 import { COPY } from '../lib/content';
+import { FEATURES_PAGE } from '../lib/capabilities';
 import { WhatsApp } from './WhatsApp';
 import {
   HOME,
@@ -49,6 +50,9 @@ export function Header({
                 <a href={anchor(n.target)}>{c.nav[n.key]}</a>
               </li>
             ))}
+            <li>
+              <Link href={pagePath(locale, 'features')}>{FEATURES_PAGE[locale].navLabel}</Link>
+            </li>
           </ul>
           <details className="nav-menu">
             <summary>
@@ -69,6 +73,9 @@ export function Header({
                   <a href={anchor(n.target)}>{c.nav[n.key]}</a>
                 </li>
               ))}
+              <li>
+                <Link href={pagePath(locale, 'features')}>{FEATURES_PAGE[locale].navLabel}</Link>
+              </li>
               <li className="menu-wa">
                 <WhatsApp label={c.whatsapp.label} ariaLabel={c.whatsapp.aria} />
               </li>

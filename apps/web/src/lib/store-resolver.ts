@@ -132,6 +132,11 @@ export interface ResolvedStore {
    * else (including an older API that omits it) is false → nothing renders.
    */
   smsMarketingOptIn?: boolean;
+  /**
+   * Render the checkout box "Email me about my cart" ONLY when true: the API sets it when the
+   * store's plan has abandoned-cart recovery AND the merchant turned the email channel on.
+   */
+  cartEmailOptIn?: boolean;
 
   // Return policy — powers hasMerchantReturnPolicy in Product JSON-LD.
   // NULL/undefined means the merchant never declared one, and the storefront
@@ -463,6 +468,7 @@ async function fetchStoreByDomain(
       taxRatePercent:
         typeof storeData.taxRatePercent === 'number' ? storeData.taxRatePercent : undefined,
       smsMarketingOptIn: storeData.smsMarketingOptIn === true,
+      cartEmailOptIn: storeData.cartEmailOptIn === true,
       enabledFeatures,
       disabledCmsSlugs,
       heroTitle: storeData.heroTitle ?? null,
@@ -638,6 +644,7 @@ async function fetchStoreBySlug(slug: string): Promise<ResolvedStore | null> {
       taxRatePercent:
         typeof storeData.taxRatePercent === 'number' ? storeData.taxRatePercent : undefined,
       smsMarketingOptIn: storeData.smsMarketingOptIn === true,
+      cartEmailOptIn: storeData.cartEmailOptIn === true,
       enabledFeatures,
       disabledCmsSlugs,
       heroTitle: storeData.heroTitle ?? null,
@@ -977,6 +984,7 @@ export async function getStoreById(storeId: string): Promise<ResolvedStore | nul
       taxRatePercent:
         typeof storeData.taxRatePercent === 'number' ? storeData.taxRatePercent : undefined,
       smsMarketingOptIn: storeData.smsMarketingOptIn === true,
+      cartEmailOptIn: storeData.cartEmailOptIn === true,
       heroTitle: storeData.heroTitle ?? null,
       heroTitleAr: storeData.heroTitleAr ?? null,
       heroSubtitle: storeData.heroSubtitle ?? null,

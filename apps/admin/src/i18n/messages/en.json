@@ -1733,6 +1733,8 @@
         "everywhereDescription": "Styling for the product CARD tiles — size, frame, aspect, and name/price/button fonts — wherever they appear (listing, category, search, carousels). This is the card itself, not a page; page backgrounds & headings are in the page cards above.",
         "brandBadgeTitle": "Brand badge on cards",
         "brandBadgeHint": "Small store-name pill in the top corner of every product card.",
+        "newBadgeTitle": "\"New\" badge on cards",
+        "newBadgeHint": "A \"New\" chip on products you mark as new or added in the last 14 days. Off by default.",
         "quickAddTitle": "Quick-add (+) on carousel cards",
         "quickAddHint": "One-tap add-to-cart circle on homepage carousel cards. When ON, the bottom Add to cart button auto-suppresses on the same card.",
         "normalizeImagesTitle": "Normalize product images",
@@ -4242,6 +4244,14 @@
         "noLimit": "No limit",
         "major": "EGP",
         "hours": "hours"
+      },
+      "email": {
+        "title": "Reminder email",
+        "description": "One email per cart, sent from your store to shoppers who subscribed to your newsletter. Shoppers who unsubscribed are never emailed.",
+        "enable": "Send a reminder email",
+        "sendAfter": "Send after",
+        "minutes": "min of inactivity",
+        "hint": "Between 60 and 1440 minutes. Default 120."
       }
     },
     "list": {
@@ -4262,7 +4272,8 @@
         "total": "Total",
         "items": "Items",
         "status": "Status",
-        "date": "Date"
+        "date": "Date",
+        "email": "Email"
       }
     },
     "messages": {
@@ -4270,6 +4281,19 @@
       "saveSuccessBody": "Abandoned cart settings saved.",
       "saveErrorTitle": "Error",
       "saveErrorBody": "Failed to save settings. Please try again."
+    },
+    "emailStatus": {
+      "none": "Not sent",
+      "queued": "Queued",
+      "sent": "Sent",
+      "skipped": "Skipped",
+      "failed": "Failed"
+    },
+    "emailNudge": {
+      "title": "Get abandoned carts back by email",
+      "body": "One reminder email per cart, sent as your store and only to shoppers who opted in. It is off until you turn it on.",
+      "review": "Review settings",
+      "dismiss": "Not now"
     }
   },
   "returns": {
@@ -9006,7 +9030,9 @@
     "chooseThisPlan": "Choose this plan",
     "instapayPlanNote": "The new plan applies when Ebda Store confirms your payment.",
     "instapayPlanFailed": "We could not start the InstaPay payment for this plan.",
-    "instapayQuoteTitle": "Pay for {plan} ({interval})"
+    "instapayQuoteTitle": "Pay for {plan} ({interval})",
+    "viewReceipt": "View receipt",
+    "receiptProcessing": "Your payment went through. Your receipt will print here in a moment."
   },
   "planLimit": {
     "maxProducts": "Your plan allows up to {limit} products. Upgrade to add more.",
@@ -10448,5 +10474,69 @@
       "WEBHOOK_URL_REJECTED": "This address cannot be used. Use a public HTTPS address.",
       "WEBHOOK_LIMIT": "You reached the maximum number of endpoints."
     }
+  },
+  "receiptBarcode": {
+    "title": "Order barcode",
+    "hint": "A real scannable barcode of the order number on receipts, packing slips and invoices. Pick a plain strip, a fun shape, or turn it off.",
+    "saveShape": "Save",
+    "saved": "Saved",
+    "failed": "Couldn't save. Try again.",
+    "shape": {
+      "plain": "Plain bars",
+      "off": "No barcode",
+      "palm": "Palm",
+      "horse": "Horse",
+      "paw": "Paw",
+      "burger": "Burger",
+      "cat": "Cat",
+      "ghost": "Ghost",
+      "angry-shark": "Angry shark",
+      "shark": "Shark",
+      "gym-dude": "Gym dude",
+      "heart": "Heart",
+      "dog": "Dog",
+      "whale": "Whale",
+      "bat": "Bat",
+      "pizza": "Pizza",
+      "cloud": "Cloud",
+      "spider": "Spider",
+      "big-cake": "Big cake",
+      "lemon": "Lemon",
+      "ring": "Ring",
+      "diamond": "Diamond",
+      "pineapple": "Pineapple",
+      "french-fries": "French fries",
+      "hot-dog": "Hot dog",
+      "cookie": "Cookie"
+    }
+  },
+  "ebdaReceipt": {
+    "aria": "Ebda payment receipt",
+    "subtitle": "Payment receipt",
+    "total": "Total",
+    "paid": "Payment received. Thank you.",
+    "printing": "Printing your receipt...",
+    "plan": "Plan",
+    "date": "Date",
+    "vat": "VAT ({rate}%)",
+    "print": "Print receipt"
+  },
+  "packingSlip": {
+    "title": "Packing slip",
+    "print": "Print packing slip",
+    "printBulk": "Print packing slips ({count})",
+    "size": "Slip size",
+    "sizeA4": "A4",
+    "sizeLabel": "4x6 label",
+    "tooMany": "Select up to 100 orders per print.",
+    "loadFailed": "Couldn't load the packing slip. Try again.",
+    "loading": "Loading...",
+    "noteTitle": "Packing slip note",
+    "noteHint": "Optional text printed at the bottom of every packing slip, like \"Thanks for your order\".",
+    "notePlaceholder": "Thanks for shopping with us!",
+    "noteSave": "Save note",
+    "noteSaved": "Saved",
+    "noteFailed": "Couldn't save. Try again.",
+    "skipped": "{count} orders skipped (not in this store or deleted)."
   }
 }

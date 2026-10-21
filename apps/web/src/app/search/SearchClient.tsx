@@ -22,24 +22,18 @@ type SortValue = (typeof sortValues)[number];
 /** Build sort options with translated labels */
 function getSortOptions(t: (en: string, ar: string) => string) {
   return [
-    { value: 'newest' as const, label: t('Newest', '\u0627\u0644\u0623\u062d\u062f\u062b') },
+    { value: 'newest' as const, label: t('Newest', 'الأحدث') },
     {
       value: 'price-asc' as const,
-      label: t(
-        'Price: Low to High',
-        '\u0627\u0644\u0633\u0639\u0631: \u0645\u0646 \u0627\u0644\u0623\u0642\u0644 \u0644\u0644\u0623\u0639\u0644\u0649'
-      ),
+      label: t('Price: Low to High', 'السعر: من الأقل للأعلى'),
     },
     {
       value: 'price-desc' as const,
-      label: t(
-        'Price: High to Low',
-        '\u0627\u0644\u0633\u0639\u0631: \u0645\u0646 \u0627\u0644\u0623\u0639\u0644\u0649 \u0644\u0644\u0623\u0642\u0644'
-      ),
+      label: t('Price: High to Low', 'السعر: من الأعلى للأقل'),
     },
     {
       value: 'name-asc' as const,
-      label: t('Name A-Z', '\u0627\u0644\u0627\u0633\u0645 \u0623-\u064a'),
+      label: t('Name A-Z', 'الاسم أ-ي'),
     },
   ];
 }
@@ -144,14 +138,14 @@ function SearchContent() {
         setAllProducts(response.data.products || []);
       } else {
         setError(
-          response.error?.message || t('Failed to search products', 'فشل البحث عن المنتجات')
+          response.error?.message || t('Failed to search products', 'البحث عن المنتجات منفعش')
         );
       }
     } catch {
       setError(
         t(
           'Unable to search. Please check your connection and try again.',
-          'تعذر البحث. يرجى التحقق من اتصالك بالإنترنت والمحاولة مرة أخرى.'
+          'معرفناش نبحث. اتأكد من اتصالك بالإنترنت وجرّب تاني.'
         )
       );
     } finally {
@@ -214,12 +208,7 @@ function SearchContent() {
         className="mx-auto w-full max-w-7xl flex-1 px-4 py-8 sm:px-6 lg:px-8"
         data-zone="products"
       >
-        <h1 className="text-3xl font-bold mb-6">
-          {t(
-            'Search Products',
-            '\u0627\u0644\u0628\u062d\u062b \u0639\u0646 \u0627\u0644\u0645\u0646\u062a\u062c\u0627\u062a'
-          )}
-        </h1>
+        <h1 className="text-3xl font-bold mb-6">{t('Search Products', 'البحث عن المنتجات')}</h1>
 
         {/* Search form */}
         <form onSubmit={handleSearch} role="search" className="mb-6">
@@ -229,10 +218,7 @@ function SearchContent() {
                 type="text"
                 value={searchTerm}
                 onChange={e => setSearchTerm(e.target.value)}
-                placeholder={t(
-                  'Search for products...',
-                  '\u0627\u0644\u0628\u062d\u062b \u0639\u0646 \u0627\u0644\u0645\u0646\u062a\u062c\u0627\u062a...'
-                )}
+                placeholder={t('Search for products...', 'البحث عن المنتجات...')}
                 className="min-w-0 flex-1 px-4 py-3 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary bg-background text-foreground"
               />
               <button
@@ -242,7 +228,7 @@ function SearchContent() {
                 {t('Search', translations['Search'])}
               </button>
             </div>
-            {/* Live autocomplete suggestions \u2014 same component as theme headers.
+            {/* Live autocomplete suggestions — same component as theme headers.
                 Absolutely positioned relative to this wrapper so it overlays
                 the page content below the input. Selecting a suggestion
                 navigates to the product page (handled inside the component);
@@ -255,12 +241,12 @@ function SearchContent() {
           </div>
         </form>
 
-        {/* Filter & Sort bar \u2014 uses the same stacked-with-inline-labels
+        {/* Filter & Sort bar — uses the same stacked-with-inline-labels
             pattern as the /products toolbar (commit 33abdf6) so Arabic
-            labels like "\u0627\u0644\u0633\u0639\u0631: \u0645\u0646 \u0627\u0644\u0623\u0639\u0644\u0649 \u0644\u0644\u0623\u0642\u0644" can't truncate. Each filter
+            labels like "السعر: من الأعلى للأقل" can't truncate. Each filter
             occupies its own row at every breakpoint; min-w on each Select
             guards the Arabic label width. 2026-05-16 ahmad standing rule:
-            'apply mobile's fix to desktop' \u2014 toolbar UX is identical
+            'apply mobile's fix to desktop' — toolbar UX is identical
             regardless of viewport. */}
         {/* Filters toggle — only appears once a search has been run (results
             are up). Tapping it reveals the category + sort controls. */}
@@ -321,7 +307,7 @@ function SearchContent() {
             {categories.length > 0 && (
               <div className="flex items-center gap-2">
                 <span className="shrink-0 text-sm font-medium text-foreground">
-                  {t('Category:', '\u0627\u0644\u0641\u0626\u0629:')}
+                  {t('Category:', 'الفئة:')}
                 </span>
                 <Select
                   id="search-category"
@@ -330,10 +316,7 @@ function SearchContent() {
                   options={[
                     {
                       value: '',
-                      label: t(
-                        'All Categories',
-                        '\u0643\u0644 \u0627\u0644\u0641\u0626\u0627\u062a'
-                      ),
+                      label: t('All Categories', 'كل الفئات'),
                     },
                     ...categories.map(cat => ({ value: cat.id, label: cat.name })),
                   ]}
@@ -344,7 +327,7 @@ function SearchContent() {
 
             <div className="flex items-center gap-2">
               <span className="shrink-0 text-sm font-medium text-foreground">
-                {t('Sort by:', '\u062a\u0631\u062a\u064a\u0628 \u062d\u0633\u0628:')}
+                {t('Sort by:', 'ترتيب حسب:')}
               </span>
               <Select
                 id="search-sort"
@@ -399,10 +382,7 @@ function SearchContent() {
                 onClick={() => performSearch(committedQuery, categoryFilter)}
                 className="px-3 py-1 text-sm bg-destructive/20 text-destructive-ink rounded hover:bg-destructive/30 transition-colors"
               >
-                {t(
-                  'Retry',
-                  '\u0625\u0639\u0627\u062f\u0629 \u0627\u0644\u0645\u062d\u0627\u0648\u0644\u0629'
-                )}
+                {t('Retry', 'إعادة المحاولة')}
               </button>
             </div>
           </div>
@@ -425,12 +405,12 @@ function SearchContent() {
                 countText('en', products.length, RESULTS),
                 countText('ar', products.length, RESULTS)
               )}{' '}
-              {t('for', '\u0644\u0640')} &quot;
+              {t('for', 'لـ')} &quot;
               {displayQuery}&quot;
               {categoryFilter && (
                 <>
                   {' '}
-                  {t('in', '\u0641\u064a')}{' '}
+                  {t('in', 'في')}{' '}
                   <span className="font-medium text-foreground">
                     {categories.find(c => c.id === categoryFilter)?.name ?? categoryFilter}
                   </span>
@@ -467,35 +447,20 @@ function SearchContent() {
         {!isLoading && !error && committedQuery && products.length === 0 && (
           <div className="text-center py-12">
             <p className="text-muted-foreground mb-3">
-              {t(
-                'No products found for',
-                '\u0644\u0645 \u064a\u062a\u0645 \u0627\u0644\u0639\u062b\u0648\u0631 \u0639\u0644\u0649 \u0645\u0646\u062a\u062c\u0627\u062a \u0644\u0640'
-              )}{' '}
-              &quot;{committedQuery}
+              {t('No products found for', 'ملقيناش منتجات لـ')} &quot;{committedQuery}
               &quot;
-              {categoryFilter
-                ? t(
-                    ' in the selected category',
-                    ' \u0641\u064a \u0627\u0644\u0641\u0626\u0629 \u0627\u0644\u0645\u062d\u062f\u062f\u0629'
-                  )
-                : ''}
+              {categoryFilter ? t(' in the selected category', ' في الفئة المحددة') : ''}
             </p>
             {categoryFilter && (
               <button
                 onClick={() => handleCategoryChange('')}
                 className="block mx-auto mb-3 text-sm text-primary hover:underline"
               >
-                {t(
-                  'Clear category filter',
-                  '\u0645\u0633\u062d \u0641\u0644\u062a\u0631 \u0627\u0644\u0641\u0626\u0629'
-                )}
+                {t('Clear category filter', 'مسح فلتر الفئة')}
               </button>
             )}
             <Link href={storeUrl('/products')} className="text-primary hover:underline text-sm">
-              {t(
-                'Browse all products',
-                '\u062a\u0635\u0641\u062d \u0643\u0644 \u0627\u0644\u0645\u0646\u062a\u062c\u0627\u062a'
-              )}
+              {t('Browse all products', 'تصفح كل المنتجات')}
             </Link>
           </div>
         )}
@@ -517,25 +482,19 @@ function SearchContent() {
               />
             </svg>
             <p className="text-lg font-medium text-foreground mb-1">
-              {t(
-                'Search our products',
-                '\u0627\u0628\u062d\u062b \u0641\u064a \u0645\u0646\u062a\u062c\u0627\u062a\u0646\u0627'
-              )}
+              {t('Search our products', 'ابحث في منتجاتنا')}
             </p>
             <p className="text-muted-foreground">
               {t(
                 'Enter a search term above to find products by name, description, or category.',
-                '\u0623\u062f\u062e\u0644 \u0643\u0644\u0645\u0629 \u0628\u062d\u062b \u0623\u0639\u0644\u0627\u0647 \u0644\u0644\u0639\u062b\u0648\u0631 \u0639\u0644\u0649 \u0627\u0644\u0645\u0646\u062a\u062c\u0627\u062a \u062d\u0633\u0628 \u0627\u0644\u0627\u0633\u0645 \u0623\u0648 \u0627\u0644\u0648\u0635\u0641 \u0623\u0648 \u0627\u0644\u0641\u0626\u0629.'
+                'اكتب كلمة بحث فوق عشان تلاقي المنتجات بالاسم أو الوصف أو الفئة.'
               )}
             </p>
             <Link
               href={storeUrl('/products')}
               className="mt-4 inline-block text-primary hover:underline text-sm font-medium"
             >
-              {t(
-                'Or browse all products',
-                '\u0623\u0648 \u062a\u0635\u0641\u062d \u062c\u0645\u064a\u0639 \u0627\u0644\u0645\u0646\u062a\u062c\u0627\u062a'
-              )}
+              {t('Or browse all products', 'أو تصفح جميع المنتجات')}
             </Link>
           </div>
         )}

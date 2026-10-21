@@ -43,3 +43,4 @@ export * from './tracking';
 export * from './looks';
 export * from './commerce';
 export * from './uploads';
+export * from './barcode';

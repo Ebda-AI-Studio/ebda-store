@@ -313,6 +313,16 @@ type CampaignSendRequestedEvent = EventPayload & {
   };
 };
 
+// Abandoned-cart recovery email: emitted ONLY by sweepCartRecoveryEmails for a cart it just
+// claimed; the event id is `cart-recovery-email/<abandonedCartId>`.
+type CartRecoveryEmailRequestedEvent = EventPayload & {
+  name: 'cart-recovery/email-requested';
+  data: {
+    abandonedCartId: string;
+    storeId: string;
+  };
+};
+
 // Ebda's own acquisition conversions (Meta Conversions API). Emitted after the business
 // transaction committed; see functions/ebda-ads-conversion.ts and services/ebda-ads-emit.ts.
 type EbdaAdsConversionRequestedEvent = EventPayload & {
@@ -395,6 +405,7 @@ export type AppEvent =
   | GscIngestRequestedEvent
   | ContactFormSubmittedEvent
   | CampaignSendRequestedEvent
+  | CartRecoveryEmailRequestedEvent
   | EbdaAdsConversionRequestedEvent
   | LegalNoticeSendRequestedEvent
   | SearchStoreReindexRequestedEvent

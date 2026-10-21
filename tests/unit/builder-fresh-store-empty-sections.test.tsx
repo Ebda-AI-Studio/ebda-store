@@ -152,7 +152,7 @@ describe('editor canvas of a brand-new store', () => {
 
   it('hints in Egyptian Arabic', () => {
     const ar = render({ empty: true, editorMode: true, language: 'ar' });
-    expect(ar).toContain('أضف أقساماً وستظهر هنا.');
+    expect(ar).toContain('ضيف أقسام وهتظهر هنا.');
   });
 });
 

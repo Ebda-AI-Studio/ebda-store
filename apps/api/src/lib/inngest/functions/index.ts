@@ -81,6 +81,7 @@ import { gscIngestCron, gscIngestOnDemand } from './gsc-ingest';
 import { contactFormSend } from './contact-form-send';
 import { campaignSend } from './campaign-send';
 import { webhookFanout, webhookDeliver, webhookDeliveryPurge } from './webhook-delivery';
+import { cartRecoveryEmail } from './cart-recovery-email';
 import { legalNoticeSend } from './legal-notice-send';
 
 /**
@@ -229,6 +230,9 @@ const allInngestFunctions: InngestFunction.Any[] = [
   webhookFanout,
   webhookDeliver,
   webhookDeliveryPurge,
+  // Abandoned-cart recovery email: event-triggered only (the 15-min cart sweep claims a due
+  // cart and emits one event); consent-gated and once per cart.
+  cartRecoveryEmail,
   // Material legal-policy change: one email per store owner (Ruling LEGAL-4). Event-triggered
   // only (a super admin pressing Send notice).
   legalNoticeSend,

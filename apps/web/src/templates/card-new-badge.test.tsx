@@ -10,6 +10,10 @@
  * Behavioural: a fresh product goes through each mapper and each card render
  * path (5 skin cards, the shared card and carousel under all 6 packs incl.
  * Dahab) and the badge must show; a 60-day-old product must not show it.
+ *
+ * Ahmad 2026-10-16 (Ruling D1016-NEW-1): the badge is the MERCHANT'S choice — a store setting,
+ * `theme.showNewBadge`, default OFF. With it off no card path shows the badge, not even for an
+ * explicit `isNew` product.
  */
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import React from 'react';
@@ -17,7 +21,10 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { render, cleanup } from '@testing-library/react';
 
-const state = { template: 'minimal' };
+const state: { template: string; theme: Record<string, unknown> } = {
+  template: 'minimal',
+  theme: { showNewBadge: true },
+};
 
 // The Dahab carousel reads prefers-reduced-motion; jsdom has no matchMedia.
 window.matchMedia ??= ((query: string) => ({
@@ -33,7 +40,7 @@ window.matchMedia ??= ((query: string) => ({
 
 vi.mock('../contexts/StoreContext', () => ({
   useStore: () => ({
-    store: { id: 's1', name: 'S', slug: 's', currency: 'EGP', theme: {} },
+    store: { id: 's1', name: 'S', slug: 's', currency: 'EGP', theme: state.theme },
     layout: undefined,
   }),
   useStoreUrl: () => (p: string) => p,
@@ -183,6 +190,7 @@ const PATHS: Path[] = [
 afterEach(() => {
   cleanup();
   state.template = 'minimal';
+  state.theme = { showNewBadge: true };
 });
 
 const NEW = /جديد/;
@@ -201,6 +209,36 @@ describe.each(MAPPERS)('%s', (_m, map) => {
   });
 });
 
+describe('the store setting decides (default OFF, Ruling D1016-NEW-1)', () => {
+  const fresh2 = () =>
+    adapters.toTemplateProduct({
+      ...base(fresh),
+      status: 'active',
+      images: img,
+      variants: [],
+    } as never);
+  it.each(PATHS)('%s: setting unset → no New badge on a fresh product', (_p, path) => {
+    state.theme = {};
+    const { container } = render(path(fresh2(), () => {}));
+    expect(container.textContent).not.toMatch(NEW);
+  });
+  it.each(PATHS)('%s: setting off → no New badge even with an explicit isNew', (_p, path) => {
+    state.theme = { showNewBadge: false };
+    const { container } = render(path({ ...fresh2(), isNew: true }, () => {}));
+    expect(container.textContent).not.toMatch(NEW);
+  });
+  it('isProductNew is false without the setting, whatever the product says', () => {
+    const now = Date.now();
+    expect(isProductNew({ isNew: true, createdAt: fresh }, now, undefined)).toBe(false);
+    expect(isProductNew({ isNew: true, createdAt: fresh }, now, {})).toBe(false);
+    expect(isProductNew({ isNew: true }, now, { showNewBadge: true })).toBe(true);
+  });
+  it('DEFAULT_THEME ships the badge off', async () => {
+    const { DEFAULT_THEME } = await import('@ebda/shared');
+    expect(DEFAULT_THEME.showNewBadge).toBe(false);
+  });
+});
+
 describe('one New rule on every card path', () => {
   it('no card reads the raw product.isNew; each decides with isProductNew', () => {
     const files = [
@@ -216,7 +254,7 @@ describe('one New rule on every card path', () => {
     for (const f of files) {
       const s = readFileSync(resolve(__dirname, f), 'utf8');
       expect(s, f).not.toMatch(/product\.isNew\b/);
-      expect(s, f).toMatch(/isProductNew\(product, renderNow\)/);
+      expect(s, f).toMatch(/isProductNew\(product, renderNow, store\.theme\)/);
       expect(s, f).toMatch(/const renderNow = useRenderNow\(\);/);
     }
   });
@@ -229,8 +267,9 @@ describe('one New rule on every card path', () => {
     expect(fn.slice(0, fn.indexOf('\n}'))).not.toMatch(/Date\.now\(\)/);
     const created = '2026-10-01T00:00:00Z';
     const t = Date.parse(created);
-    expect(isProductNew({ createdAt: created }, t + 13 * DAY)).toBe(true);
-    expect(isProductNew({ createdAt: created }, t + 15 * DAY)).toBe(false);
+    const on = { showNewBadge: true };
+    expect(isProductNew({ createdAt: created }, t + 13 * DAY, on)).toBe(true);
+    expect(isProductNew({ createdAt: created }, t + 15 * DAY, on)).toBe(false);
   });
 
   it('the root layout hands one server clock to the client', () => {

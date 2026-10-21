@@ -68,24 +68,15 @@ export default function RegisterClient() {
           {/* Header — logo lives in MinimalChrome; keep only the page heading. */}
           <div className="text-center">
             <h2 className="text-3xl font-bold tracking-tight text-foreground">
-              {t(
-                'Create your account',
-                '\u0625\u0646\u0634\u0627\u0621 \u062d\u0633\u0627\u0628\u0643'
-              )}
+              {t('Create your account', 'إنشاء حسابك')}
             </h2>
             <p className="mt-2 text-sm text-muted-foreground">
-              {t(
-                'Already have an account?',
-                '\u0644\u062f\u064a\u0643 \u062d\u0633\u0627\u0628 \u0628\u0627\u0644\u0641\u0639\u0644\u061f'
-              )}{' '}
+              {t('Already have an account?', 'عندك حساب؟')}{' '}
               <Link
                 href={storeUrl('/auth/login')}
                 className="font-medium text-primary hover:underline"
               >
-                {t(
-                  'Sign in',
-                  '\u062a\u0633\u062c\u064a\u0644 \u0627\u0644\u062f\u062e\u0648\u0644'
-                )}
+                {t('Sign in', 'تسجيل الدخول')}
               </Link>
             </p>
           </div>
@@ -104,20 +95,14 @@ export default function RegisterClient() {
             <form onSubmit={handleSubmit} className="space-y-5">
               <div className="grid grid-cols-2 gap-4">
                 <Input
-                  label={t(
-                    'First name',
-                    '\u0627\u0644\u0627\u0633\u0645 \u0627\u0644\u0623\u0648\u0644'
-                  )}
+                  label={t('First name', 'الاسم الأول')}
                   autoComplete="given-name"
                   value={formData.firstName}
                   onChange={e => setFormData({ ...formData, firstName: e.target.value })}
                   required
                 />
                 <Input
-                  label={t(
-                    'Last name',
-                    '\u0627\u0633\u0645 \u0627\u0644\u0639\u0627\u0626\u0644\u0629'
-                  )}
+                  label={t('Last name', 'اسم العائلة')}
                   autoComplete="family-name"
                   value={formData.lastName}
                   onChange={e => setFormData({ ...formData, lastName: e.target.value })}
@@ -126,10 +111,7 @@ export default function RegisterClient() {
               </div>
 
               <Input
-                label={t(
-                  'Email address',
-                  '\u0627\u0644\u0628\u0631\u064a\u062f \u0627\u0644\u0625\u0644\u0643\u062a\u0631\u0648\u0646\u064a'
-                )}
+                label={t('Email address', 'البريد الإلكتروني')}
                 type="email"
                 autoComplete="email"
                 value={formData.email}
@@ -138,10 +120,7 @@ export default function RegisterClient() {
               />
 
               <Input
-                label={t(
-                  'Password',
-                  '\u0643\u0644\u0645\u0629 \u0627\u0644\u0645\u0631\u0648\u0631'
-                )}
+                label={t('Password', 'كلمة المرور')}
                 type="password"
                 autoComplete="new-password"
                 value={formData.password}
@@ -150,10 +129,7 @@ export default function RegisterClient() {
               />
 
               <Input
-                label={t(
-                  'Confirm password',
-                  '\u062a\u0623\u0643\u064a\u062f \u0643\u0644\u0645\u0629 \u0627\u0644\u0645\u0631\u0648\u0631'
-                )}
+                label={t('Confirm password', 'تأكيد كلمة المرور')}
                 type="password"
                 autoComplete="new-password"
                 value={formData.confirmPassword}
@@ -169,25 +145,19 @@ export default function RegisterClient() {
                   required
                 />
                 <label htmlFor="terms" className="text-sm text-muted-foreground">
-                  {t('I agree to the', '\u0623\u0648\u0627\u0641\u0642 \u0639\u0644\u0649')}{' '}
+                  {t('I agree to the', 'أوافق على')}{' '}
                   <Link href={storeUrl('/terms')} className="text-primary hover:underline">
-                    {t(
-                      'Terms of Service',
-                      '\u0627\u0644\u0634\u0631\u0648\u0637 \u0648\u0627\u0644\u0623\u062d\u0643\u0627\u0645'
-                    )}
+                    {t('Terms of Service', 'الشروط والأحكام')}
                   </Link>{' '}
-                  {t('and', '\u0648')}{' '}
+                  {t('and', 'و')}{' '}
                   <Link href={storeUrl('/privacy')} className="text-primary hover:underline">
-                    {t(
-                      'Privacy Policy',
-                      '\u0633\u064a\u0627\u0633\u0629 \u0627\u0644\u062e\u0635\u0648\u0635\u064a\u0629'
-                    )}
+                    {t('Privacy Policy', 'سياسة الخصوصية')}
                   </Link>
                 </label>
               </div>
 
               <Button type="submit" className="w-full" size="lg" isLoading={isLoading}>
-                {t('Create account', '\u0625\u0646\u0634\u0627\u0621 \u062d\u0633\u0627\u0628')}
+                {t('Create account', 'إنشاء حساب')}
               </Button>
             </form>
           </div>

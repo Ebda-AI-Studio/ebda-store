@@ -33,6 +33,7 @@ import {
 } from '../../../services/wbs-bridge.service';
 import { featureService } from '../../../services/feature.service';
 import { validateE164 } from '../../../utils/phone-e164';
+import { resolveSendTemplateName } from '../../wa-templates/legacy-names';
 import logger from '../../logger';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
@@ -227,12 +228,17 @@ export async function handleOrderWhatsAppNotify(
   // ── Step 5: Send via WBS bridge ────────────────────────────────────────
   const idempotencyKey = `${orderId}-${eventName}-${storeConfig.wbsClientId}`;
 
+  // force_* → ebda_*: an un-re-submitted store keeps sending under its approved old name.
+  const sendName = await step.run('resolve-template-name', () =>
+    resolveSendTemplateName(storeId, templateConfig.name, templateConfig.languageCode || 'en')
+  );
+
   const result = await step.run('send-whatsapp', async () => {
     try {
       return await wbsBridgeService.sendOrderNotification({
         encryptedApiKey: storeConfig.credentials!.wbsApiKey!,
         recipientPhone,
-        templateName: templateConfig.name,
+        templateName: sendName,
         languageCode: templateConfig.languageCode || 'en',
         variables,
         idempotencyKey,

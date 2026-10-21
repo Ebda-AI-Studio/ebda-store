@@ -112,7 +112,7 @@ export default function FeaturesSection() {
               key={title}
               className={[
                 'group flex flex-col rounded-2xl border border-white/10 bg-white/[0.04] p-7 backdrop-blur',
-                'transition-all hover:-translate-y-1 hover:border-primary/40 hover:shadow-[0_8px_40px_rgba(255,110,1,0.15)]',
+                'transition-all hover:-translate-y-1 hover:border-primary/40 hover:shadow-[0_8px_40px_rgba(176,141,87,0.15)]',
                 featured
                   ? 'sm:col-span-2 lg:row-span-2 bg-gradient-to-br from-primary/[0.10] to-white/[0.03] lg:p-9'
                   : '',

@@ -124,10 +124,11 @@ router.put(
   }
 );
 
-// Icon-set upload (B5; Workers-safe since Ruling FU46-8). No image library runs on workerd, so
-// the source is stored as sent under every size's key: it must therefore already be a square
-// PNG of at least 512×512 (checked from its bytes below), and at most 1 MB because the same bytes
-// are served for the 16/32px favicons too.
+// Icon-set upload (B5; Workers-safe since Ruling FU46-8). No image library runs on workerd: each
+// size is resized by the Cloudflare Images binding when the deploy carries it (D1016-ICONS-1),
+// else the source is stored as sent under every size's key. Either way it must be a square PNG of
+// at least 512×512 (checked from its bytes below), and at most 1 MB because in the fallback the
+// same bytes are served for the 16/32px favicons too.
 export const PWA_ICON_MAX_BYTES = 1024 * 1024;
 const iconUpload = multer({
   storage: multer.memoryStorage(),
@@ -140,7 +141,7 @@ const iconUpload = multer({
       cb(
         new AppError(400, 'INVALID_FILE_TYPE', 'The icon must be a PNG image.', {
           messageEn: 'The icon must be a PNG image.',
-          messageAr: 'يجب أن تكون الأيقونة صورة PNG.',
+          messageAr: 'الأيقونة لازم تكون صورة PNG.',
         })
       );
     }
@@ -156,11 +157,11 @@ function iconError(
 ): AppError {
   const got = dims ? ` (${dims.width}×${dims.height})` : '';
   const text = {
-    ICON_NOT_PNG: ['The icon must be a PNG image.', 'يجب أن تكون الأيقونة صورة PNG.'],
-    ICON_NOT_SQUARE: [`The icon must be square${got}.`, `يجب أن تكون الأيقونة مربعة${got}.`],
+    ICON_NOT_PNG: ['The icon must be a PNG image.', 'الأيقونة لازم تكون صورة PNG.'],
+    ICON_NOT_SQUARE: [`The icon must be square${got}.`, `الأيقونة لازم تكون مربعة${got}.`],
     ICON_TOO_SMALL: [
       `The icon must be at least ${MIN_ICON_DIMENSION}×${MIN_ICON_DIMENSION}px${got}.`,
-      `يجب ألا تقل الأيقونة عن ${MIN_ICON_DIMENSION}×${MIN_ICON_DIMENSION} بكسل${got}.`,
+      `الأيقونة لازم تكون ${MIN_ICON_DIMENSION}×${MIN_ICON_DIMENSION} بكسل على الأقل${got}.`,
     ],
   }[code];
   return new AppError(400, code, text[0], { messageEn: text[0], messageAr: text[1] });
@@ -198,7 +199,11 @@ router.post(
         where: { id: storeId },
         select: { pwaSettings: true },
       });
-      const generated = await generatePwaIconSet(storeId, file.buffer);
+      // The maskable icon is padded with the store's PWA background (D1016-ICONS-1).
+      const bg = (previous?.pwaSettings as Record<string, unknown> | null)?.backgroundColor;
+      const generated = await generatePwaIconSet(storeId, file.buffer, {
+        background: typeof bg === 'string' ? bg : undefined,
+      });
       const result = await PWAService.updateSettings(storeId, { settings: generated });
       // Every generation writes NEW versioned keys (pwa.service.ts), so the
       // previous generation's icons are unreferenced from here on. Delete

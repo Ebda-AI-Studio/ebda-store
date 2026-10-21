@@ -25,6 +25,7 @@ interface OrderDocumentsCardProps {
  */
 export function OrderDocumentsCard({ storeId, orderId }: OrderDocumentsCardProps) {
   const t = useT('invoices');
+  const tSlip = useT('packingSlip');
   const locale = useLocale();
   // Issue date in the store's timezone, like the Invoices page.
   const { store } = useCurrentStore(storeId);
@@ -50,12 +51,20 @@ export function OrderDocumentsCard({ storeId, orderId }: OrderDocumentsCardProps
       className="rounded-2xl border border-border bg-card p-5"
       aria-labelledby="order-documents-title"
     >
-      <h2
-        id="order-documents-title"
-        className="mb-4 text-sm font-medium uppercase tracking-wide text-muted-foreground"
-      >
-        {t('documentsCard.title')}
-      </h2>
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <h2
+          id="order-documents-title"
+          className="text-sm font-medium uppercase tracking-wide text-muted-foreground"
+        >
+          {t('documentsCard.title')}
+        </h2>
+        <Link
+          href={`/stores/${storeId}/orders/${orderId}/packing-slip`}
+          className="rounded-lg border border-border px-3 py-1.5 text-sm font-medium text-foreground hover:bg-muted"
+        >
+          {tSlip('print')}
+        </Link>
+      </div>
 
       {documents === null ? (
         <p className="text-sm text-muted-foreground">{t('loading')}</p>

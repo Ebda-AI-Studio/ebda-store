@@ -2305,6 +2305,30 @@ export default function StoreLayoutPage() {
                   <label className="flex items-center justify-between gap-4 rounded-lg border border-border bg-card p-4 cursor-pointer">
                     <span className="flex-1 min-w-0">
                       <span className="block text-sm font-semibold text-foreground">
+                        {t('productCard.newBadgeTitle')}
+                      </span>
+                      <span className="mt-0.5 block text-xs text-muted-foreground">
+                        {t('productCard.newBadgeHint')}
+                      </span>
+                    </span>
+                    {/* Ruling D1016-NEW-1: the "New" badge is the merchant's choice, default OFF. */}
+                    <input
+                      type="checkbox"
+                      checked={
+                        pendingThemeUpdates.showNewBadge ?? storeInfo?.theme?.showNewBadge === true
+                      }
+                      onChange={e =>
+                        setPendingThemeUpdates(prev => ({
+                          ...prev,
+                          showNewBadge: e.target.checked,
+                        }))
+                      }
+                      className="h-5 w-5 cursor-pointer accent-primary"
+                    />
+                  </label>
+                  <label className="flex items-center justify-between gap-4 rounded-lg border border-border bg-card p-4 cursor-pointer">
+                    <span className="flex-1 min-w-0">
+                      <span className="block text-sm font-semibold text-foreground">
                         {t('productCard.quickAddTitle')}
                       </span>
                       <span className="mt-0.5 block text-xs text-muted-foreground">
@@ -3249,6 +3273,7 @@ export default function StoreLayoutPage() {
             k =>
               ![
                 'showBrandBadge',
+                'showNewBadge',
                 'showQuickAdd',
                 'showPriceOnCards',
                 'normalizeProductImages',

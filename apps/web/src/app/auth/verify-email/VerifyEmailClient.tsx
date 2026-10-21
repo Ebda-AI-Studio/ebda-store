@@ -28,7 +28,7 @@ export default function VerifyEmailClient() {
 
   const invalidLinkCopy = t(
     'The verification link is invalid or has expired.',
-    'رابط التحقق غير صالح أو منتهي الصلاحية.'
+    'رابط التأكيد مش صالح أو انتهى.'
   );
 
   async function verify() {
@@ -41,7 +41,7 @@ export default function VerifyEmailClient() {
       setErrorMessage(
         t(
           'No verification token was provided. Please check the link in your email.',
-          'لم يتم تقديم رمز التحقق. يرجى التحقق من الرابط في بريدك الإلكتروني.'
+          'مفيش رمز تأكيد. بُص على الرابط اللي في بريدك.'
         )
       );
       setState('error');
@@ -74,7 +74,7 @@ export default function VerifyEmailClient() {
           json.error?.code === 'TOKEN_EXPIRED'
             ? t(
                 'This verification link has expired. Please request a new one.',
-                'انتهت صلاحية رابط التحقق هذا. يرجى طلب رابط جديد.'
+                'رابط التأكيد ده انتهى. اطلب رابط جديد.'
               )
             : invalidLinkCopy
         );
@@ -104,15 +104,12 @@ export default function VerifyEmailClient() {
                   <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
                 </div>
                 <h1 className="mt-6 text-2xl font-bold text-foreground">
-                  {t(
-                    'Verifying your email',
-                    '\u062c\u0627\u0631\u064d \u062a\u0623\u0643\u064a\u062f \u0628\u0631\u064a\u062f\u0643 \u0627\u0644\u0625\u0644\u0643\u062a\u0631\u0648\u0646\u064a'
-                  )}
+                  {t('Verifying your email', 'بنأكد بريدك الإلكتروني')}
                 </h1>
                 <p className="mt-2 text-muted-foreground">
                   {t(
                     'Please wait while we verify your email address...',
-                    '\u064a\u0631\u062c\u0649 \u0627\u0644\u0627\u0646\u062a\u0638\u0627\u0631 \u0628\u064a\u0646\u0645\u0627 \u0646\u062a\u062d\u0642\u0642 \u0645\u0646 \u0628\u0631\u064a\u062f\u0643 \u0627\u0644\u0625\u0644\u0643\u062a\u0631\u0648\u0646\u064a...'
+                    'استنى شوية لحد ما نتأكد من بريدك...'
                   )}
                 </p>
               </>
@@ -136,15 +133,12 @@ export default function VerifyEmailClient() {
                   </svg>
                 </div>
                 <h1 className="mt-6 text-2xl font-bold text-foreground">
-                  {t(
-                    'Email Verified!',
-                    '\u062a\u0645 \u062a\u0623\u0643\u064a\u062f \u0627\u0644\u0628\u0631\u064a\u062f \u0627\u0644\u0625\u0644\u0643\u062a\u0631\u0648\u0646\u064a!'
-                  )}
+                  {t('Email Verified!', 'بريدك اتأكد!')}
                 </h1>
                 <p className="mt-2 text-muted-foreground">
                   {t(
                     'Your email address has been verified successfully. You can now sign in to your account.',
-                    '\u062a\u0645 \u0627\u0644\u062a\u062d\u0642\u0642 \u0645\u0646 \u0628\u0631\u064a\u062f\u0643 \u0627\u0644\u0625\u0644\u0643\u062a\u0631\u0648\u0646\u064a \u0628\u0646\u062c\u0627\u062d. \u064a\u0645\u0643\u0646\u0643 \u0627\u0644\u0622\u0646 \u062a\u0633\u062c\u064a\u0644 \u0627\u0644\u062f\u062e\u0648\u0644 \u0625\u0644\u0649 \u062d\u0633\u0627\u0628\u0643.'
+                    'بريدك اتأكد. تقدر تسجّل دخول لحسابك دلوقتي.'
                   )}
                 </p>
                 <div className="mt-8">
@@ -152,10 +146,7 @@ export default function VerifyEmailClient() {
                     href={storeUrl('/auth/login')}
                     className="inline-flex w-full items-center justify-center rounded-lg bg-primary px-6 py-3 font-medium text-primary-foreground hover:bg-primary/90 transition"
                   >
-                    {t(
-                      'Go to Login',
-                      '\u0627\u0644\u0630\u0647\u0627\u0628 \u0644\u062a\u0633\u062c\u064a\u0644 \u0627\u0644\u062f\u062e\u0648\u0644'
-                    )}
+                    {t('Go to Login', 'الذهاب لتسجيل الدخول')}
                   </Link>
                 </div>
               </>
@@ -181,18 +172,18 @@ export default function VerifyEmailClient() {
                 </div>
                 <h1 className="mt-6 text-2xl font-bold text-foreground">
                   {retryReason === 'throttled'
-                    ? t('Too many attempts', 'محاولات كثيرة جدًا')
-                    : t("We couldn't verify right now", 'تعذّر التحقق الآن')}
+                    ? t('Too many attempts', 'محاولات كتير')
+                    : t("We couldn't verify right now", 'معرفناش نتأكد دلوقتي')}
                 </h1>
                 <p className="mt-2 text-muted-foreground" role="status">
                   {retryReason === 'throttled'
                     ? t(
                         'Your link is still valid. Please wait a few minutes, then try again.',
-                        'رابطك لا يزال صالحًا. يرجى الانتظار بضع دقائق ثم المحاولة مرة أخرى.'
+                        'رابطك لسه شغال. استنى كام دقيقة وجرّب تاني.'
                       )
                     : t(
                         'Please check your connection and try again. Your link is still valid.',
-                        'يرجى التحقق من اتصالك والمحاولة مرة أخرى. رابطك لا يزال صالحًا.'
+                        'اتأكد من اتصالك وجرّب تاني. رابطك لسه شغال.'
                       )}
                 </p>
                 <div className="mt-8 flex flex-col gap-3">
@@ -201,16 +192,13 @@ export default function VerifyEmailClient() {
                     onClick={() => verify()}
                     className="inline-flex w-full items-center justify-center rounded-lg bg-primary px-6 py-3 font-medium text-primary-foreground hover:bg-primary/90 transition"
                   >
-                    {t('Try again', 'حاول مرة أخرى')}
+                    {t('Try again', 'جرّب تاني')}
                   </button>
                   <Link
                     href={storeUrl('/')}
                     className="inline-flex w-full items-center justify-center rounded-lg border border-border px-6 py-3 font-medium text-foreground hover:bg-muted transition"
                   >
-                    {t(
-                      'Back to Home',
-                      '\u0627\u0644\u0639\u0648\u062f\u0629 \u0644\u0644\u0631\u0626\u064a\u0633\u064a\u0629'
-                    )}
+                    {t('Back to Home', 'العودة للرئيسية')}
                   </Link>
                 </div>
               </>
@@ -234,10 +222,7 @@ export default function VerifyEmailClient() {
                   </svg>
                 </div>
                 <h1 className="mt-6 text-2xl font-bold text-foreground">
-                  {t(
-                    'Invalid Link',
-                    '\u0631\u0627\u0628\u0637 \u063a\u064a\u0631 \u0635\u0627\u0644\u062d'
-                  )}
+                  {t('Invalid Link', 'رابط غير صالح')}
                 </h1>
                 <p className="mt-2 text-muted-foreground">{errorMessage}</p>
                 <div className="mt-8 flex flex-col gap-3">
@@ -245,19 +230,13 @@ export default function VerifyEmailClient() {
                     href={storeUrl('/auth/login')}
                     className="inline-flex w-full items-center justify-center rounded-lg bg-primary px-6 py-3 font-medium text-primary-foreground hover:bg-primary/90 transition"
                   >
-                    {t(
-                      'Go to Login',
-                      '\u0627\u0644\u0630\u0647\u0627\u0628 \u0644\u062a\u0633\u062c\u064a\u0644 \u0627\u0644\u062f\u062e\u0648\u0644'
-                    )}
+                    {t('Go to Login', 'الذهاب لتسجيل الدخول')}
                   </Link>
                   <Link
                     href={storeUrl('/')}
                     className="inline-flex w-full items-center justify-center rounded-lg border border-border px-6 py-3 font-medium text-foreground hover:bg-muted transition"
                   >
-                    {t(
-                      'Back to Home',
-                      '\u0627\u0644\u0639\u0648\u062f\u0629 \u0644\u0644\u0631\u0626\u064a\u0633\u064a\u0629'
-                    )}
+                    {t('Back to Home', 'العودة للرئيسية')}
                   </Link>
                 </div>
               </>

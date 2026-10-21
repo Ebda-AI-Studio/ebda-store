@@ -7,6 +7,7 @@ import { AdminLayout } from '../../../../components/AdminLayout';
 import { ErrorState } from '../../../../components/ErrorState';
 import { useFeatures } from '../../../../hooks/useFeatures';
 import { AbandonedCartsTable } from './_components/AbandonedCartsTable';
+import { CartEmailNudge } from './_components/CartEmailNudge';
 import { RecoveryCampaignForm } from './_components/RecoveryCampaignForm';
 import { StatsGrid } from './_components/StatsGrid';
 import { useAbandonedCarts } from './_hooks/useAbandonedCarts';
@@ -67,6 +68,8 @@ export default function AbandonedCartsPage() {
       ) : (
         <div className="space-y-6">
           <StatsGrid stats={stats} guestCheckout={guestCheckout} />
+
+          <CartEmailNudge storeId={storeId} emailEnabled={config.emailEnabled} />
 
           <RecoveryCampaignForm
             config={config}
