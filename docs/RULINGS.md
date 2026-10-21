@@ -6997,3 +6997,5 @@ Ruling SEC-B2B-3 (controller, 2026-10-21; push security review of 92bbc72d0, "ra
 - Ruling B1-REG-1: B1's storefront copy follows main's Egyptian register gate (main's gate file taken wholesale; B1's exemptions B1-91 and B1-109 dropped). "تسوّق اللوك" (no gender) is used for the look CTA until Ahmad confirms "تسوقي اللوك". Cost if wrong: one string in `LanguageContext.tsx` and `ShopTheLookSection.tsx`.
 - Ruling B1-PLURAL-1: `COLOURS` uses the one Egyptian dual ("لونين") because main removed the oblique dual. Cost if wrong: one entry in `apps/web/src/lib/plural.ts`.
 - Open, not fixed in this merge (review minors M-1, M-3): the PLP still reads a stored `plp-per-page` with no selector left; the storedemo seed does not set `theme.showNewBadge`, so the NEW chips Ahmad saw at STOP 2 are off until it does.
+
+- Ruling SIGNUP-MIG-1: the default-template migration is renumbered from 20261028000800 to 20261029000200 so it sorts after main's newest (20261029000100_passkey_credentials, merged first). Content unchanged. Cost if wrong: none; the migration only changes a column default and is idempotent.

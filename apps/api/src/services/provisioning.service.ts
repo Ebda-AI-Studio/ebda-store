@@ -4,6 +4,7 @@ import {
   prisma,
   Prisma,
   StoreStatus,
+  type StoreTemplate,
   acrossStores,
   scopeTransaction,
   withMoneyTx,
@@ -27,6 +28,8 @@ import {
   storefrontOrigin,
   isReservedSlug,
   NEW_STORE_LAYOUT_SETTINGS,
+  defaultNewStoreLook,
+  isBuiltSkin,
 } from '@ebda/shared';
 
 // ==========================================
@@ -53,8 +56,8 @@ export interface ProvisionStoreInput {
   growthTrial?: boolean;
   /** Self-serve only: the plan + interval chosen at signup, billed at trial end. */
   trialChoice?: TrialChoice;
-  /** Initial storefront template; defaults to the schema default. */
-  template?: 'modern' | 'classic' | 'minimal' | 'bold' | 'elegant' | 'dahab' | 'qamar';
+  /** Initial storefront skin: must be one a BUILT look renders with. Defaults to the registry default (Qamar). */
+  template?: string;
   storeNameAr?: string;
 
   // Owner details
@@ -100,13 +103,23 @@ export class ProvisioningService {
       domain,
       plan = 'starter',
       status = 'active',
-      template,
+      template: requestedTemplate,
       storeNameAr,
       ownerEmail,
       ownerName,
       ownerPassword,
       settings,
     } = input;
+
+    // A new store starts on a built Ebda skin, never a legacy Force one and never the DB default.
+    const template = requestedTemplate ?? defaultNewStoreLook().skin;
+    if (!isBuiltSkin(template)) {
+      throw new AppError(
+        400,
+        'TEMPLATE_NOT_AVAILABLE',
+        'This template is not available for new stores'
+      );
+    }
 
     // An explicit slug is the store's `<slug>.ebda.app`: validate it (format +
     // reserved list) and refuse with a stable SLUG_* code. A generated one is
@@ -208,7 +221,7 @@ export class ProvisioningService {
               ...(storeNameAr ? { nameAr: storeNameAr } : {}),
               ownerId: owner.id,
               status,
-              ...(template ? { template } : {}),
+              template: template as StoreTemplate,
               // A new store starts with NO trust strip: `items: []` marks the
               // strip merchant-owned (empty = hidden). Stores that predate this
               // have no `items` key and keep the fixed defaults (see

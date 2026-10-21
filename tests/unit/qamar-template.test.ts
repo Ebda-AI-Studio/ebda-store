@@ -66,8 +66,11 @@ describe('qamar skin id', () => {
 
   it('is not offered as a bare skin (Ruling B1-17)', () => {
     const svc = readFileSync(path.join(root, 'apps/api/src/services/store.service.ts'), 'utf8');
-    expect(svc).toContain(
-      "const validTemplates = ['modern', 'classic', 'minimal', 'bold', 'elegant', 'dahab'];"
+    // No bare-skin allow-list at all: a switch into any skin (qamar included) is refused and the
+    // only way in is a look; the legacy skins are not selectable (new-store-built-templates-only).
+    expect(svc).not.toContain('validTemplates');
+    expect(svc).toMatch(
+      /if \(template !== store\.template\) \{\s+throw new AppError\(\s+400,\s+'INVALID_TEMPLATE'/
     );
   });
 });

@@ -1,14 +1,13 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
-import { getLook } from '@ebda/shared';
 import { authenticate, authorize } from '../middleware/auth';
 import { requireStoreAccess } from '../middleware/store-access';
 import { requireVerifiedEmail } from '../middleware/require-verified-email';
 import { tenantContext } from '../middleware/tenant-context';
 import { auditLog, writeLimiter } from '../middleware/security';
-import { OnboardingService, SELF_SERVE_TEMPLATES } from '../services/onboarding.service';
+import { OnboardingService } from '../services/onboarding.service';
+import { createStoreSchema } from './onboarding.schemas';
 import { applyOnboardingInstapay } from '../services/onboarding-instapay';
-import { SIGNUP_PLAN_CODES } from '../services/billing/trial';
 
 /**
  * Self-serve onboarding, mounted at `/onboarding`.
@@ -52,27 +51,6 @@ router.get(
     }
   }
 );
-
-const createStoreSchema = z.object({
-  name: z.string().trim().min(1).max(100),
-  nameAr: z.string().trim().min(1).max(100).optional(),
-  slug: z.string().trim().min(1).max(60),
-  template: z.enum(SELF_SERVE_TEMPLATES).optional(),
-  /** A look id from the shared registry; unknown ids are refused before anything is created. */
-  lookId: z
-    .string()
-    .refine(id => getLook(id) !== undefined, { message: 'Unknown look' })
-    .optional(),
-  language: z.enum(['ar', 'en']).optional(),
-  /** Plan chosen at signup (marketing deep link / plan step); billed at trial end. */
-  plan: z
-    .object({
-      planCode: z.enum(SIGNUP_PLAN_CODES),
-      interval: z.enum(['monthly', 'yearly']),
-    })
-    .strict()
-    .optional(),
-});
 
 // POST /onboarding/store - create the (inactive) store on the Growth trial. Verified email only.
 router.post(
