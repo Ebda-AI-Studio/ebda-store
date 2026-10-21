@@ -400,9 +400,8 @@ describe('souq skin id', () => {
       expect(json.template.page.skins.souq, f).toBe(label);
     }
     const svc = readFileSync(path.join(root, 'apps/api/src/services/store.service.ts'), 'utf8');
-    expect(svc).toContain(
-      "const validTemplates = ['modern', 'classic', 'minimal', 'bold', 'elegant', 'dahab'];"
-    );
+    // Souq, like Qamar, is only reachable through a look: updateTemplate refuses a switch INTO a bare skin.
+    expect(svc).toMatch(/nobody can switch\s+\/\/ INTO a bare skin/);
   });
   it('the souq template family renders on the souq skin', async () => {
     const { TEMPLATE_FAMILIES } = await import('@ebda/shared');
