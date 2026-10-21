@@ -2380,6 +2380,19 @@
       "loadFailedTitle": "Some analytics could not be loaded",
       "loadFailedBody": "A request failed. The figures below may be incomplete.",
       "retry": "Retry"
+    },
+    "priceSource": {
+      "title": "Wholesale vs retail",
+      "shareLabel": "of line revenue came from wholesale prices",
+      "shareBar": "Wholesale share: {percent}%",
+      "source": "Price source",
+      "units": "Units",
+      "revenue": "Revenue",
+      "retail": "Retail",
+      "tier": "Quantity breaks",
+      "group": "Wholesale group",
+      "empty": "No sales in this period yet.",
+      "loadFailed": "Could not load the wholesale split."
     }
   },
   "settings": {
