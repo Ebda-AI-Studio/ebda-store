@@ -23,6 +23,17 @@ export interface ServerCartItem {
   };
   variant?: { id: string; title: string; titleAr?: string | null; price?: number } | null;
   unavailable?: boolean;
+  /**
+   * Server-resolved pricing for this buyer (B2B Task 3): the unit price actually charged (tier / group price / retail),
+   * the retail list price, where the price came from, and the product's minimum order quantity state. Absent on a line
+   * the server did not price (an unavailable line) and on responses from an older API.
+   */
+  unitPrice?: number;
+  listPrice?: number;
+  priceSource?: 'base' | 'tier' | 'group';
+  priceTierMinQty?: number | null;
+  belowMoq?: boolean;
+  moqRequired?: number | null;
 }
 
 export function mapServerItem(item: ServerCartItem): CartItem {
@@ -31,9 +42,15 @@ export function mapServerItem(item: ServerCartItem): CartItem {
     productId: item.productId,
     name: item.product.name,
     nameAr: item.product.nameAr ?? undefined,
-    // Show the chosen variant's price (fall back to the parent product for
-    // variant-less products) — matches what the server charges.
-    price: item.variant?.price ?? item.product.price,
+    // The SERVER-resolved unit price for this buyer (tier / group / retail): the cart and checkout render this and never
+    // multiply a catalogue price themselves. Falls back to the chosen variant's price (then the parent product's) for a
+    // line the server did not price (unavailable) or an older API response.
+    price: item.unitPrice ?? item.variant?.price ?? item.product.price,
+    listPrice: item.listPrice,
+    priceSource: item.priceSource,
+    priceTierMinQty: item.priceTierMinQty ?? undefined,
+    belowMoq: item.belowMoq === true ? true : undefined,
+    moqRequired: item.moqRequired ?? undefined,
     quantity: item.quantity,
     image: item.product.images?.[0]?.url,
     slug: item.product.slug,

@@ -10,7 +10,7 @@
 import type { DbClient } from '@ebda/database';
 import { computeBundlePrice, type BundleLine, type BundlePricingType } from '@ebda/shared';
 import { AppError } from '../middleware/error-handler';
-import { cartLineUnitPrice } from '../lib/cart-pricing';
+import { retailUnitPrice } from '../lib/cart-pricing';
 import { effectiveInventory } from '../lib/effective-inventory';
 
 export interface AvailabilityItem {
@@ -176,7 +176,7 @@ export function nextSaleWindowBoundarySeconds(
 
 /**
  * Load a bundle for `storeId` with everything the cart/checkout/admin need:
- * its component lines (priced through `cartLineUnitPrice`, the same
+ * its component lines (priced through `retailUnitPrice`, the same
  * variant-vs-parent fallback the cart uses, so a bundle never charges a
  * different price for a component than buying it standalone would), the
  * derived `price` (via `computeBundlePrice`), the derived `available` count,
@@ -237,7 +237,7 @@ export async function resolveBundle(
 
   const lines: BundleLine[] = orderedItems.map(item => ({
     key: item.id,
-    unitPrice: cartLineUnitPrice({ variant: item.variant, product: item.product }),
+    unitPrice: retailUnitPrice({ variant: item.variant, product: item.product }),
     quantity: item.quantity,
   }));
 

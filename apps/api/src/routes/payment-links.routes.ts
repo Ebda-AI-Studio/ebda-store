@@ -35,6 +35,10 @@ import { requireStoreAccess } from '../middleware/store-access';
 import { requireFeature } from '../middleware/feature-gate';
 import { auditLog, writeLimiter } from '../middleware/security';
 import { encryption } from '../services/encryption.service';
+import { PriceResolver, wholesaleEntitledUncached } from '../services/price-resolver.service';
+import { ANONYMOUS_BUYER } from '../lib/buyer-identity';
+import { assertMoqSatisfied, priceSnapshot } from '../lib/order-pricing';
+import { AppError } from '../middleware/error-handler';
 import { PaymentService } from '../services/payment-providers/payment.factory';
 import { getAuthUser } from '../utils/store-helpers';
 import { generateOrderNumber } from '../utils/order-number';
@@ -200,6 +204,8 @@ router.post(
               id: true,
               name: true,
               price: true,
+              moq: true,
+              nameAr: true,
               sku: true,
               costPrice: true,
               // EFFECTIVE_STOCK_SELECT supplies inventory/trackInventory/
@@ -300,11 +306,53 @@ router.post(
         it.variantId
           ? byId.get(it.productId)?.variants.find(v => v.id === it.variantId)
           : undefined;
-      const unitPrice = (it: (typeof items)[number]) => {
-        const p = byId.get(it.productId);
-        const v = lineVariant(it);
-        return typeof v?.price === 'number' ? v.price : (p?.price ?? 0);
-      };
+      // Price through the ONE resolver. Design review I6 / Ruling B2B-2d: a payment link is priced as an ANONYMOUS buyer
+      // (retail + PUBLIC tiers) - the customer here is found by a typed WhatsApp phone, which is not a price identity, so
+      // the group price is never resolved. MOQ is enforced (422 BELOW_MOQ); the entitlement is read UNCACHED (review I2).
+      const linkResolver = await PriceResolver.forBuyer(storeId, ANONYMOUS_BUYER, {
+        uncachedEntitlement: wholesaleEntitledUncached,
+      });
+      const linkPrices = await linkResolver.priceCart(
+        items.map((it, i) => ({
+          key: String(i),
+          product: {
+            id: it.productId,
+            price: byId.get(it.productId)?.price ?? 0,
+            moq: byId.get(it.productId)?.moq ?? null,
+          },
+          variant: lineVariant(it)
+            ? { id: lineVariant(it)!.id, price: lineVariant(it)!.price }
+            : null,
+          qty: it.quantity,
+        }))
+      );
+      const linkProductQty = new Map<string, number>();
+      for (const it of items) {
+        linkProductQty.set(it.productId, (linkProductQty.get(it.productId) ?? 0) + it.quantity);
+      }
+      try {
+        assertMoqSatisfied(
+          items.map((it, i) => ({
+            productId: it.productId,
+            name: byId.get(it.productId)?.name ?? it.productId,
+            nameAr: byId.get(it.productId)?.nameAr ?? null,
+            current: linkProductQty.get(it.productId) ?? it.quantity,
+            resolved: linkPrices.get(String(i))!,
+          }))
+        );
+      } catch (err) {
+        if (err instanceof AppError) {
+          res.status(err.statusCode).json({
+            success: false,
+            error: { code: err.code, message: err.message, details: err.details },
+          });
+          return;
+        }
+        throw err;
+      }
+      const linePricing = (it: (typeof items)[number]) =>
+        linkPrices.get(String(items.indexOf(it)))!;
+      const unitPrice = (it: (typeof items)[number]) => linePricing(it).unitMinor;
       const itemsSubtotal = items.reduce((sum, it) => sum + unitPrice(it) * it.quantity, 0);
       // VAT (rulings TAX-2, MONEYB-2): a payment-link order is a sale like any
       // other — a VAT-verified store charges VAT on the items AND on the extra
@@ -403,6 +451,7 @@ router.post(
                 variantNameAr: v?.titleAr || null,
                 quantity: it.quantity,
                 price,
+                ...priceSnapshot(linePricing(it)),
                 total: price * it.quantity,
                 sku: v?.sku || p.sku || null,
                 // `??`, not `||`: a genuine 0 cost is a known cost.

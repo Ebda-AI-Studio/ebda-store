@@ -12,6 +12,7 @@ import { readInStoreContext } from '../lib/store-scoped-read';
 import { resolveSlugRedirectCached } from '../services/slug-redirect.service';
 import { AppError } from '../middleware/error-handler';
 import { authenticate, optionalAuthenticate, customerUserId } from '../middleware/auth';
+import { buyerFromRequest } from '../lib/buyer-identity';
 import { requireFeature } from '../middleware/feature-gate';
 import {
   publicLimiter,
@@ -37,7 +38,7 @@ import { redis } from '../services/redis.service';
 import { previewTokenKey } from '../lib/builder-preview-token';
 import { isReservedSlug, storefrontOrigin, CONTACT_HONEYPOT_FIELD } from '@ebda/shared';
 import { parseOptionalBooleanQuery } from '../lib/query-params';
-import { setEdgeCache } from '../lib/edge-cache';
+import { setEdgeCache, setBuyerPrivate } from '../lib/edge-cache';
 import { buildProductFeed } from '../lib/product-feed';
 import {
   listSellableBundles,
@@ -188,6 +189,8 @@ export const createOrderSchema = z.object({
    * Defaults to false when omitted (no silent opt-in).
    */
   smsOptIn: z.boolean().optional().default(false),
+  /** The total (piastres) the shopper last saw: compared to the server-resolved total, never used to charge. */
+  expectedTotal: z.number().int().min(0).optional(),
 });
 
 // GET /products - List all public products (cached 30s)
@@ -581,61 +584,78 @@ router.get('/redirects/resolve', async (req: Request, res: Response, next: NextF
 
 // Cart endpoints (using default store)
 // GET /cart - Get current cart
-router.get('/cart', cartLimiter, async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const sessionId = req.headers['x-session-id'] as string;
-    if (!sessionId) {
-      res.status(400).json({
-        success: false,
-        error: { code: 'MISSING_SESSION', message: 'Session ID required' },
+router.get(
+  '/cart',
+  cartLimiter,
+  optionalAuthenticate,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const sessionId = req.headers['x-session-id'] as string;
+      if (!sessionId) {
+        res.status(400).json({
+          success: false,
+          error: { code: 'MISSING_SESSION', message: 'Session ID required' },
+        });
+        return;
+      }
+
+      const storeId = await getStoreIdFromRequest(req);
+      setBuyerPrivate(res);
+      const cart = await CartService.getOrCreate(
+        storeId,
+        sessionId,
+        undefined,
+        buyerFromRequest(req)
+      );
+
+      res.json({
+        success: true,
+        data: { cart },
       });
-      return;
+    } catch (error) {
+      next(error);
     }
-
-    const storeId = await getStoreIdFromRequest(req);
-    const cart = await CartService.getOrCreate(storeId, sessionId);
-
-    res.json({
-      success: true,
-      data: { cart },
-    });
-  } catch (error) {
-    next(error);
   }
-});
+);
 
 // POST /cart/items - Add item to cart
-router.post('/cart/items', cartLimiter, async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const sessionId = req.headers['x-session-id'] as string;
-    if (!sessionId) {
-      res.status(400).json({
-        success: false,
-        error: { code: 'MISSING_SESSION', message: 'Session ID required' },
+router.post(
+  '/cart/items',
+  cartLimiter,
+  optionalAuthenticate,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const sessionId = req.headers['x-session-id'] as string;
+      if (!sessionId) {
+        res.status(400).json({
+          success: false,
+          error: { code: 'MISSING_SESSION', message: 'Session ID required' },
+        });
+        return;
+      }
+
+      const { productId, quantity, variantId, note } = addCartItemSchema.parse(req.body);
+      const storeId = await getStoreIdFromRequest(req);
+      const cart = await CartService.addItem(
+        storeId,
+        sessionId,
+        productId,
+        quantity,
+        undefined,
+        variantId,
+        note,
+        buyerFromRequest(req)
+      );
+
+      res.json({
+        success: true,
+        data: { cart },
       });
-      return;
+    } catch (error) {
+      next(error);
     }
-
-    const { productId, quantity, variantId, note } = addCartItemSchema.parse(req.body);
-    const storeId = await getStoreIdFromRequest(req);
-    const cart = await CartService.addItem(
-      storeId,
-      sessionId,
-      productId,
-      quantity,
-      undefined,
-      variantId,
-      note
-    );
-
-    res.json({
-      success: true,
-      data: { cart },
-    });
-  } catch (error) {
-    next(error);
   }
-});
+);
 
 // POST /cart/sync - bulk-merge a guest cart into the session cart (post-login
 // migration). Mirrors POST /cart/items but takes an array; uses the existing
@@ -653,29 +673,41 @@ const syncCartSchema = z.object({
     )
     .max(100),
 });
-router.post('/cart/sync', cartLimiter, async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const sessionId = req.headers['x-session-id'] as string;
-    if (!sessionId) {
-      res.status(400).json({
-        success: false,
-        error: { code: 'MISSING_SESSION', message: 'Session ID required' },
-      });
-      return;
+router.post(
+  '/cart/sync',
+  cartLimiter,
+  optionalAuthenticate,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const sessionId = req.headers['x-session-id'] as string;
+      if (!sessionId) {
+        res.status(400).json({
+          success: false,
+          error: { code: 'MISSING_SESSION', message: 'Session ID required' },
+        });
+        return;
+      }
+      const { items } = syncCartSchema.parse(req.body);
+      const storeId = await getStoreIdFromRequest(req);
+      const cart = await CartService.addItems(
+        storeId,
+        sessionId,
+        items,
+        undefined,
+        buyerFromRequest(req)
+      );
+      res.json({ success: true, data: { cart } });
+    } catch (error) {
+      next(error);
     }
-    const { items } = syncCartSchema.parse(req.body);
-    const storeId = await getStoreIdFromRequest(req);
-    const cart = await CartService.addItems(storeId, sessionId, items);
-    res.json({ success: true, data: { cart } });
-  } catch (error) {
-    next(error);
   }
-});
+);
 
 // PUT /cart/items/:itemId - Update cart item
 router.put(
   '/cart/items/:itemId',
   cartLimiter,
+  optionalAuthenticate,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const sessionId = req.headers['x-session-id'] as string;
@@ -690,7 +722,14 @@ router.put(
       const { itemId } = req.params;
       const { quantity } = updateCartItemSchema.parse(req.body);
       const storeId = await getStoreIdFromRequest(req);
-      const cart = await CartService.updateItem(storeId, sessionId, itemId, quantity);
+      const cart = await CartService.updateItem(
+        storeId,
+        sessionId,
+        itemId,
+        quantity,
+        undefined,
+        buyerFromRequest(req)
+      );
 
       res.json({
         success: true,
@@ -706,6 +745,7 @@ router.put(
 router.delete(
   '/cart/items/:itemId',
   cartLimiter,
+  optionalAuthenticate,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const sessionId = req.headers['x-session-id'] as string;
@@ -719,7 +759,13 @@ router.delete(
 
       const { itemId } = req.params;
       const storeId = await getStoreIdFromRequest(req);
-      const cart = await CartService.removeItem(storeId, sessionId, itemId);
+      const cart = await CartService.removeItem(
+        storeId,
+        sessionId,
+        itemId,
+        undefined,
+        buyerFromRequest(req)
+      );
 
       res.json({
         success: true,
@@ -766,7 +812,8 @@ router.post(
         sessionId,
         data.bundleId,
         data.quantity,
-        customerId
+        customerId,
+        buyerFromRequest(req)
       );
 
       if (!result.ok) {
@@ -817,7 +864,13 @@ router.delete(
       const { cartBundleId } = req.params;
       const storeId = await getStoreIdFromRequest(req);
       const customerId = customerUserId(req);
-      const cart = await CartService.removeBundle(storeId, sessionId, cartBundleId, customerId);
+      const cart = await CartService.removeBundle(
+        storeId,
+        sessionId,
+        cartBundleId,
+        customerId,
+        buyerFromRequest(req)
+      );
 
       res.json({
         success: true,
@@ -830,28 +883,33 @@ router.delete(
 );
 
 // DELETE /cart - Clear cart
-router.delete('/cart', cartLimiter, async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const sessionId = req.headers['x-session-id'] as string;
-    if (!sessionId) {
-      res.status(400).json({
-        success: false,
-        error: { code: 'MISSING_SESSION', message: 'Session ID required' },
+router.delete(
+  '/cart',
+  cartLimiter,
+  optionalAuthenticate,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const sessionId = req.headers['x-session-id'] as string;
+      if (!sessionId) {
+        res.status(400).json({
+          success: false,
+          error: { code: 'MISSING_SESSION', message: 'Session ID required' },
+        });
+        return;
+      }
+
+      const storeId = await getStoreIdFromRequest(req);
+      const cart = await CartService.clear(storeId, sessionId, undefined, buyerFromRequest(req));
+
+      res.json({
+        success: true,
+        data: { cart },
       });
-      return;
+    } catch (error) {
+      next(error);
     }
-
-    const storeId = await getStoreIdFromRequest(req);
-    const cart = await CartService.clear(storeId, sessionId);
-
-    res.json({
-      success: true,
-      data: { cart },
-    });
-  } catch (error) {
-    next(error);
   }
-});
+);
 
 // Order endpoints
 // POST /orders - Create order. Guest checkout supported: customerId is
@@ -894,7 +952,7 @@ router.post(
         sessionId,
         orderData,
         undefined,
-        { checkoutIp: ipKeyGenerator(req.ip ?? '') || null }
+        { checkoutIp: ipKeyGenerator(req.ip ?? '') || null, buyer: buyerFromRequest(req) }
       );
 
       res.status(201).json({

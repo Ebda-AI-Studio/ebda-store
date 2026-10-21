@@ -35,6 +35,8 @@ import {
   ANONYMOUS_BUYER,
   buyerFromRequest,
   buyerFromMerchantSelection,
+  buyerFromMerchantShopperSelection,
+  buyerFromCartOwner,
 } from '@api/lib/buyer-identity';
 
 const sessionBuyer = (userId = 'user-1', role = 'customer') =>
@@ -188,6 +190,41 @@ describe('RF2 / Ruling B2B-2: the buyer is the authenticated user id, never a ty
     m.tierFindMany.mockResolvedValue([tierRow(2, 1_000, { groupId: 'someone-elses-group' })]);
     const r = await PriceResolver.forBuyer(STORE, sessionBuyer(USER));
     expect(await r.priceLine(P1, null, 5)).toMatchObject({ unitMinor: 8_000, source: 'group' });
+  });
+});
+
+describe('merchant shopper selection and cart owner identities', () => {
+  const merchantReq = (role: string) => ({ user: { role, userId: 'staff-1' } }) as never;
+
+  it('a merchant picking a REGISTERED shopper prices through customers.user_id of that shopper, in this store', async () => {
+    m.customerFindFirst.mockResolvedValue({ group: group() });
+    const r = await PriceResolver.forBuyer(
+      STORE,
+      buyerFromMerchantShopperSelection(merchantReq('staff'), 'shopper-7')
+    );
+    expect(m.userFindFirst).not.toHaveBeenCalled();
+    expect(m.customerFindFirst.mock.calls[0]![0].where).toEqual({
+      storeId: STORE,
+      groupId: { not: null },
+      userId: 'shopper-7',
+    });
+    expect(await r.priceLine(P1, null, 1)).toMatchObject({ unitMinor: 8_000, source: 'group' });
+  });
+
+  it('only a merchant session can mint a merchant selection (a customer token throws)', () => {
+    expect(() => buyerFromMerchantShopperSelection(merchantReq('customer'), 'x')).toThrow(
+      /merchant session/
+    );
+    expect(() => buyerFromMerchantSelection(merchantReq('customer'), 'x')).toThrow(
+      /merchant session/
+    );
+    expect(() => buyerFromMerchantShopperSelection({} as never, 'x')).toThrow(/merchant session/);
+  });
+
+  it('a stored cart owner id is a session identity; a missing one is anonymous', () => {
+    expect(buyerFromCartOwner(null)).toBe(ANONYMOUS_BUYER);
+    expect(buyerFromCartOwner(undefined)).toBe(ANONYMOUS_BUYER);
+    expect(buyerFromCartOwner('u-1')).toMatchObject({ kind: 'session', userId: 'u-1' });
   });
 });
 

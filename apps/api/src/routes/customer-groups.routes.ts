@@ -37,6 +37,7 @@ const assignSchema = z.object({
 // which never hold a Customer id. At least one of phone/email is required
 // (enforced in the service, not the schema, so the error is a clean 400).
 const assignByIdentitySchema = z.object({
+  userId: z.string().uuid().nullish(),
   phone: z.string().trim().max(40).nullish(),
   email: z.string().trim().max(255).nullish(),
   firstName: z.string().trim().max(100).nullish(),

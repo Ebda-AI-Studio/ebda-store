@@ -16,7 +16,8 @@ import request from 'supertest';
 
 // ─── Mocks (declared before the route module is dynamically imported) ─────
 
-const { mockPrisma } = vi.hoisted(() => ({
+const { mockPrisma, mockLoadBuyerGroup } = vi.hoisted(() => ({
+  mockLoadBuyerGroup: vi.fn(),
   mockPrisma: {
     coupon: { findFirst: vi.fn() },
     customer: { findFirst: vi.fn() },
@@ -47,6 +48,12 @@ vi.mock('@api/middleware/auth', () => ({
     next();
   },
   customerUserId: (req: any) => (req.user?.role === 'customer' ? req.user.userId : undefined),
+}));
+
+// Group membership comes from the shared buyer-group loader (session / merchant pick only; Ruling B2B-2c). Its queries are
+// pinned in tests/unit/price-resolver-service.test.ts and tests/integration/b2b-promo-identity.test.ts.
+vi.mock('@api/services/price-resolver.service', () => ({
+  loadBuyerGroup: mockLoadBuyerGroup,
 }));
 
 vi.mock('@api/middleware/store-access', () => ({
@@ -326,13 +333,11 @@ describe('POST /public/:storeId/coupons/validate — storefront cart lines (#136
   });
 
   it('quotes a customer-group code by the SIGNED-IN account, not the typed contact (issue 2066)', async () => {
-    // A VIP typing a recipient's phone: the typed phone matches no Customer
-    // row, but the account does — exactly what order-create keys the group on.
+    // A VIP typing a recipient's phone: the typed phone is irrelevant; the session's customers.user_id link decides.
     mockPrisma.coupon.findFirst.mockResolvedValue(couponRow({ customerGroupId: 'vip-group' }));
     mockPrisma.product.findMany.mockResolvedValue([{ id: 'p1', categories: [] }]);
     mockPrisma.order.count.mockResolvedValue(2);
-    mockPrisma.user.findUnique.mockResolvedValue({ phone: '+96550000001', email: 'vip@x.test' });
-    mockPrisma.customer.findFirst.mockResolvedValue({ groupId: 'vip-group' });
+    mockLoadBuyerGroup.mockResolvedValue({ id: 'vip-group' });
 
     const res = await request(app)
       .post(`/api/v1/stores/public/${STORE_ID}/coupons/validate`)
@@ -341,9 +346,27 @@ describe('POST /public/:storeId/coupons/validate — storefront cart lines (#136
 
     expect(res.status).toBe(200);
     expect(res.body.data.discount).toBe(1000);
-    expect(mockPrisma.user.findUnique).toHaveBeenCalledWith(
-      expect.objectContaining({ where: { id: 'user-vip', storeId: STORE_ID } })
+    expect(mockLoadBuyerGroup).toHaveBeenCalledWith(
+      STORE_ID,
+      expect.objectContaining({ kind: 'session', userId: 'user-vip' })
     );
+    expect(mockPrisma.customer.findFirst).not.toHaveBeenCalled();
+  });
+
+  it('a GUEST typing the VIP phone gets NO group code: the typed contact is not an identity (VIP-phone exploit)', async () => {
+    mockPrisma.coupon.findFirst.mockResolvedValue(couponRow({ customerGroupId: 'vip-group' }));
+    mockPrisma.product.findMany.mockResolvedValue([{ id: 'p1', categories: [] }]);
+    mockPrisma.order.count.mockResolvedValue(0);
+    mockPrisma.customer.findFirst.mockResolvedValue({ groupId: 'vip-group' }); // the old lookup would have matched
+    mockLoadBuyerGroup.mockResolvedValue(null);
+
+    const res = await request(app)
+      .post(`/api/v1/stores/public/${STORE_ID}/coupons/validate`)
+      .send({ code: 'VIP', orderTotal: 10000, cartItems: STOREFRONT_ITEMS, phone: '+96550000001' });
+
+    expect(res.status).toBe(400);
+    expect(res.body.error.code).toBe('COUPON_NOT_ELIGIBLE');
+    expect(mockLoadBuyerGroup).toHaveBeenCalledWith(STORE_ID, expect.objectContaining({ kind: 'anonymous' }));
   });
 
   it('still refuses a GUEST whose typed contact matches no Customer row — order-create would too', async () => {

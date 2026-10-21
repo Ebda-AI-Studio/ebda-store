@@ -170,7 +170,7 @@ describe('CustomerGroupService.assignByIdentity', () => {
     expect(mockCustomer.create).not.toHaveBeenCalled();
   });
 
-  it('matches an existing customer by phone first and backfills contact fields', async () => {
+  it('matches an existing customer by phone first and attaches the group WITHOUT rewriting any contact or name field (Ruling B2B-2e)', async () => {
     mockGroup.findFirst.mockResolvedValue({ id: 'g1' });
     mockCustomer.findFirst.mockResolvedValue({ id: 'c1' });
     mockCustomer.update.mockResolvedValue({ id: 'c1', groupId: 'g1', group: { id: 'g1' } });
@@ -185,16 +185,12 @@ describe('CustomerGroupService.assignByIdentity', () => {
       where: { storeId: STORE, phone: '+96599001234' },
       select: { id: true },
     });
+    // The phone-first backfill used to overwrite the matched row's email / names with the typed values; that let one
+    // person's typed phone rewrite another person's CRM row. Only the group changes now.
     expect(mockCustomer.update).toHaveBeenCalledWith(
       expect.objectContaining({
         where: { id: 'c1', storeId: STORE },
-        data: expect.objectContaining({
-          groupId: 'g1',
-          phone: '+96599001234',
-          email: 'a@b.com',
-          firstName: 'Ali',
-          lastName: 'K',
-        }),
+        data: { groupId: 'g1' },
       })
     );
     expect(mockCustomer.create).not.toHaveBeenCalled();

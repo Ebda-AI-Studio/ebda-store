@@ -22,7 +22,10 @@ export type BuyerIdentity =
   | (Brand & { readonly kind: 'session'; readonly userId: string })
   | (Brand & {
       readonly kind: 'merchant-selected';
-      readonly customerId: string;
+      /** A Customer (CRM) row picked by id. Exactly one of customerId / shopperUserId is set. */
+      readonly customerId?: string;
+      /** A REGISTERED shopper (users.id) the merchant picked, e.g. the admin order form's customer. */
+      readonly shopperUserId?: string;
       readonly actorUserId: string;
     });
 
@@ -53,4 +56,35 @@ export function buyerFromMerchantSelection(req: Request, customerId: string): Bu
     customerId,
     actorUserId: actor.userId,
   }) as BuyerIdentity;
+}
+
+/**
+ * A merchant pricing an admin order / payment link for the REGISTERED shopper they picked (users.id, validated against the
+ * store by the caller). The shopper's group is then read through the `customers.user_id` link, exactly as for their own session.
+ */
+export function buyerFromMerchantShopperSelection(
+  req: Request,
+  shopperUserId: string
+): BuyerIdentity {
+  const actor = req.user;
+  if (!actor || !MERCHANT_ROLES.has(actor.role) || !actor.userId) {
+    throw new Error('buyerFromMerchantShopperSelection: a merchant session is required');
+  }
+  if (!shopperUserId)
+    throw new Error('buyerFromMerchantShopperSelection: shopperUserId is required');
+  return Object.freeze({
+    kind: 'merchant-selected',
+    shopperUserId,
+    actorUserId: actor.userId,
+  }) as BuyerIdentity;
+}
+
+/**
+ * The owner of a stored cart, for jobs that have no request (abandoned-cart sweeps, recovery emails): `carts.customer_id` is
+ * written ONLY from a verified customer session (`customerUserId(req)` in the cart routes, the login merge in auth.service),
+ * never from a body, a header or a tool argument, so it is a session-minted identity at rest. Anonymous when absent.
+ */
+export function buyerFromCartOwner(customerId: string | null | undefined): BuyerIdentity {
+  if (!customerId) return ANONYMOUS_BUYER;
+  return Object.freeze({ kind: 'session', userId: customerId }) as BuyerIdentity;
 }

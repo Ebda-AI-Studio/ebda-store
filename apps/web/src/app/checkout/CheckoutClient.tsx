@@ -1743,6 +1743,41 @@ export default function CheckoutClient() {
             );
           setStep(1);
           break;
+        case 'PRICE_CHANGED':
+          // B2B (Ruling B2B-9): the server re-priced the cart at order time and the total differs from the one shown (a tier
+          // edit, a change in wholesale approval, a new price). Nothing was charged. Send the buyer back to the cart, which
+          // re-reads the server prices, so they confirm the new total instead of retrying the same refused payload.
+          void refetchCart().catch(() => undefined);
+          setStep(1);
+          friendly = t(
+            'Prices changed since you last saw your cart. Please review the new total and confirm your order.',
+            'تغيّرت الأسعار منذ آخر مرة شاهدت فيها سلتك. يرجى مراجعة الإجمالي الجديد وتأكيد طلبك.'
+          );
+          break;
+        case 'BELOW_MOQ': {
+          // B2B minimum order quantity: deterministic until the quantity is raised or the line removed, so a retry can never
+          // succeed. The server lists EVERY offending product; name them and send the buyer to the cart.
+          const lines = ((details as { lines?: unknown } | null | undefined)?.lines ??
+            []) as Array<{
+            name?: string;
+            nameAr?: string | null;
+            required?: number;
+          }>;
+          const names = lines
+            .map(l => `${language === 'ar' ? l.nameAr || l.name : l.name} (${l.required})`)
+            .join(language === 'ar' ? '، ' : ', ');
+          setStep(1);
+          friendly = names
+            ? t(
+                `Some items are below their minimum order quantity: ${names}. Please increase the quantity to continue.`,
+                `بعض المنتجات أقل من الحد الأدنى للكمية: ${names}. يرجى زيادة الكمية للمتابعة.`
+              )
+            : t(
+                'Some items are below their minimum order quantity. Please increase the quantity to continue.',
+                'بعض المنتجات أقل من الحد الأدنى للكمية. يرجى زيادة الكمية للمتابعة.'
+              );
+          break;
+        }
         case 'INSUFFICIENT_INVENTORY':
           friendly = t(
             'One of the items in your cart is out of stock. Please review your cart.',

@@ -29,7 +29,9 @@ function withStoredPhone(addr: Record<string, unknown>): Record<string, unknown>
 }
 import { loadCodFeeConfig } from './payment-providers/cod.provider';
 import { generateOrderNumber } from '../utils/order-number';
-import { cartLineUnitPrice } from '../lib/cart-pricing';
+import { PriceResolver, wholesaleEntitledUncached } from './price-resolver.service';
+import { ANONYMOUS_BUYER, type BuyerIdentity } from '../lib/buyer-identity';
+import { assertMoqSatisfied, priceSnapshot, eligibleForCoupon } from '../lib/order-pricing';
 import { pairBackorderedLines } from '../lib/backorder-pairing';
 import { restoreCartShape } from '../lib/order-cart-restore';
 import { AppError } from '../middleware/error-handler';
@@ -130,6 +132,8 @@ const ORDER_PAYMENT_SELECT = {
 } as const satisfies Prisma.PaymentSelect;
 
 interface CreateOrderData {
+  /** The total (piastres) the shopper last saw. Compared, never charged: a mismatch is 409 PRICE_CHANGED (Ruling B2B-9). */
+  expectedTotal?: number;
   shippingAddress: {
     firstName: string;
     lastName: string;
@@ -597,7 +601,14 @@ export class OrderService {
      * method; a future script) simply get no IP signal in the stock-hold cap
      * below.
      */
-    requestContext?: { checkoutIp?: string | null }
+    requestContext?: {
+      checkoutIp?: string | null;
+      /**
+       * Who this order is priced for (lib/buyer-identity.ts): the signed-in customer session, minted by the route via
+       * `buyerFromRequest(req)`. Absent = anonymous (retail + public tiers), e.g. WhatsApp / MCP callers.
+       */
+      buyer?: BuyerIdentity;
+    }
   ) {
     await assertOrderAllowed(storeId);
     // One stored phone form (ruling MONEYB-7): E.164 for an Egyptian mobile,
@@ -685,6 +696,8 @@ export class OrderService {
         id: true,
         trackInventory: true,
         costPrice: true,
+        // B2B minimum order quantity (Review Focus 7): judged below on the product total.
+        moq: true,
         name: true,
         nameAr: true,
         // Every variant row (disabled included): the sizeless-line gate below.
@@ -890,31 +903,79 @@ export class OrderService {
       (sum, b) => sum + (b.resolved.componentSum - b.resolved.price) * b.cartBundle.quantity,
       0
     );
+    // Resolve every loose line's unit price through the ONE resolver (Ruling B2B-9: the price becomes binding here, in the
+    // request that creates the order). Fresh group read, UNCACHED entitlement (a just-made downgrade binds the next order).
+    // The pricing happens moments before the money transaction opens, the same window the totals above always had.
+    // `expectedTotal` (below) catches a price that moved since the shopper last saw the cart.
+    const resolver = await PriceResolver.forBuyer(
+      storeId,
+      requestContext?.buyer ?? ANONYMOUS_BUYER,
+      {
+        uncachedEntitlement: wholesaleEntitledUncached,
+      }
+    );
+    const linePrices = await resolver.priceCart(
+      cart.items.map(item => ({
+        key: item.id,
+        product: {
+          id: item.productId,
+          price: item.product.price,
+          moq: productInternalsById.get(item.productId)?.moq ?? null,
+        },
+        variant: item.variant
+          ? { id: (item as { variantId: string }).variantId, price: item.variant.price }
+          : null,
+        qty: item.quantity,
+      }))
+    );
+    const lineUnit = (item: { id: string }) => linePrices.get(item.id)!;
+    const productQtyTotals = new Map<string, number>();
+    for (const item of cart.items) {
+      productQtyTotals.set(
+        item.productId,
+        (productQtyTotals.get(item.productId) ?? 0) + item.quantity
+      );
+    }
+    // Review Focus 7: below MOQ an order is refused (inside the request, before any stock moves), all offenders listed.
+    assertMoqSatisfied(
+      cart.items.map(item => ({
+        productId: item.productId,
+        name: item.product.name,
+        nameAr: item.product.nameAr ?? null,
+        current: productQtyTotals.get(item.productId) ?? item.quantity,
+        resolved: lineUnit(item),
+      }))
+    );
+    const groupPriceApplied = cart.items.some(item => lineUnit(item).groupApplied);
+
     // The LOOSE-items-only subtotal — every cart line that is not part of a
-    // bundle. It is the basis a coupon is evaluated against, because a
-    // coupon never discounts a bundle (Ruling B1: no stacking on an
-    // already-discounted box; `cartItems` below, which drives
-    // `matchesTargeting`/`matchingSubtotal`, is likewise built from
-    // `cart.items` only). Identical to `subtotal` for every cart with no
-    // bundle, so a store without the `bundles` feature is unaffected.
+    // bundle. Coupons and promotions are evaluated against the BASE-PRICED loose lines only: a line priced by a tier or a
+    // group price is excluded (Ruling B2B-5) and a coupon never discounts a bundle (Ruling B1). Both bases equal the plain
+    // loose subtotal for every store without tiers/groups/bundles, so those stores are unaffected.
     const looseSubtotal = cart.items.reduce(
-      (sum, item) => sum + cartLineUnitPrice(item) * item.quantity,
+      (sum, item) => sum + lineUnit(item).unitMinor * item.quantity,
+      0
+    );
+    const couponBasisSubtotal = cart.items.reduce(
+      (sum, item) =>
+        eligibleForCoupon(lineUnit(item)) ? sum + lineUnit(item).unitMinor * item.quantity : sum,
       0
     );
     const subtotal = looseSubtotal + bundlesSubtotal;
 
     // Build the targeting cart snapshot (product + category ids, per-line
     // totals) shared by coupon targeting and automatic promotion resolution.
-    // Prices each line the same way as `subtotal` so scoped discounts compute
-    // against the exact piastres the customer is charged.
-    const cartItems = cart.items.map(item => ({
-      productId: item.productId,
-      categoryIds: (productInternalsById.get(item.productId)?.categories ?? []).map(
-        c => c.categoryId
-      ),
-      quantity: item.quantity,
-      lineTotal: cartLineUnitPrice(item) * item.quantity,
-    }));
+    // Only coupon-eligible (base-priced) lines are in it, priced exactly as charged.
+    const cartItems = cart.items
+      .filter(item => eligibleForCoupon(lineUnit(item)))
+      .map(item => ({
+        productId: item.productId,
+        categoryIds: (productInternalsById.get(item.productId)?.categories ?? []).map(
+          c => c.categoryId
+        ),
+        quantity: item.quantity,
+        lineTotal: lineUnit(item).unitMinor * item.quantity,
+      }));
 
     // Per-store, opt-in minimum order value (Store.settings.minimumOrderFils,
     // piastres; 0/unset = no minimum). Platform-level — any store can configure
@@ -1018,11 +1079,13 @@ export class OrderService {
       typeof data.shippingAddress.phone === 'string' ? data.shippingAddress.phone : null;
     const idEmail =
       typeof data.shippingAddress.email === 'string' ? data.shippingAddress.email : null;
-    const custCtx = await resolveCustomerContext(storeId, {
-      phone: idPhone,
-      email: idEmail,
-      customerId: customerId ?? null,
-    });
+    // Group membership for promotions and coupons comes from the SAME identity as the price (the session), never from the
+    // typed phone / email (Ruling B2B-2c/2e): a guest gets no group benefits.
+    const custCtx = await resolveCustomerContext(
+      storeId,
+      { phone: idPhone, email: idEmail, customerId: customerId ?? null },
+      requestContext?.buyer ?? ANONYMOUS_BUYER
+    );
     const targetingCtx = { ...custCtx, cartItems };
 
     let appliedCoupon: Awaited<ReturnType<typeof CouponService.getByCode>> | null = null;
@@ -1036,7 +1099,7 @@ export class OrderService {
       // had just "qualified" for. `looseSubtotal === subtotal` whenever the
       // cart holds no bundle, so this is the identity for every store
       // without the `bundles` feature.
-      if (appliedCoupon.minOrderAmount && looseSubtotal < appliedCoupon.minOrderAmount) {
+      if (appliedCoupon.minOrderAmount && couponBasisSubtotal < appliedCoupon.minOrderAmount) {
         throw new AppError(
           400,
           'MIN_ORDER_NOT_MET',
@@ -1152,6 +1215,29 @@ export class OrderService {
       ratePercent: activeTax.ratePercent,
       includedInPrice: activeTax.includedInPrice,
     });
+
+    // Ruling B2B-9: the shopper's `expectedTotal` is a QUOTE they saw, used ONLY to compare, never to charge. If the
+    // server-resolved total differs (a tier edit, a revoked approval, a downgrade, a changed price since the cart was read),
+    // refuse with the new lines so the checkout can re-render and the buyer can confirm. Absent = no comparison (older clients).
+    if (typeof data.expectedTotal === 'number' && data.expectedTotal !== total) {
+      throw new AppError(
+        409,
+        'PRICE_CHANGED',
+        'Prices changed since you last saw your cart. Review the new total and confirm.',
+        {
+          expectedTotal: data.expectedTotal,
+          total,
+          lines: cart.items.map(item => ({
+            itemId: item.id,
+            productId: item.productId,
+            unitPrice: lineUnit(item).unitMinor,
+            lineTotal: lineUnit(item).unitMinor * item.quantity,
+            priceSource: lineUnit(item).source,
+            tierMinQty: lineUnit(item).tierMinQty,
+          })),
+        }
+      );
+    }
 
     // Customer wallet (D1). Resolved on the SERVER from the real balance; the
     // debit itself happens inside the order transaction below and re-checks the
@@ -1585,6 +1671,8 @@ export class OrderService {
             // priced at `bundlePrice`, not `componentSum`), so this is never
             // added again into `discount`/`total`.
             bundleDiscount,
+            // Name of the group whose price applied, snapshotted so a renamed / deleted group never rewrites history.
+            priceGroupName: groupPriceApplied ? resolver.groupName : null,
             loyaltyPointsRedeemed: loyaltyPointsRedeemed > 0 ? loyaltyPointsRedeemed : null,
             loyaltyDiscount,
             total,
@@ -1626,7 +1714,10 @@ export class OrderService {
                   // Charge the chosen variant's price (fall back to the parent
                   // product for variant-less products). Persisting product.price
                   // here undercharged every variant at the parent (lowest) price.
-                  price: cartLineUnitPrice(item),
+                  price: lineUnit(item).unitMinor,
+                  // Price provenance snapshot (Ruling B2B-3b): invoices, returns and analytics read these and never
+                  // re-resolve a price. A pre-B2B order has NULLs, which read as 'base'.
+                  ...priceSnapshot(lineUnit(item)),
                   // Snapshot cost-of-goods at sale time so profit reports
                   // stay correct even if the product's cost changes later.
                   // A variant line takes the variant's own cost, falling back
@@ -1636,7 +1727,7 @@ export class OrderService {
                     productInternalsById.get(item.productId),
                     (item as { variantId?: string | null }).variantId
                   ),
-                  total: cartLineUnitPrice(item) * item.quantity,
+                  total: lineUnit(item).unitMinor * item.quantity,
                 })),
                 // Every bundle box's components, appended to the SAME array the
                 // loose cart items build above — ordinary product lines from
@@ -2742,8 +2833,17 @@ export class OrderService {
        */
       overrideCouponRules?: boolean;
       couponOverrideReason?: string;
+      /**
+       * Create the order below a product's minimum order quantity (B2B). Refused by default (422 BELOW_MOQ); honoured only
+       * for COUPON_OVERRIDE_ROLES (store_admin / super_admin) and only with a reason; the actor and reason are written to
+       * the order's event and audit log.
+       */
+      overrideMoq?: boolean;
+      moqOverrideReason?: string;
     },
-    actor: { role?: string } = {}
+    actor: { role?: string } = {},
+    /** Who the order is priced for (Ruling B2B-2d): the Customer the merchant selected; absent = retail. */
+    pricingOpts: { buyer?: BuyerIdentity } = {}
   ) {
     await assertOrderAllowed(storeId);
     if (data.items.length === 0) {
@@ -2783,12 +2883,12 @@ export class OrderService {
     });
     const productMap = new Map(products.map(p => [p.id, p]));
 
-    const resolved = data.items.map(it => {
+    const unpricedLines = data.items.map(it => {
       const product = productMap.get(it.productId);
       if (!product) {
         throw new AppError(404, 'PRODUCT_NOT_FOUND', `Product ${it.productId} not found`);
       }
-      let unitPrice = product.price;
+      let variantPrice: number | null = null;
       let variantSku: string | undefined;
       let variantTitle: string | undefined;
       let variantTitleAr: string | null = null;
@@ -2818,30 +2918,95 @@ export class OrderService {
             { productId: product.id, variantId: it.variantId, productName: product.name }
           );
         }
-        if (typeof variant.price === 'number') unitPrice = variant.price;
+        variantPrice = typeof variant.price === 'number' ? variant.price : null;
         variantSku = variant.sku ?? undefined;
         variantTitle = variant.title ?? undefined;
         variantTitleAr = variant.titleAr || null;
       }
       const quantity = Math.max(1, Math.floor(it.quantity));
-      const lineTotal = unitPrice * quantity;
       return {
         productId: product.id,
         productName: product.name,
+        productNameAr: product.nameAr ?? null,
+        productPrice: product.price,
+        productMoq: product.moq ?? null,
+        variantPrice,
         sku: variantSku ?? product.sku ?? undefined,
         variantId: it.variantId,
         variantTitle,
         variantTitleAr,
-        unitPrice,
         // Admin manual orders never snapshotted cost at all, so every line
         // they created had no COGS and no profit. Same rule as checkout.
         costPrice: lineUnitCost(product, it.variantId),
         quantity,
-        lineTotal,
       };
     });
 
+    // Price every line through the ONE resolver (Ruling B2B-2d): as the Customer the merchant selected, else retail + public
+    // tiers. UNCACHED entitlement (review I2). The admin form submits no price, and the route's zod object strips any.
+    const adminResolver = await PriceResolver.forBuyer(
+      storeId,
+      pricingOpts.buyer ?? ANONYMOUS_BUYER,
+      { uncachedEntitlement: wholesaleEntitledUncached }
+    );
+    const adminProductQty = new Map<string, number>();
+    for (const r of unpricedLines) {
+      adminProductQty.set(r.productId, (adminProductQty.get(r.productId) ?? 0) + r.quantity);
+    }
+    const adminPrices = await adminResolver.priceCart(
+      unpricedLines.map((r, i) => ({
+        key: String(i),
+        product: { id: r.productId, price: r.productPrice, moq: r.productMoq },
+        variant: r.variantId ? { id: r.variantId, price: r.variantPrice } : null,
+        qty: r.quantity,
+      }))
+    );
+    const resolved = unpricedLines.map((r, i) => {
+      const pricing = adminPrices.get(String(i))!;
+      return {
+        ...r,
+        unitPrice: pricing.unitMinor,
+        lineTotal: pricing.unitMinor * r.quantity,
+        pricing,
+      };
+    });
+
+    // Review Focus 7: MOQ refuses an admin order too, unless store_admin / super_admin overrides it with a reason.
+    const moqOverride = data.overrideMoq === true;
+    const moqLines = resolved.map(r => ({
+      productId: r.productId,
+      name: r.productName,
+      nameAr: r.productNameAr,
+      current: adminProductQty.get(r.productId) ?? r.quantity,
+      resolved: r.pricing,
+    }));
+    const belowMoqProducts = moqLines.filter(l => l.resolved.belowMoq).map(l => l.productId);
+    if (moqOverride) {
+      if (!actor.role || !COUPON_OVERRIDE_ROLES.includes(actor.role)) {
+        throw new AppError(
+          403,
+          'MOQ_OVERRIDE_FORBIDDEN',
+          'Only a store admin can override the minimum order quantity'
+        );
+      }
+      if (!data.moqOverrideReason?.trim()) {
+        throw new AppError(
+          400,
+          'MOQ_OVERRIDE_REASON_REQUIRED',
+          'A reason is required to override the minimum order quantity'
+        );
+      }
+    } else {
+      assertMoqSatisfied(moqLines);
+    }
+    const adminGroupPriceApplied = resolved.some(r => r.pricing.groupApplied);
+
     const subtotal = resolved.reduce((sum, r) => sum + r.lineTotal, 0);
+    // Coupons never discount a tier / group priced line (Ruling B2B-5).
+    const couponBasisSubtotal = resolved.reduce(
+      (sum, r) => (eligibleForCoupon(r.pricing) ? sum + r.lineTotal : sum),
+      0
+    );
 
     // Tax: same store-level resolution as the public checkout path, levied
     // after the coupon discount below (#193).
@@ -2940,22 +3105,29 @@ export class OrderService {
         typeof data.shippingAddress.phone === 'string' ? data.shippingAddress.phone : null;
       const idEmail =
         typeof data.shippingAddress.email === 'string' ? data.shippingAddress.email : null;
-      const custCtx = await resolveCustomerContext(storeId, {
-        phone: idPhone,
-        email: idEmail,
-        customerId: data.customerId ?? null,
-      });
+      // Group membership: the Customer the merchant selected (or none), never the typed shipping phone / email.
+      const custCtx = await resolveCustomerContext(
+        storeId,
+        { phone: idPhone, email: idEmail, customerId: data.customerId ?? null },
+        pricingOpts.buyer ?? ANONYMOUS_BUYER
+      );
       const targetingCtx = {
         ...custCtx,
-        cartItems: resolved.map(r => ({
-          productId: r.productId,
-          categoryIds: (productMap.get(r.productId)?.categories ?? []).map(c => c.categoryId),
-          quantity: r.quantity,
-          lineTotal: r.lineTotal,
-        })),
+        cartItems: resolved
+          .filter(r => eligibleForCoupon(r.pricing))
+          .map(r => ({
+            productId: r.productId,
+            categoryIds: (productMap.get(r.productId)?.categories ?? []).map(c => c.categoryId),
+            quantity: r.quantity,
+            lineTotal: r.lineTotal,
+          })),
       };
       couponViolations.push(
-        ...CouponService.adminOrderCouponViolations(appliedCoupon, targetingCtx, subtotal)
+        ...CouponService.adminOrderCouponViolations(
+          appliedCoupon,
+          targetingCtx,
+          couponBasisSubtotal
+        )
       );
       if (couponViolations.length > 0 && !overrideCoupon) {
         const first = couponViolations[0];
@@ -2967,7 +3139,7 @@ export class OrderService {
         couponDiscount = CouponService.adminOrderCouponDiscount(
           appliedCoupon,
           targetingCtx,
-          subtotal,
+          couponBasisSubtotal,
           overrideCoupon
         );
       }
@@ -3095,6 +3267,7 @@ export class OrderService {
           taxableAmount,
           discount: couponDiscount,
           total,
+          priceGroupName: adminGroupPriceApplied ? adminResolver.groupName : null,
           currency: data.currency ?? REGION.currency,
           couponCode: couponCode ?? null,
           shippingAddress: withStoredPhone(data.shippingAddress) as Prisma.InputJsonValue,
@@ -3115,6 +3288,7 @@ export class OrderService {
               variantName: r.variantTitle,
               variantNameAr: r.variantTitleAr,
               price: r.unitPrice,
+              ...priceSnapshot(r.pricing),
               costPrice: r.costPrice,
               quantity: r.quantity,
               total: r.lineTotal,
@@ -3151,10 +3325,42 @@ export class OrderService {
           },
         });
       }
+      // The durable record of a MOQ override, in the order transaction (the audit row below is best-effort).
+      if (moqOverride && belowMoqProducts.length > 0) {
+        await tx.orderEvent.create({
+          data: {
+            storeId,
+            orderId: created.id,
+            fromStatus: null,
+            toStatus: 'moq_override',
+            actorId: adminUserId,
+            metadata: {
+              reason: data.moqOverrideReason?.trim() ?? '',
+              actorRole: actor.role ?? null,
+              productIds: [...new Set(belowMoqProducts)],
+            },
+          },
+        });
+      }
       // Fiscal document + gap-free serial in the same transaction (MONEYB-1).
       await FiscalDocumentService.issueSaleDocument(tx, storeId, created.id);
       return created;
     });
+
+    if (moqOverride && belowMoqProducts.length > 0) {
+      await auditLog({
+        action: 'order.moq_override',
+        userId: adminUserId,
+        storeId,
+        resourceType: 'order',
+        resourceId: order.id,
+        details: {
+          orderNumber: order.orderNumber,
+          description: data.moqOverrideReason?.trim() ?? '',
+          productIds: [...new Set(belowMoqProducts)],
+        },
+      });
+    }
 
     await auditLog({
       action: 'order.admin_created',

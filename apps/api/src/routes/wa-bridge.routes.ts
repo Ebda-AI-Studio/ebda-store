@@ -38,6 +38,8 @@ import {
   lineAllowsBackorder,
 } from '../lib/effective-inventory';
 import logger from '../lib/logger';
+import { PriceResolver } from '../services/price-resolver.service';
+import { ANONYMOUS_BUYER } from '../lib/buyer-identity';
 import { maskPhone } from '../lib/pii-mask';
 import { waBridgeTiming } from '../lib/observability/wa-bridge-timing';
 import { AppError } from '../middleware/error-handler';
@@ -900,6 +902,7 @@ router.post('/cart/from-wa', waBridgeAuth, async (req: Request, res: Response) =
         name: true,
         nameAr: true,
         price: true,
+        moq: true,
         // EFFECTIVE_STOCK_SELECT supplies inventory/trackInventory/
         // allowBackorder plus the variants the stock check needs — spread it
         // rather than listing the columns, so a future edit cannot drop
@@ -1012,13 +1015,28 @@ router.post('/cart/from-wa', waBridgeAuth, async (req: Request, res: Response) =
       return;
     }
 
-    // Build the cart payload that the checkout JWT carries.
-    const cartItems = productItems.map(i => {
+    // Build the cart payload that the checkout JWT carries. Priced through the ONE resolver as an ANONYMOUS buyer (Ruling
+    // B2B-2: a WhatsApp conversation has no verified shopper session, so retail + PUBLIC tiers only, never a group price),
+    // so the total quoted here is what the order will charge. The order itself is created by OrderService.create, which
+    // re-resolves and enforces MOQ (422 BELOW_MOQ).
+    const waResolver = await PriceResolver.forBuyer(store.id, ANONYMOUS_BUYER);
+    const waPriced = await waResolver.priceCart(
+      productItems.map((i, idx) => ({
+        key: String(idx),
+        product: {
+          id: i.productId,
+          price: byId.get(i.productId)!.price,
+          moq: byId.get(i.productId)!.moq ?? null,
+        },
+        qty: i.quantity,
+      }))
+    );
+    const cartItems = productItems.map((i, idx) => {
       const p = byId.get(i.productId)!;
       return {
         productId: i.productId,
         quantity: i.quantity,
-        priceFils: p.price,
+        priceFils: waPriced.get(String(idx))!.unitMinor,
         name: p.name,
         nameAr: p.nameAr,
       };

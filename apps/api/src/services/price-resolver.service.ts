@@ -28,7 +28,23 @@
 import { prisma } from '@ebda/database';
 import { resolveUnitPrice, type BuyerGroup, type PriceTierRow, type Resolved } from '@ebda/shared';
 import { featureService } from './feature.service';
+import { getAutomationFlags } from './plan-entitlements';
 import type { BuyerIdentity } from '../lib/buyer-identity';
+
+/**
+ * The `b2b.wholesale` entitlement read straight from the database (no Redis / KV / in-memory cache): the per-store override
+ * row first, else the plan limit. Order, payment-link and admin-order creation use this (design review I2): a just-made
+ * downgrade or override must bind the very next order, and KV deletes are eventually consistent across colos.
+ */
+export async function wholesaleEntitledUncached(storeId: string): Promise<boolean> {
+  const override = await prisma.storeFeature.findFirst({
+    where: { storeId, featureKey: 'b2b.wholesale' },
+    select: { enabled: true },
+  });
+  if (override) return override.enabled;
+  const flags = await getAutomationFlags(storeId);
+  return flags?.wholesalePricing ?? false;
+}
 
 export interface PriceProduct {
   id: string;
@@ -63,7 +79,7 @@ export class PriceResolver {
 
   private constructor(
     private readonly storeId: string,
-    private readonly group: BuyerGroup | null,
+    private readonly group: (BuyerGroup & { name: string }) | null,
     private readonly readEntitlement?: (storeId: string) => Promise<boolean>
   ) {}
 
@@ -80,6 +96,11 @@ export class PriceResolver {
     if (!storeId) throw new Error('PriceResolver.forBuyer: storeId is required');
     const group = await loadBuyerGroup(storeId, buyer);
     return new PriceResolver(storeId, group, opts.uncachedEntitlement);
+  }
+
+  /** Name of the buyer's group (snapshotted onto Order.priceGroupName when a group price applied), else null. */
+  get groupName(): string | null {
+    return this.group?.name ?? null;
   }
 
   /** Price one line in isolation (qty = this line's quantity for both product and variant scope). */
@@ -160,11 +181,24 @@ export class PriceResolver {
 }
 
 const GROUP_SELECT = {
-  select: { id: true, storeId: true, pricingMode: true, discountBps: true, isActive: true },
+  select: {
+    id: true,
+    storeId: true,
+    name: true,
+    pricingMode: true,
+    discountBps: true,
+    isActive: true,
+  },
 } as const;
 
-/** The buyer's group, or null. See the file header for every pinned link. */
-async function loadBuyerGroup(storeId: string, buyer: BuyerIdentity): Promise<BuyerGroup | null> {
+/**
+ * The buyer's group, or null. See the file header for every pinned link. Shared with promotion / coupon targeting
+ * (promotion-resolver.ts): group membership for money benefits is decided by ONE function, from a BuyerIdentity.
+ */
+export async function loadBuyerGroup(
+  storeId: string,
+  buyer: BuyerIdentity
+): Promise<(BuyerGroup & { name: string }) | null> {
   let customer: { group: GroupRow | null } | null = null;
   if (buyer.kind === 'session') {
     const user = await prisma.user.findFirst({
@@ -183,8 +217,13 @@ async function loadBuyerGroup(storeId: string, buyer: BuyerIdentity): Promise<Bu
       select: { group: GROUP_SELECT },
     });
   } else if (buyer.kind === 'merchant-selected') {
+    if (!buyer.customerId && !buyer.shopperUserId) return null;
     customer = await prisma.customer.findFirst({
-      where: { id: buyer.customerId, storeId, groupId: { not: null } },
+      where: {
+        storeId,
+        groupId: { not: null },
+        ...(buyer.customerId ? { id: buyer.customerId } : { userId: buyer.shopperUserId }),
+      },
       select: { group: GROUP_SELECT },
     });
   } else {
@@ -193,11 +232,18 @@ async function loadBuyerGroup(storeId: string, buyer: BuyerIdentity): Promise<Bu
   const g = customer?.group;
   if (!g || g.storeId !== storeId) return null;
   if (g.pricingMode !== 'none' && g.pricingMode !== 'percent_off') return null;
-  return { id: g.id, pricingMode: g.pricingMode, discountBps: g.discountBps, isActive: g.isActive };
+  return {
+    id: g.id,
+    name: g.name,
+    pricingMode: g.pricingMode,
+    discountBps: g.discountBps,
+    isActive: g.isActive,
+  };
 }
 
 type GroupRow = {
   id: string;
+  name: string;
   storeId: string;
   pricingMode: string;
   discountBps: number;

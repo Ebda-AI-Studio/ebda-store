@@ -24,7 +24,8 @@ import { VARIANT_REQUIRED_MESSAGE } from '../lib/variant-required';
 import { featureService } from './feature.service';
 import { retryOnWriteConflict } from '../lib/db-retry';
 import { withSavepoint } from '../lib/savepoint';
-import { cartLineUnitPrice } from '../lib/cart-pricing';
+import { PriceResolver } from './price-resolver.service';
+import { ANONYMOUS_BUYER, type BuyerIdentity } from '../lib/buyer-identity';
 import { STOREFRONT_PRODUCT_SELECT } from './product.service';
 import { resolveBundle, type ResolvedBundle } from './bundle.service';
 import { activePersonalisation, cleanNote, stripNote } from '@ebda/shared';
@@ -169,6 +170,8 @@ const CART_INCLUDE = {
         select: {
           ...STOREFRONT_PRODUCT_SELECT,
           images: { take: 1, orderBy: { position: 'asc' } },
+          // B2B minimum order quantity: public product data (it is shown on the PDP), needed to flag a line `belowMoq`.
+          moq: true,
           // Read ONLY to derive the line's `unavailable` flag (#1766) and
           // stripped before the cart leaves this service — see computeTotals.
           deletedAt: true,
@@ -192,7 +195,11 @@ export class CartService {
    * lookup that must NOT create a Cart row on a miss) prices an
    * already-fetched cart identically instead of re-deriving the math.
    */
-  private static async computeTotals(storeId: string, cart: CartWithIncludes) {
+  private static async computeTotals(
+    storeId: string,
+    cart: CartWithIncludes,
+    buyer: BuyerIdentity = ANONYMOUS_BUYER
+  ) {
     // #1766 — a line whose product the merchant soft-deleted is flagged
     // `unavailable` and priced OUT of the subtotal. `OrderService.create`
     // refuses the whole order while any such line remains
@@ -205,12 +212,44 @@ export class CartService {
       return { ...item, product, unavailable: deletedAt != null };
     });
 
-    // Calculate totals — a line is priced at its chosen VARIANT's price when
-    // one is selected (variant products), falling back to the parent product's
-    // price for variant-less products. Using product.price for a variant line
-    // charged every variant at the parent's (lowest) price — a real undercharge.
-    const itemsSubtotal = items.reduce(
-      (sum, item) => (item.unavailable ? sum : sum + cartLineUnitPrice(item) * item.quantity),
+    // Every available loose line is priced by the ONE resolver for this buyer (Ruling B3b/B4): the variant price (or the
+    // product's), then tiers / the buyer's group price / MOQ. Unavailable (soft-deleted) lines are NOT handed to the resolver,
+    // so they cannot carry a cart over a tier (review I4); bundles are priced separately below and never count (B8b).
+    // The cart stores quantity only; this price is derived on every read, so a tier edit or a revoked approval shows at once.
+    const resolver = await PriceResolver.forBuyer(storeId, buyer);
+    const priced = await resolver.priceCart(
+      items
+        .filter(item => !item.unavailable)
+        .map(item => ({
+          key: item.id,
+          product: {
+            id: item.productId,
+            price: item.product.price,
+            moq: (item.product as { moq?: number | null }).moq ?? null,
+          },
+          variant: item.variant
+            ? { id: (item as { variantId: string }).variantId, price: item.variant.price }
+            : null,
+          qty: item.quantity,
+        }))
+    );
+    const pricedItems = items.map(item => {
+      const r = priced.get(item.id);
+      if (!r) return item;
+      return {
+        ...item,
+        // Server-resolved display values: the cart / checkout render THESE and never multiply a price client-side.
+        unitPrice: r.unitMinor,
+        lineTotal: r.unitMinor * item.quantity,
+        listPrice: r.listMinor,
+        priceSource: r.source,
+        priceTierMinQty: r.tierMinQty,
+        belowMoq: r.belowMoq,
+        moqRequired: r.moqRequired,
+      };
+    });
+    const itemsSubtotal = pricedItems.reduce(
+      (sum, item) => ('lineTotal' in item ? sum + item.lineTotal : sum),
       0
     );
 
@@ -246,7 +285,7 @@ export class CartService {
     const bundles = resolvedBundles.filter((b): b is CartBundleView => b !== null);
     const bundlesSubtotal = bundles.reduce((sum, b) => sum + b.total, 0);
 
-    return { ...cart, items, bundles, subtotal: itemsSubtotal + bundlesSubtotal };
+    return { ...cart, items: pricedItems, bundles, subtotal: itemsSubtotal + bundlesSubtotal };
   }
 
   /**
@@ -255,7 +294,13 @@ export class CartService {
    * an anonymous READ, so it must not be a write amplifier: an unauthenticated
    * caller could otherwise mint unbounded Cart rows just by probing cartIds.
    */
-  static async view(storeId: string, sessionId: string, customerId?: string) {
+  static async view(
+    storeId: string,
+    sessionId: string,
+    customerId?: string,
+    /** Who the prices are for (lib/buyer-identity.ts); default anonymous = retail + public tiers. */
+    buyer: BuyerIdentity = ANONYMOUS_BUYER
+  ) {
     const cart = await prisma.cart.findFirst({
       where: {
         storeId,
@@ -273,10 +318,16 @@ export class CartService {
       };
     }
 
-    return this.computeTotals(storeId, cart);
+    return this.computeTotals(storeId, cart, buyer);
   }
 
-  static async getOrCreate(storeId: string, sessionId: string, customerId?: string) {
+  static async getOrCreate(
+    storeId: string,
+    sessionId: string,
+    customerId?: string,
+    /** Who the prices are for (lib/buyer-identity.ts); default anonymous = retail + public tiers. */
+    buyer: BuyerIdentity = ANONYMOUS_BUYER
+  ) {
     // Try to find an existing cart for this session (or customer).
     //
     // orderBy: updatedAt desc — when a customer logs in mid-session,
@@ -350,7 +401,7 @@ export class CartService {
       }
     }
 
-    return this.computeTotals(storeId, cart);
+    return this.computeTotals(storeId, cart, buyer);
   }
 
   static async addItem(
@@ -360,10 +411,12 @@ export class CartService {
     quantity: number = 1,
     customerId?: string,
     variantId?: string,
-    rawNote?: string | null
+    rawNote?: string | null,
+    /** Who the prices are for (lib/buyer-identity.ts); default anonymous = retail + public tiers. */
+    buyer: BuyerIdentity = ANONYMOUS_BUYER
   ) {
     // Get or create cart first (outside transaction since getOrCreate has its own retry logic)
-    const cart = await this.getOrCreate(storeId, sessionId, customerId);
+    const cart = await this.getOrCreate(storeId, sessionId, customerId, buyer);
 
     // Resolve the backorder feature flag before entering the transaction.
     // When disabled, per-product allowBackorder flags are ignored — out-of-stock
@@ -569,7 +622,7 @@ export class CartService {
       data: { lastActivityAt: new Date() },
     });
 
-    return this.getOrCreate(storeId, sessionId, customerId);
+    return this.getOrCreate(storeId, sessionId, customerId, buyer);
   }
 
   /**
@@ -596,12 +649,14 @@ export class CartService {
     sessionId: string,
     bundleId: string,
     quantity: number = 1,
-    customerId?: string
+    customerId?: string,
+    /** Who the prices are for (lib/buyer-identity.ts); default anonymous = retail + public tiers. */
+    buyer: BuyerIdentity = ANONYMOUS_BUYER
   ): Promise<
     | { ok: true; cart: Awaited<ReturnType<typeof CartService.getOrCreate>> }
     | { ok: false; error: 'bundle_not_purchasable' | 'insufficient_stock' }
   > {
-    const cart = await this.getOrCreate(storeId, sessionId, customerId);
+    const cart = await this.getOrCreate(storeId, sessionId, customerId, buyer);
 
     // Recomputed from CURRENT component prices/stock — resolveBundle never
     // caches. Throws AppError(404) for a bundle that isn't this store's;
@@ -677,7 +732,7 @@ export class CartService {
       data: { lastActivityAt: new Date() },
     });
 
-    return { ok: true, cart: await this.getOrCreate(storeId, sessionId, customerId) };
+    return { ok: true, cart: await this.getOrCreate(storeId, sessionId, customerId, buyer) };
   }
 
   /** Remove one bundle line (by its `CartBundle` row id) from the cart. */
@@ -685,9 +740,11 @@ export class CartService {
     storeId: string,
     sessionId: string,
     cartBundleId: string,
-    customerId?: string
+    customerId?: string,
+    /** Who the prices are for (lib/buyer-identity.ts); default anonymous = retail + public tiers. */
+    buyer: BuyerIdentity = ANONYMOUS_BUYER
   ) {
-    const cart = await this.getOrCreate(storeId, sessionId, customerId);
+    const cart = await this.getOrCreate(storeId, sessionId, customerId, buyer);
 
     const bundle = await prisma.cartBundle.findFirst({
       where: { id: cartBundleId, cartId: cart.id },
@@ -705,16 +762,18 @@ export class CartService {
       data: { lastActivityAt: new Date() },
     });
 
-    return this.getOrCreate(storeId, sessionId, customerId);
+    return this.getOrCreate(storeId, sessionId, customerId, buyer);
   }
 
   static async addItems(
     storeId: string,
     sessionId: string,
     items: Array<{ productId: string; quantity: number; variantId?: string; note?: string | null }>,
-    customerId?: string
+    customerId?: string,
+    /** Who the prices are for (lib/buyer-identity.ts); default anonymous = retail + public tiers. */
+    buyer: BuyerIdentity = ANONYMOUS_BUYER
   ) {
-    const cart = await this.getOrCreate(storeId, sessionId, customerId);
+    const cart = await this.getOrCreate(storeId, sessionId, customerId, buyer);
 
     if (items.length === 0) {
       return cart;
@@ -946,7 +1005,7 @@ export class CartService {
       data: { lastActivityAt: new Date() },
     });
 
-    return this.getOrCreate(storeId, sessionId, customerId);
+    return this.getOrCreate(storeId, sessionId, customerId, buyer);
   }
 
   static async updateItem(
@@ -954,9 +1013,11 @@ export class CartService {
     sessionId: string,
     itemId: string,
     quantity: number,
-    customerId?: string
+    customerId?: string,
+    /** Who the prices are for (lib/buyer-identity.ts); default anonymous = retail + public tiers. */
+    buyer: BuyerIdentity = ANONYMOUS_BUYER
   ) {
-    const cart = await this.getOrCreate(storeId, sessionId, customerId);
+    const cart = await this.getOrCreate(storeId, sessionId, customerId, buyer);
 
     // Resolve the backorder feature flag before the inventory check.
     const backorderFeatureEnabled = await featureService.isFeatureEnabled(
@@ -1022,11 +1083,18 @@ export class CartService {
       data: { lastActivityAt: new Date() },
     });
 
-    return this.getOrCreate(storeId, sessionId, customerId);
+    return this.getOrCreate(storeId, sessionId, customerId, buyer);
   }
 
-  static async removeItem(storeId: string, sessionId: string, itemId: string, customerId?: string) {
-    const cart = await this.getOrCreate(storeId, sessionId, customerId);
+  static async removeItem(
+    storeId: string,
+    sessionId: string,
+    itemId: string,
+    customerId?: string,
+    /** Who the prices are for (lib/buyer-identity.ts); default anonymous = retail + public tiers. */
+    buyer: BuyerIdentity = ANONYMOUS_BUYER
+  ) {
+    const cart = await this.getOrCreate(storeId, sessionId, customerId, buyer);
 
     const item = await prisma.cartItem.findFirst({
       where: { id: itemId, cartId: cart.id },
@@ -1046,11 +1114,17 @@ export class CartService {
       data: { lastActivityAt: new Date() },
     });
 
-    return this.getOrCreate(storeId, sessionId, customerId);
+    return this.getOrCreate(storeId, sessionId, customerId, buyer);
   }
 
-  static async clear(storeId: string, sessionId: string, customerId?: string) {
-    const cart = await this.getOrCreate(storeId, sessionId, customerId);
+  static async clear(
+    storeId: string,
+    sessionId: string,
+    customerId?: string,
+    /** Who the prices are for (lib/buyer-identity.ts); default anonymous = retail + public tiers. */
+    buyer: BuyerIdentity = ANONYMOUS_BUYER
+  ) {
+    const cart = await this.getOrCreate(storeId, sessionId, customerId, buyer);
 
     await prisma.cartItem.deleteMany({
       where: { cartId: cart.id },
@@ -1068,7 +1142,7 @@ export class CartService {
       data: { lastActivityAt: new Date() },
     });
 
-    return this.getOrCreate(storeId, sessionId, customerId);
+    return this.getOrCreate(storeId, sessionId, customerId, buyer);
   }
 
   static async mergeGuestCart(storeId: string, guestSessionId: string, customerId: string) {

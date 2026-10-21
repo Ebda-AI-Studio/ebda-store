@@ -21,7 +21,8 @@ import {
   withStore,
 } from '@ebda/database';
 import { storefrontOrigin } from '@ebda/shared';
-import { cartLineUnitPrice } from '../lib/cart-pricing';
+import { PriceResolver } from './price-resolver.service';
+import { buyerFromCartOwner } from '../lib/buyer-identity';
 import { redis } from './redis.service';
 import { notificationDispatcher } from './notification-dispatcher.service';
 import { resolveBundle } from './bundle.service';
@@ -260,11 +261,28 @@ class AbandonedCartService {
 
         for (const cart of carts) {
           try {
+            // Price the cart as its OWNER would see it (their session-written customer id, else anonymous), through the one
+            // resolver: tiers, group price and MOQ included, so the recovery email shows what checkout will charge.
+            const resolver = await PriceResolver.forBuyer(
+              storeId,
+              buyerFromCartOwner(cart.customerId)
+            );
+            const priced = await resolver.priceCart(
+              cart.items.map(item => ({
+                key: item.id,
+                product: { id: item.productId, price: item.product.price, moq: item.product.moq },
+                variant: item.variantId
+                  ? { id: item.variantId, price: item.variant?.price ?? null }
+                  : null,
+                qty: item.quantity,
+              }))
+            );
+            const unitOf = (item: { id: string }) => priced.get(item.id)!.unitMinor;
             // Build a snapshot of cart items at abandonment time
             const itemSnapshot: CartItemSnapshot[] = cart.items.map(item => ({
               productName: item.product.name,
               productImage: item.product.images[0]?.url ?? null,
-              price: cartLineUnitPrice(item),
+              price: unitOf(item),
               quantity: item.quantity,
             }));
 
@@ -305,7 +323,7 @@ class AbandonedCartService {
             // their resolved bundle price x quantity, exactly like the
             // storefront cart's own `bundlesSubtotal` (cart.service.ts).
             const cartTotal =
-              cart.items.reduce((sum, item) => sum + cartLineUnitPrice(item) * item.quantity, 0) +
+              cart.items.reduce((sum, item) => sum + unitOf(item) * item.quantity, 0) +
               bundleSnapshot.reduce((sum, b) => sum + b.price * b.quantity, 0);
 
             const cartItemCount = cart.items.length + bundleSnapshot.length;

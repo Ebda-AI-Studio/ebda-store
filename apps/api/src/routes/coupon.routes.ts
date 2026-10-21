@@ -7,6 +7,7 @@ import { requireFeature } from '../middleware/feature-gate';
 import { couponValidateLimiter, writeLimiter, publicTenantLimiter } from '../middleware/security';
 import { CouponService } from '../services/coupon.service';
 import { resolveCustomerContext } from '../services/promotion-resolver';
+import { buyerFromRequest } from '../lib/buyer-identity';
 import { tenantContext } from '../middleware/tenant-context';
 
 import { minorToDecimalString } from '@ebda/shared';
@@ -366,11 +367,12 @@ router.post(
         // The customer id comes ONLY from a verified token (customerUserId),
         // exactly the identity OrderService.create resolves the group from.
         const signedInCustomerId = customerUserId(req);
-        const custCtx = await resolveCustomerContext(storeId, {
-          phone,
-          email,
-          customerId: signedInCustomerId ?? null,
-        });
+        // Group membership comes from the SESSION only (Ruling B2B-2c/2e); the typed phone / email never confer a group.
+        const custCtx = await resolveCustomerContext(
+          storeId,
+          { phone, email, customerId: signedInCustomerId ?? null },
+          buyerFromRequest(req)
+        );
         const ctx = {
           ...custCtx,
           // Unknown is not ineligible. The cart page quotes before the shopper

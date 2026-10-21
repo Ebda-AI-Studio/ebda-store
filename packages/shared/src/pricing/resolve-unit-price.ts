@@ -72,6 +72,8 @@ export interface Resolved {
   tierMinQty: number | null;
   /** The retail unit price (== baseMinor) this was resolved from. */
   listMinor: number;
+  /** True when the winning price came from the buyer's GROUP (a group tier or the group percent), not a public tier. */
+  groupApplied: boolean;
   /** True when qty is below the product MOQ. The price above is still valid. */
   belowMoq: boolean;
   moqRequired: number | null;
@@ -122,11 +124,17 @@ export function resolveUnitPrice(i: ResolveInput): Resolved {
   const activeGroupId = group !== null && group.isActive ? group.id : null;
   const moqRequired = i.moq ?? null;
   const belowMoq = moqRequired !== null && i.qty < moqRequired;
-  const out = (unitMinor: number, source: PriceSource, tierMinQty: number | null): Resolved => ({
+  const out = (
+    unitMinor: number,
+    source: PriceSource,
+    tierMinQty: number | null,
+    groupApplied = false
+  ): Resolved => ({
     unitMinor,
     source,
     tierMinQty,
     listMinor: base,
+    groupApplied,
     belowMoq,
     moqRequired,
   });
@@ -174,20 +182,24 @@ export function resolveUnitPrice(i: ResolveInput): Resolved {
   let unit = base;
   let source: PriceSource = 'base';
   let tierMinQty: number | null = null;
+  let groupApplied = false;
   if (gTier !== null && gTier.priceMinor < unit) {
     unit = gTier.priceMinor;
     source = 'tier';
     tierMinQty = gTier.minQty;
+    groupApplied = true;
   }
   if (gPct !== null && gPct < unit) {
     unit = gPct;
     source = 'group';
     tierMinQty = null;
+    groupApplied = true;
   }
   if (pubTier !== null && pubTier.priceMinor < unit) {
     unit = pubTier.priceMinor;
     source = 'tier';
     tierMinQty = pubTier.minQty;
+    groupApplied = false;
   }
-  return out(unit, source, tierMinQty);
+  return out(unit, source, tierMinQty, groupApplied);
 }

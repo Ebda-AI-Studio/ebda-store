@@ -12,6 +12,9 @@ import { socketService } from '@api/services/socket.service';
 // Mock dependencies
 // Money batch B: fiscal documents + the frozen COD fee are covered end-to-end
 // by tests/integration/fiscal-documents.test.ts; this unit suite stubs them.
+vi.mock('@api/services/price-resolver.service', async () =>
+  (await import('../helpers/retail-price-resolver')).retailPriceResolverModule()
+);
 vi.mock('@api/services/fiscal-document.service', () => ({
   FiscalDocumentService: {
     issueSaleDocument: vi.fn().mockResolvedValue(null),

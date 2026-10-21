@@ -219,6 +219,9 @@ export default function CustomerDetailPage() {
       const { error: apiError } = await apiPut(
         `/api/v1/stores/${storeId}/customers/group-assignment`,
         {
+          // A registered shopper's profile is keyed by the user id: send it so the server binds the group to THAT
+          // account (customers.user_id), never to whichever CRM row shares a phone (Ruling B2B-2e).
+          userId: customer.isGuest ? null : customer.id,
           phone: customer.phone || null,
           email: customer.email || null,
           firstName: customer.firstName || null,

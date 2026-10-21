@@ -178,6 +178,8 @@ export const CustomerGroupService = {
   async assignByIdentity(
     storeId: string,
     identity: {
+      /** The REGISTERED shopper (users.id) whose profile the merchant is on. When set it is the identity. */
+      userId?: string | null;
       phone?: string | null;
       email?: string | null;
       firstName?: string | null;
@@ -187,11 +189,12 @@ export const CustomerGroupService = {
   ) {
     const phone = identity.phone?.trim() || null;
     const email = identity.email?.trim() || null;
-    if (!phone && !email) {
+    const userId = identity.userId || null;
+    if (!userId && !phone && !email) {
       throw new AppError(
         400,
         'IDENTITY_REQUIRED',
-        'A phone or email is required to assign a group.'
+        'A registered customer, a phone or an email is required to assign a group.'
       );
     }
 
@@ -204,39 +207,99 @@ export const CustomerGroupService = {
       if (!group) throw new AppError(404, 'NOT_FOUND', 'Customer group not found');
     }
 
-    // Phone is the primary identity; fall back to a case-insensitive email
-    // match so 'Foo@x.com' and 'foo@x.com' resolve to the same customer.
+    // Ruling B2B-2e - this method NEVER rewrites an existing row's contact or name fields.
+    //  * userId given (the merchant is on a REGISTERED shopper's profile): the identity is the `customers.user_id` link.
+    //    Match that row; else create the shopper's own row linked to the user. Contact fields are taken from the caller
+    //    only where they are FREE (a phone / email already held by another row is never stolen or duplicated), so a
+    //    shopper who set someone else's phone on their profile gets their own row, not the other person's.
+    //  * no userId (a guest key, or a CRM identity): match phone first then email, attach the group to that row, and
+    //    change nothing else on it. Such a row has no user_id, so it grants no group PRICE or promotion benefit to anyone
+    //    who types its phone; it is only ever used when the merchant explicitly picks it.
+    if (userId) {
+      const shopper = await prisma.user.findFirst({
+        where: { id: userId, storeId, role: 'customer', deletedAt: null },
+        select: { id: true, email: true, phone: true, firstName: true, lastName: true },
+      });
+      if (!shopper) throw new AppError(404, 'NOT_FOUND', 'Customer not found');
+
+      const linked = await prisma.customer.findFirst({
+        where: { storeId, userId: shopper.id },
+        select: { id: true },
+      });
+      if (linked) {
+        return prisma.customer.update({
+          where: { id: linked.id, storeId },
+          data: { groupId },
+          select: assignReturnSelect,
+        });
+      }
+      const free = async (field: 'phone' | 'email', value: string | null) => {
+        if (!value) return null;
+        const taken = await prisma.customer.findFirst({
+          where:
+            field === 'phone'
+              ? { storeId, phone: value }
+              : { storeId, email: { equals: value, mode: 'insensitive' } },
+          select: { id: true },
+        });
+        return taken ? null : value;
+      };
+      try {
+        return await withSavepoint(async () =>
+          prisma.customer.create({
+            data: {
+              storeId,
+              userId: shopper.id,
+              phone: await free('phone', phone ?? shopper.phone ?? null),
+              email: await free('email', email ?? shopper.email ?? null),
+              firstName: identity.firstName?.trim() || shopper.firstName || '',
+              lastName: identity.lastName?.trim() || shopper.lastName || '',
+              groupId,
+            },
+            select: assignReturnSelect,
+          })
+        );
+      } catch (err) {
+        if ((err as { code?: string })?.code === 'P2002') {
+          const raced = await prisma.customer.findFirst({
+            where: { storeId, userId: shopper.id },
+            select: { id: true },
+          });
+          if (raced) {
+            return prisma.customer.update({
+              where: { id: raced.id, storeId },
+              data: { groupId },
+              select: assignReturnSelect,
+            });
+          }
+        }
+        throw err;
+      }
+    }
+
     const match: Prisma.CustomerWhereInput = phone
       ? { storeId, phone }
       : { storeId, email: { equals: email as string, mode: 'insensitive' } };
-
-    const existing = await prisma.customer.findFirst({
-      where: match,
-      select: { id: true },
-    });
+    const existing =
+      (await prisma.customer.findFirst({ where: match, select: { id: true } })) ??
+      (email && phone
+        ? await prisma.customer.findFirst({
+            where: { storeId, email: { equals: email, mode: 'insensitive' } },
+            select: { id: true },
+          })
+        : null);
 
     if (existing) {
       return prisma.customer.update({
         where: { id: existing.id, storeId },
-        data: {
-          groupId,
-          // Backfill contact/name fields we now know but the row may lack.
-          ...(phone ? { phone } : {}),
-          ...(email ? { email } : {}),
-          ...(identity.firstName?.trim() ? { firstName: identity.firstName.trim() } : {}),
-          ...(identity.lastName?.trim() ? { lastName: identity.lastName.trim() } : {}),
-        },
+        data: { groupId },
         select: assignReturnSelect,
       });
     }
 
     try {
-      // #1582: this runs inside the request's ambient tenant transaction
-      // (assignByIdentity is reachable from POST under tenantContext). A
-      // failed INSERT aborts that whole transaction (Postgres 25P02) — the
-      // P2002 recovery below would then itself throw 25P02 instead of
-      // recovering, and the request 500s. `withSavepoint` scopes the abort
-      // to just this statement so the recovery can actually run.
+      // #1582: this runs inside the request's ambient tenant transaction; a failed INSERT aborts it (25P02), so the
+      // P2002 recovery below needs a savepoint to be reachable.
       return await withSavepoint(() =>
         prisma.customer.create({
           data: {
@@ -251,8 +314,7 @@ export const CustomerGroupService = {
         })
       );
     } catch (err) {
-      // Lost a concurrent upsert race against the (store, phone)/(store, email)
-      // unique index — re-find and update instead of surfacing a 500.
+      // Lost a concurrent upsert race against the (store, phone)/(store, email) unique index: re-find, attach only.
       if ((err as { code?: string })?.code === 'P2002') {
         const raced = await prisma.customer.findFirst({ where: match, select: { id: true } });
         if (raced) {

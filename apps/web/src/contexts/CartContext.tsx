@@ -35,6 +35,14 @@ export interface CartItem {
    * before checkout (the server refuses the order while it remains).
    */
   unavailable?: boolean;
+  /** Retail list price when the server priced this line differently (tier / group), for a struck-through "was" price. */
+  listPrice?: number;
+  /** Where the charged price came from: 'base' (retail), 'tier' (quantity break) or 'group' (wholesale group). */
+  priceSource?: 'base' | 'tier' | 'group';
+  priceTierMinQty?: number;
+  /** B2B minimum order quantity: true when this product's total quantity in the cart is below it. */
+  belowMoq?: boolean;
+  moqRequired?: number;
 }
 
 /**

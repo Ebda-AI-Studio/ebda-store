@@ -69,6 +69,7 @@ describe('RF4 tier boundary and quantity change', () => {
       source: 'tier',
       tierMinQty: 10,
       listMinor: 10_000,
+      groupApplied: false,
       belowMoq: false,
       moqRequired: null,
     });
@@ -289,6 +290,25 @@ describe('RF2 / identity inputs: only a matching, active buyer group sees a grou
       6_000
     );
     expect(resolveUnitPrice(input({ qty: 5, buyerGroup: null, tiers: t })).unitMinor).toBe(9_000);
+  });
+});
+
+describe('groupApplied provenance', () => {
+  it('is true for a group tier or the group percent, false for a public tier and for base', () => {
+    const gt = [tier(2, 7_000, { groupId: G })];
+    expect(resolveUnitPrice(input({ qty: 5, tiers: gt, buyerGroup: group() })).groupApplied).toBe(
+      true
+    );
+    const pct = group({ pricingMode: 'percent_off', discountBps: 1_000 });
+    expect(resolveUnitPrice(input({ buyerGroup: pct })).groupApplied).toBe(true);
+    expect(
+      resolveUnitPrice(input({ qty: 5, tiers: [tier(2, 9_000)], buyerGroup: group() })).groupApplied
+    ).toBe(false);
+    expect(resolveUnitPrice(input({ buyerGroup: group() })).groupApplied).toBe(false);
+    // a public tier that beats the percent is not a group price
+    expect(
+      resolveUnitPrice(input({ qty: 5, tiers: [tier(2, 8_000)], buyerGroup: pct })).groupApplied
+    ).toBe(false);
   });
 });
 

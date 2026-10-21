@@ -245,7 +245,10 @@ describe('Ruling B2B-2: only the authenticated, verified account holder gets the
     const hijacked = await owner.customer.findFirst({
       where: { storeId: ids.store!, userId: ids.wholesaler! },
     });
-    expect(hijacked?.email).toBe(attacker.email); // the pre-existing defect is real: the CRM email was overwritten
+    // Ruling B2B-2e: assignByIdentity no longer rewrites the matched row's contact fields (it used to overwrite the email
+    // with the attacker's), so the CRM row is intact as well as the price.
+    expect(hijacked?.email).toBe(WHOLESALE_EMAIL);
+    expect(hijacked?.phone).toBe(WHOLESALE_PHONE);
     // 3. ... but price identity is the user_id link, so nothing moved.
     expect(await price(ids.store!, attacker.id)).toMatchObject({
       unitMinor: 10_000,
@@ -255,8 +258,6 @@ describe('Ruling B2B-2: only the authenticated, verified account holder gets the
       unitMinor: 8_000,
       source: 'group',
     });
-    // restore the fixture for the remaining tests
-    await owner.customer.update({ where: { id: hijacked!.id }, data: { email: WHOLESALE_EMAIL } });
   });
 
   it('a suspended or soft-deleted wholesaler account is charged retail', async () => {
