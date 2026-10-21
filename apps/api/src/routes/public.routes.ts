@@ -68,6 +68,7 @@ import {
   PUBLIC_PRODUCT_LIST_QUERY_KEYS,
 } from '../lib/query-params';
 import { setEdgeCache, setBuyerPrivate } from '../lib/edge-cache';
+import { searchQueryFromHeader } from '../lib/search-term';
 import { buildProductFeed } from '../lib/product-feed';
 import {
   listSellableBundles,
@@ -225,10 +226,15 @@ export const createOrderSchema = z.object({
 // GET /products - List all public products (cached 30s)
 router.get('/products', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { page, limit, category, search, featured, sort, minPrice, maxPrice, cursor, ids } =
-      req.query;
+    const { page, limit, category, featured, sort, minPrice, maxPrice, cursor, ids } = req.query;
     // Scalars only (M1): an array or `?x[op]=…` object is a 400, never a Prisma operator or a 500.
     assertScalarQuery(req.query, PUBLIC_PRODUCT_LIST_QUERY_KEYS, ['opt_']);
+    // The shopper's term travels in the `X-Search-Query` header (percent-encoded), not the URL: a
+    // typed phone or email in a URL is retained in Cloudflare Workers Logs (Ruling SEARCH-URL-1,
+    // closing SEARCH-T5-8 for the storefront). The `?search=` form stays accepted for one release
+    // for already-deployed storefront bundles, then is removed.
+    const headerTerm = searchQueryFromHeader(req);
+    const search = headerTerm ?? req.query.search;
     const storeId = await getStoreIdFromRequest(req);
     // Tri-state: absent -> undefined (no filter). `featured === 'true'` used
     // to turn an absent param into `featured: false`, which listPublic applied
@@ -411,7 +417,11 @@ router.get('/products', async (req: Request, res: Response, next: NextFunction) 
     // A hybrid-ranked list (semantic search on) depends on the mode and on the provider's health at
     // that moment, which no edge key can see: never shared-cacheable (SEARCH-T12-7). Every other
     // list keeps the edge policy unchanged.
-    if (ranked) res.setHeader('Cache-Control', 'private, no-store');
+    // A header-borne term is not part of the URL, and Cloudflare's cache key ignores `Vary`
+    // (edge-cache.ts), so a shared cache would serve one shopper's results to another term:
+    // never shared-cacheable (Ruling SEARCH-URL-1). `Vary` is set for any cache that honours it.
+    if (headerTerm !== undefined) res.vary('X-Search-Query');
+    if (ranked || headerTerm !== undefined) res.setHeader('Cache-Control', 'private, no-store');
     else setEdgeCache(res, { sMaxAge: 60, staleWhileRevalidate: 300 });
     res.json({
       success: true,
@@ -1515,7 +1525,9 @@ router.get('/:storeId/search/suggest', async (req: Request, res: Response, next:
     }
 
     assertScalarQuery(req.query, ['q']);
-    const q = typeof req.query.q === 'string' ? req.query.q : '';
+    // Header first (Ruling SEARCH-URL-1); the deprecated `?q=` stays accepted for one release.
+    const headerQ = searchQueryFromHeader(req);
+    const q = headerQ ?? (typeof req.query.q === 'string' ? req.query.q : '');
     // Length-cap alongside the >= 2 floor (same class as /products' search:
     // the term is part of the cache key, so an unbounded term is unbounded
     // cache-key cardinality AND an unbounded ILIKE pattern).
@@ -1534,7 +1546,12 @@ router.get('/:storeId/search/suggest', async (req: Request, res: Response, next:
       ProductService.getSuggestSuggestions(storeId, trimmed, 25)
     );
 
-    res.setHeader('Cache-Control', 'private, max-age=120');
+    if (headerQ !== undefined) {
+      res.vary('X-Search-Query');
+      res.setHeader('Cache-Control', 'private, no-store');
+    } else {
+      res.setHeader('Cache-Control', 'private, max-age=120');
+    }
     res.json({ success: true, data: result });
   } catch (error) {
     next(error);

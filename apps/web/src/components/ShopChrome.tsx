@@ -14,6 +14,7 @@ import type { FloatingWidgetConfig } from '@ebda/shared';
 import { resolveColor, footerLogoContrastFilter, sanitizeUrl } from '@ebda/shared';
 import type { StoreLayoutSettings } from '@ebda/shared';
 import { sectionVisibilityClass } from '../templates/shared/section-spacing';
+import { openSearch } from '../lib/search-term-state';
 import type {
   FooterBottomBarConfig,
   FooterLinkSection,
@@ -314,7 +315,8 @@ export function ShopChrome({ children, layout: layoutProp }: ShopChromeProps) {
       : undefined;
 
   const handleSearch = (query: string) => {
-    router.push(storeUrl(`/search?q=${encodeURIComponent(query)}`));
+    // The term never goes in the URL (Ruling SEARCH-URL-1): it is handed to /search out of band.
+    openSearch(query, storeUrl('/search'), url => router.push(url));
   };
 
   if (templateLoading || !T) {
