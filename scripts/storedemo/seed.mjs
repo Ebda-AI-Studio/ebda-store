@@ -258,6 +258,54 @@ export function describePlan(url, spec = TEMPLATE_SPECS.qamar) {
   ].join('\n');
 }
 
+/**
+ * Slug ownership (Ruling B2-17, security review): the seed must never take over a store it did
+ * not create. `existing` is the store row already holding the slug (or null); `owner` the seed
+ * owner row (or null when it does not exist yet); `demo` whether this slug is a demo store
+ * (`storedemo*`) or a local review store. A store that is not the seed's own, whatever its
+ * flags, is refused: a merchant who registered the slug first keeps their store and the run
+ * aborts. Pure, so it is unit-tested.
+ */
+export function seedStoreClaim(existing, owner, { demo }) {
+  if (!existing) return { ok: true };
+  if (existing.isDemo !== demo)
+    return {
+      ok: false,
+      why: demo
+        ? 'it is not a demo store (a merchant store already holds this slug)'
+        : 'it is a demo store, not a local review store',
+    };
+  if (!owner || existing.ownerId !== owner.id)
+    return { ok: false, why: 'its owner is not the seed owner (someone else registered the slug)' };
+  return { ok: true };
+}
+
+/**
+ * Check EVERY slug the run will write BEFORE the first write (no partial seed): the demo store's
+ * slug and, with --local-look-stores, each local store's. Throws with the slug and the reason.
+ */
+export async function assertSlugsClaimable(prisma, spec, { localStores }) {
+  const owner = await prisma.user.findFirst({
+    where: { email: spec.ownerEmail, storeId: null },
+    select: { id: true },
+  });
+  const slugs = [
+    [spec.slug, true],
+    ...(localStores ? spec.localLookStores.map(([slug]) => [slug, false]) : []),
+  ];
+  for (const [slug, demo] of slugs) {
+    const existing = await prisma.store.findUnique({
+      where: { slug },
+      select: { id: true, isDemo: true, ownerId: true },
+    });
+    const claim = seedStoreClaim(existing, owner, { demo });
+    if (!claim.ok)
+      throw new Error(
+        `refusing to touch store "${slug}": ${claim.why}. Nothing was written; resolve it by hand (never overwrite a merchant store).`
+      );
+  }
+}
+
 /** Exit code the guard decides on: 0 = go, 2 = refuse. Pure so it is unit-tested. */
 export function guard(url, argv) {
   if (!url || hostOf(url) === null)
@@ -600,6 +648,7 @@ async function run() {
       return pub.value.rev;
     });
   try {
+    await assertSlugsClaimable(prisma, spec, { localStores: lookStores });
     const owner = await prisma.$transaction(
       async tx =>
         (await tx.user.findFirst({ where: { email: spec.ownerEmail, storeId: null } })) ??

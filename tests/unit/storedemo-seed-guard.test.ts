@@ -1,4 +1,6 @@
 import { describe, it, expect } from 'vitest';
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
 import {
   guard,
   isLocalUrl,
@@ -11,6 +13,7 @@ import {
   TEMPLATE_SPECS,
   templateFromArgv,
   SOUQ_PROD_ASSET_BASE,
+  seedStoreClaim,
   // @ts-expect-error plain .mjs script
 } from '../../scripts/storedemo/seed.mjs';
 // @ts-expect-error plain .mjs data module
@@ -162,5 +165,63 @@ describe('storedemo seed: --template souq (Ruling B2-7)', () => {
     const remote = pg('a:b@ep-x.neon.tech/db');
     expect(guard(remote, ['--template', 'souq']).ok).toBe(false);
     expect(guard(remote, ['--template', 'souq', '--yes-production']).ok).toBe(true);
+  });
+});
+
+// Ruling B2-17 (security review): the seed never takes over a store that is not its own.
+describe('storedemo seed: slug ownership (never overwrite a merchant store)', () => {
+  const owner = { id: 'owner-seed' };
+  it('no store with the slug: the seed may create it', () => {
+    expect(seedStoreClaim(null, owner, { demo: true }).ok).toBe(true);
+    expect(seedStoreClaim(undefined, owner, { demo: false }).ok).toBe(true);
+  });
+  it('an existing demo store owned by the seed owner is re-seeded (idempotent)', () => {
+    expect(
+      seedStoreClaim({ id: 's', isDemo: true, ownerId: 'owner-seed' }, owner, { demo: true }).ok
+    ).toBe(true);
+  });
+  it('a NON-demo store with a demo slug is refused (a merchant registered it first)', () => {
+    const r = seedStoreClaim({ id: 's', isDemo: false, ownerId: 'owner-seed' }, owner, {
+      demo: true,
+    });
+    expect(r.ok).toBe(false);
+    expect(r.why).toMatch(/not a demo store/i);
+  });
+  it('a demo-flagged store owned by someone else is refused (squatted or hand-made)', () => {
+    const r = seedStoreClaim({ id: 's', isDemo: true, ownerId: 'a-merchant' }, owner, {
+      demo: true,
+    });
+    expect(r.ok).toBe(false);
+    expect(r.why).toMatch(/owner/i);
+  });
+  it('a store owned by a merchant is refused whether or not the seed owner exists yet', () => {
+    expect(
+      seedStoreClaim({ id: 's', isDemo: false, ownerId: 'a-merchant' }, null, { demo: true }).ok
+    ).toBe(false);
+    expect(
+      seedStoreClaim({ id: 's', isDemo: true, ownerId: 'a-merchant' }, null, { demo: true }).ok
+    ).toBe(false);
+  });
+  it('local look stores (non-demo) are only re-seeded when the seed owner owns them', () => {
+    expect(
+      seedStoreClaim({ id: 's', isDemo: false, ownerId: 'owner-seed' }, owner, { demo: false }).ok
+    ).toBe(true);
+    expect(
+      seedStoreClaim({ id: 's', isDemo: false, ownerId: 'a-merchant' }, owner, { demo: false }).ok
+    ).toBe(false);
+    // a local look store slug can never silently turn an official demo store into a review store
+    expect(
+      seedStoreClaim({ id: 's', isDemo: true, ownerId: 'owner-seed' }, owner, { demo: false }).ok
+    ).toBe(false);
+  });
+  it('the run checks every slug BEFORE any write (no partial seed): the claim check precedes the owner create', () => {
+    const src = readFileSync(path.resolve(__dirname, '../../scripts/storedemo/seed.mjs'), 'utf8');
+    const run = src.slice(src.indexOf('async function run()'));
+    const check = run.indexOf('assertSlugsClaimable');
+    expect(check).toBeGreaterThan(0);
+    expect(check).toBeLessThan(run.indexOf('tx.user.create'));
+    expect(check).toBeLessThan(run.indexOf('prisma.store.upsert'));
+    // and the production flag is still required for a non-loopback database
+    expect(run.indexOf('guard(url, argv)')).toBeLessThan(check);
   });
 });

@@ -12,7 +12,14 @@
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { mkdirSync, writeFileSync } from 'node:fs';
-import { isLocalUrl, hostOf, assetBase, seedCatalogue, OWNER_EMAIL } from './seed.mjs';
+import {
+  isLocalUrl,
+  hostOf,
+  assetBase,
+  seedCatalogue,
+  seedStoreClaim,
+  OWNER_EMAIL,
+} from './seed.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const LOGO_DIR = resolve(root, 'apps/web/public/__qamar-demo');
@@ -66,6 +73,13 @@ async function run() {
               ? '/__qamar-demo/logo-tall.svg'
               : null,
       };
+      // Ruling B2-17: never take over a store the seed does not own.
+      const held = await prisma.store.findUnique({
+        where: { slug },
+        select: { id: true, isDemo: true, ownerId: true },
+      });
+      const claim = seedStoreClaim(held, owner, { demo: false });
+      if (!claim.ok) throw new Error(`refusing to touch store "${slug}": ${claim.why}`);
       const s = await prisma.store.upsert({
         where: { slug },
         update: data,
