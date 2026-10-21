@@ -10369,5 +10369,22 @@
     "date": "Date",
     "vat": "VAT ({rate}%)",
     "print": "Print receipt"
+  },
+  "packingSlip": {
+    "title": "Packing slip",
+    "print": "Print packing slip",
+    "printBulk": "Print packing slips ({count})",
+    "size": "Slip size",
+    "sizeA4": "A4",
+    "sizeLabel": "4x6 label",
+    "tooMany": "Select up to 100 orders per print.",
+    "loadFailed": "Couldn't load the packing slip. Try again.",
+    "loading": "Loading...",
+    "noteTitle": "Packing slip note",
+    "noteHint": "Optional text printed at the bottom of every packing slip, like \"Thanks for your order\".",
+    "notePlaceholder": "Thanks for shopping with us!",
+    "noteSave": "Save note",
+    "noteSaved": "Saved",
+    "noteFailed": "Couldn't save. Try again."
   }
 }
