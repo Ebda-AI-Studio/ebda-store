@@ -1,14 +1,30 @@
 /**
- * Scan-proof gate: every shape x several order numbers is rasterised and
- * decoded by zxing; it must give back the exact order number. A shape that
- * cannot decode does not ship (remove it from the barkod extraction map).
+ * Scan-proof gate at the REAL display sizes (Ruling BARCODE-4), not vector size.
+ * Every shape x real-format order numbers is rendered the way each surface
+ * renders it (`displayPx` applies the module-width floor, so a shape that is
+ * too wide-for-its-bars falls back to plain), rasterised at the surface's CSS
+ * width (1x, the worst case; email = the 2x PNG), and decoded with zxing: it
+ * must equal the compact scan code, and map back to the order number.
+ *
+ * The scan zone is gated on its own: the decoration is stripped and the zone
+ * alone must decode; deleting the zone path makes that fail (negative control).
  */
 import { describe, it, expect } from 'vitest';
 import { Resvg } from '@resvg/resvg-js';
 import { readBarcodes } from 'zxing-wasm/reader';
-import { renderBarcodeSvg, RECEIPT_BARCODE_SHAPES, billingPaymentNumber, EBDA_BILLING_BARCODE_SHAPE } from '../../packages/shared/src/barcode';
+import {
+  renderBarcodeSvg,
+  RECEIPT_BARCODE_SHAPES,
+  BARCODE_DISPLAY_PX,
+  billingPaymentNumber,
+  EBDA_BILLING_BARCODE_SHAPE,
+  scanCodeFor,
+  orderNumberFromScanCode,
+  resolveBarcodeShape,
+} from '../../packages/shared/src/barcode';
 
-const VALUES = ['ORD-MJ4K9L2A-AB3XY', '1234567890', 'ORD-1', 'ORD-MJ4K9L2A-AB3XY-0042-LONGTEST'];
+const REAL = ['ORD-T5JK9Q-AB3XY', 'ORD-000000-00000', 'ORD-ZZZZZZ-ZZZZZ'];
+const SHAPES = ['plain', ...RECEIPT_BARCODE_SHAPES];
 
 async function decode(svg: string, widthPx: number): Promise<string[]> {
   const png = new Resvg(svg, {
@@ -18,7 +34,6 @@ async function decode(svg: string, widthPx: number): Promise<string[]> {
   })
     .render()
     .asPng();
-  // zxing-wasm reads encoded image bytes directly
   const res = await readBarcodes(new Blob([png], { type: 'image/png' }), {
     formats: ['Code128'],
     tryHarder: true,
@@ -26,40 +41,69 @@ async function decode(svg: string, widthPx: number): Promise<string[]> {
   return res.map(r => r.text);
 }
 
-describe('shaped barcode decode gate', () => {
-  for (const shape of ['plain', ...RECEIPT_BARCODE_SHAPES]) {
-    for (const value of VALUES) {
-      it(`${shape} decodes ${value}`, async () => {
-        const svg = renderBarcodeSvg({ value, shape, ink: '#111111' });
-        // 1600px wide ~ a 7cm receipt at 580 dpi-equivalent camera detail
-        expect(await decode(svg, 1600)).toContain(value);
-      });
+const MASKED = /<path d="M[^"]*" fill="[^"]+" mask="[^"]+"\/>/;
+const ZONE = /<path d="M[^"]*" fill="[^"]+"\/>/;
+const zoneOnly = (svg: string) => svg.replace(MASKED, '');
+
+const SURFACES = [
+  { name: 'storefront receipt', px: BARCODE_DISPLAY_PX.storefrontReceipt, raster: BARCODE_DISPLAY_PX.storefrontReceipt },
+  { name: 'email png (2x)', px: BARCODE_DISPLAY_PX.email, raster: BARCODE_DISPLAY_PX.email * 2 },
+] as const;
+
+describe('decode gate at real display sizes', () => {
+  for (const surface of SURFACES) {
+    for (const shape of SHAPES) {
+      for (const value of REAL) {
+        it(`${surface.name}: ${shape} ${value}`, async () => {
+          const svg = renderBarcodeSvg({ value, shape, ink: '#141414', displayPx: surface.px });
+          const out = await decode(svg, surface.raster);
+          expect(out).toContain(scanCodeFor(value));
+          expect(orderNumberFromScanCode(out[0]!)).toBe(value);
+          // the scan zone ALONE carries the code (decoration stripped)
+          expect(await decode(zoneOnly(svg), surface.raster)).toContain(scanCodeFor(value));
+        });
+      }
     }
   }
-});
 
-describe('decode gate negative controls (the gate can fail)', () => {
-  it('a different number does not decode to the expected one', async () => {
-    const out = await decode(renderBarcodeSvg({ value: 'ORD-AAAA', shape: 'palm', ink: '#111' }), 1600);
-    expect(out).toContain('ORD-AAAA');
-    expect(out).not.toContain('ORD-BBBB');
-  });
-  it('with the bars blanked nothing decodes', async () => {
-    const svg = renderBarcodeSvg({ value: 'ORD-AAAA', shape: 'palm', ink: '#111' }).replace(/fill="#111"/g, 'fill="none"');
-    expect(await decode(svg, 1600)).toEqual([]);
-  });
-  it('still decodes at a phone-camera-ish 700px wide', async () => {
-    for (const shape of ['palm', 'ghost', 'cloud']) {
-      expect(await decode(renderBarcodeSvg({ value: 'ORD-MJ4K9L2A-AB3XY', shape, ink: '#111' }), 700)).toContain('ORD-MJ4K9L2A-AB3XY');
+  it('invoice width: every shape decodes', async () => {
+    for (const shape of SHAPES) {
+      const svg = renderBarcodeSvg({ value: REAL[0]!, shape, ink: '#141414', displayPx: BARCODE_DISPLAY_PX.invoice });
+      expect(await decode(zoneOnly(svg), BARCODE_DISPLAY_PX.invoice), shape).toContain(scanCodeFor(REAL[0]!));
     }
   });
-});
 
-describe('ebda billing receipt number in the palm', () => {
-  it('decodes at receipt size', async () => {
+  it('billing receipt: the palm payment number decodes at receipt width and in the email', async () => {
     const value = billingPaymentNumber('3f2a91c4-7b1e-4d0a-9c55-0e8a1f2b3c4d');
-    for (const w of [1600, 700]) {
-      expect(await decode(renderBarcodeSvg({ value, shape: EBDA_BILLING_BARCODE_SHAPE, ink: '#141414' }), w)).toContain(value);
-    }
+    const svg = renderBarcodeSvg({ value, shape: EBDA_BILLING_BARCODE_SHAPE, ink: '#141414', displayPx: BARCODE_DISPLAY_PX.billingReceipt });
+    expect(svg).toContain('<mask'); // palm meets the floor at this size: it stays a palm
+    expect(await decode(zoneOnly(svg), BARCODE_DISPLAY_PX.billingReceipt)).toContain(scanCodeFor(value));
+    expect(await decode(svg, BARCODE_DISPLAY_PX.billingReceipt * 2)).toContain(scanCodeFor(value));
+  });
+});
+
+describe('negative controls (the gate can fail)', () => {
+  it('a different number does not decode to the expected one', async () => {
+    const out = await decode(renderBarcodeSvg({ value: REAL[0]!, shape: 'palm', ink: '#111', displayPx: 360 }), 720);
+    expect(out).not.toContain(scanCodeFor(REAL[1]!));
+  });
+  it('deleting the scan-zone path makes the zone-only decode fail', async () => {
+    const svg = renderBarcodeSvg({ value: REAL[0]!, shape: 'heart', ink: '#111', displayPx: 360 });
+    expect(ZONE.test(zoneOnly(svg))).toBe(true);
+    const noZone = zoneOnly(svg).replace(ZONE, '');
+    expect(await decode(noZone, 720)).toEqual([]);
+  });
+  it('blanked bars decode to nothing', async () => {
+    const svg = renderBarcodeSvg({ value: REAL[0]!, shape: 'palm', ink: '#111', displayPx: 360 }).replace(/fill="#111"/g, 'fill="none"');
+    expect(await decode(svg, 720)).toEqual([]);
+  });
+});
+
+describe('which shapes meet the floor', () => {
+  it('reports the fallbacks (informational, pinned so a change is noticed)', () => {
+    const fb = (px: number) => RECEIPT_BARCODE_SHAPES.filter(s => resolveBarcodeShape(s, REAL[0]!, px) !== s);
+    // pinned lists: update deliberately
+    expect(fb(BARCODE_DISPLAY_PX.storefrontReceipt)).toEqual(fb(BARCODE_DISPLAY_PX.billingReceipt));
+    expect(fb(BARCODE_DISPLAY_PX.storefrontReceipt)).not.toContain('palm');
   });
 });
