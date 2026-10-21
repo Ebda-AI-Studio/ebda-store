@@ -58,6 +58,7 @@ import affiliateRoutes, { publicAffiliateRoutes } from './affiliate.routes';
 import newsletterRoutes from './newsletter.routes';
 import campaignRoutes, { campaignTestSendRouter, campaignAiDraftRouter } from './campaign.routes';
 import campaignPublicRoutes from './campaign-public.routes';
+import webhookRoutes from './webhook.routes';
 import {
   accountRouter as smsConsentAccountRoutes,
   publicRouter as smsConsentPublicRoutes,
@@ -440,6 +441,8 @@ router.use('/stores', tenantContext, newsletterRoutes);
 // chain on the route; every other path falls through to this mount.
 router.use('/stores/:storeId/campaigns', tenantContext, campaignRoutes);
 router.use('/public/campaigns', campaignPublicRoutes);
+// Merchant outgoing webhooks (owner-only, Growth + Business). DNS check on create is the only slow call.
+router.use('/stores/:storeId/webhooks', tenantContext, webhookRoutes);
 // Login-free opt-out link carried by every promotional SMS (issue 206).
 router.use('/public/sms-consent', smsConsentPublicRoutes);
 
