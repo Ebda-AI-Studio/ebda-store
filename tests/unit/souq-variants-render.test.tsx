@@ -492,3 +492,57 @@ describe('STOP-2 re-audit: stage and tiles', () => {
     expect(container.querySelector('li')!.className).toContain('md:w-[calc(25%-0.5625rem)]');
   });
 });
+
+describe('final review: deals pool and the price switch', () => {
+  it('the deals row reads the API pool as-is; the client derivation is only the fallback', async () => {
+    const { resolveSectionProducts } =
+      await import('../../apps/web/src/builder/sections/section-products');
+    const mk = (id: string, extra: object = {}) =>
+      ({ id, name: id, price: 100, categories: [], ...extra }) as never;
+    // a full-price product whose only discounted variant is DISABLED: the listing payload does not
+    // carry isActive, so the client derivation would call it a sale; the API pool never lists it
+    const fakeSale = mk('fake', {
+      variants: [
+        { price: 50, compareAtPrice: 90 },
+        { price: 100, compareAtPrice: null },
+      ],
+    });
+    const real = mk('real', { compareAtPrice: 200 });
+    const pools = { newArrivals: [fakeSale, real], bestSellers: [], featured: [], extra: [] };
+    const derived = resolveSectionProducts({ productSource: 'on_sale' }, pools, 12);
+    expect(derived.map(p => p.id)).toContain('fake'); // the dead-guard defect the pool fixes
+    const fromApi = resolveSectionProducts(
+      { productSource: 'on_sale' },
+      { ...pools, onSale: [real] },
+      12
+    );
+    expect(fromApi.map(p => p.id)).toEqual(['real']);
+    // an API pool that is empty is an empty row (never newest, never the derivation)
+    expect(
+      resolveSectionProducts({ productSource: 'on_sale' }, { ...pools, onSale: [] }, 12)
+    ).toEqual([]);
+  });
+  it('the stage and the list honour the card-price switch (showPrice=false prints no price)', () => {
+    useSkin('souq');
+    const stage = render(
+      <ProductSpotlightSection
+        settings={{ layout: 'stage' }}
+        products={[PRODUCT]}
+        showPrice={false}
+        onAddToCart={async () => {}}
+      />
+    );
+    expect(stage.container.textContent).not.toMatch(/EGP|ج\.م/);
+    expect(stage.container.querySelector('s')).toBeNull();
+    cleanup();
+    const list = render(
+      <ProductSpotlightSection settings={{}} products={[PRODUCT]} showPrice={false} />
+    );
+    expect(list.container.textContent).not.toMatch(/EGP|ج\.م/);
+    cleanup();
+    const shown = render(
+      <ProductSpotlightSection settings={{ layout: 'stage' }} products={[PRODUCT]} />
+    );
+    expect(shown.container.textContent).toMatch(/EGP|ج\.م/);
+  });
+});
