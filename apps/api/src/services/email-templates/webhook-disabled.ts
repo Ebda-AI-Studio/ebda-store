@@ -11,7 +11,7 @@ export interface WebhookDisabledData {
 export const webhookDisabledTemplate = {
   subject: {
     en: (d: WebhookDisabledData) => `${d.storeName}: a webhook endpoint was turned off`,
-    ar: (d: WebhookDisabledData) => `${d.storeName}: تم إيقاف نقطة استقبال ويب هوك`,
+    ar: (d: WebhookDisabledData) => `${d.storeName}: اتوقفت نقطة استقبال ويب هوك`,
   },
   en: (d: WebhookDisabledData) => `
     <h2>A webhook endpoint was turned off</h2>
@@ -19,8 +19,8 @@ export const webhookDisabledTemplate = {
     <p>Check that your server is up and answers with a 2xx status, then turn the endpoint back on. Events that happened while it was off are not re-sent automatically.</p>
     <p><a href="${escapeHtml(d.webhooksUrl)}">Open webhooks</a></p>`,
   ar: (d: WebhookDisabledData) => `
-    <h2 dir="rtl">تم إيقاف نقطة استقبال ويب هوك</h2>
-    <p dir="rtl">آخر ${d.failures} أحداث أرسلناها إلى <strong dir="ltr">${escapeHtml(d.endpointUrl)}</strong> لم تصل، فأوقفنا الإرسال إليها.</p>
+    <h2 dir="rtl">اتوقفت نقطة استقبال ويب هوك</h2>
+    <p dir="rtl">آخر ${d.failures} أحداث بعتناها على <strong dir="ltr">${escapeHtml(d.endpointUrl)}</strong> ماوصلتش، فوقفنا الإرسال ليها.</p>
     <p dir="rtl">تأكد أن السيرفر شغال وبيرد بحالة 2xx، وبعدها شغّل النقطة من جديد. الأحداث اللي حصلت وهي موقوفة مش بتتبعت تلقائيًا.</p>
     <p dir="rtl"><a href="${escapeHtml(d.webhooksUrl)}">افتح صفحة ويب هوك</a></p>`,
 };
