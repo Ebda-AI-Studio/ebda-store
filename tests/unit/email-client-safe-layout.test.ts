@@ -61,6 +61,7 @@ import { planLimitReachedTemplate } from '@api/services/email-templates/plan-lim
 import { subscriptionBillingTemplate } from '@api/services/email-templates/subscription-billing';
 import { staffInviteTemplate } from '@api/services/email-templates/staff-invite';
 import { legalNoticeTemplate } from '@api/services/email-templates/legal-notice';
+import { passkeyNoticeTemplate } from '@api/services/email-templates/passkey-notice';
 
 type Locale = 'en' | 'ar';
 
@@ -100,6 +101,9 @@ const any = {
   email: 's@x.test',
   name: 'Sara',
   resetUrl: 'https://s.test/r',
+  kind: 'added',
+  passkeyName: 'Work laptop',
+  at: '2026-10-21T10:00:00.000Z',
   verificationUrl: 'https://s.test/v',
   expiresInMinutes: 15,
   expiresInHours: 24,
@@ -164,6 +168,7 @@ const TEMPLATES: Record<string, Tpl> = {
   planLimitReached: planLimitReachedTemplate,
   subscriptionBilling: subscriptionBillingTemplate,
   staffInvite: staffInviteTemplate,
+  passkeyNotice: passkeyNoticeTemplate,
   // One bilingual body for every recipient (Ruling LEGAL-6), so both locale keys render the same.
   legalNotice: {
     en: () => legalNoticeTemplate.body(LEGAL_NOTICE_SAMPLE),

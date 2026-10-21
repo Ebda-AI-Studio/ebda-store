@@ -9,6 +9,7 @@ import { describe, it, expect, vi, beforeAll, beforeEach } from 'vitest';
 import express, { type Express } from 'express';
 import request from 'supertest';
 import bcrypt from 'bcryptjs';
+import jwt from 'jsonwebtoken';
 import { register, assert } from '../helpers/software-authenticator';
 
 const PASSWORD = 'Correct-pw-1';
@@ -111,7 +112,12 @@ vi.mock('@api/services/auth.service', () => ({
     revokeAllSessions: async () => undefined,
     issueSessionFor: async (u: Row) => ({
       user: { id: u.id, email: u.email, storeId: u.storeId, role: u.role },
-      accessToken: `${Buffer.from(JSON.stringify({ alg: 'none', typ: 'JWT' })).toString('base64url')}.${Buffer.from(JSON.stringify({ jti: 'sess-new' })).toString('base64url')}.y`,
+      accessToken: jwt.sign({ userId: u.id }, 's', {
+        algorithm: 'HS256',
+        issuer: 'force-api',
+        audience: 'force-app',
+        jwtid: 'sess-new',
+      }),
       refreshToken: 'refresh',
     }),
   },

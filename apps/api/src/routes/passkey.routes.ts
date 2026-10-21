@@ -10,6 +10,7 @@ import {
   passkeyFinishLimiter,
   writeLimiter,
 } from '../middleware/security';
+import { config } from '../config';
 import { AppError } from '../middleware/error-handler';
 import { AuthService } from '../services/auth.service';
 import { PasskeyService } from '../services/passkey.service';
@@ -120,7 +121,13 @@ router.post(
       // A passkey sign-in is a fresh, phishing-resistant authentication: it opens the step-up window for
       // THIS new session only (bound to its token id, PASSKEY-12). Best-effort; the password path remains.
       try {
-        const jti = (jwt.decode(result.accessToken) as { jti?: string } | null)?.jti;
+        // We minted this token a line ago: verify (not decode) keeps it a checked read.
+        const claims = jwt.verify(result.accessToken, config.jwtSecret, {
+          algorithms: ['HS256'],
+          issuer: 'force-api',
+          audience: 'force-app',
+        }) as { jti?: string };
+        const jti = claims.jti;
         if (jti) await PasskeyService.markStepUp(result.user.id, jti);
       } catch {
         /* no step-up window; the person confirms with the password when managing passkeys */
