@@ -26,9 +26,7 @@ import { COMPARE_SLUGS } from '../../apps/marketing/src/lib/site';
 /** branch / PR -> the capability ids that go live when it merges */
 const FLIP_ON_MERGE: Record<string, CapabilityId[]> = {
   'feat/search-p1c-hybrid (search PR4)': ['meaning'],
-  'feat/cart-email-campaigns': ['cartemail', 'campaigns'],
   'feat/merchant-webhooks': ['webhooks'],
-  'feat/shaped-barcodes': ['barcodes'],
   'feat/b2b-wholesale': ['b2b'],
 };
 

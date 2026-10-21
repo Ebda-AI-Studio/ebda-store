@@ -31,15 +31,15 @@ Pricing (EGP per month): Basic 1,490, Growth 3,490, Business 9,990; yearly billi
 - SEO and visibility in AI answers
 - Run your store from an AI assistant (Growth and Business plans)
 - Abandoned-cart recovery (Growth and Business plans)
-- Cart reminder emails (Part of abandoned-cart recovery) — coming soon, not live yet
+- Cart reminder emails (Part of abandoned-cart recovery)
 - Order emails that send themselves
-- Email campaigns to your subscribers (Growth and Business plans) — coming soon, not live yet
+- Email campaigns to your subscribers (Growth and Business plans)
 - Connect your store to your other tools (Growth and Business plans) — coming soon, not live yet
 - Loyalty points, referral rewards and affiliates (Points on Growth and Business, affiliate programme on Business)
 - Customer reviews
 - Store analytics
 - Multiple warehouses and purchase orders (Business plan)
-- Order barcodes and a packing slip — coming soon, not live yet
+- Order barcodes and a packing slip
 - Wholesale selling (B2B) (Business plan) — coming soon, not live yet
 - Payments and shipping the Egyptian market expects
 - 0% commission on your orders
@@ -77,7 +77,6 @@ Pricing (EGP per month): Basic 1,490, Growth 3,490, Business 9,990; yearly billi
 - Wholesale (B2B) pricing: Coming soon on the Business plan: quantity price breaks, customer groups, minimum orders and wholesale-buyer approval. Until it ships there are no wholesale price lists.
 - Point of sale (POS): There is no in-store point of sale.
 - Multiple currencies: The store sells in Egyptian pounds only.
-- Marketing email campaigns: Coming soon on Growth and Business. Order emails work today on every plan.
 - Size of platform and community: A newer platform, so fewer integrations and a smaller community.
 Ebda Store is a newer platform than Salla, Zid or Shopify, with fewer integrations.
 

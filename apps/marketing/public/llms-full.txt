@@ -79,7 +79,6 @@ When a shopper leaves items in the cart, the store reminds them in steps and sen
 Arabic: استرجاع السلات المتروكة
 
 ### Cart reminder emails
-Status: coming soon, not live yet.
 Shoppers opt in to a reminder at checkout, guests included, and if they leave the cart an email brings them straight back to it. Available on: Part of abandoned-cart recovery.
 Arabic: تذكير السلة المتروكة بالإيميل
 
@@ -88,7 +87,6 @@ Order confirmation, shipping, refunds, payment success or failure and a review r
 Arabic: إيميلات الطلبات بتتبعت لوحدها
 
 ### Email campaigns to your subscribers
-Status: coming soon, not live yet.
 Write a marketing email in Arabic and English and send it to newsletter subscribers who agreed to receive it. Available on: Growth and Business plans.
 Arabic: حملات إيميل لمشتركيك
 
@@ -114,7 +112,6 @@ If you keep stock in more than one place, track inventory per warehouse, raise p
 Arabic: أكتر من مخزن وأوامر شراء
 
 ### Order barcodes and a packing slip
-Status: coming soon, not live yet.
 Every order has a barcode you scan to open it straight away, in 23 fun shapes. A packing slip carries the barcode, and you can print slips in bulk.
 Arabic: باركود للطلبات وبوليصة تغليف
 
@@ -154,19 +151,19 @@ Q: Is there search by meaning?
 A: It is rolling out gradually and coming soon. We will not switch it on for your store until its results pass our quality check on a real catalogue.
 
 Q: Does it recover abandoned carts?
-A: Yes, on the Growth and Business plans. The store reminds shoppers in steps by notification, and by SMS when they agreed to it. Reminder emails are coming soon.
+A: Yes, on the Growth and Business plans. The store reminds shoppers in steps by email (when they opted in at checkout, guests included), by notification, and by SMS when they agreed to it.
 
 Q: Is there loyalty and a referral programme?
 A: Yes. Loyalty points, tiers and referral rewards are on Growth and Business, and the affiliate programme with commission is on Business.
 
 Q: Can I send email campaigns to newsletter subscribers?
-A: Automatic order emails (confirmation, shipping, refunds, review request) work on every plan. Email campaigns to subscribers are coming soon on Growth and Business.
+A: Yes, on Growth and Business. Automatic order emails (confirmation, shipping, refunds, review request) work on every plan.
 
 Q: Can I connect my store to other tools?
 A: This is coming soon on Growth and Business. There is no app marketplace, but you will be able to connect your store to your tools.
 
 Q: Are there order barcodes?
-A: Coming soon: a barcode on every order in 23 fun shapes, and a packing slip that carries it, with bulk printing.
+A: Yes. Every order has a barcode in 23 fun shapes, and a packing slip carries it, with bulk printing.
 
 Q: Can I sell wholesale to businesses?
 A: Coming soon on the Business plan: prices that drop with quantity, customer groups, minimum orders, and your approval of a wholesale buyer. Until it ships there are no wholesale price lists.
@@ -194,7 +191,8 @@ Both Ebda Store and Salla let you open an online store in Arabic. The difference
 - AI tools: Ebda Store — Descriptions, translation, SEO and search words, plus receipt-to-expense drafts, reorder suggestions and plain-language explanations of your numbers, included in the paid plans. Salla — Check Salla's site for its AI features and which plan includes them.
 - Payments and shipping in Egypt: Ebda Store — Cash on delivery, InstaPay, Paymob, Kashier, FawryPay, and shipping with Bosta, ShipBlu, Mylerz and Aramex. Salla — Check which Egyptian gateways and carriers Salla supports for your account.
 - Templates and design: Ebda Store — Five templates with three looks each, and a page builder. Salla — Check Salla's site for its themes and editor.
-- Cart recovery and loyalty: Ebda Store — Abandoned-cart recovery by notification or SMS, and loyalty points, from the Growth plan. Salla — Check Salla's site for cart recovery and loyalty options.
+- Cart recovery and loyalty: Ebda Store — Abandoned-cart recovery by notification or SMS, and loyalty points, from the Growth plan. Plus reminder emails when the shopper opted in at checkout, guests included. Salla — Check Salla's site for cart recovery and loyalty options.
+- Marketing email campaigns: Ebda Store — Write a message in Arabic and English and send it to subscribers who agreed, on Growth and Business. Order emails work on every plan. Salla — Check Salla's site for email marketing options.
 - Search by meaning: Ebda Store — Coming soon: rolling out gradually, and only switched on for your store once its results pass our quality check on a real catalogue. Salla — Check Salla's site for how its search handles meaning.
 - Connecting other tools (webhooks): Ebda Store — Coming soon on Growth and Business: the store will notify the tool you choose when something happens, such as a new order. Salla — Check Salla's site for webhooks and integrations.
 - App marketplace: Ebda Store — There is no app marketplace. Salla — Check Salla's site for its app store.
@@ -202,7 +200,6 @@ Both Ebda Store and Salla let you open an online store in Arabic. The difference
 - Wholesale (B2B) pricing: Ebda Store — Coming soon on the Business plan: quantity price breaks, customer groups, minimum orders and wholesale-buyer approval. Until it ships there are no wholesale price lists. Salla — Check Salla's site for wholesale pricing.
 - Point of sale (POS): Ebda Store — There is no in-store point of sale. Salla — Check Salla's site for in-store selling options.
 - Multiple currencies: Ebda Store — The store sells in Egyptian pounds only. Salla — Check Salla's site for multi-currency support.
-- Marketing email campaigns: Ebda Store — Coming soon on Growth and Business. Order emails work today on every plan. Salla — Check Salla's site for email marketing options.
 - Size of platform and community: Ebda Store — A newer platform, so fewer integrations and a smaller community. Salla — Check Salla's site for its merchant base and partners.
 
 ### Ebda Store vs Zid — https://ebda.app/en/compare/zid/
@@ -216,7 +213,8 @@ Both Ebda Store and Zid let you open an online store in Arabic. The difference i
 - AI tools: Ebda Store — Descriptions, translation, SEO and search words, plus receipt-to-expense drafts, reorder suggestions and plain-language explanations of your numbers, included in the paid plans. Zid — Check Zid's site for its AI features and which plan includes them.
 - Payments and shipping in Egypt: Ebda Store — Cash on delivery, InstaPay, Paymob, Kashier, FawryPay, and shipping with Bosta, ShipBlu, Mylerz and Aramex. Zid — Check which Egyptian gateways and carriers Zid supports for your account.
 - Templates and design: Ebda Store — Five templates with three looks each, and a page builder. Zid — Check Zid's site for its themes and editor.
-- Cart recovery and loyalty: Ebda Store — Abandoned-cart recovery by notification or SMS, and loyalty points, from the Growth plan. Zid — Check Zid's site for cart recovery and loyalty options.
+- Cart recovery and loyalty: Ebda Store — Abandoned-cart recovery by notification or SMS, and loyalty points, from the Growth plan. Plus reminder emails when the shopper opted in at checkout, guests included. Zid — Check Zid's site for cart recovery and loyalty options.
+- Marketing email campaigns: Ebda Store — Write a message in Arabic and English and send it to subscribers who agreed, on Growth and Business. Order emails work on every plan. Zid — Check Zid's site for email marketing options.
 - Search by meaning: Ebda Store — Coming soon: rolling out gradually, and only switched on for your store once its results pass our quality check on a real catalogue. Zid — Check Zid's site for how its search handles meaning.
 - Connecting other tools (webhooks): Ebda Store — Coming soon on Growth and Business: the store will notify the tool you choose when something happens, such as a new order. Zid — Check Zid's site for webhooks and integrations.
 - App marketplace: Ebda Store — There is no app marketplace. Zid — Check Zid's site for its app store.
@@ -224,7 +222,6 @@ Both Ebda Store and Zid let you open an online store in Arabic. The difference i
 - Wholesale (B2B) pricing: Ebda Store — Coming soon on the Business plan: quantity price breaks, customer groups, minimum orders and wholesale-buyer approval. Until it ships there are no wholesale price lists. Zid — Check Zid's site for wholesale pricing.
 - Point of sale (POS): Ebda Store — There is no in-store point of sale. Zid — Check Zid's site for in-store selling options.
 - Multiple currencies: Ebda Store — The store sells in Egyptian pounds only. Zid — Check Zid's site for multi-currency support.
-- Marketing email campaigns: Ebda Store — Coming soon on Growth and Business. Order emails work today on every plan. Zid — Check Zid's site for email marketing options.
 - Size of platform and community: Ebda Store — A newer platform, so fewer integrations and a smaller community. Zid — Check Zid's site for its merchant base and partners.
 
 ### Ebda Store vs Shopify — https://ebda.app/en/compare/shopify/
@@ -238,7 +235,8 @@ Shopify is a large global platform serving merchants in many countries, while Eb
 - AI tools: Ebda Store — Descriptions, translation, SEO and search words, plus receipt-to-expense drafts, reorder suggestions and plain-language explanations of your numbers, included in the paid plans. Shopify — Has AI features. Compare the current scope and which plan includes them.
 - Payments and shipping in Egypt: Ebda Store — Cash on delivery, InstaPay, Paymob, Kashier, FawryPay, and shipping with Bosta, ShipBlu, Mylerz and Aramex. Shopify — Egyptian gateways and carriers depend on apps and integrations. Check what is available.
 - Templates and design: Ebda Store — Five templates with three looks each, and a page builder. Shopify — A very large theme store and a theme editor.
-- Cart recovery and loyalty: Ebda Store — Abandoned-cart recovery by notification or SMS, and loyalty points, from the Growth plan. Shopify — Available, built in or through apps.
+- Cart recovery and loyalty: Ebda Store — Abandoned-cart recovery by notification or SMS, and loyalty points, from the Growth plan. Plus reminder emails when the shopper opted in at checkout, guests included. Shopify — Available, built in or through apps.
+- Marketing email campaigns: Ebda Store — Write a message in Arabic and English and send it to subscribers who agreed, on Growth and Business. Order emails work on every plan. Shopify — Email marketing through built-in tools or apps.
 - Search by meaning: Ebda Store — Coming soon: rolling out gradually, and only switched on for your store once its results pass our quality check on a real catalogue. Shopify — Check Shopify's site for how its search handles meaning.
 - Connecting other tools (webhooks): Ebda Store — Coming soon on Growth and Business: the store will notify the tool you choose when something happens, such as a new order. Shopify — Webhooks and a developer API are available, alongside the app store.
 - App marketplace: Ebda Store — There is no app marketplace. Shopify — A very large app store.
@@ -246,5 +244,4 @@ Shopify is a large global platform serving merchants in many countries, while Eb
 - Wholesale (B2B) pricing: Ebda Store — Coming soon on the Business plan: quantity price breaks, customer groups, minimum orders and wholesale-buyer approval. Until it ships there are no wholesale price lists. Shopify — Check Shopify's site for B2B features and which plans include them.
 - Point of sale (POS): Ebda Store — There is no in-store point of sale. Shopify — Shopify POS for physical shops.
 - Multiple currencies: Ebda Store — The store sells in Egyptian pounds only. Shopify — Selling in multiple currencies and countries.
-- Marketing email campaigns: Ebda Store — Coming soon on Growth and Business. Order emails work today on every plan. Shopify — Email marketing through built-in tools or apps.
 - Size of platform and community: Ebda Store — A newer platform, so fewer integrations and a smaller community. Shopify — An established platform with a very large merchant base and partner ecosystem.
