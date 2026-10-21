@@ -2447,6 +2447,12 @@ model AbandonedCart {
   recoveredOrderId String?   @map("recovered_order_id")
   couponId         String?   @map("coupon_id")
   nextStepAt       DateTime? @map("next_step_at")
+  /// Recovery EMAIL channel (independent of the push/SMS `status` sequence): NULL = not claimed
+  /// yet, then queued | sent | skipped | failed. The claim NULL -> queued is the idempotency gate
+  /// (one email per cart, ever). `emailDetail` holds the skip reason / error code.
+  emailStatus      String?   @map("email_status")
+  emailDetail      String?   @map("email_detail")
+  emailSentAt      DateTime? @map("email_sent_at")
   createdAt        DateTime  @default(now()) @map("created_at")
   updatedAt        DateTime  @updatedAt @map("updated_at")
 
@@ -2478,6 +2484,10 @@ model AbandonedCartConfig {
   couponDiscountPercent Int      @default(10) @map("coupon_discount_percent")
   couponMaxDiscount     Int?     @map("coupon_max_discount")
   couponExpiryHours     Int      @default(48) @map("coupon_expiry_hours")
+  /// Recovery email (one reminder, to opted-in newsletter subscribers only). OFF until the
+  /// merchant turns it on. Delay is minutes of cart inactivity, 60..1440.
+  emailEnabled          Boolean  @default(false) @map("email_enabled")
+  emailDelayMinutes     Int      @default(120) @map("email_delay_minutes")
   createdAt             DateTime @default(now()) @map("created_at")
   updatedAt             DateTime @updatedAt @map("updated_at")
 
