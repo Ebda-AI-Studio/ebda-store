@@ -8,6 +8,7 @@ import bcrypt from 'bcryptjs';
 import { authenticator } from 'otplib';
 import { register, assert, type SoftCredential } from '../helpers/software-authenticator';
 
+const SID = 'sess-X';
 const ADMIN_ORIGIN = 'https://admin.ebda.app';
 const STORE_A = 'https://shop-a.ebda.app';
 const STORE_B = 'https://shop-b.ebda.app';
@@ -198,10 +199,10 @@ beforeEach(() => {
 
 /** Register a passkey for `userId` from `origin` and return the software credential. */
 async function enrol(userId: string, origin: string, name = 'My phone'): Promise<SoftCredential> {
-  await PasskeyService.markStepUp(userId);
-  const options = await PasskeyService.beginRegistration({ userId }, origin, {});
+  await PasskeyService.markStepUp(userId, SID);
+  const options = await PasskeyService.beginRegistration({ userId, sessionId: SID }, origin, {});
   const { credential, response } = register(options as any, origin);
-  await PasskeyService.finishRegistration({ userId }, origin, { response, name });
+  await PasskeyService.finishRegistration({ userId, sessionId: SID }, origin, { response, name });
   return credential;
 }
 
@@ -261,12 +262,12 @@ describe('resolvePasskeyContext (RP ID strategy, PASSKEY-3)', () => {
 describe('registration', () => {
   beforeEach(async () => {
     for (const id of ['user-1', 'user-2', 'cust-a', 'cust-b', 'root'])
-      await PasskeyService.markStepUp(id);
+      await PasskeyService.markStepUp(id, SID);
   });
 
   it('registers a merchant passkey: UV required, discoverable, challenge stored single-use with TTL >= 120s', async () => {
     const options: any = await PasskeyService.beginRegistration(
-      { userId: 'user-1' },
+      { userId: 'user-1', sessionId: SID },
       ADMIN_ORIGIN,
       {}
     );
@@ -283,10 +284,14 @@ describe('registration', () => {
     expect(chal[0].key).not.toContain(options.challenge);
 
     const { response } = register(options, ADMIN_ORIGIN);
-    const item = await PasskeyService.finishRegistration({ userId: 'user-1' }, ADMIN_ORIGIN, {
-      response,
-      name: 'Work laptop',
-    });
+    const item = await PasskeyService.finishRegistration(
+      { userId: 'user-1', sessionId: SID },
+      ADMIN_ORIGIN,
+      {
+        response,
+        name: 'Work laptop',
+      }
+    );
     expect(item).toMatchObject({ name: 'Work laptop', needsReenrol: false });
     expect(h.state.creds).toHaveLength(1);
     expect(h.state.creds[0]).toMatchObject({ userId: 'user-1', rpId: 'admin.ebda.app' });
@@ -297,7 +302,7 @@ describe('registration', () => {
   it('fails closed when the challenge store is down', async () => {
     h.state.redisUp = false;
     await expect(
-      PasskeyService.beginRegistration({ userId: 'user-1' }, ADMIN_ORIGIN, {})
+      PasskeyService.beginRegistration({ userId: 'user-1', sessionId: SID }, ADMIN_ORIGIN, {})
     ).rejects.toMatchObject({
       statusCode: 503,
     });
@@ -305,7 +310,7 @@ describe('registration', () => {
 
   it('rejects a registration whose clientDataJSON origin is not the one the challenge was issued for', async () => {
     const options: any = await PasskeyService.beginRegistration(
-      { userId: 'user-1' },
+      { userId: 'user-1', sessionId: SID },
       ADMIN_ORIGIN,
       {}
     );
@@ -313,76 +318,95 @@ describe('registration', () => {
       clientDataOrigin: 'https://evil.example',
     });
     await expect(
-      PasskeyService.finishRegistration({ userId: 'user-1' }, ADMIN_ORIGIN, { response, name: 'x' })
+      PasskeyService.finishRegistration({ userId: 'user-1', sessionId: SID }, ADMIN_ORIGIN, {
+        response,
+        name: 'x',
+      })
     ).rejects.toMatchObject({ statusCode: 400, code: 'PASSKEY_REGISTRATION_FAILED' });
     expect(h.state.creds).toHaveLength(0);
   });
 
   it('rejects a finish that arrives from a different origin than begin (RP ID / origin mismatch)', async () => {
-    const options: any = await PasskeyService.beginRegistration({ userId: 'cust-a' }, STORE_A, {});
+    const options: any = await PasskeyService.beginRegistration(
+      { userId: 'cust-a', sessionId: SID },
+      STORE_A,
+      {}
+    );
     const { response } = register(options, STORE_A);
     await expect(
-      PasskeyService.finishRegistration({ userId: 'cust-a' }, STORE_B, { response, name: 'x' })
+      PasskeyService.finishRegistration({ userId: 'cust-a', sessionId: SID }, STORE_B, {
+        response,
+        name: 'x',
+      })
     ).rejects.toMatchObject({ code: 'PASSKEY_REGISTRATION_FAILED' });
     expect(h.state.creds).toHaveLength(0);
   });
 
   it('rejects an authenticator that did not verify the user (UV required)', async () => {
     const options: any = await PasskeyService.beginRegistration(
-      { userId: 'user-1' },
+      { userId: 'user-1', sessionId: SID },
       ADMIN_ORIGIN,
       {}
     );
     const { response } = register(options, ADMIN_ORIGIN, { userVerified: false });
     await expect(
-      PasskeyService.finishRegistration({ userId: 'user-1' }, ADMIN_ORIGIN, { response, name: 'x' })
+      PasskeyService.finishRegistration({ userId: 'user-1', sessionId: SID }, ADMIN_ORIGIN, {
+        response,
+        name: 'x',
+      })
     ).rejects.toMatchObject({ code: 'PASSKEY_REGISTRATION_FAILED' });
   });
 
   it('a challenge is single-use: replaying the same registration response is rejected', async () => {
     const options: any = await PasskeyService.beginRegistration(
-      { userId: 'user-1' },
+      { userId: 'user-1', sessionId: SID },
       ADMIN_ORIGIN,
       {}
     );
     const { response } = register(options, ADMIN_ORIGIN);
-    await PasskeyService.finishRegistration({ userId: 'user-1' }, ADMIN_ORIGIN, {
+    await PasskeyService.finishRegistration({ userId: 'user-1', sessionId: SID }, ADMIN_ORIGIN, {
       response,
       name: 'a',
     });
     await expect(
-      PasskeyService.finishRegistration({ userId: 'user-1' }, ADMIN_ORIGIN, { response, name: 'a' })
+      PasskeyService.finishRegistration({ userId: 'user-1', sessionId: SID }, ADMIN_ORIGIN, {
+        response,
+        name: 'a',
+      })
     ).rejects.toMatchObject({ code: 'PASSKEY_REGISTRATION_FAILED' });
     expect(h.state.creds).toHaveLength(1);
   });
 
   it('a challenge issued to one user cannot be finished by another', async () => {
     const options: any = await PasskeyService.beginRegistration(
-      { userId: 'user-1' },
+      { userId: 'user-1', sessionId: SID },
       ADMIN_ORIGIN,
       {}
     );
     const { response } = register(options, ADMIN_ORIGIN);
     h.state.users.set('user-2', user({ id: 'user-2', email: 'two@x.com' }));
     await expect(
-      PasskeyService.finishRegistration({ userId: 'user-2' }, ADMIN_ORIGIN, { response, name: 'a' })
+      PasskeyService.finishRegistration({ userId: 'user-2', sessionId: SID }, ADMIN_ORIGIN, {
+        response,
+        name: 'a',
+      })
     ).rejects.toMatchObject({ code: 'PASSKEY_REGISTRATION_FAILED' });
   });
 
   it('super_admin is excluded (PASSKEY-5); a customer cannot enrol on the admin surface and a merchant not on a storefront', async () => {
     await expect(
-      PasskeyService.beginRegistration({ userId: 'root' }, ADMIN_ORIGIN, {})
+      PasskeyService.beginRegistration({ userId: 'root', sessionId: SID }, ADMIN_ORIGIN, {})
     ).rejects.toMatchObject({
       statusCode: 403,
       code: 'PASSKEY_NOT_ALLOWED',
     });
     await expect(
-      PasskeyService.beginRegistration({ userId: 'cust-a' }, ADMIN_ORIGIN, {})
+      PasskeyService.beginRegistration({ userId: 'cust-a', sessionId: SID }, ADMIN_ORIGIN, {})
     ).rejects.toMatchObject({
       code: 'PASSKEY_NOT_ALLOWED',
     });
     await expect(
-      PasskeyService.beginRegistration({ userId: 'user-1' }, STORE_A, {})
+      PasskeyService.beginRegistration({ userId: 'user-1', sessionId: SID }, STORE_A, {})
     ).rejects.toMatchObject({
       code: 'PASSKEY_NOT_ALLOWED',
     });
@@ -390,7 +414,7 @@ describe('registration', () => {
 
   it("a shopper cannot enrol on another store's host", async () => {
     await expect(
-      PasskeyService.beginRegistration({ userId: 'cust-a' }, STORE_B, {})
+      PasskeyService.beginRegistration({ userId: 'cust-a', sessionId: SID }, STORE_B, {})
     ).rejects.toMatchObject({
       code: 'PASSKEY_NOT_ALLOWED',
     });
@@ -407,7 +431,7 @@ describe('registration', () => {
       });
     }
     await expect(
-      PasskeyService.beginRegistration({ userId: 'user-1' }, ADMIN_ORIGIN, {})
+      PasskeyService.beginRegistration({ userId: 'user-1', sessionId: SID }, ADMIN_ORIGIN, {})
     ).rejects.toMatchObject({
       statusCode: 409,
       code: 'PASSKEY_LIMIT',
@@ -417,7 +441,7 @@ describe('registration', () => {
   it('excludes already-registered credentials of this host from the creation options', async () => {
     const cred = await enrol('user-1', ADMIN_ORIGIN);
     const options: any = await PasskeyService.beginRegistration(
-      { userId: 'user-1' },
+      { userId: 'user-1', sessionId: SID },
       ADMIN_ORIGIN,
       {}
     );
@@ -553,7 +577,7 @@ describe('authentication (discoverable, no email)', () => {
   it('a deleted credential cannot sign in', async () => {
     const cred = await enrol('user-1', ADMIN_ORIGIN);
     const [row] = await PasskeyService.list('user-1', ADMIN_ORIGIN);
-    await PasskeyService.remove('user-1', row.id);
+    await PasskeyService.remove({ userId: 'user-1', sessionId: SID }, row.id);
     const { result } = await signIn(ADMIN_ORIGIN, cred);
     await expect(result).rejects.toMatchObject({ code: 'PASSKEY_AUTH_FAILED' });
   });
@@ -662,7 +686,7 @@ describe('authentication (discoverable, no email)', () => {
 
 describe('management', () => {
   beforeEach(async () => {
-    for (const id of ['user-1', 'cust-a', 'cust-b']) await PasskeyService.markStepUp(id);
+    for (const id of ['user-1', 'cust-a', 'cust-b']) await PasskeyService.markStepUp(id, SID);
   });
 
   it('lists, renames and removes only the caller’s own passkeys; flags a host change as needing re-enrol', async () => {
@@ -673,15 +697,19 @@ describe('management', () => {
     expect(Object.keys(items[0])).not.toContain('publicKey');
     expect((await PasskeyService.list('cust-a', STORE_A_CUSTOM))[0].needsReenrol).toBe(true);
 
-    await expect(PasskeyService.rename('cust-b', items[0].id, 'mine now')).rejects.toMatchObject({
+    await expect(
+      PasskeyService.rename({ userId: 'cust-b', sessionId: SID }, items[0].id, 'mine now')
+    ).rejects.toMatchObject({
       statusCode: 404,
     });
-    await expect(PasskeyService.remove('cust-b', items[0].id)).rejects.toMatchObject({
+    await expect(
+      PasskeyService.remove({ userId: 'cust-b', sessionId: SID }, items[0].id)
+    ).rejects.toMatchObject({
       statusCode: 404,
     });
-    await PasskeyService.rename('cust-a', items[0].id, 'Face ID');
+    await PasskeyService.rename({ userId: 'cust-a', sessionId: SID }, items[0].id, 'Face ID');
     expect(h.state.creds[0].name).toBe('Face ID');
-    await PasskeyService.remove('cust-a', items[0].id);
+    await PasskeyService.remove({ userId: 'cust-a', sessionId: SID }, items[0].id);
     expect(h.state.creds).toHaveLength(0);
   });
 });
@@ -691,7 +719,7 @@ describe('step-up: register, rename and remove need a recent re-auth (PASSKEY-7)
 
   it('refuses to add, rename or remove on a bare session', async () => {
     await expect(
-      PasskeyService.beginRegistration({ userId: 'user-1' }, ADMIN_ORIGIN, {})
+      PasskeyService.beginRegistration({ userId: 'user-1', sessionId: SID }, ADMIN_ORIGIN, {})
     ).rejects.toMatchObject({
       statusCode: 403,
       code: 'STEP_UP_REQUIRED',
@@ -704,10 +732,14 @@ describe('step-up: register, rename and remove need a recent re-auth (PASSKEY-7)
       transports: [],
       name: 'mine',
     });
-    await expect(PasskeyService.rename('user-1', 'p1', 'x')).rejects.toMatchObject({
+    await expect(
+      PasskeyService.rename({ userId: 'user-1', sessionId: SID }, 'p1', 'x')
+    ).rejects.toMatchObject({
       code: 'STEP_UP_REQUIRED',
     });
-    await expect(PasskeyService.remove('user-1', 'p1')).rejects.toMatchObject({
+    await expect(
+      PasskeyService.remove({ userId: 'user-1', sessionId: SID }, 'p1')
+    ).rejects.toMatchObject({
       code: 'STEP_UP_REQUIRED',
     });
     expect(h.state.creds).toHaveLength(1);
@@ -715,50 +747,52 @@ describe('step-up: register, rename and remove need a recent re-auth (PASSKEY-7)
   });
 
   it('a wrong password does not unlock anything', async () => {
-    await expect(PasskeyService.stepUp('user-1', { password: 'nope' })).rejects.toMatchObject({
+    await expect(PasskeyService.stepUp('user-1', SID, { password: 'nope' })).rejects.toMatchObject({
       statusCode: 401,
       code: 'STEP_UP_FAILED',
     });
     await expect(
-      PasskeyService.beginRegistration({ userId: 'user-1' }, ADMIN_ORIGIN, {})
+      PasskeyService.beginRegistration({ userId: 'user-1', sessionId: SID }, ADMIN_ORIGIN, {})
     ).rejects.toMatchObject({
       code: 'STEP_UP_REQUIRED',
     });
   });
 
   it('the right password unlocks it for a short, server-held window (120s..300s)', async () => {
-    await PasskeyService.stepUp('user-1', { password: PASSWORD });
+    await PasskeyService.stepUp('user-1', SID, { password: PASSWORD });
     expect(stepupTtls()).toHaveLength(1);
     expect(stepupTtls()[0].ttl).toBeGreaterThanOrEqual(120);
     expect(stepupTtls()[0].ttl).toBeLessThanOrEqual(300);
     await expect(
-      PasskeyService.beginRegistration({ userId: 'user-1' }, ADMIN_ORIGIN, {})
+      PasskeyService.beginRegistration({ userId: 'user-1', sessionId: SID }, ADMIN_ORIGIN, {})
     ).resolves.toBeTruthy();
   });
 
   it('with TOTP on, the password alone is not enough; password + a current code is', async () => {
     h.state.users.set('user-1', user({ mfaEnabled: true, mfaSecret: `enc:${TOTP_SECRET}` }));
-    await expect(PasskeyService.stepUp('user-1', { password: PASSWORD })).rejects.toMatchObject({
-      code: 'STEP_UP_FAILED',
-    });
     await expect(
-      PasskeyService.stepUp('user-1', { password: PASSWORD, code: '000000' })
+      PasskeyService.stepUp('user-1', SID, { password: PASSWORD })
     ).rejects.toMatchObject({
       code: 'STEP_UP_FAILED',
     });
-    await PasskeyService.stepUp('user-1', {
+    await expect(
+      PasskeyService.stepUp('user-1', SID, { password: PASSWORD, code: '000000' })
+    ).rejects.toMatchObject({
+      code: 'STEP_UP_FAILED',
+    });
+    await PasskeyService.stepUp('user-1', SID, {
       password: PASSWORD,
       code: authenticator.generate(TOTP_SECRET),
     });
     await expect(
-      PasskeyService.beginRegistration({ userId: 'user-1' }, ADMIN_ORIGIN, {})
+      PasskeyService.beginRegistration({ userId: 'user-1', sessionId: SID }, ADMIN_ORIGIN, {})
     ).resolves.toBeTruthy();
   });
 
   it('expiry is enforced server-side, including between begin and finish', async () => {
-    await PasskeyService.stepUp('user-1', { password: PASSWORD });
+    await PasskeyService.stepUp('user-1', SID, { password: PASSWORD });
     const options: any = await PasskeyService.beginRegistration(
-      { userId: 'user-1' },
+      { userId: 'user-1', sessionId: SID },
       ADMIN_ORIGIN,
       {}
     );
@@ -766,44 +800,83 @@ describe('step-up: register, rename and remove need a recent re-auth (PASSKEY-7)
       if (k.startsWith('passkey:stepup:')) h.state.redis.delete(k);
     const { response } = register(options, ADMIN_ORIGIN);
     await expect(
-      PasskeyService.finishRegistration({ userId: 'user-1' }, ADMIN_ORIGIN, { response, name: 'x' })
+      PasskeyService.finishRegistration({ userId: 'user-1', sessionId: SID }, ADMIN_ORIGIN, {
+        response,
+        name: 'x',
+      })
     ).rejects.toMatchObject({ code: 'STEP_UP_REQUIRED' });
     expect(h.state.creds).toHaveLength(0);
   });
 
-  it('a step-up is per user', async () => {
-    await PasskeyService.stepUp('user-1', { password: PASSWORD });
-    h.state.users.set('user-2', user({ id: 'user-2', email: 'two@x.com' }));
+  it('a step-up from session X does not authorize session Y of the same user (PASSKEY-12)', async () => {
+    await PasskeyService.stepUp('user-1', 'sess-X', { password: PASSWORD });
     await expect(
-      PasskeyService.beginRegistration({ userId: 'user-2' }, ADMIN_ORIGIN, {})
+      PasskeyService.beginRegistration({ userId: 'user-1', sessionId: 'sess-Y' }, ADMIN_ORIGIN, {})
+    ).rejects.toMatchObject({ code: 'STEP_UP_REQUIRED' });
+    h.state.creds.push({
+      id: 'p1',
+      userId: 'user-1',
+      credentialId: 'c1',
+      rpId: 'admin.ebda.app',
+      transports: [],
+      name: 'm',
+    });
+    await expect(
+      PasskeyService.remove({ userId: 'user-1', sessionId: 'sess-Y' }, 'p1')
     ).rejects.toMatchObject({
       code: 'STEP_UP_REQUIRED',
     });
+    await expect(
+      PasskeyService.rename({ userId: 'user-1', sessionId: 'sess-Y' }, 'p1', 'x')
+    ).rejects.toMatchObject({
+      code: 'STEP_UP_REQUIRED',
+    });
+    expect(h.state.creds).toHaveLength(1);
   });
 
-  it('a passkey sign-in counts as a fresh authentication', async () => {
-    const cred = await enrol('user-1', ADMIN_ORIGIN);
-    for (const k of [...h.state.redis.keys()])
-      if (k.startsWith('passkey:stepup:')) h.state.redis.delete(k);
+  it('a session with no id can never hold a step-up', async () => {
     await expect(
-      PasskeyService.beginRegistration({ userId: 'user-1' }, ADMIN_ORIGIN, {})
+      PasskeyService.beginRegistration({ userId: 'user-1', sessionId: undefined }, ADMIN_ORIGIN, {})
+    ).rejects.toMatchObject({ code: 'STEP_UP_REQUIRED' });
+  });
+
+  it('a proof stored for user U cannot be replayed for user V even with the same session id', async () => {
+    await PasskeyService.stepUp('user-1', 'sess-X', { password: PASSWORD });
+    h.state.users.set('user-2', user({ id: 'user-2', email: 'two@x.com' }));
+    await expect(
+      PasskeyService.beginRegistration({ userId: 'user-2', sessionId: 'sess-X' }, ADMIN_ORIGIN, {})
+    ).rejects.toMatchObject({ code: 'STEP_UP_REQUIRED' });
+    // Even a planted key for V's slot holding U's id is refused (the value is checked, not just its presence).
+    const k = [...h.state.redis.keys()].find(x => x.startsWith('passkey:stepup:user-1:'))!;
+    h.state.redis.set(k.replace('user-1', 'user-2'), 'user-1');
+    await expect(
+      PasskeyService.beginRegistration({ userId: 'user-2', sessionId: 'sess-X' }, ADMIN_ORIGIN, {})
+    ).rejects.toMatchObject({ code: 'STEP_UP_REQUIRED' });
+  });
+
+  it('the proof lives only server-side: the key never contains the raw session id', async () => {
+    await PasskeyService.stepUp('user-1', 'sess-X', { password: PASSWORD });
+    expect(stepupTtls()[0].key).not.toContain('sess-X');
+  });
+
+  it('a step-up is per user', async () => {
+    await PasskeyService.stepUp('user-1', SID, { password: PASSWORD });
+    h.state.users.set('user-2', user({ id: 'user-2', email: 'two@x.com' }));
+    await expect(
+      PasskeyService.beginRegistration({ userId: 'user-2', sessionId: SID }, ADMIN_ORIGIN, {})
     ).rejects.toMatchObject({
       code: 'STEP_UP_REQUIRED',
     });
-    await (
-      await signIn(ADMIN_ORIGIN, cred)
-    ).result;
-    await expect(
-      PasskeyService.beginRegistration({ userId: 'user-1' }, ADMIN_ORIGIN, {})
-    ).resolves.toBeTruthy();
   });
 
   it('wrong step-up guesses feed the SAME lockout counter as password login', async () => {
     for (let i = 0; i < 5; i++) {
-      await expect(PasskeyService.stepUp('user-1', { password: 'bad' })).rejects.toBeTruthy();
+      await expect(PasskeyService.stepUp('user-1', SID, { password: 'bad' })).rejects.toBeTruthy();
     }
     expect(h.state.fails.get('m@x.com')).toBe(5);
-    await expect(PasskeyService.stepUp('user-1', { password: PASSWORD })).rejects.toMatchObject({
+    await expect(
+      PasskeyService.stepUp('user-1', SID, { password: PASSWORD })
+    ).rejects.toMatchObject({
       statusCode: 429,
       code: 'ACCOUNT_LOCKED',
     });
@@ -878,7 +951,7 @@ describe('login gate parity with password login (PASSKEY-8)', () => {
 
 describe('notices and revocation (PASSKEY-9)', () => {
   beforeEach(async () => {
-    await PasskeyService.markStepUp('user-1');
+    await PasskeyService.markStepUp('user-1', SID);
   });
 
   it('emails the account on every passkey added and removed', async () => {
@@ -890,7 +963,7 @@ describe('notices and revocation (PASSKEY-9)', () => {
       passkeyName: 'Work laptop',
     });
     const [row] = await PasskeyService.list('user-1', ADMIN_ORIGIN);
-    await PasskeyService.remove('user-1', row.id);
+    await PasskeyService.remove({ userId: 'user-1', sessionId: SID }, row.id);
     expect(h.state.mails).toHaveLength(2);
     expect(h.state.mails[1]).toMatchObject({
       kind: 'removed',
@@ -903,21 +976,23 @@ describe('notices and revocation (PASSKEY-9)', () => {
     h.state.mailFails = true;
     await enrol('user-1', ADMIN_ORIGIN);
     expect(h.state.creds).toHaveLength(1);
-    await PasskeyService.remove('user-1', h.state.creds[0].id);
+    await PasskeyService.remove({ userId: 'user-1', sessionId: SID }, h.state.creds[0].id);
     expect(h.state.creds).toHaveLength(0);
   });
 
   it('removing a passkey signs the account out everywhere (sessions and refresh tokens)', async () => {
     await enrol('user-1', ADMIN_ORIGIN);
-    await PasskeyService.remove('user-1', h.state.creds[0].id);
+    await PasskeyService.remove({ userId: 'user-1', sessionId: SID }, h.state.creds[0].id);
     expect(h.state.revoked).toEqual(['user-1']);
   });
 
   it('a failed removal (not yours) revokes nothing and mails nothing', async () => {
     await enrol('user-1', ADMIN_ORIGIN);
     h.state.mails = [];
-    await PasskeyService.markStepUp('user-2');
-    await expect(PasskeyService.remove('user-2', h.state.creds[0].id)).rejects.toMatchObject({
+    await PasskeyService.markStepUp('user-2', SID);
+    await expect(
+      PasskeyService.remove({ userId: 'user-2', sessionId: SID }, h.state.creds[0].id)
+    ).rejects.toMatchObject({
       statusCode: 404,
     });
     expect(h.state.revoked).toEqual([]);
@@ -928,7 +1003,7 @@ describe('notices and revocation (PASSKEY-9)', () => {
     const cred = await enrol('user-1', ADMIN_ORIGIN);
     const o: any = await PasskeyService.beginAuthentication(ADMIN_ORIGIN);
     const response = assert(cred, o, ADMIN_ORIGIN);
-    await PasskeyService.remove('user-1', h.state.creds[0].id);
+    await PasskeyService.remove({ userId: 'user-1', sessionId: SID }, h.state.creds[0].id);
     await expect(
       PasskeyService.finishAuthentication(ADMIN_ORIGIN, response as any)
     ).rejects.toMatchObject({

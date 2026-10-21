@@ -36,6 +36,8 @@ import { redis } from './redis.service';
  *             can neither add a backdoor passkey nor delete the owner's.
  *  PASSKEY-8  Sign-in gates are shared with password login through `loginGate` (one lockout counter per
  *             account, one active-account check). Failures for an identified account count toward it.
+ *  PASSKEY-12 The step-up proof is bound to the user AND the session (access-token jti), server-side, 5 min,
+ *             never client-supplied: another session or user of the same account cannot reuse it.
  *  PASSKEY-9  Add/remove emails the account (best-effort); removing signs the account out everywhere.
  */
 
@@ -192,11 +194,23 @@ function accountFitsContext(
 
 const userIdBytes = (id: string) => new TextEncoder().encode(id);
 
-const stepUpKey = (userId: string) => `passkey:stepup:${userId}`;
+/** Who is acting: the user AND the specific session (access-token jti) presenting the request. */
+export interface PasskeyActor {
+  userId: string;
+  sessionId: string | undefined;
+}
 
-async function requireStepUp(userId: string): Promise<void> {
-  const fresh = await challengeClient().get(stepUpKey(userId));
-  if (!fresh) {
+// Ruling PASSKEY-12: the proof is bound to user + session. The key is derived from both (the session id is
+// hashed, so a Redis dump never lists live token ids) and its VALUE is the user id, checked on read.
+// Nothing the client sends decides it: no timestamp, no flag.
+const stepUpKey = (userId: string, sessionId: string) =>
+  `passkey:stepup:${userId}:${crypto.createHash('sha256').update(sessionId).digest('hex')}`;
+
+async function requireStepUp(actor: PasskeyActor): Promise<void> {
+  const held = actor.sessionId
+    ? await challengeClient().get(stepUpKey(actor.userId, actor.sessionId))
+    : null;
+  if (held !== actor.userId) {
     throw new AppError(403, 'STEP_UP_REQUIRED', 'Confirm your password to manage passkeys');
   }
 }
@@ -232,10 +246,12 @@ export class PasskeyService {
   /** Prove who is holding the session: password, plus a current TOTP code when TOTP is on. */
   static async stepUp(
     userId: string,
+    sessionId: string | undefined,
     input: { password: string; code?: string },
     ip?: string
   ): Promise<{ expiresInSeconds: number }> {
     const failed = () => new AppError(401, 'STEP_UP_FAILED', 'Could not confirm your identity');
+    if (!sessionId) throw failed();
     const user = await withUser(userId, tx =>
       tx.user.findUnique({
         where: { id: userId },
@@ -268,13 +284,17 @@ export class PasskeyService {
       await loginGate.recordFailure(key, ip);
       throw failed();
     }
-    await PasskeyService.markStepUp(userId);
+    await PasskeyService.markStepUp(userId, sessionId);
     return { expiresInSeconds: PASSKEY_STEP_UP_TTL_SECONDS };
   }
 
-  /** Record a fresh authentication for this user (also called after a passkey sign-in). */
-  static async markStepUp(userId: string): Promise<void> {
-    await challengeClient().setex(stepUpKey(userId), PASSKEY_STEP_UP_TTL_SECONDS, '1');
+  /** Record a fresh authentication for this user in THIS session (also after a passkey sign-in). */
+  static async markStepUp(userId: string, sessionId: string): Promise<void> {
+    await challengeClient().setex(
+      stepUpKey(userId, sessionId),
+      PASSKEY_STEP_UP_TTL_SECONDS,
+      userId
+    );
   }
 
   // -------------------------------------------------------------------------------------------
@@ -282,12 +302,12 @@ export class PasskeyService {
   // -------------------------------------------------------------------------------------------
 
   static async beginRegistration(
-    actor: { userId: string },
+    actor: PasskeyActor,
     origin: string | undefined,
     _input?: unknown
   ) {
     const ctx = await resolvePasskeyContext(origin);
-    await requireStepUp(actor.userId);
+    await requireStepUp(actor);
     const user = await withUser(actor.userId, tx =>
       tx.user.findUnique({
         where: { id: actor.userId },
@@ -340,11 +360,11 @@ export class PasskeyService {
   }
 
   static async finishRegistration(
-    actor: { userId: string },
+    actor: PasskeyActor,
     origin: string | undefined,
     body: { response: RegistrationResponseJSON; name?: string }
   ): Promise<PasskeyListItem> {
-    await requireStepUp(actor.userId);
+    await requireStepUp(actor);
     const challenge = challengeOf(body.response as never);
     // Consumed even when a later check fails: one begin, one attempt.
     const record = challenge ? await takeChallenge(challenge) : null;
@@ -543,11 +563,7 @@ export class PasskeyService {
     if (touched.count !== 1) return failKnown('counter_race');
 
     await loginGate.recordSuccess(lockoutKey, meta.ip).catch(() => undefined);
-    // A passkey sign-in is a fresh, phishing-resistant authentication: it also opens the step-up window.
-    await PasskeyService.markStepUp(user.id).catch(err =>
-      logger.warn({ err, userId: user.id }, '[passkey] could not record step-up after sign-in')
-    );
-
+    // The route opens the step-up window for the NEW session once it has minted it (PASSKEY-12).
     return { user, credentialRowId: stored.id };
   }
 
@@ -580,8 +596,9 @@ export class PasskeyService {
     return rows.map(r => toItem(r, rpId));
   }
 
-  static async rename(userId: string, id: string, name: string): Promise<void> {
-    await requireStepUp(userId);
+  static async rename(actor: PasskeyActor, id: string, name: string): Promise<void> {
+    await requireStepUp(actor);
+    const { userId } = actor;
     const res = await withUser(userId, tx =>
       tx.passkeyCredential.updateMany({
         where: { id, userId },
@@ -591,8 +608,9 @@ export class PasskeyService {
     if (res.count !== 1) throw new AppError(404, 'PASSKEY_NOT_FOUND', 'Passkey not found');
   }
 
-  static async remove(userId: string, id: string): Promise<void> {
-    await requireStepUp(userId);
+  static async remove(actor: PasskeyActor, id: string): Promise<void> {
+    await requireStepUp(actor);
+    const { userId } = actor;
     const row = await withUser(userId, tx =>
       tx.passkeyCredential.findMany({ where: { userId }, select: { id: true, name: true } })
     ).then(rows => rows.find(r => r.id === id));

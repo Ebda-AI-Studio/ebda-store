@@ -73,6 +73,7 @@ vi.mock('@api/middleware/auth', async importOriginal => {
   return {
     ...actual,
     authenticate: (req: any, _res: any, next: any) => {
+      req.tokenJti = h.caller.jti;
       req.user = {
         userId: h.caller.userId,
         role: h.caller.role,
@@ -110,7 +111,7 @@ vi.mock('@api/services/auth.service', () => ({
     revokeAllSessions: async () => undefined,
     issueSessionFor: async (u: Row) => ({
       user: { id: u.id, email: u.email, storeId: u.storeId, role: u.role },
-      accessToken: 'access',
+      accessToken: `${Buffer.from(JSON.stringify({ alg: 'none', typ: 'JWT' })).toString('base64url')}.${Buffer.from(JSON.stringify({ jti: 'sess-new' })).toString('base64url')}.y`,
       refreshToken: 'refresh',
     }),
   },
@@ -131,7 +132,7 @@ beforeEach(() => {
   h.redis.clear();
   h.creds = [];
   h.audit = [];
-  h.caller = { userId: 'user-1', role: 'store_admin', impersonatedBy: undefined };
+  h.caller = { userId: 'user-1', role: 'store_admin', impersonatedBy: undefined, jti: 'sess-A' };
   h.users = new Map([
     [
       'user-1',
@@ -189,7 +190,6 @@ describe('passkey routes', () => {
     expect(fin.status).toBe(200);
     expect(fin.body.data).toMatchObject({
       user: { id: 'user-1' },
-      accessToken: 'access',
       refreshToken: 'refresh',
       csrfToken: 'csrf-token',
     });
@@ -318,5 +318,27 @@ describe('passkey routes', () => {
   it('step-up itself is refused for an impersonation session', async () => {
     h.caller.impersonatedBy = 'admin-9';
     expect((await post('/step-up').send({ password: PASSWORD })).status).toBe(403);
+  });
+
+  it('a step-up belongs to the session that made it (another token of the same user is refused)', async () => {
+    await stepUp();
+    expect((await post('/register/begin').send({})).status).toBe(200);
+    h.caller.jti = 'sess-B';
+    const r = await post('/register/begin').send({});
+    expect(r.status).toBe(403);
+    expect(r.body.error.code).toBe('STEP_UP_REQUIRED');
+  });
+
+  it('a passkey sign-in opens the step-up window for the NEW session only', async () => {
+    const { credential } = await enrolOverHttp();
+    const begin = await post('/authenticate/begin').send({});
+    const fin = await post('/authenticate/finish').send({
+      response: assert(credential, begin.body.data, ADMIN),
+    });
+    expect(fin.status).toBe(200);
+    h.caller.jti = 'sess-new';
+    expect((await post('/register/begin').send({})).status).toBe(200);
+    h.caller.jti = 'sess-unrelated';
+    expect((await post('/register/begin').send({})).body.error.code).toBe('STEP_UP_REQUIRED');
   });
 });
