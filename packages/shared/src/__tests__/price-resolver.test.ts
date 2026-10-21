@@ -120,43 +120,150 @@ describe('RF4 quantity scope (Ruling B2B-4): product-level tiers use the product
   });
 });
 
-describe('Ruling B2B-3 resolution order: (variant,group) > (product,group) > (variant,all) > (product,all), then group percent, then base', () => {
+describe('Ruling B2B-3b precedence: specificity inside one audience, then the minimum across audiences, no stacking', () => {
   const buyer = group({ pricingMode: 'percent_off', discountBps: 1_000 });
-  const all = (over: Partial<ResolveInput>) =>
+  const line = (over: Partial<ResolveInput>) =>
     input({ qty: 10, variantId: V1, buyerGroup: buyer, ...over });
-  const lvl4 = tier(2, 9_000);
-  const lvl3 = tier(2, 8_500, { variantId: V1 });
-  const lvl2 = tier(2, 8_000, { groupId: G });
-  const lvl1 = tier(2, 7_000, { variantId: V1, groupId: G });
 
-  it('level 1 beats everything', () => {
-    const r = resolveUnitPrice(all({ tiers: [lvl4, lvl3, lvl2, lvl1] }));
-    expect(r).toMatchObject({ unitMinor: 7_000, source: 'tier', tierMinQty: 2, listMinor: 10_000 });
+  it('C2(a): a group tier DEARER than the public tier never makes the wholesaler pay more than a retail buyer (9000 vs 8000)', () => {
+    const tiers = [tier(10, 8_000), tier(10, 9_000, { groupId: G })];
+    const anon = resolveUnitPrice(input({ qty: 10, tiers }));
+    const wholesaler = resolveUnitPrice(input({ qty: 10, tiers, buyerGroup: group() }));
+    expect(anon.unitMinor).toBe(8_000);
+    expect(wholesaler).toMatchObject({ unitMinor: 8_000, source: 'tier', tierMinQty: 10 });
   });
-  it('level 2 beats 3 and 4 (a LESS specific but cheaper public tier still loses: not "lowest wins")', () => {
-    const cheapPublic = tier(2, 5_000);
-    expect(resolveUnitPrice(all({ tiers: [cheapPublic, lvl3, lvl2] })).unitMinor).toBe(8_000);
+
+  it('C2(a) mirror: when the group tier is cheaper the group buyer gets it and the anonymous buyer still pays the public tier', () => {
+    const tiers = [tier(10, 8_000), tier(10, 7_000, { groupId: G })];
+    expect(resolveUnitPrice(input({ qty: 10, tiers })).unitMinor).toBe(8_000);
+    expect(resolveUnitPrice(input({ qty: 10, tiers, buyerGroup: group() }))).toMatchObject({
+      unitMinor: 7_000,
+      source: 'tier',
+    });
   });
-  it('level 3 beats 4', () => {
-    expect(resolveUnitPrice(all({ tiers: [lvl4, lvl3] })).unitMinor).toBe(8_500);
+
+  it('C2(b): a STALE tier (>= the lowered base) is dropped, so the group % applies instead of being masked', () => {
+    // base was 10000 with a 9000 tier; the merchant lowered the product to 5000. The tier is now above base.
+    const g20 = group({ pricingMode: 'percent_off', discountBps: 2_000 });
+    const stale = [tier(10, 9_000), tier(10, 9_000, { groupId: G })];
+    expect(
+      resolveUnitPrice(input({ baseMinor: 5_000, qty: 10, tiers: stale, buyerGroup: g20 }))
+    ).toMatchObject({
+      unitMinor: 4_000,
+      source: 'group',
+      tierMinQty: null,
+    });
+    // ... and for an anonymous buyer the stale tier is simply ignored.
+    expect(resolveUnitPrice(input({ baseMinor: 5_000, qty: 10, tiers: stale }))).toMatchObject({
+      unitMinor: 5_000,
+      source: 'base',
+    });
   });
-  it('level 4 beats group percent (a matching tier wins over the percent)', () => {
-    expect(resolveUnitPrice(all({ tiers: [lvl4] })).unitMinor).toBe(9_000);
+
+  it('C2(c): a product-level tier does NOT apply to a variant with its own price (XL 12000 stays 12000, not 8000)', () => {
+    const tiers = [tier(10, 8_000)];
+    const xl = resolveUnitPrice(
+      input({ baseMinor: 12_000, productPriceMinor: 10_000, variantId: 'xl', qty: 10, tiers })
+    );
+    expect(xl).toMatchObject({ unitMinor: 12_000, source: 'base' });
+    // a variant priced below the product tier price likewise gets no (non-)break
+    const s = resolveUnitPrice(
+      input({ baseMinor: 7_000, productPriceMinor: 10_000, variantId: 's', qty: 10, tiers })
+    );
+    expect(s).toMatchObject({ unitMinor: 7_000, source: 'base' });
   });
+
+  it('C2(c): a variant WITHOUT its own price (base === product price) still gets the product-level tier; a variant tier fixes the XL case', () => {
+    const t = [tier(10, 8_000)];
+    expect(
+      resolveUnitPrice(
+        input({
+          baseMinor: 10_000,
+          productPriceMinor: 10_000,
+          variantId: 'plain',
+          qty: 10,
+          tiers: t,
+        })
+      ).unitMinor
+    ).toBe(8_000);
+    const xlTier = [tier(10, 11_000, { variantId: 'xl' })];
+    expect(
+      resolveUnitPrice(
+        input({
+          baseMinor: 12_000,
+          productPriceMinor: 10_000,
+          variantId: 'xl',
+          qty: 10,
+          tiers: xlTier,
+        })
+      ).unitMinor
+    ).toBe(11_000);
+  });
+
+  it('inside ONE audience a variant-level tier beats a product-level one even when dearer; across audiences the minimum still wins', () => {
+    const pubTiers = [tier(2, 7_000), tier(2, 9_000, { variantId: V1 })];
+    expect(resolveUnitPrice(input({ qty: 5, variantId: V1, tiers: pubTiers })).unitMinor).toBe(
+      9_000
+    );
+    const withGroup = [...pubTiers, tier(2, 6_000, { groupId: G })];
+    expect(
+      resolveUnitPrice(input({ qty: 5, variantId: V1, tiers: withGroup, buyerGroup: group() }))
+        .unitMinor
+    ).toBe(6_000);
+  });
+
+  it('inside an audience the LOWEST reached price wins (duplicates and non-monotone rows are safe, no throw)', () => {
+    const odd = [tier(10, 9_000), tier(50, 9_500), tier(10, 8_000)];
+    expect(resolveUnitPrice(input({ qty: 60, tiers: odd })).unitMinor).toBe(8_000);
+    expect(resolveUnitPrice(input({ qty: 60, tiers: [...odd].reverse() })).unitMinor).toBe(8_000);
+  });
+
+  it('a stale variant-level tier (>= base) is dropped BEFORE specificity, so it cannot mask a cheaper product-level tier', () => {
+    const tiers = [tier(2, 12_000, { variantId: V1 }), tier(2, 8_000)];
+    expect(resolveUnitPrice(input({ qty: 5, variantId: V1, tiers })).unitMinor).toBe(8_000);
+  });
+
+  it('equal prices at different minQty report the smaller minQty (the break the buyer qualified for first)', () => {
+    const tiers = [tier(50, 8_000), tier(10, 8_000)];
+    expect(resolveUnitPrice(input({ qty: 60, tiers })).tierMinQty).toBe(10);
+    expect(resolveUnitPrice(input({ qty: 60, tiers: [...tiers].reverse() })).tierMinQty).toBe(10);
+  });
+
+  it('no stacking: the group % is never applied on top of a tier; the lowest single number wins', () => {
+    // tier 9000, 10% off 10000 = 9000 (tie) -> group tier absent, % and pub tie: provenance goes to the group %.
+    const r = resolveUnitPrice(line({ tiers: [tier(2, 9_000)] }));
+    expect(r.unitMinor).toBe(9_000);
+    expect(r.source).toBe('group');
+    // a public tier of 8000 beats 10% (9000) and is NOT reduced further
+    expect(resolveUnitPrice(line({ tiers: [tier(2, 8_000)] }))).toMatchObject({
+      unitMinor: 8_000,
+      source: 'tier',
+    });
+  });
+
+  it('provenance tie-break is gTier -> gPct -> pub tier', () => {
+    const tiers = [tier(2, 9_000), tier(2, 9_000, { groupId: G })];
+    const b = group({ pricingMode: 'percent_off', discountBps: 1_000 }); // 9000 too
+    const r = resolveUnitPrice(input({ qty: 5, tiers, buyerGroup: b }));
+    expect(r).toMatchObject({ unitMinor: 9_000, source: 'tier', tierMinQty: 2 });
+    const noGroupTier = resolveUnitPrice(input({ qty: 5, tiers: [tier(2, 9_000)], buyerGroup: b }));
+    expect(noGroupTier.source).toBe('group');
+  });
+
   it('with no tier at all, group percent_off applies to base', () => {
-    expect(resolveUnitPrice(all({ tiers: [] }))).toMatchObject({
+    expect(resolveUnitPrice(line({ tiers: [] }))).toMatchObject({
       unitMinor: 9_000,
       source: 'group',
       tierMinQty: null,
       listMinor: 10_000,
     });
   });
-  it('a tier whose minQty is not reached falls through to the next level / percent', () => {
-    expect(resolveUnitPrice(all({ qty: 1, tiers: [lvl1] })).unitMinor).toBe(9_000);
-  });
-  it('within a level the qty is applied first: a deeper tier of a LOWER level never beats a reached higher level', () => {
-    const t = [tier(100, 1_000, { variantId: V1, groupId: G }), tier(2, 8_000, { groupId: G })];
-    expect(resolveUnitPrice(all({ qty: 10, tiers: t })).unitMinor).toBe(8_000);
+
+  it('a tier whose minQty is not reached falls through to the percent', () => {
+    expect(
+      resolveUnitPrice(line({ qty: 1, tiers: [tier(2, 7_000, { variantId: V1, groupId: G })] }))
+        .unitMinor
+    ).toBe(9_000);
   });
 });
 
@@ -256,19 +363,17 @@ describe('RF5 rounding: integer piastres, half-up, no float drift', () => {
   });
 });
 
-describe('clamp [0, base] (Ruling B2B-3)', () => {
-  it('a tier priced ABOVE base is clamped to base (base later lowered under an old tier)', () => {
-    const r = resolveUnitPrice(input({ baseMinor: 5_000, qty: 10, tiers: [tier(10, 9_000)] }));
-    expect(r.unitMinor).toBe(5_000);
-  });
-  it('a clamped tier carries no discount, so it is reported as base (no coupon exclusion for a non-discount)', () => {
-    const r = resolveUnitPrice(input({ baseMinor: 5_000, qty: 10, tiers: [tier(10, 9_000)] }));
-    expect(r).toMatchObject({
-      unitMinor: 5_000,
-      source: 'base',
-      tierMinQty: null,
-      listMinor: 5_000,
-    });
+describe('clamp [0, base]: never above retail, never below a merchant-authored price', () => {
+  it('a tier priced ABOVE or AT base is dropped (base lowered under an old tier) and reported as base', () => {
+    for (const price of [5_000, 9_000]) {
+      const r = resolveUnitPrice(input({ baseMinor: 5_000, qty: 10, tiers: [tier(10, price)] }));
+      expect(r).toMatchObject({
+        unitMinor: 5_000,
+        source: 'base',
+        tierMinQty: null,
+        listMinor: 5_000,
+      });
+    }
   });
   it('a tier of 0 is a legal free price', () => {
     expect(resolveUnitPrice(input({ qty: 10, tiers: [tier(10, 0)] })).unitMinor).toBe(0);
@@ -329,6 +434,8 @@ describe('totality and input validation', () => {
     ['NaN base', { baseMinor: Number.NaN }],
     ['Infinity base', { baseMinor: Number.POSITIVE_INFINITY }],
     ['base above Int4', { baseMinor: 2_147_483_648 }],
+    ['float productPriceMinor', { productPriceMinor: 10.5 }],
+    ['negative productPriceMinor', { productPriceMinor: -1 }],
     ['float qty', { qty: 1.5 }],
     ['negative qty', { qty: -1 }],
     ['float variantQty', { variantQty: 2.5 }],
@@ -364,7 +471,7 @@ describe('totality and input validation', () => {
   });
 });
 
-describe('RF4 property tests (seeded, 2,000 cases): 0 <= unit <= base, listMinor == base, idempotent, monotone within a level', () => {
+describe('property tests (seeded, 3,000 cases)', () => {
   // mulberry32: deterministic, no Math.random (a failing seed must reproduce).
   const rng = (seed: number) => () => {
     seed = (seed + 0x6d2b79f5) | 0;
@@ -374,58 +481,100 @@ describe('RF4 property tests (seeded, 2,000 cases): 0 <= unit <= base, listMinor
   };
   const int = (r: () => number, lo: number, hi: number) => lo + Math.floor(r() * (hi - lo + 1));
 
-  it('holds for random tiers, groups and quantities', () => {
+  const randomCase = (r: () => number) => {
+    const baseMinor = int(r, 0, 5_000_000);
+    const productPriceMinor = r() < 0.6 ? baseMinor : int(r, 0, 5_000_000);
+    const mode = r() < 0.5 ? 'percent_off' : 'none';
+    const buyerGroup =
+      r() < 0.7
+        ? group({ pricingMode: mode, discountBps: int(r, 0, 9_000), isActive: r() < 0.9 })
+        : null;
+    const n = int(r, 0, 7);
+    const tiers: PriceTierRow[] = Array.from({ length: n }, () =>
+      tier(int(r, 2, 120), int(r, 0, 6_000_000), {
+        variantId: r() < 0.4 ? V1 : r() < 0.2 ? V2 : null,
+        groupId: r() < 0.4 ? G : r() < 0.15 ? OTHER_G : null,
+      })
+    );
+    const qty = int(r, 0, 150);
+    return input({
+      baseMinor,
+      productPriceMinor,
+      qty,
+      variantQty: int(r, 0, qty),
+      variantId: r() < 0.6 ? V1 : null,
+      buyerGroup,
+      tiers,
+    });
+  };
+
+  it('0 <= unit <= base, integer, listMinor == base, idempotent, order-independent', () => {
     const r = rng(20261021);
-    for (let i = 0; i < 2_000; i++) {
-      const baseMinor = int(r, 0, 5_000_000);
-      const mode = r() < 0.5 ? 'percent_off' : 'none';
-      const buyerGroup =
-        r() < 0.7
-          ? group({ pricingMode: mode, discountBps: int(r, 0, 9_000), isActive: r() < 0.9 })
-          : null;
-      const n = int(r, 0, 6);
-      const tiers: PriceTierRow[] = Array.from({ length: n }, () =>
-        tier(int(r, 2, 120), int(r, 0, 6_000_000), {
-          variantId: r() < 0.4 ? V1 : r() < 0.2 ? V2 : null,
-          groupId: r() < 0.4 ? G : r() < 0.15 ? OTHER_G : null,
-        })
-      );
-      const qty = int(r, 0, 150);
-      const args = input({
-        baseMinor,
-        qty,
-        variantQty: int(r, 0, qty),
-        variantId: r() < 0.6 ? V1 : null,
-        buyerGroup,
-        tiers,
-      });
+    for (let i = 0; i < 3_000; i++) {
+      const args = randomCase(r);
       const out = resolveUnitPrice(args);
-      expect(Number.isInteger(out.unitMinor), `seed case ${i}`).toBe(true);
-      expect(out.unitMinor, `seed case ${i}`).toBeGreaterThanOrEqual(0);
-      expect(out.unitMinor, `seed case ${i}`).toBeLessThanOrEqual(baseMinor);
-      expect(out.listMinor).toBe(baseMinor);
-      expect(resolveUnitPrice(args)).toEqual(out); // idempotent / pure
+      expect(Number.isInteger(out.unitMinor), `case ${i}`).toBe(true);
+      expect(out.unitMinor, `case ${i}`).toBeGreaterThanOrEqual(0);
+      expect(out.unitMinor, `case ${i}`).toBeLessThanOrEqual(args.baseMinor);
+      expect(out.listMinor).toBe(args.baseMinor);
+      expect(resolveUnitPrice(args)).toEqual(out);
+      expect(resolveUnitPrice({ ...args, tiers: [...args.tiers].reverse() }), `case ${i}`).toEqual(
+        out
+      );
       if (out.source === 'base') expect(out.tierMinQty).toBeNull();
       if (out.source === 'tier') expect(out.tierMinQty).not.toBeNull();
+      if (out.unitMinor === args.baseMinor) expect(out.source).toBe('base');
     }
   });
 
-  it('is non-increasing in qty within one level when tier prices fall as minQty rises', () => {
+  it('a group buyer never pays more than the anonymous buyer at the same quantity', () => {
+    const r = rng(77);
+    for (let i = 0; i < 3_000; i++) {
+      const args = randomCase(r);
+      const anon = resolveUnitPrice({ ...args, buyerGroup: null });
+      const member = resolveUnitPrice(args);
+      expect(member.unitMinor, `case ${i}`).toBeLessThanOrEqual(anon.unitMinor);
+    }
+  });
+
+  it('the unit is always one of the merchant-authored numbers: base, a tier price, or the group percent price', () => {
+    const r = rng(99);
+    const pct = (b: number, bps: number) =>
+      Number((BigInt(b) * BigInt(10_000 - bps) + 5_000n) / 10_000n);
+    for (let i = 0; i < 3_000; i++) {
+      const args = randomCase(r);
+      const out = resolveUnitPrice(args);
+      const allowed = new Set<number>([args.baseMinor, ...args.tiers.map(t => t.priceMinor)]);
+      if (args.buyerGroup) allowed.add(pct(args.baseMinor, args.buyerGroup.discountBps));
+      expect(allowed.has(out.unitMinor), `case ${i}`).toBe(true);
+    }
+  });
+
+  it('non-increasing in qty when the tiers sit on ONE level (all product-level, or all variant-level), on arbitrary non-monotone prices', () => {
     const r = rng(7);
-    for (let i = 0; i < 300; i++) {
+    for (let i = 0; i < 400; i++) {
       const baseMinor = int(r, 1_000, 100_000);
-      // strictly increasing minQty, non-increasing price, all <= base
-      let minQty = 1;
-      let price = baseMinor;
-      const tiers: PriceTierRow[] = [];
-      for (let k = 0; k < int(r, 1, 5); k++) {
-        minQty += int(r, 1, 20);
-        price = Math.max(0, price - int(r, 0, 2_000));
-        tiers.push(tier(minQty, price));
-      }
+      const variantLevel = r() < 0.5;
+      const tiers: PriceTierRow[] = Array.from({ length: int(r, 1, 6) }, () =>
+        tier(int(r, 2, 60), int(r, 0, 120_000), {
+          variantId: variantLevel ? V1 : null,
+          groupId: r() < 0.4 ? G : null,
+        })
+      );
+      const buyerGroup =
+        r() < 0.5 ? group({ pricingMode: 'percent_off', discountBps: int(r, 0, 9_000) }) : null;
       let prev = Number.POSITIVE_INFINITY;
-      for (let q = 0; q <= minQty + 5; q++) {
-        const u = resolveUnitPrice(input({ baseMinor, qty: q, tiers })).unitMinor;
+      for (let q = 0; q <= 70; q++) {
+        const u = resolveUnitPrice(
+          input({
+            baseMinor,
+            qty: q,
+            variantQty: q,
+            variantId: variantLevel ? V1 : null,
+            tiers,
+            buyerGroup,
+          })
+        ).unitMinor;
         expect(u, `case ${i} qty ${q}`).toBeLessThanOrEqual(prev);
         prev = u;
       }

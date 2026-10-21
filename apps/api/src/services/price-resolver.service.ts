@@ -1,33 +1,34 @@
 /**
  * PriceResolver - the server-side loader around the pure `resolveUnitPrice` (@ebda/shared/pricing).
- * docs/plans/2026-10-21-b2b-wholesale.md, Task 2. SERVER ONLY: never import this from a client bundle, and never
- * accept a price, a group id or a "buyer" identifier from a request body, query or header.
+ * docs/plans/2026-10-21-b2b-wholesale.md, Task 2 + design review 2026-10-21. SERVER ONLY: never import this from a client
+ * bundle, and never accept a price, a group id or a buyer identifier from a request body, query or header.
  *
- * Ruling B2B-2 - the buyer is decided by the AUTHENTICATED user id and nothing else. `forBuyer(storeId, userId)` takes the
- * id from the verified session (`customerUserId(req)`); there is deliberately no overload that takes a phone or an email.
- * Guests, WhatsApp-bot sessions and payment-link payers pass `null` and get retail + PUBLIC tiers. Group membership is
- * then looked up from that user's OWN account, with every link in the chain pinned:
- *   user      : id = session id AND storeId = this store AND role customer AND status active AND not deleted
- *               AND emailVerified (an unverified address proves nothing: anyone can register "wholesaler@x.com")
- *   customer  : storeId = this store AND email = the user's own (verified) account email, case-insensitive. The user's
- *               phone is NOT used: there is no verified-phone flag, so a phone match would be a typed identity again.
- *   group     : the customer's group, which must belong to THIS store (a cross-store id resolves to retail) and is passed
- *               to the pure function with its isActive flag (inactive => retail, Review Focus 10).
+ * Ruling B2B-2c - a wholesale price is granted ONLY through `customers.user_id`, the link between the CRM row and the
+ * registered shopper, and never through an email or a phone match (those are steerable by typed input: a profile phone is
+ * self-editable and unverified, and `assignByIdentity` matches phone first). `forBuyer` takes a `BuyerIdentity` (a branded
+ * type minted only by lib/buyer-identity.ts), so there is no overload that takes a phone, an email or a bare string.
+ *   anonymous         retail + PUBLIC tiers
+ *   session           the verified customer session. The user must be THIS store's customer-role account, active, not
+ *                     deleted; then group = customers WHERE store_id AND user_id = session user. No link => retail.
+ *   merchant-selected a merchant staff session picked a Customer BY ID (Ruling B2B-2d): that row's group, same store.
+ * The group must belong to THIS store (the DB also enforces it with a composite FK) and is passed to the pure function with
+ * its isActive flag (inactive => retail).
  *
- * Plan gate (Review Focus 13): when the store's `b2b.wholesale` feature is off, tiers, group pricing and MOQ are all
- * ignored (resolved as retail). The check runs only when there is something to gate (a tier row, a buyer group or a
- * product MOQ), through `featureService.isFeatureEnabled`, whose cache is busted by every plan / override write
- * (staleness class NEVER-stale, invalidated on write; it is not a TTL-only cache). A failure of that read PROPAGATES: a
- * wholesale buyer silently charged retail (or a retail buyer silently charged wholesale) because a cache read hiccuped
- * is a wrong charge; a 5xx is the safe failure.
+ * Plan gate (Ruling B2B-1b - restrictions survive a downgrade, benefits do not): with `b2b.wholesale` off, tiers (public AND
+ * group) and group pricing are dropped; MOQ stays enforced whatever the plan (and so does wholesale-only visibility, Task 6).
+ * The entitlement is read through `featureService.isFeatureEnabled`, a cached read that is fine for DISPLAY (cart, PDP).
+ * Order, payment-link and admin-order creation must read it UNCACHED inside the order transaction (review I2, Task 3):
+ * `forBuyer(..., { uncachedEntitlement })` is the seam for that and is wired in Task 3. A failure of the read PROPAGATES: a
+ * buyer silently charged the wrong audience's price because a cache read hiccuped is a wrong charge; a 5xx is the safe failure.
  *
- * Quantities (Ruling B2B-4): tier lookup and MOQ use the PRODUCT total across the cart lines handed to `priceCart`;
- * variant-level tiers use the VARIANT total. Cart storage keeps quantity only; the price is derived here, per request.
+ * Quantities (Ruling B2B-4): tier lookup and MOQ use the PRODUCT total across the lines handed to `priceCart`; variant-level
+ * tiers use the VARIANT total. The caller passes only orderable, loose (non-bundle) lines (review I4).
  * Memoisation: per instance (= per request) only. Never cache a resolved price across requests.
  */
 import { prisma } from '@ebda/database';
 import { resolveUnitPrice, type BuyerGroup, type PriceTierRow, type Resolved } from '@ebda/shared';
 import { featureService } from './feature.service';
+import type { BuyerIdentity } from '../lib/buyer-identity';
 
 export interface PriceProduct {
   id: string;
@@ -62,19 +63,23 @@ export class PriceResolver {
 
   private constructor(
     private readonly storeId: string,
-    private readonly group: BuyerGroup | null
+    private readonly group: BuyerGroup | null,
+    private readonly readEntitlement?: (storeId: string) => Promise<boolean>
   ) {}
 
   /**
-   * @param buyerUserId the AUTHENTICATED shopper's user id (`customerUserId(req)`), or null for anyone else.
+   * @param buyer minted by lib/buyer-identity.ts only (anonymous, the customer session, or a merchant's Customer pick).
+   * @param opts.uncachedEntitlement read `b2b.wholesale` straight from the database instead of the cached feature map
+   *   (order / payment-link / admin-order creation, review I2). Defaults to the cached read for display paths.
    */
   static async forBuyer(
     storeId: string,
-    buyerUserId: string | null | undefined
+    buyer: BuyerIdentity,
+    opts: { uncachedEntitlement?: (storeId: string) => Promise<boolean> } = {}
   ): Promise<PriceResolver> {
     if (!storeId) throw new Error('PriceResolver.forBuyer: storeId is required');
-    const group = buyerUserId ? await loadBuyerGroup(storeId, buyerUserId) : null;
-    return new PriceResolver(storeId, group);
+    const group = await loadBuyerGroup(storeId, buyer);
+    return new PriceResolver(storeId, group, opts.uncachedEntitlement);
   }
 
   /** Price one line in isolation (qty = this line's quantity for both product and variant scope). */
@@ -104,9 +109,8 @@ export class PriceResolver {
 
     const tiersByProduct = await this.loadTiers([...productQty.keys()]);
     const anyTier = [...tiersByProduct.values()].some(t => t.length > 0);
-    const anyMoq = lines.some(l => l.product.moq != null);
-    const gated = anyTier || anyMoq || this.group !== null;
-    const on = gated ? await this.wholesaleEnabled() : false;
+    // Only tiers and group pricing are plan benefits; MOQ is a restriction and survives a downgrade (Ruling B2B-1b).
+    const on = anyTier || this.group !== null ? await this.wholesaleEnabled() : false;
 
     const result = new Map<string, Resolved>();
     for (const l of lines) {
@@ -114,12 +118,13 @@ export class PriceResolver {
         l.key,
         resolveUnitPrice({
           baseMinor: l.variant?.price ?? l.product.price,
+          productPriceMinor: l.product.price,
           qty: productQty.get(l.product.id)!,
           variantQty: l.variant ? variantQty.get(l.variant.id)! : undefined,
           variantId: l.variant?.id ?? null,
           buyerGroup: on ? this.group : null,
           tiers: on ? (tiersByProduct.get(l.product.id) ?? []) : [],
-          moq: on ? (l.product.moq ?? null) : null,
+          moq: l.product.moq ?? null,
         })
       );
     }
@@ -127,7 +132,9 @@ export class PriceResolver {
   }
 
   private async wholesaleEnabled(): Promise<boolean> {
-    this.featureOn ??= await featureService.isFeatureEnabled(this.storeId, 'b2b.wholesale');
+    this.featureOn ??= this.readEntitlement
+      ? await this.readEntitlement(this.storeId)
+      : await featureService.isFeatureEnabled(this.storeId, 'b2b.wholesale');
     return this.featureOn;
   }
 
@@ -152,32 +159,47 @@ export class PriceResolver {
   }
 }
 
-/** The authenticated user's own group, or null. See the file header for every pinned link. */
-async function loadBuyerGroup(storeId: string, userId: string): Promise<BuyerGroup | null> {
-  const user = await prisma.user.findFirst({
-    where: {
-      id: userId,
-      storeId,
-      role: 'customer',
-      status: 'active',
-      deletedAt: null,
-      emailVerified: true,
-    },
-    select: { email: true },
-  });
-  if (!user?.email) return null;
+const GROUP_SELECT = {
+  select: { id: true, storeId: true, pricingMode: true, discountBps: true, isActive: true },
+} as const;
 
-  const customer = await prisma.customer.findFirst({
-    where: { storeId, email: { equals: user.email, mode: 'insensitive' }, groupId: { not: null } },
-    select: {
-      group: {
-        select: { id: true, storeId: true, pricingMode: true, discountBps: true, isActive: true },
+/** The buyer's group, or null. See the file header for every pinned link. */
+async function loadBuyerGroup(storeId: string, buyer: BuyerIdentity): Promise<BuyerGroup | null> {
+  let customer: { group: GroupRow | null } | null = null;
+  if (buyer.kind === 'session') {
+    const user = await prisma.user.findFirst({
+      where: {
+        id: buyer.userId,
+        storeId,
+        role: 'customer',
+        status: 'active',
+        deletedAt: null,
       },
-    },
-    orderBy: { createdAt: 'asc' },
-  });
+      select: { id: true },
+    });
+    if (!user) return null;
+    customer = await prisma.customer.findFirst({
+      where: { storeId, userId: user.id, groupId: { not: null } },
+      select: { group: GROUP_SELECT },
+    });
+  } else if (buyer.kind === 'merchant-selected') {
+    customer = await prisma.customer.findFirst({
+      where: { id: buyer.customerId, storeId, groupId: { not: null } },
+      select: { group: GROUP_SELECT },
+    });
+  } else {
+    return null;
+  }
   const g = customer?.group;
   if (!g || g.storeId !== storeId) return null;
   if (g.pricingMode !== 'none' && g.pricingMode !== 'percent_off') return null;
   return { id: g.id, pricingMode: g.pricingMode, discountBps: g.discountBps, isActive: g.isActive };
 }
+
+type GroupRow = {
+  id: string;
+  storeId: string;
+  pricingMode: string;
+  discountBps: number;
+  isActive: boolean;
+};

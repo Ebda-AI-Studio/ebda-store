@@ -1,5 +1,6 @@
 /**
- * Review Focus 2 / Ruling B2B-2: a typed phone or email is never a price identity. Real Postgres as `ebda_app`, the
+ * Review Focus 2 / Rulings B2B-2 + B2B-2c (design review C1): a typed phone or email is never a price identity; the link is
+ * customers.user_id. Real Postgres as `ebda_app`, the
  * real PriceResolver and the real FeatureService (docs/plans/2026-10-21-b2b-wholesale.md, Task 2).
  *
  * The HTTP half of "guest checkout with a wholesaler's phone is charged retail" lands with the cart/order wiring in
@@ -20,6 +21,8 @@ import {
   type AppPrismaClient,
 } from '@ebda/database';
 import { PriceResolver } from '../../apps/api/src/services/price-resolver.service';
+import { CustomerGroupService } from '../../apps/api/src/services/customer-group.service';
+import { ANONYMOUS_BUYER, type BuyerIdentity } from '../../apps/api/src/lib/buyer-identity';
 
 const OWNER_URL = process.env.DIRECT_URL || process.env.DATABASE_URL || '';
 const APP_PASSWORD = process.env.EBDA_APP_PASSWORD || 'ci-only-app-pw';
@@ -40,10 +43,16 @@ const makeApp = (): AppPrismaClient => {
   }) as unknown as AppPrismaClient;
 };
 /** Resolve one line the way a request would: as ebda_app, inside the store's tenant context. */
+/** Mint a session identity for a test the same way the factory does (the brand is compile-time only). */
+const session = (userId: string): BuyerIdentity =>
+  ({ kind: 'session', userId }) as unknown as BuyerIdentity;
 function price(storeId: string, buyerUserId: string | null, qty = 1) {
   return runWithRequestDb(makeApp, () =>
     runInTenantContext(storeId, async () => {
-      const r = await PriceResolver.forBuyer(storeId, buyerUserId);
+      const r = await PriceResolver.forBuyer(
+        storeId,
+        buyerUserId ? session(buyerUserId) : ANONYMOUS_BUYER
+      );
       return r.priceLine({ id: ids.product!, price: 10_000 }, null, qty);
     })
   );
@@ -117,6 +126,7 @@ beforeAll(async () => {
       firstName: 'W',
       lastName: 'T',
       groupId: group.id,
+      userId: wholesaler.id,
     },
   });
   const product = await owner.product.create({
@@ -174,22 +184,79 @@ describe('Ruling B2B-2: only the authenticated, verified account holder gets the
     expect(await price(ids.store!, thief.id)).toMatchObject({ unitMinor: 10_000, source: 'base' });
   });
 
-  it("a case-variant of the wholesaler's email that was never VERIFIED is charged retail", async () => {
-    const variant = await owner.user.create({
+  it("C1: a user whose email equals a CRM row's email but who is NOT linked (customers.user_id) is charged retail", async () => {
+    const crmOnly = await owner.customer.create({
       data: {
-        email: WHOLESALE_EMAIL.toUpperCase(),
+        storeId: ids.store!,
+        email: `${RUN}-crm@test.com`,
+        firstName: 'C',
+        lastName: 'T',
+        groupId: ids.group!,
+      },
+    });
+    const lookalike = await owner.user.create({
+      data: {
+        email: crmOnly.email!.toUpperCase(),
         passwordHash: 'x',
-        firstName: 'V',
+        firstName: 'L',
         lastName: 'T',
         role: 'customer',
-        emailVerified: false,
+        emailVerified: true,
         storeId: ids.store!,
       },
     });
-    expect(await price(ids.store!, variant.id)).toMatchObject({
+    expect(await price(ids.store!, lookalike.id)).toMatchObject({
       unitMinor: 10_000,
       source: 'base',
     });
+  });
+
+  it('C1 attack: an attacker who SETS the wholesaler phone on their profile, and a merchant re-selecting the group by identity, still pays retail while the wholesaler keeps wholesale', async () => {
+    const attacker = await owner.user.create({
+      data: {
+        email: `${RUN}-attacker@test.com`,
+        passwordHash: 'x',
+        firstName: 'A',
+        lastName: 'T',
+        role: 'customer',
+        emailVerified: true,
+        storeId: ids.store!,
+        phone: '+201000009999',
+      },
+    });
+    // 1. attacker edits their self-service profile phone to the wholesaler's phone (unverified, allowed today)
+    await owner.user.update({ where: { id: attacker.id }, data: { phone: WHOLESALE_PHONE } });
+    expect(await price(ids.store!, attacker.id)).toMatchObject({
+      unitMinor: 10_000,
+      source: 'base',
+    });
+    // 2. the merchant opens the attacker's profile (it shows "Wholesale", matched by phone) and re-selects Wholesale.
+    //    The admin page posts { phone, email } of the attacker to assignByIdentity: the pre-existing phone-first match
+    //    hits the WHOLESALER's CRM row and overwrites its email with the attacker's.
+    await runWithRequestDb(makeApp, () =>
+      runInTenantContext(ids.store!, () =>
+        CustomerGroupService.assignByIdentity(
+          ids.store!,
+          { phone: WHOLESALE_PHONE, email: attacker.email },
+          ids.group!
+        )
+      )
+    );
+    const hijacked = await owner.customer.findFirst({
+      where: { storeId: ids.store!, userId: ids.wholesaler! },
+    });
+    expect(hijacked?.email).toBe(attacker.email); // the pre-existing defect is real: the CRM email was overwritten
+    // 3. ... but price identity is the user_id link, so nothing moved.
+    expect(await price(ids.store!, attacker.id)).toMatchObject({
+      unitMinor: 10_000,
+      source: 'base',
+    });
+    expect(await price(ids.store!, ids.wholesaler!)).toMatchObject({
+      unitMinor: 8_000,
+      source: 'group',
+    });
+    // restore the fixture for the remaining tests
+    await owner.customer.update({ where: { id: hijacked!.id }, data: { email: WHOLESALE_EMAIL } });
   });
 
   it('a suspended or soft-deleted wholesaler account is charged retail', async () => {
@@ -211,29 +278,65 @@ describe('Ruling B2B-2: only the authenticated, verified account holder gets the
     });
   });
 
-  it('a Customer row pointing at a group of ANOTHER store resolves to retail (cross-store group id)', async () => {
-    const x = await owner.user.create({
+  it('C3: a Customer row cannot point at a group of ANOTHER store (composite FK, 23503), so the loader never sees one', async () => {
+    await expect(
+      owner.customer.create({
+        data: {
+          storeId: ids.store!,
+          email: `${RUN}-x@test.com`,
+          firstName: 'X',
+          lastName: 'T',
+          groupId: ids.otherGroup!,
+        },
+      })
+    ).rejects.toThrow(/customers_store_group_fkey|foreign key/i);
+  });
+
+  it('erasing the linked user unlinks the CRM row (SET NULL on user_id only, store_id kept) and nothing prices as that user again', async () => {
+    const u = await owner.user.create({
       data: {
-        email: `${RUN}-x@test.com`,
+        email: `${RUN}-erase@test.com`,
         passwordHash: 'x',
-        firstName: 'X',
+        firstName: 'E',
         lastName: 'T',
         role: 'customer',
         emailVerified: true,
         storeId: ids.store!,
       },
     });
-    // The FK permits a cross-store group id; the loader must not.
-    await owner.customer.create({
+    const c = await owner.customer.create({
       data: {
         storeId: ids.store!,
-        email: x.email,
-        firstName: 'X',
+        email: u.email,
+        firstName: 'E',
         lastName: 'T',
-        groupId: ids.otherGroup!,
+        groupId: ids.group!,
+        userId: u.id,
       },
     });
-    expect(await price(ids.store!, x.id)).toMatchObject({ unitMinor: 10_000, source: 'base' });
+    expect(await price(ids.store!, u.id)).toMatchObject({ source: 'group' });
+    await owner.user.delete({ where: { id: u.id } });
+    const after = await owner.customer.findUnique({ where: { id: c.id } });
+    expect(after).toMatchObject({ userId: null, storeId: ids.store!, groupId: ids.group! });
+    expect(await price(ids.store!, u.id)).toMatchObject({ source: 'base' });
+  });
+
+  it("a merchant-selected Customer id prices as that row's group, with no user involved (Ruling B2B-2d)", async () => {
+    const crm = await owner.customer.findFirst({
+      where: { storeId: ids.store!, email: { startsWith: `${RUN}-crm` } },
+    });
+    const merchantPick = {
+      kind: 'merchant-selected',
+      customerId: crm!.id,
+      actorUserId: ids.merchant!,
+    } as unknown as BuyerIdentity;
+    const out = await runWithRequestDb(makeApp, () =>
+      runInTenantContext(ids.store!, async () => {
+        const r = await PriceResolver.forBuyer(ids.store!, merchantPick);
+        return r.priceLine({ id: ids.product!, price: 10_000 }, null, 1);
+      })
+    );
+    expect(out).toMatchObject({ unitMinor: 8_000, source: 'group' });
   });
 
   it('a non-customer role (the merchant) never gets a customer group price', async () => {
@@ -249,12 +352,12 @@ describe('Ruling B2B-2: only the authenticated, verified account holder gets the
     await owner.customerGroup.update({ where: { id: ids.group! }, data: { isActive: true } });
     expect(await price(ids.store!, ids.wholesaler!)).toMatchObject({ source: 'group' });
     await owner.customer.updateMany({
-      where: { storeId: ids.store!, email: WHOLESALE_EMAIL },
+      where: { storeId: ids.store!, userId: ids.wholesaler! },
       data: { groupId: null },
     });
     expect(await price(ids.store!, ids.wholesaler!)).toMatchObject({ source: 'base' });
     await owner.customer.updateMany({
-      where: { storeId: ids.store!, email: WHOLESALE_EMAIL },
+      where: { storeId: ids.store!, userId: ids.wholesaler! },
       data: { groupId: ids.group! },
     });
   });
