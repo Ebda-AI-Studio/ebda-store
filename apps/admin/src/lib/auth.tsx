@@ -24,6 +24,7 @@ import {
 import { isIosWebkit, safeInternalPath } from '@ebda/shared';
 import { useT } from '@/i18n/useT';
 import { FOCUS_MODE_STORAGE_KEY } from '@/lib/focus-mode-key';
+import { passkeyAssertion, type PasskeyMode } from './passkeys';
 
 interface User {
   id: string;
@@ -44,6 +45,8 @@ interface AuthContextType {
   isAuthenticated: boolean;
   login: (email: string, password: string) => Promise<void | MfaChallenge>;
   completeMfaLogin: (challengeToken: string, code: string) => Promise<void>;
+  /** Sign in with a passkey. A passkey satisfies MFA (Ruling PASSKEY-4): no code step follows. */
+  loginWithPasskey: (mode: PasskeyMode) => Promise<void>;
   logout: () => Promise<void>;
   refreshToken: () => Promise<boolean>;
 }
@@ -312,6 +315,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     router.push(postLoginDestination());
   }
 
+  async function loginWithPasskey(mode: PasskeyMode): Promise<void> {
+    const { data } = await passkeyAssertion(API_URL, mode);
+    const session = data as {
+      user: User;
+      accessToken?: string;
+      refreshToken: string;
+      csrfToken?: string;
+    };
+    const adminRolesPasskey = ['super_admin', 'store_admin', 'staff'];
+    if (!adminRolesPasskey.includes(session.user.role)) {
+      throw new Error(t('accessDenied'));
+    }
+    storeSession(session);
+    router.push(postLoginDestination());
+  }
+
   async function logout() {
     // iOS-gated like every other refresh-token read (#1945): elsewhere the
     // token rides the httpOnly cookie, which the server revokes when the body
@@ -351,6 +370,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         isAuthenticated: !!user,
         login,
         completeMfaLogin,
+        loginWithPasskey,
         logout,
         refreshToken,
       }}

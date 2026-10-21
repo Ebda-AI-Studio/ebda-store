@@ -837,6 +837,51 @@ export async function verificationTokenUser(storedToken: string): Promise<string
   return rows[0]?.id ?? null;
 }
 
+/** A stored passkey as the discoverable sign-in needs it BEFORE any user is known (public material only). */
+export interface PasskeyLookupRow {
+  id: string;
+  userId: string;
+  publicKey: string;
+  counter: number;
+  transports: string[];
+  rpId: string;
+}
+
+/**
+ * The passkey a presented credential id belongs to (migration 20261029000100, Ruling PASSKEY-1).
+ * Unguarded on purpose, like `refreshTokenUser`: sign-in knows only the credential id, and the caller
+ * still has to produce a valid signature over a server-issued challenge.
+ */
+export async function passkeyLookup(credentialId: string): Promise<PasskeyLookupRow | null> {
+  const rows = await prisma.$queryRaw<
+    Array<{
+      id: string;
+      user_id: string;
+      public_key: string;
+      counter: bigint;
+      transports: string[] | null;
+      rp_id: string;
+    }>
+  >`SELECT * FROM public.ebda_passkey_lookup(${credentialId})`;
+  const r = rows[0];
+  if (!r) return null;
+  return {
+    id: r.id,
+    userId: r.user_id,
+    publicKey: r.public_key,
+    counter: Number(r.counter),
+    transports: r.transports ?? [],
+    rpId: r.rp_id,
+  };
+}
+
+/** Delete every passkey of a user inside the CURRENT transaction (erasure). Guarded in SQL like `deleteUserTokens`. */
+export async function deleteUserPasskeys(userId: string): Promise<number> {
+  const rows = await prisma.$queryRaw<Array<{ n: number }>>`
+    SELECT public.ebda_passkeys_delete(${userId}) AS n`;
+  return Number(rows[0]?.n ?? 0);
+}
+
 /** Delete refresh tokens that expired before `now` or were revoked before `revokedBefore`. */
 export async function purgeRefreshTokens(now: Date, revokedBefore: Date): Promise<number> {
   return withSystemJob('token-retention', async () => {

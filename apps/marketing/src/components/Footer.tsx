@@ -3,7 +3,6 @@ import { BRAND } from '@ebda/shared/brand';
 import { COPY } from '../lib/content';
 import { CookieSettingsButton } from './CookieSettingsButton';
 import { COMPARE } from '../lib/compare';
-import { FEATURES_PAGE } from '../lib/capabilities';
 import {
   COMPARE_PAGES,
   SECURITY_EMAIL,
@@ -43,7 +42,7 @@ export function Footer({ locale }: { locale: Locale }) {
         <nav aria-label={c.legalNav}>
           <ul className="footer-links">
             <li>
-              <Link href={pagePath(locale, 'features')}>{FEATURES_PAGE[locale].title}</Link>
+              <Link href={pagePath(locale, 'features')}>{COPY[locale].nav.features}</Link>
             </li>
             {COMPARE_PAGES.map(page => (
               <li key={page}>

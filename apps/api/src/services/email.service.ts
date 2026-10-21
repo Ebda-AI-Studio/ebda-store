@@ -15,6 +15,7 @@ import { ResendService } from './resend.service';
 import { emailQueue } from './email-queue.service';
 import { welcomeTemplate } from './email-templates/welcome';
 import { passwordResetTemplate } from './email-templates/password-reset';
+import { passkeyNoticeTemplate, type PasskeyNoticeData } from './email-templates/passkey-notice';
 import { emailVerificationTemplate } from './email-templates/email-verification';
 import { resendVerificationTemplate } from './email-templates/resend-verification';
 import { duplicateRegistrationTemplate } from './email-templates/duplicate-registration';
@@ -823,6 +824,23 @@ export class EmailService {
     const subject = passwordResetTemplate.subject[lang](data, store.name);
     const content = passwordResetTemplate[lang](data, store.name);
     await this.sendForStore(storeId, { to: data.email, subject, content, language: lang });
+  }
+
+  /**
+   * Passkey security notice to a SHOPPER, sent from the store's own sender identity (Ruling PASSKEY-16).
+   * Never queued or skipped: it is an account-security message.
+   */
+  static async sendPasskeyNotice(
+    storeId: string,
+    data: PasskeyNoticeData,
+    language: 'en' | 'ar'
+  ): Promise<void> {
+    await this.sendForStore(storeId, {
+      to: data.email,
+      subject: passkeyNoticeTemplate.subject[language](data),
+      content: passkeyNoticeTemplate[language](data),
+      language,
+    });
   }
 
   /**

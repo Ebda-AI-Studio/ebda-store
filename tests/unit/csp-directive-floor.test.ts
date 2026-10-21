@@ -204,6 +204,23 @@ describe('CSP directive floor (what ZAP 10055 no longer watches)', () => {
     }
   );
 
+  // Review M7: passkeys need `publickey-credentials-get` (sign in) and `-create` (enrol) on the pages that
+  // host the ceremony. The default allowlist is `self`, which works, but a future blanket deny (a
+  // `*=()` hardening pass) would silently break passkey login on every store host and custom domain.
+  // Pin both so removing them is a decision, not an accident. Custom-domain storefronts are served by the
+  // same worker, so the one web config covers them.
+  it.each(['apps/web/next.config.js', 'apps/admin/next.config.js'])(
+    '%s pins publickey-credentials-get/create to self',
+    config => {
+      const src = stripJsComments(readFileSync(join(ROOT, config), 'utf8'));
+      const m = /key:\s*'Permissions-Policy',\s*value:\s*'([^']*)'/.exec(src);
+      expect(m, `${config}: no Permissions-Policy header`).toBeTruthy();
+      expect(m![1]).toContain('publickey-credentials-get=(self)');
+      expect(m![1]).toContain('publickey-credentials-create=(self)');
+      expect(m![1]).not.toMatch(/publickey-credentials-(get|create)=\(\)/);
+    }
+  );
+
   it('the 10063 suppression that makes the Permissions-Policy floor load-bearing is still in place', () => {
     const rules = readFileSync(join(ROOT, '.zap/rules.tsv'), 'utf8');
     const line = rules.split('\n').find(l => l.startsWith('10063\t'));

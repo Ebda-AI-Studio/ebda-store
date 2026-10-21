@@ -252,6 +252,10 @@ router.delete(
         throw new AppError(404, 'NOT_FOUND', 'Staff member not found in this store.');
       }
 
+      // Ruling PASSKEY-11: this ends the person's access to THIS store and nothing else. Sessions and
+      // passkeys are per user, not per store; access is the membership row, re-checked on every request,
+      // so deleting it is immediate. Signing them out (or touching their passkeys) here would let store A's
+      // owner kick the same person out of store B or out of a store they own.
       await withStore(storeId, tx =>
         tx.storeStaff.delete({
           where: { userId_storeId: { userId, storeId } },

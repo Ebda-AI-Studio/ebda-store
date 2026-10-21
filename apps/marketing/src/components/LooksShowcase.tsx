@@ -4,9 +4,10 @@ import { useCallback, useEffect, useRef, useState, type KeyboardEvent } from 're
 import type { LooksCopy } from '../lib/content';
 import { ensureLookFont, parseFragment, type Frag } from '../lib/looks-frag';
 import { mountPhones } from '../lib/phone-store-dom';
-import { SIGNUP_URL } from '../lib/site';
+import { demoLookUrl, SIGNUP_URL } from '../lib/site';
 
 const LETTERS = ['A', 'B', 'C'] as const;
+const LIVE_LOOKS = ['atelier', 'lookbook', 'vitrine'] as const;
 
 /**
  * Pick a template, see its three looks as working mini-stores in phones (Ruling MKT-8): the
@@ -45,8 +46,8 @@ export function LooksShowcase({
   }, []);
 
   useEffect(() => {
-    if (!frags[active] && failed !== active) load(active);
-  }, [active, frags, failed, load]);
+    if (active !== copy.live.template && !frags[active] && failed !== active) load(active);
+  }, [active, frags, failed, load, copy.live.template]);
 
   // Fonts: only once the section is near the screen (or a tab was chosen), once per template.
   useEffect(() => {
@@ -124,6 +125,8 @@ export function LooksShowcase({
     return mountPhones(track, { signupUrl: SIGNUP_URL });
   }, [active, activeFrag]);
 
+  const isLive = active === copy.live.template;
+  const shotLang = rtl ? 'ar' : 'en';
   const tpl = copy.templates.find(t => t.id === active) ?? copy.templates[0];
   const items = copy.items[active];
   const frag = frags[active];
@@ -175,8 +178,8 @@ export function LooksShowcase({
             </button>
           ))}
         </div>
-        {frag && <style dangerouslySetInnerHTML={{ __html: frag.css }} />}
-        {frag ? (
+        {frag && !isLive && <style dangerouslySetInnerHTML={{ __html: frag.css }} />}
+        {isLive || frag ? (
           <div
             className={`looks-trio${switched ? ' looks-trio-in' : ''}`}
             key={active}
@@ -185,11 +188,34 @@ export function LooksShowcase({
             {items.map((it, i) => (
               <figure className="looks-item" key={LETTERS[i]}>
                 <div className="look-phone">
-                  <span className="look-badge">{copy.badge}</span>
-                  <div
-                    className="look-screen"
-                    dangerouslySetInnerHTML={{ __html: frag.looks[i] ?? '' }}
-                  />
+                  {!isLive && <span className="look-badge">{copy.badge}</span>}
+                  {isLive ? (
+                    <a
+                      className="look-screen look-shot"
+                      href={demoLookUrl(LIVE_LOOKS[i])}
+                      aria-label={`${copy.live.link}: ${it.name}`}
+                    >
+                      <picture>
+                        <source
+                          type="image/avif"
+                          srcSet={`/looks/live/${active}-${LIVE_LOOKS[i]}-${shotLang}-780.avif`}
+                        />
+                        <img
+                          src={`/looks/live/${active}-${LIVE_LOOKS[i]}-${shotLang}-780.webp`}
+                          width={780}
+                          height={1688}
+                          alt={it.alt ?? it.name}
+                          loading="lazy"
+                          decoding="async"
+                        />
+                      </picture>
+                    </a>
+                  ) : (
+                    <div
+                      className="look-screen"
+                      dangerouslySetInnerHTML={{ __html: frag?.looks[i] ?? '' }}
+                    />
+                  )}
                 </div>
                 <figcaption>
                   <h3>
@@ -202,6 +228,11 @@ export function LooksShowcase({
                   <p className="look-idea">
                     <b>{copy.ideaLabel}:</b> {it.idea}
                   </p>
+                  {isLive && (
+                    <p className="look-live">
+                      <a href={demoLookUrl(LIVE_LOOKS[i])}>{copy.live.link}</a>
+                    </p>
+                  )}
                 </figcaption>
               </figure>
             ))}

@@ -4,30 +4,25 @@
  * Run: npm run llms-full -w @ebda/marketing
  */
 import { readFileSync, writeFileSync } from 'node:fs';
-import { AI_NATIVE } from '../src/lib/ai-native';
-import { CAPABILITIES, CAPABILITY_IDS, MORE, featuresFaq } from '../src/lib/capabilities';
+import { CAPABILITIES, MORE, THEMES, THEME_COPY, featuresFaq } from '../src/lib/capabilities';
 import { COMING_LABEL, REGISTRY } from '../src/lib/capability-registry';
 import { COMPARE, COMPARE_AS_OF, compareRows } from '../src/lib/compare';
 
 const SOON = COMING_LABEL.en.toLowerCase(); // "coming soon"
-const coming = (id: (typeof CAPABILITY_IDS)[number]) => REGISTRY[id].status === 'coming';
+const coming = (id: keyof typeof REGISTRY) => REGISTRY[id].status === 'coming';
 
 // ---- llms.txt: the generated block between the markers
 const brief: string[] = ['## Capabilities'];
-for (const id of CAPABILITY_IDS) {
-  const c = CAPABILITIES.en[id];
-  brief.push(
-    `- ${c.t}${c.plan ? ` (${c.plan})` : ''}${coming(id) ? ` — ${SOON}, not live yet` : ''}`
-  );
-}
-brief.push('');
-brief.push('## How AI helps a merchant');
-for (const b of AI_NATIVE.en.blocks) {
-  brief.push(`- ${b.t}:`);
-  for (const l of b.lines)
+for (const t of THEMES) {
+  brief.push(`### ${THEME_COPY.en[t.id].title}`);
+  for (const id of t.ids) {
+    const c = CAPABILITIES.en[id];
+    const plan = c.plan ?? c.note;
     brief.push(
-      `  - ${l.text}${l.needs && REGISTRY[l.needs].status === 'coming' ? ` (${SOON})` : ''}`
+      `- ${c.t}${plan ? ` (${plan})` : ''}${coming(id) ? ` — ${SOON}, not live yet` : ''}`
     );
+    if (c.soon) brief.push(`  - ${c.soon.text}${coming(c.soon.needs) ? ` (${SOON})` : ''}`);
+  }
 }
 brief.push('');
 brief.push('## Not there yet (stated plainly)');
@@ -58,25 +53,19 @@ L.push(
   'Pricing (EGP per month): Basic 1,490, Growth 3,490, Business 9,990; yearly billing saves 25%; 14-day free Growth trial; 0% commission on every plan. Sign up: https://store.ebda.app/signup'
 );
 L.push('');
-L.push(`## ${AI_NATIVE.en.title}`);
-L.push(AI_NATIVE.en.lead);
-L.push('');
-for (const b of AI_NATIVE.en.blocks) {
-  L.push(`### ${b.t}`);
-  for (const l of b.lines)
-    L.push(
-      `- ${l.text}${l.plan ? ` (${l.plan})` : ''}${l.needs && REGISTRY[l.needs].status === 'coming' ? ` (${SOON})` : ''}`
-    );
+for (const t of THEMES) {
+  L.push(`## ${THEME_COPY.en[t.id].title}`);
+  L.push(THEME_COPY.en[t.id].lead);
   L.push('');
-}
-L.push('## Capabilities');
-for (const id of CAPABILITY_IDS) {
-  const c = CAPABILITIES.en[id];
-  L.push(`### ${c.t}`);
-  if (coming(id)) L.push(`Status: ${SOON}, not live yet.`);
-  L.push(c.d + (c.plan ? ` Available on: ${c.plan}.` : ''));
-  L.push(`Arabic: ${CAPABILITIES.ar[id].t}`);
-  L.push('');
+  for (const id of t.ids) {
+    const c = CAPABILITIES.en[id];
+    L.push(`### ${c.t}`);
+    if (coming(id)) L.push(`Status: ${SOON}, not live yet.`);
+    L.push(c.d + (c.plan ? ` Available on: ${c.plan}.` : '') + (c.note ? ` ${c.note}` : ''));
+    if (c.soon) L.push(`${c.soon.text}${coming(c.soon.needs) ? ` (${SOON})` : ''}`);
+    L.push(`Arabic: ${CAPABILITIES.ar[id].t}`);
+    L.push('');
+  }
 }
 L.push(`## ${MORE.en.title}`);
 for (const i of MORE.en.items) L.push(`- ${i}`);

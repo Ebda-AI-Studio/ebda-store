@@ -6,6 +6,10 @@ export const LOCALES: readonly Locale[] = ['ar', 'en'] as const;
 export const SITE_URL = BRAND_MARKETING_URL;
 export const LOGIN_URL = `${BRAND_STORE_APP_URL}/login`;
 export const SIGNUP_URL = `${BRAND_STORE_APP_URL}/signup`;
+/** The live showroom (a real Ebda store, seeded with the Qamar looks). `?look=` previews a look. */
+export const DEMO_STORE_URL = `https://storedemo${BRAND.domains.storeSuffix}`;
+export const demoLookUrl = (look: 'atelier' | 'lookbook' | 'vitrine') =>
+  `${DEMO_STORE_URL}/?look=qamar.${look}`;
 export const SECURITY_EMAIL = `security@${BRAND.domains.marketing}`;
 
 /** Home path per locale. Arabic is the default and lives at the root. */
