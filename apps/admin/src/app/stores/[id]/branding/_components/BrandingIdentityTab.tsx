@@ -45,7 +45,12 @@ export function BrandingIdentityTab({ branding, onChange, storeId }: BrandingIde
       </div>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div>
-          <label className="block text-sm font-medium text-foreground mb-1">{t('storeName')}</label>
+          <label
+            data-setting-id="branding.store-name"
+            className="block text-sm font-medium text-foreground mb-1"
+          >
+            {t('storeName')}
+          </label>
           <input
             type="text"
             value={branding.name}

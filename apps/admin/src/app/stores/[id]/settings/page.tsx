@@ -568,11 +568,7 @@ export default function StoreSettingsPage() {
         </Link>
       }
     >
-      <SettingsSearch
-        searchItems={cards
-          .filter(card => !card.featureKey || isEnabled(card.featureKey))
-          .map(card => ({ key: card.key, href: card.href }))}
-      />
+      <SettingsSearch />
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {isLoading
           ? Array.from({ length: 9 }).map((_, i) => (

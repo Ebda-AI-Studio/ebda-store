@@ -330,7 +330,9 @@ export function LocationsTab({ storeId, branding, onChange }: LocationsTabProps)
       {/* Enable Locations toggle */}
       <div className="flex items-center justify-between rounded-xl border bg-card p-4">
         <div>
-          <p className="text-sm font-semibold text-foreground">{t('enableTitle')}</p>
+          <p data-setting-id="branding.locations" className="text-sm font-semibold text-foreground">
+            {t('enableTitle')}
+          </p>
           <p className="mt-0.5 text-xs text-muted-foreground">{t('enableDescription')}</p>
         </div>
         <button

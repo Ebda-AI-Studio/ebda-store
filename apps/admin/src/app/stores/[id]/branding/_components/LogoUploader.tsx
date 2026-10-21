@@ -40,7 +40,12 @@ export function LogoUploader({ branding, onChange, storeId }: LogoUploaderProps)
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
       <div>
-        <label className="block text-sm font-medium text-foreground mb-2">{t('logo')}</label>
+        <label
+          data-setting-id="branding.logo"
+          className="block text-sm font-medium text-foreground mb-2"
+        >
+          {t('logo')}
+        </label>
         <ImageUpload
           value={branding.logo}
           onUpload={url => onChange({ ...branding, logo: url })}
@@ -53,7 +58,12 @@ export function LogoUploader({ branding, onChange, storeId }: LogoUploaderProps)
         />
       </div>
       <div>
-        <label className="block text-sm font-medium text-foreground mb-2">{t('logoAr')}</label>
+        <label
+          data-setting-id="branding.logo-ar"
+          className="block text-sm font-medium text-foreground mb-2"
+        >
+          {t('logoAr')}
+        </label>
         <ImageUpload
           value={branding.logoAr}
           onUpload={url => onChange({ ...branding, logoAr: url })}

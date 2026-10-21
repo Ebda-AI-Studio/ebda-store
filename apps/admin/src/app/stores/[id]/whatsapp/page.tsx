@@ -90,6 +90,17 @@ export default function WhatsAppMasterPage() {
     'bot-analytics',
   ];
 
+  /** Admin-search anchors (lib/settings-registry.ts): one per tab, so a result can ring its tab. */
+  const TAB_SETTING_ID: Record<TabKey, string> = {
+    connection: 'whatsapp.tab.connection',
+    'bot-config': 'whatsapp.tab.bot-config',
+    templates: 'whatsapp.tab.templates',
+    'order-updates': 'whatsapp.tab.order-updates',
+    'payment-link': 'whatsapp.tab.payment-link',
+    'bot-copy': 'whatsapp.tab.bot-copy',
+    'bot-analytics': 'whatsapp.tab.bot-analytics',
+  };
+
   const switchTab = (key: TabKey) => {
     router.replace(`/stores/${storeId}/whatsapp?tab=${key}`);
   };
@@ -115,6 +126,7 @@ export default function WhatsAppMasterPage() {
             <button
               key={key}
               role="tab"
+              data-setting-id={TAB_SETTING_ID[key]}
               aria-selected={activeTab === key}
               onClick={() => switchTab(key)}
               className={`whitespace-nowrap px-4 py-2.5 max-sm:min-h-11 max-sm:inline-flex max-sm:items-center text-sm font-medium border-b-2 -mb-px transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded-t ${

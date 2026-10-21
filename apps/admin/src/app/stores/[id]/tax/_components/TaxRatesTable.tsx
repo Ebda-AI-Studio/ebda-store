@@ -148,7 +148,9 @@ export function TaxRatesTable({
       <div className="bg-card rounded-xl border border-border overflow-hidden">
         <div className="flex flex-wrap items-center justify-between gap-3 p-6 border-b border-border">
           <div>
-            <h2 className="text-lg font-semibold text-foreground">{t('title')}</h2>
+            <h2 data-setting-id="tax.rates" className="text-lg font-semibold text-foreground">
+              {t('title')}
+            </h2>
             <p className="text-sm text-muted-foreground">{t('subtitle')}</p>
           </div>
           <button

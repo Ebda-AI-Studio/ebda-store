@@ -101,7 +101,9 @@ export default function LanguagePage() {
       <div className="space-y-6">
         <div className="rounded-xl border bg-card p-6 shadow-sm space-y-4">
           <div>
-            <h2 className="font-semibold text-foreground">{t('defaultTitle')}</h2>
+            <h2 data-setting-id="language.default" className="font-semibold text-foreground">
+              {t('defaultTitle')}
+            </h2>
             <p className="mt-1 text-sm text-muted-foreground">{t('defaultHint')}</p>
           </div>
 

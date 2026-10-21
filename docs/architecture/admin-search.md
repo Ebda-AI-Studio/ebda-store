@@ -1,0 +1,72 @@
+# Admin search (⌘K palette, Settings search box)
+
+Search program P2 (Tasks 15 to 18, amendment E23). Plan: `docs/plans/2026-10-15-semantic-search.md`.
+
+## What a merchant can find
+
+| Kind | Where it is matched | Opens |
+|---|---|---|
+| Products | `GET /stores/:storeId/search` → `searchProductIds` (admin scope, name field) | `/stores/:id/products/:productId/edit` |
+| Orders | same route → `OrderService.listWhere` (number, digits of the number, customer name, phone, email) | `/stores/:id/orders/:orderId` |
+| Customers | same route → `matchingCustomers`; guests are keyed by lowercased email, else phone (the Customers-page key) | `/stores/:id/customers/:customerKey` |
+| Pages and individual settings | the settings registry, in the browser (no request) | the page, or the page at the control (`?setting=<id>`) |
+
+The palette (`apps/admin/src/components/CommandPalette.tsx`) shows pages and settings immediately and the
+three record groups after a 200 ms debounce (two characters minimum, a reply for an older query is dropped).
+Each record kind is gated by its page's permission (`products:read`, `orders:read`; customers follow the
+customer typeahead's `orders:read`); a kind the role may not read is an empty list.
+
+## Customer, order and phone search in SQL (Tasks 15 to 17)
+
+- `public.ebda_digits(text)` folds Arabic-Indic and Persian digits and drops every non-digit.
+  `phoneSearchDigits` (`packages/shared/src/search/phone-search.ts`) is its TypeScript side: `+20 101 234 5678`,
+  `0020…`, `01012345678`, `٠١٠…` all search the same digits.
+- Four expression trigram indexes (migration `20261027000100`): `users_phone_digits_trgm_idx`,
+  `users_name_norm_trgm_idx`, `orders_guest_phone_digits_trgm_idx`, `orders_guest_name_norm_trgm_idx`
+  (see `docs/DB-INDEX-MIGRATIONS.md`). Names are matched through `public.ebda_ar_norm` ("احمد" finds "أحمد").
+- `public.ebda_customer_search_ids` (migration `20261027000200`) is the store-scoped SECURITY DEFINER lookup that
+  uses them. Same contract as `ebda_order_search_ids`: the store comes only from `app.current_store_id`, ids
+  only, soft-deleted rows and users the `users` policy would hide are excluded. As `ebda_app` the RLS barrier
+  makes an inline `ILIKE` unable to use any trigram index, so every customer/order/typeahead search goes
+  through it. `apps/api/src/services/admin-search.service.ts` is the only caller.
+- Customers list, export and typeahead: `aggregateCustomersMatching` (list/export rows) and
+  `searchOrderCustomers` (typeahead). The KPI strip stays store-wide (cached aggregate); a search replaces
+  only the rows. A customer older than the 20,000-order scan window is found.
+- Orders: `orderSearchWhere` takes customers and guests from the same lookup; a term made only of digits
+  (`#١٢٣٤`) is also tried as the order number's digits.
+- `ebda_order_search_ids` kinds `'guest'` and `'customers'`, and the per-key indexes `orders_guest_first_name /
+  last_name / phone_trgm_idx` and `users_first_name / last_name / phone_trgm_idx`, are no longer called by the
+  app. They stay for one release (rollback safety); drop them in a later contract migration.
+
+## Pages and settings: the registry
+
+`apps/admin/src/lib/settings-registry.ts` is the single list. Each entry: `id`, `route`, `labelKey` (a path
+into the admin messages, so ar and en are written once), `access` (`staff` / `owner` / `super_admin`),
+optional `feature`, optional `syn` (everyday words per language) and, for a setting, an optional `query`
+(`tab=…`).
+
+- `settings-search-index.generated.json` is the registry resolved against ar.json and en.json. The browser
+  imports only that file. Regenerate with `npm run gen:settings-search -w apps/admin` after changing the
+  registry or a registered label; `tests/unit/settings-registry.test.ts` fails while it is stale.
+- `lib/settings-search.ts` ranks (own label, then page name, then synonyms; pages before their settings),
+  folds Arabic (`normalizeArabicSearch`, optional "ال"), and hides what the viewer may not see: role, and a
+  feature that is off or still loading.
+- A setting is deep-linked as `/stores/:id/<route>?<tab>&setting=<id>`. The page marks the control with
+  `data-setting-id="<id>"`; `SettingHighlight` (mounted once in `AdminLayout`) waits for it, opens collapsed
+  `<details>`, scrolls to it, rings it for 3 s and focuses it. A tabbed page selects its tab from `?tab=`
+  (Branding and WhatsApp do).
+
+### Adding an admin page or a setting
+
+1. New page: add a `page(...)` entry (or list it in `REDIRECT_ROUTES` if it only redirects). Pick `access` the
+   way the sidebar does (Finance and Settings hubs are owner-only) and the same `feature` the page gates on.
+2. New control on a settings page: add `data-setting-id="<area>.<name>"` to its label or heading, add a
+   `setting(...)` entry with Arabic and English everyday words, run `npm run gen:settings-search -w apps/admin`.
+3. `npm test -- tests/unit/settings-registry.test.ts` must pass. It fails when a static admin route is not
+   registered, an anchor is not registered (or the reverse), a label is missing in a language, the generated
+   index is stale, or a settings page gained a labelled control without the reviewed baseline
+   (`SETTINGS_LABEL_BASELINE`) being raised alongside a registry entry.
+
+Limits, stated plainly: the registry covers every static admin page and the controls listed in it; it is not an
+automatic index of every input. The label ratchet makes a new labelled control on a registered settings page
+a failing test, but only for the page directories in `SETTINGS_LABEL_BASELINE`.

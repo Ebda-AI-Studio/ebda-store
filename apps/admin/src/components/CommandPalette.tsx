@@ -28,6 +28,8 @@ import { apiGet } from '../lib/api';
 /** Debounce before a record lookup (products / orders / customers) is sent. */
 const RECORD_DEBOUNCE_MS = 200;
 const RECORD_MIN_CHARS = 2;
+/** Cap on page + setting rows so a one-letter query does not render the whole registry. */
+const MAX_PAGE_RESULTS = 40;
 
 /** One selectable row: a page (from `items`) or a record found by the server. */
 interface Row {
@@ -92,15 +94,36 @@ export function CommandPalette({ items }: { items: PaletteItem[] }) {
 
   const results = useMemo(() => {
     const q = normalize(query);
-    if (!q) return items;
+    // An empty palette is the short list of hubs and pages; single settings appear once you type.
+    if (!q) return items.filter(i => i.kind !== 'setting');
     const terms = q.split(/\s+/).filter(Boolean);
     // Every whitespace-separated term must appear somewhere in name + section +
     // keywords, so "stock supplier" narrows like a human expects AND a concept
     // word ("logo" / "شعار") finds the page that contains it (e.g. Branding).
-    return items.filter(i => {
-      const hay = normalize(`${i.group ?? ''} ${i.name} ${i.keywords ?? ''}`);
-      return terms.every(term => hay.includes(term));
+    // Best first: the name holds every term, then name + section, then keywords/synonyms only;
+    // pages before the single settings on them; the original order breaks ties.
+    const ranked: Array<{ item: PaletteItem; rank: number; idx: number }> = [];
+    items.forEach((item, idx) => {
+      const hay = normalize(`${item.group ?? ''} ${item.name} ${item.keywords ?? ''}`);
+      if (!terms.every(term => hay.includes(term))) return;
+      const name = normalize(item.name);
+      const named = normalize(`${item.group ?? ''} ${item.name}`);
+      const rank = terms.every(term => name.includes(term))
+        ? 0
+        : terms.every(term => named.includes(term))
+          ? 1
+          : 2;
+      ranked.push({ item, rank, idx });
     });
+    return ranked
+      .sort(
+        (a, b) =>
+          a.rank - b.rank ||
+          Number(a.item.kind === 'setting') - Number(b.item.kind === 'setting') ||
+          a.idx - b.idx
+      )
+      .slice(0, MAX_PAGE_RESULTS)
+      .map(r => r.item);
   }, [query, items]);
 
   useEffect(() => setActive(0), [query]);

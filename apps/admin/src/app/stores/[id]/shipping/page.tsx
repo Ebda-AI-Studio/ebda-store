@@ -67,7 +67,9 @@ export default function ShippingSettingsPage() {
         )}
 
         {/* ── Area rates editor (sole shipping CRUD) ────────────────────── */}
-        <AreaRateEditor storeId={storeId} />
+        <div data-setting-id="shipping.area-rates">
+          <AreaRateEditor storeId={storeId} />
+        </div>
 
         {/* Return policy sits with shipping: both are the delivery-and-returns
             promise a buyer (or their AI agent) evaluates before purchase. */}

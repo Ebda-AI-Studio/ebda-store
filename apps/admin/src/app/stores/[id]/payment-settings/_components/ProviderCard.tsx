@@ -198,7 +198,10 @@ function CodFields({
           />
         </div>
         <div className="sm:col-span-2">
-          <label className="block text-sm font-medium text-foreground mb-1">
+          <label
+            data-setting-id="payment.cod-fee"
+            className="block text-sm font-medium text-foreground mb-1"
+          >
             {t('fixedFeeLabel')}
           </label>
           <div className="flex items-center gap-3">
@@ -289,7 +292,10 @@ function InstapayFields({
     <>
       <div className="grid gap-4 sm:grid-cols-2">
         <div>
-          <label className="block text-sm font-medium text-foreground mb-1">
+          <label
+            data-setting-id="payment.instapay-handle"
+            className="block text-sm font-medium text-foreground mb-1"
+          >
             {t('handleLabel')}
           </label>
           <input
@@ -326,7 +332,10 @@ function InstapayFields({
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-foreground mb-1">
+          <label
+            data-setting-id="payment.instapay-expiry"
+            className="block text-sm font-medium text-foreground mb-1"
+          >
             {t('expiryLabel')}
           </label>
           <input
