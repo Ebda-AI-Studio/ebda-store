@@ -1607,6 +1607,22 @@ export const couponValidateLimiter = rateLimit({
   keyGenerator: req => ipKeyGenerator(req.ip ?? '') || 'noip',
 });
 
+// Coupon attempt limiter — closes the enumeration oracle on every OTHER public
+// endpoint that evaluates a caller-supplied coupon code (POST /orders/quote,
+// POST /orders). Those routes sit behind cartLimiter/writeLimiter, which are far
+// looser than the 20/min budget above, so testing codes there bypassed it.
+// It delegates to couponValidateLimiter itself (same store, same 'coupon-validate'
+// bucket, same per-IP key), so /coupons/validate, quote and order creation share
+// ONE budget. Requests with no coupon code are not counted and never touch the store.
+export const couponAttemptLimiter = (req: Request, res: Response, next: NextFunction): void => {
+  const code = (req.body as { couponCode?: unknown } | undefined)?.couponCode;
+  if (typeof code === 'string' && code.trim().length > 0) {
+    couponValidateLimiter(req, res, next);
+    return;
+  }
+  next();
+};
+
 // Promotion preview limiter — public storefront targeting-preview endpoint.
 // Same posture as couponValidateLimiter (20/min per IP): generous for a
 // legitimate checkout flow (recomputed on every cart mutation) while

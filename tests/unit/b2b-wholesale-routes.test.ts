@@ -48,6 +48,7 @@ vi.mock('@api/middleware/tenant-context', () => ({
 vi.mock('@api/middleware/security', () => ({
   writeLimiter: (_q: any, _r: any, n: any) => n(),
   cartLimiter: (_q: any, _r: any, n: any) => n(),
+  couponAttemptLimiter: (_q: any, _r: any, n: any) => n(),
 }));
 vi.mock('@api/middleware/feature-gate', () => ({
   requireFeature: (k: string) => (_q: any, _r: any, n: any) => {

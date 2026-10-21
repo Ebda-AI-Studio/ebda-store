@@ -1167,7 +1167,17 @@ export class OrderService {
     let appliedCoupon: Awaited<ReturnType<typeof CouponService.getByCode>> | null = null;
     let couponDiscount = 0;
     if (data.couponCode) {
-      appliedCoupon = await CouponService.getByCode(storeId, data.couponCode);
+      try {
+        appliedCoupon = await CouponService.getByCode(storeId, data.couponCode);
+      } catch (err) {
+        // Public path (quote + checkout): collapse not-found / inactive / not-started / expired / exhausted into
+        // ONE generic answer, exactly as POST /coupons/validate does, so these endpoints are not a
+        // coupon-existence oracle. Anything that is not an AppError (DB outage) still propagates.
+        if (err instanceof AppError) {
+          throw new AppError(400, 'INVALID_COUPON', 'Coupon code is not valid');
+        }
+        throw err;
+      }
       // Gate on the LOOSE subtotal, not the bundle-inclusive one. A coupon
       // discounts only loose lines (Ruling B1), so measuring its minimum
       // against a total that INCLUDES bundles let a bundle-only cart pass

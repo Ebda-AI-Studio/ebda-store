@@ -1769,6 +1769,15 @@ export default function CheckoutClient() {
           refreshWallet();
           setUseWalletBalance(false);
           break;
+        case 'INVALID_COUPON':
+          // Generic on purpose: the API no longer says whether a code is unknown, expired or used up.
+          await removeCoupon();
+          setStep(1);
+          friendly = t(
+            'The coupon you applied is no longer valid, so it has been removed. Please try again.',
+            'الكوبون ده مبقاش صالح، فشيلناه. جرّب تاني.'
+          );
+          break;
         case 'COUPON_LIMIT_REACHED':
           friendly = t(
             'The coupon you applied has reached its usage limit. Please remove it and try again.',

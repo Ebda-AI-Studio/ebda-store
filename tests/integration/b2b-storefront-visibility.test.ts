@@ -22,6 +22,7 @@ vi.mock('@api/middleware/auth', async importOriginal => ({
 vi.mock('@api/middleware/security', async importOriginal => ({
   ...(await importOriginal<typeof import('@api/middleware/security')>()),
   cartLimiter: (_q: any, _r: any, n: any) => n(),
+  couponAttemptLimiter: (_q: any, _r: any, n: any) => n(),
   writeLimiter: (_q: any, _r: any, n: any) => n(),
 }));
 

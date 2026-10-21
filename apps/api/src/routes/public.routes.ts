@@ -25,6 +25,7 @@ import {
   storeResolveLimiter,
   cartLimiter,
   writeLimiter,
+  couponAttemptLimiter,
   newsletterLimiter,
   viewIngestLimiter,
 } from '../middleware/security';
@@ -930,6 +931,7 @@ router.post(
   // impersonated customer, least of all at that account's wholesale price.
   rejectImpersonated,
   writeLimiter,
+  couponAttemptLimiter,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const sessionId = req.headers['x-session-id'] as string;
@@ -998,6 +1000,7 @@ router.post(
   '/orders/quote',
   optionalAuthenticate,
   cartLimiter,
+  couponAttemptLimiter,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const sessionId = req.headers['x-session-id'] as string;
