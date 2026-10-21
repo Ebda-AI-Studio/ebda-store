@@ -12,6 +12,8 @@ import {
   sectionFromPreset,
   PAGE_DEFINITION_SCHEMA_VERSION,
   documentForLook,
+  layoutToDefinition,
+  resolveLayoutSettings,
   validateDefinitionSync,
   type PageDefinition,
   type SectionNode,
@@ -435,4 +437,24 @@ describe('lookTag selects only its own look at render', () => {
     for (const look of [night, showroom, catalogue])
       expect(ids(look)).toContain(doc.sections.find(n => n.type === 'trust-strip')!.id);
   });
+});
+
+describe('Ruling B2-22: a fresh store that applies a Souq look is not painted in the branded base', () => {
+  // The real merchant path: a layout-built page (no stored document) on the souq skin, then applyLook.
+  for (const look of [catalogue, night, showroom]) {
+    it(`${look.id}: no primary band, no card-ink typography left over on any section`, () => {
+      const page = layoutToDefinition(resolveLayoutSettings({}, 'souq', null));
+      const doc = applyTemplateFamily(page, 'souq', look, {
+        from: null,
+        design: 'reset',
+        fromSkin: { skin: 'souq' },
+        toSkin: { skin: 'souq' },
+      });
+      const json = JSON.stringify(doc.sections.map(sec => sec.settings));
+      expect(json).not.toContain('"bgColor":"token:primary"');
+      // heading / caption colours of the branded base (white on its primary band)
+      expect(json).not.toMatch(/"color":"token:(card|secondary)"/);
+      expect(validateDefinitionSync(doc).ok).toBe(true);
+    });
+  }
 });

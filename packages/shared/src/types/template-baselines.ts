@@ -322,6 +322,16 @@ function buildQamarBaseline(): StoreLayoutSettings {
 function buildSouqBaseline(): StoreLayoutSettings {
   const b = buildTemplateBaseline(TEMPLATE_IDENTITIES.minimal);
   b.footer = {};
+  // Ruling B2-22: a Souq look owns its section bands (Night's inverse band, the others sit on the
+  // page). The branded base paints whole sections in `token:primary` with `token:card` headings,
+  // which a fresh store that applies Catalogue or Showroom would show as a cobalt category band
+  // with ink captions at 3.2:1. Like Dahab, the base's section colours and typography colours are
+  // dropped here; the looks and the pack carry the colour.
+  delete b.hero.bgColor;
+  for (const section of [b.categories, b.newArrivals, b.bestSellers, b.testimonials]) {
+    delete section.bgColor;
+    delete section.typography;
+  }
   return b;
 }
 
