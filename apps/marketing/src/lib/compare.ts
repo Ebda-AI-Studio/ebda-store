@@ -73,8 +73,8 @@ const ROWS: readonly RowDef[] = [
     group: 'strength',
     label: { ar: 'بحث بالمصري والفرانكو', en: 'Egyptian and Franco search' },
     ebda: {
-      ar: 'بحث بيفهم المصري والفرانكو والإنجليزي وأشكال الحروف، وكل منتج بياخد كلمات بحث بالذكاء الاصطناعي تقدر تعدّلها.',
-      en: 'Search understands Egyptian Arabic, Franco, English and letter variants, and every product gets AI search words you can edit.',
+      ar: 'بحث بيفهم المصري والفرانكو والإنجليزي وأشكال الحروف، وكل منتج بياخد كلمات بحث بالذكاء الاصطناعي تقدر تعدّلها، وتشوف عملاءك بحثوا عن إيه ومالقوش إيه.',
+      en: 'Search understands Egyptian Arabic, Franco, English and letter variants, and every product gets AI search words you can edit. You also see what shoppers searched for and did not find.',
     },
   },
   {
@@ -89,15 +89,6 @@ const ROWS: readonly RowDef[] = [
     soon: {
       ar: 'قريبًا: بنطرحه تدريجيًا، ومش بيتفعّل على متجرك غير لما نتأكد إن نتايجه ممتازة على منتجات حقيقية.',
       en: 'Coming soon: rolling out gradually, and only switched on for your store once its results pass our quality check on a real catalogue.',
-    },
-  },
-  {
-    id: 'insights',
-    group: 'strength',
-    label: { ar: 'إحصائيات البحث', en: 'Search insights' },
-    ebda: {
-      ar: 'شوف عملاءك بحثوا عن إيه، وإيه اللي مالقوش له نتيجة.',
-      en: 'See what shoppers searched for, and what they searched for and found nothing.',
     },
   },
   {
@@ -136,7 +127,7 @@ const ROWS: readonly RowDef[] = [
       en: 'Abandoned-cart recovery by notification or SMS, and loyalty points, from the Growth plan.',
     },
     plus: {
-      needs: 'cartemail',
+      needs: 'cart',
       text: {
         ar: ' وكمان بالإيميل لو العميل وافق وهو بيدفع، حتى كزائر.',
         en: ' Plus reminder emails when the shopper opted in at checkout, guests included.',
@@ -149,11 +140,11 @@ const ROWS: readonly RowDef[] = [
     needs: 'webhooks',
     label: { ar: 'ربط أدوات تانية (Webhooks)', en: 'Connecting other tools (webhooks)' },
     ebda: {
-      ar: 'المتجر بيبعت إشعار للأداة اللي تحددها لما يحصل حاجة زي طلب جديد، في باقتي النمو والأعمال.',
+      ar: 'المتجر بيبعت إشعار للأداة اللي تحددها لما يحصل حاجة زي طلب جديد، في باقتَي النمو والأعمال.',
       en: 'The store notifies the tool you choose when something happens, such as a new order, on Growth and Business.',
     },
     soon: {
-      ar: 'قريبًا في باقتي النمو والأعمال: المتجر هيبعت إشعار للأداة اللي تحددها لما يحصل حاجة زي طلب جديد.',
+      ar: 'قريبًا في باقتَي النمو والأعمال: المتجر هيبعت إشعار للأداة اللي تحددها لما يحصل حاجة زي طلب جديد.',
       en: 'Coming soon on Growth and Business: the store will notify the tool you choose when something happens, such as a new order.',
     },
   },
@@ -204,11 +195,11 @@ const ROWS: readonly RowDef[] = [
     needs: 'campaigns',
     label: { ar: 'حملات الإيميل التسويقية', en: 'Marketing email campaigns' },
     ebda: {
-      ar: 'اكتب رسالة بالعربي والإنجليزي وابعتها لمشتركين وافقوا، في باقتي النمو والأعمال. وإيميلات الطلبات شغالة في كل الباقات.',
+      ar: 'اكتب رسالة بالعربي والإنجليزي وابعتها لمشتركين وافقوا، في باقتَي النمو والأعمال. وإيميلات الطلبات شغالة في كل الباقات.',
       en: 'Write a message in Arabic and English and send it to subscribers who agreed, on Growth and Business. Order emails work on every plan.',
     },
     soon: {
-      ar: 'قريبًا في باقتي النمو والأعمال. إيميلات الطلبات شغالة دلوقتي في كل الباقات.',
+      ar: 'قريبًا في باقتَي النمو والأعمال. إيميلات الطلبات شغالة دلوقتي في كل الباقات.',
       en: 'Coming soon on Growth and Business. Order emails work today on every plan.',
     },
   },
@@ -295,10 +286,6 @@ const vendorCells = (nameEn: string, nameAr: string) =>
     meaning: same(
       `Check ${nameEn}'s site for how its search handles meaning.`,
       `راجع موقع ${nameAr} لمعرفة هل البحث بيفهم المعنى.`
-    ),
-    insights: same(
-      `Check ${nameEn}'s site for its search reports.`,
-      `راجع موقع ${nameAr} لتقارير البحث.`
     ),
     integrations: same(
       `Check ${nameEn}'s site for webhooks and integrations.`,
@@ -478,10 +465,6 @@ export const COMPARE: Record<CompareSlug, CompareDef> = (() => {
       meaning: same(
         "Check Shopify's site for how its search handles meaning.",
         'راجع موقع شوبيفاي لمعرفة هل البحث بيفهم المعنى.'
-      ),
-      insights: same(
-        'Search reports are available; compare the detail.',
-        'فيه تقارير بحث، قارن مستوى التفاصيل.'
       ),
       integrations: same(
         'Webhooks and a developer API are available, alongside the app store.',

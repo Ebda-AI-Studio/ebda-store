@@ -17,7 +17,7 @@ const PN = BRAND.product;
  * When any legal document last changed: the footer states this date only. No version: the five
  * documents version independently, so one number would be wrong for most pages (Ruling LEGAL-4).
  */
-const LEGAL_UPDATED = LEGAL_DOC_KEYS.map(
+export const LEGAL_UPDATED = LEGAL_DOC_KEYS.map(
   key => currentLegalVersion(LEGAL_POLICIES, key).publishedAt
 ).reduce((a, b) => (b > a ? b : a));
 
@@ -393,7 +393,7 @@ export const COPY: Record<Locale, Copy> = {
           },
           {
             name: 'لوك بوك',
-            who: 'للستايليست ومحلات الفاست فاشن اللي بتبيع إطلالات مش قطع لوحدها.',
+            who: 'للستايليست ومحلات الموضة السريعة اللي بتبيع إطلالات مش قطع لوحدها.',
             idea: 'اشتري الإطلالة كلها: كل لوك فيه قطعه وأسعاره، وبضغطة واحدة تضيفهم كلهم.',
           },
           {
@@ -461,7 +461,7 @@ export const COPY: Record<Locale, Copy> = {
           },
           {
             name: 'الورشة',
-            who: 'لاستوديو فضة هاند ميد صنعته هي سبب إنك تدفع أكتر.',
+            who: 'لاستوديو فضة شغل إيد صنعته هي سبب إنك تدفع أكتر.',
             idea: 'الصنعة هي المنتج: رسم وصب وتلميع فعلي، ومدة التنفيذ على كل قطعة.',
           },
           {
@@ -499,7 +499,7 @@ export const COPY: Record<Locale, Copy> = {
         },
         ai: {
           t: 'الذكاء الاصطناعي يكتب عنك',
-          d: 'يكتب وصف منتجاتك ويترجمه عربي وإنجليزي، وانت تراجعه وتنشره.',
+          d: 'يكتب وصف منتجاتك ويترجمه عربي وإنجليزي، وإنت تراجعه وتنشره.',
           formLabel: 'نموذج منتج بوصف مكتوب بالذكاء الاصطناعي',
           descLabel: 'الوصف',
           button: 'اكتب بالذكاء الاصطناعي',
@@ -579,7 +579,7 @@ export const COPY: Record<Locale, Copy> = {
         },
         {
           q: 'بياناتي بتاعة مين؟',
-          a: 'بتاعتك. منتجاتك وطلباتك وعملاءك ملكك إنت.',
+          a: 'بتاعتك. منتجاتك وطلباتك وعملاؤك ملكك إنت.',
         },
       ],
     },
@@ -589,7 +589,7 @@ export const COPY: Record<Locale, Copy> = {
       intro:
         'المتاجر اللي بتشوفها على الموقع أمثلة توضيحية. الموديلات ثلاثية الأبعاد اللي في صفحة المنتج مأخوذة من مصادر مفتوحة، وده نسبها كاملة.',
       modelsH: 'موديلات 3D',
-      modelsLead: 'كل موديل اتحسّن للويب بـ gltf-transform. التعديلات مكتوبة قدام كل واحد.',
+      modelsLead: 'كل موديل اتظبط عشان يشتغل خفيف على الموقع. التعديلات مكتوبة قدام كل واحد.',
       author: 'صاحب الموديل',
       source: 'المصدر',
       license: 'الرخصة',
@@ -978,7 +978,7 @@ export const COPY: Record<Locale, Copy> = {
         'The stores you see on this site are illustrations. The 3D models on the product page come from openly licensed sources; here is the full attribution.',
       modelsH: '3D models',
       modelsLead:
-        'Each model was optimised for the web with gltf-transform. The changes are listed beside each one.',
+        'Each model was optimised to load fast on the web. The changes are listed beside each one.',
       author: 'Author',
       source: 'Source',
       license: 'Licence',

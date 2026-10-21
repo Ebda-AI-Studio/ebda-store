@@ -380,7 +380,7 @@ html[lang='en'] .wm-name {
 }
 html[lang='ar'] .hero h1 {
   letter-spacing: 0;
-  line-height: 1.3;
+  line-height: 1.4;
 }
 .hero-sub {
   font-size: clamp(1.1rem, 2.4vw, 1.35rem);
@@ -443,8 +443,22 @@ html[lang='ar'] .section h2 {
   font-size: 1.2rem;
   color: var(--muted);
   max-width: 50ch;
-  margin-top: -24px;
+  line-height: 1.7;
+  margin-top: 0;
   margin-bottom: 40px;
+}
+/* A heading that is directly followed by a lead owns the gap between them (no negative
+   margin on the lead: that pulled the lead up into Arabic descenders). */
+:is(.section, .page-head, .page-sec, main) :is(h1, h2, h3):has(+ .lead) {
+  margin-bottom: clamp(14px, 2vw, 22px);
+}
+/* Arabic display headings need room for dots/tails below the baseline. */
+html[lang='ar'] :is(h1, h2, h3) {
+  line-height: 1.45;
+}
+html[lang='ar'] .lead,
+html[lang='ar'] .hero-sub {
+  line-height: 1.8;
 }
 
 /* ---------- devices: bezel, glass and reflections drawn in CSS ---------- */
@@ -2503,20 +2517,18 @@ html[dir='rtl'] .not-found .lead {
   display: table;
   margin: 0 0 10px;
 }
-.ai-lines {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: grid;
-  gap: 10px;
-  color: var(--muted);
-}
-.ai-lines li {
+.cap-card .cap-soon {
   padding-inline-start: 14px;
   border-inline-start: 2px solid var(--gold);
+  color: var(--muted);
 }
-.ai-lines .cap-badge {
+.cap-card .cap-soon .cap-badge {
+  display: inline-block;
+  margin: 0 0 0 0;
   margin-inline-end: 8px;
+}
+.page-sec > .lead {
+  margin-bottom: clamp(20px, 3vw, 32px);
 }
 .cmp td .cap-badge {
   display: inline-block;

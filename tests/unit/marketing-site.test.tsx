@@ -62,10 +62,11 @@ describe('marketing nav', () => {
       'Pricing',
       'FAQ',
     ]);
-    expect(labels.map(m => m[1])).toEqual(['#story', '#looks', '#features', '#pricing', '#faq']);
+    expect(labels.map(m => m[1])).toEqual(['#story', '#looks', '/en/features', '#pricing', '#faq']);
     // every nav target exists on the page, in the same order as the sections
     const at = (id: string) => en.indexOf(`<section id="${id}"`);
-    const pos = labels.map(m => at(m[1].slice(1)));
+    // "Features" is the real /features page, not a home section
+    const pos = labels.filter(m => m[1].startsWith('#')).map(m => at(m[1].slice(1)));
     expect(pos.every(p => p > 0)).toBe(true);
     expect([...pos].sort((a, b) => a - b)).toEqual(pos);
   });

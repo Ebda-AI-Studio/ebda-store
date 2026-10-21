@@ -3,7 +3,7 @@ import {
   CAPABILITIES,
   FEATURES_PAGE,
   HOME_CAPABILITIES,
-  type CapabilityId,
+  type CardId,
 } from '../lib/capabilities';
 import { COMING_LABEL, REGISTRY } from '../lib/capability-registry';
 import { pagePath, type Locale } from '../lib/site';
@@ -29,7 +29,7 @@ export function CapabilityGrid({
   headingLevel = 3,
 }: {
   locale: Locale;
-  ids: readonly CapabilityId[];
+  ids: readonly CardId[];
   headingLevel?: 2 | 3;
 }) {
   const label = FEATURES_PAGE[locale].planLabel;
@@ -44,6 +44,15 @@ export function CapabilityGrid({
             {coming && <span className="cap-badge">{COMING_LABEL[locale]}</span>}
             <H>{cap.t}</H>
             <p>{withHost(cap.d)}</p>
+            {cap.soon && (
+              <p className="cap-soon" data-status={REGISTRY[cap.soon.needs].status}>
+                {REGISTRY[cap.soon.needs].status === 'coming' && (
+                  <span className="cap-badge">{COMING_LABEL[locale]}</span>
+                )}
+                {cap.soon.text}
+              </p>
+            )}
+            {cap.note && <p className="cap-plan">{cap.note}</p>}
             {cap.plan && (
               <p className="cap-plan">
                 <span>{label}</span> {cap.plan}
