@@ -17,6 +17,8 @@ export interface AbandonedCartConfig {
   couponDiscountPercent: number;
   couponMaxDiscount: number | null;
   couponExpiryHours: number;
+  emailEnabled: boolean;
+  emailDelayMinutes: number;
 }
 
 export interface AbandonedCartRecord {
@@ -25,6 +27,9 @@ export interface AbandonedCartRecord {
   status: string;
   customerEmail: string | null;
   customerPhone: string | null;
+  /** Recovery email state: null = not claimed; queued | sent | skipped | failed. */
+  emailStatus: string | null;
+  emailDetail: string | null;
   cartTotal: number;
   cartItemCount: number;
   customer: {
@@ -53,6 +58,8 @@ export const DEFAULT_CONFIG: AbandonedCartConfig = {
   couponDiscountPercent: 10,
   couponMaxDiscount: null,
   couponExpiryHours: 48,
+  emailEnabled: false,
+  emailDelayMinutes: 120,
 };
 
 export const CART_STATUS_KEYS = [

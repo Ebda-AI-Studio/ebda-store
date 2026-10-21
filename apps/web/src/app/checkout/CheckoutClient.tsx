@@ -411,6 +411,12 @@ export default function CheckoutClient() {
   // when the store can actually send promotional SMS (store.smsMarketingOptIn).
   const [smsOptIn, setSmsOptIn] = useState(false);
   const showSmsOptIn = store?.smsMarketingOptIn === true;
+  // "Email me if I forget something in my cart": unticked by default, rendered only when the store
+  // can actually send the reminder (store.cartEmailOptIn). Ticking records consent for that address
+  // (reaches guests); unticking withdraws it. Ruling CART-CONSENT-1.
+  const [cartEmailOptIn, setCartEmailOptIn] = useState(false);
+  const showCartEmailOptIn = store?.cartEmailOptIn === true;
+  const cartEmailRecorded = useRef(false);
 
   // Payment
   const [selectedProvider, setSelectedProvider] = useState('');
@@ -1063,6 +1069,24 @@ export default function CheckoutClient() {
     }, 400);
     return () => clearTimeout(timeoutId);
   }, [store?.id, cart, formData.phone, formData.email]);
+
+  // Record / withdraw the cart-email consent. Debounced; waits for a valid address when ticking;
+  // only calls to withdraw if a tick was actually recorded.
+  useEffect(() => {
+    if (!showCartEmailOptIn) return;
+    const email = formData.email.trim();
+    if (cartEmailOptIn && !isValidEmail(email)) return;
+    if (!cartEmailOptIn && !cartEmailRecorded.current) return;
+    const timeoutId = setTimeout(() => {
+      api
+        .post('/public/cart/email-optin', { email, consent: cartEmailOptIn, language })
+        .then(res => {
+          if (res.success) cartEmailRecorded.current = cartEmailOptIn;
+        })
+        .catch(() => {});
+    }, 600);
+    return () => clearTimeout(timeoutId);
+  }, [showCartEmailOptIn, cartEmailOptIn, formData.email, language]);
 
   // Calculate totals
   const subtotal = cart?.subtotal || 0;
@@ -2087,6 +2111,30 @@ export default function CheckoutClient() {
                           <p role="alert" className="mt-1 text-sm text-destructive-ink">
                             {formErrors.email}
                           </p>
+                        )}
+                        {showCartEmailOptIn && (
+                          <label
+                            data-cart-email-optin
+                            className="mt-2 flex cursor-pointer items-start gap-2"
+                          >
+                            <input
+                              type="checkbox"
+                              checked={cartEmailOptIn}
+                              onChange={e => setCartEmailOptIn(e.target.checked)}
+                              className="mt-0.5 h-4 w-4 shrink-0 rounded border-border text-primary accent-primary focus:ring-2 focus:ring-primary/20"
+                            />
+                            <span className="flex flex-col gap-0.5">
+                              <span className="text-sm text-foreground">
+                                {t('Email me about my cart', 'ابعتلي إيميل لو نسيت حاجة في السلة')}
+                              </span>
+                              <span className="text-xs text-muted-foreground">
+                                {t(
+                                  'A reminder about your cart only. You can stop it anytime.',
+                                  'تذكير بالسلة بس، وتقدر توقفه في أي وقت.'
+                                )}
+                              </span>
+                            </span>
+                          </label>
                         )}
                       </div>
 

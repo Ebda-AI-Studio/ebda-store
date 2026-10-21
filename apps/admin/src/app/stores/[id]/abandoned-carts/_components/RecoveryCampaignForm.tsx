@@ -203,6 +203,34 @@ export function RecoveryCampaignForm({
             )}
           </div>
         </StepRow>
+
+        <div id="cart-email-settings" className="border border-border rounded-lg p-4">
+          <div className="flex items-center justify-between mb-1">
+            <h3 className="font-medium text-foreground">{t('email.title')}</h3>
+            <Toggle
+              checked={config.emailEnabled}
+              onChange={val => onPatch({ emailEnabled: val })}
+            />
+          </div>
+          <p className="text-sm text-muted-foreground mb-3">{t('email.description')}</p>
+          <div className="flex items-center gap-2">
+            <label htmlFor="cart-email-delay" className="text-sm text-muted-foreground">
+              {t('email.sendAfter')}
+            </label>
+            <input
+              id="cart-email-delay"
+              type="number"
+              min={60}
+              max={1440}
+              value={config.emailDelayMinutes}
+              onChange={e => onPatch({ emailDelayMinutes: Number(e.target.value) })}
+              disabled={!config.emailEnabled}
+              className="w-20 px-3 py-1.5 border border-border rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-primary disabled:opacity-50"
+            />
+            <span className="text-sm text-muted-foreground">{t('email.minutes')}</span>
+          </div>
+          <p className="text-xs text-muted-foreground mt-2">{t('email.hint')}</p>
+        </div>
       </div>
 
       <div className="mt-5 flex justify-end">

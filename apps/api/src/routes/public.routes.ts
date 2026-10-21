@@ -30,6 +30,11 @@ import logger from '../lib/logger';
 import { featureService } from '../services/feature.service';
 import { gateBackorderPayload } from '../lib/effective-inventory';
 import { notificationDispatcher } from '../services/notification-dispatcher.service';
+import {
+  recordCartEmailConsent,
+  restoreCartIntoSession,
+  cartEmailOptInAvailable,
+} from '../services/cart-email-optin.service';
 import { getCached } from '../lib/public-cache';
 import { storeLookupForHost } from '../lib/store-host';
 import { lookupStore, publicStorePage, type StoreStatusName } from '../lib/definer';
@@ -671,6 +676,76 @@ router.post('/cart/sync', cartLimiter, async (req: Request, res: Response, next:
     next(error);
   }
 });
+
+// POST /cart/email-optin - the checkout box "Email me about my cart" (ticked or unticked).
+// Stores the address on this session's cart with a consent time and upserts the store's
+// newsletter subscriber (source 'checkout', scope 'cart_reminders'). Never re-activates an
+// unsubscribed address (CART-CONSENT-1).
+const cartEmailOptInSchema = z.object({
+  email: z.string().trim().max(254),
+  consent: z.boolean(),
+  language: z.enum(['en', 'ar']).optional(),
+});
+router.post(
+  '/cart/email-optin',
+  cartLimiter,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const sessionId = req.headers['x-session-id'] as string;
+      if (!sessionId) {
+        res.status(400).json({
+          success: false,
+          error: { code: 'MISSING_SESSION', message: 'Session ID required' },
+        });
+        return;
+      }
+      const body = cartEmailOptInSchema.parse(req.body);
+      const storeId = await getStoreIdFromRequest(req);
+      const { status } = await recordCartEmailConsent(storeId, sessionId, body);
+      if (status === 'invalid_email') {
+        res
+          .status(400)
+          .json({ success: false, error: { code: 'INVALID_EMAIL', message: 'Invalid email' } });
+        return;
+      }
+      res.json({ success: true, data: { status } });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// POST /cart/restore - the recovery email's button: copy the emailed cart's lines into THIS
+// session's cart. The signed, expiring, store-scoped token is the only capability; the source
+// cart's session id is never returned.
+router.post(
+  '/cart/restore',
+  cartLimiter,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const sessionId = req.headers['x-session-id'] as string;
+      if (!sessionId) {
+        res.status(400).json({
+          success: false,
+          error: { code: 'MISSING_SESSION', message: 'Session ID required' },
+        });
+        return;
+      }
+      const { token } = z.object({ token: z.string().max(200) }).parse(req.body);
+      const storeId = await getStoreIdFromRequest(req);
+      const result = await restoreCartIntoSession(storeId, token, sessionId);
+      if (!result.restored) {
+        res
+          .status(result.reason === 'invalid' ? 400 : 404)
+          .json({ success: false, error: { code: 'CART_LINK_INVALID', message: 'Link expired' } });
+        return;
+      }
+      res.json({ success: true, data: { added: result.added } });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
 
 // PUT /cart/items/:itemId - Update cart item
 router.put(
@@ -1678,6 +1753,7 @@ router.get('/stores/:slugOrId', async (req: Request, res: Response, next: NextFu
         // SWR 600; a provider switched on/off shows up within that window.
         // It is display-only — the send gate re-checks everything live.
         smsMarketingOptIn: await notificationDispatcher.isSmsMarketingAvailable(store.id),
+        cartEmailOptIn: await cartEmailOptInAvailable(store.id),
       };
 
       const enabledFeatures = await featureService.getEnabledFeatureKeys(store.id);
@@ -1902,6 +1978,7 @@ router.get(
           ...(await fetchStoreFaqsAndHowtos(store.id)),
           // Keep in lock-step with /stores/:slugOrId (issue 206, same staleness).
           smsMarketingOptIn: await notificationDispatcher.isSmsMarketingAvailable(store.id),
+          cartEmailOptIn: await cartEmailOptInAvailable(store.id),
         };
 
         const locations = await fetchFooterLocations(store);
