@@ -141,6 +141,16 @@
     "synAr": "مبيعات مشتريات"
   },
   {
+    "id": "page:/orders/packing-slips",
+    "kind": "page",
+    "route": "/orders/packing-slips",
+    "access": "staff",
+    "en": "Print packing slip",
+    "ar": "اطبع قائمة التغليف",
+    "synEn": "packing slip print label shipping barcode scan",
+    "synAr": "بوليصة تغليف طباعة ملصق شحن باركود"
+  },
+  {
     "id": "page:/orders/new",
     "kind": "page",
     "route": "/orders/new",

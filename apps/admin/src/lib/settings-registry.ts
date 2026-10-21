@@ -145,6 +145,12 @@ export const PAGES: PageEntry[] = [
   page('/orders', `${HUB}.orders`, 'staff', {
     syn: { en: 'sales purchases', ar: 'مبيعات مشتريات' },
   }),
+  page('/orders/packing-slips', 'packingSlip.print', 'staff', {
+    syn: {
+      en: 'packing slip print label shipping barcode scan',
+      ar: 'بوليصة تغليف طباعة ملصق شحن باركود',
+    },
+  }),
   page('/orders/new', 'orders.new.title', 'staff', {
     syn: { en: 'create order phone order manual order', ar: 'طلب جديد طلب هاتفي يدوي' },
   }),
