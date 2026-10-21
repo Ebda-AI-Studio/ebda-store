@@ -1450,15 +1450,15 @@ html[dir='rtl'] [data-pack='souq'] .font-display {
 }
 /* B2-23: a deal's old price is struck by a line that draws itself once (Catalogue's playful
    detail). Static when motion is reduced. */
-[data-look='souq.catalogue'] .line-through {
+[data-look='souq.catalogue'] span.line-through {
   text-decoration: none;
   background: linear-gradient(currentColor, currentColor) no-repeat 0 55% / 100% 1.5px;
 }
-html[dir='rtl'] [data-look='souq.catalogue'] .line-through {
+html[dir='rtl'] [data-look='souq.catalogue'] span.line-through {
   background-position: 100% 55%;
 }
 @media (prefers-reduced-motion: no-preference) {
-  [data-look='souq.catalogue'] .line-through {
+  [data-look='souq.catalogue'] span.line-through {
     animation: souq-strike 0.7s 0.25s both ease-out;
   }
 }

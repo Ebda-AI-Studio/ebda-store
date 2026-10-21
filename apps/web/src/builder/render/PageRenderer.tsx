@@ -416,11 +416,8 @@ export function PageRenderer({
   // A divider only separates two rendered sections.
   const dividerOk = (visible: boolean) => visible || editorMode;
 
-  return (
+  const body = (
     <>
-      {!editorMode && !homeHasHero && !!getLook(store.look) && (
-        <h1 className="sr-only">{(isRtl ? store.nameAr || store.name : store.name) || ''}</h1>
-      )}
       {/* Section titles. Each section settings type extends
           SectionTitleOverride, so the merchant can change the heading
           via the admin Layout page. Empty / unset falls back to the
@@ -1293,5 +1290,15 @@ export function PageRenderer({
           merchant content. Stores that want a closing CTA can use the
           AnnouncementBar or surface it through their hero / categories. */}
     </>
+  );
+  // a11y P2-2: a look home with no hero opens with an h1, the store's name. The wrapper exists only
+  // then, so every other tree (legacy stores, pinned fixtures) keeps its exact shape and ids.
+  return !editorMode && !homeHasHero && getLook(store.look) ? (
+    <>
+      <h1 className="sr-only">{(isRtl ? store.nameAr || store.name : store.name) || ''}</h1>
+      {body}
+    </>
+  ) : (
+    body
   );
 }

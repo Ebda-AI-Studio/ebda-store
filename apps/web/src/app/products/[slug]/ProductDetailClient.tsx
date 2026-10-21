@@ -1192,7 +1192,8 @@ export default function ProductDetailClient({
               {/* Price */}
               <div className="mt-4 flex items-baseline gap-3">
                 <span
-                  className="font-bold text-primary"
+                  // one price never splits from its currency; only an English "A to B" range may wrap
+                  className={`font-bold text-primary${pricing.mode !== 'range' || language === 'ar' ? ' whitespace-nowrap' : ''}`}
                   data-zone="productPrice"
                   style={zoneStyle(pdpPriceZone, pdpScale)}
                 >

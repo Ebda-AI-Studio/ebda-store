@@ -196,7 +196,11 @@ test('PDP: variants, OOS combination, sale, instalment line, backorder, compare 
       [...document.querySelectorAll('body *')].filter(
         e =>
           [...e.childNodes].some(n => n.nodeType === 3 && /\d/.test(n.textContent ?? '')) &&
-          getComputedStyle(e).textDecorationLine.includes('line-through')
+          // the strike is a text-decoration, or (Catalogue's drawn strike, B2-23) a 1.5px line
+          // painted by the element's own background
+          (getComputedStyle(e).textDecorationLine.includes('line-through') ||
+            (e.classList.contains('line-through') &&
+              getComputedStyle(e).backgroundImage.includes('linear-gradient')))
       ).length
   );
   expect(crossed, 'crossed price').toBeGreaterThan(0);

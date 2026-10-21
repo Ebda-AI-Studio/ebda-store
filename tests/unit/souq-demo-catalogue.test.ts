@@ -198,6 +198,7 @@ describe('souq demo catalogue: images and the home document', () => {
     const types = doc.sections.map((s: { type: string }) => s.type);
     expect(types).toEqual([
       'hero',
+      'product-spotlight', // Night's own single featured stage (tagged), STOP-2
       'category-grid',
       'product-carousel',
       'product-carousel',
@@ -210,13 +211,23 @@ describe('souq demo catalogue: images and the home document', () => {
       'newsletter',
       'brand-story',
     ]);
-    // one hero, tagged Night; the curated row is Night's too, so Catalogue shows only deals
+    // one hero, Night's stage and the curated row are tagged Night; the Showroom's three stages are
+    // tagged Showroom, so Catalogue shows only deals and Night shows exactly one stage
     expect(
-      doc.sections.filter((s: { lookTag?: string }) => s.lookTag).map((s: { id: string }) => s.id)
-    ).toEqual(['hero-night', 'curated']);
-    // three DIFFERENT stage products
+      doc.sections
+        .filter((s: { lookTag?: string }) => s.lookTag)
+        .map((s: { id: string; lookTag: string }) => `${s.id}:${s.lookTag}`)
+    ).toEqual([
+      'hero-night:souq.night',
+      'night-pick:souq.night',
+      'curated:souq.night',
+      'stage-1:souq.showroom',
+      'stage-2:souq.showroom',
+      'stage-3:souq.showroom',
+    ]);
+    // the three Showroom stages are three DIFFERENT products
     const stageIds = doc.sections
-      .filter((s: { type: string }) => s.type === 'product-spotlight')
+      .filter((s: { id: string }) => /^stage-/.test(s.id))
       .map((s: { settings: { manualProductIds: string[] } }) => s.settings.manualProductIds[0]);
     expect(new Set(stageIds).size).toBe(3);
     // a missing product fails loudly rather than rendering a blank
