@@ -19,7 +19,8 @@ Manual retouches (PIL, offline; recorded here because the committed WebP is not 
 - `hero-night.webp`: the raw lantern hero measured 11.6 % orange (shop lights). `retouch.py` shifted every
   warm pixel to jade (hue 165), and `retouch-patches.py` blurred out four rectangles (two shop-sign
   lettering fragments, one stray red highlight, one more sign) in the 1024x1024 source before the 16:9 crop.
-  The two dark slabs on the pedestal are abstract devices. Probe after: 0.0 %.
+  STOP-1 replaced the earlier device-slab composition: the prompt now asks for an empty arcade (no objects,
+  devices, people or signs), so there are no dark slabs. Probe after: 0.0 %.
 - `washing-machine.webp`: the raw front view carried micro-lettering on the control panel in all four
   generations; the source was cropped (135,250 to 909,1024) to the door and drum, which has none.
 - `student-laptop.webp`: a closed lid (no keyboard): every open-laptop generation printed letters on the keys.

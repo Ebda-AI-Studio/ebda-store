@@ -100,6 +100,12 @@ describe('the mixes, exactly as designed', () => {
     expect(deals.preset).toMatchObject({ productSource: 'on_sale', titleAr: 'عروض' });
     // quality bar section 9 rule 1: the merchant-photo grid sits on the light band, never on green
     expect(night.sections![4].design).toMatchObject({ bgColor: 'token:inverse', columns: 4 });
+    // B2-19: the curated and the deals carousel sit on the light band as well (merchant photos
+    // shot on white never show as white squares on the green)
+    for (const i of [2, 3])
+      expect(night.sections![i].design, `carousel ${i}`).toMatchObject({
+        bgColor: 'token:inverse',
+      });
   });
 
   it('Showroom: chips under the header, up to three stages, tiles on the surface, 2-col grid', () => {
@@ -117,6 +123,8 @@ describe('the mixes, exactly as designed', () => {
     for (const s of showroom.sections!.slice(1, 4)) {
       expect(s.design).toEqual({ layout: 'stage' });
       expect(s.preset).toMatchObject({ limit: 1 });
+      // STOP-1: no "Gift ideas" kicker (the registry's first spotlight preset) on a stage
+      expect(s.preset).toMatchObject({ heading: '', headingAr: '' });
     }
     expect(showroom.sections![4].design).toMatchObject({
       tileShape: 'rectangle',
@@ -381,6 +389,24 @@ describe('merchant-edited surplus sections (B2-16)', () => {
     expect(sale).toHaveLength(1);
     expect(sale[0].settings.titleAr).toBe('عروض الجمعة');
     expect(sale[0].settings.limit).toBe(5);
+  });
+});
+
+describe('STOP-1 fixes on the composed documents', () => {
+  it('a fresh Showroom stage carries no heading text at all', () => {
+    const doc = applyTemplateFamily(merchantBase(), 'souq', showroom);
+    const stages = all(doc, 'product-spotlight');
+    expect(stages).toHaveLength(3);
+    for (const st of stages) {
+      expect(st.settings.heading).toBe('');
+      expect(st.settings.headingAr).toBe('');
+      expect(JSON.stringify(st.settings)).not.toMatch(/Gift ideas|أفكار للهدايا/);
+    }
+  });
+  it('both Night carousels compose on the light band and validate', () => {
+    const doc = applyTemplateFamily(merchantBase(), 'souq', night);
+    for (const c of all(doc, 'product-carousel')) expect(c.settings.bgColor).toBe('token:inverse');
+    expect(validateDefinitionSync(doc).ok).toBe(true);
   });
 });
 

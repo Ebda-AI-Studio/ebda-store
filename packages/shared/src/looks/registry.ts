@@ -296,12 +296,16 @@ export const LOOKS: readonly LookDefinition[] = [
           paddingBottom: 'tight',
         },
       },
+      // STOP-1 finding (Ruling B2-19): merchant photos shot on white sit on the light band here
+      // too, never as white squares on the green (quality bar section 9 rule 1).
       {
         type: 'product-carousel',
+        design: { bgColor: 'token:inverse', paddingTop: 'tight', paddingBottom: 'tight' },
         preset: { productSource: 'manual', limit: 8, title: 'From the souq', titleAr: 'من السوق' },
       },
       {
         type: 'product-carousel',
+        design: { bgColor: 'token:inverse', paddingTop: 'tight', paddingBottom: 'tight' },
         preset: { productSource: 'on_sale', limit: 8, title: 'Deals', titleAr: 'عروض' },
       },
       {
@@ -371,17 +375,18 @@ export const LOOKS: readonly LookDefinition[] = [
       {
         type: 'product-spotlight',
         design: { layout: 'stage' },
-        preset: { productSource: 'featured', limit: 1 },
+        // heading '' : the registry's first spotlight preset is "Gift ideas"; a stage has no kicker
+        preset: { productSource: 'featured', limit: 1, heading: '', headingAr: '' },
       },
       {
         type: 'product-spotlight',
         design: { layout: 'stage' },
-        preset: { productSource: 'manual', limit: 1 },
+        preset: { productSource: 'manual', limit: 1, heading: '', headingAr: '' },
       },
       {
         type: 'product-spotlight',
         design: { layout: 'stage' },
-        preset: { productSource: 'manual', limit: 1 },
+        preset: { productSource: 'manual', limit: 1, heading: '', headingAr: '' },
       },
       {
         type: 'collection-list',

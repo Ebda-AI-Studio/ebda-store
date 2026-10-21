@@ -117,6 +117,9 @@ export function buildSouqHome(base, ctx) {
   });
   const stages = STAGES.map((slug, i) =>
     node('product-spotlight', `stage-${i + 1}`, {
+      // no kicker: the registry's first spotlight preset is "Gift ideas" (STOP-1 finding)
+      heading: '',
+      headingAr: '',
       productSource: 'manual',
       manualProductIds: [idOf(slug)],
       limit: 1,

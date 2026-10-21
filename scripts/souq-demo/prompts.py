@@ -53,9 +53,9 @@ add('power-bank', prod("a slim slate-black power bank with a short USB cable coi
 # phone-case-set has NO photo on purpose (the no-image product)
 # ---- heroes (16:9)
 add('hero-night', ("a long stone arcade corridor of a souq at night with plain blank arched walls and no shops, lit only by "
-                   "glowing jade green and turquoise glass lanterns hanging in a row, deep teal darkness, one dark slate "
-                   "smartphone with a blank dark screen standing on a plain dark pedestal in the foreground, cinematic "
-                   "photograph, no signs, no signage, no windows with displays, no people, " + NEG + ", no red lights, "
+                   "glowing jade green and turquoise glass lanterns hanging in a row down the middle, deep teal darkness, "
+                   "the centre of the frame is an empty stone floor, nothing on it, no objects, no devices, no people, "
+                   "cinematic photograph, no signs, no signage, no windows with displays, " + NEG + ", no red lights, "
                    "no yellow lights, no orange lanterns"), 'wide')
 add('hero-showroom', ("one dark grey smartphone standing upright on a light grey showroom table, empty light grey "
                       "wall behind it, soft overhead daylight, minimal, wide empty space on the right, " + NEG), 'wide')

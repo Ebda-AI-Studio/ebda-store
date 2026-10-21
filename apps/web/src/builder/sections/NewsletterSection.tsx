@@ -148,7 +148,10 @@ export function NewsletterSection({
         )}
         <p className="mt-3 text-xs text-muted-foreground">
           {tr('By subscribing you agree to receive marketing emails from this store.')}{' '}
-          <a href={storeUrl('/privacy')} className="underline">
+          <a
+            href={storeUrl('/privacy')}
+            className="inline-flex min-h-11 items-center underline underline-offset-4"
+          >
             {tr('Privacy policy')}
           </a>
         </p>
