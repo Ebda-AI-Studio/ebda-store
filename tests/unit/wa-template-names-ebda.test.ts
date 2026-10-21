@@ -7,15 +7,38 @@ import { describe, it, expect, vi } from 'vitest';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
 
+const db = vi.hoisted(() => ({
+  rows: [] as Array<{ metaName: string; language: string; status: string }>,
+}));
+
 vi.mock('@ebda/database', () => ({
-  prisma: {},
+  prisma: {
+    whatsAppTemplate: {
+      // honours the where clause the way Postgres would
+      findMany: async ({
+        where,
+      }: {
+        where: { status: string; metaName: string; language: string };
+      }) =>
+        db.rows.filter(
+          r =>
+            r.status === where.status &&
+            r.metaName === where.metaName &&
+            r.language === where.language
+        ),
+    },
+  },
   runInTenantContext: async (_s: string, fn: () => unknown) => fn(),
 }));
 vi.mock('@api/lib/logger', () => ({ default: { warn: vi.fn(), info: vi.fn(), error: vi.fn() } }));
 
 import { TEMPLATES } from '@api/lib/wa-templates/definitions';
 import { buildTemplatesForStore } from '@api/lib/wa-templates/buildForStore';
-import { LEGACY_TEMPLATE_NAMES, pickSendTemplateName } from '@api/lib/wa-templates/legacy-names';
+import {
+  LEGACY_TEMPLATE_NAMES,
+  pickSendTemplateName,
+  resolveSendTemplateName,
+} from '@api/lib/wa-templates/legacy-names';
 
 const NEW_NAMES = [
   'ebda_order_paid_v1',
@@ -97,6 +120,32 @@ describe('old name → new name fallback at send time', () => {
     expect(pickSendTemplateName('ebda_order_paid_v1', new Set())).toBe('ebda_order_paid_v1');
     expect(pickSendTemplateName('wady_aljuz_order_paid_v1', new Set(['x']))).toBe(
       'wady_aljuz_order_paid_v1'
+    );
+  });
+});
+
+describe('the fallback checks approval per language', () => {
+  it('en approved under ebda_*, ar not: an ar send keeps the old name', async () => {
+    db.rows = [{ metaName: 'ebda_order_paid_v1', language: 'en', status: 'approved' }];
+    expect(await resolveSendTemplateName('s1', 'force_order_paid_v1', 'ar')).toBe(
+      'force_order_paid_v1'
+    );
+    expect(await resolveSendTemplateName('s1', 'force_order_paid_v1', 'en')).toBe(
+      'ebda_order_paid_v1'
+    );
+  });
+
+  it('both languages approved: both switch; a draft row never counts', async () => {
+    db.rows = [
+      { metaName: 'ebda_order_paid_v1', language: 'en', status: 'approved' },
+      { metaName: 'ebda_order_paid_v1', language: 'ar', status: 'approved' },
+    ];
+    expect(await resolveSendTemplateName('s1', 'force_order_paid_v1', 'ar')).toBe(
+      'ebda_order_paid_v1'
+    );
+    db.rows = [{ metaName: 'ebda_order_paid_v1', language: 'ar', status: 'draft' }];
+    expect(await resolveSendTemplateName('s1', 'force_order_paid_v1', 'ar')).toBe(
+      'force_order_paid_v1'
     );
   });
 });

@@ -230,7 +230,7 @@ export async function handleOrderWhatsAppNotify(
 
   // force_* → ebda_*: an un-re-submitted store keeps sending under its approved old name.
   const sendName = await step.run('resolve-template-name', () =>
-    resolveSendTemplateName(storeId, templateConfig.name)
+    resolveSendTemplateName(storeId, templateConfig.name, templateConfig.languageCode || 'en')
   );
 
   const result = await step.run('send-whatsapp', async () => {

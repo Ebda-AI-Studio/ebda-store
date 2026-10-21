@@ -619,8 +619,8 @@ class AbandonedCartService {
       return;
     }
 
-    const templateName = await resolveSendTemplateName(store.id, template.name!);
     const languageCode = template.languageCode || (cart.language === 'ar' ? 'ar' : 'en');
+    const templateName = await resolveSendTemplateName(store.id, template.name!, languageCode);
     const idempotencyKey = `wa-cart-${cart.waCartId}-step${stepToFire}`;
 
     // Build variables for ebda_cart_abandoned_v1:

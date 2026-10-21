@@ -31,14 +31,16 @@ export function pickSendTemplateName(configured: string, approvedNames: Readonly
 /** Store lookup around `pickSendTemplateName`; reads only for a legacy name, never throws. */
 export async function resolveSendTemplateName(
   storeId: string,
-  configured: string
+  configured: string,
+  /** The send's language ('en' | 'ar'): approval is per (store, sourceKey, language). */
+  language: string
 ): Promise<string> {
   const next = LEGACY_TEMPLATE_NAMES[configured];
   if (!next) return configured;
   try {
     const rows = await runInTenantContext(storeId, () =>
       prisma.whatsAppTemplate.findMany({
-        where: { storeId, status: 'approved', metaName: next },
+        where: { storeId, status: 'approved', metaName: next, language },
         select: { metaName: true },
       })
     );
