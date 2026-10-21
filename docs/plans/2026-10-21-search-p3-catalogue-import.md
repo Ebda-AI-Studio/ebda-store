@@ -512,12 +512,12 @@ Behaviour (each bullet is a test):
 
 | ID | When | What Ahmad does | Unblock evidence |
 | --- | --- | --- | --- |
-| STOP-P3-1 | Before Task 6 merges | Approve the PDF dependency choice (or the fallback) after the workerd smoke and audit output are in the PR | PR comment "dependency approved", `npm audit` 0/0/0/0 pasted |
-| STOP-P3-2 | Before the first production run (PR C deployed, `CATALOG_IMPORT_ENABLED` still false) | Approve the caps (Decision D1/D2) and the Gemini request-cap headroom; set `CATALOG_IMPORT_ENABLED=true` for **one test store** via a `catalog_import` StoreFeature override | A written go; `wrangler secret`/var change visible; the test store id |
-| STOP-P3-3 | Before flipping the marketing item to live | Provide **10 or more real, consented Egyptian catalogue pages** (menu, price list, shelf, handwritten), hand-written truth for them, and run `npm run catalogue:eval -- --real-dir <path>`; the Task 13 targets must hold on them | The run output in the PR with every metric VERIFIED; files stay local, never committed |
-| STOP-P3-4 | Production live check | One real page uploaded on the test store in production (the merchant's own data: drafts only, never published without Ahmad's click) | Screenshots in Arabic; `/health` commit equals the merge commit; Inngest run id; the job's page rows |
+| STOP-P3-1 | RESOLVED (Ruling P3-9) | `@cantoo/pdf-lib` 2.11.1 approved, pinned exactly | `npm audit` 0/0/0/0 and the workerd smoke still go in the Task 6 PR |
+| STOP-P3-2 | RESOLVED (Ruling P3-10) | Pre-authorised: production runs on the **storedemo** store only (never `qa-walk-store-1010`, never a real store), via a `catalog_import` StoreFeature override | The override row and the store id in the PR |
+| STOP-P3-3 | Before flipping the marketing item to live (the ONLY item still waiting on Ahmad) | Provide **10 or more real, consented Egyptian catalogue pages** (menu, price list, shelf, handwritten), hand-written truth for them, and run `npm run catalogue:eval -- --real-dir <path>`; the Task 13 targets must hold on them | The run output in the PR with every metric VERIFIED; files stay local, never committed |
+| STOP-P3-4 | Production live check | One page uploaded on the **storedemo** store in production (drafts only, never published automatically) | Screenshots in Arabic; `/health` commit equals the merge commit; Inngest run id; the job's page rows |
 
-## Decisions Ahmad needs to make
+## Decisions (SETTLED by the controller rulings below; kept for the record)
 
 | ID | Decision | Recommendation |
 | --- | --- | --- |
@@ -547,3 +547,17 @@ Behaviour (each bullet is a test):
 - **Placeholder scan:** three spots tell the implementer to read the real identifier before writing code, each naming the file: Task 7's `ebda_product_embed_doc` signature, Task 10's `stampManualProvenance`, Task 11's bulk-status vs update path. Task 5 reads the SDK's thinking-budget option with `srcof`. No step leaves behaviour undefined.
 - **Type consistency:** `StagedItem` (Task 8) is what Task 7 reads and Task 6 writes; the flag names are the list in the Extraction contract and are used verbatim in Tasks 8, 9, 11, 12; `catalogImportPagesPerMonth` (Task 1) is the only plan key; `quota_counted` (Task 2) is what the ledger (Task 1) counts.
 - **Not verified in this session (stated, not claimed):** the Gemini alias's current pricing, token counts per image and thinking behaviour (all [g], replaced by Task 14); workerd memory with a 15 MB PDF (Task 14 Step 4); that a single-page PDF opens inline with the sandbox header off (Task 12 live drive); the vendor's current entry in the privacy sub-processor list (Task 15).
+
+## Controller rulings (2026-10-21; binding, override anything above that conflicts)
+
+- **Ruling P3-1 (D1, plan access and caps)** - Approved as the default: Basic 100, Growth 400, Business 1,500 pages per month; per job 30 (Business 40); per store per day 60 (Business 120). They are config (`plans.limits` and env), not code, so Ahmad can change them later. Evidence: Cost model table, worst-month all-in under 6% of plan price. Cost if wrong: a cap too low blocks a big first import, too high costs a few USD per month; either is a config edit.
+- **Ruling P3-2 (D2, request caps)** - `AI_STORE_DAILY_REQUEST_CAP` is NOT raised. The autofill tail (search words, SEO meta) continues the next day through the existing gap sweep, and the review/drafts panel shows that progress ("N of M enriched"). Evidence: Ahmad is cost-sensitive; Task 14 measures calls per product. Cost if wrong: slower enrichment on big imports.
+- **Ruling P3-3 (D3)** - Sources live in the private bucket behind a tenant-checked endpoint. Cost if wrong: slightly more API traffic on the review page.
+- **Ruling P3-4 (D4)** - No PDF rasterising in v1; PDF rows show the redacted snippet and "Open page N". Cost if wrong: PDF reviewers see less than image reviewers.
+- **Ruling P3-5 (D5)** - No crop-to-product-photo in v1; publish warns `NO_IMAGE`. Cost if wrong: merchants add photos by hand.
+- **Ruling P3-6 (D6)** - A duplicate never updates an existing product's price. Cost if wrong: price refresh from a list needs a later feature.
+- **Ruling P3-7 (D7)** - No Free-plan access. Cost if wrong: none for paid plans; Free sees an upgrade state.
+- **Ruling P3-8 (D8)** - OCR comparison comes later, after the Mac Studio, through the adapter seam only. Cost if wrong: none now.
+- **Ruling P3-9 (PDF library)** - `@cantoo/pdf-lib` 2.11.1 approved (MIT, modified 2026-09-15, registry-real), pinned to the exact version (no caret) and `npm audit` kept at 0/0/0/0. Replaces the open choice in Task 6 Step 1 and Ruling SEARCH-P3-1; the fallback path stays only if the workerd smoke fails. Cost if wrong: a Worker memory or bundle regression, caught by Task 14.
+- **Ruling P3-10 (first production run)** - Pre-launch, so production runs on the storedemo store are pre-authorised; never `qa-walk-store-1010` or a real store. Cost if wrong: demo-store drafts and a few cents of AI spend.
+- **Ruling P3-11 (go-live gate)** - The marketing item stays "coming" until a 10+ real-page accuracy re-run passes (STOP-P3-3). Ahmad supplies the pages; this is the only item waiting on him. Cost if wrong: a public claim ahead of measured accuracy, which is why it is gated.
