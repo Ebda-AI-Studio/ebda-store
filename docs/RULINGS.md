@@ -6591,3 +6591,15 @@ Ruling B1-100 — STOP-2 P2: the phone cart total bar also waits for the summary
 Ruling B1-101 — Ahmad approved the re-graded Vitrine hero at STOP 2 (B1-96, hero half): `scripts/qamar-demo/assets/hero-vitrine.webp` is now `hero-vitrine-regraded.webp` under the same filename. B1-93 (receipt printer slab) is confirmed by Ahmad: it stays. Cost if wrong: the window photo reads colder; the old file stays in git history.
 
 Ruling B1-102 — Ahmad chose MOON SILVER `#D9DCEB` for Lookbook's accent at STOP 2 (B1-96, accent half); it replaces saffron `#E8A33D` as `primary` and `accent` in the look tokens. Measured: 11.2:1 on the page, 9.2:1 on the surface (text and UI, floors 4.5 and 3), indigo on silver the same pair. On the light inverse band silver is 1.2:1, so the band now remaps `--accent` / `--accent-foreground` to the indigo / light pair, as it already did for primary. Cost if wrong: Lookbook reads cooler and less warm; the marketing mock (`apps/marketing/scripts/looks/qamar.py`) still draws saffron until it is regenerated.
+
+Ruling B1-103 — STOP-2 P2-1: product card name ids (`id` and `aria-labelledby`) come from `useId()` per card instance, not the product id, so a product in a grid and a carousel on one page never repeats an id. Cost if wrong: a script selecting `#prod-<uuid>-name` no longer finds it.
+
+Ruling B1-104 — STOP-2 P2-2: an empty cart says it once; the h1 is screen-reader only and the visible heading is the empty state's own, in Egyptian Arabic (سلتك فاضية). Cost if wrong: a pack whose EmptyState has no heading shows no visible title.
+
+Ruling B1-105 — STOP-2 P2-3/P2-4: the Area error waits for a governorate; the single-country row is a sentence, not an input-shaped box. Cost if wrong: a shopper who submits with no governorate sees the error on Governorate only.
+
+Ruling B1-106 — STOP-2 P2-6: the cart's two filled Apply buttons become the checkout's outline `Button`. Cost if wrong: a pack that styled the cart button by class loses that styling.
+
+Ruling B1-107 — STOP-2 P2-7: unselected swatch circles and card dots are outlined in the solid foreground (were 35% and 60%), >= 3:1 on every Qamar page and surface. Cost if wrong: light skins show a heavier ring on light dots.
+
+Ruling B1-108 — STOP-2 P2-5 (Lookbook light band under indigo chrome) is NOT changed in this pass: the category page is `/products?category=`, the same `ProductsClient` as `/products`, and `/categories` and `/search` use the same `darkLookListingBand`, so the listing is already one rule. The light band is the rule itself (white-ground merchant photos stay on a light surface, B1-52 / I-3); changing it means choosing between an indigo listing with light surface cards and a light header, which needs a rendered comparison and Ahmad's eye, and no stack was run in this lean pass. A test now pins the three listings to the one rule. Cost if wrong: the next audit scores Lookbook heuristic 4 at 2 again.

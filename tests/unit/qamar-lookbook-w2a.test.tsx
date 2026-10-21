@@ -216,3 +216,17 @@ describe('LB-01 on listings: a dark look lists products on the inverse band', ()
     expect(cats).toContain('darkLookListingBand(store.theme, store.look, !!catPage?.bgColor) ??');
   });
 });
+
+// STOP-2 P2-5 / Ruling B1-108: the category page IS the products listing (`/products?category=`),
+// so the three listing pages must keep sharing the ONE dark-look rule. A page that painted its own
+// canvas would split the look mid-site.
+describe('listing pages share one dark-look rule (B1-108)', () => {
+  it.each([
+    'products/ProductsClient.tsx',
+    'categories/CategoriesClient.tsx',
+    'search/SearchClient.tsx',
+  ])('%s paints the listing through darkLookListingBand', f => {
+    const src = readFileSync(path.join(web, 'app', f), 'utf8');
+    expect(src).toContain('darkLookListingBand(');
+  });
+});
