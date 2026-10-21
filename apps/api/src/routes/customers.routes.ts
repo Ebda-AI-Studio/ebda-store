@@ -15,6 +15,7 @@ import { AppError } from '../middleware/error-handler';
 import { writeLimiter, auditLog } from '../middleware/security';
 import { invalidateCustomersCache } from '../lib/public-cache';
 import { customerKeyOf } from '../lib/customer-key';
+import { searchTermOf } from '../lib/search-term';
 import { SmsConsentService } from '../services/sms-consent.service';
 import {
   aggregateCustomers,
@@ -61,10 +62,13 @@ const adminMiddleware = [
   writeLimiter,
 ];
 
-/** The `?search=` term: trimmed, bounded (it reaches a SECURITY DEFINER lookup), '' when absent. */
-function searchTerm(req: Request): string {
-  const raw = req.query.search;
-  return typeof raw === 'string' ? raw.trim().slice(0, 100) : '';
+/**
+ * The search term: the `X-Search-Query` header (clients send it there so a typed phone/email stays
+ * out of the URL, Ruling SEARCH-P2-9), else the deprecated `?search=`. Trimmed, bounded (it reaches
+ * a SECURITY DEFINER lookup), '' when absent.
+ */
+function searchTerm(req: Request, res: Response): string {
+  return searchTermOf(req, res, 'search') ?? '';
 }
 
 /**
@@ -123,8 +127,8 @@ router.get(
         throw new AppError(404, 'NOT_FOUND', 'Store not found');
       }
 
-      const aggregated = searchTerm(req)
-        ? await aggregateCustomersMatching(storeId, searchTerm(req))
+      const aggregated = searchTerm(req, res)
+        ? await aggregateCustomersMatching(storeId, searchTerm(req, res))
         : await aggregateCustomers(storeId);
       const { ordersTruncated, zeroOrderTruncated, ordersScanned } = aggregated;
       const customers = await applyCustomerListFilters(req, storeId, aggregated.customers);
@@ -474,7 +478,7 @@ router.get(
         noticeRow.getCell(1).font = { bold: true, color: { argb: 'FFB91C1C' } };
       }
 
-      const appliedSearch = (req.query.search as string | undefined)?.trim() || undefined;
+      const appliedSearch = searchTerm(req, res) || undefined;
       const appliedSegment = parseSegmentFilter(req.query.segment) ?? undefined;
       addFiltersSheet(
         workbook,
@@ -526,7 +530,7 @@ router.get(
  * value is ignored (the unfiltered list), never a 400, so an old bookmark
  * with a retired segment still loads.
  *
- * Response: { data, meta: { page, perPage, total, totalPages, truncated,
+ * Response: { data, meta: { page, perPage, total, totalPages, truncated, searchTruncated,
  * summary, segments } } — `summary` is the store-wide KPI strip
  * (`CustomersSummary`); `segments` lists the RFM segments present in the
  * store, and each row carries `segment` (null = no snapshot). Both are
@@ -544,10 +548,12 @@ router.get(
       // The KPI strip and the truncation notice describe the whole store (cached aggregate); a
       // search replaces only the rows (SQL match, see `aggregateCustomersMatching`).
       const { customers: allCustomers, truncated, summary } = await aggregateCustomers(storeId);
-      const term = searchTerm(req);
-      const customers = term
-        ? (await aggregateCustomersMatching(storeId, term)).customers
-        : allCustomers;
+      const term = searchTerm(req, res);
+      const matched = term ? await aggregateCustomersMatching(storeId, term) : null;
+      const customers = matched ? matched.customers : allCustomers;
+      // The match itself hit its cap (1,000 registered / 20,000 guest orders): the rows are the
+      // first of more, and the page says so (Task 16 review M5).
+      const searchTruncated = matched?.searchTruncated ?? false;
 
       // A guest's snapshot is keyed by the HASH of the same key this list
       // groups by (`lib/customer-key.ts`), so guests resolve too — before,
@@ -589,7 +595,16 @@ router.get(
         data: {
           data: pageItems,
           // `summary` is store-wide (unaffected by page/search/segment).
-          meta: { page, perPage, total, totalPages, truncated, summary, segments },
+          meta: {
+            page,
+            perPage,
+            total,
+            totalPages,
+            truncated,
+            searchTruncated,
+            summary,
+            segments,
+          },
         },
       });
     } catch (error) {
@@ -620,7 +635,7 @@ router.get(
       const { storeId } = req.params;
       // Bounded like the storefront suggest route: an unbounded ILIKE pattern would reach the
       // SECURITY DEFINER lookup (review M-4).
-      const q = typeof req.query.q === 'string' ? req.query.q.trim().slice(0, 100) : undefined;
+      const q = searchTermOf(req, res, 'q');
       if (!q || q.length < 2) {
         res.json({ success: true, data: { customers: [] } });
         return;

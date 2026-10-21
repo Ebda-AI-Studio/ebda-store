@@ -1,6 +1,14 @@
 /**
  * Admin ⌘K palette record lookup (search program P2, Task 18):
- * GET /stores/:storeId/search?q=  ->  { products, orders, customers }, 5 of each.
+ * GET /stores/:storeId/search  ->  { products, orders, customers }, 5 of each.
+ *
+ * The term travels in the `X-Search-Query` header (percent-encoded), NOT in the URL: it is often a
+ * customer's phone or email and URLs are retained in Cloudflare Workers Logs (Ruling SEARCH-P2-9,
+ * which extends SEARCH-T5-8). A GET with no term answers three empty lists (the empty state).
+ *
+ * Cost: one per-user rate limit (`adminSearchLimiter`; GETs skip the global limiter), small caps
+ * (50 registered customers / 200 guest orders / 50 order-number ids: the route shows 5 of each), and
+ * ONE customer lookup that the order search reuses.
  *
  * Auth: authenticate -> authorize(store_admin, super_admin, staff) -> requireStoreAccess, then each
  * kind is gated by the permission of its own page (products:read, orders:read; customers follow the
@@ -17,14 +25,21 @@ import type { AdminSearchResponse } from '@ebda/shared';
 import { authenticate, authorize } from '../middleware/auth';
 import { hasPermission, type Permission } from '../middleware/rbac';
 import { requireStoreAccess } from '../middleware/store-access';
+import { adminSearchLimiter } from '../middleware/security';
+import { searchQueryFromHeader } from '../lib/search-term';
 import { searchProductIds } from '../services/product-search.service';
 import { matchingCustomers } from '../services/admin-search.service';
-import { OrderService } from '../services/order.service';
+import { orderSearchWhere } from '../services/order.service';
 
 const router = Router({ mergeParams: true });
 
 const PER_KIND = 5;
 const MIN_QUERY = 2;
+/** Orders also need a trigram-sized term: shorter ones take the unindexed relation filter. */
+const MIN_ORDER_QUERY = 3;
+const USER_CAP = 50;
+const GUEST_ORDER_CAP = 200;
+const ORDER_NUMBER_ID_CAP = 50;
 
 /** A guest's palette key: the Customers-page key (lowercased email, else phone). */
 function guestKey(addr: Record<string, unknown>): string {
@@ -38,27 +53,45 @@ router.get(
   authenticate,
   authorize('store_admin', 'super_admin', 'staff'),
   requireStoreAccess,
+  adminSearchLimiter,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const storeId = req.params.storeId;
       const role = req.user!.role as Parameters<typeof hasPermission>[0];
       const can = (p: Permission) => hasPermission(role, p);
-      const q = typeof req.query.q === 'string' ? req.query.q.trim().slice(0, 100) : '';
+      res.vary('X-Search-Query');
+      res.setHeader('Cache-Control', 'private, no-store');
+      const q = searchQueryFromHeader(req) ?? '';
       const data: AdminSearchResponse = { products: [], orders: [], customers: [] };
       if (q.length < MIN_QUERY) {
         res.json({ success: true, data });
         return;
       }
 
-      const [productIds, orderWhere, matches] = await Promise.all([
+      const canOrders = can('orders:read');
+      const [productIds, matches] = await Promise.all([
         can('products:read')
           ? searchProductIds(storeId, q, { scope: 'admin', field: 'name', limit: PER_KIND })
           : Promise.resolve([] as string[]),
-        can('orders:read') ? OrderService.listWhere(storeId, { search: q }) : Promise.resolve(null),
-        can('orders:read')
-          ? matchingCustomers(storeId, q)
-          : Promise.resolve({ userIds: [], guestOrderIds: [] as string[] }),
+        canOrders
+          ? matchingCustomers(storeId, q, { userCap: USER_CAP, guestCap: GUEST_ORDER_CAP })
+          : Promise.resolve(null),
       ]);
+      // Only the first USER_CAP / GUEST_ORDER_CAP matches feed the order search: a palette shows 5
+      // orders, so a broader term must not fall back to the unindexed relation filter.
+      const orderWhere =
+        canOrders && matches && q.length >= MIN_ORDER_QUERY
+          ? {
+              storeId,
+              deletedAt: null,
+              OR: await orderSearchWhere(storeId, q, {
+                matches: { ...matches, usersTruncated: false, guestsTruncated: false },
+                numberIdLimit: ORDER_NUMBER_ID_CAP,
+              }),
+            }
+          : null;
+      const userIds = matches?.userIds ?? [];
+      const guestOrderIds = matches?.guestOrderIds ?? [];
 
       const [products, orders, users, guestOrders] = await Promise.all([
         productIds.length
@@ -81,19 +114,24 @@ router.get(
               },
             })
           : [],
-        matches.userIds.length
+        userIds.length
           ? prisma.user.findMany({
-              where: { storeId, id: { in: matches.userIds.slice(0, 50) } },
+              where: { storeId, deletedAt: null, id: { in: userIds.slice(0, USER_CAP) } },
               select: { id: true, firstName: true, lastName: true, phone: true },
               take: PER_KIND,
             })
           : [],
-        matches.guestOrderIds.length
+        guestOrderIds.length
           ? prisma.order.findMany({
-              where: { storeId, customerId: null, id: { in: matches.guestOrderIds.slice(0, 200) } },
+              where: {
+                storeId,
+                customerId: null,
+                deletedAt: null,
+                id: { in: guestOrderIds.slice(0, GUEST_ORDER_CAP) },
+              },
               orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
               select: { shippingAddress: true },
-              take: 200,
+              take: GUEST_ORDER_CAP,
             })
           : [],
       ]);

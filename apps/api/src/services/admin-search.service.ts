@@ -51,7 +51,13 @@ export function buildCustomerPatterns(q: string): CustomerPatterns {
  * predicate is written inline (Ruling SEARCH-T14-1). The term is only ever a bound parameter and is
  * never logged (a phone or an email is PII).
  */
-export async function matchingCustomers(storeId: string, q: string): Promise<CustomerMatches> {
+export async function matchingCustomers(
+  storeId: string,
+  q: string,
+  caps: { userCap?: number; guestCap?: number } = {}
+): Promise<CustomerMatches> {
+  const userCap = caps.userCap ?? CUSTOMER_MATCH_USER_CAP;
+  const guestCap = caps.guestCap ?? CUSTOMER_MATCH_GUEST_ORDER_CAP;
   const p = buildCustomerPatterns(q);
   if (p.names.length === 0 && !p.digits && !p.email) {
     return {
@@ -63,15 +69,15 @@ export async function matchingCustomers(storeId: string, q: string): Promise<Cus
     };
   }
   const rows = await prisma.$queryRaw<Array<{ kind: string; id: string }>>(
-    customerSearchIdsSql(storeId, p)
+    customerSearchIdsSql(storeId, p, userCap, guestCap)
   );
   const users = rows.filter(r => r.kind === 'user');
   const guests = rows.filter(r => r.kind === 'guest_order');
-  const usersTruncated = users.length > CUSTOMER_MATCH_USER_CAP;
-  const guestsTruncated = guests.length > CUSTOMER_MATCH_GUEST_ORDER_CAP;
+  const usersTruncated = users.length > userCap;
+  const guestsTruncated = guests.length > guestCap;
   return {
-    userIds: users.slice(0, CUSTOMER_MATCH_USER_CAP).map(r => r.id),
-    guestOrderIds: guests.slice(0, CUSTOMER_MATCH_GUEST_ORDER_CAP).map(r => r.id),
+    userIds: users.slice(0, userCap).map(r => r.id),
+    guestOrderIds: guests.slice(0, guestCap).map(r => r.id),
     truncated: usersTruncated || guestsTruncated,
     usersTruncated,
     guestsTruncated,
@@ -79,8 +85,13 @@ export async function matchingCustomers(storeId: string, q: string): Promise<Cus
 }
 
 /** The statement behind `matchingCustomers`; exported so the planner tests run the real SQL. */
-export function customerSearchIdsSql(storeId: string, p: CustomerPatterns): Prisma.Sql {
+export function customerSearchIdsSql(
+  storeId: string,
+  p: CustomerPatterns,
+  userCap: number = CUSTOMER_MATCH_USER_CAP,
+  guestCap: number = CUSTOMER_MATCH_GUEST_ORDER_CAP
+): Prisma.Sql {
   return Prisma.sql`SELECT kind, id FROM public.ebda_customer_search_ids(
     ${storeId}, ${p.names}::text[], ${p.digits}::text, ${p.email}::text,
-    ${CUSTOMER_MATCH_USER_CAP + 1}::int, ${CUSTOMER_MATCH_GUEST_ORDER_CAP + 1}::int)`;
+    ${userCap + 1}::int, ${guestCap + 1}::int)`;
 }

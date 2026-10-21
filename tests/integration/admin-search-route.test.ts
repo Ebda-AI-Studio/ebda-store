@@ -131,8 +131,14 @@ describe.skipIf(!hasDb)('GET /stores/:storeId/search (admin palette)', () => {
       if (u) await prisma.user.delete({ where: { id: u } }).catch(() => undefined);
   }, 60_000);
 
+  // The term rides in the X-Search-Query header, never the URL (Ruling SEARCH-P2-9).
   const search = (q: string, role = 'store_admin', store = ids.A) =>
-    request(app).get(`/api/v1/stores/${store}/search`).query({ q }).set('x-test-role', role);
+    request(app)
+      .get(`/api/v1/stores/${store}/search`)
+      .set('x-test-role', role)
+      .set(
+        ...(q ? (['X-Search-Query', encodeURIComponent(q)] as const) : (['x-none', '1'] as const))
+      );
 
   it('a product is found by its Arabic name folded (احذيه finds أحذية), and only this store’s', async () => {
     const res = await search('احذيه');
@@ -186,5 +192,18 @@ describe.skipIf(!hasDb)('GET /stores/:storeId/search (admin palette)', () => {
     const res = await search('أحمد', 'nobody');
     expect(res.status).toBe(200);
     expect(res.body.data).toEqual({ products: [], orders: [], customers: [] });
+  });
+
+  it('an erased (soft-deleted) customer and a deleted guest order are not listed (review M1/M2)', async () => {
+    await prisma.$executeRaw`
+      INSERT INTO public.users (id, store_id, email, password_hash, first_name, last_name, phone, role, updated_at, deleted_at)
+      VALUES (${`${tag}-del`}, ${ids.A}, ${`del.${tag}@x.test`}, 'x', 'ملغي', 'ملغي', '+201555000111', 'customer', now(), now())`;
+    await prisma.$executeRaw`
+      INSERT INTO public.orders (id, store_id, order_number, subtotal, total, shipping_address, billing_address, customer_id, updated_at, deleted_at)
+      VALUES (${`${tag}-gdel`}, ${ids.A}, ${`EB-${tag}-gd`}, 1, 1, ${JSON.stringify({ firstName: 'ملغي', phone: '+201555000222' })}::jsonb, '{}', NULL, now(), now()),
+             (${`${tag}-odel`}, ${ids.A}, ${`EB-${tag}-od`}, 1, 1, '{}', '{}', ${`${tag}-del`}, now(), NULL)`;
+    const res = await search('ملغي');
+    expect(res.body.data.customers).toEqual([]);
+    expect(res.body.data.orders).toEqual([]);
   });
 });

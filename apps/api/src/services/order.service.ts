@@ -1,5 +1,5 @@
 import { orderSearchIds, ORDER_SEARCH_CUSTOMER_ID_CAP } from '../lib/order-search-ids';
-import { matchingCustomers } from './admin-search.service';
+import { matchingCustomers, type CustomerMatches } from './admin-search.service';
 export {
   ORDER_SEARCH_CUSTOMER_ID_CAP,
   orderSearchIds,
@@ -257,7 +257,13 @@ const GUEST_CONTACT_FIELDS = ['firstName', 'lastName', 'email', 'phone'] as cons
 export async function orderSearchWhere(
   storeId: string,
   search: string,
-  opts: { indexed?: boolean } = {}
+  opts: {
+    indexed?: boolean;
+    /** The customer lookup, when the caller already ran it (the ⌘K route does): not repeated. */
+    matches?: CustomerMatches;
+    /** Cap for the order-number id lookups (default `ORDER_SEARCH_CUSTOMER_ID_CAP + 1`). */
+    numberIdLimit?: number;
+  } = {}
 ): Promise<Prisma.OrderWhereInput[]> {
   const contains = { contains: search, mode: 'insensitive' as const };
   const customerMatch: Prisma.UserWhereInput[] = [
@@ -298,11 +304,11 @@ export async function orderSearchWhere(
   const folded = normalizeArabicSearch(search);
   const digits = /^[#\s-]*[0-9][0-9\s-]*$/.test(folded) ? folded.replace(/\D/g, '') : '';
   const [numberIdsRaw, digitIds, matches] = await Promise.all([
-    orderSearchIds(storeId, 'order_number', search),
+    orderSearchIds(storeId, 'order_number', search, opts.numberIdLimit),
     digits.length >= 4 && digits !== search
-      ? orderSearchIds(storeId, 'order_number', digits)
+      ? orderSearchIds(storeId, 'order_number', digits, opts.numberIdLimit)
       : Promise.resolve([] as string[]),
-    matchingCustomers(storeId, search),
+    opts.matches ?? matchingCustomers(storeId, search),
   ]);
   const numberIds = [...new Set([...numberIdsRaw, ...digitIds])];
   const customerIds = matches.usersTruncated ? [] : matches.userIds;

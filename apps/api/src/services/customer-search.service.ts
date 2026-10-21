@@ -17,7 +17,7 @@ export async function searchOrderCustomers(storeId: string, q: string) {
     matches.userIds.length === 0
       ? []
       : await prisma.user.findMany({
-          where: { storeId, id: { in: matches.userIds.slice(0, 50) } },
+          where: { storeId, deletedAt: null, id: { in: matches.userIds.slice(0, 50) } },
           select: { id: true, firstName: true, lastName: true, email: true, phone: true },
           take: 10,
         });
