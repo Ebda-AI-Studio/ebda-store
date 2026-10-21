@@ -108,6 +108,8 @@ export interface LookCopy {
   who: string;
   /** The bold idea behind it. */
   idea: string;
+  /** Live templates only: alt text of the real screenshot of this look. */
+  alt?: string;
 }
 
 export interface LooksCopy {
@@ -124,6 +126,8 @@ export interface LooksCopy {
   retry: string;
   /** English page only: the phones stay Arabic. */
   bilingualNote: string;
+  /** Templates shown as real captures of the live demo store instead of the built-in mini-stores. */
+  live: { template: string; link: string };
   /** Tab labels, in tab order: id matches /looks/<id>.html. */
   templates: { id: string; name: string; kind: string }[];
   /** The three looks (A, B, C) of each template. */
@@ -377,6 +381,7 @@ export const COPY: Record<Locale, Copy> = {
       failed: 'القالب ماحمّلش.',
       retry: 'جرّب تاني',
       bilingualNote: '',
+      live: { template: 'qamar', link: 'افتح المتجر الحي' },
       templates: [
         { id: 'qamar', name: 'قمر', kind: 'أزياء وبوتيكات' },
         { id: 'souq', name: 'سوق', kind: 'تجزئة وإلكترونيات' },
@@ -390,16 +395,19 @@ export const COPY: Record<Locale, Copy> = {
             name: 'أتيليه',
             who: 'لبوتيك عايز هدومه تتكلم لوحدها: هادي وأبيض وبشكل مجلات.',
             idea: 'صور منتجات كبيرة وتقريبًا من غير زحمة: الهدوم هي الواجهة.',
+            alt: 'الصفحة الرئيسية لمتجر قمر بشكل أتيليه: صورة كبيرة لعباية كتان قرميدية جنب شماعة هدوم، وتحتها عنوان وزر وأقسام المتجر',
           },
           {
             name: 'لوك بوك',
             who: 'للستايليست ومحلات الفاست فاشن اللي بتبيع إطلالات مش قطع لوحدها.',
             idea: 'اشتري الإطلالة كلها: كل لوك فيه قطعه وأسعاره، وبضغطة واحدة تضيفهم كلهم.',
+            alt: 'الصفحة الرئيسية لمتجر قمر بشكل لوك بوك على خلفية كحلي: ثلاث صور لإطلالات وقت الغروب وعنوان «لبس السطوح» وزر تسوّق اللوكات',
           },
           {
             name: 'فيترين',
             who: 'لملابس المناسبات (فرح وخطوبة وسهرة) اللي المناسبة هي اللي بتحدد الشراء.',
             idea: 'التنقل بالمناسبة: فرح، خطوبة، سهرة، وكل واحدة بألوانها.',
+            alt: 'الصفحة الرئيسية لمتجر قمر بشكل فاترينة: فستان سهرة على مانيكان داخل إطار ذهبي رفيع، وتحته أقسام المناسبات',
           },
         ],
         souq: [
@@ -761,7 +769,8 @@ export const COPY: Record<Locale, Copy> = {
       failed: 'The template did not load.',
       retry: 'Try again',
       bilingualNote:
-        'Every template ships in Arabic and English. The previews here are shown in Arabic.',
+        'Every template ships in Arabic and English. Qamar is shown from the live demo store in English; the other previews are shown in Arabic.',
+      live: { template: 'qamar', link: 'Open the live store' },
       templates: [
         { id: 'qamar', name: 'Qamar', kind: 'Fashion and boutiques' },
         { id: 'souq', name: 'Souq', kind: 'General retail and electronics' },
@@ -775,16 +784,19 @@ export const COPY: Record<Locale, Copy> = {
             name: 'Atelier',
             who: 'For a boutique whose clothes should speak alone: calm, white, editorial.',
             idea: 'Oversized product photography with almost no chrome: the clothes are the interface.',
+            alt: 'The Qamar home page in the Atelier look: a large photo of a terracotta linen abaya beside a clothes rail, then a headline, a button and the shop categories',
           },
           {
             name: 'Lookbook',
             who: 'For stylists and fast-fashion shops that sell outfits, not single pieces.',
             idea: 'Shop the whole outfit: each look carries its items and prices, one tap adds the lot.',
+            alt: 'The Qamar home page in the Lookbook look on a navy ground: three sunset outfit photos, the headline "Dressed for the rooftop" and a Shop the looks button',
           },
           {
             name: 'Vitrine',
             who: 'For occasion wear (weddings, engagements, evenings) where the event decides the purchase.',
             idea: 'Occasion-first navigation: wedding, engagement, evening, each on its own palette band.',
+            alt: 'The Qamar home page in the Vitrine look: an evening gown on a mannequin inside a thin gold frame, and the shop-by-occasion bands below',
           },
         ],
         souq: [

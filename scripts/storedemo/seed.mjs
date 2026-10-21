@@ -21,8 +21,9 @@
 // qamar-atelier / qamar-lookbook / qamar-vitrine, each switched to its look through
 // StoreService.applyLook(..., { design: 'reset' }) - the real merchant path - for local review.
 //
-// The store's theme is written as {} on purpose: the demo preview composes skin + look with no
-// merchant overrides, and a showroom must show the look itself.
+// The store's theme is written as { showNewBadge: true } only (Ahmad 2026-10-16: the NEW chip is ON
+// on the showroom): the demo preview composes skin + look with no merchant DESIGN overrides, and a
+// showroom must show the look itself.
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import {
@@ -174,7 +175,7 @@ export function describePlan(url) {
   );
   return [
     `target database host: ${hostOf(url) ?? '(unparseable DATABASE_URL)'}`,
-    `store: slug "${SLUG}", is_demo = true, look ${DEFAULT_LOOK}, theme {} (owner ${OWNER_EMAIL}, no login)`,
+    `store: slug "${SLUG}", is_demo = true, look ${DEFAULT_LOOK}, theme {showNewBadge: true} (owner ${OWNER_EMAIL}, no login)`,
     `qamar: ${QAMAR_PRODUCTS.length} products, ${variants} variants, ${QAMAR_CATEGORIES.length} categories (${QAMAR_CATEGORIES.map(c => c.slug).join(', ')}), 2 size charts, 1 shipping zone`,
     `archived: ${PLACEHOLDER_CATEGORY_SLUGS.join(', ')} (${PLACEHOLDER_SLUGS.length} placeholder products, status archived, never deleted)`,
     'home: the Qamar superset document, saved + published through the page builder',
@@ -252,10 +253,8 @@ export async function seedCatalogue(prisma, Prisma, storeId, base) {
       // "New in" (`productSource: newest`) lists only products flagged `isNew`: flag the first
       // NEW_IN_COUNT products that have a photo (12 fills 2, 3 and 4 columns with no orphan row).
       const NEW_IN_COUNT = 12;
-      // TODO(decisions-1016, Ruling B1-117): the card "New" badge becomes a merchant toggle there
-      // (`theme.showNewBadge`, default OFF; `isProductNew` takes `theme`). That setting does not
-      // exist on this branch, so `theme` stays {} here. When decisions-1016 merges, the showroom
-      // seed MUST set `theme: { showNewBadge: true }` or every NEW chip on the showroom disappears.
+      // The card NEW chip is a merchant switch (`theme.showNewBadge`, default OFF, Ruling B1-117); the
+      // showroom store row sets it ON below.
       const newIn = new Set(
         QAMAR_PRODUCTS.filter(p => p.images.length > 0)
           .slice(0, NEW_IN_COUNT)
@@ -446,7 +445,7 @@ export async function seedCatalogue(prisma, Prisma, storeId, base) {
       });
       return { productIdBySlug, variantCount, archived: archived.count };
     },
-    { timeout: 120_000, maxWait: 10_000 }
+    { timeout: 900_000, maxWait: 10_000 }
   );
 }
 
@@ -490,6 +489,9 @@ async function run() {
   const img = f => `${a.base}/${f}`;
 
   const prisma = createPrismaClient({ connectionString: url, role: 'owner' });
+  // Open the first pooled connection before any transaction: over the internet a Neon connect takes
+  // longer than Prisma's default 2 s transaction maxWait (P2028 on the first `$transaction`).
+  await prisma.$queryRaw`select 1`;
   const publishHome = async (storeId, ownerId, productIdBySlug) =>
     runInStoreScope(storeId, async () => {
       const state = await getPageState(storeId, 'home');
@@ -527,7 +529,7 @@ async function run() {
       nameAr: 'إبدا ديمو',
       template: look.skin,
       look: look.id,
-      theme: {},
+      theme: { showNewBadge: true },
       isDemo: true,
       status: 'active',
       currency: 'EGP',

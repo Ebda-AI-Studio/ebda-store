@@ -92,7 +92,14 @@ export function Home({ locale }: { locale: Locale }) {
     looks: () => (
       <Section id="looks" title={c.looks.title} className="looks">
         <p className="lead">{c.looks.lead}</p>
-        <LooksShowcase copy={c.looks} rtl={rtl} initialHtml={initialLooksFragment()} />
+        <LooksShowcase
+          copy={c.looks}
+          rtl={rtl}
+          initialHtml={
+            // a live template renders real captures, so its built-in markup is not sent
+            c.looks.live.template === c.looks.templates[0].id ? '' : initialLooksFragment()
+          }
+        />
       </Section>
     ),
     features: () => (
