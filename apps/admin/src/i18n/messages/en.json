@@ -10110,7 +10110,8 @@
       "show": "Show {name}",
       "hide": "Hide {name}",
       "duplicate": "Duplicate {name}",
-      "remove": "Remove {name}"
+      "remove": "Remove {name}",
+      "pinned": "{name} is the core of this page, it can move but not be removed"
     },
     "addSection": {
       "title": "Add a section",
@@ -10201,7 +10202,20 @@
       "chromeDown": "Move down",
       "chromeUnsafeLink": "Use a path like /about, or a link that starts with https://, mailto: or tel:.",
       "chromeLoading": "Loading your current links…",
-      "chromeLoadFailed": "Couldn't load your current links. Reload the page and try again."
+      "chromeLoadFailed": "Couldn't load your current links. Reload the page and try again.",
+      "productMainContent": "The photos, price, options and Add to cart button. They come from the product itself, and this block can move but not be removed.",
+      "productFaqContent": "Questions and answers come from each product. Add them on the product's own page.",
+      "productReviewsContent": "Reviews come from your customers. Moderate them in Reviews.",
+      "productBundlesContent": "\"Frequently bought together\" comes from your bundles.",
+      "productRecommendationsContent": "\"You might also like\" is picked automatically from what customers buy together.",
+      "productRelatedContent": "Related products are picked automatically from the same categories.",
+      "collectionMainContent": "The product grid, filters and sorting. The products come from your catalogue, and this block can move but not be removed.",
+      "cartMainContent": "The cart lines, coupon and order summary. This block can move but not be removed.",
+      "cartRecommendationsContent": "Suggestions are picked automatically from what is in the cart.",
+      "editProducts": "Edit products",
+      "editReviews": "Open reviews",
+      "editBundles": "Open bundles",
+      "editCategories": "Edit categories"
     },
     "theme": {
       "smartPalette": "Smart Palette",
@@ -10228,6 +10242,12 @@
       "restoring": "Restoring…",
       "confirmRestore": "Publish version {rev} again? Your current draft is replaced.",
       "more": "Load more"
+    },
+    "pages": {
+      "label": "Page",
+      "previewProduct": "Preview with product",
+      "noProducts": "Add a product to preview this page",
+      "saveFirst": "Fix the errors on this page before switching."
     }
   },
   "instapayReceipt": {

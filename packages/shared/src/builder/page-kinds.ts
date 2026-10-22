@@ -32,6 +32,6 @@ export const MAIN_SECTION_TYPE: Record<SectionPageKind, string> = {
 export const PAGE_KIND_LABELS: Record<PageKind, { en: string; ar: string }> = {
   home: { en: 'Home', ar: 'الرئيسية' },
   product: { en: 'Product', ar: 'المنتج' },
-  collection: { en: 'Collection', ar: 'المجموعة' },
+  collection: { en: 'Collection', ar: 'قائمة المنتجات' },
   cart: { en: 'Cart', ar: 'السلة' },
 };

@@ -33,8 +33,8 @@ type State = {
   publishes: number;
 };
 
-async function state(page: Page): Promise<State> {
-  const r = await page.request.get(`${API}/__test/state`);
+async function state(page: Page, pageKey = 'home'): Promise<State> {
+  const r = await page.request.get(`${API}/__test/state?page=${pageKey}`);
   return (await r.json()).data;
 }
 
@@ -678,4 +678,86 @@ test('no horizontal document overflow on any editor panel (EDITOR-MOBILE-1)', as
   await noOverflow('settings panel (content)');
   await page.getByTestId('settings-panel').getByRole('tab').nth(1).click();
   await noOverflow('settings panel (design)');
+});
+
+// ---- Product, collection and cart pages are section documents (Ruling VE-3 amended, VE-12) ----
+
+async function openPage(page: Page, kind: 'product' | 'collection' | 'cart') {
+  await page.getByTestId('page-switcher').selectOption(kind);
+  await expect(page).toHaveURL(new RegExp(`[?&]page=${kind}`));
+  await expect(page.getByTestId('builder')).toBeVisible();
+  await structure(page);
+}
+
+test('cart page: sections only, the main block is pinned, the canvas loads /cart, no theme tab', async ({
+  page,
+}) => {
+  await openBuilder(page);
+  await openPage(page, 'cart');
+  expect(await templateIds(page)).toEqual(['cart-main', 'cart-recommendations']);
+  // a page of sections: the header and footer belong to every page, not to this one
+  await expect(page.getByTestId('tree-group-header')).toHaveCount(0);
+  await expect(page.getByTestId('tree-group-footer')).toHaveCount(0);
+  // pinned: a lock, no hide and no remove on the main block; the other row keeps both
+  const main = page.getByTestId('tree-row-cart-main');
+  await expect(page.getByTestId('tree-pinned-cart-main')).toBeVisible();
+  await expect(main.getByRole('button', { name: /^(إخفاء|Hide) /u })).toHaveCount(0);
+  await expect(main.getByRole('button', { name: /^(حذف|Remove) /u })).toHaveCount(0);
+  const recs = page.getByTestId('tree-row-cart-recommendations');
+  await expect(recs.getByRole('button', { name: /^(إخفاء|Hide) /u })).toHaveCount(1);
+  await expect(recs.getByRole('button', { name: /^(حذف|Remove) /u })).toHaveCount(1);
+  // the theme belongs to the home document only
+  await expect(page.getByRole('tab')).toHaveCount(2);
+  // the real storefront cart is what the canvas frames
+  await expect(page.getByTestId('builder-canvas')).toHaveAttribute('src', /\/cart\?_preview=/);
+});
+
+test('product page: the picker offers what belongs here, reorder autosaves and publishes the PRODUCT document only', async ({
+  page,
+}) => {
+  await openBuilder(page);
+  await openPage(page, 'product');
+  expect(await templateIds(page)).toEqual([
+    'product-main',
+    'product-faq',
+    'product-reviews',
+    'product-bundles',
+    'product-recommendations',
+    'product-related',
+  ]);
+  await expect(page.getByTestId('builder-canvas')).toHaveAttribute('src', /\/products\/medjool\?/);
+
+  // the picker: a shared section yes, a home-only hero no, a section already on the page is full
+  await page.getByTestId('add-section-template').click();
+  await expect(page.getByTestId('preset-image-text-0')).toBeEnabled();
+  await expect(page.getByTestId('preset-hero-0')).toHaveCount(0);
+  await expect(page.getByTestId('preset-product-reviews-0')).toBeDisabled();
+  await page.keyboard.press('Escape');
+
+  // reviews up to the top by keyboard: above the main block is allowed
+  await page.getByTestId('tree-select-product-reviews').press('Alt+ArrowUp');
+  await page.getByTestId('tree-select-product-reviews').press('Alt+ArrowUp');
+  expect((await templateIds(page))[0]).toBe('product-reviews');
+  await waitSaved(page);
+  const draft = (await state(page, 'product')).draft!;
+  expect(draft.definition.sections[0].id).toBe('product-reviews');
+  // the home document was never touched
+  expect((await state(page, 'home')).saves).toBe(0);
+
+  await page.getByTestId('publish').click();
+  await expect.poll(async () => (await state(page, 'product')).publishes).toBe(1);
+  expect((await state(page, 'home')).publishes).toBe(0);
+});
+
+test('switching page saves the unsaved edit first, and the URL carries the page', async ({
+  page,
+}) => {
+  await openBuilder(page);
+  await openPage(page, 'product');
+  await page.getByTestId('tree-select-product-related').press('Alt+ArrowUp');
+  // do not wait for the autosave debounce: the switch itself must flush it
+  await page.getByTestId('page-switcher').selectOption('home');
+  await expect(page).not.toHaveURL(/page=/);
+  await expect.poll(async () => (await state(page, 'product')).saves).toBe(1);
+  expect((await state(page, 'product')).draft!.definition.sections[4].id).toBe('product-related');
 });

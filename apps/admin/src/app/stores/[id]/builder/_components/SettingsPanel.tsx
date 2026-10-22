@@ -259,6 +259,32 @@ const CONTENT_ELSEWHERE: Record<string, { messageKey: string; route?: string; la
       labelKey: 'editStoreDescription',
     },
     'trust-strip': { messageKey: 'trustStripContentEmpty' },
+    // product / collection / cart pages: their content comes from the catalogue, not from a field here
+    'product-main': {
+      messageKey: 'productMainContent',
+      route: 'products',
+      labelKey: 'editProducts',
+    },
+    'product-faq': { messageKey: 'productFaqContent', route: 'products', labelKey: 'editProducts' },
+    'product-reviews': {
+      messageKey: 'productReviewsContent',
+      route: 'reviews',
+      labelKey: 'editReviews',
+    },
+    'product-bundles': {
+      messageKey: 'productBundlesContent',
+      route: 'bundles',
+      labelKey: 'editBundles',
+    },
+    'product-recommendations': { messageKey: 'productRecommendationsContent' },
+    'product-related': { messageKey: 'productRelatedContent' },
+    'collection-main': {
+      messageKey: 'collectionMainContent',
+      route: 'categories',
+      labelKey: 'editCategories',
+    },
+    'cart-main': { messageKey: 'cartMainContent' },
+    'cart-recommendations': { messageKey: 'cartRecommendationsContent' },
   };
 
 function ContentElsewhereNotice({

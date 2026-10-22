@@ -47,6 +47,7 @@ import {
   type StoreTheme,
   type ZoneOverride,
   type Viewport,
+  type PageKind,
 } from '@ebda/shared';
 import { useT } from '@/i18n/useT';
 import { apiGet, apiPost } from '../../../../../lib/api';
@@ -61,6 +62,7 @@ import { SettingsPanel } from './SettingsPanel';
 import { AddSectionDialog } from './AddSectionDialog';
 import { ThemeSettingsPanel } from './ThemeSettingsPanel';
 import { RevisionsPanel } from './RevisionsPanel';
+import { PageSwitcher, type PreviewProduct } from './PageSwitcher';
 
 interface StoreInfo {
   id: string;
@@ -82,11 +84,21 @@ const applyPalette = (
   updates: object
 ) => applySmartPalette(doc, palette, { ...updates });
 
-export function BuilderEditor({ storeId }: { storeId: string }) {
+export function BuilderEditor({
+  storeId,
+  pageKey = 'home',
+  onPageChange,
+}: {
+  storeId: string;
+  /** The page being edited (Ruling VE-3 amended); the parent remounts this component per page. */
+  pageKey?: PageKind;
+  onPageChange?: (next: PageKind) => void;
+}) {
   const t = useT('builder');
   const locale = useLocale();
   const { success: toastSuccess, error: toastError } = useToast();
-  const b = useBuilderDocument(storeId);
+  const b = useBuilderDocument(storeId, pageKey);
+  const isHome = pageKey === 'home';
   const [store, setStore] = useState<StoreInfo | null>(null);
   // The LIVE typography (fonts + zones); the draft's patch is applied over it for the theme pane.
   const [liveTypography, setLiveTypography] = useState<unknown>(null);
@@ -132,12 +144,47 @@ export function BuilderEditor({ storeId }: { storeId: string }) {
     void refreshTypography();
     void refreshStore();
     void apiPost<{ token: string }>(
-      `/api/v1/admin/stores/${storeId}/builder/pages/home/preview-token`,
+      `/api/v1/admin/stores/${storeId}/builder/pages/${pageKey}/preview-token`,
       {}
     ).then(r => {
       if (r.data?.token) setToken(r.data.token);
     });
-  }, [storeId, refreshStore]);
+  }, [storeId, pageKey, refreshStore]);
+
+  // The product page is previewed with one of the store's own products.
+  const [previewProducts, setPreviewProducts] = useState<PreviewProduct[]>([]);
+  const [previewSlug, setPreviewSlug] = useState<string | null>(null);
+  useEffect(() => {
+    if (pageKey !== 'product') return;
+    void apiGet<{ products?: PreviewProduct[] }>(
+      `/api/v1/stores/${storeId}/products?status=active&limit=20`
+    ).then(r => {
+      const list = (r.data?.products ?? []).filter(p => p.slug);
+      setPreviewProducts(list);
+      setPreviewSlug(prev => prev ?? list[0]?.slug ?? null);
+    });
+  }, [storeId, pageKey]);
+  const canvasPath =
+    pageKey === 'cart'
+      ? '/cart'
+      : pageKey === 'collection'
+        ? '/products'
+        : pageKey === 'product' && previewSlug
+          ? `/products/${encodeURIComponent(previewSlug)}`
+          : '/';
+
+  // Switch page: flush this page's pending draft first, so nothing is lost when the editor remounts.
+  const switchPage = useCallback(
+    async (next: PageKind) => {
+      if (next === pageKey) return;
+      if (b.dirty && !(await b.saveDraftNow())) {
+        toastError(t('pages.saveFirst'));
+        return;
+      }
+      onPageChange?.(next);
+    },
+    [b, pageKey, onPageChange, toastError, t]
+  );
 
   // Saved data changed (a new carousel, a new product source): reload the canvas.
   useEffect(() => {
@@ -353,7 +400,10 @@ export function BuilderEditor({ storeId }: { storeId: string }) {
         aria-label={t('panes.start')}
         className="flex border-b border-border text-xs"
       >
-        {(['sections', 'theme', 'history'] as const).map(k => (
+        {(isHome
+          ? (['sections', 'theme', 'history'] as const)
+          : (['sections', 'history'] as const)
+        ).map(k => (
           <button
             key={k}
             role="tab"
@@ -383,7 +433,7 @@ export function BuilderEditor({ storeId }: { storeId: string }) {
             }}
           />
         )}
-        {tab === 'theme' && (
+        {isHome && tab === 'theme' && (
           <ThemeSettingsPanel
             storeId={storeId}
             look={getLook(store.look) ?? null}
@@ -433,6 +483,7 @@ export function BuilderEditor({ storeId }: { storeId: string }) {
         {tab === 'history' && (
           <RevisionsPanel
             storeId={storeId}
+            pageKey={pageKey}
             headRev={b.rev}
             onRestored={() => {
               toastSuccess(t('restored'));
@@ -496,6 +547,13 @@ export function BuilderEditor({ storeId }: { storeId: string }) {
           <img src="/logo.svg" alt={BRAND.product.nameEn} width={28} height={28} />
         </Link>
         <span className="hidden truncate text-sm font-semibold sm:inline">{storeName}</span>
+        <PageSwitcher
+          pageKey={pageKey}
+          onChange={next => void switchPage(next)}
+          products={previewProducts}
+          previewSlug={previewSlug}
+          onPreviewSlug={setPreviewSlug}
+        />
         <div className="ms-2 flex lg:hidden">
           <button
             type="button"
@@ -563,24 +621,26 @@ export function BuilderEditor({ storeId }: { storeId: string }) {
         >
           {statusText[b.saveState]}
         </span>
-        <select
-          aria-label={t('families.label')}
-          value=""
-          onChange={e =>
-            e.target.value &&
-            applyFamily(e.target.value as (typeof TEMPLATE_FAMILIES)[number]['id'])
-          }
-          className="hidden rounded-lg border border-border bg-background px-2 py-1 text-xs md:block"
-        >
-          <option value="">{t('families.label')}</option>
-          {TEMPLATE_FAMILIES.map(f => (
-            <option key={f.id} value={f.id}>
-              {locale === 'ar'
-                ? `${f.labelAr} — ${f.verticalAr}`
-                : `${f.labelEn} — ${f.verticalEn}`}
-            </option>
-          ))}
-        </select>
+        {isHome && (
+          <select
+            aria-label={t('families.label')}
+            value=""
+            onChange={e =>
+              e.target.value &&
+              applyFamily(e.target.value as (typeof TEMPLATE_FAMILIES)[number]['id'])
+            }
+            className="hidden rounded-lg border border-border bg-background px-2 py-1 text-xs md:block"
+          >
+            <option value="">{t('families.label')}</option>
+            {TEMPLATE_FAMILIES.map(f => (
+              <option key={f.id} value={f.id}>
+                {locale === 'ar'
+                  ? `${f.labelAr} — ${f.verticalAr}`
+                  : `${f.labelEn} — ${f.verticalEn}`}
+              </option>
+            ))}
+          </select>
+        )}
         <button
           type="button"
           onClick={() => void publish()}
@@ -641,6 +701,7 @@ export function BuilderEditor({ storeId }: { storeId: string }) {
         <main className="min-w-0 flex-1">
           <Canvas
             storefrontUrl={getStoreHref(store)}
+            path={canvasPath}
             token={token}
             doc={b.doc}
             viewport={viewport}
