@@ -22,7 +22,7 @@ export interface DurableObjectStubLike {
 
 export interface DurableObjectNamespaceLike {
   idFromName(name: string): unknown;
-  get(id: unknown): DurableObjectStubLike;
+  get(id: unknown, options?: { locationHint?: string }): DurableObjectStubLike;
 }
 
 export interface QueueProducerLike {

@@ -133,7 +133,8 @@ describe('cache-generation keys have their OWN Durable Object, never an auth sha
   });
   it('the client addresses the instance by name "cachegen" and sweeps include it', () => {
     const src = readFileSync(join(__dirname, '../../apps/api/src/cf/auth-state-client.ts'), 'utf8');
-    expect(src).toContain("shard === CACHEGEN_SHARD ? 'cachegen'");
+    expect(src).toContain('shard === CACHEGEN_SHARD');
+    expect(src).toContain('cachegenPlacement()');
     expect(src).toContain('stub(CACHEGEN_SHARD).apply(ops)');
   });
 });
