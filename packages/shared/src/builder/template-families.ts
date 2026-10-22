@@ -114,6 +114,8 @@ export const TEMPLATE_FAMILIES: readonly TemplateFamily[] = [
       'footer',
     ],
     pendingSectionTypes: [],
+    // Phase B4 (Ruling B4-1): Lamma has its own chrome skin; the looks decide the mixes.
+    skin: 'lamma',
   },
   {
     id: 'jasmine',

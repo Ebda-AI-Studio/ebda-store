@@ -53,7 +53,10 @@ export function isOrangeFamily(value: string): boolean {
   const d = max - min;
   let hue = max === r ? ((g - b) / d) % 6 : max === g ? (b - r) / d + 2 : (r - g) / d + 4;
   hue = (hue * 60 + 360) % 360;
-  const inBand = hue >= ORANGE_HUE[0] && hue <= ORANGE_HUE[1];
+  // Ruling B4-2: the hue is rounded to a whole degree first. Terracotta #B5482E measures 11.6
+  // degrees, which is 12 by the ruling's own figure ("12 degrees, 59 %") and orange to the eye;
+  // the unrounded compare let it through the band's lower edge.
+  const inBand = Math.round(hue) >= ORANGE_HUE[0] && Math.round(hue) <= ORANGE_HUE[1];
   const lightness = (max + min) / 2 / 255;
   return (
     inBand && (sat >= ORANGE_MIN_SAT || (sat >= PALE_MIN_SAT && lightness < PALE_MAX_LIGHTNESS))

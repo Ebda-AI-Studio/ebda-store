@@ -141,6 +141,13 @@ const homepageTemplates: Record<TemplateId, HomepageTemplateComponents> = {
     CategoryGrid: MinimalCategoryGrid,
     ...shared,
   },
+  // Lamma re-uses the minimal statics plus the shared sections (Ruling B4-1).
+  lamma: {
+    Hero: MinimalHero,
+    ProductGrid: MinimalProductGrid,
+    CategoryGrid: MinimalCategoryGrid,
+    ...shared,
+  },
 };
 
 /**

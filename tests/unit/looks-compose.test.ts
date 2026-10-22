@@ -112,10 +112,14 @@ describe('look UI tokens (W2a token plumbing): merchant > look > skin', () => {
       for (const k of LOOK_UI_TOKEN_KEYS) expect(k in t, `${template}.${k}`).toBe(false);
     }
   });
-  it('only the Qamar, Souq and Jasmine looks declare UI tokens today (Dahab and the designed looks are unchanged)', async () => {
+  it('only the Qamar, Souq, Jasmine and Lamma looks declare UI tokens today (Dahab and the designed looks are unchanged)', async () => {
     const { LOOKS, LOOK_UI_TOKEN_KEYS } = await import('@ebda/shared');
     for (const l of LOOKS.filter(
-      x => x.template !== 'qamar' && x.template !== 'souq' && x.template !== 'jasmine'
+      x =>
+        x.template !== 'qamar' &&
+        x.template !== 'souq' &&
+        x.template !== 'jasmine' &&
+        x.template !== 'lamma'
     ))
       for (const k of LOOK_UI_TOKEN_KEYS) expect(l.tokens[k], `${l.id}.${k}`).toBeUndefined();
   });

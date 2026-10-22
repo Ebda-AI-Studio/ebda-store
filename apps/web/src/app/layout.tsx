@@ -566,7 +566,8 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           store.template === 'dahab' ||
           store.template === 'qamar' ||
           store.template === 'souq' ||
-          store.template === 'jasmine'
+          store.template === 'jasmine' ||
+          store.template === 'lamma'
             ? store.template
             : undefined
         }
