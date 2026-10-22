@@ -16,6 +16,7 @@ import { useLanguage } from '../../contexts/LanguageContext';
 import { sectionBgStyle } from '../../templates/shared/section-bg';
 import { sectionSpacingClasses } from '../../templates/shared/section-spacing';
 import { EmptySectionHint } from '../render/EmptySectionHint';
+import { displayedImageKey, imageMarker } from '../render/image-key';
 
 export interface MakerProfileSettings extends SectionPaddingMaxWidthVisibility {
   variant?: 'strip' | 'lead';
@@ -52,6 +53,7 @@ export function MakerProfileSection({
   const edit = (key: string): Record<string, string> =>
     editorMode ? { 'data-builder-setting': ar ? `${key}Ar` : key } : {};
   const name = pick(settings.name, settings.nameAr);
+  const imageKey = displayedImageKey(ar, settings.image, settings.imageAr);
   const [open, setOpen] = React.useState(false);
   const storyId = React.useId();
   const image = pick(settings.image, settings.imageAr);
@@ -85,6 +87,7 @@ export function MakerProfileSection({
                 alt="" /* the name sits beside the photo: an alt equal to it reads twice */
                 loading="lazy"
                 className="h-16 w-16 shrink-0 rounded-full object-cover"
+                {...imageMarker(editorMode, imageKey)}
               />
             )}
             <div className="min-w-0">
@@ -126,6 +129,7 @@ export function MakerProfileSection({
               alt={alt}
               loading="eager"
               className="aspect-[4/3] w-full rounded-[var(--radius)] object-cover"
+              {...imageMarker(editorMode, imageKey)}
             />
           )}
           <div className={`text-start ${image ? '' : 'md:col-span-2'}`}>

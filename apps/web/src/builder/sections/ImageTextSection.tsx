@@ -16,6 +16,7 @@ import { useLanguage } from '../../contexts/LanguageContext';
 import { sectionBgStyle } from '../../templates/shared/section-bg';
 import { sectionSpacingClasses } from '../../templates/shared/section-spacing';
 import type { SectionPaddingMaxWidthVisibility } from '@ebda/shared';
+import { displayedImageKey, imageMarker } from '../render/image-key';
 
 export interface ImageTextSettings extends SectionPaddingMaxWidthVisibility {
   image?: string;
@@ -69,6 +70,7 @@ export function ImageTextSection({
   const button = pick(settings.buttonText, settings.buttonTextAr);
   const image = pick(settings.image, settings.imageAr);
   const alt = pick(settings.alt, settings.altAr);
+  const imageKey = displayedImageKey(ar, settings.image, settings.imageAr);
   const spacing = sectionSpacingClasses(settings, store.look);
   const edit = (key: string) =>
     editorMode ? { 'data-builder-setting': ar ? `${key}Ar` : key } : {};
@@ -98,6 +100,7 @@ export function ImageTextSection({
           alt={alt}
           loading="lazy"
           className="absolute inset-0 h-full w-full object-cover"
+          {...imageMarker(editorMode, imageKey)}
         />
         <div className="relative flex min-h-[60svh] w-full items-end justify-start">
           <div
@@ -151,11 +154,13 @@ export function ImageTextSection({
                 alt={alt}
                 loading="lazy"
                 className={`w-full rounded-[var(--radius)] object-cover ${ASPECT[settings.imageAspect ?? 'square']}`}
+                {...imageMarker(editorMode, imageKey)}
               />
             ) : (
               <div
                 aria-hidden="true"
                 className={`w-full rounded-[var(--radius)] bg-muted ${ASPECT[settings.imageAspect ?? 'square']}`}
+                {...imageMarker(editorMode, imageKey)}
               />
             )}
           </div>

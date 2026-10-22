@@ -23,6 +23,7 @@ dispatches one `DocumentAction`.
 | child to parent | `select` | `sectionId`, `blockId?` | v1 |
 | child to parent | `hover` | `sectionId \| null`, `blockId?` | v1 |
 | child to parent | `patch-text` | `sectionId`, `blockId?`, `key`, `value` (max 2048) | v1 |
+| child to parent | `request-media` | `sectionId`, `blockId?`, `key` (names a target; never a URL) | v1 |
 
 Rule: a new message type needs a strict schema here and a row in this table.
 
@@ -51,6 +52,19 @@ does). The editable takes the FIELD's direction (`…Ar` is RTL) with
 `unicode-bidi: plaintext`; Enter commits except during IME composition; Escape
 cancels; Tab / Shift+Tab commit and move to the next / previous text; paste and
 drop insert plain text. The value is read from `innerText`.
+
+## Changing an image
+
+`data-builder-image="<key>"` marks a picture (hero slide frame, image-text,
+maker profile, look photo). The key is the setting ON SCREEN (`imageAr` in
+Arabic when set, else `image`; `render/image-key.ts`). A selected target shows a
+"change image" button on each of its pictures. The click sends `request-media`
+with the target only. The parent re-checks that the key is an `image` setting
+of that node (`mediaRequestFor`), opens `MediaPicker` (the store's own,
+tenant-scoped media; recommended size from `IMAGE_STANDARDS` per template),
+asks for the alt text (Arabic and English when the setting has an alt sibling),
+and commits the picture and the description under one coalesce key, so undo
+reverts both in one step.
 
 Not yet marked (listed for the editor matrix): skin-owned text under
 `apps/web/src/templates/<skin>/` and the legacy `trustStrip` items.

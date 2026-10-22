@@ -273,6 +273,7 @@ export function HeroBanner({
       dir={isRtl ? 'rtl' : 'ltr'}
       data-frame-draw={drawFrame ? '' : undefined}
       data-builder-block={!inSlider ? builderBlockId : undefined}
+      data-builder-image={builderBlockId ? (isRtl && imageAr ? 'imageAr' : 'image') : undefined}
     >
       <HeroBannerLink link={link} label={bannerLabel} urlPrefix={urlPrefix}>
         {desktopSrc &&

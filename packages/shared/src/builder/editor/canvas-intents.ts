@@ -8,7 +8,13 @@
 import type { PageDefinition } from '../schema';
 import type { DocumentAction } from './document-reducer';
 import type { ChildToParent } from './protocol';
-import { normalizeInlineText, textTargetIn } from './canvas-targets';
+import {
+  imageTargetIn,
+  nodeFor,
+  normalizeInlineText,
+  textTargetIn,
+  type ImageTarget,
+} from './canvas-targets';
 
 export interface IntentResult {
   action: DocumentAction;
@@ -39,4 +45,55 @@ export function intentToAction(doc: PageDefinition, msg: ChildToParent): IntentR
     default:
       return null;
   }
+}
+
+/** A validated "change this image" request, ready for the parent's media picker. */
+export interface MediaRequest {
+  sectionId: string;
+  blockId?: string;
+  key: string;
+  target: ImageTarget;
+  /** The current alt text (en / ar), when the setting has an alt sibling. */
+  alt?: { en: string; ar?: string };
+}
+
+/** `request-media` re-checked against the CURRENT document: the key must be an image setting of that node. */
+export function mediaRequestFor(doc: PageDefinition, msg: ChildToParent): MediaRequest | null {
+  if (msg.type !== 'request-media') return null;
+  const target = imageTargetIn(doc, msg.sectionId, msg.blockId, msg.key);
+  if (!target) return null;
+  const settings = nodeFor(doc, msg.sectionId, msg.blockId)?.settings ?? {};
+  const str = (k: string | undefined) =>
+    k && typeof settings[k] === 'string' ? (settings[k] as string) : '';
+  return {
+    sectionId: msg.sectionId,
+    ...(msg.blockId ? { blockId: msg.blockId } : {}),
+    key: msg.key,
+    target,
+    ...(target.alt
+      ? { alt: { en: str(target.alt.en), ...(target.alt.ar ? { ar: str(target.alt.ar) } : {}) } }
+      : {}),
+  };
+}
+
+/** The actions that store a picked image (and its alt text, when given): one undo step via one coalesce key. */
+export function imageSwapActions(
+  req: Pick<MediaRequest, 'sectionId' | 'blockId' | 'key' | 'target'>,
+  url: string,
+  alt?: { en?: string; ar?: string }
+): IntentResult[] {
+  const coalesce = `${req.sectionId}/${req.blockId ?? ''}/image-swap`;
+  const set = (key: string, value: string): IntentResult => ({
+    action: req.blockId
+      ? { type: 'setBlockSetting', sectionId: req.sectionId, blockId: req.blockId, key, value }
+      : { type: 'setSectionSetting', id: req.sectionId, key, value },
+    coalesce,
+  });
+  const out = [set(req.key, url)];
+  if (alt && req.target.alt) {
+    if (alt.en !== undefined) out.push(set(req.target.alt.en, alt.en.trim().slice(0, 300)));
+    if (alt.ar !== undefined && req.target.alt.ar)
+      out.push(set(req.target.alt.ar, alt.ar.trim().slice(0, 300)));
+  }
+  return out;
 }

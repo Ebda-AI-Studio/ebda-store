@@ -38,6 +38,7 @@ import { sectionSpacingClasses } from '../../templates/shared/section-spacing';
 import { EmptySectionHint } from '../render/EmptySectionHint';
 import { SectionHeader } from './SectionHeader';
 import { lookPanelPath } from '../../lib/shop-the-look';
+import { displayedImageKey, imageMarker } from '../render/image-key';
 
 export interface ShopTheLookSettings extends SectionPaddingMaxWidthVisibility {
   heading?: string;
@@ -100,6 +101,11 @@ export function ShopTheLookSection({
         id: b.id,
         title: pick(b.settings.title, b.settings.titleAr),
         image: pick(b.settings.image, b.settings.imageAr),
+        imageKey: displayedImageKey(
+          ar,
+          typeof b.settings.image === 'string' ? b.settings.image : undefined,
+          typeof b.settings.imageAr === 'string' ? b.settings.imageAr : undefined
+        ),
         alt: pick(b.settings.alt, b.settings.altAr),
         pieces,
       };
@@ -146,7 +152,10 @@ export function ShopTheLookSection({
                 >
                   <article className="flex h-full flex-col">
                     {l.image && (
-                      <div className="relative aspect-[4/5] overflow-hidden rounded-[var(--radius)] bg-muted">
+                      <div
+                        className="relative aspect-[4/5] overflow-hidden rounded-[var(--radius)] bg-muted"
+                        {...imageMarker(editorMode, l.imageKey)}
+                      >
                         <Image
                           src={l.image}
                           alt={l.alt || l.title}

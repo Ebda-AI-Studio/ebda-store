@@ -10084,7 +10084,13 @@
       "loadError": "Images could not be loaded.",
       "empty": "No images yet — upload one.",
       "more": "Load more",
-      "loading": "Loading…"
+      "loading": "Loading…",
+      "altTitle": "Describe this picture",
+      "altHint": "One short line for people who cannot see it. You can leave it empty.",
+      "altEn": "Description (English)",
+      "altAr": "Description (Arabic)",
+      "altApply": "Use this image",
+      "altBack": "Choose another"
     },
     "settings": {
       "empty": "Select a section in the page or the list to edit it.",

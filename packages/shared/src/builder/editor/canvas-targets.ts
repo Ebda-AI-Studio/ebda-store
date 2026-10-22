@@ -22,6 +22,14 @@ export interface TextTarget {
   multiline: boolean;
 }
 
+export interface ImageTarget {
+  key: string;
+  /** The image standard its size hint comes from (`IMAGE_STANDARDS`), when it has one. */
+  standard?: 'heroDesktop' | 'heroMobile';
+  /** Text settings that describe this picture (alt text), shown after a swap. */
+  alt?: { en: string; ar?: string };
+}
+
 export interface TextTargets {
   section: TextTarget[];
   blocks: Record<string, TextTarget[]>;
@@ -106,4 +114,65 @@ export function normalizeInlineText(value: string, multiline: boolean): string {
   const folded = value.replace(/\r\n?/g, '\n');
   const flat = multiline ? folded : folded.replace(/\s*\n\s*/g, ' ');
   return flat.trim().slice(0, MAX_INLINE_TEXT);
+}
+
+/**
+ * `image` settings a click on a picture may replace, by section type and block
+ * type. A localized image contributes `id` and `idAr`. The picture itself never
+ * travels over the protocol: the child names the target and the PARENT picks
+ * the file from the store's own media (`request-media`).
+ */
+const SIZE_STANDARD: Record<string, ImageTarget['standard']> = {
+  'hero/slide/image': 'heroDesktop',
+  'hero/slide/imageAr': 'heroDesktop',
+  'hero/slide/imageMobile': 'heroMobile',
+  'hero/slide/imageMobileAr': 'heroMobile',
+};
+
+function imageTargetsOf(scope: string, settings: readonly SettingDefinition[]): ImageTarget[] {
+  const alt = settings.find(s => s.id === 'alt' && s.type === 'text');
+  const out: ImageTarget[] = [];
+  for (const s of settings) {
+    if (s.type !== 'image') continue;
+    const mk = (key: string): ImageTarget => ({
+      key,
+      standard: SIZE_STANDARD[`${scope}/${key}`],
+      // Only the main picture owns the alt text; a mobile variant shares it.
+      ...(alt && s.id === 'image'
+        ? { alt: alt.localized ? { en: 'alt', ar: 'altAr' } : { en: 'alt' } }
+        : {}),
+    });
+    out.push(mk(s.id));
+    if (s.localized) out.push(mk(`${s.id}Ar`));
+  }
+  return out;
+}
+
+export const IMAGE_TARGETS: Readonly<
+  Record<string, { section: ImageTarget[]; blocks: Record<string, ImageTarget[]> }>
+> = Object.fromEntries(
+  SECTION_REGISTRY.map(d => [
+    d.type,
+    {
+      section: imageTargetsOf(d.type, d.settings),
+      blocks: Object.fromEntries(
+        d.blocks.map(b => [b.type, imageTargetsOf(`${d.type}/${b.type}`, b.settings)])
+      ),
+    },
+  ])
+);
+
+/** The image target `key` of a real node in `doc`, or null (unknown id, not an image setting). */
+export function imageTargetIn(
+  doc: PageDefinition,
+  sectionId: string,
+  blockId: string | undefined,
+  key: string
+): ImageTarget | null {
+  const n = nodeFor(doc, sectionId, blockId);
+  if (!n) return null;
+  const t = IMAGE_TARGETS[n.section.type];
+  if (!t) return null;
+  const list = n.blockType === undefined ? t.section : (t.blocks[n.blockType] ?? []);
+  return list.find(x => x.key === key) ?? null;
 }

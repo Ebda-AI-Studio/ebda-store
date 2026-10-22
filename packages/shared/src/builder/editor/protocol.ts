@@ -9,6 +9,7 @@
  *   child  -> parent `select`     { sectionId, blockId? } a section was clicked
  *   child  -> parent `hover`      { sectionId | null, blockId? }
  *   child  -> parent `patch-text` { sectionId, blockId?, key, value } inline text edit committed
+ *   child  -> parent `request-media` { sectionId, blockId?, key }  "change image" (names the target; the parent picks the file)
  *
  * Both sides accept a message ONLY when it parses here AND it comes from the
  * expected peer: the child checks `event.origin` against the admin origin it
@@ -23,6 +24,8 @@ import { pageDefinitionSchema, SECTION_ID_RE } from '../schema';
 export const BUILDER_PROTOCOL = 'ebda-builder:v1' as const;
 
 const id = z.string().regex(SECTION_ID_RE);
+/** A setting key: letters and digits only, never a path or markup. */
+const settingKey = z.string().regex(/^[a-zA-Z][a-zA-Z0-9]{0,40}$/);
 const base = { protocol: z.literal(BUILDER_PROTOCOL) };
 
 export const parentToChildSchema = z.discriminatedUnion('type', [
@@ -49,8 +52,17 @@ export const childToParentSchema = z.discriminatedUnion('type', [
       type: z.literal('patch-text'),
       sectionId: id,
       blockId: id.optional(),
-      key: z.string().regex(/^[a-zA-Z][a-zA-Z0-9]{0,40}$/),
+      key: settingKey,
       value: z.string().max(2048),
+    })
+    .strict(),
+  z
+    .object({
+      ...base,
+      type: z.literal('request-media'),
+      sectionId: id,
+      blockId: id.optional(),
+      key: settingKey,
     })
     .strict(),
 ]);

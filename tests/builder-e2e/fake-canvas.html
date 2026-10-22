@@ -83,6 +83,8 @@
       });
       window.__patch = (sectionId, key, value, blockId) =>
         send({ type: 'patch-text', sectionId, ...(blockId ? { blockId } : {}), key, value });
+      window.__requestMedia = (sectionId, key, blockId) =>
+        send({ type: 'request-media', sectionId, ...(blockId ? { blockId } : {}), key });
       send({ type: 'ready' });
     </script>
   </body>

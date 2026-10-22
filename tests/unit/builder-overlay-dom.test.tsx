@@ -38,7 +38,7 @@ function page(d: PageDefinition) {
     <div data-zone="header"><nav id="nav">menu</nav></div>
     <main>
       <div data-builder-id="${hero.id}" style="display:contents">
-        <section id="hero"><div id="s1" data-builder-block="slide-1"><h1 id="t1" data-builder-setting="headline">A</h1></div>
+        <section id="hero"><div id="s1" data-builder-block="slide-1" data-builder-image="image"><h1 id="t1" data-builder-setting="headline">A</h1></div>
         <div id="s2" data-builder-block="slide-2"><h1 id="t2" data-builder-setting="headline">B</h1></div></section>
       </div>
     </main>
@@ -197,5 +197,37 @@ describe('EditorOverlay (real)', () => {
     fireEvent.dblClick(h);
     expect(h.getAttribute('dir')).toBe('rtl');
     expect(h.getAttribute('lang')).toBe('ar');
+  });
+
+  it('a selected slide shows a keyboard-reachable "change image" that asks the parent (target only, no url)', () => {
+    const d = doc();
+    const heroId = page(d);
+    mountOverlay(d, 'ar');
+    // nothing selected: no button
+    expect(document.querySelector('[data-builder-change-image]')).toBeNull();
+    fireEvent.click(document.getElementById('t1')!);
+    const btn = document.querySelector<HTMLButtonElement>('[data-builder-change-image]')!;
+    expect(btn).toBeTruthy();
+    expect(btn.tagName).toBe('BUTTON');
+    expect(btn.getAttribute('aria-label')).toBe('تغيير الصورة');
+    expect(btn.tabIndex).toBe(0);
+    fireEvent.click(btn);
+    const req = posted().find(m => m.type === 'request-media');
+    expect(req).toEqual({
+      protocol: BUILDER_PROTOCOL,
+      type: 'request-media',
+      sectionId: heroId,
+      blockId: 'slide-1',
+      key: 'image',
+    });
+    expect(Object.keys(req).sort()).toEqual(['blockId', 'key', 'protocol', 'sectionId', 'type']);
+  });
+
+  it('only the images of the selected target get a button', () => {
+    const d = doc();
+    page(d);
+    mountOverlay(d, 'en');
+    fireEvent.click(document.getElementById('t2')!); // slide 2 has no image marker
+    expect(document.querySelector('[data-builder-change-image]')).toBeNull();
   });
 });

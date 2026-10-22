@@ -24,10 +24,13 @@ export function MediaPicker({
   storeId,
   onPick,
   onClose,
+  hint,
 }: {
   storeId: string;
   onPick: (url: string) => void;
   onClose: () => void;
+  /** One line under the title, e.g. the recommended size for this picture. */
+  hint?: string;
 }) {
   const t = useT('builder.media');
   const ref = useRef<HTMLDialogElement>(null);
@@ -96,6 +99,11 @@ export function MediaPicker({
           </button>
         </div>
       </div>
+      {hint && (
+        <p className="px-5 pt-3 text-xs text-muted-foreground" data-testid="media-hint">
+          {hint}
+        </p>
+      )}
       {uploadError && (
         <p role="alert" className="px-5 pt-3 text-sm text-destructive-ink">
           {uploadError}

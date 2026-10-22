@@ -78,6 +78,49 @@ function boxOf(target: CanvasTarget, doc: PageDefinition): Rect | null {
   return el ? unionRect([rectOf(el)]) : null;
 }
 
+interface ImageHandle {
+  key: string;
+  sectionId: string;
+  blockId?: string;
+  box: Rect;
+}
+
+/**
+ * The pictures of the selected target that can be replaced: marked
+ * `data-builder-image`, inside the selected block, or (for a section) outside
+ * every block. Hidden ones (no box) are skipped.
+ */
+function imagesOf(target: CanvasTarget | null): ImageHandle[] {
+  if (!target) return [];
+  const section = document.querySelector(`[data-builder-id="${CSS.escape(target.sectionId)}"]`);
+  if (!section) return [];
+  const found = new Set<Element>();
+  if (target.blockId) {
+    for (const root of section.querySelectorAll(
+      `[data-builder-block="${CSS.escape(target.blockId)}"]`
+    )) {
+      if (root.hasAttribute('data-builder-image')) found.add(root);
+      for (const el of root.querySelectorAll('[data-builder-image]')) found.add(el);
+    }
+  } else {
+    for (const el of section.querySelectorAll('[data-builder-image]'))
+      if (!el.closest('[data-builder-block]')) found.add(el);
+  }
+  const out: ImageHandle[] = [];
+  for (const el of found) {
+    const key = el.getAttribute('data-builder-image');
+    const box = rectOf(el);
+    if (key && box.width > 0 && box.height > 0)
+      out.push({ key, sectionId: target.sectionId, blockId: target.blockId, box });
+  }
+  return out;
+}
+
+const COPY = {
+  en: { changeImage: 'Change image' },
+  ar: { changeImage: 'تغيير الصورة' },
+} as const;
+
 const same = (a: CanvasTarget | null, b: CanvasTarget | null) =>
   a?.sectionId === b?.sectionId && a?.blockId === b?.blockId;
 
@@ -298,10 +341,50 @@ export default function EditorOverlay({ allowedOrigins, locale, definition, onRe
     );
   };
 
+  const pageWidth = document.documentElement.clientWidth;
+  const imageButtons = imagesOf(selected).map(h => (
+    <button
+      key={`${h.blockId ?? ''}/${h.key}/${Math.round(h.box.top)}`}
+      type="button"
+      data-builder-change-image={h.key}
+      aria-label={COPY[locale].changeImage}
+      onClick={e => {
+        e.stopPropagation();
+        post({
+          type: 'request-media',
+          sectionId: h.sectionId,
+          ...(h.blockId ? { blockId: h.blockId } : {}),
+          key: h.key,
+        } as Omit<ChildToParent, 'protocol'>);
+      }}
+      style={{
+        position: 'absolute',
+        top: h.box.top + 8,
+        insetInlineEnd: isRtl
+          ? h.box.left + 8
+          : Math.max(0, pageWidth - (h.box.left + h.box.width)) + 8,
+        zIndex: 2147483002,
+        minHeight: 36,
+        padding: '0 12px',
+        borderRadius: 8,
+        border: `1px solid ${BRAND.colors.gold}`,
+        background: '#1c1917',
+        color: '#ffffff',
+        fontSize: 13,
+        fontWeight: 600,
+        cursor: 'pointer',
+        direction: isRtl ? 'rtl' : 'ltr',
+      }}
+    >
+      {COPY[locale].changeImage}
+    </button>
+  ));
+
   return (
     <>
       {!same(hovered, selected) && outline(hovered, 'hover')}
       {outline(selected, 'selected')}
+      {imageButtons}
     </>
   );
 }

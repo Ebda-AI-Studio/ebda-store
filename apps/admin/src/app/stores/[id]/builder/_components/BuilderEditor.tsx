@@ -23,7 +23,12 @@ import {
   applyTemplateFamily,
   effectiveTheme,
   getLook,
+  imageSwapActions,
   intentToAction,
+  mediaRequestFor,
+  recommendedSizeTextForTemplateI18n,
+  type MediaRequest,
+  type TemplateId,
   type ChildToParent,
   type DraftTheme,
   type DocumentAction,
@@ -35,6 +40,7 @@ import { useT } from '@/i18n/useT';
 import { apiGet, apiPost } from '../../../../../lib/api';
 import { getStoreHref } from '../../../../../lib/store-url';
 import { useBuilderDocument } from '../_lib/useBuilderDocument';
+import { ImageSwapDialog } from './ImageSwapDialog';
 import { Canvas } from './Canvas';
 import { SectionTree, type Selection } from './SectionTree';
 import { SettingsPanel } from './SettingsPanel';
@@ -50,6 +56,7 @@ interface StoreInfo {
   domain?: string | null;
   theme?: StoreTheme;
   look?: string | null;
+  template?: string | null;
 }
 
 type StartTab = 'sections' | 'theme' | 'history';
@@ -65,6 +72,8 @@ export function BuilderEditor({ storeId }: { storeId: string }) {
   const [selection, setSelection] = useState<Selection | null>(null);
   const [hovered, setHovered] = useState<string | null>(null);
   const [addTo, setAddTo] = useState<SectionList | null>(null);
+  // "Change image" asked for on the canvas (the file is picked HERE, never by the canvas).
+  const [mediaReq, setMediaReq] = useState<MediaRequest | null>(null);
   const [tab, setTab] = useState<StartTab>('sections');
   const [drawer, setDrawer] = useState<'start' | 'end' | null>(null);
   const [reloadKey, setReloadKey] = useState(1);
@@ -130,6 +139,11 @@ export function BuilderEditor({ storeId }: { storeId: string }) {
       // Every other intent is re-validated against the CURRENT document and the registry
       // (VE-2) and becomes exactly one document action, or is dropped.
       const doc = docRef.current;
+      if (msg.type === 'request-media') {
+        const req = doc ? mediaRequestFor(doc, msg) : null;
+        if (req) setMediaReq(req);
+        return;
+      }
       const intent = doc ? intentToAction(doc, msg) : null;
       if (intent) dispatch(intent.action, intent.coalesce);
     },
@@ -512,6 +526,28 @@ export function BuilderEditor({ storeId }: { storeId: string }) {
           {endPane}
         </aside>
       </div>
+
+      {mediaReq && (
+        <ImageSwapDialog
+          storeId={storeId}
+          request={mediaReq}
+          hint={
+            mediaReq.target.standard
+              ? recommendedSizeTextForTemplateI18n(
+                  mediaReq.target.standard,
+                  (store?.template as TemplateId | undefined) ?? undefined,
+                  locale === 'ar' ? 'ar' : 'en'
+                )
+              : undefined
+          }
+          onClose={() => setMediaReq(null)}
+          onApply={(url, alt) => {
+            // One coalesce key: the picture and its description are ONE undo step.
+            for (const i of imageSwapActions(mediaReq, url, alt)) dispatch(i.action, i.coalesce);
+            setMediaReq(null);
+          }}
+        />
+      )}
 
       {addTo && (
         <AddSectionDialog

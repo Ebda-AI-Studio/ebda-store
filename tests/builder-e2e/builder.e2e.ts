@@ -239,6 +239,49 @@ test('inline Arabic edit of a slide headline reaches the draft, undo restores it
   expect(await slideHeadline()).toBe('علب هدايا');
 });
 
+test('change image from the canvas: pick, describe, one undo step; a non-image key opens nothing', async ({
+  page,
+}) => {
+  await openBuilder(page);
+  const slide = async () => {
+    const hero = (await state(page)).draft?.definition.sections.find(x => x.id === 'hero') as
+      | { blocks?: Array<{ id: string; settings: Record<string, unknown> }> }
+      | undefined;
+    return hero?.blocks?.find(b => b.id === 'slide-2')?.settings;
+  };
+  // the canvas names a target that is NOT an image setting: nothing opens
+  await canvas(page)
+    .locator('body')
+    .evaluate(() => (window as any).__requestMedia('hero', 'headline', 'slide-2'));
+  await page.waitForTimeout(500);
+  await expect(page.getByTestId('media-picker')).toHaveCount(0);
+
+  await canvas(page)
+    .locator('body')
+    .evaluate(() => (window as any).__requestMedia('hero', 'image', 'slide-2'));
+  await expect(page.getByTestId('media-picker')).toBeVisible();
+  // the recommended size comes from the image standard, in the admin language
+  await expect(page.getByTestId('media-hint')).toContainText(L('الحجم الموصى به', 'Recommended'));
+  await page.getByTestId('media-picker').locator('ul button').first().click();
+
+  // a slide has an alt text: the description step follows the pick
+  await expect(page.getByTestId('image-swap-alt')).toBeVisible();
+  await page.getByTestId('swap-alt-en').fill('Gift boxes of dates');
+  await page.getByTestId('swap-apply').click();
+  await expect(page.getByTestId('image-swap-alt')).toHaveCount(0);
+  await waitSaved(page);
+  expect(await slide()).toMatchObject({
+    image: 'https://media.ebda.app/stores/e2e/builder/a.jpg',
+    alt: 'Gift boxes of dates',
+  });
+
+  // the picture and its description are ONE undo step
+  await page.getByTestId('undo').click();
+  await waitSaved(page);
+  expect(await slide()).toMatchObject({ image: 'https://media.ebda.app/hero-2.jpg' });
+  expect((await slide())?.alt).toBeUndefined();
+});
+
 test('viewport switch sizes the canvas 1280 / 820 / 390', async ({ page }) => {
   await openBuilder(page);
   for (const [v, w] of [
