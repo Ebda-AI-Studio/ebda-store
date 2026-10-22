@@ -72,6 +72,11 @@ import {
   type TemplateFamily,
   type TemplateId,
   getLook,
+  PAGE_KINDS,
+  defaultPageDocument,
+  isSectionPageKind,
+  validateDefinitionSync,
+  type SectionPageKind,
 } from '@ebda/shared';
 import { withSavepoint } from '../lib/savepoint';
 import { fontLibraryProblems } from '../lib/font-url-guard';
@@ -82,6 +87,8 @@ import { cleanupRemovedJsonUrls, deleteR2ObjectIfOrphan } from './r2-cleanup.ser
 import logger from '../lib/logger';
 
 export const HOME_PAGE_KEY = 'home';
+/** The page documents the builder edits (home plus the product / collection / cart section pages). */
+export const BUILDER_PAGE_KEYS: ReadonlySet<string> = new Set(PAGE_KINDS);
 
 export type RevisionStatus = 'draft' | 'published' | 'archived';
 
@@ -157,6 +164,19 @@ async function loadStore(storeId: string) {
   );
 }
 
+/**
+ * The document a page has before anyone saved one: the home page is derived from `layout_settings`
+ * through the adapter; a product / collection / cart page is its default section document (Ruling
+ * VE-3 amended): the order the storefront already renders, so nothing is migrated.
+ */
+function fallbackDefinition(
+  store: { layoutSettings: unknown; template: string | null; look?: string | null },
+  pageKey: string
+): PageDefinition {
+  if (isSectionPageKind(pageKey)) return defaultPageDocument(pageKey);
+  return layoutToDefinition(resolvedLayout(store), pageKey);
+}
+
 async function loadRows(storeId: string, pageKey: string) {
   const [draft, published, head] = await Promise.all([
     prisma.storePageRevision.findFirst({
@@ -214,7 +234,7 @@ export async function getPageState(storeId: string, pageKey: string): Promise<Pa
       ? (draft.document as PageDefinition)
       : published
         ? withoutTheme(published.document)
-        : layoutToDefinition(resolvedLayout(store), pageKey),
+        : fallbackDefinition(store, pageKey),
     source: draft ? 'draft' : published ? 'published' : 'layout',
     draftRev: draft?.rev ?? null,
     publishedRev: published?.rev ?? null,
@@ -251,6 +271,7 @@ export async function getPublishedDefinition(
       select: { rev: true, document: true },
     })
   );
+  if (isSectionPageKind(pageKey)) return publishedPageDocument(pageKey, published);
   if (published) {
     const doc = published.document as unknown as PageDefinition;
     try {
@@ -265,6 +286,40 @@ export async function getPublishedDefinition(
     );
   }
   return { definition: layoutToDefinition(layout, pageKey), rev: published?.rev ?? null };
+}
+
+/**
+ * A section page (product / collection / cart) has no `layout_settings` projection to disagree with, so
+ * its published document is served as it is, once it still validates; an unreadable or stale one falls
+ * back to the default document rather than breaking the page.
+ */
+function publishedPageDocument(
+  pageKey: SectionPageKind,
+  published: { rev: number; document: unknown } | null
+): { definition: PageDefinition; rev: number | null } {
+  if (published) {
+    const check = validateDefinitionSync(published.document);
+    if (check.ok) return { definition: published.document as PageDefinition, rev: published.rev };
+    logger.warn(
+      { pageKey, rev: published.rev },
+      '[page-builder] published page document no longer validates; rendering the default document'
+    );
+  }
+  return { definition: defaultPageDocument(pageKey), rev: published?.rev ?? null };
+}
+
+/** The PUBLISHED document of a product / collection / cart page (the default one when none is saved). */
+export async function getPublishedPageDocument(
+  storeId: string,
+  kind: SectionPageKind
+): Promise<{ definition: PageDefinition; rev: number | null }> {
+  const published = await readInStoreContext(storeId, () =>
+    prisma.storePageRevision.findFirst({
+      where: { storeId, pageKey: kind, status: 'published' },
+      select: { rev: true, document: true },
+    })
+  );
+  return publishedPageDocument(kind, published);
 }
 
 async function validateForWrite(storeId: string, input: unknown) {
@@ -448,9 +503,21 @@ async function promote(
  */
 async function applyPublishedLayout(
   storeId: string,
-  store: { layoutSettings: unknown; slug: string; domain: string | null },
+  store: {
+    layoutSettings: unknown;
+    template: string | null;
+    look: string | null;
+    slug: string;
+    domain: string | null;
+  },
   definition: PageDefinition
 ): Promise<StoreLayoutSettings> {
+  // A product / collection / cart document is not a projection of `layout_settings`: publishing it
+  // writes nothing to the store row, it only purges the caches so the storefront re-reads it.
+  if (isSectionPageKind(definition.pageKey)) {
+    purgePublishedCaches(storeId, store.slug, store.domain);
+    return resolvedLayout(store);
+  }
   const layout = definitionToLayout(definition);
   const themePatch = definition.theme;
   const typographyPatch = hasTypographyPatch(definition.typography)

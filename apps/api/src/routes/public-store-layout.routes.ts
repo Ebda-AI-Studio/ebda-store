@@ -8,12 +8,13 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { prisma, withStore } from '@ebda/database';
 import { lookupStore } from '../lib/definer';
-import { resolveLayoutSettings } from '@ebda/shared';
+import { isSectionPageKind, resolveLayoutSettings } from '@ebda/shared';
 import type { TemplateId } from '@ebda/shared';
 import { redis } from '../services/redis.service';
 import { readInStoreContext } from '../lib/store-scoped-read';
 import {
   getPublishedDefinition,
+  getPublishedPageDocument,
   getPreviewDefinition,
   previewTokenKey,
 } from '../services/page-builder.service';
@@ -145,6 +146,41 @@ router.get('/stores/:storeId/layout', async (req: Request, res: Response, next: 
     next(error);
   }
 });
+
+/**
+ * GET /public/stores/:storeId/pages/:kind   (kind = product | collection | cart)
+ * The PUBLISHED section document of a product, collection or cart page (the default document, which
+ * equals today's render, when the merchant never saved one). Never a draft: the editor canvas reads its
+ * draft through `builder-preview`. CACHE CLASS: BOUNDED-stale, same as `/layout`: the storefront fetch
+ * carries the `layout:<storeId>` tag and every publish / rollback purges it (`bustStoreCaches`).
+ */
+router.get(
+  '/stores/:storeId/pages/:kind',
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { storeId, kind } = req.params;
+      if (!isSectionPageKind(kind)) {
+        res
+          .status(404)
+          .json({ success: false, error: { code: 'PAGE_NOT_FOUND', message: 'Unknown page' } });
+        return;
+      }
+      // `stores` is under RLS: only an ACTIVE store resolves, through the lookup definer.
+      const hit = await lookupStore({ id: storeId }, ['active']);
+      if (!hit) {
+        res
+          .status(404)
+          .json({ success: false, error: { code: 'NOT_FOUND', message: 'Store not found' } });
+        return;
+      }
+      const { definition, rev } = await getPublishedPageDocument(hit.id, kind);
+      res.setHeader('Cache-Control', 'public, max-age=60, s-maxage=120');
+      res.json({ success: true, data: { definition, rev } });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
 
 /**
  * GET /public/stores/:storeId/builder-preview?token=<t>

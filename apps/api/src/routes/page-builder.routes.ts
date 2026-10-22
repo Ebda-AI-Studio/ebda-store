@@ -27,7 +27,7 @@ import { getAuthUser } from '../utils/store-helpers';
 import { randomBytes } from 'node:crypto';
 import { redis } from '../services/redis.service';
 import {
-  HOME_PAGE_KEY,
+  BUILDER_PAGE_KEYS,
   PREVIEW_TOKEN_TTL_SECONDS,
   previewTokenKey,
   getPageState,
@@ -40,8 +40,8 @@ import {
 
 const router = Router({ mergeParams: true });
 
-/** v1 edits the homepage only; other page keys arrive with CMS pages (roadmap Phase 4). */
-const SUPPORTED_PAGES = new Set([HOME_PAGE_KEY]);
+/** The home page plus the product / collection / cart section pages (Ruling VE-3, amended). */
+const SUPPORTED_PAGES = BUILDER_PAGE_KEYS;
 
 const rev = z.number().int().min(0).max(2_147_483_647);
 const draftBody = z.object({ baseRev: rev, definition: z.unknown() }).strict();
