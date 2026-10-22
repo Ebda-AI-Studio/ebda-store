@@ -21,7 +21,8 @@ const FIELD_ALIASES: Record<string, string> = {
 };
 
 /** The settings-schema field id a deep link's `field` stands for (itself unless it is a registry id). */
-export const fieldDefId = (field: string): string => FIELD_ALIASES[field] ?? field;
+export const fieldDefId = (field: string): string =>
+  Object.prototype.hasOwnProperty.call(FIELD_ALIASES, field) ? FIELD_ALIASES[field]! : field;
 
 export interface DeepLinkParams {
   select?: string;
@@ -73,7 +74,7 @@ export function resolveDeepLink(
     if (params.field) target.field = params.field;
     const { select } = params;
     if (!select) return target;
-    if (select in TAB_TOKENS) {
+    if (Object.prototype.hasOwnProperty.call(TAB_TOKENS, select)) {
       const tab = TAB_TOKENS[select as keyof typeof TAB_TOKENS];
       if (tab !== 'theme' || opts.canOpenTheme !== false) target.tab = tab;
       return target;

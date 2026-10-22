@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { layoutToDefinition, resolveLayoutSettings } from '@ebda/shared';
-import { parseDeepLink, resolveDeepLink } from './deeplink';
+import { fieldDefId, parseDeepLink, resolveDeepLink } from './deeplink';
 
 const base = layoutToDefinition(resolveLayoutSettings({}, 'modern'));
 // The default home has no header section or slides: add one of each so every lookup path is real.
@@ -54,6 +54,14 @@ describe('builder deep link', () => {
     });
     expect(resolveDeepLink(doc, { select: 'history' }).tab).toBe('history');
     expect(resolveDeepLink(doc, { select: 'theme' }, { canOpenTheme: false }).tab).toBeUndefined();
+  });
+  it('Object.prototype names are not tabs or aliases', () => {
+    for (const name of ['constructor', 'toString', 'hasOwnProperty', '__proto__']) {
+      const r = resolveDeepLink(doc, { select: name, field: name }, { canOpenTheme: true });
+      expect(r.tab).toBeUndefined();
+      expect(r.selection).toBeUndefined();
+      expect(fieldDefId(name)).toBe(name);
+    }
   });
   it('drops values that are not plain tokens', () => {
     expect(parseDeepLink(q('select=<script>&field=a b&block=../x'))).toEqual({});

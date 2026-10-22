@@ -202,11 +202,13 @@ export function BuilderEditor({
   // The deep link (⌘K, a pasted URL) is applied ONCE, when the document first arrives: it selects
   // the section (canvas + tree follow `selection`), opens the tab or pane that holds the control and
   // rings the field. An unknown id selects nothing and breaks nothing.
-  const linkApplied = useRef(false);
+  const linkApplied = useRef<string | null>(null);
   const [focusField, setFocusField] = useState<string | undefined>(undefined);
   useEffect(() => {
-    if (linkApplied.current || !b.doc) return;
-    linkApplied.current = true;
+    // Once per distinct link: a doc edit never re-applies it, a NEW link on the open page does.
+    const key = JSON.stringify([deepLink?.select, deepLink?.block, deepLink?.field]);
+    if (linkApplied.current === key || !b.doc) return;
+    linkApplied.current = key;
     if (!deepLink || (!deepLink.select && !deepLink.field)) return;
     const target = resolveDeepLink(b.doc, deepLink, { canOpenTheme: isHome });
     if (target.tab) {
