@@ -33,7 +33,15 @@ export const LEGAL_SLUGS = [
   'acceptable-use',
 ] as const;
 export type LegalSlug = (typeof LEGAL_SLUGS)[number];
-export const COMPARE_SLUGS = ['salla', 'zid', 'shopify', 'wuilt', 'youcan', 'easyorders', 'expandcart'] as const;
+export const COMPARE_SLUGS = [
+  'salla',
+  'zid',
+  'shopify',
+  'wuilt',
+  'youcan',
+  'easyorders',
+  'expandcart',
+] as const;
 export type CompareSlug = (typeof COMPARE_SLUGS)[number];
 export type ComparePage = `compare/${CompareSlug}`;
 export type PageSlug = '' | 'about' | 'credits' | 'features' | ComparePage | LegalSlug;
