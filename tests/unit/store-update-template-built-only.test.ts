@@ -52,10 +52,16 @@ describe('StoreService.updateTemplate', () => {
   });
 
   it('applyLook refuses a look that is not built, unless it is the store’s current look', async () => {
-    const designed = LOOKS.find(l => l.status === 'designed')!;
-    existing('classic', null);
-    await expect(
-      StoreService.applyLook('s1', designed.id, { design: 'keep' })
-    ).rejects.toMatchObject({ code: 'LOOK_NOT_AVAILABLE' });
+    // every look is built since Phase B5: flip one back for the check
+    const designed = LOOKS[LOOKS.length - 1]!;
+    (designed as { status: string }).status = 'designed';
+    try {
+      existing('classic', null);
+      await expect(
+        StoreService.applyLook('s1', designed.id, { design: 'keep' })
+      ).rejects.toMatchObject({ code: 'LOOK_NOT_AVAILABLE' });
+    } finally {
+      (designed as { status: string }).status = 'built';
+    }
   });
 });

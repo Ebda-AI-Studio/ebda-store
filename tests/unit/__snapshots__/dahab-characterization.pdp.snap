@@ -87,9 +87,9 @@
 </div>
 <p>A single brilliant.</p>
 <div>
-<div role="group" aria-labelledby=":R4q:-label-0" aria-describedby=":R4q:-hint-0" tabindex="-1" data-option-group="Metal">
+<div role="group" aria-labelledby=":R:-label-0" aria-describedby=":R:-hint-0" tabindex="-1" data-option-group="Metal">
 <div>
-<span id=":R4q:-label-0">المعدن:</span>
+<span id=":R:-label-0">المعدن:</span>
 </div>
 <div>
 <button aria-pressed="false">
@@ -105,17 +105,17 @@
 </span>
 </button>
 </div>
-<p id=":R4q:-hint-0" aria-live="polite" data-testid="variant-nudge">
+<p id=":R:-hint-0" aria-live="polite" data-testid="variant-nudge">
 </p>
 </div>
 </div>
 <div>
-<label for=":R5a:">
+<label for=":R:">
 <bdi>الحروف</bdi>
 <span aria-hidden="true">*</span>
 </label>
-<input id=":R5a:" type="text" dir="auto" maxLength="12" required="" aria-required="true" aria-describedby=":R5a:-hint" autoComplete="off" enterKeyHint="done" placeholder="مثال: منى" value="AB"/>
-<p id=":R5a:-hint">
+<input id=":R:" type="text" dir="auto" maxLength="12" required="" aria-required="true" aria-describedby=":R:-hint" autoComplete="off" enterKeyHint="done" placeholder="مثال: منى" value="AB"/>
+<p id=":R:-hint">
 <span data-testid="personalisation-hint">
 </span>
 <span aria-label="عدد الحروف">2/12</span>
@@ -332,9 +332,9 @@
 </div>
 <p>A single brilliant.</p>
 <div>
-<div role="group" aria-labelledby=":R4q:-label-0" aria-describedby=":R4q:-hint-0" tabindex="-1" data-option-group="Metal">
+<div role="group" aria-labelledby=":R:-label-0" aria-describedby=":R:-hint-0" tabindex="-1" data-option-group="Metal">
 <div>
-<span id=":R4q:-label-0">Metal:</span>
+<span id=":R:-label-0">Metal:</span>
 </div>
 <div>
 <button aria-pressed="false">
@@ -350,17 +350,17 @@
 </span>
 </button>
 </div>
-<p id=":R4q:-hint-0" aria-live="polite" data-testid="variant-nudge">
+<p id=":R:-hint-0" aria-live="polite" data-testid="variant-nudge">
 </p>
 </div>
 </div>
 <div>
-<label for=":R5a:">
+<label for=":R:">
 <bdi>Letters</bdi>
 <span aria-hidden="true">*</span>
 </label>
-<input id=":R5a:" type="text" dir="auto" maxLength="12" required="" aria-required="true" aria-describedby=":R5a:-hint" autoComplete="off" enterKeyHint="done" placeholder="e.g. Mona" value="AB"/>
-<p id=":R5a:-hint">
+<input id=":R:" type="text" dir="auto" maxLength="12" required="" aria-required="true" aria-describedby=":R:-hint" autoComplete="off" enterKeyHint="done" placeholder="e.g. Mona" value="AB"/>
+<p id=":R:-hint">
 <span data-testid="personalisation-hint">
 </span>
 <span aria-label="Characters used">2/12</span>

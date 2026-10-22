@@ -5,6 +5,7 @@ import { ProductService } from '../services/product.service';
 import { SizeChartService } from '../services/size-chart.service';
 import { CartService } from '../services/cart.service';
 import { OrderService } from '../services/order.service';
+import { redactOrderForCustomer } from '../services/gold-rate/public';
 import { CustomerReorderService } from '../services/customer-reorder.service';
 import { InvoiceService } from '../services/invoice.service';
 import { EmailService } from '../services/email.service';
@@ -1396,7 +1397,8 @@ router.get(
 
       res.json({
         success: true,
-        data: { order },
+        // The shopper's own order without the merchant's cost and the gold margin (Ruling B5-23).
+        data: { order: redactOrderForCustomer(order) },
       });
     } catch (error) {
       next(error);

@@ -355,6 +355,17 @@ interface Order {
     /** The customer's personalisation text for this line. */
     personalisation?: string | null;
     /**
+     * How a gold-rate line was priced, frozen at sale (B5): the shopper-visible subset only (the server
+     * strips the margin, the making charge and the rate row id from customer reads, Ruling B5-23).
+     */
+    goldSnapshot?: {
+      karat: number;
+      weightMg: number;
+      ratePerGram: number;
+      rateAppliedAt: string;
+      unitPrice: number;
+    } | null;
+    /**
      * Set when this line is a bundle component (Task 6). `bundleGroupId`
      * groups the lines that came from ONE box — group by it to render a
      * single customer-facing row; never render these fields' presence to

@@ -40,6 +40,7 @@ import { loadCodFeeConfig } from './payment-providers/cod.provider';
 import { generateOrderNumber } from '../utils/order-number';
 import { PriceResolver, wholesaleEntitledUncached } from './price-resolver.service';
 import { assertGoldLinesPriceable, assertSameRates } from './gold-rate/gate';
+import { redactOrderForCustomer } from './gold-rate/public';
 import { ANONYMOUS_BUYER, type BuyerIdentity } from '../lib/buyer-identity';
 import { canSeeWholesaleOnly } from '../lib/audience';
 import {
@@ -2946,7 +2947,8 @@ export class OrderService {
     ]);
 
     return {
-      orders,
+      // Customer-facing by definition (a customer's own orders): never the merchant's cost or the gold margin (B5-23).
+      orders: orders.map(redactOrderForCustomer),
       meta: {
         page,
         limit,

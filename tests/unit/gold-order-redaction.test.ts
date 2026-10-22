@@ -52,6 +52,9 @@ describe('every customer-facing order read goes through the redaction', () => {
   it.each([
     ['apps/api/src/routes/order.routes.ts', 2],
     ['apps/api/src/services/auth.service.ts', 1],
+    // the guest success page and the signed-in order list (the main customer-facing reads)
+    ['apps/api/src/routes/public.routes.ts', 1],
+    ['apps/api/src/services/order.service.ts', 1],
   ])('%s', (file, minUses) => {
     const src = readFileSync(file, 'utf8');
     const uses = src.split('redactOrderForCustomer').length - 1 - 1; // minus the import

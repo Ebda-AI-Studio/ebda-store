@@ -1990,9 +1990,10 @@ export default function CheckoutClient() {
         case 'GOLD_RATE_STALE':
           // B5-16: fail closed. The store's gold rate is past its limit, so there is no price to charge.
           // Nothing was charged; the merchant has to update the rate before this piece can be ordered.
+          // The sentence is the product page's own stale sentence (GoldRateLine), word for word.
           friendly = t(
-            'The gold rate for one of your pieces is being updated, so the order cannot be placed right now. Please try again later or contact the store.',
-            'سعر الدهب لإحدى القطع بيتحدّث دلوقتي، فمش هنقدر نكمّل الطلب. جرّب تاني بعد شوية أو كلّم المحل.'
+            "We can't take orders for this piece right now because today's gold rate hasn't been updated. Please try again later or contact the store.",
+            'مش هنقدر نكمّل الطلب دلوقتي لأن سعر الدهب لسه مستني تحديث النهارده. جرّب تاني بعد شوية أو كلّم المحل.'
           );
           break;
         case 'GOLD_PRICE_DRIFT':

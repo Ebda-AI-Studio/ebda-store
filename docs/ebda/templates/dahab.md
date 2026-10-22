@@ -1,121 +1,60 @@
-# Dahab (دهب) — storefront template
+# Dahab (دهب) — jewellery template (Phase B5)
 
-> **Historical reference (2026-10-14).** Ruling TPL-2 retired the night/gold/arch skin described below. Dahab is now three looks in the looks registry — Worn (`dahab.worn`), Workshop (`dahab.workshop`), Gift box (`dahab.giftbox`) — see `docs/ebda/templates/looks.md`. The commerce wiring (ProductDetail, drawers, 3D slot) is reused; the visual language below is kept only as history until the old skin is deleted.
+Dahab is the Egyptian jewellery template: **three looks on one neutral skin**. It replaced the night + gold + arch skin of the builder pilot (Ruling TPL-2; the old skin, its Unsplash photos, its preview stack and its seed are removed in Phase B5, Task 7). The decisions and their reasons are in `docs/RULINGS.md` (B5-0 to B5-25); this page says what shipped.
 
-Builder Phase 3 pilot, 2026-10-07. Family `dahab` in `TEMPLATE_FAMILIES` (jewellery, handmade, premium gifts), with its own component skin (`stores.template = 'dahab'`). Status: **built for Ahmad's review; no other template is built until he approves the look** (preview: `https://dahab-preview.ebda.app`, admin `https://admin-preview.ebda.app`).
+| Look                 | Id               | For                                                 | Idea                                                           |
+| -------------------- | ---------------- | --------------------------------------------------- | -------------------------------------------------------------- |
+| Worn (على الإيد)     | `dahab.worn`     | a jeweller whose customers ask about size and karat | worn, not displayed: the size and the karat are always visible |
+| Workshop (الورشة)    | `dahab.workshop` | a handmade silver studio                            | the making is the product                                      |
+| Gift box (علبة هدية) | `dahab.giftbox`  | gift buyers who start with who and how much         | shop by recipient and budget                                   |
 
-## Design
+The skin id stays `dahab` (`stores.template = 'dahab'`, Ruling B5-1); only its visual language was replaced. A store on the skin with no look renders the neutral base (white page, ink primary, plum warning, `TEMPLATE_THEMES.dahab`), never a broken page.
 
-The scene: a Cairo goldsmith's vitrine at night — warm metal under low light, a velvet tray, an arched display window. Everything follows from that.
+## Tokens (re-derived under the no-orange gate, Ruling B5-2)
 
-| Token                    | Value                  | Use                                                                                                      |
-| ------------------------ | ---------------------- | -------------------------------------------------------------------------------------------------------- |
-| Night (background)       | `222 29% 8%` · #0E1119 | page; a lapis-tinted night, not a generic near-black (gold on lapis is the Egyptian goldsmith's pairing) |
-| Night, raised (card)     | `222 27% 11%`          | cards, panels, drawers                                                                                   |
-| Night, alternate         | `223 28% 10%`          | alternate sections, footer, announcement                                                                 |
-| Gold (primary)           | `39 49% 58%` · #C9A35E | prices, primary buttons, hairlines, active states                                                        |
-| Bright gold (accent)     | `40 62% 70%` · #E2C285 | hover, focus ring                                                                                        |
-| Ivory (foreground)       | `39 52% 90%` · #F2EADB | text                                                                                                     |
-| Muted ivory              | `39 14% 68%`           | secondary text                                                                                           |
-| Bronze hairline (border) | `38 24% 24%`           | dividers, outlines                                                                                       |
+Brass and antique gold are metal, not orange (Ruling METAL-1), but no Dahab look needs them: the accents are rose gold, enamel and silver. Contrast is measured, not claimed (`tests/unit/dahab-look-tokens.test.ts`).
 
-Every text pair the skin paints is checked for WCAG AA in `tests/unit/dahab-template.test.ts` (ivory/night 15:1, gold/night 8:1, night on gold buttons 8.6:1, muted on night ≥ 7:1).
+|                                | Worn                                           | Workshop                                   | Gift box                   |
+| ------------------------------ | ---------------------------------------------- | ------------------------------------------ | -------------------------- |
+| Page                           | `#FFFFFF`                                      | `#0F4C4A` (committed teal)                 | `#FFFFFF`                  |
+| Surface                        | `#F6F6F6`                                      | `#135957`                                  | `#F2C9C4`                  |
+| Ink / on page                  | `#121212`, 18.73:1                             | `#FFFFFF`, 9.75:1                          | `#16201C`, 16.70:1         |
+| Muted on page                  | 6.90:1                                         | 7.25:1                                     | 7.21:1                     |
+| Primary (button)               | `#121212`, 18.73:1                             | `#E4E7EB` silver, 7.86:1                   | `#0E5C46` emerald, 7.96:1  |
+| Accent                         | `#8F4F59` rose gold, 6.12:1                    | `#9FD8CB` enamel, 6.11:1                   | `#8F4F59`, 6.12:1          |
+| Fonts (display / body / latin) | Reem Kufi / IBM Plex Sans Arabic / Bodoni Moda | Markazi Text / Almarai / Libre Caslon Text | Kufam / Tajawal / Italiana |
+| Radius, density, ratio, motion | none, airy, 4/5, subtle                        | sm, regular, 1/1, subtle                   | md, regular, 1/1, subtle   |
 
-Type: **Amiri 700** (classical Naskh, high contrast) for Arabic display, **Marcellus** (engraved-capital Roman) for Latin display — both calligraphy-rooted, so an Arabic and an English page share one voice. Body stays on the platform faces (IBM Plex Sans Arabic / Plus Jakarta Sans), so Dahab adds one font file per page. Display fonts load through `next/font` with `preload: false`: other stores never download them. Arabic is never letter-spaced (platform `:lang(ar)` reset); headings get Arabic line-heights (1.35–1.45).
+The old fonts (Amiri, Marcellus) are gone from `layout.tsx`. The Workshop page is committed teal, so a merchant photo on a white ground sits on a LIGHT band (quality bar section 9 rule 1, tested by `dahab-white-photos`). No glass and no blur anywhere in the skin (the old header, drawers, carousel and PDP bar are flat), no arch frame, no `dahab-draw` rule.
 
-The one bold idea is the **arch**: collection tiles and the image-with-text frame are vitrine/mihrab arches (`rounded-t-[999px]`); everything else is rectangular and quiet. One orchestrated motion: on first paint the hero's gold rule draws in and its copy rises (CSS only, off under reduced motion); everything else moves only in answer to the shopper (hover cross-fade to the second photo, drawers, accordions).
+## Section mixes
 
-Radius `sm` (2px corners); buttons are solid gold (primary) or a gold hairline (secondary), 48px tall; numerals Western by default (`4,500 ج.م`), Arabic-Indic only on the store's opt-in (Ruling NUMERALS-1).
+- **Worn:** hero, category chips (the navigation sits right under the hero), featured collection "بتتلبس كل يوم", image-with-text "اسمك محفور عليها" (a link to a personalised piece), carousel "وصل حديثاً", reviews, story.
+- **Workshop:** hero, **the journey of a piece** (`steps`, reused from Jasmine with the mix's own three blocks: رسم، صب، تلميع, Ruling B5-8), featured collection on `token:inverse` "بتتعمل بالطلب", image-with-text, collection list (rectangle tiles), trust badges, story.
+- **Gift box:** hero, **the gift finder** (below), featured collection, image-with-text "بنغلّفها لحد باب الفرح", carousel, trust badges, newsletter.
 
-## What Dahab renders
+New platform sections: `gift-finder` (occasions link to categories, budgets are whole pounds; a budget link opens the PLP with `maxPrice`, Ruling B5-7, `GiftFinderSection.tsx`) and the `blocks` field of a mix section spec (a look can ship its own blocks). The collection tile shape `arch` stays in the Zod enum for old data but is no longer offered in the editor; it renders as a rectangle. `docs/architecture/page-definition.md` has the schema.
 
-Skin (`apps/web/src/templates/dahab/`): announcement bar, header (centred wordmark, inline-start navigation, search line, account, language, bag; phone menu drawer from the inline start, bag drawer from the inline end), hero banner + slideshow (art-directed mobile crop), product card (4:5, hover second photo on hover-capable pointers only, quick add, badges, Western-digit prices, sold-out state), product grid and carousel, collection tiles, testimonials, footer (link columns, contact, branches, socials, transparent payment marks), cart lines, order summary, empty state, form card, the bag drawer, and the product page (`ProductDetail.tsx`: gallery with hover zoom + full-screen viewer, metal swatches, quantity, add to bag, wishlist, `<details>` accordions for details / specifications / delivery / returns, pinned buy bar on phones, related carousel, `mediaSlot` for the 3D/AR viewer of PR #35).
+## Conventions (what a Dahab merchant fills in)
 
-Commerce logic is never duplicated: `ProductDetailClient` keeps pricing, variants, stock/backorder, add-to-cart and pixels and hands Dahab the results; the platform card (`templates/shared`) and carousel hand over to Dahab's when `pack === 'dahab'`; the collection page keeps its filters/sort and gains a 3/4-per-row density control on Dahab.
+- **Karat, width and weight are product facts** ("عيار 21", "عرض 4 مم", "الوزن 3.2 جم"), at most two on the card (Ruling B5-5). A gold-rate piece's karat and weight come from its spec; the admin warns when a fact names another karat.
+- **Gift wrap is a variant option**, the card message is personalisation (optional), engraving is personalisation (required, "الحروف للحفر", max 12) (Ruling B5-4). Nothing is a new schema.
+- **Ring sizes** use the "مقاس الخاتم" size chart through the category; **metal** is a swatch option (silver, rose gold, champagne). A yellow-gold swatch would fail the orange gate and is not offered.
+- **Made to order** is the lead time (3 to 7 days) and the computed delivery chip.
+- The **3D viewer** slot works on Dahab (it was missing: the Dahab PDP never passed `mediaSlot`, Ruling B5-1 finding).
 
-New builder sections (platform-level, every skin; `packages/shared/src/builder`): `featured-collection`, `collection-list`, `product-spotlight`, `trust-badges` — schemas, bilingual settings, presets, block validators, cross-store reference checks (`docs/architecture/page-definition.md`). `image-text` and `newsletter` get the Dahab look through CSS under `[data-pack='dahab']` (no markup change for other stores).
+## Gold-rate pricing
 
-Defaults: `TEMPLATE_THEMES.dahab` (palette above, dividers off), `TEMPLATE_LAYOUT_BASELINES.dahab` (sections on the night page, no gold-flooded section blocks). The demo page composition is the seed's `homeDocument` (hero slideshow → collections → new in → craft image-with-text → gift ideas → necklaces → testimonials → trust badges → newsletter), saved and published through the page-builder service.
+A product can be priced from today's gold rate. It is a platform feature (every template), not a Dahab one; the Dahab PDP prints the rate line under the price. Map, formula, cache layers, failure codes and runbook: `docs/architecture/gold-rate-pricing.md`; merchant surface: `docs/ebda/templates/platform-commerce.md` § Gold-rate pricing.
 
-## Demo store
+## Legacy Dahab stores
 
-`scripts/dahab-demo/`: `catalogue.mjs` (22 pieces — rings, necklaces, bracelets, earrings — 18K/21K, EGP, Arabic + English copy, karat/size/length/colour variants), `seed-dahab.mjs` (owner, store, collections, catalogue through the admin bulk-import path, demo customers/orders/reviews, home document draft → publish), `fetch-photos.mjs` + `photos.json` (Unsplash photography, re-encoded to byte budgets; credits in `CREDITS.md`), `capture.mjs` (review screenshots). The store announces itself as a demo in its announcement bar.
+`template = 'dahab'` with `look IS NULL` is the retired skin. It cannot crash (neutral base). `scripts/dahab-demo/migrate-legacy-dahab.mjs` moves such stores onto a look through `StoreService.applyLook(..., { design: 'keep' })`, the real merchant path: dry run by default, loopback guard, `--yes-production` is Ahmad's to pass, idempotent, a store with a builder revision gets a DRAFT the merchant publishes (Ruling B5-3). Production had 0 such rows on 2026-10-21. The scenario store `dahab-legacy` rehearses it in the browser matrix.
 
-```bash
-# local: Postgres + Redis containers (Apple `container`), migrate, then
-DATABASE_URL=<owner-role URL of the local container> OWNER_PASSWORD=… \
-  npx tsx scripts/dahab-demo/seed-dahab.mjs            # loopback only unless --allow-remote
-```
+## Demo store and tests
 
-## Editor end to end (real stack)
+`storedemo-dahab` (`docs/ebda/templates/demo-store.md`, the fifth demo store, Rulings B5-10 to B5-12), 21 unbranded pieces, six of them priced from the gold rate. Scenario stores: `scripts/storedemo/scenario-stores.mjs --template dahab` (empty, one product, 500, no photo, long names, edge colours, three logo shapes, white photos, COD, legacy, and `dahab-gold*` whose owner can log in). Browser suite: `tests/dahab/` with `playwright.dahab.config.ts` (`DAHAB_PORT`, `DAHAB_HOST_BASE`; local setup `scripts/dahab-demo/seed-local-hosts.sh`): the scenario matrix, the Worn chips, the Workshop steps, the Gift box finder, required engraving, the gold line on every surface, the checkout data flow (a Metal x Size ring, an engraved ring and a gold chain must reach the cart, the receipt and the order), and `dahab-gold-price.spec.ts` (the merchant moves the rate through the admin API, the shopper sees "السعر اتحدّث", Continue, the snapshot, the stale case). The purchase-path pack: `scripts/taste/shoot-purchase-path.mjs --template dahab` (17 screens plus the two gold screens, at 390-ar and 1280-en, per look).
 
-`npm run test:editor-live` (with `EDITOR_E2E_PG=<local superuser postgres URL>`) drives the visual builder against the real admin, the real storefront in the canvas and the real API in workerd, over a fresh database seeded by this demo seed: edit a hero heading → live canvas, add + reorder a section, hide a section, publish → public storefront. Local only (Ruling EDITOR-LIVE-3).
+## Deferred (with reasons: Ruling B5-9)
 
-## Preview stack
-
-Isolated from production on every axis; production Workers, routes, Hyperdrive, queues, KV, R2 and the Neon `main` branch are untouched.
-
-| Piece      | Preview                                                                                                                                                                                                                                            | Production (untouched)                              |
-| ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------- |
-| Database   | Neon branch `preview` (`br-blue-sky-b29b0j6o`), fresh database `ebda_preview` migrated from this branch; the copied `neondb` was dropped on the branch, so no production row exists in preview                                                     | `main` / `neondb`                                   |
-| API        | Worker `ebda-api-preview` → `api-preview.ebda.app`, Hyperdrive `ebda-preview` (caching off, role `ebda_app`), KV `ebda-preview-cache`, queues `ebda-preview-{email,sms}[-dlq]`, rate-limit namespace 1101, no crons, own JWT/ENCRYPTION secrets    | `ebda-api`                                          |
-| Storefront | Worker `ebda-web-preview` → `dahab-preview.ebda.app`, its own data cache (R2 `ebda-preview-isr-cache` + DO tag cache; edits appear within the fetch windows, ≤ 60 s for products/layout, 300 s for reviews — the preview has no revalidate secret) | `ebda-web` on `*.ebda.app/*` (`ebda-web-isr-cache`) |
-| Admin      | Worker `ebda-admin-preview` → `admin-preview.ebda.app`                                                                                                                                                                                             | `ebda-admin`                                        |
-| Media      | R2 `ebda-preview-media` (public r2.dev URL)                                                                                                                                                                                                        | `ebda-media`                                        |
-
-`ebda-api-preview` has **no Workers AI binding** (`preview-config.mjs` drops the base config's `ai` block; Ruling SEARCH-T10-6): preview runs no Inngest indexer and keeps `SEARCH_SEMANTIC_ENABLED="false"`, so it logs `embedding provider: none` and search there is lexical only; a binding would bill any preview embed to the production account.
-
-Smart placement was tried on `ebda-api-preview` and reverted: with it, about half of the requests waited the full 20 s for a pooled database client and answered 503 `OVERLOADED`; without it 28/28 probes answered 200. (2026-10-07: the same 20 s `OVERLOADED` came back without smart placement, from isolates whose database clients were all held by cancelled requests; fixed in `ClientPool`, see `docs/ebda/design/stage2-workers-db.md`, "Cancelled requests". The smart-placement result may have been the same leak.)
-
-Each preview Worker is a custom domain **plus** a host-specific zone route (`<host>/*`): zone routes run before custom domains, so without it the production `*.ebda.app/*` route answered `api-preview.ebda.app` on the first deploy. Every preview response carries `X-Robots-Tag: noindex, nofollow` (`preview-worker` entries). No Resend / Inngest / Sentry / OneSignal / payment keys exist on preview: it cannot email, text or charge anyone. Secrets live in the macOS keychain (account `whisky11`): `ebda-preview-JWT_SECRET`, `ebda-preview-ENCRYPTION_KEY`, `ebda-preview-OWNER_DATABASE_URL`, `ebda-preview-APP_DATABASE_URL`, `ebda-preview-admin-login` (demo admin, `email password`).
-
-Deploy (from a checkout of this branch, `CLOUDFLARE_ACCOUNT_ID=69188202efc4df480140dd76545aa3ab`):
-
-```bash
-PREVIEW_HYPERDRIVE_ID=9f87e8fb4ce549bc901a8d84c8827464 PREVIEW_KV_ID=060d12930dd84f3081a2b49feca405df \
-  node scripts/preview/preview-config.mjs api
-(cd apps/api && npx wrangler deploy --config .wrangler.preview.jsonc --secrets-file <json from keychain> --var BUILD_COMMIT_SHA:$(git rev-parse HEAD))
-OPENNEXT_CACHE=true CF_SETUP_SKIP_DEPS=1 bash scripts/cf-setup-local.sh web && CF_SETUP_SKIP_DEPS=1 bash scripts/cf-setup-local.sh admin
-STOREFRONT_FRAME_ANCESTORS=https://admin-preview.ebda.app NEXT_PUBLIC_API_URL=https://api-preview.ebda.app/api/v1 bash scripts/cf-build.sh web
-NEXT_PUBLIC_API_URL=https://api-preview.ebda.app bash scripts/cf-build.sh admin
-node scripts/preview/preview-config.mjs web && node scripts/preview/preview-config.mjs admin
-(cd apps/web && npx wrangler deploy --config .wrangler.preview.jsonc)
-(cd apps/admin && npx wrangler deploy --config .wrangler.preview.jsonc)
-git checkout apps/web/wrangler.jsonc apps/web/open-next.config.ts apps/admin/wrangler.jsonc && rm -f apps/web/cache-worker-entry.ts   # generated files
-```
-
-Teardown (all preview-only names; nothing here touches production):
-
-```bash
-export CLOUDFLARE_ACCOUNT_ID=69188202efc4df480140dd76545aa3ab
-npx wrangler delete --name ebda-web-preview      # run from an EMPTY directory (wrangler.jsonc account/name override)
-npx wrangler delete --name ebda-admin-preview
-npx wrangler delete --name ebda-api-preview
-npx wrangler hyperdrive delete 9f87e8fb4ce549bc901a8d84c8827464
-npx wrangler kv namespace delete --namespace-id 060d12930dd84f3081a2b49feca405df
-for q in ebda-preview-email ebda-preview-sms ebda-preview-email-dlq ebda-preview-sms-dlq; do npx wrangler queues delete $q; done
-npx wrangler r2 bucket delete ebda-preview-isr-cache   # empty it first if it holds cache objects
-npx wrangler r2 bucket dev-url disable ebda-preview-media && npx wrangler r2 object delete … && npx wrangler r2 bucket delete ebda-preview-media
-# Neon: delete ONLY the branch named `preview`
-curl -X DELETE -H "Authorization: Bearer $(security find-generic-password -a whisky11 -s neon-api-key-whisky11 -w)" \
-  https://console.neon.tech/api/v2/projects/lucky-truth-54548746/branches/br-blue-sky-b29b0j6o
-for s in JWT_SECRET ENCRYPTION_KEY OWNER_DATABASE_URL APP_DATABASE_URL admin-login; do security delete-generic-password -a whisky11 -s ebda-preview-$s; done
-```
-
-Deleting a Worker removes its custom domain and zone route; verify afterwards that `https://<any>.ebda.app` still answers from `ebda-web`.
-
-## Tests
-
-- `tests/unit/dahab-template.test.ts` — new sections (registry, presets, section + block validation, unsafe links, refs), family, baseline vs the layout schema, theme contrast.
-- `tests/unit/dahab-template-render.test.tsx` — render snapshots (Dahab + modern skin, ar + en; Dahab product page), Western digits, arch tiles, fallback suppression.
-- `tests/integration/public-testimonials-rls.test.ts` — the testimonials route under strict RLS (bug found by this pilot).
-- `tests/dahab/dahab-storefront.spec.ts` (`npx playwright test -c playwright.dahab.config.ts`) — home / collection / product / cart, ar + en, at 390 / 820 / 1440: direction, no horizontal scroll, Western digits, axe WCAG 2.1 AA (no serious/critical), drawers open from the correct side. Needs a seeded store; not in CI.
-- Homepage characterization snapshots (5 legacy templates) are unchanged.
-
-## Accepted payments
-
-The footer and order summary share the cart's `AcceptedPaymentBadges` renderer. It reads fresh store-scoped `/payments/config` on mount/store changes; the stored `acceptedPaymentMethods` display override cannot enable a badge. Unknown, loading, failed or malformed configuration renders no payment claim. Only enabled method codes and configured COD/InstaPay appear, with Arabic/English labels. Checkout independently revalidates availability. No payment credentials or settings are changed by this display fix.
-
-Regression evidence: `tests/unit/storefront-payment-badges.test.tsx` drives the real cart, Dahab footer and order summary, including stale card overrides, loading, network failure/retry, malformed config, method-specific labels and tenant switches/late responses. Initial15cases failed against the old renderers before correction.
-
-> Gold-rate pricing (live price from today's gold rate) is a platform feature, not a Dahab one: it works on every template. The Dahab PDP shows its rate line under the price (`priceNote` slot). See `docs/architecture/gold-rate-pricing.md`.
+Appointment booking, buy-now-pay-later, a certificate row (a fact by convention), "only 1 left", build-a-stack; per-customer-group gold price lists, silver and platinum rates, buy-back and trade-in.

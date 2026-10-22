@@ -83,10 +83,15 @@ const IMG = 'https://media.example/dahab';
 
 /** Serialise with class and style stripped (the DOM the re-skin must preserve). */
 export function stripPaint(html: string): string {
-  return html
-    .replace(/\sclass="[^"]*"/g, '')
-    .replace(/\sstyle="[^"]*"/g, '')
-    .replace(/></g, '>\n<');
+  return (
+    html
+      .replace(/\sclass="[^"]*"/g, '')
+      .replace(/\sstyle="[^"]*"/g, '')
+      // React's useId counter is process-wide, so its value depends on how many components rendered before
+      // in the same file; it is noise, not DOM structure.
+      .replace(/:R[0-9a-z]+:/g, ':R:')
+      .replace(/></g, '>\n<')
+  );
 }
 
 function setCtx(language: 'en' | 'ar') {

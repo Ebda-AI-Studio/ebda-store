@@ -23,9 +23,9 @@ describe('LookPicker (registry-driven: built templates and looks only)', () => {
     expect(tabs().map(t => t.textContent)).toContain('Souq');
     expect(tabs().map(t => t.textContent)).toContain('Jasmine');
     expect(tabs().map(t => t.textContent)).toContain('Lamma');
+    // Phase B5: Dahab is built, and last (Ruling B5-25: Qamar stays the default first tab).
+    expect(tabs().map(t => t.textContent)).toEqual(['Qamar', 'Souq', 'Jasmine', 'Lamma', 'Dahab']);
     expect(activeTab()).toBe(tabs()[0]);
-    // The unbuilt template (Dahab) is not offered.
-    for (const name of ['Dahab']) expect(screen.queryByRole('tab', { name })).toBeNull();
   });
 
   it('offers only built looks under the active tab', () => {
@@ -79,13 +79,28 @@ describe('LookPicker (registry-driven: built templates and looks only)', () => {
   });
 
   it('an existing store on an unbuilt look still sees it (and only it), but nothing unbuilt is added', () => {
-    const current = LOOKS.find(l => l.status === 'designed')!;
-    render(<LookPicker value={current.id} onChange={() => {}} locale="en" />);
-    expect(activeTab().getAttribute('aria-selected')).toBe('true');
-    const radios = screen.getAllByRole('radio');
-    expect(radios).toHaveLength(1);
-    expect(radios[0]!.getAttribute('aria-checked')).toBe('true');
-    expect(tabs()).toHaveLength(builtLookTemplates().length + 1);
+    // Every look is built since Phase B5: flip one back for the check.
+    const current = LOOKS.find(l => l.id === 'dahab.giftbox')!;
+    const before = current.status;
+    (current as { status: string }).status = 'designed';
+    try {
+      const builtTemplates = builtLookTemplates().length;
+      render(<LookPicker value={current.id} onChange={() => {}} locale="en" />);
+      expect(activeTab().getAttribute('aria-selected')).toBe('true');
+      // The store's own unbuilt look is shown (checked), beside the template's built ones and nothing else.
+      const radios = screen.getAllByRole('radio');
+      const siblings = builtLooks().filter(l => l.template === current.template);
+      expect(radios).toHaveLength(siblings.length + 1);
+      expect(radios.filter(r => r.getAttribute('aria-checked') === 'true')).toHaveLength(1);
+      expect(
+        screen
+          .getByRole('radio', { name: new RegExp(current.name.en) })
+          .getAttribute('aria-checked')
+      ).toBe('true');
+      expect(tabs()).toHaveLength(builtTemplates);
+    } finally {
+      (current as { status: string }).status = before;
+    }
   });
 
   it('every look thumbnail has alt text equal to the look name, on every tab', () => {
@@ -103,22 +118,22 @@ describe('LookPicker (registry-driven: built templates and looks only)', () => {
     }
   });
 
-  // Mutation check: flip a designed template to built in the registry and the picker must grow a
-  // tab for it with no component edit (this is what makes Dahab appear on ship; Souq, Jasmine and Lamma already have).
-  it('MUTATION: flipping a template to built adds its tab; flipping a built one back removes it', () => {
-    const designed = LOOKS.filter(l => l.template === 'dahab');
-    const before = designed.map(l => l.status);
+  // Mutation check: flip a template's looks back to designed and the picker must lose its tab with no
+  // component edit (this is what made Dahab appear when it shipped; Souq, Jasmine and Lamma did the same).
+  it('MUTATION: flipping a built template back removes its tab; flipping it to built adds it', () => {
+    const dahab = LOOKS.filter(l => l.template === 'dahab');
+    const before = dahab.map(l => l.status);
     try {
-      (designed[0] as { status: string }).status = 'built';
+      dahab.forEach(l => ((l as { status: string }).status = 'designed'));
+      render(<LookPicker value={null} onChange={() => {}} locale="en" />);
+      expect(screen.queryByRole('tab', { name: 'Dahab' })).toBeNull();
+      cleanup();
+      (dahab[0] as { status: string }).status = 'built';
       render(<LookPicker value={null} onChange={() => {}} locale="en" />);
       expect(screen.getByRole('tab', { name: 'Dahab' })).toBeTruthy();
       expect(tabs()).toHaveLength(builtLookTemplates().length);
-      cleanup();
-      (designed[0] as { status: string }).status = 'designed';
-      render(<LookPicker value={null} onChange={() => {}} locale="en" />);
-      expect(screen.queryByRole('tab', { name: 'Dahab' })).toBeNull();
     } finally {
-      designed.forEach((l, i) => ((l as { status: string }).status = before[i]!));
+      dahab.forEach((l, i) => ((l as { status: string }).status = before[i]!));
     }
   });
 });

@@ -1,11 +1,14 @@
 import type { LookDefinition, LookTemplate } from './types';
 
+// ORDER is product behaviour (Ruling B5-25): it is the order of the admin picker's tabs, of the demo bar
+// and, through `defaultNewStoreLook`, which look a store gets when none is asked for. Qamar stays first;
+// Dahab, flipped to built last, is last.
 export const LOOK_TEMPLATES: readonly LookTemplate[] = [
-  'dahab',
   'qamar',
   'souq',
   'jasmine',
   'lamma',
+  'dahab',
 ];
 
 const L = (d: LookDefinition) => d;
@@ -911,7 +914,7 @@ export const LOOKS: readonly LookDefinition[] = [
     template: 'dahab',
     letter: 'A',
     skin: 'dahab',
-    status: 'designed',
+    status: 'built',
     // Ruling B5-1 / B1-4: logo at the start, the skin's own icon search (jewellery is bought by eye).
     chrome: { header: { logoPlacement: 'start', search: 'icon' } },
     // Ruling B1-3 shape. Worn: the piece on a body, the size line under each name (karat and width
@@ -987,7 +990,7 @@ export const LOOKS: readonly LookDefinition[] = [
     template: 'dahab',
     letter: 'B',
     skin: 'dahab',
-    status: 'designed',
+    status: 'built',
     chrome: { header: { logoPlacement: 'start', search: 'icon' } },
     // Ruling B5-8: the journey of a piece (draw, cast, polish) reuses Jasmine's `steps` with the
     // mix's own three blocks. The page is committed teal, so the merchant-photo sections sit on a
@@ -1082,7 +1085,7 @@ export const LOOKS: readonly LookDefinition[] = [
     template: 'dahab',
     letter: 'C',
     skin: 'dahab',
-    status: 'designed',
+    status: 'built',
     chrome: { header: { logoPlacement: 'start', search: 'icon' } },
     // Ruling B5-4 / B5-7: start from who and how much. The gift finder sits right under the hero,
     // wrap and the card message are product options, the delivery promise is the computed chip.

@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import type { PublicGoldPricing } from '@ebda/shared';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useLocalePrice } from '@/hooks/useLocalePrice';
-import { useNumerals } from '@/hooks/useNumerals';
+import { useNumerals, useStoreNumerals } from '@/hooks/useNumerals';
 import { goldLineParts, goldRateIsStale, goldRateTime } from '@/lib/gold-display';
 
 /**
@@ -40,11 +40,12 @@ export function GoldRateLine({
   const { language, t } = useLanguage();
   const money = useLocalePrice();
   const { localize } = useNumerals();
+  const numerals = useStoreNumerals();
   const stale = useGoldRateStale(gold);
   if (!gold) return null;
   const lang = language === 'ar' ? 'ar' : 'en';
   const { karat, grams } = goldLineParts(gold);
-  const when = goldRateTime(gold.rateAppliedAt, lang);
+  const when = goldRateTime(gold.rateAppliedAt, lang, numerals === 'arab' ? 'arab' : 'latn');
   return (
     <div className={className} data-testid="gold-rate-line" data-part="gold-rate">
       <p className="text-xs text-muted-foreground">

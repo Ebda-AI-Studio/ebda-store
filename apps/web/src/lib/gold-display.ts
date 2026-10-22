@@ -16,10 +16,16 @@ export function goldRateIsStale(
 }
 
 /** When the rate was recorded, in the Egyptian clock so SSR and the browser print the same text. */
-export function goldRateTime(rateAppliedAt: string, lang: 'ar' | 'en'): string {
+export function goldRateTime(
+  rateAppliedAt: string,
+  lang: 'ar' | 'en',
+  numerals: 'latn' | 'arab' = 'latn'
+): string {
   const d = new Date(rateAppliedAt);
   if (Number.isNaN(d.getTime())) return '';
-  return new Intl.DateTimeFormat(lang === 'ar' ? 'ar-EG' : 'en-GB', {
+  // Western digits unless the merchant opted into Arabic-Indic (NUMERALS-1): `ar-EG` alone prints them.
+  const nu = lang === 'ar' && numerals === 'arab' ? 'arab' : 'latn';
+  return new Intl.DateTimeFormat(`${lang === 'ar' ? 'ar-EG' : 'en-GB'}-u-nu-${nu}`, {
     timeZone: 'Africa/Cairo',
     day: 'numeric',
     month: 'short',
@@ -64,4 +70,24 @@ export function priceChangedLines(
       previous: i.previousPrice,
       current: i.price,
     }));
+}
+
+/**
+ * The line a receipt or an order page prints for a gold-priced piece: the karat, the weight and the per-gram
+ * rate it was priced at, frozen on the order. Null for any other line. Display only.
+ */
+export function goldSnapshotLine(
+  snap: { karat: number; weightMg: number; ratePerGram: number } | null | undefined,
+  lang: 'ar' | 'en',
+  money: (piastres: number) => string,
+  localize: (v: string | number) => string
+): string | null {
+  if (!snap) return null;
+  const { karat, grams } = goldLineParts({
+    karat: snap.karat as 24 | 21 | 18,
+    weightMg: snap.weightMg,
+  });
+  return lang === 'ar'
+    ? `عيار ${localize(karat)} · ${localize(grams)} جم · ${money(snap.ratePerGram)} للجرام`
+    : `${localize(karat)} karat · ${localize(grams)} g · ${money(snap.ratePerGram)} per gram`;
 }

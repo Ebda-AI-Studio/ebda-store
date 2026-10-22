@@ -2650,6 +2650,16 @@
       "find": "if (goldPriceChanged) {\n      setCheckoutError(",
       "replace": "if (false as boolean) {\n      setCheckoutError(",
       "test": "tests/unit/gold-storefront-display.test.tsx"
+    },
+    {
+      "id": "money-gold-public-order-redaction",
+      "domain": "money",
+      "tier": "unit",
+      "why": "the guest success page and the signed-in order list return the full order again, so the merchant's cost and the gold margin reach the shopper",
+      "source": "apps/api/src/routes/public.routes.ts",
+      "find": "data: { order: redactOrderForCustomer(order) },",
+      "replace": "data: { order },",
+      "test": "tests/unit/gold-order-redaction.test.ts"
     }
   ]
 }

@@ -21,6 +21,7 @@ vi.mock('../../apps/web/src/hooks/useLocalePrice', () => ({
   useLocalePrice: () => (n: number) => `EGP ${(n / 100).toFixed(2)}`,
 }));
 vi.mock('../../apps/web/src/hooks/useNumerals', () => ({
+  useStoreNumerals: () => 'latn',
   useNumerals: () => ({ localize: (n: number | string) => String(n), numerals: 'latn' }),
 }));
 
@@ -32,6 +33,7 @@ import { PriceChangedNotice } from '../../apps/web/src/components/commerce/Price
 import {
   goldRateIsStale,
   goldRateTime,
+  goldSnapshotLine,
   priceChangedLines,
 } from '../../apps/web/src/lib/gold-display';
 import { mapServerItem } from '../../apps/web/src/contexts/cart-lines';
@@ -68,9 +70,30 @@ describe('goldRateIsStale (mirrors the server rule: whole minutes >= the limit)'
 });
 
 describe('goldRateTime', () => {
+  it('prints Western digits in Arabic unless the merchant opted into Arabic-Indic (NUMERALS-1)', () => {
+    expect(goldRateTime('2026-10-22T06:00:00.000Z', 'ar')).toMatch(/9:00/);
+    expect(goldRateTime('2026-10-22T06:00:00.000Z', 'ar')).not.toMatch(/[٠-٩]/);
+    expect(goldRateTime('2026-10-22T06:00:00.000Z', 'ar', 'arab')).toMatch(/[٠-٩]/);
+  });
   it('prints the Cairo clock whatever the server timezone is', () => {
     // 06:00Z is 09:00 in Cairo in October 2026 (EEST, UTC+3)
     expect(goldRateTime('2026-10-22T06:00:00.000Z', 'en')).toMatch(/\b9:00/);
+  });
+});
+
+describe('goldSnapshotLine (the receipt and order page line)', () => {
+  const money = (n: number) => `EGP ${(n / 100).toFixed(2)}`;
+  const id = (v: string | number) => String(v);
+  const snap = { karat: 21, weightMg: 4350, ratePerGram: 410000 };
+  it('states the karat, the weight and the per-gram rate the line was priced at, in both languages', () => {
+    expect(goldSnapshotLine(snap, 'ar', money, id)).toBe('عيار 21 · 4.35 جم · EGP 4100.00 للجرام');
+    expect(goldSnapshotLine(snap, 'en', money, id)).toBe(
+      '21 karat · 4.35 g · EGP 4100.00 per gram'
+    );
+  });
+  it('is null for a line that was not gold-priced', () => {
+    expect(goldSnapshotLine(null, 'ar', money, id)).toBeNull();
+    expect(goldSnapshotLine(undefined, 'en', money, id)).toBeNull();
   });
 });
 

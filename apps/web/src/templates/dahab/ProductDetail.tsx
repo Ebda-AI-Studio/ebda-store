@@ -516,10 +516,7 @@ export function DahabProductDetail(p: DahabProductDetailProps) {
                     'Delivery times and fees for your area are shown at checkout.',
                     'مواعيد ومصاريف التوصيل لمنطقتك بتظهر في خطوة إتمام الطلب.'
                   )}{' '}
-                  <Link
-                    href={p.shippingHref}
-                    className="text-primary underline-offset-4 hover:underline"
-                  >
+                  <Link href={p.shippingHref} className="text-primary underline underline-offset-4">
                     {t('Delivery policy', 'سياسة التوصيل')}
                   </Link>
                 </p>
@@ -530,10 +527,7 @@ export function DahabProductDetail(p: DahabProductDetailProps) {
                     'Read how returns and exchanges work for this store.',
                     'اعرف إزاي الاسترجاع والاستبدال في المتجر ده.'
                   )}{' '}
-                  <Link
-                    href={p.returnsHref}
-                    className="text-primary underline-offset-4 hover:underline"
-                  >
+                  <Link href={p.returnsHref} className="text-primary underline underline-offset-4">
                     {t('Returns policy', 'سياسة الاسترجاع')}
                   </Link>
                 </p>

@@ -142,7 +142,7 @@ function FacetGroup({
               className={`flex cursor-pointer items-center gap-3 rounded-xl px-4 py-2.5 text-base transition ${
                 isChecked
                   ? 'filter-active bg-primary text-primary-foreground font-semibold'
-                  : 'bg-[hsl(var(--filter-fg)/0.08)] text-[hsl(var(--filter-fg)/0.75)] hover:bg-[hsl(var(--filter-fg)/0.15)] hover:text-[hsl(var(--filter-fg))]'
+                  : 'bg-[hsl(var(--filter-fg)/0.08)] text-[hsl(var(--filter-fg)/0.9)] hover:bg-[hsl(var(--filter-fg)/0.15)] hover:text-[hsl(var(--filter-fg))]'
               }`}
             >
               <input
@@ -453,7 +453,7 @@ export function ProductsFilterSidebar(props: ProductsFilterSidebarProps) {
             className={`flex w-full items-center justify-between rounded-xl px-4 py-2.5 text-base lg:text-lg transition ${
               !categoryFilter
                 ? 'filter-active bg-primary text-primary-foreground font-semibold'
-                : 'bg-[hsl(var(--filter-fg)/0.08)] text-[hsl(var(--filter-fg)/0.75)] hover:bg-[hsl(var(--filter-fg)/0.15)] hover:text-[hsl(var(--filter-fg))]'
+                : 'bg-[hsl(var(--filter-fg)/0.08)] text-[hsl(var(--filter-fg)/0.9)] hover:bg-[hsl(var(--filter-fg)/0.15)] hover:text-[hsl(var(--filter-fg))]'
             }`}
           >
             <span>{t('All', 'الكل')}</span>
@@ -482,7 +482,7 @@ export function ProductsFilterSidebar(props: ProductsFilterSidebarProps) {
                 className={`flex w-full items-center justify-between rounded-xl px-4 py-2.5 text-base lg:text-lg transition ${
                   categoryFilter === cat.slug
                     ? 'filter-active bg-primary text-primary-foreground font-semibold'
-                    : 'bg-[hsl(var(--filter-fg)/0.08)] text-[hsl(var(--filter-fg)/0.75)] hover:bg-[hsl(var(--filter-fg)/0.15)] hover:text-[hsl(var(--filter-fg))]'
+                    : 'bg-[hsl(var(--filter-fg)/0.08)] text-[hsl(var(--filter-fg)/0.9)] hover:bg-[hsl(var(--filter-fg)/0.15)] hover:text-[hsl(var(--filter-fg))]'
                 }`}
               >
                 <span>{language === 'ar' && cat.nameAr ? cat.nameAr : cat.name}</span>

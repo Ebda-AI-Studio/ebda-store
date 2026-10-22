@@ -315,7 +315,8 @@ describe('Dahab product page presentation', () => {
       expect(html).toContain('<details');
       expect(html).toContain('aria-pressed');
       expect(html).not.toMatch(/[٠-٩]/);
-      parts.push(`<!-- pdp | ${language} -->\n${html}`);
+      // useId is a process-wide counter: normalise it so the snapshot does not depend on test order.
+      parts.push(`<!-- pdp | ${language} -->\n${html.replace(/:R[0-9a-z]+:/g, ':R:')}`);
     }
     await expect(parts.join('\n\n') + '\n').toMatchFileSnapshot(
       path.join(SNAP_DIR, 'dahab-pdp.html')

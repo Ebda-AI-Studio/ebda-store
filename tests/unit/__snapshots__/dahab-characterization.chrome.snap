@@ -62,9 +62,9 @@
 </div>
 </form>
 </div>
-<dialog aria-labelledby=":R3:" data-sheet="start">
+<dialog aria-labelledby=":R:" data-sheet="start">
 </dialog>
-<dialog aria-labelledby=":R4:" data-sheet="end">
+<dialog aria-labelledby=":R:" data-sheet="end">
 </dialog>
 </header>
 <footer dir="rtl">
@@ -119,9 +119,9 @@
 </div>
 </div>
 </footer>
-<dialog aria-labelledby=":R0:" data-sheet="end">
+<dialog aria-labelledby=":R:" data-sheet="end">
 <div>
-<h2 id=":R0:">سلتك (2)</h2>
+<h2 id=":R:">سلتك (2)</h2>
 <button type="button" aria-label="إغلاق السلة" data-sheet-close="true">
 <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
 <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12">
@@ -275,9 +275,9 @@
 </div>
 </form>
 </div>
-<dialog aria-labelledby=":R3:" data-sheet="start">
+<dialog aria-labelledby=":R:" data-sheet="start">
 </dialog>
-<dialog aria-labelledby=":R4:" data-sheet="end">
+<dialog aria-labelledby=":R:" data-sheet="end">
 </dialog>
 </header>
 <footer dir="ltr">
@@ -332,9 +332,9 @@
 </div>
 </div>
 </footer>
-<dialog aria-labelledby=":R0:" data-sheet="end">
+<dialog aria-labelledby=":R:" data-sheet="end">
 <div>
-<h2 id=":R0:">Your bag (2)</h2>
+<h2 id=":R:">Your bag (2)</h2>
 <button type="button" aria-label="Close bag" data-sheet-close="true">
 <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
 <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12">
