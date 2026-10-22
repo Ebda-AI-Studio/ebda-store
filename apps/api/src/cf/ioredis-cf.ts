@@ -16,6 +16,7 @@
  * A pipeline / MULTI whose keys span shards runs one atomic batch per shard.
  */
 import { cfBindings, type KVNamespaceLike } from './bindings';
+import { hop } from '../lib/hop-timing';
 import { applyOn, applyOnAll, shardOf } from './auth-state-client';
 import type { Op, SetOptions } from './auth-state-core';
 
@@ -32,7 +33,15 @@ export interface CfRedisOptions {
 function kv(): KVNamespaceLike {
   const ns = cfBindings()?.KV_CACHE;
   if (!ns) throw new Error('KV_CACHE binding is not configured');
-  return ns;
+  return new Proxy(ns, {
+    get(t, p, r) {
+      const v = Reflect.get(t, p, r);
+      return typeof v === 'function'
+        ? (...a: unknown[]) =>
+            hop(`kv-${String(p)}`, async () => (v as (...x: unknown[]) => unknown).apply(t, a))
+        : v;
+    },
+  });
 }
 
 /** Parse `SET key value [EX s|PX ms] [NX|XX] [KEEPTTL]` into DO options. */

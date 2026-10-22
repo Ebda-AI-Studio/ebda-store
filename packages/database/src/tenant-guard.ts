@@ -508,6 +508,22 @@ export function assertRawScoped(operation: string, args: unknown, scope: Ambient
 
 type QueryFn = (args: unknown) => Promise<unknown>;
 
+/**
+ * Optional per-query timing sink (API request hop timing, `x-hop-timing: 1`). Unset in every
+ * other process; when set it only OBSERVES the duration of a query that the guard already
+ * allowed, it never changes whether or how a query runs.
+ */
+let dbHopObserver: ((label: string, ms: number) => void) | undefined;
+export function setDbHopObserver(fn: ((label: string, ms: number) => void) | undefined): void {
+  dbHopObserver = fn;
+}
+function observed(label: string, run: () => Promise<unknown>): Promise<unknown> {
+  const obs = dbHopObserver;
+  if (!obs) return run();
+  const t = performance.now();
+  return run().finally(() => obs(label, performance.now() - t));
+}
+
 /** The query extension the client factory installs on every app client. */
 export const tenantGuardExtension = Prisma.defineExtension({
   name: 'ebda-tenant-guard',
@@ -515,24 +531,24 @@ export const tenantGuardExtension = Prisma.defineExtension({
     $allModels: {
       $allOperations({ model, operation, args, query }) {
         assertTenantScoped(model, operation, args, ambientScope());
-        return (query as QueryFn)(args);
+        return observed(`db-${model}.${operation}`, () => (query as QueryFn)(args));
       },
     },
     $queryRaw({ args, query }) {
       assertRawScoped('$queryRaw', args, ambientScope());
-      return (query as QueryFn)(args);
+      return observed('db-raw', () => (query as QueryFn)(args));
     },
     $executeRaw({ args, query }) {
       assertRawScoped('$executeRaw', args, ambientScope());
-      return (query as QueryFn)(args);
+      return observed('db-raw', () => (query as QueryFn)(args));
     },
     $queryRawUnsafe({ args, query }) {
       assertRawScoped('$queryRawUnsafe', args, ambientScope());
-      return (query as QueryFn)(args);
+      return observed('db-raw', () => (query as QueryFn)(args));
     },
     $executeRawUnsafe({ args, query }) {
       assertRawScoped('$executeRawUnsafe', args, ambientScope());
-      return (query as QueryFn)(args);
+      return observed('db-raw', () => (query as QueryFn)(args));
     },
   },
 });
