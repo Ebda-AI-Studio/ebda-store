@@ -83,6 +83,8 @@ export function BuilderEditor({ storeId }: { storeId: string }) {
   const [pending, setPending] = useState<{ intent: IntentResult; name: string } | null>(null);
   // "Change image" asked for on the canvas (the file is picked HERE, never by the canvas).
   const [mediaReq, setMediaReq] = useState<MediaRequest | null>(null);
+  // A fresh number per swap, so each swap is its own undo step.
+  const swapSeq = useRef(0);
   const [tab, setTab] = useState<StartTab>('sections');
   const [drawer, setDrawer] = useState<'start' | 'end' | null>(null);
   const [reloadKey, setReloadKey] = useState(1);
@@ -590,7 +592,8 @@ export function BuilderEditor({ storeId }: { storeId: string }) {
           onClose={() => setMediaReq(null)}
           onApply={(url, alt) => {
             // One coalesce key: the picture and its description are ONE undo step.
-            for (const i of imageSwapActions(mediaReq, url, alt)) dispatch(i.action, i.coalesce);
+            for (const i of imageSwapActions(mediaReq, url, alt, swapSeq.current++))
+              dispatch(i.action, i.coalesce);
             setMediaReq(null);
           }}
         />

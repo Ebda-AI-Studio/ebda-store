@@ -10663,15 +10663,15 @@
       "saving": "جاري الحفظ"
     },
     "events": {
-      "order.created": "طلب جديد",
-      "order.paid": "طلب اتدفع",
-      "order.status_changed": "طلب اتشحن أو وصل أو اتلغى",
-      "order.refunded": "طلب اتسترد",
-      "product.created": "منتج اتضاف",
-      "product.updated": "منتج اتعدّل",
-      "product.deleted": "منتج اتحذف",
-      "inventory.low": "المخزون قليل",
-      "webhook.test": "حدث تجريبي"
+      "order_created": "طلب جديد",
+      "order_paid": "طلب اتدفع",
+      "order_status_changed": "طلب اتشحن أو وصل أو اتلغى",
+      "order_refunded": "طلب اتسترد",
+      "product_created": "منتج اتضاف",
+      "product_updated": "منتج اتعدّل",
+      "product_deleted": "منتج اتحذف",
+      "inventory_low": "المخزون قليل",
+      "webhook_test": "حدث تجريبي"
     },
     "secret": {
       "title": "السر الخاص بالتوقيع",

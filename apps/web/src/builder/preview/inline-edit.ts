@@ -31,11 +31,31 @@ export interface InlineEditOptions {
   point?: { x: number; y: number };
 }
 
-const readText = (el: HTMLElement): string =>
-  ((el as HTMLElement & { innerText?: string }).innerText ?? el.textContent ?? '').replace(
-    / /g,
-    ' '
-  );
+/**
+ * The text as TYPED, not as painted. `innerText` returns the rendered text, which
+ * applies CSS `text-transform` (a hero zone set to uppercase, or a skin that
+ * uppercases its headings), so reading it would save "SUMMER SALEX" for an edit
+ * to "Summer sale". `textContent` is the raw characters; line breaks that an
+ * engine without plaintext-only editing inserts as `<br>` / block wrappers are
+ * turned back into "\n".
+ */
+export function readRawText(el: Node): string {
+  let out = '';
+  el.childNodes.forEach((child, i) => {
+    if (child.nodeType === 3) out += child.nodeValue ?? '';
+    else if (child.nodeType === 1) {
+      const tag = (child as Element).tagName;
+      if (tag === 'BR') out += '\n';
+      else {
+        const block = tag === 'DIV' || tag === 'P';
+        if (block && i > 0 && !out.endsWith('\n')) out += '\n';
+        out += readRawText(child);
+      }
+    }
+  });
+  return out.replace(/\u00a0/g, ' ');
+}
+const readText = (el: HTMLElement): string => readRawText(el);
 
 function placeCaret(el: HTMLElement, point?: { x: number; y: number }) {
   const sel = el.ownerDocument.getSelection();
@@ -67,6 +87,9 @@ export function startInlineEdit(opts: InlineEditOptions): { cancel: () => void }
     unicodeBidi: editable.style.unicodeBidi,
     outline: editable.style.outline,
     outlineOffset: editable.style.outlineOffset,
+    textTransform: editable.style.getPropertyValue('text-transform'),
+    textTransformPriority: editable.style.getPropertyPriority('text-transform'),
+    whiteSpace: editable.style.whiteSpace,
   };
 
   editable.setAttribute('contenteditable', 'plaintext-only');
@@ -77,6 +100,9 @@ export function startInlineEdit(opts: InlineEditOptions): { cancel: () => void }
   editable.style.unicodeBidi = 'plaintext';
   editable.style.outline = `2px solid ${opts.caretColor}`;
   editable.style.outlineOffset = '2px';
+  // Edit the raw characters: uppercase / capitalize would hide what is really stored.
+  editable.style.setProperty('text-transform', 'none', 'important');
+  if (field.multiline) editable.style.whiteSpace = 'pre-wrap';
   editable.focus();
   placeCaret(editable, opts.point);
 
@@ -91,9 +117,18 @@ export function startInlineEdit(opts: InlineEditOptions): { cancel: () => void }
     editable.style.unicodeBidi = saved.unicodeBidi;
     editable.style.outline = saved.outline;
     editable.style.outlineOffset = saved.outlineOffset;
+    if (saved.textTransform)
+      editable.style.setProperty(
+        'text-transform',
+        saved.textTransform,
+        saved.textTransformPriority
+      );
+    else editable.style.removeProperty('text-transform');
+    editable.style.whiteSpace = saved.whiteSpace;
     editable.removeEventListener('blur', onBlur);
     editable.removeEventListener('keydown', onKey);
     editable.removeEventListener('paste', onPaste);
+    editable.removeEventListener('beforeinput', onBeforeInput);
     editable.removeEventListener('drop', onDrop);
   };
   const finish = (commit: boolean) => {
@@ -127,16 +162,31 @@ export function startInlineEdit(opts: InlineEditOptions): { cancel: () => void }
       opts.onMove(e.shiftKey ? -1 : 1);
     }
   };
+  /** Characters still free under the field's own limit, counting the selection a typed or pasted text replaces. */
+  const room = () => {
+    const selected = editable.ownerDocument.getSelection()?.toString().length ?? 0;
+    return field.max - readText(editable).length + selected;
+  };
   const onPaste = (e: ClipboardEvent) => {
     e.preventDefault();
     const text = e.clipboardData?.getData('text/plain') ?? '';
-    const clean = field.multiline ? text : text.replace(/\s*[\r\n]+\s*/g, ' ');
-    editable.ownerDocument.execCommand('insertText', false, clean);
+    const clean = (field.multiline ? text : text.replace(/\s*[\r\n]+\s*/g, ' ')).slice(
+      0,
+      Math.max(0, room())
+    );
+    if (clean) editable.ownerDocument.execCommand('insertText', false, clean);
+  };
+  // A typed character past the field's limit is refused (an IME composition is left alone: the
+  // parent still cuts the committed value at the limit).
+  const onBeforeInput = (e: InputEvent) => {
+    if (e.inputType !== 'insertText' || e.isComposing) return;
+    if ((e.data?.length ?? 1) > room()) e.preventDefault();
   };
   const onDrop = (e: DragEvent) => e.preventDefault();
   editable.addEventListener('blur', onBlur);
   editable.addEventListener('keydown', onKey);
   editable.addEventListener('paste', onPaste);
+  editable.addEventListener('beforeinput', onBeforeInput);
   editable.addEventListener('drop', onDrop);
   return { cancel: () => finish(false) };
 }

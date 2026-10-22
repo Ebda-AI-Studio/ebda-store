@@ -324,7 +324,7 @@ export default function WebhooksPage() {
                 <div className="flex flex-wrap gap-1">
                   {ep.events.map(ev => (
                     <span key={ev} className={`${badge} bg-muted text-foreground`} dir="auto">
-                      {t(`events.${ev}`)}
+                      {t(`events.${ev.replace('.', '_')}`)}
                     </span>
                   ))}
                 </div>
@@ -450,7 +450,7 @@ export default function WebhooksPage() {
                   checked={form.events.includes(ev)}
                   onChange={() => toggleEvent(ev)}
                 />
-                <span>{t(`events.${ev}`)}</span>
+                <span>{t(`events.${ev.replace('.', '_')}`)}</span>
               </label>
             ))}
           </fieldset>

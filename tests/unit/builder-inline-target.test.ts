@@ -69,6 +69,7 @@ describe('inlineTargetFor', () => {
       key: 'headlineAr',
       dir: 'rtl',
       multiline: false,
+      max: 2048,
     });
   });
 
@@ -159,5 +160,49 @@ describe('patch-text intent (parent side)', () => {
     const d = doc();
     expect(textTargetIn(d, heroId(d), 'slide-1', 'headlineAr')?.dir).toBe('rtl');
     expect(textTargetIn(d, heroId(d), 'slide-1', 'headline')?.multiline).toBe(false);
+  });
+});
+
+describe('field limits (the save schema own)', () => {
+  const stepsDoc = (): PageDefinition =>
+    reduceDocument(doc(), {
+      type: 'addSection',
+      list: 'template',
+      sectionType: 'steps',
+      presetIndex: 0,
+    }).doc;
+
+  it('carries the limit of each field from its Zod schema', () => {
+    const d = stepsDoc();
+    const steps = d.sections.find(n => n.type === 'steps')!;
+    const block = steps.blocks![0].id;
+    expect(textTargetIn(d, steps.id, block, 'title')?.max).toBe(80);
+    expect(textTargetIn(d, steps.id, block, 'bodyAr')?.max).toBe(240);
+    const img = reduceDocument(d, {
+      type: 'addSection',
+      list: 'template',
+      sectionType: 'image-text',
+      presetIndex: 0,
+    });
+    expect(textTargetIn(img.doc, img.createdId!, undefined, 'heading')?.max).toBe(200);
+  });
+
+  it('the parent cuts an over-long edit at the field limit, never at the generic cap', () => {
+    const d = stepsDoc();
+    const steps = d.sections.find(n => n.type === 'steps')!;
+    const block = steps.blocks![0].id;
+    const r = intentToAction(
+      d,
+      childToParentSchema.parse({
+        protocol: BUILDER_PROTOCOL,
+        type: 'patch-text',
+        sectionId: steps.id,
+        blockId: block,
+        key: 'title',
+        value: 'x'.repeat(500),
+      })
+    );
+    expect(r?.action).toMatchObject({ key: 'title', value: 'x'.repeat(80) });
+    expect(normalizeInlineText('x'.repeat(500), false, 10)).toHaveLength(10);
   });
 });

@@ -14,12 +14,17 @@ import { SECTION_REGISTRY, type BlockDefinition } from '../registry';
 import type { SettingDefinition } from '../settings-schema';
 import type { PageDefinition, SectionNode } from '../schema';
 
+/** The most any inline edit may carry (the protocol caps `patch-text` values at this). */
+export const MAX_INLINE_TEXT = 2048;
+
 export interface TextTarget {
   key: string;
   /** The direction of the FIELD (an `…Ar` key is RTL), not of the page. */
   dir: 'rtl' | 'ltr';
   /** `textarea` settings accept Shift+Enter newlines; `text` settings do not. */
   multiline: boolean;
+  /** The save schema's own limit for this field (a step title is 80), else MAX_INLINE_TEXT. */
+  max: number;
 }
 
 export interface ImageTarget {
@@ -35,24 +40,69 @@ export interface TextTargets {
   blocks: Record<string, TextTarget[]>;
 }
 
-function textTargetsOf(settings: readonly SettingDefinition[]): TextTarget[] {
+/* ---- the save schema's limit for a field (read from the registry's Zod props) ---- */
+
+type AnyZod = { shape?: Record<string, unknown>; element?: unknown; maxLength?: number | null } & {
+  unwrap?: () => unknown;
+  def?: { innerType?: unknown };
+};
+const unwrapZod = (schema: unknown): AnyZod | undefined => {
+  let x = schema as AnyZod | undefined;
+  for (let i = 0; i < 6 && x; i++) {
+    if (typeof x.unwrap === 'function') x = x.unwrap() as AnyZod;
+    else if (x.def?.innerType) x = x.def.innerType as AnyZod;
+    else break;
+  }
+  return x;
+};
+/** The Zod string limit of `shape[key]`, or null when the field has none. */
+const stringLimit = (shape: Record<string, unknown> | undefined, key: string): number | null => {
+  const f = unwrapZod(shape?.[key]);
+  return typeof f?.maxLength === 'number' ? f.maxLength : null;
+};
+/** Block settings live in the block's own schema, or in an array field of the section's (hero slides). */
+function blockShape(
+  d: { propsSchema?: unknown; blocks: readonly BlockDefinition[] },
+  b: BlockDefinition
+) {
+  const own = unwrapZod(b.propsSchema)?.shape;
+  if (own) return own;
+  const section = unwrapZod(d.propsSchema)?.shape ?? {};
+  for (const v of Object.values(section)) {
+    const el = unwrapZod(unwrapZod(v)?.element)?.shape;
+    if (el && b.settings.some(s => s.id in el)) return el;
+  }
+  return undefined;
+}
+
+function textTargetsOf(
+  settings: readonly SettingDefinition[],
+  shape?: Record<string, unknown>
+): TextTarget[] {
   const out: TextTarget[] = [];
   for (const s of settings) {
     if (s.type !== 'text' && s.type !== 'textarea') continue;
     const multiline = s.type === 'textarea';
-    out.push({ key: s.id, dir: 'ltr', multiline });
-    if (s.localized) out.push({ key: `${s.id}Ar`, dir: 'rtl', multiline });
+    const max = (k: string) => Math.min(stringLimit(shape, k) ?? MAX_INLINE_TEXT, MAX_INLINE_TEXT);
+    out.push({ key: s.id, dir: 'ltr', multiline, max: max(s.id) });
+    if (s.localized) out.push({ key: `${s.id}Ar`, dir: 'rtl', multiline, max: max(`${s.id}Ar`) });
   }
   return out;
 }
 
-const blockTargets = (blocks: readonly BlockDefinition[]): Record<string, TextTarget[]> =>
-  Object.fromEntries(blocks.map(b => [b.type, textTargetsOf(b.settings)]));
+const blockTargets = (d: {
+  propsSchema?: unknown;
+  blocks: readonly BlockDefinition[];
+}): Record<string, TextTarget[]> =>
+  Object.fromEntries(d.blocks.map(b => [b.type, textTargetsOf(b.settings, blockShape(d, b))]));
 
 export const TEXT_TARGETS: Readonly<Record<string, TextTargets>> = Object.fromEntries(
   SECTION_REGISTRY.map(d => [
     d.type,
-    { section: textTargetsOf(d.settings), blocks: blockTargets(d.blocks) },
+    {
+      section: textTargetsOf(d.settings, unwrapZod(d.propsSchema)?.shape),
+      blocks: blockTargets(d),
+    },
   ])
 );
 
@@ -107,13 +157,15 @@ export function textTargetsIn(
   return n.blockType === undefined ? t.section : (t.blocks[n.blockType] ?? []);
 }
 
-export const MAX_INLINE_TEXT = 2048;
-
 /** What an inline commit stores: capped, CRLF folded, and one line unless the field is a textarea. */
-export function normalizeInlineText(value: string, multiline: boolean): string {
+export function normalizeInlineText(
+  value: string,
+  multiline: boolean,
+  max: number = MAX_INLINE_TEXT
+): string {
   const folded = value.replace(/\r\n?/g, '\n');
   const flat = multiline ? folded : folded.replace(/\s*\n\s*/g, ' ');
-  return flat.trim().slice(0, MAX_INLINE_TEXT);
+  return flat.trim().slice(0, Math.min(max, MAX_INLINE_TEXT));
 }
 
 /**

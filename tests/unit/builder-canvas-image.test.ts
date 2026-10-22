@@ -124,3 +124,19 @@ describe('displayedImageKey', () => {
     expect(displayedImageKey(true, undefined, undefined)).toBe('image');
   });
 });
+
+describe('each swap is its own undo step', () => {
+  it('two swaps of the same picture carry different coalesce keys', () => {
+    const d = doc();
+    const req = mediaRequestFor(
+      d,
+      ask({ sectionId: heroId(d), blockId: 'slide-1', key: 'image' })
+    )!;
+    const first = imageSwapActions(req, 'a', undefined, 1);
+    const second = imageSwapActions(req, 'b', undefined, 2);
+    expect(first[0].coalesce).not.toBe(second[0].coalesce);
+    // within ONE swap the picture and its description still share a key
+    const both = imageSwapActions(req, 'a', { en: 'x' }, 3);
+    expect(new Set(both.map(a => a.coalesce)).size).toBe(1);
+  });
+});

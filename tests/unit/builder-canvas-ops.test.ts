@@ -122,6 +122,25 @@ describe('section-op -> exactly one reducer action', () => {
   });
 });
 
+describe('the parent only acts on page sections (header, announcement and footer are chrome)', () => {
+  const d = doc();
+  const chrome = [
+    ...d.sectionGroups.header.map(n => n.id),
+    ...d.sectionGroups.footer.map(n => n.id),
+  ];
+  it('drops every toolbar op and move that names a header or footer section', () => {
+    expect(chrome.length).toBeGreaterThan(1);
+    for (const id of chrome) {
+      for (const o of ['moveUp', 'moveDown', 'duplicate', 'hide', 'remove'])
+        expect(
+          intentToAction(d, msg({ type: 'section-op', sectionId: id, op: o })),
+          `${id} ${o}`
+        ).toBeNull();
+      expect(intentToAction(d, msg({ type: 'move', sectionId: id, toIndex: 0 }))).toBeNull();
+    }
+  });
+});
+
 describe('move', () => {
   const d = doc();
   const [a, b, c] = ids(d);

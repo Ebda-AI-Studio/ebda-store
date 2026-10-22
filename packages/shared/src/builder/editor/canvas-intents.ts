@@ -29,7 +29,7 @@ export function intentToAction(doc: PageDefinition, msg: ChildToParent): IntentR
     case 'patch-text': {
       const target = textTargetIn(doc, msg.sectionId, msg.blockId, msg.key);
       if (!target) return null;
-      const value = normalizeInlineText(msg.value, target.multiline);
+      const value = normalizeInlineText(msg.value, target.multiline, target.max);
       const coalesce = `${msg.sectionId}/${msg.blockId ?? ''}/${msg.key}`;
       return {
         action: msg.blockId
@@ -48,7 +48,8 @@ export function intentToAction(doc: PageDefinition, msg: ChildToParent): IntentR
       return sectionOpAction(doc, msg.sectionId, msg.blockId, msg.op);
     case 'move': {
       const at = locate(doc, msg.sectionId, msg.blockId);
-      if (!at) return null;
+      // The canvas only offers these for page sections; the parent does not take its word for it.
+      if (!at || !isPageSection(doc, msg.sectionId)) return null;
       const toIndex = Math.min(msg.toIndex, at.count - 1);
       if (toIndex === at.index) return null; // dropped where it already is: no history entry
       return {
@@ -60,6 +61,11 @@ export function intentToAction(doc: PageDefinition, msg: ChildToParent): IntentR
     default:
       return null;
   }
+}
+
+/** Header, announcement bar and footer are chrome, edited in the panes: no canvas toolbar acts on them. */
+function isPageSection(doc: PageDefinition, sectionId: string): boolean {
+  return locateSection(doc, sectionId)?.list === 'template';
 }
 
 /** Where a section (or one of its blocks) sits in its own list. */
@@ -86,7 +92,7 @@ function sectionOpAction(
   op: SectionOp
 ): IntentResult | null {
   const at = locate(doc, sectionId, blockId);
-  if (!at) return null;
+  if (!at || !isPageSection(doc, sectionId)) return null;
   switch (op) {
     case 'moveUp':
     case 'moveDown': {
@@ -166,9 +172,11 @@ export function mediaRequestFor(doc: PageDefinition, msg: ChildToParent): MediaR
 export function imageSwapActions(
   req: Pick<MediaRequest, 'sectionId' | 'blockId' | 'key' | 'target'>,
   url: string,
-  alt?: { en?: string; ar?: string }
+  alt?: { en?: string; ar?: string },
+  /** One value per swap: two swaps of the same picture are two undo steps. */
+  nonce: string | number = ''
 ): IntentResult[] {
-  const coalesce = `${req.sectionId}/${req.blockId ?? ''}/image-swap`;
+  const coalesce = `${req.sectionId}/${req.blockId ?? ''}/image-swap/${nonce}`;
   const set = (key: string, value: string): IntentResult => ({
     action: req.blockId
       ? { type: 'setBlockSetting', sectionId: req.sectionId, blockId: req.blockId, key, value }
