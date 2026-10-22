@@ -94,7 +94,9 @@ const row = () => (
 );
 
 const addButtons = (c: HTMLElement) =>
-  Array.from(c.querySelectorAll('button')).filter(b => /(إضافة|أضف|السلة)/.test(b.textContent ?? ''));
+  Array.from(c.querySelectorAll('button')).filter(b =>
+    /(إضافة|أضف|السلة)/.test(b.textContent ?? '')
+  );
 
 beforeEach(() => {
   state.look = 'lamma.table';

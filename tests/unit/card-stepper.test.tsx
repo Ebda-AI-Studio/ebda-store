@@ -187,9 +187,7 @@ describe('card stepper (Ruling B4-4)', () => {
     // the line appears: BOTH copies become steppers
     state.items = [line({ quantity: 1 })];
     rerender(both());
-    await waitFor(() =>
-      expect(getByTestId('second').contains(document.activeElement)).toBe(true)
-    );
+    await waitFor(() => expect(getByTestId('second').contains(document.activeElement)).toBe(true));
     expect(getByTestId('first').contains(document.activeElement)).toBe(false);
     expect(document.activeElement?.getAttribute('aria-label')).toBe('زيادة الكمية');
     // and back: - at 1 on the second copy returns focus to ITS add button
@@ -197,9 +195,7 @@ describe('card stepper (Ruling B4-4)', () => {
     state.items = [];
     await waitFor(() => expect(state.removeItem).toHaveBeenCalled());
     rerender(both());
-    await waitFor(() =>
-      expect(getByTestId('second').contains(document.activeElement)).toBe(true)
-    );
+    await waitFor(() => expect(getByTestId('second').contains(document.activeElement)).toBe(true));
     expect(document.activeElement?.tagName).toBe('BUTTON');
   });
   it('the click never reaches the card link around it', () => {
