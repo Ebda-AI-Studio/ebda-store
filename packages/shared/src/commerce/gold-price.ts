@@ -1,0 +1,206 @@
+/**
+ * Gold-rate pricing: the ONE implementation of the price formula (Rulings B5-13, B5-14).
+ *
+ * Everything is an integer. A rate is piastres per gram, a weight is milligrams, a margin is basis
+ * points, a making charge is piastres (fixed) or piastres per gram (per_gram). The arithmetic runs
+ * in BigInt from the first multiplication to the last and rounds EXACTLY ONCE, at the end,
+ * directly to the store's rounding step. There is no Float, no `toFixed`, and no Number product of
+ * two inputs: a single Number intermediate above 2^53 would silently lose piastres (vector E of
+ * `tests/unit/gold-price.test.ts` is built to catch it).
+ *
+ *   metal  = weightMg * ratePerGram                      (piastre*mg/g)
+ *   making = fixed ? value * 1000 : weightMg * value     (same unit)
+ *   base   = metal + making
+ *   num    = base * (10 000 + marginBps)
+ *   final  = roundHalfUp(num / (10^7 * step)) * step     (piastres, `step` = 1 | 100 | 500 | 1000)
+ *
+ * The repricer, the order re-check, the admin preview and the tests all call
+ * `computeGoldUnitPrice`; SQL never re-implements it.
+ */
+
+export const GOLD_KARATS = [24, 21, 18] as const;
+export type GoldKarat = (typeof GOLD_KARATS)[number];
+export type MakingChargeType = 'fixed' | 'per_gram';
+/** Piastres: 1 = exact, 100 = whole pounds (the default), 500 and 1000 = nearest 5 / 10 pounds. */
+export const GOLD_ROUNDING_STEPS = [1, 100, 500, 1000] as const;
+export type GoldRoundingStep = (typeof GOLD_ROUNDING_STEPS)[number];
+export const GOLD_DEFAULT_ROUNDING_STEP: GoldRoundingStep = 100;
+
+export const GOLD_WEIGHT_MG_MIN = 1;
+export const GOLD_WEIGHT_MG_MAX = 1_000_000;
+export const GOLD_RATE_MIN = 10_000;
+export const GOLD_RATE_MAX = 10_000_000;
+export const GOLD_MARGIN_BPS_MIN = -5_000;
+export const GOLD_MARGIN_BPS_MAX = 10_000;
+export const GOLD_MAKING_VALUE_MAX = 2_147_483_647;
+/** Postgres int4: the materialised `price` column. */
+export const GOLD_PRICE_MAX = 2_147_483_647;
+
+export interface GoldPriceSpec {
+  karat: GoldKarat;
+  /** Milligrams, integer 1..1 000 000. */
+  weightMg: number;
+  makingChargeType: MakingChargeType;
+  /** Piastres (fixed) or piastres per gram (per_gram), integer >= 0. */
+  makingChargeValue: number;
+  /** Basis points, integer -5000..10000. */
+  marginBps: number;
+}
+
+/** Piastres. `metalValue` / `makingValue` are DISPLAY splits, each rounded half-up independently, never summed into `unitPrice`. */
+export interface GoldPriceResult {
+  unitPrice: number;
+  metalValue: number;
+  makingValue: number;
+}
+
+export type GoldPriceErrorCode =
+  | 'GOLD_SPEC_INVALID'
+  | 'GOLD_RATE_INVALID'
+  | 'GOLD_PRICE_OUT_OF_RANGE';
+
+export class GoldPriceError extends Error {
+  readonly code: GoldPriceErrorCode;
+  constructor(code: GoldPriceErrorCode, message: string) {
+    super(message);
+    this.name = 'GoldPriceError';
+    this.code = code;
+  }
+}
+
+const isInt = (n: unknown, min: number, max: number): n is number =>
+  typeof n === 'number' && Number.isSafeInteger(n) && n >= min && n <= max;
+
+/** `round_half_up(a / b)` for positive BigInts: `floor((2a + b) / (2b))`. */
+const roundHalfUpDiv = (a: bigint, b: bigint): bigint => (2n * a + b) / (2n * b);
+
+function assertSpec(spec: GoldPriceSpec): void {
+  if (!spec || typeof spec !== 'object')
+    throw new GoldPriceError('GOLD_SPEC_INVALID', 'missing spec');
+  if (!(GOLD_KARATS as readonly number[]).includes(spec.karat))
+    throw new GoldPriceError(
+      'GOLD_SPEC_INVALID',
+      `karat ${String(spec.karat)} is not 24, 21 or 18`
+    );
+  if (!isInt(spec.weightMg, GOLD_WEIGHT_MG_MIN, GOLD_WEIGHT_MG_MAX))
+    throw new GoldPriceError('GOLD_SPEC_INVALID', `weightMg ${String(spec.weightMg)} out of range`);
+  if (spec.makingChargeType !== 'fixed' && spec.makingChargeType !== 'per_gram')
+    throw new GoldPriceError('GOLD_SPEC_INVALID', 'makingChargeType must be fixed or per_gram');
+  if (!isInt(spec.makingChargeValue, 0, GOLD_MAKING_VALUE_MAX))
+    throw new GoldPriceError(
+      'GOLD_SPEC_INVALID',
+      `makingChargeValue ${String(spec.makingChargeValue)} out of range`
+    );
+  if (!isInt(spec.marginBps, GOLD_MARGIN_BPS_MIN, GOLD_MARGIN_BPS_MAX))
+    throw new GoldPriceError(
+      'GOLD_SPEC_INVALID',
+      `marginBps ${String(spec.marginBps)} out of range`
+    );
+}
+
+/**
+ * The unit price of one gold piece, in piastres, from its spec, the rate of its karat and the
+ * store's rounding step. Throws `GoldPriceError`; never returns a guess.
+ */
+export function computeGoldUnitPrice(
+  spec: GoldPriceSpec,
+  ratePerGram: number,
+  roundingStep: GoldRoundingStep
+): GoldPriceResult {
+  assertSpec(spec);
+  if (!isInt(ratePerGram, GOLD_RATE_MIN, GOLD_RATE_MAX))
+    throw new GoldPriceError('GOLD_RATE_INVALID', `rate ${String(ratePerGram)} out of range`);
+  if (!(GOLD_ROUNDING_STEPS as readonly number[]).includes(roundingStep))
+    throw new GoldPriceError(
+      'GOLD_SPEC_INVALID',
+      `rounding step ${String(roundingStep)} is not allowed`
+    );
+
+  const w = BigInt(spec.weightMg);
+  const metal = w * BigInt(ratePerGram);
+  const making =
+    spec.makingChargeType === 'fixed'
+      ? BigInt(spec.makingChargeValue) * 1000n
+      : w * BigInt(spec.makingChargeValue);
+  const num = (metal + making) * BigInt(10_000 + spec.marginBps);
+  const step = BigInt(roundingStep);
+  const final = roundHalfUpDiv(num, 10_000_000n * step) * step;
+  if (final < 1n || final > BigInt(GOLD_PRICE_MAX))
+    throw new GoldPriceError(
+      'GOLD_PRICE_OUT_OF_RANGE',
+      'computed price is outside 1..2147483647 piastres'
+    );
+  return {
+    unitPrice: Number(final),
+    metalValue: Number(roundHalfUpDiv(metal, 1000n)),
+    makingValue: Number(roundHalfUpDiv(making, 1000n)),
+  };
+}
+
+type SpecFields = {
+  karat?: number | null;
+  weightMg?: number | null;
+  makingChargeType?: MakingChargeType | null;
+  makingChargeValue?: number | null;
+  marginBps?: number | null;
+};
+
+/**
+ * The spec a variant is priced by. A variant's `pricingMode` of `null` inherits the product's; a
+ * variant spec field of `null`/undefined inherits the product's field. Returns `null` for a fixed
+ * price (the caller then reads the materialised or merchant-set price). Throws `GOLD_SPEC_INVALID`
+ * when the row is gold but the merged spec is incomplete or out of range.
+ */
+export function resolveVariantGoldSpec(
+  product: SpecFields & { pricingMode: 'fixed' | 'gold_rate' },
+  variant: SpecFields & { pricingMode: 'fixed' | 'gold_rate' | null }
+): GoldPriceSpec | null {
+  const mode = variant.pricingMode ?? product.pricingMode;
+  if (mode === 'fixed') return null;
+  const pick = <K extends keyof SpecFields>(k: K) => variant[k] ?? product[k];
+  const merged = {
+    karat: pick('karat'),
+    weightMg: pick('weightMg'),
+    makingChargeType: pick('makingChargeType'),
+    // margin defaults to 0 only when NEITHER side states one (the column default)
+    makingChargeValue: pick('makingChargeValue'),
+    marginBps: pick('marginBps') ?? 0,
+  };
+  if (
+    merged.karat == null ||
+    merged.weightMg == null ||
+    merged.makingChargeType == null ||
+    merged.makingChargeValue == null
+  )
+    throw new GoldPriceError(
+      'GOLD_SPEC_INVALID',
+      'a gold-priced row needs karat, weight and making charge'
+    );
+  const spec = merged as GoldPriceSpec;
+  assertSpec(spec);
+  return spec;
+}
+
+/** `|next - prev| * 10000 / prev` in basis points, integer, rounded UP (a gate never under-reports). */
+export function goldRateJumpBps(previous: number, next: number): number {
+  if (!isInt(previous, 1, Number.MAX_SAFE_INTEGER) || !isInt(next, 0, Number.MAX_SAFE_INTEGER))
+    throw new GoldPriceError('GOLD_RATE_INVALID', 'rates must be positive integers');
+  const p = BigInt(previous);
+  const diff = BigInt(next) > p ? BigInt(next) - p : p - BigInt(next);
+  return Number((diff * 10_000n + p - 1n) / p);
+}
+
+/**
+ * How far a 21k / 18k rate sits from `rate24 * karat / 24`, in basis points rounded up. Catches
+ * swapped fields when the three karats are entered together (Ruling B5-20).
+ */
+export function karatCoherenceBps(rate24: number, rateK: number, karat: 21 | 18): number {
+  if (!isInt(rate24, 1, Number.MAX_SAFE_INTEGER) || !isInt(rateK, 0, Number.MAX_SAFE_INTEGER))
+    throw new GoldPriceError('GOLD_RATE_INVALID', 'rates must be positive integers');
+  // expected = rate24 * karat / 24, compared without dividing: |rateK*24 - rate24*karat| / (rate24*karat)
+  const k = BigInt(karat);
+  const exp = BigInt(rate24) * k;
+  const got = BigInt(rateK) * 24n;
+  const diff = got > exp ? got - exp : exp - got;
+  return Number((diff * 10_000n + exp - 1n) / exp);
+}

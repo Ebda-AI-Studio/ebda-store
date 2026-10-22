@@ -2280,6 +2280,86 @@
       "find": "  if (!storeId || key.split('/').includes('..')) return false;",
       "replace": "  if (!storeId) return false;",
       "test": "tests/unit/r2-cleanup-store-prefix.test.ts"
+    },
+    {
+      "id": "money-gold-single-rounding",
+      "domain": "money",
+      "tier": "unit",
+      "why": "the gold price rounds in two stages (piastre, then step) instead of once, so a true 19 230.4975 pounds becomes 19 231 and every gold price drifts up by up to a pound (Ruling B5-14, vector C)",
+      "source": "packages/shared/src/commerce/gold-price.ts",
+      "find": "  const final = roundHalfUpDiv(num, 10_000_000n * step) * step;",
+      "replace": "  const piastres = roundHalfUpDiv(num, 10_000_000n);\n  const final = roundHalfUpDiv(piastres, step) * step;",
+      "test": "tests/unit/gold-price.test.ts"
+    },
+    {
+      "id": "money-gold-half-up",
+      "domain": "money",
+      "tier": "unit",
+      "why": "the gold price rounds down (floor) instead of half-up, so a true half-pound under-charges by a pound on every such piece",
+      "source": "packages/shared/src/commerce/gold-price.ts",
+      "find": "const roundHalfUpDiv = (a: bigint, b: bigint): bigint => (2n * a + b) / (2n * b);",
+      "replace": "const roundHalfUpDiv = (a: bigint, b: bigint): bigint => a / b;",
+      "test": "tests/unit/gold-price.test.ts"
+    },
+    {
+      "id": "money-gold-int4-ceiling",
+      "domain": "money",
+      "tier": "unit",
+      "why": "the int4 ceiling on a computed gold price is dropped, so an overflowing price is materialised (or wraps) instead of failing closed with GOLD_PRICE_OUT_OF_RANGE",
+      "source": "packages/shared/src/commerce/gold-price.ts",
+      "find": "if (final < 1n || final > BigInt(GOLD_PRICE_MAX))",
+      "replace": "if (final < 1n)",
+      "test": "tests/unit/gold-price.test.ts"
+    },
+    {
+      "id": "money-gold-zero-price-floor",
+      "domain": "money",
+      "tier": "unit",
+      "why": "the floor on a computed gold price is dropped, so a piece can round to a price of 0 and sell for free",
+      "source": "packages/shared/src/commerce/gold-price.ts",
+      "find": "if (final < 1n || final > BigInt(GOLD_PRICE_MAX))",
+      "replace": "if (final > BigInt(GOLD_PRICE_MAX))",
+      "test": "tests/unit/gold-price.test.ts"
+    },
+    {
+      "id": "money-gold-making-fixed-units",
+      "domain": "money",
+      "tier": "unit",
+      "why": "a fixed making charge (piastres) is not scaled to the metal's piastre*mg/g unit, so a fixed making charge is charged 1000 times too little",
+      "source": "packages/shared/src/commerce/gold-price.ts",
+      "find": "      ? BigInt(spec.makingChargeValue) * 1000n",
+      "replace": "      ? BigInt(spec.makingChargeValue)",
+      "test": "tests/unit/gold-price.test.ts"
+    },
+    {
+      "id": "money-gold-margin-applied",
+      "domain": "money",
+      "tier": "unit",
+      "why": "the merchant margin is dropped from the gold price, so a +/- margin silently has no effect on what is charged",
+      "source": "packages/shared/src/commerce/gold-price.ts",
+      "find": "  const num = (metal + making) * BigInt(10_000 + spec.marginBps);",
+      "replace": "  const num = (metal + making) * 10_000n;",
+      "test": "tests/unit/gold-price.test.ts"
+    },
+    {
+      "id": "money-gold-spec-bounds",
+      "domain": "money",
+      "tier": "unit",
+      "why": "the weight bound check is dropped, so a zero or oversized weight reaches the price formula instead of failing closed with GOLD_SPEC_INVALID",
+      "source": "packages/shared/src/commerce/gold-price.ts",
+      "find": "  if (!isInt(spec.weightMg, GOLD_WEIGHT_MG_MIN, GOLD_WEIGHT_MG_MAX))\n    throw new GoldPriceError('GOLD_SPEC_INVALID', `weightMg ${String(spec.weightMg)} out of range`);",
+      "replace": "",
+      "test": "tests/unit/gold-price.test.ts"
+    },
+    {
+      "id": "money-gold-rate-bounds",
+      "domain": "money",
+      "tier": "unit",
+      "why": "the rate bound check is dropped, so a typo rate (9 999 or 10 000 001 piastres/g) prices pieces instead of failing closed with GOLD_RATE_INVALID",
+      "source": "packages/shared/src/commerce/gold-price.ts",
+      "find": "  if (!isInt(ratePerGram, GOLD_RATE_MIN, GOLD_RATE_MAX))\n    throw new GoldPriceError('GOLD_RATE_INVALID', `rate ${String(ratePerGram)} out of range`);",
+      "replace": "",
+      "test": "tests/unit/gold-price.test.ts"
     }
   ]
 }

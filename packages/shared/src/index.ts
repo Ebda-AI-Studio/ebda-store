@@ -23,6 +23,7 @@ export * from './schemas/typography';
 export * from './schemas/analytics';
 export * from './schemas/report-range';
 export * from './schemas/list-filters';
+export * from './schemas/gold-pricing';
 export * from './data/egypt-areas';
 export * from './bundle-pricing';
 export * from './region';
