@@ -14,22 +14,30 @@
  * - double-click on a merchant text setting edits it in place; Enter or
  *   blur commits a `patch-text`, Escape cancels.
  */
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import {
   BUILDER_PROTOCOL,
   acceptMessage,
   parentToChildSchema,
   type ChildToParent,
   type PageDefinition,
+  type SectionOp,
   type TextTarget,
 } from '@ebda/shared';
 import { BRAND } from '@ebda/shared';
 import { startInlineEdit } from './inline-edit';
+import { CanvasToolbar } from './CanvasToolbar';
+import { InsertLine, InsertLineStyles } from './InsertLine';
 import {
+  dropTargetFor,
   inlineTargetFor,
+  insertionGaps,
   labelFor,
   targetOf,
+  toolbarStateFor,
   unionRect,
+  type DropTarget,
+  type SlotBox,
   type CanvasTarget,
   type Rect,
 } from './overlay-logic';
@@ -76,6 +84,26 @@ function boxOf(target: CanvasTarget, doc: PageDefinition): Rect | null {
           : null;
   const el = zone ? document.querySelector(`[data-zone="${zone}"]`) : null;
   return el ? unionRect([rectOf(el)]) : null;
+}
+
+/** The visible template sections, in document order, with their page boxes. */
+function slotsOf(doc: PageDefinition): SlotBox[] {
+  const out: SlotBox[] = [];
+  doc.sections.forEach((n, index) => {
+    if (n.hidden === true) return;
+    const box = boxOf({ sectionId: n.id }, doc);
+    if (box) out.push({ id: n.id, index, top: box.top, bottom: box.top + box.height });
+  });
+  return out;
+}
+
+interface DragState {
+  id: string;
+  /** Page y where the drag started, and where the pointer is now. */
+  startY: number;
+  y: number;
+  box: Rect;
+  drop: DropTarget | null;
 }
 
 interface ImageHandle {
@@ -134,8 +162,16 @@ export default function EditorOverlay({ allowedOrigins, locale, definition, onRe
   const localeRef = useRef(locale);
   localeRef.current = locale;
   const editingRef = useRef<{ cancel: () => void } | null>(null);
+  const [isEditing, setIsEditing] = useState(false);
+  const [drag, setDrag] = useState<DragState | null>(null);
+  const dragRef = useRef<DragState | null>(null);
+  dragRef.current = drag;
+  // The insertion index of the gap the pointer is near (reveals its "+"), or null.
+  const [nearGap, setNearGap] = useState<number | null>(null);
   const [hovered, setHovered] = useState<CanvasTarget | null>(null);
   const [, setTick] = useState(0);
+  // Boxes are read from the DOM: measure again once the new document has painted.
+  useLayoutEffect(() => setTick(t => t + 1), [definition]);
 
   const post = useCallback(
     (msg: Omit<ChildToParent, 'protocol'>) => {
@@ -186,6 +222,7 @@ export default function EditorOverlay({ allowedOrigins, locale, definition, onRe
     ) => {
       const editable = (el.closest('[data-builder-setting]') as HTMLElement | null) ?? el;
       editingRef.current?.cancel();
+      setIsEditing(true);
       editingRef.current = startInlineEdit({
         editable,
         field,
@@ -208,6 +245,7 @@ export default function EditorOverlay({ allowedOrigins, locale, definition, onRe
         },
         onDone: () => {
           editingRef.current = null;
+          setIsEditing(false);
         },
       });
     };
@@ -258,6 +296,24 @@ export default function EditorOverlay({ allowedOrigins, locale, definition, onRe
         return hit;
       });
     };
+    let nearRaf = 0;
+    const onMove = (e: MouseEvent) => {
+      if (dragRef.current) return;
+      cancelAnimationFrame(nearRaf);
+      nearRaf = requestAnimationFrame(() => {
+        const gaps = insertionGaps(slotsOf(docRef.current));
+        let hit: number | null = null;
+        let best = 18;
+        for (const g of gaps) {
+          const d = Math.abs(g.y - e.pageY);
+          if (d <= best) {
+            best = d;
+            hit = g.index;
+          }
+        }
+        setNearGap(prev => (prev === hit ? prev : hit));
+      });
+    };
     const onDblClick = (e: MouseEvent) => {
       const el = e.target as HTMLElement | null;
       if (!el || el.closest('[contenteditable]:not([contenteditable="false"])')) return;
@@ -269,19 +325,92 @@ export default function EditorOverlay({ allowedOrigins, locale, definition, onRe
     const reflow = () => setTick(t => t + 1);
     document.addEventListener('click', onClick, true);
     document.addEventListener('mouseover', onOver);
+    document.addEventListener('mousemove', onMove);
     document.addEventListener('dblclick', onDblClick);
     document.addEventListener('submit', onSubmit, true);
+    const ro = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(reflow);
+    ro?.observe(document.body);
     window.addEventListener('resize', reflow);
     window.addEventListener('scroll', reflow, { passive: true });
     return () => {
       document.removeEventListener('click', onClick, true);
       document.removeEventListener('mouseover', onOver);
+      document.removeEventListener('mousemove', onMove);
+      cancelAnimationFrame(nearRaf);
       document.removeEventListener('dblclick', onDblClick);
       document.removeEventListener('submit', onSubmit, true);
+      ro?.disconnect();
       window.removeEventListener('resize', reflow);
       window.removeEventListener('scroll', reflow);
     };
   }, [post]);
+
+  const dragging = drag !== null;
+  useEffect(() => {
+    if (!dragging) return;
+    document.body.style.userSelect = 'none';
+    document.body.style.cursor = 'grabbing';
+    let scrollRaf = 0;
+    const edgeScroll = (clientY: number) => {
+      cancelAnimationFrame(scrollRaf);
+      const edge = 70;
+      const dy = clientY < edge ? -14 : clientY > window.innerHeight - edge ? 14 : 0;
+      if (dy) {
+        window.scrollBy(0, dy);
+        scrollRaf = requestAnimationFrame(() => edgeScroll(clientY));
+      }
+    };
+    const onPointerMove = (e: PointerEvent) => {
+      const cur = dragRef.current;
+      if (!cur) return;
+      const y = e.clientY + window.scrollY;
+      setDrag({ ...cur, y, drop: dropTargetFor(slotsOf(docRef.current), cur.id, y) });
+      edgeScroll(e.clientY);
+    };
+    const finish = (commit: boolean) => {
+      const cur = dragRef.current;
+      setDrag(null);
+      if (commit && cur?.drop && !cur.drop.noop)
+        post({
+          type: 'move',
+          sectionId: cur.id,
+          toIndex: cur.drop.toIndex,
+        } as Omit<ChildToParent, 'protocol'>);
+    };
+    const onUp = () => finish(true);
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') finish(false);
+    };
+    window.addEventListener('pointermove', onPointerMove);
+    window.addEventListener('pointerup', onUp);
+    window.addEventListener('pointercancel', onUp);
+    window.addEventListener('keydown', onKey, true);
+    return () => {
+      cancelAnimationFrame(scrollRaf);
+      document.body.style.userSelect = '';
+      document.body.style.cursor = '';
+      window.removeEventListener('pointermove', onPointerMove);
+      window.removeEventListener('pointerup', onUp);
+      window.removeEventListener('pointercancel', onUp);
+      window.removeEventListener('keydown', onKey, true);
+    };
+  }, [dragging, post]);
+
+  const startDrag = (e: React.PointerEvent<HTMLButtonElement>) => {
+    const sel = selectedRef.current;
+    if (!sel || sel.blockId || e.button !== 0) return;
+    const box = boxOf({ sectionId: sel.sectionId }, docRef.current);
+    if (!box) return;
+    e.preventDefault();
+    const y = e.clientY + window.scrollY;
+    setDrag({
+      id: sel.sectionId,
+      startY: y,
+      y,
+      box,
+      drop: dropTargetFor(slotsOf(docRef.current), sel.sectionId, y),
+    });
+  };
 
   const isRtl = locale === 'ar';
   const outline = (target: CanvasTarget | null, kind: 'hover' | 'selected') => {
@@ -380,11 +509,89 @@ export default function EditorOverlay({ allowedOrigins, locale, definition, onRe
     </button>
   ));
 
+  // Toolbar on the selected template section / block (hidden while dragging or typing).
+  const toolbarState = selected ? toolbarStateFor(docRef.current, selected) : null;
+  const toolbarBox = selected && toolbarState && !drag ? boxOf(selected, docRef.current) : null;
+  const gaps = drag ? [] : insertionGaps(slotsOf(docRef.current));
+
   return (
     <>
-      {!same(hovered, selected) && outline(hovered, 'hover')}
+      <InsertLineStyles />
+      {!drag && !same(hovered, selected) && outline(hovered, 'hover')}
       {outline(selected, 'selected')}
       {imageButtons}
+      {selected && toolbarState && toolbarBox && !isEditing && (
+        <CanvasToolbar
+          locale={locale}
+          box={toolbarBox}
+          pageWidth={pageWidth}
+          draggable={toolbarState.draggable}
+          disabled={toolbarState.disabled}
+          onDragStart={startDrag}
+          onOp={(op: SectionOp) =>
+            post({
+              type: 'section-op',
+              sectionId: selected.sectionId,
+              ...(selected.blockId ? { blockId: selected.blockId } : {}),
+              op,
+            } as Omit<ChildToParent, 'protocol'>)
+          }
+        />
+      )}
+      {gaps.map(g => (
+        <InsertLine
+          key={`gap-${g.index}`}
+          locale={locale}
+          y={g.y}
+          pageWidth={pageWidth}
+          on={nearGap === g.index}
+          onAdd={() =>
+            post({
+              type: 'request-add',
+              list: 'template',
+              index: g.index,
+            } as Omit<ChildToParent, 'protocol'>)
+          }
+        />
+      ))}
+      {drag && (
+        <>
+          <div
+            aria-hidden="true"
+            data-builder-drag-ghost
+            style={{
+              position: 'absolute',
+              top: drag.box.top + (drag.y - drag.startY),
+              insetInlineStart: isRtl
+                ? Math.max(0, pageWidth - (drag.box.left + drag.box.width))
+                : drag.box.left,
+              width: drag.box.width,
+              height: drag.box.height,
+              pointerEvents: 'none',
+              zIndex: 2147483004,
+              outline: `2px dashed ${BRAND.colors.gold}`,
+              outlineOffset: -2,
+              background: 'rgba(176,141,87,0.14)',
+            }}
+          />
+          {drag.drop && !drag.drop.noop && (
+            <div
+              aria-hidden="true"
+              data-builder-drop-line
+              style={{
+                position: 'absolute',
+                top: drag.drop.y - 2,
+                insetInlineStart: 0,
+                width: pageWidth,
+                height: 4,
+                pointerEvents: 'none',
+                zIndex: 2147483004,
+                background: BRAND.colors.gold,
+              }}
+            />
+          )}
+        </>
+      )}
     </>
   );
 }

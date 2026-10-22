@@ -23,6 +23,11 @@ const VALID: Array<Record<string, unknown>> = [
   { type: 'hover', sectionId: null },
   { type: 'patch-text', sectionId: 'hero', blockId: 'slide-1', key: 'headlineAr', value: 'تمور' },
   { type: 'request-media', sectionId: 'hero', blockId: 'slide-1', key: 'image' },
+  { type: 'section-op', sectionId: 'hero', op: 'moveUp' },
+  { type: 'section-op', sectionId: 'hero', blockId: 'slide-1', op: 'remove' },
+  { type: 'move', sectionId: 'hero', toIndex: 2 },
+  { type: 'move', sectionId: 'hero', blockId: 'slide-1', toIndex: 0 },
+  { type: 'request-add', list: 'template', index: 3 },
 ];
 
 describe('child -> parent messages', () => {
@@ -56,6 +61,35 @@ describe('child -> parent messages', () => {
     expect(child({ ...ok, value: 'x'.repeat(2048) }).success).toBe(true);
     expect(child({ ...ok, value: 'x'.repeat(2049) }).success).toBe(false);
     expect(child({ ...ok, key: '1bad', value: 'x' }).success).toBe(false);
+  });
+});
+
+describe('toolbar, drag and insert intents', () => {
+  it('section-op accepts only the listed ops', () => {
+    for (const op of ['moveUp', 'moveDown', 'duplicate', 'hide', 'remove'])
+      expect(child({ type: 'section-op', sectionId: 'hero', op }).success).toBe(true);
+    for (const op of ['delete', 'aiFill', 'eval', '', 'MOVEUP'])
+      expect(child({ type: 'section-op', sectionId: 'hero', op }).success).toBe(false);
+    expect(child({ type: 'section-op', sectionId: 'hero' }).success).toBe(false);
+  });
+
+  it('move bounds the index: integer, non-negative, within the limits', () => {
+    const ok = { type: 'move', sectionId: 'hero' };
+    expect(child({ ...ok, toIndex: 0 }).success).toBe(true);
+    expect(child({ ...ok, toIndex: 50 }).success).toBe(true);
+    for (const toIndex of [-1, 51, 1.5, NaN, Infinity, '2'])
+      expect(child({ ...ok, toIndex }).success).toBe(false);
+  });
+
+  it('request-add takes a real group and a bounded index', () => {
+    const ok = { type: 'request-add', index: 0 };
+    for (const list of ['header', 'template', 'footer'])
+      expect(child({ ...ok, list }).success).toBe(true);
+    expect(child({ ...ok, list: 'sidebar' }).success).toBe(false);
+    expect(child({ ...ok, list: 'template', index: 41 }).success).toBe(false);
+    expect(child({ ...ok, list: 'template', index: -1 }).success).toBe(false);
+    expect(child({ ...ok, list: 'template', index: 0.5 }).success).toBe(false);
+    expect(child({ ...ok, list: 'template', sectionType: 'hero' }).success).toBe(false);
   });
 });
 

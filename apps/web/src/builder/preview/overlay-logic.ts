@@ -7,6 +7,7 @@ import {
   nodeFor,
   textTargetsIn,
   type PageDefinition,
+  type SectionOp,
   type TextTarget,
 } from '@ebda/shared';
 
@@ -169,4 +170,104 @@ export function unionRect(rects: Rect[]): Rect | null {
   const bottom = Math.max(...real.map(r => r.top + r.height));
   const right = Math.max(...real.map(r => r.left + r.width));
   return { top, left, width: right - left, height: bottom - top };
+}
+
+/** A visible template section on the canvas: its place in the document list and its page box. */
+export interface SlotBox {
+  id: string;
+  /** Index in `doc.sections` (hidden sections count, they just have no box). */
+  index: number;
+  top: number;
+  bottom: number;
+}
+
+export interface Gap {
+  /** The index a section inserted here gets (`addSection.index`). */
+  index: number;
+  /** Page y of the line. */
+  y: number;
+}
+
+/**
+ * Where a section can be inserted: before the first visible section, between
+ * two neighbours (halfway across the space between them), and after the last.
+ * An insertion between A and B goes right after A, so hidden sections that sit
+ * between them stay behind it.
+ */
+export function insertionGaps(slots: readonly SlotBox[]): Gap[] {
+  if (slots.length === 0) return [];
+  const gaps: Gap[] = [{ index: slots[0].index, y: slots[0].top }];
+  for (let i = 0; i < slots.length - 1; i++)
+    gaps.push({ index: slots[i].index + 1, y: (slots[i].bottom + slots[i + 1].top) / 2 });
+  const last = slots[slots.length - 1];
+  gaps.push({ index: last.index + 1, y: last.bottom });
+  return gaps;
+}
+
+export interface DropTarget {
+  /** The final index of the dragged section in its list (what `move.toIndex` carries). */
+  toIndex: number;
+  /** Page y of the drop line. */
+  y: number;
+  /** True when dropping here changes nothing (the section's own place). */
+  noop: boolean;
+}
+
+/** The gap closest to the pointer, as a drop for the section `draggedId`. Null if it is not on the canvas. */
+export function dropTargetFor(
+  slots: readonly SlotBox[],
+  draggedId: string,
+  pointerY: number
+): DropTarget | null {
+  const from = slots.find(s => s.id === draggedId);
+  if (!from) return null;
+  let best: Gap | null = null;
+  for (const g of insertionGaps(slots))
+    if (best === null || Math.abs(g.y - pointerY) < Math.abs(best.y - pointerY)) best = g;
+  if (!best) return null;
+  // Removing the section first shifts every later gap down by one.
+  const toIndex = best.index > from.index ? best.index - 1 : best.index;
+  return { toIndex, y: best.y, noop: toIndex === from.index };
+}
+
+export interface ToolbarState {
+  /** Only a section drags on the canvas; a block moves with the arrows. */
+  draggable: boolean;
+  disabled: Partial<Record<SectionOp, boolean>>;
+}
+
+/**
+ * Whether the selected target gets the canvas toolbar, and which buttons are
+ * disabled (the parent still re-checks every op). Only template sections and
+ * their blocks get one: the header, announcement bar and footer are chrome,
+ * edited in the panes.
+ */
+export function toolbarStateFor(doc: PageDefinition, target: CanvasTarget): ToolbarState | null {
+  const at = locateSection(doc, target.sectionId);
+  if (!at || at.list !== 'template') return null;
+  const def = getSectionDefinition(at.node.type);
+  if (!def) return null;
+  if (!target.blockId) {
+    const sameType = doc.sections.filter(n => n.type === at.node.type).length;
+    return {
+      draggable: true,
+      disabled: {
+        moveUp: at.index === 0,
+        moveDown: at.index === doc.sections.length - 1,
+        duplicate: sameType >= def.maxCount,
+      },
+    };
+  }
+  const blocks = at.node.blocks ?? [];
+  const i = blocks.findIndex(b => b.id === target.blockId);
+  if (i < 0) return null;
+  const bd = def.blocks.find(b => b.type === blocks[i].type);
+  return {
+    draggable: false,
+    disabled: {
+      moveUp: i === 0,
+      moveDown: i === blocks.length - 1,
+      duplicate: !bd || blocks.filter(b => b.type === bd.type).length >= bd.maxCount,
+    },
+  };
 }

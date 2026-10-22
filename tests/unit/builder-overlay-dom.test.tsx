@@ -231,3 +231,129 @@ describe('EditorOverlay (real)', () => {
     expect(document.querySelector('[data-builder-change-image]')).toBeNull();
   });
 });
+
+describe('EditorOverlay toolbar, drag and insert (real)', () => {
+  /** Three template sections stacked at known boxes (jsdom has no layout). */
+  function stack(d: PageDefinition) {
+    const [a, b, c] = d.sections.slice(0, 3).map(n => n.id);
+    document.body.innerHTML = [a, b, c]
+      .map(
+        id =>
+          `<div data-builder-id="${id}" style="display:contents"><section id="sec-${id}">${id}</section></div>`
+      )
+      .join('');
+    const tops: Record<string, [number, number]> = {
+      [`sec-${a}`]: [0, 100],
+      [`sec-${b}`]: [100, 150],
+      [`sec-${c}`]: [250, 150],
+    };
+    Element.prototype.getBoundingClientRect = function (this: Element) {
+      const [top, height] = tops[this.id] ?? [0, 0];
+      return { top, left: 0, width: 1000, height, right: 1000, bottom: top + height } as DOMRect;
+    };
+    return { a, b, c };
+  }
+  const btn = (name: string) =>
+    document.querySelector<HTMLButtonElement>(`[data-builder-toolbar="${name}"]`)!;
+
+  it('the toolbar appears on a selected section; each button posts one intent; ends are disabled', () => {
+    const d = doc();
+    const { a, b } = stack(d);
+    mountOverlay(d, 'ar');
+    expect(document.querySelector('[data-builder-toolbar-root]')).toBeNull();
+    fireEvent.click(document.getElementById(`sec-${b}`)!);
+    expect(document.querySelector('[data-builder-toolbar-root]')).toBeTruthy();
+    // labelled for assistive tech, in Arabic
+    expect(btn('moveUp').getAttribute('aria-label')).toBe('حرّك لفوق');
+    expect(btn('remove').getAttribute('aria-label')).toBe('حذف');
+    fireEvent.click(btn('moveUp'));
+    fireEvent.click(btn('remove'));
+    expect(posted()).toContainEqual({
+      protocol: BUILDER_PROTOCOL,
+      type: 'section-op',
+      sectionId: b,
+      op: 'moveUp',
+    });
+    expect(posted()).toContainEqual({
+      protocol: BUILDER_PROTOCOL,
+      type: 'section-op',
+      sectionId: b,
+      op: 'remove',
+    });
+    // first section: "up" is disabled
+    fireEvent.click(document.getElementById(`sec-${a}`)!);
+    expect(btn('moveUp').disabled).toBe(true);
+  });
+
+  it('dragging the handle shows a drop line and posts ONE move on drop; Escape cancels', () => {
+    const d = doc();
+    const { a, c } = stack(d);
+    mountOverlay(d, 'en');
+    fireEvent.click(document.getElementById(`sec-${c}`)!);
+    fireEvent.pointerDown(btn('drag'), { button: 0, clientY: 300 });
+    expect(document.querySelector('[data-builder-drag-ghost]')).toBeTruthy();
+    fireEvent.pointerMove(window, { clientY: 8 }); // near the top edge: above A
+    expect(document.querySelector('[data-builder-drop-line]')).toBeTruthy();
+    fireEvent.pointerUp(window);
+    const moves = posted().filter(m => m.type === 'move');
+    expect(moves).toEqual([{ protocol: BUILDER_PROTOCOL, type: 'move', sectionId: c, toIndex: 0 }]);
+    expect(document.querySelector('[data-builder-drag-ghost]')).toBeNull();
+
+    // Escape: nothing is posted
+    parent.postMessage.mockClear();
+    fireEvent.click(document.getElementById(`sec-${a}`)!);
+    fireEvent.pointerDown(btn('drag'), { button: 0, clientY: 50 });
+    fireEvent.pointerMove(window, { clientY: 390 });
+    fireEvent.keyDown(window, { key: 'Escape' });
+    fireEvent.pointerUp(window);
+    expect(posted().some(m => m.type === 'move')).toBe(false);
+  });
+
+  it('a drop on the dragged section own place posts nothing', () => {
+    const d = doc();
+    const { b } = stack(d);
+    mountOverlay(d, 'en');
+    fireEvent.click(document.getElementById(`sec-${b}`)!);
+    fireEvent.pointerDown(btn('drag'), { button: 0, clientY: 150 });
+    fireEvent.pointerMove(window, { clientY: 160 });
+    fireEvent.pointerUp(window);
+    expect(posted().some(m => m.type === 'move')).toBe(false);
+  });
+
+  it('every gap has a keyboard-reachable "+" that asks the parent to insert at that index', () => {
+    const d = doc();
+    stack(d);
+    mountOverlay(d, 'en');
+    const plus = Array.from(
+      document.querySelectorAll<HTMLButtonElement>('[data-builder-insert] button')
+    );
+    // before the first, two between, after the last
+    expect(plus).toHaveLength(4);
+    expect(
+      plus.every(p => p.tabIndex === 0 && p.getAttribute('aria-label') === 'Add section here')
+    ).toBe(true);
+    fireEvent.click(plus[1]);
+    expect(posted()).toContainEqual({
+      protocol: BUILDER_PROTOCOL,
+      type: 'request-add',
+      list: 'template',
+      index: 1,
+    });
+  });
+
+  it('only the "+" nearest the pointer is revealed', () => {
+    const d = doc();
+    stack(d);
+    mountOverlay(d, 'en');
+    const raf = vi.spyOn(window, 'requestAnimationFrame').mockImplementation(cb => {
+      cb(0);
+      return 0;
+    });
+    fireEvent.mouseMove(document.body, { clientY: 101 });
+    const on = Array.from(document.querySelectorAll('[data-builder-insert]')).map(el =>
+      el.getAttribute('data-on')
+    );
+    expect(on).toEqual(['false', 'true', 'false', 'false']);
+    raf.mockRestore();
+  });
+});

@@ -10076,6 +10076,12 @@
       "close": "إغلاق",
       "limitReached": "وصلت للحد ({max})"
     },
+    "canvasOps": {
+      "removeTitle": "تحذف {name}؟",
+      "removeBody": "تقدر ترجّعه على طول بزر التراجع.",
+      "removeConfirm": "احذف",
+      "cancel": "إلغاء"
+    },
     "media": {
       "title": "الوسائط",
       "upload": "رفع صورة",

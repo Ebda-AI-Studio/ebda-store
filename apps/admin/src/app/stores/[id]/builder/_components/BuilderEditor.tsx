@@ -23,8 +23,12 @@ import {
   applyTemplateFamily,
   effectiveTheme,
   getLook,
+  addRequestFor,
+  getSectionDefinition,
   imageSwapActions,
   intentToAction,
+  locateSection,
+  type IntentResult,
   mediaRequestFor,
   recommendedSizeTextForTemplateI18n,
   type MediaRequest,
@@ -40,6 +44,7 @@ import { useT } from '@/i18n/useT';
 import { apiGet, apiPost } from '../../../../../lib/api';
 import { getStoreHref } from '../../../../../lib/store-url';
 import { useBuilderDocument } from '../_lib/useBuilderDocument';
+import { ConfirmDialog } from './ConfirmDialog';
 import { ImageSwapDialog } from './ImageSwapDialog';
 import { Canvas } from './Canvas';
 import { SectionTree, type Selection } from './SectionTree';
@@ -72,6 +77,10 @@ export function BuilderEditor({ storeId }: { storeId: string }) {
   const [selection, setSelection] = useState<Selection | null>(null);
   const [hovered, setHovered] = useState<string | null>(null);
   const [addTo, setAddTo] = useState<SectionList | null>(null);
+  // Where "+" on the canvas asked to insert (undefined: the end, from the tree's own button).
+  const [addAt, setAddAt] = useState<number | undefined>(undefined);
+  // A destructive canvas action waiting for the in-app confirmation.
+  const [pending, setPending] = useState<{ intent: IntentResult; name: string } | null>(null);
   // "Change image" asked for on the canvas (the file is picked HERE, never by the canvas).
   const [mediaReq, setMediaReq] = useState<MediaRequest | null>(null);
   const [tab, setTab] = useState<StartTab>('sections');
@@ -144,10 +153,32 @@ export function BuilderEditor({ storeId }: { storeId: string }) {
         if (req) setMediaReq(req);
         return;
       }
+      if (msg.type === 'request-add') {
+        const req = doc ? addRequestFor(doc, msg) : null;
+        if (req) {
+          setAddAt(req.index);
+          setAddTo(req.list);
+        }
+        return;
+      }
       const intent = doc ? intentToAction(doc, msg) : null;
-      if (intent) dispatch(intent.action, intent.coalesce);
+      if (!intent) return;
+      if (intent.confirm && doc && msg.type === 'section-op') {
+        // Remove asks first, in the app (not window.confirm); Undo brings it back.
+        const node = locateSection(doc, msg.sectionId)?.node;
+        const def = node ? getSectionDefinition(node.type) : undefined;
+        const blockType = node?.blocks?.find(x => x.id === msg.blockId)?.type;
+        const bd = msg.blockId ? def?.blocks.find(b => b.type === blockType) : undefined;
+        const ar = locale === 'ar';
+        setPending({
+          intent,
+          name: (bd ? (ar ? bd.labelAr : bd.labelEn) : ar ? def?.labelAr : def?.labelEn) ?? '',
+        });
+        return;
+      }
+      dispatch(intent.action, intent.coalesce);
     },
-    [dispatch]
+    [dispatch, locale]
   );
 
   // Undo / redo shortcuts (leave native text undo alone inside inputs).
@@ -270,7 +301,10 @@ export function BuilderEditor({ storeId }: { storeId: string }) {
               setDrawer(d => (d === 'start' ? 'end' : d));
             }}
             dispatch={dispatch}
-            onAddSection={setAddTo}
+            onAddSection={list => {
+              setAddAt(undefined);
+              setAddTo(list);
+            }}
           />
         )}
         {tab === 'theme' && (
@@ -527,6 +561,19 @@ export function BuilderEditor({ storeId }: { storeId: string }) {
         </aside>
       </div>
 
+      {pending && (
+        <ConfirmDialog
+          title={t('canvasOps.removeTitle', { name: pending.name })}
+          body={t('canvasOps.removeBody')}
+          confirmLabel={t('canvasOps.removeConfirm')}
+          onCancel={() => setPending(null)}
+          onConfirm={() => {
+            dispatch(pending.intent.action, pending.intent.coalesce);
+            setPending(null);
+          }}
+        />
+      )}
+
       {mediaReq && (
         <ImageSwapDialog
           storeId={storeId}
@@ -553,10 +600,14 @@ export function BuilderEditor({ storeId }: { storeId: string }) {
         <AddSectionDialog
           list={addTo}
           doc={b.doc}
-          onClose={() => setAddTo(null)}
-          onPick={(sectionType, presetIndex) => {
-            dispatch({ type: 'addSection', list: addTo, sectionType, presetIndex });
+          onClose={() => {
             setAddTo(null);
+            setAddAt(undefined);
+          }}
+          onPick={(sectionType, presetIndex) => {
+            dispatch({ type: 'addSection', list: addTo, sectionType, presetIndex, index: addAt });
+            setAddTo(null);
+            setAddAt(undefined);
           }}
         />
       )}

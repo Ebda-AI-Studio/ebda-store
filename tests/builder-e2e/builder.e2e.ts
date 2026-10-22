@@ -282,6 +282,92 @@ test('change image from the canvas: pick, describe, one undo step; a non-image k
   expect((await slide())?.alt).toBeUndefined();
 });
 
+const sendFromCanvas = (page: Page, msg: Record<string, unknown>) =>
+  canvas(page)
+    .locator('body')
+    .evaluate((_b, m) => (window as any).__send(m), msg);
+
+test('canvas drop reorders the sections, the tree follows, one undo restores it', async ({
+  page,
+}) => {
+  await openBuilder(page);
+  await structure(page);
+  const before = await templateIds(page);
+  expect(before.length).toBeGreaterThan(2);
+  const last = before[before.length - 1];
+  // the canvas dropped the last section above the first
+  await sendFromCanvas(page, { type: 'move', sectionId: last, toIndex: 0 });
+  await expect.poll(async () => (await templateIds(page))[0]).toBe(last);
+  expect(await templateIds(page)).toEqual([last, ...before.slice(0, -1)]);
+  await waitSaved(page);
+  expect((await state(page)).draft!.definition.sections.map(x => x.id)).toEqual([
+    last,
+    ...before.slice(0, -1),
+  ]);
+  // ONE undo restores the original order
+  await page.getByTestId('undo').click();
+  expect(await templateIds(page)).toEqual(before);
+  // a drop where it already is changes nothing and adds no history
+  await sendFromCanvas(page, { type: 'move', sectionId: before[1], toIndex: 1 });
+  await page.waitForTimeout(300);
+  expect(await templateIds(page)).toEqual(before);
+});
+
+test('"+" between sections opens the picker and inserts at that index', async ({ page }) => {
+  await openBuilder(page);
+  await structure(page);
+  const before = await templateIds(page);
+  await sendFromCanvas(page, { type: 'request-add', list: 'template', index: 1 });
+  await expect(page.getByTestId('add-section-dialog')).toBeVisible();
+  await page.getByTestId('preset-image-text-0').click();
+  await structure(page);
+  const after = await templateIds(page);
+  expect(after).toHaveLength(before.length + 1);
+  expect(after[1]).toMatch(/^image-text/);
+  expect(after.filter((_, i) => i !== 1)).toEqual(before);
+  // an index past the end of the list is ignored
+  await sendFromCanvas(page, { type: 'request-add', list: 'template', index: 40 });
+  await page.waitForTimeout(300);
+  await expect(page.getByTestId('add-section-dialog')).toHaveCount(0);
+});
+
+test('toolbar remove asks in the app first; cancel keeps it, confirm removes, undo restores', async ({
+  page,
+}) => {
+  await openBuilder(page);
+  await structure(page);
+  const before = await templateIds(page);
+  const target = before[1];
+  let nativeDialogs = 0;
+  page.on('dialog', d => {
+    nativeDialogs++;
+    void d.dismiss();
+  });
+  await sendFromCanvas(page, { type: 'section-op', sectionId: target, op: 'remove' });
+  await expect(page.getByTestId('confirm-dialog')).toBeVisible();
+  await page.getByTestId('confirm-cancel').click();
+  await expect(page.getByTestId('confirm-dialog')).toHaveCount(0);
+  expect(await templateIds(page)).toEqual(before);
+
+  await sendFromCanvas(page, { type: 'section-op', sectionId: target, op: 'remove' });
+  await page.getByTestId('confirm-ok').click();
+  await structure(page);
+  expect(await templateIds(page)).toEqual(before.filter(id => id !== target));
+  await page.getByTestId('undo').click();
+  expect(await templateIds(page)).toEqual(before);
+  // never window.confirm
+  expect(nativeDialogs).toBe(0);
+
+  // moveDown / hide / duplicate act without a prompt, one reducer action each
+  await sendFromCanvas(page, { type: 'section-op', sectionId: before[0], op: 'moveDown' });
+  await expect.poll(async () => (await templateIds(page))[1]).toBe(before[0]);
+  await sendFromCanvas(page, { type: 'section-op', sectionId: before[0], op: 'hide' });
+  await waitSaved(page);
+  expect((await state(page)).draft!.definition.sections.find(x => x.id === before[0])?.hidden).toBe(
+    true
+  );
+});
+
 test('viewport switch sizes the canvas 1280 / 820 / 390', async ({ page }) => {
   await openBuilder(page);
   for (const [v, w] of [

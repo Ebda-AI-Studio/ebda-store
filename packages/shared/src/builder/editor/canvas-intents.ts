@@ -6,8 +6,8 @@
  * Pure, so the whole table is unit-tested without a browser.
  */
 import type { PageDefinition } from '../schema';
-import type { DocumentAction } from './document-reducer';
-import type { ChildToParent } from './protocol';
+import { locateSection, type DocumentAction, type SectionList } from './document-reducer';
+import type { ChildToParent, SectionOp } from './protocol';
 import {
   imageTargetIn,
   nodeFor,
@@ -20,6 +20,8 @@ export interface IntentResult {
   action: DocumentAction;
   /** Undo coalescing key: consecutive edits to one field are one undo step. */
   coalesce?: string;
+  /** The parent must get an in-app confirmation before dispatching (destructive). */
+  confirm?: 'remove';
 }
 
 export function intentToAction(doc: PageDefinition, msg: ChildToParent): IntentResult | null {
@@ -42,9 +44,93 @@ export function intentToAction(doc: PageDefinition, msg: ChildToParent): IntentR
         coalesce,
       };
     }
+    case 'section-op':
+      return sectionOpAction(doc, msg.sectionId, msg.blockId, msg.op);
+    case 'move': {
+      const at = locate(doc, msg.sectionId, msg.blockId);
+      if (!at) return null;
+      const toIndex = Math.min(msg.toIndex, at.count - 1);
+      if (toIndex === at.index) return null; // dropped where it already is: no history entry
+      return {
+        action: msg.blockId
+          ? { type: 'moveBlock', sectionId: msg.sectionId, blockId: msg.blockId, toIndex }
+          : { type: 'moveSection', id: msg.sectionId, toIndex },
+      };
+    }
     default:
       return null;
   }
+}
+
+/** Where a section (or one of its blocks) sits in its own list. */
+function locate(
+  doc: PageDefinition,
+  sectionId: string,
+  blockId?: string
+): { index: number; count: number } | null {
+  const at = locateSection(doc, sectionId);
+  if (!at) return null;
+  if (blockId === undefined) {
+    const list = at.list === 'template' ? doc.sections : doc.sectionGroups[at.list];
+    return { index: at.index, count: list.length };
+  }
+  const blocks = at.node.blocks ?? [];
+  const index = blocks.findIndex(b => b.id === blockId);
+  return index < 0 ? null : { index, count: blocks.length };
+}
+
+function sectionOpAction(
+  doc: PageDefinition,
+  sectionId: string,
+  blockId: string | undefined,
+  op: SectionOp
+): IntentResult | null {
+  const at = locate(doc, sectionId, blockId);
+  if (!at) return null;
+  switch (op) {
+    case 'moveUp':
+    case 'moveDown': {
+      const toIndex = at.index + (op === 'moveUp' ? -1 : 1);
+      if (toIndex < 0 || toIndex >= at.count) return null; // at the end of its list: nothing to do
+      return {
+        action: blockId
+          ? { type: 'moveBlock', sectionId, blockId, toIndex }
+          : { type: 'moveSection', id: sectionId, toIndex },
+      };
+    }
+    case 'duplicate':
+      return {
+        action: blockId
+          ? { type: 'duplicateBlock', sectionId, blockId }
+          : { type: 'duplicateSection', id: sectionId },
+      };
+    case 'hide':
+      return {
+        action: blockId
+          ? { type: 'setBlockHidden', sectionId, blockId, hidden: true }
+          : { type: 'setSectionHidden', id: sectionId, hidden: true },
+      };
+    case 'remove':
+      return {
+        action: blockId
+          ? { type: 'removeBlock', sectionId, blockId }
+          : { type: 'removeSection', id: sectionId },
+        confirm: 'remove',
+      };
+  }
+}
+
+/** A validated "+" request: the list is a real group and the index is inside it (inserting at the end is allowed). */
+export interface AddRequest {
+  list: SectionList;
+  index: number;
+}
+
+export function addRequestFor(doc: PageDefinition, msg: ChildToParent): AddRequest | null {
+  if (msg.type !== 'request-add') return null;
+  const nodes = msg.list === 'template' ? doc.sections : doc.sectionGroups[msg.list];
+  if (msg.index > nodes.length) return null;
+  return { list: msg.list, index: msg.index };
 }
 
 /** A validated "change this image" request, ready for the parent's media picker. */

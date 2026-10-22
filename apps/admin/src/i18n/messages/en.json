@@ -10076,6 +10076,12 @@
       "close": "Close",
       "limitReached": "Limit reached ({max})"
     },
+    "canvasOps": {
+      "removeTitle": "Remove {name}?",
+      "removeBody": "You can bring it back right after with Undo.",
+      "removeConfirm": "Remove",
+      "cancel": "Cancel"
+    },
     "media": {
       "title": "Media",
       "upload": "Upload image",
