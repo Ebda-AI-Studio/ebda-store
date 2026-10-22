@@ -192,8 +192,8 @@ export default function ProductsClient({
   const { store } = useStore();
   const storeUrl = useStoreUrl();
   const { templateId } = useTemplateComponents();
-  // Ruling B4-PLP-1: every template lists on an auto-fill grid (cards >= 11.5rem, photos at full card
-  // width) so 3 products never become five 160px cells. Dahab keeps its own 3/4-up density control
+  // Ruling B4-PLP-1 (amended B4-21): every template lists on an auto-fit grid (cards 11.5rem to 20rem, photos at full card
+  // width; empty tracks collapse, so a small catalogue fills or centres the row) so 3 products never become five 160px cells. Dahab keeps its own 3/4-up density control
   // (always wide cards); a look's `chrome.plp: 'autoFill'` (Souq) is now the default, not an opt-in.
   const plpAutoFill = templateId !== 'dahab' || getLook(store.look)?.chrome?.plp === 'autoFill';
   // A search the server ranked (hybrid relevance, Task 12) labels the default "Most relevant".
@@ -847,7 +847,7 @@ export default function ProductsClient({
                     templateId === 'dahab'
                       ? `grid grid-cols-2 gap-x-3 gap-y-8 sm:gap-x-5 sm:gap-y-10 md:grid-cols-3 ${dahabCols === 4 ? 'lg:grid-cols-4' : 'lg:grid-cols-3'}`
                       : plpAutoFill
-                        ? `grid grid-cols-2 md:grid-cols-3 lg:[grid-template-columns:repeat(auto-fill,minmax(11.5rem,1fr))] ${productCardDefaults?.cardGap ? gridGapClass(productCardDefaults.cardGap) : 'gap-3 sm:gap-4 lg:gap-6'}`
+                        ? `grid grid-cols-2 md:grid-cols-3 lg:justify-center lg:[grid-template-columns:repeat(auto-fit,minmax(11.5rem,20rem))] ${productCardDefaults?.cardGap ? gridGapClass(productCardDefaults.cardGap) : 'gap-3 sm:gap-4 lg:gap-6'}`
                         : `grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 ${productCardDefaults?.cardGap ? gridGapClass(productCardDefaults.cardGap) : 'gap-3 sm:gap-4 lg:gap-6'}`
                   }
                   dir={language === 'ar' ? 'rtl' : 'ltr'}

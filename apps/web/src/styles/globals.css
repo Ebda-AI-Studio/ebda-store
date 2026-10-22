@@ -1635,6 +1635,32 @@ html[lang] [data-pack='lamma'] [data-zone='filters'] :is(h2, h3, h4, legend) {
   font-weight: 700;
 }
 
+/* Family table (Ruling B4-21): the cart and checkout panels were the pale-pink surface token flat on a
+   white page. A panel is now a white sheet with a pomegranate-tinted hairline and a soft lift, so the
+   page reads as paper on a tint, not pink on white. Panels only (they carry `shadow-sm`); the dish
+   cards keep the surface. Token colours only. */
+[data-look='lamma.table'] main .bg-card.shadow-sm {
+  background-color: hsl(var(--background));
+  border-color: color-mix(in srgb, hsl(var(--primary)) 16%, hsl(var(--border)));
+  box-shadow:
+    0 1px 2px hsl(var(--foreground) / 0.06),
+    0 10px 24px -14px color-mix(in srgb, hsl(var(--primary)) 40%, transparent);
+}
+
+/* Lamma, Arabic at desktop width (Ruling B4-21): the cart and checkout set their labels, helpers and
+   totals at text-sm / text-xs (14 / 12px), which an Arabic face reads a size smaller than Latin on a
+   1280 screen. One step up from lg, Arabic only, inside `main` (the header and footer keep theirs). */
+@media (min-width: 1024px) {
+  html[dir='rtl'] [data-pack='lamma'] main .text-sm {
+    font-size: 0.9375rem;
+    line-height: 1.5rem;
+  }
+  html[dir='rtl'] [data-pack='lamma'] main .text-xs {
+    font-size: 0.8125rem;
+    line-height: 1.25rem;
+  }
+}
+
 /* Kitchen notebook (Ruling B4-16): `font-size-adjust: 0.5` (the RTL rule above) scales a face by its
    own x-height, and it shrank the notebook's Arabic UI text to ~9px. The look sets its sizes in rem,
    so it opts out; the floor for small-text zones is asserted in tests/lamma/lamma-matrix.spec.ts. */
