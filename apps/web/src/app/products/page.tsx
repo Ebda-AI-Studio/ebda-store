@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { localizedMetadata } from '@/lib/seo/localized-metadata';
 import { getStoreOrNotFound } from '../../lib/store-resolver';
 import { getPreviewDraftToken } from '../../lib/preview-draft';
+import { builderTokenFrom } from '../../lib/page-document';
 import { ProductsPageBody } from './ProductsPageBody';
 
 export function generateMetadata(): Promise<Metadata> {
@@ -28,5 +29,13 @@ export default async function ProductsPage({
   const tag = (Array.isArray(rawTag) ? rawTag[0] : rawTag)?.trim().slice(0, 120) || undefined;
   const draftToken = await getPreviewDraftToken();
 
-  return <ProductsPageBody store={store} category={category} tag={tag} draftToken={draftToken} />;
+  return (
+    <ProductsPageBody
+      store={store}
+      category={category}
+      tag={tag}
+      draftToken={draftToken}
+      builderToken={builderTokenFrom(params)}
+    />
+  );
 }

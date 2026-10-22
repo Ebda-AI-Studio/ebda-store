@@ -208,7 +208,8 @@ describe('PDP markup is unchanged when neither line applies', () => {
     expect(pdp).toMatch(
       /const reviewsOn =\s*isEnabled\('reviews'\) &&\s*!!layout\?\.reviewSection\?\.enabled/
     );
-    expect(pdp.match(/\{reviewsOn && product && \(/g)?.length).toBe(2); // belowFold + main page
+    // ONE reviews slot of the page document, rendered by every skin (Ruling VE-12)
+    expect(pdp.match(/reviewsOn && product \? \(/g)?.length).toBe(1);
     expect(pdp).toMatch(/\{reviewsOn && \(\s*<RatingSummary/);
     expect(pdp).toMatch(/ratingLine=\{\s*reviewsOn \?/); // the Dahab page, same condition
     // no ungated review block is left behind
