@@ -1854,28 +1854,66 @@ router.get('/stores', async (req: Request, res: Response, next: NextFunction) =>
  * to that one store. Identical result on the owner role. The keys stay last
  * in the payload, where the nested select used to put them.
  */
-async function fetchStoreFaqsAndHowtos(storeId: string) {
+/**
+ * The store's active FAQs and HowTos AND its unpublished CMS page slugs in ONE round trip.
+ * They were three sequential queries on the store-resolve fill (about 100 ms each from the Worker
+ * to Postgres); the shapes, filters and ordering are exactly the three Prisma reads they replace
+ * (pinned byte-for-byte by tests/integration/store-resolve-parity.test.ts). Runs inside the store
+ * scope (`readInStoreContext`), so RLS still filters every table.
+ */
+async function fetchStoreExtras(storeId: string) {
   return readInStoreContext(storeId, async () => {
-    const faqs = await prisma.storeFaq.findMany({
-      where: { storeId, isActive: true },
-      orderBy: { orderIndex: 'asc' },
-      select: { id: true, question: true, questionAr: true, answer: true, answerAr: true },
-    });
-    const howtos = await prisma.storeHowto.findMany({
-      where: { storeId, isActive: true },
-      orderBy: { orderIndex: 'asc' },
-      select: {
-        id: true,
-        title: true,
-        titleAr: true,
-        description: true,
-        descriptionAr: true,
-        steps: true,
-        stepsAr: true,
-      },
-    });
-    return { faqs, howtos };
+    const rows = await prisma.$queryRaw<
+      Array<{ faqs: unknown; howtos: unknown; disabled: unknown }>
+    >`
+      SELECT
+        COALESCE((
+          SELECT json_agg(json_build_object(
+                   'id', f.id, 'question', f.question, 'questionAr', f.question_ar,
+                   'answer', f.answer, 'answerAr', f.answer_ar) ORDER BY f.order_index ASC)
+          FROM public.store_faqs f
+          WHERE f.store_id = ${storeId} AND f.is_active = true
+        ), '[]'::json) AS faqs,
+        COALESCE((
+          SELECT json_agg(json_build_object(
+                   'id', h.id, 'title', h.title, 'titleAr', h.title_ar,
+                   'description', h.description, 'descriptionAr', h.description_ar,
+                   'steps', h.steps, 'stepsAr', h.steps_ar) ORDER BY h.order_index ASC)
+          FROM public.store_howtos h
+          WHERE h.store_id = ${storeId} AND h.is_active = true
+        ), '[]'::json) AS howtos,
+        COALESCE((
+          SELECT json_agg(json_build_object('slug', p.slug))
+          FROM public.store_pages p
+          WHERE p.store_id = ${storeId} AND p.is_published = false
+        ), '[]'::json) AS disabled
+    `;
+    const row = rows[0];
+    return {
+      faqs: (row?.faqs ?? []) as Array<{
+        id: string;
+        question: string;
+        questionAr: string | null;
+        answer: string;
+        answerAr: string | null;
+      }>,
+      howtos: (row?.howtos ?? []) as Array<{
+        id: string;
+        title: string;
+        titleAr: string | null;
+        description: string;
+        descriptionAr: string | null;
+        steps: unknown;
+        stepsAr: unknown;
+      }>,
+      disabledCmsSlugs: ((row?.disabled ?? []) as Array<{ slug: string }>).map(p => p.slug),
+    };
   });
+}
+
+async function fetchStoreFaqsAndHowtos(storeId: string) {
+  const { faqs, howtos } = await fetchStoreExtras(storeId);
+  return { faqs, howtos };
 }
 
 /**
@@ -2260,13 +2298,8 @@ router.get(
         // simply not being there. Only rows that exist AND are unpublished
         // need to be reported; if the row is missing the storefront falls
         // back to its built-in copy and the link should still work.
-        const disabledPages = await readInStoreContext(store.id, () =>
-          prisma.storePage.findMany({
-            where: { storeId: store.id, isPublished: false },
-            select: { slug: true },
-          })
-        );
-        const disabledCmsSlugs = disabledPages.map(p => p.slug);
+        const extras = await fetchStoreExtras(store.id);
+        const disabledCmsSlugs = extras.disabledCmsSlugs;
 
         // Strip server-only marketing-pixel secrets before the store reaches the
         // public storefront + edge cache (browser pixels use public IDs only).
@@ -2276,7 +2309,8 @@ router.get(
           settings: publicStoreSettings(store.settings),
           // Keep in lock-step with the /stores/:slugOrId select above (VAT gate, ruling TAX-2).
           ...effectiveTaxFields(await resolveActiveTaxRate(store.id)),
-          ...(await fetchStoreFaqsAndHowtos(store.id)),
+          faqs: extras.faqs,
+          howtos: extras.howtos,
           // Keep in lock-step with /stores/:slugOrId (issue 206, same staleness).
           smsMarketingOptIn: await notificationDispatcher.isSmsMarketingAvailable(store.id),
           cartEmailOptIn: await cartEmailOptInAvailable(store.id),
