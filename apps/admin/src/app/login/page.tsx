@@ -290,7 +290,7 @@ export default function LoginPage() {
               <Image
                 src="/logo-on-light.svg"
                 alt={tb('brandAlt')}
-                width={60}
+                width={32}
                 height={60}
                 className="dark:hidden"
                 unoptimized
@@ -298,7 +298,7 @@ export default function LoginPage() {
               <Image
                 src="/logo.svg"
                 alt={tb('brandAlt')}
-                width={60}
+                width={32}
                 height={60}
                 className="hidden dark:block"
                 unoptimized

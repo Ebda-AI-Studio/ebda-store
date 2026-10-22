@@ -53,6 +53,11 @@ import { useT } from '@/i18n/useT';
 import { apiGet, apiPost, apiPut } from '../../../../../lib/api';
 import { getStoreHref } from '../../../../../lib/store-url';
 import { useBuilderDocument } from '../_lib/useBuilderDocument';
+import { setCanvasHover } from '../_lib/canvas-hover-store';
+import { describeMove } from '../_lib/announce-move';
+import { useDrawerA11y } from '../_lib/use-drawer-a11y';
+import { resolveDeepLink, type DeepLinkParams } from '../_lib/deeplink';
+import { locateAndHighlight } from '../../../../../lib/setting-highlight';
 import { ConfirmDialog } from './ConfirmDialog';
 import type { FontEntry } from '../../../../../components/section-design/FontsCard';
 import { ImageSwapDialog } from './ImageSwapDialog';
@@ -90,11 +95,14 @@ export function BuilderEditor({
   storeId,
   pageKey = 'home',
   onPageChange,
+  deepLink,
 }: {
   storeId: string;
   /** The page being edited (Ruling VE-3 amended); the parent remounts this component per page. */
   pageKey?: PageKind;
   onPageChange?: (next: PageKind) => void;
+  /** `?select=&block=&field=` from the URL, already shape-checked (Task 11). */
+  deepLink?: DeepLinkParams;
 }) {
   const t = useT('builder');
   const locale = useLocale();
@@ -107,7 +115,13 @@ export function BuilderEditor({
   const [token, setToken] = useState<string | null>(null);
   const [viewport, setViewport] = useState<Viewport>('mobile');
   const [selection, setSelection] = useState<Selection | null>(null);
-  const [hovered, setHovered] = useState<string | null>(null);
+  // Keyboard path (Task 13): a request for the canvas to take focus, and the live-region text.
+  const [focusRequest, setFocusRequest] = useState<{
+    sectionId: string;
+    blockId?: string;
+    n: number;
+  } | null>(null);
+  const [announcement, setAnnouncement] = useState('');
   const [addTo, setAddTo] = useState<SectionList | null>(null);
   // Where "+" on the canvas asked to insert (undefined: the end, from the tree's own button).
   const [addAt, setAddAt] = useState<number | undefined>(undefined);
@@ -194,6 +208,33 @@ export function BuilderEditor({
     [b, pageKey, onPageChange, toastError, t]
   );
 
+  // The deep link (⌘K, a pasted URL) is applied ONCE, when the document first arrives: it selects
+  // the section (canvas + tree follow `selection`), opens the tab or pane that holds the control and
+  // rings the field. An unknown id selects nothing and breaks nothing.
+  const linkApplied = useRef<string | null>(null);
+  const [focusField, setFocusField] = useState<string | undefined>(undefined);
+  useEffect(() => {
+    // Once per distinct link: a doc edit never re-applies it, a NEW link on the open page does.
+    const key = JSON.stringify([deepLink?.select, deepLink?.block, deepLink?.field]);
+    if (linkApplied.current === key || !b.doc) return;
+    linkApplied.current = key;
+    if (!deepLink || (!deepLink.select && !deepLink.field)) return;
+    const target = resolveDeepLink(b.doc, deepLink, { canOpenTheme: isHome });
+    if (target.tab) {
+      setTab(target.tab);
+      setDrawer('start');
+    }
+    if (target.selection) {
+      setSelection(target.selection);
+      setDrawer('end');
+    }
+    setFocusField(target.field);
+  }, [b.doc, deepLink, isHome]);
+  useEffect(() => {
+    if (!focusField) return;
+    return locateAndHighlight(focusField);
+  }, [focusField]);
+
   // Saved data changed (a new carousel, a new product source): reload the canvas.
   useEffect(() => {
     if (b.dataEpoch > 0) setReloadKey(k => k + 1);
@@ -227,6 +268,8 @@ export function BuilderEditor({
   // The latest document, read by the canvas message handler without re-subscribing it.
   const docRef = useRef(b.doc);
   docRef.current = b.doc;
+  const selectionRef = useRef(selection);
+  selectionRef.current = selection;
 
   // The latest dispatch, for async work (the AI fill) that outlives a render.
   const dispatchRef = useRef(dispatch);
@@ -286,7 +329,23 @@ export function BuilderEditor({
         setSelection({ sectionId: msg.sectionId, blockId: msg.blockId });
         setDrawer(d => (d === 'start' ? null : d));
       }
-      if (msg.type === 'hover') setHovered(msg.sectionId);
+      if (msg.type === 'hover') setCanvasHover(msg.sectionId);
+      if (msg.type === 'focus-tree') {
+        // Esc in the canvas: back to the tree row of what is selected (the tree is the outline).
+        setTab('sections');
+        setDrawer('start');
+        const sel = selectionRef.current;
+        requestAnimationFrame(() => {
+          const row =
+            (sel &&
+              document.querySelector<HTMLElement>(
+                `[data-testid="tree-select-${window.CSS.escape(sel.sectionId)}"]`
+              )) ||
+            document.querySelector<HTMLElement>('[data-testid^="tree-select-"]');
+          row?.focus();
+        });
+        return;
+      }
       // Every other intent is re-validated against the CURRENT document and the registry
       // (VE-2) and becomes exactly one document action, or is dropped.
       const doc = docRef.current;
@@ -426,6 +485,32 @@ export function BuilderEditor({
     }
   };
 
+  // Below lg the panes are drawers: trap focus, close on Esc, return focus to the opener.
+  const startRef = useRef<HTMLElement>(null);
+  const endRef = useRef<HTMLElement>(null);
+  useDrawerA11y(startRef, drawer === 'start', () => setDrawer(null));
+  useDrawerA11y(endRef, drawer === 'end', () => setDrawer(null));
+
+  // A move is announced in a live region whichever way it happened (drag, buttons, Alt+Arrow, the
+  // canvas toolbar). Egyptian Arabic in ar, plain English in en.
+  const prevDoc = useRef<PageDefinition | null>(null);
+  useEffect(() => {
+    const prev = prevDoc.current;
+    prevDoc.current = b.doc;
+    if (!prev || !b.doc || prev === b.doc) return;
+    const move = describeMove(prev, b.doc, selectionRef.current?.sectionId);
+    if (!move) return;
+    const def = getSectionDefinition(move.node.type);
+    const name = (locale === 'ar' ? def?.labelAr : def?.labelEn) ?? move.node.type;
+    setAnnouncement(
+      t(move.direction === 'up' ? 'live.movedUp' : 'live.movedDown', {
+        name,
+        pos: move.pos,
+        total: move.total,
+      })
+    );
+  }, [b.doc, locale, t]);
+
   if (b.loadError)
     return (
       <div className="grid h-screen place-items-center bg-background p-6 text-center">
@@ -506,10 +591,14 @@ export function BuilderEditor({
           <SectionTree
             doc={b.doc}
             selection={selection}
-            hoveredId={hovered}
             onSelect={s => {
               setSelection(s);
               setDrawer(d => (d === 'start' ? 'end' : d));
+            }}
+            onFocusCanvas={s => {
+              // Enter on a row: the drawer gets out of the way and the canvas takes focus.
+              setDrawer(null);
+              setFocusRequest(r => ({ ...s, n: (r?.n ?? 0) + 1 }));
             }}
             dispatch={dispatch}
             onAddSection={list => {
@@ -614,6 +703,7 @@ export function BuilderEditor({
         look={store.look}
         errors={b.errors}
         dispatch={dispatch}
+        focusField={focusField}
         onAiFill={sectionId => {
           const req = b.doc ? aiFillRequestForSection(b.doc, sectionId) : null;
           if (req) void runAiFill(req);
@@ -644,6 +734,15 @@ export function BuilderEditor({
 
   return (
     <div className="flex h-screen flex-col bg-background text-foreground" data-testid="builder">
+      <div
+        role="status"
+        aria-live="polite"
+        aria-atomic="true"
+        className="sr-only"
+        data-testid="builder-live"
+      >
+        {announcement}
+      </div>
       <header className="flex min-h-14 shrink-0 flex-wrap items-center gap-x-2 gap-y-1 border-b border-border px-3 py-1 lg:h-14 lg:flex-nowrap lg:py-0">
         <Link
           href={`/stores/${storeId}`}
@@ -651,7 +750,7 @@ export function BuilderEditor({
           aria-label={t('back')}
         >
           {}
-          <img src="/logo.svg" alt={BRAND.product.nameEn} width={28} height={28} />
+          <img src="/logo.svg" alt={BRAND.product.nameEn} width={15} height={28} />
         </Link>
         <span className="hidden truncate text-sm font-semibold sm:inline">{storeName}</span>
         <PageSwitcher
@@ -739,6 +838,7 @@ export function BuilderEditor({
             aria-pressed={lookOpen}
             className={`rounded-lg border border-border px-2.5 py-1 text-xs font-medium hover:bg-muted ${lookOpen ? 'bg-muted' : 'bg-background'}`}
             data-testid="open-look-switch"
+            data-setting-id="builder.look-switch"
           >
             {t('look.open')}
           </button>
@@ -827,6 +927,7 @@ export function BuilderEditor({
 
       <div className="relative flex min-h-0 flex-1">
         <aside
+          ref={startRef}
           aria-label={t('panes.start')}
           className={`${drawer === 'start' ? 'absolute inset-y-0 start-0 z-20 flex w-80 max-w-[85vw] shadow-2xl' : 'hidden'} flex-col border-e border-border bg-card lg:static lg:flex lg:w-72 lg:shadow-none`}
         >
@@ -842,10 +943,12 @@ export function BuilderEditor({
             selectedId={selection?.sectionId ?? null}
             selectedBlockId={selection?.blockId ?? null}
             reloadKey={reloadKey}
+            focusRequest={focusRequest}
             onMessage={onCanvasMessage}
           />
         </main>
         <aside
+          ref={endRef}
           aria-label={t('panes.end')}
           className={`${drawer === 'end' ? 'absolute inset-y-0 end-0 z-20 flex w-80 max-w-[85vw] shadow-2xl' : 'hidden'} flex-col border-s border-border bg-card lg:static lg:flex lg:w-80 lg:shadow-none`}
         >

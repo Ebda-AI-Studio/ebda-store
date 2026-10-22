@@ -38,6 +38,7 @@ export function PageSwitcher({
         onChange={e => onChange(e.target.value as PageKind)}
         className="rounded-lg border border-border bg-background px-2 py-1 text-xs font-semibold"
         data-testid="page-switcher"
+        data-setting-id="builder.page-switcher"
       >
         {PAGE_KINDS.map(k => (
           <option key={k} value={k}>

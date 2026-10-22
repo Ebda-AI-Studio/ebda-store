@@ -123,22 +123,38 @@ export function whatsappDisplay(): string {
 export const BRAND_EMAIL_LOGO_URL = `${BRAND_MARKETING_URL}/email-logo.png`;
 
 /**
- * The approved Ebda "open door" mark as an inline SVG string (90x90 viewBox).
- * Same geometry as brand/logo/ebda-mark.svg; `arch` / `light` are CSS colours
- * (a `var(--x)` works inside an HTML page). Decorative by default.
+ * The approved Ebda mark (2026-10-22 logo pack: three gold faces forming a doorway) as an inline SVG
+ * string, 78.3x149 viewBox (width = size x 0.526). Same geometry + gradients as brand/logo/svg/03d-symbol-gold.svg.
+ * Gradient ids are fixed (`ebda-mark-*`): repeats of the mark on one page carry identical defs, which is valid.
+ * Decorative by default; `size` is the rendered HEIGHT in px.
  */
-export function brandMarkSvg(
-  opts: { arch?: string; light?: string; size?: number; cls?: string } = {}
-): string {
-  const arch = opts.arch ?? BRAND.colors.gold;
-  const light = opts.light ?? BRAND.colors.lift;
-  const size = opts.size ?? 28;
+const MARK_DEFS = `<defs><linearGradient id="ebda-mark-lint" gradientUnits="userSpaceOnUse" x1="47.04" y1="5.06" x2="58.87" y2="78.05"><stop offset="0.0" stop-color="#DAB27A"/><stop offset="0.056" stop-color="#DAB27A"/><stop offset="0.167" stop-color="#D2AA73"/><stop offset="0.278" stop-color="#CCA46E"/><stop offset="0.389" stop-color="#C8A06A"/><stop offset="0.5" stop-color="#C49C67"/><stop offset="0.611" stop-color="#BE9662"/><stop offset="0.722" stop-color="#B78E5C"/><stop offset="0.833" stop-color="#AE8656"/><stop offset="0.944" stop-color="#A57E52"/><stop offset="1.0" stop-color="#A57E52"/></linearGradient><linearGradient id="ebda-mark-col" gradientUnits="userSpaceOnUse" x1="54.53" y1="77.53" x2="89.44" y2="116.79"><stop offset="0.0" stop-color="#A27B4E"/><stop offset="0.056" stop-color="#A27B4E"/><stop offset="0.167" stop-color="#A17A4D"/><stop offset="0.278" stop-color="#9D774B"/><stop offset="0.389" stop-color="#987448"/><stop offset="0.5" stop-color="#946F44"/><stop offset="0.611" stop-color="#906C42"/><stop offset="0.722" stop-color="#8E6A40"/><stop offset="0.833" stop-color="#8B673F"/><stop offset="0.944" stop-color="#8A663E"/><stop offset="1.0" stop-color="#8A663E"/></linearGradient><linearGradient id="ebda-mark-left" gradientUnits="userSpaceOnUse" x1="-10.44" y1="99.88" x2="48.82" y2="87.05"><stop offset="0.0" stop-color="#B99160"/><stop offset="0.056" stop-color="#B99160"/><stop offset="0.167" stop-color="#B0895B"/><stop offset="0.278" stop-color="#A68156"/><stop offset="0.389" stop-color="#9F7B51"/><stop offset="0.5" stop-color="#9A774D"/><stop offset="0.611" stop-color="#957249"/><stop offset="0.722" stop-color="#906D45"/><stop offset="0.833" stop-color="#8C6A43"/><stop offset="0.944" stop-color="#8B6942"/><stop offset="1.0" stop-color="#8B6942"/></linearGradient></defs>`;
+const MARK_PATHS =
+  `<path d="M65.70 67.60 L78.30 73.90 L78.30 126.70 L65.70 120.50Z" fill="url(#ebda-mark-col)"/>` +
+  `<path d="M0.00 35.80 L78.30 0.00 L78.30 74.90Z" fill="url(#ebda-mark-lint)"/>` +
+  `<path d="M0.00 37.00 L42.60 58.30 L42.10 127.80 L0.20 149.00Z" fill="url(#ebda-mark-left)"/>`;
+
+export function brandMarkSvg(opts: { size?: number; cls?: string } = {}): string {
+  const h = opts.size ?? 28;
+  const w = Math.round(h * 0.5255 * 100) / 100;
   const cls = opts.cls ? ` class="${opts.cls}"` : '';
   return (
-    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="13 19 90 90" width="${size}" height="${size}"${cls} aria-hidden="true" focusable="false">` +
-    `<path d="M58 83 L44 100 H72 Z" fill="${arch}" opacity=".35"/>` +
-    `<path d="M30 100 V56 a28 28 0 0 1 56 0 V100" fill="none" stroke="${arch}" stroke-width="9" stroke-linecap="round"/>` +
-    `<circle cx="58" cy="74" r="9" fill="${light}"/></svg>`
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 78.3 149" width="${w}" height="${h}"${cls} aria-hidden="true" focusable="false">` +
+    MARK_DEFS +
+    MARK_PATHS +
+    `</svg>`
+  );
+}
+
+/**
+ * The app-icon tile (night rounded square + the mark, as brand/logo/svg/05d-favicon-32.svg) as an inline SVG
+ * string, for places that cannot link a file (the status page's data-URI favicon).
+ */
+export function brandAppIconSvg(): string {
+  return (
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">` +
+    `<rect width="1024" height="1024" rx="229.07" fill="${BRAND.colors.night}"/>` +
+    `<g transform="translate(318.278 143.360) scale(4.94819)">${MARK_DEFS}${MARK_PATHS}</g></svg>`
   );
 }
 

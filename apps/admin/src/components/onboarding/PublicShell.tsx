@@ -30,7 +30,7 @@ export function PublicShell({
             <Image
               src="/logo-on-light.svg"
               alt={tb('ebdaAlt')}
-              width={36}
+              width={19}
               height={36}
               className="dark:hidden"
               unoptimized
@@ -38,7 +38,7 @@ export function PublicShell({
             <Image
               src="/logo.svg"
               alt={tb('ebdaAlt')}
-              width={36}
+              width={19}
               height={36}
               className="hidden dark:block"
               unoptimized

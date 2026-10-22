@@ -12,7 +12,7 @@ import { HomeBlogCarousel } from '../../templates/shared/HomeBlogCarousel';
 import { SectionDivider, resolveSlotDividerSettings } from '../../templates/shared/SectionDivider';
 import { toTemplateProduct, toTemplateCategory } from '../../templates/adapters';
 import { getHomepageTemplate } from '../../lib/serverTemplate';
-import type { TemplateId, PageDefinition } from '@ebda/shared';
+import type { TemplateId, PageDefinition, SectionNode } from '@ebda/shared';
 import {
   sanitizeUrl,
   definitionToLayout,
@@ -131,6 +131,175 @@ function heroSlidesWithImage<T extends { image?: string }>(
 ): Array<T & { image: string }> {
   return slides.filter((s): s is T & { image: string } => !!s.image);
 }
+
+const NO_PRODUCTS: Product[] = [];
+
+/** The document-only section types `DocumentSectionBody` draws (every other type draws nothing). */
+const DOCUMENT_SECTION_TYPES = new Set([
+  'featured-collection',
+  'gift-finder',
+  'maker-profile',
+  'collection-list',
+  'product-spotlight',
+  'shop-the-look',
+  'steps',
+  'trust-badges',
+  'image-text',
+  'newsletter',
+]);
+
+/** A function with a forever-stable identity that always calls the latest one passed in. */
+function useLatestCallback<A extends unknown[], R>(fn: (...args: A) => R): (...args: A) => R {
+  const ref = React.useRef(fn);
+  ref.current = fn;
+  return React.useCallback((...args: A) => ref.current(...args), []);
+}
+
+/** The previous object while the new one is structurally equal (JSON), so memoized children skip. */
+function useStableValue<T>(value: T): T {
+  const ref = React.useRef<{ json: string; value: T } | null>(null);
+  const json = JSON.stringify(value);
+  if (!ref.current || ref.current.json !== json) ref.current = { json, value };
+  return ref.current.value;
+}
+
+interface DocumentSectionBodyProps {
+  section: SectionNode;
+  newArrivals: Product[];
+  bestSellers: Product[];
+  featured: Product[];
+  extra: Product[];
+  onSale?: Product[];
+  categories: Category[];
+  templateId: TemplateId;
+  editorMode: boolean;
+  showPrice: boolean;
+  layout: ReturnType<typeof definitionToLayout>;
+  stagePriority: boolean;
+  onAddToCart: (productId: string) => Promise<void>;
+}
+
+/**
+ * One document-only section. Memoized: the parsed document keeps the identity of every section a
+ * `render` message did not change (`shareStructure`), so typing in one text re-renders this body
+ * for that section only. Every other prop is a stable reference or a primitive.
+ */
+export const DocumentSectionBody = React.memo(function DocumentSectionBody({
+  section,
+  newArrivals,
+  bestSellers,
+  featured: featuredProducts,
+  extra,
+  onSale: onSalePool,
+  categories,
+  templateId,
+  editorMode,
+  showPrice,
+  layout,
+  stagePriority,
+  onAddToCart,
+}: DocumentSectionBodyProps) {
+  const { store } = useStore();
+  const def = getSectionDefinition(section.type)!;
+  const settings = sectionToLegacy(section, '') as Record<string, unknown>;
+  const pools = { newArrivals, bestSellers, featured: featuredProducts, extra, onSale: onSalePool };
+  return def.type === 'featured-collection' &&
+    (settings as { productSource?: string }).productSource === 'reorder' ? (
+    <ReorderRow
+      title={(settings as FeaturedCollectionSettings).heading}
+      titleAr={(settings as FeaturedCollectionSettings).headingAr}
+      limit={(settings as FeaturedCollectionSettings).limit}
+      pack={templateId}
+      onAddToCart={onAddToCart}
+      sectionProps={{
+        className: `bg-[hsl(var(--bg-page))] ${sectionSpacingClasses(settings as FeaturedCollectionSettings, store.look).wrapperClass}`,
+        style: sectionBgStyle((settings as FeaturedCollectionSettings).bgColor, store.theme),
+      }}
+    />
+  ) : def.type === 'featured-collection' &&
+    (settings as FeaturedCollectionSettings).layout === 'menu' ? (
+    <MenuSection
+      sectionId={section.id}
+      settings={settings as FeaturedCollectionSettings}
+      products={resolveSectionProducts(settings as FeaturedCollectionSettings, pools, 24)}
+      categories={categories}
+      pack={templateId}
+      onAddToCart={onAddToCart}
+      editorMode={editorMode}
+    />
+  ) : def.type === 'gift-finder' ? (
+    <GiftFinderSection
+      settings={settings as GiftFinderSettings}
+      blocks={section.blocks ?? []}
+      categories={categories}
+      editorMode={editorMode}
+    />
+  ) : def.type === 'maker-profile' ? (
+    <MakerProfileSection settings={settings as MakerProfileSettings} editorMode={editorMode} />
+  ) : def.type === 'featured-collection' ? (
+    <FeaturedCollectionSection
+      settings={settings as FeaturedCollectionSettings}
+      products={resolveSectionProducts(settings as FeaturedCollectionSettings, pools, 8).map(
+        toTemplateProduct
+      )}
+      pack={templateId}
+      onAddToCart={onAddToCart}
+      editorMode={editorMode}
+    />
+  ) : def.type === 'collection-list' ? (
+    <CollectionListSection
+      settings={settings as CollectionListSettings}
+      blocks={section.blocks ?? []}
+      categories={categories}
+      editorMode={editorMode}
+    />
+  ) : def.type === 'product-spotlight' ? (
+    <ProductSpotlightSection
+      settings={settings as ProductSpotlightSettings}
+      products={resolveSectionProducts(
+        settings as ProductSpotlightSettings,
+        pools,
+        // A stage shows exactly one product; the list shows up to three.
+        (settings as ProductSpotlightSettings).layout === 'stage' ? 1 : 3
+      ).map(toTemplateProduct)}
+      editorMode={editorMode}
+      onAddToCart={onAddToCart}
+      priority={stagePriority}
+      showPrice={showPrice}
+    />
+  ) : def.type === 'shop-the-look' ? (
+    <ShopTheLookSection
+      sectionId={section.id}
+      settings={settings as ShopTheLookSettings}
+      blocks={section.blocks ?? []}
+      // Store-scoped pools only: an unknown or foreign id is absent, never rendered (C11).
+      products={[...pools.newArrivals, ...pools.bestSellers, ...pools.featured, ...pools.extra]}
+      editorMode={editorMode}
+      showPrice={showPrice}
+      cardLayout={layout}
+    />
+  ) : def.type === 'steps' ? (
+    <StepsSection
+      settings={settings as StepsSettings}
+      blocks={section.blocks ?? []}
+      // Store-scoped pools only: an unknown or foreign id is absent (C11).
+      products={[...pools.newArrivals, ...pools.bestSellers, ...pools.featured, ...pools.extra]}
+      editorMode={editorMode}
+      showPrice={showPrice}
+      cardLayout={layout}
+    />
+  ) : def.type === 'trust-badges' ? (
+    <TrustBadgesSection
+      settings={settings as TrustBadgesSettings}
+      blocks={section.blocks ?? []}
+      editorMode={editorMode}
+    />
+  ) : def.type === 'image-text' ? (
+    <ImageTextSection settings={settings as ImageTextSettings} editorMode={editorMode} />
+  ) : def.type === 'newsletter' ? (
+    <NewsletterSection settings={settings as NewsletterSettings} editorMode={editorMode} />
+  ) : null;
+});
 
 export function PageRenderer({
   definition: storedDefinition,
@@ -326,6 +495,12 @@ export function PageRenderer({
       1
     );
   };
+
+  // Task 13: the document-only sections are memoized by node identity, so a text edit re-renders
+  // ONE section. Their handler and layout props must not change identity while their value is the
+  // same, or every edit would still repaint the whole page.
+  const stableAddToCart = useLatestCallback(handleAddToCart);
+  const stableLayout = useStableValue(layout);
 
   const templateProducts = featuredProducts.map(toTemplateProduct);
   const templateNewArrivals = newArrivals.map(toTemplateProduct);
@@ -1248,148 +1423,33 @@ export function PageRenderer({
             // Document-only sections render straight from the document.
             if (section.hidden === true) continue;
             const settings = sectionToLegacy(section, '') as Record<string, unknown>;
-            const pools = {
-              newArrivals,
-              bestSellers,
-              featured: featuredProducts,
-              extra: extraProducts ?? [],
-              onSale: onSalePool,
-            };
             const stagePriority =
               def.type === 'product-spotlight' &&
               (settings as ProductSpotlightSettings).layout === 'stage' &&
               stagesSeen++ === 0;
-            const node =
-              def.type === 'featured-collection' &&
-              (settings as { productSource?: string }).productSource === 'reorder' ? (
-                <ReorderRow
-                  title={(settings as FeaturedCollectionSettings).heading}
-                  titleAr={(settings as FeaturedCollectionSettings).headingAr}
-                  limit={(settings as FeaturedCollectionSettings).limit}
-                  pack={templateId}
-                  onAddToCart={handleAddToCart}
-                  sectionProps={{
-                    className: `bg-[hsl(var(--bg-page))] ${sectionSpacingClasses(settings as FeaturedCollectionSettings, store.look).wrapperClass}`,
-                    style: sectionBgStyle(
-                      (settings as FeaturedCollectionSettings).bgColor,
-                      store.theme
-                    ),
-                  }}
-                />
-              ) : def.type === 'featured-collection' &&
-                (settings as FeaturedCollectionSettings).layout === 'menu' ? (
-                <MenuSection
-                  sectionId={section.id}
-                  settings={settings as FeaturedCollectionSettings}
-                  products={resolveSectionProducts(
-                    settings as FeaturedCollectionSettings,
-                    pools,
-                    24
-                  )}
-                  categories={categories}
-                  pack={templateId}
-                  onAddToCart={handleAddToCart}
-                  editorMode={editorMode}
-                />
-              ) : def.type === 'gift-finder' ? (
-                <GiftFinderSection
-                  settings={settings as GiftFinderSettings}
-                  blocks={section.blocks ?? []}
-                  categories={categories}
-                  editorMode={editorMode}
-                />
-              ) : def.type === 'maker-profile' ? (
-                <MakerProfileSection
-                  settings={settings as MakerProfileSettings}
-                  editorMode={editorMode}
-                />
-              ) : def.type === 'featured-collection' ? (
-                <FeaturedCollectionSection
-                  settings={settings as FeaturedCollectionSettings}
-                  products={resolveSectionProducts(
-                    settings as FeaturedCollectionSettings,
-                    pools,
-                    8
-                  ).map(toTemplateProduct)}
-                  pack={templateId}
-                  onAddToCart={handleAddToCart}
-                  editorMode={editorMode}
-                />
-              ) : def.type === 'collection-list' ? (
-                <CollectionListSection
-                  settings={settings as CollectionListSettings}
-                  blocks={section.blocks ?? []}
-                  categories={categories}
-                  editorMode={editorMode}
-                />
-              ) : def.type === 'product-spotlight' ? (
-                <ProductSpotlightSection
-                  settings={settings as ProductSpotlightSettings}
-                  products={resolveSectionProducts(
-                    settings as ProductSpotlightSettings,
-                    pools,
-                    // A stage shows exactly one product; the list shows up to three.
-                    (settings as ProductSpotlightSettings).layout === 'stage' ? 1 : 3
-                  ).map(toTemplateProduct)}
-                  editorMode={editorMode}
-                  onAddToCart={handleAddToCart}
-                  priority={stagePriority}
-                  showPrice={showCardPriceEff !== false}
-                />
-              ) : def.type === 'shop-the-look' ? (
-                <ShopTheLookSection
-                  sectionId={section.id}
-                  settings={settings as ShopTheLookSettings}
-                  blocks={section.blocks ?? []}
-                  // Store-scoped pools only: an unknown or foreign id is absent, never rendered (C11).
-                  products={[
-                    ...pools.newArrivals,
-                    ...pools.bestSellers,
-                    ...pools.featured,
-                    ...pools.extra,
-                  ]}
-                  editorMode={editorMode}
-                  showPrice={showCardPriceEff !== false}
-                  cardLayout={layout}
-                />
-              ) : def.type === 'steps' ? (
-                <StepsSection
-                  settings={settings as StepsSettings}
-                  blocks={section.blocks ?? []}
-                  // Store-scoped pools only: an unknown or foreign id is absent (C11).
-                  products={[
-                    ...pools.newArrivals,
-                    ...pools.bestSellers,
-                    ...pools.featured,
-                    ...pools.extra,
-                  ]}
-                  editorMode={editorMode}
-                  showPrice={showCardPriceEff !== false}
-                  cardLayout={layout}
-                />
-              ) : def.type === 'trust-badges' ? (
-                <TrustBadgesSection
-                  settings={settings as TrustBadgesSettings}
-                  blocks={section.blocks ?? []}
-                  editorMode={editorMode}
-                />
-              ) : def.type === 'image-text' ? (
-                <ImageTextSection
-                  settings={settings as ImageTextSettings}
-                  editorMode={editorMode}
-                />
-              ) : def.type === 'newsletter' ? (
-                <NewsletterSection
-                  settings={settings as NewsletterSettings}
-                  editorMode={editorMode}
-                />
-              ) : null;
-            if (node)
-              body.push(
-                <SectionErrorBoundary key={section.id} section={section.id}>
-                  {mark(section.id, node)}
-                </SectionErrorBoundary>
-              );
+            if (!DOCUMENT_SECTION_TYPES.has(def.type)) continue;
+            const node = (
+              <DocumentSectionBody
+                section={section}
+                newArrivals={newArrivals}
+                bestSellers={bestSellers}
+                featured={featuredProducts}
+                extra={extraProducts ?? NO_PRODUCTS}
+                onSale={onSalePool}
+                categories={categories}
+                templateId={templateId}
+                editorMode={editorMode}
+                showPrice={showCardPriceEff !== false}
+                layout={stableLayout}
+                stagePriority={stagePriority}
+                onAddToCart={stableAddToCart}
+              />
+            );
+            body.push(
+              <SectionErrorBoundary key={section.id} section={section.id}>
+                {mark(section.id, node)}
+              </SectionErrorBoundary>
+            );
             continue;
           }
           if (def.legacyKey === 'extraCarousels') {

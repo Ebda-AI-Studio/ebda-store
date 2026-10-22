@@ -178,7 +178,9 @@ export function renderBrandedShell(content: string, store: EmailStoreContext): s
     ? emailImage({
         src: store.logo,
         alt: displayName,
-        width: EMAIL_LOGO_WIDTH,
+        // The platform mark is portrait (135x256 PNG): width 34 = 64 * 135/256, so Outlook (which reads only the
+        // width attribute) renders it at the same 34x64 every other client scales it to.
+        width: platformMark ? 34 : EMAIL_LOGO_WIDTH,
         maxHeight: EMAIL_LOGO_MAX_HEIGHT,
         align: 'center',
       })

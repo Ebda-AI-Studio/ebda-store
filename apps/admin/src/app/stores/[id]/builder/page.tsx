@@ -5,12 +5,13 @@
  * AdminLayout (like Shopify's theme editor); AuthProvider still gates it.
  * The classic page builder (/page-builder) stays live until parity.
  */
-import { useCallback } from 'react';
+import { useCallback, useMemo } from 'react';
 import { useParams, usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { isPageKind, type PageKind } from '@ebda/shared';
 import { useAuth } from '../../../../lib/auth';
 import { useT } from '@/i18n/useT';
 import { BuilderEditor } from './_components/BuilderEditor';
+import { parseDeepLink } from './_lib/deeplink';
 
 export default function BuilderPage() {
   const params = useParams();
@@ -27,11 +28,14 @@ export default function BuilderPage() {
       const q = new URLSearchParams(search?.toString() ?? '');
       if (next === 'home') q.delete('page');
       else q.set('page', next);
+      // A deep link names a place on ONE page; it must not follow the merchant to the next.
+      for (const k of ['select', 'block', 'field']) q.delete(k);
       const qs = q.toString();
       router.replace(qs ? `${pathname}?${qs}` : pathname);
     },
     [router, pathname, search]
   );
+  const deepLink = useMemo(() => parseDeepLink(search), [search]);
   const { user, isLoading } = useAuth();
   const t = useT('builder');
   if (isLoading || !user)
@@ -44,6 +48,12 @@ export default function BuilderPage() {
       </div>
     );
   return (
-    <BuilderEditor key={pageKey} storeId={storeId} pageKey={pageKey} onPageChange={goToPage} />
+    <BuilderEditor
+      key={pageKey}
+      storeId={storeId}
+      pageKey={pageKey}
+      onPageChange={goToPage}
+      deepLink={deepLink}
+    />
   );
 }

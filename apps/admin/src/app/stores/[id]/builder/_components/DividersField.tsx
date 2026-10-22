@@ -38,7 +38,7 @@ export function DividersField({
   onChange: (next: SectionDividers | undefined) => void;
 }) {
   return (
-    <div data-testid="dividers-field">
+    <div data-testid="dividers-field" data-setting-id="builder.dividers">
       <SectionDividersBlock
         values={{
           dividers: settings.dividers as SectionDividers | undefined,

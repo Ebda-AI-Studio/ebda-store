@@ -114,7 +114,7 @@ export default function LoginPage() {
                 src="/logo-on-light.svg"
                 alt={BRAND.product.nameEn}
                 className="h-16 w-auto dark:hidden"
-                width={64}
+                width={34}
                 height={64}
               />
               {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -122,7 +122,7 @@ export default function LoginPage() {
                 src="/logo.svg"
                 alt={BRAND.product.nameEn}
                 className="hidden h-16 w-auto dark:block"
-                width={64}
+                width={34}
                 height={64}
               />
               <span className="text-lg font-semibold">{t.orders.title}</span>

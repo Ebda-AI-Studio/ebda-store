@@ -10094,6 +10094,10 @@
       "takeTheirs": "حمّل نسختهم",
       "keepMine": "احتفظ بنسختي"
     },
+    "live": {
+      "movedUp": "اتنقل القسم {name} لفوق، بقى رقم {pos} من {total}",
+      "movedDown": "اتنقل القسم {name} لتحت، بقى رقم {pos} من {total}"
+    },
     "canvas": {
       "title": "معاينة المتجر",
       "loading": "جارٍ تحميل المعاينة…"
@@ -10291,6 +10295,14 @@
       "saveFirst": "صلّح الأخطاء في الصفحة دي الأول وبعدين غيّر الستايل.",
       "applied": "الستايل اتطبّق.",
       "current": "الستايل الحالي"
+    },
+    "search": {
+      "fonts": "الخطوط",
+      "typographyZones": "شكل الكتابة لكل منطقة",
+      "sectionTypography": "شكل كتابة القسم",
+      "dividers": "فواصل القسم",
+      "video": "فيديو الخلفية",
+      "pageSwitcher": "بدّل الصفحة اللي بتعدّلها"
     }
   },
   "instapayReceipt": {

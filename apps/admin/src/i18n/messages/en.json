@@ -10094,6 +10094,10 @@
       "takeTheirs": "Load their version",
       "keepMine": "Keep mine"
     },
+    "live": {
+      "movedUp": "Moved {name} up, now {pos} of {total}",
+      "movedDown": "Moved {name} down, now {pos} of {total}"
+    },
     "canvas": {
       "title": "Store preview",
       "loading": "Loading preview…"
@@ -10291,6 +10295,14 @@
       "saveFirst": "Fix the errors on this page before changing the look.",
       "applied": "The look is applied.",
       "current": "Current look"
+    },
+    "search": {
+      "fonts": "Fonts",
+      "typographyZones": "Text styles by area",
+      "sectionTypography": "Section text style",
+      "dividers": "Section dividers",
+      "video": "Background video",
+      "pageSwitcher": "Switch the page you edit"
     }
   },
   "instapayReceipt": {

@@ -203,3 +203,51 @@ describe('admin search registry: control ratchet', () => {
     }
   );
 });
+
+describe('admin search registry: every visual-editor control (Task 11)', () => {
+  // The controls Tasks 1-10 put in the editor. A forgotten control names itself here.
+  const EDITOR_CONTROLS = [
+    'builder.header-logo',
+    'builder.header-search',
+    'builder.fonts',
+    'builder.typography-zones',
+    'builder.section-typography',
+    'builder.dividers',
+    'builder.video',
+    'builder.page-settings',
+    'builder.page-switcher',
+    'builder.look-switch',
+    'builder.history',
+    'builder.add-section',
+  ];
+  const builder = SETTINGS.filter(s => s.route === '/builder');
+
+  it('has an entry for each, and no entry outside the list', () => {
+    expect(builder.map(s => s.id).sort()).toEqual([...EDITOR_CONTROLS].sort());
+  });
+
+  it('every entry that needs a pane or a section deep-links with a valid select/page', () => {
+    const OK =
+      /^(select=(theme|history|[a-z][a-z0-9-]*)(&block=[a-z][a-z0-9-]*)?|page=(product|collection|cart))$/;
+    for (const s of builder) if (s.query) expect(s.query, s.id).toMatch(OK);
+    // the two header chrome controls live in the theme tab: they must open it, not just /builder
+    for (const id of ['builder.header-logo', 'builder.header-search'])
+      expect(builder.find(s => s.id === id)?.query).toBe('select=theme');
+  });
+
+  it('labels resolve in Arabic and English and are not the same string', () => {
+    for (const s of builder) {
+      const at = (m: object) => s.labelKey.split('.').reduce<any>((o, k) => o?.[k], m);
+      expect(at(en), s.id).toBeTruthy();
+      expect(at(ar), s.id).toBeTruthy();
+    }
+  });
+
+  it('the Arabic key sets of the new labels match English and carry no ICU "#"', () => {
+    const e = (en as any).builder.search;
+    const a = (ar as any).builder.search;
+    expect(Object.keys(a).sort()).toEqual(Object.keys(e).sort());
+    for (const v of [...Object.values<string>(e), ...Object.values<string>(a)])
+      expect(v).not.toContain('#');
+  });
+});

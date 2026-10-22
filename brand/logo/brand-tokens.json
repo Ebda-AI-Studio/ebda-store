@@ -1,0 +1,99 @@
+{
+  "name": "Ebda AI Studio",
+  "version": "2026-10-22",
+  "colors": {
+    "night": {
+      "value": "#0A0B0C",
+      "role": "Primary background"
+    },
+    "gold": {
+      "value": "#B08D57",
+      "role": "Primary brand colour"
+    },
+    "lift": {
+      "value": "#CBA873",
+      "role": "Secondary brand colour"
+    },
+    "cream": {
+      "value": "#FAF8F3",
+      "role": "Surfaces and UI"
+    }
+  },
+  "fonts": {
+    "headline": {
+      "family": "Playfair Display",
+      "weights": [400, 700],
+      "license": "SIL OFL 1.1",
+      "source": "https://fonts.google.com/specimen/Playfair+Display",
+      "fallback": "Georgia, 'Times New Roman', serif"
+    },
+    "ui": {
+      "family": "Inter",
+      "weights": [400, 500, 600],
+      "license": "SIL OFL 1.1",
+      "source": "https://fonts.google.com/specimen/Inter",
+      "fallback": "system-ui, -apple-system, 'Segoe UI', sans-serif"
+    }
+  },
+  "markGoldFaces": {
+    "lint": {
+      "from": [47.04, 5.06],
+      "to": [58.87, 78.05],
+      "stops": [
+        [0.0, "#DAB27A"],
+        [0.056, "#DAB27A"],
+        [0.167, "#D2AA73"],
+        [0.278, "#CCA46E"],
+        [0.389, "#C8A06A"],
+        [0.5, "#C49C67"],
+        [0.611, "#BE9662"],
+        [0.722, "#B78E5C"],
+        [0.833, "#AE8656"],
+        [0.944, "#A57E52"],
+        [1.0, "#A57E52"]
+      ]
+    },
+    "col": {
+      "from": [54.53, 77.53],
+      "to": [89.44, 116.79],
+      "stops": [
+        [0.0, "#A27B4E"],
+        [0.056, "#A27B4E"],
+        [0.167, "#A17A4D"],
+        [0.278, "#9D774B"],
+        [0.389, "#987448"],
+        [0.5, "#946F44"],
+        [0.611, "#906C42"],
+        [0.722, "#8E6A40"],
+        [0.833, "#8B673F"],
+        [0.944, "#8A663E"],
+        [1.0, "#8A663E"]
+      ]
+    },
+    "left": {
+      "from": [-10.44, 99.88],
+      "to": [48.82, 87.05],
+      "stops": [
+        [0.0, "#B99160"],
+        [0.056, "#B99160"],
+        [0.167, "#B0895B"],
+        [0.278, "#A68156"],
+        [0.389, "#9F7B51"],
+        [0.5, "#9A774D"],
+        [0.611, "#957249"],
+        [0.722, "#906D45"],
+        [0.833, "#8C6A43"],
+        [0.944, "#8B6942"],
+        [1.0, "#8B6942"]
+      ]
+    }
+  },
+  "markViewBox": "0 0 78.3 149",
+  "appIcon": {
+    "cornerRadiusRatio": 0.2237,
+    "markHeightRatio": 0.68,
+    "faviconMarkHeightRatio": 0.72,
+    "tile": ["#171718", "#070707"]
+  },
+  "notes": "Arabic wordmark is traced vector artwork (no font). Latin wordmark text is outlined Playfair Display / Inter."
+}

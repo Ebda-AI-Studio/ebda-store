@@ -80,7 +80,7 @@ export function VideoField({
 
   const message = problem ?? uploadError;
   return (
-    <div className="min-w-0">
+    <div className="min-w-0" data-setting-id="builder.video">
       {tag && <span className="mb-0.5 block text-[11px] text-muted-foreground">{tag}</span>}
       <div className="flex items-center gap-2">
         {value ? (
