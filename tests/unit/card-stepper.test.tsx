@@ -149,7 +149,7 @@ describe('card stepper (Ruling B4-4)', () => {
     const { getByLabelText } = render(adaptive());
     // at 1 the button is named for what it does (a11y P2-2)
     expect(() => getByLabelText('إنقاص الكمية')).toThrow();
-    fireEvent.click(getByLabelText('شيل من السلة'));
+    fireEvent.click(getByLabelText('إزالة من السلة'));
     await waitFor(() => expect(state.removeItem).toHaveBeenCalledWith('line-1'));
     await waitFor(() => expect(state.addToast).toHaveBeenCalled());
     const toast = state.addToast.mock.calls[0][0];
@@ -166,6 +166,41 @@ describe('card stepper (Ruling B4-4)', () => {
     );
     // aria-disabled, not disabled: a disabled button that holds focus drops it (a11y P2-1)
     expect(getByLabelText('زيادة الكمية').getAttribute('aria-disabled')).toBe('true');
+  });
+  it('focus follows the card that was PRESSED when a dish is listed twice (instance, not product)', async () => {
+    state.items = [];
+    const both = () =>
+      withProvider(
+        <div>
+          <div data-testid="first">
+            <AdaptiveAddButton stepperProductId="p1" label="إضافة" onClick={() => {}} />
+          </div>
+          <div data-testid="second">
+            <AdaptiveAddButton stepperProductId="p1" label="إضافة" onClick={() => {}} />
+          </div>
+        </div>
+      );
+    const { getByTestId, rerender } = render(both());
+    const secondAdd = getByTestId('second').querySelector('button')!;
+    secondAdd.focus();
+    fireEvent.click(secondAdd);
+    // the line appears: BOTH copies become steppers
+    state.items = [line({ quantity: 1 })];
+    rerender(both());
+    await waitFor(() =>
+      expect(getByTestId('second').contains(document.activeElement)).toBe(true)
+    );
+    expect(getByTestId('first').contains(document.activeElement)).toBe(false);
+    expect(document.activeElement?.getAttribute('aria-label')).toBe('زيادة الكمية');
+    // and back: - at 1 on the second copy returns focus to ITS add button
+    fireEvent.click(getByTestId('second').querySelector('[aria-label="إزالة من السلة"]')!);
+    state.items = [];
+    await waitFor(() => expect(state.removeItem).toHaveBeenCalled());
+    rerender(both());
+    await waitFor(() =>
+      expect(getByTestId('second').contains(document.activeElement)).toBe(true)
+    );
+    expect(document.activeElement?.tagName).toBe('BUTTON');
   });
   it('the click never reaches the card link around it', () => {
     const outer = vi.fn();

@@ -215,7 +215,7 @@ test('the card stepper: the add control becomes - qty + once the dish is in the 
   await card.getByRole('button', { name: 'إنقاص الكمية' }).click();
   await expect(card.getByRole('status')).toHaveText('1');
   // at 1 the same button removes the line and is NAMED for it (a11y P2-2)
-  await card.getByRole('button', { name: 'شيل من السلة' }).click();
+  await card.getByRole('button', { name: 'إزالة من السلة' }).click();
   await expect(card.locator('[data-cta="stepper"]')).toHaveCount(0);
 });
 

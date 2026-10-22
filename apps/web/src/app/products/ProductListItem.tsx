@@ -1,5 +1,9 @@
 'use client';
 
+import { useEffect, useId, useRef } from 'react';
+import { CardStepper } from '../../templates/shared/CardStepper';
+import { useCardStepperLine } from '../../templates/shared/card-stepper-context';
+import { requestStepperFocus, takeStepperFocus } from '../../templates/shared/card-stepper-focus';
 import { pickLocalizedName } from '../../templates/shared/display-helpers';
 import { canBuyNow } from '@/lib/can-buy-now';
 import Link from 'next/link';
@@ -50,6 +54,14 @@ export function ProductListItem({
   const formatPrice = useLocalePrice();
   const numerals = useStoreNumerals();
   const priceVisible = showCardPrice !== false;
+  // Ruling B4-4 on the list view too: a dish already in the cart shows - qty + here, never a second
+  // "Add" that would silently add another unit (null off the Lamma looks).
+  const stepperLine = useCardStepperLine(product.id, { hasVariants: needsOptions(product) });
+  const instance = useId();
+  const addRef = useRef<HTMLButtonElement | null>(null);
+  useEffect(() => {
+    if (!stepperLine && takeStepperFocus(instance, 'add')) addRef.current?.focus();
+  }, [stepperLine, instance]);
   // Localized name for alt text + heading. Falls through to English when
   // the merchant hasn't supplied an Arabic translation.
   const displayName = pickLocalizedName(product, isRtl) ?? product.name;
@@ -332,15 +344,21 @@ export function ProductListItem({
               >
                 {t('Out of Stock', translations['Out of Stock'])}
               </button>
+            ) : stepperLine ? (
+              <CardStepper line={stepperLine} instance={instance} className="w-auto min-w-[9rem]" />
             ) : (
               <button
+                ref={addRef}
                 className={cn(
                   lookCta === 'quiet'
                     ? `flex h-10 items-center gap-2 ${QUIET_CARD_CTA_CLS}`
                     : 'flex h-10 items-center gap-2 rounded-xl bg-primary px-4 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90',
                   ctaExtraCls
                 )}
-                onClick={e => onAddToCart(product, e)}
+                onClick={e => {
+                  requestStepperFocus(instance, 'step');
+                  onAddToCart(product, e);
+                }}
                 style={{
                   ...(resolvedBg ? { backgroundColor: resolvedBg } : {}),
                   ...(resolvedText ? { color: resolvedText } : {}),

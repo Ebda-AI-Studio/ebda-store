@@ -14,7 +14,17 @@ import { requestStepperFocus, takeStepperFocus } from './card-stepper-focus';
  * product's stock or the cart cap, enforced by the server) restores the quantity and says so
  * once, in words; the `+` stays disabled until the quantity changes.
  */
-export function CardStepper({ line, className }: { line: CartItem; className?: string }) {
+export function CardStepper({
+  line,
+  instance,
+  className,
+}: {
+  line: CartItem;
+  /** The card instance (`useId()` of the control that owns this slot): the focus hand-off is keyed on it,
+   *  not on the product, so a dish listed twice on a page hands focus to the card that was pressed. */
+  instance: string;
+  className?: string;
+}) {
   const cart = useCart();
   const { addToast } = useToast();
   const { t, isRtl } = useLanguage();
@@ -23,8 +33,8 @@ export function CardStepper({ line, className }: { line: CartItem; className?: s
   const plusRef = useRef<HTMLButtonElement | null>(null);
   // the add button that became this stepper handed its focus over (2.4.3)
   useEffect(() => {
-    if (takeStepperFocus(line.productId, 'step')) plusRef.current?.focus();
-  }, [line.productId]);
+    if (takeStepperFocus(instance, 'step')) plusRef.current?.focus();
+  }, [instance]);
   const atCap = capped !== null && capped === line.quantity;
 
   const change = async (next: number) => {
@@ -32,7 +42,7 @@ export function CardStepper({ line, className }: { line: CartItem; className?: s
     busy.current = true;
     try {
       if (next <= 0) {
-        requestStepperFocus(line.productId, 'add'); // the stepper unmounts: the add button takes focus
+        requestStepperFocus(instance, 'add'); // the stepper unmounts: the add button takes focus
         await cart.removeItem(line.id);
         addToast(cartRemovalToast(line, { isRtl, t, addItem: cart.addItem }));
       } else {
@@ -67,7 +77,7 @@ export function CardStepper({ line, className }: { line: CartItem; className?: s
         className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-[var(--radius)] text-primary"
         aria-label={
           line.quantity === 1
-            ? t('Remove from cart', 'شيل من السلة') // at 1 this button removes the line (Undo follows)
+            ? t('Remove from cart', 'إزالة من السلة') // at 1 this button removes the line (Undo follows)
             : t('Decrease quantity', 'إنقاص الكمية')
         }
       >

@@ -160,7 +160,7 @@ export function MakerProfileSection({
                 onClick={() => setOpen(o => !o)}
                 className="mt-2 inline-flex min-h-11 min-w-11 items-center text-sm font-semibold text-foreground underline decoration-primary underline-offset-4"
               >
-                {open ? t('Show less', 'أقل') : t('Read more', 'اقرأ أكتر')}
+                {open ? t('Show less', 'عرض أقل') : t('Read more', 'المزيد')}
               </button>
             )}
             {hygiene && (
@@ -182,7 +182,7 @@ export function MakerProfileSection({
                 href={storeUrl('/products')}
                 className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-[var(--radius)] bg-primary px-5 text-sm font-semibold text-primary-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
               >
-                {t('See the menu', 'شوف المنيو')}
+                {t('See the menu', 'عرض المنيو')}
               </a>
             </div>
           </div>

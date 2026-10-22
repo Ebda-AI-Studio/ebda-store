@@ -104,6 +104,8 @@ export interface LookChrome {
    * Listing grid (Phase B2 STOP-2, taste P1-1): `autoFill` lays the PLP out as
    * `repeat(auto-fill, minmax(11.5rem, 1fr))` from `lg`, so the cards fill the whole column next to
    * the filter rail instead of five narrow cells with a 110px photo. Absent = the skin's own grid.
+   * Since Ruling B4-PLP-1 / B4-21 every template (Dahab aside) lists on the auto-fit grid, so this flag
+   * no longer changes anything; it stays on the Souq looks as a record of their ask.
    */
   plp?: 'autoFill';
   /**

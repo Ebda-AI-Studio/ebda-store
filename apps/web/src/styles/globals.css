@@ -1247,9 +1247,10 @@ html {
  * never sticks (measured: the strip scrolled away at 1400px). `clip` keeps the horizontal clipping
  * without creating a scroll container. Scoped to pages that mount the strip: the same defect inerts
  * every other sticky element on the storefront (headers, PDP gallery, cart summary, filter rail), which
- * is reported as a platform finding, not changed here. */
-html:has([data-part='menu-tabs']),
-body:has([data-part='menu-tabs']) {
+ * is reported as a platform finding, not changed here (docs/architecture/sticky-overflow-follow-up.md).
+ * Scoped to the Lamma skin: a `menu` section on any other template must not flip that page's stickiness. */
+html:has(body[data-pack='lamma'] [data-part='menu-tabs']),
+body[data-pack='lamma']:has([data-part='menu-tabs']) {
   overflow-x: clip;
 }
 

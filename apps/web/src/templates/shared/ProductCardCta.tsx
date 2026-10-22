@@ -1,7 +1,7 @@
 'use client';
 
 import type React from 'react';
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { AddToCartButton, CartIcon, cn } from '@ebda/ui';
 import type { StoreTheme } from '@ebda/shared';
@@ -142,12 +142,12 @@ export function AdaptiveAddButton({
 }: AdaptiveAddButtonProps) {
   const { ref, compact } = useCompactCta();
   const stepper = useCardStepperLine(stepperProductId ?? '');
+  const instance = useId();
   // `-` at 1 removed the line: this add button is back and takes the focus the stepper held (2.4.3)
   useEffect(() => {
-    if (stepperProductId && !stepper && takeStepperFocus(stepperProductId, 'add'))
-      ref.current?.focus();
-  }, [stepper, stepperProductId, ref]);
-  if (stepperProductId && stepper) return <CardStepper line={stepper} />;
+    if (stepperProductId && !stepper && takeStepperFocus(instance, 'add')) ref.current?.focus();
+  }, [stepper, stepperProductId, instance, ref]);
+  if (stepperProductId && stepper) return <CardStepper line={stepper} instance={instance} />;
   const icon = loading ? (
     <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent" />
   ) : (
@@ -159,7 +159,7 @@ export function AdaptiveAddButton({
       type="button"
       disabled={disabled}
       onClick={e => {
-        if (stepperProductId) requestStepperFocus(stepperProductId, 'step');
+        if (stepperProductId) requestStepperFocus(instance, 'step');
         onClick?.(e);
       }}
       className={compact ? cn(className, COMPACT_CTA_CLS) : className}
@@ -246,11 +246,12 @@ export function ProductCardCta({
   const router = useRouter();
   const { ref: ctaRef, compact: compactRaw } = useCompactCta();
   const stepper = useCardStepperLine(productId, { hasVariants: hasVariants || viewOnly });
+  const instance = useId();
   // An out-of-stock label must stay words: a disabled cart icon reads as "broken".
   const compact = compactRaw && inStock !== false;
   useEffect(() => {
-    if (!stepper && takeStepperFocus(productId, 'add')) ctaRef.current?.focus();
-  }, [stepper, productId, ctaRef]);
+    if (!stepper && takeStepperFocus(instance, 'add')) ctaRef.current?.focus();
+  }, [stepper, instance, ctaRef]);
 
   // Build additive shape + size classes — '' when unset so theme classes win.
   const shapeClass = ctaShapeClass(ctaShape);
@@ -275,7 +276,7 @@ export function ProductCardCta({
     return null;
   if (lookCta === 'quiet') className = QUIET_CARD_CTA_CLS;
   // Ruling B4-4: in the cart already, the one control becomes - qty + (a state of the CTA).
-  if (stepper && inStock !== false) return <CardStepper line={stepper} />;
+  if (stepper && inStock !== false) return <CardStepper line={stepper} instance={instance} />;
 
   // viewOnly: force the View link path for no-variant in-stock products too.
   if ((hasVariants || viewOnly) && viewHref) {
@@ -335,7 +336,7 @@ export function ProductCardCta({
       onAddToCart={
         onAddToCart
           ? (id: string) => {
-              requestStepperFocus(productId, 'step');
+              requestStepperFocus(instance, 'step');
               return onAddToCart(id);
             }
           : onAddToCart
