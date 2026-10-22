@@ -2,14 +2,14 @@
 
 Source: growth strategy 2026-10-22, section 3.4. Rulings: LIFE-1..5 in `docs/RULINGS.md`.
 
-| Kind | When | Skipped when | CTA |
-|---|---|---|---|
-| `add_products` | store created + 1 day | a product exists | products |
-| `payment_shipping` | + 3 days | payment AND shipping both set | payment settings |
-| `test_order` | + 5 days | any order exists | storefront |
-| `share_link` | + 7 days | never | storefront link |
-| `trial_recap` | trial end - 4 days | not trialing | billing |
-| `first_order` | `order/created`, once | no order, or the owner's own test order | WhatsApp share (referral link) |
+| Kind               | When                  | Skipped when                            | CTA                            |
+| ------------------ | --------------------- | --------------------------------------- | ------------------------------ |
+| `add_products`     | store created + 1 day | a product exists                        | products                       |
+| `payment_shipping` | + 3 days              | payment AND shipping both set           | payment settings               |
+| `test_order`       | + 5 days              | any order exists                        | storefront                     |
+| `share_link`       | + 7 days              | never                                   | storefront link                |
+| `trial_recap`      | trial end - 4 days    | not trialing                            | billing                        |
+| `first_order`      | `order/created`, once | no order, or the owner's own test order | WhatsApp share (referral link) |
 
 - Trigger: `provisionStore` emits `store/self-serve-provisioned` when `growthTrial` is set; one Inngest run (`lifecycle-emails`) sleeps with `step.sleepUntil` to each due time and re-reads the real state (`SetupGuideService`) before sending. No cron.
 - Idempotency + log: `store_lifecycle_emails` (UNIQUE store + kind, strict RLS). `sent | skipped (reason) | failed`. Viewer: admin `/stores/[id]/lifecycle-emails` (Marketing hub).
