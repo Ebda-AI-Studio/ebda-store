@@ -18,6 +18,15 @@ Every new feature: does it strengthen a pillar (if not → minimum-bar table sta
 
 **Anti-patterns to refuse:** generic any-market features when an Egypt-specific shape exists; manual workflows that should be AI-assisted; hardcoded design choices that should be knobs; English-first UI; features that add chrome without adding meaning (the taste bar).
 
+## Ebda AI Studio rules (mirrored from `~/Desktop/projects/Ebda-AI-Studio/CLAUDE.md` so task worktrees carry them)
+
+- **impeccable v4.7.0 is the ONLY design skill.** Run `impeccable` polish/critique/audit on every UI change before commit. Don't install other design skills (Taste, React Bits, GSAP skills, transitions.dev, designlang, playwright-cli were vetted 2026-10-22: reference-only or skip).
+- **Arabic-first + RTL:** never use per-letter text animations (they break Arabic joining); mirror any slide/tab transition for RTL.
+- **Motion:** CSS/Tailwind by default. GSAP only for pinned scroll stories, SVG morphs or editor FLIP transitions, after reading its licence.
+- **Ebda palette:** no orange in Ebda's own defaults, templates, demos or marketing (merchants may choose any colour; never validate merchant colours). Brass/antique gold count as metal and are allowed (Ruling METAL-1).
+- **Copy:** Egyptian Arabic for full sentences, neutral buttons, formal legal pages. Never name providers (Cloudflare, Gemini, vector DB…) in marketing.
+- **Usage:** LEAN mode. Screenshots only at audit gates; never send screenshots to Ahmad.
+
 ## Sizing — read `design.md` FIRST
 
 Default compact ecommerce sizing on desktop AND mobile; when in doubt, lean smaller. Before changing any size class (`max-w`, `h-`, `p-`, `gap-`, `aspect-`), read `design.md` (single source of truth for baselines + anti-patterns).
