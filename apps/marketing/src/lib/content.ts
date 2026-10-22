@@ -108,8 +108,6 @@ export interface LookCopy {
   who: string;
   /** The bold idea behind it. */
   idea: string;
-  /** Live templates only: alt text of the real screenshot of this look. */
-  alt?: string;
 }
 
 export interface LooksCopy {
@@ -126,7 +124,7 @@ export interface LooksCopy {
   retry: string;
   /** English page only: the phones stay Arabic. */
   bilingualNote: string;
-  /** Templates with a live demo store (`DEMO_STORES`) show real captures instead of the built-in mini-stores. */
+  /** Templates with a live demo store (`DEMO_STORES`) link each look to it. */
   live: { link: string };
   /** Tab labels, in tab order: id matches /looks/<id>.html. */
   templates: { id: string; name: string; kind: string }[];
@@ -200,8 +198,6 @@ export interface Copy {
   model3d: Model3dCopy;
   /** The interactive template + look picker (5 templates x 3 looks, phone previews). */
   looks: LooksCopy;
-  /** MKT-15: the section that links to the live demo store. */
-  demo: { title: string; lead: string; cta: string };
   features: {
     title: string;
     hero: HeroFeatures;
@@ -372,11 +368,6 @@ export const COPY: Record<Locale, Copy> = {
       phoneLabel:
         'متجر مجوهرات (قالب دهب) بيتبني على الموبايل: اسم ولوجو، منتجات، ألوان وصور، وبعدين توصله الطلبات والإشعارات. صور توضيحية.',
     },
-    demo: {
-      title: 'جرّب المتجر التجريبي بنفسك',
-      lead: 'متاجر حقيقية على إبدأ بكتالوج توضيحي: أزياء وإلكترونيات وجمال. غيّر القالب والشكل من الشريط اللي فوق، وافتح أي منتج، وجرّب السلة. الطلب مقفول، فمحدش هيتحاسب.',
-      cta: 'افتح المتجر التجريبي',
-    },
     looks: {
       title: 'اختار قالب، وبعدين اختار شكله.',
       lead: '5 قوالب، وكل قالب بـ3 أشكال. لفّ جوه أي موبايل واضغط على الفلاتر زي ما عميلك هيعمل. وبعد ما تختار، المحرر بيغيّر لك أي حاجة.',
@@ -402,19 +393,16 @@ export const COPY: Record<Locale, Copy> = {
             name: 'أتيليه',
             who: 'لبوتيك عايز هدومه تتكلم لوحدها: هادي وأبيض وبشكل مجلات.',
             idea: 'صور منتجات كبيرة وتقريبًا من غير زحمة: الهدوم هي الواجهة.',
-            alt: 'الصفحة الرئيسية لمتجر قمر بشكل أتيليه: صورة كبيرة لعباية كتان قرميدية جنب شماعة هدوم، وتحتها عنوان وزر وأقسام المتجر',
           },
           {
             name: 'لوك بوك',
             who: 'للستايليست ومحلات الموضة السريعة اللي بتبيع إطلالات مش قطع لوحدها.',
             idea: 'اشتري الإطلالة كلها: كل لوك فيه قطعه وأسعاره، وبضغطة واحدة تضيفهم كلهم.',
-            alt: 'الصفحة الرئيسية لمتجر قمر بشكل لوك بوك على خلفية كحلي: ثلاث صور لإطلالات وقت الغروب وعنوان «لبس السطوح» وزر تسوّق اللوكات',
           },
           {
             name: 'فيترين',
             who: 'لملابس المناسبات (فرح وخطوبة وسهرة) اللي المناسبة هي اللي بتحدد الشراء.',
             idea: 'التنقل بالمناسبة: فرح، خطوبة، سهرة، وكل واحدة بألوانها.',
-            alt: 'الصفحة الرئيسية لمتجر قمر بشكل فاترينة: فستان سهرة على مانيكان داخل إطار ذهبي رفيع، وتحته أقسام المناسبات',
           },
         ],
         souq: [
@@ -422,19 +410,16 @@ export const COPY: Record<Locale, Copy> = {
             name: 'كتالوج',
             who: 'لمحل فيه أصناف كتير والزبون جاي عارف عايز إيه.',
             idea: 'توصل للي عايزه في ضغطتين: البحث والأقسام قبل أي صورة كبيرة.',
-            alt: 'الصفحة الرئيسية لمتجر سوق بشكل كتالوج: خانة بحث، أقسام بصور صغيرة للموبايلات واللابتوب والصوتيات، وتحتها عروض النهارده بخصومات',
           },
           {
             name: 'سوق الليل',
             who: 'لتاجر عايز دفا وشخصية مش جدول مواصفات.',
             idea: 'سوق حيّ ومنوّر من غير زحمة، والبرتقاني محجوز للعروض بس.',
-            alt: 'الصفحة الرئيسية لمتجر سوق بشكل سوق الليل على أخضر غامق: صورة ممر سوق مضاء بالفوانيس وعنوان «السوق منوّر» وزر تسوّق العروض',
           },
           {
             name: 'شو روم',
             who: 'لمجموعة صغيرة فاخرة (موبايلات، لابتوبات) بتتباع قطعة قطعة.',
             idea: 'المنتج هو البطل، قطعة واحدة في كل شاشة، وزرار مقارنة.',
-            alt: 'الصفحة الرئيسية لمتجر سوق بشكل شو روم: شريط أقسام وتحته موبايل أسود كبير بسعره من 32,000 ج.م',
           },
         ],
         jasmine: [
@@ -442,19 +427,16 @@ export const COPY: Record<Locale, Copy> = {
             name: 'عطارة',
             who: 'للعناية الطبيعية والتراثية اللي الثقة فيها جاية من اللي جواها.',
             idea: 'المكونات الأول: إيه اللي جواه، وبعدين المنتج.',
-            alt: 'الصفحة الرئيسية لمتجر ياسمين بشكل عطارة على خلفية زيتونية غامقة: ثلاث زجاجات ملوّنة وعنوان «مكونات تعرفها» وفلاتر نوع البشرة',
           },
           {
             name: 'بلوم',
             who: 'للمكياج الملوّن والجمهور الشاب اللي بيشتري بالدرجة.',
             idea: 'لون المنتج هو لون الصفحة، ودرجات اللون في كل حتة.',
-            alt: 'الصفحة الرئيسية لمتجر ياسمين بشكل بلوم على وردي: رف مستحضرات تجميل وعنوان «درجتك» وزر تسوّق الدرجات',
           },
           {
             name: 'كلينك',
             who: 'للمنتجات الفعّالة بأسلوب دكاترة الجلدية، والعميل جاي بمشكلة عايز يحلها.',
             idea: 'الروتين هو التنقل: نضّف، عالج، احمي.',
-            alt: 'الصفحة الرئيسية لمتجر ياسمين بشكل كلينك: فلاتر المشاكل مثل البشرة الدهنية والحبوب، وتحتها سيروم فيتامين سي',
           },
         ],
         lamma: [
@@ -771,11 +753,6 @@ export const COPY: Record<Locale, Copy> = {
       phoneLabel:
         'A jewellery store (the Dahab template) being built on a phone: name and logo, products, colours and photos, then orders and notifications. Illustrative.',
     },
-    demo: {
-      title: 'Try the demo store yourself',
-      lead: 'Real Ebda stores with illustrative catalogues: fashion, electronics and beauty. Switch the template and look from the bar at the top, open any product, try the cart. Ordering is closed, so nobody gets charged.',
-      cta: 'Open the demo store',
-    },
     looks: {
       title: 'Pick a template, then pick its look.',
       lead: '5 templates, 3 looks each. Scroll inside any phone and tap the filters the way your customers will. Once you choose, the editor changes anything.',
@@ -787,7 +764,7 @@ export const COPY: Record<Locale, Copy> = {
       failed: 'The template did not load.',
       retry: 'Try again',
       bilingualNote:
-        'Every template ships in Arabic and English. Qamar, Souq and Jasmine are shown from their live demo stores in English; the other previews are shown in Arabic.',
+        'Every template ships in Arabic and English. The previews here are shown in Arabic.',
       live: { link: 'Open the live store' },
       templates: [
         { id: 'qamar', name: 'Qamar', kind: 'Fashion and boutiques' },
@@ -802,19 +779,16 @@ export const COPY: Record<Locale, Copy> = {
             name: 'Atelier',
             who: 'For a boutique whose clothes should speak alone: calm, white, editorial.',
             idea: 'Oversized product photography with almost no chrome: the clothes are the interface.',
-            alt: 'The Qamar home page in the Atelier look: a large photo of a terracotta linen abaya beside a clothes rail, then a headline, a button and the shop categories',
           },
           {
             name: 'Lookbook',
             who: 'For stylists and fast-fashion shops that sell outfits, not single pieces.',
             idea: 'Shop the whole outfit: each look carries its items and prices, one tap adds the lot.',
-            alt: 'The Qamar home page in the Lookbook look on a navy ground: three sunset outfit photos, the headline "Dressed for the rooftop" and a Shop the looks button',
           },
           {
             name: 'Vitrine',
             who: 'For occasion wear (weddings, engagements, evenings) where the event decides the purchase.',
             idea: 'Occasion-first navigation: wedding, engagement, evening, each on its own palette band.',
-            alt: 'The Qamar home page in the Vitrine look: an evening gown on a mannequin inside a thin gold frame, and the shop-by-occasion bands below',
           },
         ],
         souq: [
@@ -822,19 +796,16 @@ export const COPY: Record<Locale, Copy> = {
             name: 'Catalogue',
             who: 'For a shop with many SKUs where shoppers arrive knowing what they want.',
             idea: 'Find it in two taps: search and categories come before any hero.',
-            alt: "The Souq home page in the Catalogue look: a search box, small-photo categories for phones, laptops and audio, then today's deals with discounts",
           },
           {
             name: 'Night souq',
             who: 'For a retailer who wants warmth and personality, not a spec sheet.',
             idea: 'A market that feels lit and alive without clutter; orange is reserved for deals only.',
-            alt: 'The Souq home page in the Night souq look on dark green: a lantern-lit market arcade, the headline "The souq is lit" and a Shop the deals button',
           },
           {
             name: 'Showroom',
             who: 'For a small, premium range (phones, laptops) sold one object at a time.',
             idea: 'Product as hero, one object per screen, with a compare toggle.',
-            alt: 'The Souq home page in the Showroom look: a category strip, then a large black phone priced from EGP 32,000',
           },
         ],
         jasmine: [
@@ -842,19 +813,16 @@ export const COPY: Record<Locale, Copy> = {
             name: 'Apothecary',
             who: 'For natural and heritage skincare where trust comes from what is inside.',
             idea: 'Ingredients first: what is in it, then the product.',
-            alt: 'The Jasmine home page in the Apothecary look on dark olive: three coloured bottles, the headline "Ingredients you know" and skin-type filters',
           },
           {
             name: 'Bloom',
             who: 'For colour cosmetics and a young audience that shops by shade.',
             idea: 'The colour of the product is the colour of the page; shade swatches everywhere.',
-            alt: 'The Jasmine home page in the Bloom look on pink: a shelf of cosmetics, the headline "Your shade" and a Shop the shades button',
           },
           {
             name: 'Clinic',
             who: 'For dermatologist-style actives where the shopper has a concern to solve.',
             idea: 'The routine is the navigation: cleanse, treat, protect.',
-            alt: 'The Jasmine home page in the Clinic look: concern filters such as oily skin and acne, then a vitamin C serum',
           },
         ],
         lamma: [

@@ -6,14 +6,10 @@ import { PLANS, PRICING_PLACEHOLDER, PRICING_PUBLISHED, comparisonRows } from '.
 import { initialLooksFragment } from '../lib/looks-initial';
 import { jsonLd } from '../lib/seo';
 import {
-  DEMO_STORES,
-  demoLookUrl,
   FIRST_MERCHANT,
-  isDemoTemplate,
   LOGIN_URL,
   SECTION_ORDER,
   SIGNUP_URL,
-  type DemoTemplate,
   type Locale,
   type SectionId,
 } from '../lib/site';
@@ -95,32 +91,7 @@ export function Home({ locale }: { locale: Locale }) {
     looks: () => (
       <Section id="looks" title={c.looks.title} className="looks">
         <p className="lead">{c.looks.lead}</p>
-        <LooksShowcase
-          copy={c.looks}
-          rtl={rtl}
-          initialHtml={
-            // a live template renders real captures, so its built-in markup is not sent
-            isDemoTemplate(c.looks.templates[0].id) ? '' : initialLooksFragment()
-          }
-        />
-      </Section>
-    ),
-    demo: () => (
-      <Section id="demo" title={c.demo.title} className="demo">
-        <p className="lead">{c.demo.lead}</p>
-        <p className="actions">
-          {c.looks.templates
-            .filter(t => isDemoTemplate(t.id))
-            .map((t, i) => (
-              <a
-                key={t.id}
-                href={demoLookUrl(t.id as DemoTemplate, DEMO_STORES[t.id as DemoTemplate].looks[0])}
-                className={`btn btn-lg ${i === 0 ? 'btn-primary' : 'btn-ghost'}`}
-              >
-                {c.demo.cta}: {t.name}
-              </a>
-            ))}
-        </p>
+        <LooksShowcase copy={c.looks} rtl={rtl} initialHtml={initialLooksFragment()} />
       </Section>
     ),
     features: () => (

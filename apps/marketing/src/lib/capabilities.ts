@@ -46,13 +46,13 @@ export const THEMES = THEME_LIST;
 /** Every capability card on /features, in page order. */
 export const CAPABILITY_IDS: readonly CardId[] = THEMES.flatMap(t => t.ids);
 
-/** Home cards, in order: the ones shoppers and AI assistants ask about most. */
+/** Home value list, in order: what you get besides the AI (that has its own section). None is an AI capability. */
 export const HOME_CAPABILITIES: readonly CardId[] = [
   'builder',
-  'search',
-  'ai',
+  'domain',
   'cart',
-  'webhooks',
+  'loyalty',
+  'payments',
   'commission',
 ] as const;
 
@@ -525,7 +525,7 @@ export const FEATURES_PAGE: Record<
     compareTitle: 'قارن ابدأ ستور بغيره',
     cta: 'ابدأ دلوقتي',
     homeTitle: 'مش متجر بسيط وبس.',
-    homeLead: 'قوالب، ذكاء اصطناعي، بحث بالمصري والفرانكو، استرجاع سلات ونقاط ولاء، وصفر عمولة.',
+    homeLead: 'كل اللي محتاجه علشان تبيع من أول يوم، في مكان واحد وبصفر عمولة.',
     homeAll: 'شوف كل المميزات',
   },
   en: {
@@ -538,8 +538,7 @@ export const FEATURES_PAGE: Record<
     compareTitle: 'Compare Ebda Store',
     cta: 'Start now',
     homeTitle: 'More than a simple store.',
-    homeLead:
-      'Templates, AI, Egyptian Arabic and Franco search, cart recovery, loyalty points and 0% commission.',
+    homeLead: 'Everything you need to sell from day one, in one place and at 0% commission.',
     homeAll: 'See all features',
   },
 };

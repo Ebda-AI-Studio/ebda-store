@@ -4,7 +4,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { existsSync, readFileSync, statSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { Home } from '../../apps/marketing/src/components/Home';
 import { LegalPage } from '../../apps/marketing/src/components/LegalPage';
@@ -151,28 +151,23 @@ describe('marketing hero and structure', () => {
       existsSync(path.resolve(__dirname, '../../apps/marketing/scripts/story-frames/make.mjs'))
     ).toBe(true);
   });
-  it('MKT-15: a demo section after the looks links to the live demo store, in both languages', () => {
-    for (const [html, title] of [
-      [ar, 'جرّب المتجر التجريبي بنفسك'],
-      [en, 'Try the demo store yourself'],
-    ] as const) {
-      const s = html.match(/<section id="demo".*?<\/section>/s)![0];
-      expect(s).toContain(title);
-      for (const u of [
-        'https://storedemo.ebda.app/?look=qamar.atelier',
-        'https://storedemo-souq.ebda.app/?look=souq.catalogue',
-        'https://storedemo-jasmine.ebda.app/?look=jasmine.apothecary',
-      ])
-        expect(s).toContain(`href="${u}"`);
-      expect(s).not.toContain('target="_blank"');
+  it('MKT-15 (merged into #looks): no separate demo section, one #demo anchor, live links for all three demo stores', () => {
+    for (const html of [ar, en]) {
+      expect(html).not.toContain('<section id="demo"');
+      expect(html.match(/id="demo"/g)).toHaveLength(1);
     }
+    for (const lang of ['ar', 'en'] as const)
+      for (const [tpl, { host, looks }] of Object.entries(DEMO_STORES)) {
+        expect(COPY[lang].looks.items[tpl]).toHaveLength(3);
+        expect(looks).toHaveLength(3);
+        expect(host.startsWith('storedemo')).toBe(true);
+      }
   });
   it('renders sections in the exact required order', () => {
     // MKT-14 (Ahmad 2026-10-14): story first, then the looks
     const expected = [
       'story',
       'looks',
-      'demo',
       'model3d',
       'payments',
       'features',
@@ -432,10 +427,10 @@ describe('marketing honesty', () => {
     expect(ar).toContain('>واتساب<');
     expect(en).toContain('>WhatsApp<');
   });
-  it('shows the looks picker: 5 template tabs, Qamar as real captures of the live demo, no provider names', () => {
-    for (const [html, lang, badge] of [
-      [ar, 'ar', 'صور توضيحية'],
-      [en, 'en', 'Illustrative'],
+  it('shows the looks picker: 5 template tabs, Qamar rendered, every phone labelled illustrative', () => {
+    for (const [html, badge] of [
+      [ar, 'صور توضيحية'],
+      [en, 'Illustrative'],
     ] as const) {
       const s = html.match(/<section id="looks".*?<section id="model3d"/s)![0];
       expect(s.match(/role="tab"/g)).toHaveLength(5);
@@ -443,34 +438,16 @@ describe('marketing honesty', () => {
       expect(s).toMatch(
         /aria-selected="true"[^>]*id="looks-tab-qamar"|id="looks-tab-qamar"[^>]*aria-selected="true"/
       );
-      // Qamar is live: real screenshots (avif + webp, sized, with alt) linking to the demo store
-      for (const l of ['atelier', 'lookbook', 'vitrine']) {
-        expect(s).toContain(`/looks/live/qamar-${l}-${lang}-780.avif`);
-        expect(s).toContain(`/looks/live/qamar-${l}-${lang}-780.webp`);
-        expect(s).toContain(`href="https://storedemo.ebda.app/?look=qamar.${l}"`);
-      }
-      expect(s.match(/<img [^>]*width="780" height="1688" alt="[^"]{20,}"/g)).toHaveLength(3);
-      expect(s).not.toContain('look-badge');
-      expect(s).not.toContain(`>${badge}<`);
-      expect(s).not.toContain('id="ph-qamar-');
+      expect(s.match(new RegExp(`<span class="look-badge">${badge}</span>`, 'g'))).toHaveLength(3);
+      for (const l of ['a', 'b', 'c']) expect(s).toContain(`id="ph-qamar-${l}"`);
+      // photos are files, never inlined
+      expect(s).toContain('/looks/img/qa__hero.webp');
       expect(s).not.toContain('base64');
+      // one "open the live store" link per look (Qamar is the rendered tab), and #demo kept as an anchor here
+      for (const l of ['atelier', 'lookbook', 'vitrine'])
+        expect(s).toContain(`href="https://storedemo.ebda.app/?look=qamar.${l}"`);
+      expect(s).toContain('id="demo"');
     }
-    // every live template: 3 looks x ar/en x avif/webp exist and stay small; every look has alt text
-    for (const [tpl, { looks }] of Object.entries(DEMO_STORES))
-      for (const lang of ['ar', 'en'] as const) {
-        const items = COPY[lang].looks.items[tpl];
-        expect(items).toHaveLength(3);
-        for (const [i, l] of looks.entries()) {
-          expect(items[i].alt?.length ?? 0).toBeGreaterThan(30);
-          for (const ext of ['avif', 'webp']) {
-            const f = path.resolve(
-              __dirname,
-              `../../apps/marketing/public/looks/live/${tpl}-${l}-${lang}-780.${ext}`
-            );
-            expect(statSync(f).size).toBeLessThan(60_000);
-          }
-        }
-      }
     expect(en).toContain('Every template ships in Arabic and English');
     // the looks fetch is extensionless: Workers Static Assets 307-redirect /looks/x.html to /looks/x
     const showcase = readFileSync(

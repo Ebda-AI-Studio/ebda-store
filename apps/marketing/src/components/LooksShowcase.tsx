@@ -45,7 +45,7 @@ export function LooksShowcase({
   }, []);
 
   useEffect(() => {
-    if (!isDemoTemplate(active) && !frags[active] && failed !== active) load(active);
+    if (!frags[active] && failed !== active) load(active);
   }, [active, frags, failed, load]);
 
   // Fonts: only once the section is near the screen (or a tab was chosen), once per template.
@@ -125,13 +125,13 @@ export function LooksShowcase({
   }, [active, activeFrag]);
 
   const liveTpl = isDemoTemplate(active) ? active : null;
-  const shotLang = rtl ? 'ar' : 'en';
   const tpl = copy.templates.find(t => t.id === active) ?? copy.templates[0];
   const items = copy.items[active];
   const frag = frags[active];
 
   return (
     <div className="looks-wrap" ref={stageRef}>
+      <span id="demo" className="demo-anchor" aria-hidden="true" />
       <div className="looks-tabs" role="tablist" aria-label={copy.tablistLabel}>
         {copy.templates.map((t, i) => (
           <button
@@ -177,8 +177,8 @@ export function LooksShowcase({
             </button>
           ))}
         </div>
-        {frag && !liveTpl && <style dangerouslySetInnerHTML={{ __html: frag.css }} />}
-        {liveTpl || frag ? (
+        {frag && <style dangerouslySetInnerHTML={{ __html: frag.css }} />}
+        {frag ? (
           <div
             className={`looks-trio${switched ? ' looks-trio-in' : ''}`}
             key={active}
@@ -187,34 +187,11 @@ export function LooksShowcase({
             {items.map((it, i) => (
               <figure className="looks-item" key={LETTERS[i]}>
                 <div className="look-phone">
-                  {!liveTpl && <span className="look-badge">{copy.badge}</span>}
-                  {liveTpl ? (
-                    <a
-                      className="look-screen look-shot"
-                      href={demoLookUrl(liveTpl, DEMO_STORES[liveTpl].looks[i])}
-                      aria-label={`${copy.live.link}: ${it.name}`}
-                    >
-                      <picture>
-                        <source
-                          type="image/avif"
-                          srcSet={`/looks/live/${active}-${DEMO_STORES[liveTpl].looks[i]}-${shotLang}-780.avif`}
-                        />
-                        <img
-                          src={`/looks/live/${active}-${DEMO_STORES[liveTpl].looks[i]}-${shotLang}-780.webp`}
-                          width={780}
-                          height={1688}
-                          alt={it.alt ?? it.name}
-                          loading="lazy"
-                          decoding="async"
-                        />
-                      </picture>
-                    </a>
-                  ) : (
-                    <div
-                      className="look-screen"
-                      dangerouslySetInnerHTML={{ __html: frag?.looks[i] ?? '' }}
-                    />
-                  )}
+                  <span className="look-badge">{copy.badge}</span>
+                  <div
+                    className="look-screen"
+                    dangerouslySetInnerHTML={{ __html: frag.looks[i] ?? '' }}
+                  />
                 </div>
                 <figcaption>
                   <h3>
