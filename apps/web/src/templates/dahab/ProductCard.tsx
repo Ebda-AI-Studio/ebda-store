@@ -52,6 +52,8 @@ export default function DahabProductCard({
   priority,
   showCardName,
   showCardPrice,
+  showLabel,
+  showHover,
   imageSizes = '(min-width: 1024px) 25vw, (min-width: 768px) 33vw, 50vw',
 }: DahabProductCardProps) {
   const { isRtl: ctxIsRtl, t } = useLanguage();
@@ -75,8 +77,10 @@ export default function DahabProductCard({
   const inStock = product.inStock !== false;
   const orderable = canBuyNow(product);
   const hasVariants = (product.variants?.length ?? 0) > 0;
-  const priceVisible = showCardPrice !== false && store.theme?.showPriceOnCards !== false;
-  const nameVisible = showCardName !== false;
+  const priceVisible =
+    showCardPrice !== false && showLabel !== false && store.theme?.showPriceOnCards !== false;
+  // Show name (showLabel) gates the name and price block, as on the other skins
+  const nameVisible = showCardName !== false && showLabel !== false;
 
   const discount =
     orderable && isOnSale(product)
@@ -138,7 +142,7 @@ export default function DahabProductCard({
             ) : (
               <div aria-hidden="true" className="absolute inset-0 bg-muted" />
             )}
-            {canHover && secondary?.url && (
+            {showHover !== false && canHover && secondary?.url && (
               <Image
                 src={secondary.url}
                 alt=""

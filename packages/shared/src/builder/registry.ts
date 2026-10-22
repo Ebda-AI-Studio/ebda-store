@@ -42,6 +42,7 @@ import { PLACEHOLDER_STARTER_COPY } from './placeholder-copy';
 import { DEFAULT_LAYOUT_SETTINGS } from '../types/store-layout';
 import type { LegacyHomeSectionKey } from './section-keys';
 import { VIEWPORTS, type Viewport } from './viewports';
+import type { TemplateId } from '../types/store-theme';
 import { PAGE_KINDS, type PageKind } from './page-kinds';
 import { pageKindDefs } from './page-section-defs';
 import {
@@ -53,6 +54,7 @@ import {
   styleSettings,
   type SettingDefinition,
   type ShownFor,
+  type ShownRule,
 } from './settings-schema';
 
 export { VIEWPORTS, VIEWPORT_RANGES, type Viewport } from './viewports';
@@ -236,9 +238,49 @@ const narrowed = (list: readonly SettingDefinition[], rules: Record<string, Show
  * own container (`PageRenderer` comment on the hero wrapper; `T.ProductCarousel` ignores the
  * `innerContainerClass`), so Width, and for the hero Top / Bottom spacing, did nothing on any skin.
  */
+/**
+ * Every skin except Dahab (Ruling B5-35). Dahab's cards, tiles, heading row and hero are the
+ * look's own fixed design: one card size, the look's frame and corners, no label above the heading,
+ * a hero that always anchors its copy at the inline start. A control only the other skins read is
+ * therefore not offered on Dahab. `templates` is an inclusive list, so a skin added later must be
+ * added here once it reads these controls (the matrix and `hiddenButWired` fail if it does and is
+ * left out, and the matrix fails if it does not and is listed).
+ */
+const NOT_DAHAB: ShownRule & { templates: readonly TemplateId[] } = {
+  templates: [
+    'modern',
+    'classic',
+    'minimal',
+    'bold',
+    'elegant',
+    'qamar',
+    'souq',
+    'jasmine',
+    'lamma',
+  ],
+};
+/** Card design Dahab's card ignores; it reads Show name and Hover effect (both wired). */
+const DAHAB_FIXED_CARD: Record<string, ShownFor> = Object.fromEntries(
+  [
+    'cardSize',
+    'cardAspect',
+    'cardShape',
+    'cardGap',
+    'showCardFrame',
+    'cardFrameStyle',
+    'cardFrameWidth',
+    'cardFrameSize',
+    'cardFrameColor',
+  ].map(id => [id, NOT_DAHAB])
+);
+/** The heading row's label above the title and its flanking lines: Dahab's heading has none. */
+const DAHAB_NO_KICKER: Record<string, ShownFor> = Object.fromEntries(
+  ['kicker', 'showKickerLines', 'showSubtitleLines'].map(id => [id, NOT_DAHAB])
+);
 /** Category cards honour Aspect / Name / Hover in the scrolling row, and Modern's own grid card does. */
 const CATEGORY_CARD_LOOK: ShownFor = [
-  { variants: { layout: ['horizontal'] } },
+  // the scrolling row of every skin but Dahab (its tiles are the look's own)
+  { templates: NOT_DAHAB.templates, variants: { layout: ['horizontal'] } },
   { templates: ['modern'] },
 ];
 const NO_WIDTH = ['maxWidth'] as const;
@@ -311,10 +353,14 @@ export const SECTION_REGISTRY: readonly SectionDefinition[] = [
         opt('framed', 'Framed', 'داخل إطار'),
         opt('collage', 'Collage (3 photos)', 'كولاج (3 صور)'),
       ]),
-      s.select('frame', 'Frame line (framed only)', 'خط الإطار (داخل إطار فقط)', [
-        opt('none', 'None', 'بدون'),
-        opt('line', 'Hairline', 'خط رفيع'),
-      ]),
+      s.select(
+        'frame',
+        'Frame line (framed only)',
+        'خط الإطار (داخل إطار فقط)',
+        [opt('none', 'None', 'بدون'), opt('line', 'Hairline', 'خط رفيع')],
+        // Dahab's hero is one full-bleed photograph over a fade, with no frame to draw a line in
+        { shownFor: NOT_DAHAB }
+      ),
       s.select(
         'textAnchor',
         'Text position',
@@ -324,6 +370,8 @@ export const SECTION_REGISTRY: readonly SectionDefinition[] = [
           opt('bottom-start', 'Bottom corner', 'في الركن السفلي'),
         ],
         {
+          // Dahab always sets its copy at the inline start
+          shownFor: NOT_DAHAB,
           // M-6 (B1-48): below xl the anchored copy leaves the photo, so its colour is the page's.
           hintEn:
             'On phones and tablets the text sits under the photo in the page colours, so the headline colour applies only on large screens.',
@@ -345,7 +393,7 @@ export const SECTION_REGISTRY: readonly SectionDefinition[] = [
     // The storefront already renders a separate mobile layout + caption.
     responsive: { hidden: ALL, settings: { mobile: ['layout', 'captionPosition'] } },
     settings: [
-      ...headingSettings(),
+      ...narrowed(headingSettings(), DAHAB_NO_KICKER),
       s.select(
         'layout',
         'Layout',
@@ -381,6 +429,8 @@ export const SECTION_REGISTRY: readonly SectionDefinition[] = [
         [opt('below', 'Below', 'أسفل'), opt('overlay', 'On image', 'على الصورة')],
         {
           responsive: ['mobile'],
+          // Dahab's tiles always carry the name below the photograph
+          shownFor: NOT_DAHAB,
         }
       ),
       s.select(
@@ -408,6 +458,7 @@ export const SECTION_REGISTRY: readonly SectionDefinition[] = [
       // The grid and the aisle tiles ignore these on every skin built since the looks (their
       // cards are their own); the scrolling row, and Modern's grid card, read them.
       ...narrowed(cardSettings(), {
+        ...DAHAB_FIXED_CARD,
         cardAspect: CATEGORY_CARD_LOOK,
         showLabel: CATEGORY_CARD_LOOK,
         showHover: CATEGORY_CARD_LOOK,
@@ -423,9 +474,9 @@ export const SECTION_REGISTRY: readonly SectionDefinition[] = [
     rendererKey: 'home.newArrivals',
     group: 'template',
     settings: [
-      ...headingSettings(),
+      ...narrowed(headingSettings(), DAHAB_NO_KICKER),
       carouselLimit(48),
-      ...cardSettings(),
+      ...narrowed(cardSettings(), DAHAB_FIXED_CARD),
       ...without(styleSettings(), NO_WIDTH),
     ],
     retired: NO_WIDTH,
@@ -438,9 +489,9 @@ export const SECTION_REGISTRY: readonly SectionDefinition[] = [
     rendererKey: 'home.bestSellers',
     group: 'template',
     settings: [
-      ...headingSettings(),
+      ...narrowed(headingSettings(), DAHAB_NO_KICKER),
       carouselLimit(48),
-      ...cardSettings(),
+      ...narrowed(cardSettings(), DAHAB_FIXED_CARD),
       ...without(styleSettings(), NO_WIDTH),
     ],
     retired: NO_WIDTH,
@@ -593,9 +644,9 @@ export const SECTION_REGISTRY: readonly SectionDefinition[] = [
         group: 'content',
         max: 50,
       },
-      ...headingSettings(),
+      ...narrowed(headingSettings(), DAHAB_NO_KICKER),
       carouselLimit(50),
-      ...cardSettings(),
+      ...narrowed(cardSettings(), DAHAB_FIXED_CARD),
       ...without(styleSettings(), NO_WIDTH),
     ],
     retired: NO_WIDTH,

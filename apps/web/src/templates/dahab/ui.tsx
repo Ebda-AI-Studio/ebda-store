@@ -85,7 +85,10 @@ export function DahabSectionHeading({
             </h2>
           )}
           {subtitle && (
-            <p className="mt-2 max-w-[56ch] text-pretty text-[15px] leading-relaxed text-muted-foreground">
+            <p
+              className="mt-2 max-w-[56ch] text-pretty text-[15px] leading-relaxed text-muted-foreground"
+              {...settingMarker(editorMode, 'subtitle', isRtl)}
+            >
               {subtitle}
             </p>
           )}

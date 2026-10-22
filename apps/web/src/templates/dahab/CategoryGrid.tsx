@@ -11,6 +11,12 @@ const COLS: Record<number, string> = {
   4: 'lg:grid-cols-4',
 };
 
+const MOBILE_COLS: Record<number, string> = {
+  1: 'grid-cols-1',
+  2: 'grid-cols-2',
+  3: 'grid-cols-3',
+};
+
 export default function DahabCategoryGrid({
   categories,
   isRtl: isRtlProp,
@@ -19,6 +25,7 @@ export default function DahabCategoryGrid({
   subtitle,
   subtitleAr,
   desktopColumns = 4,
+  mobileColumns = 2,
   urlPrefix = '',
   seeAllHref,
 }: CategoryGridProps) {
@@ -35,7 +42,8 @@ export default function DahabCategoryGrid({
       />
       <div
         className={cx(
-          'grid grid-cols-2 gap-x-4 gap-y-8 sm:gap-x-6 md:grid-cols-3',
+          'grid gap-x-4 gap-y-8 sm:gap-x-6 md:grid-cols-3',
+          MOBILE_COLS[mobileColumns] ?? MOBILE_COLS[2],
           COLS[desktopColumns] ?? COLS[4]
         )}
       >

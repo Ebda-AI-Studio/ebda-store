@@ -1,11 +1,11 @@
 {
   "version": 1,
   "summary": {
-    "wired": 1357,
-    "no-op": 70,
+    "wired": 1378,
+    "no-op": 0,
     "missing": 0,
     "pending-template": 0,
-    "marker-pending": 4,
+    "marker-pending": 0,
     "classic-only": 0,
     "exempt": 0
   },
@@ -51,110 +51,6 @@
       "evidence": "static+probe"
     },
     {
-      "id": "dahab|section:best-sellers|cardAspect",
-      "skin": "dahab",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:best-sellers",
-      "control": "cardAspect",
-      "status": "no-op",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "dahab|section:best-sellers|cardFrameColor",
-      "skin": "dahab",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:best-sellers",
-      "control": "cardFrameColor",
-      "status": "no-op",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "dahab|section:best-sellers|cardFrameSize",
-      "skin": "dahab",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:best-sellers",
-      "control": "cardFrameSize",
-      "status": "no-op",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "dahab|section:best-sellers|cardFrameStyle",
-      "skin": "dahab",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:best-sellers",
-      "control": "cardFrameStyle",
-      "status": "no-op",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "dahab|section:best-sellers|cardFrameWidth",
-      "skin": "dahab",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:best-sellers",
-      "control": "cardFrameWidth",
-      "status": "no-op",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "dahab|section:best-sellers|cardGap",
-      "skin": "dahab",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:best-sellers",
-      "control": "cardGap",
-      "status": "no-op",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "dahab|section:best-sellers|cardShape",
-      "skin": "dahab",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:best-sellers",
-      "control": "cardShape",
-      "status": "no-op",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "dahab|section:best-sellers|cardSize",
-      "skin": "dahab",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:best-sellers",
-      "control": "cardSize",
-      "status": "no-op",
-      "evidence": "static+probe"
-    },
-    {
       "id": "dahab|section:best-sellers|dividers",
       "skin": "dahab",
       "looks": [
@@ -166,19 +62,6 @@
       "control": "dividers",
       "status": "wired",
       "evidence": "static"
-    },
-    {
-      "id": "dahab|section:best-sellers|kicker",
-      "skin": "dahab",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:best-sellers",
-      "control": "kicker",
-      "status": "no-op",
-      "evidence": "static+probe"
     },
     {
       "id": "dahab|section:best-sellers|limit",
@@ -220,19 +103,6 @@
       "evidence": "static+probe"
     },
     {
-      "id": "dahab|section:best-sellers|showCardFrame",
-      "skin": "dahab",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:best-sellers",
-      "control": "showCardFrame",
-      "status": "no-op",
-      "evidence": "static+probe"
-    },
-    {
       "id": "dahab|section:best-sellers|showHover",
       "skin": "dahab",
       "looks": [
@@ -242,21 +112,8 @@
       ],
       "surface": "section:best-sellers",
       "control": "showHover",
-      "status": "no-op",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "dahab|section:best-sellers|showKickerLines",
-      "skin": "dahab",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:best-sellers",
-      "control": "showKickerLines",
-      "status": "no-op",
-      "evidence": "static+probe"
+      "status": "wired",
+      "evidence": "static (ProductCard.tsx)"
     },
     {
       "id": "dahab|section:best-sellers|showLabel",
@@ -268,20 +125,7 @@
       ],
       "surface": "section:best-sellers",
       "control": "showLabel",
-      "status": "no-op",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "dahab|section:best-sellers|showSubtitleLines",
-      "skin": "dahab",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:best-sellers",
-      "control": "showSubtitleLines",
-      "status": "no-op",
+      "status": "wired",
       "evidence": "static+probe"
     },
     {
@@ -294,7 +138,7 @@
       ],
       "surface": "section:best-sellers",
       "control": "subtitle",
-      "status": "marker-pending",
+      "status": "wired",
       "evidence": "static+probe"
     },
     {
@@ -506,123 +350,6 @@
       "evidence": "static+probe"
     },
     {
-      "id": "dahab|section:category-grid|captionPosition",
-      "skin": "dahab",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:category-grid",
-      "control": "captionPosition",
-      "status": "no-op",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "dahab|section:category-grid|cardAspect",
-      "skin": "dahab",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:category-grid",
-      "control": "cardAspect",
-      "status": "no-op",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "dahab|section:category-grid|cardFrameColor",
-      "skin": "dahab",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:category-grid",
-      "control": "cardFrameColor",
-      "status": "no-op",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "dahab|section:category-grid|cardFrameSize",
-      "skin": "dahab",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:category-grid",
-      "control": "cardFrameSize",
-      "status": "no-op",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "dahab|section:category-grid|cardFrameStyle",
-      "skin": "dahab",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:category-grid",
-      "control": "cardFrameStyle",
-      "status": "no-op",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "dahab|section:category-grid|cardFrameWidth",
-      "skin": "dahab",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:category-grid",
-      "control": "cardFrameWidth",
-      "status": "no-op",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "dahab|section:category-grid|cardGap",
-      "skin": "dahab",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:category-grid",
-      "control": "cardGap",
-      "status": "no-op",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "dahab|section:category-grid|cardShape",
-      "skin": "dahab",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:category-grid",
-      "control": "cardShape",
-      "status": "no-op",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "dahab|section:category-grid|cardSize",
-      "skin": "dahab",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:category-grid",
-      "control": "cardSize",
-      "status": "no-op",
-      "evidence": "static+probe"
-    },
-    {
       "id": "dahab|section:category-grid|desktopColumns",
       "skin": "dahab",
       "looks": [
@@ -647,19 +374,6 @@
       "control": "dividers",
       "status": "wired",
       "evidence": "static"
-    },
-    {
-      "id": "dahab|section:category-grid|kicker",
-      "skin": "dahab",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:category-grid",
-      "control": "kicker",
-      "status": "no-op",
-      "evidence": "static+probe"
     },
     {
       "id": "dahab|section:category-grid|layout",
@@ -697,7 +411,7 @@
       ],
       "surface": "section:category-grid",
       "control": "mobileColumns",
-      "status": "no-op",
+      "status": "wired",
       "evidence": "static+probe"
     },
     {
@@ -727,71 +441,6 @@
       "evidence": "static+probe"
     },
     {
-      "id": "dahab|section:category-grid|showCardFrame",
-      "skin": "dahab",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:category-grid",
-      "control": "showCardFrame",
-      "status": "no-op",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "dahab|section:category-grid|showHover",
-      "skin": "dahab",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:category-grid",
-      "control": "showHover",
-      "status": "no-op",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "dahab|section:category-grid|showKickerLines",
-      "skin": "dahab",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:category-grid",
-      "control": "showKickerLines",
-      "status": "no-op",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "dahab|section:category-grid|showLabel",
-      "skin": "dahab",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:category-grid",
-      "control": "showLabel",
-      "status": "no-op",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "dahab|section:category-grid|showSubtitleLines",
-      "skin": "dahab",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:category-grid",
-      "control": "showSubtitleLines",
-      "status": "no-op",
-      "evidence": "static+probe"
-    },
-    {
       "id": "dahab|section:category-grid|source",
       "skin": "dahab",
       "looks": [
@@ -814,7 +463,7 @@
       ],
       "surface": "section:category-grid",
       "control": "subtitle",
-      "status": "marker-pending",
+      "status": "wired",
       "evidence": "static+probe"
     },
     {
@@ -1282,8 +931,8 @@
       ],
       "surface": "section:gift-finder",
       "control": "buttonText",
-      "status": "no-op",
-      "evidence": "static+probe"
+      "status": "wired",
+      "evidence": "static (GiftFinderSection.tsx)"
     },
     {
       "id": "dahab|section:gift-finder|heading",
@@ -1321,7 +970,7 @@
       ],
       "surface": "section:gift-finder",
       "control": "occasionsLabel",
-      "status": "no-op",
+      "status": "wired",
       "evidence": "static+probe"
     },
     {
@@ -1520,19 +1169,6 @@
       "evidence": "static"
     },
     {
-      "id": "dahab|section:hero|frame",
-      "skin": "dahab",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:hero",
-      "control": "frame",
-      "status": "no-op",
-      "evidence": "static+probe"
-    },
-    {
       "id": "dahab|section:hero|mode",
       "skin": "dahab",
       "looks": [
@@ -1556,19 +1192,6 @@
       "surface": "section:hero",
       "control": "presentation",
       "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "dahab|section:hero|textAnchor",
-      "skin": "dahab",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:hero",
-      "control": "textAnchor",
-      "status": "no-op",
       "evidence": "static+probe"
     },
     {
@@ -1936,110 +1559,6 @@
       "evidence": "static+probe"
     },
     {
-      "id": "dahab|section:new-arrivals|cardAspect",
-      "skin": "dahab",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:new-arrivals",
-      "control": "cardAspect",
-      "status": "no-op",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "dahab|section:new-arrivals|cardFrameColor",
-      "skin": "dahab",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:new-arrivals",
-      "control": "cardFrameColor",
-      "status": "no-op",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "dahab|section:new-arrivals|cardFrameSize",
-      "skin": "dahab",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:new-arrivals",
-      "control": "cardFrameSize",
-      "status": "no-op",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "dahab|section:new-arrivals|cardFrameStyle",
-      "skin": "dahab",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:new-arrivals",
-      "control": "cardFrameStyle",
-      "status": "no-op",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "dahab|section:new-arrivals|cardFrameWidth",
-      "skin": "dahab",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:new-arrivals",
-      "control": "cardFrameWidth",
-      "status": "no-op",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "dahab|section:new-arrivals|cardGap",
-      "skin": "dahab",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:new-arrivals",
-      "control": "cardGap",
-      "status": "no-op",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "dahab|section:new-arrivals|cardShape",
-      "skin": "dahab",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:new-arrivals",
-      "control": "cardShape",
-      "status": "no-op",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "dahab|section:new-arrivals|cardSize",
-      "skin": "dahab",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:new-arrivals",
-      "control": "cardSize",
-      "status": "no-op",
-      "evidence": "static+probe"
-    },
-    {
       "id": "dahab|section:new-arrivals|dividers",
       "skin": "dahab",
       "looks": [
@@ -2051,19 +1570,6 @@
       "control": "dividers",
       "status": "wired",
       "evidence": "static"
-    },
-    {
-      "id": "dahab|section:new-arrivals|kicker",
-      "skin": "dahab",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:new-arrivals",
-      "control": "kicker",
-      "status": "no-op",
-      "evidence": "static+probe"
     },
     {
       "id": "dahab|section:new-arrivals|limit",
@@ -2105,19 +1611,6 @@
       "evidence": "static+probe"
     },
     {
-      "id": "dahab|section:new-arrivals|showCardFrame",
-      "skin": "dahab",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:new-arrivals",
-      "control": "showCardFrame",
-      "status": "no-op",
-      "evidence": "static+probe"
-    },
-    {
       "id": "dahab|section:new-arrivals|showHover",
       "skin": "dahab",
       "looks": [
@@ -2127,21 +1620,8 @@
       ],
       "surface": "section:new-arrivals",
       "control": "showHover",
-      "status": "no-op",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "dahab|section:new-arrivals|showKickerLines",
-      "skin": "dahab",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:new-arrivals",
-      "control": "showKickerLines",
-      "status": "no-op",
-      "evidence": "static+probe"
+      "status": "wired",
+      "evidence": "static (ProductCard.tsx)"
     },
     {
       "id": "dahab|section:new-arrivals|showLabel",
@@ -2153,20 +1633,7 @@
       ],
       "surface": "section:new-arrivals",
       "control": "showLabel",
-      "status": "no-op",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "dahab|section:new-arrivals|showSubtitleLines",
-      "skin": "dahab",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:new-arrivals",
-      "control": "showSubtitleLines",
-      "status": "no-op",
+      "status": "wired",
       "evidence": "static+probe"
     },
     {
@@ -2179,7 +1646,7 @@
       ],
       "surface": "section:new-arrivals",
       "control": "subtitle",
-      "status": "marker-pending",
+      "status": "wired",
       "evidence": "static+probe"
     },
     {
@@ -2313,110 +1780,6 @@
       "evidence": "static+probe"
     },
     {
-      "id": "dahab|section:product-carousel|cardAspect",
-      "skin": "dahab",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:product-carousel",
-      "control": "cardAspect",
-      "status": "no-op",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "dahab|section:product-carousel|cardFrameColor",
-      "skin": "dahab",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:product-carousel",
-      "control": "cardFrameColor",
-      "status": "no-op",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "dahab|section:product-carousel|cardFrameSize",
-      "skin": "dahab",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:product-carousel",
-      "control": "cardFrameSize",
-      "status": "no-op",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "dahab|section:product-carousel|cardFrameStyle",
-      "skin": "dahab",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:product-carousel",
-      "control": "cardFrameStyle",
-      "status": "no-op",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "dahab|section:product-carousel|cardFrameWidth",
-      "skin": "dahab",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:product-carousel",
-      "control": "cardFrameWidth",
-      "status": "no-op",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "dahab|section:product-carousel|cardGap",
-      "skin": "dahab",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:product-carousel",
-      "control": "cardGap",
-      "status": "no-op",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "dahab|section:product-carousel|cardShape",
-      "skin": "dahab",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:product-carousel",
-      "control": "cardShape",
-      "status": "no-op",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "dahab|section:product-carousel|cardSize",
-      "skin": "dahab",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:product-carousel",
-      "control": "cardSize",
-      "status": "no-op",
-      "evidence": "static+probe"
-    },
-    {
       "id": "dahab|section:product-carousel|categoryFetchLimit",
       "skin": "dahab",
       "looks": [
@@ -2454,19 +1817,6 @@
       "control": "dividers",
       "status": "wired",
       "evidence": "static"
-    },
-    {
-      "id": "dahab|section:product-carousel|kicker",
-      "skin": "dahab",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:product-carousel",
-      "control": "kicker",
-      "status": "no-op",
-      "evidence": "static+probe"
     },
     {
       "id": "dahab|section:product-carousel|limit",
@@ -2534,19 +1884,6 @@
       "evidence": "static+probe"
     },
     {
-      "id": "dahab|section:product-carousel|showCardFrame",
-      "skin": "dahab",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:product-carousel",
-      "control": "showCardFrame",
-      "status": "no-op",
-      "evidence": "static+probe"
-    },
-    {
       "id": "dahab|section:product-carousel|showHover",
       "skin": "dahab",
       "looks": [
@@ -2556,21 +1893,8 @@
       ],
       "surface": "section:product-carousel",
       "control": "showHover",
-      "status": "no-op",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "dahab|section:product-carousel|showKickerLines",
-      "skin": "dahab",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:product-carousel",
-      "control": "showKickerLines",
-      "status": "no-op",
-      "evidence": "static+probe"
+      "status": "wired",
+      "evidence": "static (ProductCard.tsx)"
     },
     {
       "id": "dahab|section:product-carousel|showLabel",
@@ -2582,20 +1906,7 @@
       ],
       "surface": "section:product-carousel",
       "control": "showLabel",
-      "status": "no-op",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "dahab|section:product-carousel|showSubtitleLines",
-      "skin": "dahab",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:product-carousel",
-      "control": "showSubtitleLines",
-      "status": "no-op",
+      "status": "wired",
       "evidence": "static+probe"
     },
     {
@@ -2608,7 +1919,7 @@
       ],
       "surface": "section:product-carousel",
       "control": "subtitle",
-      "status": "marker-pending",
+      "status": "wired",
       "evidence": "static+probe"
     },
     {
@@ -4987,8 +4298,8 @@
       ],
       "surface": "section:gift-finder",
       "control": "buttonText",
-      "status": "no-op",
-      "evidence": "static+probe"
+      "status": "wired",
+      "evidence": "static (GiftFinderSection.tsx)"
     },
     {
       "id": "jasmine|section:gift-finder|heading",
@@ -5026,7 +4337,7 @@
       ],
       "surface": "section:gift-finder",
       "control": "occasionsLabel",
-      "status": "no-op",
+      "status": "wired",
       "evidence": "static+probe"
     },
     {
@@ -8718,8 +8029,8 @@
       ],
       "surface": "section:gift-finder",
       "control": "buttonText",
-      "status": "no-op",
-      "evidence": "static+probe"
+      "status": "wired",
+      "evidence": "static (GiftFinderSection.tsx)"
     },
     {
       "id": "lamma|section:gift-finder|heading",
@@ -8757,7 +8068,7 @@
       ],
       "surface": "section:gift-finder",
       "control": "occasionsLabel",
-      "status": "no-op",
+      "status": "wired",
       "evidence": "static+probe"
     },
     {
@@ -12436,8 +11747,8 @@
       ],
       "surface": "section:gift-finder",
       "control": "buttonText",
-      "status": "no-op",
-      "evidence": "static+probe"
+      "status": "wired",
+      "evidence": "static (GiftFinderSection.tsx)"
     },
     {
       "id": "qamar|section:gift-finder|heading",
@@ -12475,7 +11786,7 @@
       ],
       "surface": "section:gift-finder",
       "control": "occasionsLabel",
-      "status": "no-op",
+      "status": "wired",
       "evidence": "static+probe"
     },
     {
@@ -16154,8 +15465,8 @@
       ],
       "surface": "section:gift-finder",
       "control": "buttonText",
-      "status": "no-op",
-      "evidence": "static+probe"
+      "status": "wired",
+      "evidence": "static (GiftFinderSection.tsx)"
     },
     {
       "id": "souq|section:gift-finder|heading",
@@ -16193,7 +15504,7 @@
       ],
       "surface": "section:gift-finder",
       "control": "occasionsLabel",
-      "status": "no-op",
+      "status": "wired",
       "evidence": "static+probe"
     },
     {

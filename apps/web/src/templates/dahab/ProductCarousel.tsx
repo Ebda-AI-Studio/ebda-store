@@ -5,7 +5,8 @@
  * pointer devices). Same props as the shared carousel so the page renderer
  * and the product page call it unchanged; the per-card size/frame knobs of
  * the other packs do not apply to this skin — Dahab cards are one size, and
- * the row sets the density (cards per view).
+ * the row sets the density (cards per view). It reads Show name and Hover
+ * effect (Ruling B5-35).
  */
 import { useRef } from 'react';
 import type { ProductCarouselProps } from '../types';
@@ -25,6 +26,8 @@ export function DahabProductCarousel({
   urlPrefix = '',
   showCardName,
   showCardPrice,
+  showLabel,
+  showHover,
 }: ProductCarouselProps) {
   const { isRtl: ctxIsRtl, t } = useLanguage();
   const isRtl = isRtlProp ?? ctxIsRtl;
@@ -68,6 +71,8 @@ export function DahabProductCarousel({
                 urlPrefix={urlPrefix}
                 showCardName={showCardName}
                 showCardPrice={showCardPrice}
+                showLabel={showLabel}
+                showHover={showHover}
                 imageSizes="(min-width: 1024px) 25vw, (min-width: 640px) 31vw, 46vw"
               />
             </div>

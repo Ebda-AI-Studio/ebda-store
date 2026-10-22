@@ -921,7 +921,7 @@ export const LOOKS: readonly LookDefinition[] = [
     // are the two fact chips, Ruling B5-5), engraving as one band that links to the personalised
     // piece. The chip row is navigation, so it sits right under the hero.
     sections: [
-      { type: 'hero', design: { presentation: 'full-bleed', textAnchor: 'bottom-start' } },
+      { type: 'hero', design: { presentation: 'full-bleed' } },
       {
         type: 'category-grid',
         design: {
@@ -996,7 +996,7 @@ export const LOOKS: readonly LookDefinition[] = [
     // mix's own three blocks. The page is committed teal, so the merchant-photo sections sit on a
     // light band (quality bar section 9 rule 1) and the CTA is silver.
     sections: [
-      { type: 'hero', design: { presentation: 'full-bleed', textAnchor: 'bottom-start' } },
+      { type: 'hero', design: { presentation: 'full-bleed' } },
       {
         type: 'steps',
         preset: { heading: 'How a piece is made', headingAr: 'القطعة بتتعمل إزاي' },
@@ -1090,7 +1090,7 @@ export const LOOKS: readonly LookDefinition[] = [
     // Ruling B5-4 / B5-7: start from who and how much. The gift finder sits right under the hero,
     // wrap and the card message are product options, the delivery promise is the computed chip.
     sections: [
-      { type: 'hero', design: { presentation: 'full-bleed', textAnchor: 'bottom-start' } },
+      { type: 'hero', design: { presentation: 'full-bleed' } },
       { type: 'gift-finder', design: { bgColor: 'token:card' } },
       {
         type: 'featured-collection',

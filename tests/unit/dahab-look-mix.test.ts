@@ -71,7 +71,7 @@ function merchantBase(): PageDefinition {
 }
 
 describe('the mixes, exactly as designed', () => {
-  it('Worn: full-bleed hero at the bottom-start, chips under it, the pieces, the engraving band, new in, reviews, story', () => {
+  it('Worn: full-bleed hero, chips under it, the pieces, the engraving band, new in, reviews, story', () => {
     expect(worn.sections!.map(s => s.type)).toEqual([
       'hero',
       'category-grid',
@@ -82,7 +82,8 @@ describe('the mixes, exactly as designed', () => {
       'brand-story',
     ]);
     const [h, chips, pieces, engraving] = worn.sections!;
-    expect(h.design).toMatchObject({ presentation: 'full-bleed', textAnchor: 'bottom-start' });
+    // no textAnchor: Dahab's hero always sets its copy at the inline start (Ruling B5-35)
+    expect(h.design).toEqual({ presentation: 'full-bleed' });
     expect(chips.design).toMatchObject({ layout: 'chips', layoutMobile: 'chips' });
     expect(pieces.design).toMatchObject({ columns: 4, mobileColumns: 2 });
     expect(engraving.preset).toMatchObject({ headingAr: 'اسمك محفور عليها', buttonTextAr: 'خصّص' });
