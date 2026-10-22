@@ -118,6 +118,7 @@ export function DahabCartDrawer({
                 <Link
                   href={`${urlPrefix}/products/${item.slug}`}
                   onClick={onClose}
+                  aria-label={name}
                   className="relative aspect-[4/5] w-20 shrink-0 overflow-hidden rounded-[var(--radius)] bg-card"
                 >
                   {item.image && (
