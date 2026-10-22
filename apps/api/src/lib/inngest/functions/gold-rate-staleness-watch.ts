@@ -103,7 +103,10 @@ export async function handleGoldRateStalenessWatch(
         }
         return { sent: true, kind };
       });
-      if (out.sent) out.kind === 'blocked' ? blocked++ : warned++;
+      if (out.sent) {
+        if (out.kind === 'blocked') blocked++;
+        else warned++;
+      }
     }
     return { stores: byStore.size, warned, blocked };
   }
