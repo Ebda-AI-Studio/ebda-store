@@ -102,21 +102,36 @@ const reads = (source: string, key: string) => new RegExp(`\\b${key}\\b`).test(s
  */
 export const BEHAVIOUR_READERS: Readonly<Record<string, { file: string; pattern: RegExp }>> = {
   'hero/autoplayMs': {
-    file: 'templates/shared/HeroSlider.tsx',
+    file: 'apps/web/src/templates/shared/HeroSlider.tsx',
     pattern: /setInterval\(tick, autoplayMs\)/,
   },
-  'new-arrivals/limit': { file: 'app/HomePageBody.tsx', pattern: /layout\.newArrivals\.limit/ },
-  'best-sellers/limit': { file: 'app/HomePageBody.tsx', pattern: /layout\.bestSellers\.limit/ },
+  'new-arrivals/limit': {
+    file: 'apps/web/src/app/HomePageBody.tsx',
+    pattern: /layout\.newArrivals\.limit/,
+  },
+  'best-sellers/limit': {
+    file: 'apps/web/src/app/HomePageBody.tsx',
+    pattern: /layout\.bestSellers\.limit/,
+  },
   'product-carousel/categoryFetchLimit': {
-    file: 'app/HomePageBody.tsx',
+    file: 'apps/web/src/app/HomePageBody.tsx',
     pattern: /e\.categoryFetchLimit/,
   },
   'testimonials/minRating': {
-    file: 'app/HomePageBody.tsx',
+    file: 'apps/web/src/app/HomePageBody.tsx',
     pattern: /layout\.testimonials\.minRating/,
   },
+  // theme controls the header skins reach through the shared resolver
+  'theme/headerLogoPlacement': {
+    file: 'packages/shared/src/looks/compose.ts',
+    pattern: /theme\?\.headerLogoPlacement/,
+  },
+  'theme/headerSearch': {
+    file: 'packages/shared/src/looks/compose.ts',
+    pattern: /theme\?\.headerSearch/,
+  },
   'testimonials/verifiedOnly': {
-    file: 'app/HomePageBody.tsx',
+    file: 'apps/web/src/app/HomePageBody.tsx',
     pattern: /layout\.testimonials\.verifiedOnly/,
   },
 };
@@ -211,7 +226,7 @@ export function buildMatrix(): Matrix {
         const keys = settingKeys(s);
         const reader = BEHAVIOUR_READERS[`${def.type}/${s.id}`];
         const staticHit = reader
-          ? reader.pattern.test(readFileSync(path.join(WEB, reader.file), 'utf8'))
+          ? reader.pattern.test(readFileSync(path.join(ROOT, reader.file), 'utf8'))
           : keys.some(k => reads(src, k));
         const probeable = !!values && !compound && !reader;
         let differs = false;
@@ -271,19 +286,27 @@ export function buildMatrix(): Matrix {
           });
         }
     }
-    // Theme controls: static evidence (the storefront theme emitter reads them).
+    // Theme controls: static evidence (the storefront theme emitter reads them). A control the registry
+    // narrows is judged only on the skins it is offered to.
     const themeSrc = textOf(WEB);
     for (const g of THEME_SETTINGS_SCHEMA)
-      for (const s of g.settings)
+      for (const s of g.settings) {
+        if (s.shownFor !== undefined && rulesForSkin(s.shownFor, skin, looks).length === 0)
+          continue;
+        const reader = BEHAVIOUR_READERS[`theme/${s.id}`];
+        const staticHit = reader
+          ? reader.pattern.test(readFileSync(path.join(ROOT, reader.file), 'utf8'))
+          : reads(themeSrc, s.id);
         rows.push({
           id: `${skin}|theme|${s.id}`,
           skin,
           looks,
           surface: 'theme',
           control: s.id,
-          status: classify({ shown: true, staticHit: reads(themeSrc, s.id), probeable: false }),
-          evidence: 'static',
+          status: classify({ shown: true, staticHit, probeable: false }),
+          evidence: reader ? `static (${path.basename(reader.file)})` : 'static',
         });
+      }
   }
 
   // 2. Each look's mix: every design / preset key it uses must have an editor control.

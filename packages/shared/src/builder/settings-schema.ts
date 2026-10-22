@@ -307,7 +307,7 @@ export interface ThemeSettingDefinition extends Omit<SettingDefinition, 'id' | '
   id: keyof StoreTheme;
 }
 export interface ThemeSettingsGroup {
-  id: 'colors' | 'typography' | 'buttons' | 'spacing';
+  id: 'header' | 'colors' | 'typography' | 'buttons' | 'spacing';
   labelEn: string;
   labelAr: string;
   settings: ThemeSettingDefinition[];
@@ -325,6 +325,35 @@ const themeColor = (
 });
 
 export const THEME_SETTINGS_SCHEMA: readonly ThemeSettingsGroup[] = [
+  // First, like the header is on the storefront (the admin mirrors the storefront top to bottom).
+  {
+    id: 'header',
+    labelEn: 'Header',
+    labelAr: 'الهيدر',
+    settings: [
+      {
+        id: 'headerLogoPlacement',
+        type: 'select',
+        labelEn: 'Logo position',
+        labelAr: 'مكان الشعار',
+        options: [opt('start', 'Start', 'في البداية'), opt('centre', 'Centre', 'في المنتصف')],
+        // the headers built on the shared minimal header read it
+        shownFor: { templates: ['qamar', 'souq', 'jasmine', 'lamma'] },
+      },
+      {
+        id: 'headerSearch',
+        type: 'select',
+        labelEn: 'Search',
+        labelAr: 'البحث',
+        options: [
+          opt('prominent', 'Search field', 'خانة بحث ظاهرة'),
+          opt('icon', 'Icon', 'أيقونة'),
+        ],
+        // only the Souq header turns the search into a field
+        shownFor: { templates: ['souq'] },
+      },
+    ],
+  },
   {
     id: 'colors',
     labelEn: 'Colours',

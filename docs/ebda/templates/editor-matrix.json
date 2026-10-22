@@ -1,7 +1,7 @@
 {
   "version": 1,
   "summary": {
-    "wired": 1366,
+    "wired": 1371,
     "no-op": 0,
     "missing": 0,
     "pending-template": 0,
@@ -3520,6 +3520,19 @@
       "control": "foregroundColor",
       "status": "wired",
       "evidence": "static"
+    },
+    {
+      "id": "jasmine|theme|headerLogoPlacement",
+      "skin": "jasmine",
+      "looks": [
+        "jasmine.apothecary",
+        "jasmine.bloom",
+        "jasmine.clinic"
+      ],
+      "surface": "theme",
+      "control": "headerLogoPlacement",
+      "status": "wired",
+      "evidence": "static (compose.ts)"
     },
     {
       "id": "jasmine|theme|headingFont",
@@ -7082,6 +7095,19 @@
       "control": "foregroundColor",
       "status": "wired",
       "evidence": "static"
+    },
+    {
+      "id": "lamma|theme|headerLogoPlacement",
+      "skin": "lamma",
+      "looks": [
+        "lamma.table",
+        "lamma.notebook",
+        "lamma.market"
+      ],
+      "surface": "theme",
+      "control": "headerLogoPlacement",
+      "status": "wired",
+      "evidence": "static (compose.ts)"
     },
     {
       "id": "lamma|theme|headingFont",
@@ -14182,6 +14208,19 @@
       "evidence": "static"
     },
     {
+      "id": "qamar|theme|headerLogoPlacement",
+      "skin": "qamar",
+      "looks": [
+        "qamar.atelier",
+        "qamar.lookbook",
+        "qamar.vitrine"
+      ],
+      "surface": "theme",
+      "control": "headerLogoPlacement",
+      "status": "wired",
+      "evidence": "static (compose.ts)"
+    },
+    {
       "id": "qamar|theme|headingFont",
       "skin": "qamar",
       "looks": [
@@ -17729,6 +17768,32 @@
       "control": "foregroundColor",
       "status": "wired",
       "evidence": "static"
+    },
+    {
+      "id": "souq|theme|headerLogoPlacement",
+      "skin": "souq",
+      "looks": [
+        "souq.catalogue",
+        "souq.night",
+        "souq.showroom"
+      ],
+      "surface": "theme",
+      "control": "headerLogoPlacement",
+      "status": "wired",
+      "evidence": "static (compose.ts)"
+    },
+    {
+      "id": "souq|theme|headerSearch",
+      "skin": "souq",
+      "looks": [
+        "souq.catalogue",
+        "souq.night",
+        "souq.showroom"
+      ],
+      "surface": "theme",
+      "control": "headerSearch",
+      "status": "wired",
+      "evidence": "static (compose.ts)"
     },
     {
       "id": "souq|theme|headingFont",

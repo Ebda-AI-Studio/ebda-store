@@ -14,6 +14,8 @@ import {
   LOOK_CARD_CTAS,
   LOOK_CARD_HOVERS,
   LOOK_CARD_BADGES,
+  HEADER_LOGO_PLACEMENTS,
+  HEADER_SEARCH_PLACEMENTS,
 } from '@ebda/shared';
 
 /**
@@ -65,6 +67,8 @@ export const themeSchema = z
       cardCta: LOOK_CARD_CTAS,
       cardHover: LOOK_CARD_HOVERS,
       cardBadge: LOOK_CARD_BADGES,
+      headerLogoPlacement: HEADER_LOGO_PLACEMENTS,
+      headerSearch: HEADER_SEARCH_PLACEMENTS,
     };
     for (const [key, values] of Object.entries(allowed)) {
       if (!(key in data) || data[key] === null) continue;

@@ -13,6 +13,8 @@ import type {
   OverPhotoChrome,
   ReceiptStyle,
   WordmarkSize,
+  HeaderLogoPlacement,
+  HeaderSearchPlacement,
   CardCta,
   CardHover,
   CardBadge,
@@ -169,6 +171,10 @@ export interface StoreTheme {
   cardCta?: CardCta;
   cardHover?: CardHover;
   cardBadge?: CardBadge;
+  // Merchant header chrome overrides (Ruling EP-4), edited in the visual editor's theme pane.
+  // Never set by a look: merchant > look chrome > skin default. Absent = the look's own value.
+  headerLogoPlacement?: HeaderLogoPlacement;
+  headerSearch?: HeaderSearchPlacement;
 
   // Per-store homepage section background preset — see BackgroundPreset
   // for behavior. Optional; missing or 'none' means flat-surface (no

@@ -10228,7 +10228,9 @@
       "edited": "Edited",
       "reset": "Reset",
       "resetOne": "Reset {field} to the look",
-      "resetError": "Could not reset. Try again."
+      "resetError": "Could not reset. Try again.",
+      "headerLogo": "Logo position",
+      "headerSearch": "Header search"
     },
     "revisions": {
       "error": "History could not be loaded.",

@@ -1,5 +1,5 @@
 'use client';
-import { getLook } from '@ebda/shared';
+import { getLook, resolveHeaderChrome } from '@ebda/shared';
 import MinimalHeader from '../minimal/Header';
 import type { HeaderProps } from '../types';
 import { useStore } from '../../contexts/StoreContext';
@@ -11,13 +11,13 @@ import { useStore } from '../../contexts/StoreContext';
  */
 export default function JasmineHeader(props: HeaderProps) {
   const { store } = useStore();
-  const chrome = getLook(store?.look)?.chrome?.header;
+  const chrome = resolveHeaderChrome(store?.theme, getLook(store?.look)?.chrome?.header);
   return (
     <MinimalHeader
       {...props}
-      logoPlacement={chrome?.logoPlacement ?? 'start'}
+      logoPlacement={chrome.logoPlacement}
       wordmarkSize={store?.theme?.wordmarkSize ?? 'lg'}
-      searchPlacement={chrome?.search ?? 'icon'}
+      searchPlacement={chrome.search}
     />
   );
 }

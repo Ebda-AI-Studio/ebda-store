@@ -355,7 +355,9 @@ describe('settings schemas (drive the Phase 2 auto-generated panel)', () => {
   it('global theme settings are typed against StoreTheme and bilingual', () => {
     const ids = THEME_SETTINGS_SCHEMA.flatMap(g => g.settings.map(st => st.id));
     expect(new Set(ids).size).toBe(ids.length);
+    // the header first, like the header on the storefront (Ruling EP-4)
     expect(THEME_SETTINGS_SCHEMA.map(g => g.id)).toEqual([
+      'header',
       'colors',
       'typography',
       'buttons',

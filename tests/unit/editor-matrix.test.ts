@@ -111,6 +111,15 @@ describe('editor matrix', () => {
     expect(readBaseline()).toEqual([]);
   });
 
+  it('the header chrome controls are judged on the skins they are offered to, and are wired there', () => {
+    const row = (id: string) => live.rows.find(r => r.id === id);
+    for (const skin of ['qamar', 'souq', 'jasmine', 'lamma'])
+      expect(row(`${skin}|theme|headerLogoPlacement`)?.status, skin).toBe('wired');
+    expect(row('souq|theme|headerSearch')?.status).toBe('wired');
+    expect(row('qamar|theme|headerSearch')).toBeUndefined();
+    expect(row('minimal|theme|headerLogoPlacement')).toBeUndefined();
+  });
+
   it('shownFor never hides a control that works on the skin it hides it from', () => {
     expect(hiddenButWired()).toEqual([]);
   });
