@@ -5,6 +5,8 @@
  *   parent -> child  `render`     { definition }          draw this document (unsaved edits)
  *   parent -> child  `select`     { sectionId, blockId? } outline a section
  *   parent -> child  `locale`     { locale }              (reload-free locale is not supported; informational)
+ *   parent -> child  `focus`      { sectionId, blockId? } move keyboard focus onto that section's first target
+ *   child  -> parent `focus-tree` {}                      Esc: give focus back to the tree
  *   child  -> parent `ready`      {}                      overlay mounted, send `render`
  *   child  -> parent `select`     { sectionId, blockId? } a section was clicked
  *   child  -> parent `hover`      { sectionId | null, blockId? }
@@ -45,10 +47,14 @@ export const parentToChildSchema = z.discriminatedUnion('type', [
       blockId: id.optional(),
     })
     .strict(),
+  // Keyboard path: move focus to the first target of this section on the canvas (Enter on a tree row).
+  z.object({ ...base, type: z.literal('focus'), sectionId: id, blockId: id.optional() }).strict(),
 ]);
 
 export const childToParentSchema = z.discriminatedUnion('type', [
   z.object({ ...base, type: z.literal('ready') }).strict(),
+  // Keyboard path: Esc inside the canvas hands focus back to the tree.
+  z.object({ ...base, type: z.literal('focus-tree') }).strict(),
   z.object({ ...base, type: z.literal('select'), sectionId: id, blockId: id.optional() }).strict(),
   z
     .object({ ...base, type: z.literal('hover'), sectionId: id.nullable(), blockId: id.optional() })

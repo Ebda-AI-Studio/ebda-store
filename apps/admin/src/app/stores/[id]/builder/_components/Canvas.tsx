@@ -8,6 +8,7 @@
  * when it parses; we post only to that origin.
  */
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { createFrameCoalescer, type FrameCoalescer } from '../_lib/frame-coalescer';
 import {
   BUILDER_PROTOCOL,
   VIEWPORT_RANGES,
@@ -32,6 +33,8 @@ interface Props {
   selectedBlockId?: string | null;
   /** Bumps when saved data changed (new carousel, product source): reload the canvas. */
   reloadKey: number;
+  /** Move keyboard focus onto this target on the canvas; a new `n` is a new request. */
+  focusRequest?: { sectionId: string; blockId?: string; n: number } | null;
   onMessage: (msg: ChildToParent) => void;
 }
 
@@ -44,6 +47,7 @@ export function Canvas({
   selectedId,
   selectedBlockId,
   reloadKey,
+  focusRequest,
   onMessage,
 }: Props) {
   const t = useT('builder.canvas');
@@ -79,10 +83,35 @@ export function Canvas({
     return () => window.removeEventListener('message', handler);
   }, [origin, onMessage]);
 
-  // Every document change re-renders the canvas without a reload.
+  // Every document change re-renders the canvas without a reload. The post is a structured clone of
+  // the whole document, so a burst of edits inside one frame is ONE post of the latest document.
+  const renderPost = useRef<FrameCoalescer<PageDefinition> | null>(null);
   useEffect(() => {
-    if (ready) post({ type: 'render', definition: doc } as Omit<ParentToChild, 'protocol'>);
-  }, [ready, doc, post]);
+    const c = createFrameCoalescer<PageDefinition>(definition =>
+      post({ type: 'render', definition } as Omit<ParentToChild, 'protocol'>)
+    );
+    renderPost.current = c;
+    return () => {
+      c.cancel();
+      renderPost.current = null;
+    };
+  }, [post]);
+  useEffect(() => {
+    if (ready) renderPost.current?.schedule(doc);
+  }, [ready, doc]);
+
+  // Keyboard path: Enter on a tree row hands focus to the section's first target on the canvas.
+  const focusN = focusRequest?.n;
+  useEffect(() => {
+    if (!ready || !focusRequest) return;
+    frame.current?.focus();
+    post({
+      type: 'focus',
+      sectionId: focusRequest.sectionId,
+      ...(focusRequest.blockId ? { blockId: focusRequest.blockId } : {}),
+    } as Omit<ParentToChild, 'protocol'>);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- a new request number is the trigger
+  }, [ready, focusN, post]);
 
   useEffect(() => {
     if (ready)

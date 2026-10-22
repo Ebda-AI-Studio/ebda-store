@@ -7,9 +7,14 @@
  * when the request carries `?_preview` AND a valid builder preview token, so
  * the overlay chunk is never part of a public page.
  */
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import dynamic from 'next/dynamic';
-import { applyTypographyPatch, hasTypographyPatch, type PageDefinition } from '@ebda/shared';
+import {
+  applyTypographyPatch,
+  hasTypographyPatch,
+  shareStructure,
+  type PageDefinition,
+} from '@ebda/shared';
 import { emitZoneCss } from '../../lib/emit-zone-css';
 import { HomePageContent } from '../../app/HomePageContent';
 import { useLanguage } from '../../contexts/LanguageContext';
@@ -31,6 +36,12 @@ export function BuilderPreviewShell({
   liveTypography?: unknown;
 }) {
   const [definition, setDefinition] = useState(initialDefinition);
+  // A parsed `render` message has no object identity; keep every unchanged section's old object so
+  // the memoized section bodies skip (Task 13).
+  const onRender = useCallback(
+    (next: PageDefinition) => setDefinition(prev => shareStructure(prev, next)),
+    []
+  );
   const { language } = useLanguage();
   const { store } = useStore();
   // The draft's fonts + typography zones, repainted on every `render` message. The CSS is built by
@@ -58,7 +69,7 @@ export function BuilderPreviewShell({
         allowedOrigins={allowedOrigins}
         locale={language === 'ar' ? 'ar' : 'en'}
         definition={definition}
-        onRender={setDefinition}
+        onRender={onRender}
       />
     </PreviewThemeOverride>
   );

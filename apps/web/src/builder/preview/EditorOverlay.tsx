@@ -26,6 +26,7 @@ import {
 } from '@ebda/shared';
 import { BRAND } from '@ebda/shared';
 import { startInlineEdit } from './inline-edit';
+import { cycleIndex, cycleTargets, focusTarget } from './keyboard-logic';
 import { CanvasToolbar } from './CanvasToolbar';
 import { InsertLine, InsertLineStyles } from './InsertLine';
 import {
@@ -170,6 +171,8 @@ export default function EditorOverlay({ allowedOrigins, locale, definition, onRe
   const [nearGap, setNearGap] = useState<number | null>(null);
   const [hovered, setHovered] = useState<CanvasTarget | null>(null);
   const [, setTick] = useState(0);
+  // A parent `focus` request: land focus on the first target once the selection has painted.
+  const focusAfter = useRef(false);
   // Boxes are read from the DOM: measure again once the new document has painted.
   useLayoutEffect(() => setTick(t => t + 1), [definition]);
 
@@ -193,6 +196,13 @@ export default function EditorOverlay({ allowedOrigins, locale, definition, onRe
       if (!msg) return;
       parentOrigin.current = event.origin;
       if (msg.type === 'render') onRender(msg.definition);
+      if (msg.type === 'focus') {
+        const next = { sectionId: msg.sectionId, ...(msg.blockId ? { blockId: msg.blockId } : {}) };
+        setSelected(prev => (same(prev, next) ? prev : next));
+        selectedRef.current = next;
+        focusAfter.current = true;
+        setTick(t => t + 1);
+      }
       if (msg.type === 'select') {
         const next = msg.sectionId
           ? { sectionId: msg.sectionId, ...(msg.blockId ? { blockId: msg.blockId } : {}) }
@@ -211,6 +221,14 @@ export default function EditorOverlay({ allowedOrigins, locale, definition, onRe
     post({ type: 'ready' } as Omit<ChildToParent, 'protocol'>);
     return () => window.removeEventListener('message', onMessage);
   }, [allowedOrigins, onRender, post]);
+
+  useEffect(() => {
+    if (!focusAfter.current || !selected) return;
+    const first = cycleTargets(selected)[0];
+    if (!first) return;
+    focusAfter.current = false;
+    focusTarget(first);
+  });
 
   useEffect(() => {
     /** Start editing `el` as the text field `field` of `hit`. */
@@ -322,6 +340,52 @@ export default function EditorOverlay({ allowedOrigins, locale, definition, onRe
       if (hit && field) edit(el, hit, field, { x: e.clientX, y: e.clientY });
     };
     const onSubmit = (e: Event) => e.preventDefault();
+    // Keyboard path: Tab cycles the selected target, Enter edits the focused text, Esc goes back to
+    // the tree, Alt+Arrow moves the selection. Typing in a text being edited is left alone.
+    const onKeyDown = (e: KeyboardEvent) => {
+      const sel = selectedRef.current;
+      if (!sel || editingRef.current || dragRef.current) return;
+      const active = document.activeElement as HTMLElement | null;
+      if (e.key === 'Tab' && !e.altKey && !e.ctrlKey && !e.metaKey) {
+        const list = cycleTargets(sel);
+        if (list.length === 0) return;
+        e.preventDefault();
+        const at = active ? list.indexOf(active) : -1;
+        const to = list[cycleIndex(list.length, at, e.shiftKey)];
+        if (to) focusTarget(to);
+        return;
+      }
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        post({ type: 'focus-tree' } as Omit<ChildToParent, 'protocol'>);
+        return;
+      }
+      if (e.altKey && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) {
+        const op = e.key === 'ArrowUp' ? 'moveUp' : 'moveDown';
+        const state = toolbarStateFor(docRef.current, sel);
+        if (!state) return;
+        e.preventDefault();
+        if (state.disabled[op]) return;
+        post({
+          type: 'section-op',
+          sectionId: sel.sectionId,
+          ...(sel.blockId ? { blockId: sel.blockId } : {}),
+          op,
+        } as Omit<ChildToParent, 'protocol'>);
+        return;
+      }
+      if (e.key === 'Enter' && !e.altKey && active?.hasAttribute('data-builder-setting')) {
+        const hit = targetOf(active, docRef.current);
+        const field = hit && inlineTargetFor(active, docRef.current, hit, localeRef.current);
+        if (hit && field) {
+          e.preventDefault();
+          e.stopPropagation(); // the editor that just opened must not see this Enter and commit
+          edit(active, hit, field);
+        }
+      }
+    };
+    // Capture: runs before the inline editor's own handler, so Esc while editing is still "editing".
+    document.addEventListener('keydown', onKeyDown, true);
     const reflow = () => setTick(t => t + 1);
     document.addEventListener('click', onClick, true);
     document.addEventListener('mouseover', onOver);
@@ -339,6 +403,7 @@ export default function EditorOverlay({ allowedOrigins, locale, definition, onRe
       cancelAnimationFrame(nearRaf);
       document.removeEventListener('dblclick', onDblClick);
       document.removeEventListener('submit', onSubmit, true);
+      document.removeEventListener('keydown', onKeyDown, true);
       ro?.disconnect();
       window.removeEventListener('resize', reflow);
       window.removeEventListener('scroll', reflow);
@@ -517,6 +582,9 @@ export default function EditorOverlay({ allowedOrigins, locale, definition, onRe
   return (
     <>
       <InsertLineStyles />
+      <style
+        data-builder-focus-style
+      >{`[data-builder-setting]:focus-visible,[data-builder-toolbar-root] button:focus-visible,[data-builder-change-image]:focus-visible{outline:2px solid ${BRAND.colors.gold};outline-offset:2px}`}</style>
       {!drag && !same(hovered, selected) && outline(hovered, 'hover')}
       {outline(selected, 'selected')}
       {imageButtons}
@@ -528,6 +596,7 @@ export default function EditorOverlay({ allowedOrigins, locale, definition, onRe
           draggable={toolbarState.draggable}
           disabled={toolbarState.disabled}
           ai={toolbarState.ai}
+          labels={window.innerWidth >= 768}
           onDragStart={startDrag}
           onOp={(op: SectionOp) =>
             post({
