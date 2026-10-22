@@ -174,7 +174,10 @@ describe('cleanupRemovedImages — bounded fan-out (issue 2042)', () => {
       inFlight--;
       return [{ referenced: false }];
     });
-    const removed = Array.from({ length: 20 }, (_, i) => `https://cdn.example.com/stores/x/s/${i}.png`);
+    const removed = Array.from(
+      { length: 20 },
+      (_, i) => `https://cdn.example.com/stores/x/s/${i}.png`
+    );
 
     await cleanupRemovedImages(removed, []);
 
