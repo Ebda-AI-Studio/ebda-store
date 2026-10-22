@@ -1596,13 +1596,16 @@ html[lang] [data-pack='jasmine'] [data-zone='filters'] :is(h2, h3, h4, legend) {
 }
 /* Quality bar section 9 rule 1: merchant photos are shot on white. On Apothecary's olive ground a
    card photo sits on a paper matte (the page ink) and multiplies into it, so white vanishes into
-   the matte instead of reading as a white rectangle on olive. */
-[data-look='jasmine.apothecary'] [data-part='card-image'],
-[data-look='jasmine.apothecary'] [data-part='tile'] {
+   the matte instead of reading as a white rectangle on olive. INSIDE an inverse band (the listing
+   pages of a dark look and a `token:inverse` home row, `--bg-page` in the inline style) the ink
+   variables are swapped and the card is already the light paper, so the matte is left out there:
+   on the band `--foreground` is the OLIVE page colour and a matte would paint the photo dark. */
+[data-look='jasmine.apothecary'] [data-part='card-image']:not([style*='--bg-page'] *),
+[data-look='jasmine.apothecary'] [data-part='tile']:not([style*='--bg-page'] *) {
   background-color: hsl(var(--foreground));
 }
-[data-look='jasmine.apothecary'] [data-part='card-image'] img,
-[data-look='jasmine.apothecary'] [data-part='tile'] img {
+[data-look='jasmine.apothecary'] [data-part='card-image']:not([style*='--bg-page'] *) img,
+[data-look='jasmine.apothecary'] [data-part='tile']:not([style*='--bg-page'] *) img {
   mix-blend-mode: multiply;
 }
 /* Brass never dims on hover (it read as disabled next to the other CTA). */

@@ -27,6 +27,7 @@ const ctx = vi.hoisted(() => ({
   store: {} as Record<string, unknown>,
   language: 'ar' as 'en' | 'ar',
   cart: [] as Array<{ productId: string }>,
+  cartBundles: [] as Array<{ bundleId: string }>,
   addItem: vi.fn(async () => true),
   addBundle: vi.fn(async () => true),
   savings: [] as unknown[],
@@ -64,7 +65,7 @@ vi.mock('../../apps/web/src/contexts/LanguageContext', async importOriginal => {
 vi.mock('../../apps/web/src/contexts/CartContext', () => ({
   useCart: () => ({
     items: ctx.cart,
-    bundles: [],
+    bundles: ctx.cartBundles,
     addItem: ctx.addItem,
     addBundle: ctx.addBundle,
   }),
@@ -117,6 +118,7 @@ const setStore = (template: string, language: 'ar' | 'en' = 'ar', features: stri
 };
 beforeEach(() => {
   ctx.cart = [];
+  ctx.cartBundles = [];
   ctx.addItem.mockClear();
   ctx.addBundle.mockClear();
   ctx.getSavings = vi.fn(async () => ({ success: true, data: { savings: [] } }));
@@ -344,6 +346,46 @@ describe('StepsSection', () => {
       )
     ).toEqual(['false', 'true', 'false']);
     expect(container.querySelectorAll('li')[1].textContent).toContain('في سلتك');
+  });
+  it('when the routine bundle itself is in the cart every step ticks (one bundle row holds all three products)', async () => {
+    setStore('jasmine', 'ar', ['bundles']);
+    ctx.getSavings = vi.fn(async () => ({
+      success: true,
+      data: {
+        savings: [
+          {
+            bundleId: 'bun-1',
+            slug: 'r',
+            name: 'R',
+            nameAr: null,
+            price: 1,
+            componentSum: 2,
+            saving: 1,
+            percent: 15,
+            exact: true,
+          },
+        ],
+      },
+    }));
+    ctx.cartBundles = [{ bundleId: 'bun-1' }];
+    const { container } = render(S(THREE));
+    await waitFor(() =>
+      expect(
+        Array.from(container.querySelectorAll('[data-part="step"]')).map(l =>
+          l.getAttribute('data-done')
+        )
+      ).toEqual(['true', 'true', 'true'])
+    );
+    // a different bundle in the cart ticks nothing
+    cleanup();
+    ctx.cartBundles = [{ bundleId: 'other' }];
+    const other = render(S(THREE));
+    await waitFor(() => expect(ctx.getSavings).toHaveBeenCalled());
+    expect(
+      Array.from(other.container.querySelectorAll('[data-part="step"]')).map(l =>
+        l.getAttribute('data-done')
+      )
+    ).toEqual(['false', 'false', 'false']);
   });
   it('English: neutral button text and the page language headings', () => {
     setStore('jasmine', 'en');

@@ -37,7 +37,7 @@ export function RatingSummary({
       href={`#${REVIEWS_ANCHOR_ID}`}
       data-zone="ratingSummary"
       aria-label={label}
-      className="mt-2 inline-flex min-h-[44px] items-center gap-1.5 text-sm text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      className="mt-2 inline-flex min-h-[44px] items-center gap-1.5 text-sm text-foreground underline decoration-primary underline-offset-4 hover:decoration-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
     >
       <span aria-hidden="true" className="text-primary">
         ★

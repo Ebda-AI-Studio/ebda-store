@@ -110,13 +110,28 @@ describe('Jasmine CSS block: token-only, motion-safe', () => {
 });
 
 describe('Apothecary: merchant white-background photos sit on a paper matte (quality bar 9.1)', () => {
-  it('the card photo and tile get the page ink as a matte and multiply into it', () => {
-    expect(css).toMatch(
-      /\[data-look='jasmine\.apothecary'\] \[data-part='card-image'\],\s*\[data-look='jasmine\.apothecary'\] \[data-part='tile'\]\s*\{\s*background-color: hsl\(var\(--foreground\)\)/
+  it('the card photo and tile get the page ink as a matte and multiply into it, but never inside an inverse band', () => {
+    const flat = css.replace(/\s+/g, ' ');
+    const band = "\\:not\\(\\[style\\*='--bg-page'\\] \\*\\)";
+    expect(flat).toMatch(
+      new RegExp(
+        `\\[data-look='jasmine\\.apothecary'\\] \\[data-part='card-image'\\]${band}, \\[data-look='jasmine\\.apothecary'\\] \\[data-part='tile'\\]${band} \\{ background-color: hsl\\(var\\(--foreground\\)\\)`
+      )
     );
-    expect(css).toMatch(
-      /jasmine\.apothecary'\] \[data-part='card-image'\] img[^{]*\{\s*mix-blend-mode: multiply/
+    expect(flat).toMatch(
+      new RegExp(
+        `jasmine\\.apothecary'\\] \\[data-part='card-image'\\]${band} img[^{]*\\{ mix-blend-mode: multiply`
+      )
     );
+  });
+  it('the inverse band is exactly what sets --bg-page inline (so the exclusion matches the real band, not a guess)', () => {
+    const src = readFileSync(
+      path.join(root, 'apps/web/src/templates/shared/section-bg.ts'),
+      'utf8'
+    );
+    expect(src).toMatch(/'--bg-page': ink/);
+    // both band producers go through inverseBandStyle: the section band and the dark-look listing band
+    expect(src).toMatch(/return inverseBandStyle\(theme\)/g);
   });
   it('the matte is clearly separate from the page (rendered-band pair): ink vs page >= 3:1', () => {
     const t = jasmine.find(l => l.id === 'jasmine.apothecary')!.tokens;

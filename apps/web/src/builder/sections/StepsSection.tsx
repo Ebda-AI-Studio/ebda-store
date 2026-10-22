@@ -13,8 +13,8 @@
  *   options to pick (a variant product routes to its page instead, the `canBuyNow` rule). It adds
  *   the real products through the cart's own path, or the real bundle when one holds exactly these
  *   products (then the saving is the bundle's, fetched live, never a number written in the page);
- * - a step ticks when its product is already in the cart (the Clinic playful detail; the tick is a
- *   static CSS state keyed on data-done, globals.css).
+ * - a step ticks when its product is already in the cart, or when the routine's exact bundle is (the
+ *   Clinic playful detail; the tick is a static CSS state keyed on data-done, globals.css).
  */
 import React, { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
@@ -63,7 +63,7 @@ export function StepsSection({
   const { language, t } = useLanguage();
   const storeUrl = useStoreUrl();
   const formatPrice = useLocalePrice();
-  const { items, addItem, addBundle } = useCart();
+  const { items, bundles, addItem, addBundle } = useCart();
   const ar = language === 'ar';
   const pick = (en?: unknown, a?: unknown) =>
     ((ar ? (a as string) || (en as string) : (en as string) || (a as string)) ?? '').trim();
@@ -123,6 +123,9 @@ export function StepsSection({
   }, [allBuyable, bundlesOn, store.id, productIds]);
 
   const [adding, setAdding] = useState(false);
+  // The routine added as its bundle puts all three products in the cart as ONE bundle row, so the
+  // steps tick when that exact bundle is there (a loose add ticks each step on its own).
+  const bundleInCart = !!bundle && bundles.some(b => b.bundleId === bundle.bundleId);
 
   if (steps.length < MIN_STEPS) return editorMode ? <EmptySectionHint kind="steps" /> : null;
 
@@ -184,7 +187,7 @@ export function StepsSection({
         />
         <ol className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {steps.map((s, i) => {
-            const done = !!s.product && inCart.has(s.product.id);
+            const done = bundleInCart || (!!s.product && inCart.has(s.product.id));
             const price = priced[i]?.pricing;
             const name = s.product ? (pickLocalizedName(s.product, ar) ?? s.product.name) : '';
             return (
