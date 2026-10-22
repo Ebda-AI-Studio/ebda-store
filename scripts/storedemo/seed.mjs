@@ -2,10 +2,12 @@
 // Seed a looks DEMO store (is_demo = true): the showroom that previews every built look of its
 // template through `?look=<id>` (apps/web/src/lib/demo-look.ts) and refuses every order. One demo
 // store per template (Ruling B2-7): `storedemo` = Qamar (default), `storedemo-souq` = Souq
-// (`--template souq`, SOUQ_DEMO_ASSET_BASE, prod asset base https://media.ebda.app/demo/souq).
+// (`--template souq`, SOUQ_DEMO_ASSET_BASE, prod asset base https://media.ebda.app/demo/souq),
+// `storedemo-jasmine` = Jasmine (`--template jasmine`, JASMINE_DEMO_ASSET_BASE, prod asset base
+// https://media.ebda.app/demo/jasmine; Ruling B3-8).
 //
 //   DATABASE_URL=<owner-role postgres url> [QAMAR_DEMO_ASSET_BASE=<url or /path>] \
-//     npx tsx scripts/storedemo/seed.mjs [--template qamar|souq] [--yes-production] [--local-look-stores]
+//     npx tsx scripts/storedemo/seed.mjs [--template qamar|souq|jasmine] [--yes-production] [--local-look-stores]
 //
 // Prints the plan first. Refuses any non-local DATABASE_URL (anything but loopback) unless
 // `--yes-production` is passed: Ahmad approves that run, an agent never does (Ruling B1-16), and with
@@ -35,9 +37,17 @@ import {
 } from '../qamar-demo/catalogue.mjs';
 import { SOUQ_CATEGORIES, SOUQ_PRODUCTS } from '../souq-demo/catalogue.mjs';
 import { buildQamarHome } from './qamar-home.mjs';
+import {
+  JASMINE_CATEGORIES,
+  JASMINE_PRODUCTS,
+  JASMINE_TAGS,
+  JASMINE_BUNDLES,
+  JASMINE_REVIEWS,
+} from '../jasmine-demo/catalogue.mjs';
 import { buildSouqHome } from './souq-home.mjs';
+import { buildJasmineHome } from './jasmine-home.mjs';
 
-export { buildQamarHome, buildSouqHome };
+export { buildQamarHome, buildSouqHome, buildJasmineHome };
 
 export const SLUG = 'storedemo';
 export const OWNER_EMAIL = 'storedemo-owner@ebda.app';
@@ -146,6 +156,7 @@ export const LOCAL_LOOK_STORES = [
 /** The only asset base a production run accepts (Ruling B1-16). */
 export const PROD_ASSET_BASE = 'https://media.ebda.app/demo/qamar';
 export const SOUQ_PROD_ASSET_BASE = 'https://media.ebda.app/demo/souq';
+export const JASMINE_PROD_ASSET_BASE = 'https://media.ebda.app/demo/jasmine';
 
 /**
  * One entry per demo template (Ruling B2-7). Everything a template's showroom differs in is here;
@@ -204,6 +215,42 @@ export const TEMPLATE_SPECS = {
     // Ruling B2-9: arithmetic only, 12 months, no markup, NO provider name.
     instalments: { enabled: true, months: 12, markupPct: 0 },
   },
+  jasmine: {
+    template: 'jasmine',
+    slug: 'storedemo-jasmine',
+    // Ruling B3-8: no mailbox behind this address, no login (`passwordHash '!seed-no-login'`).
+    ownerEmail: 'storedemo-jasmine-owner@ebda.app',
+    name: 'Ebda Jasmine Demo',
+    nameAr: 'إبدا ياسمين ديمو',
+    defaultLook: 'jasmine.clinic',
+    categories: JASMINE_CATEGORIES,
+    products: JASMINE_PRODUCTS,
+    sizeCharts: {},
+    occasionSlugs: [],
+    archivePlaceholders: false,
+    assetEnv: 'JASMINE_DEMO_ASSET_BASE',
+    prodAssetBase: JASMINE_PROD_ASSET_BASE,
+    localLookStores: [
+      ['jasmine-apothecary', 'jasmine.apothecary'],
+      ['jasmine-bloom', 'jasmine.bloom'],
+      ['jasmine-clinic', 'jasmine.clinic'],
+    ],
+    localStoreName: l => [`Jasmine ${l.name.en}`, `ياسمين ${l.name.ar}`],
+    buildHome: buildJasmineHome,
+    description:
+      'An illustrative Egyptian beauty and skincare shop: cleansers, serums, moisturisers, makeup, perfumes and hair care.',
+    descriptionAr:
+      'متجر مصري توضيحي للعناية بالبشرة والجمال: غسول وسيرومات ومرطبات ومكياج وعطور وعناية بالشعر.',
+    deliveryDays: { min: 2, max: 4 },
+    // Ruling B2-9 (reused): arithmetic only, no provider name.
+    instalments: { enabled: true, months: 12, markupPct: 0 },
+    // Ruling B3-5/B3-6: the skin-type chips, the real routine bundle, approved reviews, and the
+    // `bundles` feature (in no plan baseline: a StoreFeature override, like every bundle store).
+    tags: JASMINE_TAGS,
+    bundles: JASMINE_BUNDLES,
+    reviews: JASMINE_REVIEWS,
+    features: ['bundles'],
+  },
 };
 /** `--template <name>` (default qamar); an unknown name is refused by the caller. */
 export function templateFromArgv(argv) {
@@ -251,12 +298,17 @@ export function describePlan(url, spec = TEMPLATE_SPECS.qamar) {
     `target database host: ${hostOf(url) ?? '(unparseable DATABASE_URL)'}`,
     `store: slug "${spec.slug}", is_demo = true, look ${spec.defaultLook}, theme {} (owner ${spec.ownerEmail}, no login)`,
     `${spec.template}: ${spec.products.length} products, ${variants} variants, ${spec.categories.length} categories (${spec.categories.map(c => c.slug).join(', ')}), ${charts} size charts, 1 shipping zone${spec.instalments ? ', instalments enabled (no provider name)' : ''}`,
+    ...(spec.tags?.length
+      ? [
+          `jasmine-style extras: ${spec.tags.length} skin-type / concern tags, ${spec.bundles?.length ?? 0} routine bundle(s), ${spec.reviews?.length ?? 0} approved reviews, features ${(spec.features ?? []).join(', ') || 'none'}`,
+        ]
+      : []),
     ...(spec.archivePlaceholders
       ? [
           `archived: ${PLACEHOLDER_CATEGORY_SLUGS.join(', ')} (${PLACEHOLDER_SLUGS.length} placeholder products, status archived, never deleted)`,
         ]
       : []),
-    `home: the ${spec.template === 'qamar' ? 'Qamar' : 'Souq'} superset document, saved + published through the page builder`,
+    `home: the ${spec.template[0].toUpperCase()}${spec.template.slice(1)} superset document, saved + published through the page builder`,
     'idempotent: upsert owner/store/categories/products, find-then-update charts/zone/variants',
   ].join('\n');
 }
@@ -444,6 +496,20 @@ export async function seedCatalogue(prisma, Prisma, storeId, base, spec = TEMPLA
           });
         }
 
+        // Skin-type / concern tags (Ruling B3-5): the product's tag set is REPLACED (a child
+        // table with no FK pointing at it), the tag rows are upserted per store.
+        if (spec.tags?.length) {
+          await tx.productTag.deleteMany({ where: { productId: product.id } });
+          for (const name of p.tags ?? []) {
+            const tag = await tx.tag.upsert({
+              where: { storeId_name: { storeId, name } },
+              update: {},
+              create: { storeId, name },
+            });
+            await tx.productTag.create({ data: { productId: product.id, tagId: tag.id } });
+          }
+        }
+
         if (!hasVariants) continue;
         // Options, values and variants are upserted, never deleted (cart lines may point at them).
         const valueIds = [];
@@ -514,6 +580,94 @@ export async function seedCatalogue(prisma, Prisma, storeId, base, spec = TEMPLA
           });
           variantCount++;
         }
+      }
+
+      // Features a template's showroom needs that no plan baseline carries (the `bundles`
+      // override, Ruling B3-6): upserted ON, never turned off by a re-seed.
+      for (const featureKey of spec.features ?? []) {
+        await tx.storeFeature.upsert({
+          where: { storeId_featureKey: { storeId, featureKey } },
+          update: { enabled: true },
+          create: { storeId, featureKey, enabled: true },
+        });
+      }
+
+      // The real routine bundle(s): upserted by slug, components replaced (variant-less only).
+      // `percentage` is basis points over the CURRENT component prices, so the saving stays real
+      // when a price changes (the PDP line and "add all" read it live).
+      for (const b of spec.bundles ?? []) {
+        const data = {
+          name: b.name,
+          nameAr: b.nameAr,
+          description: b.description,
+          descriptionAr: b.descriptionAr,
+          pricingType: b.pricingType,
+          pricingValue: b.pricingValue,
+          isActive: true,
+        };
+        const bundle = await tx.bundle.upsert({
+          where: { storeId_slug: { storeId, slug: b.slug } },
+          update: data,
+          create: { storeId, slug: b.slug, ...data },
+        });
+        await tx.bundleItem.deleteMany({ where: { bundleId: bundle.id } });
+        await tx.bundleItem.createMany({
+          data: b.products.map(slug => {
+            const productId = productIdBySlug.get(slug);
+            if (!productId) throw new Error(`bundle ${b.slug}: ${slug} is not in the catalogue`);
+            return { bundleId: bundle.id, productId, variantId: null, quantity: 1 };
+          }),
+        });
+      }
+
+      // Approved, verified reviews (the PDP rating line). A review needs an order (RESTRICT FK):
+      // one fixture order per review, found by its number so a re-seed never duplicates, with no
+      // customer and a placeholder address (no PII).
+      const addr = {
+        firstName: 'Demo',
+        lastName: 'Buyer',
+        city: 'Cairo',
+        country: 'EG',
+        address1: 'Demo',
+      };
+      for (const [i, [slug, rating, body, language]] of (spec.reviews ?? []).entries()) {
+        const productId = productIdBySlug.get(slug);
+        if (!productId) throw new Error(`review ${i}: ${slug} is not in the catalogue`);
+        // Order numbers are globally unique: keyed on the STORE id (the local look stores seed the
+        // same spec), so two stores never share one.
+        const orderNumber = `DEMO-${storeId.slice(0, 8)}-R${String(i + 1).padStart(3, '0')}`;
+        const order =
+          (await tx.order.findUnique({
+            where: { orderNumber },
+            select: { id: true, storeId: true },
+          })) ??
+          (await tx.order.create({
+            data: {
+              storeId,
+              orderNumber,
+              subtotal: 0,
+              total: 0,
+              status: 'delivered',
+              shippingAddress: addr,
+              billingAddress: addr,
+            },
+            select: { id: true, storeId: true },
+          }));
+        if (order.storeId !== storeId)
+          throw new Error(`order ${orderNumber} belongs to another store`);
+        const data = {
+          storeId,
+          rating,
+          body,
+          language,
+          status: 'published',
+          verifiedPurchase: true,
+        };
+        await tx.review.upsert({
+          where: { orderId_productId: { orderId: order.id, productId } },
+          update: data,
+          create: { productId, orderId: order.id, ...data },
+        });
       }
 
       // Shipping zone: no unique key, so find by (store, name) then update or create (C17).
