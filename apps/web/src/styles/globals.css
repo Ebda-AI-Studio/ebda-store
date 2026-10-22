@@ -207,6 +207,20 @@
     -moz-osx-font-smoothing: grayscale;
     overflow-x: hidden;
   }
+
+  /* #124: `hidden` on html + body makes <body> a scroll container that never scrolls, which
+   * inerts every `position: sticky` descendant (headers, PDP gallery, cart and checkout
+   * summaries, filter rail). `clip` clips the same horizontal overflow WITHOUT creating a scroll
+   * container. Browsers without `overflow: clip` (Safari < 16) keep `hidden`. */
+  body {
+    overflow-x: hidden;
+  }
+  @supports (overflow: clip) {
+    html,
+    body {
+      overflow-x: clip;
+    }
+  }
 }
 
 @media (prefers-reduced-motion: no-preference) {
@@ -1257,17 +1271,6 @@ html {
   scroll-padding-top: calc(var(--header-h, 0px) + var(--sticky-extra, 0px) + 0.75rem);
 }
 
-/* A page with a sticky sub-bar (the Lamma menu tab strip): `overflow-x: hidden` on html AND body
- * (layout.tsx) makes <body> a scroll container that never scrolls, so a `position: sticky` descendant
- * never sticks (measured: the strip scrolled away at 1400px). `clip` keeps the horizontal clipping
- * without creating a scroll container. Scoped to pages that mount the strip: the same defect inerts
- * every other sticky element on the storefront (headers, PDP gallery, cart summary, filter rail), which
- * is reported as a platform finding, not changed here (docs/architecture/sticky-overflow-follow-up.md).
- * Scoped to the Lamma skin: a `menu` section on any other template must not flip that page's stickiness. */
-html:has(body[data-pack='lamma'] [data-part='menu-tabs']),
-body[data-pack='lamma']:has([data-part='menu-tabs']) {
-  overflow-x: clip;
-}
 
 /* Sticky mobile bars (PDP add-to-cart, Dahab pinned bar, cart total). UI rule 6: space is
  * reserved on <body> (never the chrome wrapper). Body already carries pb-32 for the
