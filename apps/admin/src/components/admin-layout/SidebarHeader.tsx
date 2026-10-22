@@ -65,7 +65,7 @@ export function SidebarHeader({
               <Image
                 src="/logo-white.svg"
                 alt={tb('brandAlt')}
-                width={22}
+                width={12}
                 height={22}
                 unoptimized
               />

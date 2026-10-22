@@ -684,7 +684,7 @@ export function BuilderEditor({
           aria-label={t('back')}
         >
           {}
-          <img src="/logo.svg" alt={BRAND.product.nameEn} width={28} height={28} />
+          <img src="/logo.svg" alt={BRAND.product.nameEn} width={15} height={28} />
         </Link>
         <span className="hidden truncate text-sm font-semibold sm:inline">{storeName}</span>
         <PageSwitcher

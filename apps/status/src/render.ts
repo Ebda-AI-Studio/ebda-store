@@ -1,5 +1,5 @@
 // Public status page: server-rendered HTML, inline CSS, NO JavaScript, no external requests.
-import { BRAND, brandMarkSvg } from '../../../packages/shared/src/brand/index';
+import { BRAND, brandMarkSvg, brandAppIconSvg } from '../../../packages/shared/src/brand/index';
 import { COMPONENTS, HISTORY_DAYS } from './config';
 import type { ComponentSnapshot, ComponentStatus, Incident, Snapshot } from './types';
 
@@ -182,9 +182,7 @@ export function renderStatusPage(s: Snapshot, lang: Lang, origin: string): strin
   const t = T[lang];
   const home = lang === 'ar' ? '/' : '/en';
   const alt = lang === 'ar' ? '/en' : '/';
-  const icon = `data:image/svg+xml,${encodeURIComponent(
-    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120"><rect width="120" height="120" rx="22" fill="${BRAND.colors.night}"/><g transform="translate(60 60) scale(1.0667) translate(-58 -64)"><path d="M30 100 V56 a28 28 0 0 1 56 0 V100" fill="none" stroke="${BRAND.colors.gold}" stroke-width="13" stroke-linecap="round"/><circle cx="58" cy="74" r="9" fill="${BRAND.colors.lift}"/></g></svg>`
-  )}`;
+  const icon = `data:image/svg+xml,${encodeURIComponent(brandAppIconSvg())}`;
   const active = s.active.length
     ? `<ul class="incs">${s.active.map(i => incident(i, lang)).join('')}</ul>`
     : `<p class="muted">${t.none}</p>`;

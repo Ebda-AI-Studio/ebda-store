@@ -31,25 +31,13 @@ export function UnknownHostNotFound({ links }: { links: UnknownHostLinks }) {
       className="flex min-h-screen flex-col items-center justify-center px-6 py-16 text-center"
       style={{ background: '#fafafa', color: INK, fontFamily: font }}
     >
-      <svg
-        viewBox="0 0 120 120"
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src="/favicon.svg"
         width={64}
         height={64}
-        role="img"
-        aria-label={isRtl ? BRAND.product.nameAr : BRAND.product.nameEn}
-      >
-        <rect width="120" height="120" rx="22" fill={BRAND.colors.night} />
-        <g transform="translate(60 60) scale(1.0666666666666667) translate(-58 -64)">
-          <path
-            d="M30 100 V56 a28 28 0 0 1 56 0 V100"
-            fill="none"
-            stroke={BRAND.colors.gold}
-            strokeWidth="13"
-            strokeLinecap="round"
-          />
-          <circle cx="58" cy="74" r="9" fill={BRAND.colors.lift} />
-        </g>
-      </svg>
+        alt={isRtl ? BRAND.product.nameAr : BRAND.product.nameEn}
+      />
 
       <h1 className="mt-8 max-w-md text-balance text-2xl font-bold leading-snug sm:text-3xl">
         {t('This store doesn’t exist or hasn’t opened yet', 'المتجر ده مش موجود أو لسه مفتحش')}
