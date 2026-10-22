@@ -1,11 +1,12 @@
 'use client';
 
 /**
- * Dahab hero: a full-bleed photograph under lapis night, the headline set in
- * the display face at the inline start (the right edge in Arabic), one gold
- * action. The page's one orchestrated motion lives here: on first paint the
- * gold rule draws in and the copy rises (CSS only, `dahab-rise` /
- * `dahab-draw` in globals.css, skipped under reduced motion).
+ * Dahab hero (Phase B5, Ruling B5-1): the headline set in the look's display face at the inline
+ * start (the right edge in Arabic) with one action. From `lg` the photograph is full-bleed and the
+ * copy sits over a page-coloured fade; on phones and tablets the photograph takes the top of the
+ * frame and the copy sits BELOW it on the page colour, so text never covers the piece (taste profile).
+ * No entrance motion: the rule that drew in and the copy that rose were the old skin's signature
+ * and are retired with it. Every colour is a look token.
  *
  * Art direction: a separate mobile crop through <picture> (Cloudflare serves
  * storefront images unoptimized, so the crop IS the delivered file). The
@@ -65,50 +66,49 @@ function Slide({
 
   const body = (
     <>
-      {slide.video ? (
-        // The poster picture is the base layer and the LCP element; the video
-        // only overlays it after hydration (muted, looping, reduced-motion safe).
-        <HeroVideo
-          src={slide.video}
-          srcMobile={slide.videoMobile}
-          mobileQuery="(max-width: 1023px)"
-          active={active}
-          position={heroObjectPosition(slide.focus)}
-        >
-          {posterPicture}
-        </HeroVideo>
-      ) : (
-        posterPicture
-      )}
-      {/* Night falls from the inline start so the copy always sits on dark. */}
+      {/* The photograph: the top 56% of the frame below lg, the whole frame from lg. */}
+      <div className="absolute inset-x-0 top-0 h-[56%] overflow-hidden lg:inset-0 lg:h-auto">
+        {slide.video ? (
+          // The poster picture is the base layer and the LCP element; the video
+          // only overlays it after hydration (muted, looping, reduced-motion safe).
+          <HeroVideo
+            src={slide.video}
+            srcMobile={slide.videoMobile}
+            mobileQuery="(max-width: 1023px)"
+            active={active}
+            position={heroObjectPosition(slide.focus)}
+          >
+            {posterPicture}
+          </HeroVideo>
+        ) : (
+          posterPicture
+        )}
+      </div>
+      {/* From lg the page colour fades in from the inline start so the copy sits on a calm ground. */}
       <div
         aria-hidden="true"
-        className="absolute inset-0 bg-gradient-to-t from-background via-background/35 to-transparent lg:bg-gradient-to-r lg:from-background/90 lg:via-background/45 lg:to-transparent lg:rtl:bg-gradient-to-l"
+        className="absolute inset-0 hidden lg:block lg:bg-gradient-to-r lg:from-background/90 lg:via-background/45 lg:to-transparent lg:rtl:bg-gradient-to-l"
       />
       {(headline || subtitle || cta) && (
         <div
           className={cx(
             DAHAB_CONTAINER,
-            'relative flex h-full items-end pb-14 lg:items-center lg:pb-0'
+            'absolute inset-x-0 bottom-0 flex h-[44%] items-start pb-12 pt-5 lg:inset-0 lg:h-full lg:items-center lg:pb-0 lg:pt-0'
           )}
         >
-          <div className={cx('max-w-[34rem]', active && 'dahab-hero-copy')}>
-            <span
-              aria-hidden="true"
-              className="dahab-draw mb-6 block h-px w-16 origin-left bg-primary rtl:origin-right"
-            />
+          <div className="max-w-[34rem]">
             {headline && (
-              <h1 className="font-display text-balance text-[clamp(2.4rem,1.5rem+3.4vw,4.6rem)] leading-[1.05] text-foreground rtl:leading-[1.35]">
+              <h1 className="font-display text-balance text-[clamp(1.9rem,1.3rem+2.8vw,4.4rem)] leading-[1.1] text-foreground rtl:leading-[1.4]">
                 {headline}
               </h1>
             )}
             {subtitle && (
-              <p className="mt-5 max-w-[42ch] text-pretty text-base leading-relaxed text-foreground/80 md:text-[17px]">
+              <p className="mt-3 max-w-[42ch] text-pretty text-base leading-relaxed text-foreground/80 md:mt-5 md:text-[17px]">
                 {subtitle}
               </p>
             )}
             {cta && ctaHref && (
-              <Link href={ctaHref} className={cx(DAHAB_BTN_PRIMARY, 'mt-8')}>
+              <Link href={ctaHref} className={cx(DAHAB_BTN_PRIMARY, 'mt-5 md:mt-8')}>
                 {cta}
               </Link>
             )}
@@ -132,7 +132,7 @@ function Slide({
 }
 
 const FRAME =
-  'relative isolate w-full overflow-hidden bg-background h-[min(78svh,640px)] min-h-[460px] md:h-[min(70vh,820px)] lg:h-[min(84vh,760px)] lg:min-h-[520px]';
+  'relative isolate w-full overflow-hidden bg-background h-[min(88svh,720px)] min-h-[500px] md:h-[min(72vh,820px)] lg:h-[min(84vh,760px)] lg:min-h-[520px]';
 
 export function DahabHeroBanner(props: HeroBannerProps) {
   const { isRtl: ctxIsRtl } = useLanguage();

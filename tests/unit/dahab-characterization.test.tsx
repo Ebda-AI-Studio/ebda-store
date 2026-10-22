@@ -337,7 +337,15 @@ describe('Dahab characterisation (class and style stripped)', () => {
 });
 
 /**
- * ALLOWLIST for Task 2 (deliberate markup differences after the re-skin). Empty until Task 2
- * names an entry here with a reason; a snapshot change outside this list is a bug in the code.
+ * ALLOWLIST for Task 2 (the only deliberate markup differences after the re-skin; the snapshots
+ * were regenerated once and the diff reviewed to be exactly these, nothing else):
+ *  - hero: the decorative `dahab-draw` rule span is removed (retired signature), and the photo gets
+ *    its own wrapper div (phones stack the photo above the copy, so text never covers the piece);
+ *  - product card: `data-part="card-image"` on the image box (Workshop's light matte rule) and
+ *    `data-badge="sale"` on the discount chip (the chip pair rule).
+ * Collection tiles lose the arch class (class-only, invisible here). Commerce wiring is untouched.
  */
-export const ALLOWLIST: string[] = [];
+export const ALLOWLIST: string[] = [
+  'hero: dahab-draw span removed; photo wrapper div added',
+  'card: data-part="card-image", data-badge="sale"',
+];

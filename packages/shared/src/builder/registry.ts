@@ -749,7 +749,7 @@ export const SECTION_REGISTRY: readonly SectionDefinition[] = [
         settings: {
           heading: 'Shop by collection',
           headingAr: 'تسوق حسب المجموعة',
-          tileShape: 'arch',
+          tileShape: 'rectangle',
           columns: 4,
         },
         blocks: [],
@@ -758,7 +758,6 @@ export const SECTION_REGISTRY: readonly SectionDefinition[] = [
     settings: [
       s.text('heading', 'Heading', 'العنوان', { localized: true }),
       s.select('tileShape', 'Tile shape', 'شكل البطاقة', [
-        opt('arch', 'Arch', 'قوس'),
         opt('rectangle', 'Rectangle', 'مستطيل'),
         opt('circle', 'Circle', 'دائري'),
         opt('band', 'Full-width bands', 'شرائط بعرض الشاشة'),

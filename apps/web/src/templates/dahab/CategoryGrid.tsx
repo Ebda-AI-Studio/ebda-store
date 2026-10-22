@@ -47,7 +47,7 @@ export default function DahabCategoryGrid({
   );
 }
 
-/** Scrolling row of the same arch tiles (the "horizontal" categories layout). */
+/** Scrolling row of the same tiles (the "horizontal" categories layout). */
 export function DahabCategoryStrip({
   categories,
   isRtl: isRtlProp,

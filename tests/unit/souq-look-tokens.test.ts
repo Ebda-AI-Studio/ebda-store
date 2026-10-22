@@ -385,8 +385,9 @@ describe('Ruling B2-26: Night chips and the PDP discount pill are brass (one acc
   });
   it('no other look sets --chip-bg (their chips stay on the accent pair)', () => {
     const others = [...css.matchAll(/\[data-look='([^']+)'\]\s*\{[^}]*--chip-bg/g)].map(m => m[1]);
-    // Ruling B3-2: Jasmine Apothecary takes the same brass-chip rule (one accent on a deep ground)
-    expect(others.sort()).toEqual(['jasmine.apothecary', 'souq.night']);
+    // Ruling B3-2: Jasmine Apothecary takes the same brass-chip rule (one accent on a deep ground);
+    // Ruling B5-2: Dahab Workshop takes a pomegranate FILL with ink text (the accent is enamel)
+    expect(others.sort()).toEqual(['dahab.workshop', 'jasmine.apothecary', 'souq.night']);
   });
   it('the chip style reads the --chip-bg chain, and brass passes the one metal rule (METAL-1)', () => {
     expect(

@@ -79,7 +79,7 @@ export function DahabProductCarousel({
               type="button"
               onClick={() => step(-1)}
               aria-label={t('Previous', 'السابق')}
-              className="pointer-events-auto -ms-5 flex h-10 w-10 items-center justify-center rounded-full border border-input bg-background/90 text-foreground backdrop-blur-sm transition-colors hover:border-primary hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              className="pointer-events-auto -ms-5 flex h-11 w-11 items-center justify-center rounded-full border border-input bg-background text-foreground transition-colors hover:border-primary hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
               <ChevronIcon className="h-4 w-4 rotate-180" />
             </button>
@@ -87,7 +87,7 @@ export function DahabProductCarousel({
               type="button"
               onClick={() => step(1)}
               aria-label={t('Next', 'التالي')}
-              className="pointer-events-auto -me-5 flex h-10 w-10 items-center justify-center rounded-full border border-input bg-background/90 text-foreground backdrop-blur-sm transition-colors hover:border-primary hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              className="pointer-events-auto -me-5 flex h-11 w-11 items-center justify-center rounded-full border border-input bg-background text-foreground transition-colors hover:border-primary hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
               <ChevronIcon className="h-4 w-4" />
             </button>

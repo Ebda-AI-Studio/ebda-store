@@ -1089,66 +1089,13 @@ html {
 }
 
 /*
- * Dahab template (builder Phase 3 pilot) — docs/ebda/templates/dahab.md.
- * `.font-display` is the pack's display face; outside a pack that sets one it
- * inherits, so builder sections that use it look unchanged on other skins.
- * Marcellus carries Latin, Amiri carries Arabic (Arabic pages put Amiri first
- * so mixed lines keep one voice). `font-size-adjust` is reset: the platform's
- * x-height normalisation (0.5) is tuned for IBM Plex Sans Arabic and would
- * inflate Amiri.
+ * `.font-display` is the pack's display face; outside a pack that sets one it inherits, so
+ * builder sections that use it look unchanged on other skins. The Dahab looks take their faces from
+ * the look (looks/fonts.ts: Reem Kufi, Markazi Text, Kufam + the Latin pairs); the retired skin's
+ * own faces, its drawn hero rule and its rising copy are gone (Ruling B5-1).
  */
 .font-display {
   font-family: var(--font-display, inherit);
-}
-[data-pack='dahab'] {
-  --font-display: var(--font-dahab-latin), var(--font-dahab-ar), 'Times New Roman', serif;
-}
-html[dir='rtl'] [data-pack='dahab'] {
-  --font-display: var(--font-dahab-ar), var(--font-dahab-latin), serif;
-}
-[data-pack='dahab'] .font-display {
-  font-size-adjust: none;
-  font-weight: 400;
-}
-html[dir='rtl'] [data-pack='dahab'] .font-display {
-  font-weight: 700;
-}
-
-/* The page's one orchestrated motion: hero rule draws, copy rises. */
-@keyframes dahab-draw {
-  from {
-    transform: scaleX(0);
-  }
-  to {
-    transform: scaleX(1);
-  }
-}
-@keyframes dahab-rise {
-  from {
-    opacity: 0;
-    transform: translateY(14px);
-  }
-  to {
-    opacity: 1;
-    transform: none;
-  }
-}
-@media (prefers-reduced-motion: no-preference) {
-  .dahab-hero-copy .dahab-draw {
-    animation: dahab-draw 900ms cubic-bezier(0.22, 1, 0.36, 1) both;
-  }
-  .dahab-hero-copy > :not(.dahab-draw) {
-    animation: dahab-rise 900ms cubic-bezier(0.22, 1, 0.36, 1) both;
-  }
-  .dahab-hero-copy > :nth-child(2) {
-    animation-delay: 120ms;
-  }
-  .dahab-hero-copy > :nth-child(3) {
-    animation-delay: 220ms;
-  }
-  .dahab-hero-copy > :nth-child(4) {
-    animation-delay: 320ms;
-  }
 }
 
 /* Collage hero (hero presentation 'collage', Ruling B1-7): the three photos settle once on first
@@ -1200,27 +1147,20 @@ html[dir='rtl'] [data-pack='dahab'] .font-display {
   }
 }
 
-/* Dahab skin on the two Phase 2 document sections (no markup change, so
-   every other store renders exactly as before): display-face headings, the
-   arch frame on the image, and a quieter newsletter field. */
+/* Dahab looks on the two document sections (no markup change, so every other store renders exactly
+   as before): the look's display face on the headings, a rectangular image (the arch frame is
+   retired, Ruling B5-3), a quieter newsletter field. Token colours only. */
 [data-pack='dahab'] [data-section='image-text'] h2,
 [data-pack='dahab'] [data-section='newsletter'] h2 {
   font-family: var(--font-display);
   font-size-adjust: none;
-  font-weight: 400;
   font-size: clamp(1.6rem, 1.15rem + 1.5vw, 2.5rem);
   line-height: 1.15;
   letter-spacing: 0;
 }
 html[dir='rtl'] [data-pack='dahab'] [data-section='image-text'] h2,
 html[dir='rtl'] [data-pack='dahab'] [data-section='newsletter'] h2 {
-  font-weight: 700;
   line-height: 1.45;
-}
-[data-pack='dahab'] [data-section='image-text'] img,
-[data-pack='dahab'] [data-section='image-text'] img + div,
-[data-pack='dahab'] [data-section='image-text'] .bg-muted {
-  border-radius: 999px 999px var(--radius) var(--radius);
 }
 [data-pack='dahab'] [data-section='image-text'] p {
   font-size: 1rem;
@@ -1232,6 +1172,75 @@ html[dir='rtl'] [data-pack='dahab'] [data-section='newsletter'] h2 {
 }
 [data-pack='dahab'] [data-section='newsletter'] > div {
   max-width: 38rem;
+}
+
+/* Dahab type voice (Ruling B5-1): an Arabic display face is never letter-spaced and gets open
+   leading; tracked-caps classes from the shared components are reset under the dahab skin only. */
+html[dir='rtl'] [data-pack='dahab'] h1,
+html[dir='rtl'] [data-pack='dahab'] h2,
+html[dir='rtl'] [data-pack='dahab'] h3,
+html[dir='rtl'] [data-pack='dahab'] .font-display {
+  line-height: 1.4;
+  letter-spacing: 0;
+}
+[data-pack='dahab']
+  :is(
+    .ui-caps-toggle,
+    .uppercase,
+    .tracking-wide,
+    .tracking-wider,
+    .tracking-widest,
+    [class*='tracking-[0.'],
+    [class*='tracking-[.']
+  ) {
+  letter-spacing: normal;
+  text-transform: none;
+}
+[data-pack='dahab'] [data-ui-uppercase='true'] .ui-caps-toggle {
+  text-transform: uppercase;
+}
+[data-pack='dahab'] :is(h1, h2, h3, .font-display) {
+  font-size-adjust: none;
+}
+
+/* Dahab looks (Phase B5, Ruling B5-2). NO colour literal except the one pomegranate sale fill,
+   a token-shaped triplet (`#E8606A` = 356 75% 64%, Ruling B5-2): every other colour is a look token,
+   which keeps the no-orange gate true. */
+/* The sale chip is the look's accent pair (rose gold on Worn and Gift box, enamel on Workshop). */
+[data-pack='dahab'] [data-badge='sale'] {
+  background-color: hsl(var(--chip-bg, var(--accent)));
+  color: hsl(var(--chip-fg, var(--accent-foreground)));
+}
+/* Workshop: the accent is enamel, so the sale chip is the pomegranate FILL with ink text (5.51:1);
+   pomegranate is never a text colour on the teal page (it is under 4.5:1 there). */
+[data-look='dahab.workshop'] {
+  --chip-bg: 356 75% 64%;
+  --chip-fg: 215 27% 9%;
+}
+/* Workshop (quality bar section 9 rule 1): the page is committed teal, so a merchant photo shot on
+   white sits on a light matte and multiplies into it instead of leaving a white rectangle on teal. */
+[data-look='dahab.workshop'] [data-part='card-image'] {
+  background-color: hsl(var(--foreground));
+}
+[data-look='dahab.workshop'] [data-part='card-image'] img {
+  mix-blend-mode: multiply;
+}
+/* Gift box: a satin ribbon under each section title, a 2px rose-gold line with a round knot. It is
+   decorative paint only (no markup, nothing to announce), at the inline start like the title. */
+[data-look='dahab.giftbox'] main [data-section] h2::after {
+  content: '';
+  display: block;
+  width: 7rem;
+  height: 0.75rem;
+  margin-top: 0.75rem;
+  background:
+    radial-gradient(circle at 50% 50%, hsl(var(--accent)) 0 0.22rem, transparent 0.25rem) center /
+      0.75rem 0.75rem no-repeat,
+    linear-gradient(hsl(var(--accent)), hsl(var(--accent))) center / 100% 2px no-repeat;
+}
+[data-look='dahab.giftbox'] main [data-section][style*='text-align: center'] h2::after,
+[data-look='dahab.giftbox'] main [data-section] .text-center h2::after {
+  margin-inline: auto;
 }
 
 /* 2.4.11 Focus Not Obscured: the sticky header's measured height (StickyHeaderOffset) keeps the
@@ -1911,10 +1920,6 @@ html[lang] [data-look] [data-transactional] :is(h2, h3, h4) {
   [data-look] {
     --motion-duration: 0ms;
   }
-}
-/* A dahab-skinned look keeps the look's display face: the skin sets --font-display on <body>. */
-html[lang] body[data-look][data-pack='dahab'] {
-  --font-display: var(--look-font-display);
 }
 /* English locale: Latin display face first, Arabic display stack as fallback. */
 html[lang='en'] [data-look] h1,

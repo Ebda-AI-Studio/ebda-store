@@ -132,6 +132,8 @@ export const collectionListSchema = z
     ...frame,
     heading: text(200),
     headingAr: text(200),
+    // 'arch' stays ACCEPTED so saved documents keep validating (Ruling B5-3); it is never offered
+    // by the editor and renders as the look's rectangle.
     tileShape: z.enum(['arch', 'rectangle', 'circle', 'band']).optional(),
     columns: z.number().int().min(2).max(4).optional(),
   })

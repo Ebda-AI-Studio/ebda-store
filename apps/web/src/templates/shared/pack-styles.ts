@@ -212,13 +212,12 @@ const PACK_STYLES: Record<TemplateId, PackStyles> = {
     testimonialCard: 'border-t border-foreground/15 bg-transparent py-10',
     testimonialAuthor: 'text-sm font-light ui-caps-toggle tracking-[0.22em] text-foreground/80',
   },
-  // Dahab (builder Phase 3 pilot): its homepage sections and cards are its own
-  // components (templates/dahab); this row styles the shared surfaces that
-  // remain (section headings on CMS pages, the list-view row, brand story).
+  // Dahab (jewellery; three looks, Phase B5): its homepage sections and cards are its own
+  // components (templates/dahab); this row styles the shared surfaces that remain (section
+  // headings on CMS pages, the list-view row, brand story). Token colours only: the look decides.
   dahab: {
     card: 'rounded-[var(--radius)] bg-card ring-1 ring-inset ring-foreground/[0.06] transition-colors duration-300 hover:ring-primary/40',
-    categoryFrame:
-      'rounded-t-[999px] rounded-b-[var(--radius)] bg-card ring-1 ring-inset ring-primary/25',
+    categoryFrame: 'rounded-[var(--radius)] bg-card ring-1 ring-inset ring-primary/25',
     categoryCaption:
       'font-display text-lg text-foreground group-hover:text-primary transition-colors',
     productCardName: 'text-foreground leading-snug [overflow-wrap:anywhere]',

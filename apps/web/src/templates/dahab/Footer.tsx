@@ -4,8 +4,8 @@
  * Dahab footer: the wordmark and the store's own line, the merchant's link
  * columns (store.settings.footerLinks; the main navigation when none are
  * set), contact and branches, socials, then a bottom row of payment marks.
- * The marks are drawn transparent in the ivory ink — no white tiles on the
- * night surface. Newsletter signup is a page section on Dahab (builder
+ * The marks are drawn transparent in the foreground ink — no white tiles on the
+ * page surface. Newsletter signup is a page section on Dahab (builder
  * `newsletter`), so the footer does not repeat it.
  */
 import Link from 'next/link';

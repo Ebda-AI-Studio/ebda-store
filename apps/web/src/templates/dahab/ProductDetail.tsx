@@ -264,7 +264,7 @@ function Gallery({
                 : undefined
             }
           />
-          <span className="absolute bottom-4 end-4 flex h-10 w-10 items-center justify-center rounded-full bg-background/80 text-foreground opacity-0 backdrop-blur-sm transition-opacity group-hover/zoom:opacity-100">
+          <span className="absolute bottom-4 end-4 flex h-11 w-11 items-center justify-center rounded-full bg-background text-foreground opacity-0 transition-opacity group-hover/zoom:opacity-100">
             <ZoomIcon className="h-5 w-5" />
           </span>
         </button>
@@ -282,7 +282,7 @@ function Gallery({
         <button
           type="button"
           onClick={() => setLightbox(false)}
-          className="fixed end-4 top-4 z-10 flex h-11 w-11 items-center justify-center rounded-full bg-background/80 text-foreground backdrop-blur-sm hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          className="fixed end-4 top-4 z-10 flex h-11 w-11 items-center justify-center rounded-full bg-background text-foreground hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           aria-label={t('Close', 'إغلاق')}
         >
           <CloseIcon className="h-5 w-5" />

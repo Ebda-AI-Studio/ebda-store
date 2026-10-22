@@ -887,6 +887,43 @@ export default function ProductDetailClient({
                 <ShareProductRow productName={displayName} url={shareUrl} />
               </>
             }
+            // Ruling B5-1 (finding): the Dahab branch never passed `mediaSlot`, so a Dahab product
+            // with a 3D model showed no viewer. Same toggle + panel the default PDP renders, same
+            // flag and model gate; a product without a model renders nothing.
+            mediaSlot={
+              model3d ? (
+                <div className="relative mt-4" data-part="model3d-slot">
+                  <Model3dToggle
+                    active={show3d}
+                    t={t}
+                    onToggle={() => {
+                      if (!show3d) {
+                        captureEvent('product_3d_opened', {
+                          storeId: store?.id,
+                          productId: product.id,
+                        });
+                      }
+                      setShow3d(v => !v);
+                    }}
+                  />
+                  {show3d ? (
+                    <ProductModel3dPanel
+                      model={model3d}
+                      storeId={store?.id ?? ''}
+                      productId={product.id}
+                      productName={displayName}
+                      fallbackPoster={productImages[0]?.url}
+                      selected={pickedOptions}
+                      optionOrder={productOptions.map(o => o.name)}
+                      isRtl={language === 'ar'}
+                      t={t}
+                    />
+                  ) : (
+                    <div aria-hidden="true" className="h-14" />
+                  )}
+                </div>
+              ) : undefined
+            }
             selectedImage={selectedImage}
             onSelectImage={setSelectedImage}
           />

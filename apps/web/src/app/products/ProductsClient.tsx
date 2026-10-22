@@ -706,17 +706,12 @@ export default function ProductsClient({
                   bgTriplet={
                     filterSidebar?.bgColor
                       ? colorToHslTriplet(filterSidebar.bgColor, store.theme) || undefined
-                      : templateId === 'dahab'
-                        ? // Dahab: a night card panel, not a gold slab (merchant colour still wins).
-                          colorToHslTriplet('token:card', store.theme) || undefined
-                        : undefined
+                      : undefined
                   }
                   fgTriplet={
                     filterSidebar?.textColor
                       ? colorToHslTriplet(filterSidebar.textColor, store.theme) || undefined
-                      : templateId === 'dahab'
-                        ? colorToHslTriplet('token:foreground', store.theme) || undefined
-                        : undefined
+                      : undefined
                   }
                 />
                 {/* View Mode */}

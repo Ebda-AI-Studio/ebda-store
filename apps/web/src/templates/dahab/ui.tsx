@@ -1,14 +1,12 @@
 'use client';
 
 /**
- * Dahab (دهب) design primitives — the gold-on-night jewellery skin
- * (builder Phase 3 pilot; docs/ebda/templates/dahab.md).
+ * Dahab (دهب) design primitives — the jewellery skin under the Worn, Workshop and Gift box looks
+ * (Phase B5; docs/ebda/templates/dahab.md).
  *
- * Every colour comes from the store theme tokens (`--primary` = gold,
- * `--background` = lapis night, `--foreground` = ivory), so a merchant who
- * re-colours the theme re-colours Dahab. The display face is the pack's
- * `--font-display` (Marcellus for Latin, Amiri for Arabic), set on the chrome
- * root by `[data-pack='dahab']` in globals.css.
+ * Every colour comes from the store theme tokens (`--primary`, `--accent`, `--background`,
+ * `--foreground`), which the active look sets, so a merchant who re-colours the theme re-colours
+ * Dahab. The display face is the look's `--font-display` (looks/fonts.ts).
  *
  * Arabic-first rules held here: logical properties only (`ps`/`pe`/`start`/
  * `end`), direction-aware chevrons (`rtl:-scale-x-100`), no letter-spacing on
@@ -18,15 +16,15 @@
 import type { ReactNode, SVGProps } from 'react';
 import Link from 'next/link';
 
-/** Primary action: solid gold, night ink (contrast 8.6:1). */
+/** Primary action: the look's primary fill with its on-primary ink. */
 export const DAHAB_BTN_PRIMARY =
   'inline-flex min-h-[48px] items-center justify-center gap-2 rounded-[var(--radius)] bg-primary px-7 text-sm font-medium text-primary-foreground transition-[background-color,transform] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] hover:bg-accent active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50';
 
-/** Secondary action: gold hairline on night. */
+/** Secondary action: a primary hairline on the page. */
 export const DAHAB_BTN_SECONDARY =
   'inline-flex min-h-[48px] items-center justify-center gap-2 rounded-[var(--radius)] border border-primary/70 px-7 text-sm font-medium text-primary transition-colors duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] hover:border-accent hover:text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background';
 
-/** Quiet text link with a gold underline that draws in on hover. */
+/** Quiet text link with a primary underline that draws in on hover. */
 export const DAHAB_LINK =
   'relative inline-flex min-h-[44px] items-center text-sm text-primary after:absolute after:inset-x-0 after:bottom-2.5 after:h-px after:origin-left rtl:after:origin-right after:scale-x-0 after:bg-current after:transition-transform after:duration-300 hover:after:scale-x-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm';
 

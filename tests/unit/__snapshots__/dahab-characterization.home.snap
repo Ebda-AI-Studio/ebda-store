@@ -3,15 +3,15 @@
 <div data-section="hero">
 <section aria-label="دهب يتلبس كل يوم">
 <div>
+<div>
 <picture>
 <img src="https://media.example/dahab/h1.webp" alt="دهب يتلبس كل يوم" loading="eager" fetchPriority="high" decoding="sync"/>
 </picture>
+</div>
 <div aria-hidden="true">
 </div>
 <div>
 <div>
-<span aria-hidden="true">
-</span>
 <h1>دهب يتلبس كل يوم</h1>
 <a href="/products">تسوق</a>
 </div>
@@ -62,12 +62,12 @@
 <article data-pack-card="dahab">
 <div>
 <a aria-label="كاجو" href="/products/cashew">
-<div>
+<div data-part="card-image">
 <img alt="p1" loading="lazy" decoding="async" data-nimg="fill" sizes="(min-width: 1024px) 25vw, (min-width: 768px) 33vw, 50vw" srcSet="/_next/image?url=https%3A%2F%2Fpub-test.r2.dev%2Fp%2Fp1.jpg&amp;w=256&amp;q=75 256w, /_next/image?url=https%3A%2F%2Fpub-test.r2.dev%2Fp%2Fp1.jpg&amp;w=384&amp;q=75 384w, /_next/image?url=https%3A%2F%2Fpub-test.r2.dev%2Fp%2Fp1.jpg&amp;w=640&amp;q=75 640w, /_next/image?url=https%3A%2F%2Fpub-test.r2.dev%2Fp%2Fp1.jpg&amp;w=750&amp;q=75 750w, /_next/image?url=https%3A%2F%2Fpub-test.r2.dev%2Fp%2Fp1.jpg&amp;w=828&amp;q=75 828w, /_next/image?url=https%3A%2F%2Fpub-test.r2.dev%2Fp%2Fp1.jpg&amp;w=1080&amp;q=75 1080w, /_next/image?url=https%3A%2F%2Fpub-test.r2.dev%2Fp%2Fp1.jpg&amp;w=1200&amp;q=75 1200w, /_next/image?url=https%3A%2F%2Fpub-test.r2.dev%2Fp%2Fp1.jpg&amp;w=1920&amp;q=75 1920w, /_next/image?url=https%3A%2F%2Fpub-test.r2.dev%2Fp%2Fp1.jpg&amp;w=2048&amp;q=75 2048w, /_next/image?url=https%3A%2F%2Fpub-test.r2.dev%2Fp%2Fp1.jpg&amp;w=3840&amp;q=75 3840w" src="/_next/image?url=https%3A%2F%2Fpub-test.r2.dev%2Fp%2Fp1.jpg&amp;w=3840&amp;q=75"/>
 <span aria-hidden="true">
 </span>
 </div>
-<span>⁦−17%⁩</span>
+<span data-badge="sale">⁦−17%⁩</span>
 </a>
 <div>
 <button type="button" aria-label="إضافة للسلة: كاجو">
@@ -97,7 +97,7 @@
 <article data-pack-card="dahab">
 <div>
 <a aria-label="مجدول" href="/products/medjool">
-<div>
+<div data-part="card-image">
 <img alt="p2" loading="lazy" decoding="async" data-nimg="fill" sizes="(min-width: 1024px) 25vw, (min-width: 768px) 33vw, 50vw" srcSet="/_next/image?url=https%3A%2F%2Fpub-test.r2.dev%2Fp%2Fp2.jpg&amp;w=256&amp;q=75 256w, /_next/image?url=https%3A%2F%2Fpub-test.r2.dev%2Fp%2Fp2.jpg&amp;w=384&amp;q=75 384w, /_next/image?url=https%3A%2F%2Fpub-test.r2.dev%2Fp%2Fp2.jpg&amp;w=640&amp;q=75 640w, /_next/image?url=https%3A%2F%2Fpub-test.r2.dev%2Fp%2Fp2.jpg&amp;w=750&amp;q=75 750w, /_next/image?url=https%3A%2F%2Fpub-test.r2.dev%2Fp%2Fp2.jpg&amp;w=828&amp;q=75 828w, /_next/image?url=https%3A%2F%2Fpub-test.r2.dev%2Fp%2Fp2.jpg&amp;w=1080&amp;q=75 1080w, /_next/image?url=https%3A%2F%2Fpub-test.r2.dev%2Fp%2Fp2.jpg&amp;w=1200&amp;q=75 1200w, /_next/image?url=https%3A%2F%2Fpub-test.r2.dev%2Fp%2Fp2.jpg&amp;w=1920&amp;q=75 1920w, /_next/image?url=https%3A%2F%2Fpub-test.r2.dev%2Fp%2Fp2.jpg&amp;w=2048&amp;q=75 2048w, /_next/image?url=https%3A%2F%2Fpub-test.r2.dev%2Fp%2Fp2.jpg&amp;w=3840&amp;q=75 3840w" src="/_next/image?url=https%3A%2F%2Fpub-test.r2.dev%2Fp%2Fp2.jpg&amp;w=3840&amp;q=75"/>
 <span aria-hidden="true">
 </span>
@@ -130,7 +130,7 @@
 <article data-pack-card="dahab">
 <div>
 <a aria-label="فستق" href="/products/pistachio">
-<div>
+<div data-part="card-image">
 <img alt="p3" loading="lazy" decoding="async" data-nimg="fill" sizes="(min-width: 1024px) 25vw, (min-width: 768px) 33vw, 50vw" srcSet="/_next/image?url=https%3A%2F%2Fpub-test.r2.dev%2Fp%2Fp3.jpg&amp;w=256&amp;q=75 256w, /_next/image?url=https%3A%2F%2Fpub-test.r2.dev%2Fp%2Fp3.jpg&amp;w=384&amp;q=75 384w, /_next/image?url=https%3A%2F%2Fpub-test.r2.dev%2Fp%2Fp3.jpg&amp;w=640&amp;q=75 640w, /_next/image?url=https%3A%2F%2Fpub-test.r2.dev%2Fp%2Fp3.jpg&amp;w=750&amp;q=75 750w, /_next/image?url=https%3A%2F%2Fpub-test.r2.dev%2Fp%2Fp3.jpg&amp;w=828&amp;q=75 828w, /_next/image?url=https%3A%2F%2Fpub-test.r2.dev%2Fp%2Fp3.jpg&amp;w=1080&amp;q=75 1080w, /_next/image?url=https%3A%2F%2Fpub-test.r2.dev%2Fp%2Fp3.jpg&amp;w=1200&amp;q=75 1200w, /_next/image?url=https%3A%2F%2Fpub-test.r2.dev%2Fp%2Fp3.jpg&amp;w=1920&amp;q=75 1920w, /_next/image?url=https%3A%2F%2Fpub-test.r2.dev%2Fp%2Fp3.jpg&amp;w=2048&amp;q=75 2048w, /_next/image?url=https%3A%2F%2Fpub-test.r2.dev%2Fp%2Fp3.jpg&amp;w=3840&amp;q=75 3840w" src="/_next/image?url=https%3A%2F%2Fpub-test.r2.dev%2Fp%2Fp3.jpg&amp;w=3840&amp;q=75"/>
 <span aria-hidden="true">
 </span>
@@ -233,15 +233,15 @@
 <div data-section="hero">
 <section aria-label="Gold you live in">
 <div>
+<div>
 <picture>
 <img src="https://media.example/dahab/h1.webp" alt="Gold you live in" loading="eager" fetchPriority="high" decoding="sync"/>
 </picture>
+</div>
 <div aria-hidden="true">
 </div>
 <div>
 <div>
-<span aria-hidden="true">
-</span>
 <h1>Gold you live in</h1>
 <a href="/products">Shop</a>
 </div>
@@ -292,12 +292,12 @@
 <article data-pack-card="dahab">
 <div>
 <a aria-label="Cashew" href="/products/cashew">
-<div>
+<div data-part="card-image">
 <img alt="p1" loading="lazy" decoding="async" data-nimg="fill" sizes="(min-width: 1024px) 25vw, (min-width: 768px) 33vw, 50vw" srcSet="/_next/image?url=https%3A%2F%2Fpub-test.r2.dev%2Fp%2Fp1.jpg&amp;w=256&amp;q=75 256w, /_next/image?url=https%3A%2F%2Fpub-test.r2.dev%2Fp%2Fp1.jpg&amp;w=384&amp;q=75 384w, /_next/image?url=https%3A%2F%2Fpub-test.r2.dev%2Fp%2Fp1.jpg&amp;w=640&amp;q=75 640w, /_next/image?url=https%3A%2F%2Fpub-test.r2.dev%2Fp%2Fp1.jpg&amp;w=750&amp;q=75 750w, /_next/image?url=https%3A%2F%2Fpub-test.r2.dev%2Fp%2Fp1.jpg&amp;w=828&amp;q=75 828w, /_next/image?url=https%3A%2F%2Fpub-test.r2.dev%2Fp%2Fp1.jpg&amp;w=1080&amp;q=75 1080w, /_next/image?url=https%3A%2F%2Fpub-test.r2.dev%2Fp%2Fp1.jpg&amp;w=1200&amp;q=75 1200w, /_next/image?url=https%3A%2F%2Fpub-test.r2.dev%2Fp%2Fp1.jpg&amp;w=1920&amp;q=75 1920w, /_next/image?url=https%3A%2F%2Fpub-test.r2.dev%2Fp%2Fp1.jpg&amp;w=2048&amp;q=75 2048w, /_next/image?url=https%3A%2F%2Fpub-test.r2.dev%2Fp%2Fp1.jpg&amp;w=3840&amp;q=75 3840w" src="/_next/image?url=https%3A%2F%2Fpub-test.r2.dev%2Fp%2Fp1.jpg&amp;w=3840&amp;q=75"/>
 <span aria-hidden="true">
 </span>
 </div>
-<span>⁦−17%⁩</span>
+<span data-badge="sale">⁦−17%⁩</span>
 </a>
 <div>
 <button type="button" aria-label="Add to bag: Cashew">
@@ -327,7 +327,7 @@
 <article data-pack-card="dahab">
 <div>
 <a aria-label="Medjool" href="/products/medjool">
-<div>
+<div data-part="card-image">
 <img alt="p2" loading="lazy" decoding="async" data-nimg="fill" sizes="(min-width: 1024px) 25vw, (min-width: 768px) 33vw, 50vw" srcSet="/_next/image?url=https%3A%2F%2Fpub-test.r2.dev%2Fp%2Fp2.jpg&amp;w=256&amp;q=75 256w, /_next/image?url=https%3A%2F%2Fpub-test.r2.dev%2Fp%2Fp2.jpg&amp;w=384&amp;q=75 384w, /_next/image?url=https%3A%2F%2Fpub-test.r2.dev%2Fp%2Fp2.jpg&amp;w=640&amp;q=75 640w, /_next/image?url=https%3A%2F%2Fpub-test.r2.dev%2Fp%2Fp2.jpg&amp;w=750&amp;q=75 750w, /_next/image?url=https%3A%2F%2Fpub-test.r2.dev%2Fp%2Fp2.jpg&amp;w=828&amp;q=75 828w, /_next/image?url=https%3A%2F%2Fpub-test.r2.dev%2Fp%2Fp2.jpg&amp;w=1080&amp;q=75 1080w, /_next/image?url=https%3A%2F%2Fpub-test.r2.dev%2Fp%2Fp2.jpg&amp;w=1200&amp;q=75 1200w, /_next/image?url=https%3A%2F%2Fpub-test.r2.dev%2Fp%2Fp2.jpg&amp;w=1920&amp;q=75 1920w, /_next/image?url=https%3A%2F%2Fpub-test.r2.dev%2Fp%2Fp2.jpg&amp;w=2048&amp;q=75 2048w, /_next/image?url=https%3A%2F%2Fpub-test.r2.dev%2Fp%2Fp2.jpg&amp;w=3840&amp;q=75 3840w" src="/_next/image?url=https%3A%2F%2Fpub-test.r2.dev%2Fp%2Fp2.jpg&amp;w=3840&amp;q=75"/>
 <span aria-hidden="true">
 </span>
@@ -360,7 +360,7 @@
 <article data-pack-card="dahab">
 <div>
 <a aria-label="Pistachio" href="/products/pistachio">
-<div>
+<div data-part="card-image">
 <img alt="p3" loading="lazy" decoding="async" data-nimg="fill" sizes="(min-width: 1024px) 25vw, (min-width: 768px) 33vw, 50vw" srcSet="/_next/image?url=https%3A%2F%2Fpub-test.r2.dev%2Fp%2Fp3.jpg&amp;w=256&amp;q=75 256w, /_next/image?url=https%3A%2F%2Fpub-test.r2.dev%2Fp%2Fp3.jpg&amp;w=384&amp;q=75 384w, /_next/image?url=https%3A%2F%2Fpub-test.r2.dev%2Fp%2Fp3.jpg&amp;w=640&amp;q=75 640w, /_next/image?url=https%3A%2F%2Fpub-test.r2.dev%2Fp%2Fp3.jpg&amp;w=750&amp;q=75 750w, /_next/image?url=https%3A%2F%2Fpub-test.r2.dev%2Fp%2Fp3.jpg&amp;w=828&amp;q=75 828w, /_next/image?url=https%3A%2F%2Fpub-test.r2.dev%2Fp%2Fp3.jpg&amp;w=1080&amp;q=75 1080w, /_next/image?url=https%3A%2F%2Fpub-test.r2.dev%2Fp%2Fp3.jpg&amp;w=1200&amp;q=75 1200w, /_next/image?url=https%3A%2F%2Fpub-test.r2.dev%2Fp%2Fp3.jpg&amp;w=1920&amp;q=75 1920w, /_next/image?url=https%3A%2F%2Fpub-test.r2.dev%2Fp%2Fp3.jpg&amp;w=2048&amp;q=75 2048w, /_next/image?url=https%3A%2F%2Fpub-test.r2.dev%2Fp%2Fp3.jpg&amp;w=3840&amp;q=75 3840w" src="/_next/image?url=https%3A%2F%2Fpub-test.r2.dev%2Fp%2Fp3.jpg&amp;w=3840&amp;q=75"/>
 <span aria-hidden="true">
 </span>

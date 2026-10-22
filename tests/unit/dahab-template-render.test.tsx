@@ -229,12 +229,14 @@ describe('Dahab home document', () => {
     });
   }
 
-  it('Dahab skin: its own cards, arch tiles, hero and testimonials', () => {
+  it('Dahab skin: its own cards, rectangular tiles (no arch), hero and testimonials', () => {
     const html = renderDoc('dahab', 'ar');
     expect(html).toContain('data-pack-card="dahab"');
-    expect(html).toContain('rounded-t-[999px]');
+    // Ruling B5-3: the arch frame and the drawn hero rule are retired with the old skin.
+    expect(html).not.toContain('rounded-t-[999px]');
+    expect(html).not.toContain('dahab-hero-copy');
+    expect(html).not.toContain('dahab-draw');
     expect(html).toContain('دهب يتلبس كل يوم');
-    expect(html).toContain('dahab-hero-copy');
     // The "Featured products" fallback is not appended under a document that already shows products.
     expect(html).not.toContain('منتجات مميزة');
   });
