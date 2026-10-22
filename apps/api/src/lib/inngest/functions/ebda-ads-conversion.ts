@@ -142,7 +142,7 @@ export const ebdaAdsConversion: InngestFunction.Any = inngest.createFunction(
     id: 'ebda-ads-conversion',
     name: 'Ebda own ads — Meta Conversions API (registration, store, first paid subscription)',
     retries: 4, // = MAX_ATTEMPTS - 1 (Inngest types retries as a literal union)
-    concurrency: { limit: 10 },
+    concurrency: { limit: 5 }, // Inngest Hobby plan cap; a higher value makes the whole app sync fail (INNGEST-PLAN-1)
     triggers: [{ event: 'ebda-ads/conversion.requested' }],
   },
   async ({ event, step, attempt }) => {
