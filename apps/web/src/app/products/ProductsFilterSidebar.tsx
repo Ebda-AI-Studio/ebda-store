@@ -511,7 +511,7 @@ export function ProductsFilterSidebar(props: ProductsFilterSidebarProps) {
     // search input, price range labels, category chips, mobile sheet
     // trigger, the lot.
     <aside
-      className="w-full shrink-0 lg:w-64 lg:rounded-[var(--radius)] lg:overflow-hidden lg:p-4 lg:border lg:border-input lg:bg-[hsl(var(--filter-bg))] lg:text-[hsl(var(--filter-fg))]"
+      className="w-full shrink-0 lg:w-64 lg:rounded-[var(--radius)] lg:p-4 lg:sticky lg:top-[calc(var(--header-h,0px)+1rem)] lg:max-h-[calc(100dvh-var(--header-h,0px)-2rem)] lg:overflow-y-auto lg:border lg:border-input lg:bg-[hsl(var(--filter-bg))] lg:text-[hsl(var(--filter-fg))]"
       style={sidebarVars}
       data-zone="filters"
       // merchant filter colours: the active chip gets an ink ring so it never blends into a
@@ -614,7 +614,7 @@ export function ProductsFilterSidebar(props: ProductsFilterSidebarProps) {
 
       {/* Desktop inline sidebar — collapsible via the header button. Initial
           open state driven by the merchant's filterSidebar.defaultOpen setting. */}
-      <div id="products-filter-panel" className="hidden lg:block lg:sticky lg:top-24">
+      <div id="products-filter-panel" className="hidden lg:block">
         {/* Collapse toggle header */}
         <button
           type="button"

@@ -536,7 +536,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         // sibling. ShopChrome carries its own pb-32 for content inside it;
         // body-level reserve is the only way to also protect siblings
         // rendered after ShopChrome by the providers. Ahmad 2026-05-17 evening.
-        className={`${plusJakarta.variable} ${ibmPlexArabic.variable} font-sans antialiased bg-background text-foreground overflow-x-hidden pb-32 md:pb-0`}
+        className={`${plusJakarta.variable} ${ibmPlexArabic.variable} font-sans antialiased bg-background text-foreground pb-32 md:pb-0`}
         // Skin hook for pack-level CSS (globals.css), on the server-rendered body so the first
         // paint already has it (the chrome itself loads on the client). Only the look skins set
         // it: other stores' markup is unchanged. Display faces come from the look (looks/fonts.ts).
@@ -553,8 +553,8 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         data-look={look?.dataLook}
       >
         {/* Reset scroll to top on every route change — the body is the scroll
-            container (overflow-x-hidden), so Next's window-targeted scroll
-            restoration alone leaves pages loading mid-page. */}
+            container on browsers without `overflow: clip` (see globals.css, #124), so
+            Next's window-targeted scroll restoration alone leaves pages loading mid-page there. */}
         <ScrollToTop />
         <StoreProvider
           initialStore={store}
