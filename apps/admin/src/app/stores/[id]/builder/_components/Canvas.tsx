@@ -23,6 +23,8 @@ import { useT } from '@/i18n/useT';
 
 interface Props {
   storefrontUrl: string;
+  /** The storefront path this page renders on (`/` home, `/cart`, `/products`, `/products/<slug>`). */
+  path?: string;
   token: string;
   doc: PageDefinition;
   viewport: Viewport;
@@ -35,6 +37,7 @@ interface Props {
 
 export function Canvas({
   storefrontUrl,
+  path = '/',
   token,
   doc,
   viewport,
@@ -50,7 +53,7 @@ export function Canvas({
   const [scale, setScale] = useState(1);
   const origin = originOf(storefrontUrl);
   const width = VIEWPORT_RANGES[viewport].previewPx;
-  const src = `${storefrontUrl.replace(/\/$/, '')}/?_preview=${reloadKey}&_builder=${encodeURIComponent(token)}`;
+  const src = `${storefrontUrl.replace(/\/$/, '')}${path}?_preview=${reloadKey}&_builder=${encodeURIComponent(token)}`;
 
   const post = useCallback(
     (msg: Omit<ParentToChild, 'protocol'>) => {

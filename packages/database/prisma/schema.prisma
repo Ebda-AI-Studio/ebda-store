@@ -536,6 +536,7 @@ model Store {
   manualPaymentClaims        ManualPaymentClaim[]
   instapayReceipts           InstapayReceipt[]
   billingReminders           BillingReminder[]
+  lifecycleEmails            StoreLifecycleEmail[]
 
   @@index([ownerId])
   @@index([status])
@@ -949,7 +950,7 @@ model Product {
   lowStockThreshold    Int           @default(5) @map("low_stock_threshold")
   trackInventory       Boolean       @default(true) @map("track_inventory")
   // Gold-rate pricing (Phase B5, Rulings B5-12/B5-13). `price` stays the ONE price every reader uses; for a
-  // gold-priced row only the repricer writes it (trigger ebda_gold_price_guard, migration 20261102000100).
+  // gold-priced row only the repricer writes it (trigger ebda_gold_price_guard, migration 20261102000200).
   // 'fixed' | 'gold_rate' (DB CHECK). The spec below is integer-only: weight in MILLIGRAMS, making charge in
   // piastres (fixed) or piastres per gram (per_gram), margin in basis points. Never Float, never `facts`.
   pricingMode          String        @default("fixed") @map("pricing_mode")
@@ -5318,6 +5319,30 @@ model BillingReminder {
   @@map("billing_reminders")
 }
 
+/// One row per (store, onboarding/lifecycle email kind): the idempotency handle AND the merchant-visible
+/// log of the self-serve lifecycle emails (setup nudges, trial recap, first-order referral ask). The
+/// Inngest function wins the INSERT before it sends, so a retry or a second run never sends the same
+/// email twice. `status`: sent | skipped (the step was already done, `reason` says why) | failed
+/// (enqueue threw). kind `optout` is the merchant's unsubscribe: while it exists nothing is sent.
+/// Viewer: /stores/[id]/lifecycle-emails. RLS: strict store policy.
+model StoreLifecycleEmail {
+  id        String   @id @default(uuid())
+  storeId   String   @map("store_id")
+  /// add_products | payment_shipping | test_order | share_link | trial_recap | first_order | optout
+  kind      String
+  /// sent | skipped | failed
+  status    String
+  /// skipped / failed: why (step already done, no recipient, opted out, enqueue error code)
+  reason    String?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  @@unique([storeId, kind])
+  @@index([storeId, createdAt])
+  @@map("store_lifecycle_emails")
+}
+
 /// Provider webhook inbox (SP5 task 3): UNIQUE (provider, eventId) makes a
 /// replayed delivery a no-op. Written in the SAME transaction as the
 /// settlement it triggers, so a crash can never mark an event "seen" without
@@ -5654,7 +5679,7 @@ model WebhookDelivery {
 // ==========================================
 
 /// Append-only history of every rate written. ebda_app may SELECT, INSERT and UPDATE (status, decided_by,
-/// applied_at) only: no DELETE, no re-rating (column grants in migration 20261102000100).
+/// applied_at) only: no DELETE, no re-rating (column grants in migration 20261102000200).
 model GoldRate {
   id            String    @id @default(uuid())
   storeId       String    @map("store_id")

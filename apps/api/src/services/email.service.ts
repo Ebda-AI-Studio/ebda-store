@@ -59,6 +59,8 @@ import {
   planLimitReachedTemplate,
   type PlanLimitReachedData,
 } from './email-templates/plan-limit-reached';
+import { oneClickUnsubscribeHeaders } from '../lib/lifecycle-unsubscribe-token';
+import { lifecycleTemplate, type LifecycleEmailData } from './email-templates/lifecycle';
 import {
   subscriptionBillingTemplate,
   type SubscriptionBillingNoticeData,
@@ -105,6 +107,8 @@ export interface EmailOptions {
   html: string;
   text?: string;
   replyTo?: string;
+  /** Extra message headers (RFC 8058 List-Unsubscribe / List-Unsubscribe-Post). Marketing and lifecycle mail only. */
+  headers?: Record<string, string>;
 }
 
 export interface EmailStoreContext {
@@ -443,6 +447,9 @@ export class EmailService {
       content: string;
       text?: string;
       replyTo?: string;
+      /** Shell direction + brand name; default = the platform default language. */
+      language?: 'en' | 'ar';
+      headers?: Record<string, string>;
     },
     opts?: { queue?: boolean }
   ): Promise<void> {
@@ -454,11 +461,17 @@ export class EmailService {
       email: null,
       phone: null,
       address: null,
-      defaultLanguage: resolveDefaultLanguage(undefined),
+      defaultLanguage: args.language ?? resolveDefaultLanguage(undefined),
     });
     if (opts?.queue) {
       // Durable retry queue (storeId=null → platform sender on drain).
-      await emailQueue.enqueue(null, { to: args.to, subject: args.subject, html, text: args.text });
+      await emailQueue.enqueue(null, {
+        to: args.to,
+        subject: args.subject,
+        html,
+        text: args.text,
+        ...(args.headers ? { headers: args.headers } : {}),
+      });
       return;
     }
     const r = await getPlatformResend();
@@ -470,6 +483,7 @@ export class EmailService {
     };
     if (args.text) payload.text = args.text;
     if (args.replyTo) payload.replyTo = args.replyTo;
+    if (args.headers) payload.headers = args.headers;
     const { error } = await r.emails.send(
       payload as unknown as Parameters<typeof r.emails.send>[0]
     );
@@ -506,6 +520,7 @@ export class EmailService {
     };
     if (options.text) payload.text = options.text;
     if (options.replyTo) payload.replyTo = options.replyTo;
+    if (options.headers) payload.headers = options.headers;
     const { error } = await r.emails.send(
       payload as unknown as Parameters<typeof r.emails.send>[0]
     );
@@ -1211,6 +1226,29 @@ export class EmailService {
         subject: subscriptionBillingTemplate.subject[lang](data),
         content: subscriptionBillingTemplate[lang](data),
         language: lang,
+      },
+      { queue: true }
+    );
+  }
+
+  /**
+   * Self-serve lifecycle email (setup nudges, trial recap, first-order referral ask) to the store owner.
+   * Platform sender and Ebda shell (night/gold), through the durable queue. Refuses to send without an
+   * unsubscribe link: consent is part of the contract, not of the template.
+   */
+  static async sendLifecycleEmail(
+    data: LifecycleEmailData & { to: string },
+    language: 'en' | 'ar' = 'ar'
+  ): Promise<void> {
+    if (!data.unsubscribeUrl) throw new Error('LIFECYCLE_EMAIL_NEEDS_UNSUBSCRIBE_URL');
+    await this.sendPlatform(
+      {
+        to: data.to,
+        subject: lifecycleTemplate.subject(data, language),
+        content: lifecycleTemplate.content(data, language),
+        language,
+        replyTo: BRAND.supportEmail,
+        headers: oneClickUnsubscribeHeaders(data.unsubscribeUrl),
       },
       { queue: true }
     );

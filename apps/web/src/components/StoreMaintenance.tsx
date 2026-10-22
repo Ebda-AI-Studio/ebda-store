@@ -3,7 +3,7 @@
 import Image from 'next/image';
 import { useStore } from '../contexts/StoreContext';
 import { useLanguage } from '../contexts/LanguageContext';
-import { BRAND_MARKETING_URL, BRAND } from '@ebda/shared';
+import { BRAND, referralUrl } from '@ebda/shared';
 
 import { normalizeEgyptianMobile } from '@ebda/shared';
 /**
@@ -180,7 +180,7 @@ export function StoreMaintenance() {
 
         <footer className="mt-16 text-xs text-muted-foreground">
           <a
-            href={BRAND_MARKETING_URL}
+            href={referralUrl('badge')}
             target="_blank"
             rel="noopener noreferrer"
             className="transition-colors hover:text-foreground"

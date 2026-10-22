@@ -26,6 +26,8 @@ import {
   heroSlideSchema,
   type PageDefinition,
   type StoreLayoutSettings,
+  defaultPageDocument,
+  type SectionPageKind,
   type TemplateId,
 } from '@ebda/shared';
 import { LAYOUT_FIXTURES, TEMPLATES, loadLayoutFixture } from '../fixtures/builder/homepage-data';
@@ -243,6 +245,16 @@ describe('registry', () => {
       'maker-profile',
       'gift-finder',
       'trust-badges',
+      // page documents (VE-3 / VE-12)
+      'product-main',
+      'product-faq',
+      'product-reviews',
+      'product-bundles',
+      'product-recommendations',
+      'product-related',
+      'collection-main',
+      'cart-main',
+      'cart-recommendations',
     ]);
     const keys = SECTION_REGISTRY.flatMap(d => (d.legacyKey === null ? [] : [d.legacyKey])).sort();
     expect(keys).toEqual(
@@ -317,7 +329,12 @@ describe('settings schemas (drive the Phase 2 auto-generated panel)', () => {
   it('every preset inserts a valid section (add-section picker)', () => {
     for (const d of SECTION_REGISTRY) {
       d.presets.forEach((p, i) => {
-        const doc = baseDef();
+        // a page-kind section is tested on its own page's document, the rest on the home document
+        const kind = d.pages.find(k => k !== 'home');
+        const doc =
+          d.pages.includes('home') || !kind
+            ? baseDef()
+            : defaultPageDocument(kind as SectionPageKind);
         const node = sectionFromPreset(d.type, i, `preset-${d.type}`);
         expect(node.hidden).toBe(false);
         const list = d.group === 'template' ? doc.sections : doc.sectionGroups[d.group];

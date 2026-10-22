@@ -21,6 +21,13 @@ import { useToast } from '@ebda/ui';
 import { useCart } from '../../contexts/CartContext';
 import { useLanguage, translations } from '../../contexts/LanguageContext';
 import { ShopChrome } from '../../components';
+import {
+  PageMark,
+  itemNodes,
+  pageSectionsAround,
+  usePageDocument,
+  withPageSettings,
+} from '../../builder/render/PageDocument';
 import { toggleCompare } from '@/lib/compare';
 import { useStore, useStoreUrl } from '../../contexts/StoreContext';
 import { useTemplateComponents } from '../../hooks/useTemplateComponents';
@@ -87,8 +94,8 @@ export default function ProductsClient({
   initialProducts = [],
   initialMeta = null,
   productCardDefaults,
-  filterSidebar,
-  productsPage,
+  filterSidebar: liveFilterSidebar,
+  productsPage: liveProductsPage,
 }: ProductsClientProps) {
   const searchParams = useSearchParams();
   const [search, setSearch] = useState('');
@@ -196,6 +203,13 @@ export default function ProductsClient({
   const { store } = useStore();
   const storeUrl = useStoreUrl();
   const { templateId } = useTemplateComponents();
+  // The collection page's section document (Ruling VE-3): which sections go around the listing.
+  const pageDoc = usePageDocument('collection');
+  // In the editor canvas the page's own settings come from the draft document, otherwise the live layout.
+  const { filterSidebar, productsPage } = withPageSettings(pageDoc, {
+    filterSidebar: liveFilterSidebar,
+    productsPage: liveProductsPage,
+  });
   // A search the server ranked (hybrid relevance, Task 12) labels the default "Most relevant".
   const sortOptions = getSortOptions(t, meta?.ranked === true);
 
@@ -569,6 +583,8 @@ export default function ProductsClient({
     setOptionFilters({});
   };
 
+  const around = pageSectionsAround(pageDoc, {});
+
   return (
     <ShopChrome>
       <div
@@ -579,397 +595,407 @@ export default function ProductsClient({
           pageSurfaceStyle(productsPage?.bgColor, store.theme, productsPage?.colorScheme)
         }
       >
-        {/* data-zone="products" wraps the entire listing — header h1 +
+        {itemNodes(around.before)}
+        <PageMark kind="collection">
+          {/* data-zone="products" wraps the entire listing — header h1 +
           breadcrumb + filter sidebar (sort, price range, search,
           category chips) + product grid + counter — so the merchant's
           "Products" zone typography settings cascade to every text
           element on this page in one shot. */}
-        <div
-          className="mx-auto w-full max-w-7xl flex-1 px-4 py-8 sm:px-6 lg:px-8"
-          style={plpDensity}
-          data-zone="products"
-        >
-          {/* Breadcrumb */}
-          <Breadcrumbs
-            style={{ ...zoneStyle(plpSubtitleZone, plpScale), ...plpBreadcrumbColorStyle }}
-            currentStyle={{ ...zoneStyle(plpSubtitleZone, plpScale), ...plpBreadcrumbColorStyle }}
-            items={[
-              { label: t('Home', translations['Home']), href: storeUrl('/') },
-              ...(categoryFilter || tagFilter
-                ? [
-                    {
-                      label: t('Products', translations['Products']),
-                      href: storeUrl('/products'),
-                      onClick: () => {
-                        setCategoryFilter('');
-                        setTagFilter('');
+          <div
+            className="mx-auto w-full max-w-7xl flex-1 px-4 py-8 sm:px-6 lg:px-8"
+            style={plpDensity}
+            data-zone="products"
+          >
+            {/* Breadcrumb */}
+            <Breadcrumbs
+              style={{ ...zoneStyle(plpSubtitleZone, plpScale), ...plpBreadcrumbColorStyle }}
+              currentStyle={{ ...zoneStyle(plpSubtitleZone, plpScale), ...plpBreadcrumbColorStyle }}
+              items={[
+                { label: t('Home', translations['Home']), href: storeUrl('/') },
+                ...(categoryFilter || tagFilter
+                  ? [
+                      {
+                        label: t('Products', translations['Products']),
+                        href: storeUrl('/products'),
+                        onClick: () => {
+                          setCategoryFilter('');
+                          setTagFilter('');
+                        },
                       },
-                    },
-                  ]
-                : []),
-              { label: t(ctxEn, ctxAr) },
-            ]}
-          />
+                    ]
+                  : []),
+                { label: t(ctxEn, ctxAr) },
+              ]}
+            />
 
-          {/* Header */}
-          <div className="mb-8">
-            <h1
-              lang={
-                tagFilter && !activeCategory && categoryFilter !== 'best-sellers'
-                  ? tagLabel(
-                      { name: tagFilter, nameAr: tagNameAr },
-                      language === 'ar' ? 'ar' : 'en'
-                    ).lang
-                  : undefined
-              }
-              className="font-display text-3xl font-bold tracking-tight text-foreground sm:text-4xl"
-              style={{ ...zoneStyle(plpHeadingZone, plpScale), ...plpHeadingColorStyle }}
-            >
-              {t(ctxEn, ctxAr)}
-            </h1>
-            {tagFilter && !categoryFilter && (
-              // The skin-type / concern chip that brought the shopper here: the result count and
-              // one 44px control that removes the filter (Phase B3, Ruling B3-5).
-              <div
-                data-zone="tagFilter"
-                className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground"
-              >
-                {meta && (
-                  <span role="status">
-                    {t(countText('en', meta.total, RESULTS), countText('ar', meta.total, RESULTS))}
-                  </span>
-                )}
-                <button
-                  type="button"
-                  onClick={() => setTagFilter('')}
-                  className="inline-flex min-h-[44px] items-center rounded-[var(--radius)] border border-input px-4 text-foreground hover:border-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                >
-                  {t('Clear filter', translations['Clear filter'])} ·{' '}
-                  <span
-                    lang={
-                      tagLabel(
+            {/* Header */}
+            <div className="mb-8">
+              <h1
+                lang={
+                  tagFilter && !activeCategory && categoryFilter !== 'best-sellers'
+                    ? tagLabel(
                         { name: tagFilter, nameAr: tagNameAr },
                         language === 'ar' ? 'ar' : 'en'
                       ).lang
-                    }
-                  >
-                    {
-                      tagLabel(
-                        { name: tagFilter, nameAr: tagNameAr },
-                        language === 'ar' ? 'ar' : 'en'
-                      ).text
-                    }
-                  </span>
-                </button>
-              </div>
-            )}
-            {subtitle && (
-              <p
-                className="mt-2 max-w-[60ch] text-muted-foreground"
-                style={{ ...zoneStyle(plpSubtitleZone, plpScale), ...plpSubheadingColorStyle }}
+                    : undefined
+                }
+                className="font-display text-3xl font-bold tracking-tight text-foreground sm:text-4xl"
+                style={{ ...zoneStyle(plpHeadingZone, plpScale), ...plpHeadingColorStyle }}
               >
-                {subtitle}
-              </p>
-            )}
-          </div>
-
-          <div className="flex flex-col gap-8 lg:flex-row">
-            {/* Sidebar Filters — hidden when merchant sets filterSidebar.enabled = false.
-              defaultOpen drives the initial collapsed/open state on desktop. */}
-            {filterSidebar?.enabled !== false && (
-              <div className="flex shrink-0 flex-col gap-4 lg:w-72">
-                <ProductsFilterSidebar
-                  search={search}
-                  categoryFilter={categoryFilter}
-                  categories={categories}
-                  meta={meta}
-                  language={language}
-                  onSearchChange={setSearch}
-                  onCategoryChange={setCategoryFilter}
-                  onClearAll={handleClearAll}
-                  onSearchSubmit={handleSearch}
-                  sortBy={sortBy}
-                  sortOptions={sortOptions.map(o => ({ value: o.value, label: o.label }))}
-                  onSortChange={setSortBy}
-                  resultCount={products.length}
-                  isLoading={isLoading}
-                  // L-07: a page size is not a filter; the PLP keeps its default page size.
-                  priceMin={priceMin}
-                  priceMax={priceMax}
-                  priceFloor={0}
-                  priceCeil={sliderMax}
-                  priceStep={PRICE_SLIDER_STEP}
-                  onPriceChange={(min, max) => {
-                    setPriceMin(min);
-                    setPriceMax(max);
-                  }}
-                  facets={facets}
-                  optionFilters={optionFilters}
-                  onOptionToggle={handleOptionToggle}
-                  defaultOpen={filterSidebar?.defaultOpen}
-                  bgTriplet={
-                    filterSidebar?.bgColor
-                      ? colorToHslTriplet(filterSidebar.bgColor, store.theme) || undefined
-                      : undefined
-                  }
-                  fgTriplet={
-                    filterSidebar?.textColor
-                      ? colorToHslTriplet(filterSidebar.textColor, store.theme) || undefined
-                      : undefined
-                  }
-                />
-                {/* View Mode */}
-                <div className="hidden items-center gap-1 rounded-lg border border-input bg-background p-1 sm:flex">
+                {t(ctxEn, ctxAr)}
+              </h1>
+              {tagFilter && !categoryFilter && (
+                // The skin-type / concern chip that brought the shopper here: the result count and
+                // one 44px control that removes the filter (Phase B3, Ruling B3-5).
+                <div
+                  data-zone="tagFilter"
+                  className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground"
+                >
+                  {meta && (
+                    <span role="status">
+                      {t(
+                        countText('en', meta.total, RESULTS),
+                        countText('ar', meta.total, RESULTS)
+                      )}
+                    </span>
+                  )}
                   <button
                     type="button"
-                    aria-pressed={viewMode === 'grid'}
-                    onClick={() => setViewMode('grid')}
-                    aria-label={t('Grid view', '\u0639\u0631\u0636 \u0634\u0628\u0643\u064a')}
-                    className={`rounded-md inline-flex h-11 w-11 items-center justify-center transition-colors ${viewMode === 'grid' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'}`}
+                    onClick={() => setTagFilter('')}
+                    className="inline-flex min-h-[44px] items-center rounded-[var(--radius)] border border-input px-4 text-foreground hover:border-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                   >
-                    <svg
-                      className="h-4 w-4"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                      aria-hidden="true"
+                    {t('Clear filter', translations['Clear filter'])} ·{' '}
+                    <span
+                      lang={
+                        tagLabel(
+                          { name: tagFilter, nameAr: tagNameAr },
+                          language === 'ar' ? 'ar' : 'en'
+                        ).lang
+                      }
                     >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"
-                      />
-                    </svg>
-                    <span className="sr-only">{t('Grid view', 'عرض شبكي')}</span>
-                  </button>
-                  <button
-                    type="button"
-                    aria-pressed={viewMode === 'list'}
-                    onClick={() => setViewMode('list')}
-                    aria-label={t('List view', '\u0639\u0631\u0636 \u0642\u0627\u0626\u0645\u0629')}
-                    className={`rounded-md inline-flex h-11 w-11 items-center justify-center transition-colors ${viewMode === 'list' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'}`}
-                  >
-                    <svg
-                      className="h-4 w-4"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                      aria-hidden="true"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M4 6h16M4 10h16M4 14h16M4 18h16"
-                      />
-                    </svg>
-                    <span className="sr-only">{t('List view', 'عرض قائمة')}</span>
+                      {
+                        tagLabel(
+                          { name: tagFilter, nameAr: tagNameAr },
+                          language === 'ar' ? 'ar' : 'en'
+                        ).text
+                      }
+                    </span>
                   </button>
                 </div>
-              </div>
-            )}
-
-            {/* Products Grid */}
-            <div className="flex-1">
-              {/* Error State */}
-              {error && (
-                <div
-                  role="alert"
-                  className="mb-6 rounded-xl border border-destructive/30 bg-destructive/10 p-4"
+              )}
+              {subtitle && (
+                <p
+                  className="mt-2 max-w-[60ch] text-muted-foreground"
+                  style={{ ...zoneStyle(plpSubtitleZone, plpScale), ...plpSubheadingColorStyle }}
                 >
-                  <div className="flex items-center gap-3">
-                    <svg
-                      className="h-5 w-5 text-destructive-ink flex-shrink-0"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
-                      />
-                    </svg>
-                    <p className="text-destructive-ink flex-1">
-                      {error === 'LOAD_FAILED'
-                        ? t('Failed to load products', 'معرفناش نحمّل المنتجات')
-                        : error === 'CONNECTION_ERROR'
-                          ? t(
-                              'Unable to load products. Please check your connection.',
-                              'معرفناش نحمّل المنتجات. اتأكد من اتصالك.'
-                            )
-                          : error}
-                    </p>
+                  {subtitle}
+                </p>
+              )}
+            </div>
+
+            <div className="flex flex-col gap-8 lg:flex-row">
+              {/* Sidebar Filters — hidden when merchant sets filterSidebar.enabled = false.
+              defaultOpen drives the initial collapsed/open state on desktop. */}
+              {filterSidebar?.enabled !== false && (
+                <div className="flex shrink-0 flex-col gap-4 lg:w-72">
+                  <ProductsFilterSidebar
+                    search={search}
+                    categoryFilter={categoryFilter}
+                    categories={categories}
+                    meta={meta}
+                    language={language}
+                    onSearchChange={setSearch}
+                    onCategoryChange={setCategoryFilter}
+                    onClearAll={handleClearAll}
+                    onSearchSubmit={handleSearch}
+                    sortBy={sortBy}
+                    sortOptions={sortOptions.map(o => ({ value: o.value, label: o.label }))}
+                    onSortChange={setSortBy}
+                    resultCount={products.length}
+                    isLoading={isLoading}
+                    // L-07: a page size is not a filter; the PLP keeps its default page size.
+                    priceMin={priceMin}
+                    priceMax={priceMax}
+                    priceFloor={0}
+                    priceCeil={sliderMax}
+                    priceStep={PRICE_SLIDER_STEP}
+                    onPriceChange={(min, max) => {
+                      setPriceMin(min);
+                      setPriceMax(max);
+                    }}
+                    facets={facets}
+                    optionFilters={optionFilters}
+                    onOptionToggle={handleOptionToggle}
+                    defaultOpen={filterSidebar?.defaultOpen}
+                    bgTriplet={
+                      filterSidebar?.bgColor
+                        ? colorToHslTriplet(filterSidebar.bgColor, store.theme) || undefined
+                        : undefined
+                    }
+                    fgTriplet={
+                      filterSidebar?.textColor
+                        ? colorToHslTriplet(filterSidebar.textColor, store.theme) || undefined
+                        : undefined
+                    }
+                  />
+                  {/* View Mode */}
+                  <div className="hidden items-center gap-1 rounded-lg border border-input bg-background p-1 sm:flex">
                     <button
                       type="button"
-                      onClick={() => fetchProducts(page)}
-                      className="inline-flex min-h-11 items-center px-3 py-1 text-sm bg-destructive/20 text-destructive-ink rounded hover:bg-destructive/30"
+                      aria-pressed={viewMode === 'grid'}
+                      onClick={() => setViewMode('grid')}
+                      aria-label={t('Grid view', '\u0639\u0631\u0636 \u0634\u0628\u0643\u064a')}
+                      className={`rounded-md inline-flex h-11 w-11 items-center justify-center transition-colors ${viewMode === 'grid' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'}`}
                     >
-                      {t('Retry', 'إعادة المحاولة')}
+                      <svg
+                        className="h-4 w-4"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                        aria-hidden="true"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"
+                        />
+                      </svg>
+                      <span className="sr-only">{t('Grid view', 'عرض شبكي')}</span>
+                    </button>
+                    <button
+                      type="button"
+                      aria-pressed={viewMode === 'list'}
+                      onClick={() => setViewMode('list')}
+                      aria-label={t(
+                        'List view',
+                        '\u0639\u0631\u0636 \u0642\u0627\u0626\u0645\u0629'
+                      )}
+                      className={`rounded-md inline-flex h-11 w-11 items-center justify-center transition-colors ${viewMode === 'list' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'}`}
+                    >
+                      <svg
+                        className="h-4 w-4"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                        aria-hidden="true"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M4 6h16M4 10h16M4 14h16M4 18h16"
+                        />
+                      </svg>
+                      <span className="sr-only">{t('List view', 'عرض قائمة')}</span>
                     </button>
                   </div>
                 </div>
               )}
 
-              {/* Loading State */}
-              {isLoading && (
-                <div className={plpGridClass}>
-                  {[...Array(12)].map((_, i) => (
-                    <ProductSkeleton key={i} />
-                  ))}
-                </div>
-              )}
+              {/* Products Grid */}
+              <div className="flex-1">
+                {/* Error State */}
+                {error && (
+                  <div
+                    role="alert"
+                    className="mb-6 rounded-xl border border-destructive/30 bg-destructive/10 p-4"
+                  >
+                    <div className="flex items-center gap-3">
+                      <svg
+                        className="h-5 w-5 text-destructive-ink flex-shrink-0"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+                        />
+                      </svg>
+                      <p className="text-destructive-ink flex-1">
+                        {error === 'LOAD_FAILED'
+                          ? t('Failed to load products', 'معرفناش نحمّل المنتجات')
+                          : error === 'CONNECTION_ERROR'
+                            ? t(
+                                'Unable to load products. Please check your connection.',
+                                'معرفناش نحمّل المنتجات. اتأكد من اتصالك.'
+                              )
+                            : error}
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => fetchProducts(page)}
+                        className="inline-flex min-h-11 items-center px-3 py-1 text-sm bg-destructive/20 text-destructive-ink rounded hover:bg-destructive/30"
+                      >
+                        {t('Retry', 'إعادة المحاولة')}
+                      </button>
+                    </div>
+                  </div>
+                )}
 
-              {/* Grid View — Demo Store-spec PLP card (sold-out ribbon, wishlist
+                {/* Loading State */}
+                {isLoading && (
+                  <div className={plpGridClass}>
+                    {[...Array(12)].map((_, i) => (
+                      <ProductSkeleton key={i} />
+                    ))}
+                  </div>
+                )}
+
+                {/* Grid View — Demo Store-spec PLP card (sold-out ribbon, wishlist
                 top-START, full-width pill CTA). 6 cols desktop / 3 tablet /
                 2 mobile per spec § 4.4. The per-pack visual treatment comes
                 from the `pack` prop (see templates/shared/pack-styles.ts). */}
-              {!isLoading && !error && viewMode === 'grid' && templateId === 'dahab' && (
-                <div className="mb-6 hidden items-center justify-end gap-2 text-[13px] text-muted-foreground lg:flex">
-                  <span id="plp-density-label">{t('Pieces per row', 'عدد القطع في الصف')}</span>
-                  <div
-                    role="group"
-                    aria-labelledby="plp-density-label"
-                    className="flex rounded-[var(--radius)] border border-input"
-                  >
-                    {([3, 4] as const).map(n => (
-                      <button
-                        key={n}
-                        type="button"
-                        aria-pressed={dahabCols === n}
-                        onClick={() => setDahabCols(n)}
-                        className={`h-9 w-10 tabular-nums transition-colors ${dahabCols === n ? 'text-primary' : 'hover:text-foreground'}`}
-                      >
-                        {n}
-                      </button>
+                {!isLoading && !error && viewMode === 'grid' && templateId === 'dahab' && (
+                  <div className="mb-6 hidden items-center justify-end gap-2 text-[13px] text-muted-foreground lg:flex">
+                    <span id="plp-density-label">{t('Pieces per row', 'عدد القطع في الصف')}</span>
+                    <div
+                      role="group"
+                      aria-labelledby="plp-density-label"
+                      className="flex rounded-[var(--radius)] border border-input"
+                    >
+                      {([3, 4] as const).map(n => (
+                        <button
+                          key={n}
+                          type="button"
+                          aria-pressed={dahabCols === n}
+                          onClick={() => setDahabCols(n)}
+                          className={`h-9 w-10 tabular-nums transition-colors ${dahabCols === n ? 'text-primary' : 'hover:text-foreground'}`}
+                        >
+                          {n}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {!isLoading && !error && viewMode === 'grid' && (
+                  <div className={plpGridClass} dir={language === 'ar' ? 'rtl' : 'ltr'}>
+                    {products.map((p, i) => (
+                      // id="product-{id}" anchors the focus-scroll that fires
+                      // when the shopper returns from cart via "Continue Shopping"
+                      // after adding this product on the PDP.
+                      <div key={p.id} id={`product-${p.id}`}>
+                        <StorefrontProductCard
+                          key={p.id}
+                          // First row(s) are above the fold — eager-load + preload
+                          // their images to improve LCP (audit). Rest stay lazy.
+                          priority={i < 6}
+                          // productCardDefaults override the "md" fallback when set.
+                          // Per-section overrides don't apply on PLP; only the global
+                          // defaults slot applies here (Sprint 4, 2026-05-18).
+                          cardSize={productCardDefaults?.cardSize ?? 'md'}
+                          cardAspect={productCardDefaults?.cardAspect}
+                          cardShape={productCardDefaults?.cardShape}
+                          showCardFrame={productCardDefaults?.showCardFrame}
+                          cardFrameStyle={productCardDefaults?.cardFrameStyle}
+                          cardFrameWidth={productCardDefaults?.cardFrameWidth}
+                          cardFrameSize={productCardDefaults?.cardFrameSize}
+                          cardFrameColor={productCardDefaults?.cardFrameColor}
+                          showLabel={productCardDefaults?.showLabel}
+                          showHover={productCardDefaults?.showHover}
+                          cardImageAspect={productCardDefaults?.cardImageAspect}
+                          cardImageRadius={productCardDefaults?.cardImageRadius}
+                          showCardName={productCardDefaults?.showCardName}
+                          showCardPrice={
+                            store.theme?.showPriceOnCards === false
+                              ? false
+                              : productCardDefaults?.showCardPrice
+                          }
+                          productNameZone={plpProductNameZone}
+                          productPriceZone={plpProductPriceZone}
+                          productCtaZone={plpProductCtaZone}
+                          product={toTemplateProduct(p)}
+                          isRtl={language === 'ar'}
+                          currency={store.currency}
+                          pack={templateId}
+                          onAddToCart={async productId => {
+                            const found = products.find(x => x.id === productId);
+                            if (found)
+                              addItem({
+                                id: found.id,
+                                name: found.name,
+                                nameAr: found.nameAr ?? undefined,
+                                price: found.price,
+                                slug: found.slug,
+                                image: found.images?.[0]?.url,
+                                category: found.categories?.[0]?.category?.name,
+                              });
+                          }}
+                          urlPrefix={storeUrl('')}
+                        />
+                      </div>
                     ))}
                   </div>
-                </div>
-              )}
-              {!isLoading && !error && viewMode === 'grid' && (
-                <div className={plpGridClass} dir={language === 'ar' ? 'rtl' : 'ltr'}>
-                  {products.map((p, i) => (
-                    // id="product-{id}" anchors the focus-scroll that fires
-                    // when the shopper returns from cart via "Continue Shopping"
-                    // after adding this product on the PDP.
-                    <div key={p.id} id={`product-${p.id}`}>
-                      <StorefrontProductCard
-                        key={p.id}
-                        // First row(s) are above the fold — eager-load + preload
-                        // their images to improve LCP (audit). Rest stay lazy.
-                        priority={i < 6}
-                        // productCardDefaults override the "md" fallback when set.
-                        // Per-section overrides don't apply on PLP; only the global
-                        // defaults slot applies here (Sprint 4, 2026-05-18).
-                        cardSize={productCardDefaults?.cardSize ?? 'md'}
-                        cardAspect={productCardDefaults?.cardAspect}
-                        cardShape={productCardDefaults?.cardShape}
-                        showCardFrame={productCardDefaults?.showCardFrame}
-                        cardFrameStyle={productCardDefaults?.cardFrameStyle}
-                        cardFrameWidth={productCardDefaults?.cardFrameWidth}
-                        cardFrameSize={productCardDefaults?.cardFrameSize}
-                        cardFrameColor={productCardDefaults?.cardFrameColor}
-                        showLabel={productCardDefaults?.showLabel}
-                        showHover={productCardDefaults?.showHover}
-                        cardImageAspect={productCardDefaults?.cardImageAspect}
-                        cardImageRadius={productCardDefaults?.cardImageRadius}
-                        showCardName={productCardDefaults?.showCardName}
+                )}
+
+                {/* List View */}
+                {!isLoading && !error && viewMode === 'list' && (
+                  <div className="space-y-4">
+                    {products.map(product => (
+                      <ProductListItem
+                        key={product.id}
+                        product={product}
+                        isInCompare={compareIds.has(product.id)}
+                        onToggleCompare={handleToggleCompare}
+                        onAddToCart={handleAddToCart}
                         showCardPrice={
                           store.theme?.showPriceOnCards === false
                             ? false
                             : productCardDefaults?.showCardPrice
                         }
-                        productNameZone={plpProductNameZone}
-                        productPriceZone={plpProductPriceZone}
-                        productCtaZone={plpProductCtaZone}
-                        product={toTemplateProduct(p)}
-                        isRtl={language === 'ar'}
-                        currency={store.currency}
-                        pack={templateId}
-                        onAddToCart={async productId => {
-                          const found = products.find(x => x.id === productId);
-                          if (found)
-                            addItem({
-                              id: found.id,
-                              name: found.name,
-                              nameAr: found.nameAr ?? undefined,
-                              price: found.price,
-                              slug: found.slug,
-                              image: found.images?.[0]?.url,
-                              category: found.categories?.[0]?.category?.name,
-                            });
-                        }}
-                        urlPrefix={storeUrl('')}
                       />
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {/* List View */}
-              {!isLoading && !error && viewMode === 'list' && (
-                <div className="space-y-4">
-                  {products.map(product => (
-                    <ProductListItem
-                      key={product.id}
-                      product={product}
-                      isInCompare={compareIds.has(product.id)}
-                      onToggleCompare={handleToggleCompare}
-                      onAddToCart={handleAddToCart}
-                      showCardPrice={
-                        store.theme?.showPriceOnCards === false
-                          ? false
-                          : productCardDefaults?.showCardPrice
-                      }
-                    />
-                  ))}
-                </div>
-              )}
-
-              {/* No Results */}
-              {!isLoading && !error && products.length === 0 && (
-                <div className="py-16 text-center">
-                  <div className="mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-muted">
-                    <svg
-                      className="h-10 w-10 text-muted-foreground"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={1.5}
-                        d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                      />
-                    </svg>
+                    ))}
                   </div>
-                  <h3 className="text-lg font-semibold text-foreground">
-                    {t('No products found', 'ملقيناش منتجات')}
-                  </h3>
-                  <p className="mt-1 text-muted-foreground">
-                    {t(
-                      'Try adjusting your search or filter criteria',
-                      'جرّب تغيّر البحث أو الفلاتر'
-                    )}
-                  </p>
-                  <button
-                    type="button"
-                    onClick={handleClearAll}
-                    className="mt-4 rounded-xl bg-primary px-6 py-2.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
-                  >
-                    {t('Clear Filters', 'مسح الفلاتر')}
-                  </button>
-                </div>
-              )}
+                )}
 
-              {/* Pagination */}
-              {meta && <ProductsPagination meta={meta} page={page} onPageChange={setPage} />}
+                {/* No Results */}
+                {!isLoading && !error && products.length === 0 && (
+                  <div className="py-16 text-center">
+                    <div className="mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-muted">
+                      <svg
+                        className="h-10 w-10 text-muted-foreground"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={1.5}
+                          d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                        />
+                      </svg>
+                    </div>
+                    <h3 className="text-lg font-semibold text-foreground">
+                      {t('No products found', 'ملقيناش منتجات')}
+                    </h3>
+                    <p className="mt-1 text-muted-foreground">
+                      {t(
+                        'Try adjusting your search or filter criteria',
+                        'جرّب تغيّر البحث أو الفلاتر'
+                      )}
+                    </p>
+                    <button
+                      type="button"
+                      onClick={handleClearAll}
+                      className="mt-4 rounded-xl bg-primary px-6 py-2.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+                    >
+                      {t('Clear Filters', 'مسح الفلاتر')}
+                    </button>
+                  </div>
+                )}
+
+                {/* Pagination */}
+                {meta && <ProductsPagination meta={meta} page={page} onPageChange={setPage} />}
+              </div>
             </div>
           </div>
-        </div>
+        </PageMark>
+        {itemNodes(around.after)}
       </div>
     </ShopChrome>
   );

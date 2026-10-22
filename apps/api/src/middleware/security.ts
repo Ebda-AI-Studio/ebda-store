@@ -1,4 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
+import { publicTenantKey } from './public-limiter-keys';
 import rateLimit, {
   ipKeyGenerator,
   MemoryStore,
@@ -1854,19 +1855,7 @@ export const publicTenantLimiter = rateLimit({
   // Fail-OPEN on a Redis store error — same posture as every limiter above.
   passOnStoreError: true,
   skip: skipForLoadTestOrTests,
-  keyGenerator: req => {
-    // Route-level usages (coupons/validate, promotions/preview) carry the
-    // tenant as a :storeId path param; router-level usage sees only headers.
-    const paramStoreId = (req.params as Record<string, string> | undefined)?.storeId;
-    const storeId = req.headers['x-store-id'];
-    const storeDomain = req.headers['x-store-domain'];
-    const tenant =
-      (typeof paramStoreId === 'string' && paramStoreId) ||
-      (typeof storeId === 'string' && storeId) ||
-      (typeof storeDomain === 'string' && storeDomain.toLowerCase()) ||
-      '';
-    return tenant ? `t:${tenant}` : ipKeyGenerator(req.ip ?? '') || 'noip';
-  },
+  keyGenerator: publicTenantKey,
 });
 
 // ==========================================

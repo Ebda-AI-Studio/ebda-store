@@ -1,6 +1,6 @@
 -- Gold-rate pricing (Phase B5 Task 9; Rulings B5-12, B5-13, B5-16, B5-19, B5-20).
 --
--- Number: 20261102000100. The plan reserved 20261101000100, but main took that number for the FK index
+-- Number: 20261102000200. The plan reserved 20261101000100, but main took that number for the FK index
 -- migration (#122, `20261101000100_fk_leading_indexes_webhooks_b2b`) before this branch landed, so this
 -- one is renumbered to sort AFTER main's newest (Ruling B5-26). Nothing in the SQL depends on the stamp.
 --

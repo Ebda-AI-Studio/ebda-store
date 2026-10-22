@@ -11,7 +11,7 @@ import path from 'node:path';
 const sql = readFileSync(
   path.resolve(
     __dirname,
-    '../../packages/database/prisma/migrations/20261102000100_gold_rate_pricing/migration.sql'
+    '../../packages/database/prisma/migrations/20261102000200_gold_rate_pricing/migration.sql'
   ),
   'utf8'
 );
@@ -20,7 +20,7 @@ const code = sql
   .filter(l => !l.trim().startsWith('--'))
   .join('\n');
 
-describe('20261102000100_gold_rate_pricing: security statements', () => {
+describe('20261102000200_gold_rate_pricing: security statements', () => {
   for (const table of ['gold_rates', 'gold_rates_current', 'gold_rate_settings']) {
     it(`${table}: ENABLE + FORCE row level security and ONE strict ebda_app policy`, () => {
       expect(code).toContain(`ALTER TABLE ${table} ENABLE ROW LEVEL SECURITY;`);

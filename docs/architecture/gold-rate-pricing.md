@@ -4,7 +4,7 @@ A merchant can price a piece from today's gold rate instead of typing a price. T
 
 ## The model, in one paragraph
 
-`products.price` and `product_variants.price` stay THE price every reader uses (cart, order, feed, search, B2B tiers, JSON-LD). For a gold row only the **repricer** writes it, and a database trigger refuses any other write (`gold_price_guard_*`, migration `20261102000100_gold_rate_pricing`). The merchant stores a **spec** (karat, weight in milligrams, making charge, margin in basis points) and a **rate per karat** (piastres per gram); the repricer turns those into a price whenever a rate, a spec, a mode or the rounding step changes. Everything is an integer. Nothing floats, nothing is parsed from `facts`.
+`products.price` and `product_variants.price` stay THE price every reader uses (cart, order, feed, search, B2B tiers, JSON-LD). For a gold row only the **repricer** writes it, and a database trigger refuses any other write (`gold_price_guard_*`, migration `20261102000200_gold_rate_pricing`). The merchant stores a **spec** (karat, weight in milligrams, making charge, margin in basis points) and a **rate per karat** (piastres per gram); the repricer turns those into a price whenever a rate, a spec, a mode or the rounding step changes. Everything is an integer. Nothing floats, nothing is parsed from `facts`.
 
 ## The formula (Ruling B5-14)
 

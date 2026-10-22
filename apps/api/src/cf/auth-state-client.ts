@@ -3,6 +3,8 @@ import { cfBindings, type DurableObjectStubLike } from './bindings';
 import type { Op } from './auth-state-core';
 import { hop } from '../lib/hop-timing';
 
+export const CACHEGEN_PREFIX = 'cachegen:';
+
 /** Shards the key space is spread over. A key always maps to the same shard. */
 export const AUTH_STATE_SHARDS = 32;
 
@@ -26,7 +28,19 @@ export function shardKey(key: string): string {
   return key.replace(/:(attempts|locked|row)$/, '');
 }
 
+/**
+ * Sentinel "shard" of the cache-generation counters: their OWN Durable Object instance
+ * (`idFromName('cachegen')`), never one of the 32 auth shards. They are read as a group of ~5
+ * names on every public cache fill (twice), so they are one call on one instance; and because
+ * anyone can trigger cache misses on public pages, that traffic must never queue in front of the
+ * shard holding jti / token-version / lockout / CSRF / MFA / rate-limit keys. The counters are
+ * only a fill-race guard (a lost counter makes one fill skip caching), never an authorisation
+ * decision.
+ */
+export const CACHEGEN_SHARD = -1;
+
 export function shardOf(key: string): number {
+  if (key.startsWith(CACHEGEN_PREFIX)) return CACHEGEN_SHARD;
   return fnv1a(shardKey(key)) % AUTH_STATE_SHARDS;
 }
 
@@ -34,9 +48,34 @@ interface AuthStateStub extends DurableObjectStubLike {
   apply(ops: Op[]): Promise<unknown[]>;
 }
 
+/**
+ * Where the cache-generation instance lives, overridable WITHOUT a code change so its first-wake
+ * time can be measured per placement: `CACHEGEN_DO_NAME` (default `cachegen`; a new name is a new
+ * instance, created at `CACHEGEN_LOCATION_HINT` if given) and the hint, one of Cloudflare's
+ * region hints. Unset = today's behaviour exactly. The counters are only a cache fill-race guard
+ * (never authorisation), so a fresh instance costs nothing; the auth shards are never affected.
+ */
+const LOCATION_HINTS = new Set(['wnam', 'enam', 'sam', 'weur', 'eeur', 'apac', 'oc', 'afr', 'me']);
+export function cachegenPlacement(env: Record<string, string | undefined> = process.env): {
+  name: string;
+  hint?: string;
+} {
+  const rawName = env.CACHEGEN_DO_NAME ?? '';
+  const name = /^cachegen[a-z0-9-]{0,24}$/.test(rawName) ? rawName : 'cachegen';
+  const rawHint = env.CACHEGEN_LOCATION_HINT ?? '';
+  return { name, hint: LOCATION_HINTS.has(rawHint) ? rawHint : undefined };
+}
+
 function stub(shard: number): AuthStateStub {
   const ns = cfBindings()?.AUTH_STATE;
   if (!ns) throw new Error('AUTH_STATE Durable Object binding is not configured');
+  if (shard === CACHEGEN_SHARD) {
+    const { name, hint } = cachegenPlacement();
+    return ns.get(
+      ns.idFromName(name),
+      hint ? { locationHint: hint } : undefined
+    ) as unknown as AuthStateStub;
+  }
   return ns.get(ns.idFromName(`shard-${shard}`)) as unknown as AuthStateStub;
 }
 
@@ -48,9 +87,12 @@ export function applyOn(key: string, ops: Op[]): Promise<unknown[]> {
   );
 }
 
-/** Run ops on EVERY shard (sweeps: prefix scans). */
+/** Run ops on EVERY shard and the cache-generation instance (sweeps: prefix scans). */
 export async function applyOnAll(ops: Op[]): Promise<unknown[][]> {
-  return Promise.all(Array.from({ length: AUTH_STATE_SHARDS }, (_, i) => stub(i).apply(ops)));
+  return Promise.all([
+    ...Array.from({ length: AUTH_STATE_SHARDS }, (_, i) => stub(i).apply(ops)),
+    stub(CACHEGEN_SHARD).apply(ops),
+  ]);
 }
 
 export function authStateAvailable(): boolean {

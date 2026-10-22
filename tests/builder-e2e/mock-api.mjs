@@ -29,13 +29,29 @@ function freshState() {
         mode: 'slider',
         autoplayMs: 5000,
         slides: [
-          { image: 'https://media.ebda.app/hero.jpg', headline: 'Fresh dates', headlineAr: 'تمور طازجة' },
-          { image: 'https://media.ebda.app/hero-2.jpg', headline: 'Gift boxes', headlineAr: 'علب هدايا' },
+          {
+            image: 'https://media.ebda.app/hero.jpg',
+            headline: 'Fresh dates',
+            headlineAr: 'تمور طازجة',
+          },
+          {
+            image: 'https://media.ebda.app/hero-2.jpg',
+            headline: 'Gift boxes',
+            headlineAr: 'علب هدايا',
+          },
         ],
       },
       header: {},
       footer: {},
-      categories: { enabled: true, layout: 'grid', captionPosition: 'below', desktopColumns: 3, mobileColumns: 2, title: 'Shop by category', titleAr: 'تسوق حسب الفئة' },
+      categories: {
+        enabled: true,
+        layout: 'grid',
+        captionPosition: 'below',
+        desktopColumns: 3,
+        mobileColumns: 2,
+        title: 'Shop by category',
+        titleAr: 'تسوق حسب الفئة',
+      },
     },
     'modern'
   );
@@ -48,40 +64,91 @@ function freshState() {
     saves: 0,
     publishes: 0,
     liveWrites: [],
+    // product / collection / cart documents (home is the top-level fields above)
+    pages: {},
     theme: { ...shared.DEFAULT_THEME, primaryColor: '35 34% 52%' },
   };
 }
 let S = freshState();
 
-const user = { id: 'u-e2e', email: 'merchant@ebda.test', firstName: 'Mona', lastName: 'E', role: 'store_admin', storeId: null };
-const store = { id: STORE_ID, name: 'Mona Dates', nameAr: 'تمور منى', slug: 'e2e-store', domain: null, status: 'active', template: 'modern', theme: S.theme };
+const user = {
+  id: 'u-e2e',
+  email: 'merchant@ebda.test',
+  firstName: 'Mona',
+  lastName: 'E',
+  role: 'store_admin',
+  storeId: null,
+};
+const store = {
+  id: STORE_ID,
+  name: 'Mona Dates',
+  nameAr: 'تمور منى',
+  slug: 'e2e-store',
+  domain: null,
+  status: 'active',
+  template: 'modern',
+  theme: S.theme,
+};
 
 const ok = data => ({ status: 200, body: { success: true, data } });
-const fail = (status, code, message, details) => ({ status, body: { success: false, error: { code, message, ...(details ? { details } : {}) } } });
+const fail = (status, code, message, details) => ({
+  status,
+  body: { success: false, error: { code, message, ...(details ? { details } : {}) } },
+});
 
-function pageState() {
-  const row = S.draft ?? S.published;
+/** A page's state object: home is the top-level state itself, the others are created on first use. */
+function pageFor(key) {
+  if (key === 'home') return S;
+  return (S.pages[key] ??= {
+    rev: 0,
+    draft: null,
+    published: null,
+    base: shared.defaultPageDocument(key),
+    revisions: [],
+    saves: 0,
+    publishes: 0,
+  });
+}
+
+function pageState(P = S) {
+  const row = P.draft ?? P.published;
   return {
-    rev: S.rev,
-    definition: row ? row.definition : S.base,
-    source: S.draft ? 'draft' : S.published ? 'published' : 'layout',
-    draftRev: S.draft?.rev ?? null,
-    publishedRev: S.published?.rev ?? null,
+    rev: P.rev,
+    definition: row ? row.definition : P.base,
+    source: P.draft ? 'draft' : P.published ? 'published' : 'layout',
+    draftRev: P.draft?.rev ?? null,
+    publishedRev: P.published?.rev ?? null,
   };
 }
 
-function route(method, path, body) {
+function route(method, path, body, query = new URLSearchParams()) {
   const p = path.replace(/^\/api\/v1/, '');
-  if (method === 'POST' && p === '/__test/reset') return (S = freshState()), (store.theme = S.theme), ok({});
+  if (method === 'POST' && p === '/__test/reset')
+    return ((S = freshState()), (store.theme = S.theme), ok({}));
   if (method === 'POST' && p === '/__test/bump') {
     S.rev += 1;
     const def = structuredClone(pageState().definition);
     S.draft = { rev: S.rev, definition: def };
     return ok({ rev: S.rev });
   }
-  if (method === 'GET' && p === '/__test/state') return ok({ rev: S.rev, draft: S.draft, published: S.published, saves: S.saves, publishes: S.publishes, theme: S.theme, liveWrites: S.liveWrites });
+  if (method === 'GET' && p === '/__test/state') {
+    const P = pageFor(query.get('page') || 'home');
+    return ok({
+      rev: P.rev,
+      draft: P.draft,
+      published: P.published,
+      saves: P.saves,
+      publishes: P.publishes,
+      theme: S.theme,
+      liveWrites: S.liveWrites,
+    });
+  }
   // every write to the LIVE theme / typography is recorded: the editor must make none before Publish (VE-4)
-  if (method !== 'GET' && (p === `/stores/${STORE_ID}/theme` || p === `/stores/${STORE_ID}/typography`)) S.liveWrites.push(`${method} ${p}`);
+  if (
+    method !== 'GET' &&
+    (p === `/stores/${STORE_ID}/theme` || p === `/stores/${STORE_ID}/typography`)
+  )
+    S.liveWrites.push(`${method} ${p}`);
 
   if (p === '/auth/me') return ok({ user });
   if (p === '/auth/refresh') return ok({});
@@ -93,46 +160,84 @@ function route(method, path, body) {
     return ok({ theme: S.theme });
   }
   if (p === `/stores/${STORE_ID}/categories`)
-    return ok({ categories: [{ id: 'c1', slug: 'dates', name: 'Dates', nameAr: 'تمور' }, { id: 'c2', slug: 'nuts', name: 'Nuts', nameAr: 'مكسرات' }] });
+    return ok({
+      categories: [
+        { id: 'c1', slug: 'dates', name: 'Dates', nameAr: 'تمور' },
+        { id: 'c2', slug: 'nuts', name: 'Nuts', nameAr: 'مكسرات' },
+      ],
+    });
   if (p.startsWith(`/stores/${STORE_ID}/products`))
-    return ok({ products: [{ id: 'p1', name: 'Medjool', nameAr: 'مجدول' }, { id: 'p2', name: 'Cashew', nameAr: 'كاجو' }], meta: {} });
+    return ok({
+      products: [
+        { id: 'p1', slug: 'medjool', name: 'Medjool', nameAr: 'مجدول' },
+        { id: 'p2', slug: 'cashew', name: 'Cashew', nameAr: 'كاجو' },
+      ],
+      meta: {},
+    });
   if (method === 'GET' && p === `/stores/${STORE_ID}/typography`)
     return ok({ typography: { fonts: [], zones: {} } });
   if (method === 'POST' && p === `/stores/${STORE_ID}/ai/section-content`)
     return ok({
-      suggestion: { kicker: 'EXPLORE', kickerAr: 'استكشف', subtitle: 'Top picks', subtitleAr: 'أفضل الاختيارات' },
+      suggestion: {
+        kicker: 'EXPLORE',
+        kickerAr: 'استكشف',
+        subtitle: 'Top picks',
+        subtitleAr: 'أفضل الاختيارات',
+      },
     });
   if (p.startsWith('/uploads/list'))
-    return ok({ items: [{ key: `stores/${STORE_ID}/builder/a.jpg`, url: 'https://media.ebda.app/stores/e2e/builder/a.jpg', size: 10, lastModified: '2026-10-07T00:00:00.000Z' }], nextCursor: null });
+    return ok({
+      items: [
+        {
+          key: `stores/${STORE_ID}/builder/a.jpg`,
+          url: 'https://media.ebda.app/stores/e2e/builder/a.jpg',
+          size: 10,
+          lastModified: '2026-10-07T00:00:00.000Z',
+        },
+      ],
+      nextCursor: null,
+    });
 
-  const base = `/admin/stores/${STORE_ID}/builder/pages/home`;
-  if (method === 'GET' && p === base) return ok(pageState());
-  if (method === 'POST' && p === `${base}/preview-token`) return ok({ token: 'e2e-preview-token-0000000000000000', expiresIn: 3600 });
-  if (method === 'PUT' && p === `${base}/draft`) {
-    if (body?.baseRev !== S.rev) return fail(409, 'REV_CONFLICT', 'The page changed', { latest: pageState() });
-    const v = shared.validateDefinitionSync(body.definition);
-    if (!v.ok) return fail(422, 'INVALID_DEFINITION', 'The page document is invalid', { errors: v.errors });
-    S.rev += 1;
-    S.draft = { rev: S.rev, definition: v.definition };
-    S.saves += 1;
-    return ok({ rev: S.rev, warnings: [] });
-  }
-  if (method === 'POST' && p === `${base}/publish`) {
-    if (body?.baseRev !== S.rev) return fail(409, 'REV_CONFLICT', 'The page changed', { latest: pageState() });
-    if (!S.draft) return fail(409, 'NO_DRAFT', 'There is no draft to publish.');
-    if (S.published) S.revisions.push({ ...S.published, status: 'archived' });
-    S.published = S.draft;
-    S.draft = null;
-    S.publishes += 1;
-    return ok({ rev: S.published.rev, layout: {} });
-  }
-  if (method === 'GET' && p.startsWith(`${base}/revisions`)) {
-    const rows = [
-      ...(S.draft ? [{ rev: S.draft.rev, status: 'draft' }] : []),
-      ...(S.published ? [{ rev: S.published.rev, status: 'published' }] : []),
-      ...S.revisions.map(r => ({ rev: r.rev, status: 'archived' })),
-    ].map(r => ({ ...r, note: null, createdAt: '2026-10-07T10:00:00.000Z', publishedAt: null }));
-    return ok({ revisions: rows.sort((a, b) => b.rev - a.rev), nextCursor: null });
+  const m = new RegExp(
+    `^/admin/stores/${STORE_ID}/builder/pages/(home|product|collection|cart)(/[a-z-]+)?$`
+  ).exec(p);
+  if (m) {
+    const P = pageFor(m[1]);
+    const sub = m[2] ?? '';
+    if (method === 'GET' && sub === '') return ok(pageState(P));
+    if (method === 'POST' && sub === '/preview-token')
+      return ok({ token: 'e2e-preview-token-0000000000000000', expiresIn: 3600 });
+    if (method === 'PUT' && sub === '/draft') {
+      if (body?.baseRev !== P.rev)
+        return fail(409, 'REV_CONFLICT', 'The page changed', { latest: pageState(P) });
+      const v = shared.validateDefinitionSync(body.definition);
+      if (!v.ok)
+        return fail(422, 'INVALID_DEFINITION', 'The page document is invalid', {
+          errors: v.errors,
+        });
+      P.rev += 1;
+      P.draft = { rev: P.rev, definition: v.definition };
+      P.saves += 1;
+      return ok({ rev: P.rev, warnings: [] });
+    }
+    if (method === 'POST' && sub === '/publish') {
+      if (body?.baseRev !== P.rev)
+        return fail(409, 'REV_CONFLICT', 'The page changed', { latest: pageState(P) });
+      if (!P.draft) return fail(409, 'NO_DRAFT', 'There is no draft to publish.');
+      if (P.published) P.revisions.push({ ...P.published, status: 'archived' });
+      P.published = P.draft;
+      P.draft = null;
+      P.publishes += 1;
+      return ok({ rev: P.published.rev, layout: {} });
+    }
+    if (method === 'GET' && sub === '/revisions') {
+      const rows = [
+        ...(P.draft ? [{ rev: P.draft.rev, status: 'draft' }] : []),
+        ...(P.published ? [{ rev: P.published.rev, status: 'published' }] : []),
+        ...P.revisions.map(r => ({ rev: r.rev, status: 'archived' })),
+      ].map(r => ({ ...r, note: null, createdAt: '2026-10-07T10:00:00.000Z', publishedAt: null }));
+      return ok({ revisions: rows.sort((a, b) => b.rev - a.rev), nextCursor: null });
+    }
   }
   return ok({});
 }
@@ -145,7 +250,10 @@ http
       const origin = req.headers.origin || '*';
       res.setHeader('Access-Control-Allow-Origin', origin);
       res.setHeader('Access-Control-Allow-Credentials', 'true');
-      res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-CSRF-Token, X-Store-ID');
+      res.setHeader(
+        'Access-Control-Allow-Headers',
+        'Content-Type, Authorization, X-CSRF-Token, X-Store-ID'
+      );
       res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
       if (req.method === 'OPTIONS') return res.writeHead(204).end();
       let body;
@@ -155,7 +263,12 @@ http
         body = undefined;
       }
       const url = new URL(req.url, 'http://x');
-      const out = route(req.method, url.pathname + (url.pathname.startsWith('/api/v1/uploads/list') ? url.search : ''), body);
+      const out = route(
+        req.method,
+        url.pathname + (url.pathname.startsWith('/api/v1/uploads/list') ? url.search : ''),
+        body,
+        url.searchParams
+      );
       res.writeHead(out.status, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify(out.body));
     });

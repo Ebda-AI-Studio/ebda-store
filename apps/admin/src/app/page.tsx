@@ -13,6 +13,7 @@ import { StatsGrid } from './_components/StatsGrid';
 import { RecentStores } from './_components/RecentStores';
 import { RecentOrders } from './_components/RecentOrders';
 import { QuickActions } from './_components/QuickActions';
+import { ReferralCard } from './_components/ReferralCard';
 import type { PlatformStats, RecentStore, RecentOrder } from './_components/types';
 
 export default function DashboardPage() {
@@ -60,11 +61,12 @@ export default function DashboardPage() {
         const qs = params.toString() ? `?${params}` : '';
         const { data } = await apiGet<{
           stats: PlatformStats;
+          referrals?: PlatformStats['referrals'];
           recentStores: RecentStore[];
           recentOrders: RecentOrder[];
         }>(`/api/v1/admin/dashboard${qs}`);
         if (data) {
-          setStats(data.stats);
+          setStats({ ...data.stats, referrals: data.referrals ?? null });
           setRecentStores(data.recentStores || []);
           setRecentOrders(data.recentOrders || []);
         }
@@ -123,6 +125,8 @@ export default function DashboardPage() {
     >
       {/* Stats Grid */}
       <StatsGrid stats={stats} isLoading={isLoading} />
+
+      <ReferralCard referrals={stats?.referrals} />
 
       {/* Recent Activity Section */}
       <div className="mt-8 grid gap-6 lg:grid-cols-2">

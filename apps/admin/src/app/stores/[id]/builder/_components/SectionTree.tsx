@@ -34,6 +34,7 @@ import {
   type PageDefinition,
   type SectionList,
   type SectionNode,
+  isSectionPageKind,
 } from '@ebda/shared';
 import { useT } from '@/i18n/useT';
 
@@ -83,6 +84,8 @@ function Row({
   const selected = selection?.sectionId === node.id && !selection.blockId;
   const name = label(node, locale);
   const blockDef = d?.blocks[0];
+  // The core of a product / collection / cart page: it moves, it is never hidden or removed.
+  const pinned = d?.pinned === true;
 
   return (
     <li
@@ -144,14 +147,16 @@ function Row({
           >
             ↓
           </IconButton>
-          <IconButton
-            label={node.hidden ? t('show', { name }) : t('hide', { name })}
-            onClick={() =>
-              dispatch({ type: 'setSectionHidden', id: node.id, hidden: !node.hidden })
-            }
-          >
-            {node.hidden ? '◌' : '◉'}
-          </IconButton>
+          {!pinned && (
+            <IconButton
+              label={node.hidden ? t('show', { name }) : t('hide', { name })}
+              onClick={() =>
+                dispatch({ type: 'setSectionHidden', id: node.id, hidden: !node.hidden })
+              }
+            >
+              {node.hidden ? '◌' : '◉'}
+            </IconButton>
+          )}
           {d?.cardinality === 'many' && (
             <IconButton
               label={t('duplicate', { name })}
@@ -160,12 +165,35 @@ function Row({
               ⧉
             </IconButton>
           )}
-          <IconButton
-            label={t('remove', { name })}
-            onClick={() => dispatch({ type: 'removeSection', id: node.id })}
-          >
-            ✕
-          </IconButton>
+          {pinned ? (
+            <span
+              role="img"
+              aria-label={t('pinned', { name })}
+              title={t('pinned', { name })}
+              className="px-1.5 py-0.5 text-xs text-muted-foreground"
+              data-testid={`tree-pinned-${node.id}`}
+            >
+              <svg
+                viewBox="0 0 16 16"
+                width="12"
+                height="12"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                aria-hidden="true"
+              >
+                <rect x="3.5" y="7" width="9" height="6.5" rx="1.5" />
+                <path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2" />
+              </svg>
+            </span>
+          ) : (
+            <IconButton
+              label={t('remove', { name })}
+              onClick={() => dispatch({ type: 'removeSection', id: node.id })}
+            >
+              ✕
+            </IconButton>
+          )}
         </span>
       </div>
       {(node.blocks?.length || blockDef) && (
@@ -314,6 +342,7 @@ function Group({
 
 export function SectionTree({ doc, ...rest }: Props) {
   const t = useT('builder.tree');
+  const sectionsOnly = isSectionPageKind(doc.pageKey);
   const sel = rest.selection;
   // A click on the canvas selects here too: bring the row into view.
   useEffect(() => {
@@ -327,9 +356,14 @@ export function SectionTree({ doc, ...rest }: Props) {
   }, [sel?.sectionId, sel?.blockId]); // eslint-disable-line react-hooks/exhaustive-deps -- the ids are the identity
   return (
     <nav aria-label={t('label')} className="p-2">
-      <Group list="header" title={t('header')} nodes={doc.sectionGroups.header} {...rest} />
+      {/* a product / collection / cart page holds sections only: the header and footer belong to every page */}
+      {!sectionsOnly && (
+        <Group list="header" title={t('header')} nodes={doc.sectionGroups.header} {...rest} />
+      )}
       <Group list="template" title={t('template')} nodes={doc.sections} {...rest} />
-      <Group list="footer" title={t('footer')} nodes={doc.sectionGroups.footer} {...rest} />
+      {!sectionsOnly && (
+        <Group list="footer" title={t('footer')} nodes={doc.sectionGroups.footer} {...rest} />
+      )}
     </nav>
   );
 }

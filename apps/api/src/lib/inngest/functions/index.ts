@@ -36,6 +36,7 @@ import { accountingPostExpenseJournal } from './accounting-post-expense-journal'
 import { stockReorderScanCron, stockReorderScanOnDemand } from './stock-reorder-scan';
 import { stockDeadstockScanCron, stockDeadstockScanOnDemand } from './stock-deadstock-scan';
 import { wholesalePendingNudgeCron } from './wholesale-pending-nudge';
+import { lifecycleEmails, lifecycleFirstOrder } from './lifecycle-emails';
 import { stockLowStockAlertCron, stockLowStockAlertOnDemand } from './stock-low-stock-alert';
 import { goldRateFeedFetchCron } from './gold-rate-feed-fetch';
 import { goldRateStalenessWatchCron } from './gold-rate-staleness-watch';
@@ -135,6 +136,8 @@ const allInngestFunctions: InngestFunction.Any[] = [
   stockDeadstockScanOnDemand,
   stockLowStockAlertCron,
   wholesalePendingNudgeCron,
+  lifecycleEmails,
+  lifecycleFirstOrder,
   stockLowStockAlertOnDemand,
   accountingProfitAnomalyCron,
   accountingExpenseOcrProcess,

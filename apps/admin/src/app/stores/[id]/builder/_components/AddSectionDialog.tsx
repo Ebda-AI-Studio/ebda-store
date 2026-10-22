@@ -8,7 +8,12 @@
  */
 import { useEffect, useRef } from 'react';
 import { useLocale } from 'next-intl';
-import { SECTION_REGISTRY, type PageDefinition, type SectionList } from '@ebda/shared';
+import {
+  SECTION_REGISTRY,
+  sectionAllowedOnPage,
+  type PageDefinition,
+  type SectionList,
+} from '@ebda/shared';
 import { useT } from '@/i18n/useT';
 import { SectionThumb } from './SectionThumb';
 
@@ -30,7 +35,10 @@ export function AddSectionDialog({ list, doc, onPick, onClose }: Props) {
     [...doc.sectionGroups.header, ...doc.sections, ...doc.sectionGroups.footer].filter(
       n => n.type === type
     ).length;
-  const types = SECTION_REGISTRY.filter(d => d.group === list);
+  // only what belongs on this page (a cart has no hero; a product page has reviews)
+  const types = SECTION_REGISTRY.filter(
+    d => d.group === list && sectionAllowedOnPage(d, doc.pageKey)
+  );
 
   return (
     <dialog

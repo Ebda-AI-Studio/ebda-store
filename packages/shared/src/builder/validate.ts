@@ -17,7 +17,9 @@ import { isSafeUrl } from '../utils/safe-url';
 import { storeLayoutSchema } from './layout-schema';
 import { allSections, sectionToLegacy } from './adapter';
 import { isPlaceholderCopy } from './placeholder-copy';
-import { getSectionDefinition, VIEWPORTS } from './registry';
+import { getSectionDefinition, sectionAllowedOnPage, VIEWPORTS } from './registry';
+import { MAIN_SECTION_TYPE, isSectionPageKind, type SectionPageKind } from './page-kinds';
+import { PAGE_OWNED_SETTING_KEYS } from './page-settings';
 import { getLook } from '../looks/registry';
 import {
   BUILDER_LIMITS,
@@ -42,6 +44,10 @@ export interface BuilderIssue {
     | 'RESPONSIVE_NOT_SUPPORTED'
     | 'BLOCK_NOT_SUPPORTED'
     | 'GROUP_MISMATCH'
+    /** A section type that does not belong on this page, or a header/footer/theme patch on a section page. */
+    | 'PAGE_MISMATCH'
+    /** The page's pinned main section is missing or hidden. */
+    | 'PINNED'
     | 'PROPS_INVALID'
     | 'REF_NOT_FOUND'
     | 'MISSING_IMAGE'
@@ -240,6 +246,79 @@ function validateSection(
   if (!parsed.success) errors.push(...zodIssues(parsed.error, `${path}/settings`));
 }
 
+/**
+ * Page-kind rules (Ruling VE-3): every section type must be allowed on this page, and a product,
+ * collection or cart document holds sections only, with its pinned main section present and visible.
+ */
+function validatePageKind(def: PageDefinition, errors: BuilderIssue[]): void {
+  def.sections.forEach((n, i) => {
+    const d = getSectionDefinition(n.type);
+    if (d && !sectionAllowedOnPage(d, def.pageKey))
+      errors.push(
+        issue(
+          'PAGE_MISMATCH',
+          `/sections/${i}/type`,
+          `"${d.labelEn}" cannot be placed on the ${def.pageKey} page.`,
+          `مينفعش تحط "${d.labelAr}" في الصفحة دي.`
+        )
+      );
+  });
+  if (!isSectionPageKind(def.pageKey)) return;
+  const mainType = MAIN_SECTION_TYPE[def.pageKey];
+  const mainIndex = def.sections.findIndex(n => n.type === mainType);
+  const mainLabel = getSectionDefinition(mainType);
+  if (mainIndex < 0)
+    errors.push(
+      issue(
+        'PINNED',
+        '/sections',
+        `The ${def.pageKey} page needs its "${mainLabel?.labelEn ?? mainType}" section.`,
+        `الصفحة دي لازم يكون فيها قسم "${mainLabel?.labelAr ?? mainType}".`
+      )
+    );
+  else if (def.sections[mainIndex].hidden === true)
+    errors.push(
+      issue(
+        'PINNED',
+        `/sections/${mainIndex}/hidden`,
+        `"${mainLabel?.labelEn ?? mainType}" cannot be hidden.`,
+        `مينفعش تخفي قسم "${mainLabel?.labelAr ?? mainType}".`
+      )
+    );
+  // These belong to the home document (the store's header, footer, theme and layout settings).
+  if (def.sectionGroups.header.length > 0 || def.sectionGroups.footer.length > 0)
+    errors.push(
+      issue(
+        'PAGE_MISMATCH',
+        '/sectionGroups',
+        'The header and footer are edited on the home page.',
+        'الهيدر والفوتر بيتعدلوا من الصفحة الرئيسية.'
+      )
+    );
+  for (const key of ['theme', 'chrome', 'typography'] as const)
+    if (def[key] !== undefined)
+      errors.push(
+        issue(
+          'PAGE_MISMATCH',
+          `/${key}`,
+          `The ${key} is edited on the home page.`,
+          'الإعداد ده بيتعدل من الصفحة الرئيسية.'
+        )
+      );
+  // Page settings: only the keys this page owns (Ruling VE-13); the rest are written by their own page.
+  const owned = new Set<string>(PAGE_OWNED_SETTING_KEYS[def.pageKey as SectionPageKind] ?? []);
+  for (const key of Object.keys(def.siteSettings))
+    if (!owned.has(key))
+      errors.push(
+        issue(
+          'PAGE_MISMATCH',
+          `/siteSettings/${key}`,
+          `"${key}" is not a setting of this page.`,
+          'الإعداد ده مش بتاع الصفحة دي.'
+        )
+      );
+}
+
 /** Synchronous checks (no catalogue lookups). */
 export function validateDefinitionSync(input: unknown): ValidationResult {
   const errors: BuilderIssue[] = [];
@@ -301,6 +380,7 @@ export function validateDefinitionSync(input: unknown): ValidationResult {
   visit(def.sectionGroups.header, '/sectionGroups/header', 'header');
   visit(def.sections, '/sections', 'template');
   visit(def.sectionGroups.footer, '/sectionGroups/footer', 'footer');
+  validatePageKind(def, errors);
   // What renders under any one look is the untagged sections plus that look's tagged ones
   // (`documentForLook`), so the cap applies to that sum, never to tagged sections of other looks.
   for (const [type, c] of counts) {

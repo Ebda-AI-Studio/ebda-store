@@ -3,6 +3,8 @@ export interface PlatformStats {
   users: number;
   orders: number;
   revenue: number;
+  /** Super-admin only: merchant signups attributed to the store badge / referral email (UTM first touch). */
+  referrals?: { badge: number; email: number } | null;
 }
 
 export interface RecentStore {

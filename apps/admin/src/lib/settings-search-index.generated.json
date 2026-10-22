@@ -308,6 +308,16 @@
     "feature": "payment_abandonment"
   },
   {
+    "id": "page:/lifecycle-emails",
+    "kind": "page",
+    "route": "/lifecycle-emails",
+    "access": "staff",
+    "en": "Setup emails",
+    "ar": "رسائل البداية",
+    "synEn": "setup emails onboarding trial reminder referral unsubscribe",
+    "synAr": "رسائل البداية التجربة تذكير إلغاء اشتراك"
+  },
+  {
     "id": "page:/stock/dashboard",
     "kind": "page",
     "route": "/stock/dashboard",

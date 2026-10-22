@@ -4,6 +4,7 @@ import { API_URL } from '../../../lib/api';
 import { decodeRouteParam } from '../../../lib/route-params';
 import { getPreviewDraftToken } from '../../../lib/preview-draft';
 import { resolveStorefrontLocale } from '../../../lib/seo/resolve-locale';
+import { builderTokenFrom } from '../../../lib/page-document';
 import { buildProductMetadata, ProductDetailBody } from './ProductDetailBody';
 
 /**
@@ -63,11 +64,18 @@ export async function generateMetadata({
   }
 }
 
-export default async function ProductDetailPage({ params }: { params: Promise<{ slug: string }> }) {
-  const [{ slug }, store, draftToken] = await Promise.all([
+export default async function ProductDetailPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ slug: string }>;
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const [{ slug }, store, draftToken, query] = await Promise.all([
     params,
     getStoreOrNotFound(),
     getPreviewDraftToken(),
+    searchParams ?? Promise.resolve({}),
   ]);
   // Same locale generateMetadata resolves, so the JSON-LD names agree with
   // the page's <title> (#2196).
@@ -80,6 +88,7 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
       store={store}
       slug={decodeRouteParam(slug)}
       draftToken={draftToken}
+      builderToken={builderTokenFrom(query)}
       locale={locale}
     />
   );

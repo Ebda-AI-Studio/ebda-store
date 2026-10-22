@@ -1,7 +1,7 @@
 'use client';
 
 import { pdpMaxQty } from '@/lib/b2b-moq';
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { Fragment, useState, useEffect, useRef, useCallback, type ReactNode } from 'react';
 import { firstCategoryId, pickRelated } from '../../../lib/related-products';
 import { useLocalePrice } from '../../../hooks/useLocalePrice';
 import { useParams } from 'next/navigation';
@@ -24,6 +24,13 @@ import { useCart } from '../../../contexts/CartContext';
 import { useStore, useStoreUrl, useStoreTemplate } from '../../../contexts/StoreContext';
 import { useFeatures } from '../../../contexts/FeatureContext';
 import { ShopChrome, SectionErrorBoundary } from '../../../components';
+import {
+  PageMark,
+  itemNodes,
+  pageSectionsAround,
+  usePageDocument,
+  withPageSettings,
+} from '../../../builder/render/PageDocument';
 import { useLanguage, translations } from '../../../contexts/LanguageContext';
 import { trackViewContent, trackAddToCart } from '../../../components/MarketingPixels';
 import { recordFocusProduct, getLastListing } from '@/lib/last-listing';
@@ -297,7 +304,10 @@ export default function ProductDetailClient({
   const { localize, numerals } = useNumerals();
   const formatPrice = useLocalePrice();
   // Prop layout wins (server-side fetch); ctx layout is the lazy-fetched fallback.
-  const resolvedLayout = layout ?? ctxLayout ?? undefined;
+  // The product page's section document (Ruling VE-3): which sections go around the pinned main block.
+  const pageDoc = usePageDocument('product');
+  // In the editor canvas the page's own settings come from the draft document, otherwise the live layout.
+  const resolvedLayout = withPageSettings(pageDoc, layout ?? ctxLayout ?? undefined);
   // The API already drops `model3d` when `product_3d` is off; the flag check
   // here is the second gate (a super-admin override takes effect client-side
   // on the next store payload too).
@@ -307,7 +317,7 @@ export default function ProductDetailClient({
   // whose plan lacks `reviews`, or whose merchant switched the section off, shows neither.
   const reviewsOn =
     isEnabled('reviews') &&
-    !!layout?.reviewSection?.enabled &&
+    !!withPageSettings(pageDoc, layout)?.reviewSection?.enabled &&
     !!product &&
     !!store.id &&
     store.id !== 'demo';
@@ -753,29 +763,31 @@ export default function ProductDetailClient({
     store.theme
   );
 
-  // Below-the-fold blocks shared by every skin (FAQ, reviews, upsell, related).
-  const belowFold = (
-    <>
-      {product?.faqs && product.faqs.length > 0 && (
+  // Below-the-fold blocks shared by every skin, one slot per document section (FAQ, reviews, frequently
+  // bought together, you might also like). `null` = nothing to show; the related carousel is skin-specific.
+  const upsellOn = isEnabled('upsell_crosssell') && product && store.id && store.id !== 'demo';
+  const commonSlots: Record<string, ReactNode> = {
+    'product-faq':
+      product?.faqs && product.faqs.length > 0 ? (
         <ProductFAQSection faqs={product.faqs} language={language} t={t} />
-      )}
-      {reviewsOn && product && (
+      ) : null,
+    'product-reviews':
+      reviewsOn && product ? (
         <SectionErrorBoundary section="reviews">
           <ReviewSection storeId={store.id} productId={product.id} />
         </SectionErrorBoundary>
-      )}
-      {isEnabled('upsell_crosssell') && product && store.id && store.id !== 'demo' && (
-        <>
-          <SectionErrorBoundary section="frequently-bought-together">
-            <FrequentlyBoughtTogether storeId={store.id} productId={product.id} />
-          </SectionErrorBoundary>
-          <SectionErrorBoundary section="you-might-also-like">
-            <YouMightAlsoLike storeId={store.id} productId={product.id} />
-          </SectionErrorBoundary>
-        </>
-      )}
-    </>
-  );
+      ) : null,
+    'product-bundles': upsellOn ? (
+      <SectionErrorBoundary section="frequently-bought-together">
+        <FrequentlyBoughtTogether storeId={store.id} productId={product.id} />
+      </SectionErrorBoundary>
+    ) : null,
+    'product-recommendations': upsellOn ? (
+      <SectionErrorBoundary section="you-might-also-like">
+        <YouMightAlsoLike storeId={store.id} productId={product.id} />
+      </SectionErrorBoundary>
+    ) : null,
+  };
 
   // Dahab skin: same data and handlers, Dahab presentation (templates/dahab/ProductDetail).
   if (templateId === 'dahab') {
@@ -790,185 +802,265 @@ export default function ProductDetailClient({
         : pricedMax
     );
     const badges = [pdpCustomBadgeText, discountBadgeText].filter((b): b is string => !!b);
+    const dahabAround = pageSectionsAround(pageDoc, {
+      ...commonSlots,
+      'product-related':
+        relatedProducts.length > 0 && !templateLoading ? (
+          <section className="py-12 sm:py-16">
+            <ProductCarousel
+              products={relatedProducts.map(toTemplateProduct)}
+              title="You may also like"
+              titleAr="قطع قد تعجبك"
+              isRtl={language === 'ar'}
+              currency={store.currency}
+              pack={templateId}
+              urlPrefix={storeUrl('')}
+              showCardPrice={store.theme?.showPriceOnCards === false ? false : undefined}
+              onAddToCart={async productId => {
+                const found = relatedProducts.find(x => x.id === productId);
+                if (found)
+                  addItem({
+                    id: found.id,
+                    name: found.name,
+                    nameAr: found.nameAr ?? undefined,
+                    price: found.price,
+                    slug: found.slug,
+                    image: found.images?.[0]?.url,
+                    category: found.categories?.[0]?.category?.name,
+                  });
+              }}
+            />
+          </section>
+        ) : null,
+    });
+    // The skin keeps its container: consecutive blocks share one `max-w-7xl` wrapper, the related
+    // strip stands alone (the default order renders exactly the markup it did before documents).
+    const dahabGroups = (items: typeof dahabAround.after) => {
+      const out: ReactNode[] = [];
+      let run: ReactNode[] = [];
+      const flush = () => {
+        if (run.length === 0) return;
+        out.push(
+          <div key={`run-${out.length}`} className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+            {run}
+          </div>
+        );
+        run = [];
+      };
+      for (const it of items) {
+        if (it.type === 'product-related') {
+          flush();
+          out.push(<Fragment key={it.id}>{it.node}</Fragment>);
+        } else run.push(it.node);
+      }
+      flush();
+      return out;
+    };
     return (
       <ShopChrome layout={resolvedLayout}>
         <div className="flex-1" style={pdpBgStyle}>
-          <DahabProductDetail
-            ratingLine={
-              reviewsOn ? (
-                <RatingSummary
-                  average={product.ratingStats?.ratingAverage}
-                  count={product.ratingStats?.ratingCount}
-                />
-              ) : undefined
-            }
-            bundleLine={<BundleSaving productId={product.id} />}
-            priceNote={<GoldRateLine gold={goldForSelection} className="mt-1" />}
-            b2bPanel={
-              <B2bPdpPanel
-                productId={product.id}
-                variantId={selectedVariant?.id ?? null}
-                moq={product.moq}
-                tiers={product.priceTiers}
-              />
-            }
-            images={images}
-            name={displayName}
-            categoryName={categoryName ?? undefined}
-            categoryHref={
-              cat0?.category?.slug
-                ? storeUrl(`/products?category=${cat0.category.slug}`)
-                : undefined
-            }
-            homeHref={storeUrl('/')}
-            productsHref={storeUrl('/products')}
-            shippingHref={storeUrl('/shipping')}
-            returnsHref={storeUrl('/returns')}
-            codOffer={codOffer}
-            excerpt={displayExcerpt}
-            description={displayDescription}
-            priceText={priceText}
-            compareText={
-              pricing.mode === 'single' && displayCompare && displayCompare > displayPrice
-                ? formatPrice(displayCompare)
-                : null
-            }
-            badges={badges}
-            variants={productVariants}
-            options={productOptions}
-            onVariantSelect={setSelectedVariant}
-            onShopperSelect={() => setShopperPickedVariant(true)}
-            quantity={quantity}
-            setQuantity={setQuantity}
-            maxQuantity={maxQty}
-            minQuantity={moqFloor}
-            stockText={
-              outOfStock && !canBackorder
-                ? t('Out of stock', 'مش متوفر دلوقتي')
-                : canBackorder
-                  ? t('Made to order — ships when ready', 'بيتعمل مخصوص — بيتشحن أول ما يجهز')
-                  : null
-            }
-            onAddToCart={handleAddToCart}
-            isAdding={isAdding}
-            addDisabled={addDisabled}
-            personalisation={product.personalisation}
-            note={note}
-            onNoteChange={setNote}
-            noteNudge={noteNudge}
-            optionNudge={optionNudge}
-            addLabel={
-              canBackorder
-                ? t('Pre-order', 'طلب مسبق')
-                : outOfStock
-                  ? t('Out of stock', 'غير متوفر')
-                  : t('Add to bag', 'إضافة للسلة')
-            }
-            cartHref={storeUrl('/cart')}
-            cartCount={cartCount}
-            cartLabel={cartLinkLabel}
-            isWishlisted={isWishlisted}
-            onToggleWishlist={handleToggleWishlist}
-            sku={product.sku}
-            facts={product.facts}
-            leadTimeDays={product.leadTimeDays}
-            sizeChart={product.sizeChart}
-            specs={
-              (product as { specifications?: unknown }).specifications ? (
-                <SpecTable
-                  specifications={
-                    (product as { specifications?: unknown }).specifications as
-                      | Record<string, string>
-                      | undefined
-                  }
-                />
-              ) : undefined
-            }
-            extras={
-              <>
-                <WaMeProductButton
-                  product={product}
-                  priceMinor={displayPrice}
-                  className="w-full"
-                  personalisation={waPersonalisation}
-                  disabled={noteMissing}
-                  onBlocked={() => setNoteNudge(n => n + 1)}
-                />
-                <ShareProductRow productName={displayName} url={shareUrl} />
-              </>
-            }
-            // Ruling B5-1 (finding): the Dahab branch never passed `mediaSlot`, so a Dahab product
-            // with a 3D model showed no viewer. Same toggle + panel the default PDP renders, same
-            // flag and model gate; a product without a model renders nothing.
-            mediaSlot={
-              model3d ? (
-                <div className="relative mt-4" data-part="model3d-slot">
-                  <Model3dToggle
-                    active={show3d}
-                    t={t}
-                    onToggle={() => {
-                      if (!show3d) {
-                        captureEvent('product_3d_opened', {
-                          storeId: store?.id,
-                          productId: product.id,
-                        });
-                      }
-                      setShow3d(v => !v);
-                    }}
+          {dahabGroups(dahabAround.before)}
+          <PageMark kind="product">
+            <DahabProductDetail
+              ratingLine={
+                reviewsOn ? (
+                  <RatingSummary
+                    average={product.ratingStats?.ratingAverage}
+                    count={product.ratingStats?.ratingCount}
                   />
-                  {show3d ? (
-                    <ProductModel3dPanel
-                      model={model3d}
-                      storeId={store?.id ?? ''}
-                      productId={product.id}
-                      productName={displayName}
-                      fallbackPoster={productImages[0]?.url}
-                      selected={pickedOptions}
-                      optionOrder={productOptions.map(o => o.name)}
-                      isRtl={language === 'ar'}
+                ) : undefined
+              }
+              bundleLine={<BundleSaving productId={product.id} />}
+              priceNote={<GoldRateLine gold={goldForSelection} className="mt-1" />}
+              b2bPanel={
+                <B2bPdpPanel
+                  productId={product.id}
+                  variantId={selectedVariant?.id ?? null}
+                  moq={product.moq}
+                  tiers={product.priceTiers}
+                />
+              }
+              images={images}
+              name={displayName}
+              categoryName={categoryName ?? undefined}
+              categoryHref={
+                cat0?.category?.slug
+                  ? storeUrl(`/products?category=${cat0.category.slug}`)
+                  : undefined
+              }
+              homeHref={storeUrl('/')}
+              productsHref={storeUrl('/products')}
+              shippingHref={storeUrl('/shipping')}
+              returnsHref={storeUrl('/returns')}
+              codOffer={codOffer}
+              excerpt={displayExcerpt}
+              description={displayDescription}
+              priceText={priceText}
+              compareText={
+                pricing.mode === 'single' && displayCompare && displayCompare > displayPrice
+                  ? formatPrice(displayCompare)
+                  : null
+              }
+              badges={badges}
+              variants={productVariants}
+              options={productOptions}
+              onVariantSelect={setSelectedVariant}
+              onShopperSelect={() => setShopperPickedVariant(true)}
+              quantity={quantity}
+              setQuantity={setQuantity}
+              maxQuantity={maxQty}
+              minQuantity={moqFloor}
+              stockText={
+                outOfStock && !canBackorder
+                  ? t('Out of stock', 'مش متوفر دلوقتي')
+                  : canBackorder
+                    ? t('Made to order — ships when ready', 'بيتعمل مخصوص — بيتشحن أول ما يجهز')
+                    : null
+              }
+              onAddToCart={handleAddToCart}
+              isAdding={isAdding}
+              addDisabled={addDisabled}
+              personalisation={product.personalisation}
+              note={note}
+              onNoteChange={setNote}
+              noteNudge={noteNudge}
+              optionNudge={optionNudge}
+              addLabel={
+                canBackorder
+                  ? t('Pre-order', 'طلب مسبق')
+                  : outOfStock
+                    ? t('Out of stock', 'غير متوفر')
+                    : t('Add to bag', 'إضافة للسلة')
+              }
+              cartHref={storeUrl('/cart')}
+              cartCount={cartCount}
+              cartLabel={cartLinkLabel}
+              isWishlisted={isWishlisted}
+              onToggleWishlist={handleToggleWishlist}
+              sku={product.sku}
+              facts={product.facts}
+              leadTimeDays={product.leadTimeDays}
+              sizeChart={product.sizeChart}
+              specs={
+                (product as { specifications?: unknown }).specifications ? (
+                  <SpecTable
+                    specifications={
+                      (product as { specifications?: unknown }).specifications as
+                        | Record<string, string>
+                        | undefined
+                    }
+                  />
+                ) : undefined
+              }
+              extras={
+                <>
+                  <WaMeProductButton
+                    product={product}
+                    priceMinor={displayPrice}
+                    className="w-full"
+                    personalisation={waPersonalisation}
+                    disabled={noteMissing}
+                    onBlocked={() => setNoteNudge(n => n + 1)}
+                  />
+                  <ShareProductRow productName={displayName} url={shareUrl} />
+                </>
+              }
+              // Ruling B5-1 (finding): the Dahab branch never passed `mediaSlot`, so a Dahab product
+              // with a 3D model showed no viewer. Same toggle + panel the default PDP renders, same
+              // flag and model gate; a product without a model renders nothing.
+              mediaSlot={
+                model3d ? (
+                  <div className="relative mt-4" data-part="model3d-slot">
+                    <Model3dToggle
+                      active={show3d}
                       t={t}
+                      onToggle={() => {
+                        if (!show3d) {
+                          captureEvent('product_3d_opened', {
+                            storeId: store?.id,
+                            productId: product.id,
+                          });
+                        }
+                        setShow3d(v => !v);
+                      }}
                     />
-                  ) : (
-                    <div aria-hidden="true" className="h-14" />
-                  )}
-                </div>
-              ) : undefined
-            }
-            selectedImage={selectedImage}
-            onSelectImage={setSelectedImage}
-          />
-          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">{belowFold}</div>
-          {relatedProducts.length > 0 && !templateLoading && (
-            <section className="py-12 sm:py-16">
-              <ProductCarousel
-                products={relatedProducts.map(toTemplateProduct)}
-                title="You may also like"
-                titleAr="قطع قد تعجبك"
-                isRtl={language === 'ar'}
-                currency={store.currency}
-                pack={templateId}
-                urlPrefix={storeUrl('')}
-                showCardPrice={store.theme?.showPriceOnCards === false ? false : undefined}
-                onAddToCart={async productId => {
-                  const found = relatedProducts.find(x => x.id === productId);
-                  if (found)
-                    addItem({
-                      id: found.id,
-                      name: found.name,
-                      nameAr: found.nameAr ?? undefined,
-                      price: found.price,
-                      slug: found.slug,
-                      image: found.images?.[0]?.url,
-                      category: found.categories?.[0]?.category?.name,
-                    });
-                }}
-              />
-            </section>
-          )}
+                    {show3d ? (
+                      <ProductModel3dPanel
+                        model={model3d}
+                        storeId={store?.id ?? ''}
+                        productId={product.id}
+                        productName={displayName}
+                        fallbackPoster={productImages[0]?.url}
+                        selected={pickedOptions}
+                        optionOrder={productOptions.map(o => o.name)}
+                        isRtl={language === 'ar'}
+                        t={t}
+                      />
+                    ) : (
+                      <div aria-hidden="true" className="h-14" />
+                    )}
+                  </div>
+                ) : undefined
+              }
+              selectedImage={selectedImage}
+              onSelectImage={setSelectedImage}
+            />
+          </PageMark>
+          {dahabGroups(dahabAround.after)}
         </div>
       </ShopChrome>
     );
   }
+
+  const around = pageSectionsAround(pageDoc, {
+    ...commonSlots,
+    'product-related':
+      relatedProducts.length > 0 && !templateLoading ? (
+        <div className="mt-16">
+          {/* Compact horizontal carousel (was a 2/3-col grid of full-size cards). Reuses the
+              canonical ProductCarousel so the related strip is smaller + scrollable + matches the
+              homepage strips, and honours the per-store PDP heading typography zone. */}
+          <ProductCarousel
+            products={relatedProducts.map(toTemplateProduct)}
+            title="You may also like"
+            titleAr="قد يعجبك أيضاً"
+            headingZone={relatedHeadingZone}
+            isRtl={language === 'ar'}
+            currency={store.currency}
+            pack={templateId}
+            cardSize="xs"
+            cardAspect={productCardDefaults?.cardAspect}
+            cardShape={productCardDefaults?.cardShape}
+            showCardFrame={productCardDefaults?.showCardFrame}
+            cardFrameStyle={productCardDefaults?.cardFrameStyle}
+            cardFrameWidth={productCardDefaults?.cardFrameWidth}
+            cardFrameSize={productCardDefaults?.cardFrameSize}
+            cardFrameColor={productCardDefaults?.cardFrameColor}
+            showLabel={productCardDefaults?.showLabel}
+            showHover={productCardDefaults?.showHover}
+            cardImageAspect={productCardDefaults?.cardImageAspect}
+            cardImageRadius={productCardDefaults?.cardImageRadius}
+            showCardName={productCardDefaults?.showCardName}
+            showCardPrice={
+              store.theme?.showPriceOnCards === false ? false : productCardDefaults?.showCardPrice
+            }
+            urlPrefix={storeUrl('')}
+            onAddToCart={async productId => {
+              const found = relatedProducts.find(x => x.id === productId);
+              if (found)
+                addItem({
+                  id: found.id,
+                  name: found.name,
+                  price: found.price,
+                  slug: found.slug,
+                  image: found.images?.[0]?.url,
+                  category: found.categories?.[0]?.category?.name,
+                });
+            }}
+          />
+        </div>
+      ) : null,
+  });
 
   return (
     <ShopChrome layout={resolvedLayout}>
@@ -982,595 +1074,518 @@ export default function ProductDetailClient({
           style={pdpDensity}
           data-zone="products"
         >
-          {/* Breadcrumb. Hidden below md (C-04): on a phone the fold is gallery, title,
+          {itemNodes(around.before)}
+          <PageMark kind="product">
+            {/* Breadcrumb. Hidden below md (C-04): on a phone the fold is gallery, title,
               price, the first selector and the buy button; the trail pushes them down. */}
-          <Breadcrumbs
-            className="mb-8 hidden text-sm md:block"
-            items={[
-              { label: t('Home', translations['Home']), href: storeUrl('/') },
-              { label: t('Products', translations['Products']), href: storeUrl('/products') },
-              // Category segment: back to the PLP filtered to the primary category.
-              ...(categoryName && cat0?.category?.slug
-                ? [
-                    {
-                      label: categoryName,
-                      href: storeUrl(`/products?category=${cat0.category.slug}`),
-                    },
-                  ]
-                : []),
-              { label: displayName },
-            ]}
-          />
+            <Breadcrumbs
+              className="mb-8 hidden text-sm md:block"
+              items={[
+                { label: t('Home', translations['Home']), href: storeUrl('/') },
+                { label: t('Products', translations['Products']), href: storeUrl('/products') },
+                // Category segment: back to the PLP filtered to the primary category.
+                ...(categoryName && cat0?.category?.slug
+                  ? [
+                      {
+                        label: categoryName,
+                        href: storeUrl(`/products?category=${cat0.category.slug}`),
+                      },
+                    ]
+                  : []),
+                { label: displayName },
+              ]}
+            />
 
-          {/* Product Details */}
-          <div className="grid gap-8 md:grid-cols-12">
-            {/* Images */}
-            <div className="space-y-4 md:col-span-5 md:sticky md:top-24 md:self-start">
-              <div className={galleryFrameClass} data-gallery={airyGallery ? 'airy' : undefined}>
-                {model3d && (
-                  <Model3dToggle
-                    active={show3d}
-                    t={t}
-                    onToggle={() => {
-                      if (!show3d) {
-                        captureEvent('product_3d_opened', {
-                          storeId: store?.id,
-                          productId: product.id,
-                        });
-                      }
-                      setShow3d(v => !v);
-                    }}
-                  />
-                )}
-                {model3d && show3d ? (
-                  <ProductModel3dPanel
-                    model={model3d}
-                    storeId={store?.id ?? ''}
-                    productId={product.id}
-                    productName={displayName}
-                    fallbackPoster={productImages[0]?.url}
-                    selected={pickedOptions}
-                    optionOrder={productOptions.map(o => o.name)}
-                    isRtl={language === 'ar'}
-                    t={t}
-                  />
-                ) : images.length > 0 ? (
-                  // Swipeable scroll-snap track — one image per page. Touch users
-                  // swipe left/right; desktop scrolls/drag. handleGalleryScroll
-                  // keeps selectedImage (dots + thumbnails) in sync.
-                  <div
-                    ref={galleryRef}
-                    onScroll={handleGalleryScroll}
-                    // a11y re-audit P2-N5: the strip reads in the page direction, so in Arabic
-                    // photo 2 lies to the LEFT, where Next (inline end) and ArrowLeft point. It was
-                    // dir=ltr to keep scrollLeft positive; the scroll math now takes |scrollLeft|
-                    // and a signed target instead (RTL scrollLeft is 0 -> -max in every engine).
-                    dir={language === 'ar' ? 'rtl' : 'ltr'}
-                    // P1-7 (W4): a named, focusable region; arrow keys page it like the buttons.
-                    role="region"
-                    aria-roledescription="carousel"
-                    aria-label={t(`Photos of ${displayName}`, `صور ${displayName}`)}
-                    tabIndex={0}
-                    onKeyDown={e => {
-                      if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
-                      e.preventDefault();
-                      const forward = (e.key === 'ArrowLeft') === (language === 'ar');
-                      setSelectedImage(i =>
-                        Math.min(images.length - 1, Math.max(0, i + (forward ? 1 : -1)))
-                      );
-                    }}
-                    className="flex h-full w-full snap-x snap-mandatory overflow-x-auto overflow-y-hidden [scrollbar-width:none] [&::-webkit-scrollbar]:hidden focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
-                  >
-                    {images.map((img, index) => (
-                      <div
-                        key={img.id || index}
-                        className={`relative h-full w-full shrink-0 snap-center${img.id?.startsWith('variant-') ? ' variant-image-fade' : ''}`}
-                      >
-                        <Image
-                          src={img.url}
-                          alt={img.alt || `${displayName} ${index + 1}`}
-                          width={600}
-                          height={800}
-                          className="h-full w-full object-cover"
-                          sizes="(max-width: 768px) 100vw, (max-width: 1024px) 40vw, 32vw"
-                          priority={index === 0}
-                          draggable={false}
-                        />
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="flex h-full items-center justify-center">
-                    <div className="mx-auto flex h-40 w-40 items-center justify-center rounded-full bg-primary/20">
-                      <svg
-                        className="h-20 w-20 text-primary"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={1.5}
-                          d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"
-                        />
-                      </svg>
+            {/* Product Details */}
+            <div className="grid gap-8 md:grid-cols-12">
+              {/* Images */}
+              <div className="space-y-4 md:col-span-5 md:sticky md:top-24 md:self-start">
+                <div className={galleryFrameClass} data-gallery={airyGallery ? 'airy' : undefined}>
+                  {model3d && (
+                    <Model3dToggle
+                      active={show3d}
+                      t={t}
+                      onToggle={() => {
+                        if (!show3d) {
+                          captureEvent('product_3d_opened', {
+                            storeId: store?.id,
+                            productId: product.id,
+                          });
+                        }
+                        setShow3d(v => !v);
+                      }}
+                    />
+                  )}
+                  {model3d && show3d ? (
+                    <ProductModel3dPanel
+                      model={model3d}
+                      storeId={store?.id ?? ''}
+                      productId={product.id}
+                      productName={displayName}
+                      fallbackPoster={productImages[0]?.url}
+                      selected={pickedOptions}
+                      optionOrder={productOptions.map(o => o.name)}
+                      isRtl={language === 'ar'}
+                      t={t}
+                    />
+                  ) : images.length > 0 ? (
+                    // Swipeable scroll-snap track — one image per page. Touch users
+                    // swipe left/right; desktop scrolls/drag. handleGalleryScroll
+                    // keeps selectedImage (dots + thumbnails) in sync.
+                    <div
+                      ref={galleryRef}
+                      onScroll={handleGalleryScroll}
+                      // a11y re-audit P2-N5: the strip reads in the page direction, so in Arabic
+                      // photo 2 lies to the LEFT, where Next (inline end) and ArrowLeft point. It was
+                      // dir=ltr to keep scrollLeft positive; the scroll math now takes |scrollLeft|
+                      // and a signed target instead (RTL scrollLeft is 0 -> -max in every engine).
+                      dir={language === 'ar' ? 'rtl' : 'ltr'}
+                      // P1-7 (W4): a named, focusable region; arrow keys page it like the buttons.
+                      role="region"
+                      aria-roledescription="carousel"
+                      aria-label={t(`Photos of ${displayName}`, `صور ${displayName}`)}
+                      tabIndex={0}
+                      onKeyDown={e => {
+                        if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+                        e.preventDefault();
+                        const forward = (e.key === 'ArrowLeft') === (language === 'ar');
+                        setSelectedImage(i =>
+                          Math.min(images.length - 1, Math.max(0, i + (forward ? 1 : -1)))
+                        );
+                      }}
+                      className="flex h-full w-full snap-x snap-mandatory overflow-x-auto overflow-y-hidden [scrollbar-width:none] [&::-webkit-scrollbar]:hidden focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+                    >
+                      {images.map((img, index) => (
+                        <div
+                          key={img.id || index}
+                          className={`relative h-full w-full shrink-0 snap-center${img.id?.startsWith('variant-') ? ' variant-image-fade' : ''}`}
+                        >
+                          <Image
+                            src={img.url}
+                            alt={img.alt || `${displayName} ${index + 1}`}
+                            width={600}
+                            height={800}
+                            className="h-full w-full object-cover"
+                            sizes="(max-width: 768px) 100vw, (max-width: 1024px) 40vw, 32vw"
+                            priority={index === 0}
+                            draggable={false}
+                          />
+                        </div>
+                      ))}
                     </div>
-                  </div>
-                )}
-                {/* Out-of-stock label + image dim — same platform OOS system as
+                  ) : (
+                    <div className="flex h-full items-center justify-center">
+                      <div className="mx-auto flex h-40 w-40 items-center justify-center rounded-full bg-primary/20">
+                        <svg
+                          className="h-20 w-20 text-primary"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={1.5}
+                            d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"
+                          />
+                        </svg>
+                      </div>
+                    </div>
+                  )}
+                  {/* Out-of-stock label + image dim — same platform OOS system as
                     the product cards (productCardDefaults oosLabel + oosDimColor),
                     so the PDP matches the listing. orderable honors backorder:
                     a backorder-able OOS product is still orderable so no label.
                     Sits OVER the swipe track so it stays put while images scroll. */}
-                {!show3d && (
-                  <OosImageDim
-                    orderable={buyableNow}
-                    oosDimColor={productCardDefaults?.oosDimColor}
+                  {!show3d && (
+                    <OosImageDim
+                      orderable={buyableNow}
+                      oosDimColor={productCardDefaults?.oosDimColor}
+                      theme={store?.theme}
+                    />
+                  )}
+                  <OutOfStockRibbon
+                    flat={!!getLook(store.look)}
+                    inStock={buyableNow}
+                    isRtl={language === 'ar'}
+                    oosLabel={productCardDefaults?.oosLabel}
+                    oosLabelTextEn={productCardDefaults?.oosLabelTextEn}
+                    oosLabelTextAr={productCardDefaults?.oosLabelTextAr}
+                    oosLabelShape={productCardDefaults?.oosLabelShape}
+                    oosLabelPlacement={productCardDefaults?.oosLabelPlacement}
+                    oosLabelColor={productCardDefaults?.oosLabelColor}
+                    oosLabelTextColor={productCardDefaults?.oosLabelTextColor}
                     theme={store?.theme}
                   />
-                )}
-                <OutOfStockRibbon
-                  flat={!!getLook(store.look)}
-                  inStock={buyableNow}
-                  isRtl={language === 'ar'}
-                  oosLabel={productCardDefaults?.oosLabel}
-                  oosLabelTextEn={productCardDefaults?.oosLabelTextEn}
-                  oosLabelTextAr={productCardDefaults?.oosLabelTextAr}
-                  oosLabelShape={productCardDefaults?.oosLabelShape}
-                  oosLabelPlacement={productCardDefaults?.oosLabelPlacement}
-                  oosLabelColor={productCardDefaults?.oosLabelColor}
-                  oosLabelTextColor={productCardDefaults?.oosLabelTextColor}
-                  theme={store?.theme}
-                />
-                {/* P1-7 / AT-2 (W4): real prev/next buttons, 44px, at the inline edges, plus a
+                  {/* P1-7 / AT-2 (W4): real prev/next buttons, 44px, at the inline edges, plus a
                     polite status line; the dots below stay as the visual position cue. */}
-                {images.length > 1 && !show3d && (
-                  <>
-                    <button
-                      type="button"
-                      data-gallery-prev
-                      disabled={selectedImage === 0}
-                      onClick={() => setSelectedImage(i => Math.max(0, i - 1))}
-                      aria-label={t('Previous photo', 'الصورة السابقة')}
-                      className="absolute start-2 top-1/2 z-10 inline-flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-[var(--radius)] bg-background/85 text-foreground disabled:opacity-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                    >
-                      <svg
-                        className="h-5 w-5 rtl:-scale-x-100"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                        aria-hidden="true"
+                  {images.length > 1 && !show3d && (
+                    <>
+                      <button
+                        type="button"
+                        data-gallery-prev
+                        disabled={selectedImage === 0}
+                        onClick={() => setSelectedImage(i => Math.max(0, i - 1))}
+                        aria-label={t('Previous photo', 'الصورة السابقة')}
+                        className="absolute start-2 top-1/2 z-10 inline-flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-[var(--radius)] bg-background/85 text-foreground disabled:opacity-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                       >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M15 19l-7-7 7-7"
-                        />
-                      </svg>
-                    </button>
-                    <button
-                      type="button"
-                      data-gallery-next
-                      disabled={selectedImage >= images.length - 1}
-                      onClick={() => setSelectedImage(i => Math.min(images.length - 1, i + 1))}
-                      aria-label={t('Next photo', 'الصورة التالية')}
-                      className="absolute end-2 top-1/2 z-10 inline-flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-[var(--radius)] bg-background/85 text-foreground disabled:opacity-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                    >
-                      <svg
-                        className="h-5 w-5 rtl:-scale-x-100"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                        aria-hidden="true"
+                        <svg
+                          className="h-5 w-5 rtl:-scale-x-100"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                          aria-hidden="true"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M15 19l-7-7 7-7"
+                          />
+                        </svg>
+                      </button>
+                      <button
+                        type="button"
+                        data-gallery-next
+                        disabled={selectedImage >= images.length - 1}
+                        onClick={() => setSelectedImage(i => Math.min(images.length - 1, i + 1))}
+                        aria-label={t('Next photo', 'الصورة التالية')}
+                        className="absolute end-2 top-1/2 z-10 inline-flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-[var(--radius)] bg-background/85 text-foreground disabled:opacity-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                       >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M9 5l7 7-7 7"
+                        <svg
+                          className="h-5 w-5 rtl:-scale-x-100"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                          aria-hidden="true"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M9 5l7 7-7 7"
+                          />
+                        </svg>
+                      </button>
+                      <span data-gallery-status className="sr-only" aria-live="polite">
+                        {t(
+                          `Photo ${selectedImage + 1} of ${images.length}`,
+                          `الصورة ${selectedImage + 1} من ${images.length}`
+                        )}
+                      </span>
+                    </>
+                  )}
+                  {/* Dot indicators — current image of total. */}
+                  {images.length > 1 && !show3d && (
+                    <div className="pointer-events-none absolute inset-x-0 bottom-2 flex justify-center gap-1.5">
+                      {images.map((_, i) => (
+                        <span
+                          key={i}
+                          className={`h-1.5 rounded-full transition-[width,background-color] ${
+                            i === selectedImage ? 'w-4 bg-primary' : 'w-1.5 bg-foreground/30'
+                          }`}
                         />
-                      </svg>
-                    </button>
-                    <span data-gallery-status className="sr-only" aria-live="polite">
-                      {t(
-                        `Photo ${selectedImage + 1} of ${images.length}`,
-                        `الصورة ${selectedImage + 1} من ${images.length}`
-                      )}
-                    </span>
-                  </>
-                )}
-                {/* Dot indicators — current image of total. */}
-                {images.length > 1 && !show3d && (
-                  <div className="pointer-events-none absolute inset-x-0 bottom-2 flex justify-center gap-1.5">
-                    {images.map((_, i) => (
-                      <span
-                        key={i}
-                        className={`h-1.5 rounded-full transition-[width,background-color] ${
-                          i === selectedImage ? 'w-4 bg-primary' : 'w-1.5 bg-foreground/30'
-                        }`}
-                      />
-                    ))}
-                  </div>
-                )}
+                      ))}
+                    </div>
+                  )}
+                </div>
+                {/* Thumbnail strip removed — swipe track + dot indicators replace it. */}
               </div>
-              {/* Thumbnail strip removed — swipe track + dot indicators replace it. */}
-            </div>
 
-            {/* Product Info */}
-            <div className="md:col-span-7">
-              {/* The category chip moved below the buy block (taste bar: on a 390px phone
+              {/* Product Info */}
+              <div className="md:col-span-7">
+                {/* The category chip moved below the buy block (taste bar: on a 390px phone
                   the fold is gallery, title, price, selectors, personalisation, add to cart,
                   delivery chip, and nothing more). Only the merchant's own badge, the
                   discount and the draft marker stay up here, and only when one exists. */}
-              {(pdpCustomBadgeText || discountBadgeText || product.status === 'draft') && (
-                <div className="mb-4 flex items-center gap-2">
-                  {/* Custom badge — the merchant's own words, same chip the
+                {(pdpCustomBadgeText || discountBadgeText || product.status === 'draft') && (
+                  <div className="mb-4 flex items-center gap-2">
+                    {/* Custom badge — the merchant's own words, same chip the
                     product cards show. Inline color so a merchant's
                     productCardDefaults.customBadge.color carries onto the PDP
                     instead of the badge silently reverting to the primary
                     token here. */}
-                  {pdpCustomBadgeText && (
-                    <Badge
-                      className="text-white"
-                      style={{
-                        backgroundColor: pdpCustomBadgeColor,
-                        color: pdpCustomBadgeTextColor,
-                      }}
-                    >
-                      {pdpCustomBadgeText}
-                    </Badge>
-                  )}
-                  {/* Discount badge — BUG 1 fix: helper text (EGP or pct).
+                    {pdpCustomBadgeText && (
+                      <Badge
+                        className="text-white"
+                        style={{
+                          backgroundColor: pdpCustomBadgeColor,
+                          color: pdpCustomBadgeTextColor,
+                        }}
+                      >
+                        {pdpCustomBadgeText}
+                      </Badge>
+                    )}
+                    {/* Discount badge — BUG 1 fix: helper text (EGP or pct).
                     Waits for variant selection on variant products
                     (displayCompare is null until a variant is picked). */}
-                  {discountBadgeText &&
-                    (getLook(store.look) ? (
-                      // a look's sale chip is its own accent / metal, never the error red (B2-25)
-                      <span
-                        className="inline-flex items-center rounded-[var(--radius)] px-2.5 py-1 text-xs font-semibold"
-                        style={LOOK_CHIP_STYLE}
-                      >
-                        {discountBadgeText}
-                      </span>
-                    ) : (
-                      <Badge variant="destructive">{discountBadgeText}</Badge>
-                    ))}
-                  {product.status === 'draft' && (
-                    <Badge variant="outline">{t('Draft', 'مسودة')}</Badge>
-                  )}
-                </div>
-              )}
+                    {discountBadgeText &&
+                      (getLook(store.look) ? (
+                        // a look's sale chip is its own accent / metal, never the error red (B2-25)
+                        <span
+                          className="inline-flex items-center rounded-[var(--radius)] px-2.5 py-1 text-xs font-semibold"
+                          style={LOOK_CHIP_STYLE}
+                        >
+                          {discountBadgeText}
+                        </span>
+                      ) : (
+                        <Badge variant="destructive">{discountBadgeText}</Badge>
+                      ))}
+                    {product.status === 'draft' && (
+                      <Badge variant="outline">{t('Draft', 'مسودة')}</Badge>
+                    )}
+                  </div>
+                )}
 
-              {/* PDP NAME-vs-PRICE rule: name carries the zone that drives size; price
+                {/* PDP NAME-vs-PRICE rule: name carries the zone that drives size; price
                   mirrors the zone on its own span (not the parent div) so the Tailwind
                   size class on the child cannot win over the parent's inline fontSize.
                   Hardcoded text-3xl / text-2xl removed — size is purely zone-driven.
                   See design.md § "PDP name ≥ price invariant". */}
-              <h1
-                className="font-bold text-foreground [overflow-wrap:anywhere]"
-                data-zone="productName"
-                style={zoneStyle(pdpNameZone, pdpScale)}
-              >
-                {displayName}
-              </h1>
-
-              {/* Phase B3 (Ruling B3-6): one inline rating line; renders nothing without a rating. */}
-              {reviewsOn && (
-                <RatingSummary
-                  average={product.ratingStats?.ratingAverage}
-                  count={product.ratingStats?.ratingCount}
-                />
-              )}
-
-              {displayExcerpt && (
-                <p className="mt-2 whitespace-pre-line text-base text-muted-foreground">
-                  {displayExcerpt}
-                </p>
-              )}
-
-              {/* Price */}
-              <div className="mt-4 flex items-baseline gap-3">
-                <span
-                  // one price never splits from its currency; only an English "A to B" range may wrap
-                  className={`font-bold text-primary${pricing.mode !== 'range' || language === 'ar' ? ' whitespace-nowrap' : ''}`}
-                  data-zone="productPrice"
-                  style={zoneStyle(pdpPriceZone, pdpScale)}
+                <h1
+                  className="font-bold text-foreground [overflow-wrap:anywhere]"
+                  data-zone="productName"
+                  style={zoneStyle(pdpNameZone, pdpScale)}
                 >
-                  {priceText}
-                </span>
-                {pricing.mode === 'single' && displayCompare && displayCompare > displayPrice && (
-                  <span className="text-lg text-muted-foreground line-through">
-                    {formatPrice(displayCompare)}
-                  </span>
+                  {displayName}
+                </h1>
+
+                {/* Phase B3 (Ruling B3-6): one inline rating line; renders nothing without a rating. */}
+                {reviewsOn && (
+                  <RatingSummary
+                    average={product.ratingStats?.ratingAverage}
+                    count={product.ratingStats?.ratingCount}
+                  />
                 )}
-                {/* B2-9: merchant-configured estimate, PDP only; renders nothing when off. */}
-                <InstalmentLine priceMinor={displayPrice} buyable={buyableNow} />
-              </div>
-              <TaxInclusiveLabel className="mt-1 block text-xs text-muted-foreground" />
-              <GoldRateLine gold={goldForSelection} className="mt-1" />
-              {/* Phase B3 (Ruling B3-6): one live bundle-saving line; renders nothing without a saving. */}
-              <BundleSaving productId={product.id} />
-              <B2bPdpPanel
-                productId={product.id}
-                variantId={selectedVariant?.id ?? null}
-                moq={product.moq}
-                tiers={product.priceTiers}
-              />
 
-              {/* Variant Selector */}
-              {hasVariants && hasOptions ? (
-                <VariantSelector
-                  variants={productVariants}
-                  options={productOptions}
-                  onVariantSelect={setSelectedVariant}
-                  onShopperSelect={() => setShopperPickedVariant(true)}
-                  onSelectionChange={setPickedOptions}
-                  nudge={optionNudge}
-                  swatchColor={model3d ? swatchColor : undefined}
-                  sizeGuide={
-                    product.sizeChart ? <SizeChartDialog chart={product.sizeChart} /> : undefined
-                  }
-                />
-              ) : (
-                // No selector to sit beside: the guide gets its own line (renders nothing without a chart).
-                <SizeChartDialog chart={product.sizeChart} className="mt-4" />
-              )}
+                {displayExcerpt && (
+                  <p className="mt-2 whitespace-pre-line text-base text-muted-foreground">
+                    {displayExcerpt}
+                  </p>
+                )}
 
-              <PersonalisationField
-                config={product.personalisation}
-                value={note}
-                onChange={setNote}
-                nudge={noteNudge}
-              />
-
-              {/* Quantity & Add to Cart */}
-              <div className="mt-8 space-y-4">
-                <div className="flex items-center gap-4">
-                  <span className="text-sm font-medium text-foreground">
-                    {t('Quantity', 'الكمية')}:
+                {/* Price */}
+                <div className="mt-4 flex items-baseline gap-3">
+                  <span
+                    // one price never splits from its currency; only an English "A to B" range may wrap
+                    className={`font-bold text-primary${pricing.mode !== 'range' || language === 'ar' ? ' whitespace-nowrap' : ''}`}
+                    data-zone="productPrice"
+                    style={zoneStyle(pdpPriceZone, pdpScale)}
+                  >
+                    {priceText}
                   </span>
-                  <div className="flex items-center rounded-lg border border-input">
-                    <button
-                      type="button"
-                      onClick={() => setQuantity(Math.max(moqFloor, quantity - 1))}
-                      aria-label={t('Decrease quantity', 'تقليل الكمية')}
-                      // a11y re-audit P2-N11: no quantity to choose when it cannot be bought.
-                      disabled={!buyableNow || goldStale}
-                      className="flex h-11 min-w-11 items-center justify-center px-4 text-muted-foreground hover:bg-muted cursor-pointer disabled:cursor-not-allowed disabled:opacity-40"
-                    >
-                      <MinusIcon />
-                    </button>
-                    <span aria-live="polite" className="w-12 text-center font-medium">
-                      {localize(quantity)}
+                  {pricing.mode === 'single' && displayCompare && displayCompare > displayPrice && (
+                    <span className="text-lg text-muted-foreground line-through">
+                      {formatPrice(displayCompare)}
                     </span>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const retailCap =
-                          effectiveInventory != null && effectiveInventory > 0
-                            ? Math.min(effectiveInventory, 10)
-                            : 10;
-                        // A MOQ or price break above the retail cap must be selectable (stock still bounds it).
-                        const maxQty = pdpMaxQty(retailCap, product?.moq, product?.priceTiers);
-                        const stockCap =
-                          effectiveInventory != null && effectiveInventory > 0
-                            ? Math.min(maxQty, effectiveInventory)
-                            : maxQty;
-                        setQuantity(Math.min(quantity + 1, Math.max(stockCap, moqFloor)));
-                      }}
-                      aria-label={t('Increase quantity', 'زيادة الكمية')}
-                      disabled={!buyableNow || goldStale}
-                      className="flex h-11 min-w-11 items-center justify-center px-4 text-muted-foreground hover:bg-muted cursor-pointer disabled:cursor-not-allowed disabled:opacity-40"
-                    >
-                      <PlusIcon />
-                    </button>
-                  </div>
-                  {effectiveInventory !== undefined &&
-                    effectiveInventory !== null &&
-                    outOfStock && (
-                      <span className="text-sm text-muted-foreground">
-                        {/* From the same stock answer as the button (X-02): a variant
+                  )}
+                  {/* B2-9: merchant-configured estimate, PDP only; renders nothing when off. */}
+                  <InstalmentLine priceMinor={displayPrice} buyable={buyableNow} />
+                </div>
+                <TaxInclusiveLabel className="mt-1 block text-xs text-muted-foreground" />
+                <GoldRateLine gold={goldForSelection} className="mt-1" />
+                {/* Phase B3 (Ruling B3-6): one live bundle-saving line; renders nothing without a saving. */}
+                <BundleSaving productId={product.id} />
+                <B2bPdpPanel
+                  productId={product.id}
+                  variantId={selectedVariant?.id ?? null}
+                  moq={product.moq}
+                  tiers={product.priceTiers}
+                />
+
+                {/* Variant Selector */}
+                {hasVariants && hasOptions ? (
+                  <VariantSelector
+                    variants={productVariants}
+                    options={productOptions}
+                    onVariantSelect={setSelectedVariant}
+                    onShopperSelect={() => setShopperPickedVariant(true)}
+                    onSelectionChange={setPickedOptions}
+                    nudge={optionNudge}
+                    swatchColor={model3d ? swatchColor : undefined}
+                    sizeGuide={
+                      product.sizeChart ? <SizeChartDialog chart={product.sizeChart} /> : undefined
+                    }
+                  />
+                ) : (
+                  // No selector to sit beside: the guide gets its own line (renders nothing without a chart).
+                  <SizeChartDialog chart={product.sizeChart} className="mt-4" />
+                )}
+
+                <PersonalisationField
+                  config={product.personalisation}
+                  value={note}
+                  onChange={setNote}
+                  nudge={noteNudge}
+                />
+
+                {/* Quantity & Add to Cart */}
+                <div className="mt-8 space-y-4">
+                  <div className="flex items-center gap-4">
+                    <span className="text-sm font-medium text-foreground">
+                      {t('Quantity', 'الكمية')}:
+                    </span>
+                    <div className="flex items-center rounded-lg border border-input">
+                      <button
+                        type="button"
+                        onClick={() => setQuantity(Math.max(moqFloor, quantity - 1))}
+                        aria-label={t('Decrease quantity', 'تقليل الكمية')}
+                        // a11y re-audit P2-N11: no quantity to choose when it cannot be bought.
+                        disabled={!buyableNow || goldStale}
+                        className="flex h-11 min-w-11 items-center justify-center px-4 text-muted-foreground hover:bg-muted cursor-pointer disabled:cursor-not-allowed disabled:opacity-40"
+                      >
+                        <MinusIcon />
+                      </button>
+                      <span aria-live="polite" className="w-12 text-center font-medium">
+                        {localize(quantity)}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const retailCap =
+                            effectiveInventory != null && effectiveInventory > 0
+                              ? Math.min(effectiveInventory, 10)
+                              : 10;
+                          // A MOQ or price break above the retail cap must be selectable (stock still bounds it).
+                          const maxQty = pdpMaxQty(retailCap, product?.moq, product?.priceTiers);
+                          const stockCap =
+                            effectiveInventory != null && effectiveInventory > 0
+                              ? Math.min(maxQty, effectiveInventory)
+                              : maxQty;
+                          setQuantity(Math.min(quantity + 1, Math.max(stockCap, moqFloor)));
+                        }}
+                        aria-label={t('Increase quantity', 'زيادة الكمية')}
+                        disabled={!buyableNow || goldStale}
+                        className="flex h-11 min-w-11 items-center justify-center px-4 text-muted-foreground hover:bg-muted cursor-pointer disabled:cursor-not-allowed disabled:opacity-40"
+                      >
+                        <PlusIcon />
+                      </button>
+                    </div>
+                    {effectiveInventory !== undefined &&
+                      effectiveInventory !== null &&
+                      outOfStock && (
+                        <span className="text-sm text-muted-foreground">
+                          {/* From the same stock answer as the button (X-02): a variant
                           product's own inventory is 0, and a pre-order is not "out".
                           Taste re-audit P2-1: "in stock" is true for almost every item, so
                           only pre-order and out of stock are said (quality bar § 8). */}
-                        {canBackorder
-                          ? t('Available to pre-order', 'متاح للطلب المسبق')
-                          : t('Out of stock', 'غير متوفر')}
-                      </span>
-                    )}
-                </div>
-                {/* BUG 2 fix: discount badge stacked directly below the OOS
+                          {canBackorder
+                            ? t('Available to pre-order', 'متاح للطلب المسبق')
+                            : t('Out of stock', 'غير متوفر')}
+                        </span>
+                      )}
+                  </div>
+                  {/* BUG 2 fix: discount badge stacked directly below the OOS
                     indicator row when product is out of stock (and not
                     backorderable). This surfaces the saving alongside the
                     stock state rather than only in the title area. */}
-                {outOfStock && !canBackorder && discountBadgeText && (
-                  <div>
-                    <Badge variant="destructive">{discountBadgeText}</Badge>
+                  {outOfStock && !canBackorder && discountBadgeText && (
+                    <div>
+                      <Badge variant="destructive">{discountBadgeText}</Badge>
+                    </div>
+                  )}
+
+                  <div className="flex gap-4" ref={buyRef}>
+                    <Button
+                      size="lg"
+                      className="flex-1"
+                      data-testid="pdp-add"
+                      onClick={handleAddToCart}
+                      isLoading={isAdding}
+                      disabled={addDisabled}
+                    >
+                      {addLabel}
+                    </Button>
+
+                    <Button
+                      size="lg"
+                      variant="outline"
+                      onClick={handleToggleWishlist}
+                      aria-label={t('Save to wishlist', 'حفظ في المفضلة')}
+                      aria-pressed={isWishlisted}
+                    >
+                      <svg
+                        aria-hidden="true"
+                        className="h-5 w-5"
+                        fill={isWishlisted ? 'currentColor' : 'none'}
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"
+                        />
+                      </svg>
+                    </Button>
+                  </div>
+                  {/* X-03: a delivery date only for something that can be bought now. */}
+                  {buyableNow && <DeliveryChip leadTimeDays={product.leadTimeDays} />}
+                  {/* S-02: COD · return window, from the store's own settings. */}
+                  <TrustLine cod={codOffer} />
+                </div>
+
+                {/* Below the buy block: the category chip and the description (fold rule above). */}
+                {/* L-08: on phones (no breadcrumb below md) the category is a link back to its PLP;
+                  from md the breadcrumb carries it, so no second, unlinked label. */}
+                {categoryName && cat0?.category?.slug && (
+                  <div className="mt-6 md:hidden">
+                    <Link
+                      href={storeUrl(`/products?category=${cat0.category.slug}`)}
+                      className="inline-flex min-h-11 min-w-11 items-center gap-1 text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
+                    >
+                      {categoryName}
+                    </Link>
+                  </div>
+                )}
+                {displayDescription && (
+                  // whitespace-pre-line: the admin edits this in a <Textarea>, so
+                  // a merchant's line breaks are stored — but HTML collapses
+                  // them, which ran every paragraph together into one block and
+                  // read as "only the first line saved". Matches how FAQ answers
+                  // and how-to guides already render merchant prose. Still plain
+                  // text (React escapes it), so no HTML injection surface.
+                  <p className="mt-4 max-w-prose whitespace-pre-line text-muted-foreground leading-relaxed">
+                    {displayDescription}
+                  </p>
+                )}
+
+                {/* SKU */}
+                {product.sku && (
+                  <div className="mt-6 border-t border-border pt-6">
+                    <p className="text-sm text-muted-foreground">SKU: {product.sku}</p>
                   </div>
                 )}
 
-                <div className="flex gap-4" ref={buyRef}>
-                  <Button
-                    size="lg"
-                    className="flex-1"
-                    data-testid="pdp-add"
-                    onClick={handleAddToCart}
-                    isLoading={isAdding}
-                    disabled={addDisabled}
-                  >
-                    {addLabel}
-                  </Button>
+                {/* Spec rows: below the buy box on purpose (PDP above-the-fold budget). */}
+                <FactsTable facts={product.facts} />
 
-                  <Button
-                    size="lg"
-                    variant="outline"
-                    onClick={handleToggleWishlist}
-                    aria-label={t('Save to wishlist', 'حفظ في المفضلة')}
-                    aria-pressed={isWishlisted}
-                  >
-                    <svg
-                      aria-hidden="true"
-                      className="h-5 w-5"
-                      fill={isWishlisted ? 'currentColor' : 'none'}
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"
-                      />
-                    </svg>
-                  </Button>
-                </div>
-                {/* X-03: a delivery date only for something that can be bought now. */}
-                {buyableNow && <DeliveryChip leadTimeDays={product.leadTimeDays} />}
-                {/* S-02: COD · return window, from the store's own settings. */}
-                <TrustLine cod={codOffer} />
+                <WaMeProductButton
+                  product={product}
+                  priceMinor={displayPrice}
+                  className="mt-6 w-full sm:w-auto"
+                  personalisation={waPersonalisation}
+                  disabled={noteMissing}
+                  onBlocked={() => setNoteNudge(n => n + 1)}
+                />
+                <ShareProductRow
+                  productName={language === 'ar' && product.nameAr ? product.nameAr : product.name}
+                  url={shareUrl}
+                  className="mt-6 border-t border-border pt-6"
+                />
+                <SpecTable
+                  specifications={
+                    (product as { specifications?: unknown }).specifications as
+                      | Record<string, string>
+                      | undefined
+                  }
+                  className="mt-6"
+                />
               </div>
-
-              {/* Below the buy block: the category chip and the description (fold rule above). */}
-              {/* L-08: on phones (no breadcrumb below md) the category is a link back to its PLP;
-                  from md the breadcrumb carries it, so no second, unlinked label. */}
-              {categoryName && cat0?.category?.slug && (
-                <div className="mt-6 md:hidden">
-                  <Link
-                    href={storeUrl(`/products?category=${cat0.category.slug}`)}
-                    className="inline-flex min-h-11 min-w-11 items-center gap-1 text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
-                  >
-                    {categoryName}
-                  </Link>
-                </div>
-              )}
-              {displayDescription && (
-                // whitespace-pre-line: the admin edits this in a <Textarea>, so
-                // a merchant's line breaks are stored — but HTML collapses
-                // them, which ran every paragraph together into one block and
-                // read as "only the first line saved". Matches how FAQ answers
-                // and how-to guides already render merchant prose. Still plain
-                // text (React escapes it), so no HTML injection surface.
-                <p className="mt-4 max-w-prose whitespace-pre-line text-muted-foreground leading-relaxed">
-                  {displayDescription}
-                </p>
-              )}
-
-              {/* SKU */}
-              {product.sku && (
-                <div className="mt-6 border-t border-border pt-6">
-                  <p className="text-sm text-muted-foreground">SKU: {product.sku}</p>
-                </div>
-              )}
-
-              {/* Spec rows: below the buy box on purpose (PDP above-the-fold budget). */}
-              <FactsTable facts={product.facts} />
-
-              <WaMeProductButton
-                product={product}
-                priceMinor={displayPrice}
-                className="mt-6 w-full sm:w-auto"
-                personalisation={waPersonalisation}
-                disabled={noteMissing}
-                onBlocked={() => setNoteNudge(n => n + 1)}
-              />
-              <ShareProductRow
-                productName={language === 'ar' && product.nameAr ? product.nameAr : product.name}
-                url={shareUrl}
-                className="mt-6 border-t border-border pt-6"
-              />
-              <SpecTable
-                specifications={
-                  (product as { specifications?: unknown }).specifications as
-                    | Record<string, string>
-                    | undefined
-                }
-                className="mt-6"
-              />
             </div>
-          </div>
-
-          {/* Product FAQ */}
-          {product?.faqs && product.faqs.length > 0 && (
-            <ProductFAQSection faqs={product.faqs} language={language} t={t} />
-          )}
-
-          {/* Product Reviews — gated on BOTH the platform feature flag
-            AND the per-store layout toggle. Default for new stores is
-            enabled=false so a brand-new store does not show a placeholder. */}
-          {reviewsOn && product && (
-            <SectionErrorBoundary section="reviews">
-              <ReviewSection storeId={store.id} productId={product.id} />
-            </SectionErrorBoundary>
-          )}
-
-          {/* Upsell / Cross-sell recommendations — each section isolated so a
-              render error in one doesn't take down the other or the rest of
-              the PDP (Lens M graceful degradation). */}
-          {isEnabled('upsell_crosssell') && product && store.id && store.id !== 'demo' && (
-            <>
-              <SectionErrorBoundary section="frequently-bought-together">
-                <FrequentlyBoughtTogether storeId={store.id} productId={product.id} />
-              </SectionErrorBoundary>
-              <SectionErrorBoundary section="you-might-also-like">
-                <YouMightAlsoLike storeId={store.id} productId={product.id} />
-              </SectionErrorBoundary>
-            </>
-          )}
-
-          {/* Related Products — compact ProductCarousel (canonical card via
-            getPackStyles) so per-store productCardDefaults (frame, size, shape)
-            are honoured here too. Eliminates the T.ProductGrid 4th render path
-            on the PDP per the standing platform rule. */}
-          {relatedProducts.length > 0 && !templateLoading && (
-            <div className="mt-16">
-              {/* Compact horizontal carousel (was a 2/3-col grid of full-size
-                  cards). Reuses the canonical ProductCarousel so the related
-                  strip is smaller + scrollable + matches the homepage strips,
-                  and honours the per-store PDP heading typography zone. */}
-              <ProductCarousel
-                products={relatedProducts.map(toTemplateProduct)}
-                title="You may also like"
-                titleAr="قد يعجبك أيضاً"
-                headingZone={relatedHeadingZone}
-                isRtl={language === 'ar'}
-                currency={store.currency}
-                pack={templateId}
-                cardSize="xs"
-                cardAspect={productCardDefaults?.cardAspect}
-                cardShape={productCardDefaults?.cardShape}
-                showCardFrame={productCardDefaults?.showCardFrame}
-                cardFrameStyle={productCardDefaults?.cardFrameStyle}
-                cardFrameWidth={productCardDefaults?.cardFrameWidth}
-                cardFrameSize={productCardDefaults?.cardFrameSize}
-                cardFrameColor={productCardDefaults?.cardFrameColor}
-                showLabel={productCardDefaults?.showLabel}
-                showHover={productCardDefaults?.showHover}
-                cardImageAspect={productCardDefaults?.cardImageAspect}
-                cardImageRadius={productCardDefaults?.cardImageRadius}
-                showCardName={productCardDefaults?.showCardName}
-                showCardPrice={
-                  store.theme?.showPriceOnCards === false
-                    ? false
-                    : productCardDefaults?.showCardPrice
-                }
-                urlPrefix={storeUrl('')}
-                onAddToCart={async productId => {
-                  const found = relatedProducts.find(x => x.id === productId);
-                  if (found)
-                    addItem({
-                      id: found.id,
-                      name: found.name,
-                      price: found.price,
-                      slug: found.slug,
-                      image: found.images?.[0]?.url,
-                      category: found.categories?.[0]?.category?.name,
-                    });
-                }}
-              />
-            </div>
-          )}
+          </PageMark>
+          {itemNodes(around.after)}
         </div>
       </div>
       {/* Phone sticky bar: SAME handler + SAME addDisabled/label as the main button. */}

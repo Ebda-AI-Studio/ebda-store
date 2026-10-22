@@ -82,6 +82,10 @@
       "statTotalUsers": "Total Users",
       "statTotalOrders": "Total Orders",
       "statTotalRevenue": "Total Revenue",
+      "referralsTitle": "Referral signups",
+      "referralsNote": "Merchant signups whose first touch was a referral link (a floor: only visitors who consented are counted).",
+      "referralsBadge": "From the store badge",
+      "referralsEmail": "From the first-order email",
       "recentStoresTitle": "Recent Stores",
       "recentStoresSubtitle": "Latest store registrations",
       "recentOrdersTitle": "Recent Orders",
@@ -2049,6 +2053,13 @@
         "successTitle": "AI filled empty kicker + subtitle fields",
         "generating": "Generating…",
         "generateWithAi": "Generate with AI"
+      },
+      "pageSettingsMoved": {
+        "title": "Page settings moved to the visual editor",
+        "body": "The design of the product, products, categories, cart and checkout pages, the filter panel and the reviews switch are edited per page in the visual editor, where you see them live. Saving them here would not reach your store.",
+        "product": "Product page settings",
+        "collection": "Products page settings",
+        "cart": "Cart and checkout settings"
       }
     },
     "devices": {
@@ -6177,6 +6188,7 @@
         "affiliates": "Affiliates",
         "abandonedCarts": "Abandoned Carts",
         "paymentAbandonments": "Payment Abandonments",
+        "lifecycleEmails": "Setup emails",
         "locations": "Locations",
         "customerGroups": "Customer groups",
         "wallet": "Wallet",
@@ -7941,6 +7953,40 @@
       "notConnectedTitle": "Google Search Console not connected",
       "notConnectedBody": "Once Ebda Store's Search Console access is set up for your store's domain, search impressions, clicks, and top queries will appear here automatically — no action needed on your end."
     }
+  },
+  "lifecycleEmails": {
+    "title": "Setup emails",
+    "subtitle": "The onboarding emails Ebda sent to your account, and what happened to each.",
+    "optedOut": "You unsubscribed: no more setup or trial emails will be sent. Order and billing emails are not affected.",
+    "colEmail": "Email",
+    "colStatus": "Status",
+    "colWhen": "When",
+    "colNote": "Note",
+    "pending": "Not sent yet",
+    "sent": "Sent",
+    "skipped": "Not needed",
+    "failed": "Failed to send",
+    "kind": {
+      "add_products": "Add your first products (day 1, if no products yet)",
+      "payment_shipping": "Cash and shipping ready? (day 3, if not set)",
+      "test_order": "Order from your store like a customer (day 5, if no order yet)",
+      "share_link": "Put the link in your bio (day 7)",
+      "trial_recap": "Trial recap (4 days before the trial ends)",
+      "first_order": "First order: ask for a referral"
+    },
+    "reason": {
+      "products_added": "You already added products",
+      "payment_and_shipping_done": "Payment and shipping were already set",
+      "order_placed": "An order was already placed",
+      "not_trialing": "Not on a trial",
+      "no_order": "No order yet",
+      "opted_out": "You unsubscribed",
+      "store_not_active": "Store not active",
+      "no_recipient": "No owner email",
+      "ENQUEUE_FAILED": "The email could not be queued",
+      "unsubscribed_by_link": "Unsubscribed from an email link"
+    },
+    "loadFailed": "Could not load the email log."
   },
   "paymentAbandonments": {
     "page": {
@@ -10026,7 +10072,10 @@
       "group": "This section belongs in another part of the page.",
       "block": "This section does not accept that block.",
       "notFound": "That item no longer exists.",
-      "unknown": "Unknown section type."
+      "unknown": "Unknown section type.",
+      "pinned": "This is the core of the page. You can move it, but not delete or hide it.",
+      "page": "This section does not belong on this page.",
+      "setting": "This page does not have that setting."
     },
     "families": {
       "label": "Templates",
@@ -10070,7 +10119,8 @@
       "show": "Show {name}",
       "hide": "Hide {name}",
       "duplicate": "Duplicate {name}",
-      "remove": "Remove {name}"
+      "remove": "Remove {name}",
+      "pinned": "{name} is the core of this page, it can move but not be removed"
     },
     "addSection": {
       "title": "Add a section",
@@ -10161,7 +10211,20 @@
       "chromeDown": "Move down",
       "chromeUnsafeLink": "Use a path like /about, or a link that starts with https://, mailto: or tel:.",
       "chromeLoading": "Loading your current links…",
-      "chromeLoadFailed": "Couldn't load your current links. Reload the page and try again."
+      "chromeLoadFailed": "Couldn't load your current links. Reload the page and try again.",
+      "productMainContent": "The photos, price, options and Add to cart button. They come from the product itself, and this block can move but not be removed.",
+      "productFaqContent": "Questions and answers come from each product. Add them on the product's own page.",
+      "productReviewsContent": "Reviews come from your customers. Moderate them in Reviews.",
+      "productBundlesContent": "\"Frequently bought together\" comes from your bundles.",
+      "productRecommendationsContent": "\"You might also like\" is picked automatically from what customers buy together.",
+      "productRelatedContent": "Related products are picked automatically from the same categories.",
+      "collectionMainContent": "The product grid, filters and sorting. The products come from your catalogue, and this block can move but not be removed.",
+      "cartMainContent": "The cart lines, coupon and order summary. This block can move but not be removed.",
+      "cartRecommendationsContent": "Suggestions are picked automatically from what is in the cart.",
+      "editProducts": "Edit products",
+      "editReviews": "Open reviews",
+      "editBundles": "Open bundles",
+      "editCategories": "Edit categories"
     },
     "theme": {
       "smartPalette": "Smart Palette",
@@ -10188,6 +10251,19 @@
       "restoring": "Restoring…",
       "confirmRestore": "Publish version {rev} again? Your current draft is replaced.",
       "more": "Load more"
+    },
+    "pages": {
+      "label": "Page",
+      "previewProduct": "Preview with product",
+      "noProducts": "Add a product to preview this page",
+      "saveFirst": "Fix the errors on this page before switching."
+    },
+    "pageSettings": {
+      "title": "{page} page settings",
+      "hint": "Settings for the whole page. Select a section on the page to edit that section instead.",
+      "cardsOnHome": "Product card style, image shapes and the phone bottom bar are set on the Home page.",
+      "openHome": "Open Home",
+      "open": "Page settings"
     }
   },
   "instapayReceipt": {

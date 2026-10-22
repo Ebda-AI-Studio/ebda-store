@@ -1,0 +1,161 @@
+{
+  "success": true,
+  "data": {
+    "store": {
+      "id": "<uuid-1>",
+      "name": "Parity Full",
+      "nameAr": null,
+      "slug": "rspar-full-<run>",
+      "domain": null,
+      "status": "active",
+      "logo": null,
+      "logoAr": null,
+      "favicon": null,
+      "description": null,
+      "descriptionAr": null,
+      "currency": "EGP",
+      "timezone": "Africa/Cairo",
+      "template": "qamar",
+      "look": null,
+      "isDemo": false,
+      "theme": {
+        "showBranchesInFooter": true
+      },
+      "typography": null,
+      "socialLinks": {},
+      "email": null,
+      "phone": null,
+      "phoneAr": null,
+      "whatsapp": null,
+      "address": null,
+      "addressAr": null,
+      "announcementBar": null,
+      "metaTitle": null,
+      "metaTitleAr": null,
+      "metaDescription": null,
+      "metaDescriptionAr": null,
+      "metaDescriptionAeo": null,
+      "metaDescriptionAeoAr": null,
+      "ogImage": null,
+      "twitterHandle": null,
+      "googleSiteVerification": null,
+      "settings": {
+        "defaultLanguage": "ar"
+      },
+      "taxEnabled": false,
+      "taxIncludedInPrice": false,
+      "marketingPixels": {},
+      "pwaEnabled": false,
+      "pwaSettings": {},
+      "blogEnabled": false,
+      "locationsEnabled": true,
+      "returnWindowDays": null,
+      "returnFeesPaidBy": null,
+      "heroTitle": null,
+      "heroTitleAr": null,
+      "heroSubtitle": null,
+      "heroSubtitleAr": null,
+      "heroCtaText": null,
+      "heroCtaTextAr": null,
+      "heroCtaLink": null,
+      "heroImage": null,
+      "llmsTxt": null,
+      "aboutJson": null,
+      "taxRatePercent": 0,
+      "faqs": [
+        {
+          "id": "<cuid-2>",
+          "question": "q1",
+          "questionAr": "س١",
+          "answer": "a1",
+          "answerAr": "ج١"
+        },
+        {
+          "id": "<cuid-3>",
+          "question": "q2",
+          "questionAr": null,
+          "answer": "a2",
+          "answerAr": null
+        }
+      ],
+      "howtos": [
+        {
+          "id": "<cuid-4>",
+          "title": "h0",
+          "titleAr": null,
+          "description": "d0",
+          "descriptionAr": null,
+          "steps": [],
+          "stepsAr": null
+        },
+        {
+          "id": "<cuid-5>",
+          "title": "h1",
+          "titleAr": null,
+          "description": "d1",
+          "descriptionAr": null,
+          "steps": [
+            {
+              "name": "s1",
+              "text": "t1",
+              "image": "https://x/y.png"
+            },
+            {
+              "name": "s2",
+              "text": "t2"
+            }
+          ],
+          "stepsAr": [
+            {
+              "name": "خ١",
+              "text": "ن١"
+            }
+          ]
+        }
+      ],
+      "smsMarketingOptIn": false,
+      "cartEmailOptIn": false
+    },
+    "enabledFeatures": [
+      "coupons",
+      "returns",
+      "reviews",
+      "tax",
+      "bulk_operations",
+      "upsell_crosssell",
+      "marketing_pixels",
+      "agent_feed",
+      "agent_checkout",
+      "answer_engine_insights",
+      "shipping_carriers",
+      "staff_accounts",
+      "pwa",
+      "seo",
+      "search_autocomplete",
+      "inventory.basic",
+      "product_3d",
+      "accounting.profit_anomaly"
+    ],
+    "disabledCmsSlugs": ["privacy", "terms"],
+    "locations": [
+      {
+        "id": "<uuid-6>",
+        "name": "B1",
+        "nameAr": "ف١",
+        "address": "addr1",
+        "addressAr": null,
+        "phone": "+201012345678",
+        "mapsUrl": null
+      },
+      {
+        "id": "<uuid-7>",
+        "name": "B2",
+        "nameAr": null,
+        "address": "addr2",
+        "addressAr": null,
+        "phone": null,
+        "mapsUrl": null
+      }
+    ]
+  }
+}

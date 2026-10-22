@@ -107,7 +107,8 @@ setDbHopObserver(recordHop);
 
 // Request ID for tracing
 app.use(requestId);
-// Opt-in per-hop Server-Timing (x-hop-timing: 1), see lib/hop-timing.ts.
+// Operator-only per-hop timing LOG (x-hop-timing must equal the HOP_TIMING_TOKEN secret; never a
+// response header), see lib/hop-timing.ts.
 app.use(hopTiming);
 
 // Graceful shutdown middleware

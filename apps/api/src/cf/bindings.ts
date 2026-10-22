@@ -22,7 +22,7 @@ export interface DurableObjectStubLike {
 
 export interface DurableObjectNamespaceLike {
   idFromName(name: string): unknown;
-  get(id: unknown): DurableObjectStubLike;
+  get(id: unknown, options?: { locationHint?: string }): DurableObjectStubLike;
 }
 
 export interface QueueProducerLike {
@@ -59,6 +59,10 @@ export interface CfBindings {
   SMS_QUEUE?: QueueProducerLike;
   /** Coarse per-IP flood guard in front of Express (Workers Rate Limiting binding). */
   RATE_LIMITER?: RateLimitBindingLike;
+  /** Anonymous public READS only: per-IP, 300 / 60 s per location (see middleware/public-read-limit.ts). */
+  PUBLIC_IP_LIMITER?: RateLimitBindingLike;
+  /** Anonymous public READS only: per-tenant, 6000 / 60 s per location. */
+  PUBLIC_TENANT_LIMITER?: RateLimitBindingLike;
   CF_VERSION_METADATA?: { id?: string; tag?: string };
   /** Service Binding to the storefront Worker (ebda-web): cache purge without a public host. */
   STOREFRONT?: ServiceBindingLike;

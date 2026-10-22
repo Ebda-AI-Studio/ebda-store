@@ -111,7 +111,7 @@
 </div>
 <div>
 <div data-zone="afterFooter">
-<a href="https://ebda.app" target="_blank" rel="noopener noreferrer" aria-label="مدعوم من ابدأ ستور">
+<a href="https://ebda.app/?utm_source=ebda_store_badge&amp;utm_medium=referral&amp;utm_campaign=powered_by" target="_blank" rel="noopener noreferrer" aria-label="مدعوم من ابدأ ستور">
 <span>مدعوم من</span>
 <span>ابدأ ستور</span>
 </a>
@@ -324,7 +324,7 @@
 </div>
 <div>
 <div data-zone="afterFooter">
-<a href="https://ebda.app" target="_blank" rel="noopener noreferrer" aria-label="Powered by Ebda Store">
+<a href="https://ebda.app/?utm_source=ebda_store_badge&amp;utm_medium=referral&amp;utm_campaign=powered_by" target="_blank" rel="noopener noreferrer" aria-label="Powered by Ebda Store">
 <span>Powered by</span>
 <span>Ebda Store</span>
 </a>

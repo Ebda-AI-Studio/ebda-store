@@ -132,7 +132,11 @@ function scrubValue(value: unknown, depth: number, seen: WeakSet<object>): unkno
   for (const key of Object.keys(obj)) {
     // The typed search term rides in this request header (Ruling SEARCH-URL-1 / SEARCH-P2-9);
     // an SDK that records request headers must not carry it to Sentry or PostHog.
-    if (key.toLowerCase() === SEARCH_QUERY_HEADER_NAME && obj[key]) {
+    // `x-hop-timing` carries the operator token (HOP_TIMING_TOKEN) of the API's per-hop timing log.
+    if (
+      (key.toLowerCase() === SEARCH_QUERY_HEADER_NAME || key.toLowerCase() === 'x-hop-timing') &&
+      obj[key]
+    ) {
       out = put(out, key, REDACTED_QUERY_VALUE, obj);
       continue;
     }

@@ -88,12 +88,15 @@ import { confirmPaymentFromProviderStatus } from '../services/payment-confirm.se
 import type { PaymentProvider } from '../services/payment-providers/types';
 
 import { WISHLIST_CARD_VARIANTS_SELECT, wishlistCardProduct } from '../lib/wishlist-card';
+import { inParallel } from '../lib/run-in-parallel';
+import { publicReadLimit } from '../middleware/public-read-limit';
 const router = Router();
 
 // Apply public rate limiter to all routes — per-IP first, then the
 // per-tenant aggregate backstop (see publicTenantLimiter's comment).
-router.use(publicLimiter);
-router.use(publicTenantLimiter);
+// Both counters are independent keyed counters behind a Durable Object hop each; they run
+// together (one round trip, not two). Both still count every request and either can answer 429.
+router.use(publicReadLimit(inParallel(publicLimiter, publicTenantLimiter)));
 
 // GET /health - Health check endpoint
 router.get('/health', async (_req: Request, res: Response) => {
@@ -380,11 +383,13 @@ router.get('/products', async (req: Request, res: Response, next: NextFunction) 
       cacheKey,
       120,
       () =>
-        ProductService.listPublic(storeId, {
-          ...listOptions,
-          // The query-embed limit is charged inside the service at the provider call (SEARCH-T12-6).
-          searcher: searcherFromIp(req.ip),
-        }),
+        readInStoreContext(storeId, () =>
+          ProductService.listPublic(storeId, {
+            ...listOptions,
+            // The query-embed limit is charged inside the service at the provider call (SEARCH-T12-6).
+            searcher: searcherFromIp(req.ip),
+          })
+        ),
       {
         // Never cache a degraded list (transient: race lost, provider/SQL error, searcher limit, or
         // the request that DISCOVERS a spent budget, whose key still says `on`). A budget-spent list
@@ -430,7 +435,11 @@ router.get('/products', async (req: Request, res: Response, next: NextFunction) 
     // an edge-cached listing/PDP can show the old pre-order state for up to
     // sMaxAge 60s + staleWhileRevalidate 300s. BOUNDED-stale by design: the cart and
     // checkout re-read the feature uncached (lineAllowsBackorder) and stay authoritative.
-    const backorderOn = await featureService.isFeatureEnabled(storeId, 'inventory.backorder');
+    // Per request and uncached by us (FeatureService has its own cache): read in its own scope so a
+    // route that opens no request transaction (Ruling LAZY-TX-1) never touches the DB unscoped.
+    const backorderOn = await readInStoreContext(storeId, () =>
+      featureService.isFeatureEnabled(storeId, 'inventory.backorder')
+    );
     // A hybrid-ranked list (semantic search on) depends on the mode and on the provider's health at
     // that moment, which no edge key can see: never shared-cacheable (SEARCH-T12-7). Every other
     // list keeps the edge policy unchanged.
@@ -472,9 +481,11 @@ router.get('/products/:slugOrId', async (req: Request, res: Response, next: Next
       : // Anonymous path — Redis-backed get-or-set (120s TTL, min required by
         // CLAUDE.md ESLint rule to avoid hammering Neon on cache miss).
         await getCached(cacheKey, 120, () =>
-          isUuid
-            ? ProductService.getPublicById(storeId, slugOrId)
-            : ProductService.getPublicBySlug(storeId, slugOrId)
+          readInStoreContext(storeId, () =>
+            isUuid
+              ? ProductService.getPublicById(storeId, slugOrId)
+              : ProductService.getPublicBySlug(storeId, slugOrId)
+          )
         );
 
     // `product_3d` (every plan; a super-admin override can switch it off per
@@ -483,7 +494,9 @@ router.get('/products/:slugOrId', async (req: Request, res: Response, next: Next
     // override write. Residual: the edge cache below, same as every field.
     const payload =
       product && (product as { model3d?: unknown }).model3d
-        ? (await featureService.isFeatureEnabled(storeId, 'product_3d'))
+        ? (await readInStoreContext(storeId, () =>
+            featureService.isFeatureEnabled(storeId, 'product_3d')
+          ))
           ? product
           : { ...product, model3d: null }
         : product;
@@ -494,7 +507,9 @@ router.get('/products/:slugOrId', async (req: Request, res: Response, next: Next
     // an edge-cached listing/PDP can show the old pre-order state for up to
     // sMaxAge 60s + staleWhileRevalidate 300s. BOUNDED-stale by design: the cart and
     // checkout re-read the feature uncached (lineAllowsBackorder) and stay authoritative.
-    const backorderOn = await featureService.isFeatureEnabled(storeId, 'inventory.backorder');
+    const backorderOn = await readInStoreContext(storeId, () =>
+      featureService.isFeatureEnabled(storeId, 'inventory.backorder')
+    );
     setEdgeCache(res, { sMaxAge: 60, staleWhileRevalidate: 300 });
     res.json({
       success: true,
@@ -669,8 +684,10 @@ router.get('/feed/products.json', async (req: Request, res: Response, next: Next
 router.get('/categories', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const storeId = await getStoreIdFromRequest(req);
+    // No request transaction on this route (middleware/tenant-context.ts, Ruling LAZY-TX-1): the
+    // fill reads in its OWN short tenant transaction; a KV hit opens none.
     const categories = await getCached(`public:categories:${storeId}`, 120, () =>
-      ProductService.getCategories(storeId)
+      readInStoreContext(storeId, () => ProductService.getCategories(storeId))
     );
 
     setEdgeCache(res, { sMaxAge: 120, staleWhileRevalidate: 600 });
@@ -693,13 +710,15 @@ router.get('/tags', async (req: Request, res: Response, next: NextFunction) => {
     // `?name=` answers ONE tag (the PLP title label for a tag beyond the top-12 chips).
     const byName = typeof req.query.name === 'string' ? req.query.name.slice(0, 120) : '';
     if (byName) {
-      const one = await ProductService.getPublicTagByName(storeId, byName);
+      const one = await readInStoreContext(storeId, () =>
+        ProductService.getPublicTagByName(storeId, byName)
+      );
       setEdgeCache(res, { sMaxAge: 60, staleWhileRevalidate: 300 });
       res.json({ success: true, data: { tags: one ? [one] : [] } });
       return;
     }
     const tags = await getCached(`public:products:${storeId}:tags`, 120, () =>
-      ProductService.getPublicTags(storeId)
+      readInStoreContext(storeId, () => ProductService.getPublicTags(storeId))
     );
     setEdgeCache(res, { sMaxAge: 60, staleWhileRevalidate: 300 });
     res.json({ success: true, data: { tags } });
@@ -1905,28 +1924,66 @@ router.get('/stores', async (req: Request, res: Response, next: NextFunction) =>
  * to that one store. Identical result on the owner role. The keys stay last
  * in the payload, where the nested select used to put them.
  */
-async function fetchStoreFaqsAndHowtos(storeId: string) {
+/**
+ * The store's active FAQs and HowTos AND its unpublished CMS page slugs in ONE round trip.
+ * They were three sequential queries on the store-resolve fill (about 100 ms each from the Worker
+ * to Postgres); the shapes, filters and ordering are exactly the three Prisma reads they replace
+ * (pinned byte-for-byte by tests/integration/store-resolve-parity.test.ts). Runs inside the store
+ * scope (`readInStoreContext`), so RLS still filters every table.
+ */
+async function fetchStoreExtras(storeId: string) {
   return readInStoreContext(storeId, async () => {
-    const faqs = await prisma.storeFaq.findMany({
-      where: { storeId, isActive: true },
-      orderBy: { orderIndex: 'asc' },
-      select: { id: true, question: true, questionAr: true, answer: true, answerAr: true },
-    });
-    const howtos = await prisma.storeHowto.findMany({
-      where: { storeId, isActive: true },
-      orderBy: { orderIndex: 'asc' },
-      select: {
-        id: true,
-        title: true,
-        titleAr: true,
-        description: true,
-        descriptionAr: true,
-        steps: true,
-        stepsAr: true,
-      },
-    });
-    return { faqs, howtos };
+    const rows = await prisma.$queryRaw<
+      Array<{ faqs: unknown; howtos: unknown; disabled: unknown }>
+    >`
+      SELECT
+        COALESCE((
+          SELECT json_agg(json_build_object(
+                   'id', f.id, 'question', f.question, 'questionAr', f.question_ar,
+                   'answer', f.answer, 'answerAr', f.answer_ar) ORDER BY f.order_index ASC)
+          FROM public.store_faqs f
+          WHERE f.store_id = ${storeId} AND f.is_active = true
+        ), '[]'::json) AS faqs,
+        COALESCE((
+          SELECT json_agg(json_build_object(
+                   'id', h.id, 'title', h.title, 'titleAr', h.title_ar,
+                   'description', h.description, 'descriptionAr', h.description_ar,
+                   'steps', h.steps, 'stepsAr', h.steps_ar) ORDER BY h.order_index ASC)
+          FROM public.store_howtos h
+          WHERE h.store_id = ${storeId} AND h.is_active = true
+        ), '[]'::json) AS howtos,
+        COALESCE((
+          SELECT json_agg(json_build_object('slug', p.slug))
+          FROM public.store_pages p
+          WHERE p.store_id = ${storeId} AND p.is_published = false
+        ), '[]'::json) AS disabled
+    `;
+    const row = rows[0];
+    return {
+      faqs: (row?.faqs ?? []) as Array<{
+        id: string;
+        question: string;
+        questionAr: string | null;
+        answer: string;
+        answerAr: string | null;
+      }>,
+      howtos: (row?.howtos ?? []) as Array<{
+        id: string;
+        title: string;
+        titleAr: string | null;
+        description: string;
+        descriptionAr: string | null;
+        steps: unknown;
+        stepsAr: unknown;
+      }>,
+      disabledCmsSlugs: ((row?.disabled ?? []) as Array<{ slug: string }>).map(p => p.slug),
+    };
   });
+}
+
+async function fetchStoreFaqsAndHowtos(storeId: string) {
+  const { faqs, howtos } = await fetchStoreExtras(storeId);
+  return { faqs, howtos };
 }
 
 /**
@@ -2311,13 +2368,8 @@ router.get(
         // simply not being there. Only rows that exist AND are unpublished
         // need to be reported; if the row is missing the storefront falls
         // back to its built-in copy and the link should still work.
-        const disabledPages = await readInStoreContext(store.id, () =>
-          prisma.storePage.findMany({
-            where: { storeId: store.id, isPublished: false },
-            select: { slug: true },
-          })
-        );
-        const disabledCmsSlugs = disabledPages.map(p => p.slug);
+        const extras = await fetchStoreExtras(store.id);
+        const disabledCmsSlugs = extras.disabledCmsSlugs;
 
         // Strip server-only marketing-pixel secrets before the store reaches the
         // public storefront + edge cache (browser pixels use public IDs only).
@@ -2327,7 +2379,8 @@ router.get(
           settings: publicStoreSettings(store.settings),
           // Keep in lock-step with the /stores/:slugOrId select above (VAT gate, ruling TAX-2).
           ...effectiveTaxFields(await resolveActiveTaxRate(store.id)),
-          ...(await fetchStoreFaqsAndHowtos(store.id)),
+          faqs: extras.faqs,
+          howtos: extras.howtos,
           // Keep in lock-step with /stores/:slugOrId (issue 206, same staleness).
           smsMarketingOptIn: await notificationDispatcher.isSmsMarketingAvailable(store.id),
           cartEmailOptIn: await cartEmailOptInAvailable(store.id),
