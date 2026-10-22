@@ -79,7 +79,7 @@ describe('the mixes, exactly as designed', () => {
     ]);
     const [h, again, menu, maker] = table.sections!;
     expect(again.preset).toMatchObject({ productSource: 'reorder', titleAr: 'اطلب تاني' });
-    expect(h.design).toMatchObject({ presentation: 'full-bleed' });
+    expect(h.design).toMatchObject({ presentation: 'full-bleed', textAnchor: 'bottom-start' });
     expect(menu.design).toMatchObject({ layout: 'menu', tabs: 'categories' });
     expect(menu.preset).toMatchObject({
       productSource: 'newest',

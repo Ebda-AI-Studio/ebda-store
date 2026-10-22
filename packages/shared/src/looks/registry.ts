@@ -710,7 +710,8 @@ export const LOOKS: readonly LookDefinition[] = [
     // merchant content, B4-12), "order again" for a returning customer (nothing for anyone else), the
     // dishes as rows grouped by category under sticky tabs, the cook as a strip and the trust line.
     sections: [
-      { type: 'hero', design: { presentation: 'full-bleed' } },
+      // textAnchor: the copy sits under the photo on a phone (taste rule 7: text never covers the food)
+      { type: 'hero', design: { presentation: 'full-bleed', textAnchor: 'bottom-start' } },
       {
         type: 'product-carousel',
         preset: {
