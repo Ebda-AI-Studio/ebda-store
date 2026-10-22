@@ -37,6 +37,8 @@ import { stockReorderScanCron, stockReorderScanOnDemand } from './stock-reorder-
 import { stockDeadstockScanCron, stockDeadstockScanOnDemand } from './stock-deadstock-scan';
 import { wholesalePendingNudgeCron } from './wholesale-pending-nudge';
 import { stockLowStockAlertCron, stockLowStockAlertOnDemand } from './stock-low-stock-alert';
+import { goldRateFeedFetchCron } from './gold-rate-feed-fetch';
+import { goldRateStalenessWatchCron } from './gold-rate-staleness-watch';
 import { accountingProfitAnomalyCron } from './accounting-profit-anomaly';
 import { accountingExpenseOcrProcess } from './accounting-expense-ocr-process';
 import { instapayReceiptExtract } from './instapay-receipt-extract';
@@ -238,6 +240,10 @@ const allInngestFunctions: InngestFunction.Any[] = [
   // Material legal-policy change: one email per store owner (Ruling LEGAL-4). Event-triggered
   // only (a super admin pressing Send notice).
   legalNoticeSend,
+  // Gold-rate pricing (Phase B5, Ruling B5-15/B5-16): the free automatic rate (6-hourly) and the stale-rate
+  // alerts (hourly). Both exit un-stepped on an empty tick (one execution).
+  goldRateFeedFetchCron,
+  goldRateStalenessWatchCron,
 ];
 
 /**

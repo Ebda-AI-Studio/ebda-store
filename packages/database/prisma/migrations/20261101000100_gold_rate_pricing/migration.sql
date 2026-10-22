@@ -15,6 +15,10 @@
 --   products / product_variants   gain the integer pricing spec (mode, karat, weight in mg, making
 --                           charge, margin in bps, the rate row the price was computed from). A
 --                           variant's NULL means "inherit the product".
+--   ebda_gold_feed_stores() / ebda_gold_rate_watch()   NEW cron-facing SECURITY DEFINER functions (see
+--                           the end of this file): the stores that opted into the automatic rate, and the
+--                           (store, karat) pairs whose rate needs a stale warning or block alert. They let the
+--                           two crons exit un-stepped on an empty tick (INNGEST-BUDGET-1).
 --   cart_items              quoted_unit_price / quoted_at: what the shopper saw when the line was added.
 --   order_items             gold_snapshot JSONB: how the line's price was made (refund + invoice display).
 --
@@ -224,3 +228,51 @@ CREATE TRIGGER ebda_gold_price_guard BEFORE INSERT OR UPDATE OF price, compare_a
   FOR EACH ROW EXECUTE FUNCTION gold_price_guard_products();
 CREATE TRIGGER ebda_gold_price_guard BEFORE INSERT OR UPDATE OF price, compare_at_price, pricing_mode ON product_variants
   FOR EACH ROW EXECUTE FUNCTION gold_price_guard_variants();
+
+-- ---------------------------------------------------------------------------
+-- Cron-facing definers (Phase B5 Task 11). The two gold crons run with no tenant scope, and a tick that
+-- finds nothing must cost ONE Inngest execution (INNGEST-BUDGET-1), so they read these before opening any
+-- step. UNGUARDED ON PURPOSE like ebda_store_directory (crons have no principal): routing facts and
+-- numbers only, never a rate history, a price or a person. SECURITY DEFINER with a pinned search_path;
+-- EXECUTE for ebda_app only (the hygiene test in rls-ebda-app.test.ts enforces both).
+-- ---------------------------------------------------------------------------
+
+-- Stores that turned the AUTOMATIC rate on (and the gold feature on): the cron applies the feed to these.
+CREATE OR REPLACE FUNCTION public.ebda_gold_feed_stores()
+RETURNS TABLE (store_id text, feed_premium_bps integer)
+LANGUAGE sql STABLE SECURITY DEFINER
+SET search_path = pg_catalog, public, pg_temp
+AS $fn$
+  SELECT g.store_id, g.feed_premium_bps
+  FROM public.gold_rate_settings g
+  JOIN public.stores s ON s.id = g.store_id
+  WHERE g.enabled AND g.feed_enabled AND s.deleted_at IS NULL AND s.status::text = 'active'
+  ORDER BY g.store_id
+$fn$;
+
+-- (store, karat) pairs that sell gold-rate products and whose applied rate is inside the warning window
+-- (max age - 240 min) or past the max age. Empty on almost every tick.
+CREATE OR REPLACE FUNCTION public.ebda_gold_rate_watch()
+RETURNS TABLE (store_id text, karat smallint, rate_id text, applied_at timestamptz, max_age_minutes integer)
+LANGUAGE sql STABLE SECURITY DEFINER
+SET search_path = pg_catalog, public, pg_temp
+AS $fn$
+  SELECT c.store_id, c.karat, c.rate_id, c.applied_at, g.max_age_minutes
+  FROM public.gold_rates_current c
+  JOIN public.gold_rate_settings g ON g.store_id = c.store_id AND g.enabled
+  JOIN public.stores s ON s.id = c.store_id AND s.deleted_at IS NULL AND s.status::text = 'active'
+  WHERE c.applied_at <= now() - make_interval(mins => GREATEST(g.max_age_minutes - 240, 0))
+    AND EXISTS (
+      SELECT 1 FROM public.products p
+      WHERE p.store_id = c.store_id AND p.pricing_mode = 'gold_rate' AND p.deleted_at IS NULL AND p.status::text = 'active'
+        AND (p.gold_karat = c.karat
+             OR EXISTS (SELECT 1 FROM public.product_variants v
+                        WHERE v.product_id = p.id AND v.pricing_mode IS DISTINCT FROM 'fixed' AND v.gold_karat = c.karat))
+    )
+  ORDER BY c.store_id, c.karat
+$fn$;
+
+REVOKE ALL ON FUNCTION public.ebda_gold_feed_stores() FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.ebda_gold_rate_watch() FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.ebda_gold_feed_stores() TO ebda_app;
+GRANT EXECUTE ON FUNCTION public.ebda_gold_rate_watch() TO ebda_app;

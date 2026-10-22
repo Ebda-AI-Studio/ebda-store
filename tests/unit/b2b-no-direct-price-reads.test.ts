@@ -39,6 +39,12 @@ interface AllowEntry {
 }
 
 const ALLOW: Record<string, AllowEntry> = {
+  'services/gold-rate/feed/gold-api.ts': {
+    category: 'unrelated',
+    reason:
+      'the XAU/USD spot quote of the automatic gold rate (Ruling B5-15): a market figure, not a product price',
+    reads: { fetchXauUsdMicro: 1 },
+  },
   'services/gold-rate/repricer.ts': {
     category: 'writer',
     reason:

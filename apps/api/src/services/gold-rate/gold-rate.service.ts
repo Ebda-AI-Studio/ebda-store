@@ -36,7 +36,10 @@ import {
 } from './gate';
 import { repriceProduct, repriceStore, withRepriceFlag, type RateLookup } from './repricer';
 
-export type RateActor = { userId: string } | { feed: Record<string, unknown> };
+/** `forcePending`: store every feed rate PENDING whatever the gate says (the sources disagreed). */
+export type RateActor =
+  | { userId: string }
+  | { feed: Record<string, unknown>; forcePending?: boolean };
 
 export interface RateRow {
   id: string;
@@ -221,7 +224,7 @@ export class GoldRateService {
       await withRepriceFlag(tx, async () => {
         const newRates = new Map<GoldKarat, { id: string; ratePerGram: number }>();
         for (const v of verdicts) {
-          const isPending = isFeed && v.over;
+          const isPending = isFeed && (v.over || actor.forcePending === true);
           if (isPending) {
             // one pending rate per karat: a newer one supersedes the older
             await tx.goldRate.updateMany({

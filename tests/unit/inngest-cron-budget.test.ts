@@ -28,6 +28,8 @@ export const EMPTY_PATH_STEPS: Record<string, number> = {
   'agent-write-denied-watch': 0, // no step at all
   'domain-claim-sweep': 0, // no step at all (one idempotent unit)
   'gmail-alert-poller': 0, // no step at all
+  'gold-rate-feed-fetch': 0, // un-stepped definer read of the opted-in stores; none = return (Task B5-11)
+  'gold-rate-staleness-watch': 0, // un-stepped definer read of rates inside the warning window; none = return
   heartbeat: 0, // no step at all
   'instapay-expiry': 0, // stepRunUnlessEmpty
   'order-created-stuck-sweep': 0, // stepRunUnlessEmpty

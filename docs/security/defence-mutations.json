@@ -2440,6 +2440,76 @@
       "find": "const settingsChain = [...base, requirePermission('store:settings'), writeLimiter] as const;",
       "replace": "const settingsChain = [...base, requirePermission('products:write'), writeLimiter] as const;",
       "test": "tests/integration/gold-rate-apply.test.ts"
+    },
+    {
+      "id": "money-gold-feed-cross-check",
+      "domain": "money",
+      "tier": "unit",
+      "why": "the 2 % cross-check between the two feed sources is dropped, so two disagreeing sources are averaged or the primary is trusted blindly and the whole catalogue is re-priced from a bad quote",
+      "source": "apps/api/src/services/gold-rate/feed/adapter.ts",
+      "find": "        if (diffBps > CROSS_CHECK_BPS) return { kind: 'disagree', primary, fallback, diffBps };\n",
+      "replace": "",
+      "test": "tests/unit/gold-rate-feed.test.ts"
+    },
+    {
+      "id": "money-gold-feed-premium-once",
+      "domain": "money",
+      "tier": "unit",
+      "why": "the store premium is applied twice (or not at all) to the candidate rates, so an automatic rate is off by the premium",
+      "source": "apps/api/src/services/gold-rate/feed/adapter.ts",
+      "find": "      Number(roundDiv(num * B(karat) * B(10_000 + premiumBps), den * B(24) * B(10_000)))",
+      "replace": "      Number(roundDiv(num * B(karat) * B(10_000), den * B(24) * B(10_000)))",
+      "test": "tests/unit/gold-rate-feed.test.ts"
+    },
+    {
+      "id": "money-gold-feed-plausibility",
+      "domain": "money",
+      "tier": "unit",
+      "why": "the plausibility bounds on a feed quote are dropped, so a garbage figure (a unit slip, a zero) becomes a candidate rate",
+      "source": "apps/api/src/services/gold-rate/feed/adapter.ts",
+      "find": "  if (!Number.isSafeInteger(per24) || per24 < 10_000 || per24 > 10_000_000) return null;",
+      "replace": "  if (!Number.isSafeInteger(per24)) return null;",
+      "test": "tests/unit/gold-rate-feed.test.ts"
+    },
+    {
+      "id": "money-gold-feed-down-writes-nothing",
+      "domain": "money",
+      "tier": "unit",
+      "why": "when both feeds are down the cron still applies a (stale or guessed) rate instead of writing nothing and alerting",
+      "source": "apps/api/src/lib/inngest/functions/gold-rate-feed-fetch.ts",
+      "find": "    if (result.kind === 'down') {",
+      "replace": "    if (false as boolean) {",
+      "test": "tests/unit/gold-rate-feed-cron.test.ts"
+    },
+    {
+      "id": "money-gold-feed-disagree-never-applies",
+      "domain": "money",
+      "tier": "unit",
+      "why": "disagreeing feeds are applied instead of stored pending, so a 2 %+ split between sources re-prices the catalogue without the merchant",
+      "source": "apps/api/src/lib/inngest/functions/gold-rate-feed-fetch.ts",
+      "find": "{ feed: reference, forcePending: disagree }",
+      "replace": "{ feed: reference, forcePending: false }",
+      "test": "tests/unit/gold-rate-feed-cron.test.ts"
+    },
+    {
+      "id": "money-gold-stale-alert-once",
+      "domain": "money",
+      "tier": "unit",
+      "why": "the once-per-rate sentinel is dropped, so the owner is emailed (and the operator paged) every hour for the same stale rate",
+      "source": "apps/api/src/lib/inngest/functions/gold-rate-staleness-watch.ts",
+      "find": "    return res === 'OK';",
+      "replace": "    return true;",
+      "test": "tests/unit/gold-rate-staleness-watch.test.ts"
+    },
+    {
+      "id": "privacy-gold-provider-names-stay-out-of-shopper-code",
+      "domain": "privacy",
+      "tier": "unit",
+      "why": "the provider-name gate stops exempting only one exact path and exempts a whole directory, so a provider name can enter shopper-facing code",
+      "source": "tests/unit/gold-provider-name-gate.test.ts",
+      "find": "      if (rel === exempt) continue;",
+      "replace": "      if (rel.startsWith(path.dirname(exempt))) continue;",
+      "test": "tests/unit/gold-provider-name-gate.test.ts"
     }
   ]
 }
