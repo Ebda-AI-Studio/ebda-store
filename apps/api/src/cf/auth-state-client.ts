@@ -1,6 +1,7 @@
 // Client side of the AuthState Durable Object: shard routing + one-call `apply`.
 import { cfBindings, type DurableObjectStubLike } from './bindings';
 import type { Op } from './auth-state-core';
+import { hop } from '../lib/hop-timing';
 
 /** Shards the key space is spread over. A key always maps to the same shard. */
 export const AUTH_STATE_SHARDS = 32;
@@ -41,7 +42,10 @@ function stub(shard: number): AuthStateStub {
 
 /** Run ops on the shard owning `key` (atomically, in order). */
 export function applyOn(key: string, ops: Op[]): Promise<unknown[]> {
-  return stub(shardOf(key)).apply(ops);
+  return hop(
+    `do-${key.split(':')[0]}-${String(ops[0]?.[0] ?? 'op')}${ops.length > 1 ? `x${ops.length}` : ''}`,
+    () => stub(shardOf(key)).apply(ops)
+  );
 }
 
 /** Run ops on EVERY shard (sweeps: prefix scans). */

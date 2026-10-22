@@ -103,9 +103,12 @@ export const lifecycle = { isShuttingDown: false };
 // confirmation email failed to send for months without a single signal.
 // See lib/after-tenant-commit.ts.
 installClosedTenantTxAlerting();
+setDbHopObserver(recordHop);
 
 // Request ID for tracing
 app.use(requestId);
+// Opt-in per-hop Server-Timing (x-hop-timing: 1), see lib/hop-timing.ts.
+app.use(hopTiming);
 
 // Graceful shutdown middleware
 app.use((_req, res, next) => {
@@ -167,6 +170,8 @@ import {
   isPlatformOrigin,
 } from './lib/cors-cache';
 import { buildIdentity } from './lib/build-identity';
+import { hopTiming, markHop, recordHop } from './lib/hop-timing';
+import { setDbHopObserver } from '@ebda/database';
 import { skipGlobalRateLimit } from './middleware/global-rate-limit-skip';
 
 /**
@@ -534,6 +539,10 @@ app.get(
 setupSwagger(app);
 
 // API Routes
+app.use('/api/v1', (_req, _res, next) => {
+  markHop('routes');
+  next();
+});
 app.use('/api/v1', routes);
 
 // JSON 404 catch-all (2026-09-22 security audit, info finding). Mounted
