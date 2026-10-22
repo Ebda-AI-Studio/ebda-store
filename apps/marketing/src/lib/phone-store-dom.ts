@@ -367,7 +367,7 @@ ${stepper(l.key, l.qty)}<button type="button" class="ps-rm" data-ps-act="rm" dat
 <div class="ps-scroll"><div class="ps-donebody"><span class="ps-tick">${ICON.check}</span><h2>ده متجر تجريبي</h2><p class="ps-big">اعمل متجرك زيه، في دقايق.</p>
 <p class="ps-desc">مفيش طلب اتبعت ولا فلوس اتسحبت. ده شكل متجرك لما يتفتح لعملائك.</p>
 <div class="ps-sum"><span>${esc(countLabel(n).replace('في السلة', 'كانوا في طلبك'))}</span><b>${fmtEGP(cartTotal(state.cart))}</b></div>
-<a class="ps-cta ps-signup" href="${esc(opts.signupUrl)}" target="_blank" rel="noopener" data-ps-act="signup"><span>اعمل متجرك زيه</span></a>
+<a class="ps-cta ps-signup" href="${esc(opts.signupUrl)}" target="_blank" rel="noopener noreferrer" data-ps-act="signup"><span>اعمل متجرك زيه</span><span class="sr-only"> (بيفتح في تبويب جديد)</span></a>
 <button type="button" class="ps-ghost" data-ps-act="shop">كمّل التسوّق</button></div></div>`;
   };
 

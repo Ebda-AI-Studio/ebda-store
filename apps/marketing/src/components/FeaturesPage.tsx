@@ -1,3 +1,4 @@
+import { SiteLink } from './SiteLink';
 import Link from 'next/link';
 import { featuresFaq, FEATURES_PAGE, MORE, THEMES, THEME_COPY } from '../lib/capabilities';
 import { COPY } from '../lib/content';
@@ -25,9 +26,9 @@ export function FeaturesPage({ locale }: { locale: Locale }) {
           <h1>{p.h1}</h1>
           <p className="lead">{p.lead}</p>
           <p className="actions">
-            <a href={SIGNUP_URL} className="btn btn-primary btn-lg">
+            <SiteLink href={SIGNUP_URL} locale={locale} className="btn btn-primary btn-lg">
               {p.cta}
-            </a>
+            </SiteLink>
           </p>
         </header>
         {THEMES.map(theme => (

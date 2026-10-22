@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { BRAND } from '@ebda/shared/brand';
 import { COPY } from '../lib/content';
+import { SiteLink } from './SiteLink';
 import { WhatsApp } from './WhatsApp';
 import {
   HOME,
@@ -73,7 +74,7 @@ export function Header({
                 <li key={n.key}>{navLink(n)}</li>
               ))}
               <li className="menu-wa">
-                <WhatsApp label={c.whatsapp.label} ariaLabel={c.whatsapp.aria} />
+                <WhatsApp label={c.whatsapp.label} ariaLabel={c.whatsapp.aria} locale={locale} />
               </li>
               <li className="menu-lang">
                 <Link href={pagePath(other, page)} hrefLang={other} lang={other}>
@@ -81,7 +82,9 @@ export function Header({
                 </Link>
               </li>
               <li className="menu-login">
-                <a href={LOGIN_URL}>{c.nav.login}</a>
+                <SiteLink href={LOGIN_URL} locale={locale}>
+                  {c.nav.login}
+                </SiteLink>
               </li>
             </ul>
           </details>
@@ -96,13 +99,13 @@ export function Header({
           >
             {c.nav.switchTo}
           </Link>
-          <a href={LOGIN_URL} className="link-login">
+          <SiteLink href={LOGIN_URL} locale={locale} className="link-login">
             {c.nav.login}
-          </a>
-          <WhatsApp label={c.whatsapp.label} ariaLabel={c.whatsapp.aria} compact />
-          <a href={SIGNUP_URL} className="btn btn-primary">
+          </SiteLink>
+          <WhatsApp label={c.whatsapp.label} ariaLabel={c.whatsapp.aria} locale={locale} compact />
+          <SiteLink href={SIGNUP_URL} locale={locale} className="btn btn-primary">
             {c.nav.start}
-          </a>
+          </SiteLink>
         </div>
       </div>
     </header>

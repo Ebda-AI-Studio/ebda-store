@@ -1,4 +1,6 @@
 import { whatsappUrl } from '@ebda/shared/brand';
+import type { Locale } from '../lib/site';
+import { SiteLink } from './SiteLink';
 
 function ChatIcon() {
   return (
@@ -26,24 +28,26 @@ function ChatIcon() {
 export function WhatsApp({
   label,
   ariaLabel,
+  locale,
   compact = false,
 }: {
   label: string;
   ariaLabel: string;
+  locale: Locale;
   compact?: boolean;
 }) {
   return (
     <span className={`wa${compact ? ' wa-compact' : ''}`}>
-      <a
+      <SiteLink
         href={whatsappUrl()}
+        locale={locale}
         className="wa-link"
         aria-label={ariaLabel}
-        rel="noopener"
         data-whatsapp=""
       >
         <ChatIcon />
         <span className="wa-label">{label}</span>
-      </a>
+      </SiteLink>
     </span>
   );
 }

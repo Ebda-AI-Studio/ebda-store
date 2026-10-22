@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { CAPABILITIES, FEATURES_PAGE, HOME_CAPABILITIES, type CardId } from '../lib/capabilities';
+import { CAPABILITIES, FEATURES_PAGE, type CardId } from '../lib/capabilities';
 import { COMING_LABEL, REGISTRY } from '../lib/capability-registry';
 import { pagePath, type Locale } from '../lib/site';
 
@@ -60,19 +60,12 @@ export function CapabilityGrid({
   );
 }
 
-/** Home section: the capabilities people ask about most, with links to /features and the comparisons. */
+/** Home closing line before pricing: no capability list (each capability lives in one section), a link to every feature. */
 export function HomeCapabilities({ locale }: { locale: Locale }) {
   const p = FEATURES_PAGE[locale];
   return (
     <>
       <p className="lead">{p.homeLead}</p>
-      <ul className="value-list">
-        {HOME_CAPABILITIES.map(id => (
-          <li key={id} data-value={id}>
-            {CAPABILITIES[locale][id].t}
-          </li>
-        ))}
-      </ul>
       <p className="cap-more">
         <Link href={pagePath(locale, 'features')} className="btn btn-ghost">
           {p.homeAll}

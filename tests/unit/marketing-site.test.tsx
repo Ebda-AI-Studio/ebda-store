@@ -85,8 +85,13 @@ describe('marketing nav', () => {
     expect(LOGIN_URL).toBe('https://store.ebda.app/login');
     expect(SIGNUP_URL).toBe('https://store.ebda.app/signup');
     for (const html of [ar, en]) {
-      expect(html).toContain('<a href="https://store.ebda.app/login" class="link-login">');
-      expect(html).toMatch(/<a href="https:\/\/store\.ebda\.app\/signup" class="btn btn-primary">/);
+      // external: new tab (SiteLink), same attributes plus target + rel
+      expect(html).toMatch(
+        /<a href="https:\/\/store\.ebda\.app\/login" target="_blank" rel="noopener noreferrer" class="link-login">/
+      );
+      expect(html).toMatch(
+        /<a href="https:\/\/store\.ebda\.app\/signup" target="_blank" rel="noopener noreferrer" class="btn btn-primary">/
+      );
     }
     expect(en).toContain('>Log in<');
     expect(en).toContain('>Start now<');
@@ -399,13 +404,14 @@ describe('marketing honesty', () => {
         expect(p.limits.supportTier).toBe('priority');
     }
   });
-  it('features: three hero features each with a visual, then a compact list of the rest', () => {
+  it('features: two hands-on hero features each with a visual, then a compact list of the rest', () => {
     for (const html of [ar, en]) {
       const f = html.match(/<section id="features".*?<\/section>/s)![0];
-      expect(f.match(/class="fx-card"/g)).toHaveLength(3);
-      for (const k of ['editor', 'orders', 'ai']) expect(f).toContain(`data-feature="${k}"`);
-      expect(f.match(/class="fx-visual[^"]*" role="img" aria-label="[^"]+"/g)).toHaveLength(3);
-      expect(f.match(/<ul class="feature-list">.*?<\/ul>/s)![0].match(/<li>/g)).toHaveLength(4);
+      expect(f.match(/class="fx-card"/g)).toHaveLength(2);
+      for (const k of ['editor', 'orders']) expect(f).toContain(`data-feature="${k}"`);
+      expect(f).not.toContain('data-feature="ai"');
+      expect(f.match(/class="fx-visual[^"]*" role="img" aria-label="[^"]+"/g)).toHaveLength(2);
+      expect(f.match(/<ul class="feature-list">.*?<\/ul>/s)![0].match(/<li>/g)).toHaveLength(3);
       expect(f).not.toMatch(/<svg[^>]*class="[^"]*illustration/);
     }
   });

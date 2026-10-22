@@ -19,6 +19,7 @@ import { JsonLd } from './JsonLd';
 import { LooksShowcase } from './LooksShowcase';
 import { Reveal, StoryScroll } from './Motion';
 import { Product3D } from './Product3D';
+import { SiteLink } from './SiteLink';
 import { WhatsApp } from './WhatsApp';
 import { FeatureVisuals } from './FeatureVisuals';
 import { HomeCapabilities } from './Capabilities';
@@ -201,20 +202,22 @@ export function Home({ locale }: { locale: Locale }) {
                     <li key={f}>{f}</li>
                   ))}
                 </ul>
-                <a
+                <SiteLink
                   href={`${SIGNUP_URL}?plan=${p.id}&interval=month`}
+                  locale={locale}
                   className={`btn ${p.id === 'growth' ? 'btn-primary' : 'btn-ghost'}`}
                   data-plan-cta={p.id}
                 >
                   {c.pricing.planCta.replace('{plan}', p.name[locale])}
-                </a>
-                <a
+                </SiteLink>
+                <SiteLink
                   href={`${SIGNUP_URL}?plan=${p.id}&interval=year`}
+                  locale={locale}
                   className="plan-annual"
                   data-plan-cta-annual={p.id}
                 >
                   {c.pricing.planCtaAnnual}
-                </a>
+                </SiteLink>
               </li>
             ))}
           </ul>
@@ -274,7 +277,8 @@ export function Home({ locale }: { locale: Locale }) {
             ))}
           </div>
           <p className="faq-more">
-            {c.whatsapp.faq} <WhatsApp label={c.whatsapp.label} ariaLabel={c.whatsapp.aria} />
+            {c.whatsapp.faq}{' '}
+            <WhatsApp label={c.whatsapp.label} ariaLabel={c.whatsapp.aria} locale={locale} />
           </p>
         </div>
       </Section>
@@ -283,15 +287,18 @@ export function Home({ locale }: { locale: Locale }) {
       <Section id="start" title={c.start.title} className="closing">
         <p className="lead">{c.start.lead}</p>
         <p className="actions">
-          <a href={SIGNUP_URL} className="btn btn-primary btn-lg">
+          <SiteLink href={SIGNUP_URL} locale={locale} className="btn btn-primary btn-lg">
             {c.start.cta}
-          </a>
+          </SiteLink>
         </p>
         <p className="close-wa">
-          {c.whatsapp.close} <WhatsApp label={c.whatsapp.label} ariaLabel={c.whatsapp.aria} />
+          {c.whatsapp.close}{' '}
+          <WhatsApp label={c.whatsapp.label} ariaLabel={c.whatsapp.aria} locale={locale} />
         </p>
         <p className="close-login">
-          <a href={LOGIN_URL}>{c.start.login}</a>
+          <SiteLink href={LOGIN_URL} locale={locale}>
+            {c.start.login}
+          </SiteLink>
         </p>
         {FIRST_MERCHANT && (
           <p className="merchant" data-testid="first-merchant">
@@ -320,9 +327,9 @@ export function Home({ locale }: { locale: Locale }) {
               <h1 id="hero-h">{c.hero.h1}</h1>
               <p className="hero-sub">{c.hero.sub}</p>
               <p className="actions">
-                <a href={SIGNUP_URL} className="btn btn-primary btn-lg">
+                <SiteLink href={SIGNUP_URL} locale={locale} className="btn btn-primary btn-lg">
                   {c.hero.cta}
-                </a>
+                </SiteLink>
                 <a href="#looks" className="btn btn-ghost btn-lg">
                   {c.hero.secondary}
                 </a>

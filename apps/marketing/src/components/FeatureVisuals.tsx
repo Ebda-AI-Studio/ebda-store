@@ -20,14 +20,13 @@ function Glyph({ d }: { d: string }) {
 }
 
 /**
- * The three hero features, each with a visual drawn as real UI (never an illustration): the page
- * editor beside a crop of a real look, a WhatsApp order message with the push it triggers, and the
- * product form with an AI-written description in both languages. The UI is illustrative and not
+ * The two hands-on hero features, each with a visual drawn as real UI (never an illustration): the page
+ * editor beside a crop of a real look, a WhatsApp order message with the push it triggers. The UI is illustrative and not
  * interactive, so each visual is one labelled image to assistive tech. Server-rendered, no JS.
  */
 export function FeatureVisuals({ copy, locale }: { copy: HeroFeatures; locale: Locale }) {
   const dir = locale === 'ar' ? 'rtl' : 'ltr';
-  const { editor, orders, ai } = copy;
+  const { editor, orders } = copy;
   return (
     <ul className="fx">
       <li className="fx-card" data-feature="editor">
@@ -89,36 +88,6 @@ export function FeatureVisuals({ copy, locale }: { copy: HeroFeatures; locale: L
         <div className="fx-copy">
           <h3>{orders.t}</h3>
           <p>{orders.d}</p>
-        </div>
-      </li>
-
-      <li className="fx-card" data-feature="ai">
-        <div className="fx-visual fx-ai" role="img" aria-label={ai.formLabel}>
-          <div className="fx-ui" dir={dir}>
-            <div className="fx-ai-row">
-              <p className="fx-label">{ai.descLabel}</p>
-              <span className="fx-ai-btn">
-                <Glyph d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8zM19 16l.7 2.3L22 19l-2.3.7L19 22l-.7-2.3L16 19l2.3-.7z" />
-                {ai.button}
-              </span>
-            </div>
-            <div className="fx-lang" aria-hidden="true">
-              <span>AR</span>
-            </div>
-            <p className="fx-text" dir="rtl" lang="ar">
-              {ai.ar}
-            </p>
-            <div className="fx-lang" aria-hidden="true">
-              <span>EN</span>
-            </div>
-            <p className="fx-text" dir="ltr" lang="en">
-              {ai.en}
-            </p>
-          </div>
-        </div>
-        <div className="fx-copy">
-          <h3>{ai.t}</h3>
-          <p>{ai.d}</p>
         </div>
       </li>
     </ul>
