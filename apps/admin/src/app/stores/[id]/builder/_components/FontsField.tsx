@@ -18,7 +18,7 @@ export function FontsField({
   onChange: (next: FontEntry[]) => void;
 }) {
   return (
-    <div data-testid="fonts-field">
+    <div data-testid="fonts-field" data-setting-id="builder.fonts">
       <FontsCard storeId={storeId} fonts={fonts} onChange={onChange} />
     </div>
   );

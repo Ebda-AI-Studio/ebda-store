@@ -91,3 +91,12 @@ describe('admin search deep link: locate + highlight the control', () => {
     }
   });
 });
+
+describe('visual editor field deep link (Task 11)', () => {
+  it('finds a generated section field by data-field-id, and a hostile id matches nothing', () => {
+    document.body.innerHTML = `<div data-field-id="typography"><p>x</p></div>`;
+    expect(findSettingElement(document, 'typography')).toBe(document.querySelector('div'));
+    expect(findSettingElement(document, 'no-such-field')).toBeNull();
+    expect(findSettingElement(document, '"]<script>')).toBeNull();
+  });
+});

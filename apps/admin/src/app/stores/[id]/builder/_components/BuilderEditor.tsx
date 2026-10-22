@@ -53,6 +53,8 @@ import { useT } from '@/i18n/useT';
 import { apiGet, apiPost, apiPut } from '../../../../../lib/api';
 import { getStoreHref } from '../../../../../lib/store-url';
 import { useBuilderDocument } from '../_lib/useBuilderDocument';
+import { resolveDeepLink, type DeepLinkParams } from '../_lib/deeplink';
+import { locateAndHighlight } from '../../../../../lib/setting-highlight';
 import { ConfirmDialog } from './ConfirmDialog';
 import type { FontEntry } from '../../../../../components/section-design/FontsCard';
 import { ImageSwapDialog } from './ImageSwapDialog';
@@ -90,11 +92,14 @@ export function BuilderEditor({
   storeId,
   pageKey = 'home',
   onPageChange,
+  deepLink,
 }: {
   storeId: string;
   /** The page being edited (Ruling VE-3 amended); the parent remounts this component per page. */
   pageKey?: PageKind;
   onPageChange?: (next: PageKind) => void;
+  /** `?select=&block=&field=` from the URL, already shape-checked (Task 11). */
+  deepLink?: DeepLinkParams;
 }) {
   const t = useT('builder');
   const locale = useLocale();
@@ -193,6 +198,33 @@ export function BuilderEditor({
     },
     [b, pageKey, onPageChange, toastError, t]
   );
+
+  // The deep link (⌘K, a pasted URL) is applied ONCE, when the document first arrives: it selects
+  // the section (canvas + tree follow `selection`), opens the tab or pane that holds the control and
+  // rings the field. An unknown id selects nothing and breaks nothing.
+  const linkApplied = useRef<string | null>(null);
+  const [focusField, setFocusField] = useState<string | undefined>(undefined);
+  useEffect(() => {
+    // Once per distinct link: a doc edit never re-applies it, a NEW link on the open page does.
+    const key = JSON.stringify([deepLink?.select, deepLink?.block, deepLink?.field]);
+    if (linkApplied.current === key || !b.doc) return;
+    linkApplied.current = key;
+    if (!deepLink || (!deepLink.select && !deepLink.field)) return;
+    const target = resolveDeepLink(b.doc, deepLink, { canOpenTheme: isHome });
+    if (target.tab) {
+      setTab(target.tab);
+      setDrawer('start');
+    }
+    if (target.selection) {
+      setSelection(target.selection);
+      setDrawer('end');
+    }
+    setFocusField(target.field);
+  }, [b.doc, deepLink, isHome]);
+  useEffect(() => {
+    if (!focusField) return;
+    return locateAndHighlight(focusField);
+  }, [focusField]);
 
   // Saved data changed (a new carousel, a new product source): reload the canvas.
   useEffect(() => {
@@ -614,6 +646,7 @@ export function BuilderEditor({
         look={store.look}
         errors={b.errors}
         dispatch={dispatch}
+        focusField={focusField}
         onAiFill={sectionId => {
           const req = b.doc ? aiFillRequestForSection(b.doc, sectionId) : null;
           if (req) void runAiFill(req);
@@ -739,6 +772,7 @@ export function BuilderEditor({
             aria-pressed={lookOpen}
             className={`rounded-lg border border-border px-2.5 py-1 text-xs font-medium hover:bg-muted ${lookOpen ? 'bg-muted' : 'bg-background'}`}
             data-testid="open-look-switch"
+            data-setting-id="builder.look-switch"
           >
             {t('look.open')}
           </button>

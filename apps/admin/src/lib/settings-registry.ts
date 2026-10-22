@@ -832,28 +832,100 @@ export const SETTINGS: SettingEntry[] = [
       { query: `tab=${tab}`, feature: 'whatsapp' }
     )
   ),
-  // ── Visual editor (/builder): controls added by the template-aware pass (Task 10) ─────────
-  setting(
-    'builder.header-logo',
-    '/builder',
-    'builder.theme.headerLogo',
-    'staff',
-    {
-      en: 'logo position centre center start header wordmark',
-      ar: 'مكان الشعار اللوجو منتصف بداية الهيدر',
-    },
-    {}
-  ),
-  setting(
-    'builder.header-search',
-    '/builder',
-    'builder.theme.headerSearch',
-    'staff',
-    {
-      en: 'search field icon header find products',
-      ar: 'البحث خانة بحث ايقونة الهيدر',
-    },
-    {}
+  // ── Visual editor (/builder): one entry per control the editor added (Tasks 1-10) ─────────
+  // The deep link is `?select=<sectionId|type|theme|history>&block=&field=<id>&page=<kind>`; the
+  // builder selects on the canvas + tree and rings the control (Task 11). `query` carries the rest
+  // of the link, the entry id is the `field`.
+  ...(
+    [
+      // [id, labelKey, query, en synonyms, ar synonyms]
+      [
+        'builder.header-logo',
+        'builder.theme.headerLogo',
+        'select=theme',
+        'logo position centre center start header wordmark',
+        'مكان الشعار اللوجو منتصف بداية الهيدر',
+      ],
+      [
+        'builder.header-search',
+        'builder.theme.headerSearch',
+        'select=theme',
+        'search field icon header find products',
+        'البحث خانة بحث ايقونة الهيدر',
+      ],
+      [
+        'builder.fonts',
+        'builder.search.fonts',
+        'select=theme',
+        'font typeface upload arabic english heading body',
+        'خط خطوط حروف رفع عربي انجليزي عناوين',
+      ],
+      [
+        'builder.typography-zones',
+        'builder.search.typographyZones',
+        'select=theme',
+        'text size weight heading body button zone typography',
+        'حجم الكتابة سمك عناوين ازرار منطقة خطوط',
+      ],
+      [
+        'builder.section-typography',
+        'builder.search.sectionTypography',
+        'select=hero',
+        'section font size heading colour typography',
+        'خط القسم حجم لون العنوان كتابة',
+      ],
+      [
+        'builder.dividers',
+        'builder.search.dividers',
+        'select=hero',
+        'divider line ornament kicker lines separator',
+        'فاصل خط زخرفة سطر',
+      ],
+      [
+        'builder.video',
+        'builder.search.video',
+        'select=hero&block=slide',
+        'hero video background mp4 clip slide',
+        'فيديو خلفية البانر مقطع شريحة',
+      ],
+      [
+        'builder.page-settings',
+        'builder.pageSettings.open',
+        'page=product',
+        'page settings product collection cart background spacing',
+        'اعدادات الصفحة المنتج التصنيف السلة خلفية مسافات',
+      ],
+      [
+        'builder.page-switcher',
+        'builder.search.pageSwitcher',
+        '',
+        'switch page product collection cart home preview',
+        'بدل الصفحة المنتج التصنيف السلة الرئيسية معاينة',
+      ],
+      [
+        'builder.look-switch',
+        'builder.look.title',
+        '',
+        'change look style template preview apply',
+        'غيّر الشكل الستايل القالب معاينة تطبيق',
+      ],
+      [
+        'builder.history',
+        'builder.tabs.history',
+        'select=history',
+        'history versions restore undo revisions',
+        'السجل النسخ استعادة رجوع',
+      ],
+      [
+        'builder.add-section',
+        'builder.addSection.title',
+        '',
+        'add section block new row',
+        'اضافة قسم جديد',
+      ],
+    ] as const
+  ).map(([id, labelKey, query, en, ar]) =>
+    setting(id, '/builder', labelKey, 'staff', { en, ar }, query ? { query } : {})
   ),
 ];
 

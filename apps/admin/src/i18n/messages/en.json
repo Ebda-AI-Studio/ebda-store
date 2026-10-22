@@ -10290,6 +10290,14 @@
       "saveFirst": "Fix the errors on this page before changing the look.",
       "applied": "The look is applied.",
       "current": "Current look"
+    },
+    "search": {
+      "fonts": "Fonts",
+      "typographyZones": "Text styles by area",
+      "sectionTypography": "Section text style",
+      "dividers": "Section dividers",
+      "video": "Background video",
+      "pageSwitcher": "Switch the page you edit"
     }
   },
   "instapayReceipt": {

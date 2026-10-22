@@ -102,7 +102,7 @@ export function SectionTypographyField({
 
   const roles = typographyRolesFor(sectionType);
   return (
-    <div data-testid="section-typography-field">
+    <div data-testid="section-typography-field" data-setting-id="builder.section-typography">
       <SectionTypographyBlock
         roles={roles}
         typography={value}
