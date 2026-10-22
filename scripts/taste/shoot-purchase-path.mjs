@@ -234,7 +234,7 @@ async function main() {
   const screens = MANIFEST.screens
     .filter(s => !only || only.includes(s.id))
     .map(s => ({ ...s, path: pathOverride[s.id] ?? s.path }));
-  const viewportIds = MANIFEST.viewports.filter(v => !onlyViewports || onlyViewports.includes(v));
+  const viewportIds = onlyViewports ?? MANIFEST.viewports; // an explicit --viewports may name one the manifest does not list (e.g. 1280-ar)
   const u = new URL(base);
   const host = `${store}.${u.hostname}`;
   const origin = `${u.protocol}//${host}${u.port ? `:${u.port}` : ''}`;

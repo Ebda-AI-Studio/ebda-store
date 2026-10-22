@@ -156,7 +156,7 @@ export function MakerProfileSection({
             {link && story && (
               <a
                 href={link}
-                className="mt-4 inline-flex min-h-11 items-center text-sm font-semibold text-foreground underline decoration-primary underline-offset-4"
+                className="mt-4 inline-flex min-h-11 min-w-11 items-center text-sm font-semibold text-foreground underline decoration-primary underline-offset-4"
               >
                 {t('Read the story', 'اقرأ الحكاية')}
               </a>

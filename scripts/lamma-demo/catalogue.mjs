@@ -65,14 +65,15 @@ const WEIGHT = (en, ar) => chip('Weight', 'الوزن', en, ar);
 const MADE = ROW('Made', 'اتعمل', 'Fresh on the day of delivery', 'طازة يوم التوصيل');
 const STORE = (en, ar) => ROW('Keep', 'الحفظ', en, ar);
 
+const arPieces = n => n.replace(' pieces', ' قطع'); // the Arabic label must not carry the English unit
 const PORTIONS = (small, medium, family) => ({
   name: 'Portion',
   nameAr: 'الحجم',
   // [label, labelAr, extra price in piastres over the base]
   values: [
-    { value: `Small (${small})`, valueAr: `صغير (${small})` },
-    { value: `Medium (${medium})`, valueAr: `وسط (${medium})` },
-    { value: `Family (${family})`, valueAr: `عائلي (${family})` },
+    { value: `Small (${small})`, valueAr: `صغير (${arPieces(small)})` },
+    { value: `Medium (${medium})`, valueAr: `وسط (${arPieces(medium)})` },
+    { value: `Family (${family})`, valueAr: `عائلي (${arPieces(family)})` },
   ],
 });
 const WEIGHTS = (extra = 1500) => ({
