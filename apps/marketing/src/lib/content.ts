@@ -126,8 +126,8 @@ export interface LooksCopy {
   retry: string;
   /** English page only: the phones stay Arabic. */
   bilingualNote: string;
-  /** Templates shown as real captures of the live demo store instead of the built-in mini-stores. */
-  live: { template: string; link: string };
+  /** Templates with a live demo store (`DEMO_STORES`) show real captures instead of the built-in mini-stores. */
+  live: { link: string };
   /** Tab labels, in tab order: id matches /looks/<id>.html. */
   templates: { id: string; name: string; kind: string }[];
   /** The three looks (A, B, C) of each template. */
@@ -374,7 +374,7 @@ export const COPY: Record<Locale, Copy> = {
     },
     demo: {
       title: 'جرّب المتجر التجريبي بنفسك',
-      lead: 'متجر حقيقي على إبدأ بكتالوج أزياء توضيحي. غيّر القالب والشكل من الشريط اللي فوق، وافتح أي منتج، وجرّب السلة. الطلب مقفول، فمحدش هيتحاسب.',
+      lead: 'متاجر حقيقية على إبدأ بكتالوج توضيحي: أزياء وإلكترونيات وجمال. غيّر القالب والشكل من الشريط اللي فوق، وافتح أي منتج، وجرّب السلة. الطلب مقفول، فمحدش هيتحاسب.',
       cta: 'افتح المتجر التجريبي',
     },
     looks: {
@@ -388,7 +388,7 @@ export const COPY: Record<Locale, Copy> = {
       failed: 'القالب ماحمّلش.',
       retry: 'جرّب تاني',
       bilingualNote: '',
-      live: { template: 'qamar', link: 'افتح المتجر الحي' },
+      live: { link: 'افتح المتجر الحي' },
       templates: [
         { id: 'qamar', name: 'قمر', kind: 'أزياء وبوتيكات' },
         { id: 'souq', name: 'سوق', kind: 'تجزئة وإلكترونيات' },
@@ -422,16 +422,19 @@ export const COPY: Record<Locale, Copy> = {
             name: 'كتالوج',
             who: 'لمحل فيه أصناف كتير والزبون جاي عارف عايز إيه.',
             idea: 'توصل للي عايزه في ضغطتين: البحث والأقسام قبل أي صورة كبيرة.',
+            alt: 'الصفحة الرئيسية لمتجر سوق بشكل كتالوج: خانة بحث، أقسام بصور صغيرة للموبايلات واللابتوب والصوتيات، وتحتها عروض النهارده بخصومات',
           },
           {
             name: 'سوق الليل',
             who: 'لتاجر عايز دفا وشخصية مش جدول مواصفات.',
             idea: 'سوق حيّ ومنوّر من غير زحمة، والبرتقاني محجوز للعروض بس.',
+            alt: 'الصفحة الرئيسية لمتجر سوق بشكل سوق الليل على أخضر غامق: صورة ممر سوق مضاء بالفوانيس وعنوان «السوق منوّر» وزر تسوّق العروض',
           },
           {
             name: 'شو روم',
             who: 'لمجموعة صغيرة فاخرة (موبايلات، لابتوبات) بتتباع قطعة قطعة.',
             idea: 'المنتج هو البطل، قطعة واحدة في كل شاشة، وزرار مقارنة.',
+            alt: 'الصفحة الرئيسية لمتجر سوق بشكل شو روم: شريط أقسام وتحته موبايل أسود كبير بسعره من 32,000 ج.م',
           },
         ],
         jasmine: [
@@ -439,16 +442,19 @@ export const COPY: Record<Locale, Copy> = {
             name: 'عطارة',
             who: 'للعناية الطبيعية والتراثية اللي الثقة فيها جاية من اللي جواها.',
             idea: 'المكونات الأول: إيه اللي جواه، وبعدين المنتج.',
+            alt: 'الصفحة الرئيسية لمتجر ياسمين بشكل عطارة على خلفية زيتونية غامقة: ثلاث زجاجات ملوّنة وعنوان «مكونات تعرفها» وفلاتر نوع البشرة',
           },
           {
             name: 'بلوم',
             who: 'للمكياج الملوّن والجمهور الشاب اللي بيشتري بالدرجة.',
             idea: 'لون المنتج هو لون الصفحة، ودرجات اللون في كل حتة.',
+            alt: 'الصفحة الرئيسية لمتجر ياسمين بشكل بلوم على وردي: رف مستحضرات تجميل وعنوان «درجتك» وزر تسوّق الدرجات',
           },
           {
             name: 'كلينك',
             who: 'للمنتجات الفعّالة بأسلوب دكاترة الجلدية، والعميل جاي بمشكلة عايز يحلها.',
             idea: 'الروتين هو التنقل: نضّف، عالج، احمي.',
+            alt: 'الصفحة الرئيسية لمتجر ياسمين بشكل كلينك: فلاتر المشاكل مثل البشرة الدهنية والحبوب، وتحتها سيروم فيتامين سي',
           },
         ],
         lamma: [
@@ -767,7 +773,7 @@ export const COPY: Record<Locale, Copy> = {
     },
     demo: {
       title: 'Try the demo store yourself',
-      lead: 'A real Ebda store with an illustrative fashion catalogue. Switch the template and look from the bar at the top, open any product, try the cart. Ordering is closed, so nobody gets charged.',
+      lead: 'Real Ebda stores with illustrative catalogues: fashion, electronics and beauty. Switch the template and look from the bar at the top, open any product, try the cart. Ordering is closed, so nobody gets charged.',
       cta: 'Open the demo store',
     },
     looks: {
@@ -781,8 +787,8 @@ export const COPY: Record<Locale, Copy> = {
       failed: 'The template did not load.',
       retry: 'Try again',
       bilingualNote:
-        'Every template ships in Arabic and English. Qamar is shown from the live demo store in English; the other previews are shown in Arabic.',
-      live: { template: 'qamar', link: 'Open the live store' },
+        'Every template ships in Arabic and English. Qamar, Souq and Jasmine are shown from their live demo stores in English; the other previews are shown in Arabic.',
+      live: { link: 'Open the live store' },
       templates: [
         { id: 'qamar', name: 'Qamar', kind: 'Fashion and boutiques' },
         { id: 'souq', name: 'Souq', kind: 'General retail and electronics' },
@@ -816,16 +822,19 @@ export const COPY: Record<Locale, Copy> = {
             name: 'Catalogue',
             who: 'For a shop with many SKUs where shoppers arrive knowing what they want.',
             idea: 'Find it in two taps: search and categories come before any hero.',
+            alt: "The Souq home page in the Catalogue look: a search box, small-photo categories for phones, laptops and audio, then today's deals with discounts",
           },
           {
             name: 'Night souq',
             who: 'For a retailer who wants warmth and personality, not a spec sheet.',
             idea: 'A market that feels lit and alive without clutter; orange is reserved for deals only.',
+            alt: 'The Souq home page in the Night souq look on dark green: a lantern-lit market arcade, the headline "The souq is lit" and a Shop the deals button',
           },
           {
             name: 'Showroom',
             who: 'For a small, premium range (phones, laptops) sold one object at a time.',
             idea: 'Product as hero, one object per screen, with a compare toggle.',
+            alt: 'The Souq home page in the Showroom look: a category strip, then a large black phone priced from EGP 32,000',
           },
         ],
         jasmine: [
@@ -833,16 +842,19 @@ export const COPY: Record<Locale, Copy> = {
             name: 'Apothecary',
             who: 'For natural and heritage skincare where trust comes from what is inside.',
             idea: 'Ingredients first: what is in it, then the product.',
+            alt: 'The Jasmine home page in the Apothecary look on dark olive: three coloured bottles, the headline "Ingredients you know" and skin-type filters',
           },
           {
             name: 'Bloom',
             who: 'For colour cosmetics and a young audience that shops by shade.',
             idea: 'The colour of the product is the colour of the page; shade swatches everywhere.',
+            alt: 'The Jasmine home page in the Bloom look on pink: a shelf of cosmetics, the headline "Your shade" and a Shop the shades button',
           },
           {
             name: 'Clinic',
             who: 'For dermatologist-style actives where the shopper has a concern to solve.',
             idea: 'The routine is the navigation: cleanse, treat, protect.',
+            alt: 'The Jasmine home page in the Clinic look: concern filters such as oily skin and acne, then a vitamin C serum',
           },
         ],
         lamma: [

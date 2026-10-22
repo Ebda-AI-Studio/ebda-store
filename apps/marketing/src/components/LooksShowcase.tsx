@@ -4,10 +4,9 @@ import { useCallback, useEffect, useRef, useState, type KeyboardEvent } from 're
 import type { LooksCopy } from '../lib/content';
 import { ensureLookFont, parseFragment, type Frag } from '../lib/looks-frag';
 import { mountPhones } from '../lib/phone-store-dom';
-import { demoLookUrl, SIGNUP_URL } from '../lib/site';
+import { DEMO_STORES, demoLookUrl, isDemoTemplate, SIGNUP_URL } from '../lib/site';
 
 const LETTERS = ['A', 'B', 'C'] as const;
-const LIVE_LOOKS = ['atelier', 'lookbook', 'vitrine'] as const;
 
 /**
  * Pick a template, see its three looks as working mini-stores in phones (Ruling MKT-8): the
@@ -46,8 +45,8 @@ export function LooksShowcase({
   }, []);
 
   useEffect(() => {
-    if (active !== copy.live.template && !frags[active] && failed !== active) load(active);
-  }, [active, frags, failed, load, copy.live.template]);
+    if (!isDemoTemplate(active) && !frags[active] && failed !== active) load(active);
+  }, [active, frags, failed, load]);
 
   // Fonts: only once the section is near the screen (or a tab was chosen), once per template.
   useEffect(() => {
@@ -125,7 +124,7 @@ export function LooksShowcase({
     return mountPhones(track, { signupUrl: SIGNUP_URL });
   }, [active, activeFrag]);
 
-  const isLive = active === copy.live.template;
+  const liveTpl = isDemoTemplate(active) ? active : null;
   const shotLang = rtl ? 'ar' : 'en';
   const tpl = copy.templates.find(t => t.id === active) ?? copy.templates[0];
   const items = copy.items[active];
@@ -178,8 +177,8 @@ export function LooksShowcase({
             </button>
           ))}
         </div>
-        {frag && !isLive && <style dangerouslySetInnerHTML={{ __html: frag.css }} />}
-        {isLive || frag ? (
+        {frag && !liveTpl && <style dangerouslySetInnerHTML={{ __html: frag.css }} />}
+        {liveTpl || frag ? (
           <div
             className={`looks-trio${switched ? ' looks-trio-in' : ''}`}
             key={active}
@@ -188,20 +187,20 @@ export function LooksShowcase({
             {items.map((it, i) => (
               <figure className="looks-item" key={LETTERS[i]}>
                 <div className="look-phone">
-                  {!isLive && <span className="look-badge">{copy.badge}</span>}
-                  {isLive ? (
+                  {!liveTpl && <span className="look-badge">{copy.badge}</span>}
+                  {liveTpl ? (
                     <a
                       className="look-screen look-shot"
-                      href={demoLookUrl(LIVE_LOOKS[i])}
+                      href={demoLookUrl(liveTpl, DEMO_STORES[liveTpl].looks[i])}
                       aria-label={`${copy.live.link}: ${it.name}`}
                     >
                       <picture>
                         <source
                           type="image/avif"
-                          srcSet={`/looks/live/${active}-${LIVE_LOOKS[i]}-${shotLang}-780.avif`}
+                          srcSet={`/looks/live/${active}-${DEMO_STORES[liveTpl].looks[i]}-${shotLang}-780.avif`}
                         />
                         <img
-                          src={`/looks/live/${active}-${LIVE_LOOKS[i]}-${shotLang}-780.webp`}
+                          src={`/looks/live/${active}-${DEMO_STORES[liveTpl].looks[i]}-${shotLang}-780.webp`}
                           width={780}
                           height={1688}
                           alt={it.alt ?? it.name}
@@ -228,9 +227,11 @@ export function LooksShowcase({
                   <p className="look-idea">
                     <b>{copy.ideaLabel}:</b> {it.idea}
                   </p>
-                  {isLive && (
+                  {liveTpl && (
                     <p className="look-live">
-                      <a href={demoLookUrl(LIVE_LOOKS[i])}>{copy.live.link}</a>
+                      <a href={demoLookUrl(liveTpl, DEMO_STORES[liveTpl].looks[i])}>
+                        {copy.live.link}
+                      </a>
                     </p>
                   )}
                 </figcaption>
