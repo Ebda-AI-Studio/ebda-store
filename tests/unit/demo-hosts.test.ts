@@ -8,9 +8,13 @@ import { unknownHostLinks } from '../../apps/web/src/lib/unknown-store-page';
 import { TEMPLATE_SPECS } from '../../scripts/storedemo/seed.mjs';
 
 describe('demo host map', () => {
-  it('is Qamar -> storedemo, Souq -> storedemo-souq', () => {
-    expect(DEMO_HOSTS).toEqual({ qamar: 'storedemo', souq: 'storedemo-souq' });
-    expect(demoTemplates()).toEqual(['qamar', 'souq']);
+  it('is Qamar -> storedemo, Souq -> storedemo-souq, Jasmine -> storedemo-jasmine', () => {
+    expect(DEMO_HOSTS).toEqual({
+      qamar: 'storedemo',
+      souq: 'storedemo-souq',
+      jasmine: 'storedemo-jasmine',
+    });
+    expect(demoTemplates()).toEqual(['qamar', 'souq', 'jasmine']);
   });
   it('agrees with the seed: each spec slug is the host label of its template', () => {
     for (const t of demoTemplates()) expect(TEMPLATE_SPECS[t].slug).toBe(DEMO_HOSTS[t]);
@@ -21,13 +25,21 @@ describe('demo host map', () => {
     expect(demoHostFor('souq', 'storedemo.preview.ebda.app:3000')).toBe(
       'storedemo-souq.preview.ebda.app:3000'
     );
+    // Phase B3: the third demo store, from any of the other two
+    expect(demoHostFor('jasmine', 'storedemo.ebda.app')).toBe('storedemo-jasmine.ebda.app');
+    expect(demoHostFor('jasmine', 'storedemo-souq.ebda.app:3000')).toBe(
+      'storedemo-jasmine.ebda.app:3000'
+    );
+    expect(demoHostFor('qamar', 'storedemo-jasmine.ebda.app')).toBe('storedemo.ebda.app');
   });
   it('is null off a demo host, for an unknown template, and for an empty host', () => {
     expect(demoHostFor('souq', 'localhost:3000')).toBeNull();
     expect(demoHostFor('souq', 'mystore.ebda.app')).toBeNull();
     expect(demoHostFor('souq', 'storedemo')).toBeNull();
     expect(demoHostFor('souq', '')).toBeNull();
-    expect(demoHostFor('jasmine', 'storedemo.ebda.app')).toBeNull();
+    // a template with no demo store yet stays put
+    expect(demoHostFor('lamma', 'storedemo.ebda.app')).toBeNull();
+    expect(demoHostFor('dahab', 'storedemo-jasmine.ebda.app')).toBeNull();
   });
   it('the unknown-store 404 link reads the map, not a literal', () => {
     expect(unknownHostLinks({ SHOW_DEMO_STORE_LINK: 'true' }).demoStoreHref).toBe(
