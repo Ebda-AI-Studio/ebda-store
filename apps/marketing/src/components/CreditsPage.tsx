@@ -1,3 +1,4 @@
+import { SiteLink } from './SiteLink';
 import Link from 'next/link';
 import { COPY } from '../lib/content';
 import { MODEL_CREDITS } from '../lib/credits';
@@ -25,9 +26,9 @@ export function CreditsPage({ locale }: { locale: Locale }) {
               {MODEL_CREDITS.map(m => (
                 <li key={m.file} data-credit={m.file}>
                   <h3>
-                    <a href={m.sourceUrl} target="_blank" rel="noopener noreferrer">
+                    <SiteLink href={m.sourceUrl} locale={locale}>
                       {m.title}
-                    </a>
+                    </SiteLink>
                   </h3>
                   <dl>
                     <div>
@@ -41,9 +42,9 @@ export function CreditsPage({ locale }: { locale: Locale }) {
                     <div>
                       <dt>{p.license}</dt>
                       <dd>
-                        <a href={m.licenseUrl} target="_blank" rel="noopener noreferrer">
+                        <SiteLink href={m.licenseUrl} locale={locale}>
                           {m.license}
-                        </a>
+                        </SiteLink>
                       </dd>
                     </div>
                     <div>

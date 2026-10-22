@@ -1,3 +1,4 @@
+import { SiteLink } from './SiteLink';
 import Link from 'next/link';
 import { COMPARE, COMPARE_PAGE, compareRows, type ResolvedRow } from '../lib/compare';
 import { COMING_LABEL } from '../lib/capability-registry';
@@ -99,9 +100,9 @@ export function ComparePage({ locale, slug }: { locale: Locale; slug: CompareSlu
         <Table locale={locale} slug={slug} rows={rows.gap} heading={k.gapH} id="gap-h" />
         <p className="muted small">{k.verify}</p>
         <p className="actions">
-          <a href={SIGNUP_URL} className="btn btn-primary btn-lg">
+          <SiteLink href={SIGNUP_URL} locale={locale} className="btn btn-primary btn-lg">
             {k.cta}
-          </a>
+          </SiteLink>
           <Link href={pagePath(locale, 'features')} className="btn btn-ghost btn-lg">
             {k.allFeatures}
           </Link>

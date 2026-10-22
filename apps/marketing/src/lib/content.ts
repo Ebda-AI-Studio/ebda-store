@@ -90,16 +90,6 @@ export interface HeroFeatures {
     pushT: string;
     pushD: string;
   };
-  ai: {
-    t: string;
-    d: string;
-    /** Visual: the product form with the AI button and the two drafted descriptions. */
-    formLabel: string;
-    descLabel: string;
-    button: string;
-    ar: string;
-    en: string;
-  };
 }
 
 export interface LookCopy {
@@ -303,11 +293,11 @@ export const COPY: Record<Locale, Copy> = {
       tablistLabel: 'اختار شكل المتجر',
       badge: 'صور توضيحية',
       pageLabel: 'صفحة منتج على متجر تجريبي، بموديل 3D بيلف',
-      hint: 'اسحب علشان تلفّه',
+      hint: 'اسحب عشان تلفّه',
       ar: 'شوفه في مكانك',
       loading: 'بنحمّل الموديل...',
       error: 'الموديل ماحمّلش. جرّب تاني.',
-      keys: 'اضغط على الموديل واستعمل الأسهم علشان تلفّه، وزرار + و- للتقريب.',
+      keys: 'اضغط على الموديل واستعمل الأسهم عشان تلفّه، وزرار + و- للتقريب.',
       colourLabel: 'اللون',
       addToCart: 'أضف للسلة',
       load: 'شغّل الموديل 3D',
@@ -326,7 +316,7 @@ export const COPY: Record<Locale, Copy> = {
             price: 1450,
             desc: 'خفيف ومريح لليوم كله، ومتاح بـ3 ألوان.',
           },
-          alt: 'موديل 3D لكوتشي رياضي، اسحب علشان تلفّه',
+          alt: 'موديل 3D لكوتشي رياضي، اسحب عشان تلفّه',
           variants: { midnight: 'أزرق', beach: 'وردي', street: 'أسود' },
         },
         souq: {
@@ -337,7 +327,7 @@ export const COPY: Record<Locale, Copy> = {
             price: 890,
             desc: 'نحاس مشغول بإيد صنايعي، بينوّر الأوضة من غير ما يزحمها.',
           },
-          alt: 'موديل 3D لفانوس نحاس، اسحب علشان تلفّه',
+          alt: 'موديل 3D لفانوس نحاس، اسحب عشان تلفّه',
         },
         lamma: {
           name: 'لمّة',
@@ -347,7 +337,7 @@ export const COPY: Record<Locale, Copy> = {
             price: 380,
             desc: 'فخار مزجّج بيسوّي الأكل على نار هادية، وبيحافظ على سخونته على السفرة.',
           },
-          alt: 'موديل 3D لحلة فخار بغطاها، اسحب علشان تلفّها',
+          alt: 'موديل 3D لحلة فخار بغطاها، اسحب عشان تلفّها',
         },
       },
     },
@@ -487,31 +477,21 @@ export const COPY: Record<Locale, Copy> = {
           previewAlt: 'معاينة صفحة متجر بتتغيّر مع كل تعديل في المحرر',
         },
         orders: {
-          t: 'الطلب يوصلك على واتساب',
-          d: 'العميل يبعتلك تفاصيل الطلب جاهزة بضغطة، وإشعار على موبايلك مع كل طلب جديد.',
-          chatLabel: 'رسالة طلب على واتساب',
+          t: 'تأكيد الطلب على واتساب',
+          d: 'بعد الطلب بالدفع عند الاستلام، العميل يبعتلك رسالة جاهزة بتفاصيل طلبه بضغطة زرار. وبييجيلك إشعار على موبايلك مع كل طلب جديد.',
+          chatLabel: 'رسالة تأكيد طلب جاهزة على واتساب',
           message: [
             'طلب جديد من المتجر',
             'كوتشي قمر اليومي × 1',
             'الإجمالي: 1,450 ج.م',
             'الدفع عند الاستلام',
           ],
-          send: 'إرسال الطلب على واتساب',
+          send: 'أكّد على واتساب',
           pushT: 'طلب جديد · 1,450 ج.م',
           pushD: 'الدفع عند الاستلام',
         },
-        ai: {
-          t: 'الذكاء الاصطناعي يكتب عنك',
-          d: 'يكتب وصف منتجاتك ويترجمه عربي وإنجليزي، وإنت تراجعه وتنشره.',
-          formLabel: 'نموذج منتج بوصف مكتوب بالذكاء الاصطناعي',
-          descLabel: 'الوصف',
-          button: 'اكتب بالذكاء الاصطناعي',
-          ar: 'كوتشي خفيف ومريح لليوم كله، بنعل مرن وتصميم بسيط يمشي مع أي لبس.',
-          en: 'A light, comfortable sneaker for all-day wear, with a flexible sole and a clean design that goes with anything.',
-        },
       },
       items: [
-        { t: 'أرقامك قدامك', d: 'اعرف إيه اللي بيتباع وإيه اللي واقف.' },
         { t: 'الضريبة محسوبة', d: 'لو مسجّل ضريبيًا، القيمة المضافة بتتحسب لوحدها.' },
         { t: 'دومين باسمك', d: 'اربط دومينك، أو خليك على <اسمك>.ebda.app.' },
         { t: 'عربي وإنجليزي', d: 'متجرك ولوحة التحكم بالعربي من الأساس، ومعاهم إنجليزي.' },
@@ -601,7 +581,7 @@ export const COPY: Record<Locale, Copy> = {
       use: 'بيظهر في',
       photosH: 'صور القوالب',
       photosP:
-        'الصور في القوالب الخمسة وأشكالها الخمستاشر اتعملت بالذكاء الاصطناعي علشان توضيح الفكرة. مش بتعرض أي محل أو منتج أو شخص حقيقي ومش محتاجة نسب.',
+        'الصور في القوالب الخمسة وأشكالها الخمستاشر اتعملت بالذكاء الاصطناعي عشان توضيح الفكرة. مش بتعرض أي محل أو منتج أو شخص حقيقي ومش محتاجة نسب.',
       modified: 'معدّل',
     },
     aboutPage: {
@@ -617,7 +597,7 @@ export const COPY: Record<Locale, Copy> = {
       paras: [
         'كل مشروع بيبدأ قبل ما يبقى مشروع، بيبدأ بجملة: «عندي فكرة».',
         'وبين الفكرة وأول عميل فيه أبواب كتير: موقع، وطلبات، وكلام مع العملاء، ومنتجات، ودفع، وتوصيل، وتكنولوجيا.',
-        'ابدأ استوديو للذكاء الاصطناعي موجودة علشان تسهّل أول باب. علشان كده اللوجو باب، واللي جوّاه هو صاحب الفكرة، واقف على العتبة. مش محتاج يفهم في منصات التجارة الإلكترونية ولا الـ API ولا البنية التحتية ولا ربط واتساب. محتاج بس ياخد أول خطوة.',
+        'ابدأ استوديو للذكاء الاصطناعي موجودة عشان تسهّل أول باب. عشان كده اللوجو باب، واللي جوّاه هو صاحب الفكرة، واقف على العتبة. مش محتاج يفهم في منصات التجارة الإلكترونية ولا الـ API ولا البنية التحتية ولا ربط واتساب. محتاج بس ياخد أول خطوة.',
       ],
       close: 'ابدأ.',
     },
@@ -873,31 +853,21 @@ export const COPY: Record<Locale, Copy> = {
           previewAlt: 'A store page preview that changes with every edit in the editor',
         },
         orders: {
-          t: 'Orders land on WhatsApp',
-          d: 'Customers send you the order details in one tap, and your phone pings for every new order.',
-          chatLabel: 'A WhatsApp order message',
+          t: 'Order confirmation on WhatsApp',
+          d: 'After a cash-on-delivery order, the customer sends you a ready-made message with their order details in one tap. Your phone also pings for every new order.',
+          chatLabel: 'A ready-made WhatsApp order confirmation',
           message: [
             'New order from the store',
             'Qamar everyday sneaker × 1',
             'Total: EGP 1,450',
             'Cash on delivery',
           ],
-          send: 'Send the order on WhatsApp',
+          send: 'Confirm on WhatsApp',
           pushT: 'New order · EGP 1,450',
           pushD: 'Cash on delivery',
         },
-        ai: {
-          t: 'AI writes for you',
-          d: 'Writes your product descriptions and translates them into Arabic and English. You review and publish.',
-          formLabel: 'A product form with an AI-written description',
-          descLabel: 'Description',
-          button: 'Write with AI',
-          ar: 'كوتشي خفيف ومريح لليوم كله، بنعل مرن وتصميم بسيط يمشي مع أي لبس.',
-          en: 'A light, comfortable sneaker for all-day wear, with a flexible sole and a clean design that goes with anything.',
-        },
       },
       items: [
-        { t: 'Your numbers', d: 'See what sells and what doesn’t.' },
         { t: 'VAT, handled', d: 'Registered for VAT? It’s calculated for you.' },
         { t: 'Your own domain', d: 'Connect your domain, or stay on <you>.ebda.app.' },
         {

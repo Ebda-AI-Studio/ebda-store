@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import type { LooksCopy } from '../lib/content';
 import { ensureLookFont, parseFragment, type Frag } from '../lib/looks-frag';
+import { SiteLink } from './SiteLink';
 import { mountPhones } from '../lib/phone-store-dom';
 import { DEMO_STORES, demoLookUrl, isDemoTemplate, SIGNUP_URL } from '../lib/site';
 
@@ -206,9 +207,12 @@ export function LooksShowcase({
                   </p>
                   {liveTpl && (
                     <p className="look-live">
-                      <a href={demoLookUrl(liveTpl, DEMO_STORES[liveTpl].looks[i])}>
+                      <SiteLink
+                        href={demoLookUrl(liveTpl, DEMO_STORES[liveTpl].looks[i])}
+                        locale={rtl ? 'ar' : 'en'}
+                      >
                         {copy.live.link}
-                      </a>
+                      </SiteLink>
                     </p>
                   )}
                 </figcaption>
