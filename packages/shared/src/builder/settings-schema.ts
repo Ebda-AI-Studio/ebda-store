@@ -14,7 +14,7 @@
  * Zod accepts has a descriptor here, so the panel can never miss a field the
  * API stores (the silent-strip class, inverted).
  */
-import type { StoreTheme } from '../types/store-theme';
+import type { StoreTheme, TemplateId } from '../types/store-theme';
 import type { Viewport } from './viewports';
 
 export type SettingType =
@@ -40,6 +40,21 @@ export interface SettingOption {
   labelAr: string;
 }
 
+/**
+ * When a control is shown (Ruling EP-1): visibility is a declared rule, never a render accident.
+ * A rule narrows by the store's resolved `template`, its `look`, and the section's own variant
+ * values (`variants: { layout: ['horizontal'] }` = shown while `layout` is `horizontal`). Every
+ * key a rule names must hold (AND); a control with a list of rules shows when ANY rule holds
+ * (OR). Absent = shown for every template (today's behaviour). Narrow a control only when the
+ * flip probe proves the skin or variant ignores it (`scripts/editor-audit`).
+ */
+export interface ShownRule {
+  templates?: readonly TemplateId[];
+  looks?: readonly string[];
+  variants?: Readonly<Record<string, readonly (string | number | boolean)[]>>;
+}
+export type ShownFor = ShownRule | readonly ShownRule[];
+
 export interface SettingDefinition {
   id: string;
   type: SettingType;
@@ -59,6 +74,8 @@ export interface SettingDefinition {
   /** A one-line explanation under the control (bilingual), for a choice with a side effect. */
   hintEn?: string;
   hintAr?: string;
+  /** Where the control is shown; absent = everywhere. See `ShownFor`. */
+  shownFor?: ShownFor;
 }
 
 const opt = (value: string | number, labelEn: string, labelAr: string): SettingOption => ({
@@ -290,7 +307,7 @@ export interface ThemeSettingDefinition extends Omit<SettingDefinition, 'id' | '
   id: keyof StoreTheme;
 }
 export interface ThemeSettingsGroup {
-  id: 'colors' | 'typography' | 'buttons' | 'spacing';
+  id: 'header' | 'colors' | 'typography' | 'buttons' | 'spacing';
   labelEn: string;
   labelAr: string;
   settings: ThemeSettingDefinition[];
@@ -308,6 +325,35 @@ const themeColor = (
 });
 
 export const THEME_SETTINGS_SCHEMA: readonly ThemeSettingsGroup[] = [
+  // First, like the header is on the storefront (the admin mirrors the storefront top to bottom).
+  {
+    id: 'header',
+    labelEn: 'Header',
+    labelAr: 'الهيدر',
+    settings: [
+      {
+        id: 'headerLogoPlacement',
+        type: 'select',
+        labelEn: 'Logo position',
+        labelAr: 'مكان الشعار',
+        options: [opt('start', 'Start', 'في البداية'), opt('centre', 'Centre', 'في المنتصف')],
+        // the headers built on the shared minimal header read it
+        shownFor: { templates: ['qamar', 'souq', 'jasmine', 'lamma'] },
+      },
+      {
+        id: 'headerSearch',
+        type: 'select',
+        labelEn: 'Search',
+        labelAr: 'البحث',
+        options: [
+          opt('prominent', 'Search field', 'خانة بحث ظاهرة'),
+          opt('icon', 'Icon', 'أيقونة'),
+        ],
+        // only the Souq header turns the search into a field
+        shownFor: { templates: ['souq'] },
+      },
+    ],
+  },
   {
     id: 'colors',
     labelEn: 'Colours',

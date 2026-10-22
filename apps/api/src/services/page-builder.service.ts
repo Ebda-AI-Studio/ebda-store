@@ -73,6 +73,7 @@ import {
   type TemplateId,
   getLook,
   PAGE_KINDS,
+  diffTemplateFamily,
   PAGE_OWNED_SETTING_KEYS,
   ALL_PAGE_OWNED_KEYS,
   pickOwnedSettings,
@@ -786,10 +787,9 @@ function dropUnpublishableSections(definition: PageDefinition): PageDefinition {
  * `resetThemeKeys` are stripped from the document's pending theme patch so a
  * later publish cannot re-apply keys the merchant just reset.
  */
-export async function applyFamilyForLook(
+async function composeLookDocument(
   storeId: string,
   family: TemplateFamily['id'],
-  userId: string | null = null,
   resetThemeKeys: readonly string[] = [],
   /** The look being applied. The store row still holds the OLD look/template here (the builder
    *  step runs first), so a layout-derived page is re-derived for the new skin + look: the look
@@ -798,12 +798,20 @@ export async function applyFamilyForLook(
   lookId: string | null = null,
   /** The switch's design choice (TPL-1): `keep` leaves every section design field the merchant
    *  changed from the outgoing look's mix; `reset` applies the incoming look's design whole. */
-  design: 'keep' | 'reset' = 'reset'
-): Promise<'published' | 'draft'> {
+  design: 'keep' | 'reset' = 'reset',
+  revisionToken?: string
+): Promise<{
+  state: PageState;
+  definition: PageDefinition;
+  fresh: boolean;
+  store: NonNullable<Awaited<ReturnType<typeof loadStore>>>;
+}> {
   const state = await getPageState(storeId, HOME_PAGE_KEY);
   if (!state) throw new AppError(404, 'NOT_FOUND', 'Store not found');
   const store = await loadStore(storeId);
   if (!store) throw new AppError(404, 'NOT_FOUND', 'Store not found');
+  if (revisionToken !== undefined && revisionToken !== lookRevisionToken(state, store))
+    throw new AppError(409, 'DRAFT_MOVED', 'The page changed since the preview; preview again.');
   const look = getLook(lookId);
   const start =
     state.source === 'layout' && look
@@ -862,6 +870,82 @@ export async function applyFamilyForLook(
       fresh = false;
     }
   }
+  return { state, definition, fresh, store };
+}
+
+/**
+ * An opaque token for everything a look switch reads: the revision head, the document it starts
+ * from (a layout-derived page has no revision rows), and the store's layout, theme, look and
+ * template. A preview carries it and the apply refuses (DRAFT_MOVED) when any of it moved.
+ */
+export function lookRevisionToken(
+  state: Pick<PageState, 'rev' | 'draftRev' | 'publishedRev' | 'definition' | 'source'>,
+  store: { layoutSettings?: unknown; theme?: unknown; look?: unknown; template?: unknown }
+): string {
+  const text = JSON.stringify([
+    state.source,
+    state.definition,
+    store.layoutSettings ?? null,
+    store.theme ?? null,
+    store.look ?? null,
+    store.template ?? null,
+  ]);
+  let h = 0x811c9dc5; // FNV-1a, 32 bit: a change detector, not a security boundary
+  for (let i = 0; i < text.length; i++) h = Math.imul(h ^ text.charCodeAt(i), 0x01000193) >>> 0;
+  return `r${state.rev}d${state.draftRev ?? 0}p${state.publishedRev ?? 0}h${h.toString(36)}`;
+}
+
+/**
+ * The document a look switch would write, and what it changes (Task 9): nothing is saved. The apply
+ * recomputes the same document from the current draft, so a preview can never differ from it.
+ */
+export async function previewFamilyForLook(
+  storeId: string,
+  family: TemplateFamily['id'],
+  resetThemeKeys: readonly string[],
+  lookId: string,
+  design: 'keep' | 'reset'
+) {
+  const { state, definition, fresh, store } = await composeLookDocument(
+    storeId,
+    family,
+    resetThemeKeys,
+    lookId,
+    design
+  );
+  const live = (store.theme ?? {}) as Record<string, unknown>;
+  const pending = (state.definition.theme ?? {}) as Record<string, unknown>;
+  const report = diffTemplateFamily(
+    state.definition,
+    definition,
+    resetThemeKeys.filter(k => k in live || k in pending)
+  );
+  return {
+    draft: definition,
+    report,
+    revisionToken: lookRevisionToken(state, store),
+    willPublish: fresh,
+  };
+}
+
+export async function applyFamilyForLook(
+  storeId: string,
+  family: TemplateFamily['id'],
+  userId: string | null = null,
+  resetThemeKeys: readonly string[] = [],
+  lookId: string | null = null,
+  design: 'keep' | 'reset' = 'reset',
+  /** From a preview: refuse (409 DRAFT_MOVED) when the page changed since it was computed. */
+  revisionToken?: string
+): Promise<'published' | 'draft'> {
+  const { state, definition, fresh } = await composeLookDocument(
+    storeId,
+    family,
+    resetThemeKeys,
+    lookId,
+    design,
+    revisionToken
+  );
   const saved = await saveDraft({
     storeId,
     pageKey: HOME_PAGE_KEY,

@@ -28,6 +28,16 @@ export const LOOK_RECEIPT_STYLES = ['device', 'framed'] as const;
 export const LOOK_CARD_CTAS = ['none', 'quiet'] as const;
 export const LOOK_CARD_HOVERS = ['none', 'lift'] as const;
 export const LOOK_CARD_BADGES = ['accent'] as const;
+/**
+ * Header chrome the MERCHANT may override on top of the look (Ruling EP-4): where the logo sits
+ * and whether the search is a prominent field. They are not look tokens (no look sets them in its
+ * `tokens`; the look's own value is `chrome.header`), so a stored value is always a merchant pick:
+ * precedence merchant > look > skin. A design reset clears them like a look token.
+ */
+export const HEADER_LOGO_PLACEMENTS = ['start', 'centre'] as const;
+export const HEADER_SEARCH_PLACEMENTS = ['prominent', 'icon'] as const;
+export type HeaderLogoPlacement = (typeof HEADER_LOGO_PLACEMENTS)[number];
+export type HeaderSearchPlacement = (typeof HEADER_SEARCH_PLACEMENTS)[number];
 export type WordmarkSize = (typeof LOOK_WORDMARK_SIZES)[number];
 export type OverPhotoChrome = (typeof LOOK_OVER_PHOTO_CHROMES)[number];
 export type ReceiptStyle = (typeof LOOK_RECEIPT_STYLES)[number];
@@ -213,5 +223,15 @@ export const LOOK_UI_TOKEN_KEYS = [
   'cardBadge',
 ] as const satisfies readonly (keyof StoreTheme)[];
 
-/** Every StoreTheme key a look owns: the always-set tokens plus the optional UI tokens. */
-export const LOOK_OWNED_THEME_KEYS = [...LOOK_TOKEN_KEYS, ...LOOK_UI_TOKEN_KEYS] as const;
+/** The merchant's header chrome overrides (see `HEADER_LOGO_PLACEMENTS`). A design reset clears them. */
+export const HEADER_CHROME_OVERRIDE_KEYS = [
+  'headerLogoPlacement',
+  'headerSearch',
+] as const satisfies readonly (keyof StoreTheme)[];
+
+/** Every StoreTheme key a design reset clears: the look's tokens, its optional UI tokens, and the merchant's header overrides. */
+export const LOOK_OWNED_THEME_KEYS = [
+  ...LOOK_TOKEN_KEYS,
+  ...LOOK_UI_TOKEN_KEYS,
+  ...HEADER_CHROME_OVERRIDE_KEYS,
+] as const;

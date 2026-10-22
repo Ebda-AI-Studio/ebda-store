@@ -33,7 +33,7 @@ import {
   getLook,
   LOOK_OWNED_THEME_KEYS,
 } from '@ebda/shared';
-import { applyFamilyForLook } from './page-builder.service';
+import { applyFamilyForLook, previewFamilyForLook } from './page-builder.service';
 import { deferAfterTenantCommit } from '../lib/after-tenant-commit';
 import { redis } from './redis.service';
 import { invalidateCached, invalidateCachedPrefix } from '../lib/public-cache';
@@ -450,13 +450,12 @@ export class StoreService {
           // Branding → Theme.
           // 2026-07-12 design-sweep batch: new stores also get a neutral-slate
           // OOS ribbon (harmonizes better than the platform's original fixed
-          // terracotta) + rtlPolish (RTL-correct empty-state CTA arrow on
-          // elegant). Existing stores keep both undefined and render unchanged.
+          // terracotta). Existing stores keep it undefined and render unchanged.
+          // `rtlPolish` is no longer seeded: no renderer reads it (Ruling EP-8).
           theme: {
             personaChromeV2: true,
             frameChromeDedup: true,
             oosRibbonColor: '#6b7280',
-            rtlPolish: true,
           },
         },
       })
@@ -972,10 +971,37 @@ export class StoreService {
    * the home page to the look's template family without losing content (see
    * `applyFamilyForLook`: published for a fresh store, a draft otherwise).
    */
+  /**
+   * What `applyLook` would write, without writing anything (Task 9): the proposed home document, a
+   * plain change report and a revision token. The apply recomputes the same document from the current
+   * draft and, given the token, refuses with 409 DRAFT_MOVED when the page moved since the preview.
+   */
+  static async previewLook(storeId: string, lookId: string, opts: { design: 'keep' | 'reset' }) {
+    const look = getLook(lookId);
+    if (!look) throw new AppError(400, 'INVALID_LOOK', 'Unknown look');
+    const store = await this.getById(storeId);
+    if (look.status !== 'built' && store.look !== look.id) {
+      throw new AppError(400, 'LOOK_NOT_AVAILABLE', 'This look is not available yet');
+    }
+    const preview = await previewFamilyForLook(
+      storeId,
+      look.template,
+      opts.design === 'reset' ? LOOK_OWNED_THEME_KEYS : [],
+      look.id,
+      opts.design
+    );
+    return {
+      ...preview,
+      look: look.id,
+      // the skin (header, cards, buttons) is not drawn in the preview: say when it will change
+      skinChange: store.template !== look.skin ? { from: store.template, to: look.skin } : null,
+    };
+  }
+
   static async applyLook(
     storeId: string,
     lookId: string,
-    opts: { design: 'keep' | 'reset' },
+    opts: { design: 'keep' | 'reset'; revisionToken?: string },
     userId: string | null = null
   ) {
     const look = getLook(lookId);
@@ -996,7 +1022,8 @@ export class StoreService {
       userId,
       opts.design === 'reset' ? LOOK_OWNED_THEME_KEYS : [],
       look.id,
-      opts.design
+      opts.design,
+      opts.revisionToken
     );
     // Re-read the theme in the same transaction as this write (not a stale copy from before the
     // builder step): a publish above may have merged a pending theme patch into it, and that

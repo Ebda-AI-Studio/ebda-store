@@ -22,8 +22,10 @@ import {
   DEFAULT_THEME,
   VIEWPORTS,
   getSectionDefinition,
+  isShown,
   isSafeUrl,
   locateSection,
+  sectionVariants,
   type BlockNode,
   type DraftChrome,
   type DocumentAction,
@@ -55,6 +57,9 @@ interface Props {
   selection: Selection | null;
   viewport: Viewport;
   theme: StoreTheme | undefined;
+  /** The store's resolved template and look: a control no renderer of it reads is not offered (EP-1). */
+  template?: string | null;
+  look?: string | null;
   errors: Array<{ path: string; messageEn: string; messageAr: string }>;
   dispatch: (a: DocumentAction, coalesceKey?: string) => void;
   /** Ask the AI for the section's kicker and subtitle (fills only the empty ones). */
@@ -73,6 +78,8 @@ export function SettingsPanel({
   selection,
   viewport,
   theme,
+  template,
+  look,
   errors,
   dispatch,
   onAiFill,
@@ -92,8 +99,9 @@ export function SettingsPanel({
     ? node.blocks?.find(b => b.id === selection.blockId)
     : undefined;
   const blockDef = block ? d.blocks.find(b => b.type === block.type) : undefined;
+  const shownCtx = { template, look, variant: sectionVariants(d, node) };
   const defs = (blockDef ? blockDef.settings : d.settings).filter(
-    s => mode === 'design' || s.group === 'content'
+    s => (mode === 'design' || s.group === 'content') && isShown(s, shownCtx)
   );
   const values = block ? block.settings : node.settings;
   const vpOverrides =

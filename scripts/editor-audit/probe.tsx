@@ -83,6 +83,29 @@ vi.mock('../../apps/web/src/components/ShopChrome', () => ({
 
 const { PageRenderer } = await import('../../apps/web/src/builder/render/PageRenderer');
 
+/** Fixture products with a second picture: the hover swap only renders when there is one to swap to. */
+const PROBE_PRODUCTS = [
+  ...PRODUCTS,
+  // three plainly buyable products (the fixture's are out of stock or have variants): a routine's
+  // "add all" button only exists when every step holds one
+  ...['b1', 'b2', 'b3'].map(id => ({
+    id,
+    name: `Buyable ${id}`,
+    nameAr: `منتج ${id}`,
+    slug: id,
+    price: 10000,
+    images: [{ id: `img-${id}`, url: `https://pub-test.r2.dev/p/${id}.jpg`, alt: id }],
+    inventory: 5,
+    categories: [],
+  })),
+].map(p => ({
+  ...p,
+  images: [
+    ...p.images,
+    { id: `${p.id}-alt`, url: 'https://pub-test.r2.dev/p/hover.jpg', alt: 'alt' },
+  ],
+}));
+
 /** Ids React and the renderers generate (`useId`, aria links) differ per render only by counter. */
 const stable = (html: string) =>
   html
@@ -124,21 +147,22 @@ function renderSection(
   skin: TemplateId,
   doc: PageDefinition,
   language: 'en' | 'ar',
-  editorMode = false
+  editorMode = false,
+  look?: string
 ): string {
-  ctx.store = { ...STORES.A, template: skin };
+  ctx.store = { ...STORES.A, template: skin, ...(look ? { look } : {}) };
   ctx.language = language;
   return stable(
     renderToStaticMarkup(
       <PageRenderer
         definition={doc}
         templateId={skin}
-        featuredProducts={PRODUCTS as never}
-        newArrivals={PRODUCTS.slice(0, 2) as never}
-        bestSellers={[PRODUCTS[2], PRODUCTS[0]] as never}
+        featuredProducts={PROBE_PRODUCTS as never}
+        newArrivals={PROBE_PRODUCTS.slice(0, 2) as never}
+        bestSellers={[PROBE_PRODUCTS[2], PROBE_PRODUCTS[0]] as never}
         categories={CATEGORIES as never}
         testimonials={TESTIMONIALS}
-        extraProducts={PRODUCTS as never}
+        extraProducts={PROBE_PRODUCTS as never}
         editorMode={editorMode}
       />
     )
@@ -186,6 +210,14 @@ function seedContent(type: string, node: SectionNode): SectionNode {
           block('look', i, { title: `Look ${i + 1}`, image: img(i + 1), productIds: ['p1', 'p2'] })
         ),
       };
+    case 'steps':
+      // Each step holds a buyable product, or the "add all" button the button text labels never shows.
+      return {
+        ...node,
+        blocks: ['b1', 'b2', 'b3'].map((pid, i) =>
+          block('step', i, { title: `Step ${i + 1}`, body: 'Seed body', productIds: [pid] })
+        ),
+      };
     case 'trust-strip':
       return {
         ...node,
@@ -220,6 +252,26 @@ function seedContent(type: string, node: SectionNode): SectionNode {
           image: img(9),
         },
       };
+    case 'category-grid':
+    case 'best-sellers':
+    case 'new-arrivals':
+    case 'product-carousel':
+    case 'testimonials':
+    case 'featured-collection':
+      // A heading row with all three lines: the kicker / subtitle line toggles and the typography
+      // zones have nothing to act on without text (the flip would read as "no change").
+      return {
+        ...node,
+        settings: {
+          title: 'Seed title',
+          titleAr: 'عنوان',
+          kicker: 'Seed kicker',
+          kickerAr: 'نص',
+          subtitle: 'Seed subtitle',
+          subtitleAr: 'عنوان فرعي',
+          ...node.settings,
+        },
+      };
     default:
       return node;
   }
@@ -245,6 +297,8 @@ function isolated(skin: TemplateId, type: string): { doc: PageDefinition; id: st
 const PROBE_CONTEXT: Record<string, Record<string, unknown>> = {
   'hero/frame': { presentation: 'framed' },
   'hero/autoplayMs': { mode: 'slider' },
+  // a source with enough products for the cap to cut anything
+  'featured-collection/limit': { productSource: 'featured' },
   'any/cardFrameColor': { showCardFrame: true },
   'any/cardFrameSize': { showCardFrame: true },
   'any/cardFrameStyle': { showCardFrame: true },
@@ -259,21 +313,26 @@ export function probeSetting(
   skin: TemplateId,
   type: string,
   key: string,
-  values: unknown[]
+  values: unknown[],
+  /** Extra settings to apply first (a variant the control is only shown for). */
+  context: Record<string, unknown> = {},
+  /** The store's look, for a control only a look gives meaning to (aisle tints). */
+  look?: string
 ): ProbeResult {
   try {
     const { doc: base, id } = isolated(skin, type);
     let doc = base;
-    for (const [k, v] of Object.entries(
-      PROBE_CONTEXT[`${type}/${key}`] ?? PROBE_CONTEXT[`any/${key}`] ?? {}
-    ))
+    for (const [k, v] of Object.entries({
+      ...(PROBE_CONTEXT[`${type}/${key}`] ?? PROBE_CONTEXT[`any/${key}`] ?? {}),
+      ...context,
+    }))
       doc = reduceDocument(doc, { type: 'setSectionSetting', id, key: k, value: v }).doc;
     // Compare within one language: English and Arabic always differ from each other.
     for (const language of ['en', 'ar'] as const) {
       const seen = new Set<string>();
       for (const value of values) {
         const r = reduceDocument(doc, { type: 'setSectionSetting', id, key, value });
-        seen.add(renderSection(skin, r.doc, language));
+        seen.add(renderSection(skin, r.doc, language, false, look));
       }
       if (seen.size > 1) return { values, differs: true };
     }
@@ -309,4 +368,9 @@ export function probeMarker(
   } catch {
     return 'absent';
   }
+}
+export function debugHtml(skin: TemplateId, type: string, key: string, value: unknown): string {
+  const { doc, id } = isolated(skin, type);
+  const r = reduceDocument(doc, { type: 'setSectionSetting', id, key, value });
+  return renderSection(skin, r.doc, 'en');
 }

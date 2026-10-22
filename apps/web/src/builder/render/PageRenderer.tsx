@@ -45,6 +45,7 @@ import { ReorderRow } from '../sections/ReorderRow';
 import { MakerProfileSection, type MakerProfileSettings } from '../sections/MakerProfileSection';
 import { GiftFinderSection, type GiftFinderSettings } from '../sections/GiftFinderSection';
 import { SectionHeader } from '../sections/SectionHeader';
+import { EditorModeProvider } from './editor-mode';
 import { TagChips } from '../../templates/shared/TagChips';
 import { HeroCollage } from '../../templates/shared/HeroCollage';
 import { resolveSectionProducts, onSaleProducts } from '../sections/section-products';
@@ -1443,6 +1444,8 @@ export function PageRenderer({
       <h1 className="sr-only">{(isRtl ? store.nameAr || store.name : store.name) || ''}</h1>
       {body}
     </>
+  ) : editorMode ? (
+    <EditorModeProvider value>{body}</EditorModeProvider>
   ) : (
     body
   );

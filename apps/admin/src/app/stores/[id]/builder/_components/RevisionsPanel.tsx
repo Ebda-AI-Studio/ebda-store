@@ -7,6 +7,7 @@
  */
 import { useCallback, useEffect, useState } from 'react';
 import { useFormatter } from 'next-intl';
+import { ConfirmDialog } from './ConfirmDialog';
 import { useT } from '@/i18n/useT';
 import { apiGet, apiPost } from '../../../../../lib/api';
 
@@ -36,6 +37,8 @@ export function RevisionsPanel({
   const [cursor, setCursor] = useState<number | null>(null);
   const [busy, setBusy] = useState<number | null>(null);
   const [error, setError] = useState(false);
+  // The version waiting for the in-app confirmation (never `window.confirm`).
+  const [asking, setAsking] = useState<number | null>(null);
 
   const load = useCallback(
     async (after?: number) => {
@@ -54,7 +57,7 @@ export function RevisionsPanel({
   }, [load, headRev]);
 
   const restore = async (rev: number) => {
-    if (!window.confirm(t('confirmRestore', { rev }))) return;
+    setAsking(null);
     setBusy(rev);
     const res = await apiPost(`${base}/rollback`, { targetRev: rev, baseRev: headRev });
     setBusy(null);
@@ -81,7 +84,7 @@ export function RevisionsPanel({
                 <button
                   type="button"
                   disabled={busy !== null}
-                  onClick={() => void restore(r.rev)}
+                  onClick={() => setAsking(r.rev)}
                   className="text-xs font-medium text-primary hover:underline disabled:opacity-40"
                 >
                   {busy === r.rev ? t('restoring') : t('restore')}
@@ -97,6 +100,16 @@ export function RevisionsPanel({
           </li>
         ))}
       </ol>
+      {asking !== null && (
+        <ConfirmDialog
+          title={t('confirmRestoreTitle')}
+          body={t('confirmRestore', { rev: asking })}
+          confirmLabel={t('restoreConfirmButton')}
+          tone="primary"
+          onConfirm={() => void restore(asking)}
+          onCancel={() => setAsking(null)}
+        />
+      )}
       {cursor && (
         <button
           type="button"

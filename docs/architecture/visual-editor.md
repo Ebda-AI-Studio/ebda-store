@@ -42,6 +42,13 @@ Rule: a new message type needs a strict schema here and a row in this table.
   `text` / `textarea` setting of that very section or block
   (`canvas-targets.ts`, derived from the registry). A text with no marker
   falls back to an exact, unique value match, otherwise it is not editable.
+  The shared heading row (`SectionHeading`, `DahabSectionHeading`) sits below
+  nine skins' category grids, carousels and review rows and cannot be handed
+  `editorMode`, so it reads it from `EditorModeContext`
+  (`builder/render/editor-mode.tsx`, provided by `PageRenderer` only in
+  editor mode) and marks `title`, `kicker` and `subtitle` (`…Ar` in Arabic).
+  A picture's alt text is not marked: it is written through the picture's own
+  alt prompt (`ImageTarget.alt`).
 - Header, announcement bar and footer are found by the storefront's
   `data-zone` wrappers (`header`, `beforeHeader`, `footer`) and resolved to the
   document's section of that type, so no skin carries an editor attribute.
@@ -116,7 +123,9 @@ rendered alone, so they carry `static` evidence only. Statuses: `wired`, `no-op`
 `npm run editor:matrix:check` (CI) fails when the committed files are stale or a
 not-wired row is not listed in `scripts/editor-audit/baseline.json` with a reason.
 It is a ratchet: `npm run editor:matrix` only ever REMOVES baseline rows that were
-fixed; accepting a new gap is a deliberate edit with a reason.
+fixed; accepting a new gap is a deliberate edit with a reason. Since Task 10 the
+baseline is EMPTY and the matrix has no `no-op`, `missing` or `marker-pending` row
+(`tests/unit/editor-matrix.test.ts` pins both).
 `tests/unit/visual-editor-parity.test.ts` is the gate for deleting `/page-builder`
 (Ruling VE-6): every classic capability P-01 to P-14 is accounted for, wired fields
 round-trip through the builder reducer to the same layout the form writes, and the
@@ -166,3 +175,15 @@ typography PUT), and the R2 delete refuses any key outside the current store (Ru
 - Every change is `setSiteSetting { key, path, value }` on the draft (one nesting level, `undefined` clears). The reducer refuses a setting the page does not have (`UNKNOWN_SETTING`); the validator refuses a key the page does not own and checks values with `storeLayoutSchema`. The canvas paints the draft (`withPageSettings`), a public page reads the live layout.
 - Who writes which key is in VE-13. Publishing product / collection / cart writes only their keys into `layout_settings`; publishing home keeps the live value of theirs. `defaultPageDocument(kind, liveLayout)` and `getPageState` open a page on the live values.
 - `filterSidebar` and `sizing` are all-or-nothing in the layout schema: `GROUP_FLOORS` starts a missing `filterSidebar` at the baseline so one toggle is a valid object.
+
+## Template-aware controls (Task 10, Rulings EP-1, EP-5)
+
+A control the active template's renderers ignore is a lie, so the panel offers it only where it is read.
+
+- **`shownFor`** on a setting (`packages/shared/src/builder/settings-schema.ts`): `{ templates?, looks?, variants? }`, or a list of them (any rule shows it). `variants` names the section's own settings (`layout: ['horizontal']`); `isShown(setting, { template, look, variant })` (`shown-for.ts`) is the one function the settings panel, the theme pane, the audit matrix and the tests all call, and `sectionVariants` answers `variant` from the document (desktop value, viewport overrides, then the preset default). Absent = shown everywhere. An unknown template or a legacy store (no look) matches no `templates` / `looks` rule and still gets every universal control.
+- **Narrowed today:** category-row card Aspect, Show name and Hover (the scrolling row, plus Modern's grid card), tile Colours (`lamma.market` tiles, the only look with aisle colours), Category tabs (`layout: menu`), and the theme pane's Header group (logo position on Qamar, Souq, Jasmine and Lamma, search placement on Souq). The matrix judges a narrowed control only where it is shown, and `hiddenButWired()` fails the build if a rule hides a control the flip probe shows working on that skin; `tests/unit/shown-for.test.ts` also proves no rule hides a design key a built look's own mix sets.
+- **Removed, key kept (EP-5):** `SectionDefinition.retired` lists keys the save schema still accepts and stored documents may carry, with no control: Width on the new-arrivals, best-sellers, product-carousel and testimonials rows and the hero (their renderers lay themselves out inside their own container), and the hero's Top / Bottom spacing (the hero wrapper never applied them; see the comment in `PageRenderer`). Nothing is migrated or deleted. `builder-page-definition.test.ts` requires every stored key to have a control or be listed in `retired`.
+- **Wired instead of removed:** the brand-story Background (`BrandStoryBlock` never painted it; a store that had stored one now shows it).
+- **Not visible in static HTML:** a timer (slideshow autoplay) and what the home page asks the API for (product limits, the reviews filter) are judged by a named reader (`BEHAVIOUR_READERS` in `gen-matrix.ts`: file plus the exact expression), so deleting the reader turns the row red.
+- **Storefront order:** `flowOrder(template, look)` (`apps/admin/src/lib/builder-flow-order.ts`) is the home's section types in the order the storefront draws them, from the look's mix or the skin's default layout. The add-section picker lists those first, then everything else under one "more" heading; the theme pane starts with the Header group. `tests/unit/builder-flow-order.test.ts` checks it against what a look switch actually lays out for every built look.
+- **Header chrome overrides:** see `docs/architecture/store-theme-flags.md` (Ruling EP-4).

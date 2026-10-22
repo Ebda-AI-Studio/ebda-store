@@ -107,6 +107,7 @@ export interface StoreTheme {
    * (`←` in Arabic, `→` in English) instead of always rendering `→`.
    * Default false — existing stores unaffected; seeded true on new stores
    * at creation. Toggled via Branding → Theme. 2026-07-12.
+   * @deprecated Ruling EP-8: no renderer reads it; the Theme tab has no control and new stores are not seeded.
    */
   rtlPolish?: boolean;
   /**
@@ -147,6 +148,8 @@ export interface StoreTheme {
 
 export interface StoreBranding {
   id: string;
+  /** The storefront skin (`stores.template`): which template-owned controls the Theme tab offers. */
+  template?: string;
   name: string;
   nameAr?: string;
   logo?: string;

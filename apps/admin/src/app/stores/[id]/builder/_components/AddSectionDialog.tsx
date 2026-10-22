@@ -15,16 +15,20 @@ import {
   type SectionList,
 } from '@ebda/shared';
 import { useT } from '@/i18n/useT';
+import { flowOrder, orderByFlow } from '../../../../../lib/builder-flow-order';
 import { SectionThumb } from './SectionThumb';
 
 interface Props {
   list: SectionList;
   doc: PageDefinition;
+  /** The store's template and look: its own section types are listed first, in storefront order. */
+  template?: string | null;
+  look?: string | null;
   onPick: (sectionType: string, presetIndex: number) => void;
   onClose: () => void;
 }
 
-export function AddSectionDialog({ list, doc, onPick, onClose }: Props) {
+export function AddSectionDialog({ list, doc, template, look, onPick, onClose }: Props) {
   const t = useT('builder.addSection');
   const locale = useLocale();
   const ref = useRef<HTMLDialogElement>(null);
@@ -36,9 +40,20 @@ export function AddSectionDialog({ list, doc, onPick, onClose }: Props) {
       n => n.type === type
     ).length;
   // only what belongs on this page (a cart has no hero; a product page has reviews)
-  const types = SECTION_REGISTRY.filter(
+  const allowed = SECTION_REGISTRY.filter(
     d => d.group === list && sectionAllowedOnPage(d, doc.pageKey)
   );
+  // The home page's template group: what this store's look is made of first (as the storefront draws it),
+  // then everything else under one heading. Other groups and pages keep the registry order.
+  const byFlow = list === 'template' && doc.pageKey === 'home';
+  const split = byFlow
+    ? orderByFlow(
+        allowed.map(d => d.type),
+        flowOrder(template, look)
+      )
+    : { first: allowed.map(d => d.type), more: [] as string[] };
+  const defOf = (type: string) => allowed.find(d => d.type === type)!;
+  const rows = [...split.first, ...split.more].map(defOf);
 
   return (
     <dialog
@@ -62,8 +77,19 @@ export function AddSectionDialog({ list, doc, onPick, onClose }: Props) {
         </button>
       </div>
       <ul className="grid max-h-[70vh] grid-cols-1 gap-3 overflow-y-auto p-5 sm:grid-cols-2 lg:grid-cols-3">
-        {types.flatMap(d =>
-          d.presets.map((p, i) => {
+        {rows.flatMap(d => [
+          ...(split.more.length > 0 && d.type === split.more[0] && split.first.length > 0
+            ? [
+                <li
+                  key="more"
+                  className="col-span-full pt-2 text-xs font-semibold text-muted-foreground"
+                  data-testid="add-section-more"
+                >
+                  {t('more')}
+                </li>,
+              ]
+            : []),
+          ...d.presets.map((p, i) => {
             const full = count(d.type) >= d.maxCount;
             const name = locale === 'ar' ? p.nameAr : p.nameEn;
             return (
@@ -87,8 +113,8 @@ export function AddSectionDialog({ list, doc, onPick, onClose }: Props) {
                 </button>
               </li>
             );
-          })
-        )}
+          }),
+        ])}
       </ul>
     </dialog>
   );

@@ -2,7 +2,12 @@ import type { StoreTheme, TemplateId } from '../types/store-theme';
 import { getTemplateTheme } from '../types/store-theme';
 import { boundaryColorFloor, hexToHsl as h } from '../utils/color';
 import { getLook } from './registry';
-import { LOOK_OWNED_THEME_KEYS, type LookDefinition } from './types';
+import {
+  LOOK_OWNED_THEME_KEYS,
+  type HeaderLogoPlacement,
+  type HeaderSearchPlacement,
+  type LookDefinition,
+} from './types';
 
 /**
  * The StoreTheme keys a look sets. Colour values are bare HSL triplets (the
@@ -82,4 +87,25 @@ export function overriddenLookKeys(
   if (!theme) return [];
   const base = lookTheme(look) as Record<string, unknown>;
   return LOOK_OWNED_THEME_KEYS.filter(k => theme[k] !== undefined && theme[k] !== base[k]);
+}
+
+/**
+ * The header chrome a skin draws: the merchant's override (`theme.headerLogoPlacement` /
+ * `headerSearch`) over the look's `chrome.header` over `fallback` (the skin's own default).
+ * Precedence merchant > look > skin, like the colour tokens (Ruling EP-4). Pure; clearing the
+ * override (a `null` in the draft deletes the key) falls back to the look.
+ */
+export function resolveHeaderChrome(
+  theme: Pick<StoreTheme, 'headerLogoPlacement' | 'headerSearch'> | null | undefined,
+  lookHeader: { logoPlacement?: HeaderLogoPlacement; search?: HeaderSearchPlacement } | undefined,
+  fallback: { logoPlacement: HeaderLogoPlacement; search: HeaderSearchPlacement } = {
+    logoPlacement: 'start',
+    search: 'icon',
+  }
+): { logoPlacement: HeaderLogoPlacement; search: HeaderSearchPlacement } {
+  return {
+    logoPlacement:
+      theme?.headerLogoPlacement ?? lookHeader?.logoPlacement ?? fallback.logoPlacement,
+    search: theme?.headerSearch ?? lookHeader?.search ?? fallback.search,
+  };
 }

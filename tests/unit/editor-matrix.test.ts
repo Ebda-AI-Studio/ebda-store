@@ -7,12 +7,14 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
+import { probeSetting } from '../../scripts/editor-audit/probe';
 import {
   BASELINE_JSON,
   MATRIX_JSON,
   MATRIX_MD,
   NOT_WIRED,
   buildMatrix,
+  hiddenButWired,
   readBaseline,
   renderMarkdown,
 } from '../../scripts/editor-audit/gen-matrix';
@@ -89,11 +91,36 @@ describe('editor matrix', () => {
       status: 'wired',
       evidence: 'static+probe',
     });
-    // (b) the hero comment says padding does not apply to the hero wrapper: flipping it changes nothing
-    expect(row('qamar|section:hero|paddingTop')?.status).toBe('no-op');
+    // (b) the hero comment says padding does not apply to the hero wrapper: flipping it changes nothing,
+    // which is why the control was removed (Ruling EP-5) and the matrix has no row for it any more
+    expect(row('qamar|section:hero|paddingTop')).toBeUndefined();
+    expect(
+      probeSetting('qamar', 'hero', 'paddingTop', ['none', 'xloose'], { mode: 'single' }).differs
+    ).toBe(false);
     // (c) a look's design key the editor has no control for would be `missing`; the mobile-only legacy
     // names (`layoutMobile`) are viewport overrides, so none is missing today
     expect(row('qamar.atelier|section:category-grid|design:layoutMobile')).toBeUndefined();
     expect(live.rows.filter(r => r.status === 'missing').map(r => r.id)).toEqual([]);
+  });
+
+  // Plan Task 10 finish line: nothing is accepted any more. A control that does nothing is wired,
+  // narrowed with `shownFor`, or removed (Ruling EP-5); a canvas text or picture carries a marker.
+  it('no built look has a no-op, missing or marker-pending control, and the baseline is empty', () => {
+    const open = live.rows.filter(r => ['no-op', 'missing', 'marker-pending'].includes(r.status));
+    expect(open.map(r => `${r.id} ${r.status}`)).toEqual([]);
+    expect(readBaseline()).toEqual([]);
+  });
+
+  it('the header chrome controls are judged on the skins they are offered to, and are wired there', () => {
+    const row = (id: string) => live.rows.find(r => r.id === id);
+    for (const skin of ['qamar', 'souq', 'jasmine', 'lamma'])
+      expect(row(`${skin}|theme|headerLogoPlacement`)?.status, skin).toBe('wired');
+    expect(row('souq|theme|headerSearch')?.status).toBe('wired');
+    expect(row('qamar|theme|headerSearch')).toBeUndefined();
+    expect(row('minimal|theme|headerLogoPlacement')).toBeUndefined();
+  });
+
+  it('shownFor never hides a control that works on the skin it hides it from', () => {
+    expect(hiddenButWired()).toEqual([]);
   });
 });
