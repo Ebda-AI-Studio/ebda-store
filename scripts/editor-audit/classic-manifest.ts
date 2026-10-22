@@ -1,6 +1,6 @@
 /**
  * The classic page builder's write surface, generated from its source
- * (`apps/admin/src/app/stores/[id]/page-builder/`). It is the checklist the
+ * (formerly `apps/admin/src/app/stores/[id]/page-builder/`, deleted in Task 12). It is the checklist the
  * visual editor must cover before that page is deleted (Ruling VE-6): every
  * layout field the form writes, every `siteSettings` key it references and
  * every API path it calls. Each entry is mapped to a visual-editor control, or
@@ -12,6 +12,7 @@ import { readFileSync, readdirSync, statSync } from 'node:fs';
 import path from 'node:path';
 import {
   ALL_PAGE_OWNED_KEYS,
+  DRAFT_THEME_KEYS,
   MOBILE_PROP_LEGACY_NAME,
   PAGE_KINDS,
   PAGE_SETTINGS,
@@ -22,12 +23,16 @@ import {
 } from '@ebda/shared';
 
 const ROOT = path.resolve(__dirname, '../..');
-const DIR = path.join(ROOT, 'apps/admin/src/app/stores/[id]/page-builder');
-const SOURCES = ['page.tsx', 'CategoryLayoutButtons.tsx', 'ModeButton.tsx'];
+/**
+ * The classic page builder was deleted in Task 12 (Ruling VE-6). What it wrote is frozen here, extracted
+ * from its last source by `extractClassicFacts`; the wired / classic-only status of every entry is still
+ * computed live against the shared registry and the visual editor's sources.
+ */
+const FACTS_JSON = path.join(__dirname, 'classic-facts.json');
 
 export interface ManifestEntry {
   /** `field` | `site-setting` | `api`. */
-  kind: 'field' | 'site-setting' | 'component' | 'api';
+  kind: 'field' | 'site-setting' | 'component' | 'api' | 'theme-key';
   /** `<legacyKey>.<field>`, the `siteSettings` key, or `<METHOD> <path>`. */
   key: string;
   /** The visual-editor control that covers it (`section:<type>/<setting>`), or null. */
@@ -262,15 +267,51 @@ function readBuilderSources(): string {
   walkDir(path.join(ROOT, 'apps/admin/src/app/stores/[id]/builder'));
   // the shared blocks the builder panels render (fonts, dividers, typography, AI fill)
   walkDir(path.join(ROOT, 'apps/admin/src/components/section-design'));
-  out.push(readFileSync(path.join(ROOT, 'apps/admin/src/lib/page-builder-save.ts'), 'utf8'));
   return out.join('\n');
 }
 
-export function buildClassicManifest(): ManifestEntry[] {
-  const src = SOURCES.map(f => readFileSync(path.join(DIR, f), 'utf8')).join('\n');
+export interface ClassicFacts {
+  /** `updateSection(<legacyKey>, ...)` writes: legacy key -> fields. */
+  written: Record<string, string[]>;
+  /** SITE_SETTING_KEYS the form referenced. */
+  siteKeys: string[];
+  /** Compound editor components the form rendered. */
+  components: string[];
+  /** `METHOD /path` calls, template parameters collapsed. */
+  endpoints: string[];
+  /** Theme keys staged through `setPendingThemeUpdates` (written to `PUT /theme` on Save). */
+  themeKeys: string[];
+}
+
+/** Keys of `setPendingThemeUpdates(prev => ({ ...prev, key: ... }))` calls. */
+export function pendingThemeKeys(src: string): string[] {
+  const keys = new Set<string>();
+  for (const m of src.matchAll(
+    /setPendingThemeUpdates\(\s*prev\s*=>\s*\(\{\s*\.\.\.prev,\s*(\w+)\s*:/g
+  ))
+    keys.add(m[1]);
+  return [...keys].sort();
+}
+
+/** Derive the facts from the classic form's source (run once, before the page was deleted). */
+export function extractClassicFacts(src: string): ClassicFacts {
+  return {
+    written: writtenFields(src),
+    siteKeys: SITE_SETTING_KEYS.filter(key =>
+      new RegExp(`\\b(layout\\.${key}|'${key}')\\b`).test(src)
+    ),
+    components: COMPONENTS.filter(c => new RegExp(`\\b${c.name}\\b`).test(src)).map(c => c.name),
+    endpoints: calledEndpoints(src),
+    themeKeys: pendingThemeKeys(src),
+  };
+}
+
+export function buildClassicManifest(
+  facts: ClassicFacts = JSON.parse(readFileSync(FACTS_JSON, 'utf8'))
+): ManifestEntry[] {
   const entries: ManifestEntry[] = [];
 
-  for (const [legacyKey, fields] of Object.entries(writtenFields(src))) {
+  for (const [legacyKey, fields] of Object.entries(facts.written)) {
     if ((SITE_SETTING_KEYS as readonly string[]).includes(legacyKey)) {
       // A site-wide / page-type setting written through `updateSection`: no visual panel yet.
       for (const field of fields) {
@@ -354,8 +395,7 @@ export function buildClassicManifest(): ManifestEntry[] {
     }
   }
 
-  for (const key of SITE_SETTING_KEYS) {
-    if (!new RegExp(`\\b(layout\\.${key}|'${key}')\\b`).test(src)) continue;
+  for (const key of facts.siteKeys) {
     const control = pageSettingsControl(key);
     entries.push(
       control
@@ -392,8 +432,22 @@ export function buildClassicManifest(): ManifestEntry[] {
       });
   }
 
+  // Theme keys the form staged for PUT /theme: each must be an editor theme setting (its draft
+  // whitelist is the schema), or the merchant loses the switch when the form goes (Ruling VE-17).
+  for (const key of facts.themeKeys ?? []) {
+    const control = DRAFT_THEME_KEYS.includes(key) ? `theme:${key}` : null;
+    entries.push({
+      kind: 'theme-key',
+      key,
+      builder: control,
+      status: control ? 'wired' : 'classic-only',
+      capability: 'P-13',
+      ...(control ? {} : { reason: 'no control for this theme key in the theme pane' }),
+    });
+  }
+
   for (const c of COMPONENTS) {
-    if (!new RegExp(`\\b${c.name}\\b`).test(src)) continue;
+    if (!facts.components.includes(c.name)) continue;
     entries.push({
       kind: 'component',
       key: c.name,
@@ -412,7 +466,7 @@ export function buildClassicManifest(): ManifestEntry[] {
     [/\/typography$/, 'P-01'],
     [/\/theme$/, 'P-13'],
   ];
-  for (const call of calledEndpoints(src)) {
+  for (const call of facts.endpoints) {
     const path = call.split(' ')[1];
     const tail = endpointFragment(path);
     if (/layout\/preview$/.test(call)) {

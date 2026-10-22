@@ -307,7 +307,7 @@ export interface ThemeSettingDefinition extends Omit<SettingDefinition, 'id' | '
   id: keyof StoreTheme;
 }
 export interface ThemeSettingsGroup {
-  id: 'header' | 'colors' | 'typography' | 'buttons' | 'spacing';
+  id: 'header' | 'colors' | 'typography' | 'buttons' | 'cards' | 'spacing';
   labelEn: string;
   labelAr: string;
   settings: ThemeSettingDefinition[];
@@ -420,6 +420,63 @@ export const THEME_SETTINGS_SCHEMA: readonly ThemeSettingsGroup[] = [
           opt('lg', 'Large', 'كبيرة'),
           opt('xl', 'Extra large', 'كبيرة جداً'),
         ],
+      },
+    ],
+  },
+  {
+    // Merchant switches the form page builder used to own (Ruling VE-17). None is look-owned: a look
+    // switch (keep or reset) never touches them. Their readers are the shared and per-skin product
+    // cards, so none is narrowed with `shownFor`.
+    id: 'cards',
+    labelEn: 'Product cards',
+    labelAr: 'كروت المنتجات',
+    settings: [
+      {
+        id: 'showBrandBadge',
+        type: 'checkbox',
+        labelEn: 'Store name on cards',
+        labelAr: 'اسم المتجر على كل كارت',
+        hintEn: 'A small pill with the store name in the corner of every product card.',
+        hintAr: 'كبسولة صغيرة باسم المتجر في ركن كل كارت منتج.',
+      },
+      {
+        id: 'showNewBadge',
+        type: 'checkbox',
+        labelEn: '"New" badge on cards',
+        labelAr: 'شارة «جديد» على الكروت',
+        hintEn:
+          'A "New" chip on products you mark as new or added in the last 14 days. Off by default.',
+        hintAr: 'بتظهر على المنتجات اللي علّمتها جديدة أو اتضافت في آخر 14 يوم. مقفولة في الأول.',
+      },
+      {
+        id: 'showQuickAdd',
+        type: 'checkbox',
+        labelEn: 'Quick add (+) on carousel cards',
+        labelAr: 'إضافة سريعة (+) على كروت الكاروسيل',
+        hintEn:
+          'A one-tap add-to-cart circle. When on, the Add to cart button under the same card is hidden.',
+        hintAr:
+          'دايرة بتضيف للسلة بلمسة واحدة. لما تتفعّل، زرار «أضف للسلة» اللي تحت الكارت بيختفي.',
+      },
+      {
+        id: 'normalizeProductImages',
+        type: 'checkbox',
+        labelEn: 'Even product image sizes',
+        labelAr: 'توحيد مقاسات صور المنتجات',
+        hintEn:
+          'Every card image fills its frame the same way. The photos themselves are never changed; turn it off to go back.',
+        hintAr:
+          'كل صور الكروت بتملى إطارها بنفس الشكل. الصور نفسها مبتتغيرش، ولو قفلته بترجع زي ما كانت.',
+      },
+      {
+        id: 'saleBadgeLegacyCorner',
+        type: 'checkbox',
+        labelEn: 'Keep the old sale badge corner',
+        labelAr: 'شارة الخصم في الركن القديم',
+        hintEn:
+          'Off (recommended): the sale badge sits in the top corner so the Add to cart bar never covers it. On: it stays bottom-left as before.',
+        hintAr:
+          'مقفول (الأفضل): الشارة في ركن الصورة العلوي فمتتغطاش بزرار الإضافة. مفتوح: بتفضل تحت على الشمال زي الأول.',
       },
     ],
   },

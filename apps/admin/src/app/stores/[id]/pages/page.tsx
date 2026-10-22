@@ -1,16 +1,18 @@
 import { redirect } from 'next/navigation';
+import { builderRedirectPath, type RawSearchParams } from '@/lib/builder-redirect';
 
 /**
- * The standalone "Footer & utility" editor was removed — footer + utility
- * links are now edited ONLY inside the Page Builder ("Footer & utility" card)
- * and saved by the page-builder's main Save button. This route redirects old
- * bookmarks there so nothing 404s.
+ * The standalone pages editor was retired; pages are edited in the visual editor. Old bookmarks and links land in the visual editor
+ * (`/stores/:id/builder`) with the `select` / `block` / `field` / `page` deep link kept
+ * (Ruling VE-6).
  */
-export default async function StoreFooterLinksRedirectPage({
+export default async function StorePagesRedirectPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<RawSearchParams>;
 }) {
   const { id } = await params;
-  redirect(`/stores/${id}/page-builder`);
+  redirect(builderRedirectPath(id, await searchParams));
 }

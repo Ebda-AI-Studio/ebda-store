@@ -19,8 +19,8 @@ export interface HubDefinition {
 export type HubLabels = {
   // Catalog tabs
   products: string;
-  pageBuilder: string;
-  visualBuilder: string;
+  /** The one storefront editor tab (the visual editor). */
+  editor: string;
   content: string;
   blog: string;
   floatingWidget: string;
@@ -94,6 +94,7 @@ export const HUBS: HubDefinition[] = [
     key: 'catalog',
     urlPrefixes: [
       '/products',
+      // the retired classic route still redirects here, so it keeps the hub highlighted
       '/page-builder',
       '/builder',
       '/content',
@@ -106,8 +107,7 @@ export const HUBS: HubDefinition[] = [
       { label: labels.products, href: `/stores/${storeId}/products` },
       // Size charts sit with the products they describe (B0 Task 9).
       { label: labels.sizeCharts, href: `/stores/${storeId}/size-charts` },
-      { label: labels.visualBuilder, href: `/stores/${storeId}/builder` },
-      { label: labels.pageBuilder, href: `/stores/${storeId}/page-builder` },
+      { label: labels.editor, href: `/stores/${storeId}/builder` },
       { label: labels.content, href: `/stores/${storeId}/content` },
       { label: labels.blog, href: `/stores/${storeId}/blog` },
       { label: labels.floatingWidget, href: `/stores/${storeId}/floating-widget` },

@@ -84,20 +84,6 @@ describe('M-6 (B1-57 parked): the editor says why the headline colour is not use
     );
     expect(panel).toContain('def.hintEn');
   });
-  it('the classic editor shows the same hint when Bottom corner is picked', () => {
-    const page = readFileSync(
-      path.resolve(WEB, '../../admin/src/app/stores/[id]/page-builder/page.tsx'),
-      'utf8'
-    );
-    expect(page).toContain("t('sections.hero.textAnchorHint')");
-    for (const l of ['en', 'ar']) {
-      const msgs = readFileSync(
-        path.resolve(WEB, `../../admin/src/i18n/messages/${l}.json`),
-        'utf8'
-      );
-      expect(msgs, l).toContain('"textAnchorHint"');
-    }
-  });
 });
 
 describe('Y-08 / R-09: cart coupon field and back arrows', () => {

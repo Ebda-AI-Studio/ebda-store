@@ -1,27 +1,4 @@
 {
-  "classicReferences": [
-    "apps/admin/src/app/stores/[id]/announcement/page.tsx",
-    "apps/admin/src/app/stores/[id]/branding/_components/ThemeTab.tsx",
-    "apps/admin/src/app/stores/[id]/builder/page.tsx",
-    "apps/admin/src/app/stores/[id]/hero/page.tsx",
-    "apps/admin/src/app/stores/[id]/navigation/page.tsx",
-    "apps/admin/src/app/stores/[id]/page-builder/page.tsx",
-    "apps/admin/src/app/stores/[id]/pages/page.tsx",
-    "apps/admin/src/app/stores/[id]/settings/page.tsx",
-    "apps/admin/src/components/FooterLinksEditor.tsx",
-    "apps/admin/src/components/NavMenuEditor.tsx",
-    "apps/admin/src/components/SmartPaletteModal.tsx",
-    "apps/admin/src/components/ZoneEditor.tsx",
-    "apps/admin/src/components/admin-layout/SidebarNav.tsx",
-    "apps/admin/src/components/admin-layout/buildPaletteItems.ts",
-    "apps/admin/src/components/admin-layout/hubs.ts",
-    "apps/admin/src/components/section-design/SectionDividersBlock.tsx",
-    "apps/admin/src/i18n/messages/ar.json",
-    "apps/admin/src/i18n/messages/en.json",
-    "apps/admin/src/lib/__tests__/api-double-unwrap-sweep.test.ts",
-    "apps/admin/src/lib/page-builder-save.ts",
-    "apps/admin/src/lib/settings-registry.ts",
-    "apps/admin/src/lib/settings-search-index.generated.json"
-  ],
+  "classicReferences": [],
   "liveWrites": []
 }

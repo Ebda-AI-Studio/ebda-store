@@ -66,17 +66,16 @@ const CSP_SUFFIX = "; worker-src 'self' blob:; manifest-src 'self'; frame-ancest
  * in the test (the previous approach) never actually checks that this regex
  * routes the way the label assumes.
  */
-// Both editors frame the merchant's storefront: the classic page builder and
-// the visual builder (/stores/:id/builder, Phase 2), whose canvas embeds a
-// custom domain just the same.
-const PAGE_BUILDER_PREVIEW_SOURCE = '/stores/:id/:editor(page-builder|builder)';
+// The visual builder (/stores/:id/builder) frames the merchant's storefront, custom domain included.
+// The classic /page-builder route only redirects now (Ruling VE-6), so it gets the default CSP.
+const PAGE_BUILDER_PREVIEW_SOURCE = '/stores/:id/builder';
 // Named capture group (`:path(...)`), not the unnamed `(...)` form this used
 // to be. Verified at the level of what is SERVED (issues 2178/2189): the test
 // compiles both sources with Next's own buildCustomRoute (the routes-manifest
 // regex) and applies them the way OpenNext's router does on Workers — every
 // admin path gets all seven security headers, values unaltered, and only the
-// bare page-builder route gets the preview frame-src.
-const ADMIN_CATCHALL_SOURCE = '/:path((?!stores/[^/]+/(?:page-builder|builder)$).*)';
+// bare builder route gets the preview frame-src.
+const ADMIN_CATCHALL_SOURCE = '/:path((?!stores/[^/]+/builder$).*)';
 
 /**
  * The preview route accepts any https origin because a merchant's custom
@@ -195,22 +194,22 @@ const nextConfig = {
 
   // 301 permanent redirects from old admin URLs that were renamed.
   // These protect bookmarks and any hardcoded links that predated the
-  // page-builder consolidation (2026-05-19).
+  // page-builder consolidation (2026-05-19); the visual editor owns them since Ruling VE-6.
   async redirects() {
     return [
       {
         source: '/stores/:id/layout',
-        destination: '/stores/:id/page-builder',
+        destination: '/stores/:id/builder',
         permanent: true,
       },
       {
         source: '/stores/:id/typography',
-        destination: '/stores/:id/page-builder',
+        destination: '/stores/:id/builder',
         permanent: true,
       },
       {
         source: '/stores/:id/dividers',
-        destination: '/stores/:id/page-builder',
+        destination: '/stores/:id/builder',
         permanent: true,
       },
     ];

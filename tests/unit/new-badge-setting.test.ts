@@ -106,34 +106,23 @@ describe('save path: turning the badge on busts every cache layer', () => {
   });
 });
 
-describe('admin: the toggle sits with the product-card toggles, in ar and en', () => {
-  const page = readFileSync(
-    join(ROOT, 'apps/admin/src/app/stores/[id]/page-builder/page.tsx'),
-    'utf8'
-  );
-  it('page builder stages showNewBadge from a checkbox labelled by productCard.newBadgeTitle', () => {
-    const at = page.indexOf("t('productCard.newBadgeTitle')");
-    expect(at).toBeGreaterThan(page.indexOf("t('productCard.brandBadgeTitle')"));
-    expect(at).toBeLessThan(page.indexOf("t('productCard.quickAddTitle')"));
-    expect(page).toMatch(/showNewBadge: e\.target\.checked/);
-    expect(page).toMatch(/storeInfo\?\.theme\?\.showNewBadge === true/);
+describe('admin: the toggle lives in the visual editor theme pane, in ar and en', () => {
+  it('is a checkbox in the "Product cards" group with ar and en labels', async () => {
+    const { THEME_SETTINGS_SCHEMA, DRAFT_THEME_KEYS } = await import('@ebda/shared');
+    const group = THEME_SETTINGS_SCHEMA.find(g => g.id === 'cards')!;
+    const s = group.settings.find(x => x.id === 'showNewBadge')!;
+    expect(s.type).toBe('checkbox');
+    expect(s.labelEn).toMatch(/New/);
+    expect(s.labelAr).toMatch(/[ء-ي]/);
+    expect(s.hintAr).toMatch(/[ء-ي]/);
+    // it rides the draft theme like every editor theme key (published with the page)
+    expect(DRAFT_THEME_KEYS).toContain('showNewBadge');
   });
-  it.each(['en', 'ar'])('%s has the title and hint', lang => {
-    const msgs = JSON.parse(
-      readFileSync(join(ROOT, `apps/admin/src/i18n/messages/${lang}.json`), 'utf8')
+  it('the panel anchors it for the admin search', () => {
+    const panel = readFileSync(
+      join(ROOT, 'apps/admin/src/app/stores/[id]/builder/_components/ThemeSettingsPanel.tsx'),
+      'utf8'
     );
-    const find = (o: Record<string, unknown>): Record<string, string> | undefined => {
-      if (o && typeof o === 'object' && 'newBadgeTitle' in o) return o as Record<string, string>;
-      for (const v of Object.values(o ?? {}))
-        if (v && typeof v === 'object') {
-          const hit = find(v as Record<string, unknown>);
-          if (hit) return hit;
-        }
-      return undefined;
-    };
-    const pc = find(msgs);
-    expect(pc?.newBadgeTitle).toBeTruthy();
-    expect(pc?.newBadgeHint).toBeTruthy();
-    if (lang === 'ar') expect(pc?.newBadgeTitle).toMatch(/[ء-ي]/);
+    expect(panel).toContain('data-setting-id="builder.card-new-badge"');
   });
 });

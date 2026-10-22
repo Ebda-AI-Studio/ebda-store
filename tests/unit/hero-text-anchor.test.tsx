@@ -184,22 +184,6 @@ describe('textAnchor: schema, editors and the looks that set it', () => {
     expect(sel.labelAr).toBe('موضع النص');
     expect(LOOK_DESIGN_KEYS).toContain('textAnchor');
   });
-  it('the classic editor writes both values, with ar + en labels', () => {
-    const classic = readFileSync(
-      path.resolve(__dirname, '../../apps/admin/src/app/stores/[id]/page-builder/page.tsx'),
-      'utf8'
-    );
-    expect(classic).toContain("updateSection('hero', s => ({ ...s, textAnchor: 'center' }))");
-    expect(classic).toContain("updateSection('hero', s => ({ ...s, textAnchor: 'bottom-start' }))");
-    for (const lang of ['en', 'ar']) {
-      const raw = readFileSync(
-        path.resolve(__dirname, `../../apps/admin/src/i18n/messages/${lang}.json`),
-        'utf8'
-      );
-      for (const k of ['textAnchorLabel', 'textAnchorCenter', 'textAnchorBottomStart'])
-        expect(raw, `${lang}.${k}`).toContain(`"${k}":`);
-    }
-  });
   it('Atelier and Vitrine anchor bottom-start; Lookbook (collage) leaves it unset', () => {
     const heroDesign = (id: string) =>
       (getLook(id)!.sections!.find(s => s.type === 'hero')!.design ?? {}) as Record<

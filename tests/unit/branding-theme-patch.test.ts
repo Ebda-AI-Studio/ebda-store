@@ -55,14 +55,4 @@ describe('Branding theme save sends only changed keys', () => {
     expect(src).not.toMatch(/apiPut\([^)]*\/theme`,\s*branding\.theme\)/);
     expect(src).toMatch(/themePatch\(/);
   });
-
-  it('the page-builder theme PUT sends only its staged keys, not the load snapshot', () => {
-    const src = readFileSync(
-      resolve(__dirname, '../../apps/admin/src/app/stores/[id]/page-builder/page.tsx'),
-      'utf8'
-    );
-    const put = src.match(/apiPut\(`\/api\/v1\/stores\/\$\{storeId\}\/theme`,[\s\S]*?\)/);
-    expect(put?.[0]).toBeDefined();
-    expect(put![0]).not.toMatch(/storeInfo/);
-  });
 });

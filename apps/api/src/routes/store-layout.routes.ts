@@ -22,11 +22,9 @@ import { requireStoreAccess } from '../middleware/store-access';
 import { auditLog, writeLimiter } from '../middleware/security';
 import { getAuthUser } from '../utils/store-helpers';
 import { cleanupRemovedJsonUrls } from '../services/r2-cleanup.service';
-import { redis } from '../services/redis.service';
 import { bustStoreCaches } from '../services/store.service';
 import { publishLegacyLayout } from '../services/page-builder.service';
 import logger from '../lib/logger';
-import { randomBytes } from 'node:crypto';
 
 const router = Router({ mergeParams: true });
 
@@ -184,70 +182,7 @@ router.put(
   }
 );
 
-/**
- * POST /admin/stores/:storeId/layout/preview
- *
- * Real-time-preview endpoint added 2026-05-20 (Ahmad). Stores the merchant's
- * UNSAVED layout in Redis under a short-lived token (1h TTL) and returns the
- * token. The admin page-builder posts the in-memory layout here, then reloads
- * the storefront iframe with `?_layoutDraft=<token>` — storefront reads the
- * draft from Redis instead of DB. Merchant can iterate visually without
- * committing; the actual save still goes through PUT /layout above.
- *
- * Auth: same as PUT (store owner OR super_admin). Tokens are scoped to the
- * caller's store; storeId is verified before the Redis write.
- */
-router.post(
-  '/preview',
-  authenticate,
-  authorize('store_admin', 'super_admin'),
-  requireStoreAccess,
-  writeLimiter,
-  async (req: Request, res: Response, next: NextFunction) => {
-    try {
-      const { storeId } = req.params;
-      // Body shape evolved 2026-05-20: accept either the bare layout (legacy
-      // single-key shape) OR a `{ layout, typography?, theme? }` bundle. The
-      // bundle form lets the page-builder preview global typography zone
-      // changes (per-section colors / fonts / text-decoration) + theme
-      // updates (primary/accent palette, showBrandBadge, etc.) — without it,
-      // those merchant tweaks didn't show until Save committed them. The
-      // storefront applies the draft through resolveLayoutSettings which
-      // tolerates malformed input gracefully; stricter validation would slow
-      // the iteration loop.
-      const body = req.body;
-      if (!body || typeof body !== 'object') {
-        res.status(400).json({
-          success: false,
-          error: { code: 'INVALID_BODY', message: 'Preview payload required' },
-        });
-        return;
-      }
-      // Heuristic: a bundle has at least one of layout/typography/theme keys.
-      // A bare layout has the section keys directly (hero, categories, ...).
-      // Detect bundle by presence of any of the 3 known top-level keys.
-      const isBundle = 'layout' in body || 'typography' in body || 'theme' in body;
-      const bundle = isBundle ? body : { layout: body, typography: undefined, theme: undefined };
-      if (!bundle.layout || typeof bundle.layout !== 'object') {
-        res.status(400).json({
-          success: false,
-          error: { code: 'INVALID_BODY', message: 'Layout payload required' },
-        });
-        return;
-      }
-      // crypto.randomBytes, not Math.random: the read path
-      // (public-store-layout.routes.ts) is unauthenticated, and the previous
-      // Date.now()+Math.random() token carried roughly 41 bits — brute-forceable
-      // within the 1h TTL. The Redis key is storeId-scoped so a guessed token
-      // never crosses tenants, but it did expose that store's unsaved draft.
-      const token = randomBytes(24).toString('base64url');
-      // Redis key includes storeId so a cross-tenant token paste can't leak.
-      await redis.set(`layout-preview:${storeId}:${token}`, bundle, 3600);
-      res.json({ success: true, data: { token } });
-    } catch (error) {
-      next(error);
-    }
-  }
-);
+// `POST /layout/preview` (the form page builder's unsaved-preview token) was removed with the page
+// (Ruling VE-6 / VE-18); the visual editor previews through its canvas and the draft preview token.
 
 export default router;

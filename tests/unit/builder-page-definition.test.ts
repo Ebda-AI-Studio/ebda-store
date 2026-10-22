@@ -361,6 +361,7 @@ describe('settings schemas (drive the Phase 2 auto-generated panel)', () => {
       'colors',
       'typography',
       'buttons',
+      'cards',
       'spacing',
     ]);
     for (const g of THEME_SETTINGS_SCHEMA)

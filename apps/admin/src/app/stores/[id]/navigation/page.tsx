@@ -1,16 +1,18 @@
 import { redirect } from 'next/navigation';
+import { builderRedirectPath, type RawSearchParams } from '@/lib/builder-redirect';
 
 /**
- * The standalone navigation editor was removed — navigation is now edited
- * ONLY inside the Page Builder ("Storefront Navigation" card) and saved by
- * the page-builder's main Save button. This route redirects old bookmarks
- * there so nothing 404s.
+ * The standalone navigation editor was retired; navigation is edited in the visual editor. Old bookmarks and links land in the visual editor
+ * (`/stores/:id/builder`) with the `select` / `block` / `field` / `page` deep link kept
+ * (Ruling VE-6).
  */
 export default async function StoreNavigationRedirectPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<RawSearchParams>;
 }) {
   const { id } = await params;
-  redirect(`/stores/${id}/page-builder`);
+  redirect(builderRedirectPath(id, await searchParams));
 }
