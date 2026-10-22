@@ -48,11 +48,35 @@ interface AuthStateStub extends DurableObjectStubLike {
   apply(ops: Op[]): Promise<unknown[]>;
 }
 
+/**
+ * Where the cache-generation instance lives, overridable WITHOUT a code change so its first-wake
+ * time can be measured per placement: `CACHEGEN_DO_NAME` (default `cachegen`; a new name is a new
+ * instance, created at `CACHEGEN_LOCATION_HINT` if given) and the hint, one of Cloudflare's
+ * region hints. Unset = today's behaviour exactly. The counters are only a cache fill-race guard
+ * (never authorisation), so a fresh instance costs nothing; the auth shards are never affected.
+ */
+const LOCATION_HINTS = new Set(['wnam', 'enam', 'sam', 'weur', 'eeur', 'apac', 'oc', 'afr', 'me']);
+export function cachegenPlacement(env: Record<string, string | undefined> = process.env): {
+  name: string;
+  hint?: string;
+} {
+  const rawName = env.CACHEGEN_DO_NAME ?? '';
+  const name = /^cachegen[a-z0-9-]{0,24}$/.test(rawName) ? rawName : 'cachegen';
+  const rawHint = env.CACHEGEN_LOCATION_HINT ?? '';
+  return { name, hint: LOCATION_HINTS.has(rawHint) ? rawHint : undefined };
+}
+
 function stub(shard: number): AuthStateStub {
   const ns = cfBindings()?.AUTH_STATE;
   if (!ns) throw new Error('AUTH_STATE Durable Object binding is not configured');
-  const name = shard === CACHEGEN_SHARD ? 'cachegen' : `shard-${shard}`;
-  return ns.get(ns.idFromName(name)) as unknown as AuthStateStub;
+  if (shard === CACHEGEN_SHARD) {
+    const { name, hint } = cachegenPlacement();
+    return ns.get(
+      ns.idFromName(name),
+      hint ? { locationHint: hint } : undefined
+    ) as unknown as AuthStateStub;
+  }
+  return ns.get(ns.idFromName(`shard-${shard}`)) as unknown as AuthStateStub;
 }
 
 /** Run ops on the shard owning `key` (atomically, in order). */
