@@ -1,7 +1,14 @@
 /**
  * DOM-free logic for the builder canvas overlay (unit-tested in node).
  */
-import { getSectionDefinition, locateSection, type PageDefinition } from '@ebda/shared';
+import {
+  getSectionDefinition,
+  locateSection,
+  nodeFor,
+  textTargetsIn,
+  type PageDefinition,
+  type TextTarget,
+} from '@ebda/shared';
 
 /** Minimal element shape the overlay needs (Element satisfies it). */
 export interface ElementLike {
@@ -109,6 +116,41 @@ export function inlineSettingFor(
         (section.settings[key] as string).trim() === text
     );
   return candidates.length === 1 ? candidates[0] : null;
+}
+
+/**
+ * The text setting an inline edit on `el` writes to, with the field's own
+ * direction, or null (never guess: a wrong key would write the text somewhere
+ * else). `target` is what the element belongs to (`targetOf`): a block's text
+ * resolves against the block, a section's against the section.
+ *   1. an explicit `data-builder-setting` marker, valid only if it names a
+ *      text setting of that very node;
+ *   2. otherwise the text setting whose CURRENT value equals the element's
+ *      text exactly, and only when exactly one matches (skin-owned text).
+ */
+export function inlineTargetFor(
+  el: ElementLike,
+  doc: PageDefinition,
+  target: CanvasTarget,
+  locale: 'en' | 'ar'
+): TextTarget | null {
+  const targets = textTargetsIn(doc, target.sectionId, target.blockId);
+  if (targets.length === 0) return null;
+  const markedKey = el.closest('[data-builder-setting]')?.getAttribute('data-builder-setting');
+  if (markedKey) return targets.find(t => t.key === markedKey) ?? null;
+  const text = (el.textContent ?? '').trim();
+  if (!text) return null;
+  const settings = nodeFor(doc, target.sectionId, target.blockId)?.settings ?? {};
+  const wantRtl = locale === 'ar';
+  const matches = targets.filter(t => {
+    const v = settings[t.key];
+    // In the canvas locale only that locale's field is a candidate (title or titleAr, not both).
+    const hasSibling = targets.some(o => o.key === `${t.key}Ar`);
+    if (hasSibling && wantRtl) return false;
+    if (t.dir === 'rtl' && !wantRtl) return false;
+    return typeof v === 'string' && v.trim() === text;
+  });
+  return matches.length === 1 ? matches[0] : null;
 }
 
 export interface Rect {

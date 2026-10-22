@@ -210,6 +210,35 @@ test('click on a hero slide selects the slide; header and footer select their se
   await expect(page.getByTestId('footer-chrome-content')).toBeVisible();
 });
 
+test('inline Arabic edit of a slide headline reaches the draft, undo restores it; a non-text key is dropped', async ({
+  page,
+}) => {
+  await openBuilder(page);
+  const slideHeadline = async () => {
+    const hero = (await state(page)).draft?.definition.sections.find(x => x.id === 'hero') as
+      | { blocks?: Array<{ id: string; settings: Record<string, unknown> }> }
+      | undefined;
+    return hero?.blocks?.find(b => b.id === 'slide-2')?.settings.headlineAr;
+  };
+  await canvas(page)
+    .locator('body')
+    .evaluate(() => (window as any).__patch('hero', 'headlineAr', 'علب جديدة', 'slide-2'));
+  await waitSaved(page);
+  expect(await slideHeadline()).toBe('علب جديدة');
+
+  // a key that is not a text setting of the block never reaches the document
+  const saves = (await state(page)).saves;
+  await canvas(page)
+    .locator('body')
+    .evaluate(() => (window as any).__patch('hero', 'image', 'https://evil.test/x.png', 'slide-2'));
+  await page.waitForTimeout(1600);
+  expect((await state(page)).saves).toBe(saves);
+
+  await page.getByTestId('undo').click();
+  await waitSaved(page);
+  expect(await slideHeadline()).toBe('علب هدايا');
+});
+
 test('viewport switch sizes the canvas 1280 / 820 / 390', async ({ page }) => {
   await openBuilder(page);
   for (const [v, w] of [

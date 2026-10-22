@@ -13,7 +13,7 @@
  *
  * Below `lg` the side panes become toggleable drawers over the canvas.
  */
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useLocale } from 'next-intl';
 import { useToast } from '@ebda/ui';
@@ -23,6 +23,7 @@ import {
   applyTemplateFamily,
   effectiveTheme,
   getLook,
+  intentToAction,
   type ChildToParent,
   type DraftTheme,
   type DocumentAction,
@@ -115,6 +116,10 @@ export function BuilderEditor({ storeId }: { storeId: string }) {
     [b.dispatch, selection, toastError]
   );
 
+  // The latest document, read by the canvas message handler without re-subscribing it.
+  const docRef = useRef(b.doc);
+  docRef.current = b.doc;
+
   const onCanvasMessage = useCallback(
     (msg: ChildToParent) => {
       if (msg.type === 'select') {
@@ -122,25 +127,11 @@ export function BuilderEditor({ storeId }: { storeId: string }) {
         setDrawer(d => (d === 'start' ? null : d));
       }
       if (msg.type === 'hover') setHovered(msg.sectionId);
-      if (msg.type === 'patch-text') {
-        const coalesce = `${msg.sectionId}/${msg.blockId ?? ''}/${msg.key}`;
-        if (msg.blockId)
-          dispatch(
-            {
-              type: 'setBlockSetting',
-              sectionId: msg.sectionId,
-              blockId: msg.blockId,
-              key: msg.key,
-              value: msg.value,
-            },
-            coalesce
-          );
-        else
-          dispatch(
-            { type: 'setSectionSetting', id: msg.sectionId, key: msg.key, value: msg.value },
-            coalesce
-          );
-      }
+      // Every other intent is re-validated against the CURRENT document and the registry
+      // (VE-2) and becomes exactly one document action, or is dropped.
+      const doc = docRef.current;
+      const intent = doc ? intentToAction(doc, msg) : null;
+      if (intent) dispatch(intent.action, intent.coalesce);
     },
     [dispatch]
   );

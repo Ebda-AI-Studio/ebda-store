@@ -79,9 +79,23 @@ export function TrustBadgesSection({
                 <BadgeGlyph icon={b.icon} className="h-6 w-6" />
               </span>
               <span>
-                {b.title && <span className="block text-[15px] text-foreground">{b.title}</span>}
+                {b.title && (
+                  <span
+                    className="block text-[15px] text-foreground"
+                    {...(editorMode
+                      ? { 'data-builder-setting': ar ? 'titleAr' : 'title' }
+                      : undefined)}
+                  >
+                    {b.title}
+                  </span>
+                )}
                 {b.text && (
-                  <span className="mt-1 block text-[13px] leading-snug text-muted-foreground">
+                  <span
+                    className="mt-1 block text-[13px] leading-snug text-muted-foreground"
+                    {...(editorMode
+                      ? { 'data-builder-setting': ar ? 'textAr' : 'text' }
+                      : undefined)}
+                  >
                     {b.text}
                   </span>
                 )}

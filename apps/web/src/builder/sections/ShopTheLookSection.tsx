@@ -157,7 +157,12 @@ export function ShopTheLookSection({
                       </div>
                     )}
                     {l.title && (
-                      <h3 className="font-display mt-4 text-balance text-xl leading-snug text-foreground">
+                      <h3
+                        className="font-display mt-4 text-balance text-xl leading-snug text-foreground"
+                        {...(editorMode
+                          ? { 'data-builder-setting': ar ? 'titleAr' : 'title' }
+                          : undefined)}
+                      >
                         {l.title}
                       </h3>
                     )}

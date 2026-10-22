@@ -21,10 +21,12 @@ import {
   parentToChildSchema,
   type ChildToParent,
   type PageDefinition,
+  type TextTarget,
 } from '@ebda/shared';
 import { BRAND } from '@ebda/shared';
+import { startInlineEdit } from './inline-edit';
 import {
-  inlineSettingFor,
+  inlineTargetFor,
   labelFor,
   targetOf,
   unionRect,
@@ -84,6 +86,11 @@ export default function EditorOverlay({ allowedOrigins, locale, definition, onRe
   const docRef = useRef(definition);
   docRef.current = definition;
   const [selected, setSelected] = useState<CanvasTarget | null>(null);
+  const selectedRef = useRef<CanvasTarget | null>(null);
+  selectedRef.current = selected;
+  const localeRef = useRef(locale);
+  localeRef.current = locale;
+  const editingRef = useRef<{ cancel: () => void } | null>(null);
   const [hovered, setHovered] = useState<CanvasTarget | null>(null);
   const [, setTick] = useState(0);
 
@@ -127,13 +134,72 @@ export default function EditorOverlay({ allowedOrigins, locale, definition, onRe
   }, [allowedOrigins, onRender, post]);
 
   useEffect(() => {
+    /** Start editing `el` as the text field `field` of `hit`. */
+    const edit = (
+      el: HTMLElement,
+      hit: CanvasTarget,
+      field: TextTarget,
+      point?: { x: number; y: number }
+    ) => {
+      const editable = (el.closest('[data-builder-setting]') as HTMLElement | null) ?? el;
+      editingRef.current?.cancel();
+      editingRef.current = startInlineEdit({
+        editable,
+        field,
+        point,
+        caretColor: BRAND.colors.gold,
+        onCommit: value =>
+          post({
+            type: 'patch-text',
+            sectionId: hit.sectionId,
+            ...(hit.blockId ? { blockId: hit.blockId } : {}),
+            key: field.key,
+            value,
+          } as Omit<ChildToParent, 'protocol'>),
+        onMove: direction => {
+          const next = nextTextTarget(editable, direction);
+          if (!next) return;
+          setSelected(next.hit);
+          post({ type: 'select', ...next.hit } as Omit<ChildToParent, 'protocol'>);
+          edit(next.el, next.hit, next.field);
+        },
+        onDone: () => {
+          editingRef.current = null;
+        },
+      });
+    };
+    /** The next (or previous) editable text on the page, in document order. */
+    const nextTextTarget = (from: HTMLElement, direction: 1 | -1) => {
+      const all = Array.from(document.querySelectorAll<HTMLElement>('[data-builder-setting]'));
+      const start = all.indexOf(from);
+      for (let i = start + direction; i >= 0 && i < all.length; i += direction) {
+        const el = all[i];
+        const hit = targetOf(el, docRef.current);
+        const field = hit && inlineTargetFor(el, docRef.current, hit, localeRef.current);
+        if (hit && field) return { el, hit, field };
+      }
+      return null;
+    };
     const onClick = (e: MouseEvent) => {
-      const target = e.target as Element | null;
-      if (target?.closest('[contenteditable="true"]')) return;
+      const target = e.target as HTMLElement | null;
+      if (target?.closest('[contenteditable]:not([contenteditable="false"])')) return;
       const hit = targetOf(target, docRef.current);
       // Inside the canvas a click selects; it never navigates or submits.
       if (target?.closest('a, button, form')) e.preventDefault();
-      if (!hit) return;
+      if (!hit || !target) return;
+      // A click on text inside the target that is ALREADY selected edits it (Shopify's
+      // behaviour); the first click only selects.
+      const cur = selectedRef.current;
+      const alreadyThere =
+        cur?.sectionId === hit.sectionId && (!cur.blockId || cur.blockId === hit.blockId);
+      const field = alreadyThere
+        ? inlineTargetFor(target, docRef.current, hit, localeRef.current)
+        : null;
+      if (field) {
+        e.preventDefault();
+        edit(target, hit, field, { x: e.clientX, y: e.clientY });
+        return;
+      }
       setSelected(hit);
       post({ type: 'select', ...hit } as Omit<ChildToParent, 'protocol'>);
     };
@@ -151,39 +217,10 @@ export default function EditorOverlay({ allowedOrigins, locale, definition, onRe
     };
     const onDblClick = (e: MouseEvent) => {
       const el = e.target as HTMLElement | null;
-      if (!el) return;
-      const id = targetOf(el, docRef.current)?.sectionId;
-      if (!id) return;
-      const key = inlineSettingFor(el, docRef.current, id, locale);
-      if (!key) return;
-      const editable = (el.closest('[data-builder-setting]') as HTMLElement | null) ?? el;
-      const before = editable.innerText;
-      editable.contentEditable = 'true';
-      editable.focus();
-      const finish = (commit: boolean) => {
-        editable.contentEditable = 'false';
-        editable.removeEventListener('blur', onBlur);
-        editable.removeEventListener('keydown', onKey);
-        const value = editable.innerText.trim().slice(0, 2048);
-        if (!commit) editable.innerText = before;
-        else if (value !== before.trim())
-          post({ type: 'patch-text', sectionId: id, key, value } as Omit<
-            ChildToParent,
-            'protocol'
-          >);
-      };
-      const onBlur = () => finish(true);
-      const onKey = (k: KeyboardEvent) => {
-        if (k.key === 'Enter' && !k.shiftKey) {
-          k.preventDefault();
-          editable.blur();
-        }
-        if (k.key === 'Escape') {
-          finish(false);
-        }
-      };
-      editable.addEventListener('blur', onBlur);
-      editable.addEventListener('keydown', onKey);
+      if (!el || el.closest('[contenteditable]:not([contenteditable="false"])')) return;
+      const hit = targetOf(el, docRef.current);
+      const field = hit && inlineTargetFor(el, docRef.current, hit, localeRef.current);
+      if (hit && field) edit(el, hit, field, { x: e.clientX, y: e.clientY });
     };
     const onSubmit = (e: Event) => e.preventDefault();
     const reflow = () => setTick(t => t + 1);
@@ -201,7 +238,7 @@ export default function EditorOverlay({ allowedOrigins, locale, definition, onRe
       window.removeEventListener('resize', reflow);
       window.removeEventListener('scroll', reflow);
     };
-  }, [locale, post]);
+  }, [post]);
 
   const isRtl = locale === 'ar';
   const outline = (target: CanvasTarget | null, kind: 'hover' | 'selected') => {

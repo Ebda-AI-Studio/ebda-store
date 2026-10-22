@@ -38,8 +38,8 @@ function page(d: PageDefinition) {
     <div data-zone="header"><nav id="nav">menu</nav></div>
     <main>
       <div data-builder-id="${hero.id}" style="display:contents">
-        <section id="hero"><div id="s1" data-builder-block="slide-1"><h1 id="t1">A</h1></div>
-        <div id="s2" data-builder-block="slide-2"><h1 id="t2">B</h1></div></section>
+        <section id="hero"><div id="s1" data-builder-block="slide-1"><h1 id="t1" data-builder-setting="headline">A</h1></div>
+        <div id="s2" data-builder-block="slide-2"><h1 id="t2" data-builder-setting="headline">B</h1></div></section>
       </div>
     </main>
     <div data-zone="footer"><footer id="foot">foot</footer></div>`;
@@ -152,5 +152,50 @@ describe('EditorOverlay (real)', () => {
       window.dispatchEvent(ev);
     });
     expect(document.querySelector('[data-builder-outline="selected"]')).toBeNull();
+  });
+
+  it('the first click selects, the second click on its text edits in place, Enter sends patch-text', () => {
+    const d = doc();
+    const heroId = page(d);
+    mountOverlay(d, 'en');
+    const h = document.getElementById('t2')!;
+    fireEvent.click(h);
+    expect(h.hasAttribute('contenteditable')).toBe(false);
+    expect(posted().some(m => m.type === 'patch-text')).toBe(false);
+
+    fireEvent.click(h); // already selected: now it edits
+    expect(h.getAttribute('contenteditable')).toBeTruthy();
+    expect(h.getAttribute('dir')).toBe('ltr');
+    h.textContent = ' Gift boxes ';
+    fireEvent.keyDown(h, { key: 'Enter' });
+    expect(posted()).toContainEqual({
+      protocol: BUILDER_PROTOCOL,
+      type: 'patch-text',
+      sectionId: heroId,
+      blockId: 'slide-2',
+      key: 'headline',
+      value: 'Gift boxes',
+    });
+    expect(h.hasAttribute('contenteditable')).toBe(false);
+  });
+
+  it('a click on text of ANOTHER target only selects it (no edit)', () => {
+    const d = doc();
+    page(d);
+    mountOverlay(d, 'en');
+    fireEvent.click(document.getElementById('t1')!);
+    fireEvent.click(document.getElementById('t2')!);
+    expect(document.getElementById('t2')!.hasAttribute('contenteditable')).toBe(false);
+  });
+
+  it('double-click edits even when nothing was selected, and Arabic fields edit RTL', () => {
+    const d = doc();
+    page(d);
+    document.getElementById('t1')!.setAttribute('data-builder-setting', 'headlineAr');
+    mountOverlay(d, 'ar');
+    const h = document.getElementById('t1')!;
+    fireEvent.dblClick(h);
+    expect(h.getAttribute('dir')).toBe('rtl');
+    expect(h.getAttribute('lang')).toBe('ar');
   });
 });

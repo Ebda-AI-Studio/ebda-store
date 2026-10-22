@@ -231,7 +231,11 @@ export function StepsSection({
                 </span>
                 <div className="min-w-0 flex-1">
                   <h3 className="font-display text-base font-semibold text-foreground">
-                    {s.title}
+                    {editorMode ? (
+                      <span data-builder-setting={ar ? 'titleAr' : 'title'}>{s.title}</span>
+                    ) : (
+                      s.title
+                    )}
                     {done && (
                       <span className="sr-only">
                         {' '}
@@ -239,7 +243,16 @@ export function StepsSection({
                       </span>
                     )}
                   </h3>
-                  {s.body && <p className="mt-1 text-sm text-muted-foreground">{s.body}</p>}
+                  {s.body && (
+                    <p
+                      className="mt-1 text-sm text-muted-foreground"
+                      {...(editorMode
+                        ? { 'data-builder-setting': ar ? 'bodyAr' : 'body' }
+                        : undefined)}
+                    >
+                      {s.body}
+                    </p>
+                  )}
                   {s.product && !canBuyNow(s.product) && oos.resolvedOosLabel !== false && (
                     <p className="mt-1 text-xs font-medium text-muted-foreground">
                       {soldOutLabel(ar, oos.resolvedOosLabelTextEn, oos.resolvedOosLabelTextAr)}

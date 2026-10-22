@@ -220,6 +220,7 @@ export function HeroBanner({
               'drop-shadow-none'
             )}
             data-zone="heroHeadline"
+            data-builder-setting={builderBlockId ? (isRtl ? 'headlineAr' : 'headline') : undefined}
             style={{
               fontFamily: headingZone?.fontFamily,
               fontSize: responsiveFontSize(headingZone?.fontSize),
@@ -252,6 +253,7 @@ export function HeroBanner({
                 : 'bg-white text-[#141414] hover:bg-white/90'
             )}
             data-cta="button"
+            data-builder-setting={builderBlockId ? (isRtl ? 'ctaTextAr' : 'ctaText') : undefined}
           >
             {cta}
           </Link>
@@ -300,6 +302,9 @@ export function HeroBanner({
                 <h1
                   className={styles.heroHeadline}
                   data-zone="heroHeadline"
+                  data-builder-setting={
+                    builderBlockId ? (isRtl ? 'headlineAr' : 'headline') : undefined
+                  }
                   style={{
                     fontFamily: headingZone?.fontFamily,
                     fontSize: responsiveFontSize(headingZone?.fontSize),
@@ -333,6 +338,9 @@ export function HeroBanner({
                     styles.heroCta
                   )}
                   data-cta="button"
+                  data-builder-setting={
+                    builderBlockId ? (isRtl ? 'ctaTextAr' : 'ctaText') : undefined
+                  }
                 >
                   {cta}
                 </Link>

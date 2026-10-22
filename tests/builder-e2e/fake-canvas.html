@@ -81,7 +81,8 @@
         const node = type && window.__doc?.sectionGroups[group].find(n => n.type === type);
         if (node) send({ type: 'select', sectionId: node.id });
       });
-      window.__patch = (sectionId, key, value) => send({ type: 'patch-text', sectionId, key, value });
+      window.__patch = (sectionId, key, value, blockId) =>
+        send({ type: 'patch-text', sectionId, ...(blockId ? { blockId } : {}), key, value });
       send({ type: 'ready' });
     </script>
   </body>
