@@ -29,6 +29,7 @@ import {
 import publicRoutes from '@api/routes/public.routes';
 import { publicStoreContext } from '@api/middleware/tenant-context';
 import { errorHandler } from '@api/middleware/error-handler';
+import { awaitDeferredWork } from '@api/lib/after-tenant-commit';
 import { hasDb } from '../helpers/bundle-fixtures';
 
 const OWNER_URL = process.env.DIRECT_URL || process.env.DATABASE_URL || '';
@@ -43,13 +44,16 @@ const appUrl = () => {
 describe.skipIf(!hasDb)('cached public reads open no request transaction (ebda_app)', () => {
   let owner: AppPrismaClient;
   let app: Express;
-  const ids = {} as { a: string; b: string };
+  const ids = {} as { a: string; b: string; run: string };
   const seen: Array<{ path: string; scope: string | undefined }> = [];
   const forced: { err?: unknown; rawErr?: unknown } = {};
   const dbLabels: string[] = [];
   let tracing = false;
 
   async function cleanup() {
+    await owner.$executeRawUnsafe(
+      `DELETE FROM public.products WHERE store_id IN (SELECT id FROM public.stores WHERE slug LIKE '${PREFIX}%')`
+    );
     await owner.$executeRawUnsafe(
       `DELETE FROM public.categories WHERE store_id IN (SELECT id FROM public.stores WHERE slug LIKE '${PREFIX}%')`
     );
@@ -80,8 +84,18 @@ describe.skipIf(!hasDb)('cached public reads open no request transaction (ebda_a
       await owner.category.create({
         data: { storeId: s.id, name: `cat-${tag}`, slug: `cat-${tag}-${run}` },
       });
+      await owner.product.create({
+        data: {
+          storeId: s.id,
+          name: `prod-${tag}`,
+          slug: `prod-${tag}-${run}`,
+          price: 1000,
+          status: 'active' as never,
+        },
+      });
       return s.id;
     };
+    ids.run = run;
     ids.a = await mk('a');
     ids.b = await mk('b');
 
@@ -94,7 +108,8 @@ describe.skipIf(!hasDb)('cached public reads open no request transaction (ebda_a
             res.once('finish', resolve);
             res.once('close', resolve);
             next();
-          })
+          }),
+        { beforeDisconnect: () => awaitDeferredWork(5000) }
       ).catch(next);
     });
     setDbHopObserver((label: string) => {
@@ -187,6 +202,69 @@ describe.skipIf(!hasDb)('cached public reads open no request transaction (ebda_a
     expect(names(b)).not.toContain('cat-a');
   });
 
+  describe('the anonymous product list and the product page (extended pattern)', () => {
+    it('the list arrives with no ambient scope, a miss returns the store products only', async () => {
+      seen.length = 0;
+      const r = await get('/products', ids.a);
+      expect(r.status).toBe(200);
+      const names = JSON.stringify(r.body);
+      expect(names).toContain('prod-a');
+      expect(names).not.toContain('prod-b');
+      expect(seen.at(-1)).toMatchObject({ path: '/products', scope: undefined });
+    });
+
+    it('a list HIT makes no product/category/store queries (only the store-id definer and the feature read)', async () => {
+      await get('/products?page=1&limit=10', ids.a); // warm
+      dbLabels.length = 0;
+      tracing = true;
+      const r = await get('/products?page=1&limit=10', ids.a);
+      tracing = false;
+      expect(r.status).toBe(200);
+      const tenantQueries = dbLabels.filter(
+        l =>
+          /^db-(Product|Category|Store|ProductVariant|ProductOption)\b/.test(l) &&
+          !/^db-Store(Feature)?\./.test(l)
+      );
+      expect(tenantQueries).toEqual([]);
+      expect(seen.at(-1)?.scope).toBeUndefined();
+    });
+
+    it('the product page arrives with no ambient scope and returns the product', async () => {
+      seen.length = 0;
+      const r = await get(`/products/prod-a-${ids.run}`, ids.a);
+      expect(r.status).toBe(200);
+      expect(JSON.stringify(r.body)).toContain('prod-a');
+      expect(seen.at(-1)).toMatchObject({ scope: undefined });
+    });
+
+    it('another store cannot read this store product page (404, never the product)', async () => {
+      const r = await get(`/products/prod-a-${ids.run}`, ids.b);
+      expect(JSON.stringify(r.body)).not.toContain('prod-a');
+    });
+
+    it('FAILS CLOSED on both routes: an unscoped model query and raw SQL throw', async () => {
+      for (const path of ['/products', `/products/prod-a-${ids.run}`]) {
+        forced.err = forced.rawErr = undefined;
+        await get(path, ids.a).set('x-force-db', '1');
+        expect(forced.err, `${path}: model query`).toBeInstanceOf(TenantScopeViolation);
+        expect(forced.rawErr, `${path}: raw query`).toBeInstanceOf(TenantScopeViolation);
+      }
+    });
+
+    it.each([
+      ['a search term', '/products?search=prod'],
+      ['a category filter', '/products?category=x'],
+      ['a tag filter', '/products?tag=x'],
+      ['an ids filter', '/products?ids=a'],
+      ['an unknown query key', '/products?x=1'],
+      ['a query on the product page', '/products/p?x=1'],
+    ])('%s keeps the request transaction (store scope ambient)', async (_n, path) => {
+      seen.length = 0;
+      await get(path, ids.a);
+      expect(seen.at(-1)?.scope).toBe(ids.a);
+    });
+  });
+
   it.each([
     ['a request with a cookie', (s: string) => get('/categories', s).set('Cookie', 'x=1')],
     [
@@ -194,7 +272,7 @@ describe.skipIf(!hasDb)('cached public reads open no request transaction (ebda_a
       (s: string) => get('/categories', s).set('Authorization', 'Bearer nope'),
     ],
     ['a request carrying a query', (s: string) => get('/categories?x=1', s)],
-    ['another route (/products)', (s: string) => get('/products', s)],
+    ['another route (/size-charts)', (s: string) => get('/size-charts', s)],
   ])('%s keeps the request transaction (store scope ambient)', async (_n, call) => {
     seen.length = 0;
     await call(ids.a);

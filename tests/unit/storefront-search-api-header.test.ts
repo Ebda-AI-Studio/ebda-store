@@ -15,6 +15,9 @@ const { listPublic, suggest, loggerCalls, setEdgeCacheMock } = vi.hoisted(() => 
 }));
 
 vi.mock('@ebda/database', () => ({ prisma: {}, SlugEntityType: {} }));
+vi.mock('@api/lib/store-scoped-read', () => ({
+  readInStoreContext: (_id: string, fn: () => unknown) => fn(),
+}));
 vi.mock('@api/config', () => ({
   config: { webUrl: 'https://ebda.app', apiUrl: 'https://api.ebda.app' },
 }));

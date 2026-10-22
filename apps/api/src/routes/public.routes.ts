@@ -382,11 +382,13 @@ router.get('/products', async (req: Request, res: Response, next: NextFunction) 
       cacheKey,
       120,
       () =>
-        ProductService.listPublic(storeId, {
-          ...listOptions,
-          // The query-embed limit is charged inside the service at the provider call (SEARCH-T12-6).
-          searcher: searcherFromIp(req.ip),
-        }),
+        readInStoreContext(storeId, () =>
+          ProductService.listPublic(storeId, {
+            ...listOptions,
+            // The query-embed limit is charged inside the service at the provider call (SEARCH-T12-6).
+            searcher: searcherFromIp(req.ip),
+          })
+        ),
       {
         // Never cache a degraded list (transient: race lost, provider/SQL error, searcher limit, or
         // the request that DISCOVERS a spent budget, whose key still says `on`). A budget-spent list
@@ -432,7 +434,11 @@ router.get('/products', async (req: Request, res: Response, next: NextFunction) 
     // an edge-cached listing/PDP can show the old pre-order state for up to
     // sMaxAge 60s + staleWhileRevalidate 300s. BOUNDED-stale by design: the cart and
     // checkout re-read the feature uncached (lineAllowsBackorder) and stay authoritative.
-    const backorderOn = await featureService.isFeatureEnabled(storeId, 'inventory.backorder');
+    // Per request and uncached by us (FeatureService has its own cache): read in its own scope so a
+    // route that opens no request transaction (Ruling LAZY-TX-1) never touches the DB unscoped.
+    const backorderOn = await readInStoreContext(storeId, () =>
+      featureService.isFeatureEnabled(storeId, 'inventory.backorder')
+    );
     // A hybrid-ranked list (semantic search on) depends on the mode and on the provider's health at
     // that moment, which no edge key can see: never shared-cacheable (SEARCH-T12-7). Every other
     // list keeps the edge policy unchanged.
@@ -474,9 +480,11 @@ router.get('/products/:slugOrId', async (req: Request, res: Response, next: Next
       : // Anonymous path — Redis-backed get-or-set (120s TTL, min required by
         // CLAUDE.md ESLint rule to avoid hammering Neon on cache miss).
         await getCached(cacheKey, 120, () =>
-          isUuid
-            ? ProductService.getPublicById(storeId, slugOrId)
-            : ProductService.getPublicBySlug(storeId, slugOrId)
+          readInStoreContext(storeId, () =>
+            isUuid
+              ? ProductService.getPublicById(storeId, slugOrId)
+              : ProductService.getPublicBySlug(storeId, slugOrId)
+          )
         );
 
     // `product_3d` (every plan; a super-admin override can switch it off per
@@ -485,7 +493,9 @@ router.get('/products/:slugOrId', async (req: Request, res: Response, next: Next
     // override write. Residual: the edge cache below, same as every field.
     const payload =
       product && (product as { model3d?: unknown }).model3d
-        ? (await featureService.isFeatureEnabled(storeId, 'product_3d'))
+        ? (await readInStoreContext(storeId, () =>
+            featureService.isFeatureEnabled(storeId, 'product_3d')
+          ))
           ? product
           : { ...product, model3d: null }
         : product;
@@ -496,7 +506,9 @@ router.get('/products/:slugOrId', async (req: Request, res: Response, next: Next
     // an edge-cached listing/PDP can show the old pre-order state for up to
     // sMaxAge 60s + staleWhileRevalidate 300s. BOUNDED-stale by design: the cart and
     // checkout re-read the feature uncached (lineAllowsBackorder) and stay authoritative.
-    const backorderOn = await featureService.isFeatureEnabled(storeId, 'inventory.backorder');
+    const backorderOn = await readInStoreContext(storeId, () =>
+      featureService.isFeatureEnabled(storeId, 'inventory.backorder')
+    );
     setEdgeCache(res, { sMaxAge: 60, staleWhileRevalidate: 300 });
     res.json({
       success: true,
