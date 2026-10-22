@@ -353,37 +353,39 @@ class FeatureService {
     // SELECT goes to the primary that just absorbed the writes —
     // avoids the Neon read-replica staleness window where the cache
     // would otherwise be repopulated with the pre-write row state.
-    const freshFeatures = await withMoneyTx(prisma, async (tx: Prisma.TransactionClient) => {
-      for (const [featureKey, enabled] of Object.entries(updates)) {
-        await tx.storeFeature.upsert({
-          where: { storeId_featureKey: { storeId, featureKey } },
-          create: {
-            storeId,
-            featureKey,
-            enabled: enabled as boolean,
-            enabledAt: enabled ? now : null,
-            enabledBy: userId,
-          },
-          update: {
-            enabled: enabled as boolean,
-            enabledAt: enabled ? now : null,
-            enabledBy: userId,
-          },
+    const freshFeatures = await withStore(storeId, () =>
+      withMoneyTx(prisma, async (tx: Prisma.TransactionClient) => {
+        for (const [featureKey, enabled] of Object.entries(updates)) {
+          await tx.storeFeature.upsert({
+            where: { storeId_featureKey: { storeId, featureKey } },
+            create: {
+              storeId,
+              featureKey,
+              enabled: enabled as boolean,
+              enabledAt: enabled ? now : null,
+              enabledBy: userId,
+            },
+            update: {
+              enabled: enabled as boolean,
+              enabledAt: enabled ? now : null,
+              enabledBy: userId,
+            },
+          });
+        }
+        // Read plan + override rows via the SAME tx so the resolved map
+        // reflects the writes we just made.
+        const store = await tx.store.findUnique({
+          where: { id: storeId },
+          select: { plan: true },
         });
-      }
-      // Read plan + override rows via the SAME tx so the resolved map
-      // reflects the writes we just made.
-      const store = await tx.store.findUnique({
-        where: { id: storeId },
-        select: { plan: true },
-      });
-      const rows = await tx.storeFeature.findMany({
-        where: { storeId },
-        select: { featureKey: true, enabled: true },
-      });
-      const flags = await getAutomationFlags(storeId, tx, { legacyPlan: store?.plan ?? 'free' });
-      return this.rowsToMap((store?.plan ?? 'free') as StorePlan, rows, flags);
-    });
+        const rows = await tx.storeFeature.findMany({
+          where: { storeId },
+          select: { featureKey: true, enabled: true },
+        });
+        const flags = await getAutomationFlags(storeId, tx, { legacyPlan: store?.plan ?? 'free' });
+        return this.rowsToMap((store?.plan ?? 'free') as StorePlan, rows, flags);
+      })
+    );
 
     await this.writeToCache(storeId, freshFeatures);
     await this.bustPublicStoreCache(storeId);
@@ -417,11 +419,15 @@ class FeatureService {
     storeId: string,
     featureKey: FeatureKey
   ): Promise<Record<FeatureKey, boolean>> {
-    await prisma.storeFeature
-      .delete({ where: { storeId_featureKey: { storeId, featureKey } } })
-      .catch(() => {
-        // Row didn't exist — already at baseline. No-op.
-      });
+    // Super-admin route, no ambient store scope: bind the target store (the caller already
+    // passed requireStoreAccess) so the tenant guard and RLS see it.
+    await withStore(storeId, tx =>
+      tx.storeFeature
+        .delete({ where: { storeId_featureKey: { storeId, featureKey } } })
+        .catch(() => {
+          // Row didn't exist — already at baseline. No-op.
+        })
+    );
     await this.invalidateCache(storeId);
     await this.bustPublicStoreCache(storeId);
     return this.getStoreFeatures(storeId);
@@ -432,7 +438,7 @@ class FeatureService {
    * every feature to its plan baseline. Super-admin nuclear button.
    */
   async resetAllOverrides(storeId: string): Promise<Record<FeatureKey, boolean>> {
-    await prisma.storeFeature.deleteMany({ where: { storeId } });
+    await withStore(storeId, tx => tx.storeFeature.deleteMany({ where: { storeId } }));
     await this.invalidateCache(storeId);
     await this.bustPublicStoreCache(storeId);
     logger.info({ storeId }, '[FeatureService] All overrides cleared (reset to plan baseline)');
