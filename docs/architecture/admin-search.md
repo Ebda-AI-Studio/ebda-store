@@ -69,6 +69,11 @@ optional `feature`, optional `syn` (everyday words per language) and, for a sett
   `<details>`, scrolls to it, rings it for 3 s and focuses it. A tabbed page selects its tab from `?tab=`
   (Branding and WhatsApp do).
 
+The visual editor (`/builder`) is registered too: `builder.header-logo` and `builder.header-search` are anchored in
+`ThemeSettingsPanel.tsx` (its other panels are generated from the section registry; each new editor control gets an
+entry in the same commit, Task 11 adds the `?select=` deep link into the canvas). `/builder` has its own
+`SETTINGS_LABEL_BASELINE` row.
+
 ### Adding an admin page or a setting
 
 1. New page: add a `page(...)` entry (or list it in `REDIRECT_ROUTES` if it only redirects). Pick `access` the
