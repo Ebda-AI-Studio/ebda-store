@@ -107,6 +107,33 @@ describe('deleteR2ObjectIfOrphan refuses another store`s object', () => {
   });
 });
 
+describe('a caller that knows the owner (an erased user\u2019s avatar) says so', () => {
+  const AVATAR = 'https://cdn.example.com/stores/store-a/avatars/me.png';
+  it('with no store in scope, the owner store lets its own avatar be deleted', async () => {
+    h.ambient = null;
+    await deleteR2ObjectIfOrphan(AVATAR, { ownerStoreId: 'store-a' });
+    expect(h.storageDelete).toHaveBeenCalledWith('stores/store-a/avatars/me.png');
+  });
+  it('but only its own: the owner store cannot delete another store`s object', async () => {
+    h.ambient = null;
+    await deleteR2ObjectIfOrphan(B_FONT, { ownerStoreId: 'store-a' });
+    expect(h.storageDelete).not.toHaveBeenCalled();
+  });
+  it('and the scope it runs in may not contradict it', async () => {
+    h.ambient = 'store-b';
+    await deleteR2ObjectIfOrphan(AVATAR, { ownerStoreId: 'store-a' });
+    expect(h.storageDelete).not.toHaveBeenCalled();
+  });
+  it('the legacy `<storeId>/` flat prefix counts only when asked for (the explicit file delete route)', () => {
+    expect(r2KeyBelongsToStore('store-a/old.jpg', 'store-a')).toBe(false);
+    expect(r2KeyBelongsToStore('store-a/old.jpg', 'store-a', { legacyFlat: true })).toBe(true);
+    expect(r2KeyBelongsToStore('store-ab/old.jpg', 'store-a', { legacyFlat: true })).toBe(false);
+    expect(r2KeyBelongsToStore('store-a/../store-b/x', 'store-a', { legacyFlat: true })).toBe(
+      false
+    );
+  });
+});
+
 describe('the sibling paths go through the same guard', () => {
   it('cleanupRemovedJsonUrls (layout images, PWA icons): a foreign URL removed from a JSON blob is not deleted', async () => {
     const before = { hero: { slides: [{ image: B_FONT }, { image: A_FONT }] } };

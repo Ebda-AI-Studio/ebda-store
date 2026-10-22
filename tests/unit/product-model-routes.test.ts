@@ -74,7 +74,11 @@ vi.mock('../../apps/api/src/utils/store-helpers', () => ({
 vi.mock('../../apps/api/src/services/storage.service', () => ({
   StorageService: { upload: m.upload, delete: m.storageDelete },
 }));
-vi.mock('../../apps/api/src/services/r2-cleanup.service', () => ({
+vi.mock('../../apps/api/src/services/r2-cleanup.service', async importOriginal => ({
+  // the REAL ownership rule (the poster check uses it); only the delete and the key lookup are stubbed
+  r2KeyBelongsToStore: (
+    await importOriginal<typeof import('../../apps/api/src/services/r2-cleanup.service')>()
+  ).r2KeyBelongsToStore,
   deleteR2ObjectIfOrphan: m.orphan,
   urlToR2Key: (url: string) =>
     url.startsWith('https://media.test/') ? url.slice('https://media.test/'.length) : null,

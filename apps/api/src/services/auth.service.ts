@@ -2292,7 +2292,9 @@ export class AuthService {
     // the transaction commits. Best-effort, same pattern as other cleanup
     // sites: never let storage hiccups propagate to the caller.
     if (user.avatar) {
-      void deleteR2ObjectIfOrphan(user.avatar).catch(err =>
+      // The user's own store owns the avatar (`stores/<storeId>/...`); a user-scoped erase has no store
+      // in scope, and the delete refuses a store-namespaced key it cannot attribute.
+      void deleteR2ObjectIfOrphan(user.avatar, { ownerStoreId: user.storeId }).catch(err =>
         logger.warn({ err, userId }, '[auth.eraseAccount] r2 avatar cleanup failed')
       );
     }

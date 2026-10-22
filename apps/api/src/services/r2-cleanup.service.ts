@@ -54,9 +54,16 @@ export function urlToR2Key(url: string | null | undefined): string | null {
  * (`stores/<storeId>/...`, how every upload is keyed, `StorageService.composeKey`). An exact
  * prefix, so `stores/abc/` never matches `stores/abcd/`, and no `..` segment.
  */
-export function r2KeyBelongsToStore(key: string, storeId: string): boolean {
+export function r2KeyBelongsToStore(
+  key: string,
+  storeId: string,
+  opts: { legacyFlat?: boolean } = {}
+): boolean {
   if (!storeId || key.split('/').includes('..')) return false;
-  return key.startsWith(`stores/${storeId}/`);
+  if (key.startsWith(`stores/${storeId}/`)) return true;
+  // The oldest uploads were keyed `<storeId>/...` (no `stores/` namespace); only the explicit file
+  // delete route still honours them.
+  return opts.legacyFlat === true && key.startsWith(`${storeId}/`);
 }
 
 /** The store the current code is scoped to, or null (a user-scoped request, a cron). */
@@ -78,9 +85,15 @@ function ambientStoreId(): string | null {
  *  - outside one (a user-scoped request, a cron), a store-namespaced key is never deleted, because
  *    no store has been proven to own it; only the legacy flat keys (platform uploads) remain.
  */
-export function mayDeleteKey(key: string): boolean {
-  const store = ambientStoreId();
-  if (store) return r2KeyBelongsToStore(key, store);
+export function mayDeleteKey(key: string, ownerStoreId?: string | null): boolean {
+  const ambient = ambientStoreId();
+  // A caller that knows whose object this is (an erased user's avatar belongs to the user's own
+  // store) says so; the scope it runs in must not contradict it.
+  if (ownerStoreId) {
+    if (ambient && ambient !== ownerStoreId) return false;
+    return r2KeyBelongsToStore(key, ownerStoreId);
+  }
+  if (ambient) return r2KeyBelongsToStore(key, ambient);
   return !key.startsWith('stores/');
 }
 
@@ -138,7 +151,10 @@ export const ORPHAN_CHECK_STATEMENT_TIMEOUT_MS = 5000;
  * so an existence check sees the post-write state and won't flag
  * "still referenced" against the row we just deleted.
  */
-export async function deleteR2ObjectIfOrphan(url: string | null | undefined): Promise<void> {
+export async function deleteR2ObjectIfOrphan(
+  url: string | null | undefined,
+  opts: { ownerStoreId?: string | null } = {}
+): Promise<void> {
   // Every caller fires this AFTER its own write, without awaiting, so under a
   // store-scoped request it used to run on the request's tenant transaction
   // AFTER that transaction committed: `isStillReferenced` then issued ELEVEN
@@ -151,12 +167,19 @@ export async function deleteR2ObjectIfOrphan(url: string | null | undefined): Pr
   // `connections: 2` — the orphan check opens a `withRlsBypass` transaction
   // while the task's own tenant transaction is still held (issue 2250), so the
   // global deferred-work cap must count it twice.
-  await deferAfterTenantCommit('r2-cleanup.deleteOrphan', () => deleteR2ObjectIfOrphanNow(url), {
-    connections: 2,
-  });
+  await deferAfterTenantCommit(
+    'r2-cleanup.deleteOrphan',
+    () => deleteR2ObjectIfOrphanNow(url, opts.ownerStoreId),
+    {
+      connections: 2,
+    }
+  );
 }
 
-async function deleteR2ObjectIfOrphanNow(url: string | null | undefined): Promise<void> {
+async function deleteR2ObjectIfOrphanNow(
+  url: string | null | undefined,
+  ownerStoreId?: string | null
+): Promise<void> {
   if (!url) return;
   const key = urlToR2Key(url);
   if (!key) {
@@ -167,7 +190,7 @@ async function deleteR2ObjectIfOrphanNow(url: string | null | undefined): Promis
   if (!StorageService.isAvailable()) {
     return;
   }
-  if (!mayDeleteKey(key)) {
+  if (!mayDeleteKey(key, ownerStoreId)) {
     // Defence in depth, independent of whatever validated the URL on the way in.
     logger.warn({ key }, '[r2-cleanup] refused to delete an object outside the current store');
     return;

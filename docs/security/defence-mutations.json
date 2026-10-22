@@ -2250,6 +2250,36 @@
       "find": "  if (!r2KeyBelongsToStore(key, storeId) || !key.startsWith(`stores/${storeId}/fonts/`))",
       "replace": "  if (false)",
       "test": "tests/unit/font-url-guard.test.ts"
+    },
+    {
+      "id": "upload-delete-uses-store-prefix-rule",
+      "domain": "tenant / RLS",
+      "tier": "unit",
+      "why": "DELETE /uploads/:key stops checking that the key is inside the caller's store namespace, so a merchant deletes another store's file by naming its key",
+      "source": "apps/api/src/routes/upload.routes.ts",
+      "find": "      if (!r2KeyBelongsToStore(key, storeId, { legacyFlat: true })) {",
+      "replace": "      if (false) {",
+      "test": "tests/unit/upload-delete-store-prefix.test.ts"
+    },
+    {
+      "id": "r2-owner-store-scope-contradiction",
+      "domain": "tenant / RLS",
+      "tier": "unit",
+      "why": "a delete that names an owner store (an erased user's avatar) runs inside ANOTHER store's scope and is still allowed, so the scope no longer limits what it can reach",
+      "source": "apps/api/src/services/r2-cleanup.service.ts",
+      "find": "    if (ambient && ambient !== ownerStoreId) return false;\n",
+      "replace": "",
+      "test": "tests/unit/r2-cleanup-store-prefix.test.ts"
+    },
+    {
+      "id": "r2-key-belongs-rejects-traversal",
+      "domain": "tenant / RLS",
+      "tier": "unit",
+      "why": "the store-ownership rule accepts a `..` segment, so `stores/<mine>/../<other>/x` passes the prefix test",
+      "source": "apps/api/src/services/r2-cleanup.service.ts",
+      "find": "  if (!storeId || key.split('/').includes('..')) return false;",
+      "replace": "  if (!storeId) return false;",
+      "test": "tests/unit/r2-cleanup-store-prefix.test.ts"
     }
   ]
 }
