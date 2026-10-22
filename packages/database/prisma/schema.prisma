@@ -866,6 +866,7 @@ enum StoreTemplate {
   qamar
   souq
   jasmine
+  lamma
 }
 
 // ==========================================
