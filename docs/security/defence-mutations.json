@@ -2302,12 +2302,12 @@
       "test": "tests/unit/api-fewer-hops.test.ts"
     },
     {
-      "id": "cachegen-single-shard",
+      "id": "cachegen-own-durable-object",
       "domain": "cache coherence",
       "tier": "unit",
-      "why": "cache-generation counters stop sharing one Durable Object shard again, so every public cache fill pays several round trips whose slowest cold shard sets the latency",
+      "why": "cache-generation counters are routed back onto one of the auth shards, so attacker-triggerable public cache misses queue in front of jti / token-version / lockout / CSRF / MFA / rate-limit checks",
       "source": "apps/api/src/cf/auth-state-client.ts",
-      "find": "if (key.startsWith(CACHEGEN_PREFIX)) return CACHEGEN_SHARD_KEY;",
+      "find": "if (key.startsWith(CACHEGEN_PREFIX)) return CACHEGEN_SHARD;",
       "replace": "",
       "test": "tests/unit/api-fewer-hops.test.ts"
     }

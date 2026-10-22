@@ -110,7 +110,7 @@ Scope: `all` tier, 231 defence(s). 231 killed, 0 not killed.
 
 | Defence | Source | Mutation | Verdict |
 | --- | --- | --- | --- |
-| cachegen-single-shard<br>cache-generation counters stop sharing one Durable Object shard again, so every public cache fill pays several round trips whose slowest cold shard sets the latency | `apps/api/src/cf/auth-state-client.ts` | `if (key.startsWith(CACHEGEN_PREFIX)) return CACHEGEN_SHARD_KEY;` → `(removed)` | **KILLED** |
+| cachegen-own-durable-object<br>cache-generation counters are routed back onto one of the auth shards, so attacker-triggerable public cache misses queue in front of jti / token-version / lockout / CSRF / MFA / rate-limit checks | `apps/api/src/cf/auth-state-client.ts` | `if (key.startsWith(CACHEGEN_PREFIX)) return CACHEGEN_SHARD;` → `(removed)` | **ERROR**<br>baseline test is not green before mutation: 2 failed | 10 passed (12) |
 
 ## cache poisoning
 

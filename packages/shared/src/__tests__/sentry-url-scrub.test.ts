@@ -257,3 +257,13 @@ describe('the X-Search-Query request header (Ruling SEARCH-URL-1)', () => {
     expect(out.extra.headers.host).toBe('api.ebda.app');
   });
 });
+
+describe('x-hop-timing operator token', () => {
+  it('is redacted wherever a request header map is recorded', () => {
+    const ev = scrubSentryEvent({
+      request: { headers: { 'x-hop-timing': 'secret-token-value', accept: 'x' } },
+    });
+    expect(JSON.stringify(ev)).not.toContain('secret-token-value');
+    expect((ev as any).request.headers.accept).toBe('x');
+  });
+});

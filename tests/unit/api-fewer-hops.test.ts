@@ -10,6 +10,7 @@ import {
   shardKey,
   shardOf,
   AUTH_STATE_SHARDS,
+  CACHEGEN_SHARD,
 } from '../../apps/api/src/cf/auth-state-client';
 import { generationNamesFor } from '../../apps/api/src/lib/public-cache';
 
@@ -88,15 +89,34 @@ describe('the public router still mounts BOTH limiters', () => {
   });
 });
 
-describe('cache-generation keys share one shard, nothing else moves', () => {
-  it('every generation name of one cache key lands on the same shard', () => {
+describe('cache-generation keys have their OWN Durable Object, never an auth shard', () => {
+  it('every generation name of one cache key routes to the one cachegen instance', () => {
     for (const key of [
       'public:categories:abc',
       'public:products:s1:feed:v2',
       'public:store:resolve:h.ebda.app',
     ]) {
       const shards = new Set(generationNamesFor(key).map(n => shardOf(`cachegen:${n}`)));
-      expect(shards.size).toBe(1);
+      expect([...shards]).toEqual([CACHEGEN_SHARD]);
+    }
+  });
+  it('the cachegen instance is outside the auth shard range, and no auth key can route to it', () => {
+    expect(CACHEGEN_SHARD < 0 || CACHEGEN_SHARD >= AUTH_STATE_SHARDS).toBe(true);
+    for (const k of [
+      'jti:deny:abc',
+      'user:tv:x',
+      'csrf:tok',
+      'rl:public:1.2.3.4',
+      'mfa:verify:attempts:j1',
+      'lockout:a@b:attempts',
+      'leader:x',
+      'lock:y',
+      'cachegenx',
+      'jti:deny:cachegen:1',
+    ]) {
+      const s = shardOf(k);
+      expect(s).toBeGreaterThanOrEqual(0);
+      expect(s).toBeLessThan(AUTH_STATE_SHARDS);
     }
   });
   it('auth-critical keys keep exactly the shard they had before (hash of the key itself)', () => {
@@ -111,7 +131,9 @@ describe('cache-generation keys share one shard, nothing else moves', () => {
     expect(shardKey('lockout:x:attempts')).toBe('lockout:x');
     expect(shardOf('lockout:x:attempts')).toBe(shardOf('lockout:x:locked'));
   });
-  it('a key that merely contains "cachegen" elsewhere is not captured', () => {
-    expect(shardKey('jti:deny:cachegen:1')).toBe('jti:deny:cachegen:1');
+  it('the client addresses the instance by name "cachegen" and sweeps include it', () => {
+    const src = readFileSync(join(__dirname, '../../apps/api/src/cf/auth-state-client.ts'), 'utf8');
+    expect(src).toContain("shard === CACHEGEN_SHARD ? 'cachegen'");
+    expect(src).toContain('stub(CACHEGEN_SHARD).apply(ops)');
   });
 });
