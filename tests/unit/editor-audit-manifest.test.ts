@@ -60,10 +60,14 @@ describe('classic manifest of the real page builder', () => {
       builder: expect.stringContaining('mobile viewport override'),
     });
   });
-  it('theme and typography writes are flagged as live writes (VE-4)', () => {
+  it('theme and typography are carried in the draft, so their live endpoints are covered (VE-4)', () => {
     expect(m.find(e => e.key === 'PUT /api/v1/stores/:p/theme')).toMatchObject({
-      status: 'classic-only',
-      capability: 'P-13',
+      status: 'wired',
+      builder: expect.stringContaining('PageDefinition.theme'),
+    });
+    expect(m.find(e => e.key === 'PUT /api/v1/stores/:p/typography')).toMatchObject({
+      status: 'wired',
+      builder: expect.stringContaining('PageDefinition.typography'),
     });
   });
 });

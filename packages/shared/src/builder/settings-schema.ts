@@ -397,7 +397,6 @@ export const THEME_SETTINGS_SCHEMA: readonly ThemeSettingsGroup[] = [
       },
       themeColor('bgPage', 'Page background', 'خلفية الصفحة'),
       themeColor('bgSectionAlt', 'Alternate section background', 'خلفية الأقسام البديلة'),
-      { id: 'dividers', type: 'dividers', labelEn: 'Section dividers', labelAr: 'فواصل الأقسام' },
     ],
   },
 ];

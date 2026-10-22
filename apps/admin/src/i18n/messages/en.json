@@ -10163,7 +10163,8 @@
       "chromeLoadFailed": "Couldn't load your current links. Reload the page and try again."
     },
     "theme": {
-      "classicOnly": "edit in the classic page builder",
+      "smartPalette": "Smart Palette",
+      "smartPaletteHint": "Pick colours from your logo or a mood. They are applied to your sections and theme as a draft until you publish.",
       "saved": "Theme saved to your draft — publish to take it live",
       "error": "Theme not saved — try again",
       "saving": "Saving…",

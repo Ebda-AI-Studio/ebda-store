@@ -19,7 +19,10 @@ import {
   sectionDefinitionForLegacyKey,
   type SettingDefinition,
 } from '@ebda/shared';
-import { buildClassicManifest } from '../../scripts/editor-audit/classic-manifest';
+import {
+  buildClassicManifest,
+  endpointFragment,
+} from '../../scripts/editor-audit/classic-manifest';
 import { readBaseline } from '../../scripts/editor-audit/gen-matrix';
 
 const root = path.resolve(__dirname, '../..');
@@ -114,8 +117,11 @@ if (process.env.EDITOR_MATRIX_WRITE === '1') {
       for (const c of caps) expect(c).toMatch(/^P-(0[1-9]|1[0-9])$/);
     });
 
-    it('2. every endpoint the classic page calls is used by the builder or retired with a reason', () => {
-      const builderSrc = walk(BUILDER)
+    it('2. every endpoint the classic page calls is used by the builder, carried in the draft, or retired with a reason', () => {
+      const builderSrc = [
+        ...walk(BUILDER),
+        ...walk(path.join(ADMIN_SRC, 'components/section-design')),
+      ]
         .filter(f => !/\.test\./.test(f))
         .map(f => readFileSync(f, 'utf8'))
         .join('\n');
@@ -126,10 +132,14 @@ if (process.env.EDITOR_MATRIX_WRITE === '1') {
           expect(e.reason, e.key).toBeTruthy();
           continue;
         }
-        // a live theme / typography write is a gap tracked by P-01 / P-13, not a missing endpoint
-        if (e.status === 'classic-only') continue;
-        const tail = e.key.split(' ')[1].replace(/:p/g, '').split('/').filter(Boolean).slice(-1)[0];
-        expect(builderSrc.includes(tail) || libSrc.includes(tail), e.key).toBe(true);
+        if (e.status === 'classic-only') continue; // tracked by its capability id in the baseline
+        const fragment = endpointFragment(e.key.split(' ')[1]);
+        if (e.builder?.startsWith('PageDefinition.')) {
+          // carried in the draft document: the builder must not ALSO write the live endpoint (VE-4)
+          expect(/api(Put|Post)[^;]*\/(theme|typography)\b/.test(builderSrc), e.key).toBe(false);
+          continue;
+        }
+        expect(builderSrc.includes(fragment) || libSrc.includes(fragment), e.key).toBe(true);
       }
     });
 
@@ -215,11 +225,9 @@ if (process.env.EDITOR_MATRIX_WRITE === '1') {
       }
     });
 
-    it('4. nothing in the editor writes the LIVE theme or typography (VE-4); the list can only shrink', () => {
-      const extra = current.liveWrites.filter(f => !parityBaseline.liveWrites.includes(f));
-      expect(extra).toEqual([]);
-      const closed = parityBaseline.liveWrites.filter(f => !current.liveWrites.includes(f));
-      expect(closed, 'a closed gap must leave parity-baseline.json').toEqual([]);
+    it('4. nothing in the editor writes the LIVE theme or typography (VE-4): the list is empty and stays empty', () => {
+      expect(current.liveWrites).toEqual([]);
+      expect(parityBaseline.liveWrites).toEqual([]);
     });
 
     it('5. the classic builder is referenced from no new file; the list can only shrink (Task 12 empties it)', () => {

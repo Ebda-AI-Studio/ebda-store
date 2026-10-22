@@ -8,6 +8,8 @@
 import { test, expect, type Page, type FrameLocator } from '@playwright/test';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import arMessages from '../../apps/admin/src/i18n/messages/ar.json';
+import enMessages from '../../apps/admin/src/i18n/messages/en.json';
 
 const API = `http://localhost:${process.env.MOCK_API_PORT || 4510}/api/v1`;
 const STORE_ID = '0a0b0c0d-0000-4000-8000-00000000e2e0';
@@ -428,6 +430,60 @@ test('AI fill from the canvas toolbar fills only the empty kicker and subtitle, 
   await sendFromCanvas(page, { type: 'section-op', sectionId: 'hero', op: 'aiFill' });
   await page.waitForTimeout(1800);
   expect((await state(page)).saves).toBe(saves);
+});
+
+test('fonts and typography zones are draft edits: they reach the draft, and nothing live is written before Publish', async ({
+  page,
+}) => {
+  await openBuilder(page);
+  const M = (locale() === 'ar' ? arMessages : enMessages).orders.layout;
+  const startTabs = page.getByRole('tablist').first().getByRole('tab');
+  if (narrow(page))
+    await page
+      .getByRole('button', { name: L('الهيكل', 'Structure') })
+      .first()
+      .click();
+  await startTabs.nth(1).click();
+  await expect(page.getByTestId('theme-settings')).toBeVisible();
+  const typography = async () =>
+    (await state(page)).draft?.definition as unknown as
+      | {
+          typography?: {
+            fonts?: Array<{ family: string; url: string }>;
+            zones?: Record<string, unknown>;
+          };
+        }
+      | undefined;
+
+  // add a Google font: the whole library goes into the draft
+  await page.getByRole('button', { name: M.fonts.addGoogleFont }).click();
+  await page.getByLabel(M.fonts.familyNameLabel).fill('Tajawal');
+  await page.getByRole('button', { name: M.fonts.addFont, exact: true }).click();
+  await expect
+    .poll(async () => (await typography())?.typography?.fonts?.map(f => f.family), {
+      timeout: 15_000,
+    })
+    .toEqual(['Tajawal']);
+  expect((await typography())?.typography?.fonts?.[0]?.url).toMatch(
+    /^https:\/\/fonts\.googleapis\.com\//
+  );
+
+  // a typography zone edit is a partial patch for that zone only
+  const zone = page.locator('[data-zone-key="sectionTitle"]');
+  await zone.getByRole('textbox').nth(1).fill('2rem');
+  await expect
+    .poll(async () => Object.keys((await typography())?.typography?.zones ?? {}), {
+      timeout: 15_000,
+    })
+    .toEqual(['sectionTitle']);
+
+  // the live endpoints were never touched, and the canvas is told about the draft
+  expect((await state(page)).liveWrites).toEqual([]);
+
+  // publish promotes the draft; still no direct write to the live theme/typography endpoints
+  await page.getByTestId('publish').click();
+  await expect.poll(async () => (await state(page)).publishes, { timeout: 15_000 }).toBe(1);
+  expect((await state(page)).liveWrites).toEqual([]);
 });
 
 test('viewport switch sizes the canvas 1280 / 820 / 390', async ({ page }) => {

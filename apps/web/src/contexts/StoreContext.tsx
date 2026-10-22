@@ -9,7 +9,12 @@ import {
   useState,
   type ReactNode,
 } from 'react';
-import { chromePreviewSettings, type DraftChrome } from '@ebda/shared';
+import {
+  applyThemePatch,
+  chromePreviewSettings,
+  type DraftChrome,
+  type DraftTheme,
+} from '@ebda/shared';
 import { api, API_URL } from '../lib/api';
 import { isPlatformHost } from '../lib/platform-host';
 import { setCompareStoreId } from '../lib/compare';
@@ -466,7 +471,11 @@ export function PreviewThemeOverride({
     return {
       ...ctx,
       store: hasTheme
-        ? { ...ctx.store, theme: { ...ctx.store.theme, ...theme } as StoreData['theme'] }
+        ? {
+            ...ctx.store,
+            // a `null` in the patch is a reset: the key is removed so the look default shows
+            theme: applyThemePatch(ctx.store.theme, theme as DraftTheme) as StoreData['theme'],
+          }
         : ctx.store,
       draftSettings: previewSettings
         ? { ...(ctx.draftSettings ?? {}), ...previewSettings }

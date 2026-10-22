@@ -91,6 +91,21 @@ export function writtenFields(source: string): Record<string, string[]> {
   );
 }
 
+/**
+ * The part of an endpoint path to look for in source: whatever follows the last `:p` parameter
+ * (`/stores/:p/ai/section-content` -> `/ai/section-content`), or the whole path when it has none.
+ */
+export function endpointFragment(path: string): string {
+  const after = path.split(':p').pop() ?? path;
+  return after === ''
+    ? path
+        .split(':p')[0]
+        .split('/')
+        .slice(-1)
+        .map(x => `/${x}`)[0]
+    : after;
+}
+
 /** API paths the page calls, with `${...}` collapsed to `:p`. */
 export function calledEndpoints(source: string): string[] {
   const out = new Set<string>();
@@ -132,8 +147,12 @@ const siteCapability = (key: string) => SITE_CAPABILITY[key.split('.')[0]] ?? 'P
  * whether the visual editor already covers it.
  */
 const COMPONENTS: Array<{ name: string; capability: string; covered: string | null }> = [
-  { name: 'FontsCard', capability: 'P-01', covered: null },
-  { name: 'ZoneEditor', capability: 'P-02', covered: null },
+  { name: 'FontsCard', capability: 'P-01', covered: 'FontsField (theme pane, a draft edit)' },
+  {
+    name: 'ZoneEditor',
+    capability: 'P-02',
+    covered: 'TypographyZonesField (theme pane, a draft edit)',
+  },
   {
     name: 'SectionTypographyBlock',
     capability: 'P-03',
@@ -156,7 +175,11 @@ const COMPONENTS: Array<{ name: string; capability: string; covered: string | nu
   },
   { name: 'SectionTitleFields', capability: 'P-06', covered: 'registry settings title, titleAr' },
   { name: 'ProductCardControls', capability: 'P-07', covered: null },
-  { name: 'SmartPaletteModal', capability: 'P-13', covered: null },
+  {
+    name: 'SmartPaletteModal',
+    capability: 'P-13',
+    covered: 'Smart Palette in the theme pane (a draft edit)',
+  },
   {
     name: 'AiSectionFillButton',
     capability: 'P-14',
@@ -207,6 +230,8 @@ function readBuilderSources(): string {
     }
   };
   walkDir(path.join(ROOT, 'apps/admin/src/app/stores/[id]/builder'));
+  // the shared blocks the builder panels render (fonts, dividers, typography, AI fill)
+  walkDir(path.join(ROOT, 'apps/admin/src/components/section-design'));
   out.push(readFileSync(path.join(ROOT, 'apps/admin/src/lib/page-builder-save.ts'), 'utf8'));
   return out.join('\n');
 }
@@ -320,7 +345,7 @@ export function buildClassicManifest(): ManifestEntry[] {
   ];
   for (const call of calledEndpoints(src)) {
     const path = call.split(' ')[1];
-    const tail = path.replace(/:p/g, '').split('/').filter(Boolean).slice(-1)[0];
+    const tail = endpointFragment(path);
     if (/layout\/preview$/.test(call)) {
       entries.push({
         kind: 'api',
@@ -332,10 +357,22 @@ export function buildClassicManifest(): ManifestEntry[] {
       });
       continue;
     }
-    // A live theme / typography write must become a draft write (VE-4), even if the builder also calls it.
+    // A live theme / typography write must become a draft write (VE-4): the endpoint is covered when the
+    // visual editor carries the same data in the draft document and never calls the endpoint itself.
     const live = /\/(theme|typography)$/.test(path) || /uploads\/font$/.test(path);
+    const liveWriteInBuilder = /api(Put|Post)[^;]*\/(theme|typography)\b/.test(builderSrc);
+    if (live && !liveWriteInBuilder && !/uploads\/font$/.test(path)) {
+      entries.push({
+        kind: 'api',
+        key: call,
+        builder: `PageDefinition.${path.endsWith('/theme') ? 'theme' : 'typography'} (draft, published with the page)`,
+        status: 'wired',
+      });
+      continue;
+    }
     const used = builderSrc.includes(tail);
-    if (used && !live) {
+    // an uploaded font file is stored by the shared FontsCard; it is not a write to the store's typography
+    if (used && (!live || /uploads\/font$/.test(path))) {
       entries.push({ kind: 'api', key: call, builder: `builder calls ${tail}`, status: 'wired' });
       continue;
     }

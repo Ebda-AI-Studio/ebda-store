@@ -8,7 +8,8 @@ import { readFileSync } from 'node:fs';
 
 const READERS = [
   'apps/admin/src/hooks/useImageUpload.ts',
-  'apps/admin/src/app/stores/[id]/page-builder/page.tsx',
+  // the font upload moved with the shared FontsCard (page builder and visual editor both use it)
+  'apps/admin/src/components/section-design/FontsCard.tsx',
   'apps/admin/src/app/stores/[id]/finance/expenses/new/page.tsx',
   'apps/admin/src/app/stores/[id]/products/[productId]/_components/Product3dModelCard.tsx',
   'apps/admin/src/app/stores/[id]/pwa/_components/PwaIconUploader.tsx',

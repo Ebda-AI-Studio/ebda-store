@@ -54,6 +54,10 @@ import {
   publishedDocumentAgrees,
   resolveLayoutSettings,
   snapshotEditableTheme,
+  applyThemePatch,
+  applyTypographyPatch,
+  hasTypographyPatch,
+  snapshotTypography,
   applyChromePatch,
   applyTemplateFamily,
   NEW_STORE_LAYOUT_SETTINGS,
@@ -73,7 +77,7 @@ import { withSavepoint } from '../lib/savepoint';
 import { readInStoreContext } from '../lib/store-scoped-read';
 import { deferAfterTenantCommit } from '../lib/after-tenant-commit';
 import { bustStoreCaches } from './store.service';
-import { cleanupRemovedJsonUrls } from './r2-cleanup.service';
+import { cleanupRemovedJsonUrls, deleteR2ObjectIfOrphan } from './r2-cleanup.service';
 import logger from '../lib/logger';
 
 export const HOME_PAGE_KEY = 'home';
@@ -146,6 +150,7 @@ async function loadStore(storeId: string) {
         slug: true,
         domain: true,
         theme: true,
+        typography: true,
       },
     })
   );
@@ -190,6 +195,8 @@ function resolvedLayout(store: {
 function withoutTheme(document: unknown): PageDefinition {
   const rest = { ...(document as PageDefinition) };
   delete rest.theme;
+  // Typography (fonts + zones) is the same story: once published it is live in `stores.typography`.
+  delete rest.typography;
   // Same for the header/footer content patch (`chrome`): once published it is
   // live in `stores.settings`, so it is not re-opened as a pending edit.
   delete rest.chrome;
@@ -370,12 +377,21 @@ export async function saveDraft(args: {
  * patch, the published document records a full snapshot of the editor-managed
  * keys (live ⊕ patch) so rolling back to it restores exactly those keys.
  */
-function publishedThemeData(document: unknown, liveTheme: unknown): Record<string, unknown> {
+function publishedThemeData(
+  document: unknown,
+  liveTheme: unknown,
+  liveTypography: unknown
+): Record<string, unknown> {
   const doc = document as PageDefinition;
-  if (!doc.theme) return {};
+  const typography = hasTypographyPatch(doc.typography) ? doc.typography : undefined;
+  if (!doc.theme && !typography) return {};
   const snapshotted = {
     ...doc,
-    theme: snapshotEditableTheme(liveTheme as Record<string, unknown> | null, doc.theme),
+    ...(doc.theme
+      ? { theme: snapshotEditableTheme(liveTheme as Record<string, unknown> | null, doc.theme) }
+      : {}),
+    // Rollback restores the whole library + zones as they were once this revision went live.
+    ...(typography ? { typography: snapshotTypography(liveTypography, typography) } : {}),
   };
   return { document: snapshotted as unknown as object, docBytes: docBytes(snapshotted) };
 }
@@ -412,30 +428,53 @@ async function applyPublishedLayout(
 ): Promise<StoreLayoutSettings> {
   const layout = definitionToLayout(definition);
   const themePatch = definition.theme;
+  const typographyPatch = hasTypographyPatch(definition.typography)
+    ? definition.typography
+    : undefined;
   const chromePatch = hasChromePatch(definition.chrome) ? definition.chrome : undefined;
+  let removedFontUrls: string[] = [];
   await withStore(storeId, async tx => {
-    // Merge the pending theme / header+footer content over the CURRENT live
+    // Merge the pending theme / typography / header+footer content over the CURRENT live
     // values read in this same transaction (the Branding tab and the classic
     // builder also write other theme / settings keys), and write them with
     // layout_settings in one statement.
     const live =
-      themePatch || chromePatch
+      themePatch || typographyPatch || chromePatch
         ? await tx.store.findUnique({
             where: { id: storeId },
-            select: { theme: true, settings: true },
+            select: { theme: true, typography: true, settings: true },
           })
         : null;
+    const nextTypography = typographyPatch
+      ? applyTypographyPatch(live?.typography, typographyPatch)
+      : undefined;
+    if (nextTypography) {
+      // A custom font that left the library is deleted from R2 once nothing else references it.
+      const kept = new Set(nextTypography.fonts.filter(f => f.type === 'custom').map(f => f.url));
+      const before = (live?.typography as { fonts?: Array<{ type: string; url?: string }> } | null)
+        ?.fonts;
+      removedFontUrls = (Array.isArray(before) ? before : [])
+        .filter(f => f.type === 'custom' && f.url && !kept.has(f.url))
+        .map(f => f.url as string);
+    }
     return tx.store.update({
       where: { id: storeId },
       data: {
         layoutSettings: layout as unknown as object,
-        ...(themePatch ? { theme: { ...((live?.theme ?? {}) as object), ...themePatch } } : {}),
+        ...(themePatch
+          ? { theme: applyThemePatch((live?.theme ?? {}) as object, themePatch) as object }
+          : {}),
+        ...(nextTypography ? { typography: nextTypography as unknown as object } : {}),
         ...(chromePatch
           ? { settings: applyChromePatch(live?.settings, chromePatch) as unknown as object }
           : {}),
       },
     });
   });
+  for (const url of removedFontUrls)
+    void deleteR2ObjectIfOrphan(url).catch(err =>
+      logger.warn({ err, storeId, url }, '[page-builder] font r2 cleanup failed')
+    );
   void cleanupRemovedJsonUrls(store.layoutSettings ?? {}, layout).catch(err =>
     logger.warn({ err, storeId }, '[page-builder] r2 cleanup failed')
   );
@@ -499,7 +538,7 @@ export async function publishDraft(args: {
       data: {
         status: 'published',
         publishedAt: new Date(),
-        ...publishedThemeData(draft.document, store.theme),
+        ...publishedThemeData(draft.document, store.theme, store.typography),
       },
     });
     if (count !== 1) throw new RevConflict();

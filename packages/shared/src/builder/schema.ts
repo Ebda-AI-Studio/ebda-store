@@ -41,6 +41,7 @@
 import { z } from 'zod';
 import { draftThemeSchema } from './theme-draft';
 import { draftChromeSchema } from './chrome-draft';
+import { draftTypographySchema } from './typography-draft';
 
 export const PAGE_DEFINITION_SCHEMA_VERSION = 1 as const;
 
@@ -114,6 +115,8 @@ export const pageDefinitionSchema = z
     siteSettings: z.record(z.unknown()),
     /** Draft/published theme PATCH (editor-managed keys only, see `theme-draft.ts`). */
     theme: draftThemeSchema.optional(),
+    /** Draft/published font library + typography zones PATCH (see `typography-draft.ts`, Ruling VE-4). */
+    typography: draftTypographySchema.optional(),
     /** Draft/published header-menu + footer-links PATCH (see `chrome-draft.ts`). */
     chrome: draftChromeSchema.optional(),
     /** The look whose mix last composed this document (`applyFamilyForLook`): the outgoing look of

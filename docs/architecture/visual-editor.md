@@ -136,3 +136,14 @@ and testimonials, then dispatches only the EMPTY kicker/subtitle fields as ordin
 edits under one coalesce key (`aiFillActions`): undo takes the whole fill back and the merchant's own
 words are never overwritten. Colour scheme, density and text scale are page-type settings (Ruling VE-7),
 not section settings.
+
+## The theme pane is draft-only (Task 7, Ruling VE-4)
+
+Fonts (`FontsField`, the page builder's `FontsCard`), global typography zones (`TypographyZonesField`, one
+`ZoneEditor` per zone), Smart Palette (`applySmartPalette`, one undo step) and "reset to the look default" are
+edits to the page document: `PageDefinition.typography` and `PageDefinition.theme` (a `null` value is a reset).
+Nothing in the builder calls `PUT /theme` or `PUT /typography`; `visual-editor-parity.test.ts` and the builder e2e
+(`liveWrites` in the mock API) both fail if it does. Publish promotes the patches (see
+`docs/architecture/store-theme-flags.md`), and the editor re-opens the page afterwards so a stale patch is never
+re-sent. A custom font FILE is uploaded to the store's R2 area immediately (like an image), but belongs to no
+store's typography until the draft that references it is published.

@@ -24,15 +24,32 @@ import { THEME_SETTINGS_SCHEMA } from './settings-schema';
 const EDITABLE = new Map<string, 'string' | 'boolean'>();
 for (const g of THEME_SETTINGS_SCHEMA)
   for (const s of g.settings)
-    // `dividers` is a classic-builder-only control (not a scalar value).
-    if (s.type !== 'dividers')
-      EDITABLE.set(String(s.id), s.type === 'checkbox' ? 'boolean' : 'string');
+    EDITABLE.set(String(s.id), s.type === 'checkbox' ? 'boolean' : 'string');
+
+/**
+ * Colour tokens Smart Palette DERIVES from the brand colours (`deriveCoreBrandTokens`): the text
+ * colour on each brand fill and the input border. They have no control of their own, so they are not
+ * in `THEME_SETTINGS_SCHEMA`, but a palette applied in the editor must be able to put them in the
+ * draft or the live theme would end up half-updated at publish.
+ */
+export const DERIVED_THEME_KEYS = [
+  'inputColor',
+  'primaryForeground',
+  'secondaryForeground',
+  'accentForeground',
+  'cardForeground',
+] as const;
+for (const k of DERIVED_THEME_KEYS) EDITABLE.set(k, 'string');
 
 /** Theme keys the visual editor may put in a draft. */
 export const DRAFT_THEME_KEYS: readonly string[] = [...EDITABLE.keys()];
 
+/**
+ * `null` is "reset this key": at publish the key is removed from the live theme so the look's own
+ * default shows again (the editor's "reset to the look default"). It is a draft edit like any other.
+ */
 export const draftThemeSchema = z
-  .record(z.union([z.string().max(100), z.boolean()]))
+  .record(z.union([z.string().max(100), z.boolean(), z.null()]))
   .superRefine((theme, ctx) => {
     for (const [key, value] of Object.entries(theme)) {
       const kind = EDITABLE.get(key);
@@ -42,7 +59,7 @@ export const draftThemeSchema = z
           path: [key],
           message: `"${key}" is not an editable theme setting`,
         });
-      } else if (typeof value !== kind) {
+      } else if (value !== null && typeof value !== kind) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           path: [key],
@@ -54,28 +71,43 @@ export const draftThemeSchema = z
 
 export type DraftTheme = z.infer<typeof draftThemeSchema>;
 
+/** `live` with the patch applied: a `null` removes the key. Never mutates its inputs. */
+export function applyThemePatch<T extends object>(
+  live: T | null | undefined,
+  patch: DraftTheme | undefined
+): T {
+  const out = { ...(live ?? {}) } as Record<string, unknown>;
+  for (const [key, value] of Object.entries(patch ?? {})) {
+    if (value === null) delete out[key];
+    else out[key] = value;
+  }
+  return out as T;
+}
+
 /** The theme the editor shows / the canvas paints: live theme with the draft patch on top. */
 export function effectiveTheme<T extends object>(
   live: T | null | undefined,
   patch: DraftTheme | undefined
 ): T {
-  return { ...(live ?? {}), ...(patch ?? {}) } as T;
+  return applyThemePatch(live, patch);
 }
 
 /**
  * Full snapshot of the editor-managed keys after applying `patch` over `live`
  * — what a published revision records so a later rollback restores exactly
  * these keys (a bare patch would only restore the keys that revision changed).
+ * A key the patch reset is recorded as `null`, so rolling back removes it again.
  */
 export function snapshotEditableTheme(
   live: Record<string, unknown> | null | undefined,
   patch: DraftTheme
 ): DraftTheme {
-  const merged = { ...(live ?? {}), ...patch } as Record<string, unknown>;
+  const merged = applyThemePatch(live, patch) as Record<string, unknown>;
   const out: DraftTheme = {};
   for (const key of DRAFT_THEME_KEYS) {
     const v = merged[key];
     if (typeof v === 'string' || typeof v === 'boolean') out[key] = v;
+    else if (patch[key] === null) out[key] = null;
   }
   return out;
 }

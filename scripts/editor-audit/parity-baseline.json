@@ -2,7 +2,6 @@
   "classicReferences": [
     "apps/admin/src/app/stores/[id]/announcement/page.tsx",
     "apps/admin/src/app/stores/[id]/branding/_components/ThemeTab.tsx",
-    "apps/admin/src/app/stores/[id]/builder/_components/ThemeSettingsPanel.tsx",
     "apps/admin/src/app/stores/[id]/builder/page.tsx",
     "apps/admin/src/app/stores/[id]/hero/page.tsx",
     "apps/admin/src/app/stores/[id]/navigation/page.tsx",
@@ -24,7 +23,5 @@
     "apps/admin/src/lib/settings-registry.ts",
     "apps/admin/src/lib/settings-search-index.generated.json"
   ],
-  "liveWrites": [
-    "apps/admin/src/app/stores/[id]/builder/_components/ThemeSettingsPanel.tsx"
-  ]
+  "liveWrites": []
 }
