@@ -38,6 +38,7 @@ import { AcceptedPaymentBadges } from '../../components/AcceptedPaymentBadges';
 import { CartLineNote } from '../../components/commerce/CartLineNote';
 import { GoldRateLine } from '../../components/commerce/GoldRateLine';
 import { PriceChangedNotice } from '../../components/commerce/PriceChangedNotice';
+import { priceChangedLines } from '@/lib/gold-display';
 import { StickyCartTotal } from '../../components/commerce/StickyCartTotal';
 import { MinOrderProgress } from '../../components/commerce/MinOrderProgress';
 import { cartRemovalToast } from './cart-removal';
@@ -607,6 +608,7 @@ export default function CartClient() {
                   {priceChanged && (
                     <PriceChangedNotice
                       className="mb-4"
+                      lines={priceChangedLines(cartItems, language)}
                       busy={acknowledging}
                       onContinue={() => {
                         setAcknowledging(true);

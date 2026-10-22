@@ -79,6 +79,7 @@ import {
 } from '../../templates/shared/section-typography';
 import { OrderSummary } from './OrderSummary';
 import { PriceChangedNotice } from '../../components/commerce/PriceChangedNotice';
+import { priceChangedLines } from '@/lib/gold-display';
 import { couponErrorCopy } from '../../lib/coupon-errors';
 import { estimateLoyaltyRedemption } from './_lib/loyaltyEstimate';
 import { repriceAfterCouponRemoval, isShippingSettled } from './_lib/repriceAfterCouponRemoval';
@@ -1328,6 +1329,17 @@ export default function CheckoutClient() {
       return;
     }
 
+    // A gold line whose price moved (B5-17): payment waits until the shopper has seen the new price and pressed Continue.
+    if (goldPriceChanged) {
+      setCheckoutError(
+        t(
+          'The gold rate changed since you added a piece. Press Continue on the price notice to see the new price, then place your order.',
+          'سعر الدهب اتغيّر من ساعة ما ضفت قطعة. دوس متابعة في تنبيه السعر عشان تشوف السعر الجديد، وبعدها كمّل الطلب.'
+        )
+      );
+      return;
+    }
+
     // An unavailable line can never be ordered — say so now rather than let the
     // shopper fill both steps and meet the server's refusal (#2117).
     if (unavailableLinesNotice) {
@@ -2254,6 +2266,7 @@ export default function CheckoutClient() {
               {goldPriceChanged && (
                 <PriceChangedNotice
                   className="mb-4"
+                  lines={priceChangedLines(cartContextItems, language)}
                   busy={isAcknowledging}
                   onContinue={() => {
                     setIsAcknowledging(true);
@@ -2654,7 +2667,12 @@ export default function CheckoutClient() {
                         type="submit"
                         className="w-full sm:w-auto"
                         size="lg"
-                        disabled={shippingUnavailable || belowMinimumOrder || !shippingSettled}
+                        disabled={
+                          shippingUnavailable ||
+                          belowMinimumOrder ||
+                          goldPriceChanged ||
+                          !shippingSettled
+                        }
                       >
                         {t(
                           'Continue to payment',
@@ -2680,7 +2698,7 @@ export default function CheckoutClient() {
                     }
                     total={total}
                     formatPrice={formatPrice}
-                    belowMinimumOrder={belowMinimumOrder}
+                    belowMinimumOrder={belowMinimumOrder || goldPriceChanged}
                     isDemo={store.isDemo === true}
                     deliverySection={
                       checkoutDelivery ? (
@@ -2804,7 +2822,9 @@ export default function CheckoutClient() {
                   form="checkout-shipping-form"
                   className="w-full sm:w-auto"
                   size="lg"
-                  disabled={shippingUnavailable || belowMinimumOrder || !shippingSettled}
+                  disabled={
+                    shippingUnavailable || belowMinimumOrder || goldPriceChanged || !shippingSettled
+                  }
                 >
                   {t('Continue to payment', 'المتابعة للدفع')}
                 </Button>

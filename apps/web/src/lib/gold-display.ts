@@ -36,3 +36,32 @@ export interface GoldLineParts {
 export function goldLineParts(gold: Pick<PublicGoldPricing, 'karat' | 'weightMg'>): GoldLineParts {
   return { karat: gold.karat, grams: mgToGramsString(gold.weightMg) };
 }
+
+export interface PriceChangedLine {
+  id: string;
+  name: string;
+  previous?: number;
+  current: number;
+}
+
+/** The cart lines whose gold price moved, named in the shopper's language, for the "السعر اتحدّث" notice. */
+export function priceChangedLines(
+  items: ReadonlyArray<{
+    id: string;
+    name: string;
+    nameAr?: string;
+    price: number;
+    previousPrice?: number;
+    priceChanged?: boolean;
+  }>,
+  lang: string
+): PriceChangedLine[] {
+  return items
+    .filter(i => i.priceChanged === true)
+    .map(i => ({
+      id: i.id,
+      name: lang === 'ar' && i.nameAr ? i.nameAr : i.name,
+      previous: i.previousPrice,
+      current: i.price,
+    }));
+}

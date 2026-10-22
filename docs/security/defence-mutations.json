@@ -2640,6 +2640,16 @@
       "find": "const addDisabled = !buyableNow || goldStale;",
       "replace": "const addDisabled = !buyableNow;",
       "test": "tests/unit/gold-storefront-display.test.tsx"
+    },
+    {
+      "id": "money-gold-checkout-holds-payment-on-moved-price",
+      "domain": "money",
+      "tier": "unit",
+      "why": "the checkout submits the order while a moved-price notice is still open, so the shopper can pay a price they have not acknowledged",
+      "source": "apps/web/src/app/checkout/CheckoutClient.tsx",
+      "find": "if (goldPriceChanged) {\n      setCheckoutError(",
+      "replace": "if (false as boolean) {\n      setCheckoutError(",
+      "test": "tests/unit/gold-storefront-display.test.tsx"
     }
   ]
 }

@@ -29,7 +29,11 @@ import {
   useGoldRateStale,
 } from '../../apps/web/src/components/commerce/GoldRateLine';
 import { PriceChangedNotice } from '../../apps/web/src/components/commerce/PriceChangedNotice';
-import { goldRateIsStale, goldRateTime } from '../../apps/web/src/lib/gold-display';
+import {
+  goldRateIsStale,
+  goldRateTime,
+  priceChangedLines,
+} from '../../apps/web/src/lib/gold-display';
 import { mapServerItem } from '../../apps/web/src/contexts/cart-lines';
 
 const NOW = Date.parse('2026-10-22T12:00:00.000Z');
@@ -109,6 +113,9 @@ describe('GoldRateLine', () => {
     );
     await act(async () => {});
     expect(queryByTestId('gold-stale')).not.toBeNull();
+    // the last price is labelled by its time, and the sentence is the server's own
+    expect(screen.getByTestId('gold-last-price').textContent).toMatch(/^آخر سعر /);
+    expect(screen.getByTestId('gold-stale').textContent).toContain('مش هنقدر نكمّل الطلب دلوقتي');
   });
 
   it('turns stale while the page stays open', async () => {
@@ -136,20 +143,64 @@ describe('GoldRateLine', () => {
 });
 
 describe('PriceChangedNotice', () => {
-  it('is an alert with a neutral Continue button that calls back once', () => {
+  const lines = [{ id: 'l1', name: 'خاتم', previous: 2_050_000, current: 2_100_000 }];
+
+  it('is a polite status with a neutral Continue button that calls back once, and takes focus', () => {
     const onContinue = vi.fn();
-    render(<PriceChangedNotice onContinue={onContinue} />);
-    expect(screen.getByRole('alert').textContent).toContain('السعر اتحدّث');
+    render(<PriceChangedNotice onContinue={onContinue} lines={lines} />);
+    const notice = screen.getByRole('status');
+    expect(notice.getAttribute('aria-live')).toBe('polite');
+    expect(notice.textContent).toContain('السعر اتحدّث');
+    expect(document.activeElement).toBe(notice);
     fireEvent.click(screen.getByText('متابعة'));
     expect(onContinue).toHaveBeenCalledTimes(1);
   });
+
+  it('lists each moved line with the old price struck and the new one after it', () => {
+    render(<PriceChangedNotice onContinue={() => {}} lines={lines} />);
+    const li = screen.getByTestId('price-changed-lines').querySelector('li')!;
+    expect(li.textContent).toContain('خاتم');
+    const old = li.querySelector('.line-through')!;
+    expect(old.textContent).toContain('20500.00');
+    expect(old.getAttribute('aria-label')).toBe('السعر القديم');
+    expect(li.textContent).toContain('21000.00');
+  });
+
+  it('does not strike an unchanged or unknown previous price', () => {
+    render(
+      <PriceChangedNotice
+        onContinue={() => {}}
+        lines={[
+          { id: 'a', name: 'x', current: 5 },
+          { id: 'b', name: 'y', previous: 5, current: 5 },
+        ]}
+      />
+    );
+    expect(document.querySelectorAll('.line-through').length).toBe(0);
+  });
+
   it('disables Continue while busy', () => {
     render(<PriceChangedNotice onContinue={() => {}} busy />);
     expect((screen.getByText('متابعة') as HTMLButtonElement).disabled).toBe(true);
   });
-  it('button is a 44px touch target', () => {
-    render(<PriceChangedNotice onContinue={() => {}} />);
+
+  it('button is a 44px touch target and the block uses tokens only (no orange or amber)', () => {
+    const { container } = render(<PriceChangedNotice onContinue={() => {}} lines={lines} />);
     expect(screen.getByText('متابعة').className).toMatch(/min-h-11/);
+    expect(container.innerHTML).not.toMatch(/orange|amber|#[0-9a-f]{3,6}/i);
+  });
+});
+
+describe('priceChangedLines', () => {
+  it('keeps only moved lines and names them in the shopper language', () => {
+    const items = [
+      { id: '1', name: 'Ring', nameAr: 'خاتم', price: 10, previousPrice: 8, priceChanged: true },
+      { id: '2', name: 'Chain', nameAr: 'سلسلة', price: 5 },
+    ];
+    expect(priceChangedLines(items, 'ar')).toEqual([
+      { id: '1', name: 'خاتم', previous: 8, current: 10 },
+    ]);
+    expect(priceChangedLines(items, 'en')[0]!.name).toBe('Ring');
   });
 });
 
@@ -192,6 +243,11 @@ describe('wiring (source scan)', () => {
     const src = read('apps/web/src/app/checkout/CheckoutClient.tsx');
     for (const c of ["case 'GOLD_RATE_STALE'", "case 'GOLD_PRICE_DRIFT'", '<PriceChangedNotice'])
       expect(src).toContain(c);
+  });
+  it('payment is held while a gold price notice is open', () => {
+    const src = read('apps/web/src/app/checkout/CheckoutClient.tsx');
+    expect(src).toMatch(/if \(goldPriceChanged\) \{\s+setCheckoutError\(/);
+    expect((src.match(/goldPriceChanged/g) ?? []).length).toBeGreaterThanOrEqual(5);
   });
   it('the cart acknowledges through the public route with an empty body', () => {
     const api = read('apps/web/src/lib/api.ts');

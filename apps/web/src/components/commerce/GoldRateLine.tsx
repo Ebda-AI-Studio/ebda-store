@@ -67,9 +67,12 @@ export function GoldRateLine({
           className="mt-1 text-xs font-medium text-foreground"
           data-testid="gold-stale"
         >
+          <span className="block text-muted-foreground" data-testid="gold-last-price">
+            {t(`Last price ${when}`, `آخر سعر ${when}`)}
+          </span>
           {t(
-            'The gold rate is being updated, so this piece cannot be ordered right now.',
-            'سعر الدهب بيتحدّث دلوقتي، فمش هنقدر نكمّل طلب القطعة دي قبل ما يتحدّث.'
+            "We can't take orders for this piece right now because today's gold rate hasn't been updated. Please try again later or contact the store.",
+            'مش هنقدر نكمّل الطلب دلوقتي لأن سعر الدهب لسه مستني تحديث النهارده. جرّب تاني بعد شوية أو كلّم المحل.'
           )}
         </p>
       )}
