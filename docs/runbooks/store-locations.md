@@ -13,7 +13,7 @@ store's theme tokens, so each store's page matches its own brand.
 | --------------- | ------------------------------------------------- |
 | `storeId`       | FK → `stores.id`, `ON DELETE CASCADE`             |
 | `name`          | required; `nameAr?` Arabic                        |
-| `country`       | required (e.g. "Egypt", "U.A.E."); `countryAr?`  |
+| `country`       | required (e.g. "Egypt", "U.A.E."); `countryAr?`   |
 | `address`       | required; `addressAr?`                            |
 | `phone?`        | `tel:` target                                     |
 | `whatsapp?`     | wa.me number (digits or `+<intl>`)                |

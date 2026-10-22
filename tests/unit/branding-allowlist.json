@@ -1,22 +1,10 @@
 {
- "forceApiApp": [
-  "packages/shared/src/auth/jwt-claims.ts"
- ],
- "hintCookie": [
-  "packages/shared/src/auth/session-hint-cookie.ts"
- ],
- "metaEnv": [
-  "apps/api/src/services/meta-provisioner.service.ts",
-  "docs/ENVIRONMENT.md"
- ],
- "wbsBridge": [
-  "apps/api/src/lib/wbs-wire.ts",
-  "apps/api/src/services/wbs-bridge.service.ts"
- ],
- "waTemplateNames": [
-  "apps/api/src/lib/wa-templates/definitions.ts",
-  "apps/api/src/routes/wa-templates.routes.ts",
-  "apps/api/src/services/abandoned-cart.service.ts",
-  "docs/uat/wbs-bridge.md"
- ]
+  "forceApiApp": ["packages/shared/src/auth/jwt-claims.ts"],
+  "hintCookie": ["packages/shared/src/auth/session-hint-cookie.ts"],
+  "metaEnv": ["apps/api/src/services/meta-provisioner.service.ts", "docs/ENVIRONMENT.md"],
+  "wbsBridge": ["apps/api/src/lib/wbs-wire.ts", "apps/api/src/services/wbs-bridge.service.ts"],
+  "waTemplateNames": [
+    "apps/api/src/lib/wa-templates/legacy-names.ts",
+    "tests/unit/wa-template-names-ebda.test.ts"
+  ]
 }

@@ -117,8 +117,8 @@ vi.mock('@api/services/auth.service', () => ({
       user: { id: u.id, email: u.email, storeId: u.storeId, role: u.role },
       accessToken: jwt.sign({ userId: u.id }, 's', {
         algorithm: 'HS256',
-        issuer: 'force-api',
-        audience: 'force-app',
+        issuer: 'ebda-api',
+        audience: 'ebda-app',
         jwtid: 'sess-new',
       }),
       refreshToken: 'refresh',

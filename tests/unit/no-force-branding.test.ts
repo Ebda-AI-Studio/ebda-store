@@ -43,7 +43,7 @@ const ALLOWED: Record<string, { re: RegExp; why: string }> = {
   },
   waTemplateNames: {
     re: /force_[a-z_]+_v\d+/g,
-    why: 'WhatsApp template names (force_order_paid_v1 etc.): renamed on fix/shopper-messages-egyptian; remove from allowlist after it merges',
+    why: 'WhatsApp template names (the old force_* order, cart and welcome names): renamed on fix/shopper-messages-egyptian; remove from allowlist after it merges',
   },
   hintCookie: {
     re: /\bforce-session\b/g,

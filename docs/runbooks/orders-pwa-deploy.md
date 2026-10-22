@@ -40,9 +40,9 @@ Mirror the `force-admin` / `force-web` project setup:
 
 Set in Vercel → `force-orders` → Settings → Environment Variables:
 
-| Var                                   | Value                                        | Notes                                                                                  |
-| ------------------------------------- | -------------------------------------------- | -------------------------------------------------------------------------------------- |
-| `NEXT_PUBLIC_API_URL`                 | `https://api-production-c058.up.railway.app` | Same Railway API the admin/web use. No `/api/v1` suffix — the app appends it.          |
+| Var                                   | Value                                        | Notes                                                                          |
+| ------------------------------------- | -------------------------------------------- | ------------------------------------------------------------------------------ |
+| `NEXT_PUBLIC_API_URL`                 | `https://api-production-c058.up.railway.app` | Same Railway API the admin/web use. No `/api/v1` suffix — the app appends it.  |
 | `NEXT_PUBLIC_ONESIGNAL_ORDERS_APP_ID` | the Orders OneSignal app id                  | Public app id for the SEPARATE OneSignal app whose origin = `orders.ebda.app`. |
 
 The Orders OneSignal **REST API key** (`ONESIGNAL_ORDERS_REST_API_KEY`) and the

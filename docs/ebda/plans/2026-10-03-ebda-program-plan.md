@@ -46,7 +46,7 @@
 
 | Needed for                               | Item                                                                                                                                     |
 | ---------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| Start                                    | Claude GitHub app access: READ `Whisky-11/ebda-store`, WRITE `whisky-11/ebda`                                                |
+| Start                                    | Claude GitHub app access: READ `Whisky-11/ebda-store`, WRITE `whisky-11/ebda`                                                            |
 | SP3 spike deploy (optional), SP4 staging | Cloudflare API token scoped to the Ebda account + `ebda.app` zone; a Neon project for Ebda (connection string as a cloud-session secret) |
 | SP5                                      | Kashier (or chosen) merchant-billing sandbox keys; Resend API key + verified `ebda.app` sender                                           |
 | SP6                                      | Sandbox keys: Paymob, Kashier, Fawry, Valu (as available)                                                                                |

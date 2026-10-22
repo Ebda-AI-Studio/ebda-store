@@ -26,8 +26,8 @@ The admin will show you two DNS records to add. Keep this page open.
 
 Ebda Store uses Cloudflare-for-SaaS for SSL provisioning — one CNAME record for your domain (the same record works for an apex domain or a subdomain). The admin will show you the exact value, but it looks like:
 
-| Type    | Name                    | Value            | TTL  |
-| ------- | ----------------------- | ---------------- | ---- |
+| Type    | Name                    | Value         | TTL  |
+| ------- | ----------------------- | ------------- | ---- |
 | `CNAME` | `@` (or your subdomain) | `cf.ebda.app` | 3600 |
 
 The `www` variant is enrolled automatically alongside your domain — you don't need a separate record for it.

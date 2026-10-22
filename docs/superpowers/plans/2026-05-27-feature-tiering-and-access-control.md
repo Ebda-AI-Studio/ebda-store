@@ -30,7 +30,7 @@ Two-layer feature resolution: `PLAN_BASELINE[plan]` constant lists baseline-incl
 | `apps/admin/src/components/RequireSuperAdmin.tsx`                 | create | Tiny wrapper that returns 404 if `useAuth().user.role !== 'super_admin'`                                                                                                                               |
 | `apps/admin/src/components/sidebar/StoreSidebar.tsx`              | modify | "Manage Features" link only when `user.role === 'super_admin'`                                                                                                                                         |
 | `apps/admin/src/app/admin/stores/[id]/settings/page.tsx`          | modify | "Suspend store" button only when super-admin; the existing plan dropdown stays visible to store_admin but is read-only for them                                                                        |
-| `apps/web/src/components/StoreMaintenance.tsx`                    | modify | Add "Powered by Ebda AI Studio" hyperlink to `https://store.ebda.app` in the footer area                                                                                                             |
+| `apps/web/src/components/StoreMaintenance.tsx`                    | modify | Add "Powered by Ebda AI Studio" hyperlink to `https://store.ebda.app` in the footer area                                                                                                               |
 | `docs/business/04-pricing-tiers.md`                               | modify | Replace "Bands 1-4" framing with the new named-plan table — keep cost floors                                                                                                                           |
 | `docs/business/02-feature-catalog.md`                             | modify | Add "Available in:" badge per feature mapping to plan(s)                                                                                                                                               |
 | `docs/runbooks/SUPER-ADMIN-PLAYBOOK.md`                           | create | How to suspend / reactivate / change plan / override features per store                                                                                                                                |
@@ -807,11 +807,11 @@ When rendering the WBS Manage Features matrix for a client:
 
 ### H.3: Sales-facing UI copy
 
-| Merchant state                          | What they see                                                                                                                                                                                |
-| --------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Ebda Store only (no Force WhatsApp) | Admin "Connect WhatsApp" panel says: "Activate Force WhatsApp to enable in-chat ordering. Separate quote."                                                                                   |
+| Merchant state                      | What they see                                                                                                                                                                        |
+| ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Ebda Store only (no Force WhatsApp) | Admin "Connect WhatsApp" panel says: "Activate Force WhatsApp to enable in-chat ordering. Separate quote."                                                                           |
 | Force WhatsApp only (no Ebda Store) | Bot tab in WBS admin says: "Bot ordering requires Ebda Store. Ebda Store gives the bot its product catalog and order destination." Bulk campaigns + inbox + templates work normally. |
-| Both products active                    | Bridge unlocks. Bot features render per plan baseline (W-Pro/W-Enterprise) + any overrides.                                                                                                  |
+| Both products active                | Bridge unlocks. Bot features render per plan baseline (W-Pro/W-Enterprise) + any overrides.                                                                                          |
 
 ### H.4: Code locations to gate
 

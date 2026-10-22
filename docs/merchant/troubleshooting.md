@@ -230,7 +230,7 @@ See [faq.md → Payments](./faq.md#payments).
 | **P0 — site down**                    | Storefront returns 5xx or won't load at all                                             | WhatsApp immediately + tag the message URGENT    |
 | **P1 — degraded**                     | Some features broken (e.g. checkout fails, search returns 0 results, images don't load) | WhatsApp with screenshot + URL + time it started |
 | **P2 — issue affecting one merchant** | Specific product / order / category misbehaving                                         | WhatsApp + order ID or product ID                |
-| **P3 — feature request / minor bug**  | Cosmetic issues, "it'd be nice if..."                                                   | Email contact@ebda.app                   |
+| **P3 — feature request / minor bug**  | Cosmetic issues, "it'd be nice if..."                                                   | Email contact@ebda.app                           |
 
 اتصل بالدعم بحسب الأولوية: P0 (الموقع معطّل) فوري عبر واتساب، P1 (خلل جزئي) واتساب مع تفاصيل، P2 (مشكلة محدّدة) واتساب مع رقم الطلب، P3 (ميزة أو خلل بسيط) إيميل.
 

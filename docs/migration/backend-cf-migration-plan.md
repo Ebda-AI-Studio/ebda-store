@@ -33,11 +33,11 @@ combined Ebda Store+WBS compute. **Measured total: ~$6 usage, ~$0–2 actual bil
 
 **New costs (what appears) depend on the path:**
 
-| Path                 | New monthly cost added                                                                                                                                                     |
-| -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Path                 | New monthly cost added                                                                                                                                                            |
+| -------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | CF Containers        | CF Workers Paid $5 (already paying for the frontend workers) + **container compute** (always-on instance, not free) + **Upstash Redis ×2** (Ebda Store + WBS; no TCP Redis on CF) |
-| CF Workers rewrite   | $5 Workers Paid + per-request/CPU-ms (cheap) + **Upstash Redis ×2** + Durable Objects (sockets)                                                                            |
-| Mac Studio self-host | ~**$0 marginal** (hardware already being bought) — power only. Keeps Redis local.                                                                                          |
+| CF Workers rewrite   | $5 Workers Paid + per-request/CPU-ms (cheap) + **Upstash Redis ×2** + Durable Objects (sockets)                                                                                   |
+| Mac Studio self-host | ~**$0 marginal** (hardware already being bought) — power only. Keeps Redis local.                                                                                                 |
 
 **MEASURED 2026-06-26 — from the Railway DASHBOARD (the source of truth).** The whole Railway
 account (Ebda Store + WBS combined) on the **Hobby** plan:
@@ -76,15 +76,15 @@ $5 included).** There is **no meaningful cost to recover by leaving Railway.**
 app in a CONTAINER on both sides sidesteps BOTH Workers blockers (Socket.io works on a real
 process; no Hyperdrive → the RLS hard-stop disappears):**
 
-| Component                                                     | ≈ $/mo       |
-| ------------------------------------------------------------- | ------------ |
-| Mac Studio (power only)                                       | ~$0          |
+| Component                                                            | ≈ $/mo       |
+| -------------------------------------------------------------------- | ------------ |
+| Mac Studio (power only)                                              | ~$0          |
 | Neon (Ebda Store already on it; **WBS Postgres moves here**)         | ~$0–19       |
 | Upstash Redis — WBS BullMQ ($10 fixed) + Ebda Store cache (free/$10) | ~$10–20      |
-| CF Workers Paid (already paying)                              | $5           |
-| CF Container standby (scale-to-zero, idle)                    | ~$0–3        |
-| CF Load Balancer + health checks (Mac↔standby failover)       | ~$5–10       |
-| **Total**                                                     | **≈ $20–40** |
+| CF Workers Paid (already paying)                                     | $5           |
+| CF Container standby (scale-to-zero, idle)                           | ~$0–3        |
+| CF Load Balancer + health checks (Mac↔standby failover)              | ~$5–10       |
+| **Total**                                                            | **≈ $20–40** |
 
 **Net vs reality: this target is ~$20–40/mo — MORE than the ~$2/mo Railway costs today.** So it
 **does not save money**; it _adds_ ~$20–35/mo in exchange for (a) the warm-standby failover and

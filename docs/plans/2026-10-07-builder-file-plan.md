@@ -38,7 +38,7 @@ Closes gap #19 independent of the builder.
 | `packages/shared/src/builder/index.ts` + export in `packages/shared/src/index.ts` | Public surface.                                                                                                                                                                                                                                                                                                            |
 | `apps/web/src/builder/render/SectionRenderer.tsx`                                 | Maps `rendererKey` → existing template components (`getHomepageTemplate`, `templates/shared/*`). No editor imports.                                                                                                                                                                                                        |
 | `apps/web/src/builder/render/PageRenderer.tsx`                                    | Ordered render with per-section `SectionErrorBoundary` (already in `components`), spacing/bg/typography via existing `section-spacing.ts`, `section-bg.ts`, `section-typography.ts`.                                                                                                                                       |
-| `tests/fixtures/builder/*.json`                                                   | Golden layouts: default, Storefront-flow, fully customised, legacy hero-only, malformed. Captured from current code first (characterization).                                                                                                                                                                               |
+| `tests/fixtures/builder/*.json`                                                   | Golden layouts: default, Storefront-flow, fully customised, legacy hero-only, malformed. Captured from current code first (characterization).                                                                                                                                                                              |
 
 ### Changed files
 
@@ -48,7 +48,7 @@ Closes gap #19 independent of the builder.
 | `apps/web/src/app/HomePageContent.tsx`                         | Replace the hard-coded section sequence (L296-~830) with `PageRenderer` fed by `layoutToDefinition`. Output for existing fixtures must be byte-equivalent HTML.                                               |
 | `apps/api/src/routes/public-store-layout.routes.ts`            | Additive: response also carries `definition` (`schemaVersion` 1). Old `layout` field unchanged so deployed storefront/admin keep working across the Worker/Railway deploy gap (multi-service env drift rule). |
 | `apps/api/src/routes/store-layout.routes.ts`                   | `layoutSchema` composed from registry prop schemas where sections overlap; parity guard extended to registry keys.                                                                                            |
-| `docs/architecture/store-theme-flags.md`, `docs/TWIN-PATHS.md` | Document registry as the owner of section keys; mark `apps/web/src/builder/` and `packages/shared/src/builder/` as Ebda-only paths (Ebda Store twin does not get them).                                              |
+| `docs/architecture/store-theme-flags.md`, `docs/TWIN-PATHS.md` | Document registry as the owner of section keys; mark `apps/web/src/builder/` and `packages/shared/src/builder/` as Ebda-only paths (Ebda Store twin does not get them).                                       |
 
 ### Data model / migration
 

@@ -1,7 +1,7 @@
 /**
  * LOCAL-ONLY embedding proxy for the search eval (tests/search-eval/run.ts). `wrangler dev` runs it
  * on 127.0.0.1 with the Workers AI `AI` binding, which wrangler proxies to the REAL model on the
- * logged-in account (the Whisky account, 69188202…; never a Force AI account). It lets the eval use
+ * logged-in account (the Whisky account, 69188202…; never the company account). It lets the eval use
  * real bge-m3 without minting or copying an API token: wrangler's own login authorises the binding.
  * Never deployed. `npm run search:eval -- --real` starts and stops it itself.
  *

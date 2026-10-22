@@ -4,11 +4,11 @@
 
 ## Preview worker URLs
 
-| App                        | Worker        | URL                                            | Notes                                                                                                    |
-| -------------------------- | ------------- | ---------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| App                        | Worker        | URL                                            | Notes                                                                                                            |
+| -------------------------- | ------------- | ---------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
 | `apps/web` (storefront)    | `ebda-web`    | https://ebda-web.ahmed0montaser.workers.dev    | Root = Platform landing. Real stores render by slug: `/demo-store`, `/wady-aljuz`, `/demo-boutique` (see below). |
-| `apps/orders` (orders PWA) | `ebda-orders` | https://ebda-orders.ahmed0montaser.workers.dev | Clean — no blockers. SSR via OpenNext.                                                                   |
-| `apps/admin` (dashboard)   | `ebda-admin`  | https://ebda-admin.ahmed0montaser.workers.dev  | `instrumentation.ts` moved aside at build time (see below).                                              |
+| `apps/orders` (orders PWA) | `ebda-orders` | https://ebda-orders.ahmed0montaser.workers.dev | Clean — no blockers. SSR via OpenNext.                                                                           |
+| `apps/admin` (dashboard)   | `ebda-admin`  | https://ebda-admin.ahmed0montaser.workers.dev  | `instrumentation.ts` moved aside at build time (see below).                                                      |
 
 All three: `next: 16.2.9` under `@opennextjs/cloudflare@1.19.11`, `compatibility_flags: ["nodejs_compat"]`, deploy to **Workers + Static Assets** (the `ASSETS` binding), ~20–31 ms cold start.
 

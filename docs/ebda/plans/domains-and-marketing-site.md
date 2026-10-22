@@ -4,16 +4,16 @@ Ebda is a **Whisky 11** product (org `whisky-11`, repo `whisky-11/ebda`, still e
 
 ## Domain map
 
-| Host                | Purpose                                                                                                                | Ebda Store equivalent today     |
-| ------------------- | ---------------------------------------------------------------------------------------------------------------------- | ------------------------ |
-| `ebda.app`          | Main marketing website (Shopify.com equivalent)                                                                        | ebda.app landing      |
-| `store.ebda.app`    | Ebda Store merchant app: sign-up, plan, payment, onboarding, dashboard (Ruling HOST-STORE-1; `admin.ebda.app` retired) | store.ebda.app        |
-| `*.ebda.app`        | Individual merchant stores (`<slug>.ebda.app`); custom domains on top                                                  | per-store custom domains |
-| `api.ebda.app`      | API                                                                                                                    | api.ebda.app          |
-| `docs.ebda.app`     | API & developer documentation                                                                                          | —                        |
-| `whatsapp.ebda.app` | WhatsApp integration                                                                                                   | WBS (separate product)   |
-| `help.ebda.app`     | Help center                                                                                                            | —                        |
-| `status.ebda.app`   | System status                                                                                                          | —                        |
+| Host                | Purpose                                                                                                                | Ebda Store equivalent today |
+| ------------------- | ---------------------------------------------------------------------------------------------------------------------- | --------------------------- |
+| `ebda.app`          | Main marketing website (Shopify.com equivalent)                                                                        | ebda.app landing            |
+| `store.ebda.app`    | Ebda Store merchant app: sign-up, plan, payment, onboarding, dashboard (Ruling HOST-STORE-1; `admin.ebda.app` retired) | store.ebda.app              |
+| `*.ebda.app`        | Individual merchant stores (`<slug>.ebda.app`); custom domains on top                                                  | per-store custom domains    |
+| `api.ebda.app`      | API                                                                                                                    | api.ebda.app                |
+| `docs.ebda.app`     | API & developer documentation                                                                                          | —                           |
+| `whatsapp.ebda.app` | WhatsApp integration                                                                                                   | WBS (separate product)      |
+| `help.ebda.app`     | Help center                                                                                                            | —                           |
+| `status.ebda.app`   | System status                                                                                                          | —                           |
 
 Reserved subdomains (never assignable as a store slug): `app, store, api, docs, whatsapp, help, status, www, admin, orders, mail, cdn, assets, static`, plus anything else the platform takes later — enforce in slug validation from day one.
 

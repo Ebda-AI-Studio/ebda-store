@@ -36,11 +36,11 @@ must be exactly `true` or `false`; `scripts/assert-cf-cache-bindings.sh` fails t
 web deploy (and CI's `cf-build-check`) on an unset or mistyped value, which used to
 deploy the empty-cache config — a no-op `revalidateTag` — behind a green tick.
 
-| App                        | Worker serves                                                                                       |
-| -------------------------- | --------------------------------------------------------------------------------------------------- |
+| App                        | Worker serves                                                                                        |
+| -------------------------- | ---------------------------------------------------------------------------------------------------- |
 | **web** (`apps/web`)       | `store.ebda.app` + every merchant Custom Hostname (demo-merchant.com, …) via the SaaS `*/*` fallback |
-| **admin** (`apps/admin`)   | `store.ebda.app` — Vercel `store.ebda.app` stays live until a deliberate DNS cutover       |
-| **orders** (`apps/orders`) | `orders.ebda.app` — Vercel `orders.ebda.app` stays live until cutover                    |
+| **admin** (`apps/admin`)   | `store.ebda.app` — Vercel `store.ebda.app` stays live until a deliberate DNS cutover                 |
+| **orders** (`apps/orders`) | `orders.ebda.app` — Vercel `orders.ebda.app` stays live until cutover                                |
 
 The `custom_domain` routes create the `admin.`/`orders.ebda.app` DNS records +
 edge certs automatically on first deploy (needs the token's Zone DNS+SSL perms).
@@ -59,13 +59,13 @@ and a dispatch with `force_cloud: true` forces `ubuntu-latest` for one run.
 
 Cloudflare dashboard → **My Profile → API Tokens → Create Token → Create Custom Token**.
 
-| Permission                             | Scope            |
-| -------------------------------------- | ---------------- |
+| Permission                             | Scope                  |
+| -------------------------------------- | ---------------------- |
 | Account › **Workers Scripts** › Edit   | Ebda AI Studio account |
 | Account › **Account Settings** › Read  | Ebda AI Studio account |
-| Zone › **Workers Routes** › Edit       | `ebda.app`    |
-| Zone › **DNS** › Edit                  | `ebda.app`    |
-| Zone › **SSL and Certificates** › Edit | `ebda.app`    |
+| Zone › **Workers Routes** › Edit       | `ebda.app`             |
+| Zone › **DNS** › Edit                  | `ebda.app`             |
+| Zone › **SSL and Certificates** › Edit | `ebda.app`             |
 
 (The DNS + SSL zone perms are required because the worker's `custom_domain`
 routes create/manage the hostname + its edge cert.)
@@ -105,9 +105,9 @@ rm /tmp/web.env
 
 | Variable                       | Where it comes from                                          |
 | ------------------------------ | ------------------------------------------------------------ |
-| `NEXT_PUBLIC_API_URL`          | `https://api.ebda.app/api/v1` (workflow default)          |
+| `NEXT_PUBLIC_API_URL`          | `https://api.ebda.app/api/v1` (workflow default)             |
 | `NEXT_PUBLIC_APP_NAME`         | `Force Store` (workflow default)                             |
-| `NEXT_PUBLIC_SITE_URL`         | `https://store.ebda.app` (workflow default)               |
+| `NEXT_PUBLIC_SITE_URL`         | `https://store.ebda.app` (workflow default)                  |
 | `NEXT_PUBLIC_ONESIGNAL_APP_ID` | _leave empty — storefront OneSignal not configured_          |
 | `NEXT_PUBLIC_POSTHOG_HOST`     | `https://us.i.posthog.com` (workflow default)                |
 | `NEXT_PUBLIC_POSTHOG_KEY`      | Vercel `force-web` prod (`phc_…`)                            |

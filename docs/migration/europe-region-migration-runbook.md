@@ -15,13 +15,13 @@ you create a NEW project in Frankfurt and dump/restore into it.
 
 ## Measured facts (2026-06-27)
 
-|                  | Ebda Store (`silent-sun-13697505`, SG)                | WBS (`lively-sun-42203294`, US-East)                               |
-| ---------------- | ---------------------------------------------- | ------------------------------------------------------------------ |
-| Extensions       | `plpgsql` only (trivial)                       | confirm before run                                                 |
-| RLS              | 86 tables / 91 policies                        | confirm before run                                                 |
+|                  | Ebda Store (`silent-sun-13697505`, SG)                  | WBS (`lively-sun-42203294`, US-East)                               |
+| ---------------- | ------------------------------------------------------- | ------------------------------------------------------------------ |
+| Extensions       | `plpgsql` only (trivial)                                | confirm before run                                                 |
+| RLS              | 86 tables / 91 policies                                 | confirm before run                                                 |
 | Custom roles     | the earlier app role (+ `neondb_owner`, `neon_service`) | confirm before run                                                 |
-| DB size          | ~56 MB (dump = seconds)                        | confirm (likely bigger — self-hosted PG + history)                 |
-| Railway services | `api` + `Redis`                                | `whatsapp-broadcaster` + `Redis` + `vigilant-peace` (its Postgres) |
+| DB size          | ~56 MB (dump = seconds)                                 | confirm (likely bigger — self-hosted PG + history)                 |
+| Railway services | `api` + `Redis`                                         | `whatsapp-broadcaster` + `Redis` + `vigilant-peace` (its Postgres) |
 
 ## Pre-flight (do once, before either cutover)
 

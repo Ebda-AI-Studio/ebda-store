@@ -22,7 +22,7 @@ Ebda Store: **Starter / Professional / Enterprise** (plus `free` as a stripped f
 | Accounting — tax reports + multi-currency + profit anomaly + bank reconcile          | —                  | —                  | ✓                  |
 | Loyalty + push notifications + upsell-crosssell                                      | —                  | ✓                  | ✓                  |
 | Affiliate program + SMS + floating widget                                            | —                  | —                  | ✓                  |
-| Ebda AI Studio WhatsApp bot integration                                                    | **Separate quote** | **Separate quote** | **Separate quote** |
+| Ebda AI Studio WhatsApp bot integration                                              | **Separate quote** | **Separate quote** | **Separate quote** |
 
 The canonical source is `packages/shared/src/plan-baselines.ts` — when the table here disagrees with the code, the code is right.
 

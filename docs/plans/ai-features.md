@@ -264,7 +264,7 @@ User prompt:
 | Phase | Scope                                                                             | Time   | Outcome                                 |
 | ----- | --------------------------------------------------------------------------------- | ------ | --------------------------------------- |
 | 0     | Shared infra: SDK, env vars, AiUsage model, ai.service.ts skeleton, audit logging | 1 day  | Foundation, no user-visible feature yet |
-| 1     | Feature 1 — translation (per-field + bulk)                                        | 2 days | "Ebda AI Studio" becomes truthful             |
+| 1     | Feature 1 — translation (per-field + bulk)                                        | 2 days | "Ebda AI Studio" becomes truthful       |
 | 2     | Feature 2 — SEO at all three levels (per-entity + bulk)                           | 2 days | Real SEO ranking lift                   |
 | 3     | Feature 3 — category suggestions                                                  | 1 day  | Polish; faster product entry            |
 

@@ -16,7 +16,10 @@ import { createPrismaClient } from '@ebda/database';
 import { seedCoaForStore } from '../apps/api/dist/services/accounting/account.service.js';
 
 const APPLY = process.argv.includes('--apply');
-const prisma = createPrismaClient({ connectionString: process.env.DATABASE_URL ?? '', role: 'owner' });
+const prisma = createPrismaClient({
+  connectionString: process.env.DATABASE_URL ?? '',
+  role: 'owner',
+});
 
 async function main() {
   const stores = await prisma.store.findMany({

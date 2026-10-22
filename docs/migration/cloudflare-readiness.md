@@ -14,14 +14,14 @@
 
 `@opennextjs/cloudflare@1.19.11` peer range: `next: ">=15.5.18 <16 || >=16.2.6"`.
 
-| Project                          | Next          | OpenNext                                       |
-| -------------------------------- | ------------- | ---------------------------------------------- |
-| Ebda Store web / admin / orders         | 16.2.9        | ✅                                             |
-| om-hassan-menu                   | 16.2.6        | ✅                                             |
-| digital-card                     | 16.2.6        | ✅                                             |
-| WBS frontend                     | `^16.0.10`    | ✅ (pin lockfile ≥ 16.2.6 — `npm update next`) |
-| Ebda AI Studio CRM                  | `^16.0.10`    | ✅ (same lockfile nudge)                       |
-| ebda-landing / al_assriya | static/simple | ✅ trivial on Pages                            |
+| Project                         | Next          | OpenNext                                       |
+| ------------------------------- | ------------- | ---------------------------------------------- |
+| Ebda Store web / admin / orders | 16.2.9        | ✅                                             |
+| om-hassan-menu                  | 16.2.6        | ✅                                             |
+| digital-card                    | 16.2.6        | ✅                                             |
+| WBS frontend                    | `^16.0.10`    | ✅ (pin lockfile ≥ 16.2.6 — `npm update next`) |
+| Ebda AI Studio CRM              | `^16.0.10`    | ✅ (same lockfile nudge)                       |
+| ebda-landing / al_assriya       | static/simple | ✅ trivial on Pages                            |
 
 No adapter blocker anywhere.
 
@@ -29,15 +29,15 @@ No adapter blocker anywhere.
 
 Cloudflare Workers is **not Node** — native binaries (`sharp`) and Node-runtime SDKs (Sentry Node + OpenTelemetry, loaded via `instrumentation.ts`) can't execute. The `next build` succeeds; OpenNext's bundler then can't resolve/trace these. Fleet scan (`instrumentation` / `sharp` / `@sentry/node` / OTel / other native):
 
-| Project             | `instrumentation` (Sentry-node) | `sharp` (OG/image)        | Verdict        |
-| ------------------- | ------------------------------- | ------------------------- | -------------- |
-| **Ebda Store web**         | ✔                               | ✔ (`opengraph-image.tsx`) | 2 fixes        |
-| **Ebda Store admin**       | ✔                               | —                         | 1 fix (shared) |
-| **Ebda Store orders**      | —                               | —                         | **clean**      |
-| **WBS frontend**    | ✔                               | —                         | 1 fix (shared) |
+| Project                | `instrumentation` (Sentry-node) | `sharp` (OG/image)        | Verdict        |
+| ---------------------- | ------------------------------- | ------------------------- | -------------- |
+| **Ebda Store web**     | ✔                               | ✔ (`opengraph-image.tsx`) | 2 fixes        |
+| **Ebda Store admin**   | ✔                               | —                         | 1 fix (shared) |
+| **Ebda Store orders**  | —                               | —                         | **clean**      |
+| **WBS frontend**       | ✔                               | —                         | 1 fix (shared) |
 | **Ebda AI Studio CRM** | —                               | —                         | **clean**      |
-| **om-hassan-menu**  | —                               | — (OG via `next/og`)      | **clean**      |
-| **digital-card**    | —                               | — (OG via `next/og`)      | **clean**      |
+| **om-hassan-menu**     | —                               | — (OG via `next/og`)      | **clean**      |
+| **digital-card**       | —                               | — (OG via `next/og`)      | **clean**      |
 
 **The entire fleet = two distinct fixes.** Four projects already clean.
 

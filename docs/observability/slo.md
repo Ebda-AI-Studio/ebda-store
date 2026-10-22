@@ -25,8 +25,8 @@ Monitoring stack: **Sentry** (error budgets, latency sampling) · **UptimeRobot*
 
 ## 2. admin — Next.js (Cloudflare Workers)
 
-| SLO                             | Target                    | Error Budget (30 days)                               | Measurement                        |
-| ------------------------------- | ------------------------- | ---------------------------------------------------- | ---------------------------------- |
+| SLO                             | Target                    | Error Budget (30 days)                               | Measurement                     |
+| ------------------------------- | ------------------------- | ---------------------------------------------------- | ------------------------------- |
 | Availability (Cloudflare edge)  | **99.9 %**                | 43 min / month downtime                              | UptimeRobot on `store.ebda.app` |
 | Core Web Vitals — LCP (desktop) | **< 2.5 s**               | Lighthouse CI nightly job · Cloudflare Web Analytics |
 | Core Web Vitals — CLS           | **< 0.1**                 | Same                                                 |

@@ -528,17 +528,17 @@ Renewal verification: re-check these in the per-provider dashboard quarterly —
 
 ### Account ownership
 
-| Service                | Account email          | Project / org                                                                                                  |
-| ---------------------- | ---------------------- | -------------------------------------------------------------------------------------------------------------- |
-| Cloudflare             | ops@ebda.app | Workers hosting (deployed by GitHub Actions) `force-web`/`force-admin`/`ebda-orders` (replaced Vercel 2026-07) |
-| Railway                | ops@ebda.app | project `ebda-store`                                                                                |
-| Neon                   | ops@ebda.app | project `ep-falling-meadow-a1uq2yil` (ap-southeast-1)                                                          |
-| Sentry                 | ops@ebda.app | one org with four projects: `api`, `web`, `admin`, `orders`                                                    |
-| PostHog                | ops@ebda.app | EU region, single project covering web + admin                                                                 |
-| UptimeRobot            | ops@ebda.app | free tier, 2 monitors currently                                                                                |
-| Axiom                  | (Ahmad's account)      | free tier (500GB/30d) — dataset `ebda-api-railway`                                                            |
-| Resend                 | platform-wide          | one account; per-merchant domains added under it                                                               |
-| @ebda1_bot Telegram | personal DM to Ahmad   | chat_id `1943728711`                                                                                           |
+| Service             | Account email        | Project / org                                                                                                  |
+| ------------------- | -------------------- | -------------------------------------------------------------------------------------------------------------- |
+| Cloudflare          | ops@ebda.app         | Workers hosting (deployed by GitHub Actions) `force-web`/`force-admin`/`ebda-orders` (replaced Vercel 2026-07) |
+| Railway             | ops@ebda.app         | project `ebda-store`                                                                                           |
+| Neon                | ops@ebda.app         | project `ep-falling-meadow-a1uq2yil` (ap-southeast-1)                                                          |
+| Sentry              | ops@ebda.app         | one org with four projects: `api`, `web`, `admin`, `orders`                                                    |
+| PostHog             | ops@ebda.app         | EU region, single project covering web + admin                                                                 |
+| UptimeRobot         | ops@ebda.app         | free tier, 2 monitors currently                                                                                |
+| Axiom               | (Ahmad's account)    | free tier (500GB/30d) — dataset `ebda-api-railway`                                                             |
+| Resend              | platform-wide        | one account; per-merchant domains added under it                                                               |
+| @ebda1_bot Telegram | personal DM to Ahmad | chat_id `1943728711`                                                                                           |
 
 ---
 

@@ -380,5 +380,5 @@ every table has both the null-escape and the explicit bypass branch (§1 taxonom
 | payment-settings zero RLS wiring                 | High, novel      | CONFIRMED — fix #3                                                                                        |
 | affiliate fire-and-forget race                   | High, live       | CONFIRMED — fix #5                                                                                        |
 | webhook `_tx` no-op + non-unique txn id          | High, latent     | CONFIRMED — fix #4                                                                                        |
-| the earlier app role CI job covers ~6/~90 tables            | Medium           | CONFIRMED residual — Phase-2 soak (#8) is the mitigation                                                  |
+| the earlier app role CI job covers ~6/~90 tables | Medium           | CONFIRMED residual — Phase-2 soak (#8) is the mitigation                                                  |
 | ENVIRONMENT.md / DB-BACKUP-RESTORE.md gaps       | Low              | CONFIRMED — doc fix #9                                                                                    |

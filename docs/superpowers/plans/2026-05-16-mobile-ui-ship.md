@@ -11,7 +11,7 @@
 
 | Surface            | Element                    | Source px (W×H)       | CSS px (W×H) | Aspect ratio                |
 | ------------------ | -------------------------- | --------------------- | ------------ | --------------------------- |
-| **Home**           | Hero banner                | 1320×880 (demo-store)  | 440×293      | **3 : 2** landscape         |
+| **Home**           | Hero banner                | 1320×880 (demo-store) | 440×293      | **3 : 2** landscape         |
 |                    | Hero banner                | 1290×740 (alkahraman) | 430×247      | **~16 : 9** landscape       |
 |                    | Category tile (image area) | 580×580               | 193×193      | **1 : 1 square**            |
 |                    | Category tile (with label) | 580×660               | 193×220      | 1 : 1.14                    |
@@ -29,30 +29,30 @@ Caveat: these are visual estimates from screenshots, accurate to ±5%. Pixel-per
 
 ## Delta vs current Ebda Store (`apps/web/src/templates/`)
 
-| Component                                   | Current                                          | Target                                                                   | Action                                                    |
-| ------------------------------------------- | ------------------------------------------------ | ------------------------------------------------------------------------ | --------------------------------------------------------- |
-| `templates/shared/HeroBanner.tsx`           | `aspect-[3/4]` mobile / `aspect-[2.4/1]` desktop | `aspect-[3/2]` mobile / `aspect-[2.4/1]` desktop keep                    | **change mobile from portrait to landscape 3:2**          |
-| `templates/modern/CategoryCard.tsx`         | `aspect-[4/3]`                                   | `aspect-square`                                                          | **change to 1:1 square**                                  |
-| `templates/elegant/CategoryCard.tsx`        | ? (TBD on read)                                  | `aspect-square`                                                          | inspect + align if different                              |
-| `templates/classic/CategoryCard.tsx`        | ?                                                | `aspect-square`                                                          | inspect + align if different                              |
-| `templates/minimal/CategoryCard.tsx`        | ?                                                | `aspect-square`                                                          | inspect + align if different                              |
-| `templates/bold/CategoryCard.tsx`           | ?                                                | `aspect-square`                                                          | inspect + align if different                              |
-| `templates/modern/ProductCard.tsx`          | `aspect-[3/4]`                                   | `aspect-square` for category grid, keep `aspect-[3/4]` for home carousel | **dual mode: square in 2-col grid, portrait in carousel** |
+| Component                                    | Current                                          | Target                                                                   | Action                                                    |
+| -------------------------------------------- | ------------------------------------------------ | ------------------------------------------------------------------------ | --------------------------------------------------------- |
+| `templates/shared/HeroBanner.tsx`            | `aspect-[3/4]` mobile / `aspect-[2.4/1]` desktop | `aspect-[3/2]` mobile / `aspect-[2.4/1]` desktop keep                    | **change mobile from portrait to landscape 3:2**          |
+| `templates/modern/CategoryCard.tsx`          | `aspect-[4/3]`                                   | `aspect-square`                                                          | **change to 1:1 square**                                  |
+| `templates/elegant/CategoryCard.tsx`         | ? (TBD on read)                                  | `aspect-square`                                                          | inspect + align if different                              |
+| `templates/classic/CategoryCard.tsx`         | ?                                                | `aspect-square`                                                          | inspect + align if different                              |
+| `templates/minimal/CategoryCard.tsx`         | ?                                                | `aspect-square`                                                          | inspect + align if different                              |
+| `templates/bold/CategoryCard.tsx`            | ?                                                | `aspect-square`                                                          | inspect + align if different                              |
+| `templates/modern/ProductCard.tsx`           | `aspect-[3/4]`                                   | `aspect-square` for category grid, keep `aspect-[3/4]` for home carousel | **dual mode: square in 2-col grid, portrait in carousel** |
 | `templates/shared/StorefrontProductCard.tsx` | `aspect-square` already ✓                        | —                                                                        | **already correct — use this for category grids**         |
-| Footer (all 5 themes)                       | No "Powered by" line                             | "Powered by Ebda AI Studio"                                                    | **add line + i18n key already exists**                    |
-| Product detail page image                   | unknown ratio                                    | `aspect-square`                                                          | inspect + align                                           |
-| Bottom nav                                  | exists                                           | exists, may need height tweak                                            | inspect height                                            |
+| Footer (all 5 themes)                        | No "Powered by" line                             | "Powered by Ebda AI Studio"                                              | **add line + i18n key already exists**                    |
+| Product detail page image                    | unknown ratio                                    | `aspect-square`                                                          | inspect + align                                           |
+| Bottom nav                                   | exists                                           | exists, may need height tweak                                            | inspect height                                            |
 
 ### Files that need explicit reading before touching
 
-| File                                                       | Why                                                                                 |
-| ---------------------------------------------------------- | ----------------------------------------------------------------------------------- |
-| `templates/elegant/CategoryCard.tsx`                       | confirm current aspect ratio                                                        |
-| `templates/classic/CategoryCard.tsx`                       | confirm current aspect ratio                                                        |
-| `templates/minimal/CategoryCard.tsx`                       | confirm current aspect ratio                                                        |
-| `templates/bold/CategoryCard.tsx`                          | confirm current aspect ratio                                                        |
-| `templates/modern/CategoryCard.tsx`                        | confirmed `aspect-[4/3]`                                                            |
-| `apps/web/src/app/products/[slug]/ProductDetailClient.tsx` | confirm product-detail image aspect                                                 |
+| File                                                       | Why                                                                                       |
+| ---------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| `templates/elegant/CategoryCard.tsx`                       | confirm current aspect ratio                                                              |
+| `templates/classic/CategoryCard.tsx`                       | confirm current aspect ratio                                                              |
+| `templates/minimal/CategoryCard.tsx`                       | confirm current aspect ratio                                                              |
+| `templates/bold/CategoryCard.tsx`                          | confirm current aspect ratio                                                              |
+| `templates/modern/CategoryCard.tsx`                        | confirmed `aspect-[4/3]`                                                                  |
+| `apps/web/src/app/products/[slug]/ProductDetailClient.tsx` | confirm product-detail image aspect                                                       |
 | Footer components × 5 themes                               | confirm where to inject "Powered by Ebda AI Studio"                                       |
 | `contexts/LanguageContext.tsx:214`                         | extend existing i18n entry from "Powered by Force" → "Powered by Ebda AI Studio" + Arabic |
 
@@ -60,23 +60,23 @@ Caveat: these are visual estimates from screenshots, accurate to ±5%. Pixel-per
 
 ## Interactive controls (catalog from target screenshots)
 
-| Control                                                    | Both targets show | Currently in Ebda Store?                       |
-| ---------------------------------------------------------- | ----------------- | --------------------------------------- |
-| Header: hamburger (left) + centered logo + cart (right)    | ✓                 | likely ✓ — verify                       |
-| Header: filter funnel icon on category page (right)        | demo-store         | unknown — may need add                  |
-| Search bar full-width below header                         | ✓                 | likely ✓                                |
-| Hero with dot pagination (3 dots if carousel)              | demo-store         | ✓ via `HeroSlider.tsx`                  |
-| Tab pills (Tea & Herbs / Dates) on category landing        | demo-store         | unknown — may need add                  |
-| Category tile (tap-only, no overlaid CTA)                  | ✓                 | likely ✓                                |
-| Product card on home: heart top-right + "View" pill button | demo-store         | partial — `StorefrontProductCard` has it |
-| Product card "Out Of Stock" red banner top-left            | demo-store         | unknown — may need add                  |
-| Product card in category grid: View + Add To Cart pills    | demo-store         | partial                                 |
-| Round `+` add-to-cart button                               | bank-alkahraman   | may want as alt variant                 |
-| Sort dropdown ("New Arrival ▼") on category page           | demo-store         | likely ✓ — verify                       |
-| Product detail: image carousel left/right chevrons         | demo-store         | likely ✓                                |
-| Share icons row (X / FB / Telegram / WhatsApp)             | demo-store         | likely ✓                                |
-| Bottom nav (4 icons + elevated center cart)                | both              | likely ✓                                |
-| Floating chat bubble bottom-right                          | demo-store         | already present (storefront has chat)   |
+| Control                                                    | Both targets show | Currently in Ebda Store?                 |
+| ---------------------------------------------------------- | ----------------- | ---------------------------------------- |
+| Header: hamburger (left) + centered logo + cart (right)    | ✓                 | likely ✓ — verify                        |
+| Header: filter funnel icon on category page (right)        | demo-store        | unknown — may need add                   |
+| Search bar full-width below header                         | ✓                 | likely ✓                                 |
+| Hero with dot pagination (3 dots if carousel)              | demo-store        | ✓ via `HeroSlider.tsx`                   |
+| Tab pills (Tea & Herbs / Dates) on category landing        | demo-store        | unknown — may need add                   |
+| Category tile (tap-only, no overlaid CTA)                  | ✓                 | likely ✓                                 |
+| Product card on home: heart top-right + "View" pill button | demo-store        | partial — `StorefrontProductCard` has it |
+| Product card "Out Of Stock" red banner top-left            | demo-store        | unknown — may need add                   |
+| Product card in category grid: View + Add To Cart pills    | demo-store        | partial                                  |
+| Round `+` add-to-cart button                               | bank-alkahraman   | may want as alt variant                  |
+| Sort dropdown ("New Arrival ▼") on category page           | demo-store        | likely ✓ — verify                        |
+| Product detail: image carousel left/right chevrons         | demo-store        | likely ✓                                 |
+| Share icons row (X / FB / Telegram / WhatsApp)             | demo-store        | likely ✓                                 |
+| Bottom nav (4 icons + elevated center cart)                | both              | likely ✓                                 |
+| Floating chat bubble bottom-right                          | demo-store        | already present (storefront has chat)    |
 
 ---
 
@@ -144,9 +144,9 @@ Each step = its own commit so rollback is granular. All commits use the existing
 | Risk                                                                               | Mitigation                                                                                                                                                                      |
 | ---------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Changing hero aspect on existing stores crops merchant hero images badly           | Force `object-cover` is already in place; image will crop center. Acceptable for the change. If a specific merchant complains, can add a per-store `heroAspect` override later. |
-| Square category tiles on stores with very-tall category images crop heads/products | `object-cover` again. Storefront tile design has subject centered, so most images work.                                                                                          |
-| `StorefrontProductCard` already exists but isn't used everywhere                    | Plan keeps existing ProductCards per theme — just changes aspect ratio. Migration to `StorefrontProductCard` as the universal card is out of scope today.                        |
-| "Powered by Ebda AI Studio" reads as advertising on premium-positioned stores            | Per-store toggle later if anyone objects. Default-on aligns with platform branding.                                                                                             |
+| Square category tiles on stores with very-tall category images crop heads/products | `object-cover` again. Storefront tile design has subject centered, so most images work.                                                                                         |
+| `StorefrontProductCard` already exists but isn't used everywhere                   | Plan keeps existing ProductCards per theme — just changes aspect ratio. Migration to `StorefrontProductCard` as the universal card is out of scope today.                       |
+| "Powered by Ebda AI Studio" reads as advertising on premium-positioned stores      | Per-store toggle later if anyone objects. Default-on aligns with platform branding.                                                                                             |
 | RTL alignment after aspect changes                                                 | `start-*` / `end-*` Tailwind classes already used per `feedback-tailwind-v4-css-vars.md`. No new RTL work needed.                                                               |
 | Themes other than modern have different sizing                                     | Tier 2 step 4 explicitly aligns all five. Spot-check after each commit.                                                                                                         |
 

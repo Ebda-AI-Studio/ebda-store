@@ -4,10 +4,10 @@ Scope: turning on the tenant-cacheable storefront rewrite for ONE store on the s
 `ebda-web`. One Worker serves demo-boutique (`store.ebda.app/demo-boutique`), `demo-store.example` and
 `demo-merchant.com`, so the flag alone is Worker-wide. Three secrets scope it (Rulings TRC-1, TRC-5, TRC-6):
 
-| Secret                             | Meaning                                                             | Bad state           |
-| ---------------------------------- | ------------------------------------------------------------------- | ------------------- |
-| `STOREFRONT_TENANT_ROUTING`        | master switch, literal `true`                                       | anything else = off |
-| `STOREFRONT_TENANT_ROUTING_ROUTES` | route roots, e.g. `about,faq` (`all` = every Track-A route)         | routes nothing      |
+| Secret                             | Meaning                                                                    | Bad state           |
+| ---------------------------------- | -------------------------------------------------------------------------- | ------------------- |
+| `STOREFRONT_TENANT_ROUTING`        | master switch, literal `true`                                              | anything else = off |
+| `STOREFRONT_TENANT_ROUTING_ROUTES` | route roots, e.g. `about,faq` (`all` = every Track-A route)                | routes nothing      |
 | `STOREFRONT_TENANT_ROUTING_STORES` | stores, e.g. `demo-boutique:ar` (no `all`); `:ar`/`:en` = default language | routes no store     |
 
 The rewrite applies only when all three hold. Set the two scoping secrets BEFORE the master switch, so the

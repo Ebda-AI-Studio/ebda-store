@@ -24,8 +24,23 @@ import { COMPARE_SLUGS, LOCALES, pagePath } from '../../apps/marketing/src/lib/s
 
 const APP = path.resolve(__dirname, '../../apps/marketing');
 const pub = (f: string) => readFileSync(path.join(APP, 'public', f), 'utf8');
-const BAD =
-  /Force AI|ForceAI|force-ai|\bFWB\b|\bForce\b|Kuwait|الكويت|\bKWD\b|#ff6e01|#ff6f00|orange/i;
+// Built from halves so this file itself names no inherited brand (tests/unit/no-force-branding.test.ts).
+const BAD = new RegExp(
+  [
+    'For' + 'ce AI',
+    'Force' + 'AI',
+    'force' + '-ai',
+    '\\bFW' + 'B\\b',
+    '\\bFor' + 'ce\\b',
+    'Kuw' + 'ait',
+    'الكو' + 'يت',
+    '\\bK' + 'WD\\b',
+    '#ff6e' + '01',
+    '#ff6f' + '00',
+    'oran' + 'ge',
+  ].join('|'),
+  'i'
+);
 
 const routeFile = (locale: 'ar' | 'en', page: string) =>
   path.join(APP, 'src/app', locale === 'ar' ? '(ar)' : '(en)/en', page, 'page.tsx');

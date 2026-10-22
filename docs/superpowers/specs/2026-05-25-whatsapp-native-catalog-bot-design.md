@@ -191,7 +191,7 @@ model CustomerAddress {
 | `POST /wa-bridge/customer-addresses`                | Create address for customer + return it            |
 | `GET /wa-bridge/store/service-menu?storeId=`        | Get this merchant's `bot_service_menu` JSON        |
 | `GET /wa-bridge/store/meta-catalog-config?storeId=` | Get `meta_catalog_id` + `meta_business_id`         |
-| `POST /wa-bridge/store/meta-catalog-config`         | Set the IDs (called from Ebda Store admin save)           |
+| `POST /wa-bridge/store/meta-catalog-config`         | Set the IDs (called from Ebda Store admin save)    |
 
 ### 4.5 New WBS services
 
@@ -211,14 +211,14 @@ Ebda Store fires `product.synced.requested` events; WBS exposes `/internal/innge
 
 ### 5.1 Per-step budgets (target)
 
-| Step                                               | p50   | p95  | Hard ceiling |
-| -------------------------------------------------- | ----- | ---- | ------------ |
-| Webhook inbound → bot reply (no DB write)          | 500ms | 1s   | 2s           |
+| Step                                                      | p50   | p95  | Hard ceiling |
+| --------------------------------------------------------- | ----- | ---- | ------------ |
+| Webhook inbound → bot reply (no DB write)                 | 500ms | 1s   | 2s           |
 | Webhook inbound → bot reply (with Ebda Store bridge call) | 800ms | 2s   | 3s           |
-| Catalog open (catalog_message send)                | 600ms | 1.2s | 2s           |
-| Cart received → next message                       | 1s    | 2.5s | 4s           |
-| Order finalization (cart/from-wa write)            | 1.5s  | 3s   | 5s           |
-| End-to-end conversation (Hi → completed)           | 30s   | 90s  | 180s         |
+| Catalog open (catalog_message send)                       | 600ms | 1.2s | 2s           |
+| Cart received → next message                              | 1s    | 2.5s | 4s           |
+| Order finalization (cart/from-wa write)                   | 1.5s  | 3s   | 5s           |
+| End-to-end conversation (Hi → completed)                  | 30s   | 90s  | 180s         |
 
 ### 5.2 Phase 0 — latency diagnosis (PRE-WORK before Phase A)
 
@@ -274,15 +274,15 @@ Per the Ebda AI Studio 5-layer testing standard:
 
 ## 8. Failure modes
 
-| Failure                                    | Detection                                                 | Behavior                                                                                                                          |
-| ------------------------------------------ | --------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
-| Meta Catalog API down                      | metaCatalogService 5xx                                    | bot replies "Catalog temporarily unavailable, please try in a few min" + offers Agent path                                        |
-| Ebda Store /wa-bridge/\* down                     | timeout >3s                                               | bot replies "I'm having trouble loading your store, please try again" + Telegram alert to merchant                                |
+| Failure                                    | Detection                                                        | Behavior                                                                                                                          |
+| ------------------------------------------ | ---------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| Meta Catalog API down                      | metaCatalogService 5xx                                           | bot replies "Catalog temporarily unavailable, please try in a few min" + offers Agent path                                        |
+| Ebda Store /wa-bridge/\* down              | timeout >3s                                                      | bot replies "I'm having trouble loading your store, please try again" + Telegram alert to merchant                                |
 | Cart received but order create fails       | Ebda Store returns error                                         | bot keeps cart in session, replies "There was a problem placing your order. Please tap Checkout again." + Sentry alert            |
 | Payment URL never returned to bot (Online) | timer in `checkout_sent`, ping Ebda Store every 5 min for 30 min | if order in `paid` state → send confirmation; else expire to `failed` with "We couldn't confirm payment" + agent escalation offer |
-| User types free-form text mid-flow         | state machine doesn't match                               | reply with bilingual "Please use the buttons below" + re-send current state's interactive                                         |
-| User in `agent_chat` types `/menu`         | command match                                             | exit to `awaiting_service`                                                                                                        |
-| Session TTL hit (60 min default)           | `wa-cart-expiry` cron (existing)                          | mark `expired`, bot replies fresh greeting on next inbound                                                                        |
+| User types free-form text mid-flow         | state machine doesn't match                                      | reply with bilingual "Please use the buttons below" + re-send current state's interactive                                         |
+| User in `agent_chat` types `/menu`         | command match                                                    | exit to `awaiting_service`                                                                                                        |
+| Session TTL hit (60 min default)           | `wa-cart-expiry` cron (existing)                                 | mark `expired`, bot replies fresh greeting on next inbound                                                                        |
 
 ## 9. Security
 
@@ -295,15 +295,15 @@ Per the Ebda AI Studio 5-layer testing standard:
 
 Working assumption: one engineer (me + subagents), no parallel work.
 
-| Phase             | Days       | Description                                                                      |
-| ----------------- | ---------- | -------------------------------------------------------------------------------- |
-| Phase 0           | 0.5        | Latency diagnosis + quick wins                                                   |
+| Phase             | Days       | Description                                                                             |
+| ----------------- | ---------- | --------------------------------------------------------------------------------------- |
+| Phase 0           | 0.5        | Latency diagnosis + quick wins                                                          |
 | Phase A           | 1.5        | Catalog sync (Inngest events Ebda Store + metaCatalogService WBS + per-merchant config) |
-| Phase B           | 1          | State machine extension + interactive message builders                           |
-| Phase C           | 1.5        | Native Catalog send + cart receive + address book + payment                      |
-| Phase D           | 1          | Service menu config + Locations & Hours + Chat with Agent routing + admin UI     |
-| Migration + Smoke | 0.5        | Wady Aljuz cutover + smoke test + Telegram observability                         |
-| **Total**         | **6 days** | (~1 week)                                                                        |
+| Phase B           | 1          | State machine extension + interactive message builders                                  |
+| Phase C           | 1.5        | Native Catalog send + cart receive + address book + payment                             |
+| Phase D           | 1          | Service menu config + Locations & Hours + Chat with Agent routing + admin UI            |
+| Migration + Smoke | 0.5        | Wady Aljuz cutover + smoke test + Telegram observability                                |
+| **Total**         | **6 days** | (~1 week)                                                                               |
 
 ## 11. Future features (deferred from this spec)
 

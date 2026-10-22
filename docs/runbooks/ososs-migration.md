@@ -41,7 +41,7 @@ Ebda Store's bulk importer (`apps/api/src/services/bulk.service.ts`, route `POST
 | `parentSku`                    | Empty → **base product**. Non-empty → **variant** of the base product with this `sku`.                                                                                                                           |
 | `option1Name` / `option1Value` | First variant axis, e.g. `Size` / `1 Kg`. **Required on variant rows.**                                                                                                                                          |
 | `option2Name` / `option2Value` | Optional 2nd axis.                                                                                                                                                                                               |
-| `option3Name` / `option3Value` | Optional 3rd axis (Ebda Store max = 3).                                                                                                                                                                                 |
+| `option3Name` / `option3Value` | Optional 3rd axis (Ebda Store max = 3).                                                                                                                                                                          |
 
 Rules:
 

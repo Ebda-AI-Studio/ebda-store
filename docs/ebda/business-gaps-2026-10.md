@@ -32,7 +32,7 @@
 
 | Option                                                | For                                                                                                                                        | Against                                                                                              |
 | ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------- |
-| **A. Ahmad, founder-led (recommended first 8 weeks)** | Zero cash; he hears the objections himself (pillar 1 says his feedback IS the market signal); the first 10 payers need hand-holding anyway | His hours are shared with Ebda AI Studio + Whisky 11; caps volume (see math below)                         |
+| **A. Ahmad, founder-led (recommended first 8 weeks)** | Zero cash; he hears the objections himself (pillar 1 says his feedback IS the market signal); the first 10 payers need hand-holding anyway | His hours are shared with Ebda AI Studio + Whisky 11; caps volume (see math below)                   |
 | B. Part-time Egyptian growth/community hire           | Scales the outreach; Arabic-native in merchant groups                                                                                      | Costs cash before conversion rates are known; needs a playbook that does not exist yet               |
 | C. Channel partner (Bosta, Paymob, Kashier)           | They already hold Egyptian merchant relationships; Ebda already integrates all three (BYO keys)                                            | No commercial relationship exists; partner merchant-base sizes are **unverified**; months, not weeks |
 
@@ -181,17 +181,17 @@ Zero commission means Ebda's ONLY revenue is the subscription; merchants' gatewa
 
 Stack per Ruling LEGAL-3 (`docs/RULINGS.md`): Cloudflare Workers/KV/Queues/R2, Neon, Resend, Sentry, Inngest, Gemini, PostHog, OneSignal — "Railway and Redis are not used". (Note: the project `CLAUDE.md` still describes the API on Railway; the live `/health` response carries no Railway headers, `server: cloudflare`. INFERRED that Workers serves it; reconcile the docs separately.) Usage shapes borrowed from `docs/audits/_slices/06-cost-forecast.md` (written for Ebda Store, so ASSUMED transferable).
 
-| Line                                   | 10 merchants | 100 merchants | 1,000 merchants | Basis (ASSUMED unless noted)                                                 |
-| -------------------------------------- | ------------ | ------------- | --------------- | ---------------------------------------------------------------------------- |
-| Cloudflare Workers (paid plan + usage) | $5           | $5–15         | $30–80          | $5 base, 10M requests included                                               |
-| Neon (Launch, usage)                   | $5–15        | $30–60        | $100–300        | ~$0.14/CU-h (forecast doc used $0.106) + $0.35/GB-mo                         |
+| Line                                   | 10 merchants | 100 merchants | 1,000 merchants | Basis (ASSUMED unless noted)                                                        |
+| -------------------------------------- | ------------ | ------------- | --------------- | ----------------------------------------------------------------------------------- |
+| Cloudflare Workers (paid plan + usage) | $5           | $5–15         | $30–80          | $5 base, 10M requests included                                                      |
+| Neon (Launch, usage)                   | $5–15        | $30–60        | $100–300        | ~$0.14/CU-h (forecast doc used $0.106) + $0.35/GB-mo                                |
 | Resend                                 | $0–20        | $20–30        | $100–515        | free 100/day breaks at ~5 active stores (forecast); Ebda Store 1k-store figure $515 |
-| Inngest                                | $0           | $0–75         | $75–150         | free 50k steps; ~300k steps at 100 stores (forecast)                         |
-| Sentry / PostHog / OneSignal           | $0           | $0–26         | $26–260         | free tiers → paid at scale                                                   |
-| CF for SaaS custom hostnames           | $0           | $0            | $0–90           | first 100 free, then ~$0.10 each (if all 1,000 use a custom domain)          |
-| R2                                     | $0           | $0            | $1–10           | zero egress                                                                  |
-| **Total USD**                          | **$10–40**   | **$55–206**   | **$332–1,405**  |                                                                              |
-| **Per merchant (EGP @52.24)**          | **52–209**   | **29–108**    | **17–73**       |                                                                              |
+| Inngest                                | $0           | $0–75         | $75–150         | free 50k steps; ~300k steps at 100 stores (forecast)                                |
+| Sentry / PostHog / OneSignal           | $0           | $0–26         | $26–260         | free tiers → paid at scale                                                          |
+| CF for SaaS custom hostnames           | $0           | $0            | $0–90           | first 100 free, then ~$0.10 each (if all 1,000 use a custom domain)                 |
+| R2                                     | $0           | $0            | $1–10           | zero egress                                                                         |
+| **Total USD**                          | **$10–40**   | **$55–206**   | **$332–1,405**  |                                                                                     |
+| **Per merchant (EGP @52.24)**          | **52–209**   | **29–108**    | **17–73**       |                                                                                     |
 
 Excluded as company opex, not cost-to-serve: Claude Max, GitHub Team, domains (already-paid base plans).
 
