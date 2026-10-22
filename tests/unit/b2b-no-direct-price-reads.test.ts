@@ -298,8 +298,9 @@ const ALLOW: Record<string, AllowEntry> = {
   },
   'services/bundle.service.ts': {
     category: 'bundle-base',
-    reason: 'bundle components are priced at base',
-    reads: { resolveBundle: 4 },
+    reason:
+      'bundle components are priced at base; the PDP / routine saving (Phase B3) reads the RESOLVED bundle price and component sum, and a bundle with a wholesale-only component is not sellable so it never advertises a saving',
+    reads: { resolveBundle: 4, listBundleSavingsForProducts: 2 },
   },
   'routes/bundle.routes.ts': {
     category: 'bundle-base',

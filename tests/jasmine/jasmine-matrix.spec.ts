@@ -44,7 +44,7 @@ const NO_FOOTER = /^\/(checkout|account)/;
 // Products a scenario store does not carry: the PDP is a 404, correctly.
 const ABSENT: Record<string, string[]> = {
   'jasmine-empty': [SHADE_PDP, NOIMG_PDP, TAG_PATH],
-  'jasmine-one': [NOIMG_PDP],
+  'jasmine-one': [SHADE_PDP, NOIMG_PDP],
 };
 // Ruling B1-111: a merchant primaryColor at the extremes is honoured verbatim, so text-primary
 // can fail contrast on those stores; every other axe rule still applies.
@@ -76,7 +76,8 @@ for (const store of STORES)
         // The platform 404 page is its own bare layout (header and footer absent).
         if (expected === 200) {
           await expect(page.locator('header')).toHaveCount(1);
-          await expect(page.locator('footer')).toHaveCount(NO_FOOTER.test(p) ? 0 : 1);
+          // the page-level footer only: a testimonial's attribution <footer> is not a landmark
+          await expect(page.getByRole('contentinfo')).toHaveCount(NO_FOOTER.test(p) ? 0 : 1);
         }
         const tiny = await page.evaluate(
           () =>
