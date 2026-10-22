@@ -87,6 +87,7 @@ const store = {
   domain: null,
   status: 'active',
   template: 'modern',
+  look: null,
   theme: S.theme,
 };
 
@@ -124,7 +125,13 @@ function pageState(P = S) {
 function route(method, path, body, query = new URLSearchParams()) {
   const p = path.replace(/^\/api\/v1/, '');
   if (method === 'POST' && p === '/__test/reset')
-    return ((S = freshState()), (store.theme = S.theme), ok({}));
+    return (
+      (S = freshState()),
+      (store.theme = S.theme),
+      (store.look = null),
+      (store.template = 'modern'),
+      ok({})
+    );
   if (method === 'POST' && p === '/__test/bump') {
     S.rev += 1;
     const def = structuredClone(pageState().definition);
@@ -141,6 +148,7 @@ function route(method, path, body, query = new URLSearchParams()) {
       publishes: P.publishes,
       theme: S.theme,
       liveWrites: S.liveWrites,
+      look: store.look,
     });
   }
   // every write to the LIVE theme / typography is recorded: the editor must make none before Publish (VE-4)
@@ -158,6 +166,35 @@ function route(method, path, body, query = new URLSearchParams()) {
     S.theme = { ...S.theme, ...body };
     store.theme = S.theme;
     return ok({ theme: S.theme });
+  }
+  // look switch (Task 9): the SAME pure functions the real API runs, over the mock's current page
+  if (
+    (method === 'POST' && p === `/stores/${STORE_ID}/look/preview`) ||
+    (method === 'PUT' && p === `/stores/${STORE_ID}/look`)
+  ) {
+    const look = shared.getLook(body?.lookId);
+    if (!look) return fail(400, 'INVALID_LOOK', 'Unknown look');
+    const token = `r${S.rev}d${S.draft?.rev ?? 0}p${S.published?.rev ?? 0}`;
+    if (method === 'PUT' && body.revisionToken !== undefined && body.revisionToken !== token)
+      return fail(409, 'DRAFT_MOVED', 'The page changed since the preview; preview again.');
+    const current = pageState().definition;
+    const draft = shared.applyTemplateFamily(current, look.template, look, {
+      design: body.design ?? 'keep',
+    });
+    if (method === 'POST')
+      return ok({
+        draft,
+        report: shared.diffTemplateFamily(current, draft, []),
+        revisionToken: token,
+        willPublish: false,
+        look: look.id,
+        skinChange: { from: store.template, to: look.skin },
+      });
+    S.rev += 1;
+    S.draft = { rev: S.rev, definition: draft };
+    store.look = look.id;
+    store.template = look.skin;
+    return ok({ look: look.id, template: look.skin, builder: 'draft' });
   }
   if (p === `/stores/${STORE_ID}/categories`)
     return ok({

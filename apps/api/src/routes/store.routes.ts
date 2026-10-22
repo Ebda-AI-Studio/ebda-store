@@ -289,8 +289,14 @@ export const updateStoreSchema = createStoreSchema.partial().extend({
 });
 
 const lookBody = z
-  .object({ lookId: z.string().max(40), design: z.enum(['keep', 'reset']).default('keep') })
+  .object({
+    lookId: z.string().max(40),
+    design: z.enum(['keep', 'reset']).default('keep'),
+    // from a preview: refuse with 409 DRAFT_MOVED when the page changed since
+    revisionToken: z.string().max(64).optional(),
+  })
   .strict();
+const lookPreviewBody = lookBody.omit({ revisionToken: true });
 
 // Helpers that coerce empty strings and nulls to undefined before validation
 const optionalStr = (maxLen: number) =>
@@ -938,6 +944,25 @@ router.put(
   }
 );
 
+// POST /stores/:id/look/preview - What applying a look would do, without doing it (Task 9)
+router.post(
+  '/:id/look/preview',
+  authenticate,
+  requireMfaEnrolled,
+  authorize('store_admin', 'super_admin'),
+  requireStoreAccess,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { id } = req.params;
+      const { lookId, design } = lookPreviewBody.parse(req.body);
+      res.setHeader('Cache-Control', 'private, no-store');
+      res.json({ success: true, data: await StoreService.previewLook(id, lookId, { design }) });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
 // PUT /stores/:id/look - Apply a look (sets look + skin, re-shapes the home page)
 router.put(
   '/:id/look',
@@ -948,11 +973,11 @@ router.put(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { id } = req.params;
-      const { lookId, design } = lookBody.parse(req.body);
+      const { lookId, design, revisionToken } = lookBody.parse(req.body);
       const { store, builder } = await StoreService.applyLook(
         id,
         lookId,
-        { design },
+        { design, revisionToken },
         getAuthUser(req).userId
       );
       res.json({

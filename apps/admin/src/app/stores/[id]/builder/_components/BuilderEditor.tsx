@@ -19,10 +19,10 @@ import { useLocale } from 'next-intl';
 import { useToast } from '@ebda/ui';
 import {
   BRAND,
-  TEMPLATE_FAMILIES,
-  applyTemplateFamily,
   effectiveTheme,
   getLook,
+  type LookId,
+  type PageDefinition,
   addRequestFor,
   applySmartPalette,
   applyTypographyPatch,
@@ -50,7 +50,7 @@ import {
   type PageKind,
 } from '@ebda/shared';
 import { useT } from '@/i18n/useT';
-import { apiGet, apiPost } from '../../../../../lib/api';
+import { apiGet, apiPost, apiPut } from '../../../../../lib/api';
 import { getStoreHref } from '../../../../../lib/store-url';
 import { useBuilderDocument } from '../_lib/useBuilderDocument';
 import { ConfirmDialog } from './ConfirmDialog';
@@ -64,6 +64,7 @@ import { ThemeSettingsPanel } from './ThemeSettingsPanel';
 import { RevisionsPanel } from './RevisionsPanel';
 import { PageSwitcher, type PreviewProduct } from './PageSwitcher';
 import { PageSettingsPanel } from './PageSettingsPanel';
+import { LookSwitchPane, type LookDesignChoice, type LookPreviewResult } from './LookSwitchPane';
 
 interface StoreInfo {
   id: string;
@@ -122,6 +123,12 @@ export function BuilderEditor({
   const [tab, setTab] = useState<StartTab>('sections');
   const [drawer, setDrawer] = useState<'start' | 'end' | null>(null);
   const [reloadKey, setReloadKey] = useState(1);
+  // Changing the look (Task 9): the pane is open, a proposal is being shown in the canvas, a call is in flight.
+  const [lookOpen, setLookOpen] = useState(false);
+  const [lookPreview, setLookPreview] = useState<
+    (LookPreviewResult & { draft: PageDefinition; design: LookDesignChoice }) | null
+  >(null);
+  const [lookBusy, setLookBusy] = useState<'preview' | 'apply' | null>(null);
 
   // The LIVE store (its theme is what the storefront shows). Re-read after a
   // publish or a restore, which are the only things that change it here.
@@ -254,8 +261,16 @@ export function BuilderEditor({
     [storeId, t, toastError, toastSuccess]
   );
 
+  // Picking a section closes the look pane: the right pane follows what is selected.
+  useEffect(() => {
+    if (selection) setLookOpen(false);
+  }, [selection]);
+  const previewingRef = useRef(false);
+  previewingRef.current = lookPreview !== null;
   const onCanvasMessage = useCallback(
     (msg: ChildToParent) => {
+      // While a proposed look is shown the canvas is read-only: nothing it sends edits the real page.
+      if (previewingRef.current) return;
       if (msg.type === 'select') {
         setSelection({ sectionId: msg.sectionId, blockId: msg.blockId });
         setDrawer(d => (d === 'start' ? null : d));
@@ -350,11 +365,54 @@ export function BuilderEditor({
     } else if (r === 'failed') toastError(t('publishFailed'));
   };
 
-  const applyFamily = (id: (typeof TEMPLATE_FAMILIES)[number]['id']) => {
-    if (!b.doc) return;
-    if (!window.confirm(t('families.confirm'))) return;
-    b.replaceDocument(applyTemplateFamily(b.doc, id));
-    toastSuccess(t('families.applied'));
+  /** Save this page's pending edits so the server previews and applies from the same draft. */
+  const settleDraft = async (): Promise<boolean> => {
+    if (b.saveState === 'conflict') return false;
+    if (b.dirty && !(await b.saveDraftNow())) return false;
+    return true;
+  };
+
+  const previewLook = async (lookId: string, design: LookDesignChoice) => {
+    setLookBusy('preview');
+    try {
+      if (!(await settleDraft())) return void toastError(t('look.saveFirst'));
+      const r = await apiPost<LookPreviewResult & { draft: PageDefinition }>(
+        `/api/v1/stores/${storeId}/look/preview`,
+        { lookId, design }
+      );
+      if (r.error || !r.data) return void toastError(t('look.previewFailed'));
+      setLookPreview({ ...r.data, design });
+      setDrawer(d => (d === 'end' ? null : d));
+    } finally {
+      setLookBusy(null);
+    }
+  };
+
+  const applyLookNow = async () => {
+    if (!lookPreview) return;
+    setLookBusy('apply');
+    try {
+      const r = await apiPut(`/api/v1/stores/${storeId}/look`, {
+        lookId: lookPreview.look,
+        design: lookPreview.design,
+        revisionToken: lookPreview.revisionToken,
+      });
+      if (r.error) {
+        // the page moved since the preview: show nothing stale, ask for a new preview
+        setLookPreview(null);
+        setDrawer('end'); // back to the picker, to preview again
+        return void toastError(r.error.code === 'DRAFT_MOVED' ? t('look.moved') : t('look.failed'));
+      }
+      toastSuccess(t('look.applied'));
+      setLookPreview(null);
+      setLookOpen(false);
+      await b.reload();
+      void refreshStore();
+      void refreshTypography();
+      setReloadKey(k => k + 1);
+    } finally {
+      setLookBusy(null);
+    }
   };
 
   if (b.loadError)
@@ -515,51 +573,61 @@ export function BuilderEditor({
   );
 
   // Nothing selected: the page's own settings (background, spacing, filters, image shapes...).
-  const endPane = !selection ? (
-    <PageSettingsPanel
-      storeId={storeId}
-      pageKey={pageKey}
-      doc={b.doc}
-      theme={effectiveTheme(store.theme, b.doc.theme)}
-      dispatch={dispatch}
-      onSwitchPage={next => void switchPage(next)}
-    />
-  ) : (
-    <SettingsPanel
-      storeId={storeId}
-      doc={b.doc}
-      selection={selection}
-      viewport={viewport}
-      theme={effectiveTheme(store.theme, b.doc.theme)}
-      errors={b.errors}
-      dispatch={dispatch}
-      onAiFill={sectionId => {
-        const req = b.doc ? aiFillRequestForSection(b.doc, sectionId) : null;
-        if (req) void runAiFill(req);
-      }}
-      chromeEdit={{
-        chrome: b.doc.chrome,
-        liveVersion: b.publishedRev,
-        // Header / footer links ride the draft document (autosave) and go
-        // live only on Publish. Each edit carries one key; merge it into the
-        // LATEST document so quick edits to different lists never drop each other.
-        onChange: patch =>
-          b.patchDocument(doc => ({
-            ...doc,
-            chrome: {
-              ...doc.chrome,
-              ...patch,
-              ...(patch.footerLinks
-                ? { footerLinks: { ...doc.chrome?.footerLinks, ...patch.footerLinks } }
-                : {}),
-              ...(patch.utilityBar
-                ? { utilityBar: { ...doc.chrome?.utilityBar, ...patch.utilityBar } }
-                : {}),
-            },
-          })),
-      }}
-    />
-  );
+  const endPane =
+    lookOpen && !selection ? (
+      <LookSwitchPane
+        currentLook={(store.look as LookId | null | undefined) ?? null}
+        preview={lookPreview}
+        busy={lookBusy}
+        onPreview={(id, design) => void previewLook(id, design)}
+        onApply={() => void applyLookNow()}
+        onCancelPreview={() => setLookPreview(null)}
+      />
+    ) : !selection ? (
+      <PageSettingsPanel
+        storeId={storeId}
+        pageKey={pageKey}
+        doc={b.doc}
+        theme={effectiveTheme(store.theme, b.doc.theme)}
+        dispatch={dispatch}
+        onSwitchPage={next => void switchPage(next)}
+      />
+    ) : (
+      <SettingsPanel
+        storeId={storeId}
+        doc={b.doc}
+        selection={selection}
+        viewport={viewport}
+        theme={effectiveTheme(store.theme, b.doc.theme)}
+        errors={b.errors}
+        dispatch={dispatch}
+        onAiFill={sectionId => {
+          const req = b.doc ? aiFillRequestForSection(b.doc, sectionId) : null;
+          if (req) void runAiFill(req);
+        }}
+        chromeEdit={{
+          chrome: b.doc.chrome,
+          liveVersion: b.publishedRev,
+          // Header / footer links ride the draft document (autosave) and go
+          // live only on Publish. Each edit carries one key; merge it into the
+          // LATEST document so quick edits to different lists never drop each other.
+          onChange: patch =>
+            b.patchDocument(doc => ({
+              ...doc,
+              chrome: {
+                ...doc.chrome,
+                ...patch,
+                ...(patch.footerLinks
+                  ? { footerLinks: { ...doc.chrome?.footerLinks, ...patch.footerLinks } }
+                  : {}),
+                ...(patch.utilityBar
+                  ? { utilityBar: { ...doc.chrome?.utilityBar, ...patch.utilityBar } }
+                  : {}),
+              },
+            })),
+        }}
+      />
+    );
 
   return (
     <div className="flex h-screen flex-col bg-background text-foreground" data-testid="builder">
@@ -648,24 +716,19 @@ export function BuilderEditor({
           {statusText[b.saveState]}
         </span>
         {isHome && (
-          <select
-            aria-label={t('families.label')}
-            value=""
-            onChange={e =>
-              e.target.value &&
-              applyFamily(e.target.value as (typeof TEMPLATE_FAMILIES)[number]['id'])
-            }
-            className="hidden rounded-lg border border-border bg-background px-2 py-1 text-xs md:block"
+          <button
+            type="button"
+            onClick={() => {
+              setLookOpen(o => !o);
+              setSelection(null);
+              setDrawer(d => (d === 'end' ? d : 'end'));
+            }}
+            aria-pressed={lookOpen}
+            className={`rounded-lg border border-border px-2.5 py-1 text-xs font-medium hover:bg-muted ${lookOpen ? 'bg-muted' : 'bg-background'}`}
+            data-testid="open-look-switch"
           >
-            <option value="">{t('families.label')}</option>
-            {TEMPLATE_FAMILIES.map(f => (
-              <option key={f.id} value={f.id}>
-                {locale === 'ar'
-                  ? `${f.labelAr} — ${f.verticalAr}`
-                  : `${f.labelEn} — ${f.verticalEn}`}
-              </option>
-            ))}
-          </select>
+            {t('look.open')}
+          </button>
         )}
         <button
           type="button"
@@ -677,6 +740,38 @@ export function BuilderEditor({
           {b.publishing ? t('publishing') : t('publish')}
         </button>
       </header>
+
+      {lookPreview && (
+        <div
+          role="status"
+          className="flex flex-wrap items-center gap-2 border-b border-primary/30 bg-primary/10 px-4 py-2 text-sm"
+          data-testid="look-preview-bar"
+        >
+          <span className="flex-1">
+            {t('look.bar', {
+              look: getLook(lookPreview.look)?.name[locale === 'ar' ? 'ar' : 'en'] ?? '',
+            })}
+          </span>
+          <button
+            type="button"
+            onClick={() => void applyLookNow()}
+            disabled={lookBusy !== null}
+            className="rounded-lg bg-primary px-3 py-1 text-xs font-semibold text-primary-foreground disabled:opacity-50"
+            data-testid="look-bar-apply"
+          >
+            {lookBusy === 'apply' ? t('look.applying') : t('look.apply')}
+          </button>
+          <button
+            type="button"
+            onClick={() => setLookPreview(null)}
+            disabled={lookBusy !== null}
+            className="rounded-lg border border-border bg-background px-3 py-1 text-xs font-medium disabled:opacity-50"
+            data-testid="look-bar-keep"
+          >
+            {t('look.keepEditing')}
+          </button>
+        </div>
+      )}
 
       {publishBlockers.length > 0 && (
         <div
@@ -729,7 +824,7 @@ export function BuilderEditor({
             storefrontUrl={getStoreHref(store)}
             path={canvasPath}
             token={token}
-            doc={b.doc}
+            doc={lookPreview?.draft ?? b.doc}
             viewport={viewport}
             selectedId={selection?.sectionId ?? null}
             selectedBlockId={selection?.blockId ?? null}

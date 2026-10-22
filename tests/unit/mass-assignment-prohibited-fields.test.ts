@@ -436,6 +436,10 @@ const ROUTE_INVENTORY: Record<string, Coverage> = {
     exempt:
       '`lookBody` is a `.strict()` `{ lookId, design }` schema; the handler passes only those two values to StoreService.applyLook, which writes `look`/`template` from the registry look, never from the body',
   },
+  "store.routes.ts POST '/:id/look/preview'": {
+    exempt:
+      'a read-only preview: `lookPreviewBody` is a `.strict()` `{ lookId, design }` schema and nothing is written',
+  },
   "store.routes.ts PUT '/:id/theme'": {
     exempt:
       'themeSchema is a validated record written ONLY into the `theme` JSON column (StoreService.updateTheme) — no top-level Prisma column is reachable from it',

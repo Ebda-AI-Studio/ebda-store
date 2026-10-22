@@ -839,3 +839,77 @@ test('page settings: filters on the collection page start from the baseline, car
   await expect(page.getByTestId('page-settings-sizing')).toBeVisible();
   await expect(page.getByTestId('page-settings-bottomBar')).toBeVisible();
 });
+
+// ---- Change the look from the editor, with a preview (Task 9, Ruling EP-3) ----
+
+async function openLookPane(page: Page) {
+  // the button also opens the right pane on a narrow screen
+  await page.getByTestId('open-look-switch').click();
+  await expect(page.getByTestId('look-switch-pane')).toBeVisible();
+}
+
+test('look switch: the proposal shows in the same canvas, the real page is untouched until Apply', async ({
+  page,
+}) => {
+  await openBuilder(page);
+  await openLookPane(page);
+  const realDoc = await canvas(page)
+    .locator('body')
+    .evaluate(() => JSON.stringify((window as any).__doc));
+  // pick Vitrine and preview
+  await page.getByRole('radio', { name: /Vitrine|فاترينة/ }).click();
+  await page.getByTestId('look-preview').click();
+  await expect(page.getByTestId('look-preview-bar')).toBeVisible();
+  // the canvas now renders the proposed document (a different section list or settings)
+  await expect
+    .poll(async () =>
+      canvas(page)
+        .locator('body')
+        .evaluate(() => JSON.stringify((window as any).__doc))
+    )
+    .not.toBe(realDoc);
+  // the report says the content stays; nothing was saved to the real page yet
+  if (narrow(page))
+    await page
+      .getByRole('button', { name: L('الإعدادات', 'Settings') })
+      .first()
+      .click();
+  await expect(page.getByTestId('look-report')).toContainText(/(section|قسم)/);
+  expect((await state(page)).look).toBeNull();
+  expect((await state(page)).saves).toBe(0);
+
+  // Keep editing: the canvas is back on the real page
+  await page.getByTestId('look-bar-keep').click();
+  await expect(page.getByTestId('look-preview-bar')).toHaveCount(0);
+  await expect
+    .poll(async () =>
+      canvas(page)
+        .locator('body')
+        .evaluate(() => JSON.stringify((window as any).__doc))
+    )
+    .toBe(realDoc);
+});
+
+test('look switch: Apply writes the proposal and the editor reloads it; a moved page is refused, not applied', async ({
+  page,
+}) => {
+  await openBuilder(page);
+  await openLookPane(page);
+  await page.getByRole('radio', { name: /Vitrine|فاترينة/ }).click();
+  await page.getByTestId('look-preview').click();
+  await expect(page.getByTestId('look-preview-bar')).toBeVisible();
+  // the page moves under the preview (another editor saved)
+  await page.request.post(`${API}/__test/bump`);
+  await page.getByTestId('look-bar-apply').click();
+  await expect(page.getByTestId('look-preview-bar')).toHaveCount(0);
+  expect((await state(page)).look).toBeNull();
+
+  // the pane stays open for the next preview
+  await expect(page.getByTestId('look-switch-pane')).toBeVisible();
+  await page.getByRole('radio', { name: /Vitrine|فاترينة/ }).click();
+  await page.getByTestId('look-preview').click();
+  await expect(page.getByTestId('look-preview-bar')).toBeVisible();
+  await page.getByTestId('look-bar-apply').click();
+  await expect(page.getByTestId('look-preview-bar')).toHaveCount(0);
+  await expect.poll(async () => (await state(page)).look).toBe('qamar.vitrine');
+});

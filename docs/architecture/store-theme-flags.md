@@ -215,3 +215,7 @@ it since per-section dividers replaced it; a stored `theme.dividers` is still ho
 ## Page-type settings in the visual editor (Task 8e)
 
 The layout keys `sizing`, `bottomBar`, `locationsPage`, `productCardDefaults` (home document) and `productDetailPage`, `reviewSection`, `productsPage`, `filterSidebar`, `categoriesPage`, `cartPage`, `checkoutPage` (product / collection / cart documents) are edited in the visual editor's page-settings panel, one writer per key (Ruling VE-13). `filterSidebar.bgColor` / `textColor` are part of the layout schema since VE-14.
+
+## Look switch (Task 9)
+
+`PUT /stores/:id/look` (apply) and `POST /stores/:id/look/preview` (what apply would do, no write) share `composeLookDocument` in `page-builder.service.ts`. The editor's Look pane drives both; the revision token ties an apply to the preview it came from (409 `DRAFT_MOVED`). No native `confirm` remains in the visual editor (`tests/unit/builder-no-native-dialogs.test.ts`).
