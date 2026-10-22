@@ -48,9 +48,17 @@ describe('Settings search box (E23)', () => {
   });
 
   it('staff do not see owner-only settings', () => {
+    // the owner finds the Branding logo settings by "logo" (so the assertion below can fail)
+    search('logo');
+    expect(
+      screen.queryAllByRole('option', { name: /Logo size|Footer logo/ }).length
+    ).toBeGreaterThan(0);
+    cleanup();
     role = 'staff';
     search('logo');
-    expect(screen.queryAllByRole('option')).toHaveLength(0);
+    // staff still find the editor's own logo position (a staff control), never the owner-only ones
+    expect(screen.queryAllByRole('option', { name: /Logo size|Footer logo/ })).toHaveLength(0);
+    expect(screen.queryAllByRole('option', { name: /Logo position/ }).length).toBeGreaterThan(0);
   });
 
   it('a feature the store lacks is not offered', () => {

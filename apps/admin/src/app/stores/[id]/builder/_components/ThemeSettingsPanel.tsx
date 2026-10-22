@@ -18,6 +18,7 @@ import {
   THEME_SETTINGS_SCHEMA,
   hexToHsl,
   hslToHex,
+  isShown,
   overriddenLookKeys,
   type DraftTypography,
   type LookDefinition,
@@ -113,6 +114,12 @@ export function ThemeSettingsPanel({
     setState('saved');
   };
 
+  // Only the controls a renderer of this store's template reads (Ruling EP-1); a group left empty is not drawn.
+  const groups = THEME_SETTINGS_SCHEMA.map(g => ({
+    ...g,
+    settings: g.settings.filter(s => isShown(s, { template: storeTemplate, look: look?.id })),
+  })).filter(g => g.settings.length > 0);
+
   const renderField = (s: (typeof THEME_SETTINGS_SCHEMA)[number]['settings'][number]) => {
     const label = locale === 'ar' ? s.labelAr : s.labelEn;
     const v = current[s.id];
@@ -141,6 +148,12 @@ export function ThemeSettingsPanel({
             onChange={e => set(s.id, e.target.value)}
             className="w-full rounded-lg border border-border bg-background px-2.5 py-1.5 text-base sm:text-sm"
           >
+            {typeof v !== 'string' &&
+              (s.id === 'headerLogoPlacement' || s.id === 'headerSearch') && (
+                <option value="" disabled>
+                  {t('inherit')}
+                </option>
+              )}
             {s.options?.map(o => (
               <option key={String(o.value)} value={String(o.value)}>
                 {locale === 'ar' ? o.labelAr : o.labelEn}
@@ -187,34 +200,54 @@ export function ThemeSettingsPanel({
             <p className="text-xs text-muted-foreground">{t('smartPaletteHint')}</p>
           </div>
         )}
-        {THEME_SETTINGS_SCHEMA.map(group => (
+        {groups.map(group => (
           <fieldset key={group.id} className="space-y-3">
             <legend className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
               {locale === 'ar' ? group.labelAr : group.labelEn}
             </legend>
-            {group.settings.map(s => (
-              <div key={s.id} className="space-y-1">
-                {renderField(s)}
-                {overridden.has(String(s.id)) && (
-                  <div className="flex items-center gap-2">
-                    <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-foreground">
-                      {t('edited')}
-                    </span>
-                    <button
-                      type="button"
-                      disabled={resetting !== null}
-                      aria-label={t('resetOne', {
-                        field: locale === 'ar' ? s.labelAr : s.labelEn,
-                      })}
-                      onClick={() => void resetOne(String(s.id))}
-                      className="inline-flex min-h-11 items-center rounded-lg px-2 text-xs font-medium text-primary-ink underline disabled:opacity-40"
-                    >
-                      {t('reset')}
-                    </button>
+            {group.settings.map(s => {
+              const field = (
+                <>
+                  {renderField(s)}
+                  {overridden.has(String(s.id)) && (
+                    <div className="flex items-center gap-2">
+                      <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-foreground">
+                        {t('edited')}
+                      </span>
+                      <button
+                        type="button"
+                        disabled={resetting !== null}
+                        aria-label={t('resetOne', {
+                          field: locale === 'ar' ? s.labelAr : s.labelEn,
+                        })}
+                        onClick={() => void resetOne(String(s.id))}
+                        className="inline-flex min-h-11 items-center rounded-lg px-2 text-xs font-medium text-primary-ink underline disabled:opacity-40"
+                      >
+                        {t('reset')}
+                      </button>
+                    </div>
+                  )}
+                </>
+              );
+              // ⌘K anchors (admin-search registry): one literal per control, so the coverage test can find it.
+              if (s.id === 'headerLogoPlacement')
+                return (
+                  <div key={s.id} className="space-y-1" data-setting-id="builder.header-logo">
+                    {field}
                   </div>
-                )}
-              </div>
-            ))}
+                );
+              if (s.id === 'headerSearch')
+                return (
+                  <div key={s.id} className="space-y-1" data-setting-id="builder.header-search">
+                    {field}
+                  </div>
+                );
+              return (
+                <div key={s.id} className="space-y-1">
+                  {field}
+                </div>
+              );
+            })}
             {group.id === 'typography' && typography && onTypography && storeId && (
               <div className="space-y-4 pt-2">
                 <FontsField

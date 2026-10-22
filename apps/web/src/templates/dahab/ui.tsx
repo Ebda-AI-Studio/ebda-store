@@ -17,6 +17,8 @@
  */
 import type { ReactNode, SVGProps } from 'react';
 import Link from 'next/link';
+import { useLanguage } from '../../contexts/LanguageContext';
+import { settingMarker, useEditorMode } from '../../builder/render/editor-mode';
 
 /** Primary action: solid gold, night ink (contrast 8.6:1). */
 export const DAHAB_BTN_PRIMARY =
@@ -61,6 +63,9 @@ export function DahabSectionHeading({
   align?: 'start' | 'center';
   id?: string;
 }) {
+  // Canvas only: the title is the section's `title` setting (see SectionHeading).
+  const editorMode = useEditorMode();
+  const { isRtl } = useLanguage();
   if (!title && !subtitle) return null;
   const centered = align === 'center';
   return (
@@ -76,6 +81,7 @@ export function DahabSectionHeading({
             <h2
               id={id}
               className="font-display text-balance text-[clamp(1.6rem,1.15rem+1.5vw,2.4rem)] leading-[1.15] text-foreground rtl:leading-[1.45]"
+              {...settingMarker(editorMode, 'title', isRtl)}
             >
               {title}
             </h2>

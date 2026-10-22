@@ -8,6 +8,7 @@ import { themePatch } from './theme-patch';
 
 interface StoreResponse {
   id: string;
+  template?: string;
   name: string;
   nameAr?: string;
   logo?: string;
@@ -103,6 +104,7 @@ export function useBranding(storeId: string, messages: ToastMessages) {
         setLoadedTheme(shownTheme);
         setBranding({
           id: store.id,
+          template: store.template,
           name: store.name,
           nameAr: store.nameAr,
           logo: store.logo,

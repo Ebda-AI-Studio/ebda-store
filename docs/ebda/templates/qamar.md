@@ -71,3 +71,7 @@ The Qamar demo boutique (`scripts/qamar-demo/catalogue.mjs`: 18 products, 160 va
 - Independent audits 2026-10-16 (taste 24 / 25 / 24 then 28 / 27 / 28; a11y 0 P0 / 9 P1 then 4 P1): all findings fixed in W4-W6 (Rulings B1-70..B1-98).
 - STOP 2 (2026-10-21): independent audit 30 / 29 / 30, Ahmad approved all three; Lookbook accent moon silver, Vitrine re-graded hero, receipt printer box kept (B1-93, B1-102).
 - Task 10: the scenario matrix found size-chart scroll focus, auth inline links, band status inks, a showroom plan gap and a seed sale-price gap (Ruling B1-112, B1-113); one accepted residual (B1-111).
+
+## Header chrome override (Ruling EP-4, Task 10)
+
+`templates/qamar/Header.tsx` draws the logo placement the merchant chose in the visual editor's Theme pane (`theme.headerLogoPlacement`), else the look's `chrome.header.logoPlacement` (Atelier and Lookbook start, Vitrine centre), through `resolveHeaderChrome`. A store with no override draws exactly what its look says. Switching look with `design: 'reset'` clears the override; `keep` leaves it. Detail: `docs/architecture/store-theme-flags.md`.

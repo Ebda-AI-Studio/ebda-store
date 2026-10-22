@@ -1547,5 +1547,29 @@
     "feature": "whatsapp",
     "pageEn": "WhatsApp Integration",
     "pageAr": "ربط واتساب"
+  },
+  {
+    "id": "builder.header-logo",
+    "kind": "setting",
+    "route": "/builder",
+    "access": "staff",
+    "en": "Logo position",
+    "ar": "مكان الشعار",
+    "synEn": "logo position centre center start header wordmark",
+    "synAr": "مكان الشعار اللوجو منتصف بداية الهيدر",
+    "pageEn": "Visual builder",
+    "pageAr": "المحرر المرئي"
+  },
+  {
+    "id": "builder.header-search",
+    "kind": "setting",
+    "route": "/builder",
+    "access": "staff",
+    "en": "Header search",
+    "ar": "البحث في الهيدر",
+    "synEn": "search field icon header find products",
+    "synAr": "البحث خانة بحث ايقونة الهيدر",
+    "pageEn": "Visual builder",
+    "pageAr": "المحرر المرئي"
   }
 ]

@@ -610,6 +610,8 @@ export function BuilderEditor({
         selection={selection}
         viewport={viewport}
         theme={effectiveTheme(store.theme, b.doc.theme)}
+        template={store.template}
+        look={store.look}
         errors={b.errors}
         dispatch={dispatch}
         onAiFill={sectionId => {
@@ -891,6 +893,8 @@ export function BuilderEditor({
         <AddSectionDialog
           list={addTo}
           doc={b.doc}
+          template={store.template}
+          look={store.look}
           onClose={() => {
             setAddTo(null);
             setAddAt(undefined);

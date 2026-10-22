@@ -20,6 +20,7 @@ import {
   hasExplicitDividerPick,
 } from './SectionDivider';
 import { useStore } from '../../contexts/StoreContext';
+import { settingMarker, useEditorMode } from '../../builder/render/editor-mode';
 
 interface SectionHeadingProps {
   title?: string;
@@ -114,6 +115,9 @@ export function SectionHeading({
   // undefined, fall back to the deprecated boolean props so existing stores
   // keep their current look.
   const { store } = useStore();
+  // Canvas only: tag the three texts so the overlay edits the field on screen (VE-2 markers).
+  const editorMode = useEditorMode();
+  const mark = (base: 'title' | 'kicker' | 'subtitle') => settingMarker(editorMode, base, isRtl);
 
   // Anchor B (PDP-4 / YML-1): GUARANTEE a readable heading color — invert at
   // render time, never via a CSS --section-fg cascade (audit 2026-06-05).
@@ -321,6 +325,7 @@ export function SectionHeading({
               <span
                 className="text-xs font-semibold ui-caps-toggle tracking-[0.18em] text-foreground/70"
                 data-zone="sectionKicker"
+                {...mark('kicker')}
                 style={{
                   fontFamily: kickerZone?.fontFamily,
                   fontSize: responsiveFontSize(kickerZone?.fontSize),
@@ -371,6 +376,7 @@ export function SectionHeading({
                 <h2
                   className={styles.sectionHeading}
                   data-zone="sectionTitle"
+                  {...mark('title')}
                   style={{
                     fontFamily: headingZone?.fontFamily,
                     fontSize: responsiveFontSize(headingZone?.fontSize),
@@ -404,6 +410,7 @@ export function SectionHeading({
                         : 'text-center'
                   }`}
                   data-zone="sectionTitle"
+                  {...mark('title')}
                   style={{
                     fontFamily: headingZone?.fontFamily,
                     fontSize: responsiveFontSize(headingZone?.fontSize),
@@ -432,6 +439,7 @@ export function SectionHeading({
                       : 'text-center'
                 }`}
                 data-zone="sectionTitle"
+                {...mark('title')}
                 style={{
                   fontFamily: headingZone?.fontFamily,
                   fontSize: responsiveFontSize(headingZone?.fontSize),
@@ -486,6 +494,7 @@ export function SectionHeading({
               <p
                 className="text-base text-muted-foreground max-w-2xl text-pretty"
                 data-zone="sectionSubtitle"
+                {...mark('subtitle')}
                 style={{
                   fontFamily: subtitleZone?.fontFamily,
                   fontSize: responsiveFontSize(subtitleZone?.fontSize),

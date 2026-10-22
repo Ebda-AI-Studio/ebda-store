@@ -15,6 +15,7 @@ import { useLanguage } from '../../contexts/LanguageContext';
 import { useLocalePrice } from '../../hooks/useLocalePrice';
 import { sectionBgStyle } from '../../templates/shared/section-bg';
 import { sectionSpacingClasses } from '../../templates/shared/section-spacing';
+import { displayedImageKey, imageMarker } from '../render/image-key';
 import { getProductPricing } from '../../lib/product-pricing';
 import { canBuyNow } from '../../lib/can-buy-now';
 import { isInCompareList, toggleCompare } from '../../lib/compare';
@@ -296,6 +297,7 @@ function SpotlightList({
             <Image
               src={image}
               alt={pick(settings.alt, settings.altAr)}
+              {...imageMarker(editorMode, displayedImageKey(ar, settings.image, settings.imageAr))}
               fill
               sizes="(min-width: 768px) 50vw, 100vw"
               className="object-cover"

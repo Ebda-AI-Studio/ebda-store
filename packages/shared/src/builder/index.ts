@@ -11,6 +11,7 @@ export * from './typography-draft';
 export * from './smart-palette';
 export * from './rebase-draft';
 export * from './settings-schema';
+export * from './shown-for';
 export * from './registry';
 export * from './adapter';
 export * from './validate';

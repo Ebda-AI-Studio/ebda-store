@@ -450,13 +450,12 @@ export class StoreService {
           // Branding → Theme.
           // 2026-07-12 design-sweep batch: new stores also get a neutral-slate
           // OOS ribbon (harmonizes better than the platform's original fixed
-          // terracotta) + rtlPolish (RTL-correct empty-state CTA arrow on
-          // elegant). Existing stores keep both undefined and render unchanged.
+          // terracotta). Existing stores keep it undefined and render unchanged.
+          // `rtlPolish` is no longer seeded: no renderer reads it (Ruling EP-8).
           theme: {
             personaChromeV2: true,
             frameChromeDedup: true,
             oosRibbonColor: '#6b7280',
-            rtlPolish: true,
           },
         },
       })

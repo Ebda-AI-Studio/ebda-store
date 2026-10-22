@@ -49,6 +49,7 @@ import {
   spacingSettings,
   styleSettings,
   type SettingDefinition,
+  type ShownFor,
 } from './settings-schema';
 
 export { VIEWPORTS, VIEWPORT_RANGES, type Viewport } from './viewports';
@@ -96,6 +97,12 @@ export interface SectionDefinition {
   cardinality: 'one' | 'many';
   maxCount: number;
   settings: readonly SettingDefinition[];
+  /**
+   * Keys the save schema still accepts and stored documents may still carry, but no renderer
+   * reads on any skin, so the editor has no control for them (Ruling EP-5: removed, never
+   * migrated or deleted). Listed so the descriptor-parity test can tell them from a forgotten field.
+   */
+  retired: readonly string[];
   blocks: readonly BlockDefinition[];
   presets: readonly SectionPreset[];
   responsive: {
@@ -131,6 +138,7 @@ function def(
     | 'presets'
     | 'pages'
     | 'pinned'
+    | 'retired'
   > &
     Partial<
       Pick<
@@ -143,6 +151,7 @@ function def(
         | 'propsSchema'
         | 'pages'
         | 'pinned'
+        | 'retired'
       >
     >
 ): SectionDefinition {
@@ -153,6 +162,7 @@ function def(
       cardinality: 'many',
       pages: ['home'],
       pinned: false,
+      retired: [],
       maxCount: 8,
       blocks: [],
       responsive: { hidden: ALL, settings: {} },
@@ -165,6 +175,7 @@ function def(
     cardinality: 'one',
     pages: ['home'],
     pinned: false,
+    retired: [],
     maxCount: 1,
     blocks: [],
     responsive: { hidden: ALL, settings: {} },
@@ -211,6 +222,24 @@ const BADGE_ICON_LABELS: Record<(typeof TRUST_BADGE_ICONS)[number], [string, str
   engraving: ['Engraving', 'حفر'],
   support: ['Support', 'الدعم'],
 };
+
+const without = (list: readonly SettingDefinition[], ids: readonly string[]) =>
+  list.filter(x => !ids.includes(x.id));
+/** `list` with a `shownFor` rule added to the settings named in `rules`. */
+const narrowed = (list: readonly SettingDefinition[], rules: Record<string, ShownFor>) =>
+  list.map(x => (x.id in rules ? { ...x, shownFor: rules[x.id] } : x));
+/**
+ * Spacing the skin's renderer ignores. The carousels and the hero lay themselves out inside their
+ * own container (`PageRenderer` comment on the hero wrapper; `T.ProductCarousel` ignores the
+ * `innerContainerClass`), so Width, and for the hero Top / Bottom spacing, did nothing on any skin.
+ */
+/** Category cards honour Aspect / Name / Hover in the scrolling row, and Modern's own grid card does. */
+const CATEGORY_CARD_LOOK: ShownFor = [
+  { variants: { layout: ['horizontal'] } },
+  { templates: ['modern'] },
+];
+const NO_WIDTH = ['maxWidth'] as const;
+const NO_HERO_SPACING = ['paddingTop', 'paddingBottom', 'maxWidth'] as const;
 
 const carouselLimit = (max: number) => s.range('limit', 'Products to show', 'عدد المنتجات', 1, max);
 
@@ -299,8 +328,9 @@ export const SECTION_REGISTRY: readonly SectionDefinition[] = [
             'على الجوال والتابلت يظهر النص أسفل الصورة بألوان الصفحة، لذا يُطبَّق لون العنوان على الشاشات الكبيرة فقط.',
         }
       ),
-      ...styleSettings(),
+      ...without(styleSettings(), NO_HERO_SPACING),
     ],
+    retired: NO_HERO_SPACING,
   }),
   def({
     type: 'category-grid',
@@ -356,6 +386,8 @@ export const SECTION_REGISTRY: readonly SectionDefinition[] = [
         'ألوان المربعات',
         [opt('none', 'Plain', 'سادة'), opt('aisles', 'Aisle colours', 'ألوان الممرات')],
         {
+          // only a look that defines aisle colours (Lamma's market) paints them
+          shownFor: { looks: ['lamma.market'], variants: { layout: ['tiles'] } },
           hintEn: 'Square tiles take the look’s aisle colours as soft tints. Names always show.',
           hintAr: 'مربعات الأقسام بتاخد ألوان الممرات كدرجات فاتحة، والاسم بيظهر دايمًا.',
         }
@@ -370,7 +402,13 @@ export const SECTION_REGISTRY: readonly SectionDefinition[] = [
         opt(2, '2', '2'),
         opt(3, '3', '3'),
       ]),
-      ...cardSettings(),
+      // The grid and the aisle tiles ignore these on every skin built since the looks (their
+      // cards are their own); the scrolling row, and Modern's grid card, read them.
+      ...narrowed(cardSettings(), {
+        cardAspect: CATEGORY_CARD_LOOK,
+        showLabel: CATEGORY_CARD_LOOK,
+        showHover: CATEGORY_CARD_LOOK,
+      }),
       ...styleSettings(),
     ],
   }),
@@ -381,7 +419,13 @@ export const SECTION_REGISTRY: readonly SectionDefinition[] = [
     legacyKey: 'newArrivals',
     rendererKey: 'home.newArrivals',
     group: 'template',
-    settings: [...headingSettings(), carouselLimit(48), ...cardSettings(), ...styleSettings()],
+    settings: [
+      ...headingSettings(),
+      carouselLimit(48),
+      ...cardSettings(),
+      ...without(styleSettings(), NO_WIDTH),
+    ],
+    retired: NO_WIDTH,
   }),
   def({
     type: 'best-sellers',
@@ -390,7 +434,13 @@ export const SECTION_REGISTRY: readonly SectionDefinition[] = [
     legacyKey: 'bestSellers',
     rendererKey: 'home.bestSellers',
     group: 'template',
-    settings: [...headingSettings(), carouselLimit(48), ...cardSettings(), ...styleSettings()],
+    settings: [
+      ...headingSettings(),
+      carouselLimit(48),
+      ...cardSettings(),
+      ...without(styleSettings(), NO_WIDTH),
+    ],
+    retired: NO_WIDTH,
   }),
   def({
     type: 'brand-story',
@@ -467,8 +517,9 @@ export const SECTION_REGISTRY: readonly SectionDefinition[] = [
       ]),
       s.range('minRating', 'Minimum rating', 'أقل تقييم', 1, 5),
       s.check('verifiedOnly', 'Verified purchases only', 'مشتريات موثقة فقط', 'content'),
-      ...styleSettings(),
+      ...without(styleSettings(), NO_WIDTH),
     ],
+    retired: NO_WIDTH,
   }),
   def({
     type: 'product-carousel',
@@ -542,8 +593,9 @@ export const SECTION_REGISTRY: readonly SectionDefinition[] = [
       ...headingSettings(),
       carouselLimit(50),
       ...cardSettings(),
-      ...styleSettings(),
+      ...without(styleSettings(), NO_WIDTH),
     ],
+    retired: NO_WIDTH,
   }),
   def({
     type: 'image-text',
@@ -717,10 +769,13 @@ export const SECTION_REGISTRY: readonly SectionDefinition[] = [
           hintAr: 'القائمة بتعرض الأطباق في صفوف حسب القسم، ومعاها تابات للأقسام.',
         }
       ),
-      s.select('tabs', 'Category tabs (menu)', 'تابات الأقسام (القائمة)', [
-        opt('categories', 'Show', 'إظهار'),
-        opt('none', 'Hide', 'إخفاء'),
-      ]),
+      s.select(
+        'tabs',
+        'Category tabs (menu)',
+        'تابات الأقسام (القائمة)',
+        [opt('categories', 'Show', 'إظهار'), opt('none', 'Hide', 'إخفاء')],
+        { shownFor: { variants: { layout: ['menu'] } } }
+      ),
       s.select('columns', 'Columns (desktop)', 'الأعمدة (سطح المكتب)', [
         opt(2, '2', '2'),
         opt(3, '3', '3'),

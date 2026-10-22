@@ -1,11 +1,11 @@
 {
   "version": 1,
   "summary": {
-    "wired": 1169,
-    "no-op": 160,
+    "wired": 1371,
+    "no-op": 0,
     "missing": 0,
     "pending-template": 0,
-    "marker-pending": 76,
+    "marker-pending": 0,
     "classic-only": 0,
     "exempt": 0
   },
@@ -177,7 +177,7 @@
       ],
       "surface": "section:best-sellers",
       "control": "kicker",
-      "status": "marker-pending",
+      "status": "wired",
       "evidence": "static+probe"
     },
     {
@@ -190,21 +190,8 @@
       ],
       "surface": "section:best-sellers",
       "control": "limit",
-      "status": "no-op",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "jasmine|section:best-sellers|maxWidth",
-      "skin": "jasmine",
-      "looks": [
-        "jasmine.apothecary",
-        "jasmine.bloom",
-        "jasmine.clinic"
-      ],
-      "surface": "section:best-sellers",
-      "control": "maxWidth",
-      "status": "no-op",
-      "evidence": "static+probe"
+      "status": "wired",
+      "evidence": "static (HomePageBody.tsx)"
     },
     {
       "id": "jasmine|section:best-sellers|paddingBottom",
@@ -255,7 +242,7 @@
       ],
       "surface": "section:best-sellers",
       "control": "showHover",
-      "status": "no-op",
+      "status": "wired",
       "evidence": "static+probe"
     },
     {
@@ -268,7 +255,7 @@
       ],
       "surface": "section:best-sellers",
       "control": "showKickerLines",
-      "status": "no-op",
+      "status": "wired",
       "evidence": "static+probe"
     },
     {
@@ -294,7 +281,7 @@
       ],
       "surface": "section:best-sellers",
       "control": "showSubtitleLines",
-      "status": "no-op",
+      "status": "wired",
       "evidence": "static+probe"
     },
     {
@@ -307,7 +294,7 @@
       ],
       "surface": "section:best-sellers",
       "control": "subtitle",
-      "status": "marker-pending",
+      "status": "wired",
       "evidence": "static+probe"
     },
     {
@@ -320,7 +307,7 @@
       ],
       "surface": "section:best-sellers",
       "control": "title",
-      "status": "marker-pending",
+      "status": "wired",
       "evidence": "static+probe"
     },
     {
@@ -437,7 +424,7 @@
       ],
       "surface": "section:brand-story",
       "control": "bgColor",
-      "status": "no-op",
+      "status": "wired",
       "evidence": "static+probe"
     },
     {
@@ -541,7 +528,7 @@
       ],
       "surface": "section:category-grid",
       "control": "cardAspect",
-      "status": "no-op",
+      "status": "wired",
       "evidence": "static+probe"
     },
     {
@@ -671,7 +658,7 @@
       ],
       "surface": "section:category-grid",
       "control": "kicker",
-      "status": "marker-pending",
+      "status": "wired",
       "evidence": "static+probe"
     },
     {
@@ -762,7 +749,7 @@
       ],
       "surface": "section:category-grid",
       "control": "showHover",
-      "status": "no-op",
+      "status": "wired",
       "evidence": "static+probe"
     },
     {
@@ -775,7 +762,7 @@
       ],
       "surface": "section:category-grid",
       "control": "showKickerLines",
-      "status": "no-op",
+      "status": "wired",
       "evidence": "static+probe"
     },
     {
@@ -788,7 +775,7 @@
       ],
       "surface": "section:category-grid",
       "control": "showLabel",
-      "status": "no-op",
+      "status": "wired",
       "evidence": "static+probe"
     },
     {
@@ -801,7 +788,7 @@
       ],
       "surface": "section:category-grid",
       "control": "showSubtitleLines",
-      "status": "no-op",
+      "status": "wired",
       "evidence": "static+probe"
     },
     {
@@ -827,20 +814,7 @@
       ],
       "surface": "section:category-grid",
       "control": "subtitle",
-      "status": "marker-pending",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "jasmine|section:category-grid|tint",
-      "skin": "jasmine",
-      "looks": [
-        "jasmine.apothecary",
-        "jasmine.bloom",
-        "jasmine.clinic"
-      ],
-      "surface": "section:category-grid",
-      "control": "tint",
-      "status": "no-op",
+      "status": "wired",
       "evidence": "static+probe"
     },
     {
@@ -853,7 +827,7 @@
       ],
       "surface": "section:category-grid",
       "control": "title",
-      "status": "marker-pending",
+      "status": "wired",
       "evidence": "static+probe"
     },
     {
@@ -1113,7 +1087,7 @@
       ],
       "surface": "section:featured-collection",
       "control": "limit",
-      "status": "no-op",
+      "status": "wired",
       "evidence": "static+probe"
     },
     {
@@ -1217,7 +1191,7 @@
       ],
       "surface": "section:featured-collection",
       "control": "tabs",
-      "status": "no-op",
+      "status": "wired",
       "evidence": "static+probe"
     },
     {
@@ -1360,8 +1334,8 @@
       ],
       "surface": "section:hero",
       "control": "autoplayMs",
-      "status": "no-op",
-      "evidence": "static+probe"
+      "status": "wired",
+      "evidence": "static (HeroSlider.tsx)"
     },
     {
       "id": "jasmine|section:hero|bgColor",
@@ -1403,19 +1377,6 @@
       "evidence": "static+probe"
     },
     {
-      "id": "jasmine|section:hero|maxWidth",
-      "skin": "jasmine",
-      "looks": [
-        "jasmine.apothecary",
-        "jasmine.bloom",
-        "jasmine.clinic"
-      ],
-      "surface": "section:hero",
-      "control": "maxWidth",
-      "status": "no-op",
-      "evidence": "static+probe"
-    },
-    {
       "id": "jasmine|section:hero|mode",
       "skin": "jasmine",
       "looks": [
@@ -1426,32 +1387,6 @@
       "surface": "section:hero",
       "control": "mode",
       "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "jasmine|section:hero|paddingBottom",
-      "skin": "jasmine",
-      "looks": [
-        "jasmine.apothecary",
-        "jasmine.bloom",
-        "jasmine.clinic"
-      ],
-      "surface": "section:hero",
-      "control": "paddingBottom",
-      "status": "no-op",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "jasmine|section:hero|paddingTop",
-      "skin": "jasmine",
-      "looks": [
-        "jasmine.apothecary",
-        "jasmine.bloom",
-        "jasmine.clinic"
-      ],
-      "surface": "section:hero",
-      "control": "paddingTop",
-      "status": "no-op",
       "evidence": "static+probe"
     },
     {
@@ -1503,7 +1438,7 @@
       ],
       "surface": "section:image-text",
       "control": "alt",
-      "status": "marker-pending",
+      "status": "wired",
       "evidence": "static+probe"
     },
     {
@@ -1672,7 +1607,7 @@
       ],
       "surface": "section:maker-profile",
       "control": "alt",
-      "status": "marker-pending",
+      "status": "wired",
       "evidence": "static+probe"
     },
     {
@@ -1971,7 +1906,7 @@
       ],
       "surface": "section:new-arrivals",
       "control": "kicker",
-      "status": "marker-pending",
+      "status": "wired",
       "evidence": "static+probe"
     },
     {
@@ -1984,21 +1919,8 @@
       ],
       "surface": "section:new-arrivals",
       "control": "limit",
-      "status": "no-op",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "jasmine|section:new-arrivals|maxWidth",
-      "skin": "jasmine",
-      "looks": [
-        "jasmine.apothecary",
-        "jasmine.bloom",
-        "jasmine.clinic"
-      ],
-      "surface": "section:new-arrivals",
-      "control": "maxWidth",
-      "status": "no-op",
-      "evidence": "static+probe"
+      "status": "wired",
+      "evidence": "static (HomePageBody.tsx)"
     },
     {
       "id": "jasmine|section:new-arrivals|paddingBottom",
@@ -2049,7 +1971,7 @@
       ],
       "surface": "section:new-arrivals",
       "control": "showHover",
-      "status": "no-op",
+      "status": "wired",
       "evidence": "static+probe"
     },
     {
@@ -2062,7 +1984,7 @@
       ],
       "surface": "section:new-arrivals",
       "control": "showKickerLines",
-      "status": "no-op",
+      "status": "wired",
       "evidence": "static+probe"
     },
     {
@@ -2088,7 +2010,7 @@
       ],
       "surface": "section:new-arrivals",
       "control": "showSubtitleLines",
-      "status": "no-op",
+      "status": "wired",
       "evidence": "static+probe"
     },
     {
@@ -2101,7 +2023,7 @@
       ],
       "surface": "section:new-arrivals",
       "control": "subtitle",
-      "status": "marker-pending",
+      "status": "wired",
       "evidence": "static+probe"
     },
     {
@@ -2114,7 +2036,7 @@
       ],
       "surface": "section:new-arrivals",
       "control": "title",
-      "status": "marker-pending",
+      "status": "wired",
       "evidence": "static+probe"
     },
     {
@@ -2348,8 +2270,8 @@
       ],
       "surface": "section:product-carousel",
       "control": "categoryFetchLimit",
-      "status": "no-op",
-      "evidence": "static+probe"
+      "status": "wired",
+      "evidence": "static (HomePageBody.tsx)"
     },
     {
       "id": "jasmine|section:product-carousel|categorySlug",
@@ -2387,7 +2309,7 @@
       ],
       "surface": "section:product-carousel",
       "control": "kicker",
-      "status": "marker-pending",
+      "status": "wired",
       "evidence": "static+probe"
     },
     {
@@ -2415,19 +2337,6 @@
       "control": "manualProductIds",
       "status": "wired",
       "evidence": "static"
-    },
-    {
-      "id": "jasmine|section:product-carousel|maxWidth",
-      "skin": "jasmine",
-      "looks": [
-        "jasmine.apothecary",
-        "jasmine.bloom",
-        "jasmine.clinic"
-      ],
-      "surface": "section:product-carousel",
-      "control": "maxWidth",
-      "status": "no-op",
-      "evidence": "static+probe"
     },
     {
       "id": "jasmine|section:product-carousel|paddingBottom",
@@ -2491,7 +2400,7 @@
       ],
       "surface": "section:product-carousel",
       "control": "showHover",
-      "status": "no-op",
+      "status": "wired",
       "evidence": "static+probe"
     },
     {
@@ -2504,7 +2413,7 @@
       ],
       "surface": "section:product-carousel",
       "control": "showKickerLines",
-      "status": "no-op",
+      "status": "wired",
       "evidence": "static+probe"
     },
     {
@@ -2530,7 +2439,7 @@
       ],
       "surface": "section:product-carousel",
       "control": "showSubtitleLines",
-      "status": "no-op",
+      "status": "wired",
       "evidence": "static+probe"
     },
     {
@@ -2543,7 +2452,7 @@
       ],
       "surface": "section:product-carousel",
       "control": "subtitle",
-      "status": "marker-pending",
+      "status": "wired",
       "evidence": "static+probe"
     },
     {
@@ -2556,7 +2465,7 @@
       ],
       "surface": "section:product-carousel",
       "control": "title",
-      "status": "marker-pending",
+      "status": "wired",
       "evidence": "static+probe"
     },
     {
@@ -2582,7 +2491,7 @@
       ],
       "surface": "section:product-spotlight",
       "control": "alt",
-      "status": "marker-pending",
+      "status": "wired",
       "evidence": "static+probe"
     },
     {
@@ -2673,7 +2582,7 @@
       ],
       "surface": "section:product-spotlight",
       "control": "image",
-      "status": "marker-pending",
+      "status": "wired",
       "evidence": "static+probe"
     },
     {
@@ -2972,7 +2881,7 @@
       ],
       "surface": "section:steps",
       "control": "buttonText",
-      "status": "no-op",
+      "status": "wired",
       "evidence": "static+probe"
     },
     {
@@ -3037,7 +2946,7 @@
       ],
       "surface": "section:steps",
       "control": "subheading",
-      "status": "marker-pending",
+      "status": "wired",
       "evidence": "static+probe"
     },
     {
@@ -3080,19 +2989,6 @@
       "evidence": "static+probe"
     },
     {
-      "id": "jasmine|section:testimonials|maxWidth",
-      "skin": "jasmine",
-      "looks": [
-        "jasmine.apothecary",
-        "jasmine.bloom",
-        "jasmine.clinic"
-      ],
-      "surface": "section:testimonials",
-      "control": "maxWidth",
-      "status": "no-op",
-      "evidence": "static+probe"
-    },
-    {
       "id": "jasmine|section:testimonials|minRating",
       "skin": "jasmine",
       "looks": [
@@ -3102,8 +2998,8 @@
       ],
       "surface": "section:testimonials",
       "control": "minRating",
-      "status": "no-op",
-      "evidence": "static+probe"
+      "status": "wired",
+      "evidence": "static (HomePageBody.tsx)"
     },
     {
       "id": "jasmine|section:testimonials|paddingBottom",
@@ -3141,7 +3037,7 @@
       ],
       "surface": "section:testimonials",
       "control": "title",
-      "status": "marker-pending",
+      "status": "wired",
       "evidence": "static+probe"
     },
     {
@@ -3167,8 +3063,8 @@
       ],
       "surface": "section:testimonials",
       "control": "verifiedOnly",
-      "status": "no-op",
-      "evidence": "static+probe"
+      "status": "wired",
+      "evidence": "static (HomePageBody.tsx)"
     },
     {
       "id": "jasmine|section:trust-badges/badge|icon",
@@ -3232,7 +3128,7 @@
       ],
       "surface": "section:trust-badges",
       "control": "heading",
-      "status": "marker-pending",
+      "status": "wired",
       "evidence": "static+probe"
     },
     {
@@ -3626,6 +3522,19 @@
       "evidence": "static"
     },
     {
+      "id": "jasmine|theme|headerLogoPlacement",
+      "skin": "jasmine",
+      "looks": [
+        "jasmine.apothecary",
+        "jasmine.bloom",
+        "jasmine.clinic"
+      ],
+      "surface": "theme",
+      "control": "headerLogoPlacement",
+      "status": "wired",
+      "evidence": "static (compose.ts)"
+    },
+    {
       "id": "jasmine|theme|headingFont",
       "skin": "jasmine",
       "looks": [
@@ -3830,7 +3739,7 @@
       ],
       "surface": "section:best-sellers",
       "control": "kicker",
-      "status": "marker-pending",
+      "status": "wired",
       "evidence": "static+probe"
     },
     {
@@ -3843,21 +3752,8 @@
       ],
       "surface": "section:best-sellers",
       "control": "limit",
-      "status": "no-op",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "lamma|section:best-sellers|maxWidth",
-      "skin": "lamma",
-      "looks": [
-        "lamma.table",
-        "lamma.notebook",
-        "lamma.market"
-      ],
-      "surface": "section:best-sellers",
-      "control": "maxWidth",
-      "status": "no-op",
-      "evidence": "static+probe"
+      "status": "wired",
+      "evidence": "static (HomePageBody.tsx)"
     },
     {
       "id": "lamma|section:best-sellers|paddingBottom",
@@ -3908,7 +3804,7 @@
       ],
       "surface": "section:best-sellers",
       "control": "showHover",
-      "status": "no-op",
+      "status": "wired",
       "evidence": "static+probe"
     },
     {
@@ -3921,7 +3817,7 @@
       ],
       "surface": "section:best-sellers",
       "control": "showKickerLines",
-      "status": "no-op",
+      "status": "wired",
       "evidence": "static+probe"
     },
     {
@@ -3947,7 +3843,7 @@
       ],
       "surface": "section:best-sellers",
       "control": "showSubtitleLines",
-      "status": "no-op",
+      "status": "wired",
       "evidence": "static+probe"
     },
     {
@@ -3960,7 +3856,7 @@
       ],
       "surface": "section:best-sellers",
       "control": "subtitle",
-      "status": "marker-pending",
+      "status": "wired",
       "evidence": "static+probe"
     },
     {
@@ -3973,7 +3869,7 @@
       ],
       "surface": "section:best-sellers",
       "control": "title",
-      "status": "marker-pending",
+      "status": "wired",
       "evidence": "static+probe"
     },
     {
@@ -4090,7 +3986,7 @@
       ],
       "surface": "section:brand-story",
       "control": "bgColor",
-      "status": "no-op",
+      "status": "wired",
       "evidence": "static+probe"
     },
     {
@@ -4194,7 +4090,7 @@
       ],
       "surface": "section:category-grid",
       "control": "cardAspect",
-      "status": "no-op",
+      "status": "wired",
       "evidence": "static+probe"
     },
     {
@@ -4324,7 +4220,7 @@
       ],
       "surface": "section:category-grid",
       "control": "kicker",
-      "status": "marker-pending",
+      "status": "wired",
       "evidence": "static+probe"
     },
     {
@@ -4415,7 +4311,7 @@
       ],
       "surface": "section:category-grid",
       "control": "showHover",
-      "status": "no-op",
+      "status": "wired",
       "evidence": "static+probe"
     },
     {
@@ -4428,7 +4324,7 @@
       ],
       "surface": "section:category-grid",
       "control": "showKickerLines",
-      "status": "no-op",
+      "status": "wired",
       "evidence": "static+probe"
     },
     {
@@ -4441,7 +4337,7 @@
       ],
       "surface": "section:category-grid",
       "control": "showLabel",
-      "status": "no-op",
+      "status": "wired",
       "evidence": "static+probe"
     },
     {
@@ -4454,7 +4350,7 @@
       ],
       "surface": "section:category-grid",
       "control": "showSubtitleLines",
-      "status": "no-op",
+      "status": "wired",
       "evidence": "static+probe"
     },
     {
@@ -4480,7 +4376,7 @@
       ],
       "surface": "section:category-grid",
       "control": "subtitle",
-      "status": "marker-pending",
+      "status": "wired",
       "evidence": "static+probe"
     },
     {
@@ -4493,7 +4389,7 @@
       ],
       "surface": "section:category-grid",
       "control": "tint",
-      "status": "no-op",
+      "status": "wired",
       "evidence": "static+probe"
     },
     {
@@ -4506,7 +4402,7 @@
       ],
       "surface": "section:category-grid",
       "control": "title",
-      "status": "marker-pending",
+      "status": "wired",
       "evidence": "static+probe"
     },
     {
@@ -4766,7 +4662,7 @@
       ],
       "surface": "section:featured-collection",
       "control": "limit",
-      "status": "no-op",
+      "status": "wired",
       "evidence": "static+probe"
     },
     {
@@ -4870,7 +4766,7 @@
       ],
       "surface": "section:featured-collection",
       "control": "tabs",
-      "status": "no-op",
+      "status": "wired",
       "evidence": "static+probe"
     },
     {
@@ -5013,8 +4909,8 @@
       ],
       "surface": "section:hero",
       "control": "autoplayMs",
-      "status": "no-op",
-      "evidence": "static+probe"
+      "status": "wired",
+      "evidence": "static (HeroSlider.tsx)"
     },
     {
       "id": "lamma|section:hero|bgColor",
@@ -5056,19 +4952,6 @@
       "evidence": "static+probe"
     },
     {
-      "id": "lamma|section:hero|maxWidth",
-      "skin": "lamma",
-      "looks": [
-        "lamma.table",
-        "lamma.notebook",
-        "lamma.market"
-      ],
-      "surface": "section:hero",
-      "control": "maxWidth",
-      "status": "no-op",
-      "evidence": "static+probe"
-    },
-    {
       "id": "lamma|section:hero|mode",
       "skin": "lamma",
       "looks": [
@@ -5079,32 +4962,6 @@
       "surface": "section:hero",
       "control": "mode",
       "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "lamma|section:hero|paddingBottom",
-      "skin": "lamma",
-      "looks": [
-        "lamma.table",
-        "lamma.notebook",
-        "lamma.market"
-      ],
-      "surface": "section:hero",
-      "control": "paddingBottom",
-      "status": "no-op",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "lamma|section:hero|paddingTop",
-      "skin": "lamma",
-      "looks": [
-        "lamma.table",
-        "lamma.notebook",
-        "lamma.market"
-      ],
-      "surface": "section:hero",
-      "control": "paddingTop",
-      "status": "no-op",
       "evidence": "static+probe"
     },
     {
@@ -5156,7 +5013,7 @@
       ],
       "surface": "section:image-text",
       "control": "alt",
-      "status": "marker-pending",
+      "status": "wired",
       "evidence": "static+probe"
     },
     {
@@ -5325,7 +5182,7 @@
       ],
       "surface": "section:maker-profile",
       "control": "alt",
-      "status": "marker-pending",
+      "status": "wired",
       "evidence": "static+probe"
     },
     {
@@ -5624,7 +5481,7 @@
       ],
       "surface": "section:new-arrivals",
       "control": "kicker",
-      "status": "marker-pending",
+      "status": "wired",
       "evidence": "static+probe"
     },
     {
@@ -5637,21 +5494,8 @@
       ],
       "surface": "section:new-arrivals",
       "control": "limit",
-      "status": "no-op",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "lamma|section:new-arrivals|maxWidth",
-      "skin": "lamma",
-      "looks": [
-        "lamma.table",
-        "lamma.notebook",
-        "lamma.market"
-      ],
-      "surface": "section:new-arrivals",
-      "control": "maxWidth",
-      "status": "no-op",
-      "evidence": "static+probe"
+      "status": "wired",
+      "evidence": "static (HomePageBody.tsx)"
     },
     {
       "id": "lamma|section:new-arrivals|paddingBottom",
@@ -5702,7 +5546,7 @@
       ],
       "surface": "section:new-arrivals",
       "control": "showHover",
-      "status": "no-op",
+      "status": "wired",
       "evidence": "static+probe"
     },
     {
@@ -5715,7 +5559,7 @@
       ],
       "surface": "section:new-arrivals",
       "control": "showKickerLines",
-      "status": "no-op",
+      "status": "wired",
       "evidence": "static+probe"
     },
     {
@@ -5741,7 +5585,7 @@
       ],
       "surface": "section:new-arrivals",
       "control": "showSubtitleLines",
-      "status": "no-op",
+      "status": "wired",
       "evidence": "static+probe"
     },
     {
@@ -5754,7 +5598,7 @@
       ],
       "surface": "section:new-arrivals",
       "control": "subtitle",
-      "status": "marker-pending",
+      "status": "wired",
       "evidence": "static+probe"
     },
     {
@@ -5767,7 +5611,7 @@
       ],
       "surface": "section:new-arrivals",
       "control": "title",
-      "status": "marker-pending",
+      "status": "wired",
       "evidence": "static+probe"
     },
     {
@@ -6001,8 +5845,8 @@
       ],
       "surface": "section:product-carousel",
       "control": "categoryFetchLimit",
-      "status": "no-op",
-      "evidence": "static+probe"
+      "status": "wired",
+      "evidence": "static (HomePageBody.tsx)"
     },
     {
       "id": "lamma|section:product-carousel|categorySlug",
@@ -6040,7 +5884,7 @@
       ],
       "surface": "section:product-carousel",
       "control": "kicker",
-      "status": "marker-pending",
+      "status": "wired",
       "evidence": "static+probe"
     },
     {
@@ -6068,19 +5912,6 @@
       "control": "manualProductIds",
       "status": "wired",
       "evidence": "static"
-    },
-    {
-      "id": "lamma|section:product-carousel|maxWidth",
-      "skin": "lamma",
-      "looks": [
-        "lamma.table",
-        "lamma.notebook",
-        "lamma.market"
-      ],
-      "surface": "section:product-carousel",
-      "control": "maxWidth",
-      "status": "no-op",
-      "evidence": "static+probe"
     },
     {
       "id": "lamma|section:product-carousel|paddingBottom",
@@ -6144,7 +5975,7 @@
       ],
       "surface": "section:product-carousel",
       "control": "showHover",
-      "status": "no-op",
+      "status": "wired",
       "evidence": "static+probe"
     },
     {
@@ -6157,7 +5988,7 @@
       ],
       "surface": "section:product-carousel",
       "control": "showKickerLines",
-      "status": "no-op",
+      "status": "wired",
       "evidence": "static+probe"
     },
     {
@@ -6183,7 +6014,7 @@
       ],
       "surface": "section:product-carousel",
       "control": "showSubtitleLines",
-      "status": "no-op",
+      "status": "wired",
       "evidence": "static+probe"
     },
     {
@@ -6196,7 +6027,7 @@
       ],
       "surface": "section:product-carousel",
       "control": "subtitle",
-      "status": "marker-pending",
+      "status": "wired",
       "evidence": "static+probe"
     },
     {
@@ -6209,7 +6040,7 @@
       ],
       "surface": "section:product-carousel",
       "control": "title",
-      "status": "marker-pending",
+      "status": "wired",
       "evidence": "static+probe"
     },
     {
@@ -6235,7 +6066,7 @@
       ],
       "surface": "section:product-spotlight",
       "control": "alt",
-      "status": "marker-pending",
+      "status": "wired",
       "evidence": "static+probe"
     },
     {
@@ -6326,7 +6157,7 @@
       ],
       "surface": "section:product-spotlight",
       "control": "image",
-      "status": "marker-pending",
+      "status": "wired",
       "evidence": "static+probe"
     },
     {
@@ -6625,7 +6456,7 @@
       ],
       "surface": "section:steps",
       "control": "buttonText",
-      "status": "no-op",
+      "status": "wired",
       "evidence": "static+probe"
     },
     {
@@ -6690,7 +6521,7 @@
       ],
       "surface": "section:steps",
       "control": "subheading",
-      "status": "marker-pending",
+      "status": "wired",
       "evidence": "static+probe"
     },
     {
@@ -6733,19 +6564,6 @@
       "evidence": "static+probe"
     },
     {
-      "id": "lamma|section:testimonials|maxWidth",
-      "skin": "lamma",
-      "looks": [
-        "lamma.table",
-        "lamma.notebook",
-        "lamma.market"
-      ],
-      "surface": "section:testimonials",
-      "control": "maxWidth",
-      "status": "no-op",
-      "evidence": "static+probe"
-    },
-    {
       "id": "lamma|section:testimonials|minRating",
       "skin": "lamma",
       "looks": [
@@ -6755,8 +6573,8 @@
       ],
       "surface": "section:testimonials",
       "control": "minRating",
-      "status": "no-op",
-      "evidence": "static+probe"
+      "status": "wired",
+      "evidence": "static (HomePageBody.tsx)"
     },
     {
       "id": "lamma|section:testimonials|paddingBottom",
@@ -6794,7 +6612,7 @@
       ],
       "surface": "section:testimonials",
       "control": "title",
-      "status": "marker-pending",
+      "status": "wired",
       "evidence": "static+probe"
     },
     {
@@ -6820,8 +6638,8 @@
       ],
       "surface": "section:testimonials",
       "control": "verifiedOnly",
-      "status": "no-op",
-      "evidence": "static+probe"
+      "status": "wired",
+      "evidence": "static (HomePageBody.tsx)"
     },
     {
       "id": "lamma|section:trust-badges/badge|icon",
@@ -6885,7 +6703,7 @@
       ],
       "surface": "section:trust-badges",
       "control": "heading",
-      "status": "marker-pending",
+      "status": "wired",
       "evidence": "static+probe"
     },
     {
@@ -7279,6 +7097,19 @@
       "evidence": "static"
     },
     {
+      "id": "lamma|theme|headerLogoPlacement",
+      "skin": "lamma",
+      "looks": [
+        "lamma.table",
+        "lamma.notebook",
+        "lamma.market"
+      ],
+      "surface": "theme",
+      "control": "headerLogoPlacement",
+      "status": "wired",
+      "evidence": "static (compose.ts)"
+    },
+    {
       "id": "lamma|theme|headingFont",
       "skin": "lamma",
       "looks": [
@@ -7496,21 +7327,8 @@
       ],
       "surface": "section:best-sellers",
       "control": "limit",
-      "status": "no-op",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:best-sellers|maxWidth",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:best-sellers",
-      "control": "maxWidth",
-      "status": "no-op",
-      "evidence": "static+probe"
+      "status": "wired",
+      "evidence": "static (HomePageBody.tsx)"
     },
     {
       "id": "minimal|section:best-sellers|paddingBottom",
@@ -7561,7 +7379,7 @@
       ],
       "surface": "section:best-sellers",
       "control": "showHover",
-      "status": "no-op",
+      "status": "wired",
       "evidence": "static+probe"
     },
     {
@@ -7574,7 +7392,7 @@
       ],
       "surface": "section:best-sellers",
       "control": "showKickerLines",
-      "status": "no-op",
+      "status": "wired",
       "evidence": "static+probe"
     },
     {
@@ -7600,7 +7418,7 @@
       ],
       "surface": "section:best-sellers",
       "control": "showSubtitleLines",
-      "status": "no-op",
+      "status": "wired",
       "evidence": "static+probe"
     },
     {
@@ -7743,7 +7561,7 @@
       ],
       "surface": "section:brand-story",
       "control": "bgColor",
-      "status": "no-op",
+      "status": "wired",
       "evidence": "static+probe"
     },
     {
@@ -7847,7 +7665,7 @@
       ],
       "surface": "section:category-grid",
       "control": "cardAspect",
-      "status": "no-op",
+      "status": "wired",
       "evidence": "static+probe"
     },
     {
@@ -8068,7 +7886,7 @@
       ],
       "surface": "section:category-grid",
       "control": "showHover",
-      "status": "no-op",
+      "status": "wired",
       "evidence": "static+probe"
     },
     {
@@ -8081,7 +7899,7 @@
       ],
       "surface": "section:category-grid",
       "control": "showKickerLines",
-      "status": "no-op",
+      "status": "wired",
       "evidence": "static+probe"
     },
     {
@@ -8094,7 +7912,7 @@
       ],
       "surface": "section:category-grid",
       "control": "showLabel",
-      "status": "no-op",
+      "status": "wired",
       "evidence": "static+probe"
     },
     {
@@ -8107,7 +7925,7 @@
       ],
       "surface": "section:category-grid",
       "control": "showSubtitleLines",
-      "status": "no-op",
+      "status": "wired",
       "evidence": "static+probe"
     },
     {
@@ -8134,19 +7952,6 @@
       "surface": "section:category-grid",
       "control": "subtitle",
       "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:category-grid|tint",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:category-grid",
-      "control": "tint",
-      "status": "no-op",
       "evidence": "static+probe"
     },
     {
@@ -8419,7 +8224,7 @@
       ],
       "surface": "section:featured-collection",
       "control": "limit",
-      "status": "no-op",
+      "status": "wired",
       "evidence": "static+probe"
     },
     {
@@ -8523,7 +8328,7 @@
       ],
       "surface": "section:featured-collection",
       "control": "tabs",
-      "status": "no-op",
+      "status": "wired",
       "evidence": "static+probe"
     },
     {
@@ -8666,8 +8471,8 @@
       ],
       "surface": "section:hero",
       "control": "autoplayMs",
-      "status": "no-op",
-      "evidence": "static+probe"
+      "status": "wired",
+      "evidence": "static (HeroSlider.tsx)"
     },
     {
       "id": "minimal|section:hero|bgColor",
@@ -8709,19 +8514,6 @@
       "evidence": "static+probe"
     },
     {
-      "id": "minimal|section:hero|maxWidth",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:hero",
-      "control": "maxWidth",
-      "status": "no-op",
-      "evidence": "static+probe"
-    },
-    {
       "id": "minimal|section:hero|mode",
       "skin": "minimal",
       "looks": [
@@ -8732,32 +8524,6 @@
       "surface": "section:hero",
       "control": "mode",
       "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:hero|paddingBottom",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:hero",
-      "control": "paddingBottom",
-      "status": "no-op",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:hero|paddingTop",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:hero",
-      "control": "paddingTop",
-      "status": "no-op",
       "evidence": "static+probe"
     },
     {
@@ -9290,21 +9056,8 @@
       ],
       "surface": "section:new-arrivals",
       "control": "limit",
-      "status": "no-op",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:new-arrivals|maxWidth",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:new-arrivals",
-      "control": "maxWidth",
-      "status": "no-op",
-      "evidence": "static+probe"
+      "status": "wired",
+      "evidence": "static (HomePageBody.tsx)"
     },
     {
       "id": "minimal|section:new-arrivals|paddingBottom",
@@ -9355,7 +9108,7 @@
       ],
       "surface": "section:new-arrivals",
       "control": "showHover",
-      "status": "no-op",
+      "status": "wired",
       "evidence": "static+probe"
     },
     {
@@ -9368,7 +9121,7 @@
       ],
       "surface": "section:new-arrivals",
       "control": "showKickerLines",
-      "status": "no-op",
+      "status": "wired",
       "evidence": "static+probe"
     },
     {
@@ -9394,7 +9147,7 @@
       ],
       "surface": "section:new-arrivals",
       "control": "showSubtitleLines",
-      "status": "no-op",
+      "status": "wired",
       "evidence": "static+probe"
     },
     {
@@ -9654,8 +9407,8 @@
       ],
       "surface": "section:product-carousel",
       "control": "categoryFetchLimit",
-      "status": "no-op",
-      "evidence": "static+probe"
+      "status": "wired",
+      "evidence": "static (HomePageBody.tsx)"
     },
     {
       "id": "minimal|section:product-carousel|categorySlug",
@@ -9723,19 +9476,6 @@
       "evidence": "static"
     },
     {
-      "id": "minimal|section:product-carousel|maxWidth",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:product-carousel",
-      "control": "maxWidth",
-      "status": "no-op",
-      "evidence": "static+probe"
-    },
-    {
       "id": "minimal|section:product-carousel|paddingBottom",
       "skin": "minimal",
       "looks": [
@@ -9797,7 +9537,7 @@
       ],
       "surface": "section:product-carousel",
       "control": "showHover",
-      "status": "no-op",
+      "status": "wired",
       "evidence": "static+probe"
     },
     {
@@ -9810,7 +9550,7 @@
       ],
       "surface": "section:product-carousel",
       "control": "showKickerLines",
-      "status": "no-op",
+      "status": "wired",
       "evidence": "static+probe"
     },
     {
@@ -9836,7 +9576,7 @@
       ],
       "surface": "section:product-carousel",
       "control": "showSubtitleLines",
-      "status": "no-op",
+      "status": "wired",
       "evidence": "static+probe"
     },
     {
@@ -10278,7 +10018,7 @@
       ],
       "surface": "section:steps",
       "control": "buttonText",
-      "status": "no-op",
+      "status": "wired",
       "evidence": "static+probe"
     },
     {
@@ -10386,19 +10126,6 @@
       "evidence": "static+probe"
     },
     {
-      "id": "minimal|section:testimonials|maxWidth",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:testimonials",
-      "control": "maxWidth",
-      "status": "no-op",
-      "evidence": "static+probe"
-    },
-    {
       "id": "minimal|section:testimonials|minRating",
       "skin": "minimal",
       "looks": [
@@ -10408,8 +10135,8 @@
       ],
       "surface": "section:testimonials",
       "control": "minRating",
-      "status": "no-op",
-      "evidence": "static+probe"
+      "status": "wired",
+      "evidence": "static (HomePageBody.tsx)"
     },
     {
       "id": "minimal|section:testimonials|paddingBottom",
@@ -10473,8 +10200,8 @@
       ],
       "surface": "section:testimonials",
       "control": "verifiedOnly",
-      "status": "no-op",
-      "evidence": "static+probe"
+      "status": "wired",
+      "evidence": "static (HomePageBody.tsx)"
     },
     {
       "id": "minimal|section:trust-badges/badge|icon",
@@ -11136,7 +10863,7 @@
       ],
       "surface": "section:best-sellers",
       "control": "kicker",
-      "status": "marker-pending",
+      "status": "wired",
       "evidence": "static+probe"
     },
     {
@@ -11149,21 +10876,8 @@
       ],
       "surface": "section:best-sellers",
       "control": "limit",
-      "status": "no-op",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "qamar|section:best-sellers|maxWidth",
-      "skin": "qamar",
-      "looks": [
-        "qamar.atelier",
-        "qamar.lookbook",
-        "qamar.vitrine"
-      ],
-      "surface": "section:best-sellers",
-      "control": "maxWidth",
-      "status": "no-op",
-      "evidence": "static+probe"
+      "status": "wired",
+      "evidence": "static (HomePageBody.tsx)"
     },
     {
       "id": "qamar|section:best-sellers|paddingBottom",
@@ -11214,7 +10928,7 @@
       ],
       "surface": "section:best-sellers",
       "control": "showHover",
-      "status": "no-op",
+      "status": "wired",
       "evidence": "static+probe"
     },
     {
@@ -11227,7 +10941,7 @@
       ],
       "surface": "section:best-sellers",
       "control": "showKickerLines",
-      "status": "no-op",
+      "status": "wired",
       "evidence": "static+probe"
     },
     {
@@ -11253,7 +10967,7 @@
       ],
       "surface": "section:best-sellers",
       "control": "showSubtitleLines",
-      "status": "no-op",
+      "status": "wired",
       "evidence": "static+probe"
     },
     {
@@ -11266,7 +10980,7 @@
       ],
       "surface": "section:best-sellers",
       "control": "subtitle",
-      "status": "marker-pending",
+      "status": "wired",
       "evidence": "static+probe"
     },
     {
@@ -11279,7 +10993,7 @@
       ],
       "surface": "section:best-sellers",
       "control": "title",
-      "status": "marker-pending",
+      "status": "wired",
       "evidence": "static+probe"
     },
     {
@@ -11396,7 +11110,7 @@
       ],
       "surface": "section:brand-story",
       "control": "bgColor",
-      "status": "no-op",
+      "status": "wired",
       "evidence": "static+probe"
     },
     {
@@ -11500,7 +11214,7 @@
       ],
       "surface": "section:category-grid",
       "control": "cardAspect",
-      "status": "no-op",
+      "status": "wired",
       "evidence": "static+probe"
     },
     {
@@ -11630,7 +11344,7 @@
       ],
       "surface": "section:category-grid",
       "control": "kicker",
-      "status": "marker-pending",
+      "status": "wired",
       "evidence": "static+probe"
     },
     {
@@ -11721,7 +11435,7 @@
       ],
       "surface": "section:category-grid",
       "control": "showHover",
-      "status": "no-op",
+      "status": "wired",
       "evidence": "static+probe"
     },
     {
@@ -11734,7 +11448,7 @@
       ],
       "surface": "section:category-grid",
       "control": "showKickerLines",
-      "status": "no-op",
+      "status": "wired",
       "evidence": "static+probe"
     },
     {
@@ -11747,7 +11461,7 @@
       ],
       "surface": "section:category-grid",
       "control": "showLabel",
-      "status": "no-op",
+      "status": "wired",
       "evidence": "static+probe"
     },
     {
@@ -11760,7 +11474,7 @@
       ],
       "surface": "section:category-grid",
       "control": "showSubtitleLines",
-      "status": "no-op",
+      "status": "wired",
       "evidence": "static+probe"
     },
     {
@@ -11786,20 +11500,7 @@
       ],
       "surface": "section:category-grid",
       "control": "subtitle",
-      "status": "marker-pending",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "qamar|section:category-grid|tint",
-      "skin": "qamar",
-      "looks": [
-        "qamar.atelier",
-        "qamar.lookbook",
-        "qamar.vitrine"
-      ],
-      "surface": "section:category-grid",
-      "control": "tint",
-      "status": "no-op",
+      "status": "wired",
       "evidence": "static+probe"
     },
     {
@@ -11812,7 +11513,7 @@
       ],
       "surface": "section:category-grid",
       "control": "title",
-      "status": "marker-pending",
+      "status": "wired",
       "evidence": "static+probe"
     },
     {
@@ -12072,7 +11773,7 @@
       ],
       "surface": "section:featured-collection",
       "control": "limit",
-      "status": "no-op",
+      "status": "wired",
       "evidence": "static+probe"
     },
     {
@@ -12176,7 +11877,7 @@
       ],
       "surface": "section:featured-collection",
       "control": "tabs",
-      "status": "no-op",
+      "status": "wired",
       "evidence": "static+probe"
     },
     {
@@ -12319,8 +12020,8 @@
       ],
       "surface": "section:hero",
       "control": "autoplayMs",
-      "status": "no-op",
-      "evidence": "static+probe"
+      "status": "wired",
+      "evidence": "static (HeroSlider.tsx)"
     },
     {
       "id": "qamar|section:hero|bgColor",
@@ -12362,19 +12063,6 @@
       "evidence": "static+probe"
     },
     {
-      "id": "qamar|section:hero|maxWidth",
-      "skin": "qamar",
-      "looks": [
-        "qamar.atelier",
-        "qamar.lookbook",
-        "qamar.vitrine"
-      ],
-      "surface": "section:hero",
-      "control": "maxWidth",
-      "status": "no-op",
-      "evidence": "static+probe"
-    },
-    {
       "id": "qamar|section:hero|mode",
       "skin": "qamar",
       "looks": [
@@ -12385,32 +12073,6 @@
       "surface": "section:hero",
       "control": "mode",
       "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "qamar|section:hero|paddingBottom",
-      "skin": "qamar",
-      "looks": [
-        "qamar.atelier",
-        "qamar.lookbook",
-        "qamar.vitrine"
-      ],
-      "surface": "section:hero",
-      "control": "paddingBottom",
-      "status": "no-op",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "qamar|section:hero|paddingTop",
-      "skin": "qamar",
-      "looks": [
-        "qamar.atelier",
-        "qamar.lookbook",
-        "qamar.vitrine"
-      ],
-      "surface": "section:hero",
-      "control": "paddingTop",
-      "status": "no-op",
       "evidence": "static+probe"
     },
     {
@@ -12462,7 +12124,7 @@
       ],
       "surface": "section:image-text",
       "control": "alt",
-      "status": "marker-pending",
+      "status": "wired",
       "evidence": "static+probe"
     },
     {
@@ -12631,7 +12293,7 @@
       ],
       "surface": "section:maker-profile",
       "control": "alt",
-      "status": "marker-pending",
+      "status": "wired",
       "evidence": "static+probe"
     },
     {
@@ -12930,7 +12592,7 @@
       ],
       "surface": "section:new-arrivals",
       "control": "kicker",
-      "status": "marker-pending",
+      "status": "wired",
       "evidence": "static+probe"
     },
     {
@@ -12943,21 +12605,8 @@
       ],
       "surface": "section:new-arrivals",
       "control": "limit",
-      "status": "no-op",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "qamar|section:new-arrivals|maxWidth",
-      "skin": "qamar",
-      "looks": [
-        "qamar.atelier",
-        "qamar.lookbook",
-        "qamar.vitrine"
-      ],
-      "surface": "section:new-arrivals",
-      "control": "maxWidth",
-      "status": "no-op",
-      "evidence": "static+probe"
+      "status": "wired",
+      "evidence": "static (HomePageBody.tsx)"
     },
     {
       "id": "qamar|section:new-arrivals|paddingBottom",
@@ -13008,7 +12657,7 @@
       ],
       "surface": "section:new-arrivals",
       "control": "showHover",
-      "status": "no-op",
+      "status": "wired",
       "evidence": "static+probe"
     },
     {
@@ -13021,7 +12670,7 @@
       ],
       "surface": "section:new-arrivals",
       "control": "showKickerLines",
-      "status": "no-op",
+      "status": "wired",
       "evidence": "static+probe"
     },
     {
@@ -13047,7 +12696,7 @@
       ],
       "surface": "section:new-arrivals",
       "control": "showSubtitleLines",
-      "status": "no-op",
+      "status": "wired",
       "evidence": "static+probe"
     },
     {
@@ -13060,7 +12709,7 @@
       ],
       "surface": "section:new-arrivals",
       "control": "subtitle",
-      "status": "marker-pending",
+      "status": "wired",
       "evidence": "static+probe"
     },
     {
@@ -13073,7 +12722,7 @@
       ],
       "surface": "section:new-arrivals",
       "control": "title",
-      "status": "marker-pending",
+      "status": "wired",
       "evidence": "static+probe"
     },
     {
@@ -13307,8 +12956,8 @@
       ],
       "surface": "section:product-carousel",
       "control": "categoryFetchLimit",
-      "status": "no-op",
-      "evidence": "static+probe"
+      "status": "wired",
+      "evidence": "static (HomePageBody.tsx)"
     },
     {
       "id": "qamar|section:product-carousel|categorySlug",
@@ -13346,7 +12995,7 @@
       ],
       "surface": "section:product-carousel",
       "control": "kicker",
-      "status": "marker-pending",
+      "status": "wired",
       "evidence": "static+probe"
     },
     {
@@ -13374,19 +13023,6 @@
       "control": "manualProductIds",
       "status": "wired",
       "evidence": "static"
-    },
-    {
-      "id": "qamar|section:product-carousel|maxWidth",
-      "skin": "qamar",
-      "looks": [
-        "qamar.atelier",
-        "qamar.lookbook",
-        "qamar.vitrine"
-      ],
-      "surface": "section:product-carousel",
-      "control": "maxWidth",
-      "status": "no-op",
-      "evidence": "static+probe"
     },
     {
       "id": "qamar|section:product-carousel|paddingBottom",
@@ -13450,7 +13086,7 @@
       ],
       "surface": "section:product-carousel",
       "control": "showHover",
-      "status": "no-op",
+      "status": "wired",
       "evidence": "static+probe"
     },
     {
@@ -13463,7 +13099,7 @@
       ],
       "surface": "section:product-carousel",
       "control": "showKickerLines",
-      "status": "no-op",
+      "status": "wired",
       "evidence": "static+probe"
     },
     {
@@ -13489,7 +13125,7 @@
       ],
       "surface": "section:product-carousel",
       "control": "showSubtitleLines",
-      "status": "no-op",
+      "status": "wired",
       "evidence": "static+probe"
     },
     {
@@ -13502,7 +13138,7 @@
       ],
       "surface": "section:product-carousel",
       "control": "subtitle",
-      "status": "marker-pending",
+      "status": "wired",
       "evidence": "static+probe"
     },
     {
@@ -13515,7 +13151,7 @@
       ],
       "surface": "section:product-carousel",
       "control": "title",
-      "status": "marker-pending",
+      "status": "wired",
       "evidence": "static+probe"
     },
     {
@@ -13541,7 +13177,7 @@
       ],
       "surface": "section:product-spotlight",
       "control": "alt",
-      "status": "marker-pending",
+      "status": "wired",
       "evidence": "static+probe"
     },
     {
@@ -13632,7 +13268,7 @@
       ],
       "surface": "section:product-spotlight",
       "control": "image",
-      "status": "marker-pending",
+      "status": "wired",
       "evidence": "static+probe"
     },
     {
@@ -13931,7 +13567,7 @@
       ],
       "surface": "section:steps",
       "control": "buttonText",
-      "status": "no-op",
+      "status": "wired",
       "evidence": "static+probe"
     },
     {
@@ -13996,7 +13632,7 @@
       ],
       "surface": "section:steps",
       "control": "subheading",
-      "status": "marker-pending",
+      "status": "wired",
       "evidence": "static+probe"
     },
     {
@@ -14039,19 +13675,6 @@
       "evidence": "static+probe"
     },
     {
-      "id": "qamar|section:testimonials|maxWidth",
-      "skin": "qamar",
-      "looks": [
-        "qamar.atelier",
-        "qamar.lookbook",
-        "qamar.vitrine"
-      ],
-      "surface": "section:testimonials",
-      "control": "maxWidth",
-      "status": "no-op",
-      "evidence": "static+probe"
-    },
-    {
       "id": "qamar|section:testimonials|minRating",
       "skin": "qamar",
       "looks": [
@@ -14061,8 +13684,8 @@
       ],
       "surface": "section:testimonials",
       "control": "minRating",
-      "status": "no-op",
-      "evidence": "static+probe"
+      "status": "wired",
+      "evidence": "static (HomePageBody.tsx)"
     },
     {
       "id": "qamar|section:testimonials|paddingBottom",
@@ -14100,7 +13723,7 @@
       ],
       "surface": "section:testimonials",
       "control": "title",
-      "status": "marker-pending",
+      "status": "wired",
       "evidence": "static+probe"
     },
     {
@@ -14126,8 +13749,8 @@
       ],
       "surface": "section:testimonials",
       "control": "verifiedOnly",
-      "status": "no-op",
-      "evidence": "static+probe"
+      "status": "wired",
+      "evidence": "static (HomePageBody.tsx)"
     },
     {
       "id": "qamar|section:trust-badges/badge|icon",
@@ -14191,7 +13814,7 @@
       ],
       "surface": "section:trust-badges",
       "control": "heading",
-      "status": "marker-pending",
+      "status": "wired",
       "evidence": "static+probe"
     },
     {
@@ -14585,6 +14208,19 @@
       "evidence": "static"
     },
     {
+      "id": "qamar|theme|headerLogoPlacement",
+      "skin": "qamar",
+      "looks": [
+        "qamar.atelier",
+        "qamar.lookbook",
+        "qamar.vitrine"
+      ],
+      "surface": "theme",
+      "control": "headerLogoPlacement",
+      "status": "wired",
+      "evidence": "static (compose.ts)"
+    },
+    {
       "id": "qamar|theme|headingFont",
       "skin": "qamar",
       "looks": [
@@ -14789,7 +14425,7 @@
       ],
       "surface": "section:best-sellers",
       "control": "kicker",
-      "status": "marker-pending",
+      "status": "wired",
       "evidence": "static+probe"
     },
     {
@@ -14802,21 +14438,8 @@
       ],
       "surface": "section:best-sellers",
       "control": "limit",
-      "status": "no-op",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "souq|section:best-sellers|maxWidth",
-      "skin": "souq",
-      "looks": [
-        "souq.catalogue",
-        "souq.night",
-        "souq.showroom"
-      ],
-      "surface": "section:best-sellers",
-      "control": "maxWidth",
-      "status": "no-op",
-      "evidence": "static+probe"
+      "status": "wired",
+      "evidence": "static (HomePageBody.tsx)"
     },
     {
       "id": "souq|section:best-sellers|paddingBottom",
@@ -14867,7 +14490,7 @@
       ],
       "surface": "section:best-sellers",
       "control": "showHover",
-      "status": "no-op",
+      "status": "wired",
       "evidence": "static+probe"
     },
     {
@@ -14880,7 +14503,7 @@
       ],
       "surface": "section:best-sellers",
       "control": "showKickerLines",
-      "status": "no-op",
+      "status": "wired",
       "evidence": "static+probe"
     },
     {
@@ -14906,7 +14529,7 @@
       ],
       "surface": "section:best-sellers",
       "control": "showSubtitleLines",
-      "status": "no-op",
+      "status": "wired",
       "evidence": "static+probe"
     },
     {
@@ -14919,7 +14542,7 @@
       ],
       "surface": "section:best-sellers",
       "control": "subtitle",
-      "status": "marker-pending",
+      "status": "wired",
       "evidence": "static+probe"
     },
     {
@@ -14932,7 +14555,7 @@
       ],
       "surface": "section:best-sellers",
       "control": "title",
-      "status": "marker-pending",
+      "status": "wired",
       "evidence": "static+probe"
     },
     {
@@ -15049,7 +14672,7 @@
       ],
       "surface": "section:brand-story",
       "control": "bgColor",
-      "status": "no-op",
+      "status": "wired",
       "evidence": "static+probe"
     },
     {
@@ -15153,7 +14776,7 @@
       ],
       "surface": "section:category-grid",
       "control": "cardAspect",
-      "status": "no-op",
+      "status": "wired",
       "evidence": "static+probe"
     },
     {
@@ -15283,7 +14906,7 @@
       ],
       "surface": "section:category-grid",
       "control": "kicker",
-      "status": "marker-pending",
+      "status": "wired",
       "evidence": "static+probe"
     },
     {
@@ -15374,7 +14997,7 @@
       ],
       "surface": "section:category-grid",
       "control": "showHover",
-      "status": "no-op",
+      "status": "wired",
       "evidence": "static+probe"
     },
     {
@@ -15387,7 +15010,7 @@
       ],
       "surface": "section:category-grid",
       "control": "showKickerLines",
-      "status": "no-op",
+      "status": "wired",
       "evidence": "static+probe"
     },
     {
@@ -15400,7 +15023,7 @@
       ],
       "surface": "section:category-grid",
       "control": "showLabel",
-      "status": "no-op",
+      "status": "wired",
       "evidence": "static+probe"
     },
     {
@@ -15413,7 +15036,7 @@
       ],
       "surface": "section:category-grid",
       "control": "showSubtitleLines",
-      "status": "no-op",
+      "status": "wired",
       "evidence": "static+probe"
     },
     {
@@ -15439,20 +15062,7 @@
       ],
       "surface": "section:category-grid",
       "control": "subtitle",
-      "status": "marker-pending",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "souq|section:category-grid|tint",
-      "skin": "souq",
-      "looks": [
-        "souq.catalogue",
-        "souq.night",
-        "souq.showroom"
-      ],
-      "surface": "section:category-grid",
-      "control": "tint",
-      "status": "no-op",
+      "status": "wired",
       "evidence": "static+probe"
     },
     {
@@ -15465,7 +15075,7 @@
       ],
       "surface": "section:category-grid",
       "control": "title",
-      "status": "marker-pending",
+      "status": "wired",
       "evidence": "static+probe"
     },
     {
@@ -15725,7 +15335,7 @@
       ],
       "surface": "section:featured-collection",
       "control": "limit",
-      "status": "no-op",
+      "status": "wired",
       "evidence": "static+probe"
     },
     {
@@ -15829,7 +15439,7 @@
       ],
       "surface": "section:featured-collection",
       "control": "tabs",
-      "status": "no-op",
+      "status": "wired",
       "evidence": "static+probe"
     },
     {
@@ -15972,8 +15582,8 @@
       ],
       "surface": "section:hero",
       "control": "autoplayMs",
-      "status": "no-op",
-      "evidence": "static+probe"
+      "status": "wired",
+      "evidence": "static (HeroSlider.tsx)"
     },
     {
       "id": "souq|section:hero|bgColor",
@@ -16015,19 +15625,6 @@
       "evidence": "static+probe"
     },
     {
-      "id": "souq|section:hero|maxWidth",
-      "skin": "souq",
-      "looks": [
-        "souq.catalogue",
-        "souq.night",
-        "souq.showroom"
-      ],
-      "surface": "section:hero",
-      "control": "maxWidth",
-      "status": "no-op",
-      "evidence": "static+probe"
-    },
-    {
       "id": "souq|section:hero|mode",
       "skin": "souq",
       "looks": [
@@ -16038,32 +15635,6 @@
       "surface": "section:hero",
       "control": "mode",
       "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "souq|section:hero|paddingBottom",
-      "skin": "souq",
-      "looks": [
-        "souq.catalogue",
-        "souq.night",
-        "souq.showroom"
-      ],
-      "surface": "section:hero",
-      "control": "paddingBottom",
-      "status": "no-op",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "souq|section:hero|paddingTop",
-      "skin": "souq",
-      "looks": [
-        "souq.catalogue",
-        "souq.night",
-        "souq.showroom"
-      ],
-      "surface": "section:hero",
-      "control": "paddingTop",
-      "status": "no-op",
       "evidence": "static+probe"
     },
     {
@@ -16115,7 +15686,7 @@
       ],
       "surface": "section:image-text",
       "control": "alt",
-      "status": "marker-pending",
+      "status": "wired",
       "evidence": "static+probe"
     },
     {
@@ -16284,7 +15855,7 @@
       ],
       "surface": "section:maker-profile",
       "control": "alt",
-      "status": "marker-pending",
+      "status": "wired",
       "evidence": "static+probe"
     },
     {
@@ -16583,7 +16154,7 @@
       ],
       "surface": "section:new-arrivals",
       "control": "kicker",
-      "status": "marker-pending",
+      "status": "wired",
       "evidence": "static+probe"
     },
     {
@@ -16596,21 +16167,8 @@
       ],
       "surface": "section:new-arrivals",
       "control": "limit",
-      "status": "no-op",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "souq|section:new-arrivals|maxWidth",
-      "skin": "souq",
-      "looks": [
-        "souq.catalogue",
-        "souq.night",
-        "souq.showroom"
-      ],
-      "surface": "section:new-arrivals",
-      "control": "maxWidth",
-      "status": "no-op",
-      "evidence": "static+probe"
+      "status": "wired",
+      "evidence": "static (HomePageBody.tsx)"
     },
     {
       "id": "souq|section:new-arrivals|paddingBottom",
@@ -16661,7 +16219,7 @@
       ],
       "surface": "section:new-arrivals",
       "control": "showHover",
-      "status": "no-op",
+      "status": "wired",
       "evidence": "static+probe"
     },
     {
@@ -16674,7 +16232,7 @@
       ],
       "surface": "section:new-arrivals",
       "control": "showKickerLines",
-      "status": "no-op",
+      "status": "wired",
       "evidence": "static+probe"
     },
     {
@@ -16700,7 +16258,7 @@
       ],
       "surface": "section:new-arrivals",
       "control": "showSubtitleLines",
-      "status": "no-op",
+      "status": "wired",
       "evidence": "static+probe"
     },
     {
@@ -16713,7 +16271,7 @@
       ],
       "surface": "section:new-arrivals",
       "control": "subtitle",
-      "status": "marker-pending",
+      "status": "wired",
       "evidence": "static+probe"
     },
     {
@@ -16726,7 +16284,7 @@
       ],
       "surface": "section:new-arrivals",
       "control": "title",
-      "status": "marker-pending",
+      "status": "wired",
       "evidence": "static+probe"
     },
     {
@@ -16960,8 +16518,8 @@
       ],
       "surface": "section:product-carousel",
       "control": "categoryFetchLimit",
-      "status": "no-op",
-      "evidence": "static+probe"
+      "status": "wired",
+      "evidence": "static (HomePageBody.tsx)"
     },
     {
       "id": "souq|section:product-carousel|categorySlug",
@@ -16999,7 +16557,7 @@
       ],
       "surface": "section:product-carousel",
       "control": "kicker",
-      "status": "marker-pending",
+      "status": "wired",
       "evidence": "static+probe"
     },
     {
@@ -17027,19 +16585,6 @@
       "control": "manualProductIds",
       "status": "wired",
       "evidence": "static"
-    },
-    {
-      "id": "souq|section:product-carousel|maxWidth",
-      "skin": "souq",
-      "looks": [
-        "souq.catalogue",
-        "souq.night",
-        "souq.showroom"
-      ],
-      "surface": "section:product-carousel",
-      "control": "maxWidth",
-      "status": "no-op",
-      "evidence": "static+probe"
     },
     {
       "id": "souq|section:product-carousel|paddingBottom",
@@ -17103,7 +16648,7 @@
       ],
       "surface": "section:product-carousel",
       "control": "showHover",
-      "status": "no-op",
+      "status": "wired",
       "evidence": "static+probe"
     },
     {
@@ -17116,7 +16661,7 @@
       ],
       "surface": "section:product-carousel",
       "control": "showKickerLines",
-      "status": "no-op",
+      "status": "wired",
       "evidence": "static+probe"
     },
     {
@@ -17142,7 +16687,7 @@
       ],
       "surface": "section:product-carousel",
       "control": "showSubtitleLines",
-      "status": "no-op",
+      "status": "wired",
       "evidence": "static+probe"
     },
     {
@@ -17155,7 +16700,7 @@
       ],
       "surface": "section:product-carousel",
       "control": "subtitle",
-      "status": "marker-pending",
+      "status": "wired",
       "evidence": "static+probe"
     },
     {
@@ -17168,7 +16713,7 @@
       ],
       "surface": "section:product-carousel",
       "control": "title",
-      "status": "marker-pending",
+      "status": "wired",
       "evidence": "static+probe"
     },
     {
@@ -17194,7 +16739,7 @@
       ],
       "surface": "section:product-spotlight",
       "control": "alt",
-      "status": "marker-pending",
+      "status": "wired",
       "evidence": "static+probe"
     },
     {
@@ -17285,7 +16830,7 @@
       ],
       "surface": "section:product-spotlight",
       "control": "image",
-      "status": "marker-pending",
+      "status": "wired",
       "evidence": "static+probe"
     },
     {
@@ -17584,7 +17129,7 @@
       ],
       "surface": "section:steps",
       "control": "buttonText",
-      "status": "no-op",
+      "status": "wired",
       "evidence": "static+probe"
     },
     {
@@ -17649,7 +17194,7 @@
       ],
       "surface": "section:steps",
       "control": "subheading",
-      "status": "marker-pending",
+      "status": "wired",
       "evidence": "static+probe"
     },
     {
@@ -17692,19 +17237,6 @@
       "evidence": "static+probe"
     },
     {
-      "id": "souq|section:testimonials|maxWidth",
-      "skin": "souq",
-      "looks": [
-        "souq.catalogue",
-        "souq.night",
-        "souq.showroom"
-      ],
-      "surface": "section:testimonials",
-      "control": "maxWidth",
-      "status": "no-op",
-      "evidence": "static+probe"
-    },
-    {
       "id": "souq|section:testimonials|minRating",
       "skin": "souq",
       "looks": [
@@ -17714,8 +17246,8 @@
       ],
       "surface": "section:testimonials",
       "control": "minRating",
-      "status": "no-op",
-      "evidence": "static+probe"
+      "status": "wired",
+      "evidence": "static (HomePageBody.tsx)"
     },
     {
       "id": "souq|section:testimonials|paddingBottom",
@@ -17753,7 +17285,7 @@
       ],
       "surface": "section:testimonials",
       "control": "title",
-      "status": "marker-pending",
+      "status": "wired",
       "evidence": "static+probe"
     },
     {
@@ -17779,8 +17311,8 @@
       ],
       "surface": "section:testimonials",
       "control": "verifiedOnly",
-      "status": "no-op",
-      "evidence": "static+probe"
+      "status": "wired",
+      "evidence": "static (HomePageBody.tsx)"
     },
     {
       "id": "souq|section:trust-badges/badge|icon",
@@ -17844,7 +17376,7 @@
       ],
       "surface": "section:trust-badges",
       "control": "heading",
-      "status": "marker-pending",
+      "status": "wired",
       "evidence": "static+probe"
     },
     {
@@ -18236,6 +17768,32 @@
       "control": "foregroundColor",
       "status": "wired",
       "evidence": "static"
+    },
+    {
+      "id": "souq|theme|headerLogoPlacement",
+      "skin": "souq",
+      "looks": [
+        "souq.catalogue",
+        "souq.night",
+        "souq.showroom"
+      ],
+      "surface": "theme",
+      "control": "headerLogoPlacement",
+      "status": "wired",
+      "evidence": "static (compose.ts)"
+    },
+    {
+      "id": "souq|theme|headerSearch",
+      "skin": "souq",
+      "looks": [
+        "souq.catalogue",
+        "souq.night",
+        "souq.showroom"
+      ],
+      "surface": "theme",
+      "control": "headerSearch",
+      "status": "wired",
+      "evidence": "static (compose.ts)"
     },
     {
       "id": "souq|theme|headingFont",

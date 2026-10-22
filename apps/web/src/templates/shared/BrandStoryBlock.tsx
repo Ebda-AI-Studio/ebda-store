@@ -4,7 +4,8 @@ import Image from 'next/image';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useStore } from '../../contexts/StoreContext';
 import { sectionSpacingClasses } from './section-spacing';
-import type { SectionPaddingMaxWidthVisibility } from '@ebda/shared';
+import { sectionBgStyle } from './section-bg';
+import type { SectionBgOverride, SectionPaddingMaxWidthVisibility } from '@ebda/shared';
 
 /**
  * Bucket E (2026-05-17): inline editorial brand story block — image on
@@ -32,7 +33,7 @@ interface BrandStoryBlockProps {
   ctaTextEn?: string;
   ctaTextAr?: string;
   /** Per-section spacing/visibility controls from page-builder. */
-  spacingSettings?: SectionPaddingMaxWidthVisibility;
+  spacingSettings?: SectionPaddingMaxWidthVisibility & SectionBgOverride;
 }
 
 export function BrandStoryBlock({
@@ -58,6 +59,7 @@ export function BrandStoryBlock({
       aria-label={isRtl ? headingAr : headingEn}
       dir={isRtl ? 'rtl' : 'ltr'}
       className={`bg-[hsl(var(--bg-page))] ${wrapperClass}`}
+      style={sectionBgStyle(spacingSettings?.bgColor, store.theme)}
     >
       <div className={innerContainerClass}>
         <div className="grid grid-cols-1 gap-6 sm:gap-10 lg:grid-cols-2 lg:items-center">

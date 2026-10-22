@@ -832,6 +832,29 @@ export const SETTINGS: SettingEntry[] = [
       { query: `tab=${tab}`, feature: 'whatsapp' }
     )
   ),
+  // ── Visual editor (/builder): controls added by the template-aware pass (Task 10) ─────────
+  setting(
+    'builder.header-logo',
+    '/builder',
+    'builder.theme.headerLogo',
+    'staff',
+    {
+      en: 'logo position centre center start header wordmark',
+      ar: 'مكان الشعار اللوجو منتصف بداية الهيدر',
+    },
+    {}
+  ),
+  setting(
+    'builder.header-search',
+    '/builder',
+    'builder.theme.headerSearch',
+    'staff',
+    {
+      en: 'search field icon header find products',
+      ar: 'البحث خانة بحث ايقونة الهيدر',
+    },
+    {}
+  ),
 ];
 
 export const REGISTRY: RegistryEntry[] = [...PAGES, ...SETTINGS];
@@ -845,6 +868,7 @@ export const REGISTRY: RegistryEntry[] = [...PAGES, ...SETTINGS];
  */
 export const SETTINGS_LABEL_BASELINE: Record<string, number> = {
   '/branding': 43,
+  '/builder': 27, // the visual editor: panels are generated from the registry; the header chrome controls are anchored builder.header-*
   '/delivery': 14,
   '/shipping': 20,
   '/payment-settings': 23, // +6: the instalments card (enable, months, markup, provider ar/en, min price), anchored payment.instalments

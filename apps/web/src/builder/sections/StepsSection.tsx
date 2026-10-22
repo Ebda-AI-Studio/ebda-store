@@ -197,6 +197,9 @@ export function StepsSection({
           editTitle={
             editorMode ? { 'data-builder-setting': ar ? 'headingAr' : 'heading' } : undefined
           }
+          editSubtitle={
+            editorMode ? { 'data-builder-setting': ar ? 'subheadingAr' : 'subheading' } : undefined
+          }
         />
         <ol role="list" className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {steps.map((s, i) => {
@@ -299,6 +302,9 @@ export function StepsSection({
               type="button"
               onClick={addAll}
               disabled={adding}
+              {...(editorMode
+                ? { 'data-builder-setting': ar ? 'buttonTextAr' : 'buttonText' }
+                : undefined)}
               className="inline-flex min-h-[44px] items-center justify-center rounded-[var(--radius)] bg-primary px-6 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:opacity-60"
             >
               {buttonText}

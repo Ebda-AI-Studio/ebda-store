@@ -58,7 +58,10 @@ export function TrustBadgesSection({
     >
       <div className={spacing.innerContainerClass}>
         {heading && (
-          <h2 className="font-display mb-8 text-center text-[clamp(1.4rem,1.1rem+1vw,2rem)] text-foreground">
+          <h2
+            className="font-display mb-8 text-center text-[clamp(1.4rem,1.1rem+1vw,2rem)] text-foreground"
+            {...(editorMode ? { 'data-builder-setting': ar ? 'headingAr' : 'heading' } : undefined)}
+          >
             {heading}
           </h2>
         )}
