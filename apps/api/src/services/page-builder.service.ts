@@ -74,6 +74,7 @@ import {
   getLook,
 } from '@ebda/shared';
 import { withSavepoint } from '../lib/savepoint';
+import { fontLibraryProblems } from '../lib/font-url-guard';
 import { readInStoreContext } from '../lib/store-scoped-read';
 import { deferAfterTenantCommit } from '../lib/after-tenant-commit';
 import { bustStoreCaches } from './store.service';
@@ -267,6 +268,30 @@ export async function getPublishedDefinition(
 }
 
 async function validateForWrite(storeId: string, input: unknown) {
+  const result = await validateDefinitionRefs(storeId, input);
+  // A font URL is merchant-supplied and later drives an R2 delete: it must be this store's own file
+  // or an allowlisted Google stylesheet (checked on every draft save, publish and rollback).
+  if (result.definition?.typography?.fonts) {
+    const bad = fontLibraryProblems(storeId, result.definition.typography.fonts);
+    if (bad.length > 0)
+      return {
+        ...result,
+        ok: false,
+        errors: [
+          ...result.errors,
+          ...bad.map(b => ({
+            code: 'SCHEMA' as const,
+            path: `/typography/fonts/${b.index}/url`,
+            messageEn: b.reason,
+            messageAr: 'رابط الخط لازم يكون لملف مرفوع على متجرك أو لخط من Google.',
+          })),
+        ],
+      };
+  }
+  return result;
+}
+
+function validateDefinitionRefs(storeId: string, input: unknown) {
   return validateDefinition(input, {
     resolveRefs: async ({ categorySlugs, productIds }) => {
       const [cats, prods] = await Promise.all([

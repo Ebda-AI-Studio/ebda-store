@@ -1,4 +1,4 @@
-import { storeDirectory, withStore } from '@ebda/database';
+import { currentStoreId, storeDirectory, withStore } from '@ebda/database';
 import { config } from '../config';
 import { deferAfterTenantCommit } from '../lib/after-tenant-commit';
 import { StorageService } from './storage.service';
@@ -47,6 +47,41 @@ export function urlToR2Key(url: string | null | undefined): string | null {
     }
   }
   return null;
+}
+
+/**
+ * True when `key` is an object of store `storeId`: it sits under that store's own namespace
+ * (`stores/<storeId>/...`, how every upload is keyed, `StorageService.composeKey`). An exact
+ * prefix, so `stores/abc/` never matches `stores/abcd/`, and no `..` segment.
+ */
+export function r2KeyBelongsToStore(key: string, storeId: string): boolean {
+  if (!storeId || key.split('/').includes('..')) return false;
+  return key.startsWith(`stores/${storeId}/`);
+}
+
+/** The store the current code is scoped to, or null (a user-scoped request, a cron). */
+function ambientStoreId(): string | null {
+  try {
+    return currentStoreId();
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Whether the CURRENT scope may delete `key`. The URL that led here is usually merchant-controlled
+ * (a font, a hero slide, a category image the merchant saved), and "no row anywhere still references
+ * it" is not "it is mine": a merchant who pastes another store's object URL into a field and then
+ * removes it would otherwise delete that store's object whenever the owner has not saved it yet
+ * (an upload not yet attached, an object only in a pending draft). So:
+ *  - inside a store scope, only that store's own namespace may be deleted;
+ *  - outside one (a user-scoped request, a cron), a store-namespaced key is never deleted, because
+ *    no store has been proven to own it; only the legacy flat keys (platform uploads) remain.
+ */
+export function mayDeleteKey(key: string): boolean {
+  const store = ambientStoreId();
+  if (store) return r2KeyBelongsToStore(key, store);
+  return !key.startsWith('stores/');
 }
 
 /**
@@ -130,6 +165,11 @@ async function deleteR2ObjectIfOrphanNow(url: string | null | undefined): Promis
     return;
   }
   if (!StorageService.isAvailable()) {
+    return;
+  }
+  if (!mayDeleteKey(key)) {
+    // Defence in depth, independent of whatever validated the URL on the way in.
+    logger.warn({ key }, '[r2-cleanup] refused to delete an object outside the current store');
     return;
   }
   try {

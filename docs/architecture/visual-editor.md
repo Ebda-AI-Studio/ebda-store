@@ -147,3 +147,7 @@ Nothing in the builder calls `PUT /theme` or `PUT /typography`; `visual-editor-p
 `docs/architecture/store-theme-flags.md`), and the editor re-opens the page afterwards so a stale patch is never
 re-sent. A custom font FILE is uploaded to the store's R2 area immediately (like an image), but belongs to no
 store's typography until the draft that references it is published.
+
+Font URLs are tenant-checked: a custom font must be a file under this store's `stores/<id>/fonts/` namespace and a
+Google font a `fonts.googleapis.com` stylesheet (`font-url-guard.ts`, enforced on every document write and on the
+typography PUT), and the R2 delete refuses any key outside the current store (Ruling VE-11).

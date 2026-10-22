@@ -1,5 +1,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { typographySchema } from '@ebda/shared';
+import { AppError } from '../middleware/error-handler';
+import { fontLibraryProblems } from '../lib/font-url-guard';
 import { authenticate, authorize } from '../middleware/auth';
 import { requirePermission } from '../middleware/rbac';
 import { auditLog, writeLimiter } from '../middleware/security';
@@ -54,6 +56,10 @@ router.put(
     try {
       const { storeId } = req.params;
       const data = typographySchema.parse(req.body);
+      // The URL of a font later drives an R2 delete: only this store's own uploads or Google stylesheets.
+      const badFonts = fontLibraryProblems(storeId, data.fonts);
+      if (badFonts.length > 0)
+        throw new AppError(422, 'INVALID_FONT_URL', badFonts[0].reason, { fonts: badFonts });
 
       // Snapshot the previous custom-font URLs so we can clean up R2
       // when a font gets removed from the library.

@@ -2180,6 +2180,76 @@
       "find": "    if (!user || (await ownsDemoStore(user.id))) {\n      // Don't reveal",
       "replace": "    if (!user) {\n      // Don't reveal",
       "test": "tests/integration/demo-store.test.ts"
+    },
+    {
+      "id": "r2-delete-refuses-foreign-store-key",
+      "domain": "tenant / RLS",
+      "tier": "unit",
+      "why": "deleteR2ObjectIfOrphan stops checking whose object a merchant-supplied URL points at, so store A can name store B's R2 key (a font, a slide image, a category image), remove it, and delete B's object whenever B has not saved a reference to it yet",
+      "source": "apps/api/src/services/r2-cleanup.service.ts",
+      "find": "  if (!mayDeleteKey(key)) {",
+      "replace": "  if (false) {",
+      "test": "tests/unit/r2-cleanup-store-prefix.test.ts"
+    },
+    {
+      "id": "r2-delete-store-scope-prefix-match",
+      "domain": "tenant / RLS",
+      "tier": "unit",
+      "why": "inside a store scope the ownership rule accepts any key instead of only `stores/<thatStoreId>/`, so the guard is present but lets another store's object through",
+      "source": "apps/api/src/services/r2-cleanup.service.ts",
+      "find": "  if (store) return r2KeyBelongsToStore(key, store);",
+      "replace": "  if (store) return true;",
+      "test": "tests/unit/r2-cleanup-store-prefix.test.ts"
+    },
+    {
+      "id": "r2-delete-no-scope-refuses-store-keys",
+      "domain": "tenant / RLS",
+      "tier": "unit",
+      "why": "with no store in scope (a user-scoped request, a cron) a store-namespaced key is deleted although no store has been proven to own it",
+      "source": "apps/api/src/services/r2-cleanup.service.ts",
+      "find": "  return !key.startsWith('stores/');",
+      "replace": "  return true;",
+      "test": "tests/unit/r2-cleanup-store-prefix.test.ts"
+    },
+    {
+      "id": "r2-key-belongs-to-store-exact-prefix",
+      "domain": "tenant / RLS",
+      "tier": "unit",
+      "why": "the ownership prefix is matched loosely (`stores/` instead of `stores/<storeId>/`), so a look-alike store id or any other store's namespace counts as the caller's own",
+      "source": "apps/api/src/services/r2-cleanup.service.ts",
+      "find": "  return key.startsWith(`stores/${storeId}/`);",
+      "replace": "  return key.startsWith('stores/');",
+      "test": "tests/unit/r2-cleanup-store-prefix.test.ts"
+    },
+    {
+      "id": "font-url-refused-on-page-write",
+      "domain": "tenant / RLS",
+      "tier": "unit",
+      "why": "a page-document write (draft save, publish, rollback) accepts a custom font URL into another store's R2 namespace, which a later font removal turns into a deletion of that store's object",
+      "source": "apps/api/src/services/page-builder.service.ts",
+      "find": "  if (result.definition?.typography?.fonts) {",
+      "replace": "  if (false) {",
+      "test": "tests/unit/font-url-guard.test.ts"
+    },
+    {
+      "id": "font-url-refused-on-typography-put",
+      "domain": "tenant / RLS",
+      "tier": "unit",
+      "why": "PUT /stores/:id/typography accepts another store's font URL, the same cross-store deletion path through the older write",
+      "source": "apps/api/src/routes/typography.routes.ts",
+      "find": "      if (badFonts.length > 0)",
+      "replace": "      if (false)",
+      "test": "tests/unit/font-url-guard.test.ts"
+    },
+    {
+      "id": "font-url-custom-must-be-own-fonts-folder",
+      "domain": "tenant / RLS",
+      "tier": "unit",
+      "why": "a custom font URL is allowed outside `stores/<thisStoreId>/fonts/`, so another store's file or a look-alike store id passes the edge check",
+      "source": "apps/api/src/lib/font-url-guard.ts",
+      "find": "  if (!r2KeyBelongsToStore(key, storeId) || !key.startsWith(`stores/${storeId}/fonts/`))",
+      "replace": "  if (false)",
+      "test": "tests/unit/font-url-guard.test.ts"
     }
   ]
 }

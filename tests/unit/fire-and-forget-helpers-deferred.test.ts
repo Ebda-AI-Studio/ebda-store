@@ -48,6 +48,9 @@ vi.mock('@ebda/database', () => ({
   prisma: prismaMock,
   // isStillReferenced lists the stores through the directory definer (`stores` is under RLS).
   storeDirectory: vi.fn().mockResolvedValue([{ id: 'store-1' }]),
+  // the store the fixtures' keys (`stores/x/...`) belong to: the delete only touches the current
+  // store's own namespace (tests/unit/r2-cleanup-store-prefix.test.ts)
+  currentStoreId: () => 'x',
   runInTenantContext: runInTenantContextMock,
   onClosedTenantTxAccess: vi.fn(),
   hasTenantContext: vi.fn(() => false),
@@ -171,7 +174,7 @@ describe('cleanupRemovedImages — bounded fan-out (issue 2042)', () => {
       inFlight--;
       return [{ referenced: false }];
     });
-    const removed = Array.from({ length: 20 }, (_, i) => `https://cdn.example.com/s/${i}.png`);
+    const removed = Array.from({ length: 20 }, (_, i) => `https://cdn.example.com/stores/x/s/${i}.png`);
 
     await cleanupRemovedImages(removed, []);
 
@@ -186,7 +189,7 @@ describe('cleanupRemovedImages — bounded fan-out (issue 2042)', () => {
     prismaMock.$queryRawUnsafe.mockResolvedValue([{ referenced: false }]);
     await withDeferredWork({ storeId: STORE_ID }, async () => {
       void cleanupRemovedImages(
-        ['https://cdn.example.com/a.png', 'https://cdn.example.com/b.png'],
+        ['https://cdn.example.com/stores/x/a.png', 'https://cdn.example.com/stores/x/b.png'],
         []
       );
       expect(storageMock.delete).not.toHaveBeenCalled();

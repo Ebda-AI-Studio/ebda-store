@@ -35,7 +35,7 @@ const GOOGLE = {
 const CUSTOM = {
   type: 'custom' as const,
   family: 'Brand',
-  url: 'https://media.ebda.app/stores/s/fonts/brand.woff2',
+  url: 'https://cdn.example.com/stores/store-1/fonts/brand.woff2',
   format: 'woff2' as const,
 };
 const LIVE_TYPO = {
@@ -215,10 +215,18 @@ const m = vi.hoisted(() => ({
   },
 }));
 vi.mock('@api/services/store.service', () => ({ bustStoreCaches: m.bustStoreCaches }));
-vi.mock('@api/services/r2-cleanup.service', () => ({
-  cleanupRemovedJsonUrls: vi.fn().mockResolvedValue(undefined),
-  deleteR2ObjectIfOrphan: m.deleteR2,
+vi.mock('../../apps/api/src/config', () => ({
+  config: { storagePublicUrl: 'https://cdn.example.com', storageEndpoint: '', storageBucket: '' },
 }));
+vi.mock('@api/services/r2-cleanup.service', async importOriginal => {
+  // the real key helpers (the font URL guard needs them), a stubbed delete
+  const real = await importOriginal<Record<string, unknown>>();
+  return {
+    ...real,
+    cleanupRemovedJsonUrls: vi.fn().mockResolvedValue(undefined),
+    deleteR2ObjectIfOrphan: m.deleteR2,
+  };
+});
 vi.mock('@api/lib/after-tenant-commit', () => ({
   deferAfterTenantCommit: (_n: string, run: () => Promise<unknown>) => run(),
 }));
