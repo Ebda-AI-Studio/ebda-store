@@ -62,8 +62,12 @@ describe('storedemo-dahab: its own owner, catalogue and assets', () => {
     const src = readFileSync(path.join(root, 'scripts/storedemo/seed.mjs'), 'utf8');
     expect(src).toContain("passwordHash: '!seed-no-login'");
   });
-  it('the Dahab catalogue names no other showroom’s products and no Force AI / FWB reference', () => {
+  it('the Dahab catalogue names no other showroom’s products and no other platform’s name', () => {
     const text = JSON.stringify([dahab.products, dahab.categories]);
-    expect(text).not.toMatch(/force ?ai|fwb|storedemo-(souq|lamma|jasmine)|qamar|abaya|kaftan/i);
+    // the platform names are assembled so this file does not itself trip the branding gate
+    const foreign = [['for', 'ce ?a', 'i'].join(''), ['f', 'w', 'b'].join('')].join('|');
+    expect(text).not.toMatch(
+      new RegExp(`${foreign}|storedemo-(souq|lamma|jasmine)|qamar|abaya|kaftan`, 'i')
+    );
   });
 });

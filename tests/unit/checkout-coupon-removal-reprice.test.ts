@@ -113,7 +113,9 @@ describe('CheckoutClient wiring (source-pinned: no DOM in this repo)', () => {
     expect(guard).toMatch(/if \(!shippingSettled\) \{/);
     expect(guard).toMatch(/setStep\(1\)/);
     expect(
-      src.match(/disabled=\{shippingUnavailable \|\| belowMinimumOrder \|\| !shippingSettled\}/g)
+      src.match(
+        /disabled=\{\s*shippingUnavailable \|\|\s*belowMinimumOrder \|\|\s*goldPriceChanged \|\|\s*!shippingSettled\s*\}/g
+      )
     ).toHaveLength(2);
     expect(src).toMatch(/quotePending: shippingQuotePending,\s*repricing: repricingShipping/);
   });

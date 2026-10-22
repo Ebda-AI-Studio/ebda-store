@@ -105,6 +105,9 @@ export function GiftFinderSection({
     pick(settings.occasionsLabel, settings.occasionsLabelAr) || t('Who is it for?', 'الهدية لمين؟');
   const budgetsLabel =
     pick(settings.budgetsLabel, settings.budgetsLabelAr) || t('How much?', 'بكام؟');
+  // Inline-edit markers (visual editor): each text the section prints names the setting it reads.
+  const mark = (key: string) =>
+    editorMode ? { 'data-builder-setting': ar ? `${key}Ar` : key } : undefined;
   const showText =
     pick(settings.buttonText, settings.buttonTextAr) || t('Show gifts', 'عرض الهدايا');
   const query = (maxMinor?: number) => {
@@ -126,7 +129,11 @@ export function GiftFinderSection({
         <div className="mx-auto max-w-3xl space-y-6">
           {occasions.length > 0 && (
             <div role="group" aria-labelledby="gift-occasions">
-              <p id="gift-occasions" className="mb-3 text-sm text-muted-foreground">
+              <p
+                id="gift-occasions"
+                className="mb-3 text-sm text-muted-foreground"
+                {...mark('occasionsLabel')}
+              >
                 {occasionsLabel}
               </p>
               <ul className="flex flex-wrap gap-2">
@@ -147,7 +154,11 @@ export function GiftFinderSection({
           )}
           {budgets.length > 0 && (
             <div role="group" aria-labelledby="gift-budgets">
-              <p id="gift-budgets" className="mb-3 text-sm text-muted-foreground">
+              <p
+                id="gift-budgets"
+                className="mb-3 text-sm text-muted-foreground"
+                {...mark('budgetsLabel')}
+              >
                 {budgetsLabel}
               </p>
               <ul className="flex flex-wrap gap-2">
@@ -167,6 +178,7 @@ export function GiftFinderSection({
               prefetch={false}
               data-gift-show=""
               className={`${CHIP} ${CHIP_ON}`}
+              {...mark('buttonText')}
             >
               {showText}
             </Link>

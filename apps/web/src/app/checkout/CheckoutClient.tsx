@@ -1333,7 +1333,7 @@ export default function CheckoutClient() {
     if (goldPriceChanged) {
       setCheckoutError(
         t(
-          'The gold rate changed since you added a piece. Press Continue on the price notice to see the new price, then place your order.',
+          'The gold rate changed since you added a piece. Use the button on the price notice to see the new price, then place your order.',
           'سعر الدهب اتغيّر من ساعة ما ضفت قطعة. دوس متابعة في تنبيه السعر عشان تشوف السعر الجديد، وبعدها كمّل الطلب.'
         )
       );
@@ -2009,7 +2009,7 @@ export default function CheckoutClient() {
             setQuoteNonce(n => n + 1);
             void refetchCart().catch(() => undefined);
             friendly = t(
-              'The gold rate changed since you added a piece. The new price is shown; press Continue and place your order again.',
+              'The gold rate changed since you added a piece. The new price is shown; confirm it with the button above and place your order again.',
               'سعر الدهب اتغيّر من ساعة ما ضفت قطعة. السعر الجديد ظاهر، دوس متابعة وبعدها اطلب تاني.'
             );
             break;
