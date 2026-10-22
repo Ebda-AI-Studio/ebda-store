@@ -16,21 +16,21 @@
 
 What Dahab has today, and what B5 does with it:
 
-| Feature | Where it lives | B5 |
-| --- | --- | --- |
-| PDP: gallery + hover zoom + full-screen viewer, metal **swatch chips** (`VariantSelector appearance="swatch"`), qty, add to bag, wishlist, `<details>` accordions (details / facts / specs / delivery / returns), **pinned phone buy bar**, related carousel (8), `DeliveryChip`, `PersonalisationField`, size-chart dialog, `WaMeProductButton`, `mediaSlot` | `templates/dahab/ProductDetail.tsx` (582 lines) + the `templateId === 'dahab'` branch of `ProductDetailClient.tsx` | **Keep.** Restyle through tokens only. |
-| **3D / AR viewer** | default PDP renders `Model3dToggle` + `ProductModel3dPanel` (line ~917); Dahab's `ProductDetail` has a `mediaSlot` prop | **Finding: the Dahab branch never passes `mediaSlot`, so a Dahab product with a 3D model shows no viewer.** Task 2 wires it (same toggle + panel the default PDP uses) and pins it with a test. |
-| Bag drawer (inline-end), menu drawer (inline-start), `CartDrawer`, `Drawer`, `CartTable` with `CartLineNote` + `VariantText` | `templates/dahab/*` | **Keep**, restyle. |
-| Karat / weight / dimensions | `Product.facts` (B0, up to 2 `onCard`, all on the PDP accordion and compare), `Product.weight Float` (admin only), `dimensions Json` | **Karat and width are facts** ("عيار 21", "عرض 4 مم" as the 2 card chips). No new field. |
-| Price = grams × daily rate + making charge | not in code, not in any studied site (research item 13: "inferred from market practice") | **Built as a platform option, Tasks 8–14** (Ruling B5-12 overturns B5-6; any store can use it, Dahab shows it first). |
-| Engraving / name | B0 `Product.personalisation` (label, max length, required) → cart line → order → admin | **Keep**; Worn's engraving band links to it. |
-| Made to order | `leadTimeDays` + `DeliveryChip` + backorder "Pre-order" / "Made to order" stock text | **Keep**; Workshop's lead-time chip on cards is a fact chip, the PDP chip is the existing one. |
-| Ring size | B0 size charts (preset "مقاس الخاتم") | **Keep.** |
-| Gift wrap, card message, gift finder, journey-of-a-piece, maker strip | missing (research items 4, 6, 8) | Task 3 (two sections) + Rulings B5-4, B5-5. |
-| Collection tiles in arches | `CategoryCard.tsx` `arch`; **`collection-list.tileShape` defaults to `'arch'` and is persisted in saved page documents** (`registry.ts:698`) | Retired visually; the value stays *accepted* (published pages never break), never emitted (Ruling B5-3). |
-| Display faces Amiri + Marcellus | loaded for every page by `app/layout.tsx` (`preload:false`), `--font-dahab-*` in `globals.css` | Removed; the looks' own faces load through `looks/fonts.ts` (Reem Kufi, Markazi Text, Kufam, Bodoni Moda, Libre Caslon Text, Italiana are already mapped). |
-| Dahab-only hooks outside the skin | `ProductsClient` (3/4-per-row density, night card panel), `ProductDetailClient` (related 8), `AcceptedPaymentBadges variant="dahab"`, `DemoLookBar`, `serverTemplate.ts` section map, `layout.tsx data-pack`, `globals.css` blocks at 1097–1240 and 1461 | swept in Task 2 (blast radius list below). |
-| Tests tied to the old skin | `tests/unit/dahab-template.test.ts`, `dahab-template-render.test.tsx` (322 lines), `tests/dahab/dahab-storefront.spec.ts`, `playwright.dahab.config.ts`, builder snapshots `tests/fixtures/builder/__snapshots__/dahab-{pdp,sections-dahab,sections-modern}.html`, `scripts/dahab-demo/*`, the preview stack in `docs/ebda/templates/dahab.md` | characterised in Task 1, rewritten or deleted in Task 7. |
+| Feature                                                                                                                                                                                                                                                                                                                                                       | Where it lives                                                                                                                                                                                                                                                                                                                                 | B5                                                                                                                                                                                              |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| PDP: gallery + hover zoom + full-screen viewer, metal **swatch chips** (`VariantSelector appearance="swatch"`), qty, add to bag, wishlist, `<details>` accordions (details / facts / specs / delivery / returns), **pinned phone buy bar**, related carousel (8), `DeliveryChip`, `PersonalisationField`, size-chart dialog, `WaMeProductButton`, `mediaSlot` | `templates/dahab/ProductDetail.tsx` (582 lines) + the `templateId === 'dahab'` branch of `ProductDetailClient.tsx`                                                                                                                                                                                                                             | **Keep.** Restyle through tokens only.                                                                                                                                                          |
+| **3D / AR viewer**                                                                                                                                                                                                                                                                                                                                            | default PDP renders `Model3dToggle` + `ProductModel3dPanel` (line ~917); Dahab's `ProductDetail` has a `mediaSlot` prop                                                                                                                                                                                                                        | **Finding: the Dahab branch never passes `mediaSlot`, so a Dahab product with a 3D model shows no viewer.** Task 2 wires it (same toggle + panel the default PDP uses) and pins it with a test. |
+| Bag drawer (inline-end), menu drawer (inline-start), `CartDrawer`, `Drawer`, `CartTable` with `CartLineNote` + `VariantText`                                                                                                                                                                                                                                  | `templates/dahab/*`                                                                                                                                                                                                                                                                                                                            | **Keep**, restyle.                                                                                                                                                                              |
+| Karat / weight / dimensions                                                                                                                                                                                                                                                                                                                                   | `Product.facts` (B0, up to 2 `onCard`, all on the PDP accordion and compare), `Product.weight Float` (admin only), `dimensions Json`                                                                                                                                                                                                           | **Karat and width are facts** ("عيار 21", "عرض 4 مم" as the 2 card chips). No new field.                                                                                                        |
+| Price = grams × daily rate + making charge                                                                                                                                                                                                                                                                                                                    | not in code, not in any studied site (research item 13: "inferred from market practice")                                                                                                                                                                                                                                                       | **Built as a platform option, Tasks 8–14** (Ruling B5-12 overturns B5-6; any store can use it, Dahab shows it first).                                                                           |
+| Engraving / name                                                                                                                                                                                                                                                                                                                                              | B0 `Product.personalisation` (label, max length, required) → cart line → order → admin                                                                                                                                                                                                                                                         | **Keep**; Worn's engraving band links to it.                                                                                                                                                    |
+| Made to order                                                                                                                                                                                                                                                                                                                                                 | `leadTimeDays` + `DeliveryChip` + backorder "Pre-order" / "Made to order" stock text                                                                                                                                                                                                                                                           | **Keep**; Workshop's lead-time chip on cards is a fact chip, the PDP chip is the existing one.                                                                                                  |
+| Ring size                                                                                                                                                                                                                                                                                                                                                     | B0 size charts (preset "مقاس الخاتم")                                                                                                                                                                                                                                                                                                          | **Keep.**                                                                                                                                                                                       |
+| Gift wrap, card message, gift finder, journey-of-a-piece, maker strip                                                                                                                                                                                                                                                                                         | missing (research items 4, 6, 8)                                                                                                                                                                                                                                                                                                               | Task 3 (two sections) + Rulings B5-4, B5-5.                                                                                                                                                     |
+| Collection tiles in arches                                                                                                                                                                                                                                                                                                                                    | `CategoryCard.tsx` `arch`; **`collection-list.tileShape` defaults to `'arch'` and is persisted in saved page documents** (`registry.ts:698`)                                                                                                                                                                                                   | Retired visually; the value stays _accepted_ (published pages never break), never emitted (Ruling B5-3).                                                                                        |
+| Display faces Amiri + Marcellus                                                                                                                                                                                                                                                                                                                               | loaded for every page by `app/layout.tsx` (`preload:false`), `--font-dahab-*` in `globals.css`                                                                                                                                                                                                                                                 | Removed; the looks' own faces load through `looks/fonts.ts` (Reem Kufi, Markazi Text, Kufam, Bodoni Moda, Libre Caslon Text, Italiana are already mapped).                                      |
+| Dahab-only hooks outside the skin                                                                                                                                                                                                                                                                                                                             | `ProductsClient` (3/4-per-row density, night card panel), `ProductDetailClient` (related 8), `AcceptedPaymentBadges variant="dahab"`, `DemoLookBar`, `serverTemplate.ts` section map, `layout.tsx data-pack`, `globals.css` blocks at 1097–1240 and 1461                                                                                       | swept in Task 2 (blast radius list below).                                                                                                                                                      |
+| Tests tied to the old skin                                                                                                                                                                                                                                                                                                                                    | `tests/unit/dahab-template.test.ts`, `dahab-template-render.test.tsx` (322 lines), `tests/dahab/dahab-storefront.spec.ts`, `playwright.dahab.config.ts`, builder snapshots `tests/fixtures/builder/__snapshots__/dahab-{pdp,sections-dahab,sections-modern}.html`, `scripts/dahab-demo/*`, the preview stack in `docs/ebda/templates/dahab.md` | characterised in Task 1, rewritten or deleted in Task 7.                                                                                                                                        |
 
 **Stores in the wild (read-only SQL, 2026-10-21):**
 
@@ -57,17 +57,17 @@ What Dahab has today, and what B5 does with it:
 
 ## LEAN MODE contract (every task obeys it)
 
-| Rule | Encoding |
-| --- | --- |
-| Implementers | `model: "sonnet"`, one per task, ≤ 1 fix round (a second means the task was mis-scoped: stop and tell the controller). |
-| Review | **One** Sonnet review per task, spec + correctness only, **no score**. Important → fix round; Minor → `.superpowers/sdd/2026-10-21-phase-b5-dahab-looks/minors.md`, batched into Task 7's single "minors" commit. |
-| Opus | Final PR review only (after Task 7). |
-| Builder scores | **Never** (Ruling B1-70). Only independent auditors score. |
-| Independent audits | **One** taste audit + **one** a11y audit, both at the end of Task 6 on the full purchase-path pack. Gate: each look ≥ 28/40, 0 P0/P1. One fix wave; the re-audit covers only failed findings. No Ahmad STOP: a fail loops fix → re-audit, a second fail escalates to the controller. |
-| Local stack | ONE shared capped Postgres (≤ 1 GiB, DB `ebda_b5`), ONE heavy stack at a time, port passed in (`DAHAB_PORT`), never kill a process you did not start. Tasks 1–3 are unit-test only. Tasks 4–6 may start the stack; the controller serialises them. |
-| Tracks | Max 2. **A (code):** 1 → 2 → 3 → 4 → **8 → 9 → 10 → 11 → 12 → 13 → 14** → 5 → 6 → 7. **B (assets):** the asset half of Task 5 starts as soon as Task 1 lands the palettes. Everything else sequential. Gold pricing sits on Track A (no third track) before Task 5, so the demo seed carries gold-rate pieces and Task 6's audits shoot the price line and the "السعر اتحدّث" notice. |
-| Cost line | Each task report ends `Cost: <runs> · <reviews> · heavy stack: <yes/no, minutes>`. |
-| Reuse | B1/B2: token system, `applyTemplateFamily`, `lookTag`, `LookChrome`, card adapters, purchase-path manifest + 44px probe, shoot script, scenario-store helper, demo surface + `demo-hosts.ts`, the asset pipeline (`scripts/qamar-demo`, `scripts/souq-demo/orange-probe.py`), quality-bar gates. A task that re-implements one is rejected by review. |
+| Rule               | Encoding                                                                                                                                                                                                                                                                                                                                                                              |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Implementers       | `model: "sonnet"`, one per task, ≤ 1 fix round (a second means the task was mis-scoped: stop and tell the controller).                                                                                                                                                                                                                                                                |
+| Review             | **One** Sonnet review per task, spec + correctness only, **no score**. Important → fix round; Minor → `.superpowers/sdd/2026-10-21-phase-b5-dahab-looks/minors.md`, batched into Task 7's single "minors" commit.                                                                                                                                                                     |
+| Opus               | Final PR review only (after Task 7).                                                                                                                                                                                                                                                                                                                                                  |
+| Builder scores     | **Never** (Ruling B1-70). Only independent auditors score.                                                                                                                                                                                                                                                                                                                            |
+| Independent audits | **One** taste audit + **one** a11y audit, both at the end of Task 6 on the full purchase-path pack. Gate: each look ≥ 28/40, 0 P0/P1. One fix wave; the re-audit covers only failed findings. No Ahmad STOP: a fail loops fix → re-audit, a second fail escalates to the controller.                                                                                                  |
+| Local stack        | ONE shared capped Postgres (≤ 1 GiB, DB `ebda_b5`), ONE heavy stack at a time, port passed in (`DAHAB_PORT`), never kill a process you did not start. Tasks 1–3 are unit-test only. Tasks 4–6 may start the stack; the controller serialises them.                                                                                                                                    |
+| Tracks             | Max 2. **A (code):** 1 → 2 → 3 → 4 → **8 → 9 → 10 → 11 → 12 → 13 → 14** → 5 → 6 → 7. **B (assets):** the asset half of Task 5 starts as soon as Task 1 lands the palettes. Everything else sequential. Gold pricing sits on Track A (no third track) before Task 5, so the demo seed carries gold-rate pieces and Task 6's audits shoot the price line and the "السعر اتحدّث" notice. |
+| Cost line          | Each task report ends `Cost: <runs> · <reviews> · heavy stack: <yes/no, minutes>`.                                                                                                                                                                                                                                                                                                    |
+| Reuse              | B1/B2: token system, `applyTemplateFamily`, `lookTag`, `LookChrome`, card adapters, purchase-path manifest + 44px probe, shoot script, scenario-store helper, demo surface + `demo-hosts.ts`, the asset pipeline (`scripts/qamar-demo`, `scripts/souq-demo/orange-probe.py`), quality-bar gates. A task that re-implements one is rejected by review.                                 |
 
 Target: **14 tasks** (7 looks + 7 gold-rate pricing). Planned ≈ 14 implementer runs + 14 reviews + 2 audit agents + 1 Opus PR review; heavy-stack time ≈ Task 4 (migration rehearsal) + Tasks 9, 10, 12 (real-DB integration: RLS, repricer, checkout) + Task 14 (E2E) + Task 5 (seed) + Task 6 (matrix + shoot). **Gold tasks are money code:** their single review is spec + correctness + money invariants, and the final Opus PR review reads Tasks 8–14 first.
 
@@ -164,7 +164,7 @@ Appended to `docs/RULINGS.md` under `## 2026-10-21 — Phase B5 Dahab (B5-*)`, e
   - **The layers, each named in a test:**
     1. Redis/KV `public:products:<store>:*`: PLP lists and search results; PLP SQL sort/filter reads the materialised `p.price`.
     2. `public:product:<store>:*`: the PDP.
-    3. `public:suggest:<store>:*`: search suggest. `ebda_product_search_doc` is text-only (name, name_ar, search_terms, description, description_ar; `product-search.service.ts:44`), so search *docs* hold no price and need no rewrite; only cached *results* do.
+    3. `public:suggest:<store>:*`: search suggest. `ebda_product_search_doc` is text-only (name, name*ar, search_terms, description, description_ar; `product-search.service.ts:44`), so search \_docs* hold no price and need no rewrite; only cached _results_ do.
     4. `admin:products:<store>:*`.
     5. `public:bundles:v2:<store>` and the category caches (via `clearProductsRedis`).
     6. The in-process `BoundedMap` fallback, cleared by the same `invalidateCached*` calls, plus the generation bump (FIX-001) so an in-flight fill cannot republish the old price.
@@ -178,31 +178,31 @@ Appended to `docs/RULINGS.md` under `## 2026-10-21 — Phase B5 Dahab (B5-*)`, e
 
 ## File structure
 
-| File | Responsibility | Task |
-| --- | --- | --- |
-| `tests/unit/dahab-characterization.test.tsx`, `tests/unit/__snapshots__/dahab-characterization.*.snap` | class-stripped DOM snapshots + behaviours of the OLD skin, written first | 1 |
-| `packages/shared/src/looks/registry.ts` | three looks: re-derived tokens (B5-2), `skin: 'dahab'`, `chrome`, section mixes, `status` | 1, 3, 6 |
-| `tests/unit/dahab-look-tokens.test.ts` | contrast (≥ 4.5 text pairs, ≥ 3 UI), no-orange gate (reusing B2's `isOrangeFamily`), merchant-extreme guard, replaces the night/gold half of `dahab-template.test.ts` | 1 |
-| `packages/shared/src/types/store-theme.ts`, `template-baselines.ts` | `TEMPLATE_THEMES.dahab` / `buildDahabBaseline` become the neutral base | 1 |
-| `apps/web/src/templates/dahab/*`, `apps/web/src/app/layout.tsx`, `apps/web/src/styles/globals.css`, `apps/web/src/templates/shared/pack-styles.ts` | de-skin: arch, draw animation, Amiri/Marcellus, night panel in `ProductsClient`; per-look `[data-look]` rules | 2 |
-| `apps/web/src/app/products/[slug]/ProductDetailClient.tsx` | pass `mediaSlot` (3D) to Dahab PDP | 2 |
-| `packages/shared/src/builder/{registry.ts,sections-document-only.ts,schema.ts}`, `apps/web/src/builder/sections/{GiftFinderSection,ProcessStepsSection}.tsx`, `apps/web/src/app/products/ProductsClient.tsx`, `docs/architecture/page-definition.md` | `gift-finder`, `process-steps`, URL price filter, `tileShape` default | 3 |
-| `packages/shared/src/builder/template-families.ts` | `dahab` family section list | 3 |
-| `tests/unit/dahab-look-mix.test.ts` | mix order, keep-content switch (incl. legacy `arch` doc), no leakage between looks | 3, 4 |
-| `scripts/dahab-demo/migrate-legacy-dahab.mjs`, `tests/unit/dahab-legacy-store.test.ts`, `tests/integration/dahab-apply-look.test.ts` | legacy store path (B5-3) | 4 |
-| `scripts/dahab-demo/{catalogue.mjs,prompts.py,gen.py,encode.sh,orange-probe.py,assets/,CREDITS.md}` (old Unsplash files removed in Task 7) | demo catalogue + illustrative assets | 5 |
-| `scripts/storedemo/{seed.mjs,dahab-home.mjs,scenario-stores.mjs}`, `apps/web/src/lib/demo-hosts.ts`, `apps/web/src/components/demo/DemoLookBar.tsx` | `storedemo-dahab`, host row, scenario stores | 5, 6 |
-| `playwright.dahab.config.ts` (rewritten), `tests/dahab/{helpers.ts,dahab-matrix.spec.ts,dahab-demo.spec.ts}` | scenario matrix (copy of `tests/souq/*`) | 6 |
-| `docs/ebda/templates/purchase-path.json` | Dahab screens + new control files | 6 |
-| `docs/ebda/templates/{dahab.md (rewritten),looks.md,demo-store.md,platform-commerce.md}`, `docs/RULINGS.md`, `CLAUDE.md`/`handoff.md` pointers | docs | each + 7 |
-| `apps/marketing/scripts/looks/{shots.mjs,dahab.py}`, `apps/marketing/public/looks/dahab.html`, `apps/marketing/public/looks/img/*` | real `storedemo-dahab` captures replace the illustrations | 7 |
-| `packages/shared/src/commerce/gold-price.ts`, `packages/shared/src/schemas/gold-pricing.ts` (or the repo's existing schema home, found in Step 0), `packages/shared/src/commerce/index.ts`, `tests/unit/gold-price.test.ts`, `tests/unit/gold-pricing-schema.test.ts` | the one price formula + rounding; Zod for spec, rates, settings, snapshot | 8 |
-| `packages/database/prisma/migrations/20261101000100_gold_rate_pricing/migration.sql`, `schema.prisma`, `packages/database/src/tenant-guard-schema.generated.ts`, `tests/integration/gold-rate-rls.test.ts`, `tests/integration/gold-price-guard-trigger.test.ts` | 3 tables, product/variant/cart/order columns, RLS + FORCE, guard trigger | 9 |
-| `apps/api/src/services/gold-rate/{gold-rate.service.ts,repricer.ts,gate.ts}`, `apps/api/src/routes/gold-rate.routes.ts`, `tests/integration/gold-rate-apply.test.ts`, `tests/unit/gold-rate-cache-layers.test.ts` | rate writes, jump gate, repricer, audit, cache purge | 10 |
-| `apps/api/src/services/gold-rate/feed/{adapter.ts,gold-api.ts,er-api.ts,currency-api.ts}`, `apps/api/src/lib/inngest/functions/{gold-rate-feed-fetch.ts,gold-rate-staleness-watch.ts}`, `email-templates/gold-rate-*.ts`, `tests/unit/gold-rate-feed.test.ts`, `tests/unit/gold-provider-name-gate.test.ts`, `gold-rates/_components/RateAttribution.tsx`, `docs/ENVIRONMENT.md` | automatic rate, staleness alerts, provider anonymity gate | 11 |
-| `apps/api/src/services/{order.service.ts,cart.service.ts,return.service.ts,bundle.service.ts}`, `apps/api/src/routes/{payment-links.routes.ts,cart*.routes.ts}`, `apps/api/src/mcp/tools/{cart.tools.ts,order.tools.ts}`, `tests/integration/gold-checkout.test.ts`, `tests/unit/gold-gate-every-order-path.test.ts` | quote, 3-path gate, snapshot, refund/exchange/bundle guards | 12 |
-| `apps/admin/src/app/stores/[id]/gold-rates/page.tsx` (+ `_components/`), `apps/admin/src/app/stores/[id]/products/[productId]/edit/_components/GoldPricingCard.tsx`, `…/variants/_components/SimpleVariantsForm.tsx`, `apps/admin/src/app/stores/[id]/products/_components/MassEditModal.tsx`, `apps/admin/src/components/admin-layout/hubs.ts`, order detail line, import columns | rate editor + history, settings, mode toggle + preview, bulk switch | 13 |
-| `apps/web/src/components/product/GoldRateLine.tsx`, `apps/web/src/app/checkout/_components/PriceChangedNotice.tsx`, `CartContext.tsx`, `LanguageContext.tsx`, `templates/dahab/ProductDetail.tsx` + the default PDP, `tests/dahab/dahab-gold-price.spec.ts`, `docs/ebda/templates/platform-commerce.md` (§ Gold-rate pricing), `docs/architecture/gold-rate-pricing.md` | storefront line, notice, stale state, E2E, docs | 14 |
+| File                                                                                                                                                                                                                                                                                                                                                                               | Responsibility                                                                                                                                                        | Task     |
+| ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------- |
+| `tests/unit/dahab-characterization.test.tsx`, `tests/unit/__snapshots__/dahab-characterization.*.snap`                                                                                                                                                                                                                                                                             | class-stripped DOM snapshots + behaviours of the OLD skin, written first                                                                                              | 1        |
+| `packages/shared/src/looks/registry.ts`                                                                                                                                                                                                                                                                                                                                            | three looks: re-derived tokens (B5-2), `skin: 'dahab'`, `chrome`, section mixes, `status`                                                                             | 1, 3, 6  |
+| `tests/unit/dahab-look-tokens.test.ts`                                                                                                                                                                                                                                                                                                                                             | contrast (≥ 4.5 text pairs, ≥ 3 UI), no-orange gate (reusing B2's `isOrangeFamily`), merchant-extreme guard, replaces the night/gold half of `dahab-template.test.ts` | 1        |
+| `packages/shared/src/types/store-theme.ts`, `template-baselines.ts`                                                                                                                                                                                                                                                                                                                | `TEMPLATE_THEMES.dahab` / `buildDahabBaseline` become the neutral base                                                                                                | 1        |
+| `apps/web/src/templates/dahab/*`, `apps/web/src/app/layout.tsx`, `apps/web/src/styles/globals.css`, `apps/web/src/templates/shared/pack-styles.ts`                                                                                                                                                                                                                                 | de-skin: arch, draw animation, Amiri/Marcellus, night panel in `ProductsClient`; per-look `[data-look]` rules                                                         | 2        |
+| `apps/web/src/app/products/[slug]/ProductDetailClient.tsx`                                                                                                                                                                                                                                                                                                                         | pass `mediaSlot` (3D) to Dahab PDP                                                                                                                                    | 2        |
+| `packages/shared/src/builder/{registry.ts,sections-document-only.ts,schema.ts}`, `apps/web/src/builder/sections/{GiftFinderSection,ProcessStepsSection}.tsx`, `apps/web/src/app/products/ProductsClient.tsx`, `docs/architecture/page-definition.md`                                                                                                                               | `gift-finder`, `process-steps`, URL price filter, `tileShape` default                                                                                                 | 3        |
+| `packages/shared/src/builder/template-families.ts`                                                                                                                                                                                                                                                                                                                                 | `dahab` family section list                                                                                                                                           | 3        |
+| `tests/unit/dahab-look-mix.test.ts`                                                                                                                                                                                                                                                                                                                                                | mix order, keep-content switch (incl. legacy `arch` doc), no leakage between looks                                                                                    | 3, 4     |
+| `scripts/dahab-demo/migrate-legacy-dahab.mjs`, `tests/unit/dahab-legacy-store.test.ts`, `tests/integration/dahab-apply-look.test.ts`                                                                                                                                                                                                                                               | legacy store path (B5-3)                                                                                                                                              | 4        |
+| `scripts/dahab-demo/{catalogue.mjs,prompts.py,gen.py,encode.sh,orange-probe.py,assets/,CREDITS.md}` (old Unsplash files removed in Task 7)                                                                                                                                                                                                                                         | demo catalogue + illustrative assets                                                                                                                                  | 5        |
+| `scripts/storedemo/{seed.mjs,dahab-home.mjs,scenario-stores.mjs}`, `apps/web/src/lib/demo-hosts.ts`, `apps/web/src/components/demo/DemoLookBar.tsx`                                                                                                                                                                                                                                | `storedemo-dahab`, host row, scenario stores                                                                                                                          | 5, 6     |
+| `playwright.dahab.config.ts` (rewritten), `tests/dahab/{helpers.ts,dahab-matrix.spec.ts,dahab-demo.spec.ts}`                                                                                                                                                                                                                                                                       | scenario matrix (copy of `tests/souq/*`)                                                                                                                              | 6        |
+| `docs/ebda/templates/purchase-path.json`                                                                                                                                                                                                                                                                                                                                           | Dahab screens + new control files                                                                                                                                     | 6        |
+| `docs/ebda/templates/{dahab.md (rewritten),looks.md,demo-store.md,platform-commerce.md}`, `docs/RULINGS.md`, `CLAUDE.md`/`handoff.md` pointers                                                                                                                                                                                                                                     | docs                                                                                                                                                                  | each + 7 |
+| `apps/marketing/scripts/looks/{shots.mjs,dahab.py}`, `apps/marketing/public/looks/dahab.html`, `apps/marketing/public/looks/img/*`                                                                                                                                                                                                                                                 | real `storedemo-dahab` captures replace the illustrations                                                                                                             | 7        |
+| `packages/shared/src/commerce/gold-price.ts`, `packages/shared/src/schemas/gold-pricing.ts` (or the repo's existing schema home, found in Step 0), `packages/shared/src/commerce/index.ts`, `tests/unit/gold-price.test.ts`, `tests/unit/gold-pricing-schema.test.ts`                                                                                                              | the one price formula + rounding; Zod for spec, rates, settings, snapshot                                                                                             | 8        |
+| `packages/database/prisma/migrations/20261101000100_gold_rate_pricing/migration.sql`, `schema.prisma`, `packages/database/src/tenant-guard-schema.generated.ts`, `tests/integration/gold-rate-rls.test.ts`, `tests/integration/gold-price-guard-trigger.test.ts`                                                                                                                   | 3 tables, product/variant/cart/order columns, RLS + FORCE, guard trigger                                                                                              | 9        |
+| `apps/api/src/services/gold-rate/{gold-rate.service.ts,repricer.ts,gate.ts}`, `apps/api/src/routes/gold-rate.routes.ts`, `tests/integration/gold-rate-apply.test.ts`, `tests/unit/gold-rate-cache-layers.test.ts`                                                                                                                                                                  | rate writes, jump gate, repricer, audit, cache purge                                                                                                                  | 10       |
+| `apps/api/src/services/gold-rate/feed/{adapter.ts,gold-api.ts,er-api.ts,currency-api.ts}`, `apps/api/src/lib/inngest/functions/{gold-rate-feed-fetch.ts,gold-rate-staleness-watch.ts}`, `email-templates/gold-rate-*.ts`, `tests/unit/gold-rate-feed.test.ts`, `tests/unit/gold-provider-name-gate.test.ts`, `gold-rates/_components/RateAttribution.tsx`, `docs/ENVIRONMENT.md`   | automatic rate, staleness alerts, provider anonymity gate                                                                                                             | 11       |
+| `apps/api/src/services/{order.service.ts,cart.service.ts,return.service.ts,bundle.service.ts}`, `apps/api/src/routes/{payment-links.routes.ts,cart*.routes.ts}`, `apps/api/src/mcp/tools/{cart.tools.ts,order.tools.ts}`, `tests/integration/gold-checkout.test.ts`, `tests/unit/gold-gate-every-order-path.test.ts`                                                               | quote, 3-path gate, snapshot, refund/exchange/bundle guards                                                                                                           | 12       |
+| `apps/admin/src/app/stores/[id]/gold-rates/page.tsx` (+ `_components/`), `apps/admin/src/app/stores/[id]/products/[productId]/edit/_components/GoldPricingCard.tsx`, `…/variants/_components/SimpleVariantsForm.tsx`, `apps/admin/src/app/stores/[id]/products/_components/MassEditModal.tsx`, `apps/admin/src/components/admin-layout/hubs.ts`, order detail line, import columns | rate editor + history, settings, mode toggle + preview, bulk switch                                                                                                   | 13       |
+| `apps/web/src/components/product/GoldRateLine.tsx`, `apps/web/src/app/checkout/_components/PriceChangedNotice.tsx`, `CartContext.tsx`, `LanguageContext.tsx`, `templates/dahab/ProductDetail.tsx` + the default PDP, `tests/dahab/dahab-gold-price.spec.ts`, `docs/ebda/templates/platform-commerce.md` (§ Gold-rate pricing), `docs/architecture/gold-rate-pricing.md`            | storefront line, notice, stale state, E2E, docs                                                                                                                       | 14       |
 
 Order: **Task 1 → (Track B assets start) 2 → 3 → 4 → 8 → 9 → 10 → 11 → 12 → 13 → 14 (gold-rate pricing) → 5 → 6 (audits + fix wave) → 7 (delete + marketing + PR)**. No STOP points. Task numbers are stable IDs, not execution order.
 
@@ -297,6 +297,7 @@ Order: **Task 1 → (Track B assets start) 2 → 3 → 4 → 8 → 9 → 10 → 
 ## Gold-rate pricing (Tasks 8–14, Track A after Task 4; Rulings B5-12..B5-21)
 
 **What the code already does, measured 2026-10-21 (the tasks build on these, do not re-derive them):**
+
 - **Prices.** `products.price` / `product_variants.price` are `Int` piastres. A variant's `null` price means the product price. `cartLineUnitPrice` (`apps/api/src/lib/cart-pricing.ts`) is the line price for the cart, `OrderService.create`, MCP cart tools, abandoned cart and bundles. Two other sites price lines on their own: `OrderService.createAdminOrder` (`order.service.ts:~2783`) and the payment-link draft order (`payment-links.routes.ts:303`).
 - **Carts and orders.** `cart_items` stores no price. `order_items.price` is the snapshot, and refunds read it (`return.service.ts:439`).
 - **Money order.** The order is subtotal → best-of coupon/promotion → loyalty → shipping → COD fee → VAT (`order.service.ts:~1000–1160`, MONEYB-2).
@@ -320,49 +321,63 @@ export type MakingChargeType = 'fixed' | 'per_gram';
 export const GOLD_ROUNDING_STEPS = [1, 100, 500, 1000] as const; // piastres
 export interface GoldPriceSpec {
   karat: GoldKarat;
-  weightMg: number;            // int 1..1_000_000
+  weightMg: number; // int 1..1_000_000
   makingChargeType: MakingChargeType;
-  makingChargeValue: number;   // int piastres (fixed) or piastres per gram (per_gram), >= 0
-  marginBps: number;           // int -5000..10000
+  makingChargeValue: number; // int piastres (fixed) or piastres per gram (per_gram), >= 0
+  marginBps: number; // int -5000..10000
 }
-export interface GoldPriceResult { unitPrice: number; metalValue: number; makingValue: number } // piastres; metal/making are DISPLAY splits, each rounded half-up independently, never summed into unitPrice
-export class GoldPriceError extends Error { code: 'GOLD_SPEC_INVALID' | 'GOLD_RATE_INVALID' | 'GOLD_PRICE_OUT_OF_RANGE' }
-export function computeGoldUnitPrice(spec: GoldPriceSpec, ratePerGram: number, roundingStep: (typeof GOLD_ROUNDING_STEPS)[number]): GoldPriceResult;
-export function resolveVariantGoldSpec(product: Partial<GoldPriceSpec> & { pricingMode: 'fixed' | 'gold_rate' }, variant: Partial<GoldPriceSpec> & { pricingMode: 'fixed' | 'gold_rate' | null }): GoldPriceSpec | null; // null = fixed; throws GOLD_SPEC_INVALID when gold but incomplete
+export interface GoldPriceResult {
+  unitPrice: number;
+  metalValue: number;
+  makingValue: number;
+} // piastres; metal/making are DISPLAY splits, each rounded half-up independently, never summed into unitPrice
+export class GoldPriceError extends Error {
+  code: 'GOLD_SPEC_INVALID' | 'GOLD_RATE_INVALID' | 'GOLD_PRICE_OUT_OF_RANGE';
+}
+export function computeGoldUnitPrice(
+  spec: GoldPriceSpec,
+  ratePerGram: number,
+  roundingStep: (typeof GOLD_ROUNDING_STEPS)[number]
+): GoldPriceResult;
+export function resolveVariantGoldSpec(
+  product: Partial<GoldPriceSpec> & { pricingMode: 'fixed' | 'gold_rate' },
+  variant: Partial<GoldPriceSpec> & { pricingMode: 'fixed' | 'gold_rate' | null }
+): GoldPriceSpec | null; // null = fixed; throws GOLD_SPEC_INVALID when gold but incomplete
 export function goldRateJumpBps(previous: number, next: number): number; // |next-prev|*10000/prev, integer, rounded up
 export function karatCoherenceBps(rate24: number, rateK: number, karat: 21 | 18): number;
 ```
 
 ```ts
 // packages/shared/src/schemas/gold-pricing.ts — Zod at every edge
-goldPriceSpecSchema          // the interface above, .strict(), ints, bounds
-productGoldPricingInputSchema // { pricingMode, karat?, weightMg?, makingChargeType?, makingChargeValue?, marginBps? } + refine: gold ⇒ complete spec, gold ⇒ no compareAtPrice/discountType/discountValue (B5-19)
-variantGoldPricingInputSchema // same, pricingMode nullable (inherit), every spec field nullable (inherit)
-goldRateInputSchema          // { rates: [{ karat, ratePerGram (int 10_000..10_000_000) }] (1..3, unique karat), confirm?: boolean }
-goldRateSettingsSchema       // { enabled, feedEnabled, feedPremiumBps (-1000..1000), maxAgeMinutes (60..1560), jumpConfirmBps (100..5000, default 500), roundingStep, showBreakdown (default false) }
-goldLineSnapshotSchema       // { v: 1, karat, weightMg, ratePerGram, rateId, rateAppliedAt (ISO), makingChargeType, makingChargeValue, marginBps, roundingStep, unitPrice }
-publicGoldPricingSchema      // storefront payload: { karat, weightMg, ratePerGram, rateAppliedAt, maxAgeMinutes, breakdown?: { metalValue, makingValue } } — no margin, no rate id, no source
+goldPriceSpecSchema; // the interface above, .strict(), ints, bounds
+productGoldPricingInputSchema; // { pricingMode, karat?, weightMg?, makingChargeType?, makingChargeValue?, marginBps? } + refine: gold ⇒ complete spec, gold ⇒ no compareAtPrice/discountType/discountValue (B5-19)
+variantGoldPricingInputSchema; // same, pricingMode nullable (inherit), every spec field nullable (inherit)
+goldRateInputSchema; // { rates: [{ karat, ratePerGram (int 10_000..10_000_000) }] (1..3, unique karat), confirm?: boolean }
+goldRateSettingsSchema; // { enabled, feedEnabled, feedPremiumBps (-1000..1000), maxAgeMinutes (60..1560), jumpConfirmBps (100..5000, default 500), roundingStep, showBreakdown (default false) }
+goldLineSnapshotSchema; // { v: 1, karat, weightMg, ratePerGram, rateId, rateAppliedAt (ISO), makingChargeType, makingChargeValue, marginBps, roundingStep, unitPrice }
+publicGoldPricingSchema; // storefront payload: { karat, weightMg, ratePerGram, rateAppliedAt, maxAgeMinutes, breakdown?: { metalValue, makingValue } } — no margin, no rate id, no source
 ```
 
 - [ ] **Failing test first** (`tests/unit/gold-price.test.ts`). These vectors were computed with BigInt while writing this plan, and the implementer re-derives each by hand in a comment:
 
-| # | weight | rate (piastres/g) | making | margin | step | expected `unitPrice` |
-| --- | --- | --- | --- | --- | --- | --- |
-| A | 3 250 mg | 576 323 (21k) | per_gram 15 000 | 0 | 100 | **1 921 800** |
-| B | 3 250 mg | 576 323 | per_gram 15 000 | +250 | 100 | **1 969 800** |
-| C | 3 250 mg | 576 323 | fixed 50 000 | 0 | 100 | **1 923 000** (true 19 230.4975 EGP → 19 230; **negative control: a piastre-then-pound implementation returns 1 923 100 and must fail this row**) |
-| C1 | same as C | | | | 1 | **1 923 050** |
-| D | 3 250 mg | 576 323 | per_gram 15 000 | −500 | 100 | **1 825 700** |
-| E | 1 000 000 mg | 10 000 000 | per_gram 10 000 000 | +10 000 | 1 | throws `GOLD_PRICE_OUT_OF_RANGE` (40 000 000 000 > int4) |
-| F | 1 mg | 10 000 | fixed 0 | −5 000 | 1 | **5** |
-| G | 1 000 000 mg | 658 655 (24k) | fixed 0 | 0 | 100 | **658 655 000** |
+| #   | weight       | rate (piastres/g) | making              | margin  | step | expected `unitPrice`                                                                                                                              |
+| --- | ------------ | ----------------- | ------------------- | ------- | ---- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| A   | 3 250 mg     | 576 323 (21k)     | per_gram 15 000     | 0       | 100  | **1 921 800**                                                                                                                                     |
+| B   | 3 250 mg     | 576 323           | per_gram 15 000     | +250    | 100  | **1 969 800**                                                                                                                                     |
+| C   | 3 250 mg     | 576 323           | fixed 50 000        | 0       | 100  | **1 923 000** (true 19 230.4975 EGP → 19 230; **negative control: a piastre-then-pound implementation returns 1 923 100 and must fail this row**) |
+| C1  | same as C    |                   |                     |         | 1    | **1 923 050**                                                                                                                                     |
+| D   | 3 250 mg     | 576 323           | per_gram 15 000     | −500    | 100  | **1 825 700**                                                                                                                                     |
+| E   | 1 000 000 mg | 10 000 000        | per_gram 10 000 000 | +10 000 | 1    | throws `GOLD_PRICE_OUT_OF_RANGE` (40 000 000 000 > int4)                                                                                          |
+| F   | 1 mg         | 10 000            | fixed 0             | −5 000  | 1    | **5**                                                                                                                                             |
+| G   | 1 000 000 mg | 658 655 (24k)     | fixed 0             | 0       | 100  | **658 655 000**                                                                                                                                   |
 
-  Plus:
-  - a **float-path negative control**: a deliberately naive `Number` implementation over vector E's inputs loses precision, and the test asserts the real function's result for 10 000 random in-range specs equals a reference BigInt oracle written independently in the test file;
-  - exact half-boundary cases at each step: `x.5` rounds up, `x.4999…` rounds down;
-  - every bound ±1 (weight 0 / 1 000 001, rate 9 999 / 10 000 001, margin −5 001 / 10 001, non-integer inputs) throws `GOLD_SPEC_INVALID` / `GOLD_RATE_INVALID`;
-  - `resolveVariantGoldSpec` inheritance: a variant with only `weightMg` set takes karat/making/margin from the product, a variant `pricingMode: 'fixed'` on a gold product returns `null`, and an incomplete gold spec throws;
-  - `goldRateJumpBps(500_000, 525_001) === 501`.
+Plus:
+
+- a **float-path negative control**: a deliberately naive `Number` implementation over vector E's inputs loses precision, and the test asserts the real function's result for 10 000 random in-range specs equals a reference BigInt oracle written independently in the test file;
+- exact half-boundary cases at each step: `x.5` rounds up, `x.4999…` rounds down;
+- every bound ±1 (weight 0 / 1 000 001, rate 9 999 / 10 000 001, margin −5 001 / 10 001, non-integer inputs) throws `GOLD_SPEC_INVALID` / `GOLD_RATE_INVALID`;
+- `resolveVariantGoldSpec` inheritance: a variant with only `weightMg` set takes karat/making/margin from the product, a variant `pricingMode: 'fixed'` on a gold product returns `null`, and an incomplete gold spec throws;
+- `goldRateJumpBps(500_000, 525_001) === 501`.
 - [ ] Schema tests: each schema accepts a valid fixture and rejects every bound ±1. `productGoldPricingInputSchema` rejects gold + `compareAtPrice` and gold + `discountType`. `goldRateInputSchema` rejects a duplicate karat and 4 rates. `publicGoldPricingSchema` **has no `marginBps`, `rateId` or `source` key** (a test enumerates `Object.keys(shape)`; the margin is the merchant's business, not the shopper's).
 - [ ] Implement until green. No `Number` arithmetic on a product of two inputs: everything converts to `BigInt` at the top of `computeGoldUnitPrice`, and the result is asserted `<= 2_147_483_647n` before `Number()`.
 - [ ] **Verify:** `npx vitest run tests/unit/gold-price.test.ts tests/unit/gold-pricing-schema.test.ts packages/shared`; `npm run typecheck`. Rulings B5-12, B5-14, B5-19 appended. Commit `feat(gold): price formula, single rounding and zod schemas`. `Cost: 1 · 1 · heavy stack: no`.
@@ -372,6 +387,7 @@ publicGoldPricingSchema      // storefront payload: { karat, weightMg, ratePerGr
 **Files:** `packages/database/prisma/migrations/20261101000100_gold_rate_pricing/migration.sql`, `packages/database/prisma/schema.prisma`, `packages/database/src/tenant-guard-schema.generated.ts` (regenerated: `npm run gen:tenant-guard-schema -w packages/database`), `tests/integration/rls-ebda-app.test.ts` (no allowlist change: the new tables must pass the enumerating test as strict tenant tables), `tests/integration/gold-rate-rls.test.ts`, `tests/integration/gold-price-guard-trigger.test.ts`, `docs/RULINGS.md` (B5-13).
 
 **Schema (exact):**
+
 - **`gold_rates`** (history, append-only).
   - Columns: `id uuid pk`, `store_id text not null fk stores on delete cascade`, `karat smallint not null check (karat in (24,21,18))`, `rate_per_gram int not null check (rate_per_gram between 10000 and 10000000)`, `source text not null check (source in ('manual','feed'))`, `status text not null check (status in ('applied','pending','rejected'))`, `jump_bps int`, `feed_reference jsonb` (spot per oz, fetched-at, premium bps; never the provider name), `created_by text null` (null = feed), `decided_by text null`, `created_at timestamptz default now()`, `applied_at timestamptz null`.
   - Index: `(store_id, karat, created_at desc)`.
@@ -423,13 +439,13 @@ assertRatesFresh(rates, settings, now): void               // throws GOLD_RATE_S
 
 **Routes** (all `authenticate → authorize('store_admin','super_admin','staff') → requireStoreAccess` per the rule, then):
 
-| Route | Permission |
-| --- | --- |
-| `GET /stores/:storeId/gold-rates` (current + settings + `feedAvailable`) | `products:read` |
-| `GET /stores/:storeId/gold-rates/history` | `products:read` |
-| `PUT /stores/:storeId/gold-rates` | `requirePermission('store:settings')` |
-| `POST /stores/:storeId/gold-rates/:rateId/decision` | `requirePermission('store:settings')` |
-| `PUT /stores/:storeId/gold-rates/settings` | `requirePermission('store:settings')` |
+| Route                                                                    | Permission                            |
+| ------------------------------------------------------------------------ | ------------------------------------- |
+| `GET /stores/:storeId/gold-rates` (current + settings + `feedAvailable`) | `products:read`                       |
+| `GET /stores/:storeId/gold-rates/history`                                | `products:read`                       |
+| `PUT /stores/:storeId/gold-rates`                                        | `requirePermission('store:settings')` |
+| `POST /stores/:storeId/gold-rates/:rateId/decision`                      | `requirePermission('store:settings')` |
+| `PUT /stores/:storeId/gold-rates/settings`                               | `requirePermission('store:settings')` |
 
 Every body is parsed with the Task 8 Zod schemas, and an unknown key is rejected.
 
@@ -456,13 +472,20 @@ Every body is parsed with the Task 8 Zod schemas, and an unknown key is rejected
 
 ```ts
 // adapter.ts — the only thing the rest of the code imports
-export interface GoldFeedQuote { per24kGramPiastres: number; fetchedAt: string; source: 'primary' | 'fallback'; reference: { xauUsdMinor?: number; usdEgpMicro?: number; egpPerXauMinor?: number } }
-export interface GoldFeedAdapter { fetch(signal: AbortSignal): Promise<GoldFeedResult> }
+export interface GoldFeedQuote {
+  per24kGramPiastres: number;
+  fetchedAt: string;
+  source: 'primary' | 'fallback';
+  reference: { xauUsdMinor?: number; usdEgpMicro?: number; egpPerXauMinor?: number };
+}
+export interface GoldFeedAdapter {
+  fetch(signal: AbortSignal): Promise<GoldFeedResult>;
+}
 export type GoldFeedResult =
-  | { kind: 'ok'; quote: GoldFeedQuote }              // one source answered, or both agreed within 2 %
+  | { kind: 'ok'; quote: GoldFeedQuote } // one source answered, or both agreed within 2 %
   | { kind: 'disagree'; primary: GoldFeedQuote; fallback: GoldFeedQuote; diffBps: number } // > 200 bps: never auto-applied
-  | { kind: 'down' };                                  // both feeds failed
-export function goldFeed(): GoldFeedAdapter;         // gold-api.ts × er-api.ts primary, currency-api.ts fallback; no provider name leaves feed/**
+  | { kind: 'down' }; // both feeds failed
+export function goldFeed(): GoldFeedAdapter; // gold-api.ts × er-api.ts primary, currency-api.ts fallback; no provider name leaves feed/**
 export function storeCandidateRates(q: GoldFeedQuote, premiumBps: number): Map<GoldKarat, number>; // 24k × (10000+premium)/10000, 21k = ×21/24, 18k = ×18/24, one half-up rounding each, integer piastres
 ```
 
@@ -535,6 +558,7 @@ assertGoldLinesPriceable(db, storeId, lines: Array<{ productId; variantId: strin
 ### Task 13: Admin: rate editor + history, settings, per-product toggle + preview, bulk switch
 
 **Files:**
+
 - `apps/admin/src/app/stores/[id]/gold-rates/page.tsx` + `_components/{RateEditor,RateHistory,GoldSettingsCard,PendingRateBanner,RateAttribution}.tsx` (`RateAttribution` is the one ExchangeRate-API link, beside the automatic rate in `RateEditor`, B5-15)
 - `apps/admin/src/components/admin-layout/hubs.ts` + `buildPaletteItems.ts` (entry under the catalogue/products group: standing rule 4, its own page)
 - the admin dashboard banner (stale/pending)
@@ -551,16 +575,16 @@ assertGoldLinesPriceable(db, storeId, lines: Array<{ productId; variantId: strin
 
 **Every field has UI:**
 
-| Data | Surface |
-| --- | --- |
-| `gold_rates` rows | history table: karat, rate, source "يدوي/تلقائي", status, jump %, who, when; cursor-paged |
-| `gold_rates_current` | the editor's current values + age |
-| `gold_rate_settings` | `GoldSettingsCard`: enabled, automatic rate (disabled with reason when `feedAvailable` false), premium, max age (hours, ≤ 26), jump %, rounding step, show breakdown |
-| product/variant spec | `GoldPricingCard`, variants form |
-| `gold_rate_id` stamps | "محسوب على سعر {time}" under the preview |
-| `cart_items.quoted_*` | storefront notice (Task 14) |
-| `order_items.gold_snapshot` | admin order line, customer order page, invoice subtitle |
-| audit rows | the existing audit-log page (new action names listed in its filter) |
+| Data                        | Surface                                                                                                                                                              |
+| --------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `gold_rates` rows           | history table: karat, rate, source "يدوي/تلقائي", status, jump %, who, when; cursor-paged                                                                            |
+| `gold_rates_current`        | the editor's current values + age                                                                                                                                    |
+| `gold_rate_settings`        | `GoldSettingsCard`: enabled, automatic rate (disabled with reason when `feedAvailable` false), premium, max age (hours, ≤ 26), jump %, rounding step, show breakdown |
+| product/variant spec        | `GoldPricingCard`, variants form                                                                                                                                     |
+| `gold_rate_id` stamps       | "محسوب على سعر {time}" under the preview                                                                                                                             |
+| `cart_items.quoted_*`       | storefront notice (Task 14)                                                                                                                                          |
+| `order_items.gold_snapshot` | admin order line, customer order page, invoice subtitle                                                                                                              |
+| audit rows                  | the existing audit-log page (new action names listed in its filter)                                                                                                  |
 
 - **`GoldPricingCard`.**
   - Mode segmented control "سعر ثابت / بسعر الدهب"; karat select (24/21/18); weight in grams (2 decimals); making type + value; margin %.
@@ -584,6 +608,7 @@ assertGoldLinesPriceable(db, storeId, lines: Array<{ productId; variantId: strin
 ### Task 14: Storefront: "سعر الجرام النهارده" line, "السعر اتحدّث" notice, stale state, E2E, docs
 
 **Files:**
+
 - `apps/web/src/components/product/GoldRateLine.tsx`, rendered by the default PDP and `templates/dahab/ProductDetail.tsx` under the price, by the cart line (`CartTable`/`CartDrawer` line subtitle) and by the checkout summary. **Not on cards:** the card taste bar allows ≤ 2 fact chips, and karat/weight are already chips by B5-5.
 - `apps/web/src/app/checkout/_components/PriceChangedNotice.tsx`, `CheckoutClient.tsx`, `OrderSummary.tsx`
 - `apps/web/src/contexts/CartContext.tsx` (`priceChanged`, `acknowledgePrices()`)
@@ -594,14 +619,14 @@ assertGoldLinesPriceable(db, storeId, lines: Array<{ productId; variantId: strin
 
 **Copy (AR / EN):**
 
-| Key | AR | EN |
-| --- | --- | --- |
-| `gold.rateLine` | "عيار {karat} · {weight} جم · سعر الجرام النهارده {rate}" | "{karat}K · {weight} g · Today's gold rate per gram {rate}" |
-| `gold.breakdown` (only when `showBreakdown`) | "قيمة الدهب {metal} · المصنعية {making}" | "Gold value {metal} · Making charge {making}" |
-| `gold.priceChanged.title` | "السعر اتحدّث" | "Price updated" |
-| `gold.priceChanged.body` | "سعر الدهب اتغيّر من ساعة ما ضفت القطعة للسلة، والسعر الجديد ظاهر قدامك." | "The gold rate changed since you added this piece. The new price is shown." |
-| `gold.priceChanged.continue` | "متابعة" | "Continue" |
-| `gold.stale` | "مش هنقدر نكمّل الطلب دلوقتي لأن سعر الدهب ما اتحدّثش النهارده. جرّب تاني بعد شوية أو كلّم المحل." | "We can't take orders for this piece right now because today's gold rate hasn't been updated. Please try again later or contact the store." |
+| Key                                          | AR                                                                                                 | EN                                                                                                                                          |
+| -------------------------------------------- | -------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| `gold.rateLine`                              | "عيار {karat} · {weight} جم · سعر الجرام النهارده {rate}"                                          | "{karat}K · {weight} g · Today's gold rate per gram {rate}"                                                                                 |
+| `gold.breakdown` (only when `showBreakdown`) | "قيمة الدهب {metal} · المصنعية {making}"                                                           | "Gold value {metal} · Making charge {making}"                                                                                               |
+| `gold.priceChanged.title`                    | "السعر اتحدّث"                                                                                     | "Price updated"                                                                                                                             |
+| `gold.priceChanged.body`                     | "سعر الدهب اتغيّر من ساعة ما ضفت القطعة للسلة، والسعر الجديد ظاهر قدامك."                          | "The gold rate changed since you added this piece. The new price is shown."                                                                 |
+| `gold.priceChanged.continue`                 | "متابعة"                                                                                           | "Continue"                                                                                                                                  |
+| `gold.stale`                                 | "مش هنقدر نكمّل الطلب دلوقتي لأن سعر الدهب ما اتحدّثش النهارده. جرّب تاني بعد شوية أو كلّم المحل." | "We can't take orders for this piece right now because today's gold rate hasn't been updated. Please try again later or contact the store." |
 
 - **Display rules.**
   - Numbers go through the shared price formatter + NUMERALS-1.
@@ -627,6 +652,7 @@ assertGoldLinesPriceable(db, storeId, lines: Array<{ productId; variantId: strin
 - [ ] **Verify:** web vitest, the E2E file, `purchase-path-gates.test.ts`, the no-orange gate, typecheck, lint. Commit `feat(gold): storefront rate line, price-updated notice, e2e and docs`. `Cost: 1 · 1 · heavy stack: yes, ~20 min`.
 
 **Controller production steps for gold pricing (after merge, human-flagged, part of Task 7's list):**
+
 1. `cf-api-deploy.yml` applies migration `20261101000100` (the pre-deploy smoke boots with the new schema).
 2. No secret to set: the automatic rate uses keyless free sources, so the toggle is available as soon as the API deploys. The pre-deploy smoke must still boot with the feeds unreachable (the cron fails loud at run time, never at boot).
 3. **Verify against production:**
@@ -689,9 +715,9 @@ assertGoldLinesPriceable(db, storeId, lines: Array<{ productId; variantId: strin
     - search docs hold no price.
   - **Self-caught defect.** The first draft of B5-14 rounded twice. It is fixed, and vector C pins it.
 - **Not verified while planning:**
-    - whether cache generation counters live in the DO or KV (Task 10 Step 0);
-    - **gold-api.com is a small operator with no SLA**; its terms (s.9, effective 2026-09-10) can change. Action: email them for written confirmation of s.9 (owner's call, not blocking);
-    - the fawazahmed0 upstream-data licence (CC0 covers the repo, not what it aggregates; it is the fallback only);
-    - that the 21k-benchmark convention (Egyptian market quotes 21k as the headline; 24k and 18k derive by karat/24) comes from general knowledge, not a cited source;
-    - the live free-source responses from inside the Worker runtime (recorded fixtures only until the first deploy);
-    - the spot-vs-Sagha premium in practice (measured once the merchant compares, hence `feed_premium_bps`).
+  - whether cache generation counters live in the DO or KV (Task 10 Step 0);
+  - **gold-api.com is a small operator with no SLA**; its terms (s.9, effective 2026-09-10) can change. Action: email them for written confirmation of s.9 (owner's call, not blocking);
+  - the fawazahmed0 upstream-data licence (CC0 covers the repo, not what it aggregates; it is the fallback only);
+  - that the 21k-benchmark convention (Egyptian market quotes 21k as the headline; 24k and 18k derive by karat/24) comes from general knowledge, not a cited source;
+  - the live free-source responses from inside the Worker runtime (recorded fixtures only until the first deploy);
+  - the spot-vs-Sagha premium in practice (measured once the merchant compares, hence `feed_premium_bps`).
