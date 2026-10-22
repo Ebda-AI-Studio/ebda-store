@@ -701,6 +701,11 @@ export const LOOKS: readonly LookDefinition[] = [
     letter: 'A',
     skin: 'lamma',
     status: 'designed',
+    chrome: {
+      header: { logoPlacement: 'start' },
+      cartBar: 'total',
+      cardStepper: 'inline',
+    },
     name: { ar: 'سفرة العيلة', en: 'Family table' },
     forWhom: {
       ar: 'لمطبخ بيتي بياخد طلبات زي المطعم.',
@@ -732,6 +737,11 @@ export const LOOKS: readonly LookDefinition[] = [
     letter: 'B',
     skin: 'lamma',
     status: 'designed',
+    chrome: {
+      header: { logoPlacement: 'centre' },
+      cartBar: 'total',
+      cardStepper: 'inline',
+    },
     name: { ar: 'كشكول المطبخ', en: 'Kitchen notebook' },
     forWhom: { ar: 'لطباخة واحدة اسمها هو البراند.', en: 'For one named cook who is the brand.' },
     idea: { ar: 'الطباخة هي البراند.', en: 'The cook is the brand.' },
@@ -762,6 +772,12 @@ export const LOOKS: readonly LookDefinition[] = [
     letter: 'C',
     skin: 'lamma',
     status: 'designed',
+    chrome: {
+      header: { logoPlacement: 'start' },
+      cartBar: 'total',
+      cardStepper: 'inline',
+      aisles: ['#23744A', '#CC2F3F', '#5B2A6E', '#0F7F8C'],
+    },
     name: { ar: 'سوق طازة', en: 'Fresh market' },
     forWhom: {
       ar: 'للبقالة والخضار اللي الطلب بيتكرر فيها.',

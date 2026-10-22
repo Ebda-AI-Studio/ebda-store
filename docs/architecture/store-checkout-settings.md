@@ -35,6 +35,9 @@ Minimum items **subtotal** (in piastres; 100 piastres = 1 EGP) required to place
   "add X more" message below the minimum.
 - **Checkout:** `CheckoutClient.tsx` blocks the Pay button + maps the `MINIMUM_ORDER_NOT_MET`
   API code to the same friendly message.
+- **Progress (Phase B4):** a look with `chrome.cartBar` shows what is left as a sentence plus a
+  progress bar (`MinOrderProgress`) in the cart and in the browse cart bar. Advice only: the three
+  guards above are unchanged. See `docs/ebda/templates/platform-commerce.md` § 16.
 
 ## `checkoutDelivery?: { note, windows }`
 

@@ -665,6 +665,7 @@ function StorefrontProductCardImpl({
           </button>
         ) : (
           <AdaptiveAddButton
+            stepperProductId={product.id}
             disabled={isAdding}
             loading={isAdding}
             showIcon

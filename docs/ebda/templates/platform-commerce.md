@@ -238,3 +238,17 @@ Four platform pieces, available to every skin (never one tenant). Ingredients, a
 **PDP bundle-saving line.** One line, "وفّر 15% لما تشتريه في باقة", linking to the bundle page, only when an active, purchasable bundle containing this product gives a saving > 0 on a store that has the `bundles` feature (read off `store.enabledFeatures`, so a store without it makes no request). CACHE CLASS: NEVER-stale for price. `GET /stores/public/:storeId/bundle-savings?productIds=<uuid>[,..]` (1-5 ids) computes it from `resolveBundle` (the cart's own bundle price) on every request, answers `no-store`, and has no cache layer to forget. **Rulings.** B3-6.
 
 With neither line applicable the PDP markup is unchanged and the 390 fold keeps gallery, title, price, first selector and the sticky add bar.
+
+## 15. Card stepper (Phase B4, Lamma; Ruling B4-4)
+
+On a look that sets `chrome.cardStepper: 'inline'` (the three Lamma looks), the card's one add control becomes `- qty +` once the product is in the cart. It is a state of the CTA, not a second control, and it lives in the shared pieces every card path already reaches: `AdaptiveAddButton` (the shared card and the shared carousel) and `ProductCardCta` (the five template cards), so there is no new card data path. `CardStepperProvider` (mounted by `ShopChrome`) hands the cart lines to the cards only on such a look; elsewhere it provides null and every card renders byte-identically.
+
+- **When.** One plain line of a non-variant product (`stepperLine`). A variant product keeps its "view" route to the page, a product with two lines (the same dish with two notes) keeps the single add control, an unavailable line never gets a stepper.
+- **Targets and signs.** Both buttons are 44px, drawn as icons (`MinusIcon`/`PlusIcon`, the stepper-minus-glyph gate), the quantity is a polite live region.
+- **Limits.** The server owns the cap: a refused `+` restores the quantity, the live region says "وصلت للحد الأقصى للكمية" and the `+` stays off until the quantity changes. `-` at 1 removes the line and raises the same Undo toast as the cart page (`cartRemovalToast`: same variant, same note, same quantity).
+
+## 16. Browse cart bar and minimum-order progress (Phase B4, Lamma; Ruling B4-6)
+
+`chrome.cartBar: 'total'` (look data) enables a phone bar with the item count, the total (the shared price formatter) and the cart link, on home, the product list, category pages and search only (`browseBarShownOn`), while the cart has items. It is a task bar in the C-04 sense: `useStickyBarHeight` marks `<html data-task-bar>`, so it REPLACES the bottom tab bar and never stacks with the PDP buy bar or the cart total bar (those routes are excluded). It reserves body space through `body[data-sticky-cart]`, which also lifts the floating widget; the value is `blocked` (taller) while the minimum-order progress shows.
+
+`MinOrderProgress` renders, only under a set `minimumOrderFils`, one sentence ("ضيف ٨٠ ج.م وتوصل للحد الأدنى للطلب") and a determinate `role=progressbar` (value, max, text; never colour alone). The bar carries it; the cart page shows it in place of the one-line notice on such a look. It is advice only: `checkMinimumOrder`, the blocked checkout button and the API's `MINIMUM_ORDER_NOT_MET` are unchanged. Absent minimum or a met minimum renders nothing.

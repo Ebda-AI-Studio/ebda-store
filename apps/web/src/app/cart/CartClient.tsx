@@ -33,10 +33,11 @@ import {
 import { useLastListing } from '../../hooks/useLastListing';
 import { useNumerals } from '../../hooks/useNumerals';
 import { formatTaxRowLabel } from '../../lib/tax-display';
-import { resolveColor, checkMinimumOrder, computeOrderAmounts } from '@ebda/shared';
+import { resolveColor, checkMinimumOrder, computeOrderAmounts, getLook } from '@ebda/shared';
 import { AcceptedPaymentBadges } from '../../components/AcceptedPaymentBadges';
 import { CartLineNote } from '../../components/commerce/CartLineNote';
 import { StickyCartTotal } from '../../components/commerce/StickyCartTotal';
+import { MinOrderProgress } from '../../components/commerce/MinOrderProgress';
 import { cartRemovalToast } from './cart-removal';
 import { countText, ITEMS } from '../../lib/plural';
 import { CART_CHECKOUT_CTA } from '../../lib/checkout-cta';
@@ -442,6 +443,9 @@ export default function CartClient() {
   );
   const moqMessage = moqCartMessage(moqShort, language === 'ar' ? 'ar' : 'en');
   const checkoutBlocked = belowMinimumOrder || hasUnavailableLines || !!moqMessage;
+  // Ruling B4-6: a look with chrome.cartBar shows the minimum as progress, not a one-line notice.
+  const minimumProgress = getLook(store?.look)?.chrome?.cartBar === 'total' && belowMinimumOrder;
+  const minimumProgressOnly = minimumProgress && !hasUnavailableLines && !moqMessage;
   const checkoutBlockedMessage =
     minimumOrderMessage ??
     (hasUnavailableLines
@@ -1174,8 +1178,17 @@ export default function CartClient() {
                             )}
                           </div>
 
+                          {/* Below-minimum progress (Ruling B4-6): a look with chrome.cartBar says what
+                              is left as a sentence plus a bar instead of the one-line notice. */}
+                          {minimumProgress && (
+                            <MinOrderProgress
+                              subtotalFils={subtotal}
+                              minimumOrderFils={minimumOrderFils}
+                              className="mt-4"
+                            />
+                          )}
                           {/* Below-minimum notice */}
-                          {checkoutBlocked && checkoutBlockedMessage && (
+                          {checkoutBlocked && checkoutBlockedMessage && !minimumProgressOnly && (
                             <p className="mt-4 rounded-lg bg-warning/10 px-3 py-2 text-xs font-medium text-warning-ink">
                               {checkoutBlockedMessage}
                             </p>

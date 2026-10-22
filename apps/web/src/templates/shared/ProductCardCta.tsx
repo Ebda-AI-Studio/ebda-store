@@ -11,6 +11,8 @@ import { ctaShapeClass, ctaSizeClass, labelShapeClass, oosPlacementClass } from 
 import { avoidReservedCorner, soldOutCorner } from './badge-collision';
 import type { CardCta } from '@ebda/shared';
 import { lookCtaVisible, QUIET_CARD_CTA_CLS } from './look-card';
+import { CardStepper } from './CardStepper';
+import { useCardStepperLine } from './card-stepper-context';
 
 /**
  * Shared platform-level CTA used by EVERY theme's ProductCard.
@@ -113,6 +115,11 @@ interface AdaptiveAddButtonProps {
   /** Show the cart icon beside the label (Storefront card); the carousel is text-only. */
   showIcon?: boolean;
   dataZone?: string;
+  /**
+   * The card's product id (non-variant products only). On a look with `chrome.cardStepper` the
+   * control becomes - qty + once the product is in the cart (Ruling B4-4); absent = never.
+   */
+  stepperProductId?: string;
 }
 
 /**
@@ -130,8 +137,11 @@ export function AdaptiveAddButton({
   loading,
   showIcon,
   dataZone,
+  stepperProductId,
 }: AdaptiveAddButtonProps) {
   const { ref, compact } = useCompactCta();
+  const stepper = useCardStepperLine(stepperProductId ?? '');
+  if (stepperProductId && stepper) return <CardStepper line={stepper} />;
   const icon = loading ? (
     <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent" />
   ) : (
@@ -226,6 +236,7 @@ export function ProductCardCta({
 }: ProductCardCtaProps) {
   const router = useRouter();
   const { ref: ctaRef, compact: compactRaw } = useCompactCta();
+  const stepper = useCardStepperLine(productId, { hasVariants: hasVariants || viewOnly });
   // An out-of-stock label must stay words: a disabled cart icon reads as "broken".
   const compact = compactRaw && inStock !== false;
 
@@ -251,6 +262,8 @@ export function ProductCardCta({
   )
     return null;
   if (lookCta === 'quiet') className = QUIET_CARD_CTA_CLS;
+  // Ruling B4-4: in the cart already, the one control becomes - qty + (a state of the CTA).
+  if (stepper && inStock !== false) return <CardStepper line={stepper} />;
 
   // viewOnly: force the View link path for no-variant in-stock products too.
   if ((hasVariants || viewOnly) && viewHref) {

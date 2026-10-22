@@ -1581,6 +1581,47 @@ html[lang] [data-pack='jasmine'] [data-zone='filters'] :is(h2, h3, h4, legend) {
   font-weight: 600;
 }
 
+/* Lamma (Phase B4, Ruling B4-1): the type voice of a home-food store. Same rules as Souq's and
+   Jasmine's: the look's faces carry the voice, an Arabic display face is never letter-spaced and
+   gets open leading, tracked-caps classes from the minimal components are reset under the lamma
+   skin only. NO colour literal is set here: every Lamma colour is a look token (hsl(var(--token))
+   at most), which keeps the no-orange gate (Rulings B2-2, B4-2) true. The stepper and the browse
+   cart bar paint token colours only (Ruling B4-4, B4-6). */
+html[dir='rtl'] [data-pack='lamma'] h1,
+html[dir='rtl'] [data-pack='lamma'] h2,
+html[dir='rtl'] [data-pack='lamma'] h3,
+html[dir='rtl'] [data-pack='lamma'] .font-display {
+  line-height: 1.4;
+  letter-spacing: 0;
+}
+[data-pack='lamma']
+  :is(
+    .ui-caps-toggle,
+    .uppercase,
+    .tracking-wide,
+    .tracking-wider,
+    .tracking-widest,
+    [class*='tracking-[0.'],
+    [class*='tracking-[.']
+  ) {
+  letter-spacing: normal;
+  text-transform: none;
+}
+[data-pack='lamma'] [data-ui-uppercase='true'] .ui-caps-toggle {
+  text-transform: uppercase;
+}
+html[lang] [data-pack='lamma'] [data-zone='filters'] :is(h2, h3, h4, legend) {
+  font-family: var(--font-body, inherit);
+}
+[data-pack='lamma'] :is(h1, h2, h3, .font-display) {
+  font-size-adjust: none;
+}
+:where([data-pack='lamma']) :where(h1[data-zone='productName']) {
+  font-family: var(--font-display, inherit);
+  line-height: 1.3;
+  font-weight: 700;
+}
+
 /* Ruling B3-2: Apothecary's brass is a CTA FILL. As TEXT inside a card it is 5.0:1 (passes), but
    a text-primary link on a card still reads as ink there so the brass stays the one CTA metal.
    Sale / new chips and the PDP discount pill are the same brass (one accent, B2-26 pattern): the

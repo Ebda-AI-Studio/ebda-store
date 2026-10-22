@@ -112,6 +112,22 @@ export interface LookChrome {
    * instead (cream matte + multiply, globals.css), so its green runs through every page (STOP-2).
    */
   listing?: 'ground';
+  /**
+   * Browse cart bar (Ruling B4-6): `total` shows a phone bar with the item count, the total and the
+   * cart link on home, category and search while the cart has items; it replaces the tab bar
+   * (C-04). Absent = no bar.
+   */
+  cartBar?: 'total';
+  /**
+   * Card stepper (Ruling B4-4): `inline` turns the card's add control into - qty + once a
+   * non-variant product is in the cart. Absent = the card's own add control, byte-identical.
+   */
+  cardStepper?: 'inline';
+  /**
+   * Aisle tints (Ruling B4-2): the colours a `category-grid` with `tint: 'aisles'` cycles as
+   * 12-14% tints behind ink captions. Hex, no orange (gated with the look tokens).
+   */
+  aisles?: readonly string[];
 }
 
 /**
