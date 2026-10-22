@@ -96,7 +96,7 @@ export function NavMenuEditor({ storeId, variant, saveRef, stateRef }: NavMenuEd
     if (fetchError) toast.error(t('toastFailedLoad'), fetchError.message);
   }, [fetchError, toast, t]);
 
-  // Keep stateRef in sync with the live items so the page-builder can read
+  // Keep stateRef in sync with the live items so the editor can read
   // the current (unsaved) nav menu for the preview-draft bundle.
   useEffect(() => {
     if (stateRef) stateRef.current = items;

@@ -97,7 +97,7 @@ export default function AnnouncementPage() {
       // Send content only. `enabled` + `bgColor` are owned by the Page Builder
       // (layout.announcement.*) and intentionally omitted — the API merges, so
       // omitting them preserves any legacy values without this page clobbering
-      // the page-builder-managed chrome.
+      // the editor-managed chrome.
       const { enabled: _enabled, bgColor: _bgColor, ...content } = settings;
       void _enabled;
       void _bgColor;

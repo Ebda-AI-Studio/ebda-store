@@ -40,6 +40,7 @@ const ADMIN_PATHS = [
   // the visual builder (Phase 2) frames the storefront the same way
   '/stores/abc123/builder',
   '/stores/abc123/builder/extra',
+  '/stores/abc123/builder/',
   '/stores/store-with-dashes/page-builder',
   '/stores/abc123/page-builder/',
   '/stores/abc123/page-builder/extra',
@@ -50,7 +51,7 @@ const ADMIN_PATHS = [
   '/',
 ];
 
-// `/stores/:id/page-builder/` (trailing slash) matches BOTH patterns under
+// `/stores/:id/builder/` (trailing slash) matches BOTH patterns under
 // path-to-regexp's DEFAULT options (`strict: false`) used in this first block.
 // That is a property of those defaults, not of the live routing: Next compiles
 // header sources with `strict: true`, under which only the catch-all matches —
@@ -58,27 +59,23 @@ const ADMIN_PATHS = [
 // equally or more restrictive, and no batch issue asked for a routing
 // behaviour change, so this test documents the overlap rather than "fixing"
 // it as an unrelated, unreviewed change.
-const TRAILING_SLASH_OVERLAP = '/stores/abc123/page-builder/';
+const TRAILING_SLASH_OVERLAP = '/stores/abc123/builder/';
 
 describe('admin headers() route patterns match the real paths they claim to', () => {
-  it('the preview-route pattern matches page-builder paths (incl. the trailing-slash overlap)', () => {
+  it('the preview-route pattern matches the visual builder path (incl. the trailing-slash overlap), not the retired /page-builder', () => {
     const re = pathToRegexp(PAGE_BUILDER_PREVIEW_SOURCE);
     const matched = ADMIN_PATHS.filter(p => re.test(p));
-    expect(matched.sort()).toEqual(
-      [
-        '/stores/abc123/page-builder',
-        '/stores/abc123/builder',
-        '/stores/store-with-dashes/page-builder',
-        TRAILING_SLASH_OVERLAP,
-      ].sort()
-    );
+    expect(matched.sort()).toEqual(['/stores/abc123/builder', TRAILING_SLASH_OVERLAP].sort());
   });
 
-  it('the catch-all pattern matches everything except a bare page-builder path', () => {
+  it('the catch-all pattern matches everything except a bare builder path', () => {
     const re = pathToRegexp(ADMIN_CATCHALL_SOURCE);
     const matched = ADMIN_PATHS.filter(p => re.test(p));
     expect(matched.sort()).toEqual(
       [
+        '/stores/abc123/page-builder',
+        '/stores/store-with-dashes/page-builder',
+        '/stores/abc123/page-builder/',
         '/stores/abc123/page-builder/extra',
         '/stores/abc123/builder/extra',
         '/stores/abc123/products',
@@ -209,7 +206,8 @@ describe('page-builder preview CSP', () => {
     const catchAllRe = pathToRegexp(ADMIN_CATCHALL_SOURCE);
 
     const cases: Array<{ url: string; matchesPageBuilder: boolean }> = [
-      { url: '/stores/abc123/page-builder', matchesPageBuilder: true },
+      // the retired classic route only redirects: default CSP
+      { url: '/stores/abc123/page-builder', matchesPageBuilder: false },
       { url: '/stores/abc123/builder', matchesPageBuilder: true },
       { url: '/stores/abc123/builder-x', matchesPageBuilder: false },
       { url: '/stores/abc123/orders', matchesPageBuilder: false },
@@ -316,15 +314,15 @@ describe('admin security headers as SERVED — Next manifest regex + OpenNext ro
     for (const v of Object.values(served)) expect(emitted.has(v), v).toBe(true);
   });
 
-  it('only the bare page-builder route is served the permissive preview frame-src', async () => {
+  it('only the bare builder route is served the permissive preview frame-src', async () => {
     const rs = await headerRules();
     const fsOf = (p: string) =>
       (servedHeaders(rs, p)['Content-Security-Policy'].match(/frame-src[^;]*/) ?? [''])[0].split(
         /\s+/
       );
-    expect(fsOf('/stores/abc123/page-builder')).toContain('https:');
     expect(fsOf('/stores/abc123/builder')).toContain('https:');
     for (const p of [
+      '/stores/abc123/page-builder',
       '/',
       '/login',
       '/stores/abc123/products',

@@ -81,12 +81,13 @@ const setting = (
  * is a redirect, so a stub that grows content must be registered instead.
  */
 export const REDIRECT_ROUTES: Record<string, string> = {
-  '/hero': '/page-builder',
+  '/hero': '/builder',
   '/insights': '/insights/dashboard',
   '/integrations/wbs': '/whatsapp?tab=connection',
   '/inventory': '/stock/inventory',
-  '/navigation': '/page-builder',
-  '/pages': '/page-builder',
+  '/navigation': '/builder',
+  '/page-builder': '/builder',
+  '/pages': '/builder',
   '/payment-link': '/whatsapp?tab=payment-link',
   '/wa-bot': '/whatsapp?tab=bot-config',
   '/wa-order-updates': '/whatsapp?tab=order-updates',
@@ -120,14 +121,11 @@ export const PAGES: PageEntry[] = [
     feature: 'bulk_operations',
     syn: { en: 'import export csv excel upload', ar: 'استيراد تصدير اكسل رفع جماعي' },
   }),
-  page('/page-builder', `${HUB}.pageBuilder`, 'staff', {
+  page('/builder', `${HUB}.editor`, 'staff', {
     syn: {
-      en: 'homepage layout sections banner hero design menu navigation',
-      ar: 'الصفحة الرئيسية تصميم اقسام بانر قائمة تنقل',
+      en: 'visual editor drag drop design homepage layout sections banner hero menu navigation',
+      ar: 'محرر مرئي تصميم سحب الصفحة الرئيسية اقسام بانر قائمة تنقل',
     },
-  }),
-  page('/builder', `${HUB}.visualBuilder`, 'staff', {
-    syn: { en: 'visual editor drag drop design', ar: 'محرر مرئي تصميم سحب' },
   }),
   page('/content', `${HUB}.content`, 'staff', {
     syn: { en: 'static pages about contact policy', ar: 'صفحات من نحن سياسة اتصل' },
@@ -845,6 +843,41 @@ export const SETTINGS: SettingEntry[] = [
         'select=theme',
         'logo position centre center start header wordmark',
         'مكان الشعار اللوجو منتصف بداية الهيدر',
+      ],
+      [
+        'builder.card-brand-badge',
+        'builder.theme.cardBrandBadge',
+        'select=theme',
+        'store name badge pill brand product card',
+        'اسم المتجر شارة العلامة كارت المنتج',
+      ],
+      [
+        'builder.card-new-badge',
+        'builder.theme.cardNewBadge',
+        'select=theme',
+        'new badge chip product card latest',
+        'شارة جديد كارت المنتج',
+      ],
+      [
+        'builder.card-quick-add',
+        'builder.theme.cardQuickAdd',
+        'select=theme',
+        'quick add plus cart carousel one tap',
+        'اضافة سريعة سلة كاروسيل',
+      ],
+      [
+        'builder.card-even-images',
+        'builder.theme.cardEvenImages',
+        'select=theme',
+        'normalize product images same size crop cover grid',
+        'توحيد صور المنتجات مقاس قص شبكة',
+      ],
+      [
+        'builder.card-sale-corner',
+        'builder.theme.cardSaleCorner',
+        'select=theme',
+        'sale badge discount corner position old',
+        'شارة الخصم ركن مكان',
       ],
       [
         'builder.header-search',

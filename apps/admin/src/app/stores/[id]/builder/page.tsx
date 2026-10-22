@@ -3,7 +3,8 @@
 /**
  * /stores/:id/builder — the visual builder (Phase 2). Full-screen, outside
  * AdminLayout (like Shopify's theme editor); AuthProvider still gates it.
- * The classic page builder (/page-builder) stays live until parity.
+ * The classic form builder is retired: its old route and /hero, /navigation, /pages redirect
+ * here, keeping the deep link (Ruling VE-6).
  */
 import { useCallback, useMemo } from 'react';
 import { useParams, usePathname, useRouter, useSearchParams } from 'next/navigation';

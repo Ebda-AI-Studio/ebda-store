@@ -10,7 +10,7 @@ interface SidebarNavProps {
   /**
    * When provided, a nav item is considered active if its `hubKey` matches
    * this value. This ensures the Catalog hub item stays highlighted when
-   * browsing /blog or /page-builder even though the item's href points to
+   * browsing /blog or /builder even though the item's href points to
    * /products.
    */
   activeHubKey?: string | null;

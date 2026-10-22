@@ -11,7 +11,7 @@ import type { FooterBottomBarSettings } from '@ebda/shared';
  * /stores/[id]/pages 2026-05-21 (Ahmad audit: "do it then update memory")
  * so the SAME editor can be rendered:
  *   - standalone at /pages (its own AdminLayout wrapper)
- *   - embedded inside the page-builder Footer ExtraSectionCard
+ *   - embedded inside the editor's footer panel
  *
  * The component owns its own state, load, save, and Save button. Both
  * surfaces share one source of truth.
@@ -106,7 +106,7 @@ export interface FooterLinksEditorState {
 interface FooterLinksEditorProps {
   storeId: string;
   /** When 'embedded' the editor renders without its outer help banner
-   *  (the page-builder card already provides context). 'standalone'
+   *  (the editor panel already provides context). 'standalone'
    *  shows the full editor as it appears at /pages. */
   variant?: 'standalone' | 'embedded';
   /**
@@ -117,7 +117,7 @@ interface FooterLinksEditorProps {
   saveRef?: React.MutableRefObject<(() => Promise<boolean>) | null>;
   /**
    * Which part to render + save. The utility bar is a TOP-of-page strip, so the
-   * page-builder mounts it as its own card near the header (`section="utility"`)
+   * the editor mounts it as its own card near the header (`section="utility"`)
    * and the footer link columns + newsletter in the Footer card
    * (`section="links"`). Each instance saves ONLY its own keys (preserving the
    * other via the GET-merge-PUT), so the two cards don't clobber each other —
@@ -436,7 +436,7 @@ export function FooterLinksEditor({
     };
   }, [storeId]);
 
-  // Keep stateRef in sync with live editor state so the page-builder can read
+  // Keep stateRef in sync with live editor state so the editor can read
   // the current (unsaved) values for the preview-draft bundle.
   useEffect(() => {
     if (stateRef) {
@@ -777,7 +777,7 @@ export function FooterLinksEditor({
       )}
 
       {/* Sticky save bar — anchored at the bottom of the editor's flow
-          (not the viewport) so it doesn't fight the page-builder's own
+          (not the viewport) so it doesn't fight the editor's own
           sticky chrome when embedded. Pinned position inside the
           standalone /pages variant comes from the page-level sticky
           footer there, not from this component. */}

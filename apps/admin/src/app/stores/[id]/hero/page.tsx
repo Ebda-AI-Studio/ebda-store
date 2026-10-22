@@ -1,21 +1,18 @@
 import { redirect } from 'next/navigation';
+import { builderRedirectPath, type RawSearchParams } from '@/lib/builder-redirect';
 
 /**
- * The standalone hero editor was retired (2026-06-09). The hero is now edited
- * ONLY inside the Page Builder (`layout.hero.slides[]`) and saved by the page
- * builder's main Save button. The legacy per-store hero columns
- * (heroTitle / heroSubtitle / heroCta* / heroImage) are preserved as the
- * storefront's empty-state fallback, and a one-time migration
- * (`packages/database/scripts/migrate-legacy-hero-to-slide.mjs`) seeds a slide
- * from those columns for any store that had no slide yet, so nothing the
- * merchant typed in `/hero` is lost. This route redirects old bookmarks to the
- * Page Builder so nothing 404s — same pattern as `/navigation` + `/pages`.
+ * The standalone hero editor was retired; the hero is a section in the visual editor. Old bookmarks and links land in the visual editor
+ * (`/stores/:id/builder`) with the `select` / `block` / `field` / `page` deep link kept
+ * (Ruling VE-6).
  */
 export default async function StoreHeroRedirectPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<RawSearchParams>;
 }) {
   const { id } = await params;
-  redirect(`/stores/${id}/page-builder`);
+  redirect(builderRedirectPath(id, await searchParams));
 }

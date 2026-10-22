@@ -268,7 +268,7 @@ export default function StoreSettingsPage() {
      * variant="embedded"). The standalone /pages route still works by URL.
      *
      * SEO stays in Settings since it's meta-tags + structured data, distinct
-     * from page-builder's typography zones.
+     * from the editor's typography zones.
      *
      * Announcement card RE-ADDED 2026-06-01 (P1-B nav-wire fix). The page
      * edits live content (text + colors) that merchants need to reach without

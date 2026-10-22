@@ -70,7 +70,6 @@ const B2_FILES = [
   'app/stores/[id]/builder/_components/ThemeSettingsPanel.tsx',
   'app/stores/[id]/builder/_components/RevisionsPanel.tsx',
   'app/stores/[id]/builder/_components/Canvas.tsx',
-  'app/stores/[id]/page-builder/page.tsx',
   // Product 3D models card (2026-10-07) — written translated from day one.
   'app/stores/[id]/products/[productId]/_components/Product3dModelCard.tsx',
   // Policy-change notify (Ruling LEGAL-4, 2026-10-15) — written translated from day one.
@@ -283,10 +282,10 @@ describe('findHardcodedHits catches a multi-line wrapped JSX text node (#1934)',
 });
 
 describe('admin i18n: no hardcoded strings in the B2-translated files', () => {
-  it('lists exactly the 95 files this guard covers', () => {
-    // 82 + 9 visual builder files + the 3D model card + 3 policy-change notify files
-    expect(B2_FILES.length).toBe(95);
-    expect(new Set(B2_FILES).size).toBe(95); // no duplicates
+  it('lists exactly the 94 files this guard covers', () => {
+    // 81 + 9 visual builder files + the 3D model card + 3 policy-change notify files
+    expect(B2_FILES.length).toBe(94);
+    expect(new Set(B2_FILES).size).toBe(94); // no duplicates
   });
 
   it.each(B2_FILES)('%s has no un-allowlisted hardcoded strings', relativePath => {

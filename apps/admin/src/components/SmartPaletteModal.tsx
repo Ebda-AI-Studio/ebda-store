@@ -48,7 +48,7 @@ export interface ThemeUpdates {
   secondaryForeground?: string;
   accentForeground?: string;
   cardForeground?: string;
-  /** Card-level toggles staged from the page-builder "Product Cards" section
+  /** Card-level toggles staged from the editor's "Product cards" group
    *  card (Ahmad 2026-05-20: moved from branding/ThemeTab). */
   showBrandBadge?: boolean;
   /** Ruling D1016-NEW-1 — the card "New" badge, merchant's choice, default off. */

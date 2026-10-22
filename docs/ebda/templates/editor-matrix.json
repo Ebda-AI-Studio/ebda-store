@@ -1,7 +1,7 @@
 {
   "version": 1,
   "summary": {
-    "wired": 1371,
+    "wired": 1396,
     "no-op": 0,
     "missing": 0,
     "pending-template": 0,
@@ -3561,6 +3561,19 @@
       "evidence": "static"
     },
     {
+      "id": "jasmine|theme|normalizeProductImages",
+      "skin": "jasmine",
+      "looks": [
+        "jasmine.apothecary",
+        "jasmine.bloom",
+        "jasmine.clinic"
+      ],
+      "surface": "theme",
+      "control": "normalizeProductImages",
+      "status": "wired",
+      "evidence": "static"
+    },
+    {
       "id": "jasmine|theme|primaryColor",
       "skin": "jasmine",
       "looks": [
@@ -3574,6 +3587,19 @@
       "evidence": "static"
     },
     {
+      "id": "jasmine|theme|saleBadgeLegacyCorner",
+      "skin": "jasmine",
+      "looks": [
+        "jasmine.apothecary",
+        "jasmine.bloom",
+        "jasmine.clinic"
+      ],
+      "surface": "theme",
+      "control": "saleBadgeLegacyCorner",
+      "status": "wired",
+      "evidence": "static"
+    },
+    {
       "id": "jasmine|theme|secondaryColor",
       "skin": "jasmine",
       "looks": [
@@ -3583,6 +3609,45 @@
       ],
       "surface": "theme",
       "control": "secondaryColor",
+      "status": "wired",
+      "evidence": "static"
+    },
+    {
+      "id": "jasmine|theme|showBrandBadge",
+      "skin": "jasmine",
+      "looks": [
+        "jasmine.apothecary",
+        "jasmine.bloom",
+        "jasmine.clinic"
+      ],
+      "surface": "theme",
+      "control": "showBrandBadge",
+      "status": "wired",
+      "evidence": "static"
+    },
+    {
+      "id": "jasmine|theme|showNewBadge",
+      "skin": "jasmine",
+      "looks": [
+        "jasmine.apothecary",
+        "jasmine.bloom",
+        "jasmine.clinic"
+      ],
+      "surface": "theme",
+      "control": "showNewBadge",
+      "status": "wired",
+      "evidence": "static"
+    },
+    {
+      "id": "jasmine|theme|showQuickAdd",
+      "skin": "jasmine",
+      "looks": [
+        "jasmine.apothecary",
+        "jasmine.bloom",
+        "jasmine.clinic"
+      ],
+      "surface": "theme",
+      "control": "showQuickAdd",
       "status": "wired",
       "evidence": "static"
     },
@@ -7136,6 +7201,19 @@
       "evidence": "static"
     },
     {
+      "id": "lamma|theme|normalizeProductImages",
+      "skin": "lamma",
+      "looks": [
+        "lamma.table",
+        "lamma.notebook",
+        "lamma.market"
+      ],
+      "surface": "theme",
+      "control": "normalizeProductImages",
+      "status": "wired",
+      "evidence": "static"
+    },
+    {
       "id": "lamma|theme|primaryColor",
       "skin": "lamma",
       "looks": [
@@ -7149,6 +7227,19 @@
       "evidence": "static"
     },
     {
+      "id": "lamma|theme|saleBadgeLegacyCorner",
+      "skin": "lamma",
+      "looks": [
+        "lamma.table",
+        "lamma.notebook",
+        "lamma.market"
+      ],
+      "surface": "theme",
+      "control": "saleBadgeLegacyCorner",
+      "status": "wired",
+      "evidence": "static"
+    },
+    {
       "id": "lamma|theme|secondaryColor",
       "skin": "lamma",
       "looks": [
@@ -7158,6 +7249,45 @@
       ],
       "surface": "theme",
       "control": "secondaryColor",
+      "status": "wired",
+      "evidence": "static"
+    },
+    {
+      "id": "lamma|theme|showBrandBadge",
+      "skin": "lamma",
+      "looks": [
+        "lamma.table",
+        "lamma.notebook",
+        "lamma.market"
+      ],
+      "surface": "theme",
+      "control": "showBrandBadge",
+      "status": "wired",
+      "evidence": "static"
+    },
+    {
+      "id": "lamma|theme|showNewBadge",
+      "skin": "lamma",
+      "looks": [
+        "lamma.table",
+        "lamma.notebook",
+        "lamma.market"
+      ],
+      "surface": "theme",
+      "control": "showNewBadge",
+      "status": "wired",
+      "evidence": "static"
+    },
+    {
+      "id": "lamma|theme|showQuickAdd",
+      "skin": "lamma",
+      "looks": [
+        "lamma.table",
+        "lamma.notebook",
+        "lamma.market"
+      ],
+      "surface": "theme",
+      "control": "showQuickAdd",
       "status": "wired",
       "evidence": "static"
     },
@@ -10685,6 +10815,19 @@
       "evidence": "static"
     },
     {
+      "id": "minimal|theme|normalizeProductImages",
+      "skin": "minimal",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "theme",
+      "control": "normalizeProductImages",
+      "status": "wired",
+      "evidence": "static"
+    },
+    {
       "id": "minimal|theme|primaryColor",
       "skin": "minimal",
       "looks": [
@@ -10698,6 +10841,19 @@
       "evidence": "static"
     },
     {
+      "id": "minimal|theme|saleBadgeLegacyCorner",
+      "skin": "minimal",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "theme",
+      "control": "saleBadgeLegacyCorner",
+      "status": "wired",
+      "evidence": "static"
+    },
+    {
       "id": "minimal|theme|secondaryColor",
       "skin": "minimal",
       "looks": [
@@ -10707,6 +10863,45 @@
       ],
       "surface": "theme",
       "control": "secondaryColor",
+      "status": "wired",
+      "evidence": "static"
+    },
+    {
+      "id": "minimal|theme|showBrandBadge",
+      "skin": "minimal",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "theme",
+      "control": "showBrandBadge",
+      "status": "wired",
+      "evidence": "static"
+    },
+    {
+      "id": "minimal|theme|showNewBadge",
+      "skin": "minimal",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "theme",
+      "control": "showNewBadge",
+      "status": "wired",
+      "evidence": "static"
+    },
+    {
+      "id": "minimal|theme|showQuickAdd",
+      "skin": "minimal",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "theme",
+      "control": "showQuickAdd",
       "status": "wired",
       "evidence": "static"
     },
@@ -14247,6 +14442,19 @@
       "evidence": "static"
     },
     {
+      "id": "qamar|theme|normalizeProductImages",
+      "skin": "qamar",
+      "looks": [
+        "qamar.atelier",
+        "qamar.lookbook",
+        "qamar.vitrine"
+      ],
+      "surface": "theme",
+      "control": "normalizeProductImages",
+      "status": "wired",
+      "evidence": "static"
+    },
+    {
       "id": "qamar|theme|primaryColor",
       "skin": "qamar",
       "looks": [
@@ -14260,6 +14468,19 @@
       "evidence": "static"
     },
     {
+      "id": "qamar|theme|saleBadgeLegacyCorner",
+      "skin": "qamar",
+      "looks": [
+        "qamar.atelier",
+        "qamar.lookbook",
+        "qamar.vitrine"
+      ],
+      "surface": "theme",
+      "control": "saleBadgeLegacyCorner",
+      "status": "wired",
+      "evidence": "static"
+    },
+    {
       "id": "qamar|theme|secondaryColor",
       "skin": "qamar",
       "looks": [
@@ -14269,6 +14490,45 @@
       ],
       "surface": "theme",
       "control": "secondaryColor",
+      "status": "wired",
+      "evidence": "static"
+    },
+    {
+      "id": "qamar|theme|showBrandBadge",
+      "skin": "qamar",
+      "looks": [
+        "qamar.atelier",
+        "qamar.lookbook",
+        "qamar.vitrine"
+      ],
+      "surface": "theme",
+      "control": "showBrandBadge",
+      "status": "wired",
+      "evidence": "static"
+    },
+    {
+      "id": "qamar|theme|showNewBadge",
+      "skin": "qamar",
+      "looks": [
+        "qamar.atelier",
+        "qamar.lookbook",
+        "qamar.vitrine"
+      ],
+      "surface": "theme",
+      "control": "showNewBadge",
+      "status": "wired",
+      "evidence": "static"
+    },
+    {
+      "id": "qamar|theme|showQuickAdd",
+      "skin": "qamar",
+      "looks": [
+        "qamar.atelier",
+        "qamar.lookbook",
+        "qamar.vitrine"
+      ],
+      "surface": "theme",
+      "control": "showQuickAdd",
       "status": "wired",
       "evidence": "static"
     },
@@ -17822,6 +18082,19 @@
       "evidence": "static"
     },
     {
+      "id": "souq|theme|normalizeProductImages",
+      "skin": "souq",
+      "looks": [
+        "souq.catalogue",
+        "souq.night",
+        "souq.showroom"
+      ],
+      "surface": "theme",
+      "control": "normalizeProductImages",
+      "status": "wired",
+      "evidence": "static"
+    },
+    {
       "id": "souq|theme|primaryColor",
       "skin": "souq",
       "looks": [
@@ -17835,6 +18108,19 @@
       "evidence": "static"
     },
     {
+      "id": "souq|theme|saleBadgeLegacyCorner",
+      "skin": "souq",
+      "looks": [
+        "souq.catalogue",
+        "souq.night",
+        "souq.showroom"
+      ],
+      "surface": "theme",
+      "control": "saleBadgeLegacyCorner",
+      "status": "wired",
+      "evidence": "static"
+    },
+    {
       "id": "souq|theme|secondaryColor",
       "skin": "souq",
       "looks": [
@@ -17844,6 +18130,45 @@
       ],
       "surface": "theme",
       "control": "secondaryColor",
+      "status": "wired",
+      "evidence": "static"
+    },
+    {
+      "id": "souq|theme|showBrandBadge",
+      "skin": "souq",
+      "looks": [
+        "souq.catalogue",
+        "souq.night",
+        "souq.showroom"
+      ],
+      "surface": "theme",
+      "control": "showBrandBadge",
+      "status": "wired",
+      "evidence": "static"
+    },
+    {
+      "id": "souq|theme|showNewBadge",
+      "skin": "souq",
+      "looks": [
+        "souq.catalogue",
+        "souq.night",
+        "souq.showroom"
+      ],
+      "surface": "theme",
+      "control": "showNewBadge",
+      "status": "wired",
+      "evidence": "static"
+    },
+    {
+      "id": "souq|theme|showQuickAdd",
+      "skin": "souq",
+      "looks": [
+        "souq.catalogue",
+        "souq.night",
+        "souq.showroom"
+      ],
+      "surface": "theme",
+      "control": "showQuickAdd",
       "status": "wired",
       "evidence": "static"
     },

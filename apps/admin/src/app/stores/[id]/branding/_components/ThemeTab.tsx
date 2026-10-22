@@ -185,10 +185,10 @@ export function ThemeTab({ branding, onChange, storeId }: ThemeTabProps) {
             ✨ {tColors('generateButton')}
           </button>
           <Link
-            href={`/stores/${storeId}/page-builder`}
+            href={`/stores/${storeId}/builder`}
             className="text-xs font-medium text-primary underline-offset-2 hover:underline"
           >
-            {tColors('pageBuilderLink')} →
+            {tColors('editorLink')} →
           </Link>
         </div>
 
