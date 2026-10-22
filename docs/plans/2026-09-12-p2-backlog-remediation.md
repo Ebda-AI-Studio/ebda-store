@@ -85,8 +85,8 @@ Every batch follows the same seven steps. They are written once here rather than
 - [ ] **Step 1: Create the worktree and install**
 
 ```bash
-~/.claude/scripts/new-task-worktree.sh force-website-builder fix/p2-batch-<N>-<slug>
-cd ~/Desktop/projects/_worktrees/force-website-builder__fix-p2-batch-<N>-<slug>
+~/.claude/scripts/new-task-worktree.sh ebda-store fix/p2-batch-<N>-<slug>
+cd ~/Desktop/projects/_worktrees/ebda-store__fix-p2-batch-<N>-<slug>
 npm ci --no-audit --no-fund
 npx prisma generate --schema packages/database/prisma/schema.prisma
 npm run build -w packages/shared && npm run build -w packages/database
@@ -99,11 +99,11 @@ For each issue, open the `**Location:**` and check the claim reproduces. Record 
 - [ ] **Step 3: Start the test database**
 
 ```bash
-container run -d --name fwb-p2-pg -p 55432:5432 \
-  -e POSTGRES_PASSWORD=testpw -e POSTGRES_USER=test -e POSTGRES_DB=fwb_test \
+container run -d --name ebda-p2-pg -p 55432:5432 \
+  -e POSTGRES_PASSWORD=testpw -e POSTGRES_USER=test -e POSTGRES_DB=ebda_test \
   -e PGDATA=/var/lib/postgresql/data/pgdata docker.io/library/postgres:17
 export PG_TEST_PW=testpw
-export TEST_DATABASE_URL="postgresql://test:${PG_TEST_PW}@127.0.0.1:55432/fwb_test"
+export TEST_DATABASE_URL="postgresql://test:${PG_TEST_PW}@127.0.0.1:55432/ebda_test"
 export DATABASE_URL="$TEST_DATABASE_URL" DIRECT_URL="$TEST_DATABASE_URL" JWT_SECRET=t
 npx prisma migrate deploy --schema packages/database/prisma/schema.prisma
 ```
@@ -111,7 +111,7 @@ npx prisma migrate deploy --schema packages/database/prisma/schema.prisma
 - [ ] **Step 4: Record the money-path control on `origin/main` BEFORE changing anything**
 
 ```bash
-cd ~/Desktop/projects/force-website-builder   # main checkout, on main
+cd ~/Desktop/projects/ebda-store   # main checkout, on main
 npm run build -w packages/shared && npm run build -w packages/database
 ls tests/integration/*.test.ts | grep -iE "order|cart|payment|inventory|bundle" \
   | tee /tmp/p2-control-files.txt
@@ -145,9 +145,9 @@ Stage explicit paths. PR body states: the control numbers, the mutation results,
 - [ ] **Step 8: After merge, verify production**
 
 ```bash
-curl -s https://api.force-ai.co/health     # commit must equal origin/main
+curl -s https://api.ebda.app/health     # commit must equal origin/main
 psql "$PROD" -At -c "select count(*) from payments where status::text in ('failed','cancelled') and created_at > now() - interval '1 hour';"   # expect 0
-curl -s -o /dev/null -w '%{http_code}' -X POST "https://api.force-ai.co/api/v1/stores/$SID/cart/items" \
+curl -s -o /dev/null -w '%{http_code}' -X POST "https://api.ebda.app/api/v1/stores/$SID/cart/items" \
   -H 'Content-Type: application/json' -H "X-Session-ID: verify-$(uuidgen)" -d "{\"productId\":\"$PID\",\"quantity\":1}"  # expect 201
 ```
 
@@ -282,7 +282,7 @@ Two consequences for the executor:
 
 These are known, recorded, and deliberately outside the batch sequence.
 
-- [ ] **`formatPrice` non-KWD divisor.** `packages/shared/src/utils/index.ts:63` divides non-KWD by 100 while the admin write path multiplies by 1000 for EVERY currency — a non-KWD store would display prices 10x too high. Dormant: all three production stores are KWD. Store currency is bare `z.string()`, so nothing prevents a fourth. Pairs with #1699.
+- [ ] **`formatPrice` non-EGP divisor.** `packages/shared/src/utils/index.ts:63` divides non-EGP by 100 while the admin write path multiplies by 1000 for EVERY currency — a non-EGP store would display prices 10x too high. Dormant: all three production stores are EGP. Store currency is bare `z.string()`, so nothing prevents a fourth. Pairs with #1699.
 - [ ] **`store_usage_snapshots` has no RLS.** Ruling MCP-1 records why it was not swept inside an MCP PR: it holds production rows, so enabling RLS on it is a production action needing its own change, probe and rollback.
 - [ ] **`AI_FIX_PAT` lacks the `workflows` scope.** Ahmad's action in the GitHub UI. Until then the auto-fix job cannot land a workflow fix; PR #1756 makes it degrade gracefully rather than discard the rest.
 - [ ] **MCP merchant-admin phases 2 and 3** — writes, then destructive ops with `confirm_token`. Specced in `docs/superpowers/specs/2026-09-11-mcp-merchant-admin-design.md`.

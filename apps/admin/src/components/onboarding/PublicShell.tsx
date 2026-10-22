@@ -29,7 +29,7 @@ export function PublicShell({
           <a href={BRAND_MARKETING_URL} aria-label={t('back')} className="flex items-center gap-3">
             <Image
               src="/logo-on-light.svg"
-              alt={tb('forceMediaAlt')}
+              alt={tb('ebdaAlt')}
               width={36}
               height={36}
               className="dark:hidden"
@@ -37,7 +37,7 @@ export function PublicShell({
             />
             <Image
               src="/logo.svg"
-              alt={tb('forceMediaAlt')}
+              alt={tb('ebdaAlt')}
               width={36}
               height={36}
               className="hidden dark:block"

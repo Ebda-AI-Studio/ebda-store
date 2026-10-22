@@ -74,11 +74,11 @@ These can't be code changes — they live in Vercel + Railway dashboards.
 1. Open https://vercel.com/ahmed0montaser/force-web/settings/git
 2. **Production Branch**: stays `main`.
 3. **Preview deployments**: by default Vercel previews EVERY branch, including `staging`. That gives you a preview URL per staging commit — no extra config needed.
-4. **Domain attachment**: production domain (`wadyaljuz.com`) stays on the Production Branch (`main`). Add a staging-specific preview alias (e.g. `staging.wadyaljuz.com`) via Domains → Add Domain → assign to `staging` branch.
+4. **Domain attachment**: production domain (`demo-merchant.com`) stays on the Production Branch (`main`). Add a staging-specific preview alias (e.g. `staging.demo-merchant.com`) via Domains → Add Domain → assign to `staging` branch.
 
 ### Vercel — `force-admin` project
 
-Same as `force-web`. Production Branch stays `main`. Optionally add `staging.admin.forcemediakw.com`.
+Same as `force-web`. Production Branch stays `main`. Optionally add `staging.store.ebda.app`.
 
 ### Railway — API service
 
@@ -93,7 +93,7 @@ After flipping Railway:
 
 ```bash
 # Push a no-op commit to staging to confirm only the staging env builds
-cd ~/Desktop/projects/force-website-builder
+cd ~/Desktop/projects/ebda-store
 git checkout staging
 git commit --allow-empty -m "chore: verify staging gate"
 git push origin staging
@@ -161,7 +161,7 @@ git push origin staging
 
 - **Prod health**: `production-deploy.yml` includes a post-deploy `health-check` job; failure pages Telegram.
 - **Staging health**: same job to be added to `staging-validation.yml`.
-- **Cost**: GitHub Actions monthly minutes — check `gh api /repos/ForceAI-KW/<repo>/actions/billing` if usage looks high.
+- **Cost**: GitHub Actions monthly minutes — check `gh api /repos/Whisky-11/<repo>/actions/billing` if usage looks high.
 
 ## 8. Related runbooks
 
@@ -171,5 +171,5 @@ git push origin staging
 ## 9. Open items (Ahmad to decide)
 
 - [ ] Should `staging-validation.yml` include the FULL E2E + integration suite (slower, ~20min) or a subset (~10min)?
-- [ ] Add `staging.wadyaljuz.com` + `staging.admin.forcemediakw.com` DNS records?
+- [ ] Add `staging.demo-merchant.com` + `staging.store.ebda.app` DNS records?
 - [ ] Document staging-DB swap policy: same Neon DB as prod, or staging-only Neon branch? Currently same.

@@ -100,7 +100,7 @@ async function seedStore(tag: string) {
   const token = jwt.sign(
     { userId: owner.id, email: owner.email, role: 'store_admin', tv: 0 },
     config.jwtSecret,
-    { expiresIn: '10m', issuer: 'force-api', audience: 'force-app' }
+    { expiresIn: '10m', issuer: 'ebda-api', audience: 'ebda-app' }
   );
   return { storeId: store.id, token };
 }

@@ -1,4 +1,4 @@
-# Service Level Objectives (SLOs) — Force Website Builder
+# Service Level Objectives (SLOs) — Ebda Store
 
 _Last updated: 2026-06-09. Review cadence: quarterly and after any P0 incident._
 
@@ -25,9 +25,9 @@ Monitoring stack: **Sentry** (error budgets, latency sampling) · **UptimeRobot*
 
 ## 2. admin — Next.js (Cloudflare Workers)
 
-| SLO                             | Target                    | Error Budget (30 days)                               | Measurement                        |
-| ------------------------------- | ------------------------- | ---------------------------------------------------- | ---------------------------------- |
-| Availability (Cloudflare edge)  | **99.9 %**                | 43 min / month downtime                              | UptimeRobot on `admin.force-ai.co` |
+| SLO                             | Target                    | Error Budget (30 days)                               | Measurement                     |
+| ------------------------------- | ------------------------- | ---------------------------------------------------- | ------------------------------- |
+| Availability (Cloudflare edge)  | **99.9 %**                | 43 min / month downtime                              | UptimeRobot on `store.ebda.app` |
 | Core Web Vitals — LCP (desktop) | **< 2.5 s**               | Lighthouse CI nightly job · Cloudflare Web Analytics |
 | Core Web Vitals — CLS           | **< 0.1**                 | Same                                                 |
 | JS error rate                   | **< 0.1 %** of page loads | Sentry `NEXT_PUBLIC_SENTRY_DSN_ADMIN` capture        |
@@ -50,13 +50,13 @@ Monitoring stack: **Sentry** (error budgets, latency sampling) · **UptimeRobot*
 
 OTel tracing is wired in `apps/api/src/tracing.ts` behind the
 
-> **LIVE since 2026-07-12:** exports to Grafana Cloud Tempo — stack `brownoak2576` (https://brownoak2576.grafana.net, prod-eu-west-2, free tier 50GB traces). Railway `api` service carries `OTEL_EXPORTER_OTLP_ENDPOINT`/`OTEL_EXPORTER_OTLP_HEADERS` (Basic auth, instance `1720967`, access policy `force-api-otlp`). View: Grafana → Explore → Traces. Verified end-to-end (force-api spans incl. redis + http).
+> **LIVE since 2026-07-12:** exports to Grafana Cloud Tempo — stack `brownoak2576` (https://brownoak2576.grafana.net, prod-eu-west-2, free tier 50GB traces). Railway `api` service carries `OTEL_EXPORTER_OTLP_ENDPOINT`/`OTEL_EXPORTER_OTLP_HEADERS` (Basic auth, instance `1720967`, access policy `ebda-api-otlp`). View: Grafana → Explore → Traces. Verified end-to-end (ebda-api spans incl. redis + http).
 > `OTEL_EXPORTER_OTLP_ENDPOINT` env flag. When the var is set, spans are exported
 > via OTLP/HTTP and trace context (`traceparent`) propagates through all downstream
 > HTTP calls (Neon, Redis, Inngest, Gemini).
 
 **Recommended exporters:** Grafana Tempo (free in cloud tier) · Honeycomb · Jaeger
-(self-hosted). Set `OTEL_SERVICE_NAME=force-api` and
+(self-hosted). Set `OTEL_SERVICE_NAME=ebda-api` and
 `OTEL_EXPORTER_OTLP_ENDPOINT=<collector-url>` in Railway env vars.
 
 Sample rate: 10 % in production (`OTEL_TRACES_SAMPLER_ARG=0.1`), 100 % in dev.

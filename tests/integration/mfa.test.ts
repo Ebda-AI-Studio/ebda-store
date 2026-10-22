@@ -190,7 +190,7 @@ describe('SEC-1: MFA challenge token must not bypass authenticate middleware', (
     expect(login2.data.accessToken).toBeUndefined();
 
     // The critical assertion: the challenge token MUST NOT be accepted as a
-    // real access token. Before the fix, audience:'force-app' on the challenge
+    // real access token. Before the fix, audience:'ebda-app' on the challenge
     // token and the missing purpose check in authenticate() let it through.
     const meRes = await fetch(`${API}/auth/me`, {
       headers: { Authorization: `Bearer ${challengeToken}` },

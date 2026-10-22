@@ -17,7 +17,7 @@
 1. **Enable SSL for SaaS** on the Cloudflare zone that will front the storefronts
    (Cloudflare dashboard → SSL/TLS → Custom Hostnames). Set a **Fallback Origin** —
    a hostname in your zone that points at the deployed storefront Worker
-   (e.g. `cf.forcemediakw.com` → the `force-web` worker route). This is the value
+   (e.g. `cf.ebda.app` → the `force-web` worker route). This is the value
    merchants CNAME to, and the value of `CF_FALLBACK_ORIGIN`.
 2. **Create an API token** scoped to that zone: `Zone:SSL and Certificates:Edit` +
    `Zone:Zone:Read`. This is `CF_API_TOKEN`. Grab the zone id → `CF_ZONE_ID`.
@@ -40,7 +40,7 @@
 Pick a demo store with a disposable custom domain (or attach one). Run:
 
 ```bash
-CF_API_TOKEN=… CF_ZONE_ID=… CF_FALLBACK_ORIGIN=cf.forcemediakw.com \
+CF_API_TOKEN=… CF_ZONE_ID=… CF_FALLBACK_ORIGIN=cf.ebda.app \
 DATABASE_URL="$(neonctl connection-string --project-id silent-sun-13697505 \
   --org-id org-lingering-river-25973882 --role-name neondb_owner)" \
 bash scripts/cf-migrate-store.sh <demo-slug>

@@ -12,10 +12,10 @@ import { pathToRegexp } from 'next/dist/compiled/path-to-regexp';
  * origins explicitly and is untouched by anything here.
  *
  * This broke in production: the admin's frame-src was a hand-written list of
- * merchant domains containing exactly one tenant (`wadyaljuz.com`). Every
+ * merchant domains containing exactly one tenant (`demo-merchant.example`). Every
  * merchant onboarded after that silently lost their live preview and got
- * Chrome's "This content is blocked" — Pecannbee among them, because
- * `pecannbee.com.kw` was never added. A custom domain is arbitrary and
+ * Chrome's "This content is blocked" — one demo store among them, because
+ * `demo-store.example` was never added. A custom domain is arbitrary and
  * unknowable at build time, so an allowlist is wrong by construction.
  */
 
@@ -155,12 +155,12 @@ describe('page-builder preview CSP', () => {
 
   it('ships no merchant domain in the allowlist — that is what broke it', async () => {
     // Asserted against the EMITTED header, not the file: the comment above the
-    // constant names `wadyaljuz.com` on purpose, to record why a hand-kept
+    // constant names `demo-merchant.example` on purpose, to record why a hand-kept
     // list was the wrong shape. Forbidding the string anywhere would delete
     // the explanation along with the bug.
     for (const r of await rules()) {
-      expect(frameSrc(r.csp)).not.toContain('wadyaljuz');
-      expect(frameSrc(r.csp)).not.toContain('pecannbee');
+      expect(frameSrc(r.csp)).not.toContain('demo-merchant');
+      expect(frameSrc(r.csp)).not.toContain('demo-store');
     }
   });
 

@@ -3,12 +3,12 @@
 ## Setup
 
 - Bot: WBS production (Wady Aljuz)
-- Test WhatsApp number: Force Media test number (to be filled by Ahmad after first live test)
-- Instrumentation: Phase 0 timing middleware now wired in FWB (`waBridgeTiming`) + WBS (`timedCall` wrapper in wa-bridge-client.js)
+- Test WhatsApp number: Ebda AI Studio test number (to be filled by Ahmad after first live test)
+- Instrumentation: Phase 0 timing middleware now wired in Ebda Store (`waBridgeTiming`) + WBS (`timedCall` wrapper in wa-bridge-client.js)
 
 ## Note on simulation
 
-This baseline document was created with Phase 0 timing instrumentation wired in but prior to a live WhatsApp test drive. The timing middleware (`waBridgeTiming` in FWB, `timedCall` in WBS) is production-deployed and will emit structured logs on the next real bot interaction. Ahmad to fill the actual measurements after running a test order.
+This baseline document was created with Phase 0 timing instrumentation wired in but prior to a live WhatsApp test drive. The timing middleware (`waBridgeTiming` in Ebda Store, `timedCall` in WBS) is production-deployed and will emit structured logs on the next real bot interaction. Ahmad to fill the actual measurements after running a test order.
 
 Log collection command (run after a test order):
 
@@ -19,7 +19,7 @@ railway logs --service api --tail 200 | grep "wa-bridge timing"
 
 ## Expected log shape
 
-FWB emits per-request:
+Ebda Store emits per-request:
 
 ```json
 {
@@ -60,14 +60,14 @@ WBS emits per-call:
 
 ## Top latency contributors (hypotheses — to validate)
 
-1. **FWB Railway cold start** (5-10s) — the `/store-catalog` call is the first call per session; if Railway has idled, this absorbs all the latency budget
+1. **Ebda Store Railway cold start** (5-10s) — the `/store-catalog` call is the first call per session; if Railway has idled, this absorbs all the latency budget
 2. **Neon DB compute pause** (2-5s) — Neon free-tier pauses compute after 5 min of idle; first query wakes it
 3. **Sequential bridge calls** — any two consecutive `await waBridge.xxx()` calls that could be parallelized via `Promise.all`
 
 ## Quick wins applied (Phase 0)
 
 - [x] Timing instrumentation wired (this PR) — measures actual latencies
-- [ ] Keepalive script (Task 0.4) — pings FWB `/health` every 4 min to prevent cold starts
+- [ ] Keepalive script (Task 0.4) — pings Ebda Store `/health` every 4 min to prevent cold starts
 - [ ] Promise.all parallelization (Task 0.5) — eliminates sequential bridge calls in wa-ordering.js
 
 ## Post-quick-wins measurements (to fill after Task 0.4 + 0.5 deploy)

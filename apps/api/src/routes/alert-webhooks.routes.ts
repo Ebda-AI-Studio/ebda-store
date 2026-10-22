@@ -246,7 +246,7 @@ router.post('/railway', async (req, res, next) => {
         : type === 'DEPLOY_REMOVED'
           ? 'p1'
           : 'info';
-    const projectName = body.project?.name ?? 'force-api';
+    const projectName = body.project?.name ?? 'ebda-api';
     const envName = body.environment?.name ?? 'production';
     const commitMsg = body.deployment?.meta?.commitMessage?.slice(0, 120) ?? '';
     const commitAuthor = body.deployment?.meta?.commitAuthor ?? '';

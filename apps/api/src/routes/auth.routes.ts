@@ -27,6 +27,7 @@ import { maskEmail } from '../lib/pii-mask';
 import { passwordSchema } from '../services/merchant-signup.service';
 import { assertNotDemoStore } from '../services/plan-limit.service';
 
+import { JWT_AUDIENCES_ACCEPTED, JWT_ISSUERS_ACCEPTED } from '@ebda/shared';
 const router = Router();
 
 /** Shared cookie options for the HTTP-only access-token cookie.
@@ -428,8 +429,8 @@ function mayIssueCsrfToken(
   try {
     const payload = jwt.verify(newAccessToken, config.jwtSecret, {
       algorithms: ['HS256'],
-      issuer: 'force-api',
-      audience: 'force-app',
+      issuer: JWT_ISSUERS_ACCEPTED,
+      audience: JWT_AUDIENCES_ACCEPTED,
     }) as { role?: string };
     return !!payload.role && AMBIENT_CSRF_MINT_ROLES.has(payload.role);
   } catch {
@@ -711,8 +712,8 @@ router.post('/logout', async (req: Request, res: Response, next: NextFunction) =
       if (rawToken) {
         const payload = jwt.verify(rawToken, config.jwtSecret, {
           algorithms: ['HS256'],
-          issuer: 'force-api',
-          audience: 'force-app',
+          issuer: JWT_ISSUERS_ACCEPTED,
+          audience: JWT_AUDIENCES_ACCEPTED,
         }) as { jti?: string; exp?: number };
 
         if (payload.jti) {
@@ -820,7 +821,7 @@ router.delete(
 );
 
 // POST /auth/me/erase — irreversible PII anonymization (GDPR Art. 17 and
-// applicable GCC data-protection law — see docs/legal/gcc-data-protection.md).
+// applicable GCC data-protection law — see docs/privacy/data-map.md).
 // Unlike DELETE /auth/me (soft-delete that
 // leaves PII intact), this nulls/scrubs every identifying field across
 // the schema in a single transaction and preserves anonymized order
@@ -869,7 +870,7 @@ router.post(
 );
 
 // GET /auth/me/export — right to data portability (GDPR Art. 20 and
-// applicable GCC data-protection law — see docs/legal/gcc-data-protection.md).
+// applicable GCC data-protection law — see docs/privacy/data-map.md).
 // Returns a JSON bundle of every row tied to this
 // user. Marked as an attachment so browsers download it as a file.
 //

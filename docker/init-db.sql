@@ -1,4 +1,4 @@
--- Force Website Builder - Database Initialization
+-- Ebda Store - Database Initialization
 -- This script runs on first database creation
 
 -- Enable UUID extension
@@ -15,5 +15,5 @@ GRANT ALL ON SCHEMA analytics TO postgres;
 -- Log initialization
 DO $$
 BEGIN
-    RAISE NOTICE 'Force Website Builder database initialized successfully';
+    RAISE NOTICE 'Ebda Store database initialized successfully';
 END $$;

@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { PoweredByForce } from '../shared/PoweredByForce';
+import { PoweredByEbda } from '../shared/PoweredByEbda';
 import { FooterLegalRow } from '../shared/FooterLegalRow';
 import { FooterWhatsApp } from '../shared/FooterWhatsApp';
 import type { FooterProps } from '../types';
@@ -316,7 +316,7 @@ export default function BoldFooter({
           urlPrefix={urlPrefix}
           className={fgMuted}
         />
-        <PoweredByForce hidden={hidePoweredBy} />
+        <PoweredByEbda hidden={hidePoweredBy} />
       </div>
     </footer>
   );

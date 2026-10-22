@@ -42,7 +42,7 @@ describe('per-card actions are named with the product', () => {
   });
 
   it.each([
-    'shared/PecannbeeProductCard.tsx',
+    'shared/StorefrontProductCard.tsx',
     'elegant/ProductCard.tsx',
     'modern/ProductCard.tsx',
     'classic/ProductCard.tsx',
@@ -71,7 +71,7 @@ describe('card link names lead with the product (P2-14)', async () => {
     expect(cardLinkLabel('عباية', [])).toBe('عباية');
   });
 
-  it.each(['shared/PecannbeeProductCard.tsx', 'minimal/ProductCard.tsx'])(
+  it.each(['shared/StorefrontProductCard.tsx', 'minimal/ProductCard.tsx'])(
     '%s hides its chips and names the link name-first',
     f => {
       const src = readFileSync(join(T, f), 'utf8');

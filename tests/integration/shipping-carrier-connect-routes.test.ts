@@ -74,8 +74,8 @@ const asApp = <T>(fn: () => Promise<T>) =>
 const token = (userId: string, role: 'store_admin' | 'super_admin' = 'store_admin') =>
   jwt.sign({ userId, email: `${userId}@example.test`, role, tv: 0 }, config.jwtSecret, {
     expiresIn: '30m',
-    issuer: 'force-api',
-    audience: 'force-app',
+    issuer: 'ebda-api',
+    audience: 'ebda-app',
   });
 
 type Actor = { id: string; userId: string; jwt: string };
@@ -712,7 +712,7 @@ describe.skipIf(!hasDb)('connect a carrier: credentials, Test connection, enable
       const customer = jwt.sign(
         { userId: s.userId, email: 'c@example.test', role: 'customer', tv: 0, storeId: s.id },
         config.jwtSecret,
-        { expiresIn: '5m', issuer: 'force-api', audience: 'force-app' }
+        { expiresIn: '5m', issuer: 'ebda-api', audience: 'ebda-app' }
       );
       const res = await get({ jwt: customer }, listUrl(s));
       expect(res.status).toBe(403);

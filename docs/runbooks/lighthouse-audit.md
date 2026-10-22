@@ -74,4 +74,4 @@ Results land in `.lighthouseci/`. Open the `.html` files for full reports.
 
 ## CI workflow
 
-`.github/workflows/lighthouse-nightly.yml` runs at 4am UTC (7am Kuwait) daily, plus manual trigger via `workflow_dispatch`. Results upload to temporary public storage. The `LHCI_GITHUB_APP_TOKEN` secret is optional — if unset, reports still upload anonymously.
+`.github/workflows/lighthouse-nightly.yml` runs at 4am UTC (7am Egypt) daily, plus manual trigger via `workflow_dispatch`. Results upload to temporary public storage. The `LHCI_GITHUB_APP_TOKEN` secret is optional — if unset, reports still upload anonymously.

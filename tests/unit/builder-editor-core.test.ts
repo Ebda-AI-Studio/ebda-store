@@ -32,7 +32,7 @@ import {
 import { loadLayoutFixture } from '../fixtures/builder/homepage-data';
 
 const base = (): PageDefinition =>
-  layoutToDefinition(resolveLayoutSettings(loadLayoutFixture('pecannbee-flow'), 'modern'));
+  layoutToDefinition(resolveLayoutSettings(loadLayoutFixture('default-flow'), 'modern'));
 const ok = (d: PageDefinition) => expect(validateDefinitionSync(d).errors).toEqual([]);
 
 describe('document reducer', () => {

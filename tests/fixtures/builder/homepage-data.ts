@@ -14,7 +14,7 @@ export const FIXTURE_DIR = __dirname;
 export const LAYOUT_FIXTURES = [
   'default',
   'legacy-hero-only',
-  'pecannbee-flow',
+  'default-flow',
   'fully-customised',
   'carousels-off',
   'malformed',

@@ -12,6 +12,7 @@ import { config } from '../config';
 import { AppError } from '../middleware/error-handler';
 import { redis } from '../services/redis.service';
 
+import { JWT_ISSUERS_ACCEPTED, JWT_MFA_AUDIENCES_ACCEPTED } from '@ebda/shared';
 const router = Router();
 
 // TOTP codes are always 6 digits (see MfaService.verifyCode).
@@ -174,8 +175,8 @@ router.post('/verify', authLimiter, async (req, res, next) => {
     const { challengeToken, code } = parsed.data;
     let payload: any;
     try {
-      // Challenge tokens are signed with audience:'force-mfa-challenge' —
-      // distinct from real access tokens ('force-app') so jwt.verify here
+      // Challenge tokens are signed with audience:'ebda-mfa-challenge' —
+      // distinct from real access tokens ('ebda-app') so jwt.verify here
       // rejects any access token masquerading as a challenge, and the
       // authenticate middleware rejects any challenge token masquerading as
       // an access token.
@@ -185,8 +186,8 @@ router.post('/verify', authLimiter, async (req, res, next) => {
         // consistency gap rather than a live hole — but "the one call that
         // didn't pin it" is how algorithm-confusion bugs are always written.
         algorithms: ['HS256'],
-        issuer: 'force-api',
-        audience: 'force-mfa-challenge',
+        issuer: JWT_ISSUERS_ACCEPTED,
+        audience: JWT_MFA_AUDIENCES_ACCEPTED,
       });
     } catch {
       throw new AppError(401, 'MFA_CHALLENGE_INVALID', 'Challenge expired or invalid');

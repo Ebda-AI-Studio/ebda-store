@@ -94,7 +94,7 @@ export default function ElegantHeader({
             visually balanced between hamburger (left) + actions (right)
             regardless of asymmetric widths. Desktop falls back to the
             spacer pattern with normal flex flow. Ahmad 2026-05-16
-            'logo still small and not on the middle' — wadyaljuz uses
+            'logo still small and not on the middle' — demo-merchant uses
             this elegant template, my prior modern-only fixes didn't
             apply. */}
         <div className="relative flex items-center justify-between py-6 gap-6">
@@ -230,7 +230,7 @@ export default function ElegantHeader({
         </nav>
 
         {/* Mobile persistent search bar — always visible under the logo
-            row on mobile (pecannbee target). Hidden on md+ where the
+            row on mobile (demo-store target). Hidden on md+ where the
             expandable search toggle in the actions row handles it. */}
         <div className="hidden pb-4 -mt-2" data-zone="mobile-search">
           <form onSubmit={handleSearch} className="relative">

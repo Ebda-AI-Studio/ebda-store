@@ -25,6 +25,7 @@ vi.mock('next-intl', () => ({
 vi.mock('@ebda/shared', () => ({
   isIosWebkit: () => false,
   safeInternalPath: (raw: string | null, fallback: string) => raw ?? fallback,
+  sessionHintCookieClears: () => [],
 }));
 
 // jsdom's window.localStorage needs a real http(s) origin to enable —

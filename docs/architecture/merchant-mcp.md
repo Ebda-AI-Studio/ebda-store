@@ -127,7 +127,7 @@ Customers-page id IS their email or phone, so tools use an opaque
 `GUEST:<hmac>` for a guest — the same key its RFM snapshot is stored under,
 so an agent can correlate a customer with their segment without seeing the
 contact. The guest hash is an HMAC-SHA256 under a secret derived from the
-API's `ENCRYPTION_KEY` (issue 2242): a plain sha256 of an 8-digit Kuwait mobile
+API's `ENCRYPTION_KEY` (issue 2242): a plain sha256 of an 8-digit Egypt mobile
 could be brute-forced back to the number, defeating the masking below. `admin_get_customer` resolves a ref only against this store's rows;
 an unknown or foreign ref is a tool error. A guest checkout with no email and
 no phone is listed (ref `guest:<orderId>`) but has no profile — its one order
@@ -156,7 +156,7 @@ checkout does not capture a delivery slot. `admin_get_order` adds
 There is no settlement data to expose: no gateway-settlement model exists
 (only `affiliate_payouts` and per-order `payments`). A tool that presented
 `payments` as payouts would be inventing a concept; a real settlement tool
-needs a MyFatoorah/Tap settlement import first (Ruling MCP-R3).
+needs a gateway settlement import first (Ruling MCP-R3).
 
 `admin_get_analytics` returns `AnalyticsService.getDashboardStats` verbatim, so
 its semantics are the dashboard's (2026-09-30): customers are counted with the
@@ -210,7 +210,7 @@ like protection.
   "mcpServers": {
     "my-store": {
       "type": "http",
-      "url": "https://api.force-ai.co/api/v1/mcp/admin/<store-slug>",
+      "url": "https://api.ebda.app/api/v1/mcp/admin/<store-slug>",
       "headers": { "x-merchant-key": "fwbm_..." }
     }
   }

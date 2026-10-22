@@ -197,7 +197,7 @@ describe.skipIf(!hasDb)('store creation under the tenant guard + strict RLS (ebd
     const token = jwt.sign(
       { userId: admin.id, email: adminEmail, role: 'super_admin', tv: 0 },
       config.jwtSecret,
-      { expiresIn: '10m', issuer: 'force-api', audience: 'force-app' }
+      { expiresIn: '10m', issuer: 'ebda-api', audience: 'ebda-app' }
     );
     const ownerEmail = mkEmail('prov-owner');
     const slug = mkSlug('prov');

@@ -28,7 +28,13 @@ import {
   suggestManualPeriod,
 } from '../services/billing/account.service';
 import multer from 'multer';
-import { INSTAPAY_RECEIPT_MAX_BYTES, REGION, zonedLocalToUtc } from '@ebda/shared';
+import {
+  INSTAPAY_RECEIPT_MAX_BYTES,
+  JWT_AUDIENCE,
+  JWT_ISSUER,
+  REGION,
+  zonedLocalToUtc,
+} from '@ebda/shared';
 import { InstapayReceiptService } from '../services/payment-providers/instapay-receipt.service';
 import { config } from '../config';
 import logger from '../lib/logger';
@@ -2439,8 +2445,8 @@ router.post(
         {
           algorithm: 'HS256',
           expiresIn: '1h',
-          issuer: 'force-api',
-          audience: 'force-app',
+          issuer: JWT_ISSUER,
+          audience: JWT_AUDIENCE,
           subject: target.id,
           // Unique jti so this token can be individually revoked via the
           // JTI denylist (e.g. if the impersonation session must be ended early).

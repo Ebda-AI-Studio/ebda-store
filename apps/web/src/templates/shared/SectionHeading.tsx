@@ -121,7 +121,7 @@ export function SectionHeading({
   // The background is the section bg when provided, else the painted page colour (below).
   // A saved/explicit color is honoured ONLY when it actually reads against that
   // bg (contrast >= 2:1, see floor note below). If it doesn't — e.g. a
-  // stale white/light heading color on a white page (the wadyaljuz "قد يعجبك
+  // stale white/light heading color on a white page (the demo-merchant "قد يعجبك
   // أيضاً" white-on-white bug) — we override with pickReadableForeground so the
   // heading is never invisible. This keeps a deliberate light-on-dark pick
   // (white on a brand-colored section reads fine) while self-correcting the
@@ -178,7 +178,7 @@ export function SectionHeading({
   // Compute the flanking line style for each slot from the merchant's saved
   // DividerSettings. The line was hardcoded `bg-foreground/30` (Tailwind class)
   // which silently ignored merchant `customColor` / `color` / `thickness` picks
-  // — verified FWB 2026-05-20: Ahmad saved customColor=token:card for the
+  // — verified Ebda Store 2026-05-20: Ahmad saved customColor=token:card for the
   // categories subtitle divider but the storefront kept rendering the default
   // foreground hairline. Fix: resolve the merchant's pick via the canonical
   // resolveDividerColor helper and apply as inline backgroundColor + height.
@@ -240,7 +240,7 @@ export function SectionHeading({
   // me second-guessing the merchant — if they explicitly enable the
   // toggle, render the lines regardless of alignment. Merchant turns
   // OFF if they don't like the look with start/end-aligned text.
-  // Was suppressing subtitle lines on Wadyaljuz (Ahmad 2026-05-20).
+  // Was suppressing subtitle lines on demo-merchant (Ahmad 2026-05-20).
   const kickerShowLines = kickerLinesEnabled;
   const titleShowLines = titleLinesEnabled;
   const subtitleShowLines = subtitleLinesEnabled;

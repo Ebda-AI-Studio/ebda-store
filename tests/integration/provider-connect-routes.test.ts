@@ -62,7 +62,7 @@ const token = (userId: string) =>
   jwt.sign(
     { userId, email: `${userId}@example.test`, role: 'store_admin', tv: 0 },
     config.jwtSecret,
-    { expiresIn: '30m', issuer: 'force-api', audience: 'force-app' }
+    { expiresIn: '30m', issuer: 'ebda-api', audience: 'ebda-app' }
   );
 
 /** Long enough that the hint shows its last 4; distinctive so a leak is greppable. */

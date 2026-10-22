@@ -154,8 +154,8 @@ describe('refresh-token rotation', () => {
     // tv check would NOT reject it.
     const payload = jwt.verify(rotated.accessToken, config.jwtSecret, {
       algorithms: ['HS256'],
-      issuer: 'force-api',
-      audience: 'force-app',
+      issuer: 'ebda-api',
+      audience: 'ebda-app',
     }) as { userId: string; tv?: number; type?: string };
 
     expect(payload.userId).toBe(u.id);
@@ -183,8 +183,8 @@ describe('refresh-token rotation', () => {
     // The challenge token is scoped to a DISTINCT audience so it can never be
     // used as an access token (token-confusion guard).
     const decoded = jwt.verify(result.challengeToken!, config.jwtSecret, {
-      issuer: 'force-api',
-      audience: 'force-mfa-challenge',
+      issuer: 'ebda-api',
+      audience: 'ebda-mfa-challenge',
     }) as { purpose?: string };
     expect(decoded.purpose).toBe('mfa');
 

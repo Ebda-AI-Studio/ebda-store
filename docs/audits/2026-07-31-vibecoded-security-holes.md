@@ -1,8 +1,8 @@
-# FWB audit — "10 security holes in almost every vibecoded app"
+# Ebda Store audit — "10 security holes in almost every vibecoded app"
 
 **Date:** 2026-07-31
 **Lens source:** r/SaaS Instagram carousel, "Security holes I find in almost every vibecoded app" (10 items)
-**Target:** `force-website-builder` @ `7638f50b` (main)
+**Target:** `ebda-store` @ `7638f50b` (main)
 **Method:** static read of `apps/api` + `apps/web` route/middleware/service layers, live probe of the R2 bucket, empirical test of the serialization claim.
 
 ## Tally
@@ -50,7 +50,7 @@ $ node -e 'console.log(JSON.stringify({name:"a</script><img src=x onerror=alert(
 **Impact.** Two distinct paths:
 
 1. **Customer → every visitor of a product page.** Register, purchase, submit a review whose body carries the break-out. Requires the review to reach `status='published' + verifiedPurchase=true`, so a moderation step stands in the way — but moderators are reviewing _rendered text_, and the payload is invisible in a normal review UI.
-2. **Malicious merchant → cross-tenant, no moderation.** Platform-path stores share the origin `store.force-ai.co`. A merchant who sets a product name containing the payload executes script on that shared origin for anyone who visits their store — including staff/admins. This is the more serious path because it needs no approval from anyone.
+2. **Malicious merchant → cross-tenant, no moderation.** Platform-path stores share the origin `store.ebda.app`. A merchant who sets a product name containing the payload executes script on that shared origin for anyone who visits their store — including staff/admins. This is the more serious path because it needs no approval from anyone.
 
 **Fix.** New `apps/web/src/lib/json-ld-script.ts` exporting `jsonLdScriptContent()`, which escapes `<`, `>`, `&` and U+2028/U+2029 as `\uXXXX`. Those escapes are valid JSON and decode back to the original characters, so Google/Bing consumers are unaffected — verified by a round-trip test. All three emit sites now use it. Six regression tests in `apps/web/src/lib/__tests__/json-ld-script.test.ts`, one of which asserts the old behaviour was unsafe so the disproven claim cannot quietly return.
 
@@ -69,7 +69,7 @@ Guest order access (`GET /public/orders/:id`) uses possession of a v4 UUID as th
 ### 02 — RLS left open / public DB — VERIFIED LIVE 2026-08-01 (caveat resolved, and it matters)
 
 The original caveat ("could not verify the live policy state") is now settled. Connected read-only to
-the production Neon branch (`fwb-eu` / `crimson-king-40424588`, branch `main`) via `neonctl` and
+the production Neon branch (`ebda-eu` / `crimson-king-40424588`, branch `main`) via `neonctl` and
 queried the catalog directly. The earlier failure was a stale local `.env` pointing at
 `ap-southeast-1`; production is `eu-central-1`.
 
@@ -85,7 +85,7 @@ queried the catalog directly. The earlier failure was a stale local `.env` point
 | Policies with `USING (true)`          | 1 (`system_settings`, a global non-tenant table — correct) |
 
 **But RLS is INERT in production today, by tracked design.** Production connects as `neondb_owner`,
-which has `rolbypassrls = t`. Every tenant policy is written `TO force_app`, and `force_app` has
+which has `rolbypassrls = t`. Every tenant policy is written `TO the earlier app role`, and the earlier app role has
 `rolcanlogin = f` — it cannot connect at all. So none of the 94 policies apply to the live
 application connection.
 
@@ -93,10 +93,10 @@ This is **not** an undiscovered hole. `apps/api/src/index.ts` carries a boot gua
 `[SECURITY FATAL]` and `process.exit(1)` when the DB role has BYPASSRLS, deliberately escaped via
 `ALLOW_BYPASSRLS_ROLE=true` because the guard crash-looped production on 2026-06-27.
 `middleware/tenant-context.ts` states plainly that app-layer scoping is "the ONLY isolation mechanism
-until the force_app cutover". Lens 01 above independently verified that app-layer control is in fact
+until the the earlier app role cutover". Lens 01 above independently verified that app-layer control is in fact
 present on every route — which is what makes the current posture defensible rather than dangerous.
 
-**What actually blocks the Phase-3 cutover:** `force_app` already holds SELECT on all 103 tables, so
+**What actually blocks the Phase-3 cutover:** the earlier app role already holds SELECT on all 103 tables, so
 grants are done. The single blocker is that the role **cannot log in** — it needs LOGIN plus a
 password before `DATABASE_URL` can point at it.
 
@@ -123,7 +123,7 @@ WHERE n.nspname='public' AND c.relkind='r';
 
 -- is RLS actually in force for the app's role?
 SELECT rolname, rolcanlogin, rolbypassrls FROM pg_roles
-WHERE rolname IN ('neondb_owner','force_app');
+WHERE rolname IN ('neondb_owner','the earlier app role');
 ```
 
 The second query is the one that matters. Counting policies tells you what was _provisioned_; only
@@ -211,7 +211,7 @@ Registered as a reusable lens for the audit fleet so it reruns against the other
 
 ## Lens W follow-up (2026-08-01)
 
-The agentic-commerce lens (W) audit found FWB already strong — `llms.txt` serving live catalogue
+The agentic-commerce lens (W) audit found Ebda Store already strong — `llms.txt` serving live catalogue
 data, AI crawlers allowed in `robots.ts`, an MCP server, and Product JSON-LD carrying
 offers/availability/sku/aggregateRating/reviews. One gap: no `brand`, `shippingDetails` or
 `hasMerchantReturnPolicy`, despite `shippingZones`, `freeShippingThreshold` and `aboutJson` brand

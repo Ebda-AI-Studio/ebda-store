@@ -9,10 +9,10 @@ fixes: C1 (cardAspect enum), H13 (social whatsapp wipe), C6 (heroCtaLink XSS), P
 **Reviewer account:** store_admin login for Wady Aljuz (or any active test store)
 **Pre-conditions:**
 
-- Admin logged in at `app.forcemediakw.com/stores/<id>/`
+- Admin logged in at `store.ebda.app/stores/<id>/`
 - Store has at least one product + one category
 - Fresh browser session (clear localStorage before starting)
-- Preview tab open alongside: `wadyaljuz.com` (or preview domain)
+- Preview tab open alongside: `demo-merchant.com` (or preview domain)
 
 **Browser matrix:** Chrome latest · Safari latest · mobile Safari iOS 17+
 
@@ -57,7 +57,7 @@ fixes: C1 (cardAspect enum), H13 (social whatsapp wipe), C6 (heroCtaLink XSS), P
 1. Navigate to **Admin → Layout → Hero section** (or the hero slide editor)
 2. Set a slide CTA link to `javascript:alert(1)` → attempt to Save
 3. Verify: **save is rejected** — either a validation error shown in the UI, or a toast "Invalid URL"
-4. Set the CTA link to `https://wadyaljuz.com/products` → Save → verify accepted and shown on storefront
+4. Set the CTA link to `https://demo-merchant.com/products` → Save → verify accepted and shown on storefront
 5. Set the CTA link to `/products?sort=newest` (relative) → Save → verify accepted
 
 ---

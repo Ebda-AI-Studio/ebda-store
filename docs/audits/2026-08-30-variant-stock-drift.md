@@ -13,10 +13,10 @@ numbers survive the repair migration that erases the evidence.
 | Variant products carrying a non-zero parent (rows the migration resets) | 63        |
 | Non-variant products (parent IS their real stock — untouched)           | 285       |
 
-Worst case: `Dehydrated Super Vegetable` (pecannbee) — parent `-16`, variants
+Worst case: `Dehydrated Super Vegetable` (demo-store) — parent `-16`, variants
 holding `1173`.
 
-## Impact, per surface (pecannbee store)
+## Impact, per surface (demo-store store)
 
 | Surface                                    | Reported before                                | Actual            |
 | ------------------------------------------ | ---------------------------------------------- | ----------------- |

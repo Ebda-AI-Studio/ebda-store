@@ -13,7 +13,7 @@ nested in the body, or any rule they cannot parse (CSS custom properties,
 `color-mix()`, space-separated `hsl()`). An element sized only by a class then
 renders at its natural size.
 
-Incident, 2026-09-30: Pecannbee's invoice (ORD-TM67JC-2Q6XK) on the Gmail Android
+Incident, 2026-09-30: Storefront's invoice (ORD-TM67JC-2Q6XK) on the Gmail Android
 app showed a 1600px logo twice, a 1200×1600 product photo several screens tall
 and a loose "PAID" watermark. The emailed invoice was `generateInvoice()`, the
 printable web page (its own `<html>`, `<head>` and `<style>`), nested in the

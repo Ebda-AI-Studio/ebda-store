@@ -1264,7 +1264,7 @@ On `http://qamar-atelier.localhost:3100` (the real merchant path) shoot home, PL
 
 **Interfaces:**
 
-- Consumes: `resolveSectionProducts`, `toTemplateProduct`, `formatPrice` (whatever the shared card uses; grep `formatPrice\|formatMoney` in `templates/shared/PecannbeeProductCard.tsx` and use the same), `HeroSlide` type.
+- Consumes: `resolveSectionProducts`, `toTemplateProduct`, `formatPrice` (whatever the shared card uses; grep `formatPrice\|formatMoney` in `templates/shared/StorefrontProductCard.tsx` and use the same), `HeroSlide` type.
 - Produces:
 
   ```ts
@@ -2483,5 +2483,5 @@ Report VERIFIED / NOT VERIFIED (e.g. the 404 link only proven on one unknown hos
 ## Self-review (done while writing)
 
 - **Spec coverage:** scope 1 → Tasks 1–5, 7, 8, 10 (tokens, type pairs already in the registry and loaded by `lookFontsHref`; motion B1-7; signature sections; contrast Tasks 4/8; taste gates Tasks 6–8, 10; matrix + 390/820/1280 × ar/en Task 10; flip Task 10). Scope 2 → Task 6 (catalogue, every B0 feature asserted, idempotent seed under `scripts/`, assets + R2 decision B1-9, video B1-10). Scope 3 → Tasks 9 + 11 (bar, non-persisting, checkout refused server-side by `assertOrderAllowed` + coverage test, noindex, abuse limits, reset = seed, `--yes-production` + STOP 3). Scope 4 → Task 12 (after verification, B1-18). Scope 5 → docs in Tasks 1, 6, 9, 10, 11, 12; rulings B1-1..23. Scope 6 → Task 11 Step 5 and Task 12 Step 6, both halves.
-- **Program finish-line items not in B1 by design:** deleting the FWB skins (program "Then"), Dahab's three looks (TPL-2), Phase E editor — untouched.
+- **Program finish-line items not in B1 by design:** deleting the the old skins (program "Then"), Dahab's three looks (TPL-2), Phase E editor — untouched.
 - **Type consistency:** `LookSectionSpec`, `LookChrome`, `LOOK_DESIGN_KEYS`, `applyTemplateFamily(current, family, look?)`, `demoHomeDefinition`, `assertNotDemoStore`, `assetBase`, `buildQamarHome` are defined once and used with the same names in later tasks.

@@ -27,7 +27,7 @@ export function hasExplicitDividerPick(slot: Partial<DividerSettings> | undefine
  * to DEFAULT_DIVIDER_SETTINGS.color ('foreground'), and resolveDividerColor then
  * IGNORES customColor (it only reads it in the `color: 'custom'` branch) — so the
  * merchant's pick silently rendered as the grey foreground hairline. Verified
- * live FWB 2026-06-04: categories title divider saved as
+ * live Ebda Store 2026-06-04: categories title divider saved as
  * `{ enabled: true, customColor: 'token:card' }` rendered foreground/0.30.
  * Normalising customColor → custom here fixes it for every consumer without a
  * re-save and without resurrecting a stale customColor (a slot that has no
@@ -141,7 +141,7 @@ export function SectionDivider({ settings, hideForExplicitBg }: SectionDividerPr
   // toggle — honor that intent regardless of any auto-suppression rules that
   // applied to the legacy platform-wide divider. Verified 2026-05-20 when
   // Ahmad reported "Section dividers are not rendering in storefront while
-  // it's on in admin for wadyaljuz" — wadyaljuz's `theme.backgroundPreset`
+  // it's on in admin for demo-merchant" — demo-merchant's `theme.backgroundPreset`
   // was non-'none' which was suppressing every between-section divider via
   // the mutex below.
   const isExplicitOverride = settings !== undefined && settings.enabled === true;
@@ -161,11 +161,11 @@ export function SectionDivider({ settings, hideForExplicitBg }: SectionDividerPr
   // flanking section has an explicit bgColor, the color shift already acts as
   // the separator — and a between-section hairline draws its vertical padding
   // band on the PAGE background, which appears as a jarring white stripe
-  // between two brand-colored sections (pecannbee, 2026-06-19: brand-story
+  // between two brand-colored sections (demo-store, 2026-06-19: brand-story
   // disabled → an explicitly-enabled trust-strip divider rendered a white band
   // between the brown best-sellers and brown trust-strip). This mutex applies
   // even to an explicit per-section divider override — the explicit override
-  // still wins over the backgroundPreset mutex above (the wadyaljuz case, which
+  // still wins over the backgroundPreset mutex above (the demo-merchant case, which
   // has no per-section bgColor), but a flanking explicit bgColor always
   // suppresses the band. Intra-section dividers (no hideForExplicitBg) are
   // unaffected.
@@ -230,7 +230,7 @@ export function resolveDividerColor(
       //   border etc.), fall back to the global CSS variable which exists
       //   in globals.css for every shadcn token. Returning the literal
       //   "token:card" string would be silently dropped by the browser
-      //   — verified FWB 2026-05-20.
+      //   — verified Ebda Store 2026-05-20.
       if (settings.customColor) {
         const v = settings.customColor;
         if (v.startsWith('token:')) {

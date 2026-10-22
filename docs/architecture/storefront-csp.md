@@ -15,7 +15,7 @@ rests entirely on output-escaping being correct, with no CSP backstop.
 
 ## Why it cannot simply be removed
 
-Measured on a live storefront page (`pecannbee.com.kw`, 2026-09-02):
+Measured on a live storefront page (`demo-store.example`, 2026-09-02):
 
 ```
 74 <script> tags total

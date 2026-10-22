@@ -33,6 +33,7 @@ import { getAuthUser } from '../utils/store-helpers';
 import { sendAlert } from '../services/alerts.service';
 import logger from '../lib/logger';
 
+import { storeIdFields } from '../lib/wbs-wire';
 const router = Router({ mergeParams: true });
 
 // ─── Validation ──────────────────────────────────────────────────────────────
@@ -629,7 +630,7 @@ router.put(
                   'Content-Type': 'application/json',
                   'x-wbs-api-key': input.wbsApiKey,
                 },
-                body: JSON.stringify({ fwbStoreId: storeId, definitions }),
+                body: JSON.stringify({ ...storeIdFields(storeId), definitions }),
                 signal: AbortSignal.timeout(30_000),
               }
             );
@@ -751,8 +752,8 @@ router.post(
           error: {
             code: 'PROVISIONER_NOT_CONFIGURED',
             message:
-              'Meta auto-provisioning is not configured. Set FORCE_AI_META_BM_ID + ' +
-              'FORCE_AI_META_ADMIN_TOKEN on Railway (one-time Ebda AI Studio setup).',
+              'Meta auto-provisioning is not configured. Set EBDA_META_BM_ID + ' +
+              'EBDA_META_ADMIN_TOKEN on the API worker (one-time Ebda AI Studio setup).',
           },
         });
         return;

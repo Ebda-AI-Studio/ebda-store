@@ -23,7 +23,7 @@ Every decision that overrode this plan, rejected a review finding or accepted a 
 
 - Arabic-first. Every storefront string goes through `t(en, ar)` / `LanguageContext.tsx`. Every merchant-entered field has an `Ar` twin. When the active locale's value is empty, fall back to the other language, never to blank.
 - Platform-level only. Never branch on a store slug or id. Product-card changes land on **every card render path**:
-  - `templates/shared/PecannbeeProductCard.tsx`
+  - `templates/shared/StorefrontProductCard.tsx`
   - `templates/{modern,elegant,classic,minimal,bold}/ProductCard.tsx`
   - `templates/shared/ProductCarousel.tsx`
   - `ProductListItem`
@@ -82,7 +82,7 @@ Reference: Instagram reel `DeeZGosSon1`, "Taste". When anyone can build anything
 
 **3. The taste gate, run at the end of every UI task** (Tasks 2, 3, 4, 5, 6, 8, 9 and 10). It sits between "tests pass" and "commit":
 
-- Screenshot the changed surface at 390×844 Arabic and 1280×800 English, on two skins: `minimal` (the default FWB path) and `dahab`. Where a demo store can preview looks, also screenshot with `?look=qamar.atelier`. Save them under the task's report directory.
+- Screenshot the changed surface at 390×844 Arabic and 1280×800 English, on two skins: `minimal` (the default Ebda Store path) and `dahab`. Where a demo store can preview looks, also screenshot with `?look=qamar.atelier`. Save them under the task's report directory.
 - Run the `impeccable` skill's `critique` on that surface. Fix every P0/P1, and record any P2 you leave as a Ruling with cost-if-wrong.
 - Compare the result against the research references (`docs/ebda/templates/research/qamar.md`). The bar is the **restraint of Mamzi and Everlane**, with **Egyptian-shopper clarity** (COD and delivery always visible). The anti-bar is Alamal's clutter.
 - Write a three-line taste note in the task report: what was left out, what moves and why, and what it feels like on open.

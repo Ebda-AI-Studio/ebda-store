@@ -177,7 +177,7 @@ describe('legacy corner (theme.saleBadgeLegacyCorner) — byte-identical to befo
 describe('every corner-chip render path derives the placement from the per-store flag', () => {
   const ROOT = resolve(__dirname, '../..');
   const PATHS = [
-    'apps/web/src/templates/shared/PecannbeeProductCard.tsx',
+    'apps/web/src/templates/shared/StorefrontProductCard.tsx',
     'apps/web/src/templates/modern/ProductCard.tsx',
     'apps/web/src/templates/elegant/ProductCard.tsx',
     'apps/web/src/templates/classic/ProductCard.tsx',

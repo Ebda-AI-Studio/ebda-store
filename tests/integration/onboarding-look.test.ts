@@ -74,8 +74,8 @@ async function merchant(tag: string) {
   userIds.push(user.id);
   const token = jwt.sign({ userId: user.id, email, role: 'store_admin', tv: 0 }, config.jwtSecret, {
     expiresIn: '10m',
-    issuer: 'force-api',
-    audience: 'force-app',
+    issuer: 'ebda-api',
+    audience: 'ebda-app',
   });
   return { userId: user.id, token };
 }

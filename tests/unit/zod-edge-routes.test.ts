@@ -117,9 +117,9 @@ describe('alert-webhooks — wrongly-typed provider payloads degrade, never 500'
   it('/sentry: valid payload keeps its title', async () => {
     await request(a)
       .post('/hooks/sentry')
-      .send({ data: { issue: { title: 'Boom', level: 'error', project: { slug: 'force-api' } } } });
+      .send({ data: { issue: { title: 'Boom', level: 'error', project: { slug: 'ebda-api' } } } });
     expect(m.sendAlert).toHaveBeenCalledWith(
-      expect.objectContaining({ title: 'sentry: Boom', level: 'p1', source: 'sentry.force-api' })
+      expect.objectContaining({ title: 'sentry: Boom', level: 'p1', source: 'sentry.ebda-api' })
     );
   });
   it('/axiom, /posthog, /railway: wrong-typed fields do not 500', async () => {

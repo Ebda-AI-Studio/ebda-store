@@ -15,7 +15,7 @@ import { lookCtaVisible, QUIET_CARD_CTA_CLS } from './look-card';
 /**
  * Shared platform-level CTA used by EVERY theme's ProductCard.
  * Picks between two button shapes per the 2026-05-16 mobile-ui-ship plan
- * (first shipped only on PecannbeeProductCard in 65de277; Ahmad's standing
+ * (first shipped only on StorefrontProductCard in 65de277; Ahmad's standing
  * rule 'platform-level fixes go on ALL templates' moved it here so every
  * theme inherits).
  *
@@ -110,13 +110,13 @@ interface AdaptiveAddButtonProps {
   onClick?: (e: React.MouseEvent) => void;
   disabled?: boolean;
   loading?: boolean;
-  /** Show the cart icon beside the label (Pecannbee card); the carousel is text-only. */
+  /** Show the cart icon beside the label (Storefront card); the carousel is text-only. */
   showIcon?: boolean;
   dataZone?: string;
 }
 
 /**
- * The raw add-to-cart `<button>` of the Pecannbee card and the shared carousel
+ * The raw add-to-cart `<button>` of the Storefront card and the shared carousel
  * (they do not go through ProductCardCta). Same fit rule as ProductCardCta:
  * when the label would ellipsize in this box, show the cart icon alone with
  * the label as its accessible name.
@@ -319,7 +319,7 @@ export function ProductCardCta({
 
 /**
  * Shared "Out Of Stock" red ribbon for the top-start corner of a
- * ProductCard's image container. Visual match to pecannbee IMG_7988 /
+ * ProductCard's image container. Visual match to demo-store IMG_7988 /
  * IMG_7995. Mounts only when stock=0. RTL-aware via `start-3`.
  *
  * Task 3 B4: when any oosLabel* field is set render a configurable badge
@@ -355,7 +355,7 @@ interface OutOfStockRibbonProps {
 
 /**
  * Sprint 2 (2026-05-17): upgraded from a small absolute pill to a true
- * diagonal corner RIBBON — the Pecannbee IMG_7995 / IMG_7996 pattern
+ * diagonal corner RIBBON — the Storefront IMG_7995 / IMG_7996 pattern
  * the references all use. Sits across the start-top corner at -45°
  * (RTL flips the rotation), terracotta `--danger` color from the
  * Sprint 1 DESIGN.md. Eye catches it instantly vs the previous pill
@@ -423,7 +423,7 @@ export function OutOfStockRibbon({
     // EVERY top placement via a symmetric max-width, which only actually
     // clears the heart when the merchant explicitly chose top-end: the
     // default (unset → top-start) is the SAME corner a heart at top-start
-    // (PecannbeeProductCard) or a compare button occupies, and a max-width
+    // (StorefrontProductCard) or a compare button occupies, and a max-width
     // with no matching inset just narrows the pill in place — it still
     // starts under the heart. Fixed the same way `custom-badge.ts` fixes
     // the sale/custom chips: resolve the NAMED placement, then move it off
@@ -455,7 +455,7 @@ export function OutOfStockRibbon({
         ? resolveColor(oosLabelTextColor, theme)
         : 'hsl(var(--foreground))';
 
-    // Width safety net (2026-07-10, pecannbee live bug, narrowed scope
+    // Width safety net (2026-07-10, demo-store live bug, narrowed scope
     // 2026-09-25 per issue #548): even after the corner-avoidance above, an
     // unusually long merchant string on a compact card (110-200px wide)
     // could still stretch far enough to brush the card's OTHER top corner.

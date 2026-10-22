@@ -89,7 +89,7 @@ describe('Bosta on the wire', () => {
   });
 });
 
-describe('Aramex COD is EGP or refused, never KWD', () => {
+describe('Aramex COD is EGP or refused, never a 3-decimal amount', () => {
   const mk = () => {
     const stub = new AramexStub();
     const carrier = new AramexCarrier({
@@ -100,7 +100,7 @@ describe('Aramex COD is EGP or refused, never KWD', () => {
     return { stub, carrier };
   };
 
-  it('sends the COD in EGP (not amount/1000 in KWD) once the merchant confirmed COD in EGP', async () => {
+  it('sends the COD in EGP (not amount/1000) once the merchant confirmed COD in EGP', async () => {
     const { stub, carrier } = mk();
     const r = await carrier.createShipment(
       ARAMEX_STUB.credentials,
@@ -109,7 +109,7 @@ describe('Aramex COD is EGP or refused, never KWD', () => {
     );
     const p = stub.parcels.get(r.trackingNumber)!;
     expect(p.codCurrency).toBe('EGP');
-    expect(p.codValue).toBe(123.45); // the old code sent 12.345 KWD
+    expect(p.codValue).toBe(123.45); // the old code sent 12.345 (amount/1000)
   });
 
   it('refuses COD until it is confirmed, with a message saying what to do', async () => {

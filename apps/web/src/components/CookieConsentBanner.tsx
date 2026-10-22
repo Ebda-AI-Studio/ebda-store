@@ -17,7 +17,7 @@ import { useStoreUrl } from '../contexts/StoreContext';
  *
  * Regulatory context: required by GDPR Art. 6(a), ePrivacy Directive,
  * and applicable GCC data-protection law (see
- * docs/legal/gcc-data-protection.md). The "Reject"
+ * docs/privacy/data-map.md). The "Reject"
  * option must be as prominent and easy to click as "Accept" — that's
  * why both are primary-style buttons, not "Accept" prominent + "Reject"
  * buried in a sub-menu (a pattern regulators have specifically flagged

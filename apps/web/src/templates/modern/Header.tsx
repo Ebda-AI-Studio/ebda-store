@@ -66,13 +66,13 @@ export default function ModernHeader({
         style={headerBgColor ? { backgroundColor: headerBgColor } : undefined}
       >
         <div className="container mx-auto px-4">
-          {/* Row 1: hamburger | logo | actions — pecannbee mobile layout.
+          {/* Row 1: hamburger | logo | actions — demo-store mobile layout.
               h-20 mobile keeps the row compact so it doesn't dominate
               the viewport; desktop stays h-28 for the bigger nav row.
               Logo recentered with a more permissive max-w cap below. */}
           <div className="relative flex h-32 overflow-hidden items-center justify-between gap-2 md:h-44">
             {/* Mobile-only hamburger (LEFT slot). Extracted from the actions
-                block so the layout matches the pecannbee + alkahraman target:
+                block so the layout matches the demo-store + alkahraman target:
                 hamburger left, logo center, actions right. */}
             <button
               type="button"
@@ -97,7 +97,7 @@ export default function ModernHeader({
               </svg>
             </button>
 
-            {/* Logo — centered on mobile (per pecannbee + alkahraman target),
+            {/* Logo — centered on mobile (per demo-store + alkahraman target),
                 normal flex item on tablet+. Bumped to h-24 mobile per Ahmad's
                 follow-up ('still not bigger'). max-w-[60%] keeps a wide
                 wordmark from overlapping the hamburger/actions at very
@@ -138,7 +138,7 @@ export default function ModernHeader({
             {/* Actions */}
             <div className="flex items-center gap-1">
               {/* Search Button — desktop-only. On mobile the search bar is
-                  always visible as its own row below this one (pecannbee
+                  always visible as its own row below this one (demo-store
                   target layout), so the toggle button there would be
                   redundant. */}
               <button
@@ -230,12 +230,12 @@ export default function ModernHeader({
             </div>
           </div>
 
-          {/* Mobile Row 2: persistent search bar under the logo row (pecannbee
+          {/* Mobile Row 2: persistent search bar under the logo row (demo-store
               target layout). Always visible on mobile, hidden on md+ where
               the expandable search-toggle handles it instead.
 
               Inline magnifying-glass icon on the start side mirrors the
-              pecannbee pill shape — single icon-in-input, no separate
+              demo-store pill shape — single icon-in-input, no separate
               submit button on mobile (form still submits on Enter). */}
           <div className="hidden pb-3 border-t border-border/40 pt-3" data-zone="mobile-search">
             <form onSubmit={handleSearch} className="relative">

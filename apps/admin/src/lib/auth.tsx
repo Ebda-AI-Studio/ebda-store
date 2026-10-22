@@ -21,7 +21,12 @@ import {
   markSessionEvidence,
   clearStoredSession,
 } from './api';
-import { isIosWebkit, safeInternalPath } from '@ebda/shared';
+import {
+  isIosWebkit,
+  safeInternalPath,
+  sessionHintCookieClears,
+  sessionHintCookieSet,
+} from '@ebda/shared';
 import { useT } from '@/i18n/useT';
 import { FOCUS_MODE_STORAGE_KEY } from '@/lib/focus-mode-key';
 import { passkeyAssertion, type PasskeyMode } from './passkeys';
@@ -243,7 +248,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // days is the "looks signed in" hint window — the real session lasts as
     // long as the refresh token (the access token is short-lived and silently
     // rotates), so this is just a UX hint, not the auth source of truth.
-    document.cookie = 'force-session=1; path=/; max-age=' + 30 * 24 * 60 * 60 + '; SameSite=Lax';
+    document.cookie = sessionHintCookieSet(30 * 24 * 60 * 60);
     setUser(data.user);
   }
 
@@ -357,7 +362,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // from localStorage on mount with no per-user validation.
     localStorage.removeItem(FOCUS_MODE_STORAGE_KEY);
     // Clear session indicator cookie
-    document.cookie = 'force-session=; path=/; max-age=0';
+    for (const c of sessionHintCookieClears()) document.cookie = c;
     setUser(null);
     router.push('/login');
   }

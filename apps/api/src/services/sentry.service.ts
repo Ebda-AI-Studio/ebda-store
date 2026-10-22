@@ -80,12 +80,12 @@ export class SentryService {
       // answers with a 4xx (ZodError → 400, Prisma P2002 → 409, …) are
       // classified by the same function that handler uses — without it every
       // `schema.parse(req.body)` failure reached Sentry as a crash
-      // (FORCE-API-2C/1B/25/27).
+      // (EBDA-API-2C/1B/25/27).
       const ownStatus = err.statusCode ?? err.status;
       // Issue 1988 (Ruling BS-5) + issue 2005 (Ruling CL-5): a Prisma
       // P2002/P2003/P2025 is ANSWERED like a client error but is raised by our
       // own query, and the class this repo has actually shipped was a server
-      // defect (FORCE-API-28's P2003, a double-posted ledger row's P2002). They
+      // defect (EBDA-API-28's P2003, a double-posted ledger row's P2002). They
       // are captured at WARNING level — trackable, able to reopen an issue,
       // without paging like a crash. Only genuinely expected client errors are
       // skipped: Zod / body-parser input errors, AppError 4xx, a P2002 on a
@@ -142,7 +142,7 @@ export class SentryService {
     }
 
     // SECURITY: drop email from Sentry user context (GDPR / applicable GCC
-    // data-protection law, see docs/legal/gcc-data-protection.md —
+    // data-protection law, see docs/privacy/data-map.md —
     // customer email shouldn't reach a US SaaS without explicit consent for
     // error-tracking). 2026-05-22 audit P2.
     return Sentry.captureException(error, {

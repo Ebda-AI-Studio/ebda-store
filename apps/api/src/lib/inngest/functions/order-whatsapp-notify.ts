@@ -243,8 +243,8 @@ export async function handleOrderWhatsAppNotify(
         variables,
         idempotencyKey,
         // Phase 6 final-loop: pass the order id so WBS can stamp
-        // wa_carts.fwb_order_id when auto-completing the cart on this send.
-        fwbOrderId: orderId,
+        // its cart order-id column when auto-completing the cart on this send.
+        ebdaOrderId: orderId,
       });
     } catch (err) {
       if (err instanceof WbsUnauthorizedError) {

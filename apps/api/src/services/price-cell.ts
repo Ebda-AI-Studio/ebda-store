@@ -6,7 +6,7 @@ import { tryToMinor } from '@ebda/shared';
  * `1,250.50`, `٢٥٠٫٥٠` — and are converted to integer piastres with the shared
  * `tryToMinor`; there is no second conversion anywhere in the import pipeline.
  *
- * Three-decimal values are rejected outright: `12.500` is a Kuwaiti-dinar
+ * Three-decimal values are rejected outright: `12.500` is a three-decimal-dinar
  * habit, and in Egypt a cell like that may be a thousands separator
  * ("twelve thousand five hundred"). Guessing either way silently misprices a
  * live product, so the row fails and the merchant retypes it.

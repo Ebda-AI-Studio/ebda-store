@@ -31,6 +31,9 @@ import { sendMerchantPasswordResetEmail, sendMerchantVerificationEmail } from '.
 import { accountLockout } from './account-lockout.service';
 import {
   BRAND_STORE_APP_URL,
+  JWT_AUDIENCE,
+  JWT_ISSUER,
+  JWT_MFA_AUDIENCE,
   PASSWORD_RESET_TTL_MINUTES,
   registrationEventId as registrationEventIdFor,
 } from '@ebda/shared';
@@ -823,12 +826,12 @@ export class AuthService {
       const challengeToken = jwt.sign({ userId: user.id, purpose: 'mfa' }, config.jwtSecret, {
         algorithm: 'HS256',
         expiresIn: '5m',
-        issuer: 'force-api',
+        issuer: JWT_ISSUER,
         // Distinct audience so this token is NEVER accepted by the authenticate
-        // middleware (which requires audience:'force-app'). Belt-and-suspenders
+        // middleware (which requires audience:'ebda-app'). Belt-and-suspenders
         // against token-confusion attacks where the challenge is used as a
         // real access token before the second factor is verified.
-        audience: 'force-mfa-challenge',
+        audience: JWT_MFA_AUDIENCE,
         // Unique id — lets /auth/mfa/verify key a per-challenge Redis counter
         // so failed attempts are isolated per login attempt, not per IP.
         jwtid: crypto.randomUUID(),
@@ -1562,7 +1565,7 @@ export class AuthService {
     // token rotation even before the access token's tv is checked.
     //
     // The caller names the reason. `revokedReason` is the only forensic record
-    // of WHY a session died — docs/audits/2026-05-28-auth-access-audit.md
+    // of WHY a session died
     // reads `password_reset` off these rows to tell a redeemed reset from a
     // sign-out — so folding a password change or reset into a generic
     // `revoke_all` would buy correct ordering at the cost of the audit trail.
@@ -1812,7 +1815,7 @@ export class AuthService {
 
   /**
    * Irreversible PII anonymization (GDPR Art. 17 and applicable GCC
-   * data-protection law — see docs/legal/gcc-data-protection.md).
+   * data-protection law — see docs/privacy/data-map.md).
    *
    * Wipes every personally-identifying field on the user and removes child
    * rows that have no audit/financial basis (addresses, push subs, cart,
@@ -2295,7 +2298,7 @@ export class AuthService {
     }
 
     // Third-party deletion propagation (GDPR Art. 17 and applicable GCC
-    // data-protection law — see docs/legal/gcc-data-protection.md):
+    // data-protection law — see docs/privacy/data-map.md):
     // OneSignal + PostHog. Fire-and-forget, same discipline as the
     // R2 cleanup above — a dead Inngest connection must never surface as a
     // failed erase. See lib/inngest/functions/account-erased-propagation.ts +
@@ -2318,7 +2321,7 @@ export class AuthService {
 
   /**
    * Right to data portability (GDPR Art. 20 and applicable GCC
-   * data-protection law — see docs/legal/gcc-data-protection.md).
+   * data-protection law — see docs/privacy/data-map.md).
    *
    * Returns every row across the schema that ties back to this user as a
    * single JSON bundle. Intentionally returns the raw shape — the
@@ -2525,8 +2528,8 @@ export class AuthService {
       algorithm: 'HS256',
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       expiresIn: config.jwtExpiresIn as any,
-      issuer: 'force-api',
-      audience: 'force-app',
+      issuer: JWT_ISSUER,
+      audience: JWT_AUDIENCE,
       subject: payload.userId,
       jwtid: accessJti,
     });
@@ -2540,8 +2543,8 @@ export class AuthService {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       expiresIn: config.refreshTokenExpiresIn as any,
       algorithm: 'HS256',
-      issuer: 'force-api',
-      audience: 'force-app',
+      issuer: JWT_ISSUER,
+      audience: JWT_AUDIENCE,
       subject: payload.userId,
       // Unique token id. Without it, two refresh tokens minted for the same
       // user in the same second (login immediately followed by a refresh, or a

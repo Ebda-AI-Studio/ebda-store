@@ -11,9 +11,9 @@ import { sectionBgStyle } from './section-bg';
 
 /**
  * Sprint 3 (2026-05-17): 3-up trust badge strip rendered on the homepage
- * above the footer. Observed in all 3 OSOSS references (Pecannbee 2x2
+ * above the footer. Observed in all 3 OSOSS references (Storefront 2x2
  * grid / SMEJ 3-up icons / Bank Alkahraman implied via empty space).
- * FWB had no equivalent before this — addresses the "no trust signal"
+ * Ebda Store had no equivalent before this — addresses the "no trust signal"
  * gap surfaced in the 2026-05-17 UI catalog.
  *
  * Platform default content: Fast Delivery / Quality Guarantee / 24/7

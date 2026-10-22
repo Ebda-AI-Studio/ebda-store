@@ -34,7 +34,7 @@ export function computeOrderTax(
   // Convert to whole basis points (1400) and do the arithmetic in integers:
   // `base * 0.14` in floating point can land on x.4999999 for a true half
   // piastre. Rounding rule (documented in region/index.ts): HALF UP to the
-  // piastre — what FWB's `Math.round` already did.
+  // piastre — what Ebda Store's `Math.round` already did.
   return vatOnDiscounted(
     subtotal,
     discount,

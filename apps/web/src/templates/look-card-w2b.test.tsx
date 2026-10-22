@@ -80,7 +80,7 @@ vi.mock('next/link', () => ({
 }));
 
 const adapters = await import('./adapters');
-const { PecannbeeProductCard } = await import('./shared/PecannbeeProductCard');
+const { StorefrontProductCard } = await import('./shared/StorefrontProductCard');
 const { default: MinimalProductCard } = await import('./minimal/ProductCard');
 const SKIN_CARDS = {
   modern: (await import('./modern/ProductCard')).default,
@@ -126,10 +126,10 @@ function selectLook(look: string | null) {
 
 const PATHS: Array<[string, (k: Kind) => React.ReactElement]> = [
   [
-    'PecannbeeProductCard',
+    'StorefrontProductCard',
     k =>
       React.createElement(
-        PecannbeeProductCard as never,
+        StorefrontProductCard as never,
         {
           product: product(k),
           isRtl: true,
@@ -281,11 +281,11 @@ describe.each(PATHS)('%s', (name, path) => {
   });
 });
 
-describe('PecannbeeProductCard material (L-12, LB-02, M-03, K-01)', () => {
+describe('StorefrontProductCard material (L-12, LB-02, M-03, K-01)', () => {
   const card = (k: Kind) =>
     render(
       React.createElement(
-        PecannbeeProductCard as never,
+        StorefrontProductCard as never,
         {
           product: product(k),
           isRtl: true,
@@ -373,7 +373,7 @@ describe('contrast on every look', () => {
 // same corner as this card's wishlist heart, on every store. It now takes its corner from the
 // card's allocator: top-start is the heart's, so top-end, or bottom-start when the sale chip
 // holds top-end.
-describe('PecannbeeProductCard NEW chip never shares the heart corner', () => {
+describe('StorefrontProductCard NEW chip never shares the heart corner', () => {
   const newOne = (sale: boolean) =>
     ({ ...product(sale ? 'sale' : 'plain'), isNew: true }) as ReturnType<typeof product>;
   const chipOf = (c: HTMLElement) => c.querySelector('[data-badge="new"]') as HTMLElement;
@@ -382,7 +382,7 @@ describe('PecannbeeProductCard NEW chip never shares the heart corner', () => {
     for (const sale of [false, true]) {
       const { container } = render(
         React.createElement(
-          PecannbeeProductCard as never,
+          StorefrontProductCard as never,
           {
             product: newOne(sale),
             isRtl: true,
@@ -427,12 +427,12 @@ describe('minimal/ProductCard chips (the Qamar search grid) follow cardBadge', (
 
 // R-12 (W3): the card's photo link is its one tab stop to the product page; the name repeats it
 // for the pointer only, and a visible "View" names the product it opens.
-describe('PecannbeeProductCard keyboard stops (R-12)', () => {
+describe('StorefrontProductCard keyboard stops (R-12)', () => {
   it.each([null, 'qamar.atelier'])('%s', look => {
     selectLook(look);
     const c = render(
       React.createElement(
-        PecannbeeProductCard as never,
+        StorefrontProductCard as never,
         {
           product: product('sized'),
           isRtl: true,
@@ -474,11 +474,11 @@ describe('relatedHeadingSize', () => {
 // 45px in from the section heading and out of line with the carousels on the same page. On a look
 // store (photo-led, the look owns the ratio) the card fills its grid column, so the first card
 // starts at the heading's edge. A store with no look keeps the compact cap.
-describe('PecannbeeProductCard fills its column on a look store (IA-05)', () => {
+describe('StorefrontProductCard fills its column on a look store (IA-05)', () => {
   const article = () =>
     render(
       React.createElement(
-        PecannbeeProductCard as never,
+        StorefrontProductCard as never,
         {
           product: product('plain'),
           isRtl: true,
@@ -617,7 +617,7 @@ describe('one radius per look (LB-c)', () => {
     '%s: card image and heart use var(--radius); no pill, no disc',
     look => {
       selectLook(look);
-      for (const C of [PecannbeeProductCard, MinimalProductCard]) {
+      for (const C of [StorefrontProductCard, MinimalProductCard]) {
         const c = card(C);
         const img = c.querySelector('img')!.closest('div')!;
         expect(img.className).toContain('rounded-[var(--radius)]');
@@ -629,7 +629,7 @@ describe('one radius per look (LB-c)', () => {
   );
   it('no look: the card image keeps the skin shape', () => {
     selectLook(null);
-    const img = card(PecannbeeProductCard).querySelector('img')!.closest('div')!;
+    const img = card(StorefrontProductCard).querySelector('img')!.closest('div')!;
     expect(img.className).not.toContain('rounded-[var(--radius)]');
   });
 });
@@ -640,7 +640,7 @@ describe('one radius per look (LB-c)', () => {
 describe('the NEW chip is neutral on a look store (VT-b)', () => {
   it.each(['qamar.atelier', 'qamar.lookbook', 'qamar.vitrine'])('%s', look => {
     selectLook(look);
-    for (const C of [PecannbeeProductCard, MinimalProductCard]) {
+    for (const C of [StorefrontProductCard, MinimalProductCard]) {
       const c = render(
         React.createElement(
           C as never,
@@ -669,7 +669,7 @@ describe('the card name link is a 44px pointer target (P2-N4)', () => {
     selectLook('qamar.atelier');
     const c = render(
       React.createElement(
-        PecannbeeProductCard as never,
+        StorefrontProductCard as never,
         { product: product('plain'), isRtl: true, pack: state.template } as never
       )
     ).container;

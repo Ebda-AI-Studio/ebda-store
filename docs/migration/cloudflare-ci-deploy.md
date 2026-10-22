@@ -36,13 +36,13 @@ must be exactly `true` or `false`; `scripts/assert-cf-cache-bindings.sh` fails t
 web deploy (and CI's `cf-build-check`) on an unset or mistyped value, which used to
 deploy the empty-cache config — a no-op `revalidateTag` — behind a green tick.
 
-| App                        | Worker serves                                                                                       |
-| -------------------------- | --------------------------------------------------------------------------------------------------- |
-| **web** (`apps/web`)       | `store.force-ai.co` + every merchant Custom Hostname (wadyaljuz.com, …) via the SaaS `*/*` fallback |
-| **admin** (`apps/admin`)   | `admin.force-ai.co` — Vercel `app.forcemediakw.com` stays live until a deliberate DNS cutover       |
-| **orders** (`apps/orders`) | `orders.force-ai.co` — Vercel `orders.forcemediakw.com` stays live until cutover                    |
+| App                        | Worker serves                                                                                        |
+| -------------------------- | ---------------------------------------------------------------------------------------------------- |
+| **web** (`apps/web`)       | `store.ebda.app` + every merchant Custom Hostname (demo-merchant.com, …) via the SaaS `*/*` fallback |
+| **admin** (`apps/admin`)   | `store.ebda.app` — Vercel `store.ebda.app` stays live until a deliberate DNS cutover                 |
+| **orders** (`apps/orders`) | `orders.ebda.app` — Vercel `orders.ebda.app` stays live until cutover                                |
 
-The `custom_domain` routes create the `admin.`/`orders.force-ai.co` DNS records +
+The `custom_domain` routes create the `admin.`/`orders.ebda.app` DNS records +
 edge certs automatically on first deploy (needs the token's Zone DNS+SSL perms).
 
 It runs on **GitHub-hosted runners (`ubuntu-latest`)** under the current policy
@@ -59,13 +59,13 @@ and a dispatch with `force_cloud: true` forces `ubuntu-latest` for one run.
 
 Cloudflare dashboard → **My Profile → API Tokens → Create Token → Create Custom Token**.
 
-| Permission                             | Scope            |
-| -------------------------------------- | ---------------- |
-| Account › **Workers Scripts** › Edit   | Force AI account |
-| Account › **Account Settings** › Read  | Force AI account |
-| Zone › **Workers Routes** › Edit       | `force-ai.co`    |
-| Zone › **DNS** › Edit                  | `force-ai.co`    |
-| Zone › **SSL and Certificates** › Edit | `force-ai.co`    |
+| Permission                             | Scope                  |
+| -------------------------------------- | ---------------------- |
+| Account › **Workers Scripts** › Edit   | Ebda AI Studio account |
+| Account › **Account Settings** › Read  | Ebda AI Studio account |
+| Zone › **Workers Routes** › Edit       | `ebda.app`             |
+| Zone › **DNS** › Edit                  | `ebda.app`             |
+| Zone › **SSL and Certificates** › Edit | `ebda.app`             |
 
 (The DNS + SSL zone perms are required because the worker's `custom_domain`
 routes create/manage the hostname + its edge cert.)
@@ -105,9 +105,9 @@ rm /tmp/web.env
 
 | Variable                       | Where it comes from                                          |
 | ------------------------------ | ------------------------------------------------------------ |
-| `NEXT_PUBLIC_API_URL`          | `https://api.force-ai.co/api/v1` (workflow default)          |
+| `NEXT_PUBLIC_API_URL`          | `https://api.ebda.app/api/v1` (workflow default)             |
 | `NEXT_PUBLIC_APP_NAME`         | `Force Store` (workflow default)                             |
-| `NEXT_PUBLIC_SITE_URL`         | `https://store.force-ai.co` (workflow default)               |
+| `NEXT_PUBLIC_SITE_URL`         | `https://store.ebda.app` (workflow default)                  |
 | `NEXT_PUBLIC_ONESIGNAL_APP_ID` | _leave empty — storefront OneSignal not configured_          |
 | `NEXT_PUBLIC_POSTHOG_HOST`     | `https://us.i.posthog.com` (workflow default)                |
 | `NEXT_PUBLIC_POSTHOG_KEY`      | Vercel `force-web` prod (`phc_…`)                            |
@@ -125,7 +125,7 @@ That's it. The next push to `main` touching `apps/web/**` deploys automatically.
 
 1. `npm ci`
 2. Builds the workspace packages the storefront needs (`@ebda/database` → `@ebda/shared` → `@ebda/ui`)
-3. `scripts/cf-setup-local.sh web` — installs the local-only OpenNext/wrangler devDeps and writes `apps/web/{open-next.config.ts,wrangler.jsonc}` **with the force-ai.co routes** (store + cf fallback + `*/*` SaaS catch-all)
+3. `scripts/cf-setup-local.sh web` — installs the local-only OpenNext/wrangler devDeps and writes `apps/web/{open-next.config.ts,wrangler.jsonc}` **with the ebda.app routes** (store + cf fallback + `*/*` SaaS catch-all)
 4. Writes `apps/web/.env.production.local` from the repo variables (NEXT*PUBLIC*\* are build-time inlined)
 5. `scripts/cf-build.sh web` — the OpenNext build (moves `instrumentation.ts` aside for the trace workaround, then restores it)
 6. `cd apps/web && npx wrangler deploy`
@@ -157,11 +157,11 @@ repo variables:
 
 ## Cutover (later, deliberate)
 
-This workflow deploys admin/orders to the **new** `admin.`/`orders.force-ai.co`
-subdomains. The live Vercel domains (`app.forcemediakw.com`,
-`orders.forcemediakw.com`) are **untouched** — verify the force-ai.co subdomains
+This workflow deploys admin/orders to the **new** `admin.`/`orders.ebda.app`
+subdomains. The live Vercel domains (`store.ebda.app`,
+`orders.ebda.app`) are **untouched** — verify the ebda.app subdomains
 work, then cut their DNS / rebrand when ready (and drop the Vercel projects after
-a soak), exactly as wadyaljuz was cut over for the storefront.
+a soak), exactly as demo-merchant was cut over for the storefront.
 
 ## Runner requirements
 
@@ -171,8 +171,7 @@ it does not read `SCHEDULED_ON_CLOUD`. Per
 [Ruling CI-CRON-1](../RULINGS.md#ruling-ci-cron-1--scheduled-runs-stay-on-self-hosted-pushpr-dispatch-on-cloud-2026-10-03)
 the repo runs push, PR and dispatch on cloud (`USE_SELF_HOSTED=false`); only
 `schedule:` runs in other workflows are pinned to the self-hosted runner. Runner
-outage handling for those crons is in
-[wsl-runner-maintenance.md](../runbooks/wsl-runner-maintenance.md).
+outage handling for those crons is not covered by an in-repo runbook.
 
 **Consequence:** a deploy no longer waits for the self-hosted runner (the Mac being
 awake), but it does use GitHub-hosted minutes (not zero-cost; see Ruling CI-CRON-2).

@@ -1,4 +1,4 @@
-# Force Website Builder — Hardening Plan (historical)
+# Ebda Store — Hardening Plan (historical)
 
 This file was the synthesis of five parallel audits run on 2026-04-30 (267 findings,
 38 critical). It is 4 months stale as of 2026-09-02: most of its "open P0"

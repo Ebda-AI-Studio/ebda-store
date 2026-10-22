@@ -36,7 +36,7 @@ The **Stock → Scan** page lets you work with barcodes from your phone in three
 
 It uses your phone's built-in barcode scanning where available, and falls back to typing the code by hand otherwise.
 
-> **Plan note:** barcode scanning is an **Enterprise** feature. If your plan doesn't include it, the Scan page shows an upgrade prompt — talk to your Force AI account manager.
+> **Plan note:** barcode scanning is an **Enterprise** feature. If your plan doesn't include it, the Scan page shows an upgrade prompt — talk to your Ebda AI Studio account manager.
 
 صفحة **المخزون → المسح** تتيح العمل بالباركود من هاتفك في ثلاثة أوضاع:
 
@@ -46,7 +46,7 @@ It uses your phone's built-in barcode scanning where available, and falls back t
 
 يستخدم ماسح الباركود المدمج في هاتفك حين يتوفر، ويتيح إدخال الرمز يدويًا كبديل.
 
-> **ملاحظة الباقة:** مسح الباركود ميزة **مؤسسية (Enterprise)**. إذا كانت باقتك لا تتضمنها، تعرض صفحة المسح رسالة ترقية — تواصل مع مدير حسابك في Force AI.
+> **ملاحظة الباقة:** مسح الباركود ميزة **مؤسسية (Enterprise)**. إذا كانت باقتك لا تتضمنها، تعرض صفحة المسح رسالة ترقية — تواصل مع مدير حسابك في Ebda AI Studio.
 
 ---
 
@@ -60,7 +60,7 @@ For large reconciliations, Enterprise stores can upload a CSV with SKU or Barcod
 
 ## Dead stock & reorder suggestions — البضاعة الراكدة واقتراحات إعادة الطلب
 
-**Dead stock** (Stock → Dead Stock) is refreshed weekly. A product is flagged when it is in stock, has not sold for 90 days or more, and its stock is worth at least KWD 50 at cost. A product with **no cost price** is still flagged — its value shows as **Unknown (no cost price)**, and a note at the top counts how many flagged products need a cost price. Add cost prices on the product page so the scan can value them. A product that has never sold is counted from the day it was added, so a new product is not flagged in its first 90 days; once flagged it shows **Never sold**.
+**Dead stock** (Stock → Dead Stock) is refreshed weekly. A product is flagged when it is in stock, has not sold for 90 days or more, and its stock is worth at least EGP 50 at cost. A product with **no cost price** is still flagged — its value shows as **Unknown (no cost price)**, and a note at the top counts how many flagged products need a cost price. Add cost prices on the product page so the scan can value them. A product that has never sold is counted from the day it was added, so a new product is not flagged in its first 90 days; once flagged it shows **Never sold**.
 
 **Reorder suggestions** (Stock → Reorder Suggestions) are refreshed daily. A product **with variants** gets one suggestion per active variant — each card names the variant (e.g. "Variant: Large"), uses that variant's own stock and sales, and **Draft PO** orders that variant at its own cost. A disabled variant never gets one. A product without variants gets one suggestion for the product. Each has **one** open suggestion (or one open dead-stock card) at a time: each scan updates it with the latest numbers instead of adding another. Dismissing it closes it; if it still qualifies, the next scan opens a new one. Suggestions made before per-variant reordering (one per product) close themselves on the next scan. When you create a purchase order by hand, a product with variants needs a variant chosen on every line.
 

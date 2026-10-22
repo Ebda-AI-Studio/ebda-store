@@ -71,7 +71,7 @@ function storeAdminTokenFor(userId: string): string {
   return jwt.sign(
     { userId, email: `${userId}@example.test`, role: 'store_admin', tv: 0 },
     config.jwtSecret,
-    { expiresIn: '30m', issuer: 'force-api', audience: 'force-app' }
+    { expiresIn: '30m', issuer: 'ebda-api', audience: 'ebda-app' }
   );
 }
 
@@ -349,7 +349,7 @@ describe.skipIf(!hasDb)('orders, payments and the admin streaming export', () =>
         tv: 0,
       },
       config.jwtSecret,
-      { expiresIn: '30m', issuer: 'force-api', audience: 'force-app' }
+      { expiresIn: '30m', issuer: 'ebda-api', audience: 'ebda-app' }
     );
 
     const res = await request(app)

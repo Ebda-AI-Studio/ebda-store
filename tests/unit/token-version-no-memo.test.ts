@@ -62,8 +62,8 @@ function tokenWithTv(tv: number): string {
     config.jwtSecret,
     {
       algorithm: 'HS256',
-      issuer: 'force-api',
-      audience: 'force-app',
+      issuer: 'ebda-api',
+      audience: 'ebda-app',
       expiresIn: '30m',
     }
   );

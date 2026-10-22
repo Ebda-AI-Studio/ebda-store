@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Backfill the Kuwait-retail Chart of Accounts for every existing store
+ * Backfill the retail Chart of Accounts for every existing store
  * that has accountingEnabled=true. Idempotent — re-running is a safe no-op
  * for stores whose system accounts are already seeded.
  *
@@ -16,7 +16,10 @@ import { createPrismaClient } from '@ebda/database';
 import { seedCoaForStore } from '../apps/api/dist/services/accounting/account.service.js';
 
 const APPLY = process.argv.includes('--apply');
-const prisma = createPrismaClient({ connectionString: process.env.DATABASE_URL ?? '', role: 'owner' });
+const prisma = createPrismaClient({
+  connectionString: process.env.DATABASE_URL ?? '',
+  role: 'owner',
+});
 
 async function main() {
   const stores = await prisma.store.findMany({

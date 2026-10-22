@@ -146,7 +146,7 @@ export type PricingSurface = 'card' | 'detail';
  * Is this product showing a strike-through sale price?
  *
  * The expression `!!(product.compareAtPrice && product.compareAtPrice > product.price)`
- * was written out at four separate call sites (PecannbeeProductCard, ProductCarousel
+ * was written out at four separate call sites (StorefrontProductCard, ProductCarousel
  * twice, CompareClient) plus inline in SharedWishlistClient. It is the rule that
  * decides whether a shopper sees a crossed-out price, so it should have one
  * definition — a copy that drifts shows a discount that is not real, or hides one

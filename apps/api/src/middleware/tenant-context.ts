@@ -150,7 +150,7 @@ export function tenantContext(req: Request, res: Response, next: NextFunction): 
  * response is committed, and Prisma expires that transaction 30s after BEGIN
  * no matter what the handler is doing. A handler that awaits a 40-70s Gemini
  * call inside it therefore does its `aiUsage.create` on an expired transaction
- * and its COMMIT fails — FORCE-API-2G: "Transaction already closed … timeout
+ * and its COMMIT fails — EBDA-API-2G: "Transaction already closed … timeout
  * was 30000 ms, however 66772 ms passed", on a request that had already done
  * the work. It also pins a pooled connection idle for the whole call (and
  * `assertAiQuota`'s `withRlsBypass` takes a second one).
@@ -191,7 +191,7 @@ export function storeScopeContext(req: Request, _res: Response, next: NextFuncti
  *   - safe method (GET/HEAD) → `tenantContext`: ONE request transaction on ONE
  *     pooled connection, as before.
  *   - everything else → `storeScopeContext`: no long transaction to expire
- *     under a 40-70s model call (FORCE-API-2G, see above).
+ *     under a 40-70s model call (EBDA-API-2G, see above).
  *
  * WHY NOT just put the whole router on `storeScopeContext`: under a store scope
  * each awaited query opens its OWN short transaction (`scopedOp` →

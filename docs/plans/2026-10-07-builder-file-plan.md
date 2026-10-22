@@ -38,7 +38,7 @@ Closes gap #19 independent of the builder.
 | `packages/shared/src/builder/index.ts` + export in `packages/shared/src/index.ts` | Public surface.                                                                                                                                                                                                                                                                                                            |
 | `apps/web/src/builder/render/SectionRenderer.tsx`                                 | Maps `rendererKey` → existing template components (`getHomepageTemplate`, `templates/shared/*`). No editor imports.                                                                                                                                                                                                        |
 | `apps/web/src/builder/render/PageRenderer.tsx`                                    | Ordered render with per-section `SectionErrorBoundary` (already in `components`), spacing/bg/typography via existing `section-spacing.ts`, `section-bg.ts`, `section-typography.ts`.                                                                                                                                       |
-| `tests/fixtures/builder/*.json`                                                   | Golden layouts: default, Pecannbee-flow, fully customised, legacy hero-only, malformed. Captured from current code first (characterization).                                                                                                                                                                               |
+| `tests/fixtures/builder/*.json`                                                   | Golden layouts: default, Storefront-flow, fully customised, legacy hero-only, malformed. Captured from current code first (characterization).                                                                                                                                                                              |
 
 ### Changed files
 
@@ -48,7 +48,7 @@ Closes gap #19 independent of the builder.
 | `apps/web/src/app/HomePageContent.tsx`                         | Replace the hard-coded section sequence (L296-~830) with `PageRenderer` fed by `layoutToDefinition`. Output for existing fixtures must be byte-equivalent HTML.                                               |
 | `apps/api/src/routes/public-store-layout.routes.ts`            | Additive: response also carries `definition` (`schemaVersion` 1). Old `layout` field unchanged so deployed storefront/admin keep working across the Worker/Railway deploy gap (multi-service env drift rule). |
 | `apps/api/src/routes/store-layout.routes.ts`                   | `layoutSchema` composed from registry prop schemas where sections overlap; parity guard extended to registry keys.                                                                                            |
-| `docs/architecture/store-theme-flags.md`, `docs/TWIN-PATHS.md` | Document registry as the owner of section keys; mark `apps/web/src/builder/` and `packages/shared/src/builder/` as Ebda-only paths (FWB twin does not get them).                                              |
+| `docs/architecture/store-theme-flags.md`, `docs/TWIN-PATHS.md` | Document registry as the owner of section keys; mark `apps/web/src/builder/` and `packages/shared/src/builder/` as Ebda-only paths (Ebda Store twin does not get them).                                       |
 
 ### Data model / migration
 
@@ -143,7 +143,7 @@ INDEX (store_id, page_key, created_at desc)
 RLS: ENABLE+FORCE, strict store_id policy (same text as 20261004000000_ebda_strict_rls)
 ```
 
-Backfill: none required — absence of a published row means "derive from `layout_settings` via adapter" (dual-read). First publish writes row `rev=1` AND back-writes `layout_settings` through `definitionToLayout` so every legacy consumer (admin preview, any `store-layout`-reading code, FWB twin fixtures) keeps working. Rollback of the migration is a drop table (nothing else depends on it) — note in `docs/ROLLBACK.md`. New FK on a tenant table → run the `information_schema.referential_constraints` NO ACTION sweep and check delete/cascade handlers (store delete, erasure).
+Backfill: none required — absence of a published row means "derive from `layout_settings` via adapter" (dual-read). First publish writes row `rev=1` AND back-writes `layout_settings` through `definitionToLayout` so every legacy consumer (admin preview, any `store-layout`-reading code, Ebda Store twin fixtures) keeps working. Rollback of the migration is a drop table (nothing else depends on it) — note in `docs/ROLLBACK.md`. New FK on a tenant table → run the `information_schema.referential_constraints` NO ACTION sweep and check delete/cascade handlers (store delete, erasure).
 
 ### API (`apps/api/src/routes/builder.routes.ts`, all `authenticate → authorize → requireStoreAccess` under `tenantContext`)
 

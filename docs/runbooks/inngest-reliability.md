@@ -1,7 +1,7 @@
 # Inngest Reliability Runbook
 
-> Operational patterns and operational gotchas for the 30+ Inngest functions in FWB.
-> Audience: Ahmad (operator) and any Force AI engineer responsible for running or debugging async jobs.
+> Operational patterns and operational gotchas for the 30+ Inngest functions in Ebda Store.
+> Audience: Ahmad (operator) and any Ebda AI Studio engineer responsible for running or debugging async jobs.
 
 ---
 
@@ -115,7 +115,7 @@ retry budgets, and leave job rows stuck in `failed` state.
   idempotently resume from the next product in the batch
 
 **Railway deploy indicator:**
-`GET https://api.force-ai.co/health` returning 502/503 during deploy.
+`GET https://api.ebda.app/health` returning 502/503 during deploy.
 
 ---
 
@@ -263,8 +263,8 @@ itself needs raising.
 
 ## Related
 
-- **Stuck job alert**: Telegram `@ForceAI1_bot` P1 level — see docs/DEPLOYMENT.md §4
+- **Stuck job alert**: Telegram `@ebda1_bot` P1 level — see docs/DEPLOYMENT.md §4
 - **Inngest dashboard**: https://app.inngest.com — function execution history + retry audit
 - **Auto-reaper source**: `apps/api/src/lib/inngest/functions/queue-depth-watch.ts`
 - **mark-running-first source**: `apps/api/src/lib/inngest/functions/bulk-ai-recommendations.ts`
-- **Transient retry memory**: `~/.claude/projects/-Users-ahmadsharaf-Desktop-projects-force-website-builder/memory/feedback-fwb-bulk-ai-transient-retry-per-product.md`
+- **Transient retry memory**: `~/.claude/projects/-Users-ahmadsharaf-Desktop-projects-ebda-store/memory/feedback-ebda-bulk-ai-transient-retry-per-product.md`

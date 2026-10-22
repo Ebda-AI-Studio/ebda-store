@@ -22,10 +22,10 @@ fixes: H5 (newsletter HTML sanitization), PR-#89
 3. Enter HTML body with safe formatting:
    ```html
    <p>Dear customer,</p>
-   <p><b>Shop now</b> and save up to <a href="https://wadyaljuz.com/sale">40%</a>.</p>
+   <p><b>Shop now</b> and save up to <a href="https://demo-merchant.com/sale">40%</a>.</p>
    <ul>
-     <li>Free shipping on orders over 10 KWD</li>
-     <li>Same-day delivery in Kuwait</li>
+     <li>Free shipping on orders over 10 EGP</li>
+     <li>Same-day delivery in Egypt</li>
    </ul>
    ```
 4. Click **Preview** — verify the formatted email renders correctly

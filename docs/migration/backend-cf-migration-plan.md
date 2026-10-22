@@ -1,22 +1,22 @@
-# Backend → Cloudflare migration plan (FWB API + WBS)
+# Backend → Cloudflare migration plan (Ebda Store API + WBS)
 
 > **Status: PLANNING / decision doc — no code.** Driver = **cost + vendor consolidation**
-> (empty the Railway bill). Written 2026-06-26 after the FWB **frontend** cutover to
-> Cloudflare completed (storefront/admin/orders live on `*.force-ai.co`, real KNET
+> (empty the Railway bill). Written 2026-06-26 after the Ebda Store **frontend** cutover to
+> Cloudflare completed (storefront/admin/orders live on `*.ebda.app`, a real card
 > payment verified end-to-end). Builds on the parked strategy in memory
-> (`project-fwb-cloudflare-migration-strategy`) and the in-repo CF docs
+> (`project-ebda-cloudflare-migration-strategy`) and the in-repo CF docs
 > (`cloudflare-cutover-runbook.md`, `cloudflare-preview-workers.md`, `cloudflare-ci-deploy.md`).
 
 ## 1. What this is and isn't
 
 The **frontends are done.** Three Next apps build with OpenNext and serve on Cloudflare
-Workers behind `store/admin/orders.force-ai.co` + every merchant Custom Hostname. The old
-`*.forcemediakw.com` hosts 301 → the new domains. Vercel stays as a fallback during a
+Workers behind `store/admin/orders.ebda.app` + every merchant Custom Hostname. The old
+`*.ebda.app` hosts 301 → the new domains. Vercel stays as a fallback during a
 1–2 week soak, then gets dropped.
 
 What remains, and what this doc decides: **moving the two stateful backends off Railway** —
-the **FWB API** (`store-api.forcemediakw.com`) and **WBS** (WhatsApp Bulk Sender,
-`backend.forcemediakw.com`). This is a _different class of problem_ from the frontends and
+the **Ebda Store API** (`api.ebda.app`) and **WBS** (WhatsApp Bulk Sender,
+`backend.ebda.app`). This is a _different class of problem_ from the frontends and
 must not be treated as "one more redeploy."
 
 ## 2. The cost reality-check (do this BEFORE any code)
@@ -24,23 +24,23 @@ must not be treated as "one more redeploy."
 The whole point is cost, so the first gate is: **does leaving Railway actually save money?**
 
 **Consolidation only pays off if Railway is emptied entirely.** One **Hobby** plan covers both
-projects; the bill only dies when **both** FWB-API **and** WBS leave. That is why both are in
+projects; the bill only dies when **both** Ebda Store-API **and** WBS leave. That is why both are in
 scope together — but see the measured numbers below: the bill is already ~$2/mo, so there is
 almost nothing to empty.
 
 **Savings (what leaves):** the entire Railway bill — Hobby base (~$5/mo, includes $5 usage) +
-combined FWB+WBS compute. **Measured total: ~$6 usage, ~$0–2 actual bill.**
+combined Ebda Store+WBS compute. **Measured total: ~$6 usage, ~$0–2 actual bill.**
 
 **New costs (what appears) depend on the path:**
 
-| Path                 | New monthly cost added                                                                                                                                                     |
-| -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| CF Containers        | CF Workers Paid $5 (already paying for the frontend workers) + **container compute** (always-on instance, not free) + **Upstash Redis ×2** (FWB + WBS; no TCP Redis on CF) |
-| CF Workers rewrite   | $5 Workers Paid + per-request/CPU-ms (cheap) + **Upstash Redis ×2** + Durable Objects (sockets)                                                                            |
-| Mac Studio self-host | ~**$0 marginal** (hardware already being bought) — power only. Keeps Redis local.                                                                                          |
+| Path                 | New monthly cost added                                                                                                                                                            |
+| -------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| CF Containers        | CF Workers Paid $5 (already paying for the frontend workers) + **container compute** (always-on instance, not free) + **Upstash Redis ×2** (Ebda Store + WBS; no TCP Redis on CF) |
+| CF Workers rewrite   | $5 Workers Paid + per-request/CPU-ms (cheap) + **Upstash Redis ×2** + Durable Objects (sockets)                                                                                   |
+| Mac Studio self-host | ~**$0 marginal** (hardware already being bought) — power only. Keeps Redis local.                                                                                                 |
 
 **MEASURED 2026-06-26 — from the Railway DASHBOARD (the source of truth).** The whole Railway
-account (FWB + WBS combined) on the **Hobby** plan:
+account (Ebda Store + WBS combined) on the **Hobby** plan:
 
 | Cycle                         | Total usage (both projects)                                     | Total bill     |
 | ----------------------------- | --------------------------------------------------------------- | -------------- |
@@ -76,15 +76,15 @@ $5 included).** There is **no meaningful cost to recover by leaving Railway.**
 app in a CONTAINER on both sides sidesteps BOTH Workers blockers (Socket.io works on a real
 process; no Hyperdrive → the RLS hard-stop disappears):**
 
-| Component                                                     | ≈ $/mo       |
-| ------------------------------------------------------------- | ------------ |
-| Mac Studio (power only)                                       | ~$0          |
-| Neon (FWB already on it; **WBS Postgres moves here**)         | ~$0–19       |
-| Upstash Redis — WBS BullMQ ($10 fixed) + FWB cache (free/$10) | ~$10–20      |
-| CF Workers Paid (already paying)                              | $5           |
-| CF Container standby (scale-to-zero, idle)                    | ~$0–3        |
-| CF Load Balancer + health checks (Mac↔standby failover)       | ~$5–10       |
-| **Total**                                                     | **≈ $20–40** |
+| Component                                                            | ≈ $/mo       |
+| -------------------------------------------------------------------- | ------------ |
+| Mac Studio (power only)                                              | ~$0          |
+| Neon (Ebda Store already on it; **WBS Postgres moves here**)         | ~$0–19       |
+| Upstash Redis — WBS BullMQ ($10 fixed) + Ebda Store cache (free/$10) | ~$10–20      |
+| CF Workers Paid (already paying)                                     | $5           |
+| CF Container standby (scale-to-zero, idle)                           | ~$0–3        |
+| CF Load Balancer + health checks (Mac↔standby failover)              | ~$5–10       |
+| **Total**                                                            | **≈ $20–40** |
 
 **Net vs reality: this target is ~$20–40/mo — MORE than the ~$2/mo Railway costs today.** So it
 **does not save money**; it _adds_ ~$20–35/mo in exchange for (a) the warm-standby failover and
@@ -101,7 +101,7 @@ already have is **Railway itself (~$2/mo)** — stay put.
 
 ## 3. Why the API is not the frontend (the technical reality)
 
-The FWB API is Express 4.22, **62 route files / 247 TS files**, with four properties that
+The Ebda Store API is Express 4.22, **62 route files / 247 TS files**, with four properties that
 don't map onto Cloudflare Workers:
 
 | Dependency                               | Today (Railway)    | On CF Workers                     | Resolution                                               |
@@ -112,7 +112,7 @@ don't map onto Cloudflare Workers:
 | **Express** (request-scoped, middleware) | native             | ✗ not a Workers runtime           | run in **CF Containers** (as-is) or rewrite Express→Hono |
 | Inngest, crons, webhooks                 | external/offloaded | works from anywhere               | no change                                                |
 
-**HARD-STOP gate (Workers path only):** FWB tenant isolation uses
+**HARD-STOP gate (Workers path only):** Ebda Store tenant isolation uses
 `SET LOCAL app.current_client_id` per transaction (RLS via `runInTenantContext`
 AsyncLocalStorage → Postgres session GUC). **If Hyperdrive's connection pooling does not
 preserve the per-transaction GUC, tenant isolation silently fails** — a cross-tenant data
@@ -141,7 +141,7 @@ Express→Hono, ioredis→Upstash, Prisma driver-adapter or Hyperdrive, Socket.i
 
 ### C. Mac Studio self-host (cheapest consolidation)
 
-Run both APIs (FWB + WBS) as services on the Mac Studio already being purchased for
+Run both APIs (Ebda Store + WBS) as services on the Mac Studio already being purchased for
 CI/staging/backups/local-AI. Redis stays local. Neon stays. Railway is cancelled.
 
 - **Effort:** low–medium (process management, tunnel/ingress via Cloudflare Tunnel for TLS +
@@ -159,11 +159,11 @@ the price of not spending weeks. This is the **do-nothing benchmark** every opti
 
 ## 5. WBS (WhatsApp Bulk Sender) — parallel analysis
 
-Separate repo/project (`backend.forcemediakw.com`). Stack to confirm, but known: BullMQ
+Separate repo/project (`backend.ebda.app`). Stack to confirm, but known: BullMQ
 (Redis-backed queues) + WhatsApp Cloud API webhooks + per-tenant credentials. Same Redis/TCP
-constraint as FWB (BullMQ needs a real Redis, not a request-scoped HTTP client → Upstash works
-for BullMQ but verify the BullMQ-on-Upstash latency/limits). No Socket.io → simpler than FWB.
-**WBS must move in the same wave as FWB** for the Railway bill to actually die.
+constraint as Ebda Store (BullMQ needs a real Redis, not a request-scoped HTTP client → Upstash works
+for BullMQ but verify the BullMQ-on-Upstash latency/limits). No Socket.io → simpler than Ebda Store.
+**WBS must move in the same wave as Ebda Store** for the Railway bill to actually die.
 → _Action: a short WBS stack audit (deps, Redis usage, long-running workers, cron) before
 sizing._
 
@@ -198,7 +198,7 @@ cancel Railway — **make it the warm standby.** It's already running, managed, 
 
 ## 7. Scaling — vertical, horizontal, traffic
 
-**Reality check first: you are nowhere near any limit.** Measured FWB+WBS = **~0.05 vCPU avg and
+**Reality check first: you are nowhere near any limit.** Measured Ebda Store+WBS = **~0.05 vCPU avg and
 ~0.5 GB RAM combined** ($0.32 CPU + $5 memory for the whole month). Scaling is a _future_ concern,
 not a present one. The storefront/admin/orders are already on **CF Workers = infinite edge scale**;
 the API is the only thing that ever needs scaling thought.
@@ -210,7 +210,7 @@ the API is the only thing that ever needs scaling thought.
 - **Horizontal:** the dual-origin topology above IS horizontal scale — run Mac **and** Railway
   active for ~2× capacity, and add a **scale-to-zero CF Container burst pool** for spikes (costs
   ~$0 when idle, only bills during a surge). BullMQ (WBS) scales horizontally for free (add workers
-  pulling the same queue). **The one real code prerequisite: the FWB API's Socket.io needs the
+  pulling the same queue). **The one real code prerequisite: the Ebda Store API's Socket.io needs the
   `@socket.io/redis-adapter`** so WebSocket events fan out across instances (without it, a client
   on instance A misses events emitted by instance B). In-memory `bounded-map` caches also become
   per-instance — fine for cache, but don't put correctness on them. Both are small, well-trodden
@@ -222,7 +222,7 @@ the API is the only thing that ever needs scaling thought.
 
 ## 8. Decision gates (must pass in order)
 
-1. **Redis gate** — one shared Redis reachable by Mac + Railway carries FWB cache + WBS BullMQ at real volume (Upstash Fixed $10 = unlimited cmds is the safe default for BullMQ).
+1. **Redis gate** — one shared Redis reachable by Mac + Railway carries Ebda Store cache + WBS BullMQ at real volume (Upstash Fixed $10 = unlimited cmds is the safe default for BullMQ).
 2. **Socket.io gate** — add `@socket.io/redis-adapter` so notifications fan out across instances BEFORE running >1 origin.
 3. **Health-check gate** — CF Load Balancer (or a Worker) correctly detects a dead Mac and fails to Railway within seconds; failback when Mac returns.
 4. **Webhook gate** — the payment `webhook_events` inbox + Inngest offload behaves identically whichever origin serves; Meta/WhatsApp webhooks (WBS) reach whichever origin is live.
@@ -266,7 +266,7 @@ classic exhaustion trap. Plan:
 - **Keep `DIRECT_URL`** (non-pooled endpoint) for **migrations only** — Prisma already uses it.
 - **Set a conservative per-instance `connection_limit`** (e.g. 5) so `instances × limit` stays under
   Neon's backend ceiling even at peak burst.
-- **RLS is compatible:** FWB sets `SET LOCAL app.current_client_id` **per transaction**, and `SET
+- **RLS is compatible:** Ebda Store sets `SET LOCAL app.current_client_id` **per transaction**, and `SET
 LOCAL` is transaction-scoped → safe under PgBouncer transaction mode (this is the key difference
   from the Hyperdrive hard-stop — Neon's own PgBouncer preserves per-tx GUCs). Verify once with a
   cross-tenant read test, but it should hold.
@@ -304,4 +304,4 @@ No code work needed; multi-instance is unblocked today.
    survives the pooler.
 4. Stand the Mac up as a second origin behind a **CF Load Balancer** on the SAME Neon + Upstash;
    validate **failover + a reactive burst** on a PREVIEW hostname before touching
-   `store-api.forcemediakw.com`.
+   `api.ebda.app`.

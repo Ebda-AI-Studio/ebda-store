@@ -52,8 +52,8 @@
       "id": "ssr-compliance-link-in-layout",
       "label": "Compliance links must be in layout.tsx for SSR",
       "type": "rule",
-      "summary": "FWB storefront template footer only renders post-hydration (templateLoading gate). GDPR Art. 7(3) requires cookie preferences link to always be accessible — must add a fallback copy in layout.tsx (server component) to appear in initial HTML for crawlers and JS-disabled visitors.",
-      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-force-website-builder/memory/feedback-fwb-cookie-link-ssr-layout.md",
+      "summary": "Ebda Store storefront template footer only renders post-hydration (templateLoading gate). GDPR Art. 7(3) requires cookie preferences link to always be accessible — must add a fallback copy in layout.tsx (server component) to appear in initial HTML for crawlers and JS-disabled visitors.",
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-ebda-store/memory/feedback-ebda-cookie-link-ssr-layout.md",
       "tags": ["ssr", "nextjs", "gdpr", "cookie-consent", "layout", "compliance"]
     },
     {
@@ -61,32 +61,32 @@
       "label": "Dynamic template import blocks SSR HTML",
       "type": "trap",
       "summary": "useTemplateComponents() lazy-loads the template via dynamic import, gating all of header/footer behind templateLoading === true during SSR. The entire footer is absent from initial HTML — any compliance or SEO content in the template footer is invisible to crawlers.",
-      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-force-website-builder/memory/feedback-fwb-cookie-link-ssr-layout.md",
-      "tags": ["nextjs", "ssr", "template", "hydration", "trap", "fwb"]
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-ebda-store/memory/feedback-ebda-cookie-link-ssr-layout.md",
+      "tags": ["nextjs", "ssr", "template", "hydration", "trap", "ebda"]
     },
     {
       "id": "gdpr-erase-single-primitive",
       "label": "Single eraseAccount() primitive for all erasure triggers",
       "type": "pattern",
-      "summary": "FWB's AuthService.eraseAccount(userId) is the one transaction-wrapped anonymization method called by self-serve endpoint, retention cron, and future admin override. One place to extend when new PII columns land — all three trigger paths pick it up automatically.",
-      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-force-website-builder/memory/feedback-fwb-gdpr-erase-reuse-pattern.md",
-      "tags": ["gdpr", "erasure", "prisma", "auth", "pattern", "fwb", "kuwait-law"]
+      "summary": "Ebda Store's AuthService.eraseAccount(userId) is the one transaction-wrapped anonymization method called by self-serve endpoint, retention cron, and future admin override. One place to extend when new PII columns land — all three trigger paths pick it up automatically.",
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-ebda-store/memory/feedback-ebda-gdpr-erase-reuse-pattern.md",
+      "tags": ["gdpr", "erasure", "prisma", "auth", "pattern", "ebda", "egypt-law"]
     },
     {
       "id": "gdpr-erase-idempotency",
       "label": "eraseAccount is idempotent by design",
       "type": "rule",
       "summary": "The anonymization upsert is a no-op if email already starts with 'erased-', each deleteMany deletes zero rows on repeat. Safe for cron re-runs or accidental double-calls without double-recording harm beyond an audit log entry.",
-      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-force-website-builder/memory/feedback-fwb-gdpr-erase-reuse-pattern.md",
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-ebda-store/memory/feedback-ebda-gdpr-erase-reuse-pattern.md",
       "tags": ["gdpr", "idempotency", "erasure", "pattern"]
     },
     {
       "id": "gdpr-erase-tax-retention",
       "label": "Orders preserved anonymized for tax compliance",
       "type": "rule",
-      "summary": "GDPR erasure does NOT delete Order rows — preserved with customerId = null and scrubbed address JSON. Kuwait MOF requires invoice retention ≥5 years. Erasure satisfies Art. 17 while keeping audit trail. Separate 5-year hard-delete cron planned for 2026-12.",
-      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-force-website-builder/memory/feedback-fwb-gdpr-erase-reuse-pattern.md",
-      "tags": ["gdpr", "tax", "retention", "orders", "kuwait-law", "compliance"]
+      "summary": "GDPR erasure does NOT delete Order rows — preserved with customerId = null and scrubbed address JSON. Egypt MOF requires invoice retention ≥5 years. Erasure satisfies Art. 17 while keeping audit trail. Separate 5-year hard-delete cron planned for 2026-12.",
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-ebda-store/memory/feedback-ebda-gdpr-erase-reuse-pattern.md",
+      "tags": ["gdpr", "tax", "retention", "orders", "egypt-law", "compliance"]
     }
   ],
   "edges": [

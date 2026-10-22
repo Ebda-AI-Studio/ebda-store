@@ -4,11 +4,11 @@ Get your store live in under an hour. متجرك جاهز خلال ساعة.
 
 ## 1. Sign in to the admin
 
-URL: <https://app.forcemediakw.com>
+URL: <https://store.ebda.app>
 
-Your Force Media contact will create your account and email you the temporary password. On first login, you'll be asked to change it.
+Your Ebda AI Studio contact will create your account and email you the temporary password. On first login, you'll be asked to change it.
 
-سيتم إنشاء حسابك من قِبل فريق Force Media وستصلك كلمة مرور مؤقتة بالإيميل. غيّرها عند أول دخول.
+سيتم إنشاء حسابك من قِبل فريق Ebda AI Studio وستصلك كلمة مرور مؤقتة بالإيميل. غيّرها عند أول دخول.
 
 ## 2. Set your store identity
 
@@ -20,7 +20,7 @@ Fill in:
 - Store description (EN + AR) — appears in search results + on the home page
 - Logo upload — square PNG ≥ 400×400 recommended
 - Brand colors — primary + accent (will theme the storefront automatically)
-- Default currency — KWD for Kuwait
+- Default currency — EGP for Egypt
 - WhatsApp contact number — appears as the floating contact button
 
 أدخل اسم متجرك ووصفه بالإنجليزية والعربية، ارفع شعار المتجر (PNG مربّع 400×400 على الأقل)، اختر الألوان الأساسية، ضع رقم الواتساب للتواصل.
@@ -47,14 +47,14 @@ You can drag-and-drop to reorder. Empty categories are hidden from the storefron
 Required fields:
 
 - Name (EN + AR)
-- Price in KWD (Kuwaiti Dinar)
+- Price in EGP (Egyptian Dinar)
 - At least 1 image (drag-and-drop upload)
 - Stock quantity (or mark "always in stock" for digital products)
 - Category — assign to at least one
 
 Optional but recommended:
 
-- **Discount** — choose None, Percentage (%), or Fixed KWD from the dropdown. The discounted price previews live as you type and shows as a "Was / Now" strikethrough on the storefront automatically. (No need to manually fill "compare-at-price" — it is derived from your discount setting.)
+- **Discount** — choose None, Percentage (%), or Fixed EGP from the dropdown. The discounted price previews live as you type and shows as a "Was / Now" strikethrough on the storefront automatically. (No need to manually fill "compare-at-price" — it is derived from your discount setting.)
 - SKU — your internal product code
 - Weight in grams — needed for shipping calculations
 - Description (EN + AR) — formatted text with images
@@ -67,18 +67,18 @@ Optional but recommended:
 
 **Admin → Settings → Payment Settings**
 
-Force AI Store supports 4 Kuwait-based payment providers:
+Ebda Store supports these Egyptian payment providers:
 
-- Tap Payments
-- MyFatoorah
-- Hesabe
-- UPayments
+- Paymob
+- Kashier
+- Fawry
+- InstaPay
 
 Plus Cash on Delivery (COD) which needs no provider account.
 
-You need merchant accounts with at least one payment provider. See [payment-providers.md](./payment-providers.md) for the per-provider account opening + credential walkthrough.
+You need merchant accounts with at least one payment provider. Open each provider's merchant account first, then paste its credentials in Payment Settings.
 
-Cash on Delivery works out of the box — just enable the toggle. You can add a fixed COD fee (e.g. 1 KWD) which is added to the order total.
+Cash on Delivery works out of the box — just enable the toggle. You can add a fixed COD fee (e.g. 1 EGP) which is added to the order total.
 
 تحتاج حسابًا مع مزوّد دفع واحد على الأقل. الدفع عند الاستلام يعمل مباشرة من غير حساب — فعّله من الإعدادات وضع رسوم ثابتة (مثلًا 1 د.ك) إذا أردت.
 
@@ -86,7 +86,7 @@ Cash on Delivery works out of the box — just enable the toggle. You can add a 
 
 **Admin → Settings → Shipping → "Delivery areas & fees"**
 
-Set a delivery fee per Kuwait **area**. At checkout the customer picks their governorate, then their area, and pays the fee you set for that area:
+Set a delivery fee per Egypt **area**. At checkout the customer picks their governorate, then their area, and pays the fee you set for that area:
 
 - Expand a governorate (collapsible accordion) and enter a fee for each area you deliver to. Use **"Apply to all areas in this governorate"** to set one fee across a whole governorate, then tweak individual areas.
 - Areas you don't price are hidden from customers — so you can start with just the areas you serve today.
@@ -94,7 +94,7 @@ Set a delivery fee per Kuwait **area**. At checkout the customer picks their gov
 
 If you ship via a known carrier (Bosta, ShipBlu, Mylerz, Aramex), enter your API credentials so tracking numbers auto-update.
 
-اضبط رسوم التوصيل لكل **منطقة** في الكويت. عند الدفع يختار العميل المحافظة ثم المنطقة ويدفع الرسوم التي حددتها لها. وسّع المحافظة وأدخل رسوم كل منطقة تخدمها، أو استخدم "تطبيق على كل المناطق". المناطق غير المسعّرة تختفي عن العملاء. للمناطق الكثيرة، صدِّر قالب Excel وعبّئه واستورده (xlsx أو CSV) مع معاينة قبل الحفظ. لو تستخدم Bosta أو ShipBlu أو Mylerz أو Aramex، أدخل بيانات حسابك لتحديث أرقام التتبّع تلقائيًا.
+اضبط رسوم التوصيل لكل **منطقة** في مصر. عند الدفع يختار العميل المحافظة ثم المنطقة ويدفع الرسوم التي حددتها لها. وسّع المحافظة وأدخل رسوم كل منطقة تخدمها، أو استخدم "تطبيق على كل المناطق". المناطق غير المسعّرة تختفي عن العملاء. للمناطق الكثيرة، صدِّر قالب Excel وعبّئه واستورده (xlsx أو CSV) مع معاينة قبل الحفظ. لو تستخدم Bosta أو ShipBlu أو Mylerz أو Aramex، أدخل بيانات حسابك لتحديث أرقام التتبّع تلقائيًا.
 
 > Full guide: [Delivery Areas & Fees](./shipping-areas.md).
 
@@ -122,22 +122,22 @@ All copy is bilingual.
 
 ## 8. Connect a custom domain (optional)
 
-By default your store is at `store.forcemediakw.com/<your-slug>`. To use `yourstore.com`, see [custom-domain.md](./custom-domain.md) — 10 minutes of DNS work + automatic SSL.
+By default your store is at `store.ebda.app/<your-slug>`. To use `yourstore.com`, see [custom-domain.md](./custom-domain.md) — 10 minutes of DNS work + automatic SSL.
 
-افتراضيًا متجرك على `store.forcemediakw.com/<slug>`. لربط `yourstore.com` بدلًا، راجع [custom-domain.md](./custom-domain.md) — 10 دقائق من إعدادات DNS وSSL تلقائي.
+افتراضيًا متجرك على `store.ebda.app/<slug>`. لربط `yourstore.com` بدلًا، راجع [custom-domain.md](./custom-domain.md) — 10 دقائق من إعدادات DNS وSSL تلقائي.
 
-## 9. Connect Force AI WhatsApp Business Platform (optional but recommended)
+## 9. Connect Ebda AI Studio WhatsApp Business Platform (optional but recommended)
 
 If you want WhatsApp order notifications or the customer DM ordering bot:
 
 **Admin → Settings → WhatsApp Integration → Connection**
 
-1. Ask your Force AI contact for the Force AI WhatsApp Business Platform setup — you'll need an active WBS account.
-2. In Force AI Store admin, click **Generate API Key** under the WhatsApp Integration card.
+1. Ask your Ebda AI Studio contact for the Ebda AI Studio WhatsApp Business Platform setup — you'll need an active WBS account.
+2. In Ebda Store admin, click **Generate API Key** under the WhatsApp Integration card.
 3. Copy the key and paste it into the WBS admin under your store's settings.
 4. Once connected, the status chip on the Settings card shows **Connected** in green.
 
-أرسل لفريق Force AI أنك تريد تفعيل واتساب. بعد إنشاء حسابك على منصة WBS، ارجع لـ Admin ← Settings ← WhatsApp Integration وانقر «Generate API Key» ثم الصقها في إعدادات WBS.
+أرسل لفريق Ebda AI Studio أنك تريد تفعيل واتساب. بعد إنشاء حسابك على منصة WBS، ارجع لـ Admin ← Settings ← WhatsApp Integration وانقر «Generate API Key» ثم الصقها في إعدادات WBS.
 
 ### Enable Customer DM Ordering
 

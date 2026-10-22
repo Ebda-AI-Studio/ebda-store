@@ -480,12 +480,12 @@ export async function planProduct(
   const newPrice = v.price ?? product.price;
   if (newPrice !== product.price) {
     warnings.push(
-      `product price ${kwd(product.price)} → ${kwd(newPrice)} (the variant's; the storefront already shows and charges ${kwd(newPrice)})`
+      `product price ${fmtMoney(product.price)} → ${fmtMoney(newPrice)} (the variant's; the storefront already shows and charges ${fmtMoney(newPrice)})`
     );
   }
   if (product.compareAtPrice !== null && product.compareAtPrice !== v.compareAtPrice) {
     warnings.push(
-      `compare-at ${kwd(product.compareAtPrice)} → ${v.compareAtPrice === null ? 'none' : kwd(v.compareAtPrice)} (the parent's was ignored on variant products)`
+      `compare-at ${fmtMoney(product.compareAtPrice)} → ${v.compareAtPrice === null ? 'none' : fmtMoney(v.compareAtPrice)} (the parent's was ignored on variant products)`
     );
   }
   if (product.inventory !== 0) {
@@ -1069,7 +1069,7 @@ export async function bustCaches(
 
 // ─── output ──────────────────────────────────────────────────────────────────
 
-function kwd(fils: number | null): string {
+function fmtMoney(fils: number | null): string {
   return fils === null ? '—' : (fils / 1000).toFixed(3);
 }
 
@@ -1079,7 +1079,7 @@ function printPlan(p: ProductPlan): void {
   console.log(`\n[${status}] ${p.name}${p.nameAr ? ` / ${p.nameAr}` : ''}  (${p.productId})`);
   console.log(`  option     ${opt}`);
   console.log(
-    `  price      ${kwd(p.after.price)}${p.after.compareAtPrice ? ` (compare-at ${kwd(p.after.compareAtPrice)})` : ''}   cost ${kwd(p.after.costPrice)}`
+    `  price      ${fmtMoney(p.after.price)}${p.after.compareAtPrice ? ` (compare-at ${fmtMoney(p.after.compareAtPrice)})` : ''}   cost ${fmtMoney(p.after.costPrice)}`
   );
   console.log(`  stock      ${p.after.inventory} (moves from the variant row to the product row)`);
   console.log(

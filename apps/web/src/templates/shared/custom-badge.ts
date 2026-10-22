@@ -41,7 +41,7 @@ export type CustomBadgePosition = DiscountBadgePosition;
  * of this comment claimed bottom-right was, and it is not (#1609/#1611): the
  * carousel's quick-add (+) sits at bottom-end, the five theme cards show a
  * full-width Add-to-Cart band along the bottom on mobile, and the wishlist
- * heart is top-start on the Pecannbee card but top-end on elegant. The owner's
+ * heart is top-start on the Storefront card but top-end on elegant. The owner's
  * decision (#1994): the overlays stay put and the chip moves — `resolveCardBadges`
  * (via `avoidReservedCorner` in badge-collision.ts) shifts it off a reserved
  * top corner and lifts a bottom chip above the CTA band / quick-add. The chip
@@ -171,7 +171,7 @@ function bottomCornerClass(
  * Which bottom side(s), if any, a quick-add button or CTA band occupies on
  * this surface:
  *   'none' — no bottom-band overlay ever renders over the image on this
- *            surface (PecannbeeProductCard's CTA is a normal block element
+ *            surface (StorefrontProductCard's CTA is a normal block element
  *            below the image, not an overlay; same for ProductListItem/PDP).
  *   'end'  — a corner-only quick-add circle at the logical bottom-END
  *            (ProductCarousel's Bucket E3 (+) button).
@@ -274,7 +274,7 @@ export function getCustomBadgeText(product: CustomBadgeProductLike, isRtl: boole
  *
  * The top edge has its own occupants, and the chip never lands on one:
  *   - the reading-start corner can hold a NEW / brand pill (a chip, ~24px),
- *     a compare button or Pecannbee's wishlist heart (a button, ~44px), or —
+ *     a compare button or Storefront's wishlist heart (a button, ~44px), or —
  *     when the product is not orderable — the out-of-stock ribbon (the
  *     diagonal corner ribbon's box is 88px);
  *   - the reading-end corner can hold a wishlist heart / remove button.
@@ -407,7 +407,7 @@ export interface ResolveCardBadgesInput {
    * them wrong is a copy/paste error, not a data bug.
    *
    *   topStartReserved — true when a compare button (`CompareButton`,
-   *     always logical top-start) renders, OR on `PecannbeeProductCard`,
+   *     always logical top-start) renders, OR on `StorefrontProductCard`,
    *     whose wishlist heart is the one theme surface anchored at
    *     top-start instead of top-end.
    *   topEndReserved   — true when a wishlist heart (modern/elegant) or a
@@ -423,7 +423,7 @@ export interface ResolveCardBadgesInput {
    * `topStartReserved`/`topEndReserved` above. Those two model action
    * BUTTONS (heart/compare); this one models the NEW badge / brand pill
    * every theme renders unconditionally at the LOGICAL top-start corner
-   * whenever the product is new (or, on `PecannbeeProductCard`/
+   * whenever the product is new (or, on `StorefrontProductCard`/
    * `ProductCarousel`, whenever the opt-in brand pill shows instead). The
    * original avoidance model only knew about action buttons, so a badge
    * relocated off a reserved heart corner could land directly on top of a

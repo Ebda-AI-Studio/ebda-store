@@ -13,7 +13,7 @@ import { createContext, useContext, useEffect, useState, ReactNode } from 'react
  * scripts at all. Without consent, the scripts never reach the
  * browser — server-side gating is the only way to comply fully with
  * GDPR ePrivacy and applicable GCC data-protection law (see
- * docs/legal/gcc-data-protection.md).
+ * docs/privacy/data-map.md).
  */
 
 export type ConsentState = {

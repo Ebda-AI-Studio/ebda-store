@@ -139,7 +139,7 @@ describe('no card may compute its own badge corner', () => {
     'apps/web/src/templates/elegant/ProductCard.tsx',
     'apps/web/src/templates/minimal/ProductCard.tsx',
     'apps/web/src/app/products/ProductListItem.tsx',
-    'apps/web/src/templates/shared/PecannbeeProductCard.tsx',
+    'apps/web/src/templates/shared/StorefrontProductCard.tsx',
     'apps/web/src/templates/shared/ProductCarousel.tsx',
   ];
 

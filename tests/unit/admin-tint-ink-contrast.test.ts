@@ -85,7 +85,7 @@ const APPS: AppSpec[] = [
         why: 'rating star glyph',
       },
       {
-        file: 'src/templates/shared/PecannbeeProductCard.tsx',
+        file: 'src/templates/shared/StorefrontProductCard.tsx',
         cls: 'text-destructive',
         why: 'filled wishlist heart',
       },

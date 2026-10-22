@@ -146,10 +146,10 @@ function priceTexts(container: HTMLElement): string[] {
 
 const CARD_MODULES: [string, () => Promise<React.ComponentType<Record<string, unknown>>>][] = [
   [
-    'shared/PecannbeeProductCard',
+    'shared/StorefrontProductCard',
     async () =>
-      (await import('../../apps/web/src/templates/shared/PecannbeeProductCard'))
-        .PecannbeeProductCard as never,
+      (await import('../../apps/web/src/templates/shared/StorefrontProductCard'))
+        .StorefrontProductCard as never,
   ],
   [
     'modern/ProductCard',

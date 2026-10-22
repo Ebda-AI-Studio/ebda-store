@@ -15,7 +15,7 @@ Self-serve, Shopify-style store builder for Egypt, by **Ebda AI Studio**. Sign u
 | `api.ebda.app`                                            | API (`apps/api`)                                           |
 | `docs.` / `help.` / `status.` / `whatsapp.` (`.ebda.app`) | Developer docs, help centre, status page, WhatsApp (later) |
 
-Brand identity (name, colours, fonts, domains, sender addresses, legal URLs) is a single source of truth: `BRAND` in `packages/shared/src/brand/index.ts`, imported from `@ebda/shared`. Do not re-hardcode those values; `tests/unit/no-force-branding.test.ts` fails on any inherited third-party brand string in shipped sources.
+Brand identity (name, colours, fonts, domains, sender addresses, legal URLs) is a single source of truth: `BRAND` in `packages/shared/src/brand/index.ts`, imported from `@ebda/shared`. Do not re-hardcode those values; `tests/unit/no-force-branding.test.ts` fails on any inherited brand, tenant, domain, country or currency string anywhere in the tracked repository (migration history excepted).
 
 ## Repository layout
 

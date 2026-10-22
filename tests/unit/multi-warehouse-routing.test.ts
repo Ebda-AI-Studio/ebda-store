@@ -12,7 +12,7 @@
  *  3. Proximity routing — picks nearest warehouse (Haversine) with stock
  *  4. Proximity routing — falls back to priority when no warehouse has coordinates
  *  5. Insufficient-stock path — returns warehouse with most stock + flag=true
- *  6. Haversine formula — spot-check a known distance (Kuwait City → Dubai ~540 km)
+ *  6. Haversine formula — spot-check a known distance (Origin point → Dubai ~540 km)
  *  7. Single-warehouse — always routes to it regardless of rule
  */
 
@@ -147,7 +147,7 @@ const WH_MAIN: WH = {
   code: 'MAIN',
   priority: 100,
   lat: 29.3759,
-  lng: 47.9774, // Kuwait City
+  lng: 47.9774, // origin point
   stock: [
     { productId: PRODUCT_A, variantId: null, quantity: 50 },
     { productId: PRODUCT_B, variantId: null, quantity: 0 },
@@ -375,8 +375,8 @@ describe('multi-warehouse routing — edge cases', () => {
 });
 
 describe('haversineKm', () => {
-  it('Kuwait City → Dubai ≈ 857 km', () => {
-    // Kuwait City: 29.3759, 47.9774
+  it('Origin point → Dubai ≈ 857 km', () => {
+    // Origin point: 29.3759, 47.9774
     // Dubai: 25.2048, 55.2708
     // Great-circle (straight-line) distance ≈ 856–858 km; road is ~900 km
     const dist = haversineKm(29.3759, 47.9774, 25.2048, 55.2708);
@@ -395,7 +395,7 @@ describe('haversineKm', () => {
     expect(d1).toBeCloseTo(d2, 6);
   });
 
-  it('Kuwait City → Ahmadi ≈ 35 km', () => {
+  it('Origin point → nearby point ≈ 35 km', () => {
     const dist = haversineKm(29.3759, 47.9774, 29.0844, 48.1339);
     expect(dist).toBeGreaterThan(30);
     expect(dist).toBeLessThan(45);

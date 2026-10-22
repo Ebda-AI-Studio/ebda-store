@@ -4,10 +4,10 @@
  * `SentryService.errorHandler()` runs before the API's `errorHandler` and
  * decided capture from `err.statusCode ?? err.status`. A ZodError carries
  * neither, so every failed `schema.parse(req.body)` was reported even though
- * the client got a 400: FORCE-API-2C (158 events, `public.routes`
- * `schema.parse(req.query)`), FORCE-API-1B / 25 (`auth.routes` login/register),
- * FORCE-API-27 (`admin.routes`). Same hole for a Prisma P2002 answered as 409
- * (FORCE-API-2A, duplicate SKU on product update) and P2025/P2003.
+ * the client got a 400: EBDA-API-2C (158 events, `public.routes`
+ * `schema.parse(req.query)`), EBDA-API-1B / 25 (`auth.routes` login/register),
+ * EBDA-API-27 (`admin.routes`). Same hole for a Prisma P2002 answered as 409
+ * (EBDA-API-2A, duplicate SKU on product update) and P2025/P2003.
  *
  * Two layers of proof:
  *   1. PARITY — for every error class, the status the real `errorHandler`
@@ -38,7 +38,7 @@ import {
 import { SentryService } from '../../apps/api/src/services/sentry.service';
 
 function zodError(): ZodError {
-  // The exact shape of FORCE-API-2C: a query missing every required key.
+  // The exact shape of EBDA-API-2C: a query missing every required key.
   const r = z
     .object({ orderId: z.string(), productId: z.string(), token: z.string() })
     .safeParse({});
@@ -145,7 +145,7 @@ describe('SentryService.errorHandler — expected client errors are not captured
     );
   });
 
-  // Issue 1988 — the FORCE-API-28 class (a nested-transaction P2003, an
+  // Issue 1988 — the EBDA-API-28 class (a nested-transaction P2003, an
   // internal writer's P2025) is a SERVER defect answered 4xx. It must still
   // reach Sentry, or RULINGS SN-2's "the issue reopens on its own" is false.
   // Mutation proof: drop `|| integrityDefect` in sentry.service.ts → red.
@@ -179,7 +179,7 @@ describe('SentryService.errorHandler — expected client errors are not captured
     expect(captureException).not.toHaveBeenCalled();
   });
 
-  it('the FORCE-API-2C ZodError specifically is not captured', () => {
+  it('the EBDA-API-2C ZodError specifically is not captured', () => {
     gate(zodError());
     expect(captureException).not.toHaveBeenCalled();
   });

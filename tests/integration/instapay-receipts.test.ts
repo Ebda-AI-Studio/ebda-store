@@ -88,8 +88,8 @@ const asApp = <T>(fn: () => Promise<T>) =>
 const sign = (userId: string, role: string) =>
   jwt.sign({ userId, email: `${userId}@example.test`, role, tv: 0 }, config.jwtSecret, {
     expiresIn: '30m',
-    issuer: 'force-api',
-    audience: 'force-app',
+    issuer: 'ebda-api',
+    audience: 'ebda-app',
   });
 
 describe.skipIf(!hasDb)('InstaPay receipts (money batch A)', () => {

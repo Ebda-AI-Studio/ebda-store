@@ -541,7 +541,7 @@ interface RowError {
  * Parse an EGP value (number | string like "12.50") into integer piastres —
  * the SAME cell rule as the product import (`parsePriceCell`, ruling
  * MONEYB-8): Arabic digits and thousands commas accepted, more than 2
- * decimals rejected, and a Kuwaiti-style 3-decimal value ("12.500", which an
+ * decimals rejected, and a three-decimal-style value ("12.500", which an
  * Egyptian reads as twelve thousand five hundred) rejected as ambiguous.
  * Returns null for blank/invalid/negative so callers can flag an error.
  */

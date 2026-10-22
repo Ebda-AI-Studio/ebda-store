@@ -60,7 +60,7 @@ export function BundleCard({ bundle }: BundleCardProps) {
   // (loading) button bubbled to the anchor and navigated mid-add. The title
   // link is stretched over the card (`after:inset-0`) so the whole tile still
   // opens the bundle, and the button sits above that overlay as a sibling —
-  // the same shape as PecannbeeProductCard. Visually unchanged.
+  // the same shape as StorefrontProductCard. Visually unchanged.
   return (
     <div className="group relative flex flex-col overflow-hidden rounded-2xl border border-border bg-card transition hover:border-primary/30 hover:shadow-lg">
       <div className="relative aspect-square overflow-hidden bg-gradient-to-br from-primary/5 to-primary/10">

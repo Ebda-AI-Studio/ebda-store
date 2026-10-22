@@ -507,7 +507,7 @@ const q = (ident: string): string => `"${ident.replace(/"/g, '""')}"`;
 /**
  * Registry tables whose RLS policy is STRICT — no contextless allowance, so a
  * read without the bypass sees nothing (the pinned list is STRICT_TABLES in
- * tests/integration/rls-force-app.test.ts; tests/unit/r2-orphan-classify.test.ts
+ * tests/integration/rls-ebda-app.test.ts; tests/unit/r2-orphan-classify.test.ts
  * keeps this in step with it and the registry).
  */
 export const STRICT_R2_TABLES: readonly string[] = [

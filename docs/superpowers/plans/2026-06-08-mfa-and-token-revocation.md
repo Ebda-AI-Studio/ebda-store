@@ -1,4 +1,4 @@
-# FWB — TOTP 2FA + Access-Token Revocation Implementation Plan
+# Ebda Store — TOTP 2FA + Access-Token Revocation Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
@@ -140,7 +140,7 @@ import QRCode from 'qrcode';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 
-const ISSUER = 'Force AI Store';
+const ISSUER = 'Ebda Store';
 
 export class MfaService {
   static generateEnrollment(accountLabel: string): { secret: string; otpauthUrl: string } {
@@ -293,8 +293,8 @@ const accessJti = crypto.randomUUID();
 const accessToken = jwt.sign({ ...payload, tv: payload.tv ?? 0 }, config.jwtSecret, {
   algorithm: 'HS256',
   expiresIn: config.jwtExpiresIn as any, // unchanged — 30d
-  issuer: 'force-api',
-  audience: 'force-app',
+  issuer: 'ebda-api',
+  audience: 'ebda-app',
   subject: payload.userId,
   jwtid: accessJti,
 });
@@ -392,8 +392,8 @@ Expected: FAIL — second `/auth/me` returns 200 (no denylist yet).
 ```typescript
 const payload = jwt.verify(token, config.jwtSecret, {
   algorithms: ['HS256'],
-  issuer: 'force-api',
-  audience: 'force-app',
+  issuer: 'ebda-api',
+  audience: 'ebda-app',
 }) as AuthPayload & { type?: string; tv?: number; jti?: string };
 
 if (payload.type === 'refresh') {
@@ -606,8 +606,8 @@ if (user.mfaEnabled) {
   const challengeToken = jwt.sign({ userId: user.id, purpose: 'mfa' }, config.jwtSecret, {
     algorithm: 'HS256',
     expiresIn: '5m',
-    issuer: 'force-api',
-    audience: 'force-app',
+    issuer: 'ebda-api',
+    audience: 'ebda-app',
   });
   return { mfaRequired: true, challengeToken } as any;
 }
@@ -663,8 +663,8 @@ router.post('/verify', authLimiter, async (req, res) => {
   let payload: any;
   try {
     payload = jwt.verify(challengeToken, config.jwtSecret, {
-      issuer: 'force-api',
-      audience: 'force-app',
+      issuer: 'ebda-api',
+      audience: 'ebda-app',
     });
   } catch {
     throw new AppError(401, 'MFA_CHALLENGE_INVALID', 'Challenge expired');
@@ -860,7 +860,7 @@ git commit -m "feat(admin): 2FA enrollment page + login second-factor step"
 - Modify: scoped memory + the global gap doc
 
 - [ ] **Step 1: UAT checklist** `docs/uat/mfa.md` — golden path (enroll, login w/ code, backup code, disable) + edge cases (wrong code lockout via rate limit, lost authenticator recovery, Redis-down fail-open behavior).
-- [ ] **Step 2: Update `~/.claude/.../reference-force-ai-production-grade-standard.md`** — flip FWB Layer 2 toward HAVE once shipped; move gap #1 (MFA) + #2 (revocation) to "closed for FWB".
+- [ ] **Step 2: Update `~/.claude/.../reference-ebda-production-grade-standard.md`** — flip Ebda Store Layer 2 toward HAVE once shipped; move gap #1 (MFA) + #2 (revocation) to "closed for Ebda Store".
 - [ ] **Step 3: Commit**
 
 ```bash

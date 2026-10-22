@@ -36,7 +36,7 @@ describe('parsePriceCell', () => {
     expect(minor(raw)).toBe(expected);
   });
 
-  it('rejects 3-decimal values as ambiguous (Kuwaiti habit / thousands separator)', () => {
+  it('rejects 3-decimal values as ambiguous (a thousands-separator habit)', () => {
     expect(minor('12.500')).toBe('PRICE_AMBIGUOUS_DECIMALS');
     expect(minor('12.345')).toBe('PRICE_AMBIGUOUS_DECIMALS');
     expect(minor('1.000')).toBe('PRICE_AMBIGUOUS_DECIMALS');

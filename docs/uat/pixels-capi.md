@@ -41,8 +41,8 @@ independent of the browser pixel.
 3. Verify:
    - `event_name` = `Purchase`
    - `action_source` = `website`
-   - `custom_data.currency` = `KWD`
-   - `custom_data.value` = total ÷ 1000 (e.g. KWD 5.500 appears as `5.5`)
+   - `custom_data.currency` = `EGP`
+   - `custom_data.value` = total ÷ 1000 (e.g. EGP 5.500 appears as `5.5`)
    - `user_data` shows match quality indicators (email / phone — hashed)
    - `event_id` = the order UUID
 

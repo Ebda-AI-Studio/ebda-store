@@ -43,7 +43,7 @@ Observed `/public/store/resolve` 429 bursts in the 24h to 2026-09-15, **outside*
 **Attribution is UNVERIFIED and this PR does not claim otherwise.** Railway's HTTP log API
 (`railway logs --http`) returned `Problem processing request` for every query, so client IP/ASN/UA
 could not be read. Crawlers are the likely source; the case that would make it customer-facing is
-**mobile-carrier CGNAT** (many Kuwaiti shoppers egressing from one IP), and that remains unproven.
+**mobile-carrier CGNAT** (many Egyptian shoppers egressing from one IP), and that remains unproven.
 This fix is justified by the _mapping_ being wrong regardless of who tripped it: "I could not reach
 the API" is not "this store does not exist".
 
@@ -270,7 +270,7 @@ predicate the component calls.
 
 D is the important one: it proves the gate is the TYPE SYSTEM, not the regex. F guards branch ORDER —
 the demo sentinel also matches the transient fallback, so if the two `if`s are ever swapped the retry
-page silently goes back to being titled "Page not found — Force AI".
+page silently goes back to being titled "Page not found — Ebda AI Studio".
 
 **What the mutations do NOT prove:** that Next forwards a custom `digest` through the RSC payload in
 a production build, and that `generateMetadata` emits the new title — neither is executable as a unit
@@ -289,7 +289,7 @@ executed against a real production build rather than argued from Next's source.
 
 **Executed 2026-09-16.** `NEXT_PUBLIC_API_URL=http://127.0.0.1:9/api/v1` (port 9 = discard, so every
 resolve fetch is refused → the network-error branch of the transient mapping), `next build` then
-`next start`, then `GET /pecannbee`:
+`next start`, then `GET /demo-store`:
 
 | Assumption under test                                  | Observed                                                           |
 | ------------------------------------------------------ | ------------------------------------------------------------------ |
@@ -316,7 +316,7 @@ The body needed a browser — §6.3.
 ### 6.3 Client-render verification (headless Chromium)
 
 Same forced-transient build, driven with Playwright's installed `chrome-headless-shell` (no new
-dependency, no browser download), `GET /pecannbee`, 4s after load:
+dependency, no browser download), `GET /demo-store`, 4s after load:
 
 | Assertion                                                     | Observed                                                                                                                                         |
 | ------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
@@ -346,11 +346,11 @@ against a preview Worker closes it, and is the single highest-value follow-up to
 
 - **No "Go Home" during a transient.** `getStore()` fell back to the demo sentinel, so `useStoreUrl`
   drops the `/<slug>` prefix and the link resolves to `/` — which on the platform host is
-  `307 → force-ai.co` (measured). That would walk a merchant's shopper onto the Force platform pitch,
+  `307 → ebda.app` (measured). That would walk a merchant's shopper onto the Force platform pitch,
   violating the HARD multi-tenant rule in `app/not-found.tsx`. The link is suppressed on that branch.
 - **The title branch's real reach.** A page's own metadata export wins over the layout's, and nearly
   every store-resolving route exports a title, so the "Temporarily unavailable" title is visible
-  chiefly on the HOMEPAGE — the same reach the old "Page not found — Force AI" bug had. The
+  chiefly on the HOMEPAGE — the same reach the old "Page not found — Ebda AI Studio" bug had. The
   `robots: noindex` half inherits everywhere. Ruling SR-7.
 - **"Try Again" must actually retry.** Next hands the boundary the BARE `reset`, which only clears
   client error state and re-renders the SAME failed server payload — its own

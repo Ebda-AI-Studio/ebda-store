@@ -212,7 +212,7 @@ function ModernProductCard({
       itemScope
       itemType="https://schema.org/Product"
       aria-labelledby={nameId}
-      // max-w cap matches PecannbeeProductCard so theme grids (PDP related
+      // max-w cap matches StorefrontProductCard so theme grids (PDP related
       // products, category pages) render at the same size as the main
       // listings. Ahmad 2026-05-16 design.md baseline.
       // Task 3 Part A: article has no overflow-hidden so the wishlist button
@@ -312,7 +312,7 @@ function ModernProductCard({
           )}
 
           {/* NEW badge — out-of-stock now uses the shared prominent red
-              ribbon (OutOfStockRibbon below) to match the pecannbee/
+              ribbon (OutOfStockRibbon below) to match the demo-store/
               alkahraman target across every theme. NEW stays top corner,
               only shown when orderable (unchanged). */}
           {orderable && isProductNew(product, renderNow, store.theme) && (
@@ -351,7 +351,7 @@ function ModernProductCard({
           )}
 
           {/* Platform-level OOS ribbon (top-start, red, bold) — same visual
-              treatment Ahmad shipped on PecannbeeProductCard, now in every
+              treatment Ahmad shipped on StorefrontProductCard, now in every
               theme via the shared component (2026-05-16).
               Task 3 B4: OOS badge customization via productCardDefaults. */}
           <OutOfStockRibbon

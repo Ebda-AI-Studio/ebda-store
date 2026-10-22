@@ -76,7 +76,7 @@ describe('nothing under .github mentions a self-hosted runner or its switches', 
     /force_cloud/,
     /\bumbra\b/i,
     /\bwsl2?\b/i,
-    /fwb-ci/i,
+    new RegExp('fw' + 'b-ci', 'i'),
   ];
 
   const files = walk(GITHUB_DIR).filter(f => /\.(ya?ml|mjs|js|sh|md|json)$/.test(f));

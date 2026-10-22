@@ -4,7 +4,7 @@ import type { NextRequest } from 'next/server';
 /**
  * Admin middleware — passthrough.
  *
- * Earlier versions of this file checked a `force-session` indicator cookie
+ * Earlier versions of this file checked an `ebda-session` indicator cookie
  * and redirected to /login when missing. That breaks the iOS admin PWA:
  * Apple's ITP caps JS-set cookie lifetime to 7 days regardless of the
  * cookie's max-age, and Safari/WebKit also purges third-party cookies

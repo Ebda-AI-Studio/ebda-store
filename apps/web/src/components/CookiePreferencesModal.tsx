@@ -17,7 +17,7 @@ import { Sheet } from './ui/Sheet';
  *   - Marketing — Meta / GA4 / Google Ads / TikTok / Snapchat / Twitter / Pinterest
  *
  * Granular pixel-by-pixel toggles are deliberately out of scope at v1.
- * Most regulators (see docs/legal/gcc-data-protection.md) accept category-level consent
+ * Most regulators (see docs/privacy/data-map.md) accept category-level consent
  * as long as the categories are clearly described and the user can change
  * their mind. Adding per-pixel toggles would be over-engineered for what
  * the law actually requires.

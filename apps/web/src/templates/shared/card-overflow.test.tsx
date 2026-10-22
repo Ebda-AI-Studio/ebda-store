@@ -59,7 +59,7 @@ vi.mock('next/link', () => ({
     React.createElement('a', { href, 'data-prefetch': String(prefetch), ...rest }, children),
 }));
 
-const { PecannbeeProductCard } = await import('./PecannbeeProductCard');
+const { StorefrontProductCard } = await import('./StorefrontProductCard');
 const { default: ModernProductCard } = await import('../modern/ProductCard');
 const { default: ElegantProductCard } = await import('../elegant/ProductCard');
 const { default: ClassicProductCard } = await import('../classic/ProductCard');
@@ -108,7 +108,7 @@ const viaPack = (pack: string) => () => {
   state.template = pack;
   return renderToStaticMarkup(
     React.createElement(
-      PecannbeeProductCard as never,
+      StorefrontProductCard as never,
       {
         product: LONG,
         isRtl: false,
@@ -149,7 +149,7 @@ const NAME_PATHS: Array<[string, () => string]> = [
   ['classic/ProductCard', direct(ClassicProductCard)],
   ['minimal/ProductCard', direct(MinimalProductCard)],
   ['bold/ProductCard', direct(BoldProductCard)],
-  ...PACKS.map(p => [`Pecannbee card, ${p} pack`, viaPack(p)] as [string, () => string]),
+  ...PACKS.map(p => [`Storefront card, ${p} pack`, viaPack(p)] as [string, () => string]),
   ...PACKS.map(p => [`ProductCarousel, ${p} pack`, viaCarousel(p)] as [string, () => string]),
   ['app/products/ProductListItem', listItem],
 ];
@@ -178,7 +178,7 @@ describe('every pack: the CTA is bounded and uses phone-sized spacing', () => {
   });
 
   it.each(PACKS.filter(p => p !== 'dahab'))(
-    '%s: the CTA a Pecannbee card actually renders carries them',
+    '%s: the CTA a Storefront card actually renders carries them',
     pack => {
       state.language = 'en';
       const cta = dom(viaPack(pack)()).querySelector('[data-cta="button"]');
@@ -333,7 +333,7 @@ describe('ProductCardCta swaps to the icon-only button when the label would elli
     expect(container.textContent).toContain('Sold Out');
   });
 
-  it('the Pecannbee/carousel add button (AdaptiveAddButton) does the same', async () => {
+  it('the Storefront/carousel add button (AdaptiveAddButton) does the same', async () => {
     stubMetrics({ scrollWidth: 120, clientWidth: 80, parentWidth: 80 });
     const { container } = rtlRender(
       React.createElement(AdaptiveAddButton as never, { label: 'Add to cart' } as never)

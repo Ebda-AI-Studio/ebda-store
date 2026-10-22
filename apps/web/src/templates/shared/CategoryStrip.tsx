@@ -24,7 +24,7 @@ import { responsiveFontSize } from './section-typography';
 
 /**
  * Horizontal-scroll category strip. Cards are square 1:1 images with
- * caption-below per Pecannbee. Frame + caption typography vary per pack:
+ * caption-below per Storefront. Frame + caption typography vary per pack:
  *   - Modern: rounded soft + sans-serif 600
  *   - Classic: sharp border + serif 700
  *   - Minimal: chrome-free + sans-serif 300

@@ -1,3 +1,4 @@
+import { JWT_ISSUERS_ACCEPTED, JWT_AUDIENCES_ACCEPTED } from '@ebda/shared';
 import { Router, type NextFunction, type Request, type Response } from 'express';
 import { z } from 'zod';
 import jwt from 'jsonwebtoken';
@@ -134,8 +135,8 @@ router.post(
         // We minted this token a line ago: verify (not decode) keeps it a checked read.
         const claims = jwt.verify(result.accessToken, config.jwtSecret, {
           algorithms: ['HS256'],
-          issuer: 'force-api',
-          audience: 'force-app',
+          issuer: JWT_ISSUERS_ACCEPTED,
+          audience: JWT_AUDIENCES_ACCEPTED,
         }) as { jti?: string };
         const jti = claims.jti;
         if (jti) await PasskeyService.markStepUp(result.user.id, jti);

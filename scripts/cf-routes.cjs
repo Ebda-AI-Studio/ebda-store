@@ -11,7 +11,7 @@
 // A `*.ebda.app/*` route does not match the bare apex. Hosts served by something
 // else that the wildcard WOULD catch (media. = R2, preview. = marketing preview)
 // get a Worker-less exclusion route — see docs/DEPLOYMENT.md "Storefront wildcard".
-// The inherited FWB `*/*` + apex custom domain is deliberately gone: on Ebda it
+// The inherited Ebda Store `*/*` + apex custom domain is deliberately gone: on Ebda it
 // would steal the marketing apex.
 const { BRAND } = require('../packages/shared/dist/brand/index.js');
 const app = process.argv[2];

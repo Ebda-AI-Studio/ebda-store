@@ -1,6 +1,6 @@
 # ZAP Baseline Triage — first activated run (2026-07-15)
 
-Run 29426193025 vs `https://store.force-ai.co`: **0 FAIL / 15 WARN-NEW / 54 PASS.**
+Run 29426193025 vs `https://store.ebda.app`: **0 FAIL / 15 WARN-NEW / 54 PASS.**
 Every warning triaged below — fixed in this PR or accepted with reasoning. Companion to `docs/security/security-overview.md`
 (evidence log) and `docs/security/csp-hardening-plan.md` (the standing
 `unsafe-inline`/`unsafe-eval` debt — NOT re-triaged here).
@@ -57,8 +57,8 @@ Every warning triaged below — fixed in this PR or accepted with reasoning. Com
 ## Cloudflare zone transform (NOT applied — token scope)
 
 A zone-level response-header Transform Rule (HSTS + nosniff on every
-force-ai.co response) would also cover tenant custom domains' asset responses,
-but the stored CF API token (`~/.config/forceai/cf-api-token`) returns
+ebda.app response) would also cover tenant custom domains' asset responses,
+but the stored CF API token (`~/.config/ebda/cf-api-token`) returns
 `Authentication error` on `/rulesets` and `/managed_headers` — it lacks the
 Transform Rules permission. Unblock: add `Zone → Transform Rules → Edit` to the
 token (or apply the rule once in the dashboard). The in-repo `_headers` fix
@@ -107,8 +107,8 @@ space. Free space left: 17 MB` plus `docker failed with exit code 2`. The
 
   | ZAP id | Warning                                                          | Status                                                                                                                                                                                                                          | Action                                                                         |
   | ------ | ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
-  | 10011  | Cookie without Secure flag                                       | NOT reproducing — `curl -sI` on `/affiliate` and `/palora/*` shows `Secure` present on every `Set-Cookie` today                                                                                                                 | none; left unsuppressed so a real regression re-fires                          |
-  | 10035  | HSTS header not set                                              | NOT reproducing — `curl -sI https://store.force-ai.co` shows `strict-transport-security` present                                                                                                                                | none; left unsuppressed                                                        |
+  | 10011  | Cookie without Secure flag                                       | NOT reproducing — `curl -sI` on `/affiliate` and `/demo-boutique/*` shows `Secure` present on every `Set-Cookie` today                                                                                                          | none; left unsuppressed so a real regression re-fires                          |
+  | 10035  | HSTS header not set                                              | NOT reproducing — `curl -sI https://store.ebda.app` shows `strict-transport-security` present                                                                                                                                   | none; left unsuppressed                                                        |
   | 10098  | Cross-Domain Misconfiguration (`Access-Control-Allow-Origin: *`) | NOT reproducing — no ACAO header on the root or a static chunk today, checked with a cross-origin `Origin` header                                                                                                               | none; left unsuppressed                                                        |
   | 10044  | Big Redirect (potential info leak)                               | REPRODUCING — the apex 307 body is the public 404 page's markup, ~22KB, no PII/session data                                                                                                                                     | accepted, `.zap/rules.tsv`                                                     |
   | 10063  | Permissions-Policy not set (static JS/CSS chunks)                | REPRODUCING — this is the SAME gap this doc already accepted above ("Permissions-Policy is meaningless on static assets — not added"); it was never encoded as a suppression, so it re-failed every night once `-I` was dropped | accepted, `.zap/rules.tsv` (closes the gap between this doc and the mechanism) |

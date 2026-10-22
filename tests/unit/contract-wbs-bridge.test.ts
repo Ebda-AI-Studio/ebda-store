@@ -399,7 +399,7 @@ describe('contract: GET /wa-bridge/store-catalog (Ebda → WBS consumer)', () =>
       const token = jwt.sign(
         { sub: 'wa-cart', storeId: MOCK_STORE.id },
         'test-jwt-secret-for-contract-tests',
-        { algorithm: 'HS256', issuer: 'force-api', audience: 'force-wa-cart', expiresIn: 600 }
+        { algorithm: 'HS256', issuer: 'ebda-api', audience: 'ebda-wa-cart', expiresIn: 600 }
       );
       const { prisma } = await import('@ebda/database');
       (prisma.store.findUnique as ReturnType<typeof vi.fn>).mockResolvedValueOnce({

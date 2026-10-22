@@ -2,8 +2,8 @@
 
 ## Stores studied (screenshots: research folder outside git, `qamar/`)
 
-- **Joomah** (joomahabaya.com, Shopify Dawn, Kuwait abaya) - done earlier: hero video, Size x Length chips, personalisation field, pickup line.
-- **Mamzi** (mamzistore.com, Shopify, Egyptian designer label priced in KWD) - editorial, premium: slow hero slider, horizontal product rails, press logos (Vogue/ELLE), heritage story band. PDP: colour swatches shown as product thumbnails, size text chips, "1 in stock" urgency bar, Google Pay express button, "Pickup available at <branch>, ready in 24 hours". Verdict: best tone reference for Atelier.
+- **Joomah** (joomahabaya.com, Shopify Dawn, Egypt abaya) - done earlier: hero video, Size x Length chips, personalisation field, pickup line.
+- **Mamzi** (mamzistore.com, Shopify, Egyptian designer label priced in EGP) - editorial, premium: slow hero slider, horizontal product rails, press logos (Vogue/ELLE), heritage story band. PDP: colour swatches shown as product thumbnails, size text chips, "1 in stock" urgency bar, Google Pay express button, "Pickup available at <branch>, ready in 24 hours". Verdict: best tone reference for Atelier.
 - **Dress Code** (dresscodeme.com, Shopify "Nimbus", Egyptian hijabi-friendly DTC) - dense, UGC-style on-model photos, per-category carousels with a play icon (video on cards), "+" quick-add on cards, announcement bar (free shipping over 1300 EGP, code DC30, Sympl split), PDP: crossed price + "Save LE 150" chip, BNPL line ("5 payments of 105 EGP, 0 interest"), SKU, "Low stock: 6 left" bar, colour swatches as photos, S-M / L-XL set sizes, trust icons row (14-day return). Verdict: closest to what Egyptian shoppers expect; Lookbook/Vitrine territory.
 - **Alamal Shop** (alamalshop.com, WooCommerce, Giza abaya/kaftan) - cluttered but conversion-heavy: per-card colour dots + size chips, FEATURED/HOT badges, "Quick View", wishlist heart, bottom tab bar (Shop/Categories/Search), COD and 14-day return copy. Verdict: shows the colour-dot + size-chip card Egyptians already read.
 - **Everlane** (everlane.com, Shopify; global ref - COS/Zara/Arket/Reformation all block headless bots) - full-bleed single-image hero, nearly no chrome, one CTA, thin announcement bar. Only fold captured (others timed out).
@@ -27,7 +27,7 @@
 
 ## Ebda already ahead
 
-Arabic-first RTL and Egyptian payments (COD, InstaPay badges in trust-badges), bundles, FBT, loyalty, wallet, promotions engine (firstOrderOnly, minOrderAmount, scopes), shipping carriers (Bosta/Aramex/Mylerz), abandoned-cart recovery. Reference stores: English-first, Dress Code and Alamal are cluttered, Mamzi PDP hides Arabic entirely and shows 3-decimal KWD.
+Arabic-first RTL and Egyptian payments (COD, InstaPay badges in trust-badges), bundles, FBT, loyalty, wallet, promotions engine (firstOrderOnly, minOrderAmount, scopes), shipping carriers (Bosta/Aramex/Mylerz), abandoned-cart recovery. Reference stores: English-first, Dress Code and Alamal are cluttered, Mamzi PDP hides Arabic entirely and shows 3-decimal EGP.
 
 ## Phase B platform features (ranked)
 

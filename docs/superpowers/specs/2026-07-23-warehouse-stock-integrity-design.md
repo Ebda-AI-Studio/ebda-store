@@ -1,17 +1,17 @@
 # WarehouseStock Data-Integrity Fixes — Design Spec
 
 **Status:** pending review. **Item:** OSOSS program, item 5 (trimmed — Ahmad, 2026-07-23).
-**Scope decision (Ahmad):** "just fix the 2 bugs" — NO reserved/ATP feature (FWB already decrements
+**Scope decision (Ahmad):** "just fix the 2 bugs" — NO reserved/ATP feature (Ebda Store already decrements
 at order → already oversell-safe + ATP-correct), NO cross-warehouse transfer workflow. This is a
 **data-integrity fix**, not a new feature surface.
-**Branch/worktree:** `feat/inventory-atp-reserved` → `_worktrees/force-website-builder__feat-inventory-atp-reserved`.
+**Branch/worktree:** `feat/inventory-atp-reserved` → `_worktrees/ebda-store__feat-inventory-atp-reserved`.
 **Deploy:** develop-now, merges in the deploy-all-at-once batch.
 
 ---
 
 ## 1. Problem (verified against source, 2026-07-23)
 
-FWB's authoritative inventory is `Product.inventory` / `ProductVariant.inventory`: decremented
+Ebda Store's authoritative inventory is `Product.inventory` / `ProductVariant.inventory`: decremented
 atomically at **order placement** (`inventory-decrement.ts`, `WHERE inventory >= qty`), restored on
 cancel/refund (`order-refunded.ts`) and payment-rollback (`order.service.ts:885`). Storefront badges
 (`enrichStockFlags`) and checkout both read only this aggregate. **It is already oversell-safe and

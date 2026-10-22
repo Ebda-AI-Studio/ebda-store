@@ -6,7 +6,7 @@ and diffs the outcome field by field. Identical output means the change does not
 influence ordering or payment. Any difference is printed as a field path with the
 base and head values.
 
-There is no default baseline (the old Ebda Kuwait commit `96814545` is irrelevant for
+There is no default baseline (the old Ebda Egypt commit `96814545` is irrelevant for
 Ebda): in ref mode `--base <ref>` is required (use `origin/main` for "current
 main"); `--head` defaults to `HEAD`. See the **Ebda** section below for Linux usage
 and the runtime (api-url) mode.

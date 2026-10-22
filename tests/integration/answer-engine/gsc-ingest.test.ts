@@ -63,7 +63,7 @@ function mockClient(
 
 const CANNED_RESULT: GscResult = {
   dateRows: [{ date: FIXED_DATE, impressions: 120, clicks: 8, ctr: 0.0667, position: 4.2 }],
-  topQueries: [{ query: 'best gadgets kuwait', impressions: 50, clicks: 3 }],
+  topQueries: [{ query: 'best gadgets cairo', impressions: 50, clicks: 3 }],
 };
 
 beforeAll(async () => {

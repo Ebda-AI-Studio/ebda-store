@@ -71,7 +71,7 @@ export function resolveSectionZone(
     // dark section) becomes invisible when the same baseline renders on a light
     // surface in a different template. So when a section bg is known and the
     // explicit color fails the 3:1 floor against it, override with a readable
-    // foreground. Colors that already read fine (wadyaljuz) are kept verbatim,
+    // foreground. Colors that already read fine (demo-merchant) are kept verbatim,
     // so configured stores are unchanged. Mirrors SectionHeading.ensureReadable.
     const resolved = resolveColor(rawColor, theme);
     const resolvedBg = sectionBgColor ? resolveColor(sectionBgColor, theme) : undefined;
@@ -101,7 +101,7 @@ export function resolveSectionZone(
  * `token:foreground`) renders dark-on-dark on a filled dark button.
  *
  * This returns the zone color when it reads ≥3:1 against the button bg (so a
- * deliberate, readable pick — including wadyaljuz's — is kept), and `undefined`
+ * deliberate, readable pick — including demo-merchant's — is kept), and `undefined`
  * when it fails, letting the pack's designed `text-*` class win. When the button
  * bg is transparent/unknown it guards against the section bg instead and, if
  * still unreadable, returns a guaranteed-readable foreground.
@@ -152,7 +152,7 @@ export function guardedCtaColor(
  * Bracket syntax is returned as undefined so the element falls back to its
  * Tailwind class instead of injecting an invalid inline style.
  *
- * Verified 2026-05-20 against wadyaljuz: global sectionTitle.fontSize="22px"
+ * Verified 2026-05-20 against demo-merchant: global sectionTitle.fontSize="22px"
  * → clamp(15.40px, calc(8.82px + 1.716vw), 22px) → renders 15.4px on 360px
  * mobile, 22px on tablet+. Was previously 22px on every viewport, which
  * broke mobile heading wrap.

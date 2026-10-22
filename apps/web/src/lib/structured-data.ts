@@ -558,8 +558,7 @@ export function howToJsonLd(data: {
 // ---------------------------------------------------------------------------
 // AggregateRating + Review — used on product pages ONLY when populated from
 // real verified-purchase reviews. Never accept AI-generated content here.
-// See docs/superpowers/plans/2026-05-12-ai-discovery-bilingual-email.md
-// Track C (Tasks 26-31) for the enforcement architecture.
+// (Track C of the AI-discovery work is the enforcement architecture.)
 // ---------------------------------------------------------------------------
 export function aggregateRatingJsonLd(data: {
   ratingValue: number;

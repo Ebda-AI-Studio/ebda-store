@@ -5477,7 +5477,7 @@ function SectionDividersBlock({
                 // Persist `color: 'custom'` WITH the customColor so the
                 // storefront resolver honours the pick. Writing customColor
                 // alone left `color` defaulting to 'foreground', which ignored
-                // the pick and rendered the grey hairline (FWB 2026-06-04).
+                // the pick and rendered the grey hairline (Ebda Store 2026-06-04).
                 onChange={v => patchSharedStyle({ customColor: v || undefined, color: 'custom' })}
                 theme={theme}
               />

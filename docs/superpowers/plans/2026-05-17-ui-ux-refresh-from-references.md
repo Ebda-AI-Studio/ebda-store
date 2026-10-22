@@ -1,13 +1,13 @@
-# FWB Storefront UI/UX Refresh — Plan
+# Ebda Store Storefront UI/UX Refresh — Plan
 
 **Date:** 2026-05-17
 **Status:** Sprint 1 GO — Stitch preview in flight (2026-05-17 afternoon)
-**Trigger:** Friend feedback on wadyaljuz.com today + UI catalog of three Kuwait reference storefronts — **all three on OSOSS platform** (FWB's direct competitor). Synthesis play: take the best of each and apply to FWB.
+**Trigger:** Friend feedback on demo-merchant.com today + UI catalog of three Egypt reference storefronts — **all three on OSOSS platform** (Ebda Store's direct competitor). Synthesis play: take the best of each and apply to Ebda Store.
 **Companion specs:**
 
 - `~/Desktop/projects/_design-systems/fashion-smej.DESIGN.md` — future-use fashion store spec
-- `~/Desktop/projects/_design-systems/fwb-platform-sprint1.DESIGN.md` — **active** Sprint 1 target driving Stitch generation
-- `reference-ui-target-pecannbee-bankalkahraman.md`, `reference-ui-untitled-smej.md`
+- `~/Desktop/projects/_design-systems/ebda-platform-sprint1.DESIGN.md` — **active** Sprint 1 target driving Stitch generation
+- `reference-ui-target-demo-store-bankalkahraman.md`, `reference-ui-untitled-smej.md`
 
 ## Decisions locked 2026-05-17 (Ahmad)
 
@@ -73,45 +73,45 @@ Translated from Ahmad's report:
 2. **"Fonts as a ratio with the cards"** — type size relative to card size is off. With the recent typography bumps and card-size changes, the proportion looks wrong.
 3. **"Product cards are static, no visuals"** — cards feel inert. No motion, no badges, no overlays, no hover micro-payoff.
 
-These are subjective, but every one maps to a concrete, fixable gap when cross-checked against Pecannbee/SMEJ.
+These are subjective, but every one maps to a concrete, fixable gap when cross-checked against Storefront/SMEJ.
 
 ---
 
 ## What we observed — the three reference storefronts
 
-All three reference sites are Kuwait-market storefronts on the same OSOSS platform. Side-by-side patterns FWB doesn't have today:
+All three reference sites are Egypt-market storefronts on the same OSOSS platform. Side-by-side patterns Ebda Store doesn't have today:
 
 **Sectioning + rhythm:**
 
 - SMEJ uses a warm sand background (`#E8E0D4`) everywhere; product/category cards are white surfaces that _lift_ off the sand. The background color shift IS the section separator.
-- Pecannbee uses a cream background (`#F5F0E8`) plus generous vertical padding (~64–96px between sections).
+- Storefront uses a cream background (`#F5F0E8`) plus generous vertical padding (~64–96px between sections).
 - Both reference sites alternate two background tones for adjacent sections (no horizontal `<hr>` rules — color shift carries the rhythm).
 
 **Typography ratio:**
 
-- Section headings: 22–28px bold (FWB recently bumped here, ✓)
-- Product names on cards: 14–16px medium (FWB needs spot-check against current card height)
+- Section headings: 22–28px bold (Ebda Store recently bumped here, ✓)
+- Product names on cards: 14–16px medium (Ebda Store needs spot-check against current card height)
 - Hero EN overlay: 36–56px editorial serif
 
 **Product card visual interest:**
 
 - Brand pill badge top-left (SMEJ overlays "SMEJ" green pill)
-- Out-of-stock diagonal ribbon top-left (Pecannbee — red ribbon, not just a grey button)
-- Wishlist heart top-right (FWB ✓)
+- Out-of-stock diagonal ribbon top-left (Storefront — red ribbon, not just a grey button)
+- Wishlist heart top-right (Ebda Store ✓)
 - Quick-add (+) circle overlay on horizontal carousel cards (Bank Alkahraman pattern)
 - Compare-at strikethrough price inline before regular price
 - "NEW" badge for items <14 days old
 
-**Other surfaces FWB doesn't have:**
+**Other surfaces Ebda Store doesn't have:**
 
 - Mobile sticky bottom tab bar (Home / Wishlist / Cart / Search) — all three references have this
-- Trust/USP grid section on homepage (Pecannbee 2×2, SMEJ 3-up)
+- Trust/USP grid section on homepage (Storefront 2×2, SMEJ 3-up)
 - Blog/article carousel + CMS for posts (SMEJ uses this for content marketing)
 - Brand story / Vision inline block on homepage
 - PDP share row (X / Facebook / Telegram / WhatsApp)
 - PDP spec table (key-value rows)
 - Email + phone in footer (both refs surface these prominently)
-- Language toggle inside hamburger (vs FWB's top-header position)
+- Language toggle inside hamburger (vs Ebda Store's top-header position)
 
 ---
 
@@ -119,12 +119,12 @@ All three reference sites are Kuwait-market storefronts on the same OSOSS platfo
 
 Google Stitch MCP (just installed, 14 tools — see `~/.claude/projects/-Users-ahmadsharaf/memory/reference-stitch-mcp.md` once written) lets us:
 
-1. **Upload a `DESIGN.md` → create a Stitch design system** (already done for fashion-SMEJ; can do another for the FWB platform default)
+1. **Upload a `DESIGN.md` → create a Stitch design system** (already done for fashion-SMEJ; can do another for the Ebda Store platform default)
 2. **Generate full screens from text prompts** that respect the design system — much faster than hand-coding Tailwind for each variant
 3. **Generate variants** of an existing screen along specific aspects (layout / color / images / text/font)
 4. **Iterate via `edit_screens`** — keep the same screen, change one aspect at a time
 
-This means we can prototype the section-rhythm + product-card visual fixes in Stitch _before_ we touch FWB code — get visual alignment with Ahmad in a day, then implement only the picked direction.
+This means we can prototype the section-rhythm + product-card visual fixes in Stitch _before_ we touch Ebda Store code — get visual alignment with Ahmad in a day, then implement only the picked direction.
 
 ---
 
@@ -134,32 +134,32 @@ This means we can prototype the section-rhythm + product-card visual fixes in St
 
 A1. **Two-tone homepage background.** Add `--bg-page` (warm tint) and `--bg-section-alt` (slightly deeper) to the platform CSS-vars. Alternate adjacent sections. White stays only for the product/category card surfaces. _Per-store overridable_ via the existing brand-color settings.
 
-A2. **Section vertical padding bump.** Today FWB sections sit tight. Bump to `py-12 md:py-20` (48px mobile / 80px desktop) between every homepage block. Section heading → first content row: `mt-6 md:mt-8`.
+A2. **Section vertical padding bump.** Today Ebda Store sections sit tight. Bump to `py-12 md:py-20` (48px mobile / 80px desktop) between every homepage block. Section heading → first content row: `mt-6 md:mt-8`.
 
-A3. **Stronger section title anchors.** Every section starts with: kicker label (12px uppercase) + main title (22–28px bold) + optional subtitle (15px regular muted). Today FWB's `SectionKicker` is there — verify it's wired on every block (categories, new-arrivals, best-sellers, blog when added, trust strip when added).
+A3. **Stronger section title anchors.** Every section starts with: kicker label (12px uppercase) + main title (22–28px bold) + optional subtitle (15px regular muted). Today Ebda Store's `SectionKicker` is there — verify it's wired on every block (categories, new-arrivals, best-sellers, blog when added, trust strip when added).
 
 A4. **Remove visible horizontal rules between sections.** Color shift + breathing room IS the divider. No `<hr>`, no border-top.
 
 ### Bucket B — Typography:card ratio (addresses complaint #2)
 
-B1. **Audit current product card text sizes against card dimensions** in all 3 render paths (`PecannbeeProductCard`, 5 theme `ProductCard`s, `ProductCarousel`). The post-2026-05-13 typography bump may have over-corrected for headings while leaving card text too small relative to the card itself.
+B1. **Audit current product card text sizes against card dimensions** in all 3 render paths (`StorefrontProductCard`, 5 theme `ProductCard`s, `ProductCarousel`). The post-2026-05-13 typography bump may have over-corrected for headings while leaving card text too small relative to the card itself.
 
 B2. **Lock a card-size:font-size pair table:**
 
 - Card width `sm` (140–160px) → name `text-xs` (12px), price `text-sm` (14px)
 - Card width `md` (180–200px) → name `text-sm` (14px), price `text-base` (16px)
 - Card width `lg` (220–260px) → name `text-base` (16px), price `text-lg` (18px)
-- This becomes a platform rule similar to `feedback-fwb-sizing-rules.md`.
+- This becomes a platform rule similar to `feedback-ebda-sizing-rules.md`.
 
 B3. **Document the rule** in `design.md` (repo root) so future card-size changes auto-update text sizes.
 
 ### Bucket C — Product card visual interest (addresses complaint #3)
 
-C1. **Out-of-stock diagonal ribbon** — terracotta corner ribbon overlaid top-left of image when `inventory === 0`. Replaces the current grey-button-only state. Platform-level (PecannbeeProductCard + 5 theme cards + carousel = 7 files per the FWB platform rule).
+C1. **Out-of-stock diagonal ribbon** — terracotta corner ribbon overlaid top-left of image when `inventory === 0`. Replaces the current grey-button-only state. Platform-level (StorefrontProductCard + 5 theme cards + carousel = 7 files per the Ebda Store platform rule).
 
 C2. **"NEW" badge** — small red/accent pill top-left when `createdAt > 14 days ago` OR `isNew === true`. Same 7 files.
 
-C3. **Compare-at price inline** — strikethrough 12px before the regular price when `compareAtPrice > price`. FWB has this on PecannbeeProductCard; verify on the 5 theme cards.
+C3. **Compare-at price inline** — strikethrough 12px before the regular price when `compareAtPrice > price`. Ebda Store has this on StorefrontProductCard; verify on the 5 theme cards.
 
 C4. **Hover micro-payoff (desktop only):** image scales `1.02` over 300ms ease-out; card border-radius softens by 2px. Tiny, but it kills the "static" perception.
 
@@ -189,9 +189,9 @@ E3. **Quick-add (+) circle overlay** on horizontal carousel cards — Bank Alkah
 
 ### Bucket F — Stitch as accelerator (process, not feature)
 
-F1. **Upload `fashion-smej.DESIGN.md` to Stitch** (already drafted). Generate the 10 screen list from the DESIGN.md to have a visual reference catalog of what a fashion-vertical FWB store _could_ look like.
+F1. **Upload `fashion-smej.DESIGN.md` to Stitch** (already drafted). Generate the 10 screen list from the DESIGN.md to have a visual reference catalog of what a fashion-vertical Ebda Store store _could_ look like.
 
-F2. **Write `fwb-platform.DESIGN.md`** — the same spec but for the existing FWB defaults (Pecannbee-flow primitives). Upload to Stitch. From there, prompt for variants of the homepage applying buckets A–C above. Pick the winner, implement.
+F2. **Write `ebda-platform.DESIGN.md`** — the same spec but for the existing Ebda Store defaults (Storefront-flow primitives). Upload to Stitch. From there, prompt for variants of the homepage applying buckets A–C above. Pick the winner, implement.
 
 F3. **Use Stitch `edit_screens` for the typography/card-size A/B** — generate 3 variants of the new-arrivals carousel with different card-text size pairs (bucket B2). Show Ahmad, pick, implement.
 
@@ -202,7 +202,7 @@ F3. **Use Stitch `edit_screens` for the typography/card-size A/B** — generate 
 **Sprint 1 — Visual rhythm (addresses complaints #1 + #2 + reduces #3 by 30%):**
 
 - A1 (two-tone background) + A2 (section padding) + A3 (section anchors) + B1 (audit) + B2 (lock font:card table) + B3 (document)
-- Single coordinated commit + Vercel deploy. Visible win on wadyaljuz overnight.
+- Single coordinated commit + Vercel deploy. Visible win on demo-merchant overnight.
 
 **Sprint 2 — Card visual interest (completes complaint #3):**
 
@@ -212,7 +212,7 @@ F3. **Use Stitch `edit_screens` for the typography/card-size A/B** — generate 
 **Sprint 3 — Mobile chrome + trust:**
 
 - D1 (bottom tab bar) + D2 (trust strip) + D5 (footer email/phone) + D6 (lang toggle in hamburger)
-- Brings FWB to parity with all 3 reference sites on mobile.
+- Brings Ebda Store to parity with all 3 reference sites on mobile.
 
 **Sprint 4 — PDP polish:**
 
@@ -236,7 +236,7 @@ F3. **Use Stitch `edit_screens` for the typography/card-size A/B** — generate 
 
 4. **Blog (E1)** is a big-bet — needs Ahmad's "yes I want this" before scoping. Without it, content marketing remains social-only.
 
-5. **Per-tenant editability:** every change above must respect the FWB platform rule — no tenant-specific hardcoding. The two-tone background colors must be tenant-settable; the trust strip content must be tenant-editable; etc.
+5. **Per-tenant editability:** every change above must respect the Ebda Store platform rule — no tenant-specific hardcoding. The two-tone background colors must be tenant-settable; the trust strip content must be tenant-editable; etc.
 
 6. **Friend feedback was unstructured.** Worth doing a 5-minute screen-share with the friend to confirm we're solving the actual complaints, not our interpretation of them.
 
@@ -264,7 +264,7 @@ Tag what to do with each:
 
 ## Files this plan will touch (when implemented)
 
-- `apps/web/src/templates/shared/` — `PecannbeeProductCard.tsx`, `ProductCarousel.tsx`, `HeroBanner.tsx`, `HeroSlider.tsx`, new `TrustStrip.tsx`, new `BlogCarousel.tsx` (E1), new `BrandStoryBlock.tsx` (E2), new `BottomTabBar.tsx` (D1), new `ShareProductRow.tsx` (D3), new `SpecTable.tsx` (D4)
+- `apps/web/src/templates/shared/` — `StorefrontProductCard.tsx`, `ProductCarousel.tsx`, `HeroBanner.tsx`, `HeroSlider.tsx`, new `TrustStrip.tsx`, new `BlogCarousel.tsx` (E1), new `BrandStoryBlock.tsx` (E2), new `BottomTabBar.tsx` (D1), new `ShareProductRow.tsx` (D3), new `SpecTable.tsx` (D4)
 - `apps/web/src/templates/{modern,elegant,classic,minimal,bold}/ProductCard.tsx` — 5 themes (cards visual)
 - `apps/web/src/templates/{modern,elegant,classic,minimal,bold}/Footer.tsx` — 5 themes (email/phone)
 - `apps/web/src/app/HomePageContent.tsx` — wire new sections
@@ -274,7 +274,7 @@ Tag what to do with each:
 - `apps/api/src/services/store.service.ts` + `packages/database/prisma/schema.prisma` — new fields if needed (`bgPage`, `bgSectionAlt`, `trustStripBlocks`, etc.)
 - `apps/web/design.md` — document the new card:font ratio table
 
-Total scope per the FWB platform-fix rule is significant — but most changes are mechanical pattern-applications across the 5 themes once the shared primitive is set.
+Total scope per the Ebda Store platform-fix rule is significant — but most changes are mechanical pattern-applications across the 5 themes once the shared primitive is set.
 
 ---
 

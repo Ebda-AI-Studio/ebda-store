@@ -8,6 +8,7 @@ import logger from '../lib/logger';
 import { customerTokenMatchesRequestStore } from '../lib/customer-store-binding';
 import { isPlatformOrigin } from '../lib/cors-cache';
 
+import { JWT_AUDIENCES_ACCEPTED, JWT_ISSUERS_ACCEPTED } from '@ebda/shared';
 export interface AuthPayload {
   userId: string;
   email: string;
@@ -126,8 +127,8 @@ export async function authenticate(
   try {
     const payload = jwt.verify(token, config.jwtSecret, {
       algorithms: ['HS256'],
-      issuer: 'force-api',
-      audience: 'force-app',
+      issuer: JWT_ISSUERS_ACCEPTED,
+      audience: JWT_AUDIENCES_ACCEPTED,
     }) as AuthPayload & { type?: string };
 
     // Reject refresh tokens used as access tokens
@@ -139,7 +140,7 @@ export async function authenticate(
 
     // Belt-and-suspenders: reject any token that carries a non-access purpose
     // claim. Real access tokens have no `purpose` field. MFA challenge tokens
-    // carry purpose:'mfa' and are audience:'force-mfa-challenge' so jwt.verify
+    // carry purpose:'mfa' and are audience:'ebda-mfa-challenge' so jwt.verify
     // above already rejects them via audience mismatch — but this guard closes
     // the window in case the audience check is ever weakened or bypassed.
     if ((payload as any).purpose && (payload as any).purpose !== 'access') {
@@ -197,7 +198,7 @@ export async function authenticate(
  *
  * It used to run `jwt.verify` alone. That made it a strictly weaker second
  * verifier on the same secret: a 1-year REFRESH token (minted with the same
- * `force-app` audience) was accepted as an access identity, and a token
+ * `ebda-app` audience) was accepted as an access identity, and a token
  * revoked by logout / logout-all / password-change was still honoured here.
  * Ownership checks downstream meant a stale identity only ever reached its own
  * orders — but "revoked" has to mean revoked everywhere, or the revocation
@@ -234,8 +235,8 @@ export async function optionalAuthenticate(
   try {
     payload = jwt.verify(token, config.jwtSecret, {
       algorithms: ['HS256'],
-      issuer: 'force-api',
-      audience: 'force-app',
+      issuer: JWT_ISSUERS_ACCEPTED,
+      audience: JWT_AUDIENCES_ACCEPTED,
     }) as AuthPayload & { type?: string; purpose?: string };
   } catch {
     // Invalid/expired/malformed token — routine, unauthenticated traffic on

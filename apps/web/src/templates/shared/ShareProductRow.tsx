@@ -8,7 +8,7 @@ import { useCurrentUrl } from '../../hooks/useCurrentUrl';
  * PDP share. L-11 (W3): one native share button where the device has a share sheet, else
  * WhatsApp + copy link (was X / Facebook / Telegram / WhatsApp discs + copy under a tracked
  * eyebrow). Sprint 4 (2026-05-17) origin: Observed on all 3 OSOSS references during the
- * UI catalog session — FWB PDP had no equivalent before this.
+ * UI catalog session — Ebda Store PDP had no equivalent before this.
  *
  * Each platform link opens in a new tab via `window.open` so the
  * customer doesn't lose the PDP. Copy-link writes the canonical URL

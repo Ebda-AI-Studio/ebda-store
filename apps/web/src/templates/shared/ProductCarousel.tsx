@@ -25,7 +25,7 @@ import {
   ctaSizeClass,
 } from './card-size';
 import { AdaptiveAddButton, OosImageDim, OutOfStockRibbon, isProductNew } from './ProductCardCta';
-import { PecannbeeProductCard } from './PecannbeeProductCard';
+import { StorefrontProductCard } from './StorefrontProductCard';
 import {
   lookCardCta,
   lookCtaVisible,
@@ -60,7 +60,7 @@ import { useRenderNow } from '../../contexts/RenderClockContext';
  *   - Bold: 2px border + black uppercase block CTA
  *   - Elegant: hairline border + serif extralight outlined CTA
  *
- * Per Pecannbee deviation: we **show name + price** (Pecannbee hides them
+ * Per Storefront deviation: we **show name + price** (Storefront hides them
  * with CSS for a B2B feel; B2C default keeps them visible).
  *
  * Behavior: prev/next arrows nudge by one card width; autoplay rotates the
@@ -170,7 +170,7 @@ function SharedProductCarousel({
     .filter(Boolean)
     .join(' ');
   const shape = cardShapeClasses(cardShape);
-  // Match PecannbeeProductCard + 4/5 theme cards so the same product isn't square
+  // Match StorefrontProductCard + 4/5 theme cards so the same product isn't square
   // in a carousel but portrait in a category grid (audit: ratio consistency).
   const aspectCls =
     shape.aspect ||
@@ -401,7 +401,7 @@ function SharedProductCarousel({
                     key={product.id}
                     className={`snap-start shrink-0 w-[44vw] sm:w-[28vw] md:w-[22vw] ${lookCarouselLgWidth(cardGap)}`}
                   >
-                    <PecannbeeProductCard
+                    <StorefrontProductCard
                       product={product}
                       isRtl={isRtl}
                       pack={pack}
@@ -499,7 +499,7 @@ function SharedProductCarousel({
                   }
                 >
                   {/* Sprint 2 (2026-05-17): hover-scale 1.02 on the card
-                      frame for the same micro-payoff PecannbeeProductCard
+                      frame for the same micro-payoff StorefrontProductCard
                       now uses. Mobile loses nothing (no hover state).
                       cn() (tailwind-merge) resolves the shape/pack-style
                       concatenation so conflicting utilities (rounded-*,

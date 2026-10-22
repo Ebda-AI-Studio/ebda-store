@@ -1,5 +1,5 @@
 /**
- * Keeps `store_subscriptions` in step with FWB's legacy `Store.plan` enum while
+ * Keeps `store_subscriptions` in step with Ebda Store's legacy `Store.plan` enum while
  * both exist (SP5 task 1; retiring the enum is a follow-up).
  *
  * Every writer of `stores.plan` that predates the engine (admin PUT

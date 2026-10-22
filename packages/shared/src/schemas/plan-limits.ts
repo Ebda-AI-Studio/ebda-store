@@ -366,7 +366,7 @@ export const DEFAULT_PLAN_SEEDS: readonly PlanSeed[] = [
 export const LOCKED_PUBLIC_PLANS = DEFAULT_PLAN_SEEDS.filter(p => p.isPublic);
 
 /**
- * FWB's `Store.plan` enum value → Ebda plan code, AS THE ORIGINAL SP5 BACKFILL
+ * Ebda Store's `Store.plan` enum value → Ebda plan code, AS THE ORIGINAL SP5 BACKFILL
  * MIGRATION (20261003130000) APPLIED IT. Frozen: a unit test pins it to that
  * migration's CASE (`enterprise` → `comped`: nobody paid for it, it was an
  * admin-granted "everything on"). Runtime code uses `STORE_PLAN_TO_PLAN_CODE`.

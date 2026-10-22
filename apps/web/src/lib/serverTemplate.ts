@@ -44,7 +44,7 @@ import DahabCategoryGrid, { DahabCategoryStrip } from '../templates/dahab/Catego
 import { DahabProductCarousel } from '../templates/dahab/ProductCarousel';
 import { DahabTestimonialRow } from '../templates/dahab/TestimonialRow';
 
-// Pecannbee-flow shared sections — same component for all 5 packs because
+// Storefront-flow shared sections — same component for all 5 packs because
 // they're styled with theme tokens. Per-pack overrides can replace these
 // later by exporting a same-named component from the pack's index.ts.
 import { HeroBanner } from '../templates/shared/HeroBanner';

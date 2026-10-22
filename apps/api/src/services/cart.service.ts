@@ -127,7 +127,7 @@ const AMBIENT_TX_RETRY = { retries: 1, baseDelayMs: 5 } as const;
  * line write below reads the line first (scoped to this cart) and then writes
  * it by id, and nothing locks the row in between: a second tap on the
  * quantity stepper or a "remove" racing it can delete the line in that window.
- * FORCE-API-2B (2026-09-12, `PUT /public/cart/items/:id`) was exactly that —
+ * EBDA-API-2B (2026-09-12, `PUT /public/cart/items/:id`) was exactly that —
  * a 500 for a line the customer had just removed. Duck-typed on `.code` for
  * the same reason as `lib/db-retry.ts` (instanceof breaks under the mocked
  * `@ebda/database`).

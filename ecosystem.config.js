@@ -11,7 +11,7 @@
 module.exports = {
   apps: [
     {
-      name: 'force-api',
+      name: 'ebda-api',
       script: 'apps/api/dist/index.js',
       instances: 'max',
       exec_mode: 'cluster',

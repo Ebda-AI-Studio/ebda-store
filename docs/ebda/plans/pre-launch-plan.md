@@ -3,9 +3,9 @@
 Written 2026-09-27. Owner: Ahmad. Order is binding: phase 0 must be done before
 phase 1 starts, and so on. Each phase ends with evidence, not "looks done".
 
-## Phase 0 — finish FWB (in progress)
+## Phase 0 — finish Ebda Store (in progress)
 
-- Every open FWB PR merged and verified live (health commit, cf-deploy per app,
+- Every open Ebda Store PR merged and verified live (health commit, cf-deploy per app,
   5 hosts, the changed path measured).
 - Last backlog sweep: every open issue fixed, or closed with evidence, or on a
   short list of owner questions.
@@ -26,18 +26,18 @@ a check, a skill, or a standard doc). A lesson only in chat is lost.
 ### Skills to create (candidates)
 
 | Skill                 | What it packages                                                                                                                                                                                                                                             | Source this session                                                                                                       |
-| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------- | ------------------------------ |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------- | ------------------------------------- |
 | `merge-lane`          | single-lane merge train: head-only CI, cancel non-head runs, BEHIND update, audit gate, auto-resolve of append-only files (RULINGS union, defence-record regen, i18n JSON 3-way deep merge, workflow path lists), post-merge verify-deploy, worktree cleanup | `/tmp/claude-501/lane.sh`, `auto-resolve.sh`, `json-merge.py`, `union-hunks.py`, `verify-deploy.sh`, `clean-merged-wt.sh` |
 | `pr-refresh`          | refresh a stale PR onto main safely: keep both sides, money-conflict stop rule, migration re-ordering, regenerate generated files, run BOTH tests/unit and colocated app tests, parity for money code                                                        | `/tmp/claude-501/refresh-prompt.md`                                                                                       |
-| `buy-flow-parity`     | when/how to run the harness, read `result.json` not the exit code or a `                                                                                                                                                                                     | tail`, compare vs origin/main not only vs the old baseline                                                                | FWB `scripts/buy-flow-parity/` |
-| `umbra-ci-recovery`   | post-reboot / post-rebuild checklist for fwb-ci6 (runners per repo, docker run, hosts pin, kernel, doctor) and what NOT to conclude from symptoms                                                                                                            | this session's CI incidents                                                                                               |
+| `buy-flow-parity`     | when/how to run the harness, read `result.json` not the exit code or a `                                                                                                                                                                                     | tail`, compare vs origin/main not only vs the old baseline                                                                | Ebda Store `scripts/buy-flow-parity/` |
+| `umbra-ci-recovery`   | post-reboot / post-rebuild checklist for ebda-ci6 (runners per repo, docker run, hosts pin, kernel, doctor) and what NOT to conclude from symptoms                                                                                                           | this session's CI incidents                                                                                               |
 | `prod-readonly-check` | read-only prod SQL through the Railway DATABASE_URL with positive controls (psql `-c` prints only the LAST statement; check key length; one statement per call)                                                                                              | this session's prod checks                                                                                                |
 
 ### Where the skills live (owner decision 2026-09-27: part of the AI OS)
 
 Each skill is codified in TWO places, never only in `~/.claude/skills`:
 
-1. **force-ai-foundation** (the OS source): `skills/<name>/` in the same shape
+1. **the shared ops foundation** (the OS source): `skills/<name>/` in the same shape
    as the existing `skills/force-audit/` (SKILL.md + scripts + fixtures +
    tests), its scripts under `ops/` where they are OS jobs, a graded rubric
    item in `standard/` that cites the lesson slug, and installed by
@@ -103,7 +103,7 @@ Rewrite for clarity, not length. Planned changes:
 
 Owner decision (2026-09-26): Ebda's backend runs on Cloudflare, not Railway.
 
-1. **Design doc before any code.** Map every FWB API dependency to its
+1. **Design doc before any code.** Map every Ebda Store API dependency to its
    Cloudflare equivalent:
    - Express API → Workers (Hono or a thin router); keep the route contracts.
    - Postgres (Neon) via Hyperdrive; Prisma on workerd uses the pg adapter (see
@@ -119,15 +119,15 @@ Owner decision (2026-09-26): Ebda's backend runs on Cloudflare, not Railway.
 2. **Spike:** port three representative routes (a public read, a cart write, a
    payment webhook) and run the buy-flow parity harness against them.
 3. **Decide:** full port vs. staged (storefront reads first, writes later).
-4. Then the Ebda clone steps already agreed: whisky-11/ebda with FWB as
+4. Then the Ebda clone steps already agreed: whisky-11/ebda with Ebda Store as
    upstream, twin-sync tooling, rebrand (night + Antique Gold), EGP minor units,
    Egyptian payments, the Nile login animation, Amal's store as merchant #1.
 
 ## Order and evidence
 
-| Phase | Done when                                                                                                                                                                                                                                                                                    |
-| ----- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 0     | FWB open issues 0 (or owner list), every PR merged + verified live                                                                                                                                                                                                                           |
-| 1     | each lesson has a memory file with the sentinel AND an enforcing artefact; each skill lives in force-ai-foundation (skills/ + standard/ + install.sh) AND ships a probe + known-bad fixture in mypovonai-learn/fleet; invoked once on a real case; CLAUDE.md rewritten and reviewed by Ahmad |
-| 2     | two consecutive rebuilds of fwb-ci6 come back fully working with no manual step; doctor healthy on a fresh guest                                                                                                                                                                             |
-| 3     | design doc approved by Ahmad; spike passes parity; then the clone                                                                                                                                                                                                                            |
+| Phase | Done when                                                                                                                                                                                                                                                                                          |
+| ----- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 0     | Ebda Store open issues 0 (or owner list), every PR merged + verified live                                                                                                                                                                                                                          |
+| 1     | each lesson has a memory file with the sentinel AND an enforcing artefact; each skill lives in the shared ops foundation (skills/ + standard/ + install.sh) AND ships a probe + known-bad fixture in mypovonai-learn/fleet; invoked once on a real case; CLAUDE.md rewritten and reviewed by Ahmad |
+| 2     | two consecutive rebuilds of ebda-ci6 come back fully working with no manual step; doctor healthy on a fresh guest                                                                                                                                                                                  |
+| 3     | design doc approved by Ahmad; spike passes parity; then the clone                                                                                                                                                                                                                                  |

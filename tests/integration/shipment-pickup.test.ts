@@ -64,7 +64,7 @@ const token = (userId: string) =>
   jwt.sign(
     { userId, email: `${userId}@example.test`, role: 'store_admin', tv: 0 },
     config.jwtSecret,
-    { expiresIn: '30m', issuer: 'force-api', audience: 'force-app' }
+    { expiresIn: '30m', issuer: 'ebda-api', audience: 'ebda-app' }
   );
 const inStore = <T>(storeId: string, fn: () => Promise<T>) =>
   asApp(() => runInTenantContext(storeId, fn));

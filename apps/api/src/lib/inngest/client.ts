@@ -448,7 +448,7 @@ if (!process.env.INNGEST_DEPLOY_ID) {
 const isDryRun = process.env.INNGEST_DRY_RUN === 'true' || process.env.NODE_ENV === 'test';
 
 export const inngest = new Inngest({
-  id: 'force-api',
+  id: 'ebda-api',
   // Inngest's SDK auto-detects dev mode from the absence of an event
   // key, but on Railway we always have NODE_ENV=production set even
   // for staging — be explicit so dev mode is never accidentally on

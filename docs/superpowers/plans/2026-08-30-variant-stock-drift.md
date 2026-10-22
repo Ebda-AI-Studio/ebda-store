@@ -32,7 +32,7 @@ Measured against production (read-only), 2026-08-30:
 | Variant products where parent ≠ Σ variant inventory                 | 166 / 191   |
 | **Active variant products where a cart quantity change hard-fails** | **92**      |
 
-Example: `Dehydrated Super Vegetable` (pecannbee) — parent `-16`, variant stock `1173`.
+Example: `Dehydrated Super Vegetable` (demo-store) — parent `-16`, variant stock `1173`.
 
 The symptom the merchant sees ("stays out of stock even after I update the variant") is
 `apps/api/src/services/cart.service.ts:369`, which checks the drifted parent column and never
@@ -41,13 +41,13 @@ looks at `item.variantId`. Its siblings `addItem` (`:151`) and `validate` (`:285
 
 ## Global Constraints
 
-- **Money/stock paths are live.** `pecannbee` is a production store. Every change to `order.service.ts`, `order-refunded.ts` and `purchase-order.service.ts` must preserve existing behaviour for **non-variant** products byte-for-byte.
+- **Money/stock paths are live.** `demo-store` is a production store. Every change to `order.service.ts`, `order-refunded.ts` and `purchase-order.service.ts` must preserve existing behaviour for **non-variant** products byte-for-byte.
 - **The invariant, stated once:** for a product with ≥1 `ProductVariant` row, `products.inventory` is **not** stock and MUST remain `0`. Stock is `SUM(product_variants.inventory)`. For a product with no variants, `products.inventory` is the stock.
 - **One writer per row.** A single order/refund/adjustment line writes the variant row **or** the product row, never both. Reference implementation: `apps/api/src/services/accounting/stock-adjustment.service.ts:135-145`.
 - **Fail loud, never silently no-op.** A product-scoped stock write aimed at a variant product returns a 400, it does not write a meaningless column (per `feedback-tenant-resolver-throw-not-default`).
 - **Every stock write busts the cache.** `apps/api/src/lib/public-cache.ts` states that any write changing price or stock MUST call `invalidateStoreProductCaches`. Variant writes currently do not.
 - Fils are integers. Prices/costs never become floats.
-- Commit per task. Branch: `fix/variant-stock-drift`, worktree `_worktrees/force-website-builder__fix-variant-stock-drift`.
+- Commit per task. Branch: `fix/variant-stock-drift`, worktree `_worktrees/ebda-store__fix-variant-stock-drift`.
 
 ---
 
@@ -735,7 +735,7 @@ if (remainingToProcess > 0) {
     },
   });
 
-  // InventoryHistory row (existing FWB pattern)
+  // InventoryHistory row (existing Ebda Store pattern)
   await tx.inventoryHistory.create({
     data: {
       productId: item.productId,
@@ -1280,7 +1280,7 @@ WHERE p.deleted_at IS NULL AND p.status='active';"
 
 Expected: `negative = 0`, `variant_parents_nonzero = 0`. `cart_update_would_fail` is now a
 meaningless label — the count may stay non-zero, but Task 2 means it no longer predicts a
-failure. Confirm behaviourally instead: change the quantity of a variant line in a pecannbee
+failure. Confirm behaviourally instead: change the quantity of a variant line in a demo-store
 cart and get a 200.
 
 - [ ] **Step 3: Documentation parity**

@@ -16,7 +16,7 @@ import { tabBarShownOn } from './tab-bar-visibility';
 
 /**
  * Sprint 3 (2026-05-17): Mobile sticky bottom tab bar with 4 destinations
- * — Home / Wishlist / Cart (elevated primary pill — matches Pecannbee
+ * — Home / Wishlist / Cart (elevated primary pill — matches Storefront
  * IMG_7985) / Search. Mirrors the pattern observed across all 3 OSOSS
  * reference storefronts during the 2026-05-17 UI catalog session.
  *

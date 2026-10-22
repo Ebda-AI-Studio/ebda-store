@@ -3,14 +3,14 @@ feature: checkout
 updated: 2026-05-24
 ---
 
-# UAT: Guest Checkout (MyFatoorah)
+# UAT: Guest Checkout (Kashier)
 
 **Reviewer account:** anonymous (no login required for guest checkout)  
 **Admin observer account:** see 1Password vault entry `checkout-uat`  
 **Pre-conditions:**
 
 - Test store seeded with ≥1 in-stock product (price > 0)
-- MyFatoorah payment provider set to **test mode** on the store (`PAYMENT_TEST_MODE=true` or store-level test flag)
+- Kashier payment provider set to **test mode** on the store (`PAYMENT_TEST_MODE=true` or store-level test flag)
 - Fresh browser session (no stored cart, no cookies from previous run)
 - Preview/staging env only — **never run against prod**
 
@@ -23,7 +23,7 @@ updated: 2026-05-24
 1. Navigate to storefront home (e.g. `https://<preview-domain>/`)
 2. Verify page loads with correct store name, logo, and at least one product visible
 3. Click a product card → product detail page opens in ≤2s
-4. Verify product name, price (KWD), images, and "Add to Cart" button are present
+4. Verify product name, price (EGP), images, and "Add to Cart" button are present
 5. Click **Add to Cart**
 6. Verify cart icon badge increments to 1
 7. Open cart (icon or `/cart`) → verify cart item appears with correct name, quantity, price
@@ -31,20 +31,20 @@ updated: 2026-05-24
 9. Fill in shipping form:
    - First name: `UAT`
    - Last name: `Tester`
-   - Email: `uat@force-ai.co`
-   - Phone: `+96500000001`
+   - Email: `uat@ebda.app`
+   - Phone: `+201000000001`
    - Address: `Block 5, Street 10, Building 3`
-   - City: `Kuwait City`
-   - Area: `Salmiya` (or any available option)
-   - Country: `Kuwait`
-10. Select **MyFatoorah** payment (or verify it is pre-selected)
+   - City: `Cairo`
+   - Area: `Maadi` (or any available option)
+   - Country: `Egypt`
+10. Select **Kashier** payment (or verify it is pre-selected)
 11. Click **Place Order** / **Continue to Payment**
-12. MyFatoorah test payment page loads within 3s
-13. Enter MyFatoorah test card: `5111 1111 1111 1118` · Exp: `05/2025` · CVV: `100` (or current test card from MyFatoorah sandbox docs)
+12. Kashier test payment page loads within 3s
+13. Enter the test card from Kashier's sandbox docs
 14. Complete payment
 15. Verify redirect back to storefront `/order-confirmation` or `/orders/<id>` page
 16. Verify confirmation page shows: order number, item(s), total amount, estimated delivery
-17. Verify confirmation email arrives at `uat@force-ai.co` within 60s (check store SMTP config)
+17. Verify confirmation email arrives at `uat@ebda.app` within 60s (check store SMTP config)
 18. In admin → Orders list: verify new order appears with status `pending` or `paid`
 19. Verify order details match: items, quantities, shipping address, payment method
 
@@ -63,7 +63,7 @@ updated: 2026-05-24
 
 ## Known limitations
 
-- MyFatoorah test cards change periodically — check [MyFatoorah sandbox docs](https://myfatoorah.readme.io/docs/test-cards) if a card is declined
+- Sandbox test cards change periodically — check the provider's sandbox docs if a card is declined
 - Inngest order-created fanout (push notification + abandoned-cart sentinels) runs async; allow 30s before checking
 
 ---

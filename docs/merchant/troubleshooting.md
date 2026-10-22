@@ -46,7 +46,7 @@ The storefront has its own language toggle (top-right corner) independent of the
 
 ### Storefront SSL warning / "Not Secure" badge — تحذير شهادة SSL
 
-- **Default Force AI Store domain (`store.forcemediakw.com/<slug>`)**: should always show the padlock. If not, this is a Force AI Store bug — WhatsApp support immediately.
+- **Default Ebda Store domain (`store.ebda.app/<slug>`)**: should always show the padlock. If not, this is a Ebda Store bug — WhatsApp support immediately.
 - **Custom domain (`yourstore.com`)**: certificate auto-issues within 1-5 minutes after DNS verification. If still showing after 30 minutes, see [custom-domain.md](./custom-domain.md#common-issues) — common cause is a CAA DNS record blocking Let's Encrypt.
 
 ---
@@ -58,8 +58,8 @@ The storefront has its own language toggle (top-right corner) independent of the
 Check in order:
 
 1. **Email notification**: check spam folder. Confirm your notification email in **Admin → Settings → Notifications**.
-2. **Push notification**: did you install Force AI Store admin as a PWA + grant notification permission? If you cleared browser data, the permission is revoked — re-grant.
-3. **Telegram bot**: only the Force Media operator account gets platform-level Telegram alerts. Merchant-level push goes via email + admin PWA push.
+2. **Push notification**: did you install Ebda Store admin as a PWA + grant notification permission? If you cleared browser data, the permission is revoked — re-grant.
+3. **Telegram bot**: only the Ebda AI Studio operator account gets platform-level Telegram alerts. Merchant-level push goes via email + admin PWA push.
 
 تحقّق: مجلد السبام، إعدادات إيميل الإشعارات، صلاحية الإشعارات في متصفّحك (لو ثبّت كPWA).
 
@@ -88,17 +88,17 @@ Rare but possible — usually a payment provider mid-state failure. Recovery:
 
 ### Admin keeps logging me out — يطلب تسجيل دخول كل شوي
 
-Force AI Store sessions last 30 days. If you're logged out earlier:
+Ebda Store sessions last 30 days. If you're logged out earlier:
 
 - Did you switch networks (Wi-Fi → mobile data)? Cross-origin cookie behavior on iOS Safari occasionally drops the auth cookie.
 - Did you clear cookies? That resets all sessions.
-- Are you using a browser extension that blocks cookies (uBlock Origin, etc.)? Whitelist `app.forcemediakw.com`.
+- Are you using a browser extension that blocks cookies (uBlock Origin, etc.)? Whitelist `store.ebda.app`.
 
 الجلسة تستمر 30 يومًا. إذا انقطعت أسرع: تأكد ما غيّرت شبكة، ما فعّلت إضافة تحظر الكوكيز، وأن الكوكيز ما اتمسحت.
 
 ### "Validation failed" when saving a product — رسالة خطأ عند حفظ المنتج
 
-Force AI Store enforces strict validation. The error message tells you which field — common ones:
+Ebda Store enforces strict validation. The error message tells you which field — common ones:
 
 - **Name (Arabic) is required**: even if you only sell to English-speakers, Arabic name is required for SEO + Search
 - **Price must be > 0**: free products → use a coupon for 100% discount instead
@@ -127,7 +127,7 @@ never provided a real email address.
 
 For **WhatsApp-origin orders** (placed via the ordering bot), if a payment link
 was already generated for the order, the order detail **action bar** now shows
-the existing MyFatoorah URL inline with **Copy** and **Open** buttons — no new
+the existing payment-link URL inline with **Copy** and **Open** buttons — no new
 link is generated.
 
 If you see a new link being generated instead:
@@ -154,11 +154,11 @@ Check all of the following:
 
 ### Connected to WBS but seeing 0 approved templates — متصل لكن لا توجد قوالب معتمدة
 
-1. Open the WhatsApp Business Platform admin dashboard (ws.forcemediakw.com)
+1. Open the WhatsApp Business Platform admin dashboard (ws.ebda.app)
 2. Go to your template list — check the status column on Meta for each template
 3. Templates may have been rejected by Meta. Use the **Reset to Draft** button on any rejected template to automatically rename it (e.g., `order_paid_v2`) and resubmit for approval
-4. After approval, template dropdowns in Force AI Store admin resolve the new version automatically — you do not need to re-select them
-5. If the template list is **still empty** after your templates are approved: disconnect then reconnect the WBS integration (Settings → WhatsApp Integration → Connection → Disconnect, then reconnect with the same API key). This triggers a fresh metadata fetch from WBS which unions the FWB-side approved templates with the live list.
+4. After approval, template dropdowns in Ebda Store admin resolve the new version automatically — you do not need to re-select them
+5. If the template list is **still empty** after your templates are approved: disconnect then reconnect the WBS integration (Settings → WhatsApp Integration → Connection → Disconnect, then reconnect with the same API key). This triggers a fresh metadata fetch from WBS which unions the Ebda Store-side approved templates with the live list.
 
 تحقّق من حالة القوالب في لوحة WBS وMeta. القوالب المرفوضة يمكن إعادة تقديمها بزر «Reset to Draft» — القوائم المنسدلة في المتجر تتعرّف على الإصدار الجديد تلقائيًا. إن استمرت القائمة فارغة بعد الاعتماد، افصل ثم أعد الاتصال لإجراء تحديث للبيانات الوصفية.
 
@@ -168,21 +168,21 @@ This means the Gemini AI classifier is not running — the bot is in legacy keyw
 
 **Root cause:** `GEMINI_API_KEY` is missing from the WBS Railway environment.
 
-**Fix (admin-only, contact Force AI):**
+**Fix (admin-only, contact Ebda AI Studio):**
 
 1. Log into Railway → `whatsapp-broadcaster` service → Variables
 2. Confirm `GEMINI_API_KEY` is set to a valid Google AI Studio key
 3. Redeploy the service
 4. Test by DMing a natural-language phrase like "أريد أطلب قهوة" — bot should now classify and respond intelligently
 
-بدون `GEMINI_API_KEY` في Railway، البوت يرجع لوضع الكلمات المفتاحية. تواصل مع فريق Force AI لإضافة المفتاح.
+بدون `GEMINI_API_KEY` في Railway، البوت يرجع لوضع الكلمات المفتاحية. تواصل مع فريق Ebda AI Studio لإضافة المفتاح.
 
 ### Customer DM ordering toggle not showing in admin — زر تفعيل الطلبات لا يظهر
 
 The toggle only appears after a successful WBS connection. Check the **Settings card status chip**:
 
 - If it shows "Not connected" → complete the WBS connection first (see Quickstart step 9)
-- If it shows "Connected" but the toggle still doesn't appear → hard-refresh the admin (Cmd+Shift+R) or WhatsApp Force AI support with your store slug
+- If it shows "Connected" but the toggle still doesn't appear → hard-refresh the admin (Cmd+Shift+R) or WhatsApp Ebda AI Studio support with your store slug
 
 ### Payment link returns 400 error — رابط الدفع يرجع خطأ 400
 
@@ -230,7 +230,7 @@ See [faq.md → Payments](./faq.md#payments).
 | **P0 — site down**                    | Storefront returns 5xx or won't load at all                                             | WhatsApp immediately + tag the message URGENT    |
 | **P1 — degraded**                     | Some features broken (e.g. checkout fails, search returns 0 results, images don't load) | WhatsApp with screenshot + URL + time it started |
 | **P2 — issue affecting one merchant** | Specific product / order / category misbehaving                                         | WhatsApp + order ID or product ID                |
-| **P3 — feature request / minor bug**  | Cosmetic issues, "it'd be nice if..."                                                   | Email contact@forcemediakw.com                   |
+| **P3 — feature request / minor bug**  | Cosmetic issues, "it'd be nice if..."                                                   | Email contact@ebda.app                           |
 
 اتصل بالدعم بحسب الأولوية: P0 (الموقع معطّل) فوري عبر واتساب، P1 (خلل جزئي) واتساب مع تفاصيل، P2 (مشكلة محدّدة) واتساب مع رقم الطلب، P3 (ميزة أو خلل بسيط) إيميل.
 
@@ -240,7 +240,7 @@ To diagnose quickly:
 
 1. **Exact URL** where the issue happens (copy from address bar)
 2. **Screenshot** showing the error or unexpected behavior
-3. **Time + date** the issue started (Kuwait time)
+3. **Time + date** the issue started (Egypt time)
 4. **Browser + device** (Chrome on iPhone 14, Safari on iPad, etc.)
 5. **Reproducible steps** if possible ("I clicked X, then Y, then Z and saw...")
 6. **Order/product/customer ID** if the issue is about a specific entity

@@ -71,7 +71,7 @@ vi.mock('next/link', () => ({
 }));
 
 const adapters = await import('./adapters');
-const { PecannbeeProductCard } = await import('./shared/PecannbeeProductCard');
+const { StorefrontProductCard } = await import('./shared/StorefrontProductCard');
 const { default: ModernProductCard } = await import('./modern/ProductCard');
 const { default: ElegantProductCard } = await import('./elegant/ProductCard');
 const { default: ClassicProductCard } = await import('./classic/ProductCard');
@@ -166,11 +166,11 @@ const PATHS: Path[] = [
   ['bold/ProductCard', direct(BoldProductCard)],
   ...PACKS.map(
     (pack): Path => [
-      `PecannbeeProductCard, ${pack} pack`,
+      `StorefrontProductCard, ${pack} pack`,
       (product, onAdd) => {
         state.template = pack;
         return React.createElement(
-          PecannbeeProductCard as never,
+          StorefrontProductCard as never,
           {
             product,
             isRtl: true,

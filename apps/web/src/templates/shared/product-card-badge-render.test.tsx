@@ -80,7 +80,7 @@ vi.mock('next/link', () => ({
 }));
 
 // Imported AFTER the mocks so every card picks them up.
-const { PecannbeeProductCard } = await import('./PecannbeeProductCard');
+const { StorefrontProductCard } = await import('./StorefrontProductCard');
 const { default: ModernProductCard } = await import('../modern/ProductCard');
 const { default: ElegantProductCard } = await import('../elegant/ProductCard');
 const { default: ClassicProductCard } = await import('../classic/ProductCard');
@@ -112,7 +112,7 @@ const ON_SALE = { ...BASE_PRODUCT, compareAtPrice: 8000 };
 const LABEL = { badgeLabel: 'Offer', badgeLabelAr: 'عرض' };
 
 const CARDS = [
-  ['shared/PecannbeeProductCard', PecannbeeProductCard],
+  ['shared/StorefrontProductCard', StorefrontProductCard],
   ['modern/ProductCard', ModernProductCard],
   ['elegant/ProductCard', ElegantProductCard],
   ['classic/ProductCard', ClassicProductCard],
@@ -512,7 +512,7 @@ describe.each(ALL_PATHS)('custom badge colours + tap-through — %s', (_name, re
 
 describe('cardShape radius vs the modern pack (tailwind-merge order)', () => {
   it.each([
-    ['PecannbeeProductCard', () => PecannbeeProductCard],
+    ['StorefrontProductCard', () => StorefrontProductCard],
     ['ProductCarousel', () => ProductCarousel],
   ] as const)(
     '%s: circle cardShape renders rounded-full, not the pack rounded-2xl',
@@ -542,10 +542,10 @@ describe('cardShape radius vs the modern pack (tailwind-merge order)', () => {
 // any ONE surface — a copy/paste error the resolver-only tests cannot see —
 // turns red here instead of shipping.
 
-describe('heart collision — PecannbeeProductCard (heart at top-start)', () => {
+describe('heart collision — StorefrontProductCard (heart at top-start)', () => {
   it("a badge explicitly placed at top-right — the heart's RTL corner — moves to top-left", () => {
     const html = render(
-      PecannbeeProductCard,
+      StorefrontProductCard,
       { ...NO_SALE, ...LABEL },
       {
         language: 'ar',
@@ -558,7 +558,7 @@ describe('heart collision — PecannbeeProductCard (heart at top-start)', () => 
 
   it('the same top-right choice is untouched in LTR — the heart is on the other side', () => {
     const html = render(
-      PecannbeeProductCard,
+      StorefrontProductCard,
       { ...NO_SALE, ...LABEL },
       { layout: layoutWith({ position: 'top-right', color: BADGE_COLOR }) }
     );
@@ -690,7 +690,7 @@ describe('heart collision — modern/elegant (heart at top-end)', () => {
 // Issue #2092 — minimal renders its own NEW chip at LOGICAL top-start
 // (`absolute top-2 start-2`) but its `resolveCardBadges` call never passed
 // `newOrBrandBadgeReserved`, so a merchant's `top-left` custom badge resolved
-// straight onto the NEW chip (Palora runs minimal). No wishlist heart on
+// straight onto the NEW chip (demo-boutique runs minimal). No wishlist heart on
 // minimal, so the avoidance target is the other top corner.
 describe('NEW-badge corner — minimal (#2092)', () => {
   // The NEW chip is the merchant's choice (Ruling D1016-NEW-1): these cases turn it on.
@@ -733,10 +733,10 @@ describe('NEW-badge corner — minimal (#2092)', () => {
 });
 
 describe('bottom-band collision — the 5 theme cards never sit under the mobile CTA (issue #1611)', () => {
-  // PecannbeeProductCard's Add-to-Cart button is a normal block element
+  // StorefrontProductCard's Add-to-Cart button is a normal block element
   // below the image, not an overlay, so it is excluded here on purpose —
   // there is nothing for its badge to lift above.
-  const FIVE_THEMES = CARDS.filter(([name]) => name !== 'shared/PecannbeeProductCard');
+  const FIVE_THEMES = CARDS.filter(([name]) => name !== 'shared/StorefrontProductCard');
 
   it.each(FIVE_THEMES)(
     '%s: the default corner lifts above the always-mounted CTA band',
@@ -752,9 +752,9 @@ describe('bottom-band collision — the 5 theme cards never sit under the mobile
     }
   );
 
-  it('PecannbeeProductCard: the default corner does NOT lift — no overlay to clear', () => {
+  it('StorefrontProductCard: the default corner does NOT lift — no overlay to clear', () => {
     const html = render(
-      PecannbeeProductCard,
+      StorefrontProductCard,
       { ...NO_SALE, ...LABEL },
       { layout: layoutWith({ color: BADGE_COLOR }) }
     );

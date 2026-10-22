@@ -10,7 +10,7 @@ updated: 2026-05-24
 **Pre-conditions:**
 
 - Preview/staging admin at `https://<preview-admin-domain>/`
-- A spare custom domain for testing (e.g. `uat-test-store.forcemediakw.com` — a real DNS record pointing at the Cloudflare Workers preview, OR any slug-based access)
+- A spare custom domain for testing (e.g. `uat-test-store.ebda.app` — a real DNS record pointing at the Cloudflare Workers preview, OR any slug-based access)
 - Cloudflare R2 staging bucket accessible for logo upload
 - Test store from a previous run deleted (or use a fresh slug)
 
@@ -31,10 +31,10 @@ updated: 2026-05-24
 5. Navigate to **Branding** tab → upload a test logo (PNG ≤2MB)
 6. Verify logo uploads to R2 (URL shown in field; no error)
 7. Verify logo renders in the admin branding preview
-8. Navigate to **Domain** tab → enter `uat-test-store.forcemediakw.com` (or a test slug domain)
+8. Navigate to **Domain** tab → enter `uat-test-store.ebda.app` (or a test slug domain)
 9. Click **Save Domain** → verify no error (domain provisioning may be async; note it is queued)
 10. Navigate to **Products** → click **New Product**
-11. Fill in: name `Test Product`, price `5.000`, stock `10`, category (create if needed)
+11. Fill in: name `Test Product`, price `5.00`, stock `10`, category (create if needed)
 12. Click **Publish** → verify product is active
 13. Open storefront via the store's slug URL: `https://<web-preview>/<slug>` or custom domain
 14. Verify storefront loads with: correct store name, uploaded logo, and the test product visible

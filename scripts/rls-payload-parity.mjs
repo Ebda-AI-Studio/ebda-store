@@ -133,7 +133,7 @@ async function seedFixtures(db) {
         ownerId: owner.id,
         status: 'active',
         plan: 'enterprise',
-        currency: 'KWD',
+        currency: 'EGP',
         template: 'modern',
         theme: { primaryColor: '36 36% 52%', showBranchesInFooter: true },
         marketingPixels: {},
@@ -186,7 +186,7 @@ async function seedFixtures(db) {
         data: {
           storeId,
           name: `Branch ${i}`,
-          country: 'Kuwait',
+          country: 'Egypt',
           address: `Block ${i}`,
           phone: '+96500000000',
           position: i,

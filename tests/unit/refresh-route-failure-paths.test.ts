@@ -50,8 +50,8 @@ function refreshHandler() {
 const realToken = (sub = 'user-a') =>
   jwt.sign({ type: 'refresh' }, process.env.JWT_SECRET as string, {
     algorithm: 'HS256',
-    issuer: 'force-api',
-    audience: 'force-app',
+    issuer: 'ebda-api',
+    audience: 'ebda-app',
     subject: sub,
     expiresIn: '365d',
     jwtid: `${Math.random()}`,
@@ -191,8 +191,8 @@ describe('#1801 the route verifies the signature before touching the database', 
     for (const bad of [
       'junk',
       jwt.sign({ type: 'refresh' }, 'attacker-secret', {
-        issuer: 'force-api',
-        audience: 'force-app',
+        issuer: 'ebda-api',
+        audience: 'ebda-app',
         subject: 'forged',
       }),
       'a'.repeat(5000),
@@ -211,8 +211,8 @@ describe('#1801 the route verifies the signature before touching the database', 
     // than the row), so an expired-but-signed token must still be looked up.
     const expired = jwt.sign({ type: 'refresh' }, process.env.JWT_SECRET as string, {
       algorithm: 'HS256',
-      issuer: 'force-api',
-      audience: 'force-app',
+      issuer: 'ebda-api',
+      audience: 'ebda-app',
       subject: 'user-a',
       expiresIn: -60,
     });

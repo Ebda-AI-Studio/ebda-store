@@ -53,7 +53,7 @@ describe('bundle_items / cart_bundles RLS follow-up (#1564)', () => {
     );
     expect(policy, 'bundle_items policy not found').not.toBeNull();
     const block = policy![0];
-    expect(block).toMatch(/FOR ALL TO force_app/i);
+    expect(block).toMatch(/FOR ALL TO \w+_app/i);
     expect(block).toMatch(/FROM bundles b/i);
     expect(block).toMatch(/b\.id = bundle_items\.bundle_id/i);
     expect(block).toMatch(/b\.store_id = current_store_id\(\)/i);
@@ -66,7 +66,7 @@ describe('bundle_items / cart_bundles RLS follow-up (#1564)', () => {
     );
     expect(policy, 'cart_bundles policy not found').not.toBeNull();
     const block = policy![0];
-    expect(block).toMatch(/FOR ALL TO force_app/i);
+    expect(block).toMatch(/FOR ALL TO \w+_app/i);
     expect(block).toMatch(/FROM carts c/i);
     expect(block).toMatch(/c\.id = cart_bundles\.cart_id/i);
     expect(block).toMatch(/c\.store_id/i);

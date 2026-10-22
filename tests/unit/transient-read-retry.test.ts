@@ -1,5 +1,5 @@
 /**
- * FORCE-API-2D/2E/2F (issue 2470) — a dropped Neon pooler connection on an
+ * EBDA-API-2D/2E/2F (issue 2470) — a dropped Neon pooler connection on an
  * idempotent read is retried a bounded number of times; nothing else is.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';

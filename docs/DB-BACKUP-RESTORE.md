@@ -1,6 +1,6 @@
 # Database backup, restore & disaster recovery
 
-Canonical DR runbook for the FWB Neon Postgres database. Three independent layers,
+Canonical DR runbook for the Ebda Store Neon Postgres database. Three independent layers,
 all **$0**. Every restore path below has been **drilled end-to-end** — see the drill log
 at the bottom. When something goes wrong, start at the decision table.
 
@@ -45,7 +45,7 @@ mass-deleted rows, a bug corrupted data 20 minutes ago).
 
 ```bash
 ORG=org-lingering-river-25973882
-PID=crimson-king-40424588            # fwb-eu  (wbs-eu = spring-dew-80973306)
+PID=crimson-king-40424588            # ebda-eu  (wbs-eu = spring-dew-80973306)
 export PATH="/opt/homebrew/opt/postgresql@17/bin:$PATH"
 
 # 1. Branch production (branch name: main) to the moment BEFORE the incident.
@@ -76,7 +76,7 @@ dump restore you do **not** re-apply RLS. Still verify tenant isolation after an
 
 ## Layer 1 — local daily dumps (Mac, launchd)
 
-Central script `~/.claude/scripts/backup-all-neon.sh` (launchd `com.forceai.neon-backup`,
+Central script `~/.claude/scripts/backup-all-neon.sh` (launchd `com.ebda.neon-backup`,
 03:30 daily; runs on next wake if the Mac slept) gzip-dumps every Force Neon DB to
 `~/Desktop/projects/_backups/<project>/`, keeps **30** (~1 month).
 
@@ -102,7 +102,7 @@ what survives the laptop dying.
 gzip integrity → decompressed floor (1KB) → `-- PostgreSQL database dump` header → at least one
 `CREATE TABLE` → **data rows ≥ tables**. The row assertion is the one with teeth: a schema-only
 dump is a few KB, clears any byte floor, and restores an empty database — which is exactly how
-the Force Media CRM archived 30 consecutive nightly "successes" over five weeks against a
+the Ebda AI Studio CRM archived 30 consecutive nightly "successes" over five weeks against a
 database that had already been wiped. Verification happens on the PLAINTEXT because an encrypted
 blob cannot be inspected later without the key. A failed assertion **fails the job, fires the
 Telegram alert, and uploads nothing** — a missing backup is loud, a worthless one is silent.
@@ -133,7 +133,7 @@ export PATH="/opt/homebrew/opt/postgresql@17/bin:$PATH"
 ls -lt ~/Desktop/projects/_backups/ebda/*.sql.gz
 DUMP=~/Desktop/projects/_backups/ebda/<chosen>.sql.gz
 #    …or fetch + decrypt an R2 copy:
-#    KEY=$(cat ~/.claude/.force-website-builder-backup-key)
+#    KEY=$(cat ~/.claude/.ebda-store-backup-key)
 #    openssl enc -d -aes-256-cbc -pbkdf2 -pass "pass:$KEY" \
 #      -in <chosen>.sql.gz.enc -out <chosen>.sql.gz
 
@@ -147,7 +147,7 @@ URL=$(neonctl connection-string restore-candidate --project-id "$PID" --org-id "
         --role-name neondb_owner --database-name neondb)
 
 # 3. The dumps are plain-format WITHOUT --clean, so reset the branch schema first,
-#    then restore in a single transaction (all-or-nothing; ~5 min for FWB from Frankfurt).
+#    then restore in a single transaction (all-or-nothing; ~5 min for Ebda Store from Frankfurt).
 psql "$URL" -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public;"
 zcat < "$DUMP" | psql "$URL" --single-transaction -v ON_ERROR_STOP=1
 
@@ -251,7 +251,7 @@ neonctl branches delete restore-candidate --project-id "$PID" --org-id "$ORG"
 ```
 
 ⚠️ **Restore is destructive to writes made since the dump** — orders placed, products edited,
-R2 uploads referenced from new rows — all lost. For FWB that's **per-tenant loss across every
+R2 uploads referenced from new rows — all lost. For Ebda Store that's **per-tenant loss across every
 store**. Prefer PITR (Layer 0) whenever the incident is inside the 7-day window; only fall back
 to a dump when it isn't. Coordinate with the team before a production cutover.
 
@@ -260,7 +260,7 @@ to a dump when it isn't. Coordinate with the team before a production cutover.
 ## Erasure boundary — how long deleted PII survives in these backups
 
 A `POST /auth/me/erase` request (GDPR Art. 17 and applicable GCC
-data-protection law — see `docs/legal/gcc-data-protection.md`)
+data-protection law — see `docs/privacy/data-map.md`)
 only mutates the LIVE database — it can't retroactively edit a backup that
 was already taken. Full breakdown of the resulting persistence window
 (PITR 7 days + dump retention 30 days below) and what that means for a

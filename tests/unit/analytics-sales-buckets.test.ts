@@ -36,7 +36,7 @@ import {
 import { resolveDateRange } from '../../apps/admin/src/app/stores/[id]/analytics/_components/types';
 
 const STORE = 'store-1';
-const KUWAIT = 180; // minutes east of UTC
+const TZ_OFFSET_MIN = 180; // minutes east of UTC
 
 beforeEach(() => {
   queryRaw.mockReset();
@@ -99,7 +99,7 @@ describe('AnalyticsService.getSalesChart', () => {
       STORE,
       'this_year',
       { startDate, endDate },
-      KUWAIT
+      TZ_OFFSET_MIN
     );
 
     expect(granularity).toBe('month');
@@ -126,14 +126,14 @@ describe('AnalyticsService.getSalesChart', () => {
       STORE,
       'this_month',
       { startDate, endDate },
-      KUWAIT
+      TZ_OFFSET_MIN
     );
     expect(granularity).toBe('day');
     expect(sales[0].date).toBe('2026-09-01');
     expect(sales[sales.length - 1].date).toBe('2026-09-30');
     expect(sales).toHaveLength(30);
     // The offset reaches the SQL so the DB buckets on the same calendar days.
-    expect(queryRaw.mock.calls[0]).toContain(KUWAIT);
+    expect(queryRaw.mock.calls[0]).toContain(TZ_OFFSET_MIN);
   });
 
   it('last_90 → weekly buckets keyed on Mondays', async () => {
@@ -143,7 +143,7 @@ describe('AnalyticsService.getSalesChart', () => {
       STORE,
       'last_90',
       { startDate, endDate },
-      KUWAIT
+      TZ_OFFSET_MIN
     );
     expect(granularity).toBe('week');
     expect(sales.length).toBeGreaterThanOrEqual(13);

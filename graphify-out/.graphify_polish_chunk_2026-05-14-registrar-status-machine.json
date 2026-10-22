@@ -6,7 +6,7 @@
       "type": "trap",
       "summary": "Consumer registrars (GoDaddy, Squarespace, Wix, Namecheap) auto-attach new domains to their hosted-website product, surfacing a fake DNS row the merchant can't delete via the DNS panel. The fix is product-level disconnect (My Products → Websites + Marketing → Remove domain), not DNS editing.",
       "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf/memory/feedback-registrar-dns-quirks.md",
-      "tags": ["dns", "godaddy", "custom-domain", "merchant-onboarding", "registrar", "fwb"]
+      "tags": ["dns", "godaddy", "custom-domain", "merchant-onboarding", "registrar", "ebda"]
     },
     {
       "id": "multi-a-record-round-robin-trap",
@@ -21,7 +21,7 @@
         "round-robin",
         "custom-domain",
         "merchant-onboarding",
-        "fwb"
+        "ebda"
       ]
     },
     {
@@ -30,7 +30,7 @@
       "type": "rule",
       "summary": "Admin DNS records tables MUST include Type/Name/Value/Priority/TTL columns plus a copy button per row and break-all on the value cell. A 3-column table forces merchants to ask for Priority (MX=10) and TTL defaults, creating per-onboarding friction. DKIM TXT values are ~400 chars — truncation without break-all breaks copy-paste at registrars.",
       "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf/memory/feedback-registrar-dns-quirks.md",
-      "tags": ["dns", "admin-ui", "ux", "mx", "dkim", "resend", "merchant-onboarding", "fwb"]
+      "tags": ["dns", "admin-ui", "ux", "mx", "dkim", "resend", "merchant-onboarding", "ebda"]
     },
     {
       "id": "provision-verify-status-machine-trap",
@@ -45,7 +45,7 @@
         "email-sender",
         "provisioning",
         "merchant-onboarding",
-        "fwb"
+        "ebda"
       ]
     },
     {
@@ -84,7 +84,7 @@
     },
     {
       "from": "dns-records-table-contract",
-      "to": "fwb-cms-and-tenant-control",
+      "to": "ebda-cms-and-tenant-control",
       "type": "related-to"
     },
     {
@@ -94,7 +94,7 @@
     },
     {
       "from": "provision-verify-status-machine-trap",
-      "to": "fwb-content-visibility-split-trap",
+      "to": "ebda-content-visibility-split-trap",
       "type": "related-to"
     },
     {

@@ -605,7 +605,7 @@ describe('Egyptian mobile numbers', () => {
     '010123456789', // one digit long
     '01312345678', // 013 is not a mobile prefix
     '02212345678', // landline
-    '+96551234567', // Kuwait
+    '+96551234567', // foreign country code
     'abc',
   ])('rejects %s', input => {
     expect(normalizeEgyptianMobile(input)).toBeNull();

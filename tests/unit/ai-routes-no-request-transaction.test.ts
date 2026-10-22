@@ -1,5 +1,5 @@
 /**
- * FORCE-API-2G (issue 2469) — "Transaction already closed … timeout was
+ * EBDA-API-2G (issue 2469) — "Transaction already closed … timeout was
  * 30000 ms, however 66772 ms passed", breadcrumb `prisma.aiUsage.create()`.
  *
  * `tenantContext` holds one interactive transaction from BEGIN to the response
@@ -123,7 +123,7 @@ beforeEach(() => {
   h.txOpened = 0;
 });
 
-describe('FORCE-API-2G reproduction', () => {
+describe('EBDA-API-2G reproduction', () => {
   it('under tenantContext a >30s model call writes on an expired transaction and the request 500s', async () => {
     const res = await request(appWith(tenantContext)).post(`/stores/${STORE}/ai/translate`);
     expect(res.status).toBe(500);
@@ -185,7 +185,7 @@ describe('the routes that await Gemini are mounted outside the request transacti
   /**
    * `aiRouteContext` sends GETs into the request transaction, which is only safe
    * while every GET handler in ai.routes.ts is a pure DB read — a new GET that
-   * awaits the model would resurrect FORCE-API-2G. Derive the model-calling
+   * awaits the model would resurrect EBDA-API-2G. Derive the model-calling
    * identifiers from the file's OWN imports of AI modules (so the list grows by
    * itself as AI helpers are added) and assert no GET block mentions one.
    */

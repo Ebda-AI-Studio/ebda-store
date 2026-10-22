@@ -25,7 +25,14 @@ import { z } from 'zod';
 import jwt from 'jsonwebtoken';
 import { createHash } from 'node:crypto';
 import { prisma, withStore } from '@ebda/database';
-import { groupOrderLinesForDisplay, BRAND_MARKETING_URL } from '@ebda/shared';
+import {
+  BRAND_MARKETING_URL,
+  JWT_ISSUER,
+  JWT_ISSUERS_ACCEPTED,
+  JWT_WA_CART_AUDIENCE,
+  JWT_WA_CART_AUDIENCES_ACCEPTED,
+  groupOrderLinesForDisplay,
+} from '@ebda/shared';
 import { config } from '../config';
 import { waBridgeAuth } from '../middleware/wa-bridge-auth';
 import { searchQueryFromHeader } from '../lib/search-term';
@@ -54,6 +61,7 @@ import {
   type ResolvedBundle,
 } from '../services/bundle.service';
 
+import { templateStatusSchema } from '../lib/wbs-wire';
 const addressSvc = new CustomerAddressService(prisma as any);
 
 /** Default service menu when the merchant hasn't customized it. */
@@ -1102,8 +1110,8 @@ router.post('/cart/from-wa', waBridgeAuth, async (req: Request, res: Response) =
     const checkoutToken = jwt.sign(tokenPayload, config.jwtSecret, {
       algorithm: 'HS256',
       expiresIn: CHECKOUT_TOKEN_TTL_SECONDS,
-      issuer: 'force-api',
-      audience: 'force-wa-cart',
+      issuer: JWT_ISSUER,
+      audience: JWT_WA_CART_AUDIENCE,
     });
 
     // Compute the storefront checkout URL. Per-store custom domain may
@@ -1176,8 +1184,8 @@ router.post('/cart/redeem', async (req: Request, res: Response) => {
 
     const payload = jwt.verify(token, config.jwtSecret, {
       algorithms: ['HS256'],
-      issuer: 'force-api',
-      audience: 'force-wa-cart',
+      issuer: JWT_ISSUERS_ACCEPTED,
+      audience: JWT_WA_CART_AUDIENCES_ACCEPTED,
     }) as Record<string, unknown>;
     if (payload.sub !== 'wa-cart') {
       res.status(400).json({ success: false, error: 'WRONG_TOKEN_TYPE' });
@@ -1238,16 +1246,6 @@ router.post('/cart/redeem', async (req: Request, res: Response) => {
 // originated from an store-driven submission. Idempotent — same status
 // arriving twice (Meta sometimes redelivers) just refreshes the row.
 
-const templateStatusSchema = z.object({
-  fwbStoreId: z.string().min(1),
-  sourceKey: z.string().nullable().optional(),
-  templateName: z.string().min(1),
-  language: z.string().min(1),
-  status: z.enum(['draft', 'pending', 'approved', 'rejected', 'paused', 'disabled']),
-  rejectionReason: z.string().nullable().optional(),
-  metaTemplateId: z.string().nullable().optional(),
-});
-
 router.post('/templates/status', waBridgeAuth, async (req: Request, res: Response) => {
   try {
     const parsed = templateStatusSchema.safeParse(req.body);
@@ -1255,23 +1253,16 @@ router.post('/templates/status', waBridgeAuth, async (req: Request, res: Respons
       res.status(400).json({ success: false, error: 'INVALID_BODY' });
       return;
     }
-    const {
-      fwbStoreId,
-      sourceKey,
-      language,
-      status,
-      rejectionReason,
-      metaTemplateId,
-      templateName,
-    } = parsed.data;
+    const { storeId, sourceKey, language, status, rejectionReason, metaTemplateId, templateName } =
+      parsed.data;
 
     // Bridge-store auth contract: the X-WBS-API-KEY middleware already mapped
-    // the caller to a store. Refuse if the body's fwbStoreId disagrees —
+    // the caller to a store. Refuse if the body's storeId disagrees —
     // that would indicate a forged callback from a different merchant's WBS
     // integration trying to mutate this merchant's templates.
-    if (req.bridgeStore!.id !== fwbStoreId) {
+    if (req.bridgeStore!.id !== storeId) {
       logger.warn(
-        { authStoreId: req.bridgeStore!.id, bodyStoreId: fwbStoreId, templateName },
+        { authStoreId: req.bridgeStore!.id, bodyStoreId: storeId, templateName },
         '[wa-bridge] templates/status: store mismatch — refusing'
       );
       res.status(403).json({ success: false, error: 'STORE_MISMATCH' });
@@ -1292,7 +1283,7 @@ router.post('/templates/status', waBridgeAuth, async (req: Request, res: Respons
     const existing = await prisma.whatsAppTemplate.findUnique({
       where: {
         storeId_sourceKey_language: {
-          storeId: fwbStoreId,
+          storeId,
           sourceKey,
           language,
         },
@@ -1305,7 +1296,7 @@ router.post('/templates/status', waBridgeAuth, async (req: Request, res: Respons
       // and continue. Could be a template submitted directly via the WBS
       // admin (not store-driven) or a stale callback from a deleted store.
       logger.info(
-        { fwbStoreId, sourceKey, language, status },
+        { storeId, sourceKey, language, status },
         '[wa-bridge] templates/status: no matching local row — ignored'
       );
       res.json({ success: true, recorded: false });
@@ -1313,7 +1304,7 @@ router.post('/templates/status', waBridgeAuth, async (req: Request, res: Respons
     }
 
     await prisma.whatsAppTemplate.update({
-      where: { id: existing.id, storeId: fwbStoreId },
+      where: { id: existing.id, storeId },
       data: {
         status,
         rejectionReason: status === 'rejected' ? rejectionReason || null : null,
@@ -1323,7 +1314,7 @@ router.post('/templates/status', waBridgeAuth, async (req: Request, res: Respons
     });
 
     logger.info(
-      { fwbStoreId, sourceKey, language, status },
+      { storeId, sourceKey, language, status },
       '[wa-bridge] templates/status: row updated'
     );
     res.json({ success: true, recorded: true });

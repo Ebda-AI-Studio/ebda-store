@@ -77,8 +77,8 @@ function authAs(store: FixtureStore, overrides: Partial<{ slug: string; currency
 function decodeToken(token: string): Record<string, unknown> {
   return jwt.verify(token, config.jwtSecret, {
     algorithms: ['HS256'],
-    issuer: 'force-api',
-    audience: 'force-wa-cart',
+    issuer: 'ebda-api',
+    audience: 'ebda-wa-cart',
   }) as Record<string, unknown>;
 }
 

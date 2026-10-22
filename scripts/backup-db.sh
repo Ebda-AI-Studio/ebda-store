@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Local Neon backup for Force Website Builder — runs from the PRE-PUSH hook.
+# Local Neon backup for Ebda Store — runs from the PRE-PUSH hook.
 # Dumps the production DB to
 # ~/Desktop/projects/_backups/<project>/pre-push/<ts>-<sha>.sql.gz — its own
 # subdirectory, separate from the nightly `backup-all-neon.sh`'s 30-day

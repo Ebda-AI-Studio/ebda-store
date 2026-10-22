@@ -74,7 +74,7 @@ describe('retryOnWriteConflict', () => {
  * reach database server", P1002 "timed out") as a GENUINE
  * `PrismaClientInitializationError`, whose code is on `errorCode` — `code` is
  * undefined on that class. The matcher read only `code` / `meta.code`, so a
- * caller listing P1001 in `extraRetryCodes` (FeatureService, FORCE-API-2D)
+ * caller listing P1001 in `extraRetryCodes` (FeatureService, EBDA-API-2D)
  * never retried the real error; the old tests passed on a hand-built shape.
  *
  * Mutation proof: remove the `errorCode` read in extractRetryCodes → red.

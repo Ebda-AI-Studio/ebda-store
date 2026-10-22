@@ -65,12 +65,12 @@ function multerClientError(err: unknown): { status: number; code: string; messag
  * capture from `err.statusCode ?? err.status`. A ZodError, a body-parser
  * SyntaxError and a Prisma P2002/P2025/P2003 carry neither, so every one of
  * them looked like an uncaught crash and was reported even though the client
- * got a 400/404/409 — FORCE-API-2C (158 events), 1B, 25, 27 (ZodError from
+ * got a 400/404/409 — EBDA-API-2C (158 events), 1B, 25, 27 (ZodError from
  * `schema.parse` in public/auth/admin routes) and 2A (duplicate-SKU P2002).
  * Both middlewares now classify through this one function; a parity test
  * (`tests/unit/error-status-parity.test.ts`) pins it to the responses below.
  * Sentry still captures a P2003 / P2025 at WARNING level (issue 1988) — they
- * are answered as client errors but are often server defects (FORCE-API-28).
+ * are answered as client errors but are often server defects (EBDA-API-28).
  */
 export function clientErrorStatus(err: unknown): number | undefined {
   if (err instanceof AppError) return err.statusCode < 500 ? err.statusCode : undefined;
@@ -102,7 +102,7 @@ export function markExpected<E extends Error>(err: E): E {
  * Narrower than `clientErrorStatus` on purpose (issue 2005). A ZodError, a
  * body-parser SyntaxError and an AppError 4xx are client mistakes by
  * construction. A Prisma P2002/P2025/P2003 is raised by OUR query and is just
- * as often a server defect — FORCE-API-28 was a P2003 from a nested
+ * as often a server defect — EBDA-API-28 was a P2003 from a nested
  * transaction that could not see the uncommitted cart, and a P2002 on a
  * ledger row is a double-post attempt. Those keep their 4xx RESPONSE (the
  * parity with `errorHandler` is unchanged) but are still captured, unless the

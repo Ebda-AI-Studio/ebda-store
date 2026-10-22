@@ -151,7 +151,7 @@ beforeAll(async () => {
         ctr: 0.15,
         position: 4,
         topQueries: [
-          { query: 'best gadgets kuwait', impressions: 120, clicks: 20 },
+          { query: 'best gadgets cairo', impressions: 120, clicks: 20 },
           { query: 'smart widget store', impressions: 60, clicks: 5 },
         ],
       },
@@ -206,7 +206,7 @@ describe('GET /stores/:storeId/answer-engine/gsc', () => {
     // ── top queries: from the LATEST row (2026-07-20) only ──────────────
     expect(topQueries.length).toBe(2);
     expect(topQueries.map((q: any) => q.query)).toEqual([
-      'best gadgets kuwait',
+      'best gadgets cairo',
       'smart widget store',
     ]);
     expect(topQueries.some((q: any) => q.query === 'old query')).toBe(false);
@@ -233,7 +233,7 @@ describe('GET /stores/:storeId/answer-engine/gsc', () => {
       { query: STORE_B_UNIQUE_QUERY, impressions: 999, clicks: 99 },
     ]);
     const rawBody = JSON.stringify(body);
-    expect(rawBody).not.toContain('best gadgets kuwait');
+    expect(rawBody).not.toContain('best gadgets cairo');
     expect(rawBody).not.toContain(storeA.domain);
   });
 

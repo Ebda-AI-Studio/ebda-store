@@ -1,228 +1,208 @@
 /**
- * Ebda is Ebda AI Studio's product. No inherited third-party brand, tenant, domain
- * or payment-provider string may survive in anything that runs or that a
- * user / merchant / shopper can see: app source, public assets, shipped
- * content (help/docs MDX), package source and the CI workflows.
+ * Ebda is Ebda AI Studio's product. No inherited brand, tenant, domain, country
+ * or currency string may survive anywhere in the repository: app source, public
+ * assets, shipped content, packages, CI, scripts, tests, configs and docs.
  *
- * Scope: text files under apps/<app>/src, apps/<app>/public,
- * apps/<app>/content, packages/<pkg>/src and .github/workflows.
- * NOT scanned: docs/, tests/, scripts/, migrations (immutable history).
+ * Scope: EVERY git-tracked text file (and every tracked file PATH), minus
+ *  - packages/database/prisma/migrations/** : applied migrations are immutable
+ *    (Prisma checksums them); editing history would break `migrate deploy`.
+ *  - this file (it spells the patterns out) and lockfile integrity lines.
+ * The inherited payment-provider names (provider scan) additionally apply to
+ * shipped sources only (apps/<app>/src|public|content, packages/<pkg>/src and
+ * .github/workflows); docs/tests may name them to explain the removal.
  *
- * PHASE_B_PENDING lists files another workstream owned while this guard
- * landed (builder/templates, billing/signup/onboarding/provisioning, tax) or
- * that carry an external wire contract. Every entry must still violate (the
- * last test), so the list can only shrink. Empty it in Phase B.
+ * ALLOWED lists the only surviving hits, each a live wire / config contract
+ * that cannot change without a coordinated deploy. Every entry must still match
+ * somewhere (last test), so the list can only shrink.
  */
 import { describe, it, expect } from 'vitest';
-import { readdirSync, readFileSync, statSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
+import { readFileSync } from 'node:fs';
 import path from 'node:path';
 
 const ROOT = path.resolve(__dirname, '../..');
+const SELF = 'tests/unit/no-force-branding.test.ts';
 
-const FORBIDDEN =
-  /force-ai\.co|forcemedia|force media|force ai|forceai|force-website-builder|pecannbee|wadyaljuz|palora|\bKWD\b|MyFatoorah|Hesabe|UPayments|\bKNET\b/i;
-// "FWB" without the false positives of a case-insensitive substring match:
-// FWB, fwb_x, fwb-x, fwb.x, fwbStoreId — but not a run of letters containing it.
+const BRAND =
+  /(?<!en)(?<!in)force[ _-]?(ai|media|app|wb|website|suite)|forceai|forcemedia|PoweredByForce|force_[a-z_]+_v\d+|pecannbee|wadyaljuz|palora|kuwait|kuwaiti|\bKWD\b|الكويت|فورس/i;
+// FWB without the false positives of a case-insensitive match (afwbc, fwbc).
 const FWB = /(?<![A-Za-z])(?:FWB|fwb)(?![a-z])|fwb[A-Z]/;
+const brandTest = (s: string): boolean => BRAND.test(s) || FWB.test(s);
+const PROVIDERS = /MyFatoorah|Hesabe|UPayments|\bKNET\b/i;
 
-export function violates(line: string): boolean {
-  return FORBIDDEN.test(line) || FWB.test(line);
-}
-
-/** repo-relative path -> why it may still carry a hit (Phase B). */
-const PHASE_B_PENDING: Record<string, string> = {
-  'apps/admin/src/app/stores/[id]/page-builder/page.tsx':
-    'builder/templates/layout workstream (excluded)',
-  'apps/admin/src/components/onboarding/PublicShell.tsx':
-    'billing/plan/onboarding/provisioning workstream (excluded)',
-  'apps/admin/src/i18n/messages/ar.json':
-    'forceMediaAlt key still read by excluded onboarding/PublicShell.tsx',
-  'apps/admin/src/i18n/messages/en.json':
-    'forceMediaAlt key still read by excluded onboarding/PublicShell.tsx',
-  'apps/api/src/lib/inngest/functions/order-whatsapp-notify.ts':
-    'WBS bridge wire contract (fwbStoreId / fwbOrderId / wa_carts columns) - needs WBS-side decision',
-  'apps/api/src/routes/store-layout.routes.ts': 'builder/templates/layout workstream (excluded)',
-  'apps/api/src/routes/wa-bridge.routes.ts':
-    'WBS bridge wire contract (fwbStoreId / fwbOrderId / wa_carts columns) - needs WBS-side decision',
-  'apps/api/src/routes/wa-templates.routes.ts':
-    'WBS bridge wire contract (fwbStoreId / fwbOrderId / wa_carts columns) - needs WBS-side decision',
-  'apps/api/src/routes/wbs-integration.routes.ts':
-    'WBS bridge wire contract (fwbStoreId / fwbOrderId / wa_carts columns) - needs WBS-side decision',
-  'apps/api/src/services/abandoned-cart.service.ts':
-    'WBS bridge wire contract (fwbStoreId / fwbOrderId / wa_carts columns) - needs WBS-side decision',
-  'apps/api/src/services/meta-provisioner.service.ts':
-    'billing/plan/onboarding/provisioning workstream (excluded)',
-  'apps/api/src/services/plan-entitlements.ts':
-    'billing/plan/onboarding/provisioning workstream (excluded)',
-  'apps/api/src/services/plan-sync.ts':
-    'billing/plan/onboarding/provisioning workstream (excluded)',
-  'apps/api/src/services/recommendation.service.ts':
-    'PecannbeeProductCard rename (blocked on templates workstream)',
-  'apps/api/src/services/wbs-bridge.service.ts':
-    'WBS bridge wire contract (fwbStoreId / fwbOrderId / wa_carts columns) - needs WBS-side decision',
-  'apps/web/src/app/bundles/BundleCard.tsx':
-    'PecannbeeProductCard rename (blocked on templates workstream)',
-  'apps/web/src/app/layout.tsx': 'builder/templates/layout workstream (excluded)',
-  'apps/web/src/app/products/ProductsClient.tsx':
-    'PecannbeeProductCard rename (blocked on templates workstream)',
-  'apps/web/src/app/tenant-store/[tenant]/[locale]/layout.tsx':
-    'builder/templates/layout workstream (excluded)',
-  'apps/web/src/builder/sections/FeaturedCollectionSection.tsx':
-    'PecannbeeProductCard rename (blocked on templates workstream)',
-  'apps/web/src/components/FrequentlyBoughtTogether.tsx':
-    'PecannbeeProductCard rename (blocked on templates workstream)',
-  'apps/web/src/components/YouMightAlsoLike.tsx':
-    'PecannbeeProductCard rename (blocked on templates workstream)',
-  'apps/web/src/lib/product-pricing.ts':
-    'PecannbeeProductCard rename (blocked on templates workstream)',
-  'apps/web/src/lib/serverTemplate.ts': 'builder/templates/layout workstream (excluded)',
-  'apps/web/src/templates/bold/Header.tsx': 'builder/templates/layout workstream (excluded)',
-  'apps/web/src/templates/bold/index.ts': 'builder/templates/layout workstream (excluded)',
-  'apps/web/src/templates/classic/Header.tsx': 'builder/templates/layout workstream (excluded)',
-  'apps/web/src/templates/classic/index.ts': 'builder/templates/layout workstream (excluded)',
-  'apps/web/src/templates/elegant/Header.tsx': 'builder/templates/layout workstream (excluded)',
-  'apps/web/src/templates/elegant/index.ts': 'builder/templates/layout workstream (excluded)',
-  'apps/web/src/templates/minimal/Header.tsx': 'builder/templates/layout workstream (excluded)',
-  'apps/web/src/templates/minimal/Hero.tsx': 'builder/templates/layout workstream (excluded)',
-  'apps/web/src/templates/minimal/index.ts': 'builder/templates/layout workstream (excluded)',
-  'apps/web/src/templates/modern/Header.tsx': 'builder/templates/layout workstream (excluded)',
-  'apps/web/src/templates/modern/index.ts': 'builder/templates/layout workstream (excluded)',
-  'apps/web/src/templates/modern/ProductCard.tsx': 'builder/templates/layout workstream (excluded)',
-  'apps/web/src/templates/shared/BottomTabBar.tsx':
-    'builder/templates/layout workstream (excluded)',
-  'apps/web/src/templates/shared/card-size.ts': 'builder/templates/layout workstream (excluded)',
-  'apps/web/src/templates/shared/CategoryStrip.tsx':
-    'builder/templates/layout workstream (excluded)',
-  'apps/web/src/templates/shared/custom-badge.ts': 'builder/templates/layout workstream (excluded)',
-  'apps/web/src/templates/shared/FloatingWidget.tsx':
-    'builder/templates/layout workstream (excluded)',
-  'apps/web/src/templates/look-card-w2b.test.tsx':
-    'PecannbeeProductCard rename (blocked on templates workstream)',
-  'apps/web/src/templates/card-mappers-cta.test.tsx':
-    'PecannbeeProductCard rename (blocked on templates workstream)',
-  'apps/web/src/templates/card-new-badge.test.tsx':
-    'PecannbeeProductCard rename (blocked on templates workstream)',
-  'apps/web/src/templates/shared/card-overflow.test.tsx':
-    'PecannbeeProductCard rename (blocked on templates workstream)',
-  'apps/web/src/templates/shared/sold-out-corner.test.tsx':
-    'PecannbeeProductCard rename (blocked on templates workstream)',
-  'apps/web/src/templates/shared/footer-branches-render.test.tsx':
-    'builder/templates/layout workstream (excluded)',
-  'apps/web/src/templates/shared/HeroSlider.tsx': 'builder/templates/layout workstream (excluded)',
-  'apps/web/src/templates/shared/oos-badge-collision.test.tsx':
-    'builder/templates/layout workstream (excluded)',
-  'apps/web/src/templates/shared/pack-styles.ts': 'builder/templates/layout workstream (excluded)',
-  'apps/web/src/templates/shared/PecannbeeProductCard.tsx':
-    'builder/templates/layout workstream (excluded)',
-  'apps/web/src/templates/shared/product-card-badge-render.test.tsx':
-    'builder/templates/layout workstream (excluded)',
-  'apps/web/src/templates/shared/looks-card-aspect-render.test.tsx':
-    'builder/templates/layout workstream (excluded)',
-  'apps/web/src/templates/shared/product-card-defaults.ts':
-    'builder/templates/layout workstream (excluded)',
-  'apps/web/src/templates/shared/ProductCardCta.tsx':
-    'builder/templates/layout workstream (excluded)',
-  'apps/web/src/templates/shared/ProductCarousel.tsx':
-    'builder/templates/layout workstream (excluded)',
-  'apps/web/src/templates/shared/section-typography.ts':
-    'builder/templates/layout workstream (excluded)',
-  'apps/web/src/templates/shared/SectionDivider.tsx':
-    'builder/templates/layout workstream (excluded)',
-  'apps/web/src/templates/shared/SectionHeading.tsx':
-    'builder/templates/layout workstream (excluded)',
-  'apps/web/src/templates/shared/ShareProductRow.tsx':
-    'builder/templates/layout workstream (excluded)',
-  'apps/web/src/templates/shared/SpecTable.tsx': 'builder/templates/layout workstream (excluded)',
-  'apps/web/src/templates/shared/TrustStrip.tsx': 'builder/templates/layout workstream (excluded)',
-  'packages/shared/src/order-tax.ts': 'tax/VAT workstream (excluded)',
-  'packages/shared/src/schemas/plan-limits.ts':
-    'billing/plan/onboarding/provisioning workstream (excluded)',
-  'packages/shared/src/types/store-layout.ts': 'builder/templates/layout workstream (excluded)',
+/**
+ * Line-level exceptions: regex + why + the EXACT files allowed to carry it
+ * (tests/unit/branding-allowlist.json, regenerate with the one-liner in
+ * docs/RULINGS.md BRAND-ZERO-1). A hit anywhere else, including a new file, fails.
+ */
+const ALLOWED: Record<string, { re: RegExp; why: string }> = {
+  forceApiApp: {
+    re: /(?<![A-Za-z0-9_])force-(?:api|app)\b/gi,
+    why: 'JWT iss/aud claim values on every issued token (renaming logs every user out; needs a dual-accept rollout) and the live names of third-party resources (Railway service, Sentry project, Axiom dataset, Inngest app id, OTEL service name)',
+  },
+  waTemplateNames: {
+    re: /force_[a-z_]+_v\d+/g,
+    why: 'WhatsApp template names (the old force_* order, cart and welcome names): renamed on fix/shopper-messages-egyptian; remove from allowlist after it merges',
+  },
+  hintCookie: {
+    re: /\bforce-session\b/g,
+    why: 'live admin/orders hint cookie name (force-session=1) read by api.ts + middleware; renaming bounces every signed-in merchant through login once',
+  },
+  metaEnv: {
+    re: /FORCE_AI_META_[A-Z_]+/g,
+    why: 'Railway env var names for the Meta provisioner; renaming needs a coordinated env change on the deployed service',
+  },
+  wbsBridge: {
+    re: /fwb(?:StoreId|OrderId)|fwb_(?:store|order)_id/g,
+    why: 'WBS bridge wire contract (request field names + wa_carts columns owned by the WBS service)',
+  },
 };
+const ALLOW_FILES: Record<string, string[]> = JSON.parse(
+  readFileSync(path.join(ROOT, 'tests/unit/branding-allowlist.json'), 'utf8')
+);
 
-const SKIP_DIRS = new Set(['node_modules', '.next', '.open-next', 'dist', '.turbo', 'coverage']);
-const TEXT_EXT = new Set([
-  '.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs', '.json', '.jsonc', '.css', '.scss',
-  '.html', '.svg', '.md', '.mdx', '.txt', '.webmanifest', '.xml', '.yml', '.yaml', '.sql', '.prisma',
-]); // prettier-ignore
+export function brandViolates(line: string, file = ''): boolean {
+  if (!brandTest(line)) return false;
+  let rest = line;
+  for (const [name, { re }] of Object.entries(ALLOWED))
+    if (!file || (ALLOW_FILES[name] ?? []).includes(file))
+      rest = rest.replace(
+        new RegExp(re.source, re.flags.includes('g') ? re.flags : re.flags + 'g'),
+        ''
+      );
+  return brandTest(rest);
+}
+export const providerViolates = (line: string): boolean => PROVIDERS.test(line);
 
-function roots(): string[] {
-  const out: string[] = [path.join(ROOT, '.github/workflows')];
-  for (const group of ['apps', 'packages']) {
-    const dir = path.join(ROOT, group);
-    for (const name of readdirSync(dir)) {
-      const subs = group === 'apps' ? ['src', 'public', 'content'] : ['src'];
-      for (const sub of subs) {
-        const p = path.join(dir, name, sub);
-        try {
-          if (statSync(p).isDirectory()) out.push(p);
-        } catch {
-          /* app without that dir */
-        }
-      }
-    }
-  }
-  return out;
+const SIDECARS = ['tests/unit/branding-allowlist.json', 'tests/unit/applied-migrations.json'];
+// sha1 prefixes of the migration directories already on origin/main (applied, immutable).
+// Hashed so the snapshot itself carries no migration name. A migration dir NOT in this set is new
+// and is scanned like any other file.
+const APPLIED: string[] = JSON.parse(
+  readFileSync(path.join(ROOT, 'tests/unit/applied-migrations.json'), 'utf8')
+);
+function isAppliedMigration(f: string): boolean {
+  const m = /^packages\/database\/prisma\/migrations\/([^/]+)\//.exec(f);
+  return !!m && APPLIED.includes(createHash('sha1').update(m[1]).digest('hex').slice(0, 12));
 }
 
-function walk(dir: string, acc: string[] = []): string[] {
-  for (const entry of readdirSync(dir, { withFileTypes: true })) {
-    if (entry.isDirectory()) {
-      if (!SKIP_DIRS.has(entry.name)) walk(path.join(dir, entry.name), acc);
-    } else if (TEXT_EXT.has(path.extname(entry.name).toLowerCase())) {
-      acc.push(path.join(dir, entry.name));
-    }
-  }
-  return acc;
-}
+const BINARY = /\.(png|jpe?g|webp|avif|gif|ico|glb|woff2?|ttf|otf|pdf|mp4|webm|zip|gz)$/i;
+const tracked = execFileSync('git', ['ls-files', '-z'], { cwd: ROOT, maxBuffer: 64 * 1024 * 1024 })
+  .toString()
+  .split('\0')
+  .filter(Boolean)
+  .filter(f => f !== SELF && !SIDECARS.includes(f))
+  .filter(f => !isAppliedMigration(f));
+const textFiles = tracked.filter(f => !BINARY.test(f));
+const shipped = (f: string) =>
+  /^(apps\/[^/]+\/(src|public|content)|packages\/[^/]+\/src|\.github\/workflows)\//.test(f);
 
-const files = roots().flatMap(r => walk(r));
-const rel = (f: string) => path.relative(ROOT, f).split(path.sep).join('/');
-
-describe('no inherited third-party branding in shipped sources', () => {
-  it('actually scans the app, package and workflow sources (not an empty-set pass)', () => {
-    expect(files.length).toBeGreaterThan(1000);
-    expect(files.some(f => rel(f).startsWith('apps/admin/public/'))).toBe(true);
-    expect(files.some(f => rel(f) === 'packages/shared/src/brand/index.ts')).toBe(true);
-    expect(files.some(f => rel(f) === '.github/workflows/ci.yml')).toBe(true);
+describe('no inherited branding anywhere in the repository', () => {
+  it('actually scans the repo (not an empty-set pass)', () => {
+    expect(textFiles.length).toBeGreaterThan(2000);
+    for (const must of [
+      'ROADMAP.md',
+      '.github/workflows/ci.yml',
+      'docs/RULINGS.md',
+      'scripts/backup-db.sh',
+    ])
+      expect(textFiles).toContain(must);
   });
 
   it('the patterns catch each forbidden form and spare Ebda strings', () => {
     for (const s of [
-      'Force AI', 'ForceAI-KW', 'x.force-ai.co', 'a.forcemediakw.com', 'force media', 'Force Media',
-      'force-website-builder', 'pecannbee.com.kw', 'Wadyaljuz', 'palora', 'KWD', 'kwd',
-      'MyFatoorah', 'hesabe', 'UPayments', 'KNET', 'FWB', 'fwb_store_id', 'fwb-eu', 'fwbStoreId',
-    ]) {
-      expect(violates(s), s).toBe(true);
-    } // prettier-ignore
-    for (const s of ['Ebda by Ebda AI Studio', 'EGP', 'Paymob', 'InstaPay', 'afwbc', 'KWDX']) {
-      expect(violates(s), s).toBe(false);
-    }
+      'Force AI',
+      'ForceAI-KW',
+      'x.force-ai.co',
+      'a.forcemediakw.com',
+      'Force Media',
+      'force_media',
+      'force-website-builder',
+      'Force Website Builder',
+      'force_app',
+      'pecannbee.com.kw',
+      'Wadyaljuz',
+      'palora',
+      'KWD',
+      'kwd',
+      'Kuwait',
+      'Kuwaiti',
+      'الكويت',
+      'FWB',
+      'fwb_x',
+      'fwb-eu',
+      'fwbStoreId-x force ai',
+    ])
+      expect(brandViolates(s), s).toBe(true);
+    for (const s of [
+      'Ebda by Ebda AI Studio',
+      'EGP',
+      'Egypt',
+      'Paymob',
+      'InstaPay',
+      'afwbc',
+      'KWDX',
+      'enforce',
+      'reinforce app',
+    ])
+      expect(brandViolates(s), s).toBe(false);
+    for (const s of [
+      "audience: 'ebda-app'",
+      "issuer: 'ebda-api'",
+      'FORCE_AI_META_BM_ID',
+      'body.fwbStoreId',
+      'cart.fwb_order_id',
+    ])
+      expect(brandViolates(s), s).toBe(false);
+    for (const s of ['MyFatoorah', 'hesabe', 'UPayments', 'KNET'])
+      expect(providerViolates(s), s).toBe(true);
   });
 
-  it('no file names an inherited brand, tenant, domain or payment provider', () => {
+  it('no tracked file PATH names an inherited brand', () => {
+    expect(tracked.filter(f => brandTest(f))).toEqual([]);
+  });
+
+  it('no tracked file CONTENT names an inherited brand, tenant, domain, country or currency', () => {
     const offenders: string[] = [];
-    for (const f of files) {
-      if (rel(f) in PHASE_B_PENDING) continue;
-      readFileSync(f, 'utf8')
-        .split('\n')
-        .forEach((line, i) => {
-          if (violates(line)) offenders.push(`${rel(f)}:${i + 1}: ${line.trim().slice(0, 100)}`);
-        });
+    for (const f of textFiles) {
+      let text: string;
+      try {
+        text = readFileSync(path.join(ROOT, f), 'utf8');
+      } catch {
+        continue;
+      }
+      text.split('\n').forEach((line, i) => {
+        if (line.includes('sha512-')) return;
+        if (brandViolates(line, f) || (shipped(f) && providerViolates(line)))
+          offenders.push(`${f}:${i + 1}: ${line.trim().slice(0, 100)}`);
+      });
     }
     expect(
       offenders,
-      'Inherited branding found. Use BRAND from @ebda/shared (packages/shared/src/brand) and neutral demo data (EGP, +20).'
+      'Inherited branding found. Use BRAND from @ebda/shared (packages/shared/src/brand), EGP and Egypt.'
     ).toEqual([]);
   });
 
-  it('every pending entry still exists and still violates (the list only shrinks)', () => {
-    for (const file of Object.keys(PHASE_B_PENDING)) {
-      const src = readFileSync(path.join(ROOT, file), 'utf8');
-      expect(
-        src.split('\n').some(violates),
-        `${file} is clean now — drop it from PHASE_B_PENDING`
-      ).toBe(true);
+  it('every ALLOWED contract still occurs in each file listed for it (the list only shrinks)', () => {
+    for (const [name, { re, why }] of Object.entries(ALLOWED)) {
+      const files = ALLOW_FILES[name] ?? [];
+      expect(files.length, `${name} has no files - drop the allowance (${why})`).toBeGreaterThan(0);
+      for (const f of files) {
+        expect(tracked, `${f} (${name}) is not tracked`).toContain(f);
+        const src = readFileSync(path.join(ROOT, f), 'utf8');
+        expect(
+          new RegExp(re.source, re.flags.replace('g', '')).test(src),
+          `${f} no longer needs ${name} - drop it from branding-allowlist.json (${why})`
+        ).toBe(true);
+      }
     }
+  });
+
+  it('applied-migration skip covers only the snapshot: a new migration dir is scanned', () => {
+    expect(
+      isAppliedMigration('packages/database/prisma/migrations/20990101000000_new_one/migration.sql')
+    ).toBe(false);
+    expect(APPLIED.length).toBeGreaterThan(100);
   });
 });

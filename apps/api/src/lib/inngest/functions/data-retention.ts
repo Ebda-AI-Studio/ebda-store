@@ -12,7 +12,7 @@ import {
 /**
  * Data retention crons (iceberg item #15 / applicable GCC data-protection
  * law's "no longer than business need" principle + GDPR Art. 5(1)(e)
- * storage limitation — see docs/legal/gcc-data-protection.md).
+ * storage limitation — see docs/privacy/data-map.md).
  *
  * Two passes:
  *
@@ -39,7 +39,7 @@ const SOFT_DELETED_USER_RETENTION_DAYS = 365;
 // and its PII snapshots (already nullified at customer-erase time,
 // but not for orders whose customer never asked to be erased) need
 // to be scrubbed under applicable GCC data-protection law's storage
-// limitation principle (see docs/legal/gcc-data-protection.md).
+// limitation principle (see docs/privacy/data-map.md).
 const ORDER_ANONYMIZE_RETENTION_DAYS = 365 * 5; // 1825 days
 
 // Caps per run so a one-time historical backlog doesn't open
@@ -213,7 +213,7 @@ export const softDeletedUserAnonymize: InngestFunction.Any = inngest.createFunct
  * After that window the order ROW can still survive (financial record)
  * but its PII snapshots must go (applicable GCC data-protection law +
  * GDPR Art. 5(1)(e) storage limitation — see
- * docs/legal/gcc-data-protection.md).
+ * docs/privacy/data-map.md).
  *
  * The eraseAccount path already scrubs orders' shipping/billing JSON
  * to `{ anonymized: true }` and nulls customerId AT CUSTOMER-ERASE TIME.

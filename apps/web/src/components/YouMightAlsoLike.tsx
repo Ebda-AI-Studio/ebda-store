@@ -49,7 +49,7 @@ export function YouMightAlsoLike({ storeId, productId }: YouMightAlsoLikeProps) 
   // Honour the same per-store productCardDefaults as the PLP and homepage
   // carousels so frame/size/shape settings apply on this surface too.
   // Eliminates the T.ProductGrid 4th render path: these cards now go through
-  // PecannbeeProductCard (same path as PLP and catalog listings).
+  // StorefrontProductCard (same path as PLP and catalog listings).
   const productCardDefaults = layout?.productCardDefaults;
 
   const { products, status, refetch } = useProductRecommendations(

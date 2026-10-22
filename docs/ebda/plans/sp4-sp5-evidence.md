@@ -10,7 +10,7 @@ check on both runtimes logs `current_user=ebda_app rolbypassrls=false`). Databas
 migrations), the Redis is its own (`:56411`), the pooler its own (`:6491`), ports 4811-4819.
 
 A note on the shared dev-stack gotcha: `apps/api/dist` must be rebuilt after a pull (`rm -rf apps/api/dist && npm run build -w apps/api`).
-A stale `dist` still held the removed Kuwait providers, and the first parity run showed it (`knet` in `/payments/config` on the base side).
+A stale `dist` still held the removed Egypt providers, and the first parity run showed it (`knet` in `/payments/config` on the base side).
 That run is discarded; the numbers below are from a clean rebuild.
 
 ## 1. Parity, Node (base) vs workerd (head), both as `ebda_app`
@@ -42,8 +42,8 @@ Then `node scripts/ebda-amelia-http-check.mjs --api http://127.0.0.1:4816/api/v1
 | `GET /public/products?limit=50`, unknown host / no host header | 400 `STORE_NOT_RESOLVED`, no data                                                               |
 
 Tenant isolation with a REAL second store in the same database: the store the E2E below created (`e2e-3c84abb2.ebda.app`) lists only its own
-product, and `GET /public/products/solitaire-ring-18k` on its host answers 404 `Product not found`. No-FWB-branding test:
-`npx vitest run tests/unit/no-fwb-branding.test.ts` -> 4/4 green (also inside the full unit run, section 5).
+product, and `GET /public/products/solitaire-ring-18k` on its host answers 404 `Product not found`. No-Ebda Store-branding test:
+`npx vitest run tests/unit/no-ebda-branding.test.ts` -> 4/4 green (also inside the full unit run, section 5).
 Note: an unknown host answers 400 `STORE_NOT_RESOLVED`, not 404 (design: the resolver throws on an unknown host; the plan's "404/empty" is
 met in substance: nothing is served).
 

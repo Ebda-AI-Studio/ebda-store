@@ -15,7 +15,7 @@ functions not covered by the 2026-06-09 async-writer audit, and storefront
 cross-tenant IDOR was found**. The systemic risk is that the _database_ backstop
 (RLS) that the codebase documents as "isolation even if application code misses a
 WHERE filter" is **currently inert in production** and, even after the planned
-`force_app` cutover, is not wired for a large fraction of routers. Isolation today
+the earlier app role cutover, is not wired for a large fraction of routers. Isolation today
 rests entirely on the app layer; a single forgotten `storeId` filter would leak
 cross-tenant with no second line of defense.
 
@@ -61,7 +61,7 @@ any future missing-`WHERE` bug is a _live_ cross-tenant leak now, not merely
 "defense-in-depth degraded."
 
 **Fix:** complete the tracked cutover — point production `DATABASE_URL` at the
-non-owner `force_app` login role (granted DML in
+non-owner the earlier app role login role (granted DML in
 `.../20260404000000_add_rls_policies/migration.sql:22-29`) and remove
 `ALLOW_BYPASSRLS_ROLE`. Verify with `railway run -- psql "$DATABASE_URL" -c "SELECT current_user, (SELECT rolbypassrls FROM pg_roles WHERE rolname=current_user)"`.
 Gate F2 and F3 _before_ cutting over (they break at cutover).
@@ -89,7 +89,7 @@ Contrast — RLS _is_ wired (param in mount path): `/stores/:storeId/products|ca
 `/stores/:storeId` (customers), `/stores/:id/wa-templates|payment-links`,
 `/admin/stores/:storeId/layout`.
 
-**Failure scenario:** post-`force_app`-cutover (F1), these routers still receive no
+**Failure scenario:** post-the earlier app role cutover (F1), these routers still receive no
 context → allow-contextless → any handler missing `where:{storeId}` leaks all
 tenants. The `tenant-context.ts` doc comment ("the database enforces tenant
 isolation even if application code misses a WHERE filter") is **false** for them.
@@ -102,7 +102,7 @@ carries a `storeId` filter until the mount is fixed.
 
 ---
 
-### F3 — `addresses` table is FORCE-RLS'd with NO policy → deny-all for `force_app` at cutover (checkout + saved addresses break platform-wide)
+### F3 — `addresses` table is FORCE-RLS'd with NO policy → deny-all for the earlier app role at cutover (checkout + saved addresses break platform-wide)
 
 **Severity: High** · **Verdict: CONFIRMED (latent; triggers at the F1 cutover)**
 `.../20260530000000_force_rls_enforcement/migration.sql:26` (FORCE list includes `addresses`) · `.../20260404000000_add_rls_policies/migration.sql:146-151` (addresses explicitly excluded from policies) · `.../20260609000000_complete_force_rls_coverage/migration.sql:388-398` (documents addresses as user-scoped, but does **not** add a policy or `NO FORCE`)
@@ -112,8 +112,8 @@ carries a `storeId` filter until the mount is fixed.
 `stores` (which got an explicit `NO FORCE` at line 411-412) it was never un-forced.
 `FORCE` + zero policies = **deny-all** for any non-owner role. It works today only
 because prod connects as the BYPASSRLS owner (F1). The moment `DATABASE_URL` cuts
-over to `force_app`, every `addresses` SELECT/INSERT/UPDATE returns 0 rows / is
-rejected. `force_app` holds DML grants (`.../20260404…:24`), so it's a policy gap,
+over to the earlier app role, every `addresses` SELECT/INSERT/UPDATE returns 0 rows / is
+rejected. the earlier app role holds DML grants (`.../20260404…:24`), so it's a policy gap,
 not a grant gap.
 
 **Failure scenario:** at RLS cutover, storefront checkout's address step and the
@@ -167,7 +167,7 @@ key that nothing writes anymore. Two effects: (a) functional desync — PLP comp
 checkmarks read a key with no writer, so they don't reflect the real list; (b) genuine
 cross-store bleed for any shopper holding stale flat-key data from before the
 namespacing fix — store A's compared product IDs highlight on store B in the same
-browser (shared platform origin `store.forcemediakw.com/<slug>`).
+browser (shared platform origin `store.ebda.app/<slug>`).
 
 **Fix:** change line 273 to read `compareStorageKey()` (import from `lib/compare`),
 matching every other call site.
@@ -177,7 +177,7 @@ matching every other call site.
 ### F5b — Static, un-namespaced storefront storage keys bleed UX/PII state between stores
 
 **Severity: Low** · **Verdict: CONFIRMED**
-`apps/web/src/components/PushNotificationPrompt.tsx:9-10` (`push-dismissed`/`push-subscribed`) · `apps/web/src/.../WaTokenHydrator.tsx:44,120` + `CheckoutClient.tsx:318` (`fwb.wa-customer-phone`, `fwb.wa-cart-redeemed`)
+`apps/web/src/components/PushNotificationPrompt.tsx:9-10` (`push-dismissed`/`push-subscribed`) · `apps/web/src/.../WaTokenHydrator.tsx:44,120` + `CheckoutClient.tsx:318` (`ebda.wa-customer-phone`, `ebda.wa-cart-redeemed`)
 
 On the shared platform origin, these static keys carry over between stores: dismissing
 the push prompt on store A suppresses it on store B; a WhatsApp phone number entered at
@@ -189,7 +189,7 @@ PII bleed, sessionStorage clears on tab close). Most storefront keys ARE namespa
 **safe by design** — auth is server-validated and the guest cart lookup is keyed
 server-side by `(storeId, sessionId)`.
 
-**Fix:** namespace `push-dismissed`/`push-subscribed`/`fwb.wa-*` by `store.id` like the
+**Fix:** namespace `push-dismissed`/`push-subscribed`/`ebda.wa-*` by `store.id` like the
 cart/compare/checkout keys already are. Same class as
 `feedback-per-store-localstorage-namespacing.md`.
 
@@ -312,7 +312,7 @@ string so the rightful owner gets `DOMAIN_TAKEN` (denial-of-attachment nuisance)
 | --- | ---------- | ------------------ | -------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------- |
 | F1  | **High**   | CONFIRMED\*        | Prod connects as BYPASSRLS owner (`ALLOW_BYPASSRLS_ROLE=true`) → RLS entirely inert; isolation is app-layer-only                 | `apps/api/src/index.ts:438-480`                                 |
 | F2  | **High**   | CONFIRMED          | `tenantContext` never sets RLS context for ~32 routers on bare `/stores` `/` `/admin` mounts (param not in mount path)           | `routes/index.ts:111-197`; `middleware/tenant-context.ts:37-53` |
-| F3  | **High**   | CONFIRMED (latent) | `addresses` is FORCE-RLS'd with no policy → deny-all for `force_app`; checkout + saved addresses break at cutover                | migrations `20260530…:26`, `20260404…:146`, `20260609…:388`     |
+| F3  | **High**   | CONFIRMED (latent) | `addresses` is FORCE-RLS'd with no policy → deny-all for the earlier app role; checkout + saved addresses break at cutover       | migrations `20260530…:26`, `20260404…:146`, `20260609…:388`     |
 | F4  | **Medium** | CONFIRMED          | 8 bulk-AI Inngest fns run bare (no RLS) under false `runInTenantContext` comments; no backstop if a future query drops `storeId` | `lib/inngest/functions/bulk-ai-*.ts`                            |
 | F5  | **Medium** | CONFIRMED          | PLP reads legacy flat `compareProducts` key → compare desync + cross-store bleed of compared IDs                                 | `app/products/ProductsClient.tsx:273`                           |
 | F5b | **Low**    | CONFIRMED          | Static push/wa-phone storage keys bleed UX/PII across stores on shared origin                                                    | `PushNotificationPrompt.tsx:9`; `WaTokenHydrator.tsx:44,120`    |
@@ -328,4 +328,4 @@ check, not a code read.
 the strong, consistent app-layer scoping (`requireStoreAccess` + check-then-act)
 holds the line that RLS currently does not. The strategic risk is that this makes the
 app layer _load-bearing with no backstop_ (F1/F2), so the High items should be closed
-as a set before the `force_app` cutover.
+as a set before the the earlier app role cutover.

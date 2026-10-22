@@ -29,7 +29,7 @@ Meta bills the WhatsApp Business Platform per delivered message (since 2025-07-0
   - Utility templates sent inside an open service window, free since 2025-07-01, are now charged.
   - Free entry points (72-hour window) and the WhatsApp Business App remain free.
   - No volume tiers on service messages.
-  - 40 rates updated; Kuwait, Morocco, Saudi, UAE and others had marketing increases; Egypt not named in the increase lists seen, **unverified**.
+  - 40 rates updated; Egypt, Morocco, Saudi, UAE and others had marketing increases; Egypt not named in the increase lists seen, **unverified**.
 - Billing currency is USD for the Egypt rate card; Egyptian 14% VAT is reported as added on top. Source: [Chatmaxima Egypt](https://chatmaxima.com/whatsapp-api-pricing/egypt/) (2026-10-03).
 
 ## Egypt rates per category

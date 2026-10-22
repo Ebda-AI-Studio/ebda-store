@@ -1,6 +1,6 @@
-# Force AI Store — Plan ⇄ Feature Matrix
+# Ebda Store — Plan ⇄ Feature Matrix
 
-> **INTERNAL — Force AI / Force Media team. Generated from `packages/shared/src/plan-baselines.ts`
+> **INTERNAL — Ebda AI Studio / Ebda AI Studio team. Generated from `packages/shared/src/plan-baselines.ts`
 > (the code that actually gates features at runtime). If this table and the code disagree, the code
 > wins — regenerate this doc.**
 >
@@ -23,7 +23,7 @@
 
 Plans are **layered (strict superset)**: Professional includes everything in Starter, Enterprise
 includes everything in Professional. `free` is a stripped grace/demo state, **not a sold tier**
-(Force AI Store is sold managed-agency with a custom proposal + yearly contract — there is no
+(Ebda Store is sold managed-agency with a custom proposal + yearly contract — there is no
 self-serve signup and no free trial). Super-admin can override any feature per store via the
 `StoreFeature` table without changing the plan.
 
@@ -108,14 +108,14 @@ self-serve signup and no free trial). Super-admin can override any feature per s
   are excluded from bundle lines by design, and the storefront quotes a coupon against the loose
   items only so the quote matches the charge. Rollout is a supervised pilot: one merchant, one real
   order, one real return, then offer to others. Flipping the flag does not bust the 600s AI-feed
-  cache. See `docs/business/04-pricing-tiers.md` §6 for the full rollout note.
+  cache.
 - **Answer-Engine Insights** (`answer_engine_insights`) — added to `STARTER_CORE` on 2026-07-22 (Plan 8A, same AI-first policy as `agent_feed`), so it's on every paid plan and off on `free`. Merchant surface: `/stores/:id/answer-engine` (Marketing hub) shows per-engine (Gemini/Perplexity/OpenAI) cited counts, a week-over-week trend, and the latest per-prompt win/lose list with a "run AI citation fix" deep-link to the `bulk-ai-citation-copy` GEO sweep for every prompt the store lost. Read API (`GET /stores/:id/answer-engine/summary`) fails closed like every other feature-gated route in this codebase — `403 FEATURE_DISABLED`, not a 404. Underlying `AnswerEngineCheck` rows come from a weekly citation-scan cron (Gemini always runs on the platform key; Perplexity/OpenAI are opt-in, platform-wide-toggled, DB-config-keyed add-on engines — see `docs/ENVIRONMENT.md`). **Google Search Console ingestion (Plan 8B, added 2026-07-23) is part of this SAME feature — no separate feature key.** The same page's GSC section (`GET /stores/:id/answer-engine/gsc`, same `403 FEATURE_DISABLED` gate) surfaces a daily impressions/clicks/CTR/position trend and top queries from `GscDailyMetric` rows written by a force-managed daily ingestion cron. Dormant (zero rows, UI shows "Google Search Console not connected") until `GSC_SERVICE_ACCOUNT_JSON` is provisioned — see `docs/ENVIRONMENT.md` and `docs/runbooks/google-search-console-indexing.md`.
 
 ### 2026-07-21 — AI-first baseline
 
 Every AI capability is now available on every paid plan. `agent_feed`, `upsell_crosssell` and `accounting.profit_anomaly` moved into `STARTER_CORE`; the AI reorder-suggestion scan was re-gated from `inventory.purchase_orders` to `inventory.basic` so an AI feature is no longer gated behind an ERP module (purchase orders themselves stay Enterprise).
 
-Rationale: FWB is an AI-first product and AI is its only uncontested differentiator against OSOSS. Tiering it made the positioning untrue — and left the flagship AI Product Feed disabled on **every** store, with a live storefront returning 404 for `/feeds/products.json`. Revenue comes from the platform, not from gating the differentiator.
+Rationale: Ebda Store is an AI-first product and AI is its only uncontested differentiator against OSOSS. Tiering it made the positioning untrue — and left the flagship AI Product Feed disabled on **every** store, with a live storefront returning 404 for `/feeds/products.json`. Revenue comes from the platform, not from gating the differentiator.
 
 `accounting.profit_anomaly` moves independently of `accounting.basic`: `profit-anomaly.service.ts` reads only coupon, inventory-history, payment and store data — never journal entries — so it functions on Starter without the accounting suite.
 

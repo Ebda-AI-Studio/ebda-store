@@ -168,7 +168,7 @@ export function runPaymentProviderContract(label: string, make: () => ContractTa
       it('refuses any currency but EGP', async () => {
         const err = await rejection(
           t.provider.createPayment(
-            baseRequest({ currency: 'KWD' as unknown as 'EGP', amountMinor: 1000 }),
+            baseRequest({ currency: 'USD' as unknown as 'EGP', amountMinor: 1000 }),
             t.creds
           )
         );

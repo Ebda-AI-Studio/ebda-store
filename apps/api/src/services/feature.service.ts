@@ -26,7 +26,7 @@ const CACHE_TTL = 300; // 5 minutes
 // Prisma's connection-level failures: P1001 "Can't reach database server",
 // P1002 "timed out", P1017 "Server has closed the connection." On Neon's
 // pooler these are transient — a dropped idle connection or a compute blip —
-// and FORCE-API-2D / 2E were each a single one of them 500ing
+// and EBDA-API-2D / 2E were each a single one of them 500ing
 // `GET /public/store/resolve` from inside `readFromDb`. One retry on a FRESH
 // transaction (`withStore` opens its own when there is no ambient one, so a dead connection is not
 // reused) absorbs them. Deliberately NOT a stale-value fallback: this map gates

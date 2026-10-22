@@ -14,7 +14,7 @@
  * Env:
  *   OTEL_EXPORTER_OTLP_ENDPOINT   collector base URL (e.g. https://otlp.example:4318)
  *   OTEL_EXPORTER_OTLP_HEADERS    optional "key=val,key2=val2" auth headers
- *   OTEL_SERVICE_NAME             service name (default "force-api")
+ *   OTEL_SERVICE_NAME             service name (default "ebda-api")
  *   OTEL_TRACES_SAMPLER_ARG       head sample ratio 0..1 (default 0.1 in prod, 1 otherwise)
  */
 import { NodeSDK } from '@opentelemetry/sdk-node';
@@ -36,7 +36,7 @@ if (endpoint) {
 
     sdk = new NodeSDK({
       resource: resourceFromAttributes({
-        [ATTR_SERVICE_NAME]: process.env.OTEL_SERVICE_NAME || 'force-api',
+        [ATTR_SERVICE_NAME]: process.env.OTEL_SERVICE_NAME || 'ebda-api',
         [ATTR_SERVICE_VERSION]: process.env.APP_VERSION || '1.0.0',
       }),
       sampler: new ParentBasedSampler({

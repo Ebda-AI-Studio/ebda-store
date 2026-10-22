@@ -4,7 +4,7 @@ Ebda is a private repo on GitHub Free: **2,000 GitHub-hosted Actions minutes per
 month**, Linux 1x. Ahmad's decision: CI is lean from the first commit; pull
 requests run only lint, typecheck and unit tests for the paths that changed;
 integration, E2E and mutation tests run on main or nightly. Nothing depends on
-Umbra (FWB's self-hosted runner): every job is `runs-on: ubuntu-latest`, and
+Umbra (Ebda Store's self-hosted runner): every job is `runs-on: ubuntu-latest`, and
 `tests/unit/workflow-hosted-runners-only.test.ts` fails the build if a
 self-hosted label, `vars.USE_SELF_HOSTED` or `SCHEDULED_ON_CLOUD` reappears.
 
@@ -12,7 +12,7 @@ self-hosted label, `vars.USE_SELF_HOSTED` or `SCHEDULED_ON_CLOUD` reappears.
 
 | Trigger                     | Runs                                                                                                                                                                                                                                          |
 | --------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `pull_request` to main      | `changes`, `guards` (migration order, action pins, client secret scan, no-FWB-branding test, prettier on changed files), `lint`, `typecheck`, `unit` (affected paths), `worker-dry-run` (see below); plus gitleaks, blast-radius              |
+| `pull_request` to main      | `changes`, `guards` (migration order, action pins, client secret scan, no-Ebda Store-branding test, prettier on changed files), `lint`, `typecheck`, `unit` (affected paths), `worker-dry-run` (see below); plus gitleaks, blast-radius       |
 | push to `main`              | `guards` only (lite: no install) and gitleaks. The merge commit already passed its PR.                                                                                                                                                        |
 | nightly cron, Mon-Sat 01:17 | ebda_app strict-RLS proof (`test-rls-ebda-app`, the R-EBDA-001 gate)                                                                                                                                                                          |
 | weekly cron, Sun 01:17      | everything in the full lane: `build` (full lint, typecheck, format, build), `test-unit` (full, with coverage), `orphan-tests`, `test-integration`, RLS proof, `test-rls-payload-parity`, `test-e2e`, `security`, `mutation`; semgrep at 01:47 |

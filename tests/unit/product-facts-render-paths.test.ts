@@ -11,7 +11,7 @@ const ROOT = path.resolve(__dirname, '../..');
 const read = (rel: string) => fs.readFileSync(path.join(ROOT, rel), 'utf8');
 
 const CARD_PATHS = [
-  'apps/web/src/templates/shared/PecannbeeProductCard.tsx',
+  'apps/web/src/templates/shared/StorefrontProductCard.tsx',
   'apps/web/src/templates/modern/ProductCard.tsx',
   'apps/web/src/templates/elegant/ProductCard.tsx',
   'apps/web/src/templates/classic/ProductCard.tsx',

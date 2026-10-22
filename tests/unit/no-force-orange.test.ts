@@ -1,6 +1,6 @@
 /**
  * Ruling D1016-ORANGE-1 (Ahmad 2026-10-16, "Ebda do not have orange"): Ebda's palette is night
- * #0A0B0C, gold #B08D57 and lift #CBA873 (`BRAND.colors`, packages/shared/src/brand). The Force AI
+ * #0A0B0C, gold #B08D57 and lift #CBA873 (`BRAND.colors`, packages/shared/src/brand). The inherited
  * orange this repo inherited (#FF6F00 / #ff6e01 / #ff6e00, `26 100% 50%` and its tints, the
  * tailwind orange-500 brand fills, the `rgba(255,110,1,…)` glows) may not appear as a default,
  * fallback or chrome colour anywhere that runs: app and package source, CSS, tailwind configs,

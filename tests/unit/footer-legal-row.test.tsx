@@ -227,8 +227,8 @@ describe('IA-09: footer wordmark and attribution weight', () => {
     );
   });
   it('"Powered by" never outweighs the store: regular weight, muted, no foreground ink', async () => {
-    const { PoweredByForce } = await import('../../apps/web/src/templates/shared/PoweredByForce');
-    const { container } = render(<PoweredByForce />);
+    const { PoweredByEbda } = await import('../../apps/web/src/templates/shared/PoweredByEbda');
+    const { container } = render(<PoweredByEbda />);
     expect(container.innerHTML).not.toMatch(/font-semibold|font-bold|text-foreground(?!\/)/);
   });
 });

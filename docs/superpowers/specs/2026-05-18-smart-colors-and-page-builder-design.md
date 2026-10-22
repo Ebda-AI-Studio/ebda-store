@@ -457,9 +457,9 @@ A tenant who never opens a per-section typography editor sees zero behavior chan
 
 ## Related references
 
-- `feedback-fwb-card-controls-consumer-trap` (scoped) — the 4-layer discipline applies to every new field (color resolution, CSS var, admin control, Zod).
-- `feedback-fwb-template-overrides-pattern` (scoped) — the per-template upload-hint pattern from 2026-05-18; this design extends the broader "admin smart resolver" architecture.
-- `feedback-fwb-theme-identity-audit` (scoped) — confirms the auto-fix is structural (text contrast) not cosmetic (theme identity) — uniform rule respected.
-- `feedback-fwb-vercel-strict-ts-vs-local` (scoped) — Phase 1 + Phase 2 must run `npm run build -w apps/admin` AND `-w apps/web` locally before push.
+- `feedback-ebda-card-controls-consumer-trap` (scoped) — the 4-layer discipline applies to every new field (color resolution, CSS var, admin control, Zod).
+- `feedback-ebda-template-overrides-pattern` (scoped) — the per-template upload-hint pattern from 2026-05-18; this design extends the broader "admin smart resolver" architecture.
+- `feedback-ebda-theme-identity-audit` (scoped) — confirms the auto-fix is structural (text contrast) not cosmetic (theme identity) — uniform rule respected.
+- `feedback-ebda-vercel-strict-ts-vs-local` (scoped) — Phase 1 + Phase 2 must run `npm run build -w apps/admin` AND `-w apps/web` locally before push.
 - `CLAUDE.md` rule 5 — admin pages mirror storefront top-to-bottom flow. Part 2 of this design IS the canonical example of that rule applied at scale.
 - `CLAUDE.md` rule 4 — ThemeTab clutter ceiling = 7 toggles. The Page Builder is the new home for everything that would have hit that ceiling in the future.

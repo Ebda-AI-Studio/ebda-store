@@ -385,7 +385,7 @@ export async function runReorderScan(storeId: string): Promise<ReorderScanResult
   // its OWN short RLS-bypass tx. The per-unit fan-out (sumOrderQty ×2,
   // pickLastSupplierForProduct, 2 aggregates) over a large catalog otherwise
   // blew the 30s interactive-tx timeout → "Transaction not found" (P1
-  // 2026-06-27, force-api-stock-reorder-scan-cron, stores with many products).
+  // 2026-06-27, ebda-api-stock-reorder-scan-cron, stores with many products).
   // Chunking bounds each tx's duration regardless of catalog size — it is by
   // UNIT, not product, so a product with many variants cannot widen one tx.
   // -------------------------------------------------------------------------

@@ -155,7 +155,7 @@ export const config = {
 
   // PostHog — server-side Right-to-Erasure propagation only (GDPR Art. 17
   // and applicable GCC data-protection law — see
-  // docs/legal/gcc-data-protection.md). Distinct from the storefront's
+  // docs/privacy/data-map.md). Distinct from the storefront's
   // NEXT_PUBLIC_POSTHOG_KEY (public project key, baked into the browser
   // bundle) — deleting a person requires a PERSONAL API key with
   // person-level write scope, which must never reach the browser. Unset
@@ -200,7 +200,7 @@ export const config = {
   // post-boot self-register PUT hits 127.0.0.1, so the SDK registered
   // `https://localhost:4000/api/v1/inngest` — unreachable from Inngest Cloud,
   // leaving every enqueued job queued forever (verified 2026-06-27: the
-  // force-api app was stuck on localhost; description_balance jobs never ran).
+  // ebda-api app was stuck on localhost; description_balance jobs never ran).
   // Setting serveHost makes registration advertise the real domain no matter
   // who triggers it. Unset → fall back to the old (broken-on-Railway)
   // host-introspection behaviour, so prod MUST set this.

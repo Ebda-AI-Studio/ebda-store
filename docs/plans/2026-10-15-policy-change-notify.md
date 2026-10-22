@@ -1811,8 +1811,8 @@ const asApp = <T>(fn: () => Promise<T>) =>
 const token = (userId: string, role: 'store_admin' | 'super_admin') =>
   jwt.sign({ userId, email: `${userId}@example.test`, role, tv: 0 }, config.jwtSecret, {
     expiresIn: '30m',
-    issuer: 'force-api',
-    audience: 'force-app',
+    issuer: 'ebda-api',
+    audience: 'ebda-app',
   });
 
 describe.skipIf(!hasDb)('pending legal notices', () => {
@@ -3195,8 +3195,8 @@ const asApp = <T>(fn: () => Promise<T>) =>
 const token = (userId: string, role: 'store_admin' | 'super_admin') =>
   jwt.sign({ userId, email: `${userId}@example.test`, role, tv: 0 }, config.jwtSecret, {
     expiresIn: '30m',
-    issuer: 'force-api',
-    audience: 'force-app',
+    issuer: 'ebda-api',
+    audience: 'ebda-app',
   });
 
 describe.skipIf(!hasDb)('super-admin policy updates', () => {

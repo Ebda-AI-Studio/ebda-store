@@ -20,7 +20,7 @@ Worker role validation blocks unsafe/missing/failed role checks before applicati
 
 Cloudflare API has explicit `api.ebda.app` custom domain plus its zone route so storefront wildcard routing cannot take its traffic. Next CF builds bake the Ebda API origin from BRAND if no override exists (web includes `/api/v1`; admin/orders use the origin). Runtime Worker variables cannot repair already-compiled `NEXT_PUBLIC_*` values.
 
-Root package/repository metadata now names Ebda/Whisky-11. Public naming sweep found no FWB labels in merchant/signup/storefront surfaces; stored compatibility keys, JWT audiences, workspace names and inherited history remain deliberately stable.
+Root package/repository metadata now names Ebda/Whisky-11. Public naming sweep found no Ebda Store labels in merchant/signup/storefront surfaces; stored compatibility keys, JWT audiences, workspace names and inherited history remain deliberately stable.
 
 ## Remaining inputs and proof
 
@@ -44,7 +44,7 @@ Local logs `/private/tmp/ebda-launch-{workers-test,flow,strict-cron,final-target
 
 Full unit suite: 6,762/6,762 passed across 494 files. API typecheck and final OpenNext admin build passed. Focused API/merchant regressions: 60 tests passed. Worker: 29 passed. Two-store strict-role cron integration passed. Browser on the rebuilt admin Worker proved an omitted mobile is refused and a filled signup succeeds against the actual isolated backend. CSP now permits only the explicitly configured API origin (HTTPS, or loopback HTTP for local tests), plus existing service destinations.
 
-Blast-radius: swept mobile/signup, COD state, resend, tenant cron scopes, role guard, API host/build vars, deployment IDs and naming across apps/packages/scripts/CI/docs/env examples; read sibling FWB sources without changing them. Fixed related route, generator-fixture, JSONC-parser and action-pin gaps. Compatibility identifiers are documented above.
+Blast-radius: swept mobile/signup, COD state, resend, tenant cron scopes, role guard, API host/build vars, deployment IDs and naming across apps/packages/scripts/CI/docs/env examples; read sibling Ebda Store sources without changing them. Fixed related route, generator-fixture, JSONC-parser and action-pin gaps. Compatibility identifiers are documented above.
 
 Additional deployment-config guard test passed. Secretlint covered all 35 non-generated staged files; gitleaks scanned the 37 MB staged patch with no leaks. Neon CLI inventory required authentication and was cancelled; no assertion is made that an Ebda Neon project is absent.
 
