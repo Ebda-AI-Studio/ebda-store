@@ -23,9 +23,17 @@ export const SENSITIVE_QUERY_PARAMS = [
   'keywords',
   'email',
   'phone',
+  // One-time credentials in a link (password reset, email verification, cart restore, the
+  // WhatsApp cart): not typed text, but equally never for a third party (Ruling PIXEL-CONSENT-1).
+  'token',
+  'restore',
+  'watoken',
 ] as const;
 
 export const REDACTED_QUERY_VALUE = '[Filtered]';
+
+/** Lower-case name of the request header that carries a typed search term. */
+const SEARCH_QUERY_HEADER_NAME = 'x-search-query';
 
 const SENSITIVE = new Set<string>(SENSITIVE_QUERY_PARAMS);
 // `?key=value` / `&key=value` anywhere in a string (absolute or relative URL, a log message);
@@ -50,6 +58,23 @@ function normalizeKey(key: string): string {
 
 function isSensitiveKey(key: string): boolean {
   return SENSITIVE.has(normalizeKey(key));
+}
+
+/**
+ * True when a query string (or parsed params) holds a sensitive key. Ad pixels read
+ * the page URL themselves and send it to their network, so none may load or fire on such a URL
+ * (Ruling PIXEL-CONSENT-1). Keys only, same list and normalisation as the scrubbers.
+ */
+export function urlCarriesSensitiveQuery(
+  search: string | { keys(): Iterable<string> } | null | undefined
+): boolean {
+  if (!search) return false;
+  const keys: Iterable<string> =
+    typeof search === 'string'
+      ? Array.from(search.replace(/^\?/, '').split('&'), pair => pair.split('=')[0])
+      : search.keys();
+  for (const key of keys) if (key && isSensitiveKey(key)) return true;
+  return false;
 }
 
 /** Replace the value of every sensitive query parameter in `text` with `[Filtered]`. */
@@ -105,6 +130,12 @@ function scrubValue(value: unknown, depth: number, seen: WeakSet<object>): unkno
   const obj = value as Record<string, unknown>;
   let out: Record<string, unknown> = obj;
   for (const key of Object.keys(obj)) {
+    // The typed search term rides in this request header (Ruling SEARCH-URL-1 / SEARCH-P2-9);
+    // an SDK that records request headers must not carry it to Sentry or PostHog.
+    if (key.toLowerCase() === SEARCH_QUERY_HEADER_NAME && obj[key]) {
+      out = put(out, key, REDACTED_QUERY_VALUE, obj);
+      continue;
+    }
     const next = scrubValue(obj[key], depth + 1, seen);
     if (next !== obj[key]) out = put(out, key, next, obj);
   }

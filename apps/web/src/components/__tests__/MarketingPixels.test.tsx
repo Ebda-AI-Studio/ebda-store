@@ -103,6 +103,8 @@ describe('Google Ads tag bootstrap', () => {
 describe('trackPurchase — Google Ads conversion event', () => {
   let gtag: ReturnType<typeof vi.fn>;
   beforeEach(() => {
+    // The helpers fire only while the consented provider is mounted (Ruling PIXEL-CONSENT-1).
+    render(<MarketingPixelsProvider pixels={{} as MarketingPixels} />);
     gtag = vi.fn();
     (window as { gtag?: unknown }).gtag = gtag;
   });
@@ -143,6 +145,8 @@ describe('trackPurchase — Google Ads conversion event', () => {
 describe('trackPurchase — reports whether any pixel received the event', () => {
   const purchase = { orderId: 'order-1', contentIds: ['p1'], numItems: 1, value: 12.5 };
   beforeEach(() => {
+    // The helpers fire only while the consented provider is mounted (Ruling PIXEL-CONSENT-1).
+    render(<MarketingPixelsProvider pixels={{} as MarketingPixels} />);
     for (const g of ['fbq', 'gtag', 'ttq', 'snaptr', 'twq', 'pintrk']) {
       delete (window as unknown as Record<string, unknown>)[g];
     }
@@ -171,6 +175,8 @@ describe('trackSearch — the term reaches an ad network only when it is not per
   let calls: Record<string, unknown[][]>;
 
   beforeEach(() => {
+    // The helpers fire only while the consented provider is mounted (Ruling PIXEL-CONSENT-1).
+    render(<MarketingPixelsProvider pixels={{} as MarketingPixels} />);
     calls = { fbq: [], ttq: [], snaptr: [], gtag: [], twq: [], pintrk: [] };
     const w = window as unknown as W;
     for (const k of ['fbq', 'snaptr', 'gtag', 'twq', 'pintrk']) {

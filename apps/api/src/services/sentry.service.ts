@@ -99,11 +99,19 @@ export class SentryService {
         ['P2002', 'P2003', 'P2025'].includes(err.code);
       const code = ownStatus;
       if (this.isInitialized && !expected && (!code || code >= 500)) {
-        const { authorization, cookie, 'x-csrf-token': csrfToken, ...safeHeaders } = req.headers;
-        // suppress unused-var warning — these are intentionally dropped
+        const {
+          authorization,
+          cookie,
+          'x-csrf-token': csrfToken,
+          'x-search-query': searchQuery,
+          ...safeHeaders
+        } = req.headers;
+        // suppress unused-var warning — these are intentionally dropped (x-search-query is the
+        // shopper's / merchant's typed search term: Ruling SEARCH-URL-1)
         void authorization;
         void cookie;
         void csrfToken;
+        void searchQuery;
         Sentry.captureException(err, {
           ...(integrityDefect ? { level: 'warning' as const } : {}),
           extra: {

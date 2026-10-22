@@ -32,7 +32,7 @@ import {
 } from './attribution';
 import { EBDA_FUNNEL, type FunnelStep, type SignupTracking } from './funnel';
 // Relative (not the barrel): this subpath stays a small, pure browser module.
-import { scrubPostHogCapture } from '../utils/sentry-url-scrub';
+import { scrubPostHogCapture, urlCarriesSensitiveQuery } from '../utils/sentry-url-scrub';
 
 export interface TrackerConfig {
   /** Public Meta Pixel id (NEXT_PUBLIC_EBDA_META_PIXEL_ID). Empty -> Meta never loads. */
@@ -143,8 +143,15 @@ export function createTracker(config: TrackerConfig, win: Window): Tracker {
     }
   }
 
+  /**
+   * The Meta pixel reads the page URL itself and sends it to Meta, so it neither loads nor fires
+   * on a URL carrying a typed term, an email, a phone or a one-time token (`/verify-email?token=`,
+   * Ruling PIXEL-CONSENT-1). The server-side Conversions API event for the same step still goes.
+   */
+  const urlBlockedForPixel = () => urlCarriesSensitiveQuery(win.location.search);
+
   function loadMeta(): void {
-    if (metaLoaded || !config.metaPixelId) return;
+    if (metaLoaded || !config.metaPixelId || urlBlockedForPixel()) return;
     metaLoaded = true;
     if (!w.fbq) {
       const n: any = function (...args: unknown[]) {
@@ -211,7 +218,7 @@ export function createTracker(config: TrackerConfig, win: Window): Tracker {
 
   function fire(step: FunnelStep, opts: TrackOptions | undefined, c: EbdaConsent): void {
     const def = EBDA_FUNNEL[step];
-    if (c.marketing && config.metaPixelId && w.fbq) {
+    if (c.marketing && config.metaPixelId && w.fbq && !urlBlockedForPixel()) {
       w.fbq(
         def.metaCustom ? 'trackCustom' : 'track',
         def.meta,
