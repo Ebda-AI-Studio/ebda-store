@@ -319,11 +319,11 @@ export const translations = {
   'View more': 'عرض المزيد',
 
   // Shop-the-look section (Phase B1 Lookbook). Neutral noun forms, never a gendered imperative.
-  'Shop the look': 'تسوّق اللوك',
+  'Shop the look': 'شوف اللوك كامل',
   'Items in this look': 'قطع اللوك',
   'Look total': 'مجموع اللوك',
   // W2a "Shop this look" page (amends Ruling B1-6); neutral noun forms (decision (e)).
-  'Shop this look': 'تسوّق اللوك',
+  'See the full look': 'شوف اللوك كامل',
   'Choose a size for each piece and add the ones you want.':
     'اختيار المقاس لكل قطعة وإضافة القطع المطلوبة.',
   'Choose the options above first': 'اختيار الخيارات أولًا',

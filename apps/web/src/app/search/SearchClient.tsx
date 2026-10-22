@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useEffect, useCallback, Suspense } from 'react';
-import { useSearchParams, useRouter } from 'next/navigation';
+import { useState, useEffect, useLayoutEffect, useCallback, Suspense } from 'react';
+import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { api, type Category, type Product } from '@/lib/api';
 import { Select } from '@ebda/ui';
@@ -16,9 +16,17 @@ import { SearchAutocomplete } from '../../components/SearchAutocomplete';
 import { countText, RESULTS } from '../../lib/plural';
 import { displaySort, getSortOptions, sortProducts, type SortValue } from './search-sort';
 import { darkLookListingBand } from '../../templates/shared/section-bg';
+import {
+  SEARCH_TERM_EVENT,
+  commitSearchTerm,
+  readSearchTermFromHistory,
+  resolveSearchTerm,
+} from '../../lib/search-term-state';
+
+// Layout effect so a legacy `?q=` address is rewritten before any ad pixel can read it.
+const useIsoLayoutEffect = typeof window === 'undefined' ? useEffect : useLayoutEffect;
 
 function SearchContent() {
-  const router = useRouter();
   const storeUrl = useStoreUrl();
   const { store } = useStore();
   const { t, language } = useLanguage();
@@ -49,10 +57,28 @@ function SearchContent() {
     );
   };
 
-  // Derive initial values from URL params for shareability
-  const committedQuery = searchParams?.get('q') || '';
+  // The term is NOT in the URL (Ruling SEARCH-URL-1, launch blocker 31): it lives in this history
+  // entry's state, so back, forward and refresh restore it and no log, Referer or pixel sees it.
+  // Category and sort are not personal data and stay in the URL.
+  const [committedQuery, setCommittedQuery] = useState('');
   const committedCategory = searchParams?.get('category') || '';
   const committedSort = (searchParams?.get('sort') as SortValue | null) || 'relevance';
+
+  const searchKey = searchParams?.toString() ?? '';
+  useIsoLayoutEffect(() => {
+    setCommittedQuery(resolveSearchTerm());
+  }, [searchKey]);
+  useEffect(() => {
+    // Back / forward between two searches that share one address, and the header search box
+    // while this page is already open.
+    const sync = () => setCommittedQuery(readSearchTermFromHistory());
+    window.addEventListener('popstate', sync);
+    window.addEventListener(SEARCH_TERM_EVENT, sync);
+    return () => {
+      window.removeEventListener('popstate', sync);
+      window.removeEventListener(SEARCH_TERM_EVENT, sync);
+    };
+  }, []);
 
   const [searchTerm, setSearchTerm] = useState(committedQuery);
   const [categoryFilter, setCategoryFilter] = useState(committedCategory);
@@ -122,16 +148,20 @@ function SearchContent() {
       setCategoryFilter(committedCategory);
       setSortBy(committedSort);
       performSearch(committedQuery, committedCategory);
+    } else {
+      setAllProducts([]);
+      setRanked(false);
     }
   }, [committedQuery, committedCategory, committedSort, performSearch]);
 
-  /** Update URL params so filters are shareable / back-button-friendly. */
+  /** New history entry: category + sort in the URL, the term in the entry's state only. */
   function pushParams(term: string, category: string, sort: SortValue) {
     const params = new URLSearchParams();
-    if (term) params.set('q', term);
     if (category) params.set('category', category);
     if (sort && sort !== 'relevance') params.set('sort', sort);
-    router.push(storeUrl(`/search?${params.toString()}`));
+    const qs = params.toString();
+    commitSearchTerm(term, `${storeUrl('/search')}${qs ? `?${qs}` : ''}`, 'push');
+    setCommittedQuery(term.trim());
   }
 
   function handleSearch(e: React.FormEvent) {

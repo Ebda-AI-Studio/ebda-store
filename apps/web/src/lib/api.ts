@@ -22,7 +22,7 @@
  * authenticates via 'accessToken' with session/store headers, while the
  * admin app uses a simpler 'authToken' approach.
  */
-import { isIosWebkit } from '@ebda/shared';
+import { isIosWebkit, moveSearchToHeader, searchQueryHeaders } from '@ebda/shared';
 import type { buildQuoteRequest, OrderQuote } from './checkout-quote';
 import type { ResolvedPrice } from './b2b-tiers';
 import type {
@@ -1169,9 +1169,13 @@ class ApiClient {
         }
       }
     }
-    const query = searchParams.toString() ? `?${searchParams.toString()}` : '';
+    // The shopper's term travels in the X-Search-Query header, never in the URL (Ruling
+    // SEARCH-URL-1): a URL is retained in Cloudflare request logs.
+    const { params: rest, headers } = moveSearchToHeader(searchParams);
+    const query = rest.toString() ? `?${rest.toString()}` : '';
     return this.request<{ products: Product[]; facets: ProductFacet[]; meta: PaginationMeta }>(
-      `/public/products${query}`
+      `/public/products${query}`,
+      { headers }
     );
   }
 
@@ -1504,7 +1508,8 @@ class ApiClient {
       } as ApiResponse<{ suggestions: SearchSuggestion[] }>;
     }
     return this.request<{ suggestions: SearchSuggestion[] }>(
-      `/public/${this.storeId}/search/suggest?q=${encodeURIComponent(trimmed)}`
+      `/public/${this.storeId}/search/suggest`,
+      { headers: searchQueryHeaders(trimmed) }
     );
   }
 

@@ -4,10 +4,11 @@ import { AWAITING_PAYMENT_CONFIRMATION } from '@ebda/shared';
 import logger from '../../logger';
 import { inngest } from '../client';
 import { sweepAcrossStores } from '../../cross-store';
+import { stepRunUnlessEmpty } from '../empty-exit';
 import { InstapayService } from '../../../services/payment-providers/instapay.service';
 
 /**
- * InstaPay hold expiry (SP6a, Review Focus 3) — every 15 minutes.
+ * InstaPay hold expiry (SP6a, Review Focus 3) — hourly (Ruling INNGEST-BUDGET-1).
  *
  * An InstaPay order waits in `awaiting_payment_confirmation` for the merchant to
  * confirm the transfer. Past `payment_confirmation_expires_at` (default 24h, per
@@ -26,14 +27,16 @@ const RUN_CAP = 500;
 export const instapayExpiry: InngestFunction.Any = inngest.createFunction(
   {
     id: 'instapay-expiry',
-    name: 'Expire unconfirmed InstaPay orders (every 15 minutes)',
+    name: 'Expire unconfirmed InstaPay orders (hourly)',
     retries: 2,
     concurrency: { limit: 1 },
-    triggers: [{ cron: '*/15 * * * *' }],
+    // HOURLY (Ruling INNGEST-BUDGET-1): the hold is 24-48h, so a cancel up to 1h late moves nothing a
+    // shopper or merchant can see; stock is released 1h later at worst.
+    triggers: [{ cron: '7 * * * *' }],
   },
   async ({ step }) => {
     const now = new Date();
-    const due = await step.run('find-due', () =>
+    const due = await stepRunUnlessEmpty(step, 'find-due', () =>
       sweepAcrossStores({
         fetch: storeId =>
           prisma.order.findMany({

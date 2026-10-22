@@ -4,7 +4,7 @@ import { inngest } from '../client';
 import { pollGmailAlerts } from '../../../services/gmail-alert-poller.service';
 
 /**
- * Every-5-minutes Gmail IMAP poller. Forwards alert emails from
+ * Hourly (Ruling INNGEST-BUDGET-1) Gmail IMAP poller. Forwards alert emails from
  * Sentry / BetterStack / PostHog / UptimeRobot / Vercel / Railway
  * into the internal Telegram pipeline via sendAlert().
  *
@@ -15,7 +15,7 @@ import { pollGmailAlerts } from '../../../services/gmail-alert-poller.service';
  * (payment HMAC, Inngest dead-letter, health degraded, uncaught).
  *
  * retries=1 because IMAP can flake under transient network. quota:
- * one Inngest invocation per 5 min = 288/day, well under free-tier.
+ * one Inngest invocation per hour = 24/day.
  */
 export const gmailAlertPoller: InngestFunction.Any = inngest.createFunction(
   {
@@ -37,7 +37,8 @@ export const gmailAlertPoller: InngestFunction.Any = inngest.createFunction(
     //
     // Do NOT tighten this back to */5 without re-checking the Neon bill: the whole
     // saving comes from leaving a gap LONGER than the 300s suspend timeout.
-    triggers: [{ cron: '*/15 * * * *' }], // every 15 min — see CADENCE NOTE
+    // HOURLY (Ruling INNGEST-BUDGET-1). Not served on Workers (see functions/index.ts); the budget test counts it anyway.
+    triggers: [{ cron: '7 * * * *' }], // hourly
   },
   async () => {
     try {

@@ -72,7 +72,7 @@ export function PostHogProvider({ children }: Props) {
       // survive Safari ITP 7-day cap; localStorage backs it up.
       persistence: 'localStorage+cookie',
       // Free-text query values (?q=, ?search=, ?email=, ?phone=) never leave in a capture:
-      // the storefront search page is /search?q=<term> (@ebda/shared sentry-url-scrub).
+      // an old storefront search link was /search?q=<term>; the term now lives in history state (@ebda/shared sentry-url-scrub, Ruling SEARCH-URL-1).
       before_send: scrubPostHogCapture,
     });
     // Session-replay is deliberately off (see above), so link PostHog ↔ Sentry

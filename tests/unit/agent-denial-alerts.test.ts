@@ -387,7 +387,7 @@ describe('integration_never_credentialed — the rollout breaking someone quietl
    *
    * An integration that worked before the credential existed sends no header,
    * so it lands in the same bucket as a crawler: `credential: 'none'`. At the
-   * `anonymous_flood` threshold of 50 per 16-minute window, a real merchant
+   * `anonymous_flood` threshold of 50 per window, a real merchant
    * losing ten orders an hour produces NOTHING — not even the info line. The
    * one signature the monitor most needs to catch was the one it was built to
    * ignore. Prior agent volume is what separates the two populations.

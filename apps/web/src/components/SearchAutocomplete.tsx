@@ -22,9 +22,10 @@ interface SearchAutocompleteProps {
   /** Called when the user picks a suggestion (so the parent can close the
    *  expanded search row, clear focus, etc.). Optional. */
   onSelect?: () => void;
-  /** The committed query the page already shows results for (`/search?q=…`). The dropdown stays
-   *  closed for that untouched term, also when it changes client-side without a remount (the
-   *  header search navigating `/search?q=a` → `/search?q=b`). Defaults to `query` at mount. */
+  /** The committed query the page already shows results for (kept in history state, not the URL:
+   *  Ruling SEARCH-URL-1). The dropdown stays closed for that untouched term, also when it
+   *  changes client-side without a remount (the header search from one term to another).
+   *  Defaults to `query` at mount. */
   committedQuery?: string;
 }
 
@@ -68,7 +69,7 @@ export function SearchAutocomplete({ query, onSelect, committedQuery }: SearchAu
   // Track the latest query the user typed so a slow earlier response
   // can't overwrite a faster later one. Same-stale-request guard pattern.
   const latestQueryRef = useRef('');
-  // The query the parent mounted us with (/search?q=… prefills the input). Suggestions for that
+  // The query the parent mounted us with (a restored search prefills the input). Suggestions for that
   // untouched term would open a dropdown over the first row of the results the page already
   // shows, so we stay closed until the visitor edits the field (PR 1 visual gate).
   const mountedQueryRef = useRef((committedQuery ?? query).trim());

@@ -119,7 +119,7 @@ export function buildQamarHome(base, ctx) {
   const shopTheLook = node(
     'shop-the-look',
     'shop-the-look',
-    { heading: 'Shop the look', headingAr: 'تسوّق اللوك' },
+    { heading: 'Shop the look', headingAr: 'شوف اللوك كامل' },
     QAMAR_LOOKS_STORY.map(l => {
       const productIds = l.items.map(slug => productIdBySlug.get(slug));
       if (productIds.some(id => !id))

@@ -14,7 +14,7 @@ import {
 } from '../../../mcp/agent-denial-alerts';
 
 /**
- * Every-15-min watcher over `agent.write.denied` audit rows.
+ * Hourly watcher over `agent.write.denied` audit rows.
  *
  * The credential requirement (Ruling M1) refuses unauthorised MCP writes and
  * records each refusal. Until this function existed nothing READ those rows, so
@@ -28,12 +28,12 @@ import {
  * function. This file is only the plumbing: read the window, hand the rows over,
  * dispatch whatever comes back.
  *
- * Cadence: a 15-minute cron, window `DENIAL_WINDOW_MINUTES` (16). The one minute of
+ * Cadence: an HOURLY cron (Ruling INNGEST-BUDGET-1), window `DENIAL_WINDOW_MINUTES` (61). The one minute of
  * deliberate overlap means a row landing on a tick boundary is never dropped by
  * a late scheduler; the cost is that the rare boundary row can be counted twice,
  * which cannot manufacture a finding on its own at these thresholds. Because the
  * window matches the cadence, an ongoing incident re-alerts at most once every
- * 15 minutes per class per store — a noisy alert is one that gets muted, and a
+ * hour per class per store — a noisy alert is one that gets muted, and a
  * muted alert is the failure this whole function exists to avoid.
  *
  * Cross-tenant cron: `audit_logs` is an RLS table and no tenant GUC is set in an
@@ -342,8 +342,9 @@ const agentWriteDeniedWatchFn = inngest.createFunction(
   {
     id: 'agent-write-denied-watch',
     name: 'Agent-write denial watcher (agent.write.denied → Telegram)',
-    retries: 0, // failing to alert is recoverable; the next tick fires in 15 min
-    triggers: [{ cron: '*/15 * * * *' }],
+    retries: 0, // failing to alert is recoverable; the next tick fires in an hour
+    // HOURLY (Ruling INNGEST-BUDGET-1); DENIAL_WINDOW_MINUTES is cadence + 1 min and moves with it.
+    triggers: [{ cron: '7 * * * *' }],
   },
   handleAgentWriteDeniedWatch
 );

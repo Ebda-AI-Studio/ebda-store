@@ -2,6 +2,7 @@ import type { InngestFunction } from 'inngest';
 import { prisma, withStore, acrossStoresFlat } from '@ebda/database';
 import logger from '../../logger';
 import { inngest } from '../client';
+import { stepRunUnlessEmpty } from '../empty-exit';
 import { sendAlert } from '../../../services/alerts.service';
 import { recordPaymentEvent } from '../../../services/payment-event.service';
 
@@ -46,7 +47,7 @@ export async function handlePaymentReconcileSweep(
   const floor = new Date(Date.now() - RECENCY_HOURS * 3_600_000);
 
   // Cross-tenant read — Inngest crons run outside tenant-context middleware.
-  const mismatches = await step.run('find-captured-on-cancelled', () =>
+  const mismatches = await stepRunUnlessEmpty(step, 'find-captured-on-cancelled', () =>
     // `payments` is scoped through its order, so the scan runs store by store
     // (each in its own tenant scope) and is cut to the same global ceiling.
     acrossStoresFlat(() =>

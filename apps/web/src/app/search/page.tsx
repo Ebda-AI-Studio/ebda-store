@@ -9,6 +9,9 @@ export function generateMetadata(): Promise<Metadata> {
   return localizedMetadata({
     title: ['Search', 'البحث'],
     description: ['Search for products in our store.', 'ابحث عن المنتجات في متجرنا.'],
+    // Search results are never indexed (Ruling SEARCH-URL-1): there is one `/search` address now
+    // and its content is whatever a visitor typed.
+    robots: { index: false, follow: false },
   });
 }
 

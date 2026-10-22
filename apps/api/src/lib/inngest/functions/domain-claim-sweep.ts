@@ -4,7 +4,7 @@ import { DomainClaimService } from '../../../services/domain-claim.service';
 import { resolveDomainService } from '../../../services/domain-provider';
 
 /**
- * Custom-domain claim sweep (SP5 task 4) - every 15 minutes.
+ * Custom-domain claim sweep (SP5 task 4) - hourly (Ruling INNGEST-BUDGET-1).
  *
  * A custom domain is only a CLAIM until the provider (Cloudflare for SaaS)
  * reports the hostname verified (DCV). This promotes every pending claim that
@@ -23,9 +23,11 @@ export const domainClaimSweep: InngestFunction.Any = inngest.createFunction(
     name: 'Verify and release pending custom-domain claims',
     retries: 1,
     concurrency: { limit: 1 },
-    triggers: [{ cron: '*/15 * * * *' }],
+    // HOURLY (Ruling INNGEST-BUDGET-1): a merchant's custom domain goes live up to an hour after
+    // Cloudflare verifies it; nothing is lost, the claim TTL is 72h.
+    triggers: [{ cron: '7 * * * *' }],
   },
-  async ({ step }) => {
-    return step.run('sweep', () => DomainClaimService.sweep(resolveDomainService()));
-  }
+  // No `step.run`: the sweep is one idempotent unit, so a step wrapper only added a second
+  // billed execution to every tick (Executions = runs x (steps + 1)). A failure retries the run.
+  async () => DomainClaimService.sweep(resolveDomainService())
 );

@@ -2,6 +2,7 @@ import type { InngestFunction } from 'inngest';
 import { prisma, runInTenantContext } from '@ebda/database';
 import logger from '../../logger';
 import { inngest } from '../client';
+import { stepRunUnlessEmpty } from '../empty-exit';
 import { featureService } from '../../../services/feature.service';
 import { OneSignalService } from '../../../services/onesignal.service';
 import { sweepAcrossStores } from '../../cross-store';
@@ -60,16 +61,18 @@ interface AbandonCandidate {
 export const paymentAbandonmentSweep: InngestFunction.Any = inngest.createFunction(
   {
     id: 'payment-abandonment-sweep',
-    name: 'Payment-gateway abandonment capture (cron, Enterprise)',
+    name: 'Payment-gateway abandonment capture (hourly cron, Enterprise)',
     retries: 2,
     concurrency: { limit: 1 },
-    triggers: [{ cron: '*/30 * * * *' }], // every 30 minutes
+    // HOURLY (Ruling INNGEST-BUDGET-1): the alert is a merchant follow-up nudge on a checkout already 30+ min
+    // old, deduped once per order by the stamp; the order is auto-cancelled only after days.
+    triggers: [{ cron: '7 * * * *' }], // hourly
   },
   async ({ step }) => {
     const threshold = new Date(Date.now() - PAYMENT_ABANDON_MINUTES * 60_000);
 
     // Cross-tenant sweep — bypass RLS (no HTTP tenant GUC on a cron).
-    const candidates = (await step.run('find-gateway-abandoners', () =>
+    const candidates = (await stepRunUnlessEmpty(step, 'find-gateway-abandoners', () =>
       sweepAcrossStores({
         fetch: storeId =>
           prisma.order.findMany({

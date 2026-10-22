@@ -212,3 +212,11 @@ describe('order-status-fanout-stuck-sweep — failed after claim (issue 2071)', 
     expect(where.statusFanoutClaimedAt.gt).toBeInstanceOf(Date);
   });
 });
+
+describe('order-status-fanout-stuck-sweep: empty tick cost (Ruling INNGEST-BUDGET-1)', () => {
+  it('a tick that finds nothing opens no step (one billed execution, not run + steps)', async () => {
+    const run = vi.fn(stepStub.run);
+    await handleOrderStatusFanoutStuckSweep({ run });
+    expect(run).not.toHaveBeenCalled();
+  });
+});

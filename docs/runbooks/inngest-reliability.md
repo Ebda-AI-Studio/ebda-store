@@ -52,7 +52,7 @@ export const myBulkJob = inngest.createFunction(
 
 ### 2. Stuck-running auto-reaper (commit `8c229e2b`)
 
-The `queue-depth-watch` Inngest cron function (runs every 15 minutes) includes
+The `queue-depth-watch` Inngest cron function (runs hourly, Ruling INNGEST-BUDGET-1) includes
 an auto-reaper step that writes `status = 'failed'` on any job that has been in
 `status = 'running'` for **more than 60 minutes**.
 
@@ -121,7 +121,7 @@ retry budgets, and leave job rows stuck in `failed` state.
 
 ## Queue depth monitoring
 
-The `queue-depth-watch` cron fires every 15 minutes and writes a summary to
+The `queue-depth-watch` cron fires hourly (Ruling INNGEST-BUDGET-1) and writes a summary to
 Telegram at the `info` level when the queue depth exceeds a threshold:
 
 ```sql

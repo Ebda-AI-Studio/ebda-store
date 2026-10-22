@@ -239,3 +239,21 @@ describe('scrubPostHogCapture', () => {
     expect(scrubPostHogCapture(null)).toBeNull();
   });
 });
+
+describe('the X-Search-Query request header (Ruling SEARCH-URL-1)', () => {
+  it('is redacted wherever an SDK records request headers, in any case', () => {
+    const evt = {
+      request: {
+        url: 'https://api.ebda.app/api/v1/public/products',
+        headers: { 'X-Search-Query': encodeURIComponent(PHONE), accept: 'application/json' },
+      },
+      extra: { headers: { 'x-search-query': PHONE, host: 'api.ebda.app' } },
+    };
+    const out = scrubSentryEvent(evt);
+    expect(JSON.stringify(out)).not.toContain(PHONE);
+    expect(out.request.headers['X-Search-Query']).toBe('[Filtered]');
+    expect(out.extra.headers['x-search-query']).toBe('[Filtered]');
+    expect(out.request.headers.accept).toBe('application/json');
+    expect(out.extra.headers.host).toBe('api.ebda.app');
+  });
+});

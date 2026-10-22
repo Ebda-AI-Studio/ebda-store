@@ -7,7 +7,7 @@
  *
  * Endpoints (mounted at /api/v1/wa-bridge):
  *   GET  /categories                              category list
- *   GET  /products/search?q=                      text search top-10
+ *   GET  /products/search                         text search; term in X-Search-Query (?q= deprecated)
  *   GET  /products/by-category?categoryId=&page=  paginated 10/page
  *   GET  /store-catalog                           full catalog for bot intent classifier (Phase 8)
  *   POST /cart/from-wa                            create cart + signed JWT
@@ -35,6 +35,7 @@ import {
 } from '@ebda/shared';
 import { config } from '../config';
 import { waBridgeAuth } from '../middleware/wa-bridge-auth';
+import { searchQueryFromHeader } from '../lib/search-term';
 import { searchProductIds } from '../services/product-search.service';
 import { isWhatsappEnabled, FEATURE_DISABLED_BODY } from '../middleware/wa-feature-gate';
 import { makeRateLimitStore, rateLimitRedisClient } from '../middleware/security';
@@ -179,7 +180,15 @@ const searchSchema = z.object({
 });
 router.get('/products/search', waBridgeAuth, async (req: Request, res: Response) => {
   try {
-    const parse = searchSchema.safeParse(req.query);
+    // The shopper's WhatsApp search text travels in the `X-Search-Query` header (percent-encoded),
+    // not the URL: URLs are retained in Cloudflare Workers Logs (Ruling SEARCH-URL-1/-2). DEPRECATED:
+    // `?q=` is still accepted for one release so the bridge client keeps working; remove it once
+    // the bridge sends the header.
+    const headerQ = searchQueryFromHeader(req);
+    if (headerQ !== undefined) res.setHeader('Cache-Control', 'private, no-store');
+    const parse = searchSchema.safeParse(
+      headerQ !== undefined ? { ...req.query, q: headerQ } : req.query
+    );
     if (!parse.success) {
       res.status(400).json({ success: false, error: 'INVALID_QUERY' });
       return;

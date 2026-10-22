@@ -93,8 +93,12 @@ Full per-table matrix (retention days, exact columns, cron IDs) lives in
 - **Admin routes (Ruling SEARCH-P2-9):** the admin ⌘K palette, the Customers and Orders search/export
   and the Orders PWA list send the typed term in the `X-Search-Query` request header, not in the URL,
   so a merchant's customer-phone lookup does not enter this log. Request headers are not part of the
-  invocation log. Still open: the storefront → API term (SEARCH-T5-8), and an older admin/PWA build that
-  still sends `?search=`/`?q=` (accepted by the API for one release, then removed).
+  invocation log. The storefront → API term is closed too (Ruling SEARCH-URL-1): `GET
+/public/products` and `GET /public/:storeId/search/suggest` read it from the same header, and the
+  search PAGE address is `/search` with the term in the browser's history state. Still open: an older
+  admin/PWA/storefront build that still sends `?search=`/`?q=` (accepted by the API for one release,
+  then removed), and an old `/search?q=` link a shopper opens (that one request is logged before any
+  code runs).
 - **Retention:** the platform's Workers Logs window, at most 7 days (3 days on Workers Free,
   7 on Workers Paid; the plan in use was not verified from this repo), then deleted by
   Cloudflare. Not exported (no Logpush).
@@ -102,11 +106,12 @@ Full per-table matrix (retention days, exact columns, cron IDs) lives in
   shoppers have no access.
 - **Why accepted:** pre-launch these logs are our only production request trace; turning
   `invocation_logs` off would lose it.
-- **Plan (before launch):** move the storefront → API search term out of the URL (POST body or a
-  request header) so it never enters invocation logs, then re-check this section. Cost if wrong:
-  a shopper's typed phone number retained in operator-only logs for up to the retention window.
+- **Done (Ruling SEARCH-URL-1):** the storefront → API search term moved out of the URL into the
+  `X-Search-Query` header. After the first deploy, re-check that the `api` Worker's invocation log has
+  no `search=` / `q=` values from the new storefront. Cost if wrong: a shopper's typed phone number
+  retained in operator-only logs for up to the retention window.
 
-### Ad pixels receive the search term (accepted residual, Ruling SEARCH-T5-9)
+### Ad pixels receive the search term (accepted residual, Ruling SEARCH-T5-9; URL half closed by PIXEL-CONSENT-1)
 
 - **What is sent:** after the shopper gives marketing consent, the storefront's search page calls
   `trackSearch` (`apps/web/src/components/MarketingPixels.tsx`), which SENDS the typed term as an
@@ -118,9 +123,11 @@ Full per-table matrix (retention days, exact columns, cron IDs) lives in
   digit script, an email, an order number, an id/token, a link), the Search event still fires but
   WITHOUT the term.
 - **Residual:** a term that is not PII-shaped (a name, a street) still reaches those networks for
-  a consenting shopper. The pixels' own PageView also reads the page URL (`/search?q=<term>`)
-  themselves; that copy is outside our code and is not gated here. Cost if wrong: a name typed
-  into search reaches the merchant's ad networks for consenting shoppers.
+  a consenting shopper, as an event parameter. The pixels' own PageView used to read the page URL
+  (`/search?q=<term>`); that is closed (Rulings SEARCH-URL-1 and PIXEL-CONSENT-1): the search address
+  carries no term, and no pixel loads or fires on any URL with a `q` / `search` / `email` / `phone` /
+  `token` / `restore` / `waToken` query. Cost if wrong: a name typed into search reaches the
+  merchant's ad networks for consenting shoppers.
 - **Why accepted:** consent-gated, merchant-configured, and the standard behaviour of commerce
   pixels; our own capture paths (PostHog, Sentry, the search log) scrub or drop these terms.
 - Related: the PostHog `$elements_chain` string (`a:attr__href="/search?q=…"`) is scrubbed too;

@@ -4,9 +4,10 @@ import logger from '../../logger';
 import { inngest } from '../client';
 import { sendAlert } from '../../../services/alerts.service';
 import { sweepAcrossStores } from '../../cross-store';
+import { stepRunUnlessEmpty } from '../empty-exit';
 
 /**
- * Stuck order-created sweep — scheduled safety net (every 5 min).
+ * Stuck order-created sweep — scheduled safety net (hourly, Ruling INNGEST-BUDGET-1).
  *
  * The mirror of `payment-webhook-stuck-sweep` for the `order/created` fanout.
  * The `order/created` enqueue (4 call sites: COD create, admin mark-paid single
@@ -65,7 +66,7 @@ export async function handleOrderCreatedStuckSweep(
   const floorCutoff = new Date(Date.now() - STUCK_ORDER_MAX_AGE_MINUTES * 60_000);
 
   // Cross-tenant read — Inngest crons run outside tenant-context middleware.
-  const stuck: StuckOrder[] = await step.run('find-stuck', async () =>
+  const stuck: StuckOrder[] = await stepRunUnlessEmpty(step, 'find-stuck', async () =>
     sweepAcrossStores({
       fetch: storeId =>
         prisma.order.findMany({
@@ -170,7 +171,10 @@ export const orderCreatedStuckSweep: InngestFunction.Any = inngest.createFunctio
     //
     // Do NOT tighten this back to */5 without re-checking the Neon bill: the whole
     // saving comes from leaving a gap LONGER than the 300s suspend timeout.
-    triggers: [{ cron: '*/15 * * * *' }], // every 15 min — see CADENCE NOTE
+    // HOURLY (Ruling INNGEST-BUDGET-1): Inngest Hobby caps executions at 50k/month and Ebda is pre-launch;
+    // worst-case detection of a lost order/created enqueue is now 10-70 min, not 10-25.
+    // Revisit at launch, when real orders exist (docs/RULINGS.md, docs/ENVIRONMENT.md).
+    triggers: [{ cron: '7 * * * *' }], // hourly, off the :00 pile-up
   },
   async ({ step }) => handleOrderCreatedStuckSweep(step)
 );

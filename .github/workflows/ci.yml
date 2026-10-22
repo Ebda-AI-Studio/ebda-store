@@ -401,6 +401,21 @@ jobs:
         env:
           NEXT_PUBLIC_API_URL: http://localhost:4000
 
+      # Startup CPU + bundle size budget (scripts/ci/worker-startup-budget.json). Cloudflare error
+      # 10021 ("Script startup exceeded CPU time limit") failed one API deploy after the B2B merge;
+      # this fails the PR that pushes the Worker toward it instead of the deploy. No database.
+      - name: API Worker startup budget (startup CPU and bundle size)
+        if: matrix.app == 'api'
+        timeout-minutes: 10
+        run: node scripts/ci/worker-startup-budget.mjs --runs 5 --record "$RUNNER_TEMP/worker-startup-budget.json"
+      - name: Upload the startup measurement
+        if: matrix.app == 'api' && always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: worker-startup-budget
+          path: ${{ runner.temp }}/worker-startup-budget.json
+          if-no-files-found: ignore
+
   # Boot the API Worker in workerd (Ruling DEPLOY-SAFETY-1). Node unit/integration tests cannot
   # see code that throws only on Workers (2026-10-08: `Prisma.dmmf` -> error 1101 on every request
   # for ~4 minutes with every Node test green). Fresh Postgres migrated from scratch, the Worker
