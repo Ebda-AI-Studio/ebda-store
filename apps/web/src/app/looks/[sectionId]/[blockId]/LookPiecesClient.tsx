@@ -54,7 +54,7 @@ export function LookPiecesClient({ panel, pieces }: { panel: LookPanel; pieces: 
           className="text-sm"
           items={[
             { label: t('Home', 'الرئيسية'), href: storeUrl('/') },
-            { label: title || t('Shop this look', 'تسوّق اللوك') },
+            { label: title || t('See the full look', 'شوف اللوك كامل') },
           ]}
         />
         <div className="mt-4 grid gap-6 md:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] md:items-end">
@@ -72,7 +72,7 @@ export function LookPiecesClient({ panel, pieces }: { panel: LookPanel; pieces: 
           )}
           <div>
             <h1 className="font-display text-balance text-3xl leading-snug text-foreground sm:text-4xl">
-              {title || t('Shop this look', 'تسوّق اللوك')}
+              {title || t('See the full look', 'شوف اللوك كامل')}
             </h1>
             <p className="mt-2 text-sm text-muted-foreground">
               {t(

@@ -86,7 +86,7 @@ const look = (productIds: string[], extra: Record<string, unknown> = {}) => ({
 const render = (blocks: unknown[], settings: Record<string, unknown> = {}, products = PRODUCTS) =>
   renderToStaticMarkup(
     <ShopTheLookSection
-      settings={{ headingAr: 'تسوّق اللوك', heading: 'Shop the look', ...settings }}
+      settings={{ headingAr: 'شوف اللوك كامل', heading: 'Shop the look', ...settings }}
       blocks={blocks as any}
       products={products as any}
     />
@@ -184,8 +184,8 @@ describe('shop-the-look', () => {
 
   it('labels use neutral noun forms (quality bar §2, ruling e)', () => {
     const d = getSectionDefinition('shop-the-look')!;
-    expect(d.labelAr).toBe('تسوّق اللوك');
-    expect(d.presets[0].settings).toMatchObject({ headingAr: 'تسوّق اللوك' });
+    expect(d.labelAr).toBe('شوف اللوك كامل');
+    expect(d.presets[0].settings).toMatchObject({ headingAr: 'شوف اللوك كامل' });
   });
 
   it('renders each look with its items as links + prices, no add-to-cart (Ruling B1-6)', () => {

@@ -796,7 +796,7 @@ export const SECTION_REGISTRY: readonly SectionDefinition[] = [
     type: 'shop-the-look',
     labelEn: 'Shop the look',
     // Neutral noun form (the verbal noun, "shopping the look"), never a gendered imperative.
-    labelAr: 'تسوّق اللوك',
+    labelAr: 'شوف اللوك كامل',
     legacyKey: null,
     rendererKey: 'section.shopTheLook',
     group: 'template',
@@ -830,8 +830,8 @@ export const SECTION_REGISTRY: readonly SectionDefinition[] = [
     presets: [
       {
         nameEn: 'Shop the look',
-        nameAr: 'تسوّق اللوك',
-        settings: { heading: 'Shop the look', headingAr: 'تسوّق اللوك' },
+        nameAr: 'شوف اللوك كامل',
+        settings: { heading: 'Shop the look', headingAr: 'شوف اللوك كامل' },
         blocks: [],
       },
     ],
