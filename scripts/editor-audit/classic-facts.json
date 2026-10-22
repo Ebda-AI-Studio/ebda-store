@@ -1,0 +1,89 @@
+{
+  "written": {
+    "bestSellers": ["bgColor", "enabled", "limit", "title", "titleAr", "typography"],
+    "categories": [
+      "bgColor",
+      "captionPosition",
+      "captionPositionMobile",
+      "cardAspect",
+      "cardFrameColor",
+      "cardFrameSize",
+      "cardFrameStyle",
+      "cardFrameWidth",
+      "cardGap",
+      "cardShape",
+      "cardSize",
+      "desktopColumns",
+      "enabled",
+      "layout",
+      "layoutMobile",
+      "mobileColumns",
+      "showCardFrame",
+      "showHover",
+      "showLabel",
+      "title",
+      "titleAr",
+      "typography"
+    ],
+    "hero": [
+      "autoplayMs",
+      "bgColor",
+      "enabled",
+      "frame",
+      "mode",
+      "presentation",
+      "slides",
+      "textAnchor",
+      "typography"
+    ],
+    "newArrivals": ["bgColor", "enabled", "limit", "title", "titleAr", "typography"],
+    "testimonials": [
+      "bgColor",
+      "enabled",
+      "minRating",
+      "title",
+      "titleAr",
+      "typography",
+      "verifiedOnly"
+    ]
+  },
+  "siteKeys": ["sizing", "productCardDefaults", "bottomBar"],
+  "components": [
+    "FontsCard",
+    "ZoneEditor",
+    "SectionTypographyBlock",
+    "SectionDividersBlock",
+    "DividerStyleSelect",
+    "SchemeSelect",
+    "DensitySelect",
+    "TextScaleSelect",
+    "SectionPaddingMaxWidthBlock",
+    "KickerSubtitleControls",
+    "SectionTitleFields",
+    "ProductCardControls",
+    "SmartPaletteModal",
+    "AiSectionFillButton",
+    "SlidesEditor",
+    "CategoryLayoutButtons",
+    "NavMenuEditor",
+    "FooterLinksEditor",
+    "ExtraCarouselCard",
+    "ManualProductPicker"
+  ],
+  "endpoints": [
+    "GET /api/v1/admin/stores/:p",
+    "GET /api/v1/admin/stores/:p/layout",
+    "GET /api/v1/stores/:p/products",
+    "POST /api/v1/admin/stores/:p/layout/preview",
+    "PUT /api/v1/admin/stores/:p/layout",
+    "PUT /api/v1/stores/:p/theme",
+    "PUT /api/v1/stores/:p/typography"
+  ],
+  "themeKeys": [
+    "normalizeProductImages",
+    "saleBadgeLegacyCorner",
+    "showBrandBadge",
+    "showNewBadge",
+    "showQuickAdd"
+  ]
+}

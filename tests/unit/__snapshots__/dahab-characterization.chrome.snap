@@ -112,7 +112,14 @@
 <div>
 <div data-zone="afterFooter">
 <a href="https://ebda.app/?utm_source=ebda_store_badge&amp;utm_medium=referral&amp;utm_campaign=powered_by" target="_blank" rel="noopener noreferrer" aria-label="مدعوم من ابدأ ستور">
-<img src="/logo.svg" alt="" width="9" height="17" aria-hidden="true"/>
+<svg viewBox="0 0 78.3 149" width="9" height="17" fill="currentColor" aria-hidden="true" focusable="false" data-testid="ebda-badge-mark">
+<path d="M65.70 67.60 L78.30 73.90 L78.30 126.70 L65.70 120.50Z" opacity=".7">
+</path>
+<path d="M0.00 35.80 L78.30 0.00 L78.30 74.90Z">
+</path>
+<path d="M0.00 37.00 L42.60 58.30 L42.10 127.80 L0.20 149.00Z" opacity=".85">
+</path>
+</svg>
 <span>مدعوم من</span>
 <span>ابدأ ستور</span>
 </a>
@@ -326,7 +333,14 @@
 <div>
 <div data-zone="afterFooter">
 <a href="https://ebda.app/?utm_source=ebda_store_badge&amp;utm_medium=referral&amp;utm_campaign=powered_by" target="_blank" rel="noopener noreferrer" aria-label="Powered by Ebda Store">
-<img src="/logo.svg" alt="" width="9" height="17" aria-hidden="true"/>
+<svg viewBox="0 0 78.3 149" width="9" height="17" fill="currentColor" aria-hidden="true" focusable="false" data-testid="ebda-badge-mark">
+<path d="M65.70 67.60 L78.30 73.90 L78.30 126.70 L65.70 120.50Z" opacity=".7">
+</path>
+<path d="M0.00 35.80 L78.30 0.00 L78.30 74.90Z">
+</path>
+<path d="M0.00 37.00 L42.60 58.30 L42.10 127.80 L0.20 149.00Z" opacity=".85">
+</path>
+</svg>
 <span>Powered by</span>
 <span>Ebda Store</span>
 </a>

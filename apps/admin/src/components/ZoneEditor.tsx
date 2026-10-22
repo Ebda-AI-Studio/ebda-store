@@ -89,8 +89,8 @@ function hasAnyValue(v: ZoneOverride): boolean {
  * link appears at the bottom.
  *
  * Designed to work in two contexts:
- *   1. Per-section typography overrides inside the page-builder SectionCard blocks.
- *   2. The "Default typography" SectionCard at the bottom of the page-builder that
+ *   1. Per-section typography overrides inside the editor's section panels.
+ *   2. The "Default typography" SectionCard in the editor's Theme pane that
  *      mirrors the global zones from the old /typography admin page.
  */
 export function ZoneEditor({
@@ -159,7 +159,7 @@ export function ZoneEditor({
 
       <div className={`${hideLabel ? '' : 'mt-3'} grid gap-3 sm:grid-cols-2 lg:grid-cols-3`}>
         {/* Font family — select when fontFamilyOptions are provided (typography page
-            has a curated font library); free-form text input otherwise (page-builder
+            has a curated font library); free-form text input otherwise (the editor
             context where no font library is loaded). */}
         <label className="flex flex-col gap-1">
           <span className="text-xs font-medium text-muted-foreground">{t('fontFamilyLabel')}</span>

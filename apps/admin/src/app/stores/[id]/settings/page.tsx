@@ -255,20 +255,20 @@ export default function StoreSettingsPage() {
     },
     /*
      * Navigation card REMOVED 2026-06-01 (consolidation). Navigation is
-     * now embedded in Page Builder (NavMenuEditor variant="embedded") so
-     * merchants can edit header links without page-hopping. The standalone
-     * /navigation page still works by URL so existing bookmarks don't 404.
+     * edited in the visual editor (header content) so merchants do not
+     * page-hop. The /navigation route redirects to the editor (Task 12) so
+     * existing bookmarks don't 404.
      *
-     * Hero / Announcement cards REMOVED 2026-05-21 (Ahmad audit). Page
-     * Builder owns hero slides, announcement bar visibility + content.
-     * The standalone /hero, /announcement pages still work by URL.
+     * Hero / Announcement cards REMOVED 2026-05-21 (Ahmad audit). The
+     * visual editor owns hero slides, announcement bar visibility + content.
+     * /hero redirects to the editor (Task 12); /announcement still works by URL.
      *
      * Footer Links / pages card REMOVED 2026-06-01 (consolidation). Footer
-     * link editing is already embedded in Page Builder (FooterLinksEditor
-     * variant="embedded"). The standalone /pages route still works by URL.
+     * link editing lives in the visual editor (footer content). The /pages
+     * route redirects to the editor (Task 12).
      *
      * SEO stays in Settings since it's meta-tags + structured data, distinct
-     * from page-builder's typography zones.
+     * from the editor's typography zones.
      *
      * Announcement card RE-ADDED 2026-06-01 (P1-B nav-wire fix). The page
      * edits live content (text + colors) that merchants need to reach without

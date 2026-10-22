@@ -59,24 +59,3 @@ describe('hero focus', () => {
     void DahabHero;
   });
 });
-
-describe('classic /page-builder hero slide editor exposes focus (review N4)', () => {
-  it('select bound to slide.focus with ar + en labels', async () => {
-    const fs = await import('node:fs');
-    const root = `${__dirname}/../..`;
-    const page = fs.readFileSync(
-      `${root}/apps/admin/src/app/stores/[id]/page-builder/page.tsx`,
-      'utf8'
-    );
-    expect(page).toMatch(/value=\{slide\.focus \?\? 'center'\}/);
-    expect(page).toMatch(/updateSlide\(index, \{\s*focus:/);
-    for (const lang of ['en', 'ar']) {
-      const m = JSON.parse(
-        fs.readFileSync(`${root}/apps/admin/src/i18n/messages/${lang}.json`, 'utf8')
-      );
-      const slides = m.orders.layout.sections.hero.slides;
-      for (const k of ['focus', 'focusCenter', 'focusTop', 'focusBottom'])
-        expect(slides[k], `${lang}.${k}`).toBeTruthy();
-    }
-  });
-});

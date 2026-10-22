@@ -12,6 +12,7 @@ import { readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import {
   THEME_SETTINGS_SCHEMA,
+  DRAFT_THEME_KEYS,
   definitionToLayout,
   layoutToDefinition,
   reduceDocument,
@@ -41,8 +42,14 @@ function walk(dir: string, out: string[] = []): string[] {
 const rel = (p: string) => path.relative(root, p);
 
 /** Files under apps/admin/src that still mention the classic builder (item 5 of the gate). */
+/** The two files that name the retired route ON PURPOSE: hub highlighting and the redirect registry. */
+const REDIRECT_TARGET_FILES = [
+  'apps/admin/src/components/admin-layout/hubs.ts',
+  'apps/admin/src/lib/settings-registry.ts',
+];
 function classicReferences(): string[] {
   return walk(ADMIN_SRC)
+    .filter(f => !REDIRECT_TARGET_FILES.includes(rel(f)))
     .filter(f =>
       /page-builder|editInClassic|classicOnly|tryNewBuilder/.test(readFileSync(f, 'utf8'))
     )
@@ -125,7 +132,6 @@ if (process.env.EDITOR_MATRIX_WRITE === '1') {
         .filter(f => !/\.test\./.test(f))
         .map(f => readFileSync(f, 'utf8'))
         .join('\n');
-      const libSrc = readFileSync(path.join(ADMIN_SRC, 'lib/page-builder-save.ts'), 'utf8');
       for (const e of manifest.filter(x => x.kind === 'api')) {
         if (e.status === 'retired') {
           expect(e.capability, e.key).toBe('P-19');
@@ -139,7 +145,7 @@ if (process.env.EDITOR_MATRIX_WRITE === '1') {
           expect(/api(Put|Post)[^;]*\/(theme|typography)\b/.test(builderSrc), e.key).toBe(false);
           continue;
         }
-        expect(builderSrc.includes(fragment) || libSrc.includes(fragment), e.key).toBe(true);
+        expect(builderSrc.includes(fragment), e.key).toBe(true);
       }
     });
 
@@ -230,15 +236,28 @@ if (process.env.EDITOR_MATRIX_WRITE === '1') {
       expect(parityBaseline.liveWrites).toEqual([]);
     });
 
-    it('5. the classic builder is referenced from no new file; the list can only shrink (Task 12 empties it)', () => {
-      const extra = current.classicReferences.filter(
-        f => !parityBaseline.classicReferences.includes(f)
-      );
-      expect(extra).toEqual([]);
-      const closed = parityBaseline.classicReferences.filter(
-        f => !current.classicReferences.includes(f)
-      );
-      expect(closed, 'a closed gap must leave parity-baseline.json').toEqual([]);
+    it('5. nothing under apps/admin/src names the classic builder any more (Task 12 emptied the list)', () => {
+      expect(current.classicReferences).toEqual([]);
+      expect(parityBaseline.classicReferences).toEqual([]);
+    });
+
+    it('6. every theme key the classic form staged for PUT /theme is an editor theme setting (Ruling VE-17)', () => {
+      const themeKeys = manifest.filter(e => e.kind === 'theme-key');
+      // the form's five product-card switches; an empty list would mean the extractor went blind
+      expect(themeKeys.map(e => e.key).sort()).toEqual([
+        'normalizeProductImages',
+        'saleBadgeLegacyCorner',
+        'showBrandBadge',
+        'showNewBadge',
+        'showQuickAdd',
+      ]);
+      for (const e of themeKeys) {
+        expect(e.status, e.key).toBe('wired');
+        expect(DRAFT_THEME_KEYS, e.key).toContain(e.key);
+        const setting = THEME_SETTINGS_SCHEMA.flatMap(g => g.settings).find(x => x.id === e.key);
+        expect(setting?.type, e.key).toBe('checkbox');
+        expect(setting?.labelAr, e.key).toBeTruthy();
+      }
     });
 
     it('theme controls: every THEME_SETTINGS_SCHEMA setting is in the matrix as a theme row', () => {

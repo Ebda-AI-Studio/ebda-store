@@ -139,6 +139,7 @@ ol {
   display: inline-flex;
   align-items: center;
   gap: 8px;
+  min-height: 44px; /* touch target: the logo link is the home button */
   text-decoration: none;
   color: var(--fg);
   flex: none;
@@ -1583,7 +1584,7 @@ html[lang='ar'] .price {
   gap: 8px;
 }
 .footer-mark {
-  height: 24px;
+  height: 28px;
   width: auto;
 }
 .footer-h {

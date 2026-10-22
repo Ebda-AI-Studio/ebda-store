@@ -391,21 +391,6 @@ describe('framed hero hairline (Rulings B1-5, B1-7, B1-41)', () => {
     expect(sel.options.map(o => o.value)).toEqual(['none', 'line']);
     expect(sel.labelAr).toContain('خط الإطار');
     expect(LOOK_DESIGN_KEYS).toContain('frame');
-    const classic = readFileSync(
-      path.resolve(__dirname, '../../apps/admin/src/app/stores/[id]/page-builder/page.tsx'),
-      'utf8'
-    );
-    expect(classic).toContain("updateSection('hero', s => ({ ...s, frame: 'line' }))");
-    for (const lang of ['en', 'ar']) {
-      const m = JSON.parse(
-        readFileSync(
-          path.resolve(__dirname, `../../apps/admin/src/i18n/messages/${lang}.json`),
-          'utf8'
-        )
-      );
-      const hero = m.layout?.sections?.hero ?? findKey(m, 'frameLabel');
-      expect(hero.frameLabel && hero.frameNone && hero.frameLine, lang).toBeTruthy();
-    }
     // only Vitrine's and Bloom's (Ruling B3-13: a cover-filled hero) mixes set it
     for (const l of LOOKS)
       for (const sec of l.sections ?? [])

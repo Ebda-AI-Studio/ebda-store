@@ -48,13 +48,13 @@ export interface ThemeUpdates {
   secondaryForeground?: string;
   accentForeground?: string;
   cardForeground?: string;
-  /** Card-level toggles staged from the page-builder "Product Cards" section
+  /** Card-level toggles staged from the editor's "Product cards" group
    *  card (Ahmad 2026-05-20: moved from branding/ThemeTab). */
   showBrandBadge?: boolean;
   /** Ruling D1016-NEW-1 — the card "New" badge, merchant's choice, default off. */
   showNewBadge?: boolean;
   showQuickAdd?: boolean;
-  /** #1998 — keep the legacy bottom-left sale-badge corner (Page Builder toggle). */
+  /** #1998 — keep the legacy bottom-left sale-badge corner (visual editor toggle). */
   saleBadgeLegacyCorner?: boolean;
   /** Item 6 — hide price on all product cards store-wide. Default true. */
   showPriceOnCards?: boolean;
@@ -64,7 +64,7 @@ export interface ThemeUpdates {
   summaryLabelColor?: string;
   summaryTotalColor?: string;
   summaryLabelBold?: boolean;
-  /** #2349 — keep the legacy (lighter) status-message colours (Page Builder → Cart page). */
+  /** #2349 — keep the legacy (lighter) status-message colours (visual editor → Cart page). */
   legacyBannerContrast?: boolean;
   /** Products listing page (PLP) text colors. */
   plpBreadcrumbColor?: string;

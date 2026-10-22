@@ -22,7 +22,14 @@ import {
  * Theme keys that are merchant switches. `showNewBadge` (Ruling D1016-NEW-1) gates the
  * card "New" badge on every card path; a string "false" must never reach `=== true` checks.
  */
-export const THEME_BOOLEAN_KEYS = ['showNewBadge'] as const;
+export const THEME_BOOLEAN_KEYS = [
+  'showNewBadge',
+  // the other product-card switches, ported from the retired page builder (Ruling VE-17)
+  'showBrandBadge',
+  'showQuickAdd',
+  'normalizeProductImages',
+  'saleBadgeLegacyCorner',
+] as const;
 
 export const themeSchema = z
   .record(z.string(), z.unknown())

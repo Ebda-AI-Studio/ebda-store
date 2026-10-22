@@ -209,6 +209,11 @@ describe('admin search registry: every visual-editor control (Task 11)', () => {
   const EDITOR_CONTROLS = [
     'builder.header-logo',
     'builder.header-search',
+    'builder.card-brand-badge',
+    'builder.card-new-badge',
+    'builder.card-quick-add',
+    'builder.card-even-images',
+    'builder.card-sale-corner',
     'builder.fonts',
     'builder.typography-zones',
     'builder.section-typography',

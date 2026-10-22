@@ -164,10 +164,15 @@ export function ThemeSettingsPanel({
       );
     if (s.type === 'checkbox')
       return (
-        <label key={s.id} className="flex items-center justify-between text-sm">
-          <span>{label}</span>
-          <Toggle checked={v === true} onChange={on => set(s.id, on)} />
-        </label>
+        <div key={s.id} className="space-y-0.5">
+          <label className="flex items-center justify-between text-sm">
+            <span>{label}</span>
+            <Toggle checked={v === true} onChange={on => set(s.id, on)} />
+          </label>
+          {(locale === 'ar' ? s.hintAr : s.hintEn) && (
+            <p className="text-xs text-muted-foreground">{locale === 'ar' ? s.hintAr : s.hintEn}</p>
+          )}
+        </div>
       );
     if (s.type === 'text')
       return (
@@ -239,6 +244,36 @@ export function ThemeSettingsPanel({
               if (s.id === 'headerSearch')
                 return (
                   <div key={s.id} className="space-y-1" data-setting-id="builder.header-search">
+                    {field}
+                  </div>
+                );
+              if (s.id === 'showBrandBadge')
+                return (
+                  <div key={s.id} className="space-y-1" data-setting-id="builder.card-brand-badge">
+                    {field}
+                  </div>
+                );
+              if (s.id === 'showNewBadge')
+                return (
+                  <div key={s.id} className="space-y-1" data-setting-id="builder.card-new-badge">
+                    {field}
+                  </div>
+                );
+              if (s.id === 'showQuickAdd')
+                return (
+                  <div key={s.id} className="space-y-1" data-setting-id="builder.card-quick-add">
+                    {field}
+                  </div>
+                );
+              if (s.id === 'normalizeProductImages')
+                return (
+                  <div key={s.id} className="space-y-1" data-setting-id="builder.card-even-images">
+                    {field}
+                  </div>
+                );
+              if (s.id === 'saleBadgeLegacyCorner')
+                return (
+                  <div key={s.id} className="space-y-1" data-setting-id="builder.card-sale-corner">
                     {field}
                   </div>
                 );

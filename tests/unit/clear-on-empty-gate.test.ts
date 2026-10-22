@@ -138,11 +138,11 @@ describe('clear-on-empty gate — PASSES on the legitimate uses', () => {
     expect(findClearGateViolations(src, 'affiliates/page.tsx')).toHaveLength(0);
   });
 
-  it("ignores the page builder's inherit-default section patches", () => {
+  it("ignores the visual editor's inherit-default section patches", () => {
     const src = `
       <input onChange={e => onPatch({ categorySlug: e.target.value || undefined })} />
     `;
-    expect(findClearGateViolations(src, 'page-builder/page.tsx')).toHaveLength(0);
+    expect(findClearGateViolations(src, 'builder/_components/SettingsPanel.tsx')).toHaveLength(0);
   });
 
   it("ignores the floating widget's local config patches", () => {

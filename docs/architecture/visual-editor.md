@@ -111,8 +111,8 @@ Not yet marked (listed for the editor matrix): skin-owned text under
 `npm run editor:matrix` regenerates `docs/ebda/templates/editor-matrix.{md,json}`
 (`scripts/editor-audit/`). One row per skin and control: sections and blocks from
 `SECTION_REGISTRY`, theme controls from `THEME_SETTINGS_SCHEMA`, the look mixes'
-design keys, and the form page builder's write surface read from its source
-(`classic-manifest.ts`). A control is `wired` only when two independent sources
+design keys, and the form page builder's write surface, frozen from its last source
+(`classic-manifest.ts` + `classic-facts.json`). A control is `wired` only when two independent sources
 agree: a reverse grep finds a reader on the skin, and the flip probe (`probe.tsx`)
 renders the section through the real `PageRenderer` once per option value and sees
 the HTML change. The probe seeds content a section needs (hero slides, collections,
@@ -128,11 +128,30 @@ It is a ratchet: `npm run editor:matrix` only ever REMOVES baseline rows that we
 fixed; accepting a new gap is a deliberate edit with a reason. Since Task 10 the
 baseline is EMPTY and the matrix has no `no-op`, `missing` or `marker-pending` row
 (`tests/unit/editor-matrix.test.ts` pins both).
-`tests/unit/visual-editor-parity.test.ts` is the gate for deleting `/page-builder`
-(Ruling VE-6): every classic capability P-01 to P-14 is accounted for, wired fields
-round-trip through the builder reducer to the same layout the form writes, and the
-lists of live theme/typography writes and of files that still mention the classic
-builder (`parity-baseline.json`) can only shrink. Task 12 requires them empty.
+`tests/unit/visual-editor-parity.test.ts` was the gate for deleting `/page-builder`
+(Ruling VE-6) and now keeps the parity true: every classic capability P-01 to P-14 is
+accounted for, wired fields round-trip through the builder reducer to the same layout the
+form wrote, every theme key the form staged for `PUT /theme` is an editor theme setting
+(item 6, the class Ruling VE-17 closed), no editor file writes the live theme, and nothing
+under `apps/admin/src` names the classic builder (item 5, `parity-baseline.json` is empty).
+
+## Retiring the form page builder (Task 12)
+
+The 4,793-line `/stores/:id/page-builder` page (5,951 lines with its two components), `CategoryLayoutButtons`, `ModeButton`,
+`lib/page-builder-save.ts` and `POST /admin/stores/:id/layout/preview` are deleted.
+`/page-builder`, `/hero`, `/navigation` and `/pages` are server redirects to `/builder`
+(`lib/builder-redirect.ts`) that keep the Ruling VE-16 deep link (`select`, `block`, `field`,
+`page`) and drop any other param. `hubs.ts` lists ONE editor tab (`hubTabs.editor`) and keeps
+`/page-builder` in `urlPrefixes` so a redirected visit still highlights the Catalog hub.
+The admin CSP gives the preview frame-src to `/stores/:id/builder` only.
+
+The classic form's write surface is frozen in `scripts/editor-audit/classic-facts.json`
+(extracted by `extractClassicFacts` from the last source), so the manifest and matrix still
+check it without the page. Its five product-card theme switches (`showBrandBadge`,
+`showNewBadge`, `showQuickAdd`, `normalizeProductImages`, `saleBadgeLegacyCorner`) are the
+`cards` group of `THEME_SETTINGS_SCHEMA`: draft-carried like every theme key, never look-owned
+(a look switch, keep or reset, leaves them), never written by Smart Palette, strict booleans
+at `PUT /theme`, searchable (`builder.card-*`).
 
 ## Section design controls (Task 6)
 

@@ -57,7 +57,6 @@ A page is a **template** of ordered **sections**; each section holds ordered **b
 | `packages/shared/src/builder/template-families.ts`                               | the five families: Souq سوق, Dahab دهب, Qamar قمر, Lamma لمّة, Jasmine ياسمين                                                                                                                                                                                                               |
 | `apps/web/src/builder/render/PageRenderer.tsx`                                   | renders a document with the existing template components                                                                                                                                                                                                                                    |
 | `apps/api/src/services/page-builder.service.ts`, `routes/page-builder.routes.ts` | draft / publish / revisions / rollback                                                                                                                                                                                                                                                      |
-| `apps/admin/src/lib/page-builder-save.ts`                                        | the existing page-builder Save → draft + publish                                                                                                                                                                                                                                            |
 
 ## Compatibility with `stores.layout_settings`
 
@@ -94,4 +93,4 @@ Race losers fail on a row re-check or a unique index inside a SAVEPOINT, so the 
 
 ## Not done yet
 
-Typography / divider compound editors inside the new panel (they link to the classic page builder), visual evaluation of the five family presets against the shortlist rubric, builder permissions (`builder:content|design|publish`), revision retention (keep-last-50 job), a Redis layer for the public layout route, and verification against production (nothing is deployed by this branch).
+Visual evaluation of the five family presets against the shortlist rubric, builder permissions (`builder:content|design|publish`), revision retention (keep-last-50 job), a Redis layer for the public layout route, and verification against production (nothing is deployed by this branch).

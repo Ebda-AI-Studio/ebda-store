@@ -914,6 +914,35 @@ describe('builder publish -> storefront route serves the published document', { 
     expect(res.body.data.definition).toEqual(published);
   });
 
+  it('a ported product-card switch (showNewBadge; the five share one draft-theme path) goes draft -> publish -> live store theme', async () => {
+    const storeId = await freshStore('cardsw', 'modern');
+    const st = await inStore(storeId, () => getPageState(storeId, HOME));
+    const doc = withRealCopy({
+      ...st!.definition,
+      theme: { showNewBadge: true, saleBadgeLegacyCorner: true },
+    } as PageDefinition);
+    const saved = await inStore(storeId, () =>
+      saveDraft({ storeId, pageKey: HOME, baseRev: 0, definition: doc, userId: null })
+    );
+    expect(saved).toMatchObject({ ok: true, value: { rev: 1 } });
+    // a draft is invisible to the live theme
+    const before = await owner.store.findUniqueOrThrow({
+      where: { id: storeId },
+      select: { theme: true },
+    });
+    expect((before.theme as Record<string, unknown> | null)?.showNewBadge).toBeUndefined();
+    const pub = await inStore(storeId, () => publishDraft({ storeId, pageKey: HOME, baseRev: 1 }));
+    expect(pub).toMatchObject({ ok: true, value: { rev: 1 } });
+    // the live store row is what the storefront's store payload serves
+    const live = await owner.store.findUniqueOrThrow({
+      where: { id: storeId },
+      select: { theme: true },
+    });
+    expect(live.theme).toMatchObject({ showNewBadge: true, saleBadgeLegacyCorner: true });
+    const res = await request(app).get(`/public/stores/${storeId}/layout`);
+    expect(res.status).toBe(200);
+  });
+
   it('an out-of-band layout_settings write still falls back (the guard still guards)', async () => {
     const { storeId } = await publishAndRead('minimal', d => applyTemplateFamily(d, 'lamma'));
     const raw = await layoutOf(storeId);

@@ -130,8 +130,7 @@ export function AdminLayout({
   const hubLabels: HubLabels = {
     // Catalog tabs
     products: t('hubTabs.products'),
-    pageBuilder: t('hubTabs.pageBuilder'),
-    visualBuilder: t('hubTabs.visualBuilder'),
+    editor: t('hubTabs.editor'),
     content: t('hubTabs.content'),
     blog: t('hubTabs.blog'),
     floatingWidget: t('hubTabs.floatingWidget'),

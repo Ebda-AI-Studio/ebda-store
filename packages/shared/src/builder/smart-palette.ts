@@ -37,6 +37,12 @@ const NOT_PALETTE = new Set([
   'backgroundPreset',
   'bgPage',
   'bgSectionAlt',
+  // product-card merchant switches (Ruling VE-17), never part of a palette
+  'showBrandBadge',
+  'showNewBadge',
+  'showQuickAdd',
+  'normalizeProductImages',
+  'saleBadgeLegacyCorner',
 ]);
 
 export function applySmartPalette(

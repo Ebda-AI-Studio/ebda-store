@@ -247,7 +247,7 @@ export function SectionDividersBlock({
               // (primary / secondary / accent / card / muted / foreground /
               // background / border / etc) AND a full-size hex picker AND a
               // contrast preview. Same component used by every other color
-              // field in page-builder.
+              // field in the editor.
               <ColorField
                 label=""
                 value={sharedCustomColor}

@@ -28,7 +28,7 @@
 ### Storefront
 
 - [x] 5 themes — Modern, Classic, Minimal, Bold, Elegant — each RTL-compatible and independently configurable
-- [x] Page builder — drag-and-drop section ordering + bilingual copy editing; Navigation links, Footer links, and Category page config are all consolidated inside the Page Builder (not separate settings pages)
+- [x] Page builder — drag-and-drop section ordering + bilingual copy editing; Navigation links, Footer links, and Category page config are all consolidated inside the visual editor (`/stores/:id/builder`; the form Page Builder was retired in Task 12, 2026-10-22)
 - [x] Dark mode — system `prefers-color-scheme` detection + manual toggle
 - [x] RTL / bilingual — Arabic + English with full right-to-left layout support; every database field has separate AR and EN columns
 - [x] PWA — service worker, push notification support, per-merchant installable app icon/name
@@ -121,8 +121,8 @@ These items are sequenced from `docs/HANDOFF-2026-06-01.md`. Priority order is a
 
 ### Near-term (design-gated or partially implemented)
 
-- [ ] **Page Builder discount fields** — B1–B4: compare-price → active discount, percentage/dinar dropdown, live preview cell in the product form; requires schema change (discount type/value on product model) + storefront price resolution logic
-- [ ] **Settings → Page Builder full consolidation** — A1 Footer Links, A2 Storefront Navigation, A3 Branding social/SEO de-dup, A4 Category Pages access restoration, A5 page-builder preview covers all unsaved changes (currently homepage + layout only)
+- [ ] **Product discount fields** — B1–B4: compare-price → active discount, percentage/dinar dropdown, live preview cell in the product form; requires schema change (discount type/value on product model) + storefront price resolution logic
+- [ ] **Settings → visual editor full consolidation** (the form Page Builder is retired; the editor is the one surface) — A1 Footer Links, A2 Storefront Navigation, A3 Branding social/SEO de-dup, A4 Category Pages access restoration, A5 editor preview covers all unsaved changes (currently homepage + layout only)
 - [ ] **Search program** (`docs/plans/2026-10-15-semantic-search.md`) — P0 in review: Arabic-normalised trigram search on storefront, typeahead and admin product search, merchant-set search words, searches-with-no-results insights; P1 AI search terms + embeddings (hybrid ranking, off until the eval bar holds), P2 customer/order search, P3 catalogue import. Rulings SEARCH-\* in `docs/RULINGS.md`
   - **Launch gates (privacy; each must be closed before the storefront search goes live for real shoppers):**
   - [x] **SEARCH-T5-8** — DONE (Ruling SEARCH-URL-1, `fix/launch-blockers-privacy`): the storefront → API search term moved out of the URL into the `X-Search-Query` header (list + typeahead), the search page address carries no term, `/search` is noindex. The API still accepts the deprecated `?search=`/`?q=` for one release (remove with the admin ones). After the first deploy, re-check the `api` Worker's invocation log for `search=` values.

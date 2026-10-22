@@ -44,8 +44,8 @@ const PAGE_KEYWORDS: Record<string, string> = {
   announcement: 'banner bar top message strip إعلان شريط رسالة علوي',
   billing:
     'plan subscription upgrade usage limits invoice باقة اشتراك ترقية استخدام حدود فاتورة فوترة',
-  'page-builder':
-    'design layout sections hero homepage builder تصميم تخطيط أقسام الصفحة الرئيسية بانر منشئ',
+  builder:
+    'design layout sections hero homepage visual editor builder تصميم تخطيط أقسام الصفحة الرئيسية بانر محرر مرئي منشئ',
   products: 'catalog items inventory skus goods منتجات سلع بضائع كتالوج',
   categories: 'collections groups فئات تصنيفات مجموعات أقسام',
   'size-charts':

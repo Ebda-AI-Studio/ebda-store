@@ -74,7 +74,7 @@ interface LocationsClientProps {
  * Storefront locations page client component. Groups published branches by
  * country and renders bilingual cards with a map-pin placeholder (FIX C — no
  * broken iframe), directions, call, and WhatsApp actions. Applies per-page
- * design settings from the Page Builder (FIX B).
+ * design settings from the visual editor (FIX B).
  */
 export default function LocationsClient({
   locationsPage: locationsPageProp,

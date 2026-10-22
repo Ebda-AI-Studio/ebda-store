@@ -30,7 +30,7 @@
  *      a short window AFTER that specific call — not merely anywhere in the
  *      file. A whole-file check false-positives on large files that reuse
  *      the identifier `data` for an unrelated raw-fetch envelope elsewhere
- *      (page-builder/page.tsx: a correctly-typed apiGet<{ data?: ... }>
+ *      (the retired form builder page: a correctly-typed apiGet<{ data?: ... }>
  *      call, and ~350 lines away an unrelated `const data = await
  *      res.json()` from a raw apiFetch upload, whose `data.data.url` is a
  *      correct FIRST unwrap of a different object).
@@ -80,7 +80,7 @@ const DOUBLE_READ_RE = /\bdata\??\.data\b/;
 
 // How far past a flagged api* call to look for the double-read. A whole-file
 // check false-positives on large files that use the identifier `data` for
-// unrelated raw-fetch envelopes elsewhere (e.g. page-builder/page.tsx has
+// unrelated raw-fetch envelopes elsewhere (e.g. the retired form builder page had
 // BOTH a safely-typed apiGet<{ data?: ... }> call AND, ~350 lines away, an
 // unrelated `const data = await res.json()` from a raw apiFetch upload,
 // whose `data.data.url` is a correct FIRST unwrap of a different object).

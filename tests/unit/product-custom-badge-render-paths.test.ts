@@ -142,10 +142,10 @@ describe('custom badge — the data hops it must survive', () => {
     );
     expect(sidebar).toContain("tFields('badgeLabel')");
     expect(sidebar).toContain("tFields('badgeLabelAr')");
-    // …and the styling knobs live in the page builder next to the discount
+    // …and the styling knobs live in the visual editor's page settings next to the discount
     // badge's, not in a new bespoke system.
-    expect(read('apps/admin/src/app/stores/[id]/page-builder/page.tsx')).toContain(
-      'customBadge: {'
+    expect(read('packages/shared/src/builder/page-settings.ts')).toContain(
+      "'customBadge.position'"
     );
   });
 });
