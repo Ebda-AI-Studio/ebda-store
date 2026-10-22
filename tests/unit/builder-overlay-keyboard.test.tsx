@@ -133,6 +133,32 @@ describe('canvas keyboard path', () => {
     expect(posted()).toContainEqual({ protocol: BUILDER_PROTOCOL, type: 'focus-tree' });
   });
 
+  it('a page form field and IME composition keep their native Tab / Esc (nothing is intercepted)', () => {
+    const d = doc();
+    const heroId = page(d);
+    document.body.insertAdjacentHTML('beforeend', '<input id="news" />');
+    mount(d);
+    fromAdmin({ type: 'select', sectionId: heroId });
+    (document.getElementById('news') as HTMLInputElement).focus();
+    const tab = new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true });
+    document.activeElement!.dispatchEvent(tab);
+    expect(tab.defaultPrevented).toBe(false);
+    const esc = new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true });
+    document.activeElement!.dispatchEvent(esc);
+    expect(esc.defaultPrevented).toBe(false);
+    (document.getElementById('news') as HTMLInputElement).blur();
+    (document.body as HTMLElement).focus();
+    const composing = new KeyboardEvent('keydown', {
+      key: 'Escape',
+      isComposing: true,
+      bubbles: true,
+      cancelable: true,
+    });
+    document.body.dispatchEvent(composing);
+    expect(composing.defaultPrevented).toBe(false);
+    expect(posted()).not.toContainEqual({ protocol: BUILDER_PROTOCOL, type: 'focus-tree' });
+  });
+
   it('Esc while editing only cancels the edit', () => {
     const d = doc();
     const heroId = page(d);

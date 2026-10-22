@@ -6,7 +6,8 @@
  *   admin JS heap after 200 edits   < 150 MB (after a forced GC)
  *   initial editor interactive      < 2.5 s on throttled Fast 4G
  *
- * The canvas here is the contract fake (fake-canvas.html), so "paint" is the fake's next animation
+ * ADMIN-SIDE BUDGET ONLY: this cannot regress on a storefront memoization change (that is covered by
+ * tests/unit/builder-perf-*.test.tsx render counts). The canvas here is the contract fake (fake-canvas.html), so "paint" is the fake's next animation
  * frame after the `render` message: it measures the admin side (edit -> reducer -> coalesced post)
  * plus one frame, NOT the real storefront's React render. The interactive budget runs against
  * `next dev` locally (compiles on demand, slower than production) - run it with `next start` in CI.

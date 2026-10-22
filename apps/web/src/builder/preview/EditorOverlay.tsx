@@ -346,6 +346,15 @@ export default function EditorOverlay({ allowedOrigins, locale, definition, onRe
       const sel = selectedRef.current;
       if (!sel || editingRef.current || dragRef.current) return;
       const active = document.activeElement as HTMLElement | null;
+      // IME composition and the page's own form fields (a newsletter input in editor mode) keep
+      // their native Tab / Esc / Alt+Arrow; only the editable-target markers join the cycle.
+      if (e.isComposing) return;
+      if (
+        active &&
+        !active.hasAttribute('data-builder-setting') &&
+        active.matches('input, textarea, select, [contenteditable]:not([contenteditable="false"])')
+      )
+        return;
       if (e.key === 'Tab' && !e.altKey && !e.ctrlKey && !e.metaKey) {
         const list = cycleTargets(sel);
         if (list.length === 0) return;
