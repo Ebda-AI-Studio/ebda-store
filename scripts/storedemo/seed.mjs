@@ -4,10 +4,11 @@
 // store per template (Ruling B2-7): `storedemo` = Qamar (default), `storedemo-souq` = Souq
 // (`--template souq`, SOUQ_DEMO_ASSET_BASE, prod asset base https://media.ebda.app/demo/souq),
 // `storedemo-jasmine` = Jasmine (`--template jasmine`, JASMINE_DEMO_ASSET_BASE, prod asset base
-// https://media.ebda.app/demo/jasmine; Ruling B3-8).
+// https://media.ebda.app/demo/jasmine; Ruling B3-8), `storedemo-lamma` = Lamma (`--template lamma`,
+// LAMMA_DEMO_ASSET_BASE, prod asset base https://media.ebda.app/demo/lamma; Ruling B4-10).
 //
 //   DATABASE_URL=<owner-role postgres url> [QAMAR_DEMO_ASSET_BASE=<url or /path>] \
-//     npx tsx scripts/storedemo/seed.mjs [--template qamar|souq|jasmine] [--yes-production] [--local-look-stores]
+//     npx tsx scripts/storedemo/seed.mjs [--template qamar|souq|jasmine|lamma] [--yes-production] [--local-look-stores]
 //
 // Prints the plan first. Refuses any non-local DATABASE_URL (anything but loopback) unless
 // `--yes-production` is passed: Ahmad approves that run, an agent never does (Ruling B1-16), and with
@@ -44,10 +45,12 @@ import {
   JASMINE_BUNDLES,
   JASMINE_REVIEWS,
 } from '../jasmine-demo/catalogue.mjs';
+import { LAMMA_CATEGORIES, LAMMA_PRODUCTS } from '../lamma-demo/catalogue.mjs';
 import { buildSouqHome } from './souq-home.mjs';
 import { buildJasmineHome } from './jasmine-home.mjs';
+import { buildLammaHome } from './lamma-home.mjs';
 
-export { buildQamarHome, buildSouqHome, buildJasmineHome };
+export { buildQamarHome, buildSouqHome, buildJasmineHome, buildLammaHome };
 
 export const SLUG = 'storedemo';
 export const OWNER_EMAIL = 'storedemo-owner@ebda.app';
@@ -157,6 +160,7 @@ export const LOCAL_LOOK_STORES = [
 export const PROD_ASSET_BASE = 'https://media.ebda.app/demo/qamar';
 export const SOUQ_PROD_ASSET_BASE = 'https://media.ebda.app/demo/souq';
 export const JASMINE_PROD_ASSET_BASE = 'https://media.ebda.app/demo/jasmine';
+export const LAMMA_PROD_ASSET_BASE = 'https://media.ebda.app/demo/lamma';
 
 /**
  * One entry per demo template (Ruling B2-7). Everything a template's showroom differs in is here;
@@ -251,6 +255,73 @@ export const TEMPLATE_SPECS = {
     reviews: JASMINE_REVIEWS,
     features: ['bundles'],
   },
+  lamma: {
+    template: 'lamma',
+    slug: 'storedemo-lamma',
+    // Ruling B4-10: no mailbox behind this address, no login (`passwordHash '!seed-no-login'`).
+    ownerEmail: 'storedemo-lamma-owner@ebda.app',
+    name: 'Ebda Lamma Demo',
+    nameAr: 'إبدا لمّة ديمو',
+    defaultLook: 'lamma.table',
+    categories: LAMMA_CATEGORIES,
+    products: LAMMA_PRODUCTS,
+    sizeCharts: {},
+    occasionSlugs: [],
+    archivePlaceholders: false,
+    assetEnv: 'LAMMA_DEMO_ASSET_BASE',
+    prodAssetBase: LAMMA_PROD_ASSET_BASE,
+    localLookStores: [
+      ['lamma-table', 'lamma.table'],
+      ['lamma-notebook', 'lamma.notebook'],
+      ['lamma-market', 'lamma.market'],
+    ],
+    localStoreName: l => [`Lamma ${l.name.en}`, `لمّة ${l.name.ar}`],
+    buildHome: buildLammaHome,
+    description:
+      'An illustrative Egyptian home kitchen and grocery: stuffed vegetables, tagines, grill and sweets, plus fresh produce, dairy and pantry basics.',
+    descriptionAr:
+      'مطبخ بيتي وبقالة مصرية توضيحية: محاشي وطواجن ومشويات وحلويات، وخضار وفاكهة وألبان وبقالة.',
+    // Food delivers the same day (estimate 0 business days), every day of the week (Ruling B4-7).
+    deliveryDays: { min: 0, max: 1 },
+    instalments: null,
+    // Ruling B4-12: the delivery time is merchant text in the announcement bar, never a platform promise.
+    announcement: {
+      text: 'Delivery within 45 minutes (demo store)',
+      textAr: 'التوصيل خلال 45 دقيقة (ده متجر تجريبي)',
+    },
+    // Store settings a food shop needs: a 150 EGP minimum order (piastres), delivery every day,
+    // the date chips 5 days ahead with two windows (lunch and dinner, each with its cut-off).
+    storeSettings: {
+      minimumOrderFils: 15_000,
+      deliveryOffDays: [],
+      checkoutDelivery: {
+        note: { enabled: false, text: '', textAr: '' },
+        windows: {
+          enabled: true,
+          items: [
+            {
+              id: 'lunch',
+              label: 'Lunch 12-2',
+              labelAr: 'غدا 12-2',
+              start: '12:00',
+              end: '14:00',
+              orderBy: '10:00',
+            },
+            {
+              id: 'dinner',
+              label: 'Dinner 6-8',
+              labelAr: 'عشا 6-8',
+              start: '18:00',
+              end: '20:00',
+              orderBy: '15:00',
+            },
+          ],
+        },
+        daysAhead: 5,
+      },
+    },
+    zone: { deliveryFee: 3_500, estimatedDaysMin: 0, estimatedDaysMax: 1 },
+  },
 };
 /** `--template <name>` (default qamar); an unknown name is refused by the caller. */
 export function templateFromArgv(argv) {
@@ -301,6 +372,11 @@ export function describePlan(url, spec = TEMPLATE_SPECS.qamar) {
     ...(spec.tags?.length
       ? [
           `jasmine-style extras: ${spec.tags.length} skin-type / concern tags, ${spec.bundles?.length ?? 0} routine bundle(s), ${spec.reviews?.length ?? 0} approved reviews, features ${(spec.features ?? []).join(', ') || 'none'}`,
+        ]
+      : []),
+    ...(spec.storeSettings
+      ? [
+          `store settings: ${Object.keys(spec.storeSettings).join(', ')} (minimum order, delivery calendar, date chips)`,
         ]
       : []),
     ...(spec.archivePlaceholders
@@ -681,6 +757,7 @@ export async function seedCatalogue(prisma, Prisma, storeId, base, spec = TEMPLA
         estimatedDaysMin: 1,
         estimatedDaysMax: 3,
         isActive: true,
+        ...(spec.zone ?? {}),
       };
       const z = await tx.shippingZone.findFirst({
         where: { storeId, name: zone.name },
@@ -719,8 +796,8 @@ export async function seedCatalogue(prisma, Prisma, storeId, base, spec = TEMPLA
           // labels the photos (Task 9 review).
           announcementBar: {
             enabled: true,
-            text: 'Illustrative photos',
-            textAr: 'الصور توضيحية',
+            text: spec.announcement?.text ?? 'Illustrative photos',
+            textAr: spec.announcement?.textAr ?? 'الصور توضيحية',
           },
           settings: {
             ...((store?.settings && typeof store.settings === 'object' && store.settings) || {}),
@@ -731,6 +808,8 @@ export async function seedCatalogue(prisma, Prisma, storeId, base, spec = TEMPLA
             // Ruling B2-9: written only for a template that shows instalments; a re-seed of the
             // Qamar showroom leaves the key out, exactly as before.
             ...(spec.instalments ? { instalments: spec.instalments } : {}),
+            // Ruling B4-7: minimum order, delivery calendar and date chips (Lamma only).
+            ...(spec.storeSettings ?? {}),
           },
         },
       });

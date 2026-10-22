@@ -8,13 +8,14 @@ import { unknownHostLinks } from '../../apps/web/src/lib/unknown-store-page';
 import { TEMPLATE_SPECS } from '../../scripts/storedemo/seed.mjs';
 
 describe('demo host map', () => {
-  it('is Qamar -> storedemo, Souq -> storedemo-souq, Jasmine -> storedemo-jasmine', () => {
+  it('is Qamar -> storedemo, Souq -> storedemo-souq, Jasmine -> storedemo-jasmine, Lamma -> storedemo-lamma', () => {
     expect(DEMO_HOSTS).toEqual({
       qamar: 'storedemo',
       souq: 'storedemo-souq',
       jasmine: 'storedemo-jasmine',
+      lamma: 'storedemo-lamma',
     });
-    expect(demoTemplates()).toEqual(['qamar', 'souq', 'jasmine']);
+    expect(demoTemplates()).toEqual(['qamar', 'souq', 'jasmine', 'lamma']);
   });
   it('agrees with the seed: each spec slug is the host label of its template', () => {
     for (const t of demoTemplates()) expect(TEMPLATE_SPECS[t].slug).toBe(DEMO_HOSTS[t]);
@@ -31,6 +32,12 @@ describe('demo host map', () => {
       'storedemo-jasmine.ebda.app:3000'
     );
     expect(demoHostFor('qamar', 'storedemo-jasmine.ebda.app')).toBe('storedemo.ebda.app');
+    // Phase B4: the fourth demo store, from any of the others (Ruling B4-10)
+    expect(demoHostFor('lamma', 'storedemo.ebda.app')).toBe('storedemo-lamma.ebda.app');
+    expect(demoHostFor('lamma', 'storedemo-jasmine.preview.ebda.app:3000')).toBe(
+      'storedemo-lamma.preview.ebda.app:3000'
+    );
+    expect(demoHostFor('souq', 'storedemo-lamma.ebda.app')).toBe('storedemo-souq.ebda.app');
   });
   it('is null off a demo host, for an unknown template, and for an empty host', () => {
     expect(demoHostFor('souq', 'localhost:3000')).toBeNull();
@@ -38,7 +45,7 @@ describe('demo host map', () => {
     expect(demoHostFor('souq', 'storedemo')).toBeNull();
     expect(demoHostFor('souq', '')).toBeNull();
     // a template with no demo store yet stays put
-    expect(demoHostFor('lamma', 'storedemo.ebda.app')).toBeNull();
+    expect(demoHostFor('dahab', 'storedemo.ebda.app')).toBeNull();
     expect(demoHostFor('dahab', 'storedemo-jasmine.ebda.app')).toBeNull();
   });
   it('the unknown-store 404 link reads the map, not a literal', () => {
