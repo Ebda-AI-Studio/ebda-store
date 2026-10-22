@@ -76,6 +76,10 @@ const URL_SHAPED =
  * column, or that is also registered, fails the suite.
  */
 const NOT_R2_REFERENCES: Record<string, string> = {
+  'OrderItem.goldSnapshot':
+    'JSON snapshot of how a gold line was priced (karat, weight, rate id and value, making charge, margin, step, unit price; goldLineSnapshotSchema, Ruling B5-17), never a URL',
+  'GoldRate.feedReference':
+    "the automatic rate's inputs (spot per ounce, fetched-at, premium bps; Ruling B5-15), never a URL and never a provider name",
   'OrderItem.tierLadder':
     'JSON entitlement snapshot { rungs: [{ minQty, priceMinor, variant, group }], groupPercentMinor } taken at sale time (B2B Task 8b, B2B-17/18), never a URL',
   'InstapayReceipt.extracted':

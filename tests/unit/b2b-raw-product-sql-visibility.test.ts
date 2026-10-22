@@ -39,6 +39,12 @@ const CLASSIFIED: Record<
   string,
   { statements: number; kind: Kind; reason: string; publicStatements?: number }
 > = {
+  'services/gold-rate/repricer.ts': {
+    statements: 1,
+    kind: 'system',
+    reason:
+      'Ruling B5-13: the repricer UPDATEs gold-priced rows by id inside the store scope; it returns no product data to any caller',
+  },
   'services/product-search.service.ts': {
     statements: 3,
     kind: 'public',
@@ -104,7 +110,9 @@ const EXEMPT_MIGRATIONS = new Set<string>(
   scanMigrationFunctions(MIGRATIONS)
     .filter(f => !f.hasAudiencePredicate)
     .map(f => f.migration)
-    .filter(m => m < '20261028') // everything before the audience column existed
+    // everything before the audience column existed, plus the gold price guard (Ruling B5-13): its trigger
+    // function reads ONE product's pricing_mode by id to guard a write and returns no product data
+    .filter(m => m < '20261028' || m === '20261101000100_gold_rate_pricing')
 );
 
 function evaluate(queries: readonly RawProductQuery[]): string[] {

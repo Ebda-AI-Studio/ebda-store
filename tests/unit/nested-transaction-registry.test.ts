@@ -59,6 +59,14 @@ const API_SRC = path.resolve(__dirname, '../../apps/api/src');
  * uncomfortable to leave entries in.
  */
 const REVIEWED_OWN_TRANSACTION: Record<string, string> = {
+  // Gold-rate pricing (Phase B5, Rulings B5-13/B5-17): every rate write is ONE money transaction that
+  // takes an advisory lock and FOR UPDATE on the store's current rates, then writes history, current
+  // rates, re-priced rows and (through the definer) audit rows. It reads only rows committed before
+  // the request (rates, products, settings), and the request writes nothing through the proxy first.
+  // The atomicity this needs (rate rows + every price commit or roll back together) is exactly what
+  // its own transaction gives; tests/integration/gold-rate-apply.test.ts case 5 proves it.
+  'services/gold-rate/gold-rate.service.ts':
+    'rate / settings / spec writes run in one money transaction (advisory lock + FOR UPDATE + repricer); no prior write in the request, reads only committed rows',
   // (AuthService.verifyEmail used to be listed here: it now runs `withUser`, which joins or opens
   // the user's own scope itself, so it no longer opens a bare `prisma.$transaction`.)
   // #1787 — the route-level sites the services-only scan could not see. Each

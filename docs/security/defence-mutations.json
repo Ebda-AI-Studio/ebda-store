@@ -2287,8 +2287,8 @@
       "tier": "unit",
       "why": "the gold price rounds in two stages (piastre, then step) instead of once, so a true 19 230.4975 pounds becomes 19 231 and every gold price drifts up by up to a pound (Ruling B5-14, vector C)",
       "source": "packages/shared/src/commerce/gold-price.ts",
-      "find": "  const final = roundHalfUpDiv(num, 10_000_000n * step) * step;",
-      "replace": "  const piastres = roundHalfUpDiv(num, 10_000_000n);\n  const final = roundHalfUpDiv(piastres, step) * step;",
+      "find": "  const final = roundHalfUpDiv(num, SCALE * step) * step;",
+      "replace": "  const piastres = roundHalfUpDiv(num, SCALE);\n  const final = roundHalfUpDiv(piastres, step) * step;",
       "test": "tests/unit/gold-price.test.ts"
     },
     {
@@ -2297,7 +2297,7 @@
       "tier": "unit",
       "why": "the gold price rounds down (floor) instead of half-up, so a true half-pound under-charges by a pound on every such piece",
       "source": "packages/shared/src/commerce/gold-price.ts",
-      "find": "const roundHalfUpDiv = (a: bigint, b: bigint): bigint => (2n * a + b) / (2n * b);",
+      "find": "const roundHalfUpDiv = (a: bigint, b: bigint): bigint => (N2 * a + b) / (N2 * b);",
       "replace": "const roundHalfUpDiv = (a: bigint, b: bigint): bigint => a / b;",
       "test": "tests/unit/gold-price.test.ts"
     },
@@ -2307,8 +2307,8 @@
       "tier": "unit",
       "why": "the int4 ceiling on a computed gold price is dropped, so an overflowing price is materialised (or wraps) instead of failing closed with GOLD_PRICE_OUT_OF_RANGE",
       "source": "packages/shared/src/commerce/gold-price.ts",
-      "find": "if (final < 1n || final > BigInt(GOLD_PRICE_MAX))",
-      "replace": "if (final < 1n)",
+      "find": "if (final < N1 || final > BigInt(GOLD_PRICE_MAX))",
+      "replace": "if (final < N1)",
       "test": "tests/unit/gold-price.test.ts"
     },
     {
@@ -2317,7 +2317,7 @@
       "tier": "unit",
       "why": "the floor on a computed gold price is dropped, so a piece can round to a price of 0 and sell for free",
       "source": "packages/shared/src/commerce/gold-price.ts",
-      "find": "if (final < 1n || final > BigInt(GOLD_PRICE_MAX))",
+      "find": "if (final < N1 || final > BigInt(GOLD_PRICE_MAX))",
       "replace": "if (final > BigInt(GOLD_PRICE_MAX))",
       "test": "tests/unit/gold-price.test.ts"
     },
@@ -2327,7 +2327,7 @@
       "tier": "unit",
       "why": "a fixed making charge (piastres) is not scaled to the metal's piastre*mg/g unit, so a fixed making charge is charged 1000 times too little",
       "source": "packages/shared/src/commerce/gold-price.ts",
-      "find": "      ? BigInt(spec.makingChargeValue) * 1000n",
+      "find": "      ? BigInt(spec.makingChargeValue) * N1000",
       "replace": "      ? BigInt(spec.makingChargeValue)",
       "test": "tests/unit/gold-price.test.ts"
     },
@@ -2338,7 +2338,7 @@
       "why": "the merchant margin is dropped from the gold price, so a +/- margin silently has no effect on what is charged",
       "source": "packages/shared/src/commerce/gold-price.ts",
       "find": "  const num = (metal + making) * BigInt(10_000 + spec.marginBps);",
-      "replace": "  const num = (metal + making) * 10_000n;",
+      "replace": "  const num = (metal + making) * N10000;",
       "test": "tests/unit/gold-price.test.ts"
     },
     {
@@ -2410,6 +2410,36 @@
       "find": "  IF NEW.pricing_mode = 'gold_rate'\n     AND coalesce(current_setting('app.gold_reprice', true), '') <> 'on'",
       "replace": "  IF NEW.pricing_mode = 'gold_rate'\n     AND false",
       "test": "tests/unit/gold-migration-defences.test.ts"
+    },
+    {
+      "id": "money-gold-rate-write-purges-caches",
+      "domain": "money",
+      "tier": "unit",
+      "why": "a rate write stops purging the product caches, so storefront lists, product pages, search suggest and the feed keep showing the previous gold price until a TTL lapses (price is NEVER-stale, Ruling B5-21)",
+      "source": "apps/api/src/services/gold-rate/gold-rate.service.ts",
+      "find": "    if (out.applied.length > 0) await purgeGoldPrices(storeId);\n",
+      "replace": "",
+      "test": "tests/unit/gold-rate-cache-layers.test.ts"
+    },
+    {
+      "id": "money-gold-jump-confirm-gate",
+      "domain": "money",
+      "tier": "integration",
+      "why": "the jump gate is dropped, so a mistyped rate (7 % off, or 21k and 18k swapped) is applied and re-prices the whole catalogue without a confirmation",
+      "source": "apps/api/src/services/gold-rate/gold-rate.service.ts",
+      "find": "      if (offending.length > 0 && !isFeed && !input.confirm)",
+      "replace": "      if (false as boolean)",
+      "test": "tests/integration/gold-rate-apply.test.ts"
+    },
+    {
+      "id": "money-gold-rate-write-needs-store-settings",
+      "domain": "authz",
+      "tier": "integration",
+      "why": "writing a gold rate needs only products:write instead of store:settings, so a staff member can re-price the whole catalogue",
+      "source": "apps/api/src/routes/gold-rate.routes.ts",
+      "find": "const settingsChain = [...base, requirePermission('store:settings'), writeLimiter] as const;",
+      "replace": "const settingsChain = [...base, requirePermission('products:write'), writeLimiter] as const;",
+      "test": "tests/integration/gold-rate-apply.test.ts"
     }
   ]
 }

@@ -607,7 +607,20 @@ router.get('/feed/products.json', async (req: Request, res: Response, next: Next
             return { ...b, description, descriptionAr };
           })
         : [];
-      return { products, bundles };
+      // Ruling B5-21 (item 9): does this store sell gold-rate products? Cached WITH the feed inputs (same
+      // key, same purge), so a rate write that clears this key also re-reads the flag.
+      const hasGold =
+        (await prisma.product.count({
+          where: {
+            storeId,
+            status: 'active',
+            audience: 'public',
+            pricingMode: 'gold_rate',
+            deletedAt: null,
+          },
+          take: 1,
+        })) > 0;
+      return { products, bundles, hasGold };
     });
     const now = new Date();
     const live = inputs.bundles.filter(b => withinSaleWindow(b, now));
@@ -626,11 +639,25 @@ router.get('/feed/products.json', async (req: Request, res: Response, next: Next
     // Never let the edge serve this body past the next window boundary: the
     // fresh window AND the stale-while-revalidate tail both end before it.
     const nextBoundarySec = nextSaleWindowBoundarySeconds(inputs.bundles, now);
-    const sMaxAge = Math.max(1, Math.min(600, nextBoundarySec));
-    setEdgeCache(res, {
-      sMaxAge,
-      staleWhileRevalidate: Math.min(86400, Math.max(0, nextBoundarySec - sMaxAge)),
-    });
+    // Ruling B5-21 (item 9), the one documented BOUNDED-stale residual of gold pricing: this feed is held
+    // by third-party caches (crawlers, shopping feeds, the CDN) that a rate write cannot purge. For a
+    // store that sells gold-rate products the window is at most 60 s and there is NO stale-while-revalidate
+    // tail, so a shopping feed can show the previous price for up to a minute. Checkout re-prices from the
+    // database and shows "السعر اتحدّث", so no one is charged it. `X-Gold-Pricing` tells the storefront's
+    // feed passthrough to apply the same window.
+    if (inputs.hasGold) {
+      res.setHeader('X-Gold-Pricing', '1');
+      setEdgeCache(res, {
+        sMaxAge: Math.max(1, Math.min(60, nextBoundarySec)),
+        staleWhileRevalidate: 0,
+      });
+    } else {
+      const sMaxAge = Math.max(1, Math.min(600, nextBoundarySec));
+      setEdgeCache(res, {
+        sMaxAge,
+        staleWhileRevalidate: Math.min(86400, Math.max(0, nextBoundarySec - sMaxAge)),
+      });
+    }
     res.json(feed);
   } catch (err) {
     next(err);

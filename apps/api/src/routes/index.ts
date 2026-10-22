@@ -50,6 +50,7 @@ import productModelRoutes from './product-model.routes';
 import categoryRoutes from './category.routes';
 import tagRoutes from './tag.routes';
 import sizeChartRoutes from './size-chart.routes';
+import goldRateRoutes from './gold-rate.routes';
 import aiRoutes from './ai.routes';
 import wishlistRoutes from './wishlist.routes';
 import addressRoutes from './address.routes';
@@ -281,6 +282,7 @@ router.use('/stores/:storeId/products', tenantContext, productRoutes);
 router.use('/stores/:storeId/categories', tenantContext, categoryRoutes);
 router.use('/stores/:storeId/tags', tenantContext, tagRoutes);
 router.use('/stores/:storeId/size-charts', tenantContext, sizeChartRoutes);
+router.use('/stores/:storeId/gold-rates', tenantContext, goldRateRoutes);
 // Context chosen PER REQUEST, not per router (EBDA-API-2G): the WRITES here
 // await Gemini and the request transaction expires 30s after BEGIN — a slow
 // model call made the COMMIT fail on a request whose work was already done, so

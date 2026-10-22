@@ -17,6 +17,8 @@ const mockBuildProductFeed = vi.fn(() => ({ products: [] }));
 vi.mock('@ebda/database', () => ({
   prisma: {
     store: { findUniqueOrThrow: (...a: unknown[]) => mockStoreFindUniqueOrThrow(...a) },
+    // the feed asks whether the store sells gold-rate products (Ruling B5-21 item 9): none here
+    product: { count: async () => 0 },
   },
   SlugEntityType: {},
 }));

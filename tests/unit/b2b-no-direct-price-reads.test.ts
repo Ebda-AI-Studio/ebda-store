@@ -39,6 +39,18 @@ interface AllowEntry {
 }
 
 const ALLOW: Record<string, AllowEntry> = {
+  'services/gold-rate/repricer.ts': {
+    category: 'writer',
+    reason:
+      "Ruling B5-13: the repricer is the ONE writer of a gold-priced row's materialised price (computeGoldUnitPrice), min-of-variants for the parent; it reads current prices only to skip unchanged rows",
+    reads: { '<module>': 2, planProduct: 13, priceOf: 1, writePlan: 4 },
+  },
+  'services/gold-rate/gold-rate.service.ts': {
+    category: 'writer',
+    reason:
+      "Ruling B5-13/B5-19: setProductPricing reads a product's price to freeze it when a gold product goes back to fixed (audit row) and to return the new price",
+    reads: { setProductPricing: 4 },
+  },
   'services/cart.service.ts': {
     category: 'resolver-input',
     reason: 'computeTotals feeds item/variant base prices to priceCart',
@@ -239,7 +251,7 @@ const ALLOW: Record<string, AllowEntry> = {
     reads: {
       '<module>': 3,
       advancedSearch: 9,
-      bulkUpdate: 5,
+      bulkUpdate: 6,
       create: 1,
       getById: 1,
       getFilterOptions: 4,
@@ -269,7 +281,7 @@ const ALLOW: Record<string, AllowEntry> = {
   'services/bulk.service.ts': {
     category: 'writer',
     reason: 'bulk price edits / import; Task 4 returns tier-above-base warnings',
-    reads: { createVariantsForProductTx: 1, exportProducts: 2, importProducts: 4 },
+    reads: { createVariantsForProductTx: 1, exportProducts: 2, importProducts: 7 },
   },
   'routes/bulk.routes.ts': {
     category: 'writer',
@@ -289,7 +301,7 @@ const ALLOW: Record<string, AllowEntry> = {
   'services/variant.service.ts': {
     category: 'writer',
     reason: 'variant price edits',
-    reads: { createVariant: 1, getProductVariants: 1 },
+    reads: { createVariant: 1, createVariantRow: 1, getProductVariants: 1 },
   },
   'routes/product.routes.ts': {
     category: 'writer',

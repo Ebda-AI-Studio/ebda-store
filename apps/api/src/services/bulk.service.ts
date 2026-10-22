@@ -677,6 +677,16 @@ export class BulkService {
       productBySlug.set(p.slug, p);
     }
 
+    // Ruling B5-13: a gold-rate product's price is the repricer's. A row for one may repeat its
+    // CURRENT price (an export edited and re-imported) but never change it or add a compare-at
+    // price: that row fails with a clear error and the other rows import.
+    const goldPrice = new Map<string, number>();
+    for (const g of await prisma.product.findMany({
+      where: { storeId, pricingMode: 'gold_rate', deletedAt: null },
+      select: { id: true, price: true },
+    }))
+      goldPrice.set(g.id, g.price);
+
     // Pre-load all existing slugs into a Set for fast unique-slug generation
     const existingSlugs = new Set(existingProducts.map(p => p.slug));
 
@@ -859,6 +869,19 @@ export class BulkService {
             error: `Product with SKU "${row.sku}" or slug "${baseSlug}" already exists`,
           });
           continue;
+        }
+
+        if (existing && goldPrice.has(existing.id)) {
+          const incoming = parseInt(String(row.price), 10);
+          const compare = row.compareAtPrice != null && String(row.compareAtPrice).trim() !== '';
+          if (incoming !== goldPrice.get(existing.id) || compare) {
+            result.failed++;
+            result.errors.push({
+              row: rowIndex,
+              error: `"${row.name}" is priced by the gold rate: its price (and compare-at price) cannot be changed by import. Edit its karat, weight or making charge instead.`,
+            });
+            continue;
+          }
         }
 
         // #1029 / issue 2048: a row claiming a SKU an earlier row in this

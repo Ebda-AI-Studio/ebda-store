@@ -31,10 +31,28 @@ const tierSelect = {
 async function loadProduct(storeId: string, productId: string) {
   const product = await prisma.product.findFirst({
     where: { id: productId, storeId, deletedAt: null },
-    select: { id: true, price: true, costPrice: true, moq: true },
+    select: { id: true, price: true, costPrice: true, moq: true, pricingMode: true },
   });
   if (!product) throw new AppError(404, 'NOT_FOUND', 'Product not found');
   return product;
+}
+
+/**
+ * Ruling B5-19a: a fixed-amount wholesale tier cannot sit under a gold-rate product. The base price
+ * moves with the rate, the tier amount does not, so within a day the "discount" tier would be
+ * ABOVE the base (or lose the merchant money). A group PERCENT still works on a gold base.
+ */
+function assertNotGold(product: { pricingMode: string }) {
+  if (product.pricingMode === 'gold_rate')
+    throw new AppError(
+      409,
+      'GOLD_NO_PRICE_TIERS',
+      'A gold-rate product cannot have fixed-price wholesale tiers: its price moves with the gold rate.',
+      {
+        messageAr:
+          'المنتج المسعّر بالدهب مينفعش يتحط له شرائح أسعار ثابتة لأن سعره بيتغيّر مع سعر الجرام.',
+      }
+    );
 }
 
 const toInput = (t: {
@@ -118,6 +136,7 @@ export const PriceTierService = {
   async create(storeId: string, productId: string, input: TierWriteInput) {
     await assertWholesaleEntitled(storeId);
     const product = await loadProduct(storeId, productId);
+    assertNotGold(product);
     const tier: TierInput = {
       variantId: input.variantId ?? null,
       groupId: input.groupId ?? null,
@@ -155,6 +174,7 @@ export const PriceTierService = {
   ) {
     await assertWholesaleEntitled(storeId);
     const product = await loadProduct(storeId, productId);
+    assertNotGold(product);
     const current = await prisma.productPriceTier.findFirst({
       where: { id: tierId, storeId, productId },
       select: tierSelect,

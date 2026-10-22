@@ -72,7 +72,15 @@ const isInt = (n: unknown, min: number, max: number): n is number =>
   typeof n === 'number' && Number.isSafeInteger(n) && n >= min && n <= max;
 
 /** `round_half_up(a / b)` for positive BigInts: `floor((2a + b) / (2b))`. */
-const roundHalfUpDiv = (a: bigint, b: bigint): bigint => (2n * a + b) / (2n * b);
+// BigInt() calls, not `1000n` literals: apps/web and apps/admin compile this source at a target below ES2020.
+const N1 = BigInt(1);
+const N2 = BigInt(2);
+const N1000 = BigInt(1000);
+const N10000 = BigInt(10000);
+/** Piastre*mg/g -> piastre, times the basis-point scale: the divisor before the rounding step. */
+const SCALE = BigInt(10_000_000);
+
+const roundHalfUpDiv = (a: bigint, b: bigint): bigint => (N2 * a + b) / (N2 * b);
 
 function assertSpec(spec: GoldPriceSpec): void {
   if (!spec || typeof spec !== 'object')
@@ -120,20 +128,20 @@ export function computeGoldUnitPrice(
   const metal = w * BigInt(ratePerGram);
   const making =
     spec.makingChargeType === 'fixed'
-      ? BigInt(spec.makingChargeValue) * 1000n
+      ? BigInt(spec.makingChargeValue) * N1000
       : w * BigInt(spec.makingChargeValue);
   const num = (metal + making) * BigInt(10_000 + spec.marginBps);
   const step = BigInt(roundingStep);
-  const final = roundHalfUpDiv(num, 10_000_000n * step) * step;
-  if (final < 1n || final > BigInt(GOLD_PRICE_MAX))
+  const final = roundHalfUpDiv(num, SCALE * step) * step;
+  if (final < N1 || final > BigInt(GOLD_PRICE_MAX))
     throw new GoldPriceError(
       'GOLD_PRICE_OUT_OF_RANGE',
       'computed price is outside 1..2147483647 piastres'
     );
   return {
     unitPrice: Number(final),
-    metalValue: Number(roundHalfUpDiv(metal, 1000n)),
-    makingValue: Number(roundHalfUpDiv(making, 1000n)),
+    metalValue: Number(roundHalfUpDiv(metal, N1000)),
+    makingValue: Number(roundHalfUpDiv(making, N1000)),
   };
 }
 
@@ -187,7 +195,7 @@ export function goldRateJumpBps(previous: number, next: number): number {
     throw new GoldPriceError('GOLD_RATE_INVALID', 'rates must be positive integers');
   const p = BigInt(previous);
   const diff = BigInt(next) > p ? BigInt(next) - p : p - BigInt(next);
-  return Number((diff * 10_000n + p - 1n) / p);
+  return Number((diff * N10000 + p - N1) / p);
 }
 
 /**
@@ -200,7 +208,7 @@ export function karatCoherenceBps(rate24: number, rateK: number, karat: 21 | 18)
   // expected = rate24 * karat / 24, compared without dividing: |rateK*24 - rate24*karat| / (rate24*karat)
   const k = BigInt(karat);
   const exp = BigInt(rate24) * k;
-  const got = BigInt(rateK) * 24n;
+  const got = BigInt(rateK) * BigInt(24);
   const diff = got > exp ? got - exp : exp - got;
-  return Number((diff * 10_000n + exp - 1n) / exp);
+  return Number((diff * N10000 + exp - N1) / exp);
 }

@@ -1150,7 +1150,13 @@ export class ProductService {
       // The real variant ROWS, never the `hasVariants` column (it can drift): a
       // bulk price/stock write on a variant product would break the inventory
       // invariant (the parent column stays 0, variant row XOR product row).
-      select: { id: true, price: true, inventory: true, _count: { select: { variants: true } } },
+      select: {
+        id: true,
+        price: true,
+        inventory: true,
+        pricingMode: true,
+        _count: { select: { variants: true } },
+      },
     });
 
     if (existing.length === 0) return { updated: 0, skippedVariantProducts: 0 };
@@ -1162,8 +1168,15 @@ export class ProductService {
     // Only count variant products as "skipped" when a price or inventory
     // mutation was requested — a status/flags-only edit isn't skipping anything.
     const variantCount = existing.filter(isVariantProduct).length;
+    // Ruling B5-13: a gold-rate product's price is the repricer's, so a bulk price write skips it
+    // exactly like a variant product (counted as skipped; the database trigger would refuse it).
+    const goldSimple = simpleProducts.filter(p => p.pricingMode === 'gold_rate');
     const skippedVariantProducts =
-      fields.price !== undefined || fields.inventory !== undefined ? variantCount : 0;
+      fields.price !== undefined
+        ? variantCount + goldSimple.length
+        : fields.inventory !== undefined
+          ? variantCount
+          : 0;
 
     // --- 1. Scalar flags (all products, updateMany) ---
     const scalarData: Record<string, unknown> = {};
@@ -1236,12 +1249,13 @@ export class ProductService {
     }
 
     // --- 3. Price (simple products only) ---
-    if (fields.price && simpleIds.length > 0) {
+    const priceable = simpleProducts.filter(p => p.pricingMode !== 'gold_rate');
+    if (fields.price && priceable.length > 0) {
       const { mode, value } = fields.price;
       if (mode === 'set') {
         const piastres = Math.max(0, Math.round(value));
         await prisma.product.updateMany({
-          where: { storeId, id: { in: simpleIds }, deletedAt: null },
+          where: { storeId, id: { in: priceable.map(p => p.id) }, deletedAt: null },
           data: { price: piastres },
         });
       } else {
@@ -1251,7 +1265,7 @@ export class ProductService {
         const MAX_INT4 = 2_147_483_647;
         const pct = value / 100;
         // Run in chunks of 20 to avoid pool exhaustion (up to 500 items).
-        await runChunked(simpleProducts, 20, p => {
+        await runChunked(priceable, 20, p => {
           const newPrice = Math.min(MAX_INT4, Math.max(0, Math.round(p.price * (1 + pct))));
           return prisma.product.update({ where: { id: p.id, storeId }, data: { price: newPrice } });
         });
@@ -1294,7 +1308,12 @@ export class ProductService {
       fields.isNew !== undefined ||
       fields.isBestSeller !== undefined ||
       fields.addCategoryId !== undefined;
-    const actuallyUpdated = hasScalarOrCategoryField ? allIds.length : simpleIds.length;
+    const actuallyUpdated = hasScalarOrCategoryField
+      ? allIds.length
+      : new Set([
+          ...(fields.price ? priceable.map(p => p.id) : []),
+          ...(fields.inventory ? simpleIds : []),
+        ]).size;
 
     return { updated: actuallyUpdated, skippedVariantProducts };
   }

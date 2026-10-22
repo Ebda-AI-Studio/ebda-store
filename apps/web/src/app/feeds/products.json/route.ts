@@ -68,11 +68,18 @@ export async function GET() {
     });
   }
 
+  // Ruling B5-21 (item 9): a store that sells gold-rate products is held to the BOUNDED-stale window of
+  // at most 60 s with no stale-while-revalidate tail. A rate write cannot purge the CDN or a shopping
+  // feed's own cache, so the window is what keeps a displayed price within a minute of the rate.
+  // Checkout re-prices from the database, so no one is charged the old figure. Other stores: unchanged.
+  const gold = upstream.headers.get('x-gold-pricing') === '1';
   return new Response(await upstream.text(), {
     status: 200,
     headers: {
       'Content-Type': 'application/json; charset=utf-8',
-      'Cache-Control': 'public, s-maxage=600, stale-while-revalidate=86400',
+      'Cache-Control': gold
+        ? 'public, s-maxage=60'
+        : 'public, s-maxage=600, stale-while-revalidate=86400',
     },
   });
 }
