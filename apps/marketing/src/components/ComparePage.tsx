@@ -65,6 +65,7 @@ export function ComparePage({ locale, slug }: { locale: Locale; slug: CompareSlu
   const d = COMPARE[slug][locale];
   const k = COMPARE_PAGE[locale];
   const rows = compareRows();
+  const sources = COMPARE[slug].sources;
   return (
     <>
       <a href="#main" className="skip">
@@ -99,6 +100,19 @@ export function ComparePage({ locale, slug }: { locale: Locale; slug: CompareSlu
         <Table locale={locale} slug={slug} rows={rows.strength} heading={k.strongH} id="strong-h" />
         <Table locale={locale} slug={slug} rows={rows.gap} heading={k.gapH} id="gap-h" />
         <p className="muted small">{k.verify}</p>
+        {sources && (
+          <p className="muted small">
+            {k.sourcesH}{' '}
+            {sources.map((src, i) => (
+              <span key={src.href}>
+                {i > 0 && ' · '}
+                <SiteLink href={src.href} locale={locale}>
+                  {src.name}
+                </SiteLink>
+              </span>
+            ))}
+          </p>
+        )}
         <p className="actions">
           <SiteLink href={SIGNUP_URL} locale={locale} className="btn btn-primary btn-lg">
             {k.cta}

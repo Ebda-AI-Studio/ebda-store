@@ -14,7 +14,7 @@ const marketing = (page: string) => page === 'features' || page.startsWith('comp
  * build time on every page, so every deploy marked all pages changed. Legal pages use their own
  * published date (LEGAL_UPDATED), so a features edit no longer re-dates the privacy policy.
  */
-const CONTENT_UPDATED = '2026-10-21';
+const CONTENT_UPDATED = '2026-10-22';
 
 export default function sitemap(): MetadataRoute.Sitemap {
   const lastModifiedFor = (page: string) =>

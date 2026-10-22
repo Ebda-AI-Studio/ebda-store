@@ -10,6 +10,9 @@ import type { CompareSlug, Locale } from './site';
  */
 export const COMPARE_AS_OF = 'October 2026';
 export const COMPARE_AS_OF_AR = 'أكتوبر 2026';
+/** The day the sourced vendors' (Wuilt, YouCan, EasyOrders, ExpandCart) public pages were read. */
+export const CHECKED_ON = '22 October 2026';
+export const CHECKED_ON_AR = '22 أكتوبر 2026';
 
 type Pair = Record<Locale, string>;
 
@@ -346,7 +349,18 @@ export interface CompareCopy {
   linkText: string;
 }
 
-export type CompareDef = Record<Locale, CompareCopy> & { cells: Record<string, Them> };
+/**
+ * `sources` is set only for vendors whose public pricing/feature pages were read on CHECKED_ON: those pages may
+ * carry dated figures and an "Ebda stronger / stronger there" verdict. Without it a page says "check their site".
+ */
+export interface CompareSource {
+  name: string;
+  href: string;
+}
+export type CompareDef = Record<Locale, CompareCopy> & {
+  cells: Record<string, Them>;
+  sources?: readonly CompareSource[];
+};
 
 const ebdaChoiceAr = [
   'بتبيع في مصر وعايز تدفع الاشتراك بالجنيه.',
@@ -498,10 +512,327 @@ export const COMPARE: Record<CompareSlug, CompareDef> = (() => {
     }
   );
 
+  /* ---- Egyptian alternatives. Every figure below was read on CHECKED_ON from the URL in `sources`;
+   *      anything their pages do not state says "unverified" instead of a guess. ---- */
+  const wuilt: Record<Locale, CompareCopy> = {
+    ar: {
+      name: 'ويلت',
+      title: 'ابدأ ستور مقابل ويلت',
+      desc: 'مقارنة صريحة بين ابدأ ستور وويلت لبائع في مصر: ويلت أرخص لو لسه بتبدأ، وابدأ ستور بيدّيك الدفع والشحن والذكاء الاصطناعي. بتاريخ 22 أكتوبر 2026.',
+      h1: 'ابدأ ستور مقابل ويلت',
+      intro:
+        'ويلت منصة مركّزة على مصر وفيها متجر مجاني. دي ميزة حقيقية لو لسه بتبدأ. الجدول ده بيقولك فين ويلت أرخص وفين ابدأ ستور أقوى، والأرقام مأخوذة من صفحاتهم العامة بتاريخ 22 أكتوبر 2026.',
+      chooseThemH: 'اختار ويلت لو',
+      chooseThem: [
+        'لسه بتبدأ وطلباتك قليلة وماعندكش حد بمرتب بيرد على الرسايل: المتجر المجاني ما بيكلفكش حاجة، وابدأ ستور بيبدأ من 1,490 ج.م في الشهر.',
+        'محتاج متجر بسيط بصفحات قليلة وعايز تجرّب من غير ما تدفع.',
+      ],
+      chooseEbdaH: 'اختار ابدأ ستور لو',
+      chooseEbda: [
+        ...ebdaChoiceAr,
+        'بتاخد طلبات كتير بالرسايل وعايز اللينك ياخد الطلب لوحده وتوفّر مرتب اللي بيرد.',
+      ],
+      linkText: 'ابدأ ستور مقابل ويلت',
+    },
+    en: {
+      name: 'Wuilt',
+      title: 'Ebda Store vs Wuilt',
+      desc: 'An honest comparison of Ebda Store and Wuilt for a seller in Egypt: Wuilt is cheaper when you are starting out, Ebda Store adds payments, shipping and AI. Checked 22 October 2026.',
+      h1: 'Ebda Store vs Wuilt',
+      intro:
+        'Wuilt is an Egypt-focused platform with a free store, which is a real advantage when you are starting out. This page says where Wuilt is cheaper and where Ebda Store is stronger. Figures come from their public pages, checked 22 October 2026.',
+      chooseThemH: 'Choose Wuilt if',
+      chooseThem: [
+        'You are starting out, sell few orders and have nobody on payroll answering messages: the free store costs nothing, while Ebda Store starts at EGP 1,490 a month.',
+        'You need a simple store with a few pages and want to try it without paying.',
+      ],
+      chooseEbdaH: 'Choose Ebda Store if',
+      chooseEbda: [
+        ...ebdaChoiceEn,
+        'You take many orders by message and want the link to take the order by itself, so you save the salary of the person answering.',
+      ],
+      linkText: 'Ebda Store vs Wuilt',
+    },
+  };
+  const wuiltCells = them(
+    {
+      ...vendorCells('Wuilt', 'ويلت'),
+      market: same(
+        'Egypt-focused: its homepage says Wuilt stores are free for life for Wuilt customers in Egypt.',
+        'مركّزة على مصر: صفحتها الرئيسية بتقول إن متاجر ويلت مجانية مدى الحياة لعملاء ويلت في مصر.'
+      ),
+      currency: same(
+        'There is a free store. Paid plans are billed annually and listed in dollars with pound equivalents: Personal EGP 1,250 a year, Basic EGP 7,500, Premium EGP 10,500, Professional EGP 17,500 (plan cards on its pricing page). Cheaper than Ebda Store at the entry level.',
+        'فيه متجر مجاني. الباقات المدفوعة بتتدفع سنويًا ومتسعّرة بالدولار مع المعادل بالجنيه: الشخصية 1,250 ج.م في السنة، والأساسية 7,500، والمميزة 10,500، والاحترافية 17,500 (من كروت الباقات في صفحة الأسعار). أرخص من ابدأ ستور في أول الطريق.'
+      ),
+      commission: same(
+        'Its pricing page does not state a commission on orders. Unverified.',
+        'صفحة الأسعار عندهم مش بتذكر عمولة على الطلبات. غير مؤكد.'
+      ),
+      arabic: same(
+        'Arabic-first: it calls itself the fastest way to design an online store in the Arab world.',
+        'عربية من الأساس: بتوصف نفسها إنها أسرع طريقة لتصميم متجر إلكتروني في العالم العربي.'
+      ),
+      payments: same(
+        'Says you can connect different electronic payment methods and ship with the largest carriers in Egypt. It names no gateway or carrier, and cash on delivery and InstaPay are not stated. Unverified.',
+        'بتقول إنك تقدر توصّل وسائل دفع إلكترونية مختلفة وتشحن مع أكبر شركات الشحن في مصر. من غير ما تسمّي بوابة أو شركة، والدفع عند الاستلام وإنستا باي مش مذكورين. غير مؤكد.'
+      ),
+      ai: same(
+        'AI features are not stated on its homepage. Unverified.',
+        'أدوات الذكاء الاصطناعي مش مذكورة في صفحتها الرئيسية. غير مؤكد.'
+      ),
+      builder: same(
+        'A store builder managed from one dashboard and from your phone. Paid plans cap pages and languages: Basic has 10 pages and 2 languages, Premium 20 pages and 4.',
+        'منشئ متاجر بتديره من لوحة واحدة ومن الموبايل. الباقات المدفوعة ليها حد للصفحات واللغات: الأساسية 10 صفحات ولغتين، والمميزة 20 صفحة و4 لغات.'
+      ),
+      ecosystem: same(
+        'Its homepage claims more than 350 thousand customers worldwide (its own figure, not verified by us).',
+        'صفحتها الرئيسية بتقول أكتر من 350 ألف عميل حول العالم (رقمهم هم، ومش متأكدين منه).'
+      ),
+    },
+    { currency: 'them', ecosystem: 'them' }
+  );
+
+  const youcan: Record<Locale, CompareCopy> = {
+    ar: {
+      name: 'يوكان',
+      title: 'ابدأ ستور مقابل يوكان',
+      desc: 'مقارنة صريحة بين ابدأ ستور ويوكان لبائع في مصر: الاشتراك بالدولار ورسوم معاملات عند يوكان، وصفر عمولة عند ابدأ ستور. بتاريخ 22 أكتوبر 2026.',
+      h1: 'ابدأ ستور مقابل يوكان',
+      intro:
+        'يوكان منصة بتخدم تجار في دول كتير، وبتاخد رسوم معاملات على الطلبات حسب طريقة الدفع. ابدأ ستور بالجنيه وبصفر عمولة. الأرقام مأخوذة من صفحاتهم العامة بتاريخ 22 أكتوبر 2026.',
+      chooseThemH: 'اختار يوكان لو',
+      chooseThem: [
+        'بتبيع في أكتر من دولة وعايز باقة بالدولار على حسب حجم المبيعات.',
+        'محتاج حاجة مش موجودة في ابدأ ستور لسه، وتأكدت إنها متاحة عندهم.',
+      ],
+      chooseEbdaH: 'اختار ابدأ ستور لو',
+      chooseEbda: ebdaChoiceAr,
+      linkText: 'ابدأ ستور مقابل يوكان',
+    },
+    en: {
+      name: 'YouCan',
+      title: 'Ebda Store vs YouCan',
+      desc: 'An honest comparison of Ebda Store and YouCan for a seller in Egypt: dollar plans plus transaction fees at YouCan, 0% commission at Ebda Store. Checked 22 October 2026.',
+      h1: 'Ebda Store vs YouCan',
+      intro:
+        'YouCan serves merchants in many countries and charges a transaction fee on orders depending on how the customer pays. Ebda Store bills in pounds with 0% commission. Figures come from their public pages, checked 22 October 2026.',
+      chooseThemH: 'Choose YouCan if',
+      chooseThem: [
+        'You sell in more than one country and want a dollar plan sized to your sales.',
+        'You need something Ebda Store lacks and you have confirmed they offer it.',
+      ],
+      chooseEbdaH: 'Choose Ebda Store if',
+      chooseEbda: ebdaChoiceEn,
+      linkText: 'Ebda Store vs YouCan',
+    },
+  };
+  const youcanCells = them(
+    {
+      ...vendorCells('YouCan', 'يوكان'),
+      market: same(
+        'Its homepage says it serves 166+ countries. It does not say where it is based and does not mention Egypt.',
+        'صفحتها الرئيسية بتقول إنها بتخدم أكتر من 166 دولة. مش بتقول مقرها فين ومش بتذكر مصر.'
+      ),
+      currency: same(
+        'Plans are priced in dollars ($ shown): Solopreneur $29, Starter $49, Entrepreneur $89 and Premium $187 a month, with a lower yearly price. No pound price is shown.',
+        'الباقات متسعّرة بالدولار: Solopreneur بـ29$ وStarter بـ49$ وEntrepreneur بـ89$ وPremium بـ187$ في الشهر، وفيه سعر أقل للسنوي. مفيش سعر بالجنيه.'
+      ),
+      commission: same(
+        'Transaction fees apply: cash on delivery 0.5% and online payment 1% on the first $5K, then 0.25% and 0.5% above $5K (the period the $5K is measured over is not stated). Plans also cap monthly sales, from up to $50K to unlimited.',
+        'فيه رسوم معاملات: 0.5% على الدفع عند الاستلام و1% على الدفع الأونلاين لأول 5 آلاف دولار، وبعدها 0.25% و0.5% (مش مذكور المبلغ ده بيتحسب على أي فترة). والباقات ليها حد مبيعات شهري من 50 ألف دولار لحد غير محدود.'
+      ),
+      arabic: same(
+        'The language menu lists English, French and Arabic.',
+        'قايمة اللغات فيها الإنجليزي والفرنسي والعربي.'
+      ),
+      payments: same(
+        'YouCan Ship offers a list of local shipping companies, none named on its homepage. Cash on delivery and Egyptian gateways are not stated. Unverified.',
+        'يوكان شيب بتقدّم قايمة شركات شحن محلية، ومفيش اسم منها في الصفحة الرئيسية. الدفع عند الاستلام والبوابات المصرية مش مذكورين. غير مؤكد.'
+      ),
+    },
+    { commission: 'ebda' }
+  );
+
+  const easyorders: Record<Locale, CompareCopy> = {
+    ar: {
+      name: 'إيزي أوردرز',
+      title: 'ابدأ ستور مقابل إيزي أوردرز',
+      desc: 'مقارنة صريحة بين ابدأ ستور وإيزي أوردرز لبائع في مصر: إيزي أوردرز أرخص لو طلباتك قليلة، وابدأ ستور بيدّيك متجر كامل بالجنيه وبصفر عمولة. بتاريخ 22 أكتوبر 2026.',
+      h1: 'ابدأ ستور مقابل إيزي أوردرز',
+      intro:
+        'إيزي أوردرز بيبدأ مجاني وبتدفع 4 سنت على كل طلب، وده أرخص بكتير لو طلباتك قليلة. الجدول ده بيقولك فين هو أرخص وفين ابدأ ستور أقوى. الأرقام من صفحاتهم العامة بتاريخ 22 أكتوبر 2026.',
+      chooseThemH: 'اختار إيزي أوردرز لو',
+      chooseThem: [
+        'طلباتك قليلة وماعندكش حد بمرتب بيرد على الرسايل: الخطة المجانية بتحاسبك 4 سنت على الطلب بس.',
+        'عندك مطوّر وعايز واجهة برمجية وتوثيق للقوالب.',
+      ],
+      chooseEbdaH: 'اختار ابدأ ستور لو',
+      chooseEbda: ebdaChoiceAr,
+      linkText: 'ابدأ ستور مقابل إيزي أوردرز',
+    },
+    en: {
+      name: 'EasyOrders',
+      title: 'Ebda Store vs EasyOrders',
+      desc: 'An honest comparison of Ebda Store and EasyOrders for a seller in Egypt: EasyOrders is cheaper when orders are few, Ebda Store is a full store in pounds with 0% commission. Checked 22 October 2026.',
+      h1: 'Ebda Store vs EasyOrders',
+      intro:
+        'EasyOrders starts free and charges $0.04 per order, which is much cheaper when you take few orders. This page says where it is cheaper and where Ebda Store is stronger. Figures come from their public pages, checked 22 October 2026.',
+      chooseThemH: 'Choose EasyOrders if',
+      chooseThem: [
+        'You take few orders and have nobody on payroll answering messages: the free plan charges only $0.04 an order, so 200 orders in a month cost $8.',
+        'You have a developer and want a public API and theme documentation.',
+      ],
+      chooseEbdaH: 'Choose Ebda Store if',
+      chooseEbda: ebdaChoiceEn,
+      linkText: 'Ebda Store vs EasyOrders',
+    },
+  };
+  const easyordersCells = them(
+    {
+      ...vendorCells('EasyOrders', 'إيزي أوردرز'),
+      market: same(
+        'Its site is in Arabic with an Egypt market selector; it also lists global, Morocco and Algeria.',
+        'موقعها بالعربي وفيه اختيار لسوق مصر، وبتعرض كمان العالمي والمغرب والجزائر.'
+      ),
+      currency: same(
+        'Prices are in dollars. The free plan has no subscription and charges $0.04 per order. A fixed plan is $100 a month with unlimited orders.',
+        'الأسعار بالدولار. الخطة المجانية من غير اشتراك وبتاخد 4 سنت على كل طلب. وفيه خطة ثابتة بـ100$ في الشهر بطلبات غير محدودة. أرخص من ابدأ ستور لو طلباتك قليلة.'
+      ),
+      commission: same(
+        'The $100 plan says no commission on orders. On the free plan the $0.04 per-order fee replaces the subscription.',
+        'خطة الـ100$ مكتوب فيها بدون عمولة على الطلبات. وفي الخطة المجانية رسم الـ4 سنت على الطلب بدل الاشتراك.'
+      ),
+      arabic: same('The site and its pricing page are in Arabic.', 'الموقع وصفحة الأسعار بالعربي.'),
+      builder: same(
+        'Both plans list unlimited products, orders and visits, and a lifetime-active store. Theme and funnel documentation is published for developers.',
+        'الخطتين فيهم منتجات وطلبات وزيارات غير محدودة ومتجر شغال مدى الحياة. وفيه توثيق للقوالب والصفحات الهابطة للمطورين.'
+      ),
+      integrations: same(
+        'A public API is listed for developers.',
+        'فيه واجهة برمجية عامة للمطورين.'
+      ),
+      code: same(
+        'Public API and theme documentation are listed for developers.',
+        'الواجهة البرمجية وتوثيق القوالب متاحين للمطورين.'
+      ),
+    },
+    { currency: 'them', integrations: 'them', code: 'them' }
+  );
+
+  const expandcart: Record<Locale, CompareCopy> = {
+    ar: {
+      name: 'إكسباند كارت',
+      title: 'ابدأ ستور مقابل إكسباند كارت',
+      desc: 'مقارنة صريحة بين ابدأ ستور وإكسباند كارت لبائع في مصر: إكسباند كارت بالدولار وبعملات متعددة، وابدأ ستور بالجنيه ومبني لمصر. بتاريخ 22 أكتوبر 2026.',
+      h1: 'ابدأ ستور مقابل إكسباند كارت',
+      intro:
+        'إكسباند كارت بيقول إنه من غير عمولات على المبيعات، وفيه عملات متعددة وتكاملات كتير. ابدأ ستور بالجنيه ومبني لمصر. الأرقام من صفحاتهم العامة بتاريخ 22 أكتوبر 2026.',
+      chooseThemH: 'اختار إكسباند كارت لو',
+      chooseThem: [
+        'بتبيع بأكتر من عملة، أو محتاج نقطة بيع وتطبيقات دروبشيبنج جاهزة.',
+        'محتاج حاجة مش موجودة في ابدأ ستور لسه، وتأكدت إنها متاحة عندهم.',
+      ],
+      chooseEbdaH: 'اختار ابدأ ستور لو',
+      chooseEbda: ebdaChoiceAr,
+      linkText: 'ابدأ ستور مقابل إكسباند كارت',
+    },
+    en: {
+      name: 'ExpandCart',
+      title: 'Ebda Store vs ExpandCart',
+      desc: 'An honest comparison of Ebda Store and ExpandCart for a seller in Egypt: dollar plans with multiple currencies at ExpandCart, pounds and Egypt-first at Ebda Store. Checked 22 October 2026.',
+      h1: 'Ebda Store vs ExpandCart',
+      intro:
+        'ExpandCart says it takes no commission on sales, and it offers multiple currencies and many integrations. Ebda Store bills in pounds and is built for Egypt. Figures come from their public pages, checked 22 October 2026.',
+      chooseThemH: 'Choose ExpandCart if',
+      chooseThem: [
+        'You sell in more than one currency, or need a point of sale and ready dropshipping apps.',
+        'You need something Ebda Store lacks and you have confirmed they offer it.',
+      ],
+      chooseEbdaH: 'Choose Ebda Store if',
+      chooseEbda: ebdaChoiceEn,
+      linkText: 'Ebda Store vs ExpandCart',
+    },
+  };
+  const expandcartCells = them(
+    {
+      ...vendorCells('ExpandCart', 'إكسباند كارت'),
+      market: same(
+        'Where it is based is not stated on its pricing page. Unverified. The site is in English and Arabic.',
+        'صفحة الأسعار مش بتقول مقرها فين. غير مؤكد. والموقع بالإنجليزي والعربي.'
+      ),
+      currency: same(
+        'Plans are priced in dollars: Standard $19, Professional $39 and Ultimate $149 a month, or $199, $399 and $1,499 a year.',
+        'الباقات بالدولار: Standard بـ19$ وProfessional بـ39$ وUltimate بـ149$ في الشهر، أو 199$ و399$ و1,499$ في السنة.'
+      ),
+      commission: same(
+        'Its pricing page says no commissions no matter how big your sales are.',
+        'صفحة الأسعار بتقول من غير عمولات مهما كبرت مبيعاتك.'
+      ),
+      arabic: same(
+        'Multi-language is listed on the Standard plan, and the site is in English and Arabic.',
+        'تعدد اللغات مكتوب في باقة Standard، والموقع بالإنجليزي والعربي.'
+      ),
+      payments: same(
+        'Lists 100+ payment and shipping integrations. Which of them are Egyptian is not stated. Unverified.',
+        'بتعرض أكتر من 100 تكامل للدفع والشحن. مش مذكور أنهي منهم مصري. غير مؤكد.'
+      ),
+      builder: same(
+        'Standard includes 1 template and an advanced template editor with up to 100 products; Professional has 4 templates and up to 1,000 products.',
+        'Standard فيها قالب واحد ومحرر قوالب متقدم وحتى 100 منتج، وProfessional فيها 4 قوالب وحتى 1,000 منتج.'
+      ),
+      integrations: same(
+        'Facebook Pixel on Standard and Google Analytics on Professional are listed.',
+        'Facebook Pixel في Standard وGoogle Analytics في Professional.'
+      ),
+      apps: same(
+        'Free marketing and SEO apps are listed on Professional, and free dropshipping apps (Knawat on Standard, AliExpress on Professional).',
+        'تطبيقات تسويق وSEO مجانية في Professional، وتطبيقات دروبشيبنج مجانية (Knawat في Standard وAliExpress في Professional).'
+      ),
+      pos: same(
+        'Its navigation lists a point-of-sale option under Sell.',
+        'القايمة عندهم فيها نقطة بيع تحت Sell.'
+      ),
+      multicur: same(
+        'Multi-currency is listed on the Standard plan.',
+        'العملات المتعددة مكتوبة في باقة Standard.'
+      ),
+    },
+    { apps: 'them', pos: 'them', multicur: 'them' }
+  );
+
   return {
     salla: { ...salla, cells: them(vendorCells('Salla', 'سلة')) },
     zid: { ...zid, cells: them(vendorCells('Zid', 'زد')) },
     shopify: { ...shopify, cells: shopifyCells },
+    wuilt: {
+      ...wuilt,
+      cells: wuiltCells,
+      sources: [
+        { name: 'wuilt.com/pricing', href: 'https://wuilt.com/pricing' },
+        { name: 'wuilt.com', href: 'https://wuilt.com' },
+      ],
+    },
+    youcan: {
+      ...youcan,
+      cells: youcanCells,
+      sources: [
+        { name: 'youcan.shop/pricing', href: 'https://www.youcan.shop/pricing' },
+        { name: 'youcan.shop', href: 'https://www.youcan.shop/' },
+      ],
+    },
+    easyorders: {
+      ...easyorders,
+      cells: easyordersCells,
+      sources: [{ name: 'easyorders.eg/pricing', href: 'https://www.easyorders.eg/pricing' }],
+    },
+    expandcart: {
+      ...expandcart,
+      cells: expandcartCells,
+      sources: [
+        { name: 'expandcart.com/en/pricing-2', href: 'https://expandcart.com/en/pricing-2/' },
+      ],
+    },
   };
 })();
 
@@ -516,6 +847,7 @@ export const COMPARE_PAGE: Record<
     verify: string;
     cta: string;
     allFeatures: string;
+    sourcesH: string;
     verdict: Record<Verdict, string>;
   }
 > = {
@@ -529,6 +861,7 @@ export const COMPARE_PAGE: Record<
       'معلومات المنافسين مأخوذة من اللي منشور للعامة وبتتغير. راجع موقعهم الرسمي قبل ما تقرر.',
     cta: 'ابدأ دلوقتي',
     allFeatures: 'شوف كل مميزات ابدأ ستور',
+    sourcesH: `المصادر (اتقرت بتاريخ ${CHECKED_ON_AR}):`,
     verdict: {
       ebda: 'ابدأ ستور أقوى',
       them: 'التاني أقوى',
@@ -545,6 +878,7 @@ export const COMPARE_PAGE: Record<
       'Competitor information comes from what is publicly published and changes over time. Check their official site before you decide.',
     cta: 'Start now',
     allFeatures: 'See all Ebda Store features',
+    sourcesH: `Sources (read ${CHECKED_ON}):`,
     verdict: {
       ebda: 'Ebda Store stronger',
       them: 'Stronger there',
