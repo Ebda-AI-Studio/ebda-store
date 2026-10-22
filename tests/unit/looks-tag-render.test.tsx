@@ -112,7 +112,7 @@ describe('page renderer: lookTag sections render only under their look (C10)', (
   });
 
   it('under a look with no mix, or no look: every section renders as before', () => {
-    for (const look of ['lamma.table', null]) {
+    for (const look of ['dahab.worn', null]) {
       const html = render(look);
       expect(html, String(look)).toContain('Atelier story');
       expect(html, String(look)).toContain('Lookbook story');

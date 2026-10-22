@@ -25,6 +25,11 @@ export function productCardPropsEqual(
   if ((prev.quantityInCart ?? 0) !== (next.quantityInCart ?? 0)) return false;
   if ((prev.isInCompare ?? false) !== (next.isInCompare ?? false)) return false;
   if ((prev.isRtl ?? false) !== (next.isRtl ?? false)) return false;
+  if (
+    (prev as { orientation?: string }).orientation !==
+    (next as { orientation?: string }).orientation
+  )
+    return false;
   if (prev.currency !== next.currency) return false;
   if (prev.urlPrefix !== next.urlPrefix) return false;
   // Compare image identity by url + length to catch product image swaps

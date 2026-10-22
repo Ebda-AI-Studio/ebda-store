@@ -26,6 +26,9 @@ export interface FeaturedCollectionSettings
   subheadingAr?: string;
   columns?: number;
   mobileColumns?: number;
+  /** `menu` renders MenuSection (dish rows under category tabs); absent / `grid` = this grid. */
+  layout?: 'grid' | 'menu';
+  tabs?: 'categories' | 'none';
   buttonText?: string;
   buttonTextAr?: string;
   buttonLink?: string;

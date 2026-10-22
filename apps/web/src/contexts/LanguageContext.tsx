@@ -311,6 +311,8 @@ export const translations = {
     'أضف لوك بصورته وقطعه وهيظهر هنا.',
   'Add at least two steps and your routine will appear here.':
     'ضيف خطوتين على الأقل والروتين هيظهر هنا.',
+  'Add a name or a photo and your kitchen profile will appear here.':
+    'ضيف اسم أو صورة وملف مطبخك هيظهر هنا.',
   // Jasmine routine, rating and bundle lines (Phase B3): sentences are Egyptian, buttons neutral.
   'Add all to cart': 'إضافة الكل للسلة',
   'In your cart': 'في سلتك',

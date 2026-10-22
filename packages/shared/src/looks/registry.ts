@@ -706,6 +706,24 @@ export const LOOKS: readonly LookDefinition[] = [
       cartBar: 'total',
       cardStepper: 'inline',
     },
+    // Ruling B4-1 (Family table). Order like a menu: a full-bleed food photo (the delivery line is
+    // merchant content, B4-12), the dishes as rows grouped by category under sticky tabs, the cook
+    // as a strip and the trust line. The "order again" row joins in Task 4.
+    sections: [
+      { type: 'hero', design: { presentation: 'full-bleed' } },
+      {
+        type: 'featured-collection',
+        design: { layout: 'menu', tabs: 'categories', paddingTop: 'tight' },
+        preset: {
+          productSource: 'newest',
+          limit: 24,
+          heading: "Today's menu",
+          headingAr: 'منيو النهاردة',
+        },
+      },
+      { type: 'maker-profile', design: { variant: 'strip' } },
+      { type: 'trust-strip' },
+    ],
     name: { ar: 'سفرة العيلة', en: 'Family table' },
     forWhom: {
       ar: 'لمطبخ بيتي بياخد طلبات زي المطعم.',
@@ -742,6 +760,24 @@ export const LOOKS: readonly LookDefinition[] = [
       cartBar: 'total',
       cardStepper: 'inline',
     },
+    // Ruling B4-1 (Kitchen notebook). The cook is the brand: her photo and story lead, no hero. The
+    // dish grid sits on the LIGHT band (`token:inverse`, quality bar section 9 rule 1) because the
+    // merchant's dish photos are shot on white and would read as white rectangles on the green.
+    sections: [
+      { type: 'maker-profile', design: { variant: 'lead' } },
+      {
+        type: 'featured-collection',
+        design: { columns: 2, mobileColumns: 2, bgColor: 'token:inverse' },
+        preset: {
+          productSource: 'newest',
+          limit: 8,
+          heading: 'From the kitchen today',
+          headingAr: 'من المطبخ النهاردة',
+        },
+      },
+      { type: 'brand-story' },
+      { type: 'trust-strip' },
+    ],
     name: { ar: 'كشكول المطبخ', en: 'Kitchen notebook' },
     forWhom: { ar: 'لطباخة واحدة اسمها هو البراند.', en: 'For one named cook who is the brand.' },
     idea: { ar: 'الطباخة هي البراند.', en: 'The cook is the brand.' },
@@ -778,6 +814,43 @@ export const LOOKS: readonly LookDefinition[] = [
       cardStepper: 'inline',
       aisles: ['#23744A', '#CC2F3F', '#5B2A6E', '#0F7F8C'],
     },
+    // Ruling B4-1 (Fresh market). Aisle tiles first (three across on a phone, so eight or more fit
+    // the first screen), today's deals, then a dense two-across grid whose cards carry the stepper.
+    sections: [
+      {
+        type: 'category-grid',
+        design: {
+          layout: 'tiles',
+          layoutMobile: 'tiles',
+          tint: 'aisles',
+          mobileColumns: 3,
+          captionPosition: 'below',
+          paddingTop: 'tight',
+          paddingBottom: 'none',
+        },
+      },
+      {
+        type: 'product-carousel',
+        design: { paddingTop: 'tight' },
+        preset: {
+          productSource: 'on_sale',
+          limit: 8,
+          title: 'Deals today',
+          titleAr: 'عروض النهاردة',
+        },
+      },
+      {
+        type: 'featured-collection',
+        design: { columns: 5, mobileColumns: 2, paddingTop: 'tight' },
+        preset: {
+          productSource: 'newest',
+          limit: 24,
+          heading: 'Fresh today',
+          headingAr: 'طازة النهاردة',
+        },
+      },
+      { type: 'trust-strip' },
+    ],
     name: { ar: 'سوق طازة', en: 'Fresh market' },
     forWhom: {
       ar: 'للبقالة والخضار اللي الطلب بيتكرر فيها.',

@@ -384,6 +384,8 @@ export interface CategoriesSettings
    * each linking to the PLP filtered by that tag; a tag with no published product is never shown.
    */
   source?: 'categories' | 'tags';
+  /** `aisles` (Phase B4, Ruling B4-2): square tiles take the look's aisle tints; names always show. */
+  tint?: 'none' | 'aisles';
   captionPosition: CategoriesCaption;
   captionPositionMobile?: CategoriesCaption;
   desktopColumns: 2 | 3 | 4;

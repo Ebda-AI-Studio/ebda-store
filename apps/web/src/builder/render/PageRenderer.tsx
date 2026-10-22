@@ -40,6 +40,8 @@ import {
 import { TrustBadgesSection, type TrustBadgesSettings } from '../sections/TrustBadgesSection';
 import { ShopTheLookSection, type ShopTheLookSettings } from '../sections/ShopTheLookSection';
 import { StepsSection, type StepsSettings } from '../sections/StepsSection';
+import { MenuSection } from '../sections/MenuSection';
+import { MakerProfileSection, type MakerProfileSettings } from '../sections/MakerProfileSection';
 import { SectionHeader } from '../sections/SectionHeader';
 import { TagChips } from '../../templates/shared/TagChips';
 import { HeroCollage } from '../../templates/shared/HeroCollage';
@@ -684,6 +686,8 @@ export function PageRenderer({
                             pack={templateId}
                             mobileColumns={layout.categories.mobileColumns}
                             desktopColumns={layout.categories.desktopColumns}
+                            tint={layout.categories.tint}
+                            aisles={getLook(store.look)?.chrome?.aisles}
                           />
                         </div>
                       ) : kind === 'chips' ? (
@@ -1222,7 +1226,27 @@ export function PageRenderer({
               (settings as ProductSpotlightSettings).layout === 'stage' &&
               stagesSeen++ === 0;
             const node =
-              def.type === 'featured-collection' ? (
+              def.type === 'featured-collection' &&
+              (settings as FeaturedCollectionSettings).layout === 'menu' ? (
+                <MenuSection
+                  sectionId={section.id}
+                  settings={settings as FeaturedCollectionSettings}
+                  products={resolveSectionProducts(
+                    settings as FeaturedCollectionSettings,
+                    pools,
+                    24
+                  )}
+                  categories={categories}
+                  pack={templateId}
+                  onAddToCart={handleAddToCart}
+                  editorMode={editorMode}
+                />
+              ) : def.type === 'maker-profile' ? (
+                <MakerProfileSection
+                  settings={settings as MakerProfileSettings}
+                  editorMode={editorMode}
+                />
+              ) : def.type === 'featured-collection' ? (
                 <FeaturedCollectionSection
                   settings={settings as FeaturedCollectionSettings}
                   products={resolveSectionProducts(

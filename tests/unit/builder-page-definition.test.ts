@@ -240,6 +240,7 @@ describe('registry', () => {
       'product-spotlight',
       'shop-the-look',
       'steps',
+      'maker-profile',
       'trust-badges',
     ]);
     const keys = SECTION_REGISTRY.flatMap(d => (d.legacyKey === null ? [] : [d.legacyKey])).sort();
