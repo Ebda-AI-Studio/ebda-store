@@ -191,12 +191,40 @@ describe('DemoLookBar: template, then look', () => {
     }
   });
 
-  it('a template without a demo store is not offered (the bar lists demo-hosted templates only)', () => {
+  it('Phase B5: Dahab is offered once it has a built look, and its host keeps the look (B5-10)', () => {
+    const dahabBuilt = (id: string) => isBuilt(id) || id.startsWith('dahab.');
+    const loc = window.location as unknown as Record<string, unknown>;
+    const saved = { host: loc.host, protocol: loc.protocol };
+    loc.host = 'storedemo.ebda.app';
+    loc.protocol = 'https:';
+    try {
+      const { container } = render(<DemoLookBar activeLook="qamar.atelier" isBuilt={dahabBuilt} />);
+      expect(values(templateSelect(container))).toEqual(['qamar', 'souq', 'dahab']);
+      fireEvent.change(templateSelect(container), { target: { value: 'dahab' } });
+      // its own host and its first built look (registry order: Worn)
+      expect(assign).toHaveBeenCalledWith('https://storedemo-dahab.ebda.app/?look=dahab.worn');
+      cleanup();
+      assign.mockReset();
+      loc.host = 'storedemo-dahab.ebda.app';
+      search = 'look=dahab.giftbox';
+      const on = render(<DemoLookBar activeLook="dahab.giftbox" isBuilt={dahabBuilt} />);
+      expect(templateSelect(on.container).value).toBe('dahab');
+      expect(values(lookSelect(on.container))).toEqual([
+        'dahab.worn',
+        'dahab.workshop',
+        'dahab.giftbox',
+      ]);
+      fireEvent.change(lookSelect(on.container), { target: { value: 'dahab.workshop' } });
+      expect(assign).toHaveBeenCalledWith('/products?look=dahab.workshop');
+    } finally {
+      loc.host = saved.host;
+      loc.protocol = saved.protocol;
+    }
+  });
+
+  it('a template whose looks are all unbuilt is not offered (the bar lists built, demo-hosted templates only)', () => {
     const { container } = render(
-      <DemoLookBar
-        activeLook="qamar.atelier"
-        isBuilt={id => id.startsWith('qamar.') || id.startsWith('dahab.')}
-      />
+      <DemoLookBar activeLook="qamar.atelier" isBuilt={id => id.startsWith('qamar.')} />
     );
     expect(values(templateSelect(container))).toEqual(['qamar']);
   });

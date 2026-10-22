@@ -1,342 +1,583 @@
-// Dahab (دهب) demo catalogue — a sample Egyptian jewellery brand used to show
-// the Dahab template (builder Phase 3 pilot). SAMPLE CONTENT: product names,
-// prices and reviews are illustrative; the photographs are Unsplash-licensed
-// (scripts/dahab-demo/CREDITS.md). Prices are EGP, written as the merchant
-// would type them; gold prices reflect 18K / 21K at roughly 2026 Cairo rates.
+// Dahab demo catalogue (Phase B5 Task 5): an Egyptian jewellery shop, Arabic first, prices in piastres
+// (1 EGP = 100). Data only: `scripts/storedemo/seed.mjs --template dahab` writes it,
+// tests/unit/dahab-demo-catalogue.test.ts enforces every feature below by count. UNBRANDED and
+// FICTIONAL on purpose (Rulings B5-10, B5-11): generic Egyptian piece names, no brand, no hallmark,
+// no lettering. Photos are AI-generated ILLUSTRATIVE samples (scripts/dahab-demo/CREDITS.md).
+//
+// Features present at least once (the test counts them): rings with the "مقاس الخاتم" size chart and a
+// METAL swatch option (silver, rose gold, champagne: never a yellow-gold swatch), a length option on
+// necklaces, wrap as a variant option (B5-4) and a card message as personalisation, a gift card with
+// fixed amounts as variants, facts on every piece (karat, width, weight, warranty; at most two on the
+// card), two pieces with REQUIRED engraving ("الحروف للحفر", max 12), four made-to-order pieces with a
+// lead time of 3-7 days, sale prices on variants, one sold-out variant, one backorder piece, occasion
+// categories hidden from the home row, and SIX GOLD-RATE pieces (two per karat; one with a per-gram
+// making charge, one with a fixed one, a ring whose size variants weigh differently): their price is
+// computed from the store's rate (the seed writes the spec through GoldRateService; `price` here is
+// only the placeholder the row is created with).
 
-export const COLLECTIONS = [
-  { slug: 'rings', name: 'Rings', nameAr: 'خواتم', image: 'collection-rings' },
-  { slug: 'necklaces', name: 'Necklaces', nameAr: 'سلاسل', image: 'collection-necklaces' },
-  { slug: 'bracelets', name: 'Bracelets', nameAr: 'أساور', image: 'collection-bracelets' },
-  { slug: 'earrings', name: 'Earrings', nameAr: 'حلقان', image: 'collection-earrings' },
-];
-
-/** Arabic for option names / values (the CSV import carries English only). */
-export const OPTION_AR = {
-  Size: 'المقاس',
-  Karat: 'العيار',
-  Length: 'الطول',
-  Colour: 'اللون',
-};
-export const VALUE_AR = {
-  '18K': 'عيار 18',
-  '21K': 'عيار 21',
-  'Yellow gold': 'ذهب أصفر',
-  'White gold': 'ذهب أبيض',
-  '45 cm': '45 سم',
-  '50 cm': '50 سم',
-};
-
-const p = o => o;
-
+/** @typedef {{ value: string, valueAr: string, hex?: string, priceAdd?: number, weightMg?: number }} DahabOptionValue */
+/** @typedef {{ name: string, nameAr: string, values: DahabOptionValue[] }} DahabOption */
 /**
- * `variants`: rows of { options: {Name: Value}, price, compareAt? }.
- * Products without variants carry `price` directly.
+ * @typedef {{ karat: 24 | 21 | 18, weightMg: number, makingChargeType: 'fixed' | 'per_gram',
+ *   makingChargeValue: number, marginBps: number }} DahabGoldSpec
+ * @typedef {{ slug: string, name: string, nameAr: string, category: string, alsoIn?: string[], price: number,
+ *   compareAtPrice?: number, images: string[], description: string, descriptionAr: string,
+ *   options?: DahabOption[], soldOut?: string[][], backorder?: boolean, gold?: DahabGoldSpec,
+ *   facts: { key: string, keyAr: string, value: string, valueAr: string, onCard?: boolean }[],
+ *   leadTimeDays?: number, stock?: number,
+ *   personalisation?: { label: string, labelAr: string, maxLength: number, required: boolean } }} DahabProduct
  */
-export const PRODUCTS = [
-  // ── Rings ──────────────────────────────────────────────────────────────
-  p({
-    handle: 'solitaire-ring',
-    collection: 'rings',
-    name: 'Solitaire ring',
-    nameAr: 'خاتم سوليتير',
-    body: 'A single brilliant held in four claws on a slim 18K band. About 2.8 g, stamped by the Egyptian Assay Office.',
-    bodyAr:
-      'فص واحد لامع على أربع مخالب فوق دبلة رفيعة من الذهب عيار 18. وزن تقريبي 2.8 جرام، ومدموغ من مصلحة الدمغة والموازين.',
-    images: ['ring-solitaire-1', 'ring-solitaire-2'],
-    isNew: true,
-    featured: true,
-    variants: [
-      { options: { Colour: 'Yellow gold', Size: '16' }, price: 18750 },
-      { options: { Colour: 'Yellow gold', Size: '17' }, price: 18750 },
-      { options: { Colour: 'Yellow gold', Size: '18' }, price: 18950 },
-      { options: { Colour: 'White gold', Size: '16' }, price: 19400 },
-      { options: { Colour: 'White gold', Size: '17' }, price: 19400 },
-      { options: { Colour: 'White gold', Size: '18' }, price: 19600 },
-    ],
-  }),
-  p({
-    handle: 'braided-band-ring',
-    collection: 'rings',
-    name: 'Braided band ring',
-    nameAr: 'خاتم مجدول',
-    body: 'Three strands of gold braided by hand into one band. Comfortable enough to wear every day.',
-    bodyAr: 'ثلاث خيوط ذهب مجدولة يدوياً في دبلة واحدة. مريح للبس اليومي.',
-    images: ['ring-braided-1', 'ring-braided-2'],
-    variants: [
-      { options: { Karat: '18K' }, price: 12400 },
-      { options: { Karat: '21K' }, price: 14200 },
-    ],
-  }),
-  p({
-    handle: 'emerald-ring',
-    collection: 'rings',
-    name: 'Emerald ring',
-    nameAr: 'خاتم بفص زمرد',
-    body: 'A step-cut green stone set low in 21K gold, so it never catches on sleeves.',
-    bodyAr: 'فص أخضر بقطع مدرّج مركّب على ارتفاع منخفض في ذهب عيار 21 عشان ميشبكش في الهدوم.',
-    images: ['ring-emerald-1', 'ring-emerald-2'],
-    price: 21900,
-    compareAt: 24500,
-  }),
-  p({
-    handle: 'wedding-bands',
-    collection: 'rings',
-    name: 'Pair of wedding bands',
-    nameAr: 'دبلتين خطوبة',
-    body: 'Two classic court-profile bands, sized separately after you order. Engraving inside is free.',
-    bodyAr: 'دبلتين بقصّة كلاسيك، المقاس لكل واحدة بيتحدد بعد الطلب. الحفر من جوه مجاناً.',
-    images: ['ring-bands-1', 'ring-bands-2'],
-    variants: [
-      { options: { Karat: '18K' }, price: 21800 },
-      { options: { Karat: '21K' }, price: 25600 },
-    ],
-  }),
-  p({
-    handle: 'dome-ring',
-    collection: 'rings',
-    name: 'Sculpted dome ring',
-    nameAr: 'خاتم قبة',
-    body: 'A rounded dome of polished 21K gold. Bold on its own, quiet next to a band.',
-    bodyAr: 'قبة مدورة من ذهب عيار 21 ملمّع. لافت لوحده وهادي جنب دبلة.',
-    images: ['ring-bold-1', 'ring-bold-2'],
-    price: 15300,
-    isNew: true,
-  }),
 
-  // ── Necklaces ──────────────────────────────────────────────────────────
-  p({
-    handle: 'teardrop-pendant',
-    collection: 'necklaces',
-    name: 'Teardrop pendant necklace',
-    nameAr: 'سلسلة بدلاية دمعة',
-    body: 'A pierced teardrop on a fine curb chain, in 18K yellow gold.',
-    bodyAr: 'دلاية دمعة مفرّغة على سلسلة رفيعة من الذهب الأصفر عيار 18.',
-    images: ['necklace-teardrop-1', 'necklace-teardrop-2'],
-    isNew: true,
-    featured: true,
-    variants: [
-      { options: { Length: '45 cm' }, price: 13900 },
-      { options: { Length: '50 cm' }, price: 14450 },
-    ],
-  }),
-  p({
-    handle: 'cuban-chain',
-    collection: 'necklaces',
-    name: 'Cuban link chain',
-    nameAr: 'سلسلة كوبي',
-    body: 'Heavy, flat cuban links with a box clasp. About 9 g in 18K, 10 g in 21K.',
-    bodyAr: 'حلقات كوبي مبططة وتقيلة بقفل علبة. وزن تقريبي 9 جرام عيار 18 و10 جرام عيار 21.',
-    images: ['necklace-cuban-1', 'necklace-cuban-2'],
-    featured: true,
-    variants: [
-      { options: { Karat: '18K' }, price: 38500 },
-      { options: { Karat: '21K' }, price: 44200 },
-    ],
-  }),
-  p({
-    handle: 'crown-pendant',
-    collection: 'necklaces',
-    name: 'Crown pendant on rope chain',
-    nameAr: 'سلسلة حبل بدلاية تاج',
-    body: 'A small enamelled crown on a twisted rope chain, 21K.',
-    bodyAr: 'تاج صغير بالمينا على سلسلة حبل مجدولة، عيار 21.',
-    images: ['necklace-crown-1', 'necklace-crown-2'],
-    price: 16750,
-  }),
-  p({
-    handle: 'pearl-blossom-necklace',
-    collection: 'necklaces',
-    name: 'Pearl blossom necklace',
-    nameAr: 'سلسلة وردة اللولي',
-    body: 'Five mother-of-pearl petals with green stones at the heart. Made in small batches.',
-    bodyAr: 'خمس بتلات من الصدف وفصوص خضرا في القلب. بتتعمل بكميات صغيرة.',
-    images: ['necklace-flower-1', 'necklace-flower-2'],
-    isNew: true,
-    price: 19400,
-    featured: true,
-    badge: 'Limited',
-    badgeAr: 'كمية محدودة',
-  }),
-  p({
-    handle: 'coin-layered-necklace',
-    collection: 'necklaces',
-    name: 'Layered coin necklace',
-    nameAr: 'سلسلة عملة بطبقات',
-    body: 'Three fine chains at three lengths, finished with a stamped coin.',
-    bodyAr: 'تلات سلاسل رفيعة بأطوال مختلفة تنتهي بعملة مدموغة.',
-    images: ['necklace-coin-1', 'necklace-coin-2'],
-    price: 11600,
-  }),
-  p({
-    handle: 'fringe-collar',
-    collection: 'necklaces',
-    name: 'Fringe collar necklace',
-    nameAr: 'طوق ذهب بشراشيب',
-    body: 'A statement collar of 21K gold fringe, for weddings and big evenings.',
-    bodyAr: 'طوق لافت بشراشيب من الذهب عيار 21، للأفراح والسهرات الكبيرة.',
-    images: ['necklace-classic-1', 'necklace-classic-2'],
-    price: 52000,
-  }),
-
-  // ── Bracelets ──────────────────────────────────────────────────────────
-  p({
-    handle: 'evil-eye-bracelet',
-    collection: 'bracelets',
-    name: 'Evil-eye chain bracelet',
-    nameAr: 'إسورة عين',
-    body: 'A blue enamel eye on a fine 18K chain. Adjustable from 16 to 19 cm.',
-    bodyAr: 'عين بالمينا الزرقا على سلسلة رفيعة عيار 18. مقاسها بيتظبط من 16 لـ 19 سم.',
-    images: ['bracelet-eye-1', 'bracelet-eye-2'],
-    isNew: true,
-    price: 7450,
-    featured: true,
-  }),
-  p({
-    handle: 'stone-cuff',
-    collection: 'bracelets',
-    name: 'Open cuff with stones',
-    nameAr: 'إسورة مفتوحة بفصوص',
-    body: 'A polished open cuff set with three warm-toned stones.',
-    bodyAr: 'إسورة مفتوحة ملمّعة مركّب فيها تلات فصوص بألوان دافية.',
-    images: ['bracelet-cuff-1', 'bracelet-cuff-2'],
-    price: 14800,
-  }),
-  p({
-    handle: 'gourmette-bracelet',
-    collection: 'bracelets',
-    name: 'Gourmette chain bracelet',
-    nameAr: 'إسورة جورميه',
-    body: 'Chunky, rounded links in 21K gold with a lobster clasp.',
-    bodyAr: 'حلقات مدورة وتقيلة من ذهب عيار 21 بقفل كلّاب.',
-    images: ['bracelet-gourmet-1', 'bracelet-gourmet-2'],
-    price: 17900,
-    isNew: true,
-  }),
-  p({
-    handle: 'stone-bangles-set',
-    collection: 'bracelets',
-    name: 'Set of stone bangles',
-    nameAr: 'طقم غوايش بفصوص',
-    body: 'Two bangles paved with clear stones, 21K. Sold as a pair.',
-    bodyAr: 'غويشتين مرصّعين بفصوص شفافة، عيار 21. بيتباعوا مع بعض.',
-    images: ['bracelet-bangles-1', 'bracelet-bangles-2'],
-    price: 48000,
-  }),
-  p({
-    handle: 'fine-chain-bracelet',
-    collection: 'bracelets',
-    name: 'Fine chain bracelet',
-    nameAr: 'إسورة سلسلة رفيعة',
-    body: 'The lightest piece we make: a fine chain with a small engraved tag.',
-    bodyAr: 'أخف قطعة بنعملها: سلسلة رفيعة بتاج صغير ممكن نحفر عليه.',
-    images: ['bracelet-fine-1', 'bracelet-fine-2'],
-    price: 5900,
-  }),
-
-  // ── Earrings ───────────────────────────────────────────────────────────
-  p({
-    handle: 'drop-earrings',
-    collection: 'earrings',
-    name: 'Liquid drop earrings',
-    nameAr: 'حلق دمعة',
-    body: 'Hollow 18K drops, light enough for all day.',
-    bodyAr: 'دموع مجوّفة من الذهب عيار 18، خفيفة تلبسيها طول اليوم.',
-    images: ['earring-drop-1', 'earring-drop-2'],
-    isNew: true,
-    price: 9650,
-    featured: true,
-  }),
-  p({
-    handle: 'bold-hoops',
-    collection: 'earrings',
-    name: 'Bold hoop earrings',
-    nameAr: 'حلق دوائر عريض',
-    body: 'Thick, polished 21K hoops with a hinged post.',
-    bodyAr: 'دواير عريضة ملمّعة من ذهب عيار 21 بقفل مفصلي.',
-    images: ['earring-hoop-1', 'earring-hoop-2'],
-    price: 12300,
-  }),
-  p({
-    handle: 'twisted-hoops',
-    collection: 'earrings',
-    name: 'Twisted hoop earrings',
-    nameAr: 'حلق مجدول',
-    body: 'Rope-twisted hoops in 18K gold.',
-    bodyAr: 'حلق دواير مجدولة زي الحبل من الذهب عيار 18.',
-    images: ['earring-twist-1', 'earring-twist-2'],
-    price: 8450,
-  }),
-  p({
-    handle: 'ribbed-huggies',
-    collection: 'earrings',
-    name: 'Ribbed huggie earrings',
-    nameAr: 'حلق صغير مضلّع',
-    body: 'Small ribbed huggies that sit close to the lobe.',
-    bodyAr: 'حلق صغير مضلّع بيلف على شحمة الودن.',
-    images: ['earring-huggie-1', 'earring-huggie-2'],
-    price: 6900,
-  }),
-  p({
-    handle: 'hammered-studs',
-    collection: 'earrings',
-    name: 'Hammered wave studs',
-    nameAr: 'حلق مطروق',
-    body: 'Square studs hammered by hand, so no two pairs catch the light the same way.',
-    bodyAr: 'حلق مربع مطروق باليد، فمفيش جوزين بيعكسوا النور بنفس الطريقة.',
-    images: ['earring-wave-1', 'earring-wave-2'],
-    price: 7800,
-    isNew: true,
-  }),
-  p({
-    handle: 'chain-link-hoops',
-    collection: 'earrings',
-    name: 'Chain-link hoops',
-    nameAr: 'حلق حلقات سلسلة',
-    body: 'Hoops built from three oval links, 18K.',
-    bodyAr: 'حلق دواير معمول من تلات حلقات بيضاوي، عيار 18.',
-    images: ['earring-link-1', 'earring-link-2'],
-    price: 10200,
-    compareAt: 11500,
-  }),
+/** The shop's occasions: categories the gift finder links to, hidden from the home category row. */
+export const DAHAB_OCCASIONS = [
+  { slug: 'engagement', name: 'Engagement', nameAr: 'خطوبة' },
+  { slug: 'birthday', name: 'Birthday', nameAr: 'عيد ميلاد' },
+  { slug: 'mothers-day', name: "Mother's Day", nameAr: 'عيد الأم' },
+  { slug: 'graduation', name: 'Graduation', nameAr: 'تخرج' },
 ];
 
-/** Demo reviews (published, verified purchases of the demo orders). */
-export const REVIEWS = [
+export const DAHAB_CATEGORIES = [
   {
-    product: 'solitaire-ring',
-    name: ['Nour', 'Hassan'],
-    rating: 5,
-    body: 'الخاتم أحلى من الصور، والمقاس مظبوط. وصلني في علبة شيك جداً.',
+    slug: 'rings',
+    name: 'Rings',
+    nameAr: 'خواتم',
+    sizeChart: 'ring',
+    image: 'ring-solitaire.webp',
+  },
+  { slug: 'necklaces', name: 'Necklaces', nameAr: 'سلاسل وقلادات', image: 'necklace-pearl.webp' },
+  {
+    slug: 'bracelets',
+    name: 'Bracelets and bangles',
+    nameAr: 'أساور وغوايش',
+    image: 'bracelet-tennis.webp',
+  },
+  { slug: 'earrings', name: 'Earrings', nameAr: 'حلقان', image: 'earrings-pearl.webp' },
+  { slug: 'sets', name: 'Sets', nameAr: 'أطقم', image: 'set-bridal.webp' },
+  {
+    slug: 'gold-rate',
+    name: 'Gold at today’s rate',
+    nameAr: 'دهب بسعر النهارده',
+    image: 'gold-bar.webp',
+  },
+  { slug: 'gifts', name: 'Gifts', nameAr: 'هدايا', image: 'gift-box.webp' },
+  ...DAHAB_OCCASIONS,
+];
+
+export const DAHAB_SIZE_CHARTS = {
+  ring: {
+    name: 'Ring size',
+    nameAr: 'مقاس الخاتم',
+    unit: 'cm',
+    columns: [
+      { label: 'Size', labelAr: 'المقاس' },
+      { label: 'Inner diameter', labelAr: 'القطر الداخلي' },
+      { label: 'Circumference', labelAr: 'المحيط' },
+    ],
+    rows: [
+      ['12', '1.2', '3.8'],
+      ['14', '1.4', '4.4'],
+      ['16', '1.6', '5.0'],
+      ['18', '1.8', '5.7'],
+      ['20', '2.0', '6.3'],
+      ['22', '2.2', '6.9'],
+    ],
+    note: 'The size number is the inner diameter in millimetres.',
+    noteAr: 'رقم المقاس هو القطر الداخلي بالمليمتر.',
+  },
+};
+
+/** Today's illustrative rates for the demo, piastres per gram. The seed re-stamps them on every run. */
+export const DAHAB_GOLD_RATES = [
+  { karat: 24, ratePerGram: 468_600 },
+  { karat: 21, ratePerGram: 410_000 },
+  { karat: 18, ratePerGram: 351_400 },
+];
+
+// ---- fact helpers: at most TWO `onCard` chips per product (B0-4/B0-49, B5-5): karat and weight are
+// the chips on a gold piece; width, warranty and the rest are table rows on the PDP.
+const chip = (key, keyAr, value, valueAr = value) => ({ key, keyAr, value, valueAr, onCard: true });
+const ROW = (key, keyAr, value, valueAr = value) => ({ key, keyAr, value, valueAr });
+const KARAT = k => chip('Karat', 'العيار', `${k} karat`, `عيار ${k}`);
+const WEIGHT = (g, ar = g) => chip('Weight', 'الوزن', `${g} g`, `${ar} جم`);
+const WEIGHT_ROW = (g, ar = g) => ROW('Weight', 'الوزن', `${g} g`, `${ar} جم`);
+const WIDTH = mm => ROW('Width', 'العرض', `${mm} mm`, `${mm} مم`);
+const WARRANTY = ROW('Warranty', 'الضمان', 'One year', 'سنة');
+const METAL = (en, ar) => ROW('Metal', 'المعدن', en, ar);
+
+/** Gift wrap is a VARIANT option (Ruling B5-4): no schema, the price step is the wrap. */
+const WRAP = {
+  name: 'Gift wrap',
+  nameAr: 'تغليف الهدية',
+  values: [
+    { value: 'No wrap', valueAr: 'من غير تغليف' },
+    { value: 'Gift box', valueAr: 'علبة هدية', priceAdd: 5_000 },
+  ],
+};
+const SIZES = (...sizes) => ({
+  name: 'Size',
+  nameAr: 'المقاس',
+  values: sizes.map(s => ({ value: String(s), valueAr: String(s) })),
+});
+const LENGTHS = (...cm) => ({
+  name: 'Length',
+  nameAr: 'الطول',
+  values: cm.map((c, i) => ({
+    value: `${c} cm`,
+    valueAr: `${c} سم`,
+    ...(i > 0 ? { priceAdd: i * 12_000 } : {}),
+  })),
+});
+/** The metal swatch: silver, rose gold, champagne. Never a yellow-gold swatch (Ruling B5-2). */
+const METALS = {
+  name: 'Metal',
+  nameAr: 'المعدن',
+  values: [
+    { value: 'Silver', valueAr: 'فضة', hex: '#C4C7CC' },
+    { value: 'Rose gold', valueAr: 'روز جولد', hex: '#C9A5A0', priceAdd: 20_000 },
+    { value: 'Champagne', valueAr: 'شامبانيا', hex: '#D9D4C5', priceAdd: 20_000 },
+  ],
+};
+
+/** @type {DahabProduct[]} */
+export const DAHAB_PRODUCTS = [
+  // ---------------------------------------------------------------- gold-rate pieces (two per karat)
+  {
+    slug: 'gold-bar-24',
+    name: 'Gift gold bar, 24 karat',
+    nameAr: 'سبيكة دهب هدية عيار 24',
+    category: 'gold-rate',
+    alsoIn: ['gifts', 'engagement', 'graduation'],
+    price: 3_000_000,
+    images: ['gold-bar.webp'],
+    description:
+      'A small 24 karat bar, priced from the day’s gold rate. A gift that keeps its value.',
+    descriptionAr: 'سبيكة صغيرة عيار 24 بتتسعّر من سعر الدهب النهارده. هدية بتحافظ على قيمتها.',
+    gold: {
+      karat: 24,
+      weightMg: 5_000,
+      makingChargeType: 'fixed',
+      makingChargeValue: 25_000,
+      marginBps: 200,
+    },
+    facts: [KARAT(24), WEIGHT('5.00', '5.00'), WARRANTY],
   },
   {
-    product: 'evil-eye-bracelet',
-    name: ['Mariam', 'Adel'],
-    rating: 5,
-    body: 'جبتها هدية لماما وعجبتها جداً. التغليف كان حلو والتوصيل في يومين.',
+    slug: 'gold-coin-24',
+    name: 'Gift gold coin, 24 karat',
+    nameAr: 'قطعة دهب هدية عيار 24',
+    category: 'gold-rate',
+    alsoIn: ['gifts', 'birthday'],
+    price: 1_500_000,
+    images: ['gold-coin.webp'],
+    description: 'A plain round coin, 24 karat, in a small box. Priced from the day’s gold rate.',
+    descriptionAr: 'قطعة دايرة سادة عيار 24 في علبة صغيرة. بتتسعّر من سعر الدهب النهارده.',
+    gold: {
+      karat: 24,
+      weightMg: 2_500,
+      makingChargeType: 'per_gram',
+      makingChargeValue: 30_000,
+      marginBps: 300,
+    },
+    facts: [KARAT(24), WEIGHT('2.50', '2.50'), WARRANTY],
   },
   {
-    product: 'cuban-chain',
-    name: ['Youssef', 'Samir'],
-    rating: 5,
-    body: 'الشغل نضيف والسلسلة تقيلة زي ما مكتوب. الدفع عند الاستلام سهّل الموضوع.',
+    slug: 'gold-chain-21',
+    name: 'Gold chain, 21 karat',
+    nameAr: 'سلسلة دهب عيار 21',
+    category: 'gold-rate',
+    alsoIn: ['necklaces', 'mothers-day'],
+    price: 3_000_000,
+    images: ['necklace-chain.webp'],
+    description:
+      'A fine cable chain in 21 karat gold. The price follows the gold rate; the making charge is per gram.',
+    descriptionAr: 'سلسلة رفيعة من الدهب عيار 21. السعر بيتبع سعر الدهب والمصنعية بالجرام.',
+    gold: {
+      karat: 21,
+      weightMg: 6_200,
+      makingChargeType: 'per_gram',
+      makingChargeValue: 20_000,
+      marginBps: 500,
+    },
+    facts: [KARAT(21), WEIGHT('6.20', '6.20'), WIDTH('1.2', '1.2'), WARRANTY],
   },
   {
-    product: 'drop-earrings',
-    name: ['Salma', 'Mostafa'],
-    rating: 4,
-    body: 'خفاف جداً ومريحين، لابساهم كل يوم.',
+    slug: 'gold-bangle-21',
+    name: 'Plain gold bangle, 21 karat',
+    nameAr: 'غويشة دهب سادة عيار 21',
+    category: 'gold-rate',
+    alsoIn: ['bracelets', 'engagement', 'mothers-day'],
+    price: 4_500_000,
+    images: ['bangle-plain.webp'],
+    description:
+      'A smooth round bangle in 21 karat gold. A fixed making charge; the price follows the gold rate.',
+    descriptionAr: 'غويشة دايرة ناعمة من الدهب عيار 21. مصنعية ثابتة والسعر بيتبع سعر الدهب.',
+    gold: {
+      karat: 21,
+      weightMg: 9_800,
+      makingChargeType: 'fixed',
+      makingChargeValue: 50_000,
+      marginBps: 400,
+    },
+    facts: [KARAT(21), WEIGHT('9.80', '9.80'), WIDTH('4', '4'), WARRANTY],
   },
   {
-    product: 'wedding-bands',
-    name: ['Ahmed', 'Farouk'],
-    rating: 5,
-    body: 'حفروا لنا التاريخ جوه الدبلتين من غير أي تكلفة زيادة.',
+    slug: 'gold-solitaire-18',
+    name: 'Solitaire ring, 18 karat',
+    nameAr: 'خاتم سوليتير عيار 18',
+    category: 'gold-rate',
+    alsoIn: ['rings', 'engagement'],
+    price: 1_000_000,
+    images: ['ring-solitaire.webp'],
+    description:
+      'One small clear stone in four claws on a slim 18 karat band. Each size weighs a little differently, and the price follows the weight.',
+    descriptionAr:
+      'فص واحد صغير على أربع مخالب فوق دبلة رفيعة من الدهب عيار 18. كل مقاس وزنه مختلف شوية والسعر بيتبع الوزن.',
+    options: [
+      {
+        name: 'Size',
+        nameAr: 'المقاس',
+        values: [
+          { value: '14', valueAr: '14', weightMg: 2_400 },
+          { value: '16', valueAr: '16', weightMg: 2_600 },
+          { value: '18', valueAr: '18', weightMg: 2_900 },
+        ],
+      },
+    ],
+    gold: {
+      karat: 18,
+      weightMg: 2_600,
+      makingChargeType: 'per_gram',
+      makingChargeValue: 25_000,
+      marginBps: 600,
+    },
+    facts: [KARAT(18), WEIGHT('2.60', '2.60'), WIDTH('1.8', '1.8'), WARRANTY],
   },
   {
-    product: 'pearl-blossom-necklace',
-    name: ['Habiba', 'Kamal'],
-    rating: 5,
-    body: 'قطعة مختلفة عن أي حاجة في محلات الصاغة. كل اللي شافوها سألوا عليها.',
+    slug: 'gold-hoops-18',
+    name: 'Small hoop earrings, 18 karat',
+    nameAr: 'حلقان دايرة صغيرة عيار 18',
+    category: 'gold-rate',
+    alsoIn: ['earrings', 'birthday', 'graduation'],
+    price: 1_300_000,
+    images: ['earrings-hoop.webp'],
+    description:
+      'A pair of small hoops in 18 karat gold, light enough for every day. Priced from the gold rate.',
+    descriptionAr: 'حلقان دايرة صغيرة من الدهب عيار 18، خفيفة لكل يوم. بتتسعّر من سعر الدهب.',
+    gold: {
+      karat: 18,
+      weightMg: 3_100,
+      makingChargeType: 'per_gram',
+      makingChargeValue: 22_000,
+      marginBps: 500,
+    },
+    facts: [KARAT(18), WEIGHT('3.10', '3.10'), WARRANTY],
   },
+
+  // ---------------------------------------------------------------- rings (fixed price)
+  {
+    slug: 'silver-band-ring',
+    name: 'Plain band ring',
+    nameAr: 'خاتم سادة',
+    category: 'rings',
+    alsoIn: ['birthday'],
+    price: 65_000,
+    compareAtPrice: 85_000,
+    images: ['ring-silver.webp'],
+    description:
+      'A smooth, slightly domed band in sterling silver, rose gold plating or champagne plating.',
+    descriptionAr:
+      'دبلة ناعمة مقوّسة شوية من الفضة الإسترليني، أو بطلاء روز جولد، أو بطلاء شامبانيا.',
+    options: [METALS, SIZES(14, 16, 18)],
+    soldOut: [['Champagne', '18']],
+    facts: [
+      chip('Metal', 'المعدن', 'Sterling silver', 'فضة إسترليني'),
+      chip('Width', 'العرض', '3 mm', '3 مم'),
+      WARRANTY,
+    ],
+  },
+  {
+    slug: 'engraved-ring',
+    name: 'Ring with your letters',
+    nameAr: 'خاتم بحروفك',
+    category: 'rings',
+    alsoIn: ['engagement', 'birthday'],
+    price: 120_000,
+    images: ['ring-engraved.webp'],
+    description:
+      'A wide band engraved inside with the letters you choose, made for you in a few days.',
+    descriptionAr: 'دبلة عريضة بتتحفر من جوه بالحروف اللي تختارها، وبتتعملك في كام يوم.',
+    options: [SIZES(14, 16, 18, 20)],
+    leadTimeDays: 5,
+    personalisation: {
+      label: 'Letters to engrave',
+      labelAr: 'الحروف للحفر',
+      maxLength: 12,
+      required: true,
+    },
+    facts: [chip('Metal', 'المعدن', 'Sterling silver', 'فضة إسترليني'), WIDTH('6', '6'), WARRANTY],
+  },
+  {
+    slug: 'signet-ring',
+    name: 'Small signet ring',
+    nameAr: 'خاتم ختم صغير',
+    category: 'rings',
+    price: 98_000,
+    images: ['ring-signet.webp'],
+    description: 'A small oval top on a plain band, left blank for your own initial.',
+    descriptionAr: 'سطح بيضاوي صغير على دبلة سادة، سايبينه فاضي لحرفك إنت.',
+    options: [SIZES(16, 18, 20)],
+    facts: [chip('Metal', 'المعدن', 'Sterling silver', 'فضة إسترليني'), WIDTH('8', '8'), WARRANTY],
+  },
+
+  // ---------------------------------------------------------------- necklaces
+  {
+    slug: 'name-necklace',
+    name: 'Necklace with your name',
+    nameAr: 'سلسلة باسمك',
+    category: 'necklaces',
+    alsoIn: ['birthday', 'mothers-day', 'graduation'],
+    price: 135_000,
+    images: ['necklace-name.webp'],
+    description:
+      'A fine chain with a small plate engraved with the name you choose. Made for you in about a week.',
+    descriptionAr: 'سلسلة رفيعة بلوحة صغيرة محفور عليها الاسم اللي تختاره. بتتعملك في حوالي أسبوع.',
+    options: [LENGTHS(40, 45)],
+    leadTimeDays: 7,
+    personalisation: {
+      label: 'Letters to engrave',
+      labelAr: 'الحروف للحفر',
+      maxLength: 12,
+      required: true,
+    },
+    facts: [chip('Metal', 'المعدن', 'Sterling silver', 'فضة إسترليني'), WARRANTY],
+  },
+  {
+    slug: 'pearl-necklace',
+    name: 'Pearl necklace',
+    nameAr: 'عقد لؤلؤ',
+    category: 'necklaces',
+    alsoIn: ['mothers-day', 'engagement'],
+    price: 210_000,
+    compareAtPrice: 260_000,
+    images: ['necklace-pearl.webp'],
+    description: 'A single strand of round freshwater pearls with a small silver clasp.',
+    descriptionAr: 'خيط واحد من اللؤلؤ المدوّر بقفل فضة صغير.',
+    facts: [
+      chip('Pearl', 'اللؤلؤ', 'Freshwater', 'مياه عذبة'),
+      chip('Length', 'الطول', '45 cm', '45 سم'),
+      WARRANTY,
+    ],
+  },
+  {
+    slug: 'heart-pendant',
+    name: 'Heart pendant',
+    nameAr: 'دلاية قلب',
+    category: 'necklaces',
+    alsoIn: ['gifts', 'mothers-day', 'birthday'],
+    price: 78_000,
+    images: ['pendant-heart.webp'],
+    description:
+      'A small smooth heart on a fine silver chain, with a card message if you want to add one.',
+    descriptionAr: 'قلب صغير ناعم على سلسلة فضة رفيعة، وتقدر تضيف رسالة على الكارت.',
+    options: [LENGTHS(40, 45, 50), WRAP],
+    soldOut: [['50 cm', 'No wrap']],
+    personalisation: {
+      label: 'Card message',
+      labelAr: 'رسالة على الكارت',
+      maxLength: 80,
+      required: false,
+    },
+    facts: [chip('Metal', 'المعدن', 'Sterling silver', 'فضة إسترليني'), WARRANTY],
+  },
+
+  // ---------------------------------------------------------------- bracelets
+  {
+    slug: 'tennis-bracelet',
+    name: 'Tennis bracelet',
+    nameAr: 'أسورة تنس',
+    category: 'bracelets',
+    alsoIn: ['engagement', 'graduation'],
+    price: 285_000,
+    images: ['bracelet-tennis.webp'],
+    description:
+      'A thin line of small clear stones set in silver. On pre-order: the next batch ships in two weeks.',
+    descriptionAr:
+      'صف رفيع من الفصوص الصغيرة الشفافة مثبتة في الفضة. بالحجز المسبق: الدفعة الجاية بتوصل بعد أسبوعين.',
+    backorder: true,
+    stock: 0,
+    facts: [
+      chip('Metal', 'المعدن', 'Sterling silver', 'فضة إسترليني'),
+      chip('Length', 'الطول', '18 cm', '18 سم'),
+      WARRANTY,
+    ],
+  },
+  {
+    slug: 'charm-bracelet',
+    name: 'Charm bracelet',
+    nameAr: 'أسورة تعليقات',
+    category: 'bracelets',
+    alsoIn: ['birthday', 'graduation'],
+    price: 165_000,
+    images: ['bracelet-charm.webp'],
+    description: 'A fine chain with three small round charms. Made to order in a few days.',
+    descriptionAr: 'سلسلة رفيعة بتلات تعليقات صغيرة دايرة. بتتعمل بالطلب في كام يوم.',
+    leadTimeDays: 4,
+    facts: [
+      chip('Metal', 'المعدن', 'Sterling silver', 'فضة إسترليني'),
+      chip('Length', 'الطول', '17 cm', '17 سم'),
+      WARRANTY,
+    ],
+  },
+  {
+    slug: 'beaded-anklet',
+    name: 'Beaded anklet',
+    nameAr: 'خلخال خرز',
+    category: 'bracelets',
+    price: 72_000,
+    stock: 0,
+    images: ['anklet.webp'],
+    description: 'A delicate silver anklet with tiny round beads.',
+    descriptionAr: 'خلخال فضة رفيع بخرز دايري صغير.',
+    facts: [
+      chip('Metal', 'المعدن', 'Sterling silver', 'فضة إسترليني'),
+      chip('Length', 'الطول', '24 cm', '24 سم'),
+      WARRANTY,
+    ],
+  },
+
+  // ---------------------------------------------------------------- earrings
+  {
+    slug: 'pearl-studs',
+    name: 'Pearl stud earrings',
+    nameAr: 'حلقان لؤلؤ صغير',
+    category: 'earrings',
+    alsoIn: ['gifts', 'mothers-day', 'graduation'],
+    price: 88_000,
+    images: ['earrings-pearl.webp'],
+    description: 'Round white pearls on silver posts, in a gift box with a card if you want one.',
+    descriptionAr: 'لؤلؤ أبيض مدوّر على دبابيس فضة، في علبة هدية مع كارت لو حابب.',
+    options: [WRAP],
+    personalisation: {
+      label: 'Card message',
+      labelAr: 'رسالة على الكارت',
+      maxLength: 80,
+      required: false,
+    },
+    facts: [
+      chip('Pearl', 'اللؤلؤ', 'Freshwater', 'مياه عذبة'),
+      chip('Size', 'القياس', '6 mm', '6 مم'),
+      WARRANTY,
+    ],
+  },
+  {
+    slug: 'drop-earrings',
+    name: 'Slim drop earrings',
+    nameAr: 'حلقان نازلة رفيعة',
+    category: 'earrings',
+    alsoIn: ['engagement'],
+    price: 142_000,
+    compareAtPrice: 178_000,
+    images: ['earrings-drop.webp'],
+    description:
+      'A small clear stone hanging from a silver hook. Made to order in about three days.',
+    descriptionAr: 'فص صغير شفاف متعلّق في خطاف فضة. بتتعمل بالطلب في حوالي تلات أيام.',
+    leadTimeDays: 3,
+    facts: [
+      chip('Metal', 'المعدن', 'Sterling silver', 'فضة إسترليني'),
+      chip('Drop', 'الطول', '3 cm', '3 سم'),
+      WARRANTY,
+    ],
+  },
+
+  // ---------------------------------------------------------------- sets
+  {
+    slug: 'bridal-set',
+    name: 'Bridal set',
+    nameAr: 'طقم عروسة',
+    category: 'sets',
+    alsoIn: ['engagement'],
+    price: 540_000,
+    images: ['set-bridal.webp'],
+    description:
+      'A pearl necklace, two drop earrings and a ring, made together for the day. Allow a week.',
+    descriptionAr: 'عقد لؤلؤ وحلقان نازلة وخاتم، بيتعملوا مع بعض ليوم الفرح. اسمح بأسبوع.',
+    options: [SIZES(14, 16, 18)],
+    leadTimeDays: 7,
+    facts: [
+      chip('Pieces', 'القطع', '4 pieces', '4 قطع'),
+      chip('Metal', 'المعدن', 'Sterling silver', 'فضة إسترليني'),
+      WARRANTY,
+    ],
+  },
+  {
+    slug: 'mini-set',
+    name: 'Mini set',
+    nameAr: 'طقم صغير',
+    category: 'sets',
+    alsoIn: ['gifts', 'birthday', 'graduation'],
+    price: 155_000,
+    images: ['set-mini.webp'],
+    description: 'A tiny pendant on a chain and two small studs, in a gift box.',
+    descriptionAr: 'دلاية صغيرة على سلسلة وحلقين صغيرين، في علبة هدية.',
+    options: [WRAP],
+    facts: [
+      chip('Pieces', 'القطع', '3 pieces', '3 قطع'),
+      chip('Metal', 'المعدن', 'Sterling silver', 'فضة إسترليني'),
+      WARRANTY,
+    ],
+  },
+
+  // ---------------------------------------------------------------- gifts
+  {
+    slug: 'gift-box',
+    name: 'Empty gift box',
+    nameAr: 'علبة هدية فاضية',
+    category: 'gifts',
+    price: 15_000,
+    images: ['gift-box.webp'],
+    description: 'A small jewellery box with a satin ribbon, to wrap a piece you bought elsewhere.',
+    descriptionAr: 'علبة مجوهرات صغيرة بشريطة ساتان، عشان تغلّف قطعة اشتريتها من مكان تاني.',
+    facts: [
+      chip('Size', 'القياس', '8 x 8 cm', '8 × 8 سم'),
+      ROW('Colour', 'اللون', 'Emerald green', 'أخضر زمردي'),
+    ],
+  },
+  {
+    slug: 'gift-card',
+    name: 'Gift card',
+    nameAr: 'كارت هدية',
+    category: 'gifts',
+    alsoIn: ['birthday', 'graduation', 'engagement'],
+    price: 50_000,
+    images: ['gift-card.webp'],
+    description:
+      'A card in an envelope, for the piece they will choose themselves. Pick the amount.',
+    descriptionAr: 'كارت في ظرف، للقطعة اللي هما هيختاروها. اختار المبلغ.',
+    options: [
+      {
+        name: 'Amount',
+        nameAr: 'المبلغ',
+        values: [
+          { value: 'EGP 500', valueAr: '500 ج.م' },
+          { value: 'EGP 1,000', valueAr: '1000 ج.م', priceAdd: 50_000 },
+          { value: 'EGP 2,000', valueAr: '2000 ج.م', priceAdd: 150_000 },
+          { value: 'EGP 5,000', valueAr: '5000 ج.م', priceAdd: 450_000 },
+        ],
+      },
+    ],
+    facts: [
+      chip('Valid for', 'صالح لمدة', 'One year', 'سنة'),
+      ROW('Use', 'الاستخدام', 'In store and online', 'في المتجر وأونلاين'),
+    ],
+  },
+];
+
+/** Every photo file the catalogue names (products, categories); the three heroes are listed below. */
+export const DAHAB_HERO_FILES = ['hero-worn.webp', 'hero-workshop.webp', 'hero-giftbox.webp'];
+export const DAHAB_IMAGE_FILES = [
+  ...new Set([
+    ...DAHAB_PRODUCTS.flatMap(p => p.images),
+    ...DAHAB_CATEGORIES.map(c => c.image).filter(Boolean),
+    ...DAHAB_HERO_FILES,
+  ]),
 ];

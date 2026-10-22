@@ -1,58 +1,31 @@
-# Dahab demo photography — credits
+# Dahab demo assets (Phase B5 Task 5)
 
-All photographs used by the Dahab demo store (`scripts/dahab-demo/`) are from [Unsplash](https://unsplash.com) under the [Unsplash License](https://unsplash.com/license): free to use commercially and non-commercially, no permission needed, attribution appreciated. Unsplash+ (premium) images were excluded at selection time. Files are re-cropped and re-encoded as WebP by `fetch-photos.mjs` and served from the preview media bucket only; they are not committed to the repository.
+The 24 WebP files in `assets/` are AI-generated ILLUSTRATIVE samples (Ruling TPL-3) for the `storedemo-dahab`
+showroom: they are not a real jeweller's pieces and show no real brand, hallmark, person or place. They
+replace the third-party stock photographs of the retired night + gold skin (that set, its fetch script and
+its credits are removed in the same PR).
 
-| File key               | Photographer                                                  | Unsplash photo                                                                                                      |
-| ---------------------- | ------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
-| `ring-solitaire-1`     | [Expose Studio](https://unsplash.com/@muskanmehreen17)        | [UktGGAIwQyQ](https://unsplash.com/photos/a-close-up-of-a-black-fabric-with-a-ring-on-it-UktGGAIwQyQ)               |
-| `ring-solitaire-2`     | [Peter Muniz](https://unsplash.com/@petepxl)                  | [EsjkVKMdN_I](https://unsplash.com/photos/a-womans-hand-displays-a-large-rectangular-diamond-ring-EsjkVKMdN_I)      |
-| `ring-braided-1`       | [JESSIE ABRAHAM](https://unsplash.com/@jessicabelle)          | [MGlSslCP2LY](https://unsplash.com/photos/gold-earrings-with-small-diamonds-on-satin-fabric-MGlSslCP2LY)            |
-| `ring-braided-2`       | [Sanju Pandita](https://unsplash.com/@spxclicks)              | [ltQW6B3rgvA](https://unsplash.com/photos/a-woman-with-a-ring-on-her-finger-ltQW6B3rgvA)                            |
-| `ring-emerald-1`       | [Hosniye sadeghi](https://unsplash.com/@hosniyesadeghi)       | [41PGxdWN0xo](https://unsplash.com/photos/a-persons-hand-holding-a-ring-with-a-green-stone-41PGxdWN0xo)             |
-| `ring-emerald-2`       | [Hosniye sadeghi](https://unsplash.com/@hosniyesadeghi)       | [NTvXpPuSJrE](https://unsplash.com/photos/a-green-ring-sitting-on-top-of-a-black-stand-NTvXpPuSJrE)                 |
-| `ring-bands-1`         | [Mariano Rivas](https://unsplash.com/@colormono)              | [ZYet8yoepik](https://unsplash.com/photos/gold-wedding-bands-on-fabric-ZYet8yoepik)                                 |
-| `ring-bands-2`         | [Razieh Bakhtom](https://unsplash.com/@raziii1375)            | [4U0i-ZlpyCk](https://unsplash.com/photos/gold-ring-on-black-surface-4U0i-ZlpyCk)                                   |
-| `ring-bold-1`          | [Mikhail Blinov](https://unsplash.com/@mishablinovv)          | [PYklI-sQ0ig](https://unsplash.com/photos/a-close-up-of-a-person-holding-a-handbag-PYklI-sQ0ig)                     |
-| `ring-bold-2`          | [Mutzii](https://unsplash.com/@mutzii)                        | [51FssjDQCPY](https://unsplash.com/photos/woman-wearing-gold-ring-and-gold-ring-51FssjDQCPY)                        |
-| `necklace-teardrop-1`  | [Atul Mohan](https://unsplash.com/@atulmohan)                 | [TmOPo7TpLzw](https://unsplash.com/photos/a-necklace-on-a-mannequin-with-flowers-in-the-background-TmOPo7TpLzw)     |
-| `necklace-teardrop-2`  | [Atul Mohan](https://unsplash.com/@atulmohan)                 | [QkZgJ7jWzIs](https://unsplash.com/photos/a-white-mannequin-with-a-gold-necklace-on-it-QkZgJ7jWzIs)                 |
-| `necklace-cuban-1`     | [Oscar Ramirez](https://unsplash.com/@oscareduardohr)         | [Z3GHeY0NXGg](https://unsplash.com/photos/a-pair-of-gold-chain-bracelets-sitting-on-top-of-a-white-box-Z3GHeY0NXGg) |
-| `necklace-cuban-2`     | [PRAHANT STUDIO](https://unsplash.com/@prahantstudio)         | [FV4STFfvcnw](https://unsplash.com/photos/a-woman-wearing-a-white-dress-and-gold-jewelry-FV4STFfvcnw)               |
-| `necklace-crown-1`     | [Hosniye sadeghi](https://unsplash.com/@hosniyesadeghi)       | [\_Ycmc96ZxWM](https://unsplash.com/photos/a-gold-necklace-with-a-crown-on-it-_Ycmc96ZxWM)                          |
-| `necklace-crown-2`     | [Ruan Richard Rodrigues](https://unsplash.com/@ricdeoliveira) | [QwRwbZe6dWc](https://unsplash.com/photos/a-close-up-of-a-necklace-QwRwbZe6dWc)                                     |
-| `necklace-flower-1`    | [Hosniye sadeghi](https://unsplash.com/@hosniyesadeghi)       | [rvF5EglUXWg](https://unsplash.com/photos/a-necklace-with-white-flowers-on-a-gold-chain-rvF5EglUXWg)                |
-| `necklace-flower-2`    | [Marco J Haenssgen](https://unsplash.com/@marcohaenssgen)     | [XYa9DKDBbPs](https://unsplash.com/photos/a-close-up-of-a-person-wearing-a-necklace-XYa9DKDBbPs)                    |
-| `necklace-coin-1`      | [Eve Maier](https://unsplash.com/@maierfoto)                  | [7uQQHORcTpc](https://unsplash.com/photos/a-necklace-hanging-on-a-metal-chain-7uQQHORcTpc)                          |
-| `necklace-coin-2`      | [Kateryna Hliznitsova](https://unsplash.com/@kate_gliz)       | [EnvGlhMhFrc](https://unsplash.com/photos/woman-in-white-tank-top-wearing-silver-necklace-EnvGlhMhFrc)              |
-| `necklace-classic-1`   | [Tetiana Shulika](https://unsplash.com/@te_creator)           | [eVqKdSJKW9Q](https://unsplash.com/photos/a-black-mannequin-with-a-gold-necklace-on-it-eVqKdSJKW9Q)                 |
-| `necklace-classic-2`   | [Ahmadreza Rezaie](https://unsplash.com/@ahmdrzarzai)         | [n2-AYPfb-Ug](https://unsplash.com/photos/woman-wearing-gold-jewelry-with-pearl-accents-n2-AYPfb-Ug)                |
-| `bracelet-eye-1`       | [PRAHANT STUDIO](https://unsplash.com/@prahantstudio)         | [W49Oxm_WnmI](https://unsplash.com/photos/a-woman-wearing-a-bracelet-with-a-evil-eye-on-it-W49Oxm_WnmI)             |
-| `bracelet-eye-2`       | [PRAHANT STUDIO](https://unsplash.com/@prahantstudio)         | [fP7s7YTfKx4](https://unsplash.com/photos/a-woman-sitting-on-a-bed-with-her-hands-on-her-chest-fP7s7YTfKx4)         |
-| `bracelet-cuff-1`      | [Ruan Richard Rodrigues](https://unsplash.com/@ricdeoliveira) | [O7YCeE_65TE](https://unsplash.com/photos/a-close-up-of-a-gold-ring-on-a-table-O7YCeE_65TE)                         |
-| `bracelet-cuff-2`      | [Ruan Richard Rodrigues](https://unsplash.com/@ricdeoliveira) | [WDsohK10HAw](https://unsplash.com/photos/a-close-up-of-a-gold-ring-on-a-table-WDsohK10HAw)                         |
-| `bracelet-gourmet-1`   | [Nataliya Melnychuk](https://unsplash.com/@natinati)          | [oO0JAOJhquk](https://unsplash.com/photos/a-gold-chain-bracelet-sitting-on-top-of-a-magazine-oO0JAOJhquk)           |
-| `bracelet-gourmet-2`   | [Sama Hosseini](https://unsplash.com/@samahosseini)           | [h_ssRPj8UZo](https://unsplash.com/photos/a-close-up-of-a-person-wearing-a-bracelet-h_ssRPj8UZo)                    |
-| `bracelet-bangles-1`   | [Khizar Rathore](https://unsplash.com/@khizar_rathore)        | [AoZrJQ80KCc](https://unsplash.com/photos/a-couple-of-bracelets-sitting-on-top-of-a-table-AoZrJQ80KCc)              |
-| `bracelet-bangles-2`   | [Syed F Hashemi](https://unsplash.com/@sfhashemi)             | [aldDZePniqg](https://unsplash.com/photos/gold-chain-necklace-on-white-surface-aldDZePniqg)                         |
-| `bracelet-fine-1`      | [Diego Castañeda](https://unsplash.com/@disfruta_cafe)        | [Jno26Xf1-WI](https://unsplash.com/photos/a-delicate-gold-bracelet-with-an-id-tag-Jno26Xf1-WI)                      |
-| `bracelet-fine-2`      | [Sama Hosseini](https://unsplash.com/@samahosseini)           | [GtOo17K-vTg](https://unsplash.com/photos/a-woman-wearing-a-gold-chain-bracelet-GtOo17K-vTg)                        |
-| `earring-drop-1`       | [Diego Castañeda](https://unsplash.com/@disfruta_cafe)        | [q4uRpPcvF88](https://unsplash.com/photos/a-pair-of-gold-earrings-sitting-on-top-of-a-white-sheet-q4uRpPcvF88)      |
-| `earring-drop-2`       | [Diego Castañeda](https://unsplash.com/@disfruta_cafe)        | [5S0IV03f0i8](https://unsplash.com/photos/a-pair-of-gold-earrings-sitting-on-top-of-a-white-sheet-5S0IV03f0i8)      |
-| `earring-hoop-1`       | [Oscar Ramirez](https://unsplash.com/@oscareduardohr)         | [77vl4dH6KKQ](https://unsplash.com/photos/a-pair-of-gold-hoop-earrings-on-a-white-stand-77vl4dH6KKQ)                |
-| `earring-hoop-2`       | [Ruan Richard Rodrigues](https://unsplash.com/@ricdeoliveira) | [s9idT2PQUt4](https://unsplash.com/photos/a-close-up-of-a-person-wearing-a-pair-of-earrings-s9idT2PQUt4)            |
-| `earring-twist-1`      | [Nataliya Melnychuk](https://unsplash.com/@natinati)          | [Ki7TPcA9204](https://unsplash.com/photos/gold-ring-on-white-textile-Ki7TPcA9204)                                   |
-| `earring-twist-2`      | [Sanju Pandita](https://unsplash.com/@spxclicks)              | [FEIoXyYIPik](https://unsplash.com/photos/a-woman-wearing-a-pair-of-gold-rings-FEIoXyYIPik)                         |
-| `earring-huggie-1`     | [Diego Castañeda](https://unsplash.com/@disfruta_cafe)        | [jqcmEaerPjU](https://unsplash.com/photos/two-textured-and-smooth-gold-hoop-earrings-on-white-jqcmEaerPjU)          |
-| `earring-huggie-2`     | [Diego Castañeda](https://unsplash.com/@disfruta_cafe)        | [6OHCS0XIKAQ](https://unsplash.com/photos/two-gold-hoop-earrings-one-ribbed-on-white-background-6OHCS0XIKAQ)        |
-| `earring-wave-1`       | [Oscar Ramirez](https://unsplash.com/@oscareduardohr)         | [pQYSjhWz4cQ](https://unsplash.com/photos/a-pair-of-gold-earrings-on-a-white-surface-pQYSjhWz4cQ)                   |
-| `earring-wave-2`       | [Ahmadreza Rezaie](https://unsplash.com/@ahmdrzarzai)         | [n2-AYPfb-Ug](https://unsplash.com/photos/woman-wearing-gold-jewelry-with-pearl-accents-n2-AYPfb-Ug)                |
-| `earring-link-1`       | [César O'neill](https://unsplash.com/@cesaroneill)            | [GaWRVzfRfbY](https://unsplash.com/photos/gold-chain-link-hoop-earrings-on-a-reflective-surface-GaWRVzfRfbY)        |
-| `earring-link-2`       | [César O'neill](https://unsplash.com/@cesaroneill)            | [I4GVWQXXIXQ](https://unsplash.com/photos/a-pair-of-gold-chain-link-hoop-earrings-on-a-mirror-I4GVWQXXIXQ)          |
-| `hero-1`               | [Tim Mossholder](https://unsplash.com/@timmossholder)         | [sNRL7DRavPw](https://unsplash.com/photos/woman-with-curly-hair-and-jewelry-sNRL7DRavPw)                            |
-| `hero-2`               | [Niaz Ahmed](https://unsplash.com/@nyaaaz)                    | [mrljCG3nCR4](https://unsplash.com/photos/woman-with-long-brown-hair-looking-away-mrljCG3nCR4)                      |
-| `collection-rings`     | [Sanju Pandita](https://unsplash.com/@spxclicks)              | [ltQW6B3rgvA](https://unsplash.com/photos/a-woman-with-a-ring-on-her-finger-ltQW6B3rgvA)                            |
-| `collection-necklaces` | [PRAHANT STUDIO](https://unsplash.com/@prahantstudio)         | [FV4STFfvcnw](https://unsplash.com/photos/a-woman-wearing-a-white-dress-and-gold-jewelry-FV4STFfvcnw)               |
-| `collection-bracelets` | [PRAHANT STUDIO](https://unsplash.com/@prahantstudio)         | [fP7s7YTfKx4](https://unsplash.com/photos/a-woman-sitting-on-a-bed-with-her-hands-on-her-chest-fP7s7YTfKx4)         |
-| `collection-earrings`  | [Sanju Pandita](https://unsplash.com/@spxclicks)              | [FEIoXyYIPik](https://unsplash.com/photos/a-woman-wearing-a-pair-of-gold-rings-FEIoXyYIPik)                         |
-| `story-craft`          | [Ronja Flucke](https://unsplash.com/@ronjamaria)              | [muMwgeSo31A](https://unsplash.com/photos/person-holding-stone-muMwgeSo31A)                                         |
-| `gift-tray`            | [Ruan Richard Rodrigues](https://unsplash.com/@ricdeoliveira) | [moRYg6k5-Kg](https://unsplash.com/photos/a-silver-tray-topped-with-lots-of-gold-jewelry-moRYg6k5-Kg)               |
+- **Model / how:** FLUX.1 schnell on Cloudflare Workers AI (`@cf/black-forest-labs/flux-1-schnell`, 8 steps),
+  offline, by `gen.py` from the prompts in `prompts.py`; `grade.py` caps the saturation of gold-toned pixels
+  (below); `encode.sh` crops (1:1 pieces, 4:3 sets, 16:9 heroes), caps the long edge at 1200 px and encodes
+  with `cwebp` (each file <= 140 KB). No stock photo, no third-party image and no real person is used. The
+  Workers AI call used the local wrangler login; nothing else was touched.
+- **Unbranded (Ruling B5-11):** no logo, lettering, hallmark or readable engraving. FLUX invents text on any
+  flat surface: a first pass of the gold bar came back stamped "UTINAL BULLION 2012", the chain sat on a
+  slab with a printed caption and "13S7 Brillon", and the bridal set carried "butieley tionls." in a corner.
+  All three were regenerated on plain grounds with prompts that name no word that implies a mark. Every file
+  was viewed before commit (one contact sheet; the two regenerated pieces and the bar re-viewed alone).
+- **No orange (Rulings B5-2, B5-11):** FLUX paints yellow gold at HSV saturation 0.5-0.8, which sits in the
+  12-50 degree band the no-orange gate bans. Art direction answers it: the prompts ask for "pale champagne
+  metal in cool neutral daylight on white and grey", and `grade.py` clamps every pixel in the band (11-51
+  degrees) to saturation 0.30, so gold reads as pale gold, never as orange. `orange-probe.py` (hue 12-50,
+  HSV saturation >= 0.35, value >= 0.15, every 3rd pixel) measured the worst file at 0.7 % against the 2 %
+  limit; `tests/unit/dahab-demo-assets.test.ts` runs it with negative controls (orange, saffron, amber,
+  terracotta fail) and a positive control (silver, white, emerald, champagne pass).
+- **Faces and hands:** none. Skin reads as orange to the probe, so the "worn" shots are pieces on linen by a
+  window, and the workshop hero shows tools and enamel dishes, not hands.
+- **Merchant-style packshots:** the white-ground product shots are the same files, so quality-bar section 9
+  rule 1 (a merchant photo on a white ground) is judged against real conditions.
+- **Known illustrative limits:** the "gold" pieces are graded paler than real 21 karat gold on purpose; the
+  gold bar is a plain plate and the coin a plain disc (any mark FLUX drew was a fake one); the single drop
+  earring is one earring, not a pair.
