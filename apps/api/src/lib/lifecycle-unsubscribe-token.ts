@@ -45,3 +45,16 @@ export function lifecycleUnsubscribeUrl(storeId: string): string {
   const base = (config.apiUrl ?? '').replace(/\/$/, '');
   return `${base}/api/v1/public/lifecycle-emails/unsubscribe?token=${encodeURIComponent(signLifecycleUnsubscribeToken(storeId))}`;
 }
+
+/**
+ * RFC 8058 one-click headers for a lifecycle email, pointing at the signed unsubscribe URL. Only our own
+ * https API origin is ever advertised (a local/dev URL would hand every mailbox provider an unreachable
+ * link), so outside production this returns undefined and the in-body link remains the control.
+ */
+export function oneClickUnsubscribeHeaders(url: string): Record<string, string> | undefined {
+  if (!/^https:\/\/[^\s/]+/i.test(url)) return undefined;
+  return {
+    'List-Unsubscribe': `<${url}>`,
+    'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
+  };
+}

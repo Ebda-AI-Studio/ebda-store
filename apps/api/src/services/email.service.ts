@@ -54,6 +54,7 @@ import {
   planLimitReachedTemplate,
   type PlanLimitReachedData,
 } from './email-templates/plan-limit-reached';
+import { oneClickUnsubscribeHeaders } from '../lib/lifecycle-unsubscribe-token';
 import { lifecycleTemplate, type LifecycleEmailData } from './email-templates/lifecycle';
 import {
   subscriptionBillingTemplate,
@@ -101,6 +102,8 @@ export interface EmailOptions {
   html: string;
   text?: string;
   replyTo?: string;
+  /** Extra message headers (RFC 8058 List-Unsubscribe / List-Unsubscribe-Post). Marketing and lifecycle mail only. */
+  headers?: Record<string, string>;
 }
 
 export interface EmailStoreContext {
@@ -441,6 +444,7 @@ export class EmailService {
       replyTo?: string;
       /** Shell direction + brand name; default = the platform default language. */
       language?: 'en' | 'ar';
+      headers?: Record<string, string>;
     },
     opts?: { queue?: boolean }
   ): Promise<void> {
@@ -456,7 +460,13 @@ export class EmailService {
     });
     if (opts?.queue) {
       // Durable retry queue (storeId=null → platform sender on drain).
-      await emailQueue.enqueue(null, { to: args.to, subject: args.subject, html, text: args.text });
+      await emailQueue.enqueue(null, {
+        to: args.to,
+        subject: args.subject,
+        html,
+        text: args.text,
+        ...(args.headers ? { headers: args.headers } : {}),
+      });
       return;
     }
     const r = await getPlatformResend();
@@ -468,6 +478,7 @@ export class EmailService {
     };
     if (args.text) payload.text = args.text;
     if (args.replyTo) payload.replyTo = args.replyTo;
+    if (args.headers) payload.headers = args.headers;
     const { error } = await r.emails.send(
       payload as unknown as Parameters<typeof r.emails.send>[0]
     );
@@ -504,6 +515,7 @@ export class EmailService {
     };
     if (options.text) payload.text = options.text;
     if (options.replyTo) payload.replyTo = options.replyTo;
+    if (options.headers) payload.headers = options.headers;
     const { error } = await r.emails.send(
       payload as unknown as Parameters<typeof r.emails.send>[0]
     );
@@ -1204,6 +1216,7 @@ export class EmailService {
         content: lifecycleTemplate.content(data, language),
         language,
         replyTo: BRAND.supportEmail,
+        headers: oneClickUnsubscribeHeaders(data.unsubscribeUrl),
       },
       { queue: true }
     );
