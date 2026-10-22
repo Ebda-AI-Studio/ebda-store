@@ -160,6 +160,14 @@ export default function StoreTemplatePage() {
           </p>
         )}
 
+        {/* The editor previews a look on the merchant's own page before applying it (Task 9). */}
+        <p className="text-sm text-muted-foreground">
+          {t('previewInEditor')}{' '}
+          <Link href={`/stores/${storeId}/builder`} className="text-primary underline">
+            {t('openEditorPreview')}
+          </Link>
+        </p>
+
         <LookPicker
           value={store.look}
           locale={locale}

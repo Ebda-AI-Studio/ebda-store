@@ -5442,7 +5442,9 @@
         "souq": "Souq",
         "jasmine": "Jasmine",
         "lamma": "Lamma"
-      }
+      },
+      "previewInEditor": "Want to see a look on your own page first? Preview it in the editor.",
+      "openEditorPreview": "Open the editor preview"
     }
   },
   "seo": {
@@ -10076,11 +10078,6 @@
       "page": "This section does not belong on this page.",
       "setting": "This page does not have that setting."
     },
-    "families": {
-      "label": "Templates",
-      "confirm": "Apply this template as a draft? Your products, slides and copy are kept; nothing goes live until you publish.",
-      "applied": "Template applied to your draft."
-    },
     "panes": {
       "start": "Structure",
       "end": "Settings"
@@ -10249,7 +10246,9 @@
       "restore": "Restore",
       "restoring": "Restoring…",
       "confirmRestore": "Publish version {rev} again? Your current draft is replaced.",
-      "more": "Load more"
+      "more": "Load more",
+      "confirmRestoreTitle": "Restore this version?",
+      "restoreConfirmButton": "Restore"
     },
     "pages": {
       "label": "Page",
@@ -10263,6 +10262,35 @@
       "cardsOnHome": "Product card style, image shapes and the phone bottom bar are set on the Home page.",
       "openHome": "Open Home",
       "open": "Page settings"
+    },
+    "look": {
+      "open": "Look",
+      "title": "Change the look",
+      "intro": "Pick a look and preview it on your own page. Nothing changes until you apply it.",
+      "design": "Colours, fonts and spacing",
+      "keep": "Keep my changes",
+      "reset": "Start from this look's design",
+      "preview": "Preview",
+      "previewing": "Preparing the preview…",
+      "bar": "Previewing {look}. Only the design changes, your content stays.",
+      "apply": "Apply look",
+      "applying": "Applying…",
+      "keepEditing": "Keep editing",
+      "reportTitle": "What changes",
+      "kept": "{count, plural, one {{count} section keeps its content} other {{count} sections keep their content}}",
+      "designChanged": "{count, plural, one {{count} section changes its design} other {{count} sections change their design}}",
+      "added": "New sections: {names}",
+      "dropped": "Leaves your draft (restorable from History): {names}",
+      "themeReset": "Colours and fonts reset to this look",
+      "skin": "The header, cards and buttons also change to this look's style when you apply it. The preview shows your page in the current style.",
+      "draftNote": "It is applied as a draft. Nothing goes live until you publish.",
+      "publishNote": "Your page is new, so it goes live with this look.",
+      "moved": "The page changed since the preview. Preview again.",
+      "failed": "Could not change the look. Try again.",
+      "previewFailed": "Could not prepare the preview. Try again.",
+      "saveFirst": "Fix the errors on this page before changing the look.",
+      "applied": "The look is applied.",
+      "current": "Current look"
     }
   },
   "instapayReceipt": {

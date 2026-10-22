@@ -11,12 +11,15 @@ export function ConfirmDialog({
   title,
   body,
   confirmLabel,
+  tone = 'danger',
   onConfirm,
   onCancel,
 }: {
   title: string;
   body: string;
   confirmLabel: string;
+  /** `danger` for a removal (the default), `primary` for a safe, reversible choice. */
+  tone?: 'danger' | 'primary';
   onConfirm: () => void;
   onCancel: () => void;
 }) {
@@ -54,7 +57,7 @@ export function ConfirmDialog({
             type="button"
             onClick={onConfirm}
             data-testid="confirm-ok"
-            className="rounded-lg bg-destructive px-3 py-1.5 text-sm font-semibold text-destructive-foreground hover:bg-destructive/90"
+            className={`rounded-lg px-3 py-1.5 text-sm font-semibold ${tone === 'danger' ? 'bg-destructive text-destructive-foreground hover:bg-destructive/90' : 'bg-primary text-primary-foreground hover:bg-primary/90'}`}
           >
             {confirmLabel}
           </button>
