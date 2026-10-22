@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { ZodError } from 'zod';
 import { Prisma } from '@ebda/database';
-import { uniqueViolationTarget } from '../lib/prisma-errors';
+import { isGoldPriceManaged, uniqueViolationTarget } from '../lib/prisma-errors';
 import logger from '../lib/logger';
 import { redactSensitiveQuery } from '@ebda/shared';
 
@@ -74,6 +74,8 @@ function multerClientError(err: unknown): { status: number; code: string; messag
  */
 export function clientErrorStatus(err: unknown): number | undefined {
   if (err instanceof AppError) return err.statusCode < 500 ? err.statusCode : undefined;
+  // Ruling B5-13: a writer touched a gold-priced row's price outside the repricer.
+  if (isGoldPriceManaged(err)) return 409;
   if (err instanceof SyntaxError && 'body' in err) return 400;
   if (isZodError(err)) return 400;
   const multerErr = multerClientError(err);
@@ -227,6 +229,23 @@ export function errorHandler(err: Error, req: Request, res: Response, next: Next
         code: 'VALIDATION_ERROR',
         message: 'Invalid request data',
         details,
+      },
+    });
+    return;
+  }
+
+  // Ruling B5-13: the database guard `ebda_gold_price_guard` refused a price write on a gold-rate
+  // row. The caller's fault (they edited a price the repricer owns), so a 409 with a business message.
+  if (isGoldPriceManaged(err)) {
+    logger.warn({ requestId }, 'Gold price write refused by the database guard');
+    res.status(409).json({
+      success: false,
+      error: {
+        code: 'GOLD_PRICE_MANAGED',
+        message:
+          "The price of a gold-rate product is calculated from the day's gold rate and cannot be edited by hand.",
+        messageAr: 'سعر القطعة بسعر الدهب بيتحسب لوحده من سعر الجرام ومينفعش يتعدّل يدوي.',
+        requestId,
       },
     });
     return;

@@ -478,6 +478,9 @@ model Store {
   pageRevisions              StorePageRevision[]
   productModels              ProductModel[]
   sizeCharts                 SizeChart[]
+  goldRates                  GoldRate[]
+  goldRatesCurrent           GoldRateCurrent[]
+  goldRateSettings           GoldRateSettings?
   searchQueryDaily           SearchQueryDaily[]
   productEmbeddings          ProductEmbedding[]
   productEmbedFailures       ProductEmbedFailure[]
@@ -945,6 +948,18 @@ model Product {
   inventory            Int           @default(0)
   lowStockThreshold    Int           @default(5) @map("low_stock_threshold")
   trackInventory       Boolean       @default(true) @map("track_inventory")
+  // Gold-rate pricing (Phase B5, Rulings B5-12/B5-13). `price` stays the ONE price every reader uses; for a
+  // gold-priced row only the repricer writes it (trigger ebda_gold_price_guard, migration 20261101000100).
+  // 'fixed' | 'gold_rate' (DB CHECK). The spec below is integer-only: weight in MILLIGRAMS, making charge in
+  // piastres (fixed) or piastres per gram (per_gram), margin in basis points. Never Float, never `facts`.
+  pricingMode          String        @default("fixed") @map("pricing_mode")
+  goldKarat            Int?          @map("gold_karat") @db.SmallInt
+  goldWeightMg         Int?          @map("gold_weight_mg")
+  makingChargeType     String?       @map("making_charge_type")
+  makingChargeValue    Int?          @map("making_charge_value")
+  goldMarginBps        Int           @default(0) @map("gold_margin_bps")
+  /// The gold_rates row the current price was computed from (informational, no FK: history is append-only).
+  goldRateId           String?       @map("gold_rate_id")
   weight               Float?
   dimensions           Json? // { length, width, height }
   status               ProductStatus @default(draft)
@@ -1230,23 +1245,31 @@ model ProductOptionValue {
 
 // A specific variant combining options (e.g., "Size: Large, Color: Red")
 model ProductVariant {
-  id             String   @id @default(uuid())
-  productId      String   @map("product_id")
-  title          String // Generated from option values: "Large / Red"
-  titleAr        String?  @map("title_ar")
-  sku            String?
-  barcode        String?
-  price          Int? // Override price (null = use product price)
-  compareAtPrice Int?     @map("compare_at_price")
-  costPrice      Int?     @map("cost_price")
-  inventory      Int      @default(0)
-  weight         Float?
-  imageUrl       String?  @map("image_url")
-  position       Int      @default(0)
-  isActive       Boolean  @default(true) @map("is_active")
-  createdAt      DateTime @default(now()) @map("created_at")
-  updatedAt      DateTime @updatedAt @map("updated_at")
-  allowBackorder Boolean  @default(false) @map("allow_backorder")
+  id                String   @id @default(uuid())
+  productId         String   @map("product_id")
+  title             String // Generated from option values: "Large / Red"
+  titleAr           String?  @map("title_ar")
+  sku               String?
+  barcode           String?
+  price             Int? // Override price (null = use product price)
+  compareAtPrice    Int?     @map("compare_at_price")
+  costPrice         Int?     @map("cost_price")
+  inventory         Int      @default(0)
+  weight            Float?
+  imageUrl          String?  @map("image_url")
+  position          Int      @default(0)
+  isActive          Boolean  @default(true) @map("is_active")
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+  allowBackorder    Boolean  @default(false) @map("allow_backorder")
+  // Gold-rate pricing (Ruling B5-13): every column NULL = inherit the product's. Written only by the repricer.
+  pricingMode       String?  @map("pricing_mode")
+  goldKarat         Int?     @map("gold_karat") @db.SmallInt
+  goldWeightMg      Int?     @map("gold_weight_mg")
+  makingChargeType  String?  @map("making_charge_type")
+  makingChargeValue Int?     @map("making_charge_value")
+  goldMarginBps     Int?     @map("gold_margin_bps")
+  goldRateId        String?  @map("gold_rate_id")
 
   product              Product                @relation(fields: [productId], references: [id], onDelete: Cascade)
   options              ProductVariantOption[]
@@ -1545,15 +1568,19 @@ model Cart {
 }
 
 model CartItem {
-  id        String   @id @default(uuid())
-  cartId    String   @map("cart_id")
-  productId String   @map("product_id")
-  variantId String?  @map("variant_id")
-  quantity  Int      @default(1)
+  id              String    @id @default(uuid())
+  cartId          String    @map("cart_id")
+  productId       String    @map("product_id")
+  variantId       String?   @map("variant_id")
+  quantity        Int       @default(1)
   // Customer personalisation text (cleanNote: trimmed, control/bidi chars stripped, <=200). Part of the line identity.
-  note      String?
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  note            String?
+  // Gold-rate pricing (Ruling B5-17): the unit price the shopper was shown when the line was added (server-read,
+  // never client-supplied), and when. A gold line whose current price differs shows "السعر اتحدّث" until acknowledged.
+  quotedUnitPrice Int?      @map("quoted_unit_price")
+  quotedAt        DateTime? @map("quoted_at") @db.Timestamptz(3)
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
 
   cart    Cart            @relation(fields: [cartId], references: [id], onDelete: Cascade)
   product Product         @relation(fields: [productId], references: [id], onDelete: Cascade)
@@ -1968,6 +1995,9 @@ model OrderItem {
   /// The buyer's entitlement at sale time ({ rungs: [{minQty, priceMinor, variant, group}], groupPercentMinor }), for
   /// tier-aware partial returns (Task 8b, Rulings B2B-17 / B2B-18).
   tierLadder        Json?    @map("tier_ladder")
+  /// Gold-rate pricing (Ruling B5-17): how this line's price was made (karat, weight, rate id and value, making charge,
+  /// margin, step, unit price; @ebda/shared goldLineSnapshotSchema). Refunds read `price`; this is for display and audit.
+  goldSnapshot      Json?    @map("gold_snapshot")
 
   // Scan-to-pick fulfilment state. pickedQty tracks how many units of this
   // line have been physically scanned/picked. Default 0 so existing rows are
@@ -5615,4 +5645,73 @@ model WebhookDelivery {
   // Leading index for the composite FK (endpoint_id, store_id).
   @@index([endpointId, storeId])
   @@map("webhook_deliveries")
+}
+
+// ==========================================
+// Gold-rate pricing (Phase B5, Rulings B5-12..B5-21). Docs: docs/architecture/gold-rate-pricing.md
+// UI: admin /stores/[id]/gold-rates (editor, history, settings), the product edit GoldPricingCard,
+// storefront GoldRateLine + PriceChangedNotice.
+// ==========================================
+
+/// Append-only history of every rate written. ebda_app may SELECT, INSERT and UPDATE (status, decided_by,
+/// applied_at) only: no DELETE, no re-rating (column grants in migration 20261101000100).
+model GoldRate {
+  id            String    @id @default(uuid())
+  storeId       String    @map("store_id")
+  karat         Int       @db.SmallInt
+  /// Piastres per gram, 10 000..10 000 000 (DB CHECK).
+  ratePerGram   Int       @map("rate_per_gram")
+  /// 'manual' | 'feed'
+  source        String
+  /// 'applied' | 'pending' | 'rejected'
+  status        String
+  /// The jump from the previous applied rate of this karat in basis points, when one was measured.
+  jumpBps       Int?      @map("jump_bps")
+  /// Spot per ounce, fetched-at, premium bps. Never a provider name.
+  feedReference Json?     @map("feed_reference")
+  createdBy     String?   @map("created_by")
+  decidedBy     String?   @map("decided_by")
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  appliedAt     DateTime? @map("applied_at") @db.Timestamptz(3)
+
+  store   Store             @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  current GoldRateCurrent[]
+
+  @@index([storeId, karat, createdAt(sort: Desc)])
+  @@map("gold_rates")
+}
+
+/// The one applied rate per (store, karat). Rate writes take FOR UPDATE on it, checkout takes FOR SHARE.
+model GoldRateCurrent {
+  storeId     String   @map("store_id")
+  karat       Int      @db.SmallInt
+  rateId      String   @map("rate_id")
+  ratePerGram Int      @map("rate_per_gram")
+  appliedAt   DateTime @map("applied_at") @db.Timestamptz(3)
+
+  store Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  rate  GoldRate @relation(fields: [rateId], references: [id], onDelete: Cascade)
+
+  @@id([storeId, karat])
+  @@index([rateId])
+  @@map("gold_rates_current")
+}
+
+model GoldRateSettings {
+  storeId        String   @id @map("store_id")
+  enabled        Boolean  @default(false)
+  feedEnabled    Boolean  @default(false) @map("feed_enabled")
+  feedPremiumBps Int      @default(0) @map("feed_premium_bps")
+  /// Minutes; 60..1560 (26 h is the default AND the ceiling, Ruling B5-16).
+  maxAgeMinutes  Int      @default(1560) @map("max_age_minutes")
+  jumpConfirmBps Int      @default(500) @map("jump_confirm_bps")
+  /// Piastres: 1 | 100 | 500 | 1000.
+  roundingStep   Int      @default(100) @map("rounding_step")
+  showBreakdown  Boolean  @default(false) @map("show_breakdown")
+  updatedBy      String?  @map("updated_by")
+  updatedAt      DateTime @default(now()) @map("updated_at") @db.Timestamptz(3)
+
+  store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  @@map("gold_rate_settings")
 }

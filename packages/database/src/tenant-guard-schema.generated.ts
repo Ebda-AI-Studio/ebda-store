@@ -123,6 +123,9 @@ export const TENANT_GUARD_SCHEMA: readonly TenantGuardModel[] = [
       pageRevisions: 'StorePageRevision',
       productModels: 'ProductModel',
       sizeCharts: 'SizeChart',
+      goldRates: 'GoldRate',
+      goldRatesCurrent: 'GoldRateCurrent',
+      goldRateSettings: 'GoldRateSettings',
       searchQueryDaily: 'SearchQueryDaily',
       productEmbeddings: 'ProductEmbedding',
       productEmbedFailures: 'ProductEmbedFailure',
@@ -1495,6 +1498,32 @@ export const TENANT_GUARD_SCHEMA: readonly TenantGuardModel[] = [
     relations: {
       store: 'Store',
       endpoint: 'WebhookEndpoint',
+    },
+  },
+  {
+    name: 'GoldRate',
+    table: 'gold_rates',
+    storeId: true,
+    relations: {
+      store: 'Store',
+      current: 'GoldRateCurrent',
+    },
+  },
+  {
+    name: 'GoldRateCurrent',
+    table: 'gold_rates_current',
+    storeId: true,
+    relations: {
+      store: 'Store',
+      rate: 'GoldRate',
+    },
+  },
+  {
+    name: 'GoldRateSettings',
+    table: 'gold_rate_settings',
+    storeId: true,
+    relations: {
+      store: 'Store',
     },
   },
 ];
