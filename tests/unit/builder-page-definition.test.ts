@@ -295,9 +295,15 @@ describe('settings schemas (drive the Phase 2 auto-generated panel)', () => {
     for (const d of SECTION_REGISTRY) {
       const stored = shapeKeys(d.propsSchema).filter(k => !VISIBILITY_AND_STRUCTURE.has(k));
       const declared = settingIds(d.settings);
+      // Ruling EP-5: a key no skin reads loses its control but stays accepted by the save schema.
+      const retired = new Set(d.retired);
       expect(
-        stored.filter(k => !declared.has(k)),
+        stored.filter(k => !declared.has(k) && !retired.has(k)),
         `${d.type}: stored but no descriptor`
+      ).toEqual([]);
+      expect(
+        [...retired].filter(k => declared.has(k) || !stored.includes(k)),
+        `${d.type}: a retired key is still declared, or is not stored at all`
       ).toEqual([]);
       expect(
         [...declared].filter(k => !stored.includes(k)),
