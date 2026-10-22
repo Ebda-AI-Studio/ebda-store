@@ -66,7 +66,13 @@ export function HomeCapabilities({ locale }: { locale: Locale }) {
   return (
     <>
       <p className="lead">{p.homeLead}</p>
-      <CapabilityGrid locale={locale} ids={HOME_CAPABILITIES} />
+      <ul className="value-list">
+        {HOME_CAPABILITIES.map(id => (
+          <li key={id} data-value={id}>
+            {CAPABILITIES[locale][id].t}
+          </li>
+        ))}
+      </ul>
       <p className="cap-more">
         <Link href={pagePath(locale, 'features')} className="btn btn-ghost">
           {p.homeAll}
