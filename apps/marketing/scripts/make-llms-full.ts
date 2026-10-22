@@ -7,6 +7,7 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { CAPABILITIES, MORE, THEMES, THEME_COPY, featuresFaq } from '../src/lib/capabilities';
 import { COMING_LABEL, REGISTRY } from '../src/lib/capability-registry';
 import { COMPARE, COMPARE_AS_OF, compareRows } from '../src/lib/compare';
+import { COMPARE_SLUGS } from '../src/lib/site';
 
 const SOON = COMING_LABEL.en.toLowerCase(); // "coming soon"
 const coming = (id: keyof typeof REGISTRY) => REGISTRY[id].status === 'coming';
@@ -77,9 +78,11 @@ for (const f of featuresFaq('en')) {
   L.push('');
 }
 L.push(`## Comparisons (as of ${COMPARE_AS_OF})`);
-L.push('Competitor facts are general and publicly known; check their sites before deciding.');
+L.push(
+  'Competitor facts come from their public pages (Wuilt, YouCan, EasyOrders and ExpandCart were read on 22 October 2026; the others are general and say to check their sites). Check their sites before deciding.'
+);
 L.push('');
-for (const slug of ['salla', 'zid', 'shopify'] as const) {
+for (const slug of COMPARE_SLUGS) {
   const d = COMPARE[slug];
   L.push(`### ${d.en.title} — https://ebda.app/en/compare/${slug}/`);
   L.push(d.en.intro);

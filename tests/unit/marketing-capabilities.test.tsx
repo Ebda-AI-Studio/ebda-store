@@ -94,9 +94,14 @@ describe('/compare is balanced', () => {
     for (const locale of LOCALES) {
       it(`${locale} ${slug}: says where Ebda is stronger AND not yet, dated, no forbidden strings`, () => {
         const html = renderToStaticMarkup(<ComparePage locale={locale} slug={slug} />);
-        // verdicts of "stronger" either way only where the fact is firmly public: Shopify
-        expect(html.includes('data-verdict="ebda"')).toBe(slug === 'shopify');
-        expect(html.includes('data-verdict="them"')).toBe(slug === 'shopify');
+        // verdicts of "stronger" either way only where the fact is firmly public: Shopify, or a vendor whose
+        // pages were read and are cited (`sources`)
+        if (COMPARE[slug].sources) {
+          expect(/data-verdict="(ebda|them)"/.test(html)).toBe(true);
+        } else {
+          expect(html.includes('data-verdict="ebda"')).toBe(slug === 'shopify');
+          expect(html.includes('data-verdict="them"')).toBe(slug === 'shopify');
+        }
         for (const r of [...compareRows().gap, ...compareRows().strength])
           expect(html).toContain(r.label[locale]);
         expect(html).toContain(locale === 'en' ? 'October 2026' : 'أكتوبر 2026');
@@ -112,11 +117,50 @@ describe('/compare is balanced', () => {
     for (const slug of COMPARE_SLUGS)
       for (const id of ALL_ROW_IDS) expect(COMPARE[slug].cells[id]).toBeTruthy();
   });
-  it('uses no invented numbers about competitors (digits only in the Ebda column)', () => {
-    for (const slug of COMPARE_SLUGS)
+  it('uses no invented numbers about competitors (digits only in the Ebda column, or where the page cites its sources)', () => {
+    for (const slug of COMPARE_SLUGS.filter(s => !COMPARE[s].sources))
       for (const id of ALL_ROW_IDS)
         for (const l of LOCALES)
           expect(COMPARE[slug].cells[id].text[l].replace(/B2B/g, '')).not.toMatch(/\d/);
+  });
+});
+
+describe('sourced compare pages (Wuilt, YouCan, EasyOrders, ExpandCart)', () => {
+  const sourced = COMPARE_SLUGS.filter(s => COMPARE[s].sources);
+  it('exactly the four Egyptian alternatives carry sources', () => {
+    expect(sourced).toEqual(['wuilt', 'youcan', 'easyorders', 'expandcart']);
+  });
+  for (const slug of sourced)
+    for (const locale of LOCALES) {
+      it(`${locale} ${slug}: cites https sources dated 22 October 2026 as new-tab links, says where they are cheaper, invents nothing`, () => {
+        const html = renderToStaticMarkup(<ComparePage locale={locale} slug={slug} />);
+        expect(html).toContain(locale === 'en' ? '22 October 2026' : '22 أكتوبر 2026');
+        for (const src of COMPARE[slug].sources!) {
+          expect(src.href).toMatch(/^https:\/\//);
+          expect(html).toMatch(
+            new RegExp(
+              `href="${src.href.replace(/[.*+?^$()|[\]\\/]/g, '\\$&')}"[^>]*target="_blank"`
+            )
+          );
+        }
+        // honesty: a row where the other platform is stronger (price/features) unless the sourced facts show none, and unverified items say so
+        expect(html).toContain(slug === 'youcan' ? 'data-verdict="ebda"' : 'data-verdict="them"');
+        const unverified = locale === 'en' ? /nverified/ : /غير مؤكد/;
+        const cells = ALL_ROW_IDS.map(id => COMPARE[slug].cells[id].text[locale]).join(' ');
+        expect(cells.length).toBeGreaterThan(0);
+        if (slug !== 'easyorders') expect(cells).toMatch(unverified);
+        expect(html).not.toMatch(BAD);
+      });
+    }
+  it('cheaper-for-small-sellers vendors say so in the price cell, in both languages', () => {
+    for (const slug of ['wuilt', 'easyorders'] as const) {
+      expect(COMPARE[slug].cells.currency.v).toBe('them');
+      expect(COMPARE[slug].en.chooseThem[0]).toMatch(/nobody on payroll|few pages/);
+    }
+    expect(COMPARE.youcan.cells.commission.v).toBe('ebda');
+    expect(COMPARE.wuilt.cells.currency.text.en).toContain('1,250');
+    expect(COMPARE.easyorders.cells.currency.text.en).toContain('$0.04');
+    expect(COMPARE.expandcart.cells.commission.text.en).toContain('no commissions');
   });
 });
 

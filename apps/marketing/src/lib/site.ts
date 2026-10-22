@@ -33,12 +33,12 @@ export const LEGAL_SLUGS = [
   'acceptable-use',
 ] as const;
 export type LegalSlug = (typeof LEGAL_SLUGS)[number];
-export const COMPARE_SLUGS = ['salla', 'zid', 'shopify'] as const;
+export const COMPARE_SLUGS = ['salla', 'zid', 'shopify', 'wuilt', 'youcan', 'easyorders', 'expandcart'] as const;
 export type CompareSlug = (typeof COMPARE_SLUGS)[number];
 export type ComparePage = `compare/${CompareSlug}`;
 export type PageSlug = '' | 'about' | 'credits' | 'features' | ComparePage | LegalSlug;
 
-/** The comparison pages (/compare/salla, /compare/zid, /compare/shopify), as page slugs. */
+/** The comparison pages (/compare/{salla,zid,shopify,wuilt,youcan,easyorders,expandcart}), as page slugs. */
 export const COMPARE_PAGES: readonly ComparePage[] = COMPARE_SLUGS.map(
   s => `compare/${s}` as const
 );
