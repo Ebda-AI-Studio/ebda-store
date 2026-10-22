@@ -114,7 +114,11 @@ describe('the mixes, exactly as designed', () => {
     expect(chips.preset).toMatchObject({ titleAr: 'اختار مشكلتك' });
     expect(steps.preset).toMatchObject({ headingAr: 'روتينك في 3 خطوات' });
     expect(stage.design).toMatchObject({ layout: 'stage' });
-    expect(stage.preset).toMatchObject({ limit: 1, heading: '', headingAr: '' });
+    expect(stage.preset).toMatchObject({
+      limit: 1,
+      heading: 'Active of the week',
+      headingAr: 'مادة الأسبوع',
+    });
     expect(grid.design).toMatchObject({ bgColor: 'token:card' });
   });
   it('the first screen shows a path to the products in every look (categories, chips or rail)', () => {

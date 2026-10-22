@@ -644,7 +644,12 @@ export const LOOKS: readonly LookDefinition[] = [
       {
         type: 'product-spotlight',
         design: { layout: 'stage', paddingTop: 'tight', paddingBottom: 'tight' },
-        preset: { productSource: 'featured', limit: 1, heading: '', headingAr: '' },
+        preset: {
+          productSource: 'featured',
+          limit: 1,
+          heading: 'Active of the week',
+          headingAr: 'مادة الأسبوع',
+        },
       },
       {
         type: 'steps',

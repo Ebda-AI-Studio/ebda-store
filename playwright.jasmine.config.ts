@@ -1,6 +1,8 @@
 import { defineConfig, devices } from '@playwright/test';
 
 // Jasmine looks (Phase B3 Task 6): scenario matrix + demo-bar checks against a LOCAL stack.
+// One-shot local setup (seeds every showroom the demo bar switches to, sets the custom domains):
+//   bash scripts/jasmine-demo/seed-local-hosts.sh   (LOCAL DATABASE_URL only)
 // Needs the seeded stores: scripts/storedemo/seed.mjs --template jasmine --local-look-stores and
 // scripts/storedemo/scenario-stores.mjs --template jasmine, and the stack on JASMINE_PORT. The
 // store hosts are `<slug>.<JASMINE_HOST_BASE>:<port>`:

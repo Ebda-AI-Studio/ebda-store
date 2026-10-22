@@ -8,6 +8,7 @@ import { AdminLayout } from '../../../../components/AdminLayout';
 import { AITranslateMissingButton } from '../../../../components/AITranslateMissingButton';
 import { apiGet, apiPut } from '../../../../lib/api';
 import { useT } from '@/i18n/useT';
+import { tagTranslatePair } from '../../../../lib/tag-translate-pair';
 
 /**
  * Store tags (Phase B3 fix wave 1, Ruling B3-13): the skin-type / concern chips are tags, and each
@@ -89,14 +90,7 @@ export default function StoreTagsPage() {
         <div className="flex gap-2">
           <AITranslateMissingButton
             storeId={storeId}
-            pairs={rows.map(r => ({
-              key: r.id,
-              en: r.name,
-              ar: r.nameAr,
-              kind: 'category-name' as const,
-              onEnFilled: (v: string) => patch(r.id, { name: v }),
-              onArFilled: (v: string) => patch(r.id, { nameAr: v }),
-            }))}
+            pairs={rows.map(r => tagTranslatePair(r, patch))}
           />
           <Link href={`/stores/${storeId}/categories`}>
             <Button type="button" variant="outline">

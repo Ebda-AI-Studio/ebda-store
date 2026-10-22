@@ -1614,6 +1614,38 @@ html[lang] [data-pack='jasmine'] [data-zone='filters'] :is(h2, h3, h4, legend) {
   img {
   mix-blend-mode: multiply;
 }
+/* Clinic's featured active (fix wave 1): a finished clinical panel, not a grey tile beside floating
+   text. The photo sits on a white panel with a hairline, the
+   copy column gets a primary rule, a larger name and price, and an eyebrow ("Active of the week"). */
+[data-look='jasmine.clinic']
+  [data-section='product-spotlight'][data-layout='stage']
+  [data-part='card-image'] {
+  background-color: hsl(var(--background));
+  border: 1px solid hsl(var(--border));
+}
+@media (min-width: 768px) {
+  [data-look='jasmine.clinic'] [data-section='product-spotlight'][data-layout='stage'] .min-w-0 {
+    border-inline-start: 3px solid hsl(var(--primary));
+    padding-inline-start: 2rem;
+  }
+}
+[data-look='jasmine.clinic'] [data-section='product-spotlight'][data-layout='stage'] h2 {
+  font-size: clamp(1.75rem, 1.2rem + 1.8vw, 2.75rem);
+}
+[data-look='jasmine.clinic'] [data-section='product-spotlight'][data-layout='stage'] p.text-xl {
+  font-size: 1.5rem;
+}
+[data-look='jasmine.clinic']
+  [data-section='product-spotlight'][data-layout='stage']
+  p.text-sm.font-medium {
+  color: hsl(var(--primary));
+  letter-spacing: 0.02em;
+}
+/* Bloom's hero is a cover-filled rounded card (Ruling B3-13); the Vitrine hairline inset over the
+   photo is not part of its look. `frame: 'line'` is what makes the photo cover, so only the line is hidden. */
+[data-look='jasmine.bloom'] [data-part='frame-line'] {
+  display: none;
+}
 /* Brass never dims on hover (it read as disabled next to the other CTA). */
 [data-look='jasmine.apothecary'] [class*='hover:bg-primary/90']:hover {
   background-color: hsl(var(--primary));
