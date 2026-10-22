@@ -225,6 +225,14 @@ Adds `qamar` to the `"StoreTemplate"` enum (Phase B1; stamp 2026-10-23 so it sor
 
 Adds `souq` to the `"StoreTemplate"` enum (Phase B2; stamp 2026-10-29 so it sorts after main's newest migration (20261028000700, B2B); renumbered from 20261026000100 before merge (Ruling B2-27)). Same shape as the Qamar value above: Postgres cannot drop an enum value, so a rollback is: revert the code, then `UPDATE stores SET template = 'minimal' WHERE template = 'souq';` and redeploy (re-check RLS policy state after); the `look` column keeps the Souq look and renders on `minimal` until the skin is back. Leave the enum value unused. Delete the row from `_prisma_migrations` only if you also restore from a pre-migration branch.
 
+## Jasmine template enum value (`20261030000100_store_template_jasmine`)
+
+Adds `jasmine` to the `"StoreTemplate"` enum (Phase B3; stamp 2026-10-30 so it sorts after main's newest migration (20261029000400, Souq)). Same shape as the Souq value above: Postgres cannot drop an enum value, so a rollback is: revert the code, then `UPDATE stores SET template = 'minimal' WHERE template = 'jasmine';` and redeploy (re-check RLS policy state after); the `look` column keeps the Jasmine look and renders on `minimal` until the skin is back. Leave the enum value unused. Delete the row from `_prisma_migrations` only if you also restore from a pre-migration branch.
+
+## Tag Arabic label (`20261030000200_tag_name_ar`)
+
+Adds the nullable `tags.name_ar` column (Phase B3 fix wave 1; stamp 2026-10-30, sorts after `20261030000100_store_template_jasmine`). Additive only: code that does not read it ignores it, so the rollback is: revert the code and redeploy; the column can stay. To drop it after a code revert: `ALTER TABLE tags DROP COLUMN name_ar;` (the Arabic labels are lost; `tags.name` is untouched and remains the filter key).
+
 ## Product 3D models (`20261008000020_product_3d_models`)
 
 Two additive tables (`product_models`, `product_model_bindings`); every FK into them CASCADEs and nothing else references them. Feature-only rollback without a deploy: a super-admin `StoreFeature` override `product_3d = false` hides the viewer for that store (the public payload drops `model3d`). Code rollback: revert (path B); the PDP then renders photos only. To also drop the data: `DROP TABLE product_model_bindings, product_models;` and delete the row from `_prisma_migrations`; the `.glb`/`.usdz` objects under `stores/<id>/models/` become orphans for the weekly R2 sweep. Re-check RLS state after any restore (`tests/integration/rls-ebda-app.test.ts`).

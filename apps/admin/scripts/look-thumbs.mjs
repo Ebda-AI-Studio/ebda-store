@@ -79,7 +79,15 @@ async function fromStorefront(list) {
   const { chromium } = createRequire(join(repo, 'package.json'))('playwright');
   const consent = encodeURIComponent(JSON.stringify({ v: 1, marketing: false, analytics: false }));
   const work = mkdtempSync(join(tmpdir(), 'look-thumbs-sf-'));
-  const browser = await chromium.launch();
+  // THUMBS_CHANNEL=chrome drives an installed Chrome when no Playwright chromium is cached;
+  // THUMBS_HOST_RULES (e.g. `MAP *.localhost-b3.test 127.0.0.1`) maps store hosts to a local
+  // PRODUCTION-build stack (it refuses `<slug>.localhost`; tests/jasmine/ documents the host trick).
+  const browser = await chromium.launch({
+    ...(process.env.THUMBS_CHANNEL ? { channel: process.env.THUMBS_CHANNEL } : {}),
+    ...(process.env.THUMBS_HOST_RULES
+      ? { args: [`--host-resolver-rules=${process.env.THUMBS_HOST_RULES}`] }
+      : {}),
+  });
   try {
     for (const look of list) {
       const url = new URL(storefront.replace('{slug}', look.id.replace('.', '-')));

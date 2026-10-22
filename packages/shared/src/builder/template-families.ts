@@ -123,7 +123,11 @@ export const TEMPLATE_FAMILIES: readonly TemplateFamily[] = [
     verticalAr: 'جمال وعناية بالبشرة',
     sectionTypes: [
       'hero',
+      'category-grid',
+      'steps',
       'product-carousel',
+      'featured-collection',
+      'product-spotlight',
       'trust-strip',
       'image-text',
       'testimonials',
@@ -131,6 +135,8 @@ export const TEMPLATE_FAMILIES: readonly TemplateFamily[] = [
       'footer',
     ],
     pendingSectionTypes: [],
+    // Phase B3 (Ruling B3-1): Jasmine has its own chrome skin; the looks decide the mixes.
+    skin: 'jasmine',
   },
 ];
 

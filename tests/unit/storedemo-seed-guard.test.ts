@@ -13,6 +13,7 @@ import {
   TEMPLATE_SPECS,
   templateFromArgv,
   SOUQ_PROD_ASSET_BASE,
+  JASMINE_PROD_ASSET_BASE,
   seedStoreClaim,
   SHOWROOM_THEME,
   // @ts-expect-error plain .mjs script
@@ -166,6 +167,81 @@ describe('storedemo seed: --template souq (Ruling B2-7)', () => {
     const remote = pg('a:b@ep-x.neon.tech/db');
     expect(guard(remote, ['--template', 'souq']).ok).toBe(false);
     expect(guard(remote, ['--template', 'souq', '--yes-production']).ok).toBe(true);
+  });
+});
+
+describe('storedemo seed: --template jasmine (Ruling B3-8)', () => {
+  const jasmine = TEMPLATE_SPECS.jasmine;
+  it('--template jasmine picks the third spec', () => {
+    expect(templateFromArgv(['--template', 'jasmine'])).toBe(jasmine);
+  });
+  it('the third demo store: own slug, own owner without a mailbox, own default look, own host label', () => {
+    expect(jasmine.slug).toBe('storedemo-jasmine');
+    expect(jasmine.ownerEmail).toBe('storedemo-jasmine-owner@ebda.app');
+    expect(jasmine.defaultLook).toBe('jasmine.clinic');
+    for (const other of [TEMPLATE_SPECS.qamar, TEMPLATE_SPECS.souq]) {
+      expect(jasmine.slug).not.toBe(other.slug);
+      expect(jasmine.ownerEmail).not.toBe(other.ownerEmail);
+    }
+    // the slug is in the unclaimable demo family (isDemoShowroomSlug: storedemo-*)
+    expect(jasmine.slug.startsWith('storedemo-')).toBe(true);
+  });
+  it('local look stores: one per Jasmine look, on its own look', () => {
+    expect(jasmine.localLookStores).toEqual([
+      ['jasmine-apothecary', 'jasmine.apothecary'],
+      ['jasmine-bloom', 'jasmine.bloom'],
+      ['jasmine-clinic', 'jasmine.clinic'],
+    ]);
+  });
+  it('production run accepts only https://media.ebda.app/demo/jasmine, never another template base', () => {
+    expect(JASMINE_PROD_ASSET_BASE).toBe('https://media.ebda.app/demo/jasmine');
+    expect(
+      assetBase(['--yes-production'], { JASMINE_DEMO_ASSET_BASE: JASMINE_PROD_ASSET_BASE }, jasmine)
+        .ok
+    ).toBe(true);
+    expect(assetBase(['--yes-production'], {}, jasmine).base).toBe(JASMINE_PROD_ASSET_BASE);
+    for (const bad of [
+      'http://localhost:9000',
+      'https://media.ebda.app/demo/qamar',
+      SOUQ_PROD_ASSET_BASE,
+      '/__jasmine-demo',
+    ])
+      expect(
+        assetBase(['--yes-production'], { JASMINE_DEMO_ASSET_BASE: bad }, jasmine).ok,
+        bad
+      ).toBe(false);
+    expect(assetBase([], { JASMINE_DEMO_ASSET_BASE: '/__jasmine-demo' }, jasmine).base).toBe(
+      '/__jasmine-demo'
+    );
+    // another template's asset env var never leaks into a Jasmine run
+    expect(assetBase([], { SOUQ_DEMO_ASSET_BASE: '/__souq-demo' }, jasmine).base).toBe(
+      JASMINE_PROD_ASSET_BASE
+    );
+  });
+  it('describePlan names the catalogue, tags, bundle, reviews, the bundles feature and no archive', () => {
+    const plan = describePlan(pg('user:secretpw@localhost:5432/x'), jasmine);
+    expect(plan).toContain('jasmine: 22 products, 23 variants, 7 categories');
+    expect(plan).toContain('6 skin-type / concern tags, 1 routine bundle(s), 13 approved reviews');
+    expect(plan).toContain('features bundles');
+    expect(plan).toContain('instalments enabled (no provider name)');
+    expect(plan).toContain('storedemo-jasmine');
+    expect(plan).toContain('the Jasmine superset document');
+    expect(plan).not.toContain('archived:');
+    expect(plan).not.toContain('secretpw');
+  });
+  it('only Jasmine writes tags, bundles, reviews and features; Qamar and Souq plans are unchanged', () => {
+    for (const other of [TEMPLATE_SPECS.qamar, TEMPLATE_SPECS.souq]) {
+      expect(other.tags).toBeUndefined();
+      expect(other.bundles).toBeUndefined();
+      expect(other.features).toBeUndefined();
+      expect(describePlan(pg('a:b@localhost/x'), other)).not.toContain('jasmine-style extras');
+    }
+    expect(jasmine.features).toEqual(['bundles']);
+  });
+  it('the guard is the same: a remote host needs --yes-production', () => {
+    const remote = pg('a:b@ep-x.neon.tech/db');
+    expect(guard(remote, ['--template', 'jasmine']).ok).toBe(false);
+    expect(guard(remote, ['--template', 'jasmine', '--yes-production']).ok).toBe(true);
   });
 });
 

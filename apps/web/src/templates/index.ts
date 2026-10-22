@@ -123,6 +123,21 @@ const templates: Record<TemplateId, () => Promise<TemplateComponents>> = {
       EmptyState: m.EmptyState,
       FormCard: m.FormCard,
     })),
+  jasmine: () =>
+    import('./jasmine').then(m => ({
+      Header: m.Header,
+      Footer: m.Footer,
+      Hero: m.Hero,
+      ProductCard: m.ProductCard,
+      ProductGrid: m.ProductGrid,
+      CategoryCard: m.CategoryCard,
+      CategoryGrid: m.CategoryGrid,
+      AnnouncementBar: m.AnnouncementBar,
+      CartTable: m.CartTable,
+      OrderSummary: m.OrderSummary,
+      EmptyState: m.EmptyState,
+      FormCard: m.FormCard,
+    })),
 };
 
 /**
@@ -149,6 +164,7 @@ export const TEMPLATE_IDS: TemplateId[] = [
   'dahab',
   'qamar',
   'souq',
+  'jasmine',
 ];
 
 // Re-export types

@@ -16,9 +16,9 @@ import {
 } from '../../../../components/looks/LookSwitchDialog';
 
 const SKIN_IDS = ['modern', 'classic', 'minimal', 'bold', 'elegant', 'dahab'];
-// Qamar and Souq are reached only through a look (Rulings B1-17, B2-1): labelled, never a bare
+// Qamar, Souq and Jasmine are reached only through a look (Rulings B1-17, B2-1, B3-1): labelled, never a bare
 // skin choice.
-const SKIN_LABEL_IDS = [...SKIN_IDS, 'qamar', 'souq'];
+const SKIN_LABEL_IDS = [...SKIN_IDS, 'qamar', 'souq', 'jasmine'];
 
 export default function StoreTemplatePage() {
   const params = useParams();

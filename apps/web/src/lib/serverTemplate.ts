@@ -134,6 +134,13 @@ const homepageTemplates: Record<TemplateId, HomepageTemplateComponents> = {
     CategoryGrid: MinimalCategoryGrid,
     ...shared,
   },
+  // Jasmine re-uses the minimal statics plus the shared sections (Ruling B3-1).
+  jasmine: {
+    Hero: MinimalHero,
+    ProductGrid: MinimalProductGrid,
+    CategoryGrid: MinimalCategoryGrid,
+    ...shared,
+  },
 };
 
 /**

@@ -141,6 +141,19 @@ export const ITEMS_NEED_OPTIONS: CountedNoun = {
   },
 };
 
+/** Customer ratings behind a product's average ("212 ratings"): the PDP rating line (Phase B3). */
+export const RATINGS: CountedNoun = {
+  en: { one: '{n} rating', other: '{n} ratings' },
+  ar: {
+    zero: '{n} تقييم',
+    one: 'تقييم واحد',
+    two: 'تقييمين',
+    few: '{n} تقييمات',
+    many: '{n} تقييم',
+    other: '{n} تقييم',
+  },
+};
+
 /** Star ratings ("rate 3 stars"): 1–5 on the review form. */
 export const STARS: CountedNoun = {
   en: { one: '{n} star', other: '{n} stars' },

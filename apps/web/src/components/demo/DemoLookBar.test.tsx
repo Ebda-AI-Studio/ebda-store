@@ -74,11 +74,11 @@ describe('DemoLookBar: template, then look', () => {
     expect(lookSelect(container).value).toBe('qamar.lookbook');
   });
 
-  it('with the real registry it lists the Qamar and Souq templates (each has a demo host, B2-7), Qamar looks for a Qamar look', () => {
+  it('with the real registry it lists the Qamar, Souq and Jasmine templates (each has a demo host, B2-7, B3-8), Qamar looks for a Qamar look', () => {
     const { container } = render(
       <DemoLookBar activeLook="qamar.atelier" isBuilt={id => getLook(id)?.status === 'built'} />
     );
-    expect(values(templateSelect(container))).toEqual(['qamar', 'souq']);
+    expect(values(templateSelect(container))).toEqual(['qamar', 'souq', 'jasmine']);
     expect(values(lookSelect(container))).toEqual([
       'qamar.atelier',
       'qamar.lookbook',
@@ -125,11 +125,46 @@ describe('DemoLookBar: template, then look', () => {
     }
   });
 
+  it('Phase B3: Jasmine is offered once it has a built look, and its host keeps the look (B3-8)', () => {
+    const jasmineBuilt = (id: string) => isBuilt(id) || id.startsWith('jasmine.');
+    const loc = window.location as unknown as Record<string, unknown>;
+    const saved = { host: loc.host, protocol: loc.protocol };
+    loc.host = 'storedemo.ebda.app';
+    loc.protocol = 'https:';
+    try {
+      const { container } = render(
+        <DemoLookBar activeLook="qamar.atelier" isBuilt={jasmineBuilt} />
+      );
+      expect(values(templateSelect(container))).toEqual(['qamar', 'souq', 'jasmine']);
+      fireEvent.change(templateSelect(container), { target: { value: 'jasmine' } });
+      // its own host and its first built look (registry order: Apothecary)
+      expect(assign).toHaveBeenCalledWith(
+        'https://storedemo-jasmine.ebda.app/?look=jasmine.apothecary'
+      );
+      cleanup();
+      assign.mockReset();
+      loc.host = 'storedemo-jasmine.ebda.app';
+      search = 'look=jasmine.bloom';
+      const on = render(<DemoLookBar activeLook="jasmine.bloom" isBuilt={jasmineBuilt} />);
+      expect(templateSelect(on.container).value).toBe('jasmine');
+      expect(values(lookSelect(on.container))).toEqual([
+        'jasmine.apothecary',
+        'jasmine.bloom',
+        'jasmine.clinic',
+      ]);
+      fireEvent.change(lookSelect(on.container), { target: { value: 'jasmine.clinic' } });
+      expect(assign).toHaveBeenCalledWith('/products?look=jasmine.clinic');
+    } finally {
+      loc.host = saved.host;
+      loc.protocol = saved.protocol;
+    }
+  });
+
   it('a template without a demo store is not offered (the bar lists demo-hosted templates only)', () => {
     const { container } = render(
       <DemoLookBar
         activeLook="qamar.atelier"
-        isBuilt={id => id.startsWith('qamar.') || id.startsWith('jasmine.')}
+        isBuilt={id => id.startsWith('qamar.') || id.startsWith('lamma.')}
       />
     );
     expect(values(templateSelect(container))).toEqual(['qamar']);

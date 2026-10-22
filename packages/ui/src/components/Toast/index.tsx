@@ -250,7 +250,16 @@ function ToastItem({
       <div className="flex-1 min-w-0">
         <p className="font-semibold text-sm text-foreground">{toast.title}</p>
         {toast.message && (
-          <p className="text-sm text-muted-foreground mt-0.5 leading-relaxed">{toast.message}</p>
+          <p
+            className={`text-sm text-muted-foreground mt-0.5 leading-relaxed [overflow-wrap:anywhere] ${
+              // a success toast names a product (a long name must not run a toast tall); an error or
+              // warning is read in full, never cut to two lines with the rest in a tooltip
+              toast.type === 'success' ? 'line-clamp-2' : ''
+            }`}
+            title={toast.message}
+          >
+            {toast.message}
+          </p>
         )}
       </div>
 

@@ -24,7 +24,10 @@ export function InstalmentLine({ priceMinor, buyable }: { priceMinor: number; bu
   );
   if (!r) return null;
   return (
-    <span data-testid="instalment-line" className="text-xs text-muted-foreground">
+    <span
+      data-testid="instalment-line"
+      className="inline-block max-w-full text-balance text-xs text-muted-foreground"
+    >
       {instalmentText(language === 'ar' ? 'ar' : 'en', r, money, localize)}
     </span>
   );

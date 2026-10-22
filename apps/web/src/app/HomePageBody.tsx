@@ -3,7 +3,7 @@ import { PLATFORM_MARKETING_URL } from '../lib/platform';
 import type { ResolvedStore } from '../lib/store-resolver';
 import { API_URL } from '../lib/api';
 import { idChunks, MANUAL_IDS_PER_FETCH } from '../builder/sections/section-products';
-import type { Product, Category } from '../lib/api';
+import type { Product, Category, PublicTag } from '../lib/api';
 import {
   resolveLayoutSettings,
   type StoreLayoutSettings,
@@ -101,7 +101,8 @@ function documentSectionRefs(def: PageDefinition | undefined): {
   let onSale = false;
   for (const n of def?.sections ?? []) {
     if (n.hidden === true) continue;
-    if (n.type === 'shop-the-look') {
+    // Shop-the-look pieces and routine-step products (Phase B3) are product refs held in blocks.
+    if (n.type === 'shop-the-look' || n.type === 'steps') {
       for (const b of n.blocks ?? []) {
         const ids = (b.settings as { productIds?: unknown }).productIds;
         if (b.hidden !== true && Array.isArray(ids))
@@ -170,6 +171,8 @@ async function fetchHomepageData(
    *  deals row reads THIS, never a client re-derivation: the listing payload does not carry
    *  `isActive`, so a disabled variant's compare-at would count as a sale (STOP-2 final review). */
   onSalePool?: Product[];
+  /** The skin-type / concern chips, fetched only when the category row is tag-sourced. */
+  tags?: PublicTag[];
 }> {
   const storeHeaders: Record<string, string> = {
     'Content-Type': 'application/json',
@@ -249,6 +252,7 @@ async function fetchHomepageData(
     categoryResults,
     manualResults,
     onSaleResult,
+    tagsResult,
   ] = await Promise.all([
     prefetched?.featured ?? fetchFeaturedProducts(storeHeaders, store.id),
     prefetched?.categories ?? fetchHomeCategories(storeHeaders, store.id),
@@ -308,6 +312,16 @@ async function fetchHomepageData(
           .then(r => (r.ok ? r.json() : null))
           .catch(() => null)
       : Promise.resolve(null),
+    // The chips row (Phase B3, Ruling B3-5): one capped request, only when the category row lists
+    // tags. CACHE CLASS: BOUNDED-stale, the same `products:<storeId>` storefront tag as every list.
+    layout.categories.enabled && layout.categories.source === 'tags'
+      ? fetch(`${API_URL}/public/tags`, {
+          next: { revalidate: 60, tags: [`products:${store.id}`] },
+          headers: storeHeaders,
+        })
+          .then(r => (r.ok ? r.json() : null))
+          .catch(() => null)
+      : Promise.resolve(null),
   ]);
 
   let featuredProducts: Product[] = featuredResult?.data?.products ?? [];
@@ -350,6 +364,7 @@ async function fetchHomepageData(
     testimonials,
     extraProducts,
     onSalePool,
+    tags: (tagsResult?.data?.tags as PublicTag[] | undefined) ?? undefined,
   };
 }
 
@@ -501,6 +516,7 @@ export async function HomePageBody({
     testimonials,
     extraProducts,
     onSalePool,
+    tags,
   } = await fetchHomepageData(
     store,
     layout,
@@ -584,6 +600,7 @@ export async function HomePageBody({
           testimonials={testimonials}
           extraProducts={extraProducts}
           onSalePool={onSalePool}
+          tags={tags}
           storeName={store.name}
           layout={layout}
           initialDefinition={builderDefinition}
@@ -599,6 +616,7 @@ export async function HomePageBody({
           testimonials={testimonials}
           extraProducts={extraProducts}
           onSalePool={onSalePool}
+          tags={tags}
           storeName={store.name}
           layout={layout}
           definition={homeDefinition}

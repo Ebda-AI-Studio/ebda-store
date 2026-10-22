@@ -194,6 +194,8 @@ scripts/qamar-demo/__pycache__/
 # local-only copy of the demo assets for the dev stack (docs/ebda/templates/demo-store.md)
 apps/web/public/__qamar-demo/
 scripts/souq-demo/img-src/
+scripts/jasmine-demo/img-src/
+apps/web/public/__jasmine-demo/
 
 # Python bytecode (any script folder), never committed
 **/__pycache__/

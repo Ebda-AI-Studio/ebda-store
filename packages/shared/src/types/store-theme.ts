@@ -31,7 +31,8 @@ export type TemplateId =
   | 'elegant'
   | 'dahab'
   | 'qamar'
-  | 'souq';
+  | 'souq'
+  | 'jasmine';
 
 /**
  * Font family options for store themes
@@ -714,6 +715,24 @@ export const TEMPLATE_THEMES: Record<TemplateId, Partial<StoreTheme>> = {
     warningColor: '320 62% 40%',
     warningForeground: '0 0% 100%',
   },
+  // Jasmine (beauty and skincare, Phase B3): a neutral base; every Jasmine store has a look and
+  // the look's tokens own colour, type, radius, density, image ratio and motion. No orange
+  // anywhere in the family (Ruling B3-2/B3-3); dividers off like Souq. Warning is plum, not the
+  // platform amber, for the same reason as Souq (it reaches the cart / checkout notices).
+  jasmine: {
+    primaryColor: '168 63% 30%',
+    primaryForeground: '0 0% 100%',
+    backgroundColor: '0 0% 100%',
+    foregroundColor: '206 36% 12%',
+    fontFamily: 'default',
+    borderRadius: 'md',
+    backgroundPreset: 'none',
+    showBrandStory: false,
+    showTrustStrip: false,
+    dividers: { ...DEFAULT_DIVIDER_SETTINGS, enabled: false },
+    warningColor: '320 62% 40%',
+    warningForeground: '0 0% 100%',
+  },
   dahab: {
     primaryColor: '39 49% 58%', // gold #C9A35E
     primaryForeground: '222 29% 8%', // night
@@ -834,6 +853,16 @@ export const TEMPLATES: TemplateInfo[] = [
     thumbnail: '/looks/souq.catalogue.webp',
     tags: ['electronics', 'appliances', 'general'],
     bestFor: 'General retail, electronics and appliances',
+  },
+  {
+    id: 'jasmine',
+    name: 'Jasmine',
+    nameAr: 'ياسمين',
+    description: 'Beauty and skincare: Apothecary, Bloom and Clinic looks',
+    descriptionAr: 'جمال وعناية بالبشرة: عطارة وبلوم وعيادة',
+    thumbnail: '/looks/jasmine.apothecary.webp',
+    tags: ['beauty', 'skincare', 'cosmetics'],
+    bestFor: 'Beauty, skincare and cosmetics',
   },
 ];
 

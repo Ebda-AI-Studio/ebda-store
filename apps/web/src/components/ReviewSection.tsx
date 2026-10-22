@@ -359,7 +359,7 @@ export default function ReviewSection({ storeId, productId }: Props) {
   const storeName = pickLocalizedName(store, language === 'ar') || t('Store', 'المتجر');
 
   return (
-    <section className="mt-16 border-t border-border pt-12">
+    <section id="reviews" className="mt-16 border-t border-border pt-12">
       <h2 className="text-2xl font-bold text-foreground">
         {t('Customer Reviews', 'مراجعات العملاء')}
       </h2>

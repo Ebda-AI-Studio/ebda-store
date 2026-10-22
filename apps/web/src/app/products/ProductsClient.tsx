@@ -41,6 +41,8 @@ import { recordLastListing, consumeFocusProduct } from '@/lib/last-listing';
 
 import { roundToMinor } from '@ebda/shared';
 import { Breadcrumbs } from '../../components/Breadcrumbs';
+import { countText, RESULTS } from '../../lib/plural';
+import { tagLabel } from '../../lib/tag-label';
 import { darkLookListingBand } from '../../templates/shared/section-bg';
 /**
  * How many products the user can choose to load per PLP page. Capped at 96
@@ -90,6 +92,28 @@ export default function ProductsClient({
   const searchParams = useSearchParams();
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState(searchParams.get('category') || '');
+  // Store tag NAME from `?tag=` (Phase B3, Ruling B3-5): the skin-type / concern chips land here.
+  const [tagFilter, setTagFilter] = useState((searchParams.get('tag') || '').slice(0, 120));
+  // The filter key is the tag NAME; the label shown is the shopper's language (Ruling B3-13).
+  const [tagNameAr, setTagNameAr] = useState<string | null>(null);
+  useEffect(() => {
+    if (!tagFilter) {
+      setTagNameAr(null);
+      return;
+    }
+    let live = true;
+    api
+      .getPublicTags(tagFilter)
+      .then(res => {
+        if (live) setTagNameAr(res.data?.tags.find(x => x.name === tagFilter)?.nameAr ?? null);
+      })
+      .catch(() => {
+        if (live) setTagNameAr(null);
+      });
+    return () => {
+      live = false;
+    };
+  }, [tagFilter]);
   // Honour the `?sort=` URL parameter on initial render so deep links from
   // the homepage carousels ("Newest" → /products?sort=newest, "Best
   // Sellers" → /products?sort=best_seller) actually filter the list.
@@ -224,11 +248,17 @@ export default function ProductsClient({
   // Task 7: derive active category context for breadcrumb / H1 / subtitle.
   const activeCategory = categoryFilter ? categories.find(c => c.slug === categoryFilter) : null;
   const ctxEn =
-    categoryFilter === 'best-sellers' ? 'Best Sellers' : (activeCategory?.name ?? 'All Products');
+    categoryFilter === 'best-sellers'
+      ? 'Best Sellers'
+      : (activeCategory?.name ??
+        (tagFilter ? tagLabel({ name: tagFilter, nameAr: tagNameAr }, 'en').text : 'All Products'));
   const ctxAr =
     categoryFilter === 'best-sellers'
       ? 'الأكثر مبيعاً'
-      : (pickLocalizedName(activeCategory, true) ?? translations['All Products']);
+      : (pickLocalizedName(activeCategory, true) ??
+        (tagFilter
+          ? tagLabel({ name: tagFilter, nameAr: tagNameAr }, 'ar').text
+          : translations['All Products']));
   // Subtitle = the category's own description in the shopper's language, or nothing. Never a
   // generated "Browse X" line (quality bar Y-06: empty means absent; Ruling B1-44).
   const subtitle = (
@@ -305,7 +335,6 @@ export default function ProductsClient({
     });
 
     return () => cancelAnimationFrame(rafId);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isLoading, products, store?.id]);
 
   // Track previous filter values to detect filter changes vs. page changes.
@@ -315,6 +344,7 @@ export default function ProductsClient({
   const prevFiltersRef = useRef({
     search,
     categoryFilter,
+    tagFilter,
     sortBy,
     priceMin,
     priceMax,
@@ -342,6 +372,7 @@ export default function ProductsClient({
         // resolve.
         const isVirtualBestSellers = categoryFilter === 'best-sellers';
         if (categoryFilter && !isVirtualBestSellers) params.category = categoryFilter;
+        if (tagFilter) params.tag = tagFilter;
         if (sortBy === 'newest') params.sort = 'newest';
         if (sortBy === 'price-asc') params.sort = 'price_asc';
         if (sortBy === 'price-desc') params.sort = 'price_desc';
@@ -373,7 +404,7 @@ export default function ProductsClient({
         setIsLoading(false);
       }
     },
-    [search, categoryFilter, sortBy, priceMin, priceMax, perPage, optionFilters]
+    [search, categoryFilter, tagFilter, sortBy, priceMin, priceMax, perPage, optionFilters]
   );
 
   const fetchCategories = useCallback(async () => {
@@ -402,6 +433,7 @@ export default function ProductsClient({
     const filtersChanged =
       prev.search !== search ||
       prev.categoryFilter !== categoryFilter ||
+      prev.tagFilter !== tagFilter ||
       prev.sortBy !== sortBy ||
       prev.priceMin !== priceMin ||
       prev.priceMax !== priceMax ||
@@ -413,6 +445,7 @@ export default function ProductsClient({
       prevFiltersRef.current = {
         search,
         categoryFilter,
+        tagFilter,
         sortBy,
         priceMin,
         priceMax,
@@ -429,6 +462,7 @@ export default function ProductsClient({
     page,
     search,
     categoryFilter,
+    tagFilter,
     sortBy,
     priceMin,
     priceMax,
@@ -514,6 +548,7 @@ export default function ProductsClient({
   const handleClearAll = () => {
     setSearch('');
     setCategoryFilter('');
+    setTagFilter('');
     setSortBy('default');
     setPriceMin(0);
     setPriceMax(100);
@@ -546,12 +581,15 @@ export default function ProductsClient({
             currentStyle={{ ...zoneStyle(plpSubtitleZone, plpScale), ...plpBreadcrumbColorStyle }}
             items={[
               { label: t('Home', translations['Home']), href: storeUrl('/') },
-              ...(categoryFilter
+              ...(categoryFilter || tagFilter
                 ? [
                     {
                       label: t('Products', translations['Products']),
                       href: storeUrl('/products'),
-                      onClick: () => setCategoryFilter(''),
+                      onClick: () => {
+                        setCategoryFilter('');
+                        setTagFilter('');
+                      },
                     },
                   ]
                 : []),
@@ -562,11 +600,55 @@ export default function ProductsClient({
           {/* Header */}
           <div className="mb-8">
             <h1
+              lang={
+                tagFilter && !activeCategory && categoryFilter !== 'best-sellers'
+                  ? tagLabel(
+                      { name: tagFilter, nameAr: tagNameAr },
+                      language === 'ar' ? 'ar' : 'en'
+                    ).lang
+                  : undefined
+              }
               className="font-display text-3xl font-bold tracking-tight text-foreground sm:text-4xl"
               style={{ ...zoneStyle(plpHeadingZone, plpScale), ...plpHeadingColorStyle }}
             >
               {t(ctxEn, ctxAr)}
             </h1>
+            {tagFilter && !categoryFilter && (
+              // The skin-type / concern chip that brought the shopper here: the result count and
+              // one 44px control that removes the filter (Phase B3, Ruling B3-5).
+              <div
+                data-zone="tagFilter"
+                className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground"
+              >
+                {meta && (
+                  <span role="status">
+                    {t(countText('en', meta.total, RESULTS), countText('ar', meta.total, RESULTS))}
+                  </span>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setTagFilter('')}
+                  className="inline-flex min-h-[44px] items-center rounded-[var(--radius)] border border-input px-4 text-foreground hover:border-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  {t('Clear filter', translations['Clear filter'])} ·{' '}
+                  <span
+                    lang={
+                      tagLabel(
+                        { name: tagFilter, nameAr: tagNameAr },
+                        language === 'ar' ? 'ar' : 'en'
+                      ).lang
+                    }
+                  >
+                    {
+                      tagLabel(
+                        { name: tagFilter, nameAr: tagNameAr },
+                        language === 'ar' ? 'ar' : 'en'
+                      ).text
+                    }
+                  </span>
+                </button>
+              </div>
+            )}
             {subtitle && (
               <p
                 className="mt-2 max-w-[60ch] text-muted-foreground"

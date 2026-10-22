@@ -148,7 +148,8 @@ describe('STOP-2 re-audit minors (R1, R2, M3, price, chip, stage)', () => {
 
   it('Showroom keeps a card action on every card (no `quiet` mode that hides it on a sized product)', () => {
     const reg = read('packages/shared/src/looks/registry.ts');
-    const showroom = reg.slice(reg.indexOf("id: 'souq.showroom'"));
+    const start = reg.indexOf("id: 'souq.showroom'");
+    const showroom = reg.slice(start, reg.indexOf("id: 'jasmine.apothecary'", start));
     expect(showroom).not.toMatch(/cardCta:\s*'quiet'/);
     expect(read('apps/web/src/styles/globals.css')).toContain(
       "[data-look='souq.showroom'] article :is(a, button).mt-auto.w-full"

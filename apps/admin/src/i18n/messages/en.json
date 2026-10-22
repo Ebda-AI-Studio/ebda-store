@@ -5427,7 +5427,8 @@
         "elegant": "Elegant",
         "dahab": "Dahab",
         "qamar": "Qamar",
-        "souq": "Souq"
+        "souq": "Souq",
+        "jasmine": "Jasmine"
       }
     }
   },
@@ -10770,5 +10771,22 @@
     "noteSaved": "Saved",
     "noteFailed": "Couldn't save. Try again.",
     "skipped": "{count} orders skipped (not in this store or deleted)."
+  },
+  "tags": {
+    "page": {
+      "title": "Tags",
+      "description": "Skin-type and concern chips. Each tag has an English and an Arabic label; the storefront shows the one for the shopper's language.",
+      "name": "Name (English)",
+      "nameAr": "Name (Arabic)",
+      "products": "Products",
+      "save": "Save",
+      "saved": "Saved",
+      "empty": "No tags yet. Tags are created from the product form, bulk import or the AI tagger.",
+      "loadError": "Could not load tags.",
+      "saveError": "Could not save the tag.",
+      "exists": "Another tag already uses this name.",
+      "missingAr": "No Arabic label: Arabic shoppers see the English name.",
+      "manage": "Manage tags"
+    }
   }
 }

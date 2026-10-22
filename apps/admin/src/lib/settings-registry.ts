@@ -113,6 +113,9 @@ export const PAGES: PageEntry[] = [
   page('/categories', 'categories.page.title', 'staff', {
     syn: { en: 'collections groups', ar: 'اقسام تصنيفات مجموعات' },
   }),
+  page('/tags', 'tags.page.title', 'staff', {
+    syn: { en: 'skin type concern chips labels translate', ar: 'وسوم نوع البشرة المشكلة ترجمة' },
+  }),
   page('/bulk', 'bulk.page.title', 'staff', {
     feature: 'bulk_operations',
     syn: { en: 'import export csv excel upload', ar: 'استيراد تصدير اكسل رفع جماعي' },

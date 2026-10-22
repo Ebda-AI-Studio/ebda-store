@@ -189,7 +189,7 @@ export function ProductInfoSections({
 interface ProductSidebarProps {
   product: {
     categories: { categoryId: string; category: { id: string; name: string } }[];
-    tags: { tagId: string; tag: { id: string; name: string } }[];
+    tags: { tagId: string; tag: { id: string; name: string; nameAr?: string | null } }[];
     isFeatured: boolean;
     isNew: boolean;
     trackInventory: boolean;
@@ -223,7 +223,7 @@ export function ProductSidebar({ product }: ProductSidebarProps) {
           <div className="flex flex-wrap gap-2">
             {product.tags.map(tg => (
               <Badge key={tg.tagId || tg.tag?.id} variant="outline">
-                {tg.tag?.name || tg.tagId}
+                {tg.tag?.nameAr ? `${tg.tag.name} · ${tg.tag.nameAr}` : tg.tag?.name || tg.tagId}
               </Badge>
             ))}
           </div>

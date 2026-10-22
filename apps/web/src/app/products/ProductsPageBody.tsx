@@ -60,7 +60,7 @@ async function fetchPlpLayoutSettings(
 
 async function fetchInitialData(
   store: { id: string; domain?: string },
-  filters: { category?: string }
+  filters: { category?: string; tag?: string }
 ) {
   // Always send X-Store-ID so the API doesn't fall back to some other store.
   // x-store-domain is kept as a backup for logging/debugging.
@@ -89,6 +89,7 @@ async function fetchInitialData(
     limit: '96',
   });
   if (filters.category) productsQuery.set('category', filters.category);
+  if (filters.tag) productsQuery.set('tag', filters.tag);
 
   // Fetch categories and first page of products in parallel
   const [categoriesResult, productsResult] = await Promise.all([
@@ -116,10 +117,13 @@ async function fetchInitialData(
 export async function ProductsPageBody({
   store,
   category,
+  tag,
   draftToken,
 }: {
   store: ResolvedStore;
   category?: string;
+  /** Store tag NAME to filter by (the skin-type / concern chips). */
+  tag?: string;
   /** Always `undefined` from the new `tenant-store` tree — see HomePageBody's
    *  doc comment for why Track-A never carries a draft token. */
   draftToken?: string;
@@ -128,7 +132,7 @@ export async function ProductsPageBody({
   // merchant's global productCardDefaults (size, frame color, etc.) and the
   // filterSidebar.enabled / filterSidebar.defaultOpen merchant preferences.
   const [initialData, plpLayout] = await Promise.all([
-    fetchInitialData(store, { category }),
+    fetchInitialData(store, { category, tag }),
     fetchPlpLayoutSettings(store, draftToken),
   ]);
   const { productCardDefaults, filterSidebar, productsPage } = plpLayout;

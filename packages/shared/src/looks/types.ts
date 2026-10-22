@@ -125,6 +125,7 @@ export const LOOK_DESIGN_KEYS = [
   'textAnchor',
   'layout',
   'layoutMobile',
+  'source',
   'captionPosition',
   'desktopColumns',
   'mobileColumns',

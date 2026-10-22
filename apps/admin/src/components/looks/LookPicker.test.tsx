@@ -21,10 +21,10 @@ describe('LookPicker (registry-driven: built templates and looks only)', () => {
     expect(tabs()).toHaveLength(builtLookTemplates().length);
     expect(tabs()[0]!.textContent).toBe('Qamar');
     expect(tabs().map(t => t.textContent)).toContain('Souq');
+    expect(tabs().map(t => t.textContent)).toContain('Jasmine');
     expect(activeTab()).toBe(tabs()[0]);
-    // The unbuilt templates (Jasmine, Lamma, Dahab) are not offered.
-    for (const name of ['Jasmine', 'Lamma', 'Dahab'])
-      expect(screen.queryByRole('tab', { name })).toBeNull();
+    // The unbuilt templates (Lamma, Dahab) are not offered.
+    for (const name of ['Lamma', 'Dahab']) expect(screen.queryByRole('tab', { name })).toBeNull();
   });
 
   it('offers only built looks under the active tab', () => {
@@ -103,19 +103,19 @@ describe('LookPicker (registry-driven: built templates and looks only)', () => {
   });
 
   // Mutation check: flip a designed template to built in the registry and the picker must grow a
-  // tab for it with no component edit (this is what makes Souq/Jasmine/Lamma/Dahab appear on ship).
+  // tab for it with no component edit (this is what makes Lamma/Dahab appear on ship; Souq and Jasmine already have).
   it('MUTATION: flipping a template to built adds its tab; flipping a built one back removes it', () => {
-    const designed = LOOKS.filter(l => l.template === 'jasmine');
+    const designed = LOOKS.filter(l => l.template === 'lamma');
     const before = designed.map(l => l.status);
     try {
       (designed[0] as { status: string }).status = 'built';
       render(<LookPicker value={null} onChange={() => {}} locale="en" />);
-      expect(screen.getByRole('tab', { name: 'Jasmine' })).toBeTruthy();
+      expect(screen.getByRole('tab', { name: 'Lamma' })).toBeTruthy();
       expect(tabs()).toHaveLength(builtLookTemplates().length);
       cleanup();
       (designed[0] as { status: string }).status = 'designed';
       render(<LookPicker value={null} onChange={() => {}} locale="en" />);
-      expect(screen.queryByRole('tab', { name: 'Jasmine' })).toBeNull();
+      expect(screen.queryByRole('tab', { name: 'Lamma' })).toBeNull();
     } finally {
       designed.forEach((l, i) => ((l as { status: string }).status = before[i]!));
     }

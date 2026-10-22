@@ -36,7 +36,9 @@ export function SectionHeader({
   // STOP-2 final review (P2-3): every pack skin that defines the heading + see-all voice (qamar,
   // souq) speaks it here, so a Souq page never shows two heading or two link styles either.
   const packSkin =
-    store?.template === 'qamar' || store?.template === 'souq' ? store.template : null;
+    store?.template === 'qamar' || store?.template === 'souq' || store?.template === 'jasmine'
+      ? store.template
+      : null;
   const qamar = packSkin !== null;
   if (!title && !subtitle && !linkLabel) return null;
   return (

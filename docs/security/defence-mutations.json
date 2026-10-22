@@ -697,8 +697,8 @@
       "tier": "unit",
       "why": "an impersonation session deactivates the impersonated person's account via DELETE /auth/me",
       "source": "apps/api/src/routes/auth.routes.ts",
-      "find": "  '/me',\n  authenticate,\n  rejectImpersonated,",
-      "replace": "  '/me',\n  authenticate,",
+      "find": "  '/me',\n  authenticate,\n  rejectAdminOnMerchantOrigin,\n  rejectImpersonated,",
+      "replace": "  '/me',\n  authenticate,\n  rejectAdminOnMerchantOrigin,",
       "test": "tests/unit/reject-impersonated.test.ts"
     },
     {
@@ -717,8 +717,8 @@
       "tier": "unit",
       "why": "an impersonation session binds a new TOTP secret to a victim with no MFA and locks the owner out permanently",
       "source": "apps/api/src/routes/mfa.routes.ts",
-      "find": "router.post('/enroll/begin', authenticate, rejectImpersonated, async (req, res, next) => {",
-      "replace": "router.post('/enroll/begin', authenticate, async (req, res, next) => {",
+      "find": "  '/enroll/begin',\n  authenticate,\n  rejectAdminOnMerchantOrigin,\n  rejectImpersonated,",
+      "replace": "  '/enroll/begin',\n  authenticate,\n  rejectAdminOnMerchantOrigin,",
       "test": "tests/unit/reject-impersonated.test.ts"
     },
     {

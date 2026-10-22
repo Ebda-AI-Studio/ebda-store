@@ -309,6 +309,16 @@ export const translations = {
     'آراء العملاء هتظهر هنا أول ما العملاء يكتبوها.',
   'Add a look with a photo and its pieces and it will appear here.':
     'أضف لوك بصورته وقطعه وهيظهر هنا.',
+  'Add at least two steps and your routine will appear here.':
+    'ضيف خطوتين على الأقل والروتين هيظهر هنا.',
+  // Jasmine routine, rating and bundle lines (Phase B3): sentences are Egyptian, buttons neutral.
+  'Add all to cart': 'إضافة الكل للسلة',
+  'In your cart': 'في سلتك',
+  'Instead of': 'بدل',
+  'Save {n}% when you buy them together': 'وفّر {n}% لما تشتريهم مع بعض',
+  'Save {n}% when you buy it in a bundle': 'وفّر {n}% لما تشتريه في باقة',
+  'Out of 5, read the reviews': 'من 5، اقرا التقييمات',
+  'Clear filter': 'مسح الفلتر',
   'Only you see this in the editor. Visitors do not see an empty section.':
     'إنت بس اللي بتشوف ده في المحرر. الزوار مش بيشوفوا قسم فاضي.',
 

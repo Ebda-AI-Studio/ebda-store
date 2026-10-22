@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import type { Product, Category } from '@/lib/api';
+import type { Product, Category, PublicTag } from '@/lib/api';
 import { useStore, useStoreUrl } from '../../contexts/StoreContext';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useCart } from '../../contexts/CartContext';
@@ -39,6 +39,9 @@ import {
 } from '../sections/ProductSpotlightSection';
 import { TrustBadgesSection, type TrustBadgesSettings } from '../sections/TrustBadgesSection';
 import { ShopTheLookSection, type ShopTheLookSettings } from '../sections/ShopTheLookSection';
+import { StepsSection, type StepsSettings } from '../sections/StepsSection';
+import { SectionHeader } from '../sections/SectionHeader';
+import { TagChips } from '../../templates/shared/TagChips';
 import { HeroCollage } from '../../templates/shared/HeroCollage';
 import { resolveSectionProducts, onSaleProducts } from '../sections/section-products';
 import { sectionBgStyle } from '../../templates/shared/section-bg';
@@ -98,6 +101,11 @@ export interface PageRendererProps {
    *  editor canvas, a page that fetched none) = the client derivation over the loaded pools. */
   onSalePool?: Product[];
   /**
+   * The skin-type / concern chips (`GET /public/tags`, Phase B3): tags that carry at least one
+   * published product. Read only by a `category-grid` whose `source` is `tags`.
+   */
+  tags?: PublicTag[];
+  /**
    * Editor canvas only (token-gated preview): wrap each section in a
    * `display: contents` marker carrying its id so the overlay can select it,
    * and mark inline-editable text. Never set on a public render, so public
@@ -130,6 +138,7 @@ export function PageRenderer({
   testimonials,
   extraProducts,
   onSalePool,
+  tags = [],
 }: PageRendererProps) {
   // The legacy-shaped view of the document: section props plus the
   // cross-section lookups the dividers and the featured fallback need.
@@ -401,7 +410,11 @@ export function PageRenderer({
   // show (never an empty shell, never a stray divider). In the editor canvas
   // they show a dashed hint instead, so the merchant can still see and select
   // them. A section the merchant switched off shows neither.
-  const categoriesVisible = layout.categories.enabled && templateCategories.length > 0;
+  // A tag-sourced row (Phase B3, Ruling B3-5) lists the store's tags instead of its categories; a
+  // tag with no published product never reaches `tags`, so an empty list means no section.
+  const tagSource = layout.categories.source === 'tags';
+  const categoriesVisible =
+    layout.categories.enabled && (tagSource ? tags.length > 0 : templateCategories.length > 0);
   const newArrivalsVisible = layout.newArrivals.enabled && templateNewArrivals.length > 0;
   const bestSellersVisible = layout.bestSellers.enabled && templateBestSellers.length > 0;
   const testimonialsVisible =
@@ -549,126 +562,156 @@ export function PageRenderer({
                 className={`bg-[hsl(var(--bg-page))] ${sectionSpacingClasses(layout.categories, store.look).wrapperClass}`}
                 style={sectionBgStyle(layout.categories.bgColor, store.theme)}
               >
-                {(() => {
-                  // Desktop + mobile layout are INDEPENDENT (Ahmad 2026-06-04):
-                  // `layout` is the desktop choice, `layoutMobile` the mobile one
-                  // (falls back to desktop when unset). When both resolve to the
-                  // same kind we render ONE component (zero change for existing
-                  // stores); when they differ we render both and toggle with
-                  // md: visibility so e.g. mobile=grid + desktop=horizontal works.
-                  // md (768px) is the platform mobile/desktop boundary.
-                  const categoriesInnerClass = sectionSpacingClasses(
-                    layout.categories,
-                    store.look
-                  ).innerContainerClass;
-                  const common = {
-                    categories: templateCategories,
-                    title: categoriesTitle,
-                    titleAr: categoriesTitleAr,
-                    kicker: layout.categories.kicker,
-                    kickerAr: layout.categories.kickerAr,
-                    subtitle: layout.categories.subtitle,
-                    subtitleAr: layout.categories.subtitleAr,
-                    showKickerLines: layout.categories.showKickerLines,
-                    showSubtitleLines: layout.categories.showSubtitleLines,
-                    dividers: layout.categories.dividers,
-                    seeAllHref: storeUrl('/products'),
-                    urlPrefix: storeUrl(''),
-                    isRtl,
-                    cardSize: layout.categories.cardSize,
-                    cardAspect: layout.categories.cardAspect,
-                    cardShape: layout.categories.cardShape,
-                    cardGap: layout.categories.cardGap,
-                    showLabel: layout.categories.showLabel,
-                    showHover: layout.categories.showHover,
-                    showCardFrame: layout.categories.showCardFrame,
-                    cardFrameStyle: layout.categories.cardFrameStyle,
-                    cardFrameWidth: layout.categories.cardFrameWidth,
-                    cardFrameSize: layout.categories.cardFrameSize,
-                    cardFrameColor: layout.categories.cardFrameColor,
-                    headingZone: categoriesHeadingZone,
-                    kickerZone: categoriesKickerZone,
-                    subtitleZone: categoriesSubtitleZone,
-                    seeAllZone: categoriesSeeAllZone,
-                    categoryLabelZone: categoriesLabelZone,
-                    sectionBgColor: layout.categories.bgColor,
-                  };
-                  type Caption = typeof layout.categories.captionPosition;
-                  const renderGrid = (caption: Caption, vis?: string) => (
-                    <div className={`${categoriesInnerClass} ${vis ?? ''}`.trim()}>
-                      <T.CategoryGrid
-                        {...common}
-                        captionPosition={caption}
-                        mobileColumns={layout.categories.mobileColumns}
-                        desktopColumns={layout.categories.desktopColumns}
-                      />
-                    </div>
-                  );
-                  const renderStrip = (caption: Caption, vis?: string) =>
-                    T.CategoryStrip ? (
-                      <div className={vis}>
-                        <T.CategoryStrip {...common} captionPosition={caption} pack={templateId} />
-                      </div>
-                    ) : (
-                      renderGrid(caption, vis)
-                    );
-                  const kindFor = (lay: typeof layout.categories.layout) =>
-                    lay === 'chips' || lay === 'rail' || lay === 'tiles'
-                      ? lay
-                      : lay === 'horizontal' && T.CategoryStrip
-                        ? 'strip'
-                        : 'grid';
-                  const desktopKind = kindFor(layout.categories.layout);
-                  const mobileKind = kindFor(
-                    layout.categories.layoutMobile ?? layout.categories.layout
-                  );
-                  const desktopCaption = layout.categories.captionPosition;
-                  const mobileCaption =
-                    layout.categories.captionPositionMobile ?? layout.categories.captionPosition;
-                  const renderKind = (
-                    kind: 'strip' | 'grid' | 'chips' | 'rail' | 'tiles',
-                    caption: Caption,
-                    vis?: string
-                  ) =>
-                    kind === 'rail' ? (
-                      <div className={vis}>
-                        <CategoryRail {...common} captionPosition={caption} pack={templateId} />
-                      </div>
-                    ) : kind === 'tiles' ? (
-                      <div className={vis}>
-                        <CategoryTiles
+                {tagSource ? (
+                  <div
+                    className={
+                      sectionSpacingClasses(layout.categories, store.look).innerContainerClass
+                    }
+                  >
+                    <SectionHeader
+                      title={
+                        isRtl
+                          ? layout.categories.titleAr || layout.categories.title
+                          : layout.categories.title || layout.categories.titleAr
+                      }
+                    />
+                    <TagChips
+                      tags={tags}
+                      urlPrefix={storeUrl('')}
+                      isRtl={isRtl}
+                      label={
+                        (isRtl
+                          ? layout.categories.titleAr || layout.categories.title
+                          : layout.categories.title || layout.categories.titleAr) || undefined
+                      }
+                    />
+                  </div>
+                ) : (
+                  (() => {
+                    // Desktop + mobile layout are INDEPENDENT (Ahmad 2026-06-04):
+                    // `layout` is the desktop choice, `layoutMobile` the mobile one
+                    // (falls back to desktop when unset). When both resolve to the
+                    // same kind we render ONE component (zero change for existing
+                    // stores); when they differ we render both and toggle with
+                    // md: visibility so e.g. mobile=grid + desktop=horizontal works.
+                    // md (768px) is the platform mobile/desktop boundary.
+                    const categoriesInnerClass = sectionSpacingClasses(
+                      layout.categories,
+                      store.look
+                    ).innerContainerClass;
+                    const common = {
+                      categories: templateCategories,
+                      title: categoriesTitle,
+                      titleAr: categoriesTitleAr,
+                      kicker: layout.categories.kicker,
+                      kickerAr: layout.categories.kickerAr,
+                      subtitle: layout.categories.subtitle,
+                      subtitleAr: layout.categories.subtitleAr,
+                      showKickerLines: layout.categories.showKickerLines,
+                      showSubtitleLines: layout.categories.showSubtitleLines,
+                      dividers: layout.categories.dividers,
+                      seeAllHref: storeUrl('/products'),
+                      urlPrefix: storeUrl(''),
+                      isRtl,
+                      cardSize: layout.categories.cardSize,
+                      cardAspect: layout.categories.cardAspect,
+                      cardShape: layout.categories.cardShape,
+                      cardGap: layout.categories.cardGap,
+                      showLabel: layout.categories.showLabel,
+                      showHover: layout.categories.showHover,
+                      showCardFrame: layout.categories.showCardFrame,
+                      cardFrameStyle: layout.categories.cardFrameStyle,
+                      cardFrameWidth: layout.categories.cardFrameWidth,
+                      cardFrameSize: layout.categories.cardFrameSize,
+                      cardFrameColor: layout.categories.cardFrameColor,
+                      headingZone: categoriesHeadingZone,
+                      kickerZone: categoriesKickerZone,
+                      subtitleZone: categoriesSubtitleZone,
+                      seeAllZone: categoriesSeeAllZone,
+                      categoryLabelZone: categoriesLabelZone,
+                      sectionBgColor: layout.categories.bgColor,
+                    };
+                    type Caption = typeof layout.categories.captionPosition;
+                    const renderGrid = (caption: Caption, vis?: string) => (
+                      <div className={`${categoriesInnerClass} ${vis ?? ''}`.trim()}>
+                        <T.CategoryGrid
                           {...common}
                           captionPosition={caption}
-                          pack={templateId}
                           mobileColumns={layout.categories.mobileColumns}
                           desktopColumns={layout.categories.desktopColumns}
                         />
                       </div>
-                    ) : kind === 'chips' ? (
-                      <div className={vis}>
-                        <CategoryChips
-                          categories={common.categories}
-                          urlPrefix={common.urlPrefix}
-                          isRtl={isRtl}
-                        />
-                      </div>
-                    ) : kind === 'strip' ? (
-                      renderStrip(caption, vis)
-                    ) : (
-                      renderGrid(caption, vis)
                     );
-                  // Render once when desktop + mobile resolve to the SAME layout AND
-                  // caption; otherwise render both trees + toggle with md: so each
-                  // breakpoint gets its own layout + caption independently.
-                  if (desktopKind === mobileKind && desktopCaption === mobileCaption)
-                    return renderKind(desktopKind, desktopCaption);
-                  return (
-                    <>
-                      {renderKind(mobileKind, mobileCaption, 'md:hidden')}
-                      {renderKind(desktopKind, desktopCaption, 'hidden md:block')}
-                    </>
-                  );
-                })()}
+                    const renderStrip = (caption: Caption, vis?: string) =>
+                      T.CategoryStrip ? (
+                        <div className={vis}>
+                          <T.CategoryStrip
+                            {...common}
+                            captionPosition={caption}
+                            pack={templateId}
+                          />
+                        </div>
+                      ) : (
+                        renderGrid(caption, vis)
+                      );
+                    const kindFor = (lay: typeof layout.categories.layout) =>
+                      lay === 'chips' || lay === 'rail' || lay === 'tiles'
+                        ? lay
+                        : lay === 'horizontal' && T.CategoryStrip
+                          ? 'strip'
+                          : 'grid';
+                    const desktopKind = kindFor(layout.categories.layout);
+                    const mobileKind = kindFor(
+                      layout.categories.layoutMobile ?? layout.categories.layout
+                    );
+                    const desktopCaption = layout.categories.captionPosition;
+                    const mobileCaption =
+                      layout.categories.captionPositionMobile ?? layout.categories.captionPosition;
+                    const renderKind = (
+                      kind: 'strip' | 'grid' | 'chips' | 'rail' | 'tiles',
+                      caption: Caption,
+                      vis?: string
+                    ) =>
+                      kind === 'rail' ? (
+                        <div className={vis}>
+                          <CategoryRail {...common} captionPosition={caption} pack={templateId} />
+                        </div>
+                      ) : kind === 'tiles' ? (
+                        <div className={vis}>
+                          <CategoryTiles
+                            {...common}
+                            captionPosition={caption}
+                            pack={templateId}
+                            mobileColumns={layout.categories.mobileColumns}
+                            desktopColumns={layout.categories.desktopColumns}
+                          />
+                        </div>
+                      ) : kind === 'chips' ? (
+                        <div className={vis}>
+                          <CategoryChips
+                            categories={common.categories}
+                            urlPrefix={common.urlPrefix}
+                            isRtl={isRtl}
+                          />
+                        </div>
+                      ) : kind === 'strip' ? (
+                        renderStrip(caption, vis)
+                      ) : (
+                        renderGrid(caption, vis)
+                      );
+                    // Render once when desktop + mobile resolve to the SAME layout AND
+                    // caption; otherwise render both trees + toggle with md: so each
+                    // breakpoint gets its own layout + caption independently.
+                    if (desktopKind === mobileKind && desktopCaption === mobileCaption)
+                      return renderKind(desktopKind, desktopCaption);
+                    return (
+                      <>
+                        {renderKind(mobileKind, mobileCaption, 'md:hidden')}
+                        {renderKind(desktopKind, desktopCaption, 'hidden md:block')}
+                      </>
+                    );
+                  })()
+                )}
               </section>
             )}
             {emptyHint('categories', layout.categories.enabled, categoriesVisible)}
@@ -1218,6 +1261,21 @@ export function PageRenderer({
                   settings={settings as ShopTheLookSettings}
                   blocks={section.blocks ?? []}
                   // Store-scoped pools only: an unknown or foreign id is absent, never rendered (C11).
+                  products={[
+                    ...pools.newArrivals,
+                    ...pools.bestSellers,
+                    ...pools.featured,
+                    ...pools.extra,
+                  ]}
+                  editorMode={editorMode}
+                  showPrice={showCardPriceEff !== false}
+                  cardLayout={layout}
+                />
+              ) : def.type === 'steps' ? (
+                <StepsSection
+                  settings={settings as StepsSettings}
+                  blocks={section.blocks ?? []}
+                  // Store-scoped pools only: an unknown or foreign id is absent (C11).
                   products={[
                     ...pools.newArrivals,
                     ...pools.bestSellers,
