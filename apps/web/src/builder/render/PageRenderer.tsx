@@ -1283,6 +1283,8 @@ export function PageRenderer({
                     ...pools.extra,
                   ]}
                   editorMode={editorMode}
+                  showPrice={showCardPriceEff !== false}
+                  cardLayout={layout}
                 />
               ) : def.type === 'trust-badges' ? (
                 <TrustBadgesSection

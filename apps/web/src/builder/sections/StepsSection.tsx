@@ -18,7 +18,12 @@
  */
 import React, { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import type { BlockNode, SectionPaddingMaxWidthVisibility } from '@ebda/shared';
+import {
+  sanitizeUrl,
+  type BlockNode,
+  type SectionPaddingMaxWidthVisibility,
+  type StoreLayoutSettings,
+} from '@ebda/shared';
 import { api, type Product, type BundleSavingInfo } from '../../lib/api';
 import { useStore, useStoreUrl } from '../../contexts/StoreContext';
 import { useLanguage, translations } from '../../contexts/LanguageContext';
@@ -29,6 +34,8 @@ import { getProductPricing } from '../../lib/product-pricing';
 import { canBuyNow } from '../../lib/can-buy-now';
 import { bundlesNavVisible } from '../../lib/bundles-nav';
 import { pickLocalizedName } from '../../templates/shared/display-helpers';
+import { soldOutLabel } from '../../templates/shared/ProductCardCta';
+import { resolveProductCardCtaOosDefaults } from '../../templates/shared/product-card-defaults';
 import { sectionBgStyle } from '../../templates/shared/section-bg';
 import { sectionSpacingClasses } from '../../templates/shared/section-spacing';
 import { EmptySectionHint } from '../render/EmptySectionHint';
@@ -52,12 +59,17 @@ export function StepsSection({
   blocks,
   products,
   editorMode = false,
+  showPrice = true,
+  cardLayout,
 }: {
   settings: StepsSettings;
   blocks: BlockNode[];
   /** The store's own product pool (store-scoped fetch). */
   products: Product[];
   editorMode?: boolean;
+  /** The store's effective card-price switch (`showPriceOnCards` x `showCardPrice`). */
+  showPrice?: boolean;
+  cardLayout?: StoreLayoutSettings | null;
 }) {
   const { store } = useStore();
   const { language, t } = useLanguage();
@@ -65,6 +77,7 @@ export function StepsSection({
   const formatPrice = useLocalePrice();
   const { items, bundles, addItem, addBundle } = useCart();
   const ar = language === 'ar';
+  const oos = resolveProductCardCtaOosDefaults(cardLayout);
   const pick = (en?: unknown, a?: unknown) =>
     ((ar ? (a as string) || (en as string) : (en as string) || (a as string)) ?? '').trim();
   const spacing = sectionSpacingClasses(settings, store.look);
@@ -226,23 +239,35 @@ export function StepsSection({
                     )}
                   </h3>
                   {s.body && <p className="mt-1 text-sm text-muted-foreground">{s.body}</p>}
+                  {s.product && !canBuyNow(s.product) && oos.resolvedOosLabel !== false && (
+                    <p className="mt-1 text-xs font-medium text-muted-foreground">
+                      {soldOutLabel(ar, oos.resolvedOosLabelTextEn, oos.resolvedOosLabelTextAr)}
+                    </p>
+                  )}
                   {s.product ? (
                     <Link
                       href={storeUrl(`/products/${s.product.slug}`)}
                       className="mt-2 flex min-h-[44px] items-center justify-between gap-3 text-sm text-foreground underline decoration-primary underline-offset-4 hover:decoration-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                     >
                       <span className="min-w-0 line-clamp-2">{name}</span>
-                      {price && (
-                        <span className="shrink-0 whitespace-nowrap font-medium">
-                          {price.mode === 'fromMin' ? `${t('From', 'من')} ` : ''}
-                          {formatPrice(price.displayPrice)}
+                      {showPrice && price && (
+                        <span className="flex shrink-0 flex-col items-end whitespace-nowrap text-end font-medium">
+                          <span>
+                            {price.mode === 'fromMin' ? `${t('From', 'من')} ` : ''}
+                            {formatPrice(price.displayPrice)}
+                          </span>
+                          {price.displayCompare !== null && (
+                            <s className="text-xs font-normal text-muted-foreground">
+                              {formatPrice(price.displayCompare)}
+                            </s>
+                          )}
                         </span>
                       )}
                     </Link>
                   ) : (
                     s.link && (
                       <Link
-                        href={s.link.startsWith('/') ? storeUrl(s.link) : s.link}
+                        href={storeUrl(sanitizeUrl(s.link, '/products'))}
                         className="mt-2 inline-flex min-h-[44px] items-center text-sm text-foreground underline decoration-primary underline-offset-4 hover:decoration-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                       >
                         {t('Shop', translations['Shop'])}
@@ -264,16 +289,20 @@ export function StepsSection({
             >
               {buttonText}
             </button>
-            <span className="text-sm text-foreground" data-part="steps-total">
-              {formatPrice(bundle ? bundle.price : sum)}
-              {bundle && (
-                <s className="ms-2 text-muted-foreground">
-                  <span className="sr-only">{t('Instead of', translations['Instead of'])} </span>
-                  {formatPrice(bundle.componentSum)}
-                </s>
-              )}
-            </span>
-            {bundle && <span className="text-sm font-medium text-foreground">{savingLine}</span>}
+            {showPrice && (
+              <span className="text-sm text-foreground" data-part="steps-total">
+                {formatPrice(bundle ? bundle.price : sum)}
+                {bundle && (
+                  <s className="ms-2 text-muted-foreground">
+                    <span className="sr-only">{t('Instead of', translations['Instead of'])} </span>
+                    {formatPrice(bundle.componentSum)}
+                  </s>
+                )}
+              </span>
+            )}
+            {showPrice && bundle && (
+              <span className="text-sm font-medium text-foreground">{savingLine}</span>
+            )}
           </div>
         )}
       </div>

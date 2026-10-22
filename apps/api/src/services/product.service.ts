@@ -2176,7 +2176,9 @@ export class ProductService {
           },
         },
       },
-      orderBy: { name: 'asc' },
+      // Rank by use IN the query (a store with more than 60 tags must not drop a popular tag that
+      // sorts late in the alphabet); the published-only count below is the final ranking.
+      orderBy: [{ products: { _count: 'desc' } }, { name: 'asc' }],
       take: 60,
     });
     return rows
@@ -2184,6 +2186,25 @@ export class ProductService {
       .filter(r => r.productCount > 0)
       .sort((a, b) => b.productCount - a.productCount || a.name.localeCompare(b.name))
       .slice(0, 12);
+  }
+
+  /**
+   * One tag by NAME with its labels (the PLP's `?tag=` title in the shopper's language, which
+   * may be a tag outside the top-12 chips). Same published-only rule as the list, explicit select,
+   * `storeId` on the tag row; not cached (one indexed lookup, the name is caller-controlled).
+   */
+  static async getPublicTagByName(storeId: string, name: string) {
+    const row = await prisma.tag.findFirst({
+      where: {
+        storeId,
+        name,
+        products: {
+          some: { product: { storeId, status: 'active', deletedAt: null, audience: 'public' } },
+        },
+      },
+      select: { id: true, name: true, nameAr: true },
+    });
+    return row ? { id: row.id, name: row.name, nameAr: row.nameAr, productCount: 0 } : null;
   }
 
   static async getCategories(storeId: string) {

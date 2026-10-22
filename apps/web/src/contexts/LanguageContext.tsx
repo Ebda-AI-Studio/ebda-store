@@ -316,7 +316,7 @@ export const translations = {
   'In your cart': 'في سلتك',
   'Instead of': 'بدل',
   'Save {n}% when you buy them together': 'وفّر {n}% لما تشتريهم مع بعض',
-  'Save {n}% when you buy it with the routine': 'وفّر {n}% لما تشتريه مع الروتين',
+  'Save {n}% when you buy it in a bundle': 'وفّر {n}% لما تشتريه في باقة',
   'Out of 5, read the reviews': 'من 5، اقرا التقييمات',
   'Clear filter': 'مسح الفلتر',
   'Only you see this in the editor. Visitors do not see an empty section.':

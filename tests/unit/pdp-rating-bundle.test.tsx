@@ -130,13 +130,13 @@ describe('RatingSummary', () => {
 });
 
 describe('BundleSaving', () => {
-  it('renders ONE line "وفّر 15% لما تشتريه مع الروتين" linking to the bundle, from the live endpoint', async () => {
+  it('renders ONE line "وفّر 15% لما تشتريه في باقة" linking to the bundle, from the live endpoint', async () => {
     ctx.getSavings = vi.fn(async () => ({ success: true, data: { savings: [saving(15)] } }));
     const { container } = render(<BundleSaving productId="prod-1" />);
     await waitFor(() => expect(container.querySelector('a')).not.toBeNull());
     expect(ctx.getSavings).toHaveBeenCalledWith('store-j', ['prod-1']);
     const a = container.querySelector('a')!;
-    expect(a.textContent).toBe('وفّر 15% لما تشتريه مع الروتين');
+    expect(a.textContent).toBe('وفّر 15% لما تشتريه في باقة');
     expect(a.getAttribute('href')).toBe('/s/bundles/routine-bundle');
     expect(smallTargets(container, 44)).toEqual([]);
   });
@@ -145,7 +145,7 @@ describe('BundleSaving', () => {
     ctx.getSavings = vi.fn(async () => ({ success: true, data: { savings: [saving(20)] } }));
     const { container } = render(<BundleSaving productId="prod-1" />);
     await waitFor(() => expect(container.querySelector('a')).not.toBeNull());
-    expect(container.textContent).toBe('Save 20% when you buy it with the routine');
+    expect(container.textContent).toBe('Save 20% when you buy it in a bundle');
   });
   it('renders nothing and makes NO request when the bundles feature is off', () => {
     setStore([]);
@@ -197,8 +197,22 @@ describe('PDP markup is unchanged when neither line applies', () => {
       path.join(root, 'apps/web/src/app/products/[slug]/ProductDetailClient.tsx'),
       'utf8'
     );
-    expect(pdp).toMatch(/<\/h1>\s*\{\/\*[^*]*\*\/\}\s*<RatingSummary/);
+    expect(pdp).toMatch(/<\/h1>\s*\{\/\*[^*]*\*\/\}\s*\{reviewsOn && \(\s*<RatingSummary/);
     expect(pdp).toMatch(/<BundleSaving productId=\{product\.id\} \/>\s*<B2bPdpPanel/);
+  });
+  it('the rating line and the reviews block it links to share ONE condition (reviews switched off = no line, no dead #reviews link)', () => {
+    const pdp = readFileSync(
+      path.join(root, 'apps/web/src/app/products/[slug]/ProductDetailClient.tsx'),
+      'utf8'
+    );
+    expect(pdp).toMatch(
+      /const reviewsOn =\s*isEnabled\('reviews'\) &&\s*!!layout\?\.reviewSection\?\.enabled/
+    );
+    expect(pdp.match(/\{reviewsOn && product && \(/g)?.length).toBe(2); // belowFold + main page
+    expect(pdp).toMatch(/\{reviewsOn && \(\s*<RatingSummary/);
+    expect(pdp).toMatch(/ratingLine=\{\s*reviewsOn \?/); // the Dahab page, same condition
+    // no ungated review block is left behind
+    expect(pdp).not.toMatch(/isEnabled\('reviews'\) &&\s*layout\?\.reviewSection/);
   });
   it('a card carries no rating (Ruling B3-6): no card path imports RatingSummary', () => {
     for (const f of [

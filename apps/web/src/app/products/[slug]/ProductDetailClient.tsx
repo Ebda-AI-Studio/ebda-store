@@ -302,6 +302,14 @@ export default function ProductDetailClient({
   // on the next store payload too).
   const model3d = product?.model3d && isEnabled('product_3d') ? product.model3d : null;
   const model3dBindings = model3d?.bindings;
+  // ONE condition for the reviews block AND the rating line that links to it (#reviews): a store
+  // whose plan lacks `reviews`, or whose merchant switched the section off, shows neither.
+  const reviewsOn =
+    isEnabled('reviews') &&
+    !!layout?.reviewSection?.enabled &&
+    !!product &&
+    !!store.id &&
+    store.id !== 'demo';
   const swatchColor = useCallback(
     (optionName: string, value: string) =>
       model3dBindings ? model3dSwatchColor(model3dBindings, optionName, value) : undefined,
@@ -742,15 +750,11 @@ export default function ProductDetailClient({
       {product?.faqs && product.faqs.length > 0 && (
         <ProductFAQSection faqs={product.faqs} language={language} t={t} />
       )}
-      {isEnabled('reviews') &&
-        layout?.reviewSection?.enabled &&
-        product &&
-        store.id &&
-        store.id !== 'demo' && (
-          <SectionErrorBoundary section="reviews">
-            <ReviewSection storeId={store.id} productId={product.id} />
-          </SectionErrorBoundary>
-        )}
+      {reviewsOn && product && (
+        <SectionErrorBoundary section="reviews">
+          <ReviewSection storeId={store.id} productId={product.id} />
+        </SectionErrorBoundary>
+      )}
       {isEnabled('upsell_crosssell') && product && store.id && store.id !== 'demo' && (
         <>
           <SectionErrorBoundary section="frequently-bought-together">
@@ -781,6 +785,15 @@ export default function ProductDetailClient({
       <ShopChrome layout={resolvedLayout}>
         <div className="flex-1" style={pdpBgStyle}>
           <DahabProductDetail
+            ratingLine={
+              reviewsOn ? (
+                <RatingSummary
+                  average={product.ratingStats?.ratingAverage}
+                  count={product.ratingStats?.ratingCount}
+                />
+              ) : undefined
+            }
+            bundleLine={<BundleSaving productId={product.id} />}
             b2bPanel={
               <B2bPdpPanel
                 productId={product.id}
@@ -1197,10 +1210,12 @@ export default function ProductDetailClient({
               </h1>
 
               {/* Phase B3 (Ruling B3-6): one inline rating line; renders nothing without a rating. */}
-              <RatingSummary
-                average={product.ratingStats?.ratingAverage}
-                count={product.ratingStats?.ratingCount}
-              />
+              {reviewsOn && (
+                <RatingSummary
+                  average={product.ratingStats?.ratingAverage}
+                  count={product.ratingStats?.ratingCount}
+                />
+              )}
 
               {displayExcerpt && (
                 <p className="mt-2 whitespace-pre-line text-base text-muted-foreground">
@@ -1436,15 +1451,11 @@ export default function ProductDetailClient({
           {/* Product Reviews — gated on BOTH the platform feature flag
             AND the per-store layout toggle. Default for new stores is
             enabled=false so a brand-new store does not show a placeholder. */}
-          {isEnabled('reviews') &&
-            layout?.reviewSection?.enabled &&
-            product &&
-            store.id &&
-            store.id !== 'demo' && (
-              <SectionErrorBoundary section="reviews">
-                <ReviewSection storeId={store.id} productId={product.id} />
-              </SectionErrorBoundary>
-            )}
+          {reviewsOn && product && (
+            <SectionErrorBoundary section="reviews">
+              <ReviewSection storeId={store.id} productId={product.id} />
+            </SectionErrorBoundary>
+          )}
 
           {/* Upsell / Cross-sell recommendations — each section isolated so a
               render error in one doesn't take down the other or the rest of

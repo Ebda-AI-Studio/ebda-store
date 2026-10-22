@@ -106,6 +106,26 @@ describe.skipIf(!hasDb)('tag chips source and ?tag= filter', () => {
     expect(await ProductService.getPublicTags(s)).toHaveLength(12);
   });
 
+  it('a store with more than 60 tags still ranks by use: a popular tag late in the alphabet is a chip', async () => {
+    const s = await mkStore('big');
+    for (const k of ['b1', 'b2', 'b3']) await mkProduct(s, k);
+    // 70 one-product tags that sort BEFORE 'zz' ...
+    for (let i = 0; i < 70; i++) await tag(s, `aa-${String(i).padStart(2, '0')}`, ['b1']);
+    // ... and the most used tag, which sorts last
+    await tag(s, 'zz-popular', ['b1', 'b2', 'b3']);
+    const names = (await ProductService.getPublicTags(s)).map(t => t.name);
+    expect(names[0]).toBe('zz-popular');
+  });
+
+  it('getPublicTagByName returns the labels of ONE published tag, tenant-scoped, and nothing for an unpublished or foreign one', async () => {
+    expect(await ProductService.getPublicTagByName(storeId, 'Dry skin')).toEqual(
+      expect.objectContaining({ name: 'Dry skin', nameAr: 'بشرة جافة' })
+    );
+    expect(await ProductService.getPublicTagByName(storeId, 'مسودة بس')).toBeNull();
+    expect(await ProductService.getPublicTagByName(storeId, 'تصبغات')).toBeNull(); // other store's tag
+    expect(await ProductService.getPublicTagByName(otherStoreId, 'Dry skin')).toBeNull();
+  });
+
   it('?tag= returns exactly that tag products and nothing from another store with the same tag name', async () => {
     const res = await ProductService.listPublic(storeId, { tag: 'بشرة دهنية' });
     expect(res.products.map(p => p.id).sort()).toEqual([pid.a1, pid.a2, pid.a3].sort());

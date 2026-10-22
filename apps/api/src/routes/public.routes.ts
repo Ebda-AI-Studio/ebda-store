@@ -650,6 +650,14 @@ router.get('/categories', async (req: Request, res: Response, next: NextFunction
 router.get('/tags', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const storeId = await getStoreIdFromRequest(req);
+    // `?name=` answers ONE tag (the PLP title label for a tag beyond the top-12 chips).
+    const byName = typeof req.query.name === 'string' ? req.query.name.slice(0, 120) : '';
+    if (byName) {
+      const one = await ProductService.getPublicTagByName(storeId, byName);
+      setEdgeCache(res, { sMaxAge: 60, staleWhileRevalidate: 300 });
+      res.json({ success: true, data: { tags: one ? [one] : [] } });
+      return;
+    }
     const tags = await getCached(`public:products:${storeId}:tags`, 120, () =>
       ProductService.getPublicTags(storeId)
     );

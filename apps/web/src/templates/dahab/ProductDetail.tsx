@@ -48,6 +48,10 @@ import {
 export interface DahabProductDetailProps {
   /** B2B wholesale panel (MOQ + public price breaks + the signed-in buyer's prices), rendered under the price. */
   b2bPanel?: React.ReactNode;
+  /** The PDP rating line (a link to #reviews); the page passes it only when the reviews block renders. */
+  ratingLine?: React.ReactNode;
+  /** The live bundle-saving line (renders nothing without a saving). */
+  bundleLine?: React.ReactNode;
   images: Array<{ id?: string; url: string; alt?: string | null }>;
   name: string;
   categoryName?: string;
@@ -389,6 +393,7 @@ export function DahabProductDetail(p: DahabProductDetailProps) {
             >
               {p.name}
             </h1>
+            {p.ratingLine}
             <div
               className="mt-4 flex flex-wrap items-baseline gap-x-3 gap-y-1"
               data-zone="productPrice"
@@ -402,6 +407,7 @@ export function DahabProductDetail(p: DahabProductDetailProps) {
               )}
             </div>
             <TaxInclusiveLabel className="mt-1 block text-xs text-muted-foreground" />
+            {p.bundleLine}
             {p.b2bPanel}
             {p.excerpt && (
               <p className="mt-5 text-pretty text-[15px] leading-relaxed text-foreground/80">

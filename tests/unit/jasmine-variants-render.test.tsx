@@ -274,6 +274,32 @@ describe('StepsSection', () => {
     expect(container.querySelector('button')).toBeNull();
     expect(container.querySelectorAll('a')).toHaveLength(3);
   });
+  it('a ROW path reads the card-price switch, compare-at and sold-out through the shared helpers (CLAUDE.md row paths)', () => {
+    const NOPRICE = (
+      <StepsSection
+        settings={{ heading: 'R', headingAr: 'R' }}
+        blocks={THREE as never}
+        products={POOL as never}
+        showPrice={false}
+      />
+    );
+    const hidden = render(NOPRICE).container;
+    expect(hidden.querySelector('[data-part="steps-total"]')).toBeNull();
+    expect(hidden.textContent).not.toMatch(/EGP|ج\.م/); // no price anywhere
+    expect(render(S(THREE)).container.textContent).toMatch(/EGP|ج\.م/); // control: shown by default
+  });
+  it('a sale step shows its struck original; a sold-out step says so', () => {
+    const pool = [
+      product('a', { compareAtPrice: 15000 }),
+      product('b', { inventory: 0 }),
+      product('c'),
+    ];
+    const { container } = render(S(THREE, {}, pool));
+    const steps = container.querySelectorAll('li');
+    expect(steps[0].querySelector('s')).not.toBeNull();
+    expect(steps[1].textContent).toMatch(/نفد|غير متوفر|Sold out/);
+    expect(steps[2].querySelector('s')).toBeNull();
+  });
   it('"add all" adds each real product through the cart path (no bundle claimed, no saving shown)', async () => {
     const { container } = render(S(THREE));
     fireEvent.click(container.querySelector('button')!);

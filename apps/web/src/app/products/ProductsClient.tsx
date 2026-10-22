@@ -103,7 +103,7 @@ export default function ProductsClient({
     }
     let live = true;
     api
-      .getPublicTags()
+      .getPublicTags(tagFilter)
       .then(res => {
         if (live) setTagNameAr(res.data?.tags.find(x => x.name === tagFilter)?.nameAr ?? null);
       })

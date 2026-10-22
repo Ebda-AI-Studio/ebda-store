@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * PDP bundle-saving line (Phase B3, Ruling B3-6): ONE line, "وفّر 15% لما تشتريه مع الروتين",
+ * PDP bundle-saving line (Phase B3, Ruling B3-6): ONE line, "وفّر 15% لما تشتريه في باقة",
  * only when an active, purchasable bundle containing this product gives a real saving > 0. It
  * links to the bundle page. Renders NOTHING otherwise (including when the `bundles` feature is
  * off, which is read off `store.enabledFeatures`, never probed with a request).
@@ -44,8 +44,8 @@ export function BundleSaving({ productId }: { productId: string }) {
 
   if (!enabled || !best || best.percent < 1) return null;
   const text = t(
-    'Save {n}% when you buy it with the routine',
-    translations['Save {n}% when you buy it with the routine']
+    'Save {n}% when you buy it in a bundle',
+    translations['Save {n}% when you buy it in a bundle']
   ).replace('{n}', String(best.percent));
   return (
     <Link

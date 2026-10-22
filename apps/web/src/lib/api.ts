@@ -1354,8 +1354,10 @@ class ApiClient {
   }
 
   /** GET /public/tags — the store's tags with published products (labels in both languages). */
-  async getPublicTags() {
-    return this.request<{ tags: PublicTag[] }>('/public/tags');
+  async getPublicTags(name?: string) {
+    return this.request<{ tags: PublicTag[] }>(
+      name ? `/public/tags?name=${encodeURIComponent(name)}` : '/public/tags'
+    );
   }
 
   /** GET /stores/public/:storeId/bundle-savings — the bundles that save money on these products.
