@@ -82,7 +82,7 @@ describe('look UI tokens (W2a token plumbing): merchant > look > skin', () => {
     expect(t.receiptStyle).toBe('framed');
   });
   it('a look that does not declare a token leaves the skin behaviour (undefined)', () => {
-    const t = composeStoreTheme({ template: 'minimal', look: 'jasmine.clinic', theme: {} });
+    const t = composeStoreTheme({ template: 'minimal', look: 'lamma.table', theme: {} });
     expect(t.wordmarkSize).toBeUndefined();
     expect(t.overPhotoChrome).toBeUndefined();
     expect(t.receiptStyle).toBeUndefined();
@@ -98,6 +98,7 @@ describe('look UI tokens (W2a token plumbing): merchant > look > skin', () => {
       'dahab',
       'qamar',
       'souq',
+      'jasmine',
     ] as const;
     for (const template of skins) {
       const t = composeStoreTheme({ template, look: null, theme: {} });
@@ -111,9 +112,11 @@ describe('look UI tokens (W2a token plumbing): merchant > look > skin', () => {
       for (const k of LOOK_UI_TOKEN_KEYS) expect(k in t, `${template}.${k}`).toBe(false);
     }
   });
-  it('only the Qamar and Souq looks declare UI tokens today (Dahab and the designed looks are unchanged)', async () => {
+  it('only the Qamar, Souq and Jasmine looks declare UI tokens today (Dahab and the designed looks are unchanged)', async () => {
     const { LOOKS, LOOK_UI_TOKEN_KEYS } = await import('@ebda/shared');
-    for (const l of LOOKS.filter(x => x.template !== 'qamar' && x.template !== 'souq'))
+    for (const l of LOOKS.filter(
+      x => x.template !== 'qamar' && x.template !== 'souq' && x.template !== 'jasmine'
+    ))
       for (const k of LOOK_UI_TOKEN_KEYS) expect(l.tokens[k], `${l.id}.${k}`).toBeUndefined();
   });
   it('overriddenLookKeys reports a merchant UI-token override', () => {

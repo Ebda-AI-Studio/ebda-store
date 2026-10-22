@@ -461,6 +461,8 @@ export const LOOKS: readonly LookDefinition[] = [
     letter: 'A',
     skin: 'jasmine',
     status: 'designed',
+    // Ruling B3-1: logo-forward header, the skin's own icon search (beauty is bought by brand trust).
+    chrome: { header: { logoPlacement: 'start', search: 'icon' } },
     name: { ar: 'عطارة', en: 'Apothecary' },
     forWhom: {
       ar: 'للعناية الطبيعية اللي الثقة فيها من مكوناتها.',
@@ -499,6 +501,8 @@ export const LOOKS: readonly LookDefinition[] = [
     letter: 'B',
     skin: 'jasmine',
     status: 'designed',
+    // Ruling B3-1: logo-forward header, the skin's own icon search (beauty is bought by brand trust).
+    chrome: { header: { logoPlacement: 'start', search: 'icon' } },
     name: { ar: 'بلوم', en: 'Bloom' },
     forWhom: {
       ar: 'للمكياج وجمهور صغير بيختار بالدرجة.',
@@ -531,6 +535,8 @@ export const LOOKS: readonly LookDefinition[] = [
     letter: 'C',
     skin: 'jasmine',
     status: 'designed',
+    // Ruling B3-1: logo-forward header, the skin's own icon search (beauty is bought by brand trust).
+    chrome: { header: { logoPlacement: 'start', search: 'icon' } },
     name: { ar: 'عيادة', en: 'Clinic' },
     forWhom: {
       ar: 'للمواد الفعالة لما الزبون عنده مشكلة يحلها.',

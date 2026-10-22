@@ -1539,6 +1539,153 @@ html[lang] [data-pack='souq'] [data-zone='filters'] :is(h2, h3, h4, legend) {
   font-weight: 600;
 }
 
+/* Jasmine (Phase B3, Ruling B3-1): the type voice of a beauty store, and each look's playful
+   detail. Same rules as Souq's: the look's faces carry the voice, an Arabic display face is never
+   letter-spaced and gets open leading, tracked-caps classes from the minimal components are reset
+   under the jasmine skin only. NO colour literal is set here: every Jasmine colour is a look
+   token (hsl(var(--token)) at most), which keeps the no-orange gate (Rulings B2-2, B3-2) true.
+   Every animation below lives inside a no-preference media query, so under
+   prefers-reduced-motion each detail resolves to its static end state (quality bar section 10). */
+html[dir='rtl'] [data-pack='jasmine'] h1,
+html[dir='rtl'] [data-pack='jasmine'] h2,
+html[dir='rtl'] [data-pack='jasmine'] h3,
+html[dir='rtl'] [data-pack='jasmine'] .font-display {
+  line-height: 1.4;
+  letter-spacing: 0;
+}
+[data-pack='jasmine']
+  :is(
+    .ui-caps-toggle,
+    .uppercase,
+    .tracking-wide,
+    .tracking-wider,
+    .tracking-widest,
+    [class*='tracking-[0.'],
+    [class*='tracking-[.']
+  ) {
+  letter-spacing: normal;
+  text-transform: none;
+}
+[data-pack='jasmine'] [data-ui-uppercase='true'] .ui-caps-toggle {
+  text-transform: uppercase;
+}
+html[lang] [data-pack='jasmine'] [data-zone='filters'] :is(h2, h3, h4, legend) {
+  font-family: var(--font-body, inherit);
+}
+[data-pack='jasmine'] :is(h1, h2, h3, .font-display) {
+  font-size-adjust: none;
+}
+:where([data-pack='jasmine']) :where(h1[data-zone='productName']) {
+  font-family: var(--font-display, inherit);
+  line-height: 1.3;
+  font-weight: 600;
+}
+
+/* Ruling B3-2: Apothecary's brass is a CTA FILL. As TEXT inside a card it is 5.0:1 (passes), but
+   a text-primary link on a card still reads as ink there so the brass stays the one CTA metal.
+   Sale / new chips and the PDP discount pill are the same brass (one accent, B2-26 pattern): the
+   chip pair resolves to the primary pair, no new hex. */
+[data-look='jasmine.apothecary'] {
+  --chip-bg: var(--primary);
+  --chip-fg: var(--primary-foreground);
+}
+[data-look='jasmine.apothecary'] .bg-card .text-primary {
+  color: hsl(var(--foreground));
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+/* Quality bar section 9 rule 1: merchant photos are shot on white. On Apothecary's olive ground a
+   card photo sits on a paper matte (the page ink) and multiplies into it, so white vanishes into
+   the matte instead of reading as a white rectangle on olive. */
+[data-look='jasmine.apothecary'] [data-part='card-image'],
+[data-look='jasmine.apothecary'] [data-part='tile'] {
+  background-color: hsl(var(--foreground));
+}
+[data-look='jasmine.apothecary'] [data-part='card-image'] img,
+[data-look='jasmine.apothecary'] [data-part='tile'] img {
+  mix-blend-mode: multiply;
+}
+/* Brass never dims on hover (it read as disabled next to the other CTA). */
+[data-look='jasmine.apothecary'] [class*='hover:bg-primary/90']:hover {
+  background-color: hsl(var(--primary));
+  filter: brightness(1.08);
+}
+
+/* Playful detail, Apothecary: pressing a card's add control "unscrews the cap" - a drop leaves the
+   button and falls. Reduced motion: no drop (the control's rest state IS the end state). */
+@media (prefers-reduced-motion: no-preference) {
+  [data-look='jasmine.apothecary'] article :is(a, button).mt-auto.w-full {
+    position: relative;
+  }
+  [data-look='jasmine.apothecary'] article :is(a, button).mt-auto.w-full:active::after {
+    content: '';
+    position: absolute;
+    inset-inline-start: 50%;
+    top: 100%;
+    width: 0.5rem;
+    height: 0.75rem;
+    border-radius: 50% 50% 50% 50% / 35% 35% 65% 65%;
+    background-color: hsl(var(--primary));
+    pointer-events: none;
+    animation: jasmine-drop 0.6s ease-in both;
+  }
+}
+@keyframes jasmine-drop {
+  from {
+    transform: translateY(-0.75rem);
+    opacity: 1;
+  }
+  to {
+    transform: translateY(1.5rem);
+    opacity: 0;
+  }
+}
+
+/* Playful detail, Bloom: picking a shade pops its dot, and the page wash shifts a tint toward the
+   brand colour. The wash is a token mix (no literal); the transition is motion-gated, the tinted
+   end state is not. */
+[data-look='jasmine.bloom']
+  main:has([data-option-group] button[aria-pressed='true'] [data-swatch-hex]) {
+  background-color: color-mix(in srgb, hsl(var(--primary)) 7%, hsl(var(--background)));
+}
+@media (prefers-reduced-motion: no-preference) {
+  [data-look='jasmine.bloom'] main {
+    transition: background-color 0.4s ease;
+  }
+  [data-look='jasmine.bloom'] [data-option-group] button[aria-pressed='true'] [data-swatch-hex] {
+    animation: jasmine-pop 0.35s cubic-bezier(0.3, 1.6, 0.5, 1) both;
+  }
+}
+@keyframes jasmine-pop {
+  from {
+    transform: scale(0.7);
+  }
+  to {
+    transform: scale(1);
+  }
+}
+
+/* Playful detail, Clinic: a routine step ticks when its product is in the cart. The step sets
+   data-done="true" (StepsSection); the tick mark is shown statically, and only its entrance is
+   motion-gated. */
+[data-look='jasmine.clinic'] [data-part='step'] [data-part='step-tick'] {
+  opacity: 0;
+}
+[data-look='jasmine.clinic'] [data-part='step'][data-done='true'] [data-part='step-tick'] {
+  opacity: 1;
+}
+@media (prefers-reduced-motion: no-preference) {
+  [data-look='jasmine.clinic'] [data-part='step'] [data-part='step-tick'] {
+    transition:
+      opacity 0.25s ease,
+      transform 0.25s ease;
+    transform: scale(0.6);
+  }
+  [data-look='jasmine.clinic'] [data-part='step'][data-done='true'] [data-part='step-tick'] {
+    transform: scale(1);
+  }
+}
+
 /* Ruling B1-29: the shared PDP title (h1[data-zone='productName']) has no size class, so with no
    zone size it fell to the body size, smaller than its own price (design.md: name >= price).
    Platform default for EVERY skin at specificity (0,0,1): it must beat Tailwind preflight's
