@@ -224,7 +224,7 @@ describe('LB-01 on listings: a dark look lists products on the inverse band', ()
   });
   it('W2b: the categories page too (its category photos are shot on white), merchant colour first', () => {
     const cats = readFileSync(path.join(web, 'app/categories/CategoriesClient.tsx'), 'utf8');
-    expect(cats).toContain('darkLookListingBand(store.theme, store.look, !!catPage?.bgColor) ??');
+    expect(cats).toContain('darkLookListingBand(store.theme, store.look, !!catPage?.bgColor);');
   });
 });
 

@@ -108,6 +108,7 @@ describe('(a) the screen manifest covers the whole purchase path', () => {
     'checkout-payment',
     'checkout-coupon-failed',
     'receipt',
+    'categories',
     'cart-empty',
     'footer',
   ];

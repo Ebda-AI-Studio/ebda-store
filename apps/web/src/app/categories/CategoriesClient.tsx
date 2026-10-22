@@ -17,7 +17,7 @@ import {
   pageTextScale,
   pageDensityStyle,
 } from '../../templates/shared/section-typography';
-import type { CategoriesPageSettings } from '@ebda/shared';
+import { INVERSE_SURFACE, type CategoriesPageSettings } from '@ebda/shared';
 import { recordLastListing } from '@/lib/last-listing';
 
 interface CategoriesClientProps {
@@ -55,9 +55,9 @@ export default function CategoriesClient({
     store.theme
   );
   // A dark look lists its (white-ground) category photos on the inverse band (W2b, rule 1).
+  const lookBand = darkLookListingBand(store.theme, store.look, !!catPage?.bgColor);
   const catBgStyle =
-    darkLookListingBand(store.theme, store.look, !!catPage?.bgColor) ??
-    pageSurfaceStyle(catPage?.bgColor, store.theme, catPage?.colorScheme);
+    lookBand ?? pageSurfaceStyle(catPage?.bgColor, store.theme, catPage?.colorScheme);
   const catScale = pageTextScale(catPage?.textScale);
   const catDensity = pageDensityStyle(catPage?.density);
 
@@ -104,6 +104,9 @@ export default function CategoriesClient({
               titleAr="تسوق حسب الفئة"
               isRtl={isRtl}
               urlPrefix={urlPrefix}
+              // The band is the INVERSE surface: SectionHeading must measure against it, not the
+              // dark page, or it paints a page-light heading onto the light band (1.1:1).
+              sectionBgColor={lookBand ? INVERSE_SURFACE : undefined}
               headingZone={scaleZone(catHeadingZone, catScale)}
               categoryLabelZone={scaleZone(catLabelZone, catScale)}
               showCardFrame={layout?.categories?.showCardFrame}

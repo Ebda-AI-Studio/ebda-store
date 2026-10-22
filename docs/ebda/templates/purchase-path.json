@@ -99,6 +99,11 @@
       "action": "place-cod-order"
     },
     {
+      "id": "categories",
+      "path": "/categories",
+      "probe": ["contrast"]
+    },
+    {
       "id": "cart-empty",
       "path": "/cart",
       "probe": ["contrast"]

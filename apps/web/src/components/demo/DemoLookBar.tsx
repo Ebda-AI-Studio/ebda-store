@@ -76,6 +76,35 @@ export function DemoLookBar({
   }, [previewLook]);
 
   const built = LOOKS.filter(l => isBuilt(l.id));
+
+  // Warm the sibling looks of THIS template (read-only GETs of this very page with `?look=`),
+  // once the page is idle: the switch is a full document load whose cost is the cold server render
+  // and its API reads, so the visitor's click lands on warm caches. Demo bar only (it renders for
+  // `store.isDemo` alone); nothing is written and no merchant store is touched.
+  const warmKey = built.map(l => l.id).join(',');
+  useEffect(() => {
+    if (typeof window === 'undefined' || typeof fetch !== 'function') return;
+    const cur = built.find(l => l.id === activeLook);
+    if (!cur) return;
+    const targets = built.filter(l => l.template === cur.template && l.id !== cur.id);
+    const run = () => {
+      for (const l of targets) {
+        const params = new URLSearchParams(window.location.search);
+        params.set('look', l.id);
+        fetch(`${window.location.pathname}?${params.toString()}`, {
+          credentials: 'same-origin',
+          priority: 'low',
+        } as RequestInit).catch(() => {});
+      }
+    };
+    const w = window as Window & { requestIdleCallback?: (cb: () => void) => number };
+    const id = w.requestIdleCallback ? w.requestIdleCallback(run) : window.setTimeout(run, 1500);
+    return () => {
+      if (!w.requestIdleCallback) window.clearTimeout(id);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeLook, warmKey]);
+
   if (built.length === 0) return null;
 
   // Only a template with a built look AND a demo store of its own is offered (Ruling B2-7).
