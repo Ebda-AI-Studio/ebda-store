@@ -1,4 +1,5 @@
 import { Request } from 'express';
+import { setResolvedStoreId } from './resolved-store';
 import { AppError } from '../middleware/error-handler';
 import { AuthPayload } from '../middleware/auth';
 import { storeLookupForHost } from '../lib/store-host';
@@ -41,7 +42,10 @@ export async function resolvePublicStoreId(req: Request): Promise<string | undef
     RESOLVED_PUBLIC_STORE
   ];
   if (memo) return memo;
-  const pending = lookupPublicStoreId(req);
+  const pending = lookupPublicStoreId(req).then(id => {
+    if (id) setResolvedStoreId(req, id);
+    return id;
+  });
   (req as unknown as Record<symbol, Promise<string | undefined>>)[RESOLVED_PUBLIC_STORE] = pending;
   return pending;
 }
