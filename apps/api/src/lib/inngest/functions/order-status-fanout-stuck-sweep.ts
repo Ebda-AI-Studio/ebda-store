@@ -2,6 +2,7 @@ import type { InngestFunction } from 'inngest';
 import { prisma, withStore } from '@ebda/database';
 import logger from '../../logger';
 import { inngest } from '../client';
+import { stepRunUnlessEmpty } from '../empty-exit';
 import { sendAlert } from '../../../services/alerts.service';
 import { redis } from '../../../services/redis.service';
 import { sweepAcrossStores } from '../../cross-store';
@@ -79,31 +80,34 @@ export async function handleOrderStatusFanoutStuckSweep(
   const floorCutoff = new Date(Date.now() - ORDER_STATUS_FANOUT_MAX_AGE_MINUTES * 60_000);
 
   // Cross-tenant read — Inngest crons run outside tenant-context middleware.
-  const stuck: StuckTransition[] = await step.run('find-stuck-status-fanouts', async () =>
-    sweepAcrossStores({
-      fetch: storeId =>
-        prisma.order.findMany({
-          where: {
-            storeId,
-            statusFanoutClaimedAt: null,
-            statusFanoutRequestedAt: { lt: cutoff, gt: floorCutoff },
-            status: { in: [...FANOUT_STATUSES] },
-            deletedAt: null,
-          },
-          select: {
-            id: true,
-            storeId: true,
-            status: true,
-            paymentStatus: true,
-            statusFanoutRequestedAt: true,
-            statusFanoutRequestedStatus: true,
-          },
-          orderBy: { statusFanoutRequestedAt: 'asc' },
-          take: SWEEP_TAKE,
-        }),
-      orderKey: r => r.statusFanoutRequestedAt ?? 0,
-      take: SWEEP_TAKE,
-    })
+  const stuck: StuckTransition[] = await stepRunUnlessEmpty(
+    step,
+    'find-stuck-status-fanouts',
+    async () =>
+      sweepAcrossStores({
+        fetch: storeId =>
+          prisma.order.findMany({
+            where: {
+              storeId,
+              statusFanoutClaimedAt: null,
+              statusFanoutRequestedAt: { lt: cutoff, gt: floorCutoff },
+              status: { in: [...FANOUT_STATUSES] },
+              deletedAt: null,
+            },
+            select: {
+              id: true,
+              storeId: true,
+              status: true,
+              paymentStatus: true,
+              statusFanoutRequestedAt: true,
+              statusFanoutRequestedStatus: true,
+            },
+            orderBy: { statusFanoutRequestedAt: 'asc' },
+            take: SWEEP_TAKE,
+          }),
+        orderKey: r => r.statusFanoutRequestedAt ?? 0,
+        take: SWEEP_TAKE,
+      })
   );
 
   const failedAfterClaim = await reportFailedAfterClaim(step, cutoff, floorCutoff);
@@ -248,7 +252,7 @@ async function reportFailedAfterClaim(
   cutoff: Date,
   floorCutoff: Date
 ): Promise<number> {
-  const failed = await step.run('find-failed-after-claim', () =>
+  const failed = await stepRunUnlessEmpty(step, 'find-failed-after-claim', () =>
     sweepAcrossStores({
       fetch: storeId =>
         prisma.order.findMany({
@@ -317,11 +321,14 @@ export const orderStatusFanoutStuckSweep: InngestFunction.Any = inngest.createFu
     id: 'order-status-fanout-stuck-sweep',
     name: 'Order status fanout — sweep transitions whose order/status-changed never ran',
     retries: 1,
-    // CADENCE: */15 on the SAME minutes as refund-reversal-stuck-sweep and
+    // CADENCE: hourly at minute 7, the SAME minute as refund-reversal-stuck-sweep and
     // order-created-stuck-sweep, so it wakes the Neon compute in windows those
-    // already open rather than adding new ones — see the CADENCE NOTE in
-    // refund-reversal-stuck-sweep.ts. Do not tighten without re-checking Neon.
-    triggers: [{ cron: '*/15 * * * *' }],
+    // already open rather than adding new ones. The budget rationale is in the
+    // comment below; do not tighten without re-checking Neon AND the Inngest budget.
+    // HOURLY (Ruling INNGEST-BUDGET-1): Inngest Hobby caps executions at 50k/month and Ebda is pre-launch;
+    // worst-case detection of a lost order/status-changed enqueue is now 10-70 min, not 10-25.
+    // Revisit at launch, when real orders exist (docs/RULINGS.md, docs/ENVIRONMENT.md).
+    triggers: [{ cron: '7 * * * *' }],
   },
   async ({ step }) => handleOrderStatusFanoutStuckSweep(step)
 );

@@ -2,6 +2,7 @@ import { prisma, acrossStores } from '@ebda/database';
 import logger from '../../logger';
 import { sendAlert } from '../../../services/alerts.service';
 import { redis } from '../../../services/redis.service';
+import { stepRunUnlessEmpty } from '../empty-exit';
 import {
   REFUND_CLAIM_EVENT,
   REFUND_EXECUTED_EVENT,
@@ -99,118 +100,122 @@ export async function handleStuckRefundClaimSweep(step: SweepStep): Promise<{ st
   const cutoff = Date.now() - STUCK_AFTER_MINUTES * 60_000;
   const floor = new Date(Date.now() - MAX_AGE_MINUTES * 60_000);
 
-  const stuck: StuckClaim[] = await step.run('find-stuck-refund-claims', async () => {
-    const claims: StuckClaim[] = [];
-    let windowExhausted = true;
-    let budgetSpent = false;
-    const startedAt = Date.now();
-    // Pages read so far, across stores: the first page is always read, so a tick makes progress.
-    let pagesRead = 0;
-    // `payment_events` is store-scoped: the claim scan runs store by store (one
-    // at a time, so the page/limit/budget ceilings stay GLOBAL), each store's
-    // paging inside its own tenant scope. A cursor id only exists in one store,
-    // so cursors never cross stores.
-    await acrossStores(
-      async storeId => {
-        let cursorId: string | null = null;
-        let storeWindowExhausted = false;
-        for (let page = 0; page < CLAIM_MAX_PAGES && claims.length < CLAIM_SCAN_LIMIT; page++) {
-          if (pagesRead > 0 && Date.now() - startedAt > CLAIM_SCAN_BUDGET_MS) {
-            budgetSpent = true;
-            break;
-          }
-          pagesRead++;
-          const claimRows: Array<{
-            id: string;
-            paymentId: string;
-            storeId: string;
-            orderId: string;
-            details: unknown;
-            occurredAt: Date;
-          }> = await prisma.paymentEvent.findMany({
-            where: {
-              storeId,
-              eventType: REFUND_CLAIM_EVENT,
-              occurredAt: { gt: floor, lt: new Date(cutoff) },
-            },
-            select: {
-              id: true,
-              paymentId: true,
-              storeId: true,
-              orderId: true,
-              details: true,
-              occurredAt: true,
-            },
-            // `id` breaks occurredAt ties so the cursor is total.
-            orderBy: [{ occurredAt: 'asc' }, { id: 'asc' }],
-            take: CLAIM_PAGE_SIZE,
-            ...(cursorId ? { cursor: { id: cursorId }, skip: 1 } : {}),
-          });
-          if (claimRows.length < CLAIM_PAGE_SIZE) storeWindowExhausted = true;
-          if (claimRows.length === 0) break;
-          cursorId = claimRows[claimRows.length - 1].id;
-
-          // This page's payments' resolutions, cursor-paged (issue 2347: the read
-          // had no `take`, the shape issue 2028 removed from the claim read).
-          const paymentIds = [...new Set(claimRows.map(c => c.paymentId))];
-          const resolved = new Set<string>();
-          let resCursor: string | null = null;
-          for (;;) {
-            const resolutionRows: Array<{ id: string; details: unknown }> =
-              await prisma.paymentEvent.findMany({
-                where: {
-                  storeId,
-                  eventType: { in: RESOLVING_EVENTS },
-                  paymentId: { in: paymentIds },
-                },
-                select: { id: true, details: true },
-                orderBy: { id: 'asc' },
-                take: RESOLUTION_PAGE_SIZE,
-                ...(resCursor ? { cursor: { id: resCursor }, skip: 1 } : {}),
-              });
-            for (const e of resolutionRows) {
-              const claimId = ((e.details ?? {}) as Record<string, unknown>).claimId;
-              if (typeof claimId === 'string') resolved.add(claimId);
+  const stuck: StuckClaim[] = await stepRunUnlessEmpty(
+    step,
+    'find-stuck-refund-claims',
+    async () => {
+      const claims: StuckClaim[] = [];
+      let windowExhausted = true;
+      let budgetSpent = false;
+      const startedAt = Date.now();
+      // Pages read so far, across stores: the first page is always read, so a tick makes progress.
+      let pagesRead = 0;
+      // `payment_events` is store-scoped: the claim scan runs store by store (one
+      // at a time, so the page/limit/budget ceilings stay GLOBAL), each store's
+      // paging inside its own tenant scope. A cursor id only exists in one store,
+      // so cursors never cross stores.
+      await acrossStores(
+        async storeId => {
+          let cursorId: string | null = null;
+          let storeWindowExhausted = false;
+          for (let page = 0; page < CLAIM_MAX_PAGES && claims.length < CLAIM_SCAN_LIMIT; page++) {
+            if (pagesRead > 0 && Date.now() - startedAt > CLAIM_SCAN_BUDGET_MS) {
+              budgetSpent = true;
+              break;
             }
-            if (resolutionRows.length < RESOLUTION_PAGE_SIZE) break;
-            resCursor = resolutionRows[resolutionRows.length - 1].id;
-          }
-          for (const e of claimRows) {
-            const details = (e.details ?? {}) as Record<string, unknown>;
-            const claimId = typeof details.claimId === 'string' ? details.claimId : null;
-            if (!claimId || resolved.has(claimId)) continue;
-            claims.push({
-              claimId,
-              paymentId: e.paymentId,
-              storeId: e.storeId,
-              orderId: e.orderId,
-              amount: typeof details.amount === 'number' ? details.amount : null,
-              claimedAt: e.occurredAt.toISOString(),
+            pagesRead++;
+            const claimRows: Array<{
+              id: string;
+              paymentId: string;
+              storeId: string;
+              orderId: string;
+              details: unknown;
+              occurredAt: Date;
+            }> = await prisma.paymentEvent.findMany({
+              where: {
+                storeId,
+                eventType: REFUND_CLAIM_EVENT,
+                occurredAt: { gt: floor, lt: new Date(cutoff) },
+              },
+              select: {
+                id: true,
+                paymentId: true,
+                storeId: true,
+                orderId: true,
+                details: true,
+                occurredAt: true,
+              },
+              // `id` breaks occurredAt ties so the cursor is total.
+              orderBy: [{ occurredAt: 'asc' }, { id: 'asc' }],
+              take: CLAIM_PAGE_SIZE,
+              ...(cursorId ? { cursor: { id: cursorId }, skip: 1 } : {}),
             });
-            if (claims.length >= CLAIM_SCAN_LIMIT) break;
+            if (claimRows.length < CLAIM_PAGE_SIZE) storeWindowExhausted = true;
+            if (claimRows.length === 0) break;
+            cursorId = claimRows[claimRows.length - 1].id;
+
+            // This page's payments' resolutions, cursor-paged (issue 2347: the read
+            // had no `take`, the shape issue 2028 removed from the claim read).
+            const paymentIds = [...new Set(claimRows.map(c => c.paymentId))];
+            const resolved = new Set<string>();
+            let resCursor: string | null = null;
+            for (;;) {
+              const resolutionRows: Array<{ id: string; details: unknown }> =
+                await prisma.paymentEvent.findMany({
+                  where: {
+                    storeId,
+                    eventType: { in: RESOLVING_EVENTS },
+                    paymentId: { in: paymentIds },
+                  },
+                  select: { id: true, details: true },
+                  orderBy: { id: 'asc' },
+                  take: RESOLUTION_PAGE_SIZE,
+                  ...(resCursor ? { cursor: { id: resCursor }, skip: 1 } : {}),
+                });
+              for (const e of resolutionRows) {
+                const claimId = ((e.details ?? {}) as Record<string, unknown>).claimId;
+                if (typeof claimId === 'string') resolved.add(claimId);
+              }
+              if (resolutionRows.length < RESOLUTION_PAGE_SIZE) break;
+              resCursor = resolutionRows[resolutionRows.length - 1].id;
+            }
+            for (const e of claimRows) {
+              const details = (e.details ?? {}) as Record<string, unknown>;
+              const claimId = typeof details.claimId === 'string' ? details.claimId : null;
+              if (!claimId || resolved.has(claimId)) continue;
+              claims.push({
+                claimId,
+                paymentId: e.paymentId,
+                storeId: e.storeId,
+                orderId: e.orderId,
+                amount: typeof details.amount === 'number' ? details.amount : null,
+                claimedAt: e.occurredAt.toISOString(),
+              });
+              if (claims.length >= CLAIM_SCAN_LIMIT) break;
+            }
+            if (storeWindowExhausted) break;
           }
-          if (storeWindowExhausted) break;
-        }
-        // This store's window was cut short (page ceiling, budget or the global
-        // limit) unless it ran dry: the sweep as a whole then did not see the end.
-        if (!storeWindowExhausted) windowExhausted = false;
-      },
-      { concurrency: 1 }
-    );
-    if (!windowExhausted) {
-      logger.warn(
-        {
-          unresolvedLimit: CLAIM_SCAN_LIMIT,
-          maxPages: CLAIM_MAX_PAGES,
-          budgetMs: CLAIM_SCAN_BUDGET_MS,
-          budgetSpent,
-          found: claims.length,
+          // This store's window was cut short (page ceiling, budget or the global
+          // limit) unless it ran dry: the sweep as a whole then did not see the end.
+          if (!storeWindowExhausted) windowExhausted = false;
         },
-        '[refund-claim-stuck-sweep] claim scan stopped before the window ended — newer unresolved claims are read on later ticks'
+        { concurrency: 1 }
       );
+      if (!windowExhausted) {
+        logger.warn(
+          {
+            unresolvedLimit: CLAIM_SCAN_LIMIT,
+            maxPages: CLAIM_MAX_PAGES,
+            budgetMs: CLAIM_SCAN_BUDGET_MS,
+            budgetSpent,
+            found: claims.length,
+          },
+          '[refund-claim-stuck-sweep] claim scan stopped before the window ended — newer unresolved claims are read on later ticks'
+        );
+      }
+      return claims;
     }
-    return claims;
-  });
+  );
 
   if (stuck.length === 0) return { stuck: 0 };
 

@@ -83,7 +83,12 @@
 import type { AgentCredentialOutcome } from './agent-auth';
 
 /** How far back a single watcher tick looks. */
-export const DENIAL_WINDOW_MINUTES = 16;
+/**
+ * The watcher is HOURLY (Ruling INNGEST-BUDGET-1), so the window is the cadence plus one minute of
+ * overlap. Thresholds below are per window: a wider window reaches them sooner, which at worst raises an
+ * alert earlier than the 15-minute window would have, never later.
+ */
+export const DENIAL_WINDOW_MINUTES = 61;
 
 /** ≥ this many distinct source IPs in one window reads as a sweep, not one agent. */
 export const PROBE_DISTINCT_IPS = 3;
@@ -317,7 +322,7 @@ export function classifyAgentDenials(rows: AgentDenialRow[]): AgentDenialFinding
     //
     // Folding the second into the first is how a rollout breaks someone
     // silently: at 10 refused orders/hour a real merchant never reaches the
-    // 50-per-16-minute flood threshold, so nothing fires at all.
+    // 50-per-window flood threshold, so nothing fires at all.
     const anonymous = storeRows.filter(r => r.credential === 'none' || r.credential == null);
     const anonymousCount = weightedCount(anonymous);
     const hadPriorAgentActivity = storeRows.some(r => r.storeHadPriorAgentActivity === true);
