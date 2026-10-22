@@ -401,7 +401,9 @@ async function readGoldState(
     const spec = lineGoldSpec(p, v);
     if (spec) goldLines.push({ line, spec, dbPrice: v?.price ?? p.price });
   }
-  const settings = await loadSettings(db, storeId);
+  // no gold line: nothing below is read (a fixed-price-only cart costs the same queries as before)
+  const settings =
+    goldLines.length > 0 ? await loadSettings(db, storeId) : { ...DEFAULT_GOLD_SETTINGS };
   const karats = [...new Set(goldLines.map(g => g.spec.karat))];
   const rates =
     goldLines.length > 0 ? await loadCurrentRates(db, storeId, karats, { lock }) : new Map();
