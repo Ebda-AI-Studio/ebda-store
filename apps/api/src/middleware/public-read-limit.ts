@@ -91,7 +91,8 @@ export function publicReadLimit(exactLimiters: RequestHandler): RequestHandler {
 
 /**
  * Routes that never open the per-request tenant transaction (Ruling LAZY-TX-1): an anonymous
- * GET/HEAD of exactly `/categories` or `/tags` with no query at all. A KV hit needs no database;
+ * GET/HEAD of exactly `/categories`, `/tags`, the product list (paging/sort only) or the product
+ * page, with no cookie or Authorization. A KV hit needs no database;
  * the cache fill reads through `readInStoreContext` in its own short tenant transaction. Anything
  * else, and every authenticated or cookie-bearing request, keeps the request transaction.
  */
@@ -100,6 +101,14 @@ export function skipsRequestTransaction(req: Request): boolean {
   if (m !== 'GET' && m !== 'HEAD') return false;
   if (req.headers.authorization || req.headers.cookie) return false;
   if (req.headers['x-search-query'] !== undefined) return false;
-  if (Object.keys(req.query ?? {}).length > 0) return false;
-  return /^\/(categories|tags)\/?$/.test(req.path ?? '');
+  const path = req.path ?? '';
+  const q = (req.query ?? {}) as Record<string, unknown>;
+  const keys = Object.keys(q);
+  if (/^\/(categories|tags)\/?$/.test(path)) return keys.length === 0;
+  // The anonymous product list: paging and sort only (no search, filter or ids: those reach the
+  // database with unbounded distinct values), and the product page (no query).
+  if (/^\/products\/?$/.test(path))
+    return keys.every(k => PAGING_KEYS.has(k) && typeof q[k] === 'string');
+  if (/^\/products\/[A-Za-z0-9_-]{1,120}\/?$/.test(path)) return keys.length === 0;
+  return false;
 }
